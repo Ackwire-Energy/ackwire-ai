@@ -6,7 +6,7 @@ import { Button, useToast } from "@/ui";
 import { useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
-import { successHaptic, tapHaptic } from "../shared/parts";
+import { successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { FAILED_REASONS, NOTE_MAX } from "./logic";
 
@@ -45,8 +45,8 @@ export function useFinishHandoff(
       setFinishing(false);
     }
   };
+  // No haptic here: the press gives its own (`Button`, the dock's `PressScale`).
   const leaveNote = () => {
-    tapHaptic();
     sheet.open(
       <PromptForm
         title={t("mobile.browser.done.title")}
@@ -65,11 +65,9 @@ export function useFinishHandoff(
   const handBack = () => {
     if (finishing) return;
     if (handoffWantsWords(handoff)) return leaveNote();
-    tapHaptic();
     void finish(true);
   };
   const couldnt = () => {
-    tapHaptic();
     sheet.open(
       <PromptForm
         title={t("mobile.browser.failed.title")}

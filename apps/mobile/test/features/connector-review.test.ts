@@ -81,9 +81,9 @@ const TOOLS = [
 ];
 
 describe("where the sheet is", () => {
-  test("the steps: a catalog service starts with what it does, a server by address with connecting", () => {
+  test("the steps: a catalog service starts with what it does, a server by address with connecting, then who", () => {
     expect(CATALOG_STEPS).toEqual(["about", "connect", "review", "who"]);
-    expect(ADDRESS_STEPS).toEqual(["connect", "review", "who"]);
+    expect(ADDRESS_STEPS).toEqual(["connect", "who"]);
   });
 
   test("a new service opens on what it does; a connection on who uses it (its tools are a screen)", () => {

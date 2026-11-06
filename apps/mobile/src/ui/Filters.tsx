@@ -58,6 +58,7 @@ export function Filters({ items, value, onChange }: FiltersProps) {
             accessibilityState={{ selected: on }}
             // The pill is 34 tall: the slop makes its target the 44 a finger needs without spacing the row out.
             hitSlop={{ top: 5, bottom: 5 }}
+            style={({ pressed }) => (pressed && !on ? { opacity: 0.6 } : null)}
           >
             <View
               style={{
@@ -76,7 +77,7 @@ export function Filters({ items, value, onChange }: FiltersProps) {
               >
                 {item.label}
               </RNText>
-              {item.count !== undefined ? <Count value={item.count} size={14} color={color} /> : null}
+              {item.count !== undefined ? <Count value={item.count} size={15} color={color} /> : null}
             </View>
           </Pressable>
         );

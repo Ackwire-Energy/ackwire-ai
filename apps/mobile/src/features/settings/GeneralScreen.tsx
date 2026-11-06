@@ -41,7 +41,7 @@ import { ZoneList } from "../me/AccountPage";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { useColors } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
-import { goBack, MONO } from "../shared/parts";
+import { errorHaptic, goBack, MONO, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { missingIdeas, nameOnLeave, withIdea, zoneLabel } from "./logic";
 import { chooseAction, Gap, SettingsPage } from "./parts";
@@ -223,8 +223,10 @@ export function GeneralScreen() {
     try {
       await api.orgs.setLogo(orgId, { imageBase64: a.base64, contentType: photoContentType(a.mimeType, a.fileName) });
       refreshOrg();
+      successHaptic();
       toast({ title: t("orgLogo.saved") });
     } catch {
+      errorHaptic();
       toast({ title: t("mobile.settings.logo.failed"), icon: "x" });
     } finally {
       setUploading(false);
@@ -234,8 +236,10 @@ export function GeneralScreen() {
     try {
       await api.orgs.removeLogo(orgId);
       refreshOrg();
+      successHaptic();
       toast({ title: t("orgLogo.removed") });
     } catch {
+      errorHaptic();
       toast({ title: t("mobile.app.failed"), icon: "x" });
     }
   };
@@ -269,7 +273,13 @@ export function GeneralScreen() {
       <View style={styles.logo}>
         <OrgAvatar logo={org?.logo} size={84} />
         {editable ? (
-          <Pressable onPress={changeLogo} disabled={uploading} accessibilityRole="button" hitSlop={8}>
+          <Pressable
+            onPress={changeLogo}
+            disabled={uploading}
+            accessibilityRole="button"
+            hitSlop={12}
+            style={({ pressed }) => (pressed ? styles.pressed : null)}
+          >
             <Text variant="subhead" tone={uploading ? "faint" : "ink2"} style={styles.semibold}>
               {org?.logo ? t("orgLogo.change") : t("orgLogo.add")}
             </Text>
@@ -459,6 +469,7 @@ const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
   logo: { alignItems: "center", gap: 8, paddingTop: 14, paddingBottom: 14 },
   semibold: { fontWeight: "600" },
+  pressed: { opacity: 0.6 },
   input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
   contextHead: { paddingHorizontal: 4, paddingTop: 24, paddingBottom: 10 },
   ideas: { gap: 8, paddingHorizontal: 4, paddingTop: 10 },

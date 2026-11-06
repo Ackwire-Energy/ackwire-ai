@@ -489,7 +489,7 @@ describe("working line", () => {
     expect(entriesOffScreen(workingEntries([ada], [], name), [ada], adaShows)).toEqual([]);
   });
 
-  test("its row out of view, the line speaks for that one agent: its step, its time, Ver and its stop", async () => {
+  test("its row out of view, the line speaks for that one agent: its step, its time right after it, and Ver", async () => {
     const en = await translator("en");
     const now = 1_000_000;
     const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: now - 16_000 });
@@ -513,13 +513,13 @@ describe("working line", () => {
     // Two agents out of view: the line can't say whose time or stop.
     const both = workingEntries([ada, atlas], [], name);
     expect(awayRun(both, [ada, atlas], () => false)).toBeUndefined();
-    // The step keeps one width in the line, so the clock and the stop never move as it turns.
+    // The step takes its own width, so its time follows the words instead of floating after a fixed gap.
     const lines = await source("features/chat/LiveRows.tsx");
-    expect(lines).toContain("barStep: { flexBasis: 150, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
-    // "Ver" only once its row is in the conversation, and then the stop after it, without a second rule.
+    expect(lines).toContain("barStep: { flexShrink: 1, minWidth: 0 },");
+    // "Ver" only once its row is in the conversation; no stop of the line's own (the composer's, under it, is the one).
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
     expect(line).toContain("const seeable = away && turnShows(away) ? away : undefined;");
-    expect(line).toContain("<LineStop runs={stoppable} onStop={onStop} rule={!seeable} />");
+    expect(line).not.toContain("<LineStop");
   });
 
   test("the row's stop: the latest run here I may stop (the web's rule), never a guess", () => {

@@ -258,33 +258,35 @@ function MessageBox({ target, label, onSent }: { target: DmTarget; label: string
     );
   };
   return (
-    <div className="ac-input-affix mcard__dm">
-      <input
-        ref={field}
-        value={text}
-        placeholder={label}
-        aria-label={label}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-          e.preventDefault();
-          submit();
-        }}
-      />
-      <EmojiPickerPopover
-        labels={emojiLabels}
-        side="top"
-        align="end"
-        onPick={(emoji) => {
-          setText((v) => v + emoji);
-          field.current?.focus();
-        }}
-        trigger={
-          <button type="button" className="mcard__emoji" aria-label={t("presence.emoji")} title={t("presence.emoji")}>
-            <Icon name="smile" size={18} />
-          </button>
-        }
-      />
+    <div className="mcard__foot">
+      <div className="ac-input-affix mcard__dm">
+        <input
+          ref={field}
+          value={text}
+          placeholder={label}
+          aria-label={label}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            submit();
+          }}
+        />
+        <EmojiPickerPopover
+          labels={emojiLabels}
+          side="top"
+          align="end"
+          onPick={(emoji) => {
+            setText((v) => v + emoji);
+            field.current?.focus();
+          }}
+          trigger={
+            <button type="button" className="mcard__emoji" aria-label={t("presence.emoji")} title={t("presence.emoji")}>
+              <Icon name="smile" size={18} />
+            </button>
+          }
+        />
+      </div>
     </div>
   );
 }

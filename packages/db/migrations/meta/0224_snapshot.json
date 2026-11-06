@@ -1,5 +1,5 @@
 {
-  "id": "bfc2443b-566e-4579-8888-1f1385439daa",
+  "id": "94d66607-c666-4ac7-975d-6c12c42b8342",
   "prevId": "19b411cc-f435-49bf-a57a-2999bca68293",
   "version": "7",
   "dialect": "postgresql",
@@ -316,13 +316,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "brain_speed": {
-          "name": "brain_speed",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'standard'"
         },
         "media_replies": {
           "name": "media_replies",

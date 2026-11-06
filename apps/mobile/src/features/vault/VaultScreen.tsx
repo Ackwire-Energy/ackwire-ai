@@ -21,7 +21,7 @@ import {
 import { Note } from "../ai/parts";
 import { Gap, SettingsPage } from "../settings/parts";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
-import { MONO } from "../shared/parts";
+import { Loaded, MONO } from "../shared/parts";
 import {
   agentsSummary,
   connectionLine,
@@ -73,32 +73,37 @@ export function VaultScreen() {
   const newScope = current === "team" && data.canManageTeam ? "team" : "personal";
   return (
     <SettingsPage title={title}>
-      <GroupedFooter>{t("settings.sectionText.vault")}</GroupedFooter>
-      <Gap />
-      <GroupedList>
-        <GroupedRow
-          icon="plus"
-          label={t("mobile.vault.newItem")}
-          chevron
-          onPress={() => router.push(vaultHref.create(newScope) as never)}
-        />
-      </GroupedList>
-      <View style={styles.tabs}>
-        <Segmented
-          items={[
-            { key: "team", label: t("mobile.vault.tab.team"), count: counts.team },
-            { key: "personal", label: t("mobile.vault.tab.personal"), count: counts.personal },
-            { key: "connections", label: t("mobile.vault.tab.connections"), count: counts.connections },
-          ]}
-          value={current}
-          onChange={(key) => setTab(key as VaultTab)}
-        />
-      </View>
-      {current === "connections" ? (
-        <Connections data={data} />
-      ) : (
-        <Items key={current} data={data} tab={current} onNew={() => router.push(vaultHref.create(newScope) as never)} />
-      )}
+      <Loaded>
+        <GroupedFooter>{t("settings.sectionText.vault")}</GroupedFooter>
+        <Gap />
+        <GroupedList>
+          <GroupedRow
+            icon="plus"
+            label={t("mobile.vault.newItem")}
+            chevron
+            onPress={() => router.push(vaultHref.create(newScope) as never)}
+          />
+        </GroupedList>
+        <View style={styles.tabs}>
+          <Segmented
+            items={[
+              { key: "team", label: t("mobile.vault.tab.team"), count: counts.team },
+              { key: "personal", label: t("mobile.vault.tab.personal"), count: counts.personal },
+              { key: "connections", label: t("mobile.vault.tab.connections"), count: counts.connections },
+            ]}
+            value={current}
+            onChange={(key) => setTab(key as VaultTab)}
+          />
+        </View>
+        {/* Another tab's rows fade in where the last one's were. */}
+        <Loaded key={current}>
+          {current === "connections" ? (
+            <Connections data={data} />
+          ) : (
+            <Items data={data} tab={current} onNew={() => router.push(vaultHref.create(newScope) as never)} />
+          )}
+        </Loaded>
+      </Loaded>
     </SettingsPage>
   );
 }
@@ -303,7 +308,7 @@ function ConnectionRow({ icon, conn, now }: { icon: IconName; conn: VaultConnect
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
   loading: { marginVertical: 16 },
-  tabs: { paddingTop: 18, paddingBottom: 4, paddingHorizontal: 4 },
+  tabs: { paddingTop: 20, paddingBottom: 4, paddingHorizontal: 4 },
   search: { paddingTop: 12, paddingBottom: 4 },
   // The pills scroll to the screen's edges; their row has its own inset.
   filters: { marginHorizontal: -16, paddingTop: 10, paddingBottom: 10 },

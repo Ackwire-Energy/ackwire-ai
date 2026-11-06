@@ -184,7 +184,8 @@ export const RoutineRow = memo(function RoutineRow({
       }}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }, done && styles.done]}
     >
-      {divider ? <View style={[styles.divider, { backgroundColor: c.line }]} /> : null}
+      {/* The lists' hairline (`ListRow`'s tone), not the lighter card line. */}
+      {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
       <View style={styles.top}>
         <AgentFace agentId={r.agentId} size={AVATAR} live={live} mode={running ? "run" : paused ? "rest" : "idle"} />
         <View style={styles.main}>
@@ -250,9 +251,10 @@ const styles = StyleSheet.create({
   usagePause: { gap: 8, paddingTop: 16, paddingHorizontal: 4, alignItems: "flex-start" },
   divider: { position: "absolute", top: 0, right: 0, left: SIDE + AVATAR + GAP, height: StyleSheet.hairlineWidth },
   top: { flexDirection: "row", alignItems: "flex-start", gap: GAP },
-  main: { flex: 1, minWidth: 0, gap: 3, paddingTop: 1 },
+  main: { flex: 1, minWidth: 0, gap: 4, paddingTop: 1 },
   title: { fontWeight: "600" },
-  line: { flexDirection: "row", alignItems: "center", gap: 5, minWidth: 0 },
+  // The delivery's words and the when's below start on one column: 13 + 8 = 14 + 7.
+  line: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
   shrink: { flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
   chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 },

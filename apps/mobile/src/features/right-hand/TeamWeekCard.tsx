@@ -29,8 +29,9 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text } from "@/ui";
+import { Button, LineIcon, Text, useReducedMotion } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
@@ -45,7 +46,12 @@ const NANO = 1_000_000_000;
  */
 export function TeamWeek({ message: m }: { message: Message }) {
   const card = m.author.type === "agent" ? teamWeekCardOf(m.meta) : null;
-  return card ? <WeekCard message={m} card={card} /> : null;
+  // A fix done while the card shows fades into its done line; one done before it mounts just shows.
+  return card ? (
+    <LayoutAnimationConfig skipEntering>
+      <WeekCard message={m} card={card} />
+    </LayoutAnimationConfig>
+  ) : null;
 }
 
 function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
@@ -99,9 +105,11 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
     }
   };
   const { stats } = card;
-  const stat = (value: string, label: string, warn = false) => (
-    <View key={label} style={[styles.stat, { backgroundColor: c.sunken }]}>
-      <Text variant="title" style={[styles.statValue, warn ? { color: c.amber } : null]} numberOfLines={1}>
+  // Flat on the card, two by two. Amber only for what waits on the person; "stuck" counts the week's failed runs
+  // (the server's `failed`), errors, so red.
+  const stat = (value: string, label: string, color?: string) => (
+    <View key={label} style={styles.stat}>
+      <Text variant="title" style={[styles.statValue, color ? { color } : null]} numberOfLines={1}>
         {value}
       </Text>
       <Text variant="caption" tone="muted">
@@ -125,8 +133,8 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
         </View>
         <View style={styles.stats}>
           {stat(String(stats.done), t("teamWeek.stat.done"))}
-          {stat(String(stats.stuck), t("teamWeek.stat.stuck"), stats.stuck > 0)}
-          {stat(String(stats.waiting), t("teamWeek.stat.waiting"), stats.waiting > 0)}
+          {stat(String(stats.stuck), t("teamWeek.stat.stuck"), stats.stuck > 0 ? c.danger : undefined)}
+          {stat(String(stats.waiting), t("teamWeek.stat.waiting"), stats.waiting > 0 ? c.amber : undefined)}
           {stat(names.usd(stats.spentNanoUsd), t("teamWeek.stat.budget", { budget: names.usd(stats.budgetNanoUsd) }))}
         </View>
         {card.worked.length > 0 ? (
@@ -135,8 +143,8 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
               {t("teamWeek.worked")}
             </Text>
             {card.worked.map((w) => (
-              <View key={`${w.kind}:${w.agentId}`} style={styles.worked}>
-                <Icon name="check" size={14} color={c.ok} />
+              <View key={`${w.kind}:${w.agentId}`} style={styles.line}>
+                <LineIcon name="check" size={13} color={c.ok} variant="footnote" />
                 <Text variant="footnote" tone="ink" style={styles.fill}>
                   {w.kind === "runs"
                     ? t("teamWeek.workedRuns", {
@@ -159,9 +167,10 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
             <Text variant="caption" tone="muted" style={styles.semibold}>
               {t("teamWeek.improve")}
             </Text>
-            {rows.map(({ row, state, text }) => (
+            {rows.map(({ row, state, text }, i) => (
               <Fix
                 key={row.id}
+                divider={i > 0}
                 message={message}
                 row={row}
                 state={state}
@@ -176,7 +185,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
             ))}
           </View>
         ) : null}
-        <View style={[styles.foot, { borderTopColor: c.line }]}>
+        <View style={[styles.foot, { borderTopColor: c.line2 }]}>
           {!dismissed && bulk.length > 0 ? (
             <Button
               variant="primary"
@@ -196,7 +205,12 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
             />
           ) : null}
           {prefs ? (
-            <Pressable accessibilityRole="button" onPress={openRightHandSettings} hitSlop={6} style={styles.when}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={openRightHandSettings}
+              hitSlop={8}
+              style={({ pressed }) => [styles.when, pressed && styles.pressed]}
+            >
               <Text variant="footnote" tone="muted">
                 {prefs.off ? t("teamWeek.off") : teamWeekWhen(t, locale, prefs)}
                 {" · "}
@@ -213,6 +227,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
 }
 
 function Fix({
+  divider,
   message,
   row,
   state,
@@ -224,6 +239,8 @@ function Fix({
   busy,
   onApply,
 }: {
+  /** A hairline above it: every fix but the first. */
+  divider: boolean;
   message: Message;
   row: TeamWeekRow;
   state: "open" | "done" | "gone";
@@ -238,6 +255,7 @@ function Fix({
   const { t } = useTranslation();
   const { orgId } = useOrg();
   const c = useColors();
+  const reduced = useReducedMotion();
   const qc = useQueryClient();
   const failed = useFailed();
   const actions = useAgentActions(orgId, message.channelId);
@@ -248,20 +266,21 @@ function Fix({
     receipt && !receipt.undoneAt && receipt.undoableUntil && Date.parse(receipt.undoableUntil) > Date.now();
   const done = state !== "open";
   return (
-    <View
-      style={[
-        styles.fix,
-        done ? { borderColor: c.line, borderWidth: StyleSheet.hairlineWidth } : { backgroundColor: c.sunken },
-      ]}
-    >
+    // A flat row on the card, divided by a hairline (never a plate or a box in a card).
+    <View style={[styles.fix, divider && [styles.divided, { borderTopColor: c.line2 }]]}>
       <View style={styles.fixTop}>
-        {agentId ? (
-          <AgentFace agentId={agentId} size={32} live={false} />
-        ) : (
-          <View style={[styles.tile, { backgroundColor: c.raised }]}>
-            <Icon name={row.kind === "unanswered" ? "help" : row.kind === "stalled" ? "issue" : "clock"} size={16} />
-          </View>
-        )}
+        <View style={styles.lead}>
+          {agentId ? (
+            <AgentFace agentId={agentId} size={32} live={false} />
+          ) : (
+            <LineIcon
+              name={row.kind === "unanswered" ? "help" : row.kind === "stalled" ? "issue" : "clock"}
+              size={15}
+              color={c.muted}
+              variant="small"
+            />
+          )}
+        </View>
         <View style={styles.fill}>
           <Text variant="small" tone={done ? "muted" : "ink"} style={styles.semibold}>
             {title}
@@ -272,11 +291,13 @@ function Fix({
         </View>
       </View>
       {state === "done" ? (
-        <View style={styles.doneRow}>
-          <Icon name="check" size={14} color={c.ok} />
-          <Text variant="footnote" tone="ok" style={[styles.semibold, styles.fill]}>
-            {receipt?.undoneAt ? t("rightHand.card.undone") : doneText}
-          </Text>
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.doneRow}>
+          <View style={[styles.line, styles.fill]}>
+            <LineIcon name="check" size={13} color={c.ok} variant="footnote" />
+            <Text variant="footnote" tone="ok" style={[styles.semibold, styles.fill]}>
+              {receipt?.undoneAt ? t("rightHand.card.undone") : doneText}
+            </Text>
+          </View>
           {undoable ? (
             <Button
               variant="ghost"
@@ -291,7 +312,7 @@ function Fix({
               }
             />
           ) : null}
-        </View>
+        </Animated.View>
       ) : state === "gone" ? (
         <Text variant="footnote" tone="muted">
           {t("teamWeek.gone")}
@@ -319,29 +340,26 @@ const styles = StyleSheet.create({
   card: {
     paddingTop: 12,
     paddingHorizontal: 14,
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
+    borderRadius: 14,
+    borderBottomLeftRadius: 6,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
   head: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 },
   semibold: { fontWeight: "600" },
-  stats: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-  stat: { flexBasis: "47%", flexGrow: 1, padding: 10, borderRadius: 12, borderBottomLeftRadius: 4, gap: 2 },
+  stats: { flexDirection: "row", flexWrap: "wrap", rowGap: 12, columnGap: 8, marginTop: 12 },
+  stat: { flexBasis: "47%", flexGrow: 1, gap: 2 },
   statValue: { fontVariant: ["tabular-nums"] },
   section: { marginTop: 16, gap: 8 },
-  worked: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  // An icon on the first line of the words beside it.
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   fill: { flex: 1, minWidth: 0 },
-  fix: { padding: 12, borderRadius: 12, borderBottomLeftRadius: 4, gap: 10 },
+  fix: { gap: 10 },
+  // 12 above the hairline (with the section's gap) and 12 under it.
+  divided: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   fixTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  tile: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    borderBottomLeftRadius: 3,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // One column for whatever leads (a face, or an icon on the title's first line): the words start at one place.
+  lead: { width: 32, alignItems: "center" },
   doneRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   foot: {
     marginTop: 14,
@@ -353,4 +371,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   when: { alignSelf: "flex-start", minHeight: 28, justifyContent: "center" },
+  pressed: { opacity: 0.6 },
 });

@@ -273,6 +273,7 @@ const styles = StyleSheet.create({
   in: { paddingHorizontal: 16, paddingTop: 8 },
   loading: { marginTop: 16 },
   // A list without a header keeps a header's room above it.
-  gap: { marginTop: 18 },
-  ramp: { paddingHorizontal: 15, paddingTop: 13, paddingBottom: 12 },
+  gap: { marginTop: 20 },
+  // On the rows' 14 pt edge.
+  ramp: { paddingHorizontal: 14, paddingVertical: 12 },
 });

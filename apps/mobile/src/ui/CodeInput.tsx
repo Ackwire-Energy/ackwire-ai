@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: 46,
     height: 52,
-    borderRadius: 12,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },

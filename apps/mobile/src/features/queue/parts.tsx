@@ -10,7 +10,8 @@ import {
 } from "@agenteschat/client/lib/computer-queue";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, Chip, Icon, Text } from "@/ui";
+import { Button, Chip, LineIcon, Text } from "@/ui";
+import { MSG_AVATAR, MSG_GAP, MSG_INSET, MSG_TEXT } from "../chat/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { useAgentsQueue, useOpenQueue } from "./QueueSheet";
@@ -36,16 +37,14 @@ export function QueueWaitRow({ channelId, wait: { agentId, runId } }: { channelI
   return (
     <View style={styles.turn} accessibilityLiveRegion="polite">
       <View style={styles.avslot}>
-        <AgentFace agentId={agentId} size={32} mode="rest" />
+        <AgentFace agentId={agentId} size={MSG_AVATAR} mode="rest" />
       </View>
       <View style={styles.body}>
         <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
           {name(agentId) ?? t("channel.unknownAgent")}
         </Text>
         <View style={styles.say}>
-          <View style={styles.sayIcon}>
-            <Icon name="wait" size={14} color={c.muted} />
-          </View>
+          <LineIcon name="wait" size={13} color={c.muted} variant="footnote" />
           <Text variant="footnote" tone="muted" style={styles.grow}>
             {text}
           </Text>
@@ -101,18 +100,23 @@ export function FanStrip({ message: m, receipt }: { message: Message; receipt: M
 
 const styles = StyleSheet.create({
   // The turn a live row takes (MessageRow, LiveRows): its reply takes the same place.
-  turn: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
-  avslot: { width: 34, alignItems: "center", paddingTop: 2 },
-  body: { flex: 1, minWidth: 0, gap: 3 },
+  turn: {
+    flexDirection: "row",
+    gap: MSG_GAP,
+    paddingLeft: MSG_INSET,
+    paddingRight: 16,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
+  body: { flex: 1, minWidth: 0, gap: 4 },
   name: { fontWeight: "600" },
   say: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  // The icon's middle on the words' first line (footnote, 18 tall).
-  sayIcon: { paddingTop: 2 },
   grow: { flex: 1, minWidth: 0 },
   acts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 },
-  // Under the message's text, in its column (MessageRow: 14 + 34 avatar + 11 gap).
+  // Under the message's text, in its column.
   fan: {
-    marginLeft: 59,
+    marginLeft: MSG_TEXT,
     marginRight: 16,
     marginBottom: 6,
     paddingHorizontal: 12,

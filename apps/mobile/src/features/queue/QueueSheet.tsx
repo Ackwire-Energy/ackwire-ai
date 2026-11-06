@@ -24,7 +24,8 @@ import {
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, type IconName, PressScale, Text } from "@/ui";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, type IconName, PressScale, Text, useReducedMotion } from "@/ui";
 import { useComputerSays, useWatchableComputer } from "../chat/DmComputerButton";
 import { openComputer } from "../computer/AgentComputerRow";
 import { AgentFace, OpensAgent } from "../shared/Face";
@@ -79,9 +80,10 @@ export function QueueButton({
       hitSlop={4}
       style={styles.button}
     >
-      <Icon name={icon} size={20} color={c.ink2} />
-      <View style={styles.badge} pointerEvents="none">
-        <Count value={queue.waiting.length} size={10} inverted max={99} />
+      {/* The count beside the icon, as the tasks' button beside it: a badge on a 20 pt icon covered it. */}
+      <View style={styles.counted}>
+        <Icon name={icon} size={18} color={c.ink2} />
+        <Count value={queue.waiting.length} size={15} color={c.ink2} max={99} />
       </View>
     </PressScale>
   );
@@ -105,6 +107,7 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
   const q = useMachineQueue(orgId, machineId);
   const now = useNow(30_000);
   const words = useQueueWords();
+  const reduced = useReducedMotion();
   if (!q.data) {
     return q.isError ? (
       <Text tone="muted">{t("mobile.app.failed")}</Text>
@@ -114,6 +117,8 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
   }
   const view = queueView(q.data, meId ?? "");
   const allStarted = queueAllStartedText(t, view, now);
+  // A turn that starts or ends while the sheet shows fades and the line closes up; the first look just shows.
+  const motion = reduced ? {} : { entering: ROW_IN, exiting: ROW_OUT, layout: LinearTransition };
   return (
     <>
       <View accessible accessibilityRole="header" accessibilityLabel={t("queue.label", { name: q.data.name })}>
@@ -126,21 +131,29 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
             {t("queue.nothingWorking")}
           </Text>
         ) : (
-          <View style={styles.rows}>
-            {view.working.map((w) => (
-              <WorkingRow key={w.runId} row={w} words={words} now={now} />
-            ))}
-          </View>
+          <LayoutAnimationConfig skipEntering skipExiting>
+            <View style={styles.rows}>
+              {view.working.map((w) => (
+                <Animated.View key={w.runId} {...motion}>
+                  <WorkingRow row={w} words={words} now={now} />
+                </Animated.View>
+              ))}
+            </View>
+          </LayoutAnimationConfig>
         )}
       </View>
       {view.waiting.length > 0 ? (
         <View style={[styles.group, styles.nextGroup, { borderTopColor: c.line }]}>
           <GroupHead title={t("queue.inLine", { n: view.waiting.length })} aside={allStarted} />
-          <View style={styles.rows}>
-            {view.waiting.map((w) => (
-              <WaitingRow key={w.runId} row={w} words={words} now={now} />
-            ))}
-          </View>
+          <LayoutAnimationConfig skipEntering skipExiting>
+            <View style={styles.rows}>
+              {view.waiting.map((w) => (
+                <Animated.View key={w.runId} {...motion}>
+                  <WaitingRow row={w} words={words} now={now} />
+                </Animated.View>
+              ))}
+            </View>
+          </LayoutAnimationConfig>
         </View>
       ) : null}
       <Text variant="caption" tone="faint" style={styles.rule}>
@@ -311,10 +324,13 @@ export function QueueLine({
   );
 }
 
+const ROW_IN = FadeIn.duration(160);
+const ROW_OUT = FadeOut.duration(120);
+
 const styles = StyleSheet.create({
   loading: { marginVertical: 24 },
-  button: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  badge: { position: "absolute", top: 2, right: 0 },
+  button: { height: 40, borderRadius: 20 },
+  counted: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10 },
   head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8 },
   headTitle: { fontWeight: "600", flexShrink: 1 },
   // 16 between groups, on each side of the line (the sheet's own gap is 12).
@@ -323,7 +339,7 @@ const styles = StyleSheet.create({
   // The rows' 8 of padding bleeds past the group's edge: faces line up with the group title.
   rows: { marginHorizontal: -8, gap: 2 },
   // The face (20) on the first line (small, 20 tall).
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 8, borderRadius: 12 },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 8, borderRadius: 10 },
   text: { flex: 1, minWidth: 0 },
   l1: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 20 },
   name: { fontWeight: "600", flexShrink: 1 },

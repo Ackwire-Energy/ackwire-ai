@@ -38,7 +38,7 @@ export function ChannelPicker({ query, pick }: { query: string; pick: (name: str
           style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
         >
           {i > 0 ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
-          <Icon name={o.visibility === "private" ? "lock" : "hash"} size={18} color={c.muted} />
+          <Icon name={o.visibility === "private" ? "lock" : "hash"} size={MARK} color={c.muted} />
           <View style={styles.tx}>
             <Text variant="body" numberOfLines={1} style={styles.name}>
               #{o.name}
@@ -55,17 +55,22 @@ export function ChannelPicker({ query, pick }: { query: string; pick: (name: str
   );
 }
 
+/** A row's inset, its mark and the gap to the name: the hairline above starts where the name does. */
+const INSET = 16;
+const MARK = 18;
+const GAP = 12;
+
 const styles = StyleSheet.create({
   card: { marginHorizontal: 2, marginBottom: 8, borderRadius: 20, overflow: "hidden", paddingVertical: 4 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: GAP,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: INSET,
     minHeight: 48,
   },
-  divider: { position: "absolute", top: 0, left: 46, right: 0, height: StyleSheet.hairlineWidth },
+  divider: { position: "absolute", top: 0, left: INSET + MARK + GAP, right: 0, height: StyleSheet.hairlineWidth },
   tx: { flex: 1, minWidth: 0 },
   name: { fontWeight: "600" },
 });

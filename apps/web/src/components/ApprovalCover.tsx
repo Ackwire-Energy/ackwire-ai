@@ -274,71 +274,69 @@ function RightHandCard({ view, name }: { view: RightHandApprovals; name: string 
         }
       />
       {view.enabled && !view.pausedAt && (
-        <>
-          <div className="settings-rows">
-            <CheckRow
-              id="rh-new"
-              label={t("rightHandApprovals.newAgents")}
-              help={t(view.mayDecide.newAgents ? "rightHandApprovals.newAgentsHelp" : "rightHandApprovals.cantDecide")}
-              checked={view.newAgents && view.mayDecide.newAgents}
-              disabled={!view.mayDecide.newAgents}
-              onChange={(newAgents) => save({ newAgents })}
-            />
-            <CheckRow
-              id="rh-changes"
-              label={t("rightHandApprovals.agentChanges")}
-              help={t(
-                view.mayDecide.agentChanges ? "rightHandApprovals.agentChangesHelp" : "rightHandApprovals.cantDecide",
-              )}
-              checked={view.agentChanges && view.mayDecide.agentChanges}
-              disabled={!view.mayDecide.agentChanges}
-              onChange={(agentChanges) => save({ agentChanges })}
-            />
-            <div className="settings-row">
-              <span className="settings-row__text">
-                <label className="settings-row__label" htmlFor="rh-budget">
-                  {t("rightHandApprovals.budget")}
-                </label>
-                <span className="settings-row__help" id="rh-budget-help">
-                  {t("rightHandApprovals.budgetHelp")}
-                </span>
+        <div className="settings-rows">
+          <CheckRow
+            id="rh-new"
+            label={t("rightHandApprovals.newAgents")}
+            help={t(view.mayDecide.newAgents ? "rightHandApprovals.newAgentsHelp" : "rightHandApprovals.cantDecide")}
+            checked={view.newAgents && view.mayDecide.newAgents}
+            disabled={!view.mayDecide.newAgents}
+            onChange={(newAgents) => save({ newAgents })}
+          />
+          <CheckRow
+            id="rh-changes"
+            label={t("rightHandApprovals.agentChanges")}
+            help={t(
+              view.mayDecide.agentChanges ? "rightHandApprovals.agentChangesHelp" : "rightHandApprovals.cantDecide",
+            )}
+            checked={view.agentChanges && view.mayDecide.agentChanges}
+            disabled={!view.mayDecide.agentChanges}
+            onChange={(agentChanges) => save({ agentChanges })}
+          />
+          <div className="settings-row">
+            <span className="settings-row__text">
+              <label className="settings-row__label" htmlFor="rh-budget">
+                {t("rightHandApprovals.budget")}
+              </label>
+              <span className="settings-row__help" id="rh-budget-help">
+                {t("rightHandApprovals.budgetHelp")}
               </span>
-              <span className="settings-row__end rh-money">
-                <AffixInput
-                  id="rh-budget"
-                  prefix="US$"
-                  inputMode="decimal"
-                  value={budget ?? String(Math.round(view.budgetCapNanoUsd / USD))}
-                  onChange={(e) => setBudget(e.target.value)}
-                  onBlur={saveBudget}
-                  onKeyDown={(e) => e.key === "Enter" && saveBudget()}
-                  aria-describedby="rh-budget-help"
-                />
-                <span className="muted">{t("rightHandApprovals.perMonth")}</span>
-              </span>
-            </div>
-            <div className="settings-row rh-guidance">
-              <span className="settings-row__text">
-                <label className="settings-row__label" htmlFor="rh-guidance">
-                  {t("rightHandApprovals.guidanceLabel", { name })}
-                </label>
-                <span className="settings-row__help" id="rh-guidance-help">
-                  {t("rightHandApprovals.guidanceHelp", { name })}
-                </span>
-              </span>
-              <Textarea
-                id="rh-guidance"
-                rows={3}
-                maxLength={2000}
-                value={guidance ?? view.guidance}
-                onChange={(e) => setGuidance(e.target.value)}
-                onBlur={saveGuidance}
-                placeholder={t("rightHandApprovals.guidancePlaceholder")}
-                aria-describedby="rh-guidance-help"
+            </span>
+            <span className="settings-row__end rh-money">
+              <AffixInput
+                id="rh-budget"
+                prefix="US$"
+                inputMode="decimal"
+                value={budget ?? String(Math.round(view.budgetCapNanoUsd / USD))}
+                onChange={(e) => setBudget(e.target.value)}
+                onBlur={saveBudget}
+                onKeyDown={(e) => e.key === "Enter" && saveBudget()}
+                aria-describedby="rh-budget-help"
               />
-            </div>
+              <span className="muted">{t("rightHandApprovals.perMonth")}</span>
+            </span>
           </div>
-        </>
+          <div className="settings-row rh-guidance">
+            <span className="settings-row__text">
+              <label className="settings-row__label" htmlFor="rh-guidance">
+                {t("rightHandApprovals.guidanceLabel", { name })}
+              </label>
+              <span className="settings-row__help" id="rh-guidance-help">
+                {t("rightHandApprovals.guidanceHelp", { name })}
+              </span>
+            </span>
+            <Textarea
+              id="rh-guidance"
+              rows={3}
+              maxLength={2000}
+              value={guidance ?? view.guidance}
+              onChange={(e) => setGuidance(e.target.value)}
+              onBlur={saveGuidance}
+              placeholder={t("rightHandApprovals.guidancePlaceholder")}
+              aria-describedby="rh-guidance-help"
+            />
+          </div>
+        </div>
       )}
       <CardFooter icon="lock">{t("approvalCover.lock")}</CardFooter>
     </Card>

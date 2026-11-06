@@ -152,6 +152,7 @@ import {
   buildRows,
   type ChatRow,
   dayInView,
+  MSG_TEXT,
   mayStopRun,
   mergeTimeline,
   parseSlash,
@@ -1019,7 +1020,11 @@ function Chat({
     }
   };
   const onPlus = async (pick: PlusPick) => {
-    sheet.close();
+    // The library, the camera and the files picker open once the sheet is gone: presented over it while it slid out,
+    // iOS took them away with it and the app waited for an answer that never came.
+    const system = pick === "camera" || pick === "photos" || pick === "file";
+    if (system) await new Promise<void>((done) => sheet.close(done));
+    else sheet.close();
     switch (pick) {
       case "camera": {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -1373,6 +1378,7 @@ function Chat({
             about={personDm ? <PersonStatusCard userId={personDm} /> : undefined}
             onPins={openPins}
             onMembers={channel && !dm ? openMembers : undefined}
+            onSearch={dm && searchPlace ? openSearch : undefined}
           />,
         );
   // Holding the pill: "Trocar de conversa". The pick swaps the conversation in place (the route's params; the
@@ -1430,12 +1436,7 @@ function Chat({
         subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
-        extraActions={
-          (dmAgentId ? 1 : 0) +
-          (queueShown ? 1 : 0) +
-          (agentTasks ? tasksBadge(agentTasks).room : 0) +
-          (searchPlace ? 1 : 0)
-        }
+        extraActions={(dmAgentId ? 1 : 0) + (queueShown ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
         label={
@@ -1508,7 +1509,10 @@ function Chat({
         ) : dmComputer ? (
           <DmComputerButton agentId={dmComputer.agentId} onOpen={leavePlace} />
         ) : null}
-        {searchPlace ? <IconButton icon="search" label={t("searchPage.searchHere")} onPress={openSearch} /> : null}
+        {/* A DM searches from its "…" (its name and the agent's own buttons keep the room). */}
+        {searchPlace && !dm ? (
+          <IconButton icon="search" label={t("searchPage.searchHere")} onPress={openSearch} />
+        ) : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
       </>
     ) : null;
@@ -1518,9 +1522,8 @@ function Chat({
       ? t("issues.commentPlaceholder")
       : t("mobile.chat.reply")
     : dm
-      ? rightHand
-        ? `${t("mobile.chat.messageTo", { name: dm.with.name })} · ${t("rightHand.composerHint")}`
-        : t("mobile.chat.messageTo", { name: dm.with.name })
+      ? // One line on the phone: the right hand's "nada muda sem você" doesn't fit beside its name.
+        t("mobile.chat.messageTo", { name: dm.with.name })
       : t("mobile.chat.messageIn", { channel: channel ? `#${channel.name}` : "" });
   // What to say next comes from the latest card: a code change, a file; none
   // while the agent works, asks or waits for an approval.
@@ -2084,8 +2087,6 @@ function Chat({
                     runs={runs}
                     consults={lineConsults}
                     typing={typing}
-                    canStop={canStop}
-                    onStop={stopRun}
                     onOpenBrowser={(agentId) => {
                       // The agent's browser card opens in the conversation (at the end), not another screen.
                       toggleBrowser(agentId, true);
@@ -2156,7 +2157,7 @@ function Chat({
 function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, reducedMotion } = useTheme();
   const nameOf = (who: string) => {
     const at = who.indexOf(":");
     return dir.nameOf({ type: who.slice(0, at), id: who.slice(at + 1) });
@@ -2170,7 +2171,11 @@ function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) 
     unseen.mentionsMe ? t("mobile.chat.unseen.mentionsYou") : "",
   ].filter(Boolean);
   return (
-    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} pointerEvents="box-none">
+    <Animated.View
+      entering={reducedMotion ? undefined : FadeIn.duration(160)}
+      exiting={reducedMotion ? undefined : FadeOut.duration(120)}
+      pointerEvents="box-none"
+    >
       <PressScale
         to={0.92}
         onPress={onPress}
@@ -2263,8 +2268,8 @@ function Connection({ status }: { status: ConnectionStatus }) {
 
 const styles = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
-  // Under the agent's words, like a card on its message (MessageRow: 14 + 34 avatar + 11 gap).
-  browserRow: { paddingLeft: 59, paddingRight: 16, paddingBottom: 6 },
+  // Under the agent's words, like a card on its message.
+  browserRow: { paddingLeft: MSG_TEXT, paddingRight: 16, paddingBottom: 6 },
   screen: { flex: 1 },
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
@@ -2291,7 +2296,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: 4,
     marginBottom: 6,
-    paddingVertical: 7,
+    paddingVertical: 8,
     paddingHorizontal: 10,
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,

@@ -16,42 +16,44 @@ import {
   useRemoveApprovalRule,
   useUsage,
 } from "@agenteschat/client";
-import { approvalRuleServer, approvalRuleWords } from "@agenteschat/client/lib/approval-words";
+import { approvalRuleServer, approvalRuleWords, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { listsAgent, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { modelUnpriced } from "@agenteschat/client/lib/endpoints";
-import { formatPercent, lowerFirst } from "@agenteschat/client/lib/format";
+import { formatPercent, lowerFirst, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { usageShown } from "@agenteschat/client/lib/plan-usage";
+import { planMeterText, usageShown } from "@agenteschat/client/lib/plan-usage";
 import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
+import { planLine } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
   AgentAvatar,
   Button,
-  Card,
   EmptyState,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
   Icon,
   IconButton,
   type IconName,
-  LineIcon,
   PixelOrbit,
   ProviderLogo,
-  Row,
-  Section,
+  Segmented,
   Sky,
-  SpendBar,
   Text,
+  useReducedMotion,
   useToast,
   WithPresence,
 } from "@/ui";
@@ -59,36 +61,47 @@ import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { LetMeTalkButton } from "../chat/ReachLines";
-import { AgentComputerRow } from "../computer/AgentComputerRow";
+import { AgentComputerButton, AgentComputerPicture } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { openRightHandSettings, RightHandMine } from "../right-hand/SettingsScreen";
 import { useConnectedById } from "../settings/hooks";
 import { agentBadgeInset } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
-import { PushedHeader, Tile } from "../shared/parts";
+import { PushedHeader } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
-import { useAgentProfileStatus } from "../status/hooks";
+import { WaitingCard } from "../shared/WaitingCard";
+import { useAgentProfileStatus, usePresenceOf } from "../status/hooks";
 import { StatusCard } from "../status/StatusCard";
-import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
-import { AgentMailSection } from "./AgentMailSection";
-import { byPlaybook, canEditMemories, type DidLine, didLines, knownAboutMe, plainRole, spendOf, usesOf } from "./logic";
+import { useAgentMailboxes } from "./AgentMailSection";
+import {
+  agoOf,
+  byPlaybook,
+  canEditMemories,
+  type DidLine,
+  didLines,
+  knownAboutMe,
+  plainRole,
+  spendOf,
+  statusCardShown,
+  usesOf,
+} from "./logic";
 import { MergeReposSection } from "./MergeReposSection";
 import { MonthPixels } from "./MonthPixels";
 import { useMemoryOriginText } from "./useMemoryOriginText";
-import { workTitle } from "./work";
+import { agoText, workTitle, workWhere } from "./work";
 
 /** Rows of "O que fez por você" before "Ver tudo". */
 const DID_SHOWN = 4;
 
-/** Built-in areas in "O que pode usar": their tile. */
+/** Built-in areas in "Can use": their tile. */
 const AREA_ICON: Record<string, IconName> = {
   context: "brain",
   drive: "drive",
@@ -103,12 +116,16 @@ const AREA_ICON: Record<string, IconName> = {
   desktop: "laptop",
 };
 
+/** The profile's views: what it is on and did for you, what it can reach, what it knows. */
+type ProfileTab = "today" | "access" | "memory";
+
 /**
- * An agent's profile as a teammate: its sky and living body (with its presence badge), its
- * role in one plain sentence, who answers for it, its presence and status line (ADR 0084), what it is on now (or
- * what waits on you), one button
- * (Conversar), then what it did for you, what it knows about you (tap to correct or forget, for its owner and
- * admins), what it can use in plain levels and the approval rule, and its month last.
+ * An agent's profile as a teammate: its sky and living body (its presence on the badge), its name and one plain line
+ * of what it does, Chat (and its computer beside it), then three views on the grouped gray. Today: what waits on you,
+ * what it is on now, what it did for you and its month in one row. Access: what it thinks with, what it can use (apps,
+ * areas and mailboxes in one list), what it runs without asking and who answers for it. Memory: what it knows about
+ * you and how it works (tap to correct or forget, for its owner and admins). Someone it doesn't answer sees only what
+ * it is on now.
  */
 export function AgentProfileScreen({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -143,6 +160,7 @@ function Profile({ id }: { id: string }) {
   const meId = useMeId();
   const org = useOrg().org;
   const insets = useSafeAreaInsets();
+  const now = useNow();
   // The cover's sky lags behind the scroll and stretches on pull; the agent fades as it nears the bar.
   const { y, onScroll } = useCoverScroll();
   const underBar = AVATAR_TOP - (insets.top + BAR_HEIGHT);
@@ -153,12 +171,16 @@ function Profile({ id }: { id: string }) {
   const details = seesDetails(agent);
   // The team's right hand (ADR 0137): what it is and how it works, its model, Configurar for who manages agents.
   const rightHand = isRightHand(agent);
+  // Which view shows; only for this visit.
+  const [tab, setTab] = useState<ProfileTab>("today");
+  const reduced = useReducedMotion();
   const modelLabel = useModelLabel();
   const detail = useAgentDetail(orgId, id);
   const access = useAgentAccess(orgId, id, details);
   const usage = useUsage(orgId);
   const forYou = useAgentForYou(orgId, id);
   const knows = useMemoryAboutMe(orgId, id);
+  const mailboxes = useAgentMailboxes(id, details && !rightHand);
   const work = useWorkingNow().filter((w) => w.agentId === id);
   const asking = useWaitingApprovals().filter((a) => a.agentId === id);
   const noAi = aiStateOf(useAiStatus(orgId).data, id) === "no_ai";
@@ -174,10 +196,14 @@ function Profile({ id }: { id: string }) {
   const plain = plainRole(agent?.instructions || detail.data?.instructions);
   const busy = work.length > 0;
   const editable = canEditMemories(agent, { id: meId, org });
-  // Its presence and line (ADR 0084): the badge, "Ocupado · Num trabalho pesado", the card with what it does.
+  // Its presence (ADR 0084): the badge, and the card with what it does where nothing else here says it.
   const status = useAgentProfileStatus(id, name);
+  const statusLine = usePresenceOf().agent(id)?.status?.status ?? null;
   const decides = mine || can(org, "manage_agents");
-  const did = didLines(forYou.data?.items);
+  // The request in the card above leaves the list, so it is said once.
+  const did = didLines(forYou.data?.items).filter(
+    (l) => !(waitingNow && l.href?.kind === "approval" && l.href.id === waitingNow.id),
+  );
   const memories = knownAboutMe(knows.data);
   const learned = byPlaybook(memories);
   const uses = usesOf(access.data);
@@ -256,13 +282,13 @@ function Profile({ id }: { id: string }) {
     );
 
   const memoryRow = (m: Memory) => (
-    <Row
+    <GroupedRow
       key={m.id}
-      leading={<Tile icon="brain" />}
-      title={m.summary ?? m.text}
-      subtitle={originText(m)}
-      chevron={editable}
-      {...(editable ? { onPress: () => fix(m) } : {})}
+      icon="brain"
+      label={m.summary ?? m.text}
+      labelLines={2}
+      sub={originText(m)}
+      {...(editable ? { chevron: true, onPress: () => fix(m) } : {})}
     />
   );
 
@@ -279,6 +305,340 @@ function Profile({ id }: { id: string }) {
         .filter(Boolean)
         .join(" · ");
   const shownDid = allDid ? did : did.slice(0, DID_SHOWN);
+  // A line's kind or title, then when: "Document · yesterday".
+  const didKind = (sub: DidLine["sub"]) => {
+    if (!sub) return null;
+    return "text" in sub ? sub.text : t(`mobile.intentAgents.did.${sub.key}`, sub.values ?? {});
+  };
+  const didSub = (l: DidLine) => [didKind(l.sub), when.short(l.at)].filter(Boolean).join(" · ");
+  const didHead = [
+    t("mobile.intentAgents.did.title", agentGrammar(name)),
+    forYou.data && forYou.data.monthCount > 0
+      ? t("mobile.intentAgents.did.month", { count: forYou.data.monthCount })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  // "This month" in one row (ADR 0063 §5): the plan it thinks with, or its model, and how much of it is used; the
+  // budget once it spent through the API. The usage page has the rest.
+  const meter = planMeterText(t, i18n.language);
+  const planNow = shown.plan ? planLine(shown.plan.usage, meter, now) : null;
+  // The budget's share as the web says it ("<1%" for a little spent); money only where the API gives it (ADR 0026).
+  const budgetText = () => {
+    if (!spend || !shown.budget) return null;
+    if (spend.kind === "money")
+      return t("settings.usageAgentLine", { spent: money(spend.spentUsd), budget: money(spend.budgetUsd) });
+    return `${formatPercent(i18n.language, spend.percent)} ${t("mobile.agent.ofMonthBudget")}`;
+  };
+  const budgetLine = budgetText();
+  const apiModel = !agent?.model
+    ? null
+    : isAuto(agent.model)
+      ? t("brain.auto.label")
+      : (modelLabel(agent.model) ?? agent.model);
+  const monthLabel =
+    shown.plan?.account ?? thinksPlan ?? thinks?.text ?? apiModel ?? t("usageViews.agent.title", agentGrammar(name));
+  // A short value fits on the right ("week 40%", "$3.20 of $50.00"); a sentence goes under the name.
+  const monthValue = planNow?.top
+    ? `${meter.short(planNow.top)} ${planNow.top.used}%`
+    : !shown.plan && spend?.kind === "money"
+      ? budgetLine
+      : null;
+  const budgetUnder = budgetLine !== null && monthValue !== budgetLine;
+  const monthSub = [
+    planNow?.alert ?? null,
+    budgetUnder ? budgetLine : null,
+    !budgetUnder && budgetLine && spend && spend.fraction >= 1 ? t(`mobile.agent.exhausted${g}`, { name }) : null,
+    // A model with no price can't count against the budget: said where the budget is.
+    budgetLine && agent && modelUnpriced(models.data?.models, agent.model) ? t("endpoint.budgetUnpriced") : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  // What it is on now, each thing said once: the request waiting on you as its card (it leaves "What it did for
+  // you"), its status card only where no job row or request says it, then the jobs themselves.
+  const left = waitingNow ? timeLeft(t, waitingNow.expiresAt, new Date(now)) : null;
+  const review = () => {
+    if (waitingNow) router.push(`/approval/${waitingNow.id}`);
+  };
+  const showsStatus =
+    Boolean(status?.card) && statusCardShown(statusLine, { working: busy, asking: asking.length > 0 });
+  const nowBlock = (
+    <>
+      {noAi ? (
+        <View style={styles.block}>
+          <GroupedList>
+            <GroupedRow
+              icon="bolt"
+              label={t("noAi.agent", agentGrammar(agent?.name ?? ""))}
+              labelLines={3}
+              chevron
+              onPress={() => openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })}
+            />
+          </GroupedList>
+        </View>
+      ) : null}
+      {waitingNow ? (
+        <View style={styles.block}>
+          <WaitingCard
+            agentId={id}
+            kind={{ icon: "shield", label: t("ask.kind.approval") }}
+            title={approvalTitle(t, waitingNow)}
+            expires={left ? { createdAt: waitingNow.createdAt, expiresAt: waitingNow.expiresAt } : null}
+            action={{ label: t("mobile.chats.wait.review"), onPress: review }}
+            onPress={review}
+            accessibilityLabel={[t("ask.kind.approval"), approvalTitle(t, waitingNow)].join(", ")}
+          />
+        </View>
+      ) : null}
+      {showsStatus && status?.card ? (
+        <View style={styles.block}>
+          <StatusCard
+            emoji={status.card.emoji}
+            icon={status.card.icon}
+            text={status.card.text}
+            note={status.card.note}
+          />
+        </View>
+      ) : null}
+      {status?.waiting ? (
+        <View style={styles.block}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="wait"
+            label={t("queue.see")}
+            onPress={() => sheet.open(<UsageQueueSheet agentId={id} />)}
+          />
+        </View>
+      ) : null}
+      {work.length > 0 ? (
+        <>
+          <GroupedHeader>{t("mobile.home.workingNow")}</GroupedHeader>
+          <GroupedList>
+            {work.map((w) => (
+              <GroupedRow
+                key={w.key}
+                leading={
+                  <View style={styles.orbit}>
+                    <PixelOrbit color={look.color} size={14} />
+                  </View>
+                }
+                label={workTitle(t, w)}
+                sub={[w.what ? workWhere(t, w) : null, agoText(t, agoOf(w.since, now))].filter(Boolean).join(" · ")}
+                chevron
+                onPress={() =>
+                  w.missionId ? router.push(`/mission/${w.missionId}`) : router.push(chatHref(w.channelId, w.threadId))
+                }
+              />
+            ))}
+          </GroupedList>
+        </>
+      ) : null}
+    </>
+  );
+
+  const todayView = (
+    <>
+      {nowBlock}
+      <AgentComputerPicture agentId={id} />
+      {forYou.data || forYou.isError ? (
+        <>
+          <GroupedHeader>{didHead}</GroupedHeader>
+          {/* Its month, day by day, in its own tones (the web's Activity tab), on the gray above the list. */}
+          {detail.data && detail.data.runsThisMonth > 0 ? (
+            <View style={styles.pixels}>
+              <MonthPixels
+                perDay={detail.data.runsByDay}
+                color={look.color}
+                label={t("agentPage.activity.chartLabel", {
+                  count: detail.data.runsThisMonth,
+                  month: new Intl.DateTimeFormat(when.locale, { month: "long", timeZone: "UTC" }).format(new Date()),
+                })}
+              />
+            </View>
+          ) : null}
+          <GroupedList>
+            {shownDid.map((l) => (
+              <GroupedRow
+                key={l.key}
+                icon={l.icon}
+                label={t(`mobile.intentAgents.did.${l.title.key}`, l.title.values)}
+                sub={didSub(l)}
+                {...(l.href ? { chevron: true, onPress: () => open(l.href) } : {})}
+              />
+            ))}
+            {did.length > DID_SHOWN ? (
+              <GroupedRow
+                key="all"
+                label={allDid ? t("mobile.intentAgents.did.seeLess") : t("mobile.intentAgents.did.seeAll")}
+                chevron={!allDid}
+                onPress={() => setAllDid((v) => !v)}
+              />
+            ) : null}
+          </GroupedList>
+          {did.length === 0 ? <GroupedFooter>{t(`mobile.intentAgents.did.empty${g}`, { name })}</GroupedFooter> : null}
+        </>
+      ) : null}
+      <GroupedHeader>{t("mobile.agent.month")}</GroupedHeader>
+      <GroupedList>
+        {/* The month by account and the plan it thinks with now open on its usage page, as the web's Usage tab. */}
+        <GroupedRow
+          {...(thinks?.mark ? { leading: <ProviderLogo id={thinks.mark} size="sm" /> } : { icon: "chart" as const })}
+          label={monthLabel}
+          {...(monthValue ? { value: monthValue } : {})}
+          {...(monthSub ? { sub: monthSub, subLines: 2 } : {})}
+          chevron
+          onPress={() => openAgentUsage(id)}
+        />
+      </GroupedList>
+    </>
+  );
+
+  // The approval rule under what it can use: in one sentence, naming whoever decides for it.
+  const asksNote = () => {
+    if (decides) return t("mobile.intentAgents.uses.asksYou");
+    return owner ? t("mobile.intentAgents.uses.asksOwner", { name: owner }) : t("mobile.intentAgents.uses.asksAdmins");
+  };
+  const usesNote =
+    uses.lines.length === 0 && mailboxes.length === 0
+      ? t("mobile.intentAgents.uses.empty")
+      : uses.asks
+        ? asksNote()
+        : null;
+  const accessView = (
+    <>
+      {thinks ? (
+        <>
+          <GroupedHeader>{t("mobile.intentAgents.thinks")}</GroupedHeader>
+          <GroupedList>
+            {/* Its owner and admins open its AI: the account, the plan's usage, who it replies to. */}
+            <GroupedRow
+              leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
+              label={thinksPlan ?? thinks.text}
+              {...(thinksUnder ? { sub: thinksUnder, subLines: 2 } : {})}
+              {...(decides ? { chevron: true, onPress: () => openAgentAi(id) } : {})}
+            />
+          </GroupedList>
+        </>
+      ) : null}
+      {access.data || mailboxes.length > 0 ? (
+        <>
+          <GroupedHeader>{t("mobile.agent.canUse")}</GroupedHeader>
+          <GroupedList>
+            {uses.lines.map((u) =>
+              "area" in u.label ? (
+                <GroupedRow
+                  key={u.key}
+                  icon={AREA_ICON[u.label.area] ?? "doc"}
+                  label={t(`mobile.intentAgents.uses.area.${u.label.area}`, { defaultValue: u.label.area })}
+                  value={t(`mobile.intentAgents.uses.level.${u.level}`)}
+                />
+              ) : (
+                <GroupedRow
+                  key={u.key}
+                  leading={
+                    <ConnectorIcon
+                      def={(u.connectionId ? connected.get(u.connectionId)?.def : null) ?? null}
+                      image={u.connectionId ? connected.get(u.connectionId)?.image : null}
+                      label={u.label.text}
+                      size={30}
+                    />
+                  }
+                  label={u.label.text}
+                  value={t(`mobile.intentAgents.uses.level.${u.level}`)}
+                />
+              ),
+            )}
+            {/* Its mailboxes beside its apps (ADR 0038): a tap on one's own changes the level. */}
+            {mailboxes.map((m) =>
+              m.remove ? (
+                <ButtonRow
+                  key={`mail:${m.id}`}
+                  icon="mail"
+                  label={m.address}
+                  sub={m.sub}
+                  value={m.level}
+                  below={
+                    <View style={styles.remove}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        label={m.remove.label}
+                        disabled={m.remove.busy}
+                        onPress={m.remove.onPress}
+                      />
+                    </View>
+                  }
+                />
+              ) : (
+                <GroupedRow
+                  key={`mail:${m.id}`}
+                  icon="mail"
+                  label={m.address}
+                  {...(m.sub ? { sub: m.sub, subLines: 2 } : {})}
+                  value={m.level}
+                  {...(m.onPress ? { onPress: m.onPress } : {})}
+                />
+              ),
+            )}
+            {decides ? (
+              // A new service for this agent starts in Conectores (who uses it is chosen there).
+              <GroupedRow
+                key="connect"
+                icon="plus"
+                label={t("mobile.connectors.fromAgent")}
+                chevron
+                onPress={() => router.push("/connectors")}
+              />
+            ) : null}
+          </GroupedList>
+          {usesNote ? <GroupedFooter>{usesNote}</GroupedFooter> : null}
+        </>
+      ) : null}
+      <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
+      <MergeReposSection agentId={id} name={name} mayEdit={mine || can(org, "manage_agents")} />
+      {ownerLine ? (
+        <View style={styles.apart}>
+          <GroupedList>
+            <GroupedRow icon="person" label={ownerLine} />
+          </GroupedList>
+        </View>
+      ) : null}
+    </>
+  );
+
+  // Who may correct what it knows, said once under the memories.
+  const editFoot = editable
+    ? t(`mobile.intentAgents.knows.foot${g}`)
+    : owner
+      ? t("mobile.intentAgents.knows.footOwner", { name: owner })
+      : t("mobile.intentAgents.knows.footAdmins");
+  const memoryKnows = (
+    <>
+      <GroupedHeader>{t("mobile.intentAgents.knows.title", agentGrammar(name))}</GroupedHeader>
+      <GroupedList>{learned.people.map(memoryRow)}</GroupedList>
+      <GroupedFooter>
+        {learned.people.length > 0 ? editFoot : t(`mobile.intentAgents.knows.empty${g}`, { name })}
+      </GroupedFooter>
+      {learned.playbook.length > 0 ? (
+        <>
+          <GroupedHeader>{t("agentPage.memory.playbook", agentGrammar(name))}</GroupedHeader>
+          <GroupedList>{learned.playbook.map(memoryRow)}</GroupedList>
+          <GroupedFooter>{t("agentPage.memory.playbookNote")}</GroupedFooter>
+          {learned.people.length === 0 ? <GroupedFooter>{editFoot}</GroupedFooter> : null}
+        </>
+      ) : null}
+    </>
+  );
+  const memoryView = (
+    <>
+      {/* What people told it to always do first, as the web's Memória. */}
+      <GivenRules agentId={id} />
+      {knows.data ? memoryKnows : null}
+    </>
+  );
 
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
@@ -290,28 +650,24 @@ function Profile({ id }: { id: string }) {
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
-        <View style={[styles.cover, { paddingTop: insets.top + 56 }]}>
+        <View style={styles.cover}>
           <CoverParallax y={y} style={StyleSheet.absoluteFill}>
             <Sky color={look.color} depth={1} style={StyleSheet.absoluteFill} />
           </CoverParallax>
-          <Animated.View style={avatarFade}>
-            <WithPresence size={104} presence={status?.presence} inset={agentBadgeInset(look, 104)}>
-              <AgentAvatar agent={look} size={104} mode={busy ? "run" : "idle"} />
+          {/* Its presence is the badge; a screen reader hears it in words, with why. */}
+          <Animated.View style={avatarFade} {...(status ? { accessible: true, accessibilityLabel: status.line } : {})}>
+            <WithPresence size={FACE} presence={status?.presence} inset={agentBadgeInset(look, FACE)}>
+              <AgentAvatar agent={look} size={FACE} mode={busy ? "run" : "idle"} />
             </WithPresence>
           </Animated.View>
         </View>
         <View style={styles.prof}>
-          <Text variant="display" style={styles.center}>
+          <Text variant="display2" style={styles.center}>
             {name}
           </Text>
           {roleLine ? (
-            <Text variant="body" tone="ink2" style={styles.center}>
+            <Text variant="small" tone="muted" numberOfLines={2} style={styles.center}>
               {roleLine}
-            </Text>
-          ) : null}
-          {ownerLine ? (
-            <Text variant="small" tone="muted" style={styles.center}>
-              {ownerLine}
             </Text>
           ) : null}
           {tellsNameStory(agent) ? (
@@ -319,75 +675,28 @@ function Profile({ id }: { id: string }) {
               {t("rightHand.profile.nameStory")}
             </Text>
           ) : null}
-          {status ? (
-            <Text variant="small" tone="muted" style={styles.center}>
-              {status.line}
-            </Text>
-          ) : null}
-          {status?.card ? (
-            <View style={styles.status}>
-              <StatusCard
-                emoji={status.card.emoji}
-                icon={status.card.icon}
-                text={status.card.text}
-                note={status.card.note}
-              />
-            </View>
-          ) : null}
-          {status?.waiting ? (
-            <View style={styles.status}>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon="wait"
-                label={t("queue.see")}
-                onPress={() => sheet.open(<UsageQueueSheet agentId={id} />)}
-              />
-            </View>
-          ) : null}
-          {waitingNow ? (
-            <NowPill
-              leading={<Icon name="wait" size={15} color={c.amber} />}
-              label={t("mobile.intentAgents.nowWaiting", { title: waitingNow.title })}
-              onPress={() => router.push(`/approval/${waitingNow.id}`)}
-            />
-          ) : null}
-          {noAi ? (
-            <NowPill
-              leading={<Icon name="bolt" size={15} color={c.amber} />}
-              label={t("noAi.agent", agentGrammar(agent?.name ?? ""))}
-              onPress={() => openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })}
-            />
-          ) : null}
-          {work.map((w) => (
-            <NowPill
-              key={w.key}
-              leading={<PixelOrbit color={look.color} size={14} />}
-              label={workTitle(t, w)}
-              onPress={() =>
-                w.missionId ? router.push(`/mission/${w.missionId}`) : router.push(chatHref(w.channelId, w.threadId))
-              }
-            />
-          ))}
           <View style={styles.acts}>
-            {details || !ownerId ? (
-              <Button
-                variant="primary"
-                wide
-                icon="chat"
-                label={t("mobile.agent.talk")}
-                disabled={!listsAgent(org, agent)}
-                onPress={() => void openDm()}
-              />
-            ) : (
-              <Button
-                variant="primary"
-                wide
-                icon="chat"
-                label={t("profile.askAccess")}
-                onPress={() => void openDm({ userId: ownerId })}
-              />
-            )}
+            <View style={styles.grow}>
+              {details || !ownerId ? (
+                <Button
+                  variant="primary"
+                  wide
+                  icon="chat"
+                  label={t("mobile.agent.talk")}
+                  disabled={!listsAgent(org, agent)}
+                  onPress={() => void openDm()}
+                />
+              ) : (
+                <Button
+                  variant="primary"
+                  wide
+                  icon="chat"
+                  label={t("profile.askAccess")}
+                  onPress={() => void openDm({ userId: ownerId })}
+                />
+              )}
+            </View>
+            {details && !rightHand ? <AgentComputerButton agentId={id} /> : null}
           </View>
           {agent?.canTalk === false ? (
             <Text variant="small" tone="muted" style={styles.center}>
@@ -398,278 +707,46 @@ function Profile({ id }: { id: string }) {
         </View>
 
         {rightHand && agent ? (
-          <Section title={t("rightHand.settings.mine")}>
+          <View style={styles.page}>
+            {nowBlock}
+            <GroupedHeader>{t("rightHand.settings.mine")}</GroupedHeader>
             <RightHandMine agent={agent} />
-          </Section>
-        ) : null}
-        {rightHand && agent ? (
-          <Section title={t("rightHand.profile.how")}>
-            <Card>
-              <Row leading={<Tile icon="shield" />} title={t("rightHand.profile.permissions")} />
-              <Row leading={<Tile icon="lock" />} title={t("rightHand.profile.private")} />
-              <Row leading={<Tile icon="hash" />} title={t("rightHand.profile.channels")} />
-              <Row
-                leading={<Tile icon="brain" />}
-                title={t("rightHand.profile.model")}
-                meta={
-                  <Text variant="small" tone="muted">
-                    {agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
-                  </Text>
-                }
+            <GroupedHeader>{t("rightHand.profile.how")}</GroupedHeader>
+            <GroupedList>
+              <GroupedRow icon="shield" label={t("rightHand.profile.permissions")} labelLines={2} />
+              <GroupedRow icon="lock" label={t("rightHand.profile.private")} labelLines={2} />
+              <GroupedRow icon="hash" label={t("rightHand.profile.channels")} labelLines={2} />
+              <GroupedRow
+                icon="brain"
+                label={t("rightHand.profile.model")}
+                value={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
               />
-            </Card>
-          </Section>
+            </GroupedList>
+          </View>
         ) : details ? (
           <>
-            {forYou.data || forYou.isError ? (
-              <Section
-                title={t("mobile.intentAgents.did.title", agentGrammar(name))}
-                {...(did.length > DID_SHOWN
-                  ? {
-                      action: {
-                        label: allDid ? t("mobile.intentAgents.did.seeLess") : t("mobile.intentAgents.did.seeAll"),
-                        onPress: () => setAllDid((v) => !v),
-                      },
-                    }
-                  : {})}
-              >
-                {forYou.data && forYou.data.monthCount > 0 ? (
-                  <Text variant="small" tone="muted" style={styles.lead}>
-                    {t("mobile.intentAgents.did.month", { count: forYou.data.monthCount })}
-                  </Text>
-                ) : null}
-                {/* Its month, day by day, in its own tones (the web's Atividade tab). */}
-                {detail.data && detail.data.runsThisMonth > 0 ? (
-                  <View style={styles.pixels}>
-                    <MonthPixels
-                      perDay={detail.data.runsByDay}
-                      color={look.color}
-                      label={t("agentPage.activity.chartLabel", {
-                        count: detail.data.runsThisMonth,
-                        month: new Intl.DateTimeFormat(when.locale, { month: "long", timeZone: "UTC" }).format(
-                          new Date(),
-                        ),
-                      })}
-                    />
-                  </View>
-                ) : null}
-                {did.length > 0 ? (
-                  <Card>
-                    {shownDid.map((l) => (
-                      <Row
-                        key={l.key}
-                        leading={<Tile icon={l.icon} />}
-                        title={t(`mobile.intentAgents.did.${l.title.key}`, l.title.values)}
-                        subtitle={
-                          l.sub
-                            ? "text" in l.sub
-                              ? l.sub.text
-                              : t(`mobile.intentAgents.did.${l.sub.key}`, l.sub.values ?? {})
-                            : undefined
-                        }
-                        meta={
-                          <Text variant="small" tone="faint">
-                            {when.short(l.at)}
-                          </Text>
-                        }
-                        {...(l.href ? { onPress: () => open(l.href) } : {})}
-                      />
-                    ))}
-                  </Card>
-                ) : (
-                  <Text variant="small" tone="muted" style={styles.foot}>
-                    {t(`mobile.intentAgents.did.empty${g}`, { name })}
-                  </Text>
-                )}
-              </Section>
-            ) : null}
-
-            {knows.data ? (
-              <Section title={t("mobile.intentAgents.knows.title", agentGrammar(name))}>
-                {memories.length > 0 ? (
-                  <>
-                    {learned.people.length > 0 ? <Card>{learned.people.map(memoryRow)}</Card> : null}
-                    {learned.playbook.length > 0 ? (
-                      <>
-                        <Text variant="small" tone="ink" accessibilityRole="header" style={styles.playbook}>
-                          {t("agentPage.memory.playbook", agentGrammar(name))}
-                        </Text>
-                        <Text variant="small" tone="muted" style={styles.foot}>
-                          {t("agentPage.memory.playbookNote")}
-                        </Text>
-                        <Card>{learned.playbook.map(memoryRow)}</Card>
-                      </>
-                    ) : null}
-                    <Text variant="small" tone="muted" style={styles.foot}>
-                      {editable
-                        ? t(`mobile.intentAgents.knows.foot${g}`)
-                        : owner
-                          ? t("mobile.intentAgents.knows.footOwner", { name: owner })
-                          : t("mobile.intentAgents.knows.footAdmins")}
-                    </Text>
-                  </>
-                ) : (
-                  <Text variant="small" tone="muted" style={styles.foot}>
-                    {t(`mobile.intentAgents.knows.empty${g}`, { name })}
-                  </Text>
-                )}
-              </Section>
-            ) : null}
-
-            <AgentComputerRow agentId={id} />
-
-            {thinks ? (
-              <Section title={t("mobile.intentAgents.thinks")}>
-                <Card>
-                  {/* Its owner and admins open its AI: the account, the plan's usage, who it replies to. */}
-                  <Row
-                    leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
-                    title={thinksPlan ?? thinks.text}
-                    {...(thinksUnder ? { subtitle: thinksUnder, subtitleLines: 2 } : {})}
-                    {...(decides ? { chevron: true, onPress: () => openAgentAi(id) } : {})}
-                  />
-                </Card>
-              </Section>
-            ) : null}
-
-            {access.data ? (
-              <Section title={t("mobile.intentAgents.uses.title", agentGrammar(name))}>
-                {uses.lines.length > 0 ? (
-                  <Card>
-                    {uses.lines.map((u) => (
-                      <Row
-                        key={u.key}
-                        leading={
-                          "area" in u.label ? (
-                            <Tile icon={AREA_ICON[u.label.area] ?? "doc"} />
-                          ) : (
-                            <ConnectorIcon
-                              def={(u.connectionId ? connected.get(u.connectionId)?.def : null) ?? null}
-                              image={u.connectionId ? connected.get(u.connectionId)?.image : null}
-                              label={u.label.text}
-                              size={36}
-                            />
-                          )
-                        }
-                        title={
-                          "area" in u.label
-                            ? t(`mobile.intentAgents.uses.area.${u.label.area}`, { defaultValue: u.label.area })
-                            : u.label.text
-                        }
-                        meta={
-                          <Text variant="small" tone="muted">
-                            {t(`mobile.intentAgents.uses.level.${u.level}`)}
-                          </Text>
-                        }
-                      />
-                    ))}
-                  </Card>
-                ) : (
-                  <Text variant="small" tone="muted" style={styles.foot}>
-                    {t("mobile.intentAgents.uses.empty")}
-                  </Text>
-                )}
-                {uses.asks ? (
-                  <Text variant="small" tone="muted" style={styles.foot}>
-                    {decides
-                      ? t("mobile.intentAgents.uses.asksYou")
-                      : owner
-                        ? t("mobile.intentAgents.uses.asksOwner", { name: owner })
-                        : t("mobile.intentAgents.uses.asksAdmins")}
-                  </Text>
-                ) : null}
-                {decides ? (
-                  // Ferramentas: a new service for this agent starts in Conectores (who uses it is chosen there).
-                  <View style={styles.foot}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      icon="plus"
-                      label={t("mobile.connectors.fromAgent")}
-                      onPress={() => router.push("/connectors")}
-                    />
-                  </View>
-                ) : null}
-              </Section>
-            ) : null}
-
-            <AgentMailSection agentId={id} />
-
-            <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
-
-            {details ? <GivenRules agentId={id} /> : null}
-
-            <MergeReposSection agentId={id} name={name} mayEdit={mine || can(org, "manage_agents")} />
-
-            <Section title={t("mobile.agent.month")}>
-              <View style={styles.monthCards}>
-                {shown.plan ? (
-                  <Card>
-                    <View style={styles.spend}>
-                      <PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />
-                      {spend && shown.budget ? (
-                        <Text variant="caption" tone="muted">
-                          {spend.kind === "money"
-                            ? `${money(spend.spentUsd)} ${t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}`
-                            : `${formatPercent(i18n.language, spend.percent)} ${t("mobile.agent.ofMonthBudget")}`}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </Card>
-                ) : spend && shown.budget ? (
-                  <Card>
-                    <View style={styles.spend}>
-                      <View style={styles.spendHead}>
-                        {spend.kind === "money" ? (
-                          <>
-                            <Text variant="body" tone="ink2">
-                              {money(spend.spentUsd)}
-                            </Text>
-                            <Text variant="small" tone="muted">
-                              {t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}
-                            </Text>
-                          </>
-                        ) : (
-                          <>
-                            <Text variant="body" tone="ink2">
-                              {formatPercent(i18n.language, spend.percent)}
-                            </Text>
-                            <Text variant="small" tone="muted">
-                              {t("mobile.agent.ofMonthBudget")}
-                            </Text>
-                          </>
-                        )}
-                      </View>
-                      <SpendBar color={look.color} value={spend.fraction} />
-                      {agent && modelUnpriced(models.data?.models, agent.model) ? (
-                        <Text variant="caption" tone="muted">
-                          {t("endpoint.budgetUnpriced")}
-                        </Text>
-                      ) : null}
-                      {spend.fraction >= 1 ? (
-                        <View style={styles.warn}>
-                          <LineIcon variant="caption" name="clock" size={14} color={c.muted} />
-                          <Text variant="caption" tone="muted" style={styles.shrink}>
-                            {t(`mobile.agent.exhausted${g}`, { name })}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </Card>
-                ) : null}
-                {/* Uso: the month by account and the plan it thinks with now, as the web's Uso tab. */}
-                <Card>
-                  <Row
-                    leading={<Tile icon="chart" />}
-                    title={t("usageViews.agent.title", agentGrammar(name))}
-                    chevron
-                    onPress={() => openAgentUsage(id)}
-                  />
-                </Card>
-              </View>
-            </Section>
+            <View style={styles.tabs}>
+              <Segmented
+                items={[
+                  { key: "today", label: t("common.today") },
+                  { key: "access", label: t("agentPage.fields.levels") },
+                  { key: "memory", label: t("agentPage.tabs.memory") },
+                ]}
+                value={tab}
+                onChange={(k) => setTab(k as ProfileTab)}
+                wide
+              />
+            </View>
+            {/* A view picked fades in; the one the profile opens on just shows. */}
+            <LayoutAnimationConfig skipEntering>
+              <Animated.View key={tab} entering={reduced ? undefined : TAB_IN} style={styles.page}>
+                {tab === "today" ? todayView : tab === "access" ? accessView : memoryView}
+              </Animated.View>
+            </LayoutAnimationConfig>
           </>
-        ) : null}
+        ) : (
+          <View style={styles.page}>{nowBlock}</View>
+        )}
       </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
         {/* Its person changes its look; admins, everything ("Editar", as the web's Configurações). */}
@@ -706,30 +783,32 @@ function AlwaysApproved({ agentId, name, mayRemove }: { agentId: string; name: s
   const list = rules.data ?? [];
   if (list.length === 0) return null;
   return (
-    <Section title={t("agentPage.access.always.title")}>
-      <Card>
+    <>
+      <GroupedHeader>{t("agentPage.access.always.title")}</GroupedHeader>
+      <GroupedList>
         {list.map((rule) => {
           const what = approvalRuleWords(t, rule);
           const who = rule.createdByUserId ? dir.memberById.get(rule.createdByUserId)?.name : undefined;
           const at = when.short(rule.createdAt);
           return (
-            <Row
+            <ButtonRow
               key={rule.id}
               leading={
                 <ConnectorIcon
                   def={(rule.connectionId && connected.get(rule.connectionId)?.def) || null}
                   image={rule.connectionId ? connected.get(rule.connectionId)?.image : null}
                   label={approvalRuleServer(t, rule)}
-                  size={36}
+                  size={30}
                 />
               }
-              title={what}
-              subtitle={
+              label={what}
+              labelLines={2}
+              sub={
                 who
                   ? t("agentPage.access.always.by", { name: who, when: at })
                   : t("agentPage.access.always.byNobody", { when: at })
               }
-              meta={
+              trailing={
                 mayRemove ? (
                   <IconButton
                     icon="x"
@@ -747,11 +826,67 @@ function AlwaysApproved({ agentId, name, mayRemove }: { agentId: string; name: s
             />
           );
         })}
-      </Card>
-      <Text variant="small" tone="muted" style={styles.foot}>
-        {t("agentPage.access.always.help")}
-      </Text>
-    </Section>
+      </GroupedList>
+      <GroupedFooter>{t("agentPage.access.always.help")}</GroupedFooter>
+    </>
+  );
+}
+
+/**
+ * A row of a grouped list that holds its own button (a rule's ×, a mailbox's Remove access), drawn as `GroupedRow`
+ * draws its rows. A plain view, not a pressable one: a pressable row would fold the button into itself for
+ * VoiceOver. `GroupedList` reads `icon` and `leading` for where its hairline starts.
+ */
+function ButtonRow({
+  icon,
+  leading,
+  label,
+  labelLines = 1,
+  sub,
+  value,
+  trailing,
+  below,
+}: {
+  icon?: IconName;
+  leading?: ReactNode;
+  label: string;
+  labelLines?: number;
+  sub?: string | null;
+  value?: string;
+  trailing?: ReactNode;
+  below?: ReactNode;
+}) {
+  const c = useColors();
+  return (
+    <View style={styles.row}>
+      {icon ? (
+        <View style={styles.lead}>
+          <View style={[styles.tile, { backgroundColor: c.sunken }]}>
+            <Icon name={icon} size={16} color={c.ink2} />
+          </View>
+        </View>
+      ) : null}
+      {leading ? <View style={styles.lead}>{leading}</View> : null}
+      <View style={styles.grow}>
+        <View accessible accessibilityLabel={[label, sub].filter(Boolean).join(", ")}>
+          <Text variant="body" numberOfLines={labelLines}>
+            {label}
+          </Text>
+          {sub ? (
+            <Text variant="footnote" tone="faint" numberOfLines={2}>
+              {sub}
+            </Text>
+          ) : null}
+        </View>
+        {below}
+      </View>
+      {value ? (
+        <Text variant="callout" tone="faint" numberOfLines={1} style={styles.value}>
+          {value}
+        </Text>
+      ) : null}
+      {trailing}
+    </View>
   );
 }
 
@@ -769,18 +904,20 @@ function GivenRules({ agentId }: { agentId: string }) {
   const list = (memory.data ?? []).filter((m) => m.kind === "rule" && !m.archived);
   if (list.length === 0) return null;
   return (
-    <Section title={t("agentPage.memory.rules")}>
-      <Card>
+    <>
+      <GroupedHeader>{t("agentPage.memory.rules")}</GroupedHeader>
+      <GroupedList>
         {list.map((m) => (
-          <Row
+          <ButtonRow
             key={m.id}
-            leading={<Tile icon="flag" />}
-            title={m.text}
-            subtitle={t("agentPage.memory.ruleBy", {
+            icon="flag"
+            label={m.text}
+            labelLines={3}
+            sub={t("agentPage.memory.ruleBy", {
               name: m.origin?.name ?? t("memory.origin.someone"),
               date: when.short(m.origin?.at ?? m.updatedAt),
             })}
-            meta={
+            trailing={
               m.removable ? (
                 <IconButton
                   icon="x"
@@ -800,30 +937,9 @@ function GivenRules({ agentId }: { agentId: string }) {
             }
           />
         ))}
-      </Card>
-      <Text variant="small" tone="muted" style={styles.foot}>
-        {t("agentPage.memory.rulesNote")}
-      </Text>
-    </Section>
-  );
-}
-
-/** What it is on now (`.nowp`): one line that opens the place (the request, the conversation, the mission). */
-function NowPill({ leading, label, onPress }: { leading: ReactNode; label: string; onPress: () => void }) {
-  const c = useColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [styles.now, { backgroundColor: pressed ? c.sunken : c.raised, borderColor: c.line }]}
-    >
-      {leading}
-      <Text variant="small" tone="ink2" numberOfLines={1} style={styles.nowText}>
-        {label}
-      </Text>
-      <Icon name="right" size={14} color={c.faint} />
-    </Pressable>
+      </GroupedList>
+      <GroupedFooter>{t("agentPage.memory.rulesNote")}</GroupedFooter>
+    </>
   );
 }
 
@@ -880,12 +996,17 @@ export function MemoryFix({
       <SheetTitle title={t(`mobile.intentAgents.fix.title${g}`, { name: agentName })} />
       <TextArea value={text} onChangeText={setText} autoFocus maxLength={8000} />
       <View style={styles.src}>
-        <Icon name="chat" size={14} color={c.muted} />
+        <Icon name="chat" size={15} color={c.muted} />
         <Text variant="small" tone="muted" numberOfLines={1} style={styles.grow}>
           {source}
         </Text>
         {onSee ? (
-          <Pressable onPress={onSee} accessibilityRole="link" hitSlop={8}>
+          <Pressable
+            onPress={onSee}
+            accessibilityRole="link"
+            hitSlop={12}
+            style={({ pressed }) => (pressed ? styles.pressed : null)}
+          >
             <Text variant="small" tone="ink2" style={styles.bold}>
               {t("mobile.intentAgents.fix.see")}
             </Text>
@@ -911,46 +1032,49 @@ export function MemoryFix({
   );
 }
 
-/** Height of the sky cover. */
-const COVER_HEIGHT = 300;
-/** Where the agent's top sits in the cover (bottom padding 22, avatar 104), and the bar's height. */
-const AVATAR_TOP = COVER_HEIGHT - 22 - 104;
+const TAB_IN = FadeIn.duration(160);
+
+/** Height of the sky cover, the bar's area included. */
+const COVER_HEIGHT = 250;
+/** The agent's face, unframed, and the room under it at the cover's foot. */
+const FACE = 96;
+const COVER_FOOT = 14;
+/** Where the agent's top sits in the cover, and the bar's height. */
+const AVATAR_TOP = COVER_HEIGHT - COVER_FOOT - FACE;
 const BAR_HEIGHT = 44;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   bar: { position: "absolute", top: 0, left: 0, right: 0 },
   // Not clipped: on a pull the sky grows up into the gap above the content.
-  cover: { height: COVER_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 22 },
+  cover: { height: COVER_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: COVER_FOOT },
   prof: { paddingHorizontal: 24, gap: 4 },
-  status: { marginTop: 10 },
   center: { textAlign: "center" },
-  acts: { marginTop: 14 },
-  grow: { flex: 1 },
+  // Chat takes the row; the computer's square sits beside it.
+  acts: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
+  grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  now: {
+  pressed: { opacity: 0.6 },
+  // `Segmented` sizes to its labels: a row centers it under the centered head.
+  tabs: { paddingHorizontal: 16, paddingTop: 20 },
+  page: { paddingHorizontal: 16 },
+  block: { marginTop: 16 },
+  orbit: { width: 30, height: 30, alignItems: "center", justifyContent: "center" },
+  pixels: { marginBottom: 12 },
+  apart: { marginTop: 24 },
+  remove: { marginTop: 6, alignSelf: "flex-start" },
+  // As `GroupedRow`'s own row, tile and value.
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "center",
-    gap: 8,
-    marginTop: 12,
-    paddingVertical: 9,
+    gap: 12,
+    minHeight: 50,
     paddingHorizontal: 14,
-    // It opens what the agent is on: a button, so the buttons' corner (pills are for labels only).
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    maxWidth: "100%",
+    paddingVertical: 8,
   },
-  nowText: { flexShrink: 1, fontWeight: "500" },
-  lead: { paddingHorizontal: 4, marginTop: -6, marginBottom: 10 },
-  pixels: { paddingHorizontal: 4, marginBottom: 12 },
-  monthCards: { gap: 10 },
-  foot: { paddingHorizontal: 4, marginTop: 8 },
-  playbook: { paddingHorizontal: 4, marginTop: 16, fontWeight: "600" },
+  // One leading column for a tile or a mark, as `GroupedRow`'s: the text starts at 58 in every row.
+  lead: { width: 32, alignItems: "center", justifyContent: "center" },
+  tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  value: { flexShrink: 1, maxWidth: "50%" },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
-  spend: { padding: 14, gap: 10 },
-  spendHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  // The sentence wraps inside the card (it ran past its edge): the clock stays on its first line.
-  warn: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  shrink: { flexShrink: 1, minWidth: 0 },
 });

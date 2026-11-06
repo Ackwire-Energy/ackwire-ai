@@ -85,6 +85,9 @@ function BlockWebView({
   const web = useRef<WebView<object>>(null);
   const [life, setLife] = useState(0);
   const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
+  // Until the page says it started, a spinner over it: a blank box reads as broken.
+  const [ready, setReady] = useState(false);
+  const c = useColors();
   const theme = scheme === "dark" ? "dark" : "light";
   const sharedRef = useRef(shared);
   sharedRef.current = shared;
@@ -119,49 +122,62 @@ function BlockWebView({
     if (sharedRef.current) web.current?.injectJavaScript(hostScript(sharedRef.current));
   }, [rev]);
 
-  const restart = () => setLife((n) => n + 1);
+  const restart = () => {
+    setReady(false);
+    setLife((n) => n + 1);
+  };
   return (
-    <WebView
-      key={life}
-      ref={web}
-      source={{ html: page }}
-      // Every address passes this list and is refused below: one that failed here would go to the system to open.
-      originWhitelist={["*"]}
-      onShouldStartLoadWithRequest={(request) => blockMayLoad(request.url)}
-      javaScriptEnabled
-      javaScriptCanOpenWindowsAutomatically={false}
-      setSupportMultipleWindows={false}
-      domStorageEnabled={false}
-      incognito
-      cacheEnabled={false}
-      sharedCookiesEnabled={false}
-      thirdPartyCookiesEnabled={false}
-      allowFileAccess={false}
-      allowFileAccessFromFileURLs={false}
-      allowUniversalAccessFromFileURLs={false}
-      geolocationEnabled={false}
-      mediaCapturePermissionGrantType="deny"
-      mediaPlaybackRequiresUserAction
-      scrollEnabled={scrolls}
-      nestedScrollEnabled={false}
-      bounces={false}
-      overScrollMode="never"
-      showsVerticalScrollIndicator={false}
-      style={[styles.web, !scrolls && { height: height || INLINE_HEIGHT }]}
-      onMessage={(e) => {
-        const event = blockEvent(e.nativeEvent.data);
-        if (!event) return;
-        if (event.type === "height") {
-          keptOf(blockKey).height = event.height;
-          setHeight(event.height);
-        }
-        // What moved while it was starting.
-        if (event.type === "ready" && sharedRef.current) web.current?.injectJavaScript(hostScript(sharedRef.current));
-        onEvent(event);
-      }}
-      onContentProcessDidTerminate={restart}
-      onRenderProcessGone={restart}
-    />
+    <View style={scrolls ? styles.fill : undefined}>
+      <WebView
+        key={life}
+        ref={web}
+        source={{ html: page }}
+        // Every address passes this list and is refused below: one that failed here would go to the system to open.
+        originWhitelist={["*"]}
+        onShouldStartLoadWithRequest={(request) => blockMayLoad(request.url)}
+        javaScriptEnabled
+        javaScriptCanOpenWindowsAutomatically={false}
+        setSupportMultipleWindows={false}
+        domStorageEnabled={false}
+        incognito
+        cacheEnabled={false}
+        sharedCookiesEnabled={false}
+        thirdPartyCookiesEnabled={false}
+        allowFileAccess={false}
+        allowFileAccessFromFileURLs={false}
+        allowUniversalAccessFromFileURLs={false}
+        geolocationEnabled={false}
+        mediaCapturePermissionGrantType="deny"
+        mediaPlaybackRequiresUserAction
+        scrollEnabled={scrolls}
+        nestedScrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
+        style={[styles.web, !scrolls && { height: height || INLINE_HEIGHT }]}
+        onMessage={(e) => {
+          const event = blockEvent(e.nativeEvent.data);
+          if (!event) return;
+          if (event.type === "height") {
+            keptOf(blockKey).height = event.height;
+            setHeight(event.height);
+          }
+          if (event.type === "ready") {
+            setReady(true);
+            // What moved while it was starting.
+            if (sharedRef.current) web.current?.injectJavaScript(hostScript(sharedRef.current));
+          }
+          onEvent(event);
+        }}
+        onContentProcessDidTerminate={restart}
+        onRenderProcessGone={restart}
+      />
+      {ready ? null : (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.asleep]}>
+          <ActivityIndicator color={c.faint} />
+        </View>
+      )}
+    </View>
   );
 }
 

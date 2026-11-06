@@ -1167,6 +1167,9 @@
     "review": "审阅",
     "answer": "回复",
     "open": "打开",
+    "toolsTitle": "更改了你批准的工具",
+    "toolsWhy": "在你接受新版本之前，智能体会继续使用已批准的版本。",
+    "reviewChanges": "查看更改",
     "clear": {
       "title": "没有等你处理的事",
       "text": "智能体需要你时，会先出现在这里。"

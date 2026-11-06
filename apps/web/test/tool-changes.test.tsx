@@ -4,8 +4,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { ToolChange } from "@agenteschat/client";
+import { toolChangeDiff } from "@agenteschat/client/lib/tool-changes";
+import { diffLines } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { toolChangeDiff } from "@/lib/tool-changes";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -96,7 +97,7 @@ test("many changed tools: grouped by connection, the first few shown, all accept
 });
 
 test("the diff: added, removed and changed fields, and input changes outside the fields", () => {
-  const diff = toolChangeDiff({
+  const change = {
     before: {
       description: "Same.",
       inputSchema: {
@@ -121,7 +122,8 @@ test("the diff: added, removed and changed fields, and input changes outside the
         },
       },
     },
-  });
+  };
+  const diff = toolChangeDiff(change, diffLines);
   expect(diff.description).toBeNull();
   // Same field with its keys in another order: not a change.
   expect(diff.fields.map((f) => [f.name, f.status])).toEqual([

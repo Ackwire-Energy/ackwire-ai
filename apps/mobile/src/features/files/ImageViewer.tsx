@@ -295,7 +295,7 @@ function Action({
       contentStyle={styles.actionIn}
     >
       <View style={[styles.circle, { backgroundColor: PLATE }]}>
-        {busy ? <ActivityIndicator color={WHITE} /> : <Icon name={icon} size={21} color={WHITE} />}
+        {busy ? <ActivityIndicator color={WHITE} /> : <Icon name={icon} size={20} color={WHITE} />}
       </View>
       <Text variant="caption" style={[styles.bold, { color: WHITE }]} numberOfLines={1}>
         {label}
@@ -327,6 +327,6 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   actions: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 20, paddingTop: 10 },
   action: { minWidth: 88 },
-  actionIn: { alignItems: "center", gap: 5 },
+  actionIn: { alignItems: "center", gap: 6 },
   circle: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
 });

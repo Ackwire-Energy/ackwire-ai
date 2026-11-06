@@ -15,7 +15,9 @@ import { weights } from "./type-scale";
 /** The avatar column of a full-width list row (52pt: an agent's body, a person's photo, a tile). */
 export const LIST_AVATAR = 52;
 /** The gap between the avatar and the text. */
-const GAP = 13;
+const GAP = 12;
+/** The unread dot sits nearer the text than the row's gap. */
+const DOT_GAP = 10;
 /** Where the hairline between rows starts: the text column. */
 export const LIST_INSET = 14 + LIST_AVATAR + GAP;
 
@@ -103,7 +105,6 @@ export function ListRow({
           ) : (
             <View style={styles.shrink}>{title}</View>
           )}
-          <View style={styles.grow} />
           {time ? (
             <View style={[styles.time, { minHeight: titleLine }]}>
               <Text variant="small" tone={unread ? "ink2" : "faint"} style={[LIST_TIME, unread && styles.unreadTime]}>
@@ -144,15 +145,16 @@ const styles = StyleSheet.create({
     minHeight: 82,
   },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
-  dot: { width: 10, height: 10, borderRadius: 5, marginLeft: -3 },
+  dot: { width: 10, height: 10, borderRadius: 5, marginLeft: DOT_GAP - GAP },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
   tx: { flex: 1, minWidth: 0, gap: 2 },
+  // The time and the badge stay on their line's first row when the name or the preview wraps.
   l1: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   l2: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   trailing: { justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   unreadName: { fontWeight: weights.bold },
-  time: { flexShrink: 0, justifyContent: "center" },
+  time: { flexShrink: 0, marginLeft: "auto", justifyContent: "center" },
   unreadTime: { fontWeight: weights.medium },
 });

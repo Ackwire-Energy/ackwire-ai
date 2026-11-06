@@ -4,7 +4,6 @@ import { IconButton } from "@/ui";
 import { openComputer } from "../computer/AgentComputerRow";
 import { useAgentComputer } from "../computer/useAgentComputer";
 import { useDirectory } from "../shared/hooks";
-import { tapHaptic } from "../shared/parts";
 
 /**
  * The agent's computer when this person may watch it and it has one, else null: a self-hosted agent with no computer
@@ -56,7 +55,6 @@ export function DmComputerButton({ agentId, onOpen }: { agentId: string; onOpen?
       icon="laptop"
       label={says ? `${t("agentComputer.button")}, ${says}` : t("agentComputer.button")}
       onPress={() => {
-        tapHaptic();
         onOpen?.();
         openComputer(agentId);
       }}

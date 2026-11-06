@@ -3,7 +3,7 @@
 - Status: Accepted (built)
 - Date: 2026-11-05
 - Extends: ADR 0041 (accounts and effort), ADR 0086 ("Configuração avançada"), ADR 0121 (long work)
-- Code: db `packages/db/src/schema/agents.ts` (`agents.brain_speed`, migration `0224_agent_speed.sql`); `packages/providers/src/plans.ts`, `packages/engine/src/brains/select.ts`, `apps/server/runner/brain-codex.ts`, `brain-codex-app.ts`
+- Code: db `packages/db/src/schema/agents.ts` (`agents.brain_speed`, migration `0225_agent_speed.sql`); `packages/providers/src/plans.ts`, `packages/engine/src/brains/select.ts`, `apps/server/runner/brain-codex.ts`, `brain-codex-app.ts`
 
 ## Context
 

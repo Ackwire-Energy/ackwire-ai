@@ -18,7 +18,7 @@ import { ActionSheetIOS, Alert, Platform } from "react-native";
 import { type IconName, useToast } from "@/ui";
 import { routineHref, widgetHref } from "../links/logic";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { type ActionItem, ActionList, copyText, successHaptic } from "../shared/parts";
+import { type ActionItem, ActionList, copyText, errorHaptic, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { everyMinutes, isInbox, isRunning, nextLine, RUN_SLOTS, routineTitle, runCaption, toastParts } from "./logic";
 import { fromApiRule, nextLabel, ruleSentence } from "./rule";
@@ -187,12 +187,16 @@ export function useTargetLabel() {
   );
 }
 
-/** A failed write: "Não deu certo", with the server's reason in the person's words when it is a known one. */
+/**
+ * A failed write: "Não deu certo", with the server's reason in the person's words when it is a known one, and the
+ * error haptic, so a write that didn't take is felt as well as read.
+ */
 export function useFailed() {
   const { t } = useTranslation();
   const toast = useToast();
   return useCallback(
     (error: unknown) => {
+      errorHaptic();
       const known = knownErrorText(t, error);
       toast({ title: t("mobile.app.failed"), ...(known ? { subtitle: known } : {}), icon: "x" });
     },
@@ -306,6 +310,7 @@ export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: 
               { type: "delete", id: r.id },
               {
                 onSuccess: () => {
+                  successHaptic();
                   toast({ title: t("routines.deleted") });
                   onDeleted?.();
                 },
