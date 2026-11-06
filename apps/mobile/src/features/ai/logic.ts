@@ -46,15 +46,15 @@ import type { TFunction } from "i18next";
 
 /**
  * "Usar uma chave de API agora" under a plan that can't sign in on the agent's computer yet. On the phone the key's
- * row is a page away, so every wait for the workspace's computer offers it (not on hold: nothing runs then), as do
- * an offline computer, none and one that can't take the plan. A billing hold offers it to whoever may add a key.
+ * row is a page away, so every wait for the workspace's computer offers it, as do an offline computer, none and one
+ * that can't take the plan, all but on a hold, when nothing runs. A billing hold offers it to whoever may add a key.
  */
 export const offersKeyNow = (gate: PlanGate, held: boolean, mayAddKey: boolean) =>
   gate.state === "billing"
     ? mayAddKey
     : gate.state === "preparing"
       ? gate.view !== null && !held
-      : gate.state === "offline" || gate.state === "missing" || gate.state === "unsupported";
+      : !held && (gate.state === "offline" || gate.state === "missing" || gate.state === "unsupported");
 
 /** That button's words: a billing hold has no "now" to promise, as the key waits for the plan too. */
 export const keyNowLabel = (gate: PlanGate) =>

@@ -69,7 +69,7 @@ import {
 import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
 import { setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
-import { keyRefusal } from "@agenteschat/client/lib/errors";
+import { holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
 import {
   allowsInApp,
@@ -1147,6 +1147,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       gateLine(t, {
         gate: unsupportedGate(o.reason, edition, computerSetup),
         edition,
+        hold: holdText(t, org.standing),
         kind: k,
         computer: view.computer?.name ?? "",
         machine: work.machines.data?.find((m) => m.id === view.computer?.machineId),

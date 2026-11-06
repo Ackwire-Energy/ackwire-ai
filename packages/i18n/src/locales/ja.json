@@ -8566,6 +8566,7 @@
       "tool_off": "{{computer}}で{{program}}がオフになっています。そのコンピューターのagentes.chatアプリの「環境設定 → ツール」でオンにしてください。",
       "tool_offLinux": "{{computer}}で{{program}}がオフになっています。そのコンピューターのagentes.chatアプリか、{{command}}でオンにしてください。",
       "not_installed": "{{computer}}に{{program}}がインストールされていません。",
+      "not_reported": "{{computer}}は、入っているプログラムをまだ確認しています。終わりしだい自動で切り替わります。",
       "outdated": "{{computer}}のバージョンが古くなっています。使うにはCodexをアップデートしてください。",
       "no_computerCloud": "{{computer}}の準備ができ次第使えます。"
     },

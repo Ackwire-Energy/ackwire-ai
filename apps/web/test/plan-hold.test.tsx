@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AiAccounts, AiComputer } from "@agenteschat/client";
+import type { AgentBrain, AiAccounts, AiComputer, BrainOption, ComputerSetup, OrgStanding } from "@agenteschat/client";
 import { PLAN_CHOICES, type PlanChoice, planTitle } from "@agenteschat/client/lib/no-ai";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
@@ -259,5 +259,89 @@ describe("the other places a plan is chosen", () => {
     expect(buttonNamed(body, PAY)).not.toBeNull();
     expect(buttonNamed(body, KEY)).not.toBeNull();
     expect(shownText(body)).not.toContain("Conecte um plano em Sua IA para usar aqui.");
+  });
+});
+
+describe("what a plan's panel never says on the Cloud", () => {
+  const INSTALLING = /sendo instalado/;
+  const off = (reason: BrainOption["reason"]) =>
+    EVERY_PROGRAM.map((o) => (o.kind === "codex" ? { ...o, available: false, reason } : o));
+
+  async function panel(
+    view: Partial<AgentBrain>,
+    standing?: OrgStanding,
+    setup: Partial<ComputerSetup> = { state: "ready", since: new Date().toISOString() },
+  ) {
+    const state = seedState({ authConfig: { billingUrl: "https://billing.example.com" } });
+    if (state.me && standing) state.me.organizations = state.me.organizations.map((o) => ({ ...o, standing }));
+    for (const a of state.agents) if (a.id === ADA_ID) a.ownerUserId = state.me?.user.id ?? null;
+    state.aiStatus = { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] };
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup(setup);
+    fakeMachinesOf.get(api)?.setAiAccounts({ accounts: [], computers: [COMPUTER] });
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({
+      ...(await viewOf(orgId, agentId)),
+      ownSignIn: false,
+      accounts: [],
+      computer: { machineId: "machine_1", name: "MacBook", online: true },
+      accountsSupported: true,
+      canManageAccounts: true,
+      ...view,
+    });
+    await renderApp(`/org/${ORG_ID}?connect=ai`, { api });
+    await settle(8);
+    const dialog = screen().getByRole("dialog", { name: /Conectar uma IA/ });
+    if (within(dialog).queryByRole("combobox", { name: "Plano" }) === null)
+      await click(payWith(dialog, "Com um plano"));
+    return planPanel(dialog, "chatgpt");
+  }
+
+  test("a computer that hasn't said what it has: it's looking, not installing, and a key is the way on", async () => {
+    const box = await panel({ options: off("not_reported") });
+    expect(shownText(box)).toContain("ainda está vendo quais programas tem");
+    expect(shownText(box)).not.toMatch(INSTALLING);
+    expect(buttonNamed(box, "Usar uma chave de API agora")).not.toBeNull();
+  });
+
+  test("a CLI the computer looked for and hasn't got, just after it was ready: that one may be on its way", async () => {
+    expect(shownText(await panel({ options: off("not_installed") }))).toMatch(INSTALLING);
+  });
+
+  test("the same CLI long after the computer was ready: nothing says it's coming", async () => {
+    const box = await panel({ options: off("not_installed") }, undefined, { state: "ready", since: null });
+    expect(shownText(box)).not.toMatch(INSTALLING);
+    expect(shownText(box)).toContain("não vai mudar sozinho");
+  });
+
+  test("a computer that never reached the agent: nobody connects one on the Cloud, so no such button", async () => {
+    const box = await panel({ computer: null, machines: [], options: EVERY_PROGRAM });
+    expect(shownText(box)).toContain("não vai mudar sozinho");
+    expect(buttonNamed(box, "Conectar um computador")).toBeNull();
+    expect(buttonNamed(box, "Usar uma chave de API agora")).not.toBeNull();
+  });
+
+  test("a hold that isn't billing: it speaks, the computer's wait doesn't, and no key is offered as if it ran", async () => {
+    const box = await panel({ options: off("not_installed") }, { state: "hold", reason: null });
+    expect(shownText(box)).not.toMatch(INSTALLING);
+    expect(shownText(box)).toContain("pausados para uma revisão");
+    expect(buttonNamed(box, "Usar uma chave de API agora")).toBeNull();
+  });
+});
+
+describe("a key kept on a billing hold", () => {
+  test("Settings says when it starts, never that its maker didn't answer", async () => {
+    const { api } = await open("owner", `/org/${ORG_ID}/settings/keys`);
+    const addKey = api.agents.addCredential;
+    api.agents.addCredential = async (orgId, input) => ({ ...(await addKey(orgId, input)), check: "unchecked" });
+    await click(screen().getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    await act(async () =>
+      fireEvent.change(within(add).getByLabelText("Chave da API"), { target: { value: `sk-ant-${"a".repeat(40)}` } }),
+    );
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await settle(4);
+    expect(document.body.textContent).toContain(`Salva. ${HELD}`);
+    expect(document.body.textContent).not.toContain("não respondeu");
   });
 });

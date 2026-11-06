@@ -804,7 +804,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       return {
         ...result,
         // The refusal that sent the call again without its thinking: a provider's words, masked like its errors.
-        ...(refused ? { thinking: { ...result.thinking, refused: redactCredentials(refused) } } : {}),
+        ...(refused ? { thinking: { ...result.thinking, refused: withoutKey(refused, key.apiKey) } } : {}),
         usageRecordId: record.id,
         costNanoUsd: record.cost,
         maxTokens,

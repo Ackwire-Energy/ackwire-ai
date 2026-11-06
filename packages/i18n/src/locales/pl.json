@@ -9619,6 +9619,7 @@
       "tool_off": "{{program}} jest wyłączony na komputerze {{computer}}. Włącz go tam, w aplikacji agentes.chat: Preferencje → Narzędzia.",
       "tool_offLinux": "{{program}} jest wyłączony na komputerze {{computer}}. Włącz go tam, w aplikacji agentes.chat albo poleceniem {{command}}.",
       "not_installed": "{{program}} nie jest zainstalowany na komputerze {{computer}}.",
+      "not_reported": "{{computer}} wciąż sprawdza, jakie ma programy. To zmieni się samo, gdy skończy.",
       "outdated": "Wersja na komputerze {{computer}} jest stara. Zaktualizuj Codex, żeby z niego korzystać.",
       "no_computerCloud": "Gotowe, gdy tylko {{computer}} będzie gotowy."
     },

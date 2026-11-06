@@ -21787,6 +21787,9 @@
   "brain.reasons.not_installed": {
     "value": "{{program}} isn't installed on {{computer}}."
   },
+  "brain.reasons.not_reported": {
+    "value": "{{computer}} is still checking which programs it has. This changes by itself when it's done."
+  },
   "brain.reasons.outdated": {
     "value": "The version on {{computer}} is old. Update Codex to use it."
   },

@@ -8559,6 +8559,7 @@
       "tool_off": "{{computer}}에서 {{program}}이(가) 꺼져 있어요. 그 컴퓨터의 agentes.chat 앱에서 켜세요: 환경설정 → 도구.",
       "tool_offLinux": "{{computer}}에서 {{program}}이(가) 꺼져 있어요. 그 컴퓨터의 agentes.chat 앱이나 {{command}}(으)로 켜세요.",
       "not_installed": "{{computer}}에 {{program}}이(가) 설치되어 있지 않아요.",
+      "not_reported": "{{computer}}에 어떤 프로그램이 있는지 아직 확인하는 중이에요. 끝나면 저절로 바뀌어요.",
       "outdated": "{{computer}}의 버전이 오래됐어요. 사용하려면 Codex를 업데이트하세요.",
       "no_computerCloud": "{{computer}}이(가) 준비되면 바로 쓸 수 있어요."
     },

@@ -5066,7 +5066,15 @@ export interface MissionSettings {
 export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
 /** Why a computer brain can't be chosen now. */
-export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
+export type BrainUnavailable =
+  | "no_computer"
+  | "exec_off"
+  | "runner_old"
+  | "tool_off"
+  | "not_installed"
+  | "outdated"
+  /** Its runner hasn't said which CLIs it has yet. */
+  | "not_reported";
 
 export interface BrainModelOption {
   /** What is stored (`opus`, `sonnet`, `haiku`, a Codex model). */
@@ -5228,6 +5236,8 @@ export interface AiComputer {
     antigravity?: boolean;
     key: boolean;
   };
+  /** Why a CLI of `brains` can't think there (absent: an older server). */
+  off?: Partial<Record<MachineAccountKind, BrainUnavailable>>;
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: {
     claude_code: boolean;

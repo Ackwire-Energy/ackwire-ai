@@ -48,6 +48,7 @@ import {
   planOfAccount,
   planPickText,
   planTitle,
+  uncheckedKeyLine,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
@@ -259,7 +260,8 @@ export interface ConnectAiFlowProps {
 export function ConnectAiFlow(props: ConnectAiFlowProps) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
-  const { orgId } = useAiOrg();
+  const { orgId, org } = useAiOrg();
+  const held = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -346,7 +348,7 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
         async () => {
           const { check } = await api.agents.checkCredential(orgId, k.id);
           if (check === "unchecked")
-            toast({ title: t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) }), icon: "check" });
+            toast({ title: uncheckedKeyLine(t, providerLabel(k.provider), held), icon: "check" });
           // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
           if (rightHand) return rightHandOnKey(api, orgId, rightHand, k, models.data?.models ?? []);
           if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });
@@ -426,7 +428,10 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
             dimmedLine(t, agentId !== undefined ? gates.gateOf(choice) : bareGates.at(choice).gate, {
               edition: gates.edition ?? bareGates.edition,
               kind: kindOf(choice),
-              computer: gates.view?.computer?.name ?? "",
+              computer:
+                gates.view?.computer?.name ??
+                bareGates.at(choice).computer?.name ??
+                computerName(t, org?.name ?? "", null),
             })
           }
           have={have}
@@ -1135,7 +1140,14 @@ function GateWait({
   const machines = useMachines(orgId, edition !== null);
   const hold = holdText(t, org?.standing);
   // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself: the page asks again).
-  const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
+  const why = gateLine(t, {
+    gate,
+    edition,
+    kind,
+    computer,
+    hold,
+    machine: machines.data?.find((m) => m.id === machineId),
+  });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
   else if (gate.state === "billing") {

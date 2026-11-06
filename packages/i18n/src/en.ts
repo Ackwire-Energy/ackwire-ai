@@ -8795,6 +8795,8 @@ export const en = {
       tool_offLinux:
         "{{program}} is turned off on {{computer}}. Turn it on there, in the agentes.chat app or with {{command}}.",
       not_installed: "{{program}} isn't installed on {{computer}}.",
+      /** Its runner hasn't said which CLIs it has yet: nobody knows whether this one is there. */
+      not_reported: "{{computer}} is still checking which programs it has. This changes by itself when it's done.",
       outdated: "The version on {{computer}} is old. Update Codex to use it.",
       no_computerCloud: "Ready as soon as {{computer}} is.",
     },

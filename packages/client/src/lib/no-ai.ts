@@ -358,7 +358,7 @@ export function planGate({
     return edition === "cloud" && !caughtUp ? { state: "preparing", view: null } : { state: "missing" };
   if (!brain.computer.online) return { state: "offline" };
   const option = brain.options.find((o) => o.kind === kindOf(choice));
-  if (!option?.available) return unsupportedGate(option?.reason ?? "not_installed", edition, setup, now);
+  if (!option?.available) return unsupportedGate(option?.reason ?? "not_reported", edition, setup, now);
   if (!brain.accountsSupported) return unsupportedGate("runner_old", edition, setup, now);
   if (isPlanId(choice) && !computer?.keys) return unsupportedGate("keys", edition, setup, now);
   if (!brain.canManageAccounts) return { state: "locked", who: "computer" };
@@ -384,7 +384,7 @@ export function planGateWithoutAgent({
   edition: Edition | null;
   setup: SetupView | null;
   computers: readonly AiComputer[] | undefined;
-  machines?: readonly Pick<Machine, "id" | "pairedBy" | "execAllowed" | "access">[] | undefined;
+  machines?: readonly Pick<Machine, "id" | "pairedBy">[] | undefined;
   standing?: Pick<OrgStanding, "state" | "reason"> | null;
   now?: number;
 }): { gate: PlanGate; computer?: AiComputer } {
@@ -400,31 +400,20 @@ export function planGateWithoutAgent({
   if (!computer) {
     // `canAdd` is also false on a runner too old for accounts: one they connected, or nobody did, is that.
     const old = computers.find((c) => c.mine || machineOf(c)?.pairedBy === null);
-    if (old) return { gate: unsupportedGate("runner_old", edition, setup, now), computer: old };
+    if (old)
+      return {
+        gate: old.online ? unsupportedGate("runner_old", edition, setup, now) : { state: "offline" },
+        computer: old,
+      };
     const first = computers[0];
     if (!first) return { gate: edition === "cloud" ? { state: "preparing", view: null } : { state: "missing" } };
     return { gate: { state: "locked", who: "computer" }, computer: first };
   }
   if (!computer.online) return { gate: { state: "offline" }, computer };
   if (computer.brains[kind] !== true)
-    return { gate: unsupportedGate(brainOffReason(machineOf(computer), kind), edition, setup, now), computer };
+    return { gate: unsupportedGate(computer.off?.[kind] ?? "not_reported", edition, setup, now), computer };
   if (isPlanId(choice) && !computer.keys) return { gate: unsupportedGate("keys", edition, setup, now), computer };
   return { gate: { state: "ready" }, computer };
-}
-
-/** Why a CLI can't think on a computer, as far as its row says (the server's `brainOptions`): else not installed. */
-function brainOffReason(
-  m: Pick<Machine, "execAllowed" | "access"> | undefined,
-  kind: MachineAccountKind,
-): BrainUnavailable {
-  if (m && !m.execAllowed) return "exec_off";
-  const tools = m?.access?.tools;
-  const on = !tools
-    ? undefined
-    : kind === "cursor" || kind === "opencode" || kind === "grok" || kind === "antigravity"
-      ? (tools[kind] ?? tools.codex)
-      : tools[kind === "codex" ? "codex" : "claude"];
-  return on === false ? "tool_off" : "not_installed";
 }
 
 /**
@@ -455,12 +444,15 @@ export const gateDims = (gate: PlanGate) =>
 
 /**
  * The gate passes by itself, with nothing for the person to do: the computer reconnecting, or (the Cloud's, which is
- * ours) its programs being installed or updated there. The panel asks again while it shows, as events may not say it.
- * A program not allowed there is ours to allow, and all of self-host's wait for someone (their computers are people's own).
+ * ours) its programs being installed or updated there, or any computer's runner saying what it has. The panel asks
+ * again while it shows, as events may not say it. A program not allowed there is ours to allow, and the rest of
+ * self-host's wait for someone (their computers are people's own).
  */
 export const gateRechecks = (gate: PlanGate, edition: Edition | null) =>
   gate.state === "offline" ||
-  (edition === "cloud" && gate.state === "unsupported" && gate.reason !== "tool_off" && !gate.overdue);
+  (gate.state === "unsupported" &&
+    !gate.overdue &&
+    (gate.reason === "not_reported" || (edition === "cloud" && gate.reason !== "tool_off")));
 
 /** The Cloud's line per reason a plan can't sign in on the workspace's computer (`aiAccounts.connect.needsCloud.*`). */
 const CLOUD_REASON = {
@@ -471,15 +463,18 @@ const CLOUD_REASON = {
   tool_off: "toolOff",
   not_installed: "installing",
   outdated: "updating",
+  // Said only past the wait: before it, the line says the computer is still looking.
+  not_reported: "stuck",
 } as const satisfies Record<BrainUnavailable | "keys", string>;
 
 /**
  * Why a plan's panel can't sign in yet, in plain words, with what happens next: an offline computer, or a reason the
  * plan can't sign in there (`unsupported`). On the Cloud the computer is ours, so the line says what it's doing (a
  * program being installed or updated, a restart) and that it comes back by itself (`rechecks`), or that it's on our
- * side. Null
- * for any other gate. `computer`: its name as the panel says it; `machine`: its row, for the way to allow a program
- * on a self-hosted one.
+ * side. The Cloud's computer that never reached this agent has no line of its own: nothing is coming, as past a wait.
+ * `hold`: a workspace on hold (`holdText`) waits for that, not for the computer, so it speaks instead. Null for any
+ * other gate. `computer`: its name as the panel says it; `machine`: its row, for the way to allow a program on a
+ * self-hosted one.
  */
 export function gateLine(
   t: TFunction,
@@ -489,6 +484,7 @@ export function gateLine(
     kind,
     computer,
     machine,
+    hold,
     now = Date.now(),
   }: {
     gate: PlanGate;
@@ -496,11 +492,15 @@ export function gateLine(
     kind: MachineAccountKind;
     computer: string;
     machine?: (Pick<Machine, "os" | "mode"> & Partial<Pick<Machine, "lastSeenAt">>) | null;
+    hold?: string | null;
     now?: number;
   },
 ): { text: string; rechecks: boolean } | null {
   const rechecks = gateRechecks(gate, edition);
   const program = t(`brain.card.${kind}`);
+  if (hold && (gate.state === "offline" || gate.state === "unsupported")) return { text: hold, rechecks: false };
+  if (gate.state === "missing" && edition === "cloud")
+    return { text: t("aiAccounts.connect.needsCloud.stuck", { computer, program }), rechecks };
   if (gate.state === "offline") {
     const seen = machine?.lastSeenAt ? Date.parse(machine.lastSeenAt) : null;
     if (edition === "cloud" && seen !== null && now - seen >= CLOUD_AWAY_MS)
@@ -514,6 +514,8 @@ export function gateLine(
     };
   }
   if (gate.state !== "unsupported") return null;
+  if (gate.reason === "not_reported" && !gate.overdue)
+    return { text: t("brain.reasons.not_reported", { computer }), rechecks };
   if (edition === "cloud")
     return {
       text: t(`aiAccounts.connect.needsCloud.${gate.overdue ? "stuck" : CLOUD_REASON[gate.reason]}`, {
@@ -539,6 +541,10 @@ export function dimmedLine(
   if (gate.state === "billing") return t("connectAi.billing");
   return gateLine(t, { gate, ...where })?.text ?? t("aiAccounts.connect.noComputer");
 }
+
+/** A key kept with no word from its maker: a billing hold asked no one, and the key waits for the plan. */
+export const uncheckedKeyLine = (t: TFunction, provider: string, held: boolean) =>
+  held ? t("connectAi.key.savedHeld") : t("connectAi.key.savedUnchecked", { provider });
 
 /**
  * The phone's words for a plan a billing hold stops: paying has no button or link there (ADR 0079 §6, App Store 3.1.1),

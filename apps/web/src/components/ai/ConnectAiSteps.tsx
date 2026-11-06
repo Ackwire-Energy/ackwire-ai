@@ -55,6 +55,7 @@ import {
   planPickText,
   planTitle,
   signsInOnce,
+  uncheckedKeyLine,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
@@ -319,6 +320,7 @@ export function ExistingRows({
   const toast = useToast();
   const dir = useDirectory(org.id);
   const models = useModels();
+  const held = usePlanHold() !== null;
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const view = gates.view;
@@ -368,8 +370,7 @@ export function ExistingRows({
   const pickKey = (key: Credential) =>
     save(async () => {
       const { check } = await api.agents.checkCredential(org.id, key.id);
-      if (check === "unchecked")
-        toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(key.provider) }), "info");
+      if (check === "unchecked") toast.show(uncheckedKeyLine(t, providerLabel(key.provider), held), "info");
       const row = dir.agentById.get(agent.id);
       // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
       if (view.scope === "mine" && row) {
@@ -389,7 +390,12 @@ export function ExistingRows({
     return gateDims(gate) ? [{ gate, kind: r.choice.login.kind }] : [];
   })[0];
   const dimmedWhy =
-    dimmed && dimmedLine(t, dimmed.gate, { ...dimmed, edition: gates.edition, computer: view.computer?.name ?? "" });
+    dimmed &&
+    dimmedLine(t, dimmed.gate, {
+      ...dimmed,
+      edition: gates.edition,
+      computer: view.computer?.name ?? computerName(t, org.name, null),
+    });
   const items = rows.map((r) => {
     if (r.kind === "key") {
       const k = r.key;
@@ -1308,7 +1314,14 @@ function GateWait({
   );
   const hold = holdText(t, org.standing);
   // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself as events arrive).
-  const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
+  const why = gateLine(t, {
+    gate,
+    edition,
+    kind,
+    computer,
+    hold,
+    machine: machines.data?.find((m) => m.id === machineId),
+  });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "billing") {
@@ -1363,7 +1376,7 @@ function GateWait({
         <SettingNote icon={why.rechecks ? "clock" : "alert"} live={why.rechecks}>
           {why.text}
         </SettingNote>
-        {useKey}
+        {!hold && useKey}
       </>
     );
   } else if (gate.state === "missing") {

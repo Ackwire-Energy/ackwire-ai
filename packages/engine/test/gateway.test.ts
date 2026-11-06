@@ -411,6 +411,17 @@ test("a provider's failure leaves with who answered and with the key it ran on m
   expect(error.message).toBe("no ••••");
 });
 
+test("a thinking refusal that echoes the call's key doesn't pass it on, whatever its shape", async () => {
+  f = await setup({
+    reply: () => ({ chunks: ["ok"], thinking: { refused: "bad platform-key" } }),
+    platform: { resolve: async () => ({ apiKey: "platform-key" }) },
+  });
+  await f.db.update(schema.agents).set({ credentialId: null }).where(eq(schema.agents.id, f.agent.id));
+  await revokeCredential(f.db, f.owner.id, f.org.id, f.credential.id);
+  const result = await call(f);
+  expect(result.thinking?.refused).toBe("bad ••••");
+});
+
 test("a refusal on the server's own key is reported, as nobody else will tell us; one on a person's isn't", async () => {
   const seen = async (platform: boolean) => {
     f = await setup({

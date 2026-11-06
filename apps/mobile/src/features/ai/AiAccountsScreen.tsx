@@ -22,7 +22,7 @@ import {
 import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { agentAi, aiStateOf, uncheckedKeyLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import { providerLabel } from "@agenteschat/client/lib/providers";
@@ -340,7 +340,8 @@ export function AiAccountsScreen() {
 /** The workspace's API keys (the web's "Chaves de provedor"): the default one, a key swapped or deleted. */
 function KeysSection({ locale }: { locale: string }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const held = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -375,7 +376,7 @@ function KeysSection({ locale }: { locale: string }) {
               toast({
                 title:
                   saved.check === "unchecked"
-                    ? t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) })
+                    ? uncheckedKeyLine(t, providerLabel(k.provider), held)
                     : t("settings.rotated"),
                 icon: "check",
               });

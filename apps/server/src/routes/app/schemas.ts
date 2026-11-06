@@ -751,14 +751,21 @@ export const BrainKind = z
   .enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"])
   .openapi("BrainKind");
 
+export const BrainUnavailable = z.enum([
+  "no_computer",
+  "exec_off",
+  "runner_old",
+  "tool_off",
+  "not_installed",
+  "outdated",
+  "not_reported",
+]);
+
 export const BrainOption = z
   .object({
     kind: BrainKind,
     available: z.boolean(),
-    reason: z
-      .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
-      .optional()
-      .openapi({ description: "Why it can't be chosen now (computer brains)." }),
+    reason: BrainUnavailable.optional().openapi({ description: "Why it can't be chosen now (computer brains)." }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),

@@ -9568,6 +9568,7 @@
       "tool_off": "{{program}} выключен на {{computer}}. Включите его там, в приложении agentes.chat: Настройки → Инструменты.",
       "tool_offLinux": "{{program}} выключен на {{computer}}. Включите его там, в приложении agentes.chat или командой {{command}}.",
       "not_installed": "{{program}} не установлен на {{computer}}.",
+      "not_reported": "{{computer}} ещё проверяет, какие программы на нём есть. Это изменится само, когда он закончит.",
       "outdated": "Версия на {{computer}} устарела. Обновите Codex, чтобы им пользоваться.",
       "no_computerCloud": "Будет готово, как только будет готов {{computer}}."
     },

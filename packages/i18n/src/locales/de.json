@@ -8939,6 +8939,7 @@
       "tool_off": "{{program}} ist auf {{computer}} ausgeschaltet. Schalte es dort in der agentes.chat-App ein: Einstellungen → Tools.",
       "tool_offLinux": "{{program}} ist auf {{computer}} ausgeschaltet. Schalte es dort in der agentes.chat-App oder mit {{command}} ein.",
       "not_installed": "{{program}} ist auf {{computer}} nicht installiert.",
+      "not_reported": "{{computer}} prüft noch, welche Programme vorhanden sind. Das ändert sich von selbst, wenn es so weit ist.",
       "outdated": "Die Version auf {{computer}} ist veraltet. Aktualisiere Codex, um es zu nutzen.",
       "no_computerCloud": "Bereit, sobald {{computer}} es ist."
     },

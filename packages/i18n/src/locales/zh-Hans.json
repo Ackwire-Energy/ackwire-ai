@@ -8632,6 +8632,7 @@
       "tool_off": "{{program}} 在 {{computer}} 上已关闭。请在那台电脑的 agentes.chat 应用中开启：偏好设置 → 工具。",
       "tool_offLinux": "{{program}} 在 {{computer}} 上已关闭。请在那台电脑的 agentes.chat 应用中开启，或使用 {{command}}。",
       "not_installed": "{{computer}} 上没有安装 {{program}}。",
+      "not_reported": "{{computer}} 还在检查有哪些程序。完成后这里会自动更新。",
       "outdated": "{{computer}} 上的版本太旧。请更新 Codex 后使用。",
       "no_computerCloud": "{{computer}} 一就绪即可使用。"
     },

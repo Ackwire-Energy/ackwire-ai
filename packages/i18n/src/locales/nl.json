@@ -9005,6 +9005,7 @@
       "tool_off": "{{program}} staat uit op {{computer}}. Zet het daar aan, in de agentes.chat-app: Voorkeuren → Tools.",
       "tool_offLinux": "{{program}} staat uit op {{computer}}. Zet het daar aan, in de agentes.chat-app of met {{command}}.",
       "not_installed": "{{program}} is niet geïnstalleerd op {{computer}}.",
+      "not_reported": "{{computer}} controleert nog welke programma's erop staan. Dit verandert vanzelf als het klaar is.",
       "outdated": "De versie op {{computer}} is oud. Werk Codex bij om het te gebruiken.",
       "no_computerCloud": "Klaar zodra {{computer}} klaar is."
     },

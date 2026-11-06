@@ -9234,6 +9234,7 @@
       "tool_off": "{{program}} está desactivado en {{computer}}. Actívalo allí, en la app de agentes.chat: Preferencias → Herramientas.",
       "tool_offLinux": "{{program}} está desactivado en {{computer}}. Actívalo allí, en la app de agentes.chat o con {{command}}.",
       "not_installed": "{{program}} no está instalado en {{computer}}.",
+      "not_reported": "{{computer}} todavía está comprobando qué programas tiene. Esto cambia solo cuando termine.",
       "outdated": "La versión de {{computer}} es antigua. Actualiza Codex para usarlo.",
       "no_computerCloud": "Listo en cuanto {{computer}} lo esté."
     },

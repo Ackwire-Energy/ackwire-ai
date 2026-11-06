@@ -8879,6 +8879,7 @@
       "tool_off": "{{program}}, {{computer}} üzerinde kapalı. Orada, agentes.chat uygulamasında açın: Tercihler → Araçlar.",
       "tool_offLinux": "{{program}}, {{computer}} üzerinde kapalı. Orada, agentes.chat uygulamasında veya {{command}} ile açın.",
       "not_installed": "{{program}}, {{computer}} üzerinde yüklü değil.",
+      "not_reported": "{{computer}} hangi programların olduğunu hâlâ kontrol ediyor. Bittiğinde bu kendiliğinden değişir.",
       "outdated": "{{computer}} üzerindeki sürüm eski. Kullanmak için Codex'i güncelleyin.",
       "no_computerCloud": "{{computer}} hazır olur olmaz hazır."
     },

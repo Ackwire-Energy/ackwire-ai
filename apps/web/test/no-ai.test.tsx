@@ -629,8 +629,9 @@ describe("the agent's no-AI card", () => {
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     const panel = within(plan).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.querySelector("[aria-busy='true']")).toBeNull();
-    expect(panel.textContent).toContain("As contas ficam num computador conectado.");
-    expect(within(panel).getByRole("button", { name: "Conectar um computador" })).toBeTruthy();
+    expect(panel.textContent).toContain("não vai mudar sozinho");
+    expect(within(panel).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
+    expect(within(panel).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
   });
 
   test("its views don't load: the plan's panel says so with Tentar de novo, which asks again", async () => {

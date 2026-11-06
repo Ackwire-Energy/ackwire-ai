@@ -8941,6 +8941,7 @@ export const ptBR = {
       tool_offLinux:
         "O {{program}} está desligado no {{computer}}. Ligue lá, no app do agentes.chat ou com {{command}}.",
       not_installed: "O {{program}} não está instalado no {{computer}}.",
+      not_reported: "O {{computer}} ainda está vendo quais programas tem. Isto muda sozinho quando terminar.",
       outdated: "A versão no {{computer}} é antiga. Atualize o Codex para usar.",
       no_computerCloud: "Disponível assim que o {{computer}} ficar pronto.",
     },

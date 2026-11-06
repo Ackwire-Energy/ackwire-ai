@@ -347,6 +347,9 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(offersKeyNow({ state: "offline" }, false, true)).toBe(true);
     expect(offersKeyNow({ state: "missing" }, false, true)).toBe(true);
     expect(offersKeyNow({ state: "unsupported", reason: "keys" }, false, true)).toBe(true);
+    // On a hold no key runs, and the line says the hold.
+    for (const gate of [{ state: "offline" }, { state: "unsupported", reason: "keys" }] as const)
+      expect(offersKeyNow(gate, true, true)).toBe(false);
     expect(offersKeyNow({ state: "ready" }, false, true)).toBe(false);
     expect(offersKeyNow({ state: "loading" }, false, true)).toBe(false);
     expect(offersKeyNow({ state: "locked", who: "owner" }, false, true)).toBe(false);
@@ -367,6 +370,7 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "cloud")).toBe(true);
     expect(pollsPlan({ state: "unsupported", reason: "runner_old" }, "cloud")).toBe(true);
     expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "selfhost")).toBe(false);
+    expect(pollsPlan({ state: "unsupported", reason: "not_reported" }, "selfhost")).toBe(true);
   });
 });
 
