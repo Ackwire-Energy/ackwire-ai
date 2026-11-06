@@ -490,3 +490,84 @@ describe("the step after a reply", () => {
     expect(await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, AGENT_MEDIA_JOB))).toEqual([]);
   });
 });
+
+describe("a GIF in another channel (post_message's gif)", () => {
+  /** `post_message` as the run lists it. */
+  const postMessageOf = async (ctx: ToolContext) => (await tools().list(ctx)).find((t) => t.name === "post_message");
+  const hasGif = async (ctx: ToolContext) =>
+    "gif" in (((await postMessageOf(ctx))?.inputSchema.properties ?? {}) as object);
+  /** ana asks Dev in their DM. */
+  const dmRun = async () => personRun((await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id })).id);
+  /** What landed in #general. */
+  const inGeneral = async () =>
+    (await agentMessages()).filter((m) => m.channelId === f.general.id).map((m) => ({ body: m.body, meta: m.meta }));
+
+  test("asked in a DM: the text and the GIF go to #general as one message, kept without a URL, never its title", async () => {
+    const gifs = createFakeGifs();
+    f = await setup({ mediaTools: true, chatTools: true, gifs });
+    const { ctx } = await dmRun();
+    expect(await hasGif(ctx)).toBe(true);
+    expect((await postMessageOf(ctx))?.description).toContain("add one with `gif`");
+    const sent = await call(ctx, "post_message", {
+      channel: "#general",
+      text: "Boa noite, pessoal!",
+      gif: "  good   morning ",
+    });
+    const output = (sent as { output: { content: string; isError?: boolean } }).output;
+    expect(output.isError).toBeFalsy();
+    expect(output.content).toStartWith("Posted in #general with a GIF:");
+    expect(output.content).not.toContain("Good morning sunshine");
+    expect(gifs.calls.search.map((s) => s.query)).toEqual(["good morning"]);
+    const [posted, ...more] = await inGeneral();
+    expect(more).toEqual([]);
+    expect(posted?.body).toBe("Boa noite, pessoal!");
+    expect(posted?.meta.media).toMatchObject({ kind: "gif", provider: "giphy", id: "fakeMorning1" });
+    expect(JSON.stringify(posted?.meta)).not.toContain("http");
+  });
+
+  test("a GIF alone posts too; GIFs off: not offered, and a call posts nothing", async () => {
+    f = await setup({ mediaTools: true, chatTools: true, gifs: createFakeGifs() });
+    const { ctx } = await dmRun();
+    expect(await call(ctx, "post_message", { channel: "general", gif: "celebration" })).toMatchObject({
+      type: "result",
+      output: { content: expect.stringContaining("Posted in #general with a GIF:") },
+    });
+    expect((await inGeneral()).map((m) => m.body)).toEqual([""]);
+
+    await settings({ gifs: false });
+    expect(await hasGif(ctx)).toBe(false);
+    await settings({ gifs: true });
+    await agentSwitch(false);
+    expect(await hasGif(ctx)).toBe(false);
+    // Called anyway (a listing from before the switch): the schema has no `gif`, so nothing goes.
+    expect(await call(ctx, "post_message", { channel: "general", text: "Oi", gif: "hello" })).toMatchObject({
+      type: "result",
+      output: { isError: true },
+    });
+    expect(await inGeneral()).toHaveLength(1);
+  });
+
+  test("no GIF search on the server, or a search that fails: no gif, and nothing posted", async () => {
+    f = await setup({ mediaTools: true, chatTools: true });
+    expect(await hasGif((await dmRun()).ctx)).toBe(false);
+    await f.close();
+
+    const fake = createFakeGifs();
+    const down: GifProvider = {
+      ...fake,
+      search: async () => {
+        throw new GifProviderError("GIPHY answered 503", 503);
+      },
+    };
+    f = await setup({ mediaTools: true, chatTools: true, gifs: down });
+    const { ctx } = await dmRun();
+    expect(await call(ctx, "post_message", { channel: "general", text: "Boa noite!", gif: "moon" })).toMatchObject({
+      type: "result",
+      output: {
+        isError: true,
+        content: "GIF search isn't answering right now: try again, or post without `gif`.",
+      },
+    });
+    expect(await inGeneral()).toEqual([]);
+  });
+});

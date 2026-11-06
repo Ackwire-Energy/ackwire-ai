@@ -1952,13 +1952,36 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 }
 /* Tables: a quiet box with a hairline, the header on a soft band, rows split by hairlines, numbers aligned
    (right, tabular figures; the parser decides the side). A wide table scrolls inside its box. */
-/* As wide as its columns, up to the message's: a wide one scrolls in its box, a small one doesn't stretch across. */
+/* Outside a message (a wiki page) as wide as its columns, up to the page's; in a message, the message's width. */
 .md__table {
   overflow: auto;
   width: fit-content;
   max-width: 100%;
   border-radius: 12px;
   box-shadow: inset 0 0 0 1px var(--line);
+}
+/* In a message every table is one width, the message's (as a code block is), whatever its columns: a small one
+   spreads its columns across, a wide one scrolls inside, so tables one under another line up. */
+.md--message .md__table {
+  width: 100%;
+}
+/* The table scrolls inside the box (`TableBox`), so the hairline and the corners stay put; the side with more
+   columns past it fades, the way the task board's does. */
+.md__table-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.md__table[data-more="end"] > .md__table-scroll {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+}
+.md__table[data-more="start"] > .md__table-scroll {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px);
+  mask-image: linear-gradient(to right, transparent, #000 48px);
+}
+.md__table[data-more="both"] > .md__table-scroll {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
 }
 .md__table table {
   border-collapse: collapse;
