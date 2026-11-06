@@ -12999,11 +12999,17 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 /* The receipt's last line: who picked the agents, or how they are picked, under a hairline. */
 .who-by {
   margin-top: 4px;
-  padding: 8px 6px 2px;
+  padding: 8px 6px 4px;
   border-top: 1px solid var(--line);
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
+}
+/* No agent listed yet ("Picking who answers"): nothing to set it apart from, so no hairline right under the title. */
+.ac-popover__title + .who-by {
+  margin-top: 0;
+  padding-top: 2px;
+  border-top: 0;
 }
 
 /* The notifications dialog (WebPush.tsx `WebPushAsk`, ADR 0071): three notifications as the computer shows them,
