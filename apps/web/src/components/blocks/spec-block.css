@@ -120,7 +120,7 @@
 .spec-block__slider input[type="range"]:active::-webkit-slider-thumb {
   transform: scale(1.1);
 }
-.spec-block__slider input[type="range"]:focus-visible {
+html:not([data-pointer]) .spec-block__slider input[type="range"]:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -268,7 +268,7 @@
 .spec-block__more[open] summary::before {
   transform: rotate(45deg);
 }
-.spec-block__more summary:focus-visible {
+html:not([data-pointer]) .spec-block__more summary:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -314,7 +314,7 @@
 .spec-block__card[data-on] {
   box-shadow: 0 0 0 1.6px var(--ink);
 }
-.spec-block__card:focus-visible {
+html:not([data-pointer]) .spec-block__card:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
