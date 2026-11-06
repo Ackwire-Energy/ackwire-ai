@@ -127,7 +127,7 @@ const until = async (done: () => boolean) => {
   for (let i = 0; i < 100 && !done(); i++) await Bun.sleep(5);
 };
 
-test("a runner at protocol 46 gets the view's own socket: frames come as bytes, each acknowledged", async () => {
+test("a runner at protocol 49 gets the view's own socket: frames come as bytes, each acknowledged", async () => {
   const { hub, paired, live, got, viewer } = await liveSetup();
   const runner = browserRunner(hub);
   await runner.hello(paired.token);

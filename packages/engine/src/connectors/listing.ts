@@ -226,7 +226,12 @@ export interface MissingConnector {
    * a Composio account of it stopped working.
    */
   state: "unavailable" | "soon" | "not_connected" | "not_given" | "needs_reconnect";
+  /** The workspace's working connections and mailboxes of it. */
+  connectionIds: string[];
 }
+
+/** A connector of "Adicionar conector" as this agent stands with it: `usable`, it has tools of it. */
+export type ConnectorState = Omit<MissingConnector, "state"> & { state: MissingConnector["state"] | "usable" };
 
 /** The mailboxes "Adicionar conector" offers, by the rule of `mailChoices` (apps/web/src/components/MailConnect.tsx). */
 const MAILBOXES: {
@@ -266,17 +271,28 @@ const MAILBOXES: {
 
 type Tools = Iterable<Pick<ToolDefinition, "connectionId">>;
 
-/**
- * The connectors of "Adicionar conector" (`connectorListing` and the mailboxes) the agent has no tool of, and why.
- * `usable`: the agent's tools; `listed`: every tool this server lists for the workspace. Names and states only:
- * never a connection's account, address or key.
- */
+/** The connectors the agent has no tool of, and why (`connectorStates`). */
 export async function missingConnectors(
   db: Database,
   orgId: string,
   catalog: ServerCatalog,
   tools: { usable: Tools; listed: Tools },
 ): Promise<MissingConnector[]> {
+  const states = await connectorStates(db, orgId, catalog, tools);
+  return states.filter((c): c is MissingConnector => c.state !== "usable");
+}
+
+/**
+ * The connectors of "Adicionar conector" (`connectorListing` and the mailboxes) and how the agent stands with each.
+ * `usable`: the agent's tools; `listed`: every tool this server lists for the workspace. Names and states only:
+ * never a connection's account, address or key.
+ */
+export async function connectorStates(
+  db: Database,
+  orgId: string,
+  catalog: ServerCatalog,
+  tools: { usable: Tools; listed: Tools },
+): Promise<ConnectorState[]> {
   const [connections, mailboxes] = await Promise.all([activeConnections(db, orgId), orgMailAccounts(db, orgId)]);
   const services = new Map<
     string,
@@ -333,14 +349,14 @@ export async function missingConnectors(
   }
   const ids = (list: Tools) => new Set([...list].map((t) => t.connectionId));
   const [usable, listed] = [ids(tools.usable), ids(tools.listed)];
-  return [...services.values()].flatMap((s): MissingConnector[] => {
-    if (s.held.some((id) => usable.has(id))) return [];
-    let state: MissingConnector["state"];
-    if (s.held.some((id) => listed.has(id))) state = "not_given";
+  return [...services.values()].flatMap((s): ConnectorState[] => {
+    let state: ConnectorState["state"];
+    if (s.held.some((id) => usable.has(id))) state = "usable";
+    else if (s.held.some((id) => listed.has(id))) state = "not_given";
     else if (s.reconnect) state = "needs_reconnect";
     // Connected, but no tool of it listed (server down, not reviewed yet): nothing says the agent lacks it.
     else if (s.held.length > 0) return [];
     else state = s.offered ? "not_connected" : s.soon ? "soon" : "unavailable";
-    return [{ label: s.label, description: s.description, names: [...s.names], state }];
+    return [{ label: s.label, description: s.description, names: [...s.names], state, connectionIds: s.held }];
   });
 }

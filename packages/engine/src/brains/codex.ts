@@ -18,7 +18,14 @@ import type { CodeSetup } from "../git/machine";
 import type { MachineCaller } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
-import { accountFields, accountUnavailable, busyRefusal, contextFields, steerOnMachine } from "./claude-code";
+import {
+  accountFields,
+  accountUnavailable,
+  busyRefusal,
+  contextFields,
+  speedFields,
+  steerOnMachine,
+} from "./claude-code";
 import { computerPrompt, systemWithConversation } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
@@ -378,9 +385,11 @@ export class CodexBrain implements Brain {
       ...(agent ? { agent } : {}),
       ...accountFields(status.protocol, turn),
       ...contextFields(status.protocol, turn),
+      ...speedFields(status.protocol, turn),
       ...(permissions ? { permissions } : {}),
       ...(this.deps.keepAlive === false ? { keepAlive: false } : {}),
       ...(freeTier ? { freeTier } : {}),
+      ...(turn.personWaiting ? { personWaiting: true } : {}),
     };
 
     const events = channel<BrainEvent>();

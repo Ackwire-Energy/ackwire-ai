@@ -1,7 +1,10 @@
+import { opensDetails } from "@agenteschat/client/lib/audience";
 import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { splitAtNames } from "@agenteschat/client/lib/text";
+import { router } from "expo-router";
 import { Fragment, type ReactNode } from "react";
-import { Text as RNText, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import type { AgentLookInput } from "@/agent/looks";
 import { type AgentMode, agentLayout, framedByDefault } from "@/agent/poses";
 import { AgentAvatar, PersonAvatar, WithPresence } from "@/ui";
@@ -9,6 +12,7 @@ import { usePresenceOf } from "../status/hooks";
 import { useDirectory } from "./hooks";
 import { agentLook } from "./logic";
 import { usePersonPhoto } from "./photo";
+import { useSheetIfAny } from "./SheetHost";
 
 /**
  * A person's or an agent's face. Agents are living bodies; long lists pass
@@ -46,6 +50,32 @@ export function Face({
     <Badged who={{ type: who.type, id: who.id }} size={size} ring={ring} inset={0}>
       {face}
     </Badged>
+  );
+}
+
+/**
+ * An agent's picture on a surface about it: a tap opens its profile and the sheet it sits on gives way. Plain for who
+ * has no details to reach (`opensDetails`).
+ */
+export function OpensAgent({ agentId, children }: { agentId: string; children: ReactNode }) {
+  const { t } = useTranslation();
+  const dir = useDirectory();
+  const sheet = useSheetIfAny();
+  const agent = dir.anyAgent(agentId);
+  if (!agent || !opensDetails(agent)) return <>{children}</>;
+  return (
+    <Pressable
+      onPress={() => {
+        sheet?.close();
+        router.push(`/agent/${agentId}`);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={t("profile.of", { name: agent.name })}
+      hitSlop={8}
+      style={({ pressed }) => pressed && whoStyles.pressed}
+    >
+      {children}
+    </Pressable>
   );
 }
 
@@ -130,7 +160,10 @@ function Badged({
   children: ReactNode;
 }) {
   const of = usePresenceOf();
-  const presence = who.type === "agent" ? of.agent(who.id)?.presence : of.person(who.id)?.presence;
+  const said = who.type === "agent" ? of.agent(who.id)?.presence : of.person(who.id)?.presence;
+  // An agent at rest ("away" once its last run is a while back) wears no badge: its badge is amber, the color of what
+  // waits on the person, and resting is no news. People's "away" is theirs to say, so it stays.
+  const presence = who.type === "agent" && said === "away" ? undefined : said;
   return (
     <WithPresence size={size} presence={presence} inset={inset} {...(ring !== undefined ? { ring } : {})}>
       {children}
@@ -190,4 +223,5 @@ export function withAgentFaces(
 const whoStyles = StyleSheet.create({
   who: { fontWeight: "600" },
   face: { transform: [{ translateY: 2 }] },
+  pressed: { opacity: 0.6 },
 });

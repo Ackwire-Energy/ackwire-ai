@@ -20,8 +20,10 @@ import {
   Chip,
   Diff,
   diffLines,
+  EmptyState,
   Field,
   Icon,
+  Locked,
   SearchField,
   Segmented,
   Textarea,
@@ -30,11 +32,20 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
-import { LoadingLine } from "@/components/Loading";
+import { ErrorState, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
-import { filterMemories, KIND_ICON, type MemoryTab as Kind, memorySource, usageLabel } from "@/pages/MemoryPage";
+import {
+  filterMemories,
+  KIND_ICON,
+  type MemoryTab as Kind,
+  memorySource,
+  NoMemories,
+  usageLabel,
+} from "@/pages/MemoryPage";
 import { CardHead, useAgentEdit } from "./context";
 import { Cell } from "./Work";
 
@@ -88,9 +99,11 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         <b>{t("proposals.why")}:</b> {proposal.why}
       </p>
       {editing ? (
-        <Field label={t("proposals.finalText")} id={`prop-edit-${proposal.id}`}>
-          <Textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} />
-        </Field>
+        <Locked when={decide.isPending || stale || proposal.stale}>
+          <Field label={t("proposals.finalText")} id={`prop-edit-${proposal.id}`}>
+            <Textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} />
+          </Field>
+        </Locked>
       ) : (
         <Diff
           aria-label={t("proposals.changeLabel")}
@@ -112,7 +125,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
             >
               {editing ? t("proposals.acceptEdited") : t("proposals.accept")}
             </Button>
-            <Button size="sm" icon="edit" onClick={() => setEditing((v) => !v)}>
+            <Button size="sm" icon="edit" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
               {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
             </Button>
             <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={refuse}>
@@ -187,9 +200,11 @@ function LearnedRow({ m }: { m: Memory }) {
           <span>{m.text}</span>
         )
       ) : (
-        <Field label={t("agentPage.memory.edit")} id={`learned-${m.id}`}>
-          <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} />
-        </Field>
+        <Locked when={act.isPending}>
+          <Field label={t("agentPage.memory.edit")} id={`learned-${m.id}`}>
+            <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          </Field>
+        </Locked>
       )}
       <span className="agp-chips">
         {m.howTo ? (
@@ -236,7 +251,7 @@ function LearnedRow({ m }: { m: Memory }) {
           </>
         ) : (
           <>
-            <Button size="sm" variant="primary" disabled={act.isPending || !draft.trim()} onClick={save}>
+            <Button size="sm" variant="primary" disabled={!draft.trim()} loading={act.isPending} onClick={save}>
               {t("agentPage.memory.save")}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
@@ -379,9 +394,14 @@ function LearnedList({ list }: { list: Memory[] }) {
   const skills = useLearnedSkills(org.id, agent.id).data ?? [];
   if (list.length === 0 && skills.length === 0)
     return (
-      <div className="agp-empty">
-        <b>{t("agentPage.memory.learnedEmpty")}</b>
-      </div>
+      <EmptyState
+        size="panel"
+        agent={lookOf(agent) ?? true}
+        title={t("agentPage.memory.learnedEmptyTitle")}
+        actions={<AskAgentButton agent={agent} variant="primary" />}
+      >
+        {t("agentPage.memory.learnedEmpty")}
+      </EmptyState>
     );
   const people = list.filter((m) => !m.playbook);
   const playbook = list.filter((m) => m.playbook);
@@ -527,12 +547,12 @@ export function MemoryTab() {
             </Toolbar>
             {memory.isLoading ? (
               <LoadingLine width={260} />
+            ) : memory.isError && !memory.data ? (
+              <ErrorState error={memory.error} onRetry={() => void memory.refetch()} />
             ) : kind === "learned" ? (
               <LearnedList list={learned} />
             ) : shown.length === 0 ? (
-              <div className="agp-empty">
-                <b>{q.trim() ? t("memory.emptySearch", { q }) : t("memory.empty", g)}</b>
-              </div>
+              <NoMemories agent={agent} q={q} none={list.length === 0} onClear={() => setQ("")} />
             ) : (
               <ul className="agp-list agp-mems">
                 {shown.map((m) => (

@@ -1,10 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
+import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation, SecretRequest } from "@agenteschat/client";
 import { activitySentence, barElapsed, barFaces, barWords, entriesOffScreen } from "@agenteschat/client/lib/activity";
 import { runAround, runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
+import {
+  latestSecret,
+  secretLabel,
+  secretRefusalKey,
+  secretRequestOf,
+  secretValueProblem,
+  secretWhere,
+} from "@agenteschat/client/lib/secret-requests";
+import { secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
   AGENT_WORDS_MIN,
@@ -64,6 +72,7 @@ import {
   turnPhase,
   turnRuns,
   turnShows,
+  turnSignature,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -79,6 +88,18 @@ describe("timeline", () => {
     const b = message({ id: "b", createdAt: at(8), threadId: "a", author: { type: "agent", id: "dev" } });
     const c = message({ id: "c", createdAt: at(5) });
     expect(mergeTimeline([a, c], [[b, a]]).map((m) => m.id)).toEqual(["a", "b", "c"]);
+  });
+
+  test("a reply to a message starts its own block, and the next one groups under it", () => {
+    const quote = { replyTo: { messageId: "1", excerpt: "oi", author: { type: "person", id: "u" } } };
+    const rows = buildRows([message({ id: "1" }), message({ id: "2", meta: quote }), message({ id: "3" })]).flatMap(
+      (r) => (r.kind === "message" ? [[r.message.id, r.grouped]] : []),
+    );
+    expect(rows).toEqual([
+      ["1", false],
+      ["2", false],
+      ["3", true],
+    ]);
   });
 
   test("same author within 5 minutes groups; a day starts a new group; cards stand alone", () => {
@@ -488,7 +509,7 @@ describe("working line", () => {
     expect(entriesOffScreen(workingEntries([ada], [], name), [ada], adaShows)).toEqual([]);
   });
 
-  test("its row out of view, the line speaks for that one agent: its step, its time, Ver and its stop", async () => {
+  test("its row out of view, the line speaks for that one agent: its step, its time right after it, and Ver", async () => {
     const en = await translator("en");
     const now = 1_000_000;
     const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: now - 16_000 });
@@ -512,13 +533,13 @@ describe("working line", () => {
     // Two agents out of view: the line can't say whose time or stop.
     const both = workingEntries([ada, atlas], [], name);
     expect(awayRun(both, [ada, atlas], () => false)).toBeUndefined();
-    // The step keeps one width in the line, so the clock and the stop never move as it turns.
+    // The step takes its own width, so its time follows the words instead of floating after a fixed gap.
     const lines = await source("features/chat/LiveRows.tsx");
-    expect(lines).toContain("barStep: { flexBasis: 150, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
-    // "Ver" only once its row is in the conversation, and then the stop after it, without a second rule.
+    expect(lines).toContain("barStep: { flexShrink: 1, minWidth: 0 },");
+    // "Ver" only once its row is in the conversation; no stop of the line's own (the composer's, under it, is the one).
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
     expect(line).toContain("const seeable = away && turnShows(away) ? away : undefined;");
-    expect(line).toContain("<LineStop runs={stoppable} onStop={onStop} rule={!seeable} />");
+    expect(line).not.toContain("<LineStop");
   });
 
   test("the row's stop: the latest run here I may stop (the web's rule), never a guess", () => {
@@ -929,6 +950,21 @@ describe("an agent's turn as one block", () => {
     expect(turnShows({ ...fresh, work: [{ kind: "say", text: "Vou ler.", turn: 1 }] })).toBe(true);
   });
 
+  test("a call refused for its arguments: quiet once made right, plain when the run ends without it", () => {
+    const slip = { ...call("1", "offer_connect_app", false), failed: true, slip: true };
+    const made = turnItems(run({ runId: "r", work: [slip, call("2", "offer_connect_app", false)] }));
+    expect(made.map((x) => x.kind === "call" && x.line.state)).toEqual(["stop", "done"]);
+    expect(toolNow(turnItems(run({ runId: "r", work: [slip] })))?.state).toBe("run");
+    expect(toolNow(turnItems(run({ runId: "r", work: [slip] }), true))?.state).toBe("fail");
+    expect(toolNow(turnItems(run({ runId: "r", status: "failed", work: [slip] })))?.state).toBe("fail");
+  });
+
+  test("the end of what it said reaching its line changes what the saved reply keeps", () => {
+    const said = (text: string) =>
+      turnSignature(turnItems(run({ runId: "r", work: [{ kind: "say", text, turn: 1 }] })));
+    expect(said("Se você me passar o `build.gradle`")).not.toBe(said("Se você me pa"));
+  });
+
   test("the header word: thinking, working on steps, writing, stopped", () => {
     expect(turnPhase(run({ runId: "a" }))).toBe("thinking");
     expect(turnPhase(run({ runId: "b", tool: "sentry_list_issues" }))).toBe("working");
@@ -1324,7 +1360,7 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
       "Só o navegador de Theo digita, em shop.example.com. Fica fora dos comandos de Theo.",
     );
     expect(secretWhere(en, { ...request, name: "NPM_TOKEN", target: { kind: "env" } }, "Theo")).toBe(
-      "Goes in as the variable NPM_TOKEN on Theo's computer.",
+      "Goes to Theo's computer, for its commands.",
     );
     expect(secretWhere(pt, { ...request, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
       "Vai para o arquivo .npmrc no computador de Theo.",
@@ -1332,17 +1368,58 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     // Asked again under a name the agent holds (a key that was refused): the card says it replaces that one.
     const again = { ...request, name: "TYPESAFE_API_KEY", target: { kind: "env" as const }, replaces: true };
     expect(secretWhere(pt, again, "Theo")).toBe(
-      "Vai como a variável TYPESAFE_API_KEY no computador de Theo. Substitui a chave com esse nome que Theo já tem.",
+      "Vai para o computador de Theo, para os comandos. Substitui a chave com esse nome que Theo já tem.",
     );
     expect(secretWhere(en, again, "Theo")).toBe(
-      "Goes in as the variable TYPESAFE_API_KEY on Theo's computer. Replaces the key Theo already has under this name.",
+      "Goes to Theo's computer, for its commands. Replaces the key Theo already has under this name.",
     );
     // Answered or closed, nothing is being replaced: the details say only where it goes.
     for (const status of ["delivered", "declined", "expired"] as const) {
-      expect(secretWhere(pt, { ...again, status }, "Theo")).toBe(
-        "Vai como a variável TYPESAFE_API_KEY no computador de Theo.",
-      );
+      expect(secretWhere(pt, { ...again, status }, "Theo")).toBe("Vai para o computador de Theo, para os comandos.");
     }
+  });
+
+  test("people read a label, never the agent's own name for it", async () => {
+    const pt = await translator("pt-BR");
+    expect(secretLabel(pt, { ...request, label: "Senha da Conta Google" }, "Theo")).toBe("Senha da Conta Google");
+    expect(secretLabel(pt, request, "Theo")).toBe("Senha de shop.example.com");
+    expect(secretLabel(pt, { ...request, codeDigits: 6 }, "Theo")).toBe("Código de shop.example.com");
+    expect(secretLabel(pt, { ...request, site: null, target: { kind: "env" } }, "Theo")).toBe(
+      "Chave para o computador de Theo",
+    );
+    expect(secretLabel(pt, { ...request, site: null, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
+      "O arquivo .npmrc",
+    );
+  });
+
+  test("an ended request says what happened and what's next, for each way it ends", async () => {
+    const pt = await translator("pt-BR");
+    const said = (r: Partial<SecretRequest>) => secretOutcome(pt, { ...request, ...r }, true, "Ana", "Theo");
+    expect(said({ status: "delivered" })).toBe("Entregue por você");
+    expect(said({ status: "declined" })).toBe("Recusado. Theo segue sem isso.");
+    expect(said({ status: "expired" })).toContain("Ninguém respondeu a tempo.");
+    // Past its deadline before any event: the same words.
+    expect(said({ status: "pending" })).toContain("Ninguém respondeu a tempo.");
+    expect(said({ status: "canceled", endReason: "run_stopped" })).toContain("A tarefa de Theo parou");
+    expect(said({ status: "canceled", endReason: "superseded" })).toContain("num pedido mais novo");
+    // Its run stopped and the agent asked again: the newer one is what's next.
+    expect(said({ status: "canceled", endReason: "run_stopped", supersededBy: "r2" })).toContain(
+      "num pedido mais novo",
+    );
+    expect(said({ status: "canceled", endReason: "computer_changed" })).toContain("o computador que pediu mudou");
+    expect(said({ status: "canceled", endReason: "person_left" })).toContain("Ana saiu do workspace");
+    expect(said({ status: "canceled", withdrawn: true })).toBe("Theo não precisa mais disso.");
+    expect(said({ status: "canceled" })).toContain("Este pedido fechou antes da resposta.");
+  });
+
+  test("a closed copy beats an open one, and only a computer that can't take it keeps the card open", () => {
+    const closed = { ...request, status: "canceled" as const };
+    expect(latestSecret(request, closed)).toBe(closed);
+    expect(latestSecret(closed, request)).toBe(closed);
+    expect(latestSecret(undefined, request)).toBe(request);
+    expect(secretRefusalKey({ code: "machine.offline" })).toBe("secret.computerAway");
+    expect(secretRefusalKey({ code: "machine.paused" })).toBe("secret.computerPaused");
+    expect(secretRefusalKey({ code: "secret.closed" })).toBeNull();
   });
 
   test("an empty or too large value is caught before it is sealed", async () => {

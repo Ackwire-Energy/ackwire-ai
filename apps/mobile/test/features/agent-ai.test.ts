@@ -15,6 +15,7 @@ import {
   accountSaved,
   agentAccounts,
   existingRows,
+  flowBack,
   modelInput,
   modelRows,
   modelSections,
@@ -214,6 +215,15 @@ describe("the agent's AI", () => {
     expect(sheet).toContain("queryKey: keys.brainMachines(orgId)");
   });
 
+  test("under a hold, Uso's empty plans card says what comes first and invites no plan", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const usage = await Bun.file(new URL("../../src/features/usage/UsageScreen.tsx", import.meta.url).pathname).text();
+    expect(usage).toContain("usePlanHold(orgId, org)");
+    expect(usage.indexOf("<PlanHoldNote")).toBeGreaterThan(-1);
+    expect(usage.indexOf("<PlanHoldNote")).toBeLessThan(usage.indexOf('place="ai"'));
+    expect(usage).toContain("data.accounts.length === 0 && hold ?");
+  });
+
   test("the agent's AI and a plan's page draw the same switch, line and ⓘ, and nothing asks to accept the terms", async () => {
     // The screens are components the tests can't render: what they wire in, as text.
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
@@ -401,6 +411,17 @@ describe("the agent's AI", () => {
     expect(home.indexOf('t("connectAi.have.title")')).toBeGreaterThan(-1);
     expect(home.indexOf('t("connectAi.have.title")')).toBeLessThan(home.indexOf('t("mobile.ai.yourPlan")'));
     expect(home).toContain("<AiRow");
+    // A plan or a key, one row each; whose is one searched list, the plan's page and the key's steps as before.
+    expect(home).toContain('onView({ page: "plans" })');
+    expect(home).toContain('onView({ page: "key" })');
+    const plans = connect.slice(connect.indexOf("function Plans("), connect.indexOf("function Makers("));
+    expect(plans).toContain("<PickList");
+    expect(plans).toContain("options={PLAN_CHOICES.map(");
+    expect(plans).toContain('onView({ page: "plan", choice: o.value })');
+    const makers = connect.slice(connect.indexOf("function Makers("));
+    expect(makers).toContain("<PickList");
+    expect(makers).toContain("...PROVIDERS.map(");
+    expect(connect.slice(connect.indexOf("function KeyPage("))).toContain("onPress={onMakers}");
     expect(connect).toContain("existingRows(t, gates.view, credentials.data ?? [], forAgent.name)");
     // The workspace's keys only in Connect an AI (a sheet), as on the web: the first run's saved key already serves
     // every agent with no plan.
@@ -527,13 +548,14 @@ describe("the agent's AI", () => {
     expect(ownSignInTitle(await translator("pt-BR"), { kind: "claude_code", plan: "max" })).toBe("Claude · Max");
     const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
     expect(await read("ai/logic.ts")).toContain("label: accountTitle(choice.login),");
-    for (const [screen, row] of [
-      ["ai/AiAccountsScreen.tsx", "a"],
-      ["me/MeScreen.tsx", "first"],
+    // AI accounts' grouped rows take a `label`, the Me page's rows a `title`.
+    for (const [screen, row, prop] of [
+      ["ai/AiAccountsScreen.tsx", "a", "label"],
+      ["me/MeScreen.tsx", "first", "title"],
     ]) {
       const source = await read(screen);
-      expect(source).toContain(`title={accountTitle(${row})}`);
-      expect(source).toContain("title={ownSignInTitle(t, o)}");
+      expect(source).toContain(`${prop}={accountTitle(${row})}`);
+      expect(source).toContain(`${prop}={ownSignInTitle(t, o)}`);
       expect(source).not.toContain("planWordOf(o.plan)");
     }
     expect((await translator("pt-BR"))("connectAi.plan.claude.tiers")).toBe("Pro, Max, Ultra, Team ou Enterprise");
@@ -775,7 +797,7 @@ describe("the agent's AI", () => {
       'const steps = ready || gate.state === "preparing" || (gate.state === "offline" && signingIn);',
     );
     expect(connect).toContain('} else if (why && !(gate.state === "offline" && signingIn)) {');
-    expect(connect).toContain("offersKeyNow(gate, hold !== null) && !signingIn");
+    expect(connect).toContain("offersKeyNow(gate, hold !== null, mayAddKey) && !signingIn");
     expect(connect).toContain("onSigningIn={setSigningIn}");
     expect(flow).toMatch(
       /useEffect\(\(\) => \{\s*onSigningIn\?\.\(begun\);\s*return \(\) => onSigningIn\?\.\(false\);/,
@@ -810,8 +832,17 @@ describe("the agent's AI", () => {
       accounts: [],
       account: null,
     };
-    const now = { effort: "high" as const, contextTokens: null, onlyOwner: true, fallback: true };
+    const now = {
+      effort: "high" as const,
+      speed: "standard" as const,
+      contextTokens: null,
+      onlyOwner: true,
+      fallback: true,
+    };
     expect(setupWords(t, "pt-BR", view, { apiKey: true, now })).toBe("Opus pelo plano do Claude · Esforço alto");
+    expect(setupWords(t, "pt-BR", view, { apiKey: true, now: { ...now, speed: "fast" } })).toBe(
+      "Opus pelo plano do Claude · Esforço alto · Velocidade rápida",
+    );
     // On a coding plan, its own model; everything at its default says nothing more.
     const glm = { ...view, effectiveModel: "sonnet", accounts: [account("glm", { provider: "zai" })], account: "glm" };
     expect(setupWords(t, "pt-BR", glm, { apiKey: true, now: { ...now, effort: "medium" } })).toBe(
@@ -821,6 +852,14 @@ describe("the agent's AI", () => {
     expect(setupWords(t, "pt-BR", { ...view, autonomy: "never" }, { apiKey: true, now })).toBe(
       "Opus pelo plano do Claude · Esforço alto · Autonomia: Não pergunta",
     );
+    const advanced = await Bun.file(
+      new URL("../../src/features/ai/AgentAdvancedScreen.tsx", import.meta.url).pathname,
+    ).text();
+    // Velocidade as on the web: only where it fits, read-only for who can't edit, saved at once.
+    expect(advanced).toContain("{viewSpeedFits(view) ? (");
+    expect(advanced).toContain('t("agentPage.work.brain.speedText")');
+    expect(advanced).toContain("disabled={!view.canEdit}");
+    expect(advanced).toContain('speed: viewSpeedFits(view) ? view.speed : "standard"');
     const setup = await Bun.file(
       new URL("../../src/features/ai/AgentSetupScreen.tsx", import.meta.url).pathname,
     ).text();
@@ -976,5 +1015,17 @@ describe("Seus planos' rows", () => {
     const row = readFileSync(join(import.meta.dir, "../../src/ui/Row.tsx"), "utf8");
     expect(row).toContain("padding: 14,");
     expect(row).not.toContain("paddingVertical");
+  });
+});
+
+describe("Back in Connect an AI", () => {
+  test("a plan picked from the list goes back to the list, a sign-in from a row of what the person has to that row", () => {
+    const plan = { page: "plan", choice: "chatgpt" } as const;
+    expect(flowBack(plan, false)).toEqual({ page: "plans" });
+    expect(flowBack(plan, true)).toEqual({ page: "home" });
+    expect(flowBack({ page: "plans" }, false)).toEqual({ page: "home" });
+    expect(flowBack({ page: "makers" }, false)).toEqual({ page: "key" });
+    expect(flowBack({ page: "key" }, false)).toEqual({ page: "home" });
+    expect(flowBack({ page: "home" }, false)).toBeNull();
   });
 });

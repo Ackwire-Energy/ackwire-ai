@@ -1,8 +1,9 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { copyText, type HeaderWordAction, MONO, PushedHeader, successHaptic } from "../shared/parts";
 
@@ -23,11 +24,14 @@ export function SettingsPage({
   title,
   subtitle,
   action,
+  locked = false,
   children,
 }: {
   title: string;
   subtitle?: string | undefined;
   action?: HeaderWordAction;
+  /** The page's form is sending: its controls are off, the page still scrolls. */
+  locked?: boolean;
   children?: ReactNode;
 }) {
   const c = useColors();
@@ -48,7 +52,10 @@ export function SettingsPage({
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={[styles.body, { paddingBottom: 24 + insets.bottom }]}
       >
-        {children}
+        {/* What is there as the screen opens doesn't fade in; what loads while it is watched does (`Loaded`). */}
+        <Locked when={locked}>
+          <LayoutAnimationConfig skipEntering>{children}</LayoutAnimationConfig>
+        </Locked>
       </ScrollView>
     </View>
   );
@@ -176,6 +183,6 @@ const styles = StyleSheet.create({
   gap: { height: 14 },
   command: { paddingHorizontal: 14, paddingVertical: 12 },
   mono: { fontFamily: MONO, fontSize: 13, lineHeight: 19 },
-  track: { height: 6, borderRadius: 3, overflow: "hidden" },
-  done: { height: 6, borderRadius: 3 },
+  track: { height: 6, borderRadius: 999, overflow: "hidden" },
+  done: { height: 6, borderRadius: 999 },
 });

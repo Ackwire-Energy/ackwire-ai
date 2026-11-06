@@ -249,7 +249,7 @@ describe("own message styles", () => {
     expect(narrow).toContain("top: -4px;\n    right: 8px;");
     // Keyboard focus in my row opens its time's details (the head that has them is hidden).
     expect(css).toMatch(
-      /\.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-time > \.ac-msg__tip \{\s*visibility: visible;/,
+      /html:not\(\[data-pointer\]\) \.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-time > \.ac-msg__tip \{\s*visibility: visible;/,
     );
   });
 
@@ -262,7 +262,8 @@ describe("own message styles", () => {
     // It may grow to the row but stays as wide as what it holds: a small table never sits in a wide empty bubble.
     expect(r.get(".ac-msg--own.ac-msg--wide > .ac-msg__body")).not.toContain("flex:");
     expect(r.get(".ac-msg--own.ac-msg--wide .ac-msg__text")).toBeUndefined();
-    expect(r.get(".ac-msg--own > .ac-msg__body")).toContain("--own-max: min(70%, 640px)");
+    // 70% of a wide row; a narrow column (a thread beside the chat) lets it take the row up to 400px.
+    expect(r.get(".ac-msg--own > .ac-msg__body")).toContain("--own-max: max(min(70%, 640px), min(100%, 400px))");
     expect(r.get(".ac-msg--own.ac-msg--failed .ac-msg__text")).toContain("var(--danger)");
   });
 });
@@ -358,7 +359,9 @@ describe("the bar hugs my message, a GIF or a picture too", () => {
       expect(block(sel)).not.toContain("min(100%");
     // Others' rows keep their bar on the row's right, a keyboard's focus shows it too.
     expect(r.get(".ac-msg__actions")).toContain("right: 12px");
-    expect(r.get(".ac-msg:focus-within .ac-msg__actions")).toContain("transform: translateY(-50%)");
+    expect(r.get("html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions")).toContain(
+      "transform: translateY(-50%)",
+    );
   });
 });
 

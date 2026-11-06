@@ -21,9 +21,12 @@ import {
   aiChoiceOf,
   allAgents,
   behindComputer,
+  CLOUD_AWAY_MS,
+  CLOUD_INSTALL_WAIT_MS,
   catchUp,
   defaultChoice,
   defaultTarget,
+  dimmedLine,
   firstAgent,
   freePlanAccount,
   gateDims,
@@ -42,6 +45,8 @@ import {
   type PlanGate,
   planGate,
   planGateWithoutAgent,
+  planHoldOf,
+  planHoldPhoneLine,
   planLineFix,
   planMark,
   planOfAccount,
@@ -49,8 +54,13 @@ import {
   signInAgainPlan,
   signsInOnce,
   signsInPerAgent,
+  uncheckedKeyLine,
 } from "../src/lib/no-ai";
 import { LOGIN_PER_AGENT, OPENCODE_KEY_PLAN, providerFitsChoice, SHARED_SIGN_INS, signInKey } from "../src/lib/plans";
+
+const enI18n = i18next.createInstance();
+void enI18n.init({ lng: "en", resources, initAsync: false });
+const enT: TFunction = enI18n.t.bind(enI18n);
 
 const setup = (patch: Partial<ComputerSetup> = {}) =>
   setupView({
@@ -81,6 +91,7 @@ const option = (kind: "claude_code" | "codex", over: Partial<AgentBrain["options
 /** Ada on the MacBook, hers: every plan can sign in there. */
 const brain = (over: Partial<AgentBrain> = {}): AgentBrain => ({
   agentId: "ada",
+  speed: "standard",
   brain: "model",
   model: null,
   effectiveModel: null,
@@ -177,10 +188,15 @@ describe("planGate: what a plan's panel can do now", () => {
   });
 
   test("the plan's program isn't there, the runner is old, or the computer takes no plan key: unsupported", () => {
-    const missingCodex = brain({ options: [option("claude_code"), option("codex", { available: false })] });
+    const missingCodex = brain({
+      options: [option("claude_code"), option("codex", { available: false, reason: "not_installed" })],
+    });
     expect(gate({ choice: "chatgpt", brain: missingCodex })).toEqual({ state: "unsupported", reason: "not_installed" });
     // The same computer still takes Claude.
     expect(gate({ brain: missingCodex })).toEqual({ state: "ready" });
+    // A server that gives no reason or doesn't know the plan: nothing says it's being installed.
+    const unknown = brain({ options: [option("claude_code")] });
+    expect(gate({ choice: "chatgpt", brain: unknown })).toEqual({ state: "unsupported", reason: "not_reported" });
     const old = brain({
       options: [option("claude_code", { available: false, reason: "runner_old" }), option("codex")],
     });
@@ -235,6 +251,93 @@ describe("planGate: what a plan's panel can do now", () => {
   });
 });
 
+describe("the Cloud's plan gate tells the truth", () => {
+  const NOW = Date.parse("2026-11-05T12:00:00Z");
+  const ready = (ago: number) => setup({ state: "ready", step: null, since: new Date(NOW - ago).toISOString() });
+  const noCodex = brain({
+    computer: { machineId: "m1", name: "Acme", online: true },
+    options: [option("claude_code"), option("codex", { available: false, reason: "not_installed" })],
+  });
+  const codexGate = (ago: number) =>
+    planGate({ choice: "chatgpt", edition: "cloud", setup: ready(ago), brain: noCodex, computer: MAC, now: NOW });
+
+  test("a billing hold says so first, for every plan, and offers no sign-in", () => {
+    for (const choice of ["claude", "chatgpt", "cursor", "zen", "grok", "gemini", "zai"] as const) {
+      const standing = { state: "hold", reason: "payment" } as const;
+      expect(gate({ choice, edition: "cloud", standing })).toEqual({ state: "billing", hold: "payment" });
+      expect(
+        planGateWithoutAgent({ choice, edition: "cloud", setup: null, computers: undefined, standing }).gate,
+      ).toEqual({ state: "billing", hold: "payment" });
+    }
+    expect(gateDims({ state: "billing", hold: "unpaid" })).toBe(true);
+    // A review hold isn't about money, and a self-hosted server has no plan to pay.
+    expect(gate({ edition: "cloud", standing: { state: "hold", reason: "review" } }).state).not.toBe("billing");
+    expect(gate({ standing: { state: "hold", reason: "payment" } }).state).toBe("ready");
+    expect(planHoldOf("selfhost", { state: "hold", reason: "payment" })).toBeNull();
+    expect(planHoldOf("cloud", { state: "hold", reason: "ended" })).toBe("ended");
+    expect(planHoldOf("cloud", { state: "active", reason: null })).toBeNull();
+  });
+
+  test("the phone's words for a hold: where to pay for whoever pays, who can for anyone else, never a link", () => {
+    const t = ((key: string, o?: { a: string; b: string }) => (o ? `${o.a} ${o.b}` : key)) as unknown as TFunction;
+    expect(planHoldPhoneLine(t, true)).toBe("connectAi.billing connectAi.billingWeb");
+    expect(planHoldPhoneLine(t, false)).toBe("connectAi.billing standing.billing.askAdmin");
+  });
+
+  test("a key kept on a billing hold says when it starts: nobody was asked, so it can't read as no answer", () => {
+    expect(uncheckedKeyLine(enT, "OpenAI", true)).toBe(enT("connectAi.key.savedHeld"));
+    expect(uncheckedKeyLine(enT, "OpenAI", false)).toBe(enT("connectAi.key.savedUnchecked", { provider: "OpenAI" }));
+  });
+
+  test("a dimmed plan's rows always have words: the hold's, the computer's, or that it has none", () => {
+    const where = { edition: "cloud", kind: "codex", computer: "Acme" } as const;
+    expect(dimmedLine(enT, { state: "billing", hold: "payment" }, where)).toBe(enT("connectAi.billing"));
+    expect(dimmedLine(enT, { state: "missing" }, { ...where, edition: "selfhost" })).toBe(
+      enT("aiAccounts.connect.noComputer"),
+    );
+    expect(dimmedLine(enT, { state: "unsupported", reason: "not_installed" }, where)).toBe(
+      gateLine(enT, { gate: { state: "unsupported", reason: "not_installed" }, ...where })?.text ?? "",
+    );
+  });
+
+  test("a CLI missing from a computer ready just now may still be coming; past that it never reads as installing", () => {
+    const soon = codexGate(CLOUD_INSTALL_WAIT_MS - 60_000);
+    expect(soon).toEqual({ state: "unsupported", reason: "not_installed" });
+    expect(gateRechecks(soon, "cloud")).toBe(true);
+    const late = codexGate(CLOUD_INSTALL_WAIT_MS + 60_000);
+    expect(late).toEqual({ state: "unsupported", reason: "not_installed", overdue: true });
+    expect(gateRechecks(late, "cloud")).toBe(false);
+    const line = cloudLine(late);
+    expect(line?.text).toContain("won't change by itself");
+    expect(line?.text).not.toContain("being installed");
+    expect(line?.rechecks).toBe(false);
+  });
+
+  test("every plan's program gets the same honest line", () => {
+    for (const kind of ["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"] as const) {
+      const line = cloudLine({ state: "unsupported", reason: "not_installed", overdue: true }, kind);
+      expect(line?.text).toContain("Acme");
+      expect(line?.text).toContain("API key");
+    }
+  });
+
+  test("a computer away past a restart stops promising it comes back by itself", () => {
+    const seen = (ago: number) =>
+      ({ os: "linux", mode: "system", lastSeenAt: new Date(NOW - ago).toISOString() }) as const;
+    const line = (ago: number) => cloudLine({ state: "offline" }, "codex", seen(ago))?.text;
+    expect(line(60_000)).toContain("reconnecting");
+    expect(line(CLOUD_AWAY_MS + 60_000)).toContain("away longer");
+  });
+
+  function cloudLine(
+    g: Parameters<typeof gateLine>[1]["gate"],
+    kind: Parameters<typeof gateLine>[1]["kind"] = "codex",
+    machine?: Parameters<typeof gateLine>[1]["machine"],
+  ) {
+    return gateLine(enT, { gate: g, edition: "cloud", kind, computer: "Acme", machine, now: NOW });
+  }
+});
+
 describe("planGateWithoutAgent: a plan connected before its owner has any agent", () => {
   const SERVER: AiComputer = { ...MAC, machineId: "m2", name: "Servidor", mine: false };
   const at = (patch: Partial<Parameters<typeof planGateWithoutAgent>[0]> = {}) =>
@@ -261,7 +364,10 @@ describe("planGateWithoutAgent: a plan connected before its owner has any agent"
     expect(at({ computers: [] }).gate).toEqual({ state: "missing" });
     expect(at({ computers: [{ ...MAC, online: false }] }).gate).toEqual({ state: "offline" });
     expect(
-      at({ choice: "chatgpt", computers: [{ ...MAC, brains: { claude_code: true, codex: false } }] }).gate,
+      at({
+        choice: "chatgpt",
+        computers: [{ ...MAC, brains: { claude_code: true, codex: false }, off: { codex: "not_installed" } }],
+      }).gate,
     ).toEqual({ state: "unsupported", reason: "not_installed" });
     expect(at({ choice: "zai", computers: [{ ...MAC, keys: false }] }).gate).toEqual({
       state: "unsupported",
@@ -282,22 +388,21 @@ describe("planGateWithoutAgent: a plan connected before its owner has any agent"
     });
   });
 
-  test("a program that can't run says why, as the computer's switches say it", () => {
+  test("a program that can't run says the server's reason, never a guess that it's on its way", () => {
     const noClaude = { ...MAC, brains: { claude_code: false, codex: true } };
-    const mac = { id: "m1", pairedBy: null, execAllowed: true };
-    const tools = (claude: boolean) => ({ folders: [], tools: { claude, codex: true, commands: true } });
-    expect(at({ computers: [noClaude], machines: [{ ...mac, access: tools(false) }] }).gate).toEqual({
-      state: "unsupported",
-      reason: "tool_off",
-    });
-    expect(at({ computers: [noClaude], machines: [{ ...mac, access: tools(true) }] }).gate).toEqual({
-      state: "unsupported",
-      reason: "not_installed",
-    });
-    expect(at({ computers: [noClaude], machines: [{ ...mac, execAllowed: false }] }).gate).toEqual({
-      state: "unsupported",
-      reason: "exec_off",
-    });
+    const reasons = ["tool_off", "exec_off", "runner_old", "outdated", "not_installed", "not_reported"] as const;
+    for (const reason of reasons)
+      expect(at({ computers: [{ ...noClaude, off: { claude_code: reason } }] }).gate).toEqual({
+        state: "unsupported",
+        reason,
+      });
+    // An older server gives no reason: nothing says it's being installed.
+    expect(at({ computers: [noClaude] }).gate).toEqual({ state: "unsupported", reason: "not_reported" });
+  });
+
+  test("a computer that never connected is offline, not a runner to update", () => {
+    const paired = { ...MAC, online: false, canAdd: false };
+    expect(at({ computers: [paired] })).toEqual({ gate: { state: "offline" }, computer: paired });
   });
 });
 
@@ -387,14 +492,14 @@ describe("the agent a plan starts on, and the order of the plans", () => {
     expect(firstAgent([], () => false)).toBeUndefined();
   });
 
-  test("Claude, ChatGPT, Cursor, OpenCode, Grok, Gemini, then the coding plans; ChatGPT signs in through Codex, the others through their own CLIs", () => {
+  test("Claude, ChatGPT, Gemini, Grok, Cursor, OpenCode, then the coding plans; ChatGPT signs in through Codex, the others through their own CLIs", () => {
     expect(PLAN_CHOICES).toEqual([
       "claude",
       "chatgpt",
+      "gemini",
+      "grok",
       "cursor",
       "zen",
-      "grok",
-      "gemini",
       "zai",
       "kimi",
       "minimax",
@@ -403,10 +508,10 @@ describe("the agent a plan starts on, and the order of the plans", () => {
     expect(PLAN_CHOICES.map((c: PlanChoice) => kindOf(c))).toEqual([
       "claude_code",
       "codex",
+      "antigravity",
+      "grok",
       "cursor",
       "opencode",
-      "grok",
-      "antigravity",
       "claude_code",
       "claude_code",
       "claude_code",
@@ -713,12 +818,45 @@ describe("why a plan can't sign in yet, in plain words (`gateLine`)", () => {
   });
 
   test("no Cloud line is the old generic one, and every reason has its own key", () => {
-    const reasons = ["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated", "keys"] as const;
+    const reasons = [
+      "no_computer",
+      "exec_off",
+      "runner_old",
+      "tool_off",
+      "not_installed",
+      "outdated",
+      "not_reported",
+      "keys",
+    ] as const;
     for (const r of reasons) {
       const text = line(off(r), "cloud")?.text ?? "";
       expect(text).not.toContain("Ainda não está pronto");
       expect(text).not.toContain("aiAccounts.");
     }
+  });
+
+  test("a computer that hasn't said what it has reads as looking, on any setup, and asks again", () => {
+    const looking = { text: pt("brain.reasons.not_reported", { computer }), rechecks: true };
+    expect(looking.text).not.toContain("instal");
+    expect(line(off("not_reported"), "cloud")).toEqual(looking);
+    expect(line(off("not_reported"), "selfhost")).toEqual(looking);
+    // Past the wait it says nothing is coming, with the other ways on.
+    const late = { state: "unsupported", reason: "not_reported", overdue: true } as const;
+    expect(line(late, "cloud")?.text).toBe(pt("aiAccounts.connect.needsCloud.stuck", { computer, program: "Codex" }));
+    expect(line(late, "cloud")?.rechecks).toBe(false);
+  });
+
+  test("the Cloud's computer that never reached the agent offers no computer to connect: nobody connects one there", () => {
+    const text = pt("aiAccounts.connect.needsCloud.stuck", { computer, program: "Codex" });
+    expect(line({ state: "missing" }, "cloud")).toEqual({ text, rechecks: false });
+    expect(line({ state: "missing" }, "selfhost")).toBeNull();
+  });
+
+  test("a workspace on hold says the hold, not what the computer would be doing", () => {
+    const say = (gate: PlanGate) => gateLine(pt, { gate, edition: "cloud", kind: "codex", computer, hold: "On hold" });
+    for (const gate of [off("not_installed"), off("not_reported"), { state: "offline" } as const])
+      expect(say(gate)).toEqual({ text: "On hold", rechecks: false });
+    expect(say({ state: "ready" })).toBeNull();
   });
 
   test("self-host keeps its reasons, with the way to allow a program on the person's own computer", () => {
@@ -735,8 +873,7 @@ describe("why a plan can't sign in yet, in plain words (`gateLine`)", () => {
   });
 
   test("any other gate has no line", () => {
-    for (const gate of [{ state: "ready" }, { state: "missing" }, { state: "loading" }] as const)
-      expect(line(gate, "cloud")).toBeNull();
+    for (const gate of [{ state: "ready" }, { state: "loading" }] as const) expect(line(gate, "cloud")).toBeNull();
     expect(gateRechecks({ state: "locked", who: "computer" }, "cloud")).toBe(false);
   });
 });

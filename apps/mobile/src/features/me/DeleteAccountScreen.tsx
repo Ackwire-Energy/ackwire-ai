@@ -3,12 +3,17 @@ import { formatTimeLeft } from "@agenteschat/client/lib/actions";
 import {
   type AccountDeletionLine,
   accountDeletionLines,
+  deletableWorkspaces,
+  deletionDueFrom,
   deletionProof,
   proofToSend,
   soleOwnerWaysOut,
+  workspaceLabel,
+  workspaceNotes,
+  workspaceOpens,
 } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { formatShortDate, joinNames } from "@agenteschat/client/lib/format";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { typedCode } from "@agenteschat/client/lib/join-requests";
 import { useRef, useState } from "react";
@@ -17,7 +22,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteAccount } from "@/features/account";
 import { serverUrl } from "@/lib/server";
-import { Button, Card, HoldButton, Icon, type IconName, Text, useToast } from "@/ui";
+import { Button, Card, HoldButton, type IconName, LineIcon, Locked, Text, useToast } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { openPage } from "../ai/parts";
@@ -26,6 +31,7 @@ import { PushedHeader } from "../shared/parts";
 import { preflightMissing } from "./logic";
 
 const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
+  when: "clock",
   closes: "x",
   leaves: "out",
   computers: "laptop",
@@ -36,13 +42,14 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
 };
 
 /**
- * Apagar conta (App Store 5.1.1(v)): what goes and what stays, from the preflight (what closes, what they leave, the
- * computers removed, what stays behind with where to disconnect it on the website, and where plans are billed that
- * theirs stop renewing), then a hold. A workspace that
- * still needs this person as its only owner comes first, with its two ways out on the website (People, or deleting
- * it; its onboarding, while it's still being set up). Then the proof that it's them (ADR 0088 §2): a code emailed to
- * them, or on a server that sends no email their password, which the website adds first to an account without one.
- * A server from before the preflight gets the fixed lines and the hold, as it always did.
+ * Apagar conta (App Store 5.1.1(v)). The title and first line say it's the whole account, not one workspace, 7 days out
+ * with a way back until then. What goes and what stays, from the preflight (each workspace that closes with what it holds, what they leave, the computers
+ * removed, what stays behind with where to disconnect it on the website, and where plans are billed that theirs stop
+ * renewing), the way to delete just a workspace on the website, then a hold. A workspace that still needs this person
+ * as its only owner comes first, with its two ways out on the website (People, or deleting it; its onboarding, while
+ * it's still being set up). Then the proof that it's them (ADR 0088 §2): a code emailed to them, or on a server that
+ * sends no email their password, which the website adds first to an account without one. A server from before the
+ * preflight gets the fixed lines and the hold, as it always did.
  */
 export function DeleteAccountScreen() {
   const { t, i18n } = useTranslation();
@@ -75,15 +82,19 @@ export function DeleteAccountScreen() {
   const toSend = proof ? proofToSend(proof, { sent: sent !== null, code, password }) : null;
   const ready = toSend === null || toSend.ready;
   const web = (path: string) => openPage(`${serverUrl()}${path}`);
+  const notes = workspaceNotes(t, i18n.language, me?.organizations ?? []);
+  const named = (o: { id: string; name: string }) => workspaceLabel(o.name, notes.get(o.id));
   const lines = plan.data
     ? accountDeletionLines(t, i18n.language, plan.data, {
         cloud: config?.workspaceComputer === true,
         billing: Boolean(config?.billingUrl),
+        notes,
       })
     : [];
   const inSetup = (id: string) => me?.organizations.some((o) => o.id === id && settingUp(o)) === true;
   // Where the website's account menu adds a password: a workspace of theirs that is open.
-  const shell = me?.organizations.find((o) => !o.deletion && o.standing?.state !== "suspended" && !settingUp(o));
+  const shell = me?.organizations.find(workspaceOpens);
+  const own = deletableWorkspaces(me?.organizations ?? []);
 
   const codeOut = (email: string, resendIn: number) => setSent({ email, resendAt: Date.now() + resendIn * 1000 });
   const sendCode = async () => {
@@ -116,9 +127,12 @@ export function DeleteAccountScreen() {
     }
     const result = await deleteAccount(toSend?.input);
     setBusy(false);
-    // Deleted: the session ends and the gate shows sign-in.
-    if (result.ok) toast({ title: t("mobile.account.deleted") });
-    else if (result.reason === "sole_owner") {
+    // Scheduled: the session ends and the gate shows sign-in, which comes back to the waiting screen.
+    // An older server deletes at once: there is no date, and nothing to come back to.
+    if (result.ok) {
+      if (!legacy)
+        toast({ title: t("mobile.account.deleted", { date: formatShortDate(i18n.language, deletionDueFrom()) }) });
+    } else if (result.reason === "sole_owner") {
       if (legacy) setBlockedBy(result.organizations);
       else void plan.refetch();
     } else if (result.reason === "proof") {
@@ -135,7 +149,7 @@ export function DeleteAccountScreen() {
   const line = (key: string, icon: IconName, text: string, links?: AccountDeletionLine["links"]) => (
     <View key={key} style={styles.line}>
       <View style={styles.item}>
-        <Icon name={icon} size={16} color={c.muted} />
+        <LineIcon name={icon} variant="small" size={16} color={c.muted} />
         <Text variant="small" tone="ink2" style={styles.grow}>
           {text}
         </Text>
@@ -164,9 +178,9 @@ export function DeleteAccountScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
-        <Text variant="display">{t("mobile.delete.title")}</Text>
+        <Text variant="display">{t("deleteAccount.title")}</Text>
         <Text variant="body" tone="muted">
-          {t("mobile.delete.intro")}
+          {t("deleteAccount.intro")} {t(legacy ? "mobile.delete.intro" : "mobile.delete.introGrace")}
         </Text>
         <Card>
           <View style={styles.list}>
@@ -182,6 +196,26 @@ export function DeleteAccountScreen() {
             {line("phones", "x", t("mobile.delete.goes.phones"))}
           </View>
         </Card>
+        {own.length > 0 && blockers.length === 0 && blockedBy.length === 0 ? (
+          <Card>
+            <View style={styles.list}>
+              <Text variant="small" tone="ink2">
+                {t("deleteAccount.oneWorkspace")}
+              </Text>
+              <View style={styles.acts}>
+                {own.map((o) => (
+                  <Button
+                    key={o.id}
+                    variant="secondary"
+                    size="sm"
+                    label={t("deleteAccount.deleteOrg", { name: named(o) })}
+                    onPress={() => web(soleOwnerWaysOut(o.id, settingUp(o)).delete)}
+                  />
+                ))}
+              </View>
+            </View>
+          </Card>
+        ) : null}
         {plan.isError && !legacy ? (
           <Button variant="secondary" label={t("mobile.common.retry")} onPress={() => void plan.refetch()} />
         ) : !plan.data && !legacy ? (
@@ -196,7 +230,7 @@ export function DeleteAccountScreen() {
                 return (
                   <View key={o.id} style={styles.line}>
                     <Text variant="small" tone="ink2">
-                      {t(setup ? "deleteAccount.soleOwnerSettingUp" : "deleteAccount.soleOwner", { name: o.name })}
+                      {t(setup ? "deleteAccount.soleOwnerSettingUp" : "deleteAccount.soleOwner", { name: named(o) })}
                     </Text>
                     <View style={styles.acts}>
                       <Button
@@ -208,7 +242,7 @@ export function DeleteAccountScreen() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        label={t("deleteAccount.deleteOrg", { name: o.name })}
+                        label={t("deleteAccount.deleteOrg", { name: named(o) })}
                         onPress={() => web(out.delete)}
                       />
                     </View>
@@ -234,17 +268,19 @@ export function DeleteAccountScreen() {
             ) : null}
             {proof === "code" && sent ? (
               <View style={styles.proof}>
-                <AuthField
-                  code
-                  value={code}
-                  onChangeText={(value) => setCode(typedCode(value))}
-                  placeholder={t("proof.code")}
-                  accessibilityLabel={t("proof.code")}
-                  keyboardType="number-pad"
-                  textContentType="oneTimeCode"
-                  autoComplete="one-time-code"
-                  returnKeyType="done"
-                />
+                <Locked when={busy || sending}>
+                  <AuthField
+                    code
+                    value={code}
+                    onChangeText={(value) => setCode(typedCode(value))}
+                    placeholder={t("proof.code")}
+                    accessibilityLabel={t("proof.code")}
+                    keyboardType="number-pad"
+                    textContentType="oneTimeCode"
+                    autoComplete="one-time-code"
+                    returnKeyType="done"
+                  />
+                </Locked>
                 <Text variant="small" tone="muted">
                   {t("proof.sent", { email: sent.email })}
                 </Text>
@@ -252,16 +288,16 @@ export function DeleteAccountScreen() {
                   variant="ghost"
                   size="sm"
                   label={left > 0 ? t("proof.resendIn", { time: formatTimeLeft(left) }) : t("proof.resend")}
-                  disabled={left > 0}
+                  disabled={left > 0 || busy}
                   loading={sending}
                   onPress={() => void sendCode()}
                 />
               </View>
             ) : null}
             {proof === "password" ? (
-              <View style={styles.proof}>
+              <Locked when={busy} style={styles.proof}>
                 <PasswordField label={t("proof.password")} value={password} onChangeText={setPassword} />
-              </View>
+              </Locked>
             ) : null}
             {refused ? (
               <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
@@ -299,7 +335,8 @@ const styles = StyleSheet.create({
   in: { paddingHorizontal: 20, paddingTop: 8, gap: 16 },
   list: { padding: 14, gap: 10 },
   line: { gap: 8 },
-  item: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // A line that wraps keeps its icon on the first.
+  item: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   grow: { flex: 1 },
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   proof: { gap: 10 },

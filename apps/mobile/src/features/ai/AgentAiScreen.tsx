@@ -2,7 +2,7 @@ import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/c
 import { keys, useAgentBrain, useAiAccounts, useApi, useMachines, useModels } from "@agenteschat/client";
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
-import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
+import { advancedContents, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -50,7 +50,7 @@ import {
   thinkingUsage,
 } from "./logic";
 import { openConnectAi } from "./NoAiCard";
-import { AiRow, Note } from "./parts";
+import { AiRow, Note, PlanHoldNote, usePlanHold } from "./parts";
 
 /*
  * An agent's AI on the phone (the web's "Quem pensa" for a plan, ADR 0059), from "Pensa com" on its profile, under what
@@ -103,6 +103,7 @@ function useSaveBrain(agentId: string) {
 export function AgentAiScreen({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
+  const hold = usePlanHold(orgId, org);
   const api = useApi();
   const c = useColors();
   const insets = useSafeAreaInsets();
@@ -194,6 +195,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
             {thinks.text}
           </Text>
         </View>
+        {hold ? <PlanHoldNote org={org} /> : null}
         {!allowed ? (
           <Note icon="lock">{t("agentPage.lock.admins")}</Note>
         ) : brain.isPending ? (
@@ -308,7 +310,11 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               <GroupedList>
                 <GroupedRow
                   label={t("agentPage.work.brain.advanced.title")}
-                  sub={advancedContents(t, { kind: view.brain, autoModel: isAuto(view.effectiveModel) })}
+                  sub={advancedContents(t, {
+                    kind: view.brain,
+                    autoModel: isAuto(view.effectiveModel),
+                    speed: viewSpeedFits(view),
+                  })}
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />
@@ -471,11 +477,11 @@ const styles = StyleSheet.create({
   loading: { marginTop: 16 },
   meter: { paddingHorizontal: 14, paddingVertical: 12 },
   // A list without a header keeps a header's room above it.
-  advanced: { marginTop: 18 },
+  advanced: { marginTop: 20 },
   dock: { position: "absolute", left: 10, right: 10, borderRadius: 28 },
   dockGlass: {
-    paddingHorizontal: 15,
-    paddingTop: 13,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 10,
     borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,

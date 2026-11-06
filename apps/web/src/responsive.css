@@ -73,22 +73,26 @@
     flex: none;
   }
 
-  /* The drawer: same sidebar, off-canvas. Hidden (and out of the tab order) while closed. */
+  /* The drawer: same sidebar, off-canvas. Hidden (and out of the tab order) while closed.
+     It floats 8px off the edges with round corners: in a phone's browser the strip
+     above the page (clock, battery) takes one colour across its whole width, the
+     scrim's, so a drawer flush with the top looked cut under it. Floating, that
+     strip reads as part of the dimmed page around the drawer. */
   .shell .sidebar {
     position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    left: calc(env(safe-area-inset-left, 0px) + 8px);
     z-index: var(--z-scrim);
     flex: none;
-    width: min(304px, calc(100vw - 48px));
+    width: min(304px, calc(100vw - 56px));
     min-width: 0;
     height: auto;
-    padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px calc(env(safe-area-inset-bottom, 0px) + 14px)
-      calc(env(safe-area-inset-left, 0px) + 12px);
+    padding: 14px 12px;
+    border-radius: var(--radius-section);
     box-shadow: var(--e3);
     overscroll-behavior: contain;
-    transform: translateX(-100%);
+    transform: translateX(calc(-100% - 8px - env(safe-area-inset-left, 0px)));
     visibility: hidden;
     transition:
       transform 0.24s var(--out),
@@ -176,7 +180,6 @@
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
   }
-  .channel__status,
   .channel__notice {
     margin-right: 12px;
     margin-left: 12px;
@@ -202,9 +205,6 @@
   }
   .tabs-bar .ac-toolbar {
     flex: 1 1 100%;
-  }
-  .proposals__list {
-    max-width: none;
   }
 }
 
@@ -375,6 +375,11 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
+  /* Activity's month: the numbers under the chart (layout.css), not a 260px column beside a sliver of it. */
+  .agp-month {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
   .agp-subnav {
     position: static;
     flex-direction: row;
@@ -462,20 +467,20 @@
   }
 }
 @container agp-side (max-width: 640px) {
-  .agp-brainrows > .ac-setrow {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  .agp-brainrows .ac-setrow__end,
-  .agp-brainrows__sel {
-    width: 100%;
-  }
   .level-row__below {
     padding-left: 0;
   }
+  /* The tile above its card, the role's field the rest of its line and its list as wide as it (layout.css). */
   .agp-id {
     flex-direction: column;
+  }
+  .agp-roleedit {
+    flex: 1 1 auto;
+  }
+  .agp-roles {
+    right: 0;
+    width: auto;
+    max-width: none;
   }
 }
 
@@ -528,17 +533,31 @@
     grid-row: 1;
     margin: calc(11px - var(--cap-mid) - var(--control-h-sm) / 2) -12px 0 0;
   }
+  /* The buttons end the notice at its right edge, under the × (as the notice island's do), not under the words where
+     the main one read as part of the text. */
   .outage__acts {
     grid-column: 2 / -1;
     grid-row: 2;
     flex-wrap: wrap;
+    justify-content: flex-end;
   }
   /* A hold's button has a row of its own here: it takes its whole height. */
   .hold-banner > .outage__acts {
     margin-block: 0;
   }
-  /* A ghost shows only its words: they start where the words above start. */
-  .outage__acts > .ac-btn--ghost:first-child {
+  /* A ghost shows only its words: at the end they stop on the padding line, where the × above stops. */
+  .outage__acts > .ac-btn--ghost:last-child {
+    margin-right: -12px;
+  }
+  /* The setup notice's faces end that row, across from its button: the button stays under the words, its words
+     starting where they start. */
+  .setup-notice .outage__acts {
+    justify-content: flex-start;
+  }
+  .setup-notice .outage__acts > .ac-btn--ghost:last-child {
+    margin-right: 0;
+  }
+  .setup-notice .outage__acts > .ac-btn--ghost:first-child {
     margin-left: -12px;
   }
 }

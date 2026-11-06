@@ -53,7 +53,7 @@ import { Note } from "../ai/parts";
 import { RoleMark } from "../dashboards/parts";
 import { Face } from "../shared/Face";
 import { useColors, useMeId } from "../shared/hooks";
-import { goBack, successHaptic } from "../shared/parts";
+import { goBack, successHaptic, tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import {
   areaChoices,
@@ -326,7 +326,7 @@ function RolePage({ role, people }: { role: OrgRole; people: Person[] }) {
               onPress={() =>
                 confirmAction({
                   title: t("rolesPage.deleteTitle", { name }),
-                  text: t("rolesPage.deleteText"),
+                  text: t("common.joinSentences", { a: t("rolesPage.deleteText"), b: t("common.cantUndo") }),
                   action: t("rolesPage.delete"),
                   cancel: t("common.cancel"),
                   onConfirm: () =>
@@ -386,9 +386,17 @@ function ColorPick({
               accessibilityLabel={t(`look.colors.${color}`, { defaultValue: color })}
               accessibilityState={{ checked: on, disabled }}
               disabled={disabled}
-              hitSlop={4}
-              onPress={() => !on && onPick(color)}
-              style={[styles.swatch, { borderColor: on ? c.ink : "transparent", opacity: disabled ? 0.5 : 1 }]}
+              // 44 pt tall to the finger; side by side, as far as half the gap between swatches.
+              hitSlop={{ top: 7, bottom: 7, left: 4, right: 4 }}
+              onPress={() => {
+                if (on) return;
+                tapHaptic();
+                onPick(color);
+              }}
+              style={({ pressed }) => [
+                styles.swatch,
+                { borderColor: on ? c.ink : "transparent", opacity: disabled ? 0.5 : pressed && !on ? 0.6 : 1 },
+              ]}
             >
               <RoleMark color={color} size={22} />
             </Pressable>
@@ -607,6 +615,7 @@ export function AddToRoleScreen({ roleId }: { roleId: string }) {
         disabled: picked.size === 0 || busy,
         onPress: () => void add(),
       }}
+      locked={busy}
     >
       <GroupedFooter>{t("rolesPage.addSub")}</GroupedFooter>
       {candidates.length > PEOPLE_SEARCH_FROM ? (
@@ -684,6 +693,7 @@ export function NewRoleScreen() {
     <SettingsPage
       title={t("rolesPage.newTitle")}
       action={{ label: t("mobile.settings.roles.create"), disabled: !typed || create.isPending, onPress: submit }}
+      locked={create.isPending}
     >
       <GroupedHeader>{t("rolesPage.name")}</GroupedHeader>
       <TextArea
@@ -725,13 +735,17 @@ export function RenameRoleScreen({ roleId }: { roleId: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const value = draft ?? role?.name ?? "";
   const next = value.trim();
-  const ready = Boolean(role?.editable) && next.length > 0 && next !== role?.name;
+  const ready = Boolean(role?.editable) && next.length > 0 && next !== role?.name && !update.isPending;
   const save = () => {
     if (!role || !ready) return;
     update.mutate({ roleId: role.id, patch: { name: next } }, { onSuccess: () => goBack(), onError: fail });
   };
   return (
-    <SettingsPage title={t("rolesPage.name")} action={{ label: t("common.save"), disabled: !ready, onPress: save }}>
+    <SettingsPage
+      title={t("rolesPage.name")}
+      action={{ label: t("common.save"), disabled: !ready, onPress: save }}
+      locked={update.isPending}
+    >
       <GroupedHeader>{t("rolesPage.name")}</GroupedHeader>
       <TextArea
         value={value}
@@ -754,6 +768,7 @@ const styles = StyleSheet.create({
   loading: { marginVertical: 16 },
   colors: { paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   swatches: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  swatch: { padding: 3, borderRadius: 10, borderWidth: 2 },
+  // The ring's corner is the mark's (30% of 22) plus the 2 pt gap and the 2 pt ring: concentric at 10.
+  swatch: { padding: 2, borderRadius: 10, borderWidth: 2 },
   search: { paddingTop: 10 },
 });

@@ -23,10 +23,12 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
-import { LoadingPage } from "@/components/Loading";
+import { ErrorState, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { lookOf } from "@/lib/look";
 
 export type MemoryTab = "known" | "lessons" | "archived";
 
@@ -97,6 +99,48 @@ export function MemoryPage({ agentId }: { agentId: string }) {
     );
   }
   return <MemoryView agent={agent} />;
+}
+
+/**
+ * Nothing to show of an agent's memory: its own face and a way to teach it when it holds `none` at all, a way out of
+ * the search, or one line for a tab with nothing in it while the others have.
+ */
+export function NoMemories({
+  agent,
+  q,
+  none,
+  onClear,
+}: {
+  agent: Agent;
+  q: string;
+  none: boolean;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+  if (q.trim())
+    return (
+      <EmptyState
+        size="inline"
+        actions={
+          <Button size="sm" onClick={onClear}>
+            {t("filters.clearSearch")}
+          </Button>
+        }
+      >
+        {t("memory.emptySearch", { q })}
+      </EmptyState>
+    );
+  if (!none) return <EmptyState size="inline">{t("memory.emptyTab")}</EmptyState>;
+  return (
+    <EmptyState
+      size="panel"
+      agent={lookOf(agent) ?? true}
+      title={t("memory.emptyTitle", { name: agent.name })}
+      actions={<AskAgentButton agent={agent} variant="primary" />}
+    >
+      {t("memory.emptyText")}
+    </EmptyState>
+  );
 }
 
 function MemoryView({ agent }: { agent: Agent }) {
@@ -196,7 +240,8 @@ function MemoryView({ agent }: { agent: Agent }) {
                   ? t("memory.editedByYou", { when: relativeTime(t, i18n.language, m.updatedAt) })
                   : memorySource(t, i18n.language, m)}
               </span>
-              <div className="row" style={{ gap: 4 }}>
+              {/* A row of ghosts: their words 16px apart, the last one on the item's padding line. */}
+              <div className="ac-acts">
                 <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>
                   {t("memory.edit")}
                 </Button>
@@ -218,10 +263,9 @@ function MemoryView({ agent }: { agent: Agent }) {
             </div>
           </article>
         ))}
+        {memory.isError && !memory.data && <ErrorState error={memory.error} onRetry={() => void memory.refetch()} />}
         {memory.isSuccess && items.length === 0 && (
-          <p className="muted" style={{ margin: 0, padding: "32px 16px", textAlign: "center" }}>
-            {q.trim() ? t("memory.emptySearch", { q }) : t("memory.empty", g)}
-          </p>
+          <NoMemories agent={agent} q={q} none={all.length === 0} onClear={() => setQ("")} />
         )}
       </List>
       <p className="page__note">

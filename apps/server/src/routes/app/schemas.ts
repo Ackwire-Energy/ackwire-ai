@@ -1,4 +1,4 @@
-import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
+import { ACCOUNT_KINDS, BRAIN_EFFORTS, BRAIN_SPEEDS } from "@agenteschat/adapters";
 import {
   AGENT_ACTION_KINDS,
   AGENT_STYLES,
@@ -79,6 +79,10 @@ export const Organization = z
       .nullable()
       .optional()
       .openapi({ description: "The workspace logo (`/api/app/org-logos/…`); null = the agent mark." }),
+    createdAt: z
+      .string()
+      .optional()
+      .openapi({ description: "In `GET /me`: when it was made, which tells apart two workspaces with the same name." }),
     standing: z
       .object({
         state: z.enum(STANDING_STATES),
@@ -210,6 +214,14 @@ export const Credential = z
       .boolean()
       .optional()
       .openapi({ description: "The workspace's default key (agents without their own key, router, summaries)." }),
+    usedBy: z
+      .array(z.object({ id: z.uuid(), name: z.string() }))
+      .optional()
+      .openapi({ description: "The agents that think with it, in a list of keys: what removing it would change." }),
+    check: z
+      .enum(["ok", "unchecked"])
+      .optional()
+      .openapi({ description: "On a key just saved: `ok` a real call passed, `unchecked` the provider didn't say." }),
     createdAt: z.string(),
     revokedAt: z.string().nullable(),
   })
@@ -385,6 +397,9 @@ export const Agent = z
         usage: PlanUsage.optional().openapi({
           description: "On a plan: that account's limits as last reported (ADR 0063 §5); absent: not known yet.",
         }),
+        speed: z.literal("fast").optional().openapi({
+          description: "Set to `fast` where that applies to what it thinks with (ADR 0149); absent: standard speed.",
+        }),
       })
       .optional()
       .openapi({ description: "Who thinks for it (ADR 0032), to show next to its name." }),
@@ -534,6 +549,10 @@ export const WorkView = z
     finishedAt: z.string().nullable(),
     nextUpdateAt: z.string().nullable(),
     lastUpdate: z.object({ text: z.string(), at: z.string(), seq: z.number() }).nullable(),
+    question: z
+      .object({ text: z.string(), messageId: z.uuid().nullable() })
+      .nullable()
+      .openapi({ description: "Waiting on an answer: what its run asked, and the message that holds the card." }),
     plan: z.array(z.object({ id: z.string(), text: z.string(), state: z.enum(["todo", "doing", "done"]) })),
     issue: z.object({ id: z.uuid(), number: z.number() }).nullable(),
     resultMessageId: z.uuid().nullable(),
@@ -732,14 +751,21 @@ export const BrainKind = z
   .enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"])
   .openapi("BrainKind");
 
+export const BrainUnavailable = z.enum([
+  "no_computer",
+  "exec_off",
+  "runner_old",
+  "tool_off",
+  "not_installed",
+  "outdated",
+  "not_reported",
+]);
+
 export const BrainOption = z
   .object({
     kind: BrainKind,
     available: z.boolean(),
-    reason: z
-      .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
-      .optional()
-      .openapi({ description: "Why it can't be chosen now (computer brains)." }),
+    reason: BrainUnavailable.optional().openapi({ description: "Why it can't be chosen now (computer brains)." }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),
@@ -770,6 +796,10 @@ export const BrainEffort = z.enum(BRAIN_EFFORTS).openapi("BrainEffort", {
 });
 
 /** The effort setting: a level, or `auto` (picked per run with the model tier). */
+export const BrainSpeed = z.enum(BRAIN_SPEEDS).openapi("BrainSpeed", {
+  description:
+    "How fast it answers in conversations; `fast` applies on a ChatGPT plan with a model that has Fast mode.",
+});
 export const BrainEffortSetting = z.enum([...BRAIN_EFFORTS, "auto"]).openapi("BrainEffortSetting", {
   description: "A `BrainEffort`, or `auto`: the judge picks low, medium or high for each run.",
 });
@@ -836,11 +866,12 @@ export const AgentBrain = z
         brain: BrainKind,
         ownerId: z.string().nullable(),
         servesYou: z.boolean(),
+        key: z.object({ provider: z.string(), label: z.string() }).nullable().optional(),
       })
       .optional()
       .openapi({
         description:
-          "With `mine`: the workspace's AI, `model` for an API key, else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
+          "The team's right hand: the workspace's AI, `model` for an API key (`key`, by its provider and name; null with none), else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
       }),
     brain: BrainKind,
     model: z.string().nullable().openapi({ description: "As stored; null = the brain's default." }),
@@ -864,6 +895,7 @@ export const AgentBrain = z
       .nullable()
       .openapi({ description: "The account its computer brain runs with (ADR 0041); null = the computer's own." }),
     effort: BrainEffortSetting.nullable().openapi({ description: "`auto` = per run; null = the CLI's default." }),
+    speed: BrainSpeed,
     contextTokens: ContextLimit.nullable().openapi({
       description: "The most context it reads, any brain; null = its model's window (the smaller one wins).",
     }),
@@ -916,6 +948,7 @@ export const AgentSetup = z
       .optional()
       .openapi({ description: "A computer brain: the account there; null = that computer's own sign-in." }),
     effort: BrainEffortSetting.nullable().optional(),
+    speed: BrainSpeed.optional().openapi({ description: "Omitted = each agent keeps its own." }),
     contextTokens: ContextLimit.nullable().optional(),
     fallback: z.boolean().optional(),
     onlyOwner: z.boolean().optional().openapi({

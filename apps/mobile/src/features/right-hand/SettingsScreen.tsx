@@ -5,6 +5,7 @@ import {
   useAgentBrain,
   useApi,
   useModelLabel,
+  usePlatformKey,
   useRoles,
   useSetTeamWeekPrefs,
   useTeamWeekPrefs,
@@ -20,7 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import {
   EmptyState,
@@ -29,6 +30,7 @@ import {
   GroupedHeader,
   GroupedList,
   GroupedRow,
+  PressScale,
   ProviderLogo,
   Text,
   useToast,
@@ -36,6 +38,7 @@ import {
 import { openAgentEdit } from "../agents/AgentEditScreen";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
+import { PlanHoldNote, usePlanHold } from "../ai/parts";
 import { useFailed } from "../routines/hooks";
 import { Gap, SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
@@ -79,7 +82,10 @@ export function RightHandMine({ agent }: { agent: Agent }) {
   const kind = view && view.brain !== "model" ? view.brain : null;
   const signIn = view?.accounts.find((a) => a.id === view.account);
   const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0];
-  const fallback = view?.workspaceAi ? rightHandFallback(t, view.workspaceAi, meId ?? undefined, g, first) : "";
+  const platform = usePlatformKey(orgId).data === true;
+  const fallback = view?.workspaceAi
+    ? rightHandFallback(t, view.workspaceAi, meId ?? undefined, g, first, platform)
+    : "";
   const shared = signIn?.ownerId && signIn.ownerId !== meId ? first(signIn.ownerId) : undefined;
   const back = () =>
     void api.agents
@@ -185,7 +191,8 @@ function PlanRows({
 /** The plans the workspace's AI may move onto (the admin's own, everyone's with `use_others_plans`), a tap each. */
 function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const hold = usePlanHold(orgId, org);
   const api = useApi();
   const qc = useQueryClient();
   const failed = useFailed();
@@ -201,6 +208,7 @@ function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
           void qc.invalidateQueries({ queryKey: key });
       })
       .catch(failed);
+  if (hold) return <PlanHoldNote org={org} />;
   return (
     <>
       {plans.length > 0 ? (
@@ -237,6 +245,7 @@ function Form({ agent }: { agent: Agent }) {
   const modelLabel = useModelLabel();
   const dir = useDirectory();
   const planKind = agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null;
+  const key = useAgentBrain(orgId, agent.id, true, false, "workspace").data?.workspaceAi?.key;
   const roles = useRoles(orgId).data?.roles ?? [];
   const update = useUpdateAgent(orgId, agent.id);
   const [budget, setBudget] = useState(agent.monthlyBudgetUsd == null ? "" : String(agent.monthlyBudgetUsd));
@@ -288,6 +297,7 @@ function Form({ agent }: { agent: Agent }) {
             <GroupedRow
               icon="brain"
               label={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
+              {...(key ? { sub: key.label } : {})}
               chevron
               onPress={() => openAgentAi(agent.id)}
             />
@@ -299,24 +309,26 @@ function Form({ agent }: { agent: Agent }) {
       )}
 
       <GroupedHeader>{t("rightHand.settings.budget")}</GroupedHeader>
-      <View style={[styles.budget, { backgroundColor: c.raised }]}>
-        <Text variant="body" tone="muted">
-          US$
-        </Text>
-        <TextInput
-          value={budget}
-          onChangeText={setBudget}
-          onEndEditing={saveBudget}
-          keyboardType="decimal-pad"
-          placeholder={t("rightHand.value.budgetDefault")}
-          placeholderTextColor={c.faint}
-          accessibilityLabel={t("rightHand.settings.budget")}
-          style={[styles.amount, fieldText("body"), { color: c.ink }]}
-        />
-        <Text variant="body" tone="muted">
-          {t("rightHand.settings.perMonth")}
-        </Text>
-      </View>
+      <GroupedList>
+        <View style={styles.budget}>
+          <Text variant="body" tone="muted">
+            US$
+          </Text>
+          <TextInput
+            value={budget}
+            onChangeText={setBudget}
+            onEndEditing={saveBudget}
+            keyboardType="decimal-pad"
+            placeholder={t("rightHand.value.budgetDefault")}
+            placeholderTextColor={c.faint}
+            accessibilityLabel={t("rightHand.settings.budget")}
+            style={[styles.amount, fieldText("body"), { color: c.ink }]}
+          />
+          <Text variant="body" tone="muted">
+            {t("rightHand.settings.perMonth")}
+          </Text>
+        </View>
+      </GroupedList>
       <GroupedFooter>{t("rightHand.settings.budgetHelp", g)}</GroupedFooter>
 
       <TeamWeekRows name={agent.name} />
@@ -365,6 +377,7 @@ function TeamWeekRows({ name }: { name: string }) {
   return (
     <>
       <GroupedHeader>{t("teamWeek.settings.label")}</GroupedHeader>
+      {/* The day and the hour are rows of the switch's group, as any settings group. */}
       <GroupedList>
         <GroupedRow
           icon="clock"
@@ -372,23 +385,23 @@ function TeamWeekRows({ name }: { name: string }) {
           toggle={!prefs.off}
           onPress={() => save({ off: !prefs.off })}
         />
-      </GroupedList>
-      {prefs.off ? null : (
-        <>
+        {prefs.off ? null : (
           <Pills
             label={t("teamWeek.schedule.day")}
             value={prefs.day}
             options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: d, label: dayText(locale, d) }))}
             onPick={(day) => save({ day })}
           />
+        )}
+        {prefs.off ? null : (
           <Pills
             label={t("teamWeek.schedule.hour")}
             value={prefs.hour}
             options={Array.from({ length: 24 }, (_, h) => ({ value: h, label: hourText(locale, h) }))}
             onPick={(hour) => save({ hour })}
           />
-        </>
-      )}
+        )}
+      </GroupedList>
       <GroupedFooter>{t("teamWeek.settings.help", agentGrammar(name))}</GroupedFooter>
     </>
   );
@@ -408,11 +421,7 @@ function Pills({
 }) {
   const c = useColors();
   return (
-    <View
-      accessibilityRole="radiogroup"
-      accessibilityLabel={label}
-      style={[styles.pills, { backgroundColor: c.raised }]}
-    >
+    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={styles.pills}>
       <Text variant="footnote" tone="muted" style={styles.pillsLabel}>
         {label}
       </Text>
@@ -420,17 +429,19 @@ function Pills({
         {options.map((o) => {
           const on = o.value === value;
           return (
-            <Pressable
+            <PressScale
               key={o.value}
+              to={0.95}
               accessibilityRole="radio"
               accessibilityState={{ checked: on }}
               onPress={() => !on && onPick(o.value)}
               style={[styles.pill, { backgroundColor: on ? c.ink : c.sunken }]}
+              contentStyle={styles.pillIn}
             >
               <Text variant="footnote" style={{ color: on ? c.bg : c.ink }}>
                 {o.label}
               </Text>
-            </Pressable>
+            </PressScale>
           );
         })}
       </View>
@@ -439,17 +450,14 @@ function Pills({
 }
 
 const styles = StyleSheet.create({
-  pills: { borderRadius: 14, padding: 12, marginTop: 8, gap: 8 },
+  // Inside a group: its rows' 14 sides.
+  pills: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   pillsLabel: { fontWeight: "600" },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  pill: { minHeight: 32, paddingHorizontal: 12, borderRadius: 12, borderBottomLeftRadius: 4, justifyContent: "center" },
-  budget: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    minHeight: 48,
-  },
+  pill: { minHeight: 32, borderRadius: 10, borderBottomLeftRadius: 3 },
+  // The whole pill presses: its padding is the press area's.
+  pillIn: { paddingHorizontal: 12, justifyContent: "center" },
+  // One row of a group: GroupedRow's 50 high and 14 sides.
+  budget: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, minHeight: 50 },
   amount: { flex: 1, paddingVertical: 12 },
 });

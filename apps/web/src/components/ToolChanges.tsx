@@ -1,12 +1,11 @@
 import type { ToolChange } from "@agenteschat/client";
 import { useAcceptConnectionToolChanges, useAcceptToolChange, useToolChanges } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button, Diff } from "@agenteschat/ui";
-import type { TFunction } from "i18next";
+import { type ToolChangeDiff, toolChangeDiff, toolChangeSummary } from "@agenteschat/client/lib/tool-changes";
+import { Button, Diff, diffLines, Locked } from "@agenteschat/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
-import { type ToolChangeDiff, toolChangeDiff } from "@/lib/tool-changes";
 
 /** Tools shown per connection before "Mostrar todas": a server that changed many doesn't push the page down. */
 const FIRST_TOOLS = 5;
@@ -85,11 +84,13 @@ function ConnectionChanges({
           </Button>
         )}
       </div>
-      <ul className="tool-changes__tools">
-        {shown.map((c) => (
-          <ToolRow key={c.toolName} orgId={orgId} change={c} />
-        ))}
-      </ul>
+      <Locked when={acceptAll.isPending}>
+        <ul className="tool-changes__tools">
+          {shown.map((c) => (
+            <ToolRow key={c.toolName} orgId={orgId} change={c} />
+          ))}
+        </ul>
+      </Locked>
       {tools.length > FIRST_TOOLS && !all && (
         <Button size="sm" variant="ghost" className="tool-changes__more" onClick={() => setAll(true)}>
           {t("connectors.toolChanges.showAll", { total: tools.length })}
@@ -105,14 +106,14 @@ function ToolRow({ orgId, change }: { orgId: string; change: ToolChange }) {
   const toast = useToast();
   const accept = useAcceptToolChange(orgId);
   const [open, setOpen] = useState(false);
-  const diff = useMemo(() => toolChangeDiff(change), [change]);
+  const diff = useMemo(() => toolChangeDiff(change, diffLines), [change]);
   const detailsId = `tool-change-${change.connectionId}-${change.toolName}`;
   return (
     <li className="tool-change">
       <div className="tool-change__row">
         <div className="tool-change__what">
           <code className="tool-change__name">{change.toolName}</code>
-          <span className="small muted">{summary(t, diff)}</span>
+          <span className="small muted">{toolChangeSummary(t, diff)}</span>
         </div>
         <div className="tool-change__actions">
           <Button
@@ -176,13 +177,4 @@ function ChangeDetails({ diff }: { diff: ToolChangeDiff }) {
       )}
     </>
   );
-}
-
-/** "O texto mudou · 2 campos mudaram": what changed, in a few words. */
-function summary(t: TFunction, diff: ToolChangeDiff): string {
-  const parts: string[] = [];
-  if (diff.description) parts.push(t("connectors.toolChanges.textChanged"));
-  if (diff.fields.length > 0) parts.push(t("connectors.toolChanges.fieldsChanged", { count: diff.fields.length }));
-  if (parts.length === 0) parts.push(t("connectors.toolChanges.inputChanged"));
-  return parts.join(" · ");
 }

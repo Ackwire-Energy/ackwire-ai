@@ -38,7 +38,18 @@ import {
   reviewToolsOf,
   toolName,
 } from "@agenteschat/client/lib/tool-review";
-import { Alert, Button, Dialog, DialogBody, DialogFooter, Field, Icon, Input, Segmented } from "@agenteschat/ui";
+import {
+  Alert,
+  Button,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Field,
+  Icon,
+  Input,
+  Locked,
+  Segmented,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
@@ -332,75 +343,77 @@ function ConnectStep({
 
   return (
     <>
-      <DialogBody className="cflow__body">
-        {def && viaComposio ? (
-          <p className="muted cflow__text">
-            {connectorDescription(t, def)} {composioConnectText(t, def)}
-          </p>
-        ) : def ? (
-          <p className="muted cflow__text">
-            {connectorDescription(t, def)} {canOAuth && t("connectFlow.oauthHelp", { name: connectorBrand(def) })}
-          </p>
-        ) : viaComposio ? (
-          <p className="muted cflow__text">{t("connectors.composio.via")}</p>
-        ) : fixed ? (
-          <p className="muted cflow__text">{fixed}</p>
-        ) : (
-          <p className="muted cflow__text">{t("connectFlow.customText")}</p>
-        )}
-        {askUrl && (
-          <Field label={t("connectors.serverUrl")} id="cflow-url" help={t("connectFlow.urlHelp")} error={urlError}>
-            <Input
-              value={url}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                setNeedsKey(null);
-              }}
-              placeholder="https://"
-              inputMode="url"
-            />
-          </Field>
-        )}
-        {def === null && fixed === null && (
-          <Field label={t("connectFlow.name")} id="cflow-name">
-            <Input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={t("connectFlow.namePlaceholder")}
-            />
-          </Field>
-        )}
-        {canOAuth && (
-          <Button
-            variant="primary"
-            block
-            className="cflow__oauth"
-            disabled={busy}
-            loading={(connect.isPending || oauth.isPending) && touched === "oauth"}
-            onClick={startOAuth}
-          >
-            {viaComposio
-              ? t("connectFlow.continueInComposio")
-              : def
-                ? t("connectFlow.continueIn", { name: connectorBrand(def) })
-                : t("connectors.connect")}
-          </Button>
-        )}
-        {canOAuth && canKey && (
-          <>
-            <div className="auth__or">{t("connectFlow.or")}</div>
-            <details
-              className="cflow__more"
-              open={keyOpen}
-              onToggle={(e) => setKeyOpen((e.currentTarget as HTMLDetailsElement).open)}
+      <Locked when={busy}>
+        <DialogBody className="cflow__body">
+          {def && viaComposio ? (
+            <p className="muted cflow__text">
+              {connectorDescription(t, def)} {composioConnectText(t, def)}
+            </p>
+          ) : def ? (
+            <p className="muted cflow__text">
+              {connectorDescription(t, def)} {canOAuth && t("connectFlow.oauthHelp", { name: connectorBrand(def) })}
+            </p>
+          ) : viaComposio ? (
+            <p className="muted cflow__text">{t("connectors.composio.via")}</p>
+          ) : fixed ? (
+            <p className="muted cflow__text">{fixed}</p>
+          ) : (
+            <p className="muted cflow__text">{t("connectFlow.customText")}</p>
+          )}
+          {askUrl && (
+            <Field label={t("connectors.serverUrl")} id="cflow-url" help={t("connectFlow.urlHelp")} error={urlError}>
+              <Input
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  setNeedsKey(null);
+                }}
+                placeholder="https://"
+                inputMode="url"
+              />
+            </Field>
+          )}
+          {def === null && fixed === null && (
+            <Field label={t("connectFlow.name")} id="cflow-name">
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={t("connectFlow.namePlaceholder")}
+              />
+            </Field>
+          )}
+          {canOAuth && (
+            <Button
+              variant="primary"
+              block
+              className="cflow__oauth"
+              disabled={busy}
+              loading={(connect.isPending || oauth.isPending) && touched === "oauth"}
+              onClick={startOAuth}
             >
-              <summary>{t("connectFlow.withKey")}</summary>
-              {keyForm}
-            </details>
-          </>
-        )}
-        {!canOAuth && canKey && keyForm}
-      </DialogBody>
+              {viaComposio
+                ? t("connectFlow.continueInComposio")
+                : def
+                  ? t("connectFlow.continueIn", { name: connectorBrand(def) })
+                  : t("connectors.connect")}
+            </Button>
+          )}
+          {canOAuth && canKey && (
+            <>
+              <div className="auth__or">{t("connectFlow.or")}</div>
+              <details
+                className="cflow__more"
+                open={keyOpen}
+                onToggle={(e) => setKeyOpen((e.currentTarget as HTMLDetailsElement).open)}
+              >
+                <summary>{t("connectFlow.withKey")}</summary>
+                {keyForm}
+              </details>
+            </>
+          )}
+          {!canOAuth && canKey && keyForm}
+        </DialogBody>
+      </Locked>
       <DialogFooter
         bar
         note={
@@ -508,49 +521,51 @@ function ToolsStep({
 
   return (
     <>
-      <DialogBody className="cflow__body tr-body">
-        {naming && (
-          <Field
-            label={t("connectFlow.accountName")}
-            id="cflow-account"
-            help={t("connectFlow.accountNameHelp")}
-            error={labelError ?? undefined}
-          >
-            <Input
-              value={label}
-              maxLength={80}
-              onChange={(e) => {
-                setLabel(e.target.value);
-                setLabelError(null);
-              }}
-            />
-          </Field>
-        )}
-        <div className="cflow__lead">
-          {server.toolsError ? (
-            <Alert>{t("toolReview.unreadable", { reason: server.toolsError })}</Alert>
-          ) : (
-            <p className="muted cflow__text">{t("toolReview.lead", { count: tools.length, name })}</p>
+      <Locked when={save.isPending || rename.isPending}>
+        <DialogBody className="cflow__body tr-body">
+          {naming && (
+            <Field
+              label={t("connectFlow.accountName")}
+              id="cflow-account"
+              help={t("connectFlow.accountNameHelp")}
+              error={labelError ?? undefined}
+            >
+              <Input
+                value={label}
+                maxLength={80}
+                onChange={(e) => {
+                  setLabel(e.target.value);
+                  setLabelError(null);
+                }}
+              />
+            </Field>
           )}
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="repeat"
-            disabled={refresh.isPending}
-            loading={refresh.isPending}
-            onClick={() => refresh.mutate(server.id, { onSuccess: (fresh) => setServer(fresh) })}
-          >
-            {server.toolsError ? t("common.retry") : t("toolReview.refresh")}
-          </Button>
-        </div>
-        {tools.length === 0 ? (
-          server.toolsError ? null : (
-            <p className="muted">{t("toolReview.noTools")}</p>
-          )
-        ) : (
-          <ToolReview name={name} tools={tools} state={state} onChange={setState} onMoved={(m) => toast.show(m)} />
-        )}
-      </DialogBody>
+          <div className="cflow__lead">
+            {server.toolsError ? (
+              <Alert>{t("toolReview.unreadable", { reason: server.toolsError })}</Alert>
+            ) : (
+              <p className="muted cflow__text">{t("toolReview.lead", { count: tools.length, name })}</p>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="repeat"
+              disabled={refresh.isPending}
+              loading={refresh.isPending}
+              onClick={() => refresh.mutate(server.id, { onSuccess: (fresh) => setServer(fresh) })}
+            >
+              {server.toolsError ? t("common.retry") : t("toolReview.refresh")}
+            </Button>
+          </div>
+          {tools.length === 0 ? (
+            server.toolsError ? null : (
+              <p className="muted">{t("toolReview.noTools")}</p>
+            )
+          ) : (
+            <ToolReview name={name} tools={tools} state={state} onChange={setState} onMoved={(m) => toast.show(m)} />
+          )}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={reviewNote(t, tools, state)}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
@@ -623,60 +638,64 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
 
   return (
     <>
-      <DialogBody className="cflow__body">
-        {!ready ? (
-          <LoadingList count={3} />
-        ) : list.length === 0 ? (
-          <p className="muted">{t("connectFlow.noAgents")}</p>
-        ) : (
-          <>
-            {list.length > 1 && (
-              <div className="cflow-agent cflow-agent--all">
-                <span className="cflow-agent__all-icon" aria-hidden="true">
-                  <Icon name="members" size={16} />
-                </span>
-                <span className="cflow-agent__name">
-                  <span>{t("connectFlow.everyone")}</span>
-                  <span className="small muted">{t("connectFlow.everyoneCount", { count: list.length })}</span>
-                </span>
-                <Segmented<LevelState | "">
-                  size="sm"
-                  label={t("connectFlow.everyoneLevel")}
-                  value={sharedLevel(list.map((a) => picked(a.id))) ?? ""}
-                  onValueChange={(l) => {
-                    if (l) setWho(Object.fromEntries(list.map((a) => [a.id, l])));
-                  }}
-                  options={LEVELS.map((l) => ({ value: l, label: levelLabel(l) }))}
-                />
-              </div>
-            )}
-            <ul className="cflow-agents">
-              {list.map((a) => (
-                <li key={a.id} className="cflow-agent">
-                  <AgentAvatar agentId={a.id} name={a.name} size="sm" />
-                  <span className="cflow-agent__name">
-                    <span>{a.name}</span>
-                    {a.role && <span className="small muted">{a.role}</span>}
+      <Locked when={grant.isPending}>
+        <DialogBody className="cflow__body">
+          {!ready ? (
+            <LoadingList count={3} />
+          ) : list.length === 0 ? (
+            <p className="muted">{t("connectFlow.noAgents")}</p>
+          ) : (
+            <>
+              {list.length > 1 && (
+                <div className="cflow-agent cflow-agent--all">
+                  <span className="cflow-agent__all-icon" aria-hidden="true">
+                    <Icon name="members" size={16} />
                   </span>
-                  <Segmented
+                  <span className="cflow-agent__name">
+                    <span>{t("connectFlow.everyone")}</span>
+                    <span className="small muted">{t("connectFlow.everyoneCount", { count: list.length })}</span>
+                  </span>
+                  <Segmented<LevelState | "">
                     size="sm"
-                    label={t("connectFlow.levelOf", { name: a.name })}
-                    value={picked(a.id)}
-                    onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
-                    options={options(a.id)}
+                    label={t("connectFlow.everyoneLevel")}
+                    value={sharedLevel(list.map((a) => picked(a.id))) ?? ""}
+                    onValueChange={(l) => {
+                      if (l) setWho(Object.fromEntries(list.map((a) => [a.id, l])));
+                    }}
+                    options={LEVELS.map((l) => ({ value: l, label: levelLabel(l) }))}
                   />
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        <p className="small muted cflow__asks">
-          <Icon name="lock" />
-          {asks > 0 ? t("connectFlow.asksCount", { count: asks }) : t("connectFlow.asksDefault")}
-        </p>
-      </DialogBody>
+                </div>
+              )}
+              <ul className="cflow-agents">
+                {list.map((a) => (
+                  <li key={a.id} className="cflow-agent">
+                    <AgentAvatar agentId={a.id} name={a.name} size="sm" />
+                    <span className="cflow-agent__name">
+                      <span>{a.name}</span>
+                      {a.role && <span className="small muted">{a.role}</span>}
+                    </span>
+                    <Segmented
+                      size="sm"
+                      label={t("connectFlow.levelOf", { name: a.name })}
+                      value={picked(a.id)}
+                      onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
+                      options={options(a.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="small muted cflow__asks">
+            <Icon name="lock" />
+            {asks > 0 ? t("connectFlow.asksCount", { count: asks }) : t("connectFlow.asksDefault")}
+          </p>
+        </DialogBody>
+      </Locked>
       <DialogFooter bar>
-        <Button onClick={onBack}>{t("connectFlow.back")}</Button>
+        <Button disabled={grant.isPending} onClick={onBack}>
+          {t("connectFlow.back")}
+        </Button>
         <Button
           variant="primary"
           disabled={!ready || grant.isPending}

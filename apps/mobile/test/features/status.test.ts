@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { STATUS_SUGGESTIONS } from "@agenteschat/client/lib/presence";
+import { STATUS_SUGGESTIONS, statusEndNote } from "@agenteschat/client/lib/presence";
 import {
   agentWhyKey,
   availabilityOf,
@@ -69,6 +69,13 @@ describe("the Status screen's draft (ADR 0084)", () => {
 });
 
 describe("how a status reads in a row, a pill and a profile", () => {
+  test("the line under a status: with no end, only its owner reads Até você mudar", async () => {
+    const t = await translator("pt-BR");
+    expect(statusEndNote(t, "pt-BR", null, true)).toBe("Até você mudar");
+    expect(statusEndNote(t, "pt-BR", null, false)).toBeNull();
+    expect(statusEndNote(t, "pt-BR", new Date(Date.now() + 40 * 86_400_000).toISOString(), false)).toMatch(/^Some /);
+  });
+
   test("a person's line, with when it clears", async () => {
     const t = await translator("pt-BR");
     expect(lineText({ emoji: "📅", text: "Em reunião" })).toBe("📅 Em reunião");

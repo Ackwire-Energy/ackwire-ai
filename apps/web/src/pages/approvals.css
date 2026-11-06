@@ -348,6 +348,13 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
   outline: none;
   box-shadow: inset 0 0 0 1.5px var(--ink);
 }
+.ap-refuse textarea:disabled {
+  background: var(--sunken);
+  color: var(--muted);
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+  cursor: not-allowed;
+}
 .ap-refuse__suggest {
   display: flex;
   flex-wrap: wrap;
@@ -366,8 +373,12 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
   line-height: normal;
   cursor: pointer;
 }
-.ap-refuse__suggest button:hover {
+.ap-refuse__suggest button:hover:not(:disabled) {
   color: var(--ink);
+}
+.ap-refuse__suggest button:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
 }
 html:not([data-pointer]) .ap-refuse__suggest button:focus-visible {
   outline: none;
@@ -404,7 +415,7 @@ html:not([data-pointer]) .ap-refuse__suggest button:focus-visible {
   background: color-mix(in srgb, var(--sunken) 45%, transparent);
 }
 html:not([data-pointer]) .ap-row:focus-visible {
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .ap-row.is-selected {
   background: color-mix(in srgb, var(--sunken) 80%, transparent);
@@ -546,9 +557,12 @@ html:not([data-pointer]) .ap-link:focus-visible {
     grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: start;
   }
+  /* Open on the title's first line (its 22px line, with the same rise), not centred on the wrapped title. */
   .ap-mi__row .ap-row__end {
     grid-column: auto;
-    align-self: center;
+    height: 22px;
+    margin-block-start: calc(var(--cap-top) - 11px);
+    font-size: 14px;
   }
   .ap-mi__row .ap-row__end > .ac-chip {
     display: none;
@@ -676,8 +690,9 @@ html:not([data-pointer]) .ap-link:focus-visible {
 .ap-li:hover {
   background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
+/* The list scrolls with no room on its left (the rows' plates start on the page's edge): the ring goes inside. */
 html:not([data-pointer]) .ap-li:focus-visible {
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .ap-li.is-selected {
   background: color-mix(in srgb, var(--ink) 7%, transparent);
@@ -751,7 +766,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
 .ap-run__acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   padding-left: 34px;
 }
 .ap-run .ap-run__items {
@@ -769,13 +784,14 @@ html:not([data-pointer]) .ap-li:focus-visible {
   padding: 0 0 16px 28px;
   border-left: 1px solid var(--line);
 }
+/* The face's top on the first line's capitals (`.ac-captop` on "by"), as a chat name starts at its face. */
 .ap-review__head {
   position: sticky;
   top: 0;
   z-index: 3;
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 14px;
   padding: 18px 0 12px;
   background: var(--bg);
@@ -788,7 +804,8 @@ html:not([data-pointer]) .ap-li:focus-visible {
 }
 .ap-review__by,
 .ap-review__title {
-  margin: 0;
+  margin-inline: 0;
+  margin-block-end: 0;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -803,6 +820,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
   font-weight: 600;
 }
 .ap-review__title {
+  margin-block-start: 0;
   font-size: 22px;
   line-height: 28px;
   font-weight: 650;

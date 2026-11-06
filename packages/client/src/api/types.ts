@@ -197,6 +197,8 @@ export interface User {
    * access allowed them; `org.create_refused` and `org.create_unpaid` can still refuse it).
    */
   canCreateWorkspace?: boolean;
+  /** They deleted this account: the apps show only its waiting screen. `dueAt` is null once the date passed. */
+  deletion?: { dueAt: string | null; requestedAt: string | null };
   /** The app's language for emails, pushes and every device (ADR 0122); null before any app said one. */
   locale?: string | null;
   /** The language follows each device's own (Automático) until the person picks one. */
@@ -227,6 +229,8 @@ export interface OrgSummary {
   rank?: number | null;
   /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
   logo?: string | null;
+  /** From `GET /me`: when it was made. Absent from older servers. */
+  createdAt?: string;
   /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
   standing?: OrgStanding;
   /**
@@ -280,7 +284,14 @@ export interface AccountDeletionPlan {
    * Only I am in them: they close now and are deleted for good 7 days later. One being deleted already keeps its date
    * (`deletion.dueAt`, null once it passed).
    */
-  closes: { id: string; name: string; deletion?: { dueAt: string | null } }[];
+  closes: {
+    id: string;
+    name: string;
+    /** What it holds, unless it's being deleted already. Absent from older servers. */
+    agents?: number;
+    messages?: number;
+    deletion?: { dueAt: string | null };
+  }[];
   /** Others are in them: I leave. */
   leaves: { id: string; name: string; role: Role }[];
   /** I'm their only owner, others are in them and they aren't being deleted: the account can't go yet (`sole_owner`). */
@@ -525,6 +536,10 @@ export interface Credential {
   workspaceIdHint?: string | null;
   /** `custom` (ADR 0146): the endpoint's address, API and models. */
   endpoint?: { style: EndpointStyle; baseURL: string; models: EndpointModel[] };
+  /** The agents that think with it, in a list of keys: what removing it would change. */
+  usedBy?: { id: string; name: string }[];
+  /** On a key just saved: `ok` a real call passed, `unchecked` the provider didn't say. */
+  check?: "ok" | "unchecked";
   createdAt: string;
   revokedAt: string | null;
 }
@@ -738,6 +753,8 @@ export interface AgentBrainLine {
   account?: string;
   /** On a plan: that account's limits as last reported; absent: not known yet. */
   usage?: PlanUsage;
+  /** Set to Rápida where that applies to what it thinks with; absent: standard speed. */
+  speed?: "fast";
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -1397,6 +1414,8 @@ export type ChannelEvent =
       turn?: number;
       /** Where `text` starts in its turn's text: past what arrived here, a piece was missed. */
       at?: number;
+      /** Where its stretch starts in the turn's text (a stretch: the text between two calls of a computer brain). */
+      from?: number;
     }
   | {
       type: "agent.run";
@@ -2199,6 +2218,8 @@ export interface WorkView {
   finishedAt: string | null;
   nextUpdateAt: string | null;
   lastUpdate: { text: string; at: string; seq: number } | null;
+  /** Waiting on an answer: what its run asked, and the message that holds the card. */
+  question?: { text: string; messageId: string | null } | null;
   plan: { id: string; text: string; state: "todo" | "doing" | "done" }[];
   issue: { id: string; number: number } | null;
   resultMessageId: string | null;
@@ -2536,6 +2557,8 @@ export interface ReplyRef {
   excerpt: string;
   /** What it quotes was a GIF or a sticker (ADR 0091): the quote says so where its excerpt is empty. */
   media?: MediaKind;
+  /** The original is gone: the server keeps nothing of it here. */
+  deleted?: boolean;
 }
 
 // ── GIFs and stickers in chat (ADR 0091) ──────────────────────────────────────
@@ -2823,6 +2846,8 @@ export interface DirectMessage {
   lastReadAt?: string | null;
   /** False until this person first reads it (server side, so on every device): the right hand waves then. */
   everRead?: boolean;
+  /** When the DM began: where it sorts until its first message. Absent from an older server. */
+  openedAt?: string;
 }
 
 /**
@@ -2870,7 +2895,10 @@ export interface SecretRequest {
   messageId: string | null;
   /** The only person who can answer. */
   requestedForUserId: string;
+  /** The agent's own name for it, for the box's binding: never shown. */
   name: string;
+  /** What people read, in the agent's words. Null or absent: `secretLabel` derives one. */
+  label?: string | null;
   purpose: string;
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
@@ -2885,6 +2913,10 @@ export interface SecretRequest {
   removed: boolean;
   /** The agent took it back: it no longer needs it. */
   withdrawn?: true;
+  /** Why it closed with nobody answering. Null or absent: answered, expired, or closed before this was kept. */
+  endReason?: "run_stopped" | "withdrawn" | "person_left" | "superseded" | "computer_changed" | null;
+  /** The newer request that took its place. */
+  supersededBy?: string | null;
   /** The agent already held this name on this computer: a delivery replaces that value. */
   replaces?: boolean;
   /**
@@ -2898,7 +2930,9 @@ export interface SecretRequest {
 
 /** A secret on an agent's computer, by name (the agent page). */
 export interface AgentSecret {
+  /** What removing it goes by, never shown: people read `label`. */
   name: string;
+  label: string;
   target: SecretTarget;
   machineId: string | null;
   deliveredAt: string;
@@ -4190,19 +4224,31 @@ export type QueuePurpose =
 export interface QueueWhere {
   channelId: string;
   threadId: string | null;
+  /** Two agents' private conversation, said only to who may see that work. */
+  agents?: boolean;
 }
 
-export interface QueueWorking {
+/** What you may do with a row of the line (absent on an older server: nothing). */
+export interface QueueAccess {
+  /** You see it in the task manager: the row opens it. */
+  canOpen?: boolean;
+  /** You may stop it. */
+  canStop?: boolean;
+}
+
+export interface QueueWorking extends QueueAccess {
   runId: string;
   agentId: string;
   purpose: QueuePurpose;
   where: QueueWhere;
   startedAt: string;
-  /** An estimate (the agent's typical turn), never exact; null with no basis. */
+  /** An estimate (the agent's typical turn), never exact; null with no basis or past it. */
   estimatedEndAt: string | null;
+  /** Past its typical turn: there is no honest end to give. */
+  overdue?: boolean;
 }
 
-export interface QueueWaiting {
+export interface QueueWaiting extends QueueAccess {
   runId: string;
   agentId: string;
   purpose: QueuePurpose;
@@ -5022,7 +5068,15 @@ export interface MissionSettings {
 export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
 /** Why a computer brain can't be chosen now. */
-export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
+export type BrainUnavailable =
+  | "no_computer"
+  | "exec_off"
+  | "runner_old"
+  | "tool_off"
+  | "not_installed"
+  | "outdated"
+  /** Its runner hasn't said which CLIs it has yet. */
+  | "not_reported";
 
 export interface BrainModelOption {
   /** What is stored (`opus`, `sonnet`, `haiku`, a Codex model). */
@@ -5063,7 +5117,13 @@ export interface AgentBrain {
    */
   scope?: BrainScope;
   /** With `mine`: the workspace's AI (`model`: an API key), and whether it thinks for the viewer. */
-  workspaceAi?: { brain: BrainKind; ownerId: string | null; servesYou: boolean };
+  workspaceAi?: {
+    brain: BrainKind;
+    ownerId: string | null;
+    servesYou: boolean;
+    /** On a key: the workspace's key it thinks with; null with none (the server's own key may serve). */
+    key?: { provider: string; label: string } | null;
+  };
   brain: BrainKind;
   /** As stored; null = the brain's default. */
   model: string | null;
@@ -5081,6 +5141,8 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
+  /** How fast it answers in conversations; kept whatever it thinks with, applied only where `speedFits`. */
+  speed: BrainSpeed;
   /** The most context it reads, in tokens (200K, 400K or 1M), any brain; null = its model's window. */
   contextTokens?: number | null;
   /**
@@ -5116,6 +5178,8 @@ export type BrainScope = "mine" | "workspace";
 export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** A level, or "Automático" (each run picks low, medium or high with the model). */
 export type BrainEffortSetting = BrainEffort | "auto";
+
+export type BrainSpeed = "standard" | "fast";
 
 export type MachineAccountKind = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
@@ -5174,6 +5238,8 @@ export interface AiComputer {
     antigravity?: boolean;
     key: boolean;
   };
+  /** Why a CLI of `brains` can't think there (absent: an older server). */
+  off?: Partial<Record<MachineAccountKind, BrainUnavailable>>;
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: {
     claude_code: boolean;
@@ -5227,6 +5293,7 @@ export interface AgentBrainInput {
   /** The account thinks for another agent: take it from that one. */
   moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
+  speed?: BrainSpeed;
   /** 200K, 400K or 1M tokens; null = the model's window; omitted = keep. */
   contextTokens?: number | null;
 }
@@ -5242,6 +5309,8 @@ export interface AgentSetup {
   machineId?: string | null;
   account?: string | null;
   effort?: BrainEffortSetting | null;
+  /** Omitted = each agent keeps its own. */
+  speed?: BrainSpeed;
   contextTokens?: number | null;
   fallback?: boolean;
   /** "Atende outras pessoas" off, for the agents that move onto the plan. */
@@ -5872,6 +5941,8 @@ export interface NotificationSource {
   dashboardId?: string;
   /** `widget_alert`, `widget_failed`: the widget. */
   widgetId?: string;
+  /** `connector_tool_changed`: the connected server whose approved tools changed (ADR 0117). */
+  connectionId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
@@ -6165,6 +6236,12 @@ export interface TaskNow {
   at: string;
 }
 
+/** Who asked a task in agents' private conversation, and what started the chain. */
+export interface TaskDelegation {
+  agentId: string;
+  origin: { kind: "person"; userId: string; name: string } | { kind: "routine"; name: string } | { kind: "agent" };
+}
+
 /** One task in the task manager (`GET …/task-manager`, ADR 0128): a run still on. No cost. */
 export interface ManagedTask {
   runId: string;
@@ -6173,6 +6250,8 @@ export interface ManagedTask {
   channelKind: "channel" | "dm";
   /** Null for a DM (and a routine's room). */
   channelName: string | null;
+  /** A conversation only agents are in: nobody can open it, its steps say what happens there. */
+  betweenAgents?: boolean;
   /** Null: the main timeline. */
   threadId: string | null;
   status: "queued" | "running" | "waiting_approval" | "waiting_input";
@@ -6187,6 +6266,10 @@ export interface ManagedTask {
   plan: { done: number; total: number } | null;
   /** Who asked (a person); null for another agent, a routine or an event. */
   requester: { userId: string; name: string } | null;
+  /** Another agent asked it, in their private conversation (absent on an older server). */
+  delegation?: TaskDelegation | null;
+  /** What it asked of other agents and is still on or not started, all the way down. */
+  helpers?: number;
   /** `model`, `claude_code`, `codex`, `cursor`; null before its first turn. */
   brain: string | null;
   /** The agent's computer. */
@@ -6247,6 +6330,7 @@ export interface EndedTask {
   channelId: string;
   channelKind: "channel" | "dm";
   channelName: string | null;
+  betweenAgents?: boolean;
   threadId: string | null;
   status: "done" | "failed" | "canceled";
   label: string | null;
@@ -6264,9 +6348,20 @@ export interface TaskSteps {
   steps: RunStep[];
 }
 
+/** The workspace's work you may not see: how much, never what. */
+export interface HiddenTasks {
+  total: number;
+  /** Of them, running now. */
+  working: number;
+  /** Per agent: its tasks still on. */
+  byAgent: Record<string, number>;
+}
+
 export interface TaskManagerView {
   tasks: ManagedTask[];
   ended: EndedTask[];
+  /** Absent on an older server. */
+  hidden?: HiddenTasks;
   /** Computers with turns running or waiting for room (absent on an older server). */
   computers?: ComputerSummary[];
   /** Per agent with work in the last hour: tool calls per minute, 60 points, oldest first. */
@@ -6753,7 +6848,17 @@ export interface AppConsent {
     };
   };
   account: { name: string; email: string };
-  workspaces: { id: string; name: string; logo: string | null; paused: boolean; current: boolean }[];
+  workspaces: {
+    id: string;
+    name: string;
+    logo: string | null;
+    paused: boolean;
+    current: boolean;
+    /** Tells apart two with the same name. Absent from older servers. */
+    createdAt?: string;
+    /** While it's being deleted, when it goes. Absent from older servers. */
+    deletion?: { dueAt: string };
+  }[];
 }
 
 export interface AppConsentDecision {

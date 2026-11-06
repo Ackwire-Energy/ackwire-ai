@@ -40,7 +40,7 @@ export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
         accessibilityRole="button"
         accessibilityLabel={org?.name ? `${t("mobile.me.title")}, ${org.name}` : t("mobile.me.title")}
         hitSlop={6}
-        style={styles.box}
+        style={({ pressed }) => [styles.box, pressed ? styles.pressed : null]}
       >
         <OrgAvatar logo={org?.logo} size={ORG} />
         <View style={[styles.me, { borderColor: c.bg, backgroundColor: c.bg }]}>
@@ -55,5 +55,6 @@ export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
 const styles = StyleSheet.create({
   // Room for the photo on the logo's corner.
   box: { width: ORG + 6, height: ORG + 6 },
+  pressed: { opacity: 0.6 },
   me: { position: "absolute", right: 0, bottom: 0, borderRadius: (ME + RING * 2) / 2, borderWidth: RING },
 });

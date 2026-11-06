@@ -20,8 +20,9 @@ import {
 } from "@/ui";
 import { Note } from "../ai/parts";
 import { Gap, SettingsPage } from "../settings/parts";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
-import { MONO } from "../shared/parts";
+import { Loaded, MONO } from "../shared/parts";
 import {
   agentsSummary,
   connectionLine,
@@ -71,34 +72,45 @@ export function VaultScreen() {
   const counts = vaultCounts(data);
   // A new item starts where the person is: the team's tab adds to the team when they may.
   const newScope = current === "team" && data.canManageTeam ? "team" : "personal";
+  const tabEmpty = current === newScope && !data.items.some((i) => i.scope === current);
   return (
     <SettingsPage title={title}>
-      <GroupedFooter>{t("settings.sectionText.vault")}</GroupedFooter>
-      <Gap />
-      <GroupedList>
-        <GroupedRow
-          icon="plus"
-          label={t("mobile.vault.newItem")}
-          chevron
-          onPress={() => router.push(vaultHref.create(newScope) as never)}
-        />
-      </GroupedList>
-      <View style={styles.tabs}>
-        <Segmented
-          items={[
-            { key: "team", label: t("mobile.vault.tab.team"), count: counts.team },
-            { key: "personal", label: t("mobile.vault.tab.personal"), count: counts.personal },
-            { key: "connections", label: t("mobile.vault.tab.connections"), count: counts.connections },
-          ]}
-          value={current}
-          onChange={(key) => setTab(key as VaultTab)}
-        />
-      </View>
-      {current === "connections" ? (
-        <Connections data={data} />
-      ) : (
-        <Items key={current} data={data} tab={current} onNew={() => router.push(vaultHref.create(newScope) as never)} />
-      )}
+      <Loaded>
+        <GroupedFooter>{t("settings.sectionText.vault")}</GroupedFooter>
+        {/* Empty, the button in the tab's empty state is the one way to add. */}
+        {tabEmpty ? null : (
+          <>
+            <Gap />
+            <GroupedList>
+              <GroupedRow
+                icon="plus"
+                label={t("mobile.vault.newItem")}
+                chevron
+                onPress={() => router.push(vaultHref.create(newScope) as never)}
+              />
+            </GroupedList>
+          </>
+        )}
+        <View style={styles.tabs}>
+          <Segmented
+            items={[
+              { key: "team", label: t("mobile.vault.tab.team"), count: counts.team },
+              { key: "personal", label: t("mobile.vault.tab.personal"), count: counts.personal },
+              { key: "connections", label: t("mobile.vault.tab.connections"), count: counts.connections },
+            ]}
+            value={current}
+            onChange={(key) => setTab(key as VaultTab)}
+          />
+        </View>
+        {/* Another tab's rows fade in where the last one's were. */}
+        <Loaded key={current}>
+          {current === "connections" ? (
+            <Connections data={data} />
+          ) : (
+            <Items data={data} tab={current} onNew={() => router.push(vaultHref.create(newScope) as never)} />
+          )}
+        </Loaded>
+      </Loaded>
     </SettingsPage>
   );
 }
@@ -115,31 +127,22 @@ function Items({ data, tab, onNew }: { data: VaultOverview; tab: "team" | "perso
   const mayAdd = tab === "personal" || data.canManageTeam;
   return (
     <>
-      <GroupedFooter>
-        {tab === "personal"
-          ? t("mobile.vault.personalText")
-          : data.canManageTeam
-            ? t("mobile.vault.teamText")
-            : t("mobile.vault.teamReadText")}
-      </GroupedFooter>
+      {all.length > 0 ? (
+        <GroupedFooter>
+          {tab === "personal"
+            ? t("mobile.vault.personalText")
+            : data.canManageTeam
+              ? t("mobile.vault.teamText")
+              : t("mobile.vault.teamReadText")}
+        </GroupedFooter>
+      ) : null}
       {all.length === 0 ? (
-        <EmptyState
-          icon={tab === "personal" ? "lock" : "members"}
-          title={tab === "personal" ? t("mobile.vault.empty.personalTitle") : t("mobile.vault.empty.teamTitle")}
-          subtitle={
-            tab === "personal"
-              ? t("mobile.vault.empty.personalText")
-              : mayAdd
-                ? t("mobile.vault.empty.teamText")
-                : t("mobile.vault.empty.teamReadText")
-          }
-          {...(mayAdd
-            ? {
-                action: (
-                  <Button variant="primary" size="sm" icon="plus" label={t("mobile.vault.newItem")} onPress={onNew} />
-                ),
-              }
-            : {})}
+        <FirstUse
+          place={tab === "personal" ? "vaultPersonal" : "vaultTeam"}
+          size="panel"
+          acts={mayAdd}
+          label={t("mobile.vault.newItem")}
+          onPress={onNew}
         />
       ) : (
         <>
@@ -168,7 +171,21 @@ function Items({ data, tab, onNew }: { data: VaultOverview; tab: "team" | "perso
             <Gap />
           )}
           {shown.length === 0 ? (
-            <GroupedFooter>{t("mobile.vault.noResults", { q: q.trim() })}</GroupedFooter>
+            <EmptyState
+              size="inline"
+              title={t("mobile.vault.noResults", { q: q.trim() })}
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={t("filters.clearAll")}
+                  onPress={() => {
+                    setQ("");
+                    setKind("all");
+                  }}
+                />
+              }
+            />
           ) : (
             <GroupedList>
               {shown.map((item) => (
@@ -303,7 +320,7 @@ function ConnectionRow({ icon, conn, now }: { icon: IconName; conn: VaultConnect
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
   loading: { marginVertical: 16 },
-  tabs: { paddingTop: 18, paddingBottom: 4, paddingHorizontal: 4 },
+  tabs: { paddingTop: 20, paddingBottom: 4, paddingHorizontal: 4 },
   search: { paddingTop: 12, paddingBottom: 4 },
   // The pills scroll to the screen's edges; their row has its own inset.
   filters: { marginHorizontal: -16, paddingTop: 10, paddingBottom: 10 },

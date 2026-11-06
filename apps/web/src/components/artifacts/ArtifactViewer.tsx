@@ -4,7 +4,20 @@ import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Alert, Button, Chip, cx, DetailsDialog, Field, Icon, Input, Menu, MenuItem, Textarea } from "@agenteschat/ui";
+import {
+  Alert,
+  Button,
+  Chip,
+  cx,
+  DetailsDialog,
+  Field,
+  Icon,
+  Input,
+  Locked,
+  Menu,
+  MenuItem,
+  Textarea,
+} from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -273,8 +286,8 @@ function Versions({ artifact, onVersion }: { artifact: ArtifactDetail; onVersion
                 aria-current={current ? "true" : undefined}
                 onClick={() => onVersion(v.version === artifact.version ? undefined : v.version)}
               >
-                <span className="row" style={{ gap: 6 }}>
-                  <span style={{ fontWeight: 600 }}>
+                <span className="artifact-viewer__vhead">
+                  <span className="artifact-viewer__vname">
                     {t("artifacts.versionBy", {
                       version: v.version,
                       name: authorName(v.author),
@@ -323,25 +336,27 @@ function Editor({ artifact, onDone }: { artifact: ArtifactDetail; onDone: (saved
       }}
     >
       <p className="small muted">{t("artifacts.editing", { version: artifact.version + 1 })}</p>
-      {content.kind === "document" && (
-        <Field label={t("artifacts.markdownSource")} id="artifact-md">
-          <Textarea
-            rows={18}
-            value={content.markdown}
-            onChange={(e) => setContent({ kind: "document", markdown: e.target.value })}
+      <Locked when={save.isPending}>
+        {content.kind === "document" && (
+          <Field label={t("artifacts.markdownSource")} id="artifact-md">
+            <Textarea
+              rows={18}
+              value={content.markdown}
+              onChange={(e) => setContent({ kind: "document", markdown: e.target.value })}
+            />
+          </Field>
+        )}
+        {content.kind === "table" && (
+          <TableEditor
+            columns={content.columns}
+            rows={content.rows}
+            onChange={(rows) => setContent({ ...content, rows })}
           />
+        )}
+        <Field label={t("artifacts.note")} id="artifact-note">
+          <Input value={note} placeholder={t("artifacts.notePlaceholder")} onChange={(e) => setNote(e.target.value)} />
         </Field>
-      )}
-      {content.kind === "table" && (
-        <TableEditor
-          columns={content.columns}
-          rows={content.rows}
-          onChange={(rows) => setContent({ ...content, rows })}
-        />
-      )}
-      <Field label={t("artifacts.note")} id="artifact-note">
-        <Input value={note} placeholder={t("artifacts.notePlaceholder")} onChange={(e) => setNote(e.target.value)} />
-      </Field>
+      </Locked>
       {stale && (
         <div className="stack-4" style={{ gap: 8 }}>
           <Alert>{t("artifacts.stale")}</Alert>
@@ -356,7 +371,7 @@ function Editor({ artifact, onDone }: { artifact: ArtifactDetail; onDone: (saved
         <Button type="button" onClick={() => onDone(false)}>
           {t("artifacts.cancel")}
         </Button>
-        <Button type="submit" variant="primary" disabled={save.isPending || stale}>
+        <Button type="submit" variant="primary" disabled={stale} loading={save.isPending}>
           {t("artifacts.save")}
         </Button>
       </div>

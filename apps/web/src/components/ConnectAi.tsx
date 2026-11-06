@@ -7,11 +7,13 @@ import {
   useApi,
   useCredentials,
   useMachines,
+  useModels,
 } from "@agenteschat/client";
 import { listsExisting } from "@agenteschat/client/lib/ai-accounts";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
-import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { stepPermissions } from "@agenteschat/client/lib/home";
 import {
   type AgentAi,
   type AiChoice,
@@ -24,13 +26,14 @@ import {
   type ExistingSignIn,
   freePlanAccount,
   gateDims,
+  mayConnectAi,
   type PlanChoice,
   type PlanGate,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, rightHandOf, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { Button, Dialog, DialogBody, DialogFooter, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -47,9 +50,11 @@ import {
   PlanWithoutAgent,
   useGatesWithoutAgent,
   usePlanGates,
+  usePlanHold,
 } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { useOrg } from "@/components/org-context";
+import { ProviderKeySelect } from "@/components/ProviderKey";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
@@ -105,6 +110,21 @@ const ConnectAiContext = createContext<ConnectAi | null>(null);
 
 /** Null outside the workspace shell (an isolated page in a test): no Connect there. */
 export const useConnectAi = () => useContext(ConnectAiContext);
+
+/**
+ * Whether this person has an AI to connect: the workspace's key, a plan for an agent they have or may make, or their
+ * own for the right hand. Yes until the agents are known, so nobody reads "who connects it" for a moment.
+ */
+export function useMayConnectAi() {
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  return (
+    dir.loading ||
+    stepPermissions(org, me.user.id, dir.agents).connectAi ||
+    can(org, "create_agents") ||
+    mayConnectAi(rightHandOf(dir.agents), me.user.id, org)
+  );
+}
 
 export function ConnectAiProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -175,10 +195,13 @@ function ConnectAiDialog({
   const status = useAiStatus(org.id);
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const add = useAddCredential(org.id);
+  const add = useAddCredential(org.id, true);
   const api = useApi();
+  const toast = useToast();
+  const models = useModels();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
+  const hold = usePlanHold();
   // The team's right hand thinks with each person's own AI (ADR 0137 §11): everyone's to connect for their DM.
   const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id || isRightHand(a));
   // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
@@ -261,6 +284,8 @@ function ConnectAiDialog({
   // Anything connected shows Done; only a saved key closes the key's field (after a plan, it's for the other agents).
   const [connected, setConnected] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
+  const [keyNote, setKeyNote] = useState<string>();
+  const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const done = () => {
     setConnected(true);
     void qc.invalidateQueries({ queryKey: keys.aiStatus(org.id) });
@@ -269,19 +294,38 @@ function ConnectAiDialog({
     onConnected();
   };
   const saveKey = () => {
-    if (draft.provider === "platform" || draft.provider === CUSTOM_PROVIDER) return;
+    if (draft.provider === CUSTOM_PROVIDER) return;
+    setRefused(null);
+    const provider = providerLabel(draft.provider);
     add.mutate(
-      { provider: draft.provider, label: providerLabel(draft.provider), apiKey: draft.apiKey.trim() },
+      { provider: draft.provider, label: provider, apiKey: draft.apiKey.trim() },
       {
+        onError: (error) => {
+          setRefused(keyRefusal(t, error));
+          if (!keyRefusal(t, error)) toast.show(errorText(t, error), "error");
+        },
         onSuccess: async (key) => {
           // The right hand asked for a key ("Usar uma chave de API"): the workspace's AI from now on, and the person's
           // own DM goes back to it.
+          let moved = false;
           if (one && rightHand) {
-            await api.agents.setBrain(org.id, one.id, { brain: "model" }).catch(() => null);
-            await api.agents.setBrain(org.id, one.id, { scope: "workspace", brain: "model" }).catch(() => null);
-            await api.agents.update(org.id, one.id, { credentialId: key.id }).catch(() => null);
+            moved = await rightHandOnKey(api, org.id, one, key, models.data?.models ?? []).then(
+              () => true,
+              (error) => {
+                toast.show(errorText(t, error), "error");
+                return false;
+              },
+            );
             void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
+            void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, one.id) });
           }
+          setKeyNote(
+            key.check === "unchecked"
+              ? t("connectAi.key.savedUnchecked", { provider })
+              : moved && one
+                ? thinksWithLine(t, "workspace", one.name, key.label)
+                : undefined,
+          );
           setKeySaved(true);
           done();
         },
@@ -319,7 +363,6 @@ function ConnectAiDialog({
           : t("connectAi.title.any")
       }
       closeLabel={t("common.close")}
-      // Three plans a row, each name on one line even when chosen, as in the setup's column.
       width={600}
     >
       <DialogBody>
@@ -348,6 +391,13 @@ function ConnectAiDialog({
                     setPickedTarget(forAgent.id);
                     setHeldReader(undefined);
                   }}
+                  onManageKeys={() => {
+                    onClose();
+                    void navigate({
+                      to: "/org/$orgId/settings/$section",
+                      params: { orgId: org.id, section: "keys" },
+                    });
+                  }}
                   onUsed={(id, next) => {
                     setLinked((l) => ({ ...l, [id]: next.choice }));
                     setUsed(next);
@@ -366,6 +416,17 @@ function ConnectAiDialog({
                 setPickedTarget(defaultTarget({ agents, hasAi, set: setOf(next) }));
             }}
             dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
+            busy={add.isPending}
+            keySelect={
+              mayAddKey &&
+              !keySaved && (
+                <ProviderKeySelect
+                  value={draft.provider}
+                  disabled={add.isPending}
+                  onChange={(provider) => setDraft((d) => ({ ...d, provider }))}
+                />
+              )
+            }
             panel={
               choice === "key" ? (
                 <KeyPanel
@@ -373,7 +434,10 @@ function ConnectAiDialog({
                   onDraft={setDraft}
                   locked={!mayAddKey}
                   saved={keySaved}
+                  savedNote={keyNote}
+                  refused={refused}
                   saving={add.isPending}
+                  held={hold !== null}
                   onSave={saveKey}
                   endpoint={
                     <EndpointForm

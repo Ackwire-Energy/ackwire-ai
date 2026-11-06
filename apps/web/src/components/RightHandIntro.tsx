@@ -200,6 +200,7 @@ function StartCard({
         waitingFor={answer !== null ? t("teamPlan.answered") : undefined}
         lead={question}
         what={question}
+        locked={create.isPending}
         body={
           <>
             {first && (
@@ -226,7 +227,7 @@ function StartCard({
                     >
                       <AgentAvatar name={name} appearance={normalizeAppearance(PRESET_LOOK[p])} size="sm" />
                       <span className="rh-intro__preset-text">
-                        <b>{name}</b>
+                        <b className="ac-captop">{name}</b>
                         <small>{t(`onboarding.presets.${p}.role`)}</small>
                       </span>
                     </button>
@@ -335,6 +336,7 @@ function StyleCard({ agent }: { agent: Agent }) {
       mine={false}
       lead={question}
       what={question}
+      locked={save.isPending}
       body={<p>{t("rightHand.intro.style.text")}</p>}
       actions={
         <>

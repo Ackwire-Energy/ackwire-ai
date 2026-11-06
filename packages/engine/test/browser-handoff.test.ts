@@ -75,6 +75,12 @@ const reply = (req: ModelRequest) => {
     const instructions = "Entre no agentes.chat com a conta administradora; deixe o painel aberto para eu continuar.";
     return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { instructions } }] };
   }
+  if (last.includes("guess the field"))
+    return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { message: "Sign in to Stripe" } }] };
+  if (last.includes("two fields")) {
+    const input = { instructions: "Sign in to Stripe", message: "Sign in" };
+    return { chunks: [], toolUses: [{ name: "browser_ask_person", input }] };
+  }
   if (last.includes("sign in"))
     return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { instructions: "Sign in to Stripe" } }] };
   if (last.includes("probe")) return { chunks: [], toolUses: [{ name: "browser_probe", input: {} }] };
@@ -165,6 +171,19 @@ async function runFor(userId: string) {
 }
 
 describe("browser_ask_person", () => {
+  test("`message` is taken as `instructions` when the call has no `instructions`; with both it is refused", async () => {
+    await start();
+    await post("@dev guess the field");
+    await drainOutbox(f.db, f.handlers);
+    expect(await handoffs()).toMatchObject([{ kind: "ask", status: "pending", instructions: "Sign in to Stripe" }]);
+    await f.db.delete(schema.browserHandoffs);
+
+    await post("@dev two fields");
+    await drainOutbox(f.db, f.handlers);
+    expect(await handoffs()).toEqual([]);
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("Invalid input:");
+  });
+
   test("asks with a card and a waiting notification; Done resumes the run, which checks the page", async () => {
     await start();
     await post("@dev sign in please");
@@ -1685,6 +1704,32 @@ describe("live view", () => {
     live.hubHooks.frame(machine.machineId, frame(f.agent.id, 7));
     expect(seqs(b.got)).toEqual([]);
     expect(seqs(a.got)).toEqual([7]);
+    live.close();
+  });
+
+  test("input the computer couldn't put on the page comes back as failed: the view says so", async () => {
+    await start();
+    const { hub } = fakeHub((r) => (r.op === "browser.input" ? { accepted: 0, failed: 1 } : undefined));
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await startTakeover({ db: f.db }, f.owner.id, f.org.id, f.agent.id);
+    expect(await live.sendInput(f.owner.id, f.org.id, f.agent.id, [{ kind: "text", text: "a" }])).toEqual({
+      accepted: 0,
+      refused: false,
+      failed: 1,
+    });
+    live.close();
+  });
+
+  test("text that reached a page with nothing to take it comes back as nowhere: the view says so", async () => {
+    await start();
+    const { hub } = fakeHub((r) => (r.op === "browser.input" ? { accepted: 1, nowhere: true } : undefined));
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await startTakeover({ db: f.db }, f.owner.id, f.org.id, f.agent.id);
+    expect(await live.sendInput(f.owner.id, f.org.id, f.agent.id, [{ kind: "text", text: "a" }])).toEqual({
+      accepted: 1,
+      refused: false,
+      nowhere: true,
+    });
     live.close();
   });
 

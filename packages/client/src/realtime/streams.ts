@@ -172,6 +172,8 @@ export interface LiveRun {
   steerNow?: string[];
   /** How much of the current turn's text arrived (`agent.delta.at`), moved to the narration or not. */
   turnChars?: number;
+  /** Where `text` starts in the current turn's text: the start of its stretch (`agent.delta.from`). */
+  textFrom?: number;
   /** A piece of the current turn's text never arrived (a lost socket, a conversation opened mid-answer). */
   gap?: boolean;
   /** The current turn's pieces heard past that hole, kept for the server's copy of the text before them. */
@@ -179,7 +181,8 @@ export interface LiveRun {
 }
 
 export type LiveWork =
-  | { kind: "say"; text: string; turn?: number }
+  /** `from`: where this stretch starts in the turn's text, so what still arrives of it joins this line. */
+  | { kind: "say"; text: string; turn?: number; from?: number }
   /**
    * The running task read a message sent while it worked ("Leu seu recado"); `now`: it stopped
    * to read it ("Parou para ler seu recado").
@@ -202,6 +205,8 @@ export type LiveWork =
       ms?: number;
       /** The tool answered with an error (`agent.tool` end with `failed`). */
       failed?: boolean;
+      /** That error was its arguments refused: a later call may make it right (`toolItemsLive`). */
+      slip?: boolean;
       /** It didn't run: it waits on a person (an approval, a question, a secret). */
       held?: boolean;
       /** A permission check: the whole command it checked (its line opens on it). */
@@ -291,6 +296,8 @@ export interface AgentToolEvent {
   toolUseId?: string;
   /** On the end (`tool: null`): the tool answered with an error. */
   failed?: boolean;
+  /** On a failed end: its arguments were refused, the tool never ran. */
+  slip?: boolean;
   /** On the end: it didn't run, it waits on a person. */
   held?: boolean;
   /** On the end: a rule ("Aprovar sempre") let it run without asking. */
@@ -307,8 +314,8 @@ export interface AgentToolEvent {
 
 export interface StreamsState {
   runs: Record<string, LiveRun>;
-  /** Runs whose final message arrived: late deltas for them are ignored. */
-  finished: Record<string, true>;
+  /** Runs heard to stop, and when: late deltas for them are ignored. */
+  finished: Record<string, number>;
   /** A routine's runs working in the background: never a row, never "trabalhando" (`isBackgroundEvent`). */
   background?: Record<string, true>;
   /** Runs whose message came without its body (too big for its event): it is on its way over HTTP. */
@@ -319,10 +326,16 @@ export const emptyStreams: StreamsState = { runs: {}, finished: {} };
 
 const provisionalId = (agentId: string, threadId: string) => `pending:${agentId}:${threadId}`;
 
-/** Shows "Ada está pensando…" right away for an agent that was mentioned or picked. */
+/** The message a "pensando…" answers: the one that asked in a thread, or the top-level one it hangs off. */
+export const guessedFrom = (r: Pick<LiveRun, "threadId" | "triggerMessageId">) => r.triggerMessageId ?? r.threadId;
+
+/**
+ * Shows "Ada está pensando…" right away for an agent that was mentioned or picked. `messageId`: a reply, whose row
+ * lives in its thread (`threadId`) and hangs off the message that asked.
+ */
 export function expectReply(
   state: StreamsState,
-  event: { channelId: string; threadId: string; agentId: string },
+  event: { channelId: string; threadId: string; agentId: string; messageId?: string },
   now = Date.now(),
 ) {
   const input = { channelId: event.channelId, threadId: event.threadId, agentId: event.agentId };
@@ -340,6 +353,7 @@ export function expectReply(
     provisional: true,
     since: now,
     startedAt: now,
+    ...(event.messageId && event.messageId !== input.threadId ? { triggerMessageId: event.messageId } : {}),
   };
   return { ...state, runs: { ...state.runs, [runId]: run } };
 }
@@ -404,7 +418,7 @@ function upsert(
     lastSeq: -1,
     startedAt: provisional?.startedAt ?? Date.now(),
     // A "pensando…" row hangs off the message I sent: that message started the run.
-    ...(provisional ? { triggerMessageId: provisional.threadId } : {}),
+    ...(provisional ? { triggerMessageId: guessedFrom(provisional) } : {}),
     ...current,
     ...patch,
   };
@@ -428,7 +442,16 @@ type StreamEvent =
   | RunContinuedEvent
   | AgentNarrationEvent;
 
-/** Adds what the agent said (or replaces the line of the same turn: `agent.narration` is the final word). */
+/** The body so far as a line of what it said (its end may still come: its spaces stay). */
+const spoken = (r: LiveRun): LiveWork => ({
+  kind: "say",
+  text: r.text.trimStart(),
+  ...(r.turn !== undefined ? { turn: r.turn } : {}),
+  // Past a hole, what still comes of this stretch wouldn't continue what it holds.
+  ...(r.textFrom !== undefined && !r.gap ? { from: r.textFrom } : {}),
+});
+
+/** `agent.narration`, the turn's final word: adds what the agent said, or replaces the line of the same turn. */
 function say(work: LiveWork[], text: string, turn: number | undefined): LiveWork[] {
   if (turn !== undefined) {
     const at = work.findIndex((w) => w.kind === "say" && w.turn === turn);
@@ -466,13 +489,18 @@ export function applyChannelEvent(state: StreamsState, event: StreamEvent, now =
 function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
   switch (event.type) {
     case "agent.run.steered": {
+      // It joined a run under way, one that may be waiting with no row of its own: no new reply comes, so no
+      // "pensando…" for it. By channel: the guess may still hang off the optimistic message.
+      const s = event.agentId
+        ? settleAfterRun(state, { agentId: event.agentId, channelId: event.channelId, threadId: null })
+        : state;
       // Only noted here: it shows in the work once read (`agent.run.read`), under the message until then.
-      const r = state.runs[event.runId];
-      if (!r) return state;
-      if (event.stop) return { ...state, runs: { ...state.runs, [event.runId]: { ...r, stopping: true } } };
-      if (!event.now || r.steerNow?.includes(event.messageId)) return state;
+      const r = s.runs[event.runId];
+      if (!r) return s;
+      if (event.stop) return { ...s, runs: { ...s.runs, [event.runId]: { ...r, stopping: true } } };
+      if (!event.now || r.steerNow?.includes(event.messageId)) return s;
       const steerNow = [...(r.steerNow ?? []), event.messageId];
-      return { ...state, runs: { ...state.runs, [event.runId]: { ...r, steerNow } } };
+      return { ...s, runs: { ...s.runs, [event.runId]: { ...r, steerNow } } };
     }
     case "agent.run.read": {
       const r = state.runs[event.runId];
@@ -480,10 +508,9 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const seen = new Set((r.work ?? []).flatMap((w) => (w.kind === "steer" ? [w.messageId] : [])));
       const fresh = event.messageIds.filter((id) => !seen.has(id));
       if (fresh.length === 0) return state;
-      // Text so far is narration: the answer continues after the message it read.
-      const said = r.text.trim();
+      // What it wrote stays where it is: the reply goes on from it, and the saved message holds both.
       const work: LiveWork[] = [
-        ...(said ? say(r.work ?? [], said, r.turn) : (r.work ?? [])),
+        ...(r.work ?? []),
         ...fresh.map((messageId) => ({
           kind: "steer" as const,
           messageId,
@@ -491,18 +518,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         })),
       ];
       const steerNow = (r.steerNow ?? []).filter((id) => !fresh.includes(id));
-      return {
-        ...state,
-        runs: {
-          ...state.runs,
-          [event.runId]: {
-            ...r,
-            work,
-            steerNow,
-            ...(said ? { text: "", status: "thinking" as const } : {}),
-          },
-        },
-      };
+      return { ...state, runs: { ...state.runs, [event.runId]: { ...r, work, steerNow } } };
     }
     case "run.continued": {
       // The stopped row (if still here) gives way to the run that picks up, a normal live run.
@@ -535,15 +551,16 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const said = newCall ? (current?.text ?? "").trim() : "";
       const status: LiveStatus = said ? "thinking" : current?.text ? current.status : "thinking";
       let work = current?.work ?? [];
-      if (said) work = say(work, said, current?.turn);
+      if (said && current) work = [...work, spoken(current)];
       const end = (
         w: Extract<LiveWork, { kind: "call" }>,
-        how: Pick<AgentToolEvent, "failed" | "held" | "why" | "refusal" | "requestId" | "autoApproved"> = {},
+        how: Pick<AgentToolEvent, "failed" | "slip" | "held" | "why" | "refusal" | "requestId" | "autoApproved"> = {},
       ) => ({
         ...w,
         running: false,
         ...(w.since !== undefined ? { ms: Math.max(0, Date.now() - w.since) } : {}),
         ...(how.failed ? { failed: true } : {}),
+        ...(how.slip ? { slip: true } : {}),
         ...(how.held ? { held: true } : {}),
         ...(how.why ? { why: how.why } : {}),
         ...(how.refusal ? { refusal: how.refusal } : {}),
@@ -710,7 +727,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const picked = new Set(event.pickedBy);
       const runs = Object.fromEntries(
         Object.entries(state.runs).filter(
-          ([, r]) => !(r.provisional && r.threadId === event.messageId && !picked.has(r.agentId)),
+          ([, r]) => !(r.provisional && guessedFrom(r) === event.messageId && !picked.has(r.agentId)),
         ),
       );
       return Object.keys(runs).length === Object.keys(state.runs).length ? state : { ...state, runs };
@@ -734,12 +751,29 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
             : undefined,
         ...(event.at !== undefined ? { turnChars: Math.max(heard ?? 0, event.at + event.text.length) } : {}),
         ...(event.turn !== undefined ? { turn: event.turn } : {}),
+        ...(event.from !== undefined ? { textFrom: event.from } : {}),
       };
       // Sent before the server's copy of the turn was read, it arrived after it (`caughtUp`): only its tail is new.
       const fresh =
         event.at !== undefined && heard !== undefined && event.at < heard
           ? event.text.slice(heard - event.at)
           : event.text;
+      const { from } = event;
+      if (from !== undefined && !gap) {
+        // The end of text that left the body already: a call's start overtakes what a brain still keeps back
+        // (`redactHold`), and the call's end brings it. It finishes its line; alone in the body it would start mid-word.
+        const line =
+          current?.work?.findIndex((w) => w.kind === "say" && w.turn === event.turn && w.from === from) ?? -1;
+        if (current?.work && line >= 0) {
+          const work = current.work.map((w, i) =>
+            i === line && w.kind === "say" ? { ...w, text: w.text + fresh } : w,
+          );
+          return upsert(state, event, { work, lastSeq: event.seq, ...turnPatch });
+        }
+        // Opened during a call: the end of a text whose start this app never had. It doesn't show at all.
+        if (current && !current.text && event.at !== undefined && event.at > from)
+          return upsert(state, event, { lastSeq: event.seq, ...turnPatch });
+      }
       // A new model call. Narration (text before tool calls) already left the body with `agent.narration` or the
       // call; what is still here is a whole reply the server held and sent back for another try (a give-up, a
       // question it shouldn't ask), never posted: the next turn's text replaces it.
@@ -751,9 +785,19 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
           ...turnPatch,
         });
       }
+      // The next stretch with the last one still here: a call that shows no line of its own (the brain's own tools) or
+      // text that came whole after its call. A line here would land below the body, and stay after the reply.
+      const said = current?.text.trimEnd();
+      const next = !gap && sameTurn && from !== undefined && from > (current?.textFrom ?? from) && said;
       return upsert(state, event, {
         status: "running",
-        text: gap ? (sameTurn ? (current?.text ?? "") : "") : (current?.text ?? "") + fresh,
+        text: gap
+          ? sameTurn
+            ? (current?.text ?? "")
+            : ""
+          : next
+            ? `${said}\n\n${fresh.trimStart()}`
+            : (current?.text ?? "") + fresh,
         lastSeq: event.seq,
         ...turnPatch,
       });
@@ -765,7 +809,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
 
 function finish(state: StreamsState, runId: string): StreamsState {
   const { [runId]: _done, ...runs } = state.runs;
-  return { ...state, runs, finished: { ...state.finished, [runId]: true } };
+  return { ...state, runs, finished: { ...state.finished, [runId]: Date.now() } };
 }
 
 /**
@@ -824,7 +868,13 @@ export function reconcileRuns(
     s = finish(s, r.runId);
   }
   for (const a of active) {
-    if (!known.has(a.runId) || a.channelId !== channelId || s.finished[a.runId]) continue;
+    if (!known.has(a.runId) || a.channelId !== channelId) continue;
+    // Heard to stop, yet listed by a read asked since: it stopped to wait, and went on while we weren't listening.
+    const stopped = s.finished[a.runId];
+    if (stopped) {
+      if (stopped >= askedAt || a.status === "waiting_approval") continue;
+      s = reopen(s, a.runId);
+    }
     const startedAt = a.startedAt ? Date.parse(a.startedAt) : undefined;
     const heartbeat = a.heartbeatAt ? Date.parse(a.heartbeatAt) : undefined;
     const r = s.runs[a.runId];
@@ -884,6 +934,7 @@ function caughtUp(r: LiveRun, live: NonNullable<ActiveRun["live"]>): LiveRun {
     ...r,
     status: "running",
     text,
+    textFrom: live.at,
     turn: live.turn,
     turnChars: Math.max(heard, end),
     gap,
@@ -902,9 +953,9 @@ export function dismissRun(state: StreamsState, runId: string): StreamsState {
  * for a message sent there (`topLevelIds`: the channel's own messages).
  */
 export const inMainTimeline = (
-  r: { threadId: string | null; provisional?: boolean },
+  r: { threadId: string | null; provisional?: boolean; triggerMessageId?: string | null },
   topLevelIds: ReadonlySet<string>,
-) => r.threadId === null || Boolean(r.provisional && topLevelIds.has(r.threadId));
+) => r.threadId === null || Boolean(r.provisional && topLevelIds.has(r.triggerMessageId ?? r.threadId));
 
 /** Runs to show in a channel, oldest first. */
 export const runsInChannel = (state: StreamsState, channelId: string) =>
@@ -939,8 +990,12 @@ export function dropProvisional(state: StreamsState, threadIds: Set<string>): St
 export function retargetProvisional(state: StreamsState, fromId: string, toId: string): StreamsState {
   const runs: Record<string, LiveRun> = {};
   for (const [id, r] of Object.entries(state.runs)) {
-    if (!(r.provisional && r.threadId === fromId)) {
+    if (!(r.provisional && guessedFrom(r) === fromId)) {
       runs[id] = r;
+      continue;
+    }
+    if (r.threadId !== fromId) {
+      runs[id] = { ...r, triggerMessageId: toId };
       continue;
     }
     const answered = Object.values(state.runs).some(

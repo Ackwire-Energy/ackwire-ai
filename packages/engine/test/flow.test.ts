@@ -46,7 +46,7 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
 
   // Deltas went out through PubSub to channel subscribers, in order, then the final message.
   // Ordering: the message is out first, "thinking" is shown before any routing or model work,
-  // then the claim, typing on the first delta, the stream, the reply, and the finish + receipt.
+  // then the claim, typing on the first text, the stream, the reply, and the finish + receipt.
   expect(events.map((e) => e.type)).toEqual([
     "message.created",
     "message.routed", // at post time: the run was created with the message
@@ -55,9 +55,7 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
     "message.claimed",
     "agent.run",
     "agent.typing",
-    "agent.delta",
-    "agent.delta",
-    "agent.delta",
+    "agent.delta", // a short answer shows whole when its turn ends
     "message.created",
     "agent.run",
     "agent.idle",
@@ -75,7 +73,7 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
   expect(events.at(-1)).toMatchObject({ type: "message.handled", messageId: question.id, status: "done" });
   const deltas = events.filter((e) => e.type === "agent.delta");
   expect(deltas.map((e) => e.text).join("")).toBe("Sure, I'll check the build.");
-  expect(deltas.map((e) => e.seq)).toEqual([0, 1, 2]);
+  expect(deltas.map((e) => e.seq)).toEqual([0]);
   expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({ status: "done", runId: run?.id });
 
   // The reply is persisted in the main timeline, under the question, authored by the agent.
@@ -156,7 +154,8 @@ test("a run that keeps failing on a provider outage parks on its last attempt, n
   const told = await toldAboutRun(f, 5);
   const [run] = await f.db.select().from(schema.agentRuns);
   // The last attempt parks the run on the outage ladder (it answers once the provider is back): no failure to report.
-  expect([run?.status, run?.error]).toEqual(["running", null]);
+  // Woken and refused again, it parks at once: one try per wake.
+  expect([run?.status, run?.error]).toEqual(["waiting_input", null]);
   expect(told.slice(0, 3)).toEqual(["1 retry: overloaded", "2 retry: overloaded", "3 retry: overloaded"]);
   expect(told.filter((line) => line.includes("failed"))).toEqual([]);
 });
@@ -166,7 +165,10 @@ test("a request the provider rejects fails the run and is told as a failed job",
   await post(f, "@dev hi");
   expect(await toldAboutRun(f)).toEqual(["1 failed: provider rejected the request (400)"]);
   const [run] = await f.db.select().from(schema.agentRuns);
-  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: provider rejected the request (400)"]);
+  expect([run?.status, run?.error]).toEqual([
+    "failed",
+    "provider_error: said@Claude: provider rejected the request (400)",
+  ]);
 });
 
 test("the account's own refusal (an invalid key) fails the run untold: the person sees why", async () => {
@@ -174,7 +176,7 @@ test("the account's own refusal (an invalid key) fails the run untold: the perso
   await post(f, "@dev hi");
   expect(await toldAboutRun(f)).toEqual([]);
   const [run] = await f.db.select().from(schema.agentRuns);
-  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: account: invalid provider API key"]);
+  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: invalid_key@Claude: invalid provider API key"]);
 });
 
 test("a refused request fails the run with the provider's words, credentials masked, on the run and its error step", async () => {
@@ -189,7 +191,8 @@ test("a refused request fails the run with the provider's words, credentials mas
   await post(f, "@dev hi");
   await drainOutbox(f.db, f.handlers);
   const [run] = await f.db.select().from(schema.agentRuns);
-  const reason = "provider_error: provider rejected the request (400 invalid_request_error): key •••• is not allowed";
+  const reason =
+    "provider_error: said@Claude: provider rejected the request (400 invalid_request_error): key •••• is not allowed";
   expect([run?.status, run?.error]).toEqual(["failed", reason]);
   const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "error"));
   expect(steps.map((s) => s.data)).toEqual([{ reason }]);

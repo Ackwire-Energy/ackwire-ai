@@ -5,6 +5,7 @@ import type {
   BrainEffortSetting,
   BrainKind,
   BrainOption,
+  BrainSpeed,
   CommandApproval,
   Machine,
   MachineAccount,
@@ -25,6 +26,7 @@ import {
   useBrowserProfileMutations,
   useBrowserProfiles,
   useComputer,
+  useComputerSetup,
   useCredentials,
   useMachines,
   useModels,
@@ -62,10 +64,12 @@ import {
   advancedDefaults,
   advancedParts,
   isAdvancedDefault,
+  SPEEDS,
 } from "@agenteschat/client/lib/brain-advanced";
 import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
-import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
+import { holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
 import {
   allowsInApp,
@@ -80,9 +84,12 @@ import {
   aiStateOf,
   gateLine,
   kindOf,
+  planHoldOf,
   planLabel,
   planMark,
   planOfAccount,
+  planPickText,
+  unsupportedGate,
 } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
@@ -96,12 +103,13 @@ import {
   planModel as planModelOf,
   planOf,
   signInProviderOf,
+  speedFits,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
 import {
-  BrainPortrait,
   Button,
+  Card,
   Checkbox,
   ComputerPortrait,
   cx,
@@ -114,6 +122,7 @@ import {
   type IconName,
   InfoHint,
   Input,
+  Locked,
   LogoMark,
   OptionList,
   PlanMeter,
@@ -126,6 +135,7 @@ import {
   Switch,
 } from "@agenteschat/ui";
 import { extraUsageOn } from "@agenteschat/ui/plan-state";
+import { matchesWords } from "@agenteschat/ui/search";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
@@ -140,12 +150,13 @@ import {
   pickerValue,
 } from "@/components/AgentFields";
 import { AddAccount, OpenPage } from "@/components/ai/AddAccountFlow";
-import { accountOption } from "@/components/ai/ConnectAiSteps";
+import { accountOption, PlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { LoadingLine } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { ProviderSelect } from "@/components/ProviderKey";
 import { useWidenAsk } from "@/components/ReachLines";
 import {
   OpenPrefsButton,
@@ -306,6 +317,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
           level: t(`agentPage.work.brain.effortsLower.${shownEffort(view.effort)}`),
         })
       : null;
+  const speed = agent.brain?.speed ? t("agentPage.work.brain.speeds.fast") : null;
   const target = work.target;
   const machine = target?.kind === "machine" ? target : null;
   // Read once the server says where it works: "no computer" never shows while that loads.
@@ -363,7 +375,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
                   : t("agentPage.work.cell.brainWith", { plan: planLabel(t, ai) })
               }
               value={ai === "key" ? orgModel : planModel}
-              more={ai === "key" ? null : effort}
+              more={ai === "key" ? null : [effort, speed].filter(Boolean).join(" · ")}
               sub={sub}
               openLabel={t("agentPage.work.open.brain")}
               onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
@@ -615,11 +627,10 @@ function Footer({
 // ── Quem pensa ──────────────────────────────────────────────────────────────
 
 /*
- * The brains as a list; the chosen one opens into one card with its settings
- * full width under a hairline, each with a small label above it: the model one
- * click away, the effort as a pixel ramp, the account on that computer
- * (ADR 0041, only its owner), and at the card's foot a switch for answering
- * through the API while the computer is off.
+ * What pays, in one select with a search, as Connect an AI's; the chosen one's settings in a card right under it,
+ * each with a small label above it: the model one click away, the effort as a pixel ramp, the account on that computer
+ * (ADR 0041, only its owner), and in its advanced settings a switch for answering through the API while the computer
+ * is off.
  */
 
 /**
@@ -682,6 +693,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const edition = useComputerEdition(org.id);
+  const setupQ = useComputerSetup(org.id);
+  const computerSetup = setupView(setupQ.data, setupQ.dataUpdatedAt);
+  const hold = planHoldOf(edition, org.standing);
   const api = useApi();
   const toast = useToast();
   const refresh = useRefresh();
@@ -707,6 +721,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [key, setKey] = useState(saved.key ?? DEFAULT_KEY);
   const [account, setAccount] = useState<string | null>(view.account);
   const [effort, setEffort] = useState<ShownEffort>(shownEffort(view.effort));
+  const [speed, setSpeed] = useState<BrainSpeed>(view.speed);
   const savedContext = isContextLimit(view.contextTokens) ? view.contextTokens : null;
   const [contextTokens, setContextTokens] = useState<ContextLimit | null>(savedContext);
   // "Configuração avançada" open: what it edits, put on the form by "Pronto" (nothing saves before "Usar").
@@ -870,6 +885,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const effortToSave: BrainEffortSetting = isAuto(planModel) ? AUTO : effort;
   const savedEffort: BrainEffortSetting = isAuto(view.effort) ? AUTO : shownEffort(view.effort);
   const effortChanged = kind !== "model" && effortToSave !== savedEffort;
+  // Where it doesn't apply the choice stays saved, untouched, for a model or sign-in that takes it.
+  const speedOn = !view.scope && speedFits({ kind, provider: current?.provider, model: planModel });
+  const speedChanged = speedOn && speed !== view.speed;
+  const shownSpeed = speedOn ? speed : "standard";
   const savedOnlyOwner = kind === view.brain ? view.onlyOwner : true;
   const onlyOwner = share?.kind === kind ? share.onlyOwner : savedOnlyOwner;
   const shareChanged = kind !== "model" && onlyOwner !== savedOnlyOwner;
@@ -895,6 +914,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     extraUsage === view.extraUsage &&
     !accountChanged &&
     !effortChanged &&
+    !speedChanged &&
     !shareChanged &&
     !contextChanged &&
     (kind === "model"
@@ -929,6 +949,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         });
       }
       if (model !== saved.model || key !== (saved.key ?? DEFAULT_KEY)) {
+        // A key kept earlier may have run out of credit: "now thinks with it" has to be true. Whoever may not try keys
+        // (no `manage_credentials`) gets no answer here, and the run says it if it fails.
+        if (key !== DEFAULT_KEY && key !== saved.key)
+          await api.agents.checkCredential(org.id, key).catch((e) => {
+            if (keyRefusal(t, e)) throw e;
+          });
         await update.mutateAsync({
           ...(model !== saved.model ? { model } : {}),
           ...(key !== (saved.key ?? DEFAULT_KEY) ? { credentialId: key === DEFAULT_KEY ? null : key } : {}),
@@ -943,6 +969,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       fallback,
       ...(extraUsage !== view.extraUsage ? { extraUsage } : {}),
       ...(effortChanged ? { effort: effortToSave } : {}),
+      ...(speedChanged ? { speed } : {}),
       ...(accountChanged ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
       ...(shareChanged ? { onlyOwner } : {}),
       ...(contextChanged ? { contextTokens } : {}),
@@ -955,6 +982,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       refresh();
       const same =
         !effortChanged &&
+        !speedChanged &&
         !contextChanged &&
         card === savedCard &&
         fallback === view.fallback &&
@@ -1018,8 +1046,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   }),
         );
       onClose();
-    } catch {
-      toast.show(t("agentPage.work.failed"), "error");
+    } catch (e) {
+      toast.show(keyRefusal(t, e)?.text ?? t("agentPage.work.failed"), "error");
       refresh();
     } finally {
       setBusy(false);
@@ -1046,6 +1074,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             account: accountsOn ? account : null,
             model: planModel === option?.defaultModel ? null : planModel,
             effort: effortToSave,
+            ...(speedOn ? { speed } : {}),
             contextTokens: shownContext,
             fallback,
             onlyOwner,
@@ -1058,7 +1087,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       kind,
       autoModel: isAuto(kind === "model" ? model : planModel),
       apiKey,
-      now: { effort, contextTokens: shownContext, onlyOwner, fallback },
+      now: { effort, speed: shownSpeed, contextTokens: shownContext, onlyOwner, fallback },
     }),
     ...(carried ? [autonomyWords(t, carried)] : []),
   ].join(" · ");
@@ -1086,37 +1115,27 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       setBusy(false);
     }
   };
-  const side = (c: AiChoice) => {
-    if (c === "key") return null;
+  /** Where a plan would think, when that says something: none there, its computer off, or the agent moving. */
+  const side = (c: AiChoice): { icon: IconName; text: string } | null => {
+    if (c === "key" || hold) return null;
     const where = homeOf(c);
-    // A coding plan's card stays on the agent's computer, where its key is: no other computer could have it.
-    if (!where)
-      return isPlanId(c) ? null : (
-        <>
-          <Icon name="block" size={14} />
-          {t("agentPage.work.brain.none")}
-        </>
-      );
+    // A coding plan's stays on the agent's computer, where its key is: no other computer could have it.
+    if (!where) return isPlanId(c) ? null : { icon: "block", text: t("agentPage.work.brain.none") };
     if (away(c))
-      return (
-        <>
-          <Icon name="alert" size={14} />
-          {edition === "cloud"
+      return {
+        icon: "alert",
+        text:
+          edition === "cloud"
             ? t("agentPage.work.brain.offCloud", { computer: where.name })
-            : t("agentPage.work.brain.off", { computer: where.name })}
-        </>
-      );
+            : t("agentPage.work.brain.off", { computer: where.name }),
+      };
     // Where the agent already works goes without saying: only a move changes something.
     if (where.machineId === work.machineId) return null;
-    return (
-      <>
-        <Icon name="computer" size={14} />
-        {t("agentPage.work.brain.moves", { computer: where.name })}
-      </>
-    );
+    return { icon: "computer", text: t("agentPage.work.brain.moves", { computer: where.name }) };
   };
   const reason = (c: AiChoice) => {
     if (c === "key") return null;
+    if (hold) return t("connectAi.billing");
     const k = kindOf(c);
     const o = view.options.find((x) => x.kind === k);
     if (!o?.reason) return null;
@@ -1126,14 +1145,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // The card names the plan: the line names the program on the computer that can't run it, as the plan's panel.
     return (
       gateLine(t, {
-        gate: { state: "unsupported", reason: o.reason },
+        gate: unsupportedGate(o.reason, edition, computerSetup),
         edition,
+        hold: holdText(t, org.standing),
         kind: k,
         computer: view.computer?.name ?? "",
         machine: work.machines.data?.find((m) => m.id === view.computer?.machineId),
       })?.text ?? null
     );
   };
+  const chosenSide = side(card);
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(
     t,
@@ -1189,7 +1210,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       ),
     },
   ];
-  const shownAccounts = view.canManageAccounts ? accountOptions : accountOptions.filter((o) => o.value !== ADD);
+  const shownAccounts =
+    view.canManageAccounts && !hold ? accountOptions : accountOptions.filter((o) => o.value !== ADD);
   // On someone else's computer only whoever connected it adds a sign-in: with nothing of the owner's there, the account
   // says so in place of an empty list.
   const lockedHere = shownAccounts.length === 0;
@@ -1333,8 +1355,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   );
   const freeHint = planFreeHint(t, plan);
   // "Configuração avançada" names what it holds.
-  const advancedNow: Advanced = { effort, contextTokens: shownContext, onlyOwner, fallback };
-  const advancedLine = advancedContents(t, { kind, autoModel: isAuto(planModel) });
+  const advancedNow: Advanced = { effort, speed: shownSpeed, contextTokens: shownContext, onlyOwner, fallback };
+  const advancedLine = advancedContents(t, { kind, autoModel: isAuto(planModel), speed: speedOn });
   const advancedRow = (
     <AdvancedRow
       line={advancedLine}
@@ -1421,106 +1443,106 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       width={560}
       className="agp-wdlg"
     >
-      <DialogBody>
-        <OptionList
-          attached
-          aria-label={t("brain.title")}
-          value={card}
-          onValueChange={choose}
-          disabled={!can("brain")}
-          options={cards.map((c) => {
-            const where = homeOf(c);
-            const off = c !== "key" && away(c);
-            return {
+      <Locked when={busy}>
+        <DialogBody>
+          <ProviderSelect<AiChoice>
+            aria-label={t("brain.title")}
+            value={card}
+            onValueChange={choose}
+            disabled={!can("brain")}
+            matches={(o, q) => matchesWords(o.value === "key" ? o.label : planPickText(t, o.value), q)}
+            options={cards.map((c) => ({
               value: c,
-              // Each plan by its maker's mark; the API key by its model's maker, or the agent itself when none is known.
+              label: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
+              // Each plan by its maker's mark; the API key by its model's maker, or a key's mark when none is known.
               leading:
-                c === "key" ? (
-                  apiProvider ? (
-                    <ProviderLogo id={apiProvider} />
-                  ) : (
-                    <BrainPortrait kind="agent" state={card === c ? "working" : "idle"} agent={draft.look} />
-                  )
+                c !== "key" ? (
+                  <ProviderLogo id={planMark(c)} size="xs" off={away(c)} />
+                ) : apiProvider ? (
+                  <ProviderLogo id={apiProvider} size="xs" />
                 ) : (
-                  <ProviderLogo id={planMark(c)} off={off} />
+                  <Icon name="key" size={16} />
                 ),
-              title: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
               description:
                 c === "key"
                   ? t("agentPage.work.brain.modelText", g)
-                  : !where
+                  : !homeOf(c)
                     ? reason(c)
-                    : !view.canUsePlans && ownerFirst
-                      ? t("agentPage.work.brain.planTextOf", { plan: planLabel(t, c), owner: ownerFirst })
-                      : t("agentPage.work.brain.planText", { plan: planLabel(t, c) }),
-              side: side(c),
-              disabled: c !== "key" && !where,
-              children:
-                c === "key" ? (
-                  orgRows
-                ) : adding && accountKind && view.computer ? (
-                  <AddAccount
-                    machineId={view.computer.machineId}
-                    kind={accountKind}
-                    computer={computerName}
-                    again={again?.id}
-                    // "Adicionar conta" beside the accounts the agent's choice already lists: another one.
-                    fresh
-                    {...(isPlanId(card)
-                      ? { provider: card }
-                      : signInProviderOf(again?.provider)
-                        ? { provider: signInProviderOf(again?.provider) }
-                        : {})}
-                    email={signingIn?.email}
-                    local={view.ownSignIn}
-                    onBack={() => setAdding(false)}
-                    onAdded={(a) => {
-                      setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
-                      setAccount(a.id);
-                      setArrived(a);
-                      setAdding(false);
-                    }}
-                    onUse={(a) => {
-                      setArrived(null);
-                      setAccount(a.id);
-                      setAdding(false);
-                    }}
-                    onSigningIn={setSignInBegun}
-                  />
-                ) : (
-                  planRows
-                ),
-            };
-          })}
-        />
-        {card === "gemini" && adding === false && geminiPersonal(accounts.find((a) => a.id === account)) && (
-          <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
-        )}
-        {toolOffHere && (
-          <SettingNote icon="settings">
-            {t("machines.thisMac.toolsOff")}
-            <span style={{ display: "block", marginTop: 8 }}>
-              <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+                    : (side(c)?.text ??
+                      (!view.canUsePlans && ownerFirst
+                        ? t("agentPage.work.brain.planTextOf", { plan: planLabel(t, c), owner: ownerFirst })
+                        : t("agentPage.work.brain.planText", { plan: planLabel(t, c) }))),
+              disabled: c !== "key" && !homeOf(c),
+            }))}
+          />
+          {hold && <PlanHold hold={hold} onKey={card !== "key" && can("brain") ? () => choose("key") : undefined} />}
+          {hold && card === "key" && can("brain") && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
+          {chosenSide && <SettingNote icon={chosenSide.icon}>{chosenSide.text}</SettingNote>}
+          <Card as="section" className="ai-panel" aria-label={t("brain.title")}>
+            {card === "key" ? (
+              orgRows
+            ) : adding && !hold && accountKind && view.computer ? (
+              <AddAccount
+                machineId={view.computer.machineId}
+                kind={accountKind}
+                computer={computerName}
+                again={again?.id}
+                // "Adicionar conta" beside the accounts the agent's choice already lists: another one.
+                fresh
+                {...(isPlanId(card)
+                  ? { provider: card }
+                  : signInProviderOf(again?.provider)
+                    ? { provider: signInProviderOf(again?.provider) }
+                    : {})}
+                email={signingIn?.email}
+                local={view.ownSignIn}
+                onBack={() => setAdding(false)}
+                onAdded={(a) => {
+                  setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
+                  setAccount(a.id);
+                  setArrived(a);
+                  setAdding(false);
+                }}
+                onUse={(a) => {
+                  setArrived(null);
+                  setAccount(a.id);
+                  setAdding(false);
+                }}
+                onSigningIn={setSignInBegun}
+              />
+            ) : (
+              planRows
+            )}
+          </Card>
+          {card === "gemini" && adding === false && geminiPersonal(accounts.find((a) => a.id === account)) && (
+            <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+          )}
+          {toolOffHere && (
+            <SettingNote icon="settings">
+              {t("machines.thisMac.toolsOff")}
+              <span style={{ display: "block", marginTop: 8 }}>
+                <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+              </span>
+            </SettingNote>
+          )}
+          {/* Another plan, as the "Sem IA" cell offers it: Connect an AI, for this agent (its owner's choice). */}
+          {view.canUsePlans && connect && (
+            <span>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="plus"
+                onClick={() => {
+                  onClose();
+                  connect.open({ agentId: agent.id });
+                }}
+              >
+                {t("agentPage.work.brain.connectPlan")}
+              </Button>
             </span>
-          </SettingNote>
-        )}
-        {/* Another plan, as the "Sem IA" cell offers it: Connect an AI, for this agent (its owner's choice). */}
-        {view.canUsePlans && connect && (
-          <span>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon="plus"
-              onClick={() => {
-                onClose();
-                connect.open({ agentId: agent.id });
-              }}
-            >
-              {t("agentPage.work.brain.connectPlan")}
-            </Button>
-          </span>
-        )}
-      </DialogBody>
+          )}
+        </DialogBody>
+      </Locked>
       <Footer
         // Moving onto a plan needs a computer that runs it now. Its own settings (model, account, effort) save while
         // none does: the server checks the computer only when the brain changes, and the agent waits for it anyway.
@@ -1560,6 +1582,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
                   />
                 ))}
+              {speedOn && <SpeedField value={adv.speed} onChange={(s) => setAdv({ ...adv, speed: s })} />}
               <ContextField
                 value={adv.contextTokens}
                 options={contextOptions}
@@ -1617,6 +1640,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 // Letting more people in on someone else's plan asks first: it spends their plan.
                 if (onlyOwner && !adv.onlyOwner && !(await asks.ask(EVERYONE_AUDIENCE)([]))) return;
                 setEffort(adv.effort);
+                if (speedOn) setSpeed(adv.speed);
                 setContextTokens(adv.contextTokens);
                 setFallback(adv.fallback);
                 if (adv.onlyOwner !== onlyOwner) setShare({ kind, onlyOwner: adv.onlyOwner });
@@ -1714,79 +1738,81 @@ function SetupCopyDialog({
       closeLabel={t("common.close")}
       className="agp-copydialog"
     >
-      {autonomy && (
-        <div className="ac-dialog__tools">
-          <label htmlFor="setup-autonomy" className="agp-copydialog__all">
-            <span className="scope-row__text">
-              <b>{t("agentPage.work.brain.copy.withAutonomy")}</b>
-              <span className="small muted">
-                {t("agentPage.work.brain.copy.withAutonomyLine", { value: autonomyName(t, autonomy) })}
-              </span>
-            </span>
-            <Switch id="setup-autonomy" checked={withAutonomy} disabled={busy} onCheckedChange={onWithAutonomy} />
-          </label>
-        </div>
-      )}
-      {preview.data && (
-        <div className="ac-dialog__tools">
-          <label htmlFor="setup-all" className="agp-copydialog__all" data-off={can.length === 0 || undefined}>
-            <Checkbox
-              id="setup-all"
-              checked={can.length > 0 && chosen.length === can.length}
-              disabled={can.length === 0}
-              onCheckedChange={(on) => setPicked(new Set(on ? can : []))}
-            />
-            <span className="scope-row__text">
-              <b>{t("agentPage.work.brain.copy.all")}</b>
-              <span className="small muted">
-                {can.length === 0
-                  ? t("agentPage.work.brain.copy.none")
-                  : t("agentPage.work.brain.copy.allLine", { count: can.length })}
-              </span>
-            </span>
-          </label>
-        </div>
-      )}
-      {preview.isPending ? (
-        <div className="ac-dialog__body">
-          <LoadingLine width={220} />
-        </div>
-      ) : preview.isError ? (
-        <p className="ac-dialog__empty">{t("agentPage.work.failed")}</p>
-      ) : (
-        <DialogSearchList
-          query={q}
-          onQueryChange={setQ}
-          search={others.length > 8}
-          searchLabel={t("agentPage.work.brain.copy.search")}
-          searchPlaceholder={t("agentPage.work.brain.copy.search")}
-          listLabel={t("agentPage.work.brain.copy.title")}
-          isEmpty={shown.length === 0}
-          emptyText={t("agentPage.work.brain.copy.noMatch", { q })}
-        >
-          {shown.map((r) => {
-            const a = byId.get(r.agentId);
-            if (!a) return null;
-            const id = `setup-${a.id}`;
-            const off = !changes(r);
-            return (
-              <label key={a.id} htmlFor={id} className="scope-row" data-off={off || undefined}>
-                <Checkbox
-                  id={id}
-                  checked={!off && picked.has(a.id)}
-                  disabled={off}
-                  onCheckedChange={(on) => toggle(a.id, on)}
-                />
-                <AgentAvatar agentId={a.id} name={a.name} size="sm" />
-                <span className="scope-row__text">
-                  <span>{a.name}</span>
-                  <span className="small muted">{setupResultLine(t, r, { now: nowOf(a), owner: ownerOf(a) })}</span>
+      <Locked when={busy}>
+        {autonomy && (
+          <div className="ac-dialog__tools">
+            <label htmlFor="setup-autonomy" className="agp-copydialog__all">
+              <span className="scope-row__text">
+                <b>{t("agentPage.work.brain.copy.withAutonomy")}</b>
+                <span className="small muted">
+                  {t("agentPage.work.brain.copy.withAutonomyLine", { value: autonomyName(t, autonomy) })}
                 </span>
-              </label>
-            );
-          })}
-        </DialogSearchList>
-      )}
+              </span>
+              <Switch id="setup-autonomy" checked={withAutonomy} disabled={busy} onCheckedChange={onWithAutonomy} />
+            </label>
+          </div>
+        )}
+        {preview.data && (
+          <div className="ac-dialog__tools">
+            <label htmlFor="setup-all" className="agp-copydialog__all" data-off={can.length === 0 || undefined}>
+              <Checkbox
+                id="setup-all"
+                checked={can.length > 0 && chosen.length === can.length}
+                disabled={can.length === 0}
+                onCheckedChange={(on) => setPicked(new Set(on ? can : []))}
+              />
+              <span className="scope-row__text">
+                <b>{t("agentPage.work.brain.copy.all")}</b>
+                <span className="small muted">
+                  {can.length === 0
+                    ? t("agentPage.work.brain.copy.none")
+                    : t("agentPage.work.brain.copy.allLine", { count: can.length })}
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
+        {preview.isPending ? (
+          <div className="ac-dialog__body">
+            <LoadingLine width={220} />
+          </div>
+        ) : preview.isError ? (
+          <p className="ac-dialog__empty">{t("agentPage.work.failed")}</p>
+        ) : (
+          <DialogSearchList
+            query={q}
+            onQueryChange={setQ}
+            search={others.length > 8}
+            searchLabel={t("agentPage.work.brain.copy.search")}
+            searchPlaceholder={t("agentPage.work.brain.copy.search")}
+            listLabel={t("agentPage.work.brain.copy.title")}
+            isEmpty={shown.length === 0}
+            emptyText={t("agentPage.work.brain.copy.noMatch", { q })}
+          >
+            {shown.map((r) => {
+              const a = byId.get(r.agentId);
+              if (!a) return null;
+              const id = `setup-${a.id}`;
+              const off = !changes(r);
+              return (
+                <label key={a.id} htmlFor={id} className="scope-row" data-off={off || undefined}>
+                  <Checkbox
+                    id={id}
+                    checked={!off && picked.has(a.id)}
+                    disabled={off}
+                    onCheckedChange={(on) => toggle(a.id, on)}
+                  />
+                  <AgentAvatar agentId={a.id} name={a.name} size="sm" />
+                  <span className="scope-row__text">
+                    <span>{a.name}</span>
+                    <span className="small muted">{setupResultLine(t, r, { now: nowOf(a), owner: ownerOf(a) })}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </DialogSearchList>
+        )}
+      </Locked>
       <DialogFooter bar>
         <Button variant="ghost" onClick={onClose}>
           {t("common.cancel")}
@@ -1848,6 +1874,25 @@ function AdvancedRow({
         </span>
         <Icon name="chevronRight" size={16} className="agp-advrow__chev" />
       </button>
+    </div>
+  );
+}
+
+/** Velocidade: Padrão or Rápida, with what Rápida costs and where it doesn't apply. */
+function SpeedField({ value, onChange }: { value: BrainSpeed; onChange: (value: BrainSpeed) => void }) {
+  const { t } = useTranslation();
+  const label = t("agentPage.work.brain.speed");
+  return (
+    <div className="agp-brainfield">
+      <span className="ac-effort__head">{label}</span>
+      <Segmented
+        className="agp-brainseg"
+        label={label}
+        value={value}
+        onValueChange={onChange}
+        options={SPEEDS.map((s) => ({ value: s, label: t(`agentPage.work.brain.speeds.${s}`) }))}
+      />
+      <span className="agp-brainfield__hint">{t("agentPage.work.brain.speedText")}</span>
     </div>
   );
 }
@@ -1990,49 +2035,51 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
       width={640}
       className="agp-wdlg"
     >
-      <DialogBody>
-        <OptionList
-          aria-label={t("agentPage.work.computer.title", g)}
-          value={choice}
-          onValueChange={setChoice}
-          options={[
-            ...(none
-              ? [
-                  {
-                    value: NO_COMPUTER,
-                    // Portraits are as wide as their drawings: one column keeps the titles in line.
-                    leading: (
-                      <span className="machine-row__pic">
-                        {none === "none" ? (
-                          <Icon name="dash" size={20} />
-                        ) : (
-                          <ComputerPortrait
-                            kind={WORKSPACE_COMPUTER_KIND}
-                            state={workspace ? setupPortrait(workspace, false) : "online"}
-                          />
-                        )}
-                      </span>
-                    ),
-                    title: noComputer.label(none),
-                    description: workspace ? t(workspace.textKey) : t("computer.target.noneText"),
-                    children: note(NO_COMPUTER),
-                  },
-                ]
-              : []),
-            ...listed.map((m) => ({
-              value: m.id,
-              leading: (
-                <span className="machine-row__pic">
-                  <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />
-                </span>
-              ),
-              title: m.name,
-              description: `${status(m)} · ${offers(m)}`,
-              children: note(m.id),
-            })),
-          ]}
-        />
-      </DialogBody>
+      <Locked when={busy}>
+        <DialogBody>
+          <OptionList
+            aria-label={t("agentPage.work.computer.title", g)}
+            value={choice}
+            onValueChange={setChoice}
+            options={[
+              ...(none
+                ? [
+                    {
+                      value: NO_COMPUTER,
+                      // Portraits are as wide as their drawings: one column keeps the titles in line.
+                      leading: (
+                        <span className="machine-row__pic">
+                          {none === "none" ? (
+                            <Icon name="dash" size={20} />
+                          ) : (
+                            <ComputerPortrait
+                              kind={WORKSPACE_COMPUTER_KIND}
+                              state={workspace ? setupPortrait(workspace, false) : "online"}
+                            />
+                          )}
+                        </span>
+                      ),
+                      title: noComputer.label(none),
+                      description: workspace ? t(workspace.textKey) : t("computer.target.noneText"),
+                      children: note(NO_COMPUTER),
+                    },
+                  ]
+                : []),
+              ...listed.map((m) => ({
+                value: m.id,
+                leading: (
+                  <span className="machine-row__pic">
+                    <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />
+                  </span>
+                ),
+                title: m.name,
+                description: `${status(m)} · ${offers(m)}`,
+                children: note(m.id),
+              })),
+            ]}
+          />
+        </DialogBody>
+      </Locked>
       <Footer
         note={
           thisMacFree ? (
@@ -2173,155 +2220,157 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
       width={720}
       className="agp-wdlg"
     >
-      <DialogBody>
-        <div className="stack-4" style={{ gap: 14 }}>
-          <OptionList
-            aria-label={t("agentPage.work.browserDialog.title", g)}
-            layout="cards"
-            value={mode}
-            onValueChange={(v) => (admin || v !== "off" ? setMode(v) : undefined)}
-            options={[
-              {
-                value: "any",
-                leading: lead("globe"),
-                title: t("agentPage.work.browserDialog.any"),
-                description: t("agentPage.work.browserDialog.anyText"),
-                disabled: !admin && !work.granted,
-              },
-              {
-                value: "only",
-                leading: lead("lock"),
-                title: t("agentPage.work.browserDialog.only"),
-                description: t("agentPage.work.browserDialog.onlyText"),
-                disabled: !admin && !work.granted,
-              },
-              {
-                value: "off",
-                leading: lead("block"),
-                title: t("agentPage.work.browserDialog.off"),
-                description: t("agentPage.work.browserDialog.offText"),
-                disabled: !admin,
-              },
-            ]}
-          />
-          {mode === "only" && (
-            <div className="brw-sites">
-              {sites.map((d) => (
-                <span key={d} className="brw-site">
-                  <Icon name="globe" size={14} />
-                  {d}
-                  <button
-                    type="button"
-                    aria-label={t("browser.agent.removeSite", { site: d })}
-                    onClick={() => setSites(sites.filter((x) => x !== d))}
-                  >
-                    <Icon name="close" size={14} />
-                  </button>
-                </span>
-              ))}
-              <Input
-                className="brw-sites__add"
-                value={typed}
-                placeholder={`${t("browser.agent.addSite")} · ${t("browser.agent.addSiteHint")}`}
-                aria-label={t("browser.agent.addSite")}
-                onChange={(e) => {
-                  setTyped(e.target.value);
-                  setBad(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    add();
-                  }
-                }}
-                onBlur={add}
-              />
-            </div>
-          )}
-          {bad && <SettingNote icon="alert">{t("browser.agent.badSite")}</SettingNote>}
-          {!admin && <SettingNote icon="lock">{t("agentPage.work.browserDialog.admins")}</SettingNote>}
-          {moveTo && (
-            <SettingNote icon="arrowRight" live>
-              {t("agentPage.work.browserDialog.moves", { ...g, computer: moveTo.name })}
-            </SettingNote>
-          )}
-          {noComputer && (
-            <SettingNote icon="alert">
-              {edition === "cloud"
-                ? t("agentPage.work.browserDialog.noComputerCloud", {
-                    computer: t("computerSetup.title", { org: org.name }),
-                  })
-                : t("agentPage.work.browserDialog.noComputer")}
-            </SettingNote>
-          )}
-          {blocked && inDesktopApp() && (
-            <ThisMacButton orgId={org.id} canPair={canDo(org, "pair_computers")} folders={false} />
-          )}
-          {on && (moveTo ? !ready(moveTo) : work.browser.data?.reason === "switched_off") && (
-            <BrowserSteps
-              computer={moveTo?.name ?? work.browser.data?.machine?.name ?? ""}
-              machineId={moveTo?.id ?? work.browser.data?.machine?.id}
+      <Locked when={busy}>
+        <DialogBody>
+          <div className="stack-4" style={{ gap: 14 }}>
+            <OptionList
+              aria-label={t("agentPage.work.browserDialog.title", g)}
+              layout="cards"
+              value={mode}
+              onValueChange={(v) => (admin || v !== "off" ? setMode(v) : undefined)}
+              options={[
+                {
+                  value: "any",
+                  leading: lead("globe"),
+                  title: t("agentPage.work.browserDialog.any"),
+                  description: t("agentPage.work.browserDialog.anyText"),
+                  disabled: !admin && !work.granted,
+                },
+                {
+                  value: "only",
+                  leading: lead("lock"),
+                  title: t("agentPage.work.browserDialog.only"),
+                  description: t("agentPage.work.browserDialog.onlyText"),
+                  disabled: !admin && !work.granted,
+                },
+                {
+                  value: "off",
+                  leading: lead("block"),
+                  title: t("agentPage.work.browserDialog.off"),
+                  description: t("agentPage.work.browserDialog.offText"),
+                  disabled: !admin,
+                },
+              ]}
             />
-          )}
-          {on && !withProfiles && <SettingNote icon="lock">{t("browser.agent.signedIn", g)}</SettingNote>}
-          {on && withProfiles && (
-            <div className="ac-field">
-              <span className="ac-field__label" id="agent-browser-profile">
-                {t("browser.profiles.agentChoice", g)}
-              </span>
-              <OptionList
-                aria-labelledby="agent-browser-profile"
-                value={profile}
-                onValueChange={setProfile}
-                options={[
-                  {
-                    value: OWN_BROWSER,
-                    leading: lead("person"),
-                    title: t("browser.profiles.own", g),
-                    description: t("browser.profiles.ownText", g),
-                    ...(savedProfile === null ? { tag: t("browser.profiles.default") } : {}),
-                  },
-                  ...mine.map((p) => {
-                    const holder = p.holder?.type === "agent" ? dir.agentById.get(p.holder.agentId)?.name : undefined;
-                    return {
-                      value: p.id,
-                      leading: lead("globe"),
-                      title: p.name,
-                      description: p.holder
-                        ? t("browser.profiles.inUsePerson", {
-                            name:
-                              holder ??
-                              (p.holder.type === "person" ? dir.memberById.get(p.holder.userId)?.name : "") ??
-                              "",
-                          })
-                        : t("browser.profiles.free"),
-                      ...(savedProfile === p.id ? { tag: t("browser.profiles.default") } : {}),
-                    };
-                  }),
-                ]}
-              />
-              {!canDo(org, "manage_connectors") && (
-                <div className="row">
-                  <Button
-                    size="sm"
-                    icon="plus"
-                    loading={profileActions.request.isPending}
-                    onClick={() =>
-                      profileActions.request.mutate(agent.id, {
-                        onSuccess: () => toast.show(t("browser.profiles.asked")),
-                        onError: () => toast.show(t("browser.profiles.failed"), "error"),
-                      })
+            {mode === "only" && (
+              <div className="brw-sites">
+                {sites.map((d) => (
+                  <span key={d} className="brw-site">
+                    <Icon name="globe" size={14} />
+                    {d}
+                    <button
+                      type="button"
+                      aria-label={t("browser.agent.removeSite", { site: d })}
+                      onClick={() => setSites(sites.filter((x) => x !== d))}
+                    >
+                      <Icon name="close" size={14} />
+                    </button>
+                  </span>
+                ))}
+                <Input
+                  className="brw-sites__add"
+                  value={typed}
+                  placeholder={`${t("browser.agent.addSite")} · ${t("browser.agent.addSiteHint")}`}
+                  aria-label={t("browser.agent.addSite")}
+                  onChange={(e) => {
+                    setTyped(e.target.value);
+                    setBad(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      add();
                     }
-                  >
-                    {t("browser.profiles.askMore")}
-                  </Button>
-                  <span className="small muted">{t("browser.profiles.askHelp", g)}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </DialogBody>
+                  }}
+                  onBlur={add}
+                />
+              </div>
+            )}
+            {bad && <SettingNote icon="alert">{t("browser.agent.badSite")}</SettingNote>}
+            {!admin && <SettingNote icon="lock">{t("agentPage.work.browserDialog.admins")}</SettingNote>}
+            {moveTo && (
+              <SettingNote icon="arrowRight" live>
+                {t("agentPage.work.browserDialog.moves", { ...g, computer: moveTo.name })}
+              </SettingNote>
+            )}
+            {noComputer && (
+              <SettingNote icon="alert">
+                {edition === "cloud"
+                  ? t("agentPage.work.browserDialog.noComputerCloud", {
+                      computer: t("computerSetup.title", { org: org.name }),
+                    })
+                  : t("agentPage.work.browserDialog.noComputer")}
+              </SettingNote>
+            )}
+            {blocked && inDesktopApp() && (
+              <ThisMacButton orgId={org.id} canPair={canDo(org, "pair_computers")} folders={false} />
+            )}
+            {on && (moveTo ? !ready(moveTo) : work.browser.data?.reason === "switched_off") && (
+              <BrowserSteps
+                computer={moveTo?.name ?? work.browser.data?.machine?.name ?? ""}
+                machineId={moveTo?.id ?? work.browser.data?.machine?.id}
+              />
+            )}
+            {on && !withProfiles && <SettingNote icon="lock">{t("browser.agent.signedIn", g)}</SettingNote>}
+            {on && withProfiles && (
+              <div className="ac-field">
+                <span className="ac-field__label" id="agent-browser-profile">
+                  {t("browser.profiles.agentChoice", g)}
+                </span>
+                <OptionList
+                  aria-labelledby="agent-browser-profile"
+                  value={profile}
+                  onValueChange={setProfile}
+                  options={[
+                    {
+                      value: OWN_BROWSER,
+                      leading: lead("person"),
+                      title: t("browser.profiles.own", g),
+                      description: t("browser.profiles.ownText", g),
+                      ...(savedProfile === null ? { tag: t("browser.profiles.default") } : {}),
+                    },
+                    ...mine.map((p) => {
+                      const holder = p.holder?.type === "agent" ? dir.agentById.get(p.holder.agentId)?.name : undefined;
+                      return {
+                        value: p.id,
+                        leading: lead("globe"),
+                        title: p.name,
+                        description: p.holder
+                          ? t("browser.profiles.inUsePerson", {
+                              name:
+                                holder ??
+                                (p.holder.type === "person" ? dir.memberById.get(p.holder.userId)?.name : "") ??
+                                "",
+                            })
+                          : t("browser.profiles.free"),
+                        ...(savedProfile === p.id ? { tag: t("browser.profiles.default") } : {}),
+                      };
+                    }),
+                  ]}
+                />
+                {!canDo(org, "manage_connectors") && (
+                  <div className="row">
+                    <Button
+                      size="sm"
+                      icon="plus"
+                      loading={profileActions.request.isPending}
+                      onClick={() =>
+                        profileActions.request.mutate(agent.id, {
+                          onSuccess: () => toast.show(t("browser.profiles.asked")),
+                          onError: () => toast.show(t("browser.profiles.failed"), "error"),
+                        })
+                      }
+                    >
+                      {t("browser.profiles.askMore")}
+                    </Button>
+                    <span className="small muted">{t("browser.profiles.askHelp", g)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogBody>
+      </Locked>
       <Footer
         disabled={unchanged || blocked}
         busy={busy}

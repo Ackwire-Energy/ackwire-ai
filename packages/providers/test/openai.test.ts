@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { cheapModelOf, costNanoUsd, createOpenAIProvider, MODEL_CATALOG, ProviderError } from "../src";
+import OpenAI from "openai";
+import {
+  cheapModelOf,
+  costNanoUsd,
+  createOpenAIProvider,
+  keyRefusalOf,
+  MODEL_CATALOG,
+  openAIError,
+  ProviderError,
+} from "../src";
 
 const sse = (events: Record<string, unknown>[], tail = "") =>
   events.map((e, i) => `event: ${e.type}\ndata: ${JSON.stringify({ ...e, sequence_number: i })}\n\n`).join("") + tail;
@@ -305,5 +314,97 @@ describe("OpenAI adapter (Responses API, scripted transport)", () => {
     ).toBe(501_000_000);
     expect(cheapModelOf("openai")).toBe("gpt-6-luna");
     expect(cheapModelOf("anthropic")).toBe("claude-haiku-5-5");
+  });
+});
+
+describe("what a failure says", () => {
+  const failed = async (body: string, status = 200) => {
+    const provider = createOpenAIProvider({ fetch: scripted(body, status).fetcher, maxRetries: 0 });
+    const call = provider.stream(
+      { model: cheapModelOf("openai") ?? "", system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 16 },
+      { apiKey: "sk-test", onDelta: () => {} },
+    );
+    return call.then(
+      () => null,
+      (e: ProviderError) => e,
+    );
+  };
+  const frame = (code: string, message: string) =>
+    `event: error\ndata: ${JSON.stringify({ type: "error", error: { code, message } })}\n\n`;
+
+  test("no credit inside a stream, with no status: its words and code, and no retry", async () => {
+    const e = await failed(frame("insufficient_quota", "You exceeded your current quota, please check your plan."));
+    expect(e).toMatchObject({
+      message:
+        "no prepaid credit left at the provider (429 insufficient_quota): You exceeded your current quota, please check your plan.",
+      retryable: false,
+      status: 429,
+    });
+  });
+
+  test("no credit on a 429 never reads as a rate limit", async () => {
+    const body = JSON.stringify({ error: { code: "insufficient_quota", message: "Add credit." } });
+    expect(await failed(body, 429)).toMatchObject({ retryable: false, status: 429 });
+  });
+
+  test("a rate limit inside a stream is still one", async () => {
+    expect(await failed(frame("rate_limit_exceeded", "Slow down."))).toMatchObject({ retryable: true, status: 429 });
+  });
+
+  test("a response that failed is a failure, never an empty reply that worked", async () => {
+    const response = (status: string, error: unknown) => ({
+      id: "r1",
+      object: "response",
+      created_at: 1,
+      status,
+      model: "m",
+      output: [],
+      error,
+    });
+    const event = (type: string, n: number, body: unknown) =>
+      `event: ${type}\ndata: ${JSON.stringify({ type, sequence_number: n, response: body })}\n\n`;
+    const body =
+      event("response.created", 0, response("in_progress", null)) +
+      event("response.failed", 1, response("failed", { code: "insufficient_quota", message: "Add credit." }));
+    const e = await failed(body);
+    expect(e).toMatchObject({ retryable: false, status: 429 });
+    expect(e?.message).toContain("no prepaid credit left at the provider (429 insufficient_quota): Add credit.");
+  });
+
+  test("a 403 keeps the words that tell a model out of reach from a key with no rights", async () => {
+    const said = "Project proj_1 does not have access to model gpt-small";
+    const body = JSON.stringify({ error: { code: "model_not_found", message: said } });
+    const e = await failed(body, 403);
+    expect(e?.message).toBe(`provider denied access (403 model_not_found): ${said}`);
+    expect(e && keyRefusalOf(e)).toBeNull();
+  });
+
+  test("any other refusal keeps the status, the code and the words, cut short", async () => {
+    const body = JSON.stringify({ error: { code: "bad_thing", message: `Nope ${"x".repeat(400)}` } });
+    const e = await failed(body, 400);
+    expect(e?.message.startsWith("provider rejected the request (400 bad_thing): Nope x")).toBe(true);
+    expect(e?.message.length).toBeLessThan(360);
+  });
+});
+
+describe("openAIError", () => {
+  const generated = (status: number, error: Record<string, unknown>) =>
+    OpenAI.APIError.generate(status, { error }, undefined, new Headers());
+
+  test("an empty quota is no rate limit: waiting won't bring it back", () => {
+    const quota = { code: "insufficient_quota", message: "You exceeded your current quota" };
+    expect(openAIError(generated(429, quota))).toMatchObject({ retryable: false, status: 429, said: quota.message });
+    expect(openAIError(generated(429, { message: "Slow down" }))).toMatchObject({ retryable: true, status: 429 });
+  });
+
+  test("a refusal keeps the API's words, and a timeout is told from a connection that failed", () => {
+    expect(openAIError(generated(400, { message: "tools: too many" }))).toMatchObject({ said: "tools: too many" });
+    expect(openAIError(generated(403, { message: "Country not supported" }))).toMatchObject({
+      said: "Country not supported",
+    });
+    expect(openAIError(new OpenAI.APIConnectionTimeoutError())).toMatchObject({ message: "provider timed out" });
+    expect(openAIError(new OpenAI.APIConnectionError({ message: "x" }))).toMatchObject({
+      message: "could not reach provider",
+    });
   });
 });

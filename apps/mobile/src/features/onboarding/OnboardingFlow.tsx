@@ -6,14 +6,27 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "@/features/account";
 import { authClient } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
-import { AgentAvatar, Button, fieldText, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
+import {
+  AgentAvatar,
+  Button,
+  fieldText,
+  Icon,
+  type IconName,
+  LineIcon,
+  Locked,
+  Text,
+  textLineOf,
+  useTheme,
+} from "@/ui";
+import { WholeAccount } from "@/ui/auth/WholeAccount";
+import { leadBox } from "@/ui/type-scale";
 import { fullLook } from "../agents/edit";
 import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
@@ -159,7 +172,7 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
         <Text variant="callout" tone="muted">
           {t("onboarding.workspace.lead")}
         </Text>
-        <View style={styles.answer}>
+        <Locked when={pending} style={styles.answer}>
           <Field
             value={name}
             onChangeText={setName}
@@ -177,7 +190,7 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
           />
           {zone ? <Note icon="clock" text={t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })} /> : null}
           {unconfirmed ? <ConfirmationNote email={email} /> : null}
-        </View>
+        </Locked>
       </ScrollView>
       <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {error ? (
@@ -189,11 +202,12 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
           variant="primary"
           wide
           label={t("onboarding.actions.continue")}
-          disabled={orgName.length === 0 || pending}
+          loading={pending}
+          disabled={orgName.length === 0}
           onPress={() => void save()}
         />
-        {/* Until a workspace is set up this is the only screen: the ways out of the account, and of a workspace made
-            by mistake, are here (deleting either on the website). */}
+        {/* Until a workspace is set up this is the only screen: the way out of a workspace made by mistake is here, and
+            of the account for someone with no other workspace that opens (deleting either on the website). */}
         {onLeave && !created ? (
           <Button variant="ghost" wide label={t("mobile.common.back")} disabled={pending} onPress={onLeave} />
         ) : null}
@@ -213,13 +227,13 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
           disabled={pending}
           onPress={() => void signOut()}
         />
-        <Button
-          variant="ghost"
-          wide
-          label={t("deleteAccount.menu")}
-          disabled={pending}
-          onPress={() => openPage(`${serverUrl()}/onboarding?account=delete`)}
-        />
+        {me.data ? (
+          <WholeAccount
+            orgs={me.data.organizations}
+            disabled={pending}
+            onDelete={() => openPage(`${serverUrl()}/onboarding?account=delete`)}
+          />
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -242,7 +256,7 @@ function ConfirmationNote({ email }: { email: string }) {
   };
   return (
     <View style={styles.note} accessibilityLiveRegion="polite">
-      <LineIcon name="mail" size={14} color={c.faint} variant="small" />
+      <LineIcon name="mail" size={15} color={c.faint} variant="small" />
       <View style={styles.grow}>
         <Text variant="small" tone="muted">
           {sent === "sent" ? t("auth.newLinkSent", { email }) : t("onboarding.confirmation.sent", { email })}
@@ -252,8 +266,9 @@ function ConfirmationNote({ email }: { email: string }) {
             onPress={() => void resend()}
             disabled={sent === "sending"}
             accessibilityRole="button"
-            hitSlop={8}
-            style={styles.linkButton}
+            // A 20-point line: 12 of slop around it reaches the 44-point target.
+            hitSlop={12}
+            style={({ pressed }) => [styles.linkButton, pressed ? styles.pressed : null]}
           >
             <Text variant="small" style={styles.bold}>
               {t("auth.sendNewLink")}
@@ -299,13 +314,21 @@ function Line({
   onPress: () => void;
 }) {
   const { colors: c } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  // A help line that wraps: the icon and the word on the right stay on the title's line, not the row's middle.
+  const line = sub ? textLineOf("body", fontScale) : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.line, { borderColor: c.line }, pressed ? { backgroundColor: c.sunken } : null]}
+      style={({ pressed }) => [
+        styles.line,
+        line ? styles.lineTall : null,
+        { borderColor: c.line },
+        pressed ? { backgroundColor: c.sunken } : null,
+      ]}
     >
-      <View style={styles.lead}>{lead}</View>
+      <View style={[styles.lead, line ? leadBox(line, 18) : null]}>{lead}</View>
       <View style={styles.grow}>
         <Text variant="body" style={styles.bold}>
           {title}
@@ -317,9 +340,11 @@ function Line({
         ) : null}
       </View>
       {end ? (
-        <Text variant="small" style={styles.bold}>
-          {end}
-        </Text>
+        <View style={line ? [styles.end, { minHeight: line.height }] : null}>
+          <Text variant="small" style={styles.bold}>
+            {end}
+          </Text>
+        </View>
       ) : null}
     </Pressable>
   );
@@ -329,7 +354,7 @@ function Note({ icon, text }: { icon: IconName; text: string }) {
   const { colors: c } = useTheme();
   return (
     <View style={styles.note}>
-      <LineIcon name={icon} size={14} color={c.faint} variant="small" />
+      <LineIcon name={icon} size={15} color={c.faint} variant="small" />
       <Text variant="small" tone="muted" style={styles.grow}>
         {text}
       </Text>
@@ -360,9 +385,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  lineTall: { alignItems: "flex-start", paddingVertical: 12 },
   lead: { width: 38, alignItems: "center" },
+  end: { justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   linkButton: { alignSelf: "flex-start", marginTop: 2 },
+  pressed: { opacity: 0.6 },
 });

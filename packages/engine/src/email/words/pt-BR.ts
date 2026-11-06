@@ -215,7 +215,7 @@ export const ptBR: Words = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} é seu código para apagar um workspace`,
-    subjectAccount: (code) => `${code} é seu código para apagar sua conta`,
+    subjectAccount: (code) => `${code} é seu código para apagar sua conta inteira`,
     preheader: "Digite no agentes.chat para confirmar. Vale por 10 minutos.",
     headline: "Seu código",
     workspace: (org) => [
@@ -224,9 +224,9 @@ export const ptBR: Words = {
       ". Ele fecha para todos na hora e é apagado de vez 7 dias depois.",
     ],
     account: (email) => [
-      "Digite este código para apagar a conta ",
+      "Digite este código para apagar a conta inteira ",
       { b: email },
-      ". Ela some na hora, e os workspaces em que só você está fecham com ela.",
+      ", não só um workspace. Ela sai de todos os aparelhos na hora e é apagada de vez 7 dias depois, e os workspaces em que só você está fecham com ela.",
     ],
     support: (address) => [
       "Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e escreva para ",
@@ -270,6 +270,27 @@ export const ptBR: Words = {
     note: "Não foi você? Desconecte agora e troque sua senha.",
     button: "Ver apps conectados",
     why: (org) => `Você recebeu este e-mail porque um app foi conectado à sua conta na ${org} no agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Sua conta do agentes.chat vai ser apagada em ${day}`,
+    preheader: "Você tem 7 dias para mudar de ideia.",
+    headline: "Sua conta está sendo apagada",
+    body: (email, day, time) => [
+      "Vamos apagar a conta ",
+      { b: email },
+      ` em ${day} às ${time}. Ela saiu de todos os aparelhos, e ninguém fala com você aqui até você voltar.`,
+    ],
+    closes: (count, names) => [
+      plural("pt-BR", count, {
+        one: "O workspace em que só você estava fechou agora e some na mesma data: ",
+        other: "Os workspaces em que só você estava fecharam agora e somem na mesma data: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Mudou de ideia? Entre antes dessa data e aperte Restaurar.",
+    button: "Entrar para restaurar",
+    why: "Você recebeu este e-mail porque este endereço tem uma conta no agentes.chat.",
   },
   accountDeleted: {
     subject: "Sua conta do agentes.chat foi apagada",

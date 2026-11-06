@@ -71,7 +71,7 @@
   },
   "account": {
     "deleteFailed": "Dein Konto lässt sich gerade nicht löschen. Versuch es noch einmal.",
-    "deleted": "Dein Konto wurde gelöscht.",
+    "deleted": "Dein Konto verschwindet am {{date}} endgültig. Melde dich vorher an, um es wiederherzustellen.",
     "signedOut": "Du hast dich abgemeldet."
   },
   "theme": {

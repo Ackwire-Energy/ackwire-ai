@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { and, eq, isNull, schema } from "@agenteschat/db";
-import { CURSOR_CALLBACK, pinnedLookup, purgeApps, resetAppDocumentFailures, sha256 } from "@agenteschat/engine";
-import { authorize, connectApp, LOOPBACK, mcp, pkce, registerClient, requestIdOf, token } from "./ai-apps";
+import {
+  CURSOR_CALLBACK,
+  pinnedLookup,
+  purgeApps,
+  resetAppDocumentFailures,
+  restoreAccount,
+  scheduleAccountDeletion,
+  sha256,
+} from "@agenteschat/engine";
+import { authorize, callTool, connectApp, LOOPBACK, mcp, pkce, registerClient, requestIdOf, token } from "./ai-apps";
 import { browser, createTestServer, joinByInvitation, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -373,6 +381,19 @@ describe("consent", () => {
       .where(eq(schema.organizations.id, second.organization.id));
     const view = (await (await ana(`/api/app/authorize/${req}`)).json()) as { workspaces: { paused: boolean }[] };
     expect(view.workspaces.map((w) => w.paused)).toEqual([true]);
+    const dueAt = new Date(Date.now() + 86_400_000);
+    await t.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: dueAt })
+      .where(eq(schema.organizations.id, second.organization.id));
+    const closing = (await (await ana(`/api/app/authorize/${req}`)).json()) as {
+      workspaces: { deletion?: { dueAt: string } }[];
+    };
+    expect(closing.workspaces[0]?.deletion?.dueAt).toBe(dueAt.toISOString());
+    await t.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: null })
+      .where(eq(schema.organizations.id, second.organization.id));
     const paused = await ana(`/api/app/authorize/${req}`, {
       json: { decision: "allow", orgId: second.organization.id },
     });
@@ -634,6 +655,24 @@ describe("token", () => {
       (await mcp(t, String(retry.json.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" })).status,
     ).toBe(401);
     expect((await refresh(String(retry.json.refresh_token))).json.error).toBe("invalid_grant");
+  });
+
+  test("an account waiting for its deletion gets no token, and its restore finds the app still connected", async () => {
+    const { b, orgId } = await owner();
+    const app = await connectApp(t, b, orgId);
+    const [person] = await t.db.select({ id: schema.users.id }).from(schema.users);
+    const userId = person?.id ?? "";
+    const refresh = () =>
+      token(t, { grant_type: "refresh_token", refresh_token: app.refresh, client_id: app.clientId });
+    await scheduleAccountDeletion({ db: t.db }, userId);
+    expect((await refresh()).json.error).toBe("invalid_grant");
+    const refused = await callTool(t, app.access, "list_agents", {});
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0]?.text).toContain("can't be used right now");
+    await restoreAccount({ db: t.db }, userId);
+    const back = await refresh();
+    expect(back.res.status).toBe(200);
+    expect((await callTool(t, String(back.json.access_token), "list_agents", {})).isError).toBeFalsy();
   });
 
   test("two refreshes at once: whichever answer the client keeps, its session survives", async () => {

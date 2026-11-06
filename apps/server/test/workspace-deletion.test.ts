@@ -47,6 +47,12 @@ const signedInAnHourAgo = (userId: string) =>
     .update(schema.sessions)
     .set({ createdAt: new Date(Date.now() - 3600_000) })
     .where(eq(schema.sessions.userId, userId));
+/** The database wrote the date: a test moves it back to make the deletion due. */
+const pastDue = (userId: string) =>
+  t.db
+    .update(schema.users)
+    .set({ deletionDueAt: new Date(Date.now() - 60_000) })
+    .where(eq(schema.users.id, userId));
 /** A code that isn't `code`. */
 const otherThan = (code: string) => (code === "000000" ? "111111" : "000000");
 
@@ -298,7 +304,8 @@ describe("deleting an account", () => {
     const plan = await (await bia("/api/app/account/deletion")).json();
     expect(plan).toEqual({
       closes: [
-        { id: solo, name: "Solo" },
+        // What it holds, so the page can say which is which.
+        { id: solo, name: "Solo", agents: expect.any(Number), messages: expect.any(Number) },
         { id: old, name: "Old", deletion },
       ],
       leaves: [
@@ -359,6 +366,15 @@ describe("deleting an account", () => {
     const deleted = await deleteAccount(bia, { code: await deletionCode(t, bia, null) });
     expect(deleted.status).toBe(204);
     expect(deleted.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_token=;"))).toBe(true);
+    // It waits for its date, with its sign-ins: Apple's only go then.
+    await t.drain();
+    expect(revoked).toEqual([]);
+    await pastDue(biaId);
+    await t.db
+      .update(schema.outbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(schema.outbox.kind, "account.delete"));
+    await t.drain();
     expect(revoked).toEqual([{ value: "refresh-bia", hint: "refresh_token" }]);
     expect(await t.db.select().from(schema.users).where(eq(schema.users.id, biaId))).toEqual([]);
   });
@@ -373,6 +389,12 @@ describe("deleting an account", () => {
     const cached = other.cookie();
 
     expect((await deleteAccount(owner, { code: await deletionCode(t, owner, null) })).status).toBe(204);
+    await pastDue((await meOf(other)).user.id);
+    await t.db
+      .update(schema.outbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(schema.outbox.kind, "account.delete"));
+    await t.drain();
     const me = await other("/api/app/me");
     expect(me.status).toBe(401);
     expect(me.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_data=;"))).toBe(true);
@@ -382,6 +404,85 @@ describe("deleting an account", () => {
       body: JSON.stringify({ name: "Late" }),
     });
     expect(await answer(made)).toEqual([401, "unauthorized"]);
+  });
+
+  test("7 days to come back: every session ends, signing in shows only that, and Restaurar brings it all back", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const id = (await meOf(owner)).user.id;
+    const phone = browser(t);
+    const signIn = { email: "owner@example.com", password: "correct horse battery" };
+    expect((await phone("/api/auth/sign-in/email", { json: signIn })).status).toBe(200);
+
+    expect((await deleteAccount(owner, { code: await deletionCode(t, owner, null) })).status).toBe(204);
+    expect(await t.db.select().from(schema.sessions).where(eq(schema.sessions.userId, id))).toEqual([]);
+    await t.drain();
+    const told = t.email.sent.at(-1);
+    expect(told?.to).toEqual(["owner@example.com"]);
+    expect(told?.subject).toContain("vai ser apagada");
+
+    // A cached cookie still reads as a session for minutes: no workspace answers it.
+    expect((await phone(`/api/app/organizations/${orgId}/channels`)).status).toBe(403);
+
+    // The same address can't start over meanwhile: it is this account's until the date.
+    const newcomer = browser(t);
+    const again = { email: "owner@example.com", password: "another good password", name: "Twin" };
+    expect((await newcomer("/api/auth/sign-up/email", { json: again })).status).not.toBe(200);
+    expect(await t.db.select().from(schema.users).where(eq(schema.users.email, "owner@example.com"))).toHaveLength(1);
+
+    const back = browser(t);
+    expect((await back("/api/auth/sign-in/email", { json: signIn })).status).toBe(200);
+    const waiting = (await (await back("/api/app/me")).json()) as {
+      user: { deletion?: { dueAt: string | null }; canCreateWorkspace: boolean };
+      organizations: unknown[];
+    };
+    expect(waiting.organizations).toEqual([]);
+    expect(waiting.user.canCreateWorkspace).toBe(false);
+    const dueAt = Date.parse(waiting.user.deletion?.dueAt ?? "");
+    expect(Math.abs(dueAt - Date.now() - 7 * 86_400_000)).toBeLessThan(60_000);
+    expect((await back(`/api/app/organizations/${orgId}/channels`)).status).toBe(403);
+    expect(await answer(await back("/api/app/organizations", { json: { name: "Fresh start" } }))).toEqual([
+      403,
+      "org.create_refused",
+    ]);
+
+    expect((await back("/api/app/account/deletion", { method: "DELETE" })).status).toBe(204);
+    const restored = (await (await back("/api/app/me")).json()) as {
+      user: { deletion?: unknown };
+      organizations: { id: string; deletion?: unknown }[];
+    };
+    expect(restored.user.deletion).toBeUndefined();
+    expect(restored.organizations.map((o) => [o.id, o.deletion])).toEqual([[orgId, undefined]]);
+    expect((await back(`/api/app/organizations/${orgId}/channels`)).status).toBe(200);
+    expect(await answer(await back("/api/app/account/deletion", { method: "DELETE" }))).toEqual([
+      409,
+      "account.not_restorable",
+    ]);
+    // Its job comes and finds nothing to do.
+    await t.db
+      .update(schema.outbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(schema.outbox.kind, "account.delete"));
+    await t.drain();
+    expect((await back("/api/app/me")).status).toBe(200);
+  });
+
+  test("past its date Restaurar is refused, and the job deletes it", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const id = (await meOf(owner)).user.id;
+    expect((await deleteAccount(owner, { code: await deletionCode(t, owner, null) })).status).toBe(204);
+    const back = browser(t);
+    const signIn = { email: "owner@example.com", password: "correct horse battery" };
+    expect((await back("/api/auth/sign-in/email", { json: signIn })).status).toBe(200);
+    await pastDue(id);
+    const me = (await (await back("/api/app/me")).json()) as { user: { deletion?: { dueAt: string | null } } };
+    expect(me.user.deletion?.dueAt).toBeNull();
+    expect(await answer(await back("/api/app/account/deletion", { method: "DELETE" }))).toEqual([
+      409,
+      "account.not_restorable",
+    ]);
   });
 
   test("a person makes at most 10 workspaces a day", async () => {

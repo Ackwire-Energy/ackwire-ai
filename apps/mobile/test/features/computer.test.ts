@@ -18,7 +18,7 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { resources } from "@agenteschat/i18n";
 import { bannedIn, CLOUD_BANNED } from "../../../../packages/i18n/test/edition-words";
-import { offersKeyNow, pollsPlan } from "../../src/features/ai/logic";
+import { keyNowLabel, offersKeyNow, pollsPlan } from "../../src/features/ai/logic";
 import { pageGapKey, stepText } from "../../src/features/browser/logic";
 import {
   offersSwitch,
@@ -333,18 +333,26 @@ describe("the workspace's computer on its way, on Conversas", () => {
   test("the AI step offers an API key now in every wait, a page away on the phone, but not on hold", () => {
     const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
     for (const view of [viewOf(), wait, viewOf({ state: "problem", step: null, secondsLeft: null })]) {
-      expect(offersKeyNow({ state: "preparing", view }, false)).toBe(true);
-      expect(offersKeyNow({ state: "preparing", view }, true)).toBe(false);
+      expect(offersKeyNow({ state: "preparing", view }, false, true)).toBe(true);
+      expect(offersKeyNow({ state: "preparing", view }, true, true)).toBe(false);
     }
     // Ready, its agent getting it at the next refresh: seconds, nothing to offer.
-    expect(offersKeyNow({ state: "preparing", view: null }, false)).toBe(false);
+    expect(offersKeyNow({ state: "preparing", view: null }, false, true)).toBe(false);
+    // A billing hold: whoever may add a key can keep one for when the plan is active, in words that promise no "now".
+    expect(offersKeyNow({ state: "billing", hold: "payment" }, true, true)).toBe(true);
+    expect(offersKeyNow({ state: "billing", hold: "payment" }, true, false)).toBe(false);
+    expect(keyNowLabel({ state: "billing", hold: "payment" })).toBe("noAi.rightHand.useKey");
+    expect(keyNowLabel({ state: "offline" })).toBe("connectAi.wait.useKey");
     // Where the plan can't sign in there: as before.
-    expect(offersKeyNow({ state: "offline" }, false)).toBe(true);
-    expect(offersKeyNow({ state: "missing" }, false)).toBe(true);
-    expect(offersKeyNow({ state: "unsupported", reason: "keys" }, false)).toBe(true);
-    expect(offersKeyNow({ state: "ready" }, false)).toBe(false);
-    expect(offersKeyNow({ state: "loading" }, false)).toBe(false);
-    expect(offersKeyNow({ state: "locked", who: "owner" }, false)).toBe(false);
+    expect(offersKeyNow({ state: "offline" }, false, true)).toBe(true);
+    expect(offersKeyNow({ state: "missing" }, false, true)).toBe(true);
+    expect(offersKeyNow({ state: "unsupported", reason: "keys" }, false, true)).toBe(true);
+    // On a hold no key runs, and the line says the hold.
+    for (const gate of [{ state: "offline" }, { state: "unsupported", reason: "keys" }] as const)
+      expect(offersKeyNow(gate, true, true)).toBe(false);
+    expect(offersKeyNow({ state: "ready" }, false, true)).toBe(false);
+    expect(offersKeyNow({ state: "loading" }, false, true)).toBe(false);
+    expect(offersKeyNow({ state: "locked", who: "owner" }, false, true)).toBe(false);
   });
 
   test("a plan's page asks again only while it waits on something no event may bring", () => {
@@ -362,5 +370,32 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "cloud")).toBe(true);
     expect(pollsPlan({ state: "unsupported", reason: "runner_old" }, "cloud")).toBe(true);
     expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "selfhost")).toBe(false);
+    expect(pollsPlan({ state: "unsupported", reason: "not_reported" }, "selfhost")).toBe(true);
+  });
+});
+
+describe("the agent's computer, from the app's own pieces", () => {
+  const read = (path: string) => Bun.file(new URL(`../../src/features/${path}`, import.meta.url).pathname).text();
+
+  test("actions ride the screen's capsule; a request is the chat's card; Agora is the live trail", async () => {
+    const [screen, page, cover] = await Promise.all([
+      read("computer/AgentScreen.tsx"),
+      read("computer/ComputerScreen.tsx"),
+      read("computer/Cover.tsx"),
+    ]);
+    // Taking control, the keyboard, laying it down and the way out: on the capsule, never loose in a corner.
+    expect(screen).toContain("{docked ? <EdgeDock>{dock}</EdgeDock> : null}");
+    expect(screen).not.toContain("styles.padTurn");
+    expect(screen).toContain("<DockDone label={doneLabel} loading={finishing} onPress={handBack} />");
+    // The request for help: the chat's card with Ajudar and Agora não, not a gray line over the screen.
+    expect(screen).toContain("<AskCard");
+    expect(screen).not.toContain("agentComputer.ask.banner");
+    // What it did: the browser's trail, live; and the chat's composer to it.
+    expect(screen).toContain("<LiveTrail steps={steps} color={color} now={now} />");
+    expect(screen).toContain("<Composer");
+    // The header is the conversation's glass pill.
+    expect(page).toContain("<HeaderPill");
+    // A state with nothing live says itself on the screen, with no card inside it (glass only over a live picture).
+    expect(cover.slice(cover.indexOf("const screen = ("))).not.toContain("<Glass");
   });
 });

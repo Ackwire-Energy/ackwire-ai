@@ -75,7 +75,7 @@ test("an archived agent still in the channel is in no roster a run reads", async
   await drainOutbox(f.db, f.handlers);
 
   const prompt = systemText(requests[0]?.system ?? []);
-  expect(prompt).toContain("Members: ana (person), Dev (@dev, agent).");
+  expect(prompt).toContain("Members: ana (@ana, person), Dev (@dev, agent).");
   expect(prompt).toContain("Other agents in this organization: @design (Designer).");
   expect(prompt).not.toContain("@infra");
 });

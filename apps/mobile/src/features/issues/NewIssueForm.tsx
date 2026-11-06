@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Filters, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
+import { Filters, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, useToast } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
@@ -96,108 +96,110 @@ export function NewIssueForm() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.in, { paddingBottom: 22 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
-        <TextArea
-          value={title}
-          onChangeText={setTitle}
-          placeholder={t("mobile.issues.form.titlePlaceholder")}
-          accessibilityLabel={t("issues.form.title")}
-          multiline={false}
-          minHeight={50}
-          autoFocus
-          returnKeyType="next"
-          maxLength={300}
-        />
-        <TextArea
-          value={text}
-          onChangeText={setText}
-          placeholder={t("mobile.issues.form.description")}
-          accessibilityLabel={t("mobile.issues.form.description")}
-          minHeight={96}
-          maxLength={50_000}
-        />
-        <View>
-          <GroupedHeader>{t("mobile.issues.form.who")}</GroupedHeader>
-          <GroupedList>
-            <GroupedRow
-              label={whoName(who)}
-              leading={who ? <Face who={who} size={26} live={false} /> : undefined}
-              icon={who ? undefined : "agent"}
-              value={whoRole || undefined}
-              chevron
-              onPress={() => toggle("who")}
-            />
-            {open === "who"
-              ? choices
-                  .filter((a) => (a?.type ?? null) !== (who?.type ?? null) || a?.id !== who?.id)
-                  .map((a) => (
-                    <GroupedRow
-                      key={a ? `${a.type}:${a.id}` : "nobody"}
-                      label={whoName(a)}
-                      leading={a ? <Face who={a} size={26} live={false} /> : undefined}
-                      icon={a ? undefined : "circle"}
-                      value={a?.type === "agent" ? (dir.agentById.get(a.id)?.role ?? undefined) : undefined}
-                      onPress={() => {
-                        setWho(a);
-                        setOpen(null);
-                      }}
-                    />
-                  ))
-              : null}
-          </GroupedList>
-          {who?.type === "agent" ? (
-            <GroupedFooter>
-              {/* "Starts as soon as it's created" isn't true for an agent with no AI: it waits for one. */}
-              {aiStateOf(ai.data, who.id) === "no_ai"
-                ? t("mobile.ai.taskNoAi", { name: dir.agentById.get(who.id)?.name ?? "" })
-                : t("mobile.issues.form.agentStarts")}
-            </GroupedFooter>
-          ) : null}
-        </View>
-        <View>
-          <GroupedHeader>{t("mobile.issues.form.details")}</GroupedHeader>
-          <GroupedList>
-            <GroupedRow
-              icon="flag"
-              label={t("issues.form.priority")}
-              value={t(`issues.priority.${priority}`)}
-              chevron
-              onPress={() => toggle("priority")}
-            />
-            {open === "priority" ? (
-              <View style={styles.inline}>
-                <Filters
-                  items={PRIORITIES.map((p) => ({ key: p, label: t(`issues.priority.${p}`) }))}
-                  value={priority}
-                  onChange={(k) => {
-                    setPriority(k as IssuePriority);
-                    setOpen(null);
-                  }}
-                />
-              </View>
+        <Locked when={action.isPending} style={styles.fields}>
+          <TextArea
+            value={title}
+            onChangeText={setTitle}
+            placeholder={t("mobile.issues.form.titlePlaceholder")}
+            accessibilityLabel={t("issues.form.title")}
+            multiline={false}
+            minHeight={50}
+            autoFocus
+            returnKeyType="next"
+            maxLength={300}
+          />
+          <TextArea
+            value={text}
+            onChangeText={setText}
+            placeholder={t("mobile.issues.form.description")}
+            accessibilityLabel={t("mobile.issues.form.description")}
+            minHeight={96}
+            maxLength={50_000}
+          />
+          <View>
+            <GroupedHeader>{t("mobile.issues.form.who")}</GroupedHeader>
+            <GroupedList>
+              <GroupedRow
+                label={whoName(who)}
+                leading={who ? <Face who={who} size={26} live={false} /> : undefined}
+                icon={who ? undefined : "agent"}
+                value={whoRole || undefined}
+                chevron
+                onPress={() => toggle("who")}
+              />
+              {open === "who"
+                ? choices
+                    .filter((a) => (a?.type ?? null) !== (who?.type ?? null) || a?.id !== who?.id)
+                    .map((a) => (
+                      <GroupedRow
+                        key={a ? `${a.type}:${a.id}` : "nobody"}
+                        label={whoName(a)}
+                        leading={a ? <Face who={a} size={26} live={false} /> : undefined}
+                        icon={a ? undefined : "circle"}
+                        value={a?.type === "agent" ? (dir.agentById.get(a.id)?.role ?? undefined) : undefined}
+                        onPress={() => {
+                          setWho(a);
+                          setOpen(null);
+                        }}
+                      />
+                    ))
+                : null}
+            </GroupedList>
+            {who?.type === "agent" ? (
+              <GroupedFooter>
+                {/* "Starts as soon as it's created" isn't true for an agent with no AI: it waits for one. */}
+                {aiStateOf(ai.data, who.id) === "no_ai"
+                  ? t("mobile.ai.taskNoAi", { name: dir.agentById.get(who.id)?.name ?? "" })
+                  : t("mobile.issues.form.agentStarts")}
+              </GroupedFooter>
             ) : null}
-            <GroupedRow
-              icon="clock"
-              label={t("mobile.issues.form.due")}
-              value={t(`mobile.issues.form.dueChoice.${due}`)}
-              chevron
-              onPress={() => toggle("due")}
-            />
-            {open === "due" ? (
-              <View style={styles.inline}>
-                <Filters
-                  items={DUE_CHOICES.map((d) => ({ key: d, label: t(`mobile.issues.form.dueChoice.${d}`) }))}
-                  value={due}
-                  onChange={(k) => {
-                    setDue(k as DueChoice);
-                    setOpen(null);
-                  }}
-                />
-              </View>
-            ) : null}
-          </GroupedList>
-        </View>
+          </View>
+          <View>
+            <GroupedHeader>{t("mobile.issues.form.details")}</GroupedHeader>
+            <GroupedList>
+              <GroupedRow
+                icon="flag"
+                label={t("issues.form.priority")}
+                value={t(`issues.priority.${priority}`)}
+                chevron
+                onPress={() => toggle("priority")}
+              />
+              {open === "priority" ? (
+                <View style={styles.inline}>
+                  <Filters
+                    items={PRIORITIES.map((p) => ({ key: p, label: t(`issues.priority.${p}`) }))}
+                    value={priority}
+                    onChange={(k) => {
+                      setPriority(k as IssuePriority);
+                      setOpen(null);
+                    }}
+                  />
+                </View>
+              ) : null}
+              <GroupedRow
+                icon="clock"
+                label={t("mobile.issues.form.due")}
+                value={t(`mobile.issues.form.dueChoice.${due}`)}
+                chevron
+                onPress={() => toggle("due")}
+              />
+              {open === "due" ? (
+                <View style={styles.inline}>
+                  <Filters
+                    items={DUE_CHOICES.map((d) => ({ key: d, label: t(`mobile.issues.form.dueChoice.${d}`) }))}
+                    value={due}
+                    onChange={(k) => {
+                      setDue(k as DueChoice);
+                      setOpen(null);
+                    }}
+                  />
+                </View>
+              ) : null}
+            </GroupedList>
+          </View>
+        </Locked>
       </ScrollView>
     </View>
   );
@@ -205,6 +207,8 @@ export function NewIssueForm() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 18, paddingTop: 8, gap: 12 },
+  // A form's 16 pt sides, as Nova rotina's.
+  in: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+  fields: { gap: 12 },
   inline: { paddingVertical: 10, marginHorizontal: -2 },
 });

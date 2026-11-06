@@ -1,11 +1,12 @@
 import { useHeaderHeight } from "expo-router/react-navigation";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WorkspaceSky } from "@/sky/Sky";
-import { Count, Icon, type IconName, Text, weights } from "@/ui";
+import { Icon, type IconName, SectionHeader, Text, textLineOf } from "@/ui";
 import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
+import { leadBox } from "@/ui/type-scale";
 import { useColors } from "./hooks";
 import { PushedHeader, Tile } from "./parts";
 
@@ -41,7 +42,7 @@ export function CoverPage({
         scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
       >
         {/* The workspace's sky, as on Conversas, reaching up behind the clear bar and the status bar. */}
         <View style={[styles.band, { paddingTop: insets.top + 62 }]}>
@@ -70,22 +71,14 @@ export function CoverPage({
   );
 }
 
-/** A section's head, as Conversas' ("Agentes 4"): the title and its count, faint. */
+/** A section's head: the Chats tab's own `SectionHeader` ("Agents 4"), so both pages' sections sit the same. */
 export function PageSection({ title, count }: { title: string; count?: number | undefined }) {
-  const c = useColors();
-  return (
-    <View style={styles.section}>
-      <Text variant="small" tone="ink" style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>
-        {title}
-      </Text>
-      {count !== undefined ? <Count value={count} size={15} weight={weights.medium} color={c.faint} /> : null}
-    </View>
-  );
+  return <SectionHeader title={title} {...(count !== undefined ? { count } : {})} />;
 }
 
 /**
  * A loose row, as Conversas' (the hairline starts at the text): a tile, the label, a value, the chevron. With
- * `below` the tile stays at the top with the label; the chevron stays in the middle, as the system's.
+ * `below` the tile stays at the top with the label, and the value and the chevron on the label's line.
  */
 export function PageRow({
   icon,
@@ -109,7 +102,10 @@ export function PageRow({
   chevron?: boolean;
 }) {
   const c = useColors();
+  const { fontScale } = useWindowDimensions();
   const lead = leading ?? (icon ? <Tile icon={icon} size={TILE} /> : null);
+  // Beside a row that grows under its label, what is on the right stays on the label's line, not the row's middle.
+  const line = below ? textLineOf("body", fontScale) : null;
   return (
     <Pressable
       onPress={onPress}
@@ -129,44 +125,49 @@ export function PageRow({
         {below}
       </View>
       {value ? (
-        <Text variant="body" tone="faint" numberOfLines={1} style={styles.value}>
+        <Text variant="body" tone="faint" numberOfLines={1} style={[styles.value, line ? styles.top : null]}>
           {value}
         </Text>
       ) : null}
-      {chevron ? <Icon name="right" size={15} color={c.faint} /> : null}
+      {chevron ? (
+        <View style={line ? [styles.top, leadBox(line, 15)] : undefined}>
+          <Icon name="right" size={15} color={c.faint} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
 
 /** The rows' tile, and what a leading face of the same size takes. */
 export const TILE = 36;
+/** The rows' side inset and the gap after the tile: the hairline starts where the text does. */
+const ROW_INSET = 20;
+const ROW_GAP = 12;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
   // Not clipped: on a pull the sky grows up into the gap above the content.
-  band: { paddingHorizontal: 20, paddingBottom: 18 },
+  band: { paddingHorizontal: 20, paddingBottom: 20 },
   faceLine: { flexDirection: "row", alignItems: "center", gap: 14 },
-  acts: { flexDirection: "row", gap: 8, marginTop: 16 },
-  section: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingTop: 22,
-    paddingHorizontal: 20,
-    paddingBottom: 6,
-  },
-  sectionTitle: { fontWeight: "600", flexShrink: 1 },
+  // Wraps: two buttons with long labels (some languages) would run past the screen's edge in one line.
+  acts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 13,
+    gap: ROW_GAP,
     minHeight: 56,
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: ROW_INSET,
   },
-  // From the text column: 20 + the 36 tile + 13.
-  rowLine: { position: "absolute", top: 0, right: 0, left: 69, height: StyleSheet.hairlineWidth },
+  // From the text column.
+  rowLine: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    left: ROW_INSET + TILE + ROW_GAP,
+    height: StyleSheet.hairlineWidth,
+  },
   value: { maxWidth: "45%" },
   top: { alignSelf: "flex-start" },
 });

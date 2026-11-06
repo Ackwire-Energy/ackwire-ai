@@ -56,10 +56,9 @@ export const issueColumns = pgTable(
 );
 
 /**
- * Native issues. Visible to the whole org, or like the channel they
- * came from (`channel_id`, e.g. "Transformar em issue" in a private
- * channel). Acceptance criteria are a checklist; assignee is a person or an
- * agent.
+ * Native issues. Visible to the whole org, or like the conversation they came from (`channel_id`: a DM or a private
+ * channel, set by "Transformar em issue" and by an agent's `create_issue` there). Acceptance criteria are a checklist;
+ * assignee is a person or an agent.
  */
 export const issues = pgTable(
   "issues",

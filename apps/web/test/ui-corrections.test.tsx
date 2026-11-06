@@ -30,7 +30,7 @@ const value = (css: string, selector: string, property: string) =>
 const row = (id: string) => document.querySelector(`article[data-message-id="${id}"]`) as HTMLElement;
 
 describe("a message that mentions me", () => {
-  test("its row is tinted with an accent bar and my chip stands out; a mention of someone else stays plain", async () => {
+  test("its row is tinted and my chip stands out; a mention of someone else stays plain", async () => {
     const state = seedState();
     state.messages.push({
       id: "m-me",
@@ -65,10 +65,10 @@ describe("a message that mentions me", () => {
     expect(mentionsHandle("@walterx", "walter")).toBe(false);
   });
 
-  test("the row's tint, its bar and the chip's shape", async () => {
+  test("the row's tint (no bar on its edge) and the chip's shape", async () => {
     const css = await sheet("packages/ui/src/styles/components.css", "apps/web/src/layout.css");
     const me = ".channel__messages .ac-msg--mentions-me";
-    expect(value(css, me, "box-shadow")).toBe("inset 2px 0 0 var(--attention)");
+    expect(value(css, me, "box-shadow")).toBeUndefined();
     expect(value(css, me, "background")).toContain("var(--attention) 9%");
     expect(value(css, ".ac-mention", "padding")).toBe("0 4px");
     expect(value(css, ".ac-mention", "border-radius")).toBe("var(--radius-sm)");
@@ -511,10 +511,10 @@ describe("ghost buttons on a dark or agent-colored surface", () => {
     expect(value(css, ".ac-on-dark .ac-btn--ghost:hover", "color")).toBe("var(--on-dark)");
     expect(value(css, ".ac-on-dark .ac-btn--ghost:hover", "background")).toBe("var(--on-dark-plate)");
     expect(value(css, '.ac-on-dark .ac-btn--ghost[aria-pressed="true"]', "color")).toBe("var(--on-dark)");
-    expect(value(css, ".ac-on-dark .ac-btn--ghost:active:not([disabled])", "background")).toBe(
+    expect(value(css, ".ac-on-dark .ac-btn--ghost:active:not(:disabled)", "background")).toBe(
       "var(--on-dark-plate-strong)",
     );
-    expect(value(css, ".ac-on-dark .ac-btn--ghost[disabled]", "color")).toBe("var(--on-dark-faint)");
+    expect(value(css, ".ac-on-dark .ac-btn--ghost:disabled", "color")).toBe("var(--on-dark-faint)");
     expect(value(css, ".ac-on-dark .ac-btn--ghost.ac-btn--glyph:hover::before", "background")).toBe(
       "var(--on-dark-plate)",
     );

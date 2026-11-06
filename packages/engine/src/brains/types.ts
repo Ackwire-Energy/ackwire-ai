@@ -1,4 +1,4 @@
-import type { BrainEffort } from "@agenteschat/adapters";
+import type { BrainEffort, BrainSpeed } from "@agenteschat/adapters";
 import { planOf } from "@agenteschat/providers/plans";
 import type { CodeSetup } from "../git/machine";
 
@@ -97,8 +97,12 @@ export interface BrainTurn {
   account?: BrainAccount;
   /** How hard it thinks (absent: the CLI's or the API's default); the model brain only gets one from "Automático". */
   effort?: BrainEffort;
+  /** Codex: `fast` on a conversation's turn of an agent set to it (`brainSpeedFor`); absent: standard speed. */
+  speed?: BrainSpeed;
   /** Computer brains: the agent's context limit in tokens (`agents.context_tokens`); absent: the model's window. */
   contextTokens?: number;
+  /** Computer brains: a person waits on this turn (the line's first rank); the runner holds a slot for one. */
+  personWaiting?: boolean;
   /** The text the person/system sent that starts this turn (also the last user message). */
   trigger: string;
   /**
@@ -177,7 +181,9 @@ export type BrainEvent =
       worked?: boolean;
     }
   /** Messages handed mid-turn (`BrainIO.steerable`) that the turn read, by their `uuid`. */
-  | { type: "steer_read"; uuids: string[] };
+  | { type: "steer_read"; uuids: string[] }
+  /** Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
+  | { type: "speed_fallback"; message: string };
 
 export interface Brain {
   kind: BrainKind;

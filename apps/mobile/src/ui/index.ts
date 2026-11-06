@@ -9,6 +9,7 @@ export { PersonAvatar, type PersonAvatarProps } from "@/agent/PersonAvatar";
 export { InkOrbit, PixelDone, PixelFail, PixelStop, PixelStopped } from "@/agent/PixelMarks";
 export { PixelOrbit, type PixelOrbitProps } from "@/agent/PixelOrbit";
 export type { AgentMode } from "@/agent/poses";
+export { CardHorizon } from "@/sky/CardHorizon";
 export { ComputerSky } from "@/sky/ComputerSky";
 export { Fuse, type FuseProps } from "@/sky/Fuse";
 export type { PlanState } from "@/sky/math";
@@ -55,6 +56,7 @@ export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";
 export { LineIcon, type LineIconProps } from "./LineIcon";
 export { LIST_AVATAR, LIST_INSET, LIST_PREVIEW, LIST_TIME, ListRow, type ListRowProps } from "./ListRow";
+export { Locked } from "./Locked";
 export { LogoMark } from "./LogoMark";
 export {
   CoverTabStack,

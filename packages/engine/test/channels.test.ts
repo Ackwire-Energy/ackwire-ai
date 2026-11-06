@@ -95,9 +95,13 @@ test("removing a channel member: self, creator or admin; publishes the revocatio
   await removeChannelMember(f.db, a.id, f.org.id, f.general.id, { userId: a.id }, opts); // leave
   await removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: b.id }, opts); // creator/admin
   await removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: f.agent.id }, opts);
+  const changed = { type: "org.broadcast", orgId: f.org.id, event: { type: "channels.changed" } };
   expect(events).toEqual([
     { type: "membership.revoked", orgId: f.org.id, userId: a.id, channelId: f.general.id },
+    changed,
     { type: "membership.revoked", orgId: f.org.id, userId: b.id, channelId: f.general.id },
+    changed,
+    changed,
   ]);
 
   await removeMember(f.db, f.owner.id, f.org.id, a.id, opts);
@@ -134,7 +138,10 @@ test("archiving a channel: creator or admin; access ends and subscribers are tol
   await expect(archiveChannel(f.db, f.owner.id, f.org.id, f.general.id)).rejects.toBeInstanceOf(ValidationError);
   await archiveChannel(f.db, f.owner.id, f.org.id, eng.id, { pubsub: f.pubsub });
   await expect(requireChannelAccess(f.db, member.id, f.org.id, eng.id)).rejects.toBeInstanceOf(NotFoundError);
-  expect(events).toEqual([{ type: "channel.archived", orgId: f.org.id, channelId: eng.id }]);
+  expect(events).toEqual([
+    { type: "channel.archived", orgId: f.org.id, channelId: eng.id },
+    { type: "org.broadcast", orgId: f.org.id, event: { type: "channels.changed" } },
+  ]);
 });
 
 test("joining a channel tells its members, so their members column shows the newcomer", async () => {

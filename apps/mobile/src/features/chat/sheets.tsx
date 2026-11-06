@@ -34,7 +34,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
+import { Button, CHROME_MAX_SCALE, Count, Icon, Locked, PressScale, Text, useToast } from "@/ui";
 import { useMovesChannel } from "../categories/CategoryScreens";
 import { categoryHrefs } from "../categories/logic";
 import { setPinDraft } from "../dashboards/logic";
@@ -59,6 +59,7 @@ export function MessageActions({
   thread,
   onMission,
   onRemind,
+  onReply,
 }: {
   message: Message;
   /** "Transformar em missão" is offered (a channel or a DM, not a mission thread). */
@@ -69,6 +70,8 @@ export function MessageActions({
   onMission: (goal: string, threadId: string) => void;
   /** "Lembrar disso": the screen opens the reminder sheet for this message. */
   onRemind: (m: Message) => void;
+  /** "Responder" in a thread: the next message answers this one. Absent where nothing can be written. */
+  onReply?: (m: Message) => void;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -145,6 +148,19 @@ export function MessageActions({
       )}
       <ActionList
         items={[
+          ...(inThread && !m.local && onReply
+            ? [
+                {
+                  key: "reply",
+                  icon: "reply" as const,
+                  label: t("channel.reply"),
+                  onPress: () => {
+                    sheet.close();
+                    onReply(m);
+                  },
+                },
+              ]
+            : []),
           ...(!inThread && !m.local
             ? [
                 {
@@ -257,20 +273,21 @@ export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
     <>
       <View style={styles.tiles}>
         {tiles.map((x) => (
-          <Pressable
+          <PressScale
             key={x.key}
             onPress={() => onPick(x.key)}
             accessibilityRole="button"
             accessibilityLabel={x.label}
-            style={({ pressed }) => [styles.tileBtn, pressed && styles.emoPressed]}
+            style={styles.tileBtn}
+            contentStyle={styles.tileIn}
           >
             <View style={[styles.bigTile, surface]}>
-              <Icon name={x.icon} size={22} />
+              <Icon name={x.icon} size={24} />
             </View>
             <Text variant="caption" tone="ink2" style={styles.bold}>
               {x.label}
             </Text>
-          </Pressable>
+          </PressScale>
         ))}
       </View>
       <ActionList
@@ -534,6 +551,7 @@ export function ChannelOptions({
   about,
   onPins,
   onMembers,
+  onSearch,
 }: {
   channelId: string;
   title: string;
@@ -546,6 +564,8 @@ export function ChannelOptions({
   onPins: () => void;
   /** A channel: who is in it (and, for admins, adding and removing). */
   onMembers?: (() => void) | undefined;
+  /** A DM: searching it (its header keeps the room for the name and the agent's own buttons). */
+  onSearch?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -565,6 +585,9 @@ export function ChannelOptions({
       {about}
       <ActionList
         items={[
+          ...(onSearch
+            ? [{ key: "search", icon: "search" as const, label: t("searchPage.searchHere"), onPress: onSearch }]
+            : []),
           ...(onMembers
             ? [{ key: "members", icon: "members" as const, label: t("shell.members"), onPress: onMembers }]
             : []),
@@ -673,28 +696,32 @@ export function NewMissionForm({
       <Text variant="body" tone="muted">
         {t("mobile.newMission.intro")}
       </Text>
-      <TextArea
-        value={goal}
-        onChangeText={setGoal}
-        placeholder={t("mobile.newMission.placeholder")}
-        accessibilityLabel={t("mobile.newMission.placeholder")}
-        autoFocus={!initialGoal}
-      />
+      <Locked when={create.isPending}>
+        <TextArea
+          value={goal}
+          onChangeText={setGoal}
+          placeholder={t("mobile.newMission.placeholder")}
+          accessibilityLabel={t("mobile.newMission.placeholder")}
+          autoFocus={!initialGoal}
+        />
+      </Locked>
       {eligible.isLoading ? <ActivityIndicator color={c.muted} /> : null}
       {list.length > 0 ? (
-        <ActionList
-          items={[
-            ...list.map((a) => ({
-              key: a.agentId,
-              leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
-              label: a.name,
-              hint: (waitCloud && !a.machine ? waitCloud : whereText(t, a, { cloud, names })) ?? undefined,
-              disabled: a.eligible === false,
-              trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
-              onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
-            })),
-          ]}
-        />
+        <Locked when={create.isPending}>
+          <ActionList
+            items={[
+              ...list.map((a) => ({
+                key: a.agentId,
+                leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
+                label: a.name,
+                hint: (waitCloud && !a.machine ? waitCloud : whereText(t, a, { cloud, names })) ?? undefined,
+                disabled: a.eligible === false,
+                trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
+                onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
+              })),
+            ]}
+          />
+        </Locked>
       ) : eligible.isSuccess ? (
         <Text variant="small" tone="muted">
           {waitCloud ?? t("mobile.newMission.noAgents")}
@@ -705,7 +732,8 @@ export function NewMissionForm({
         wide
         icon="sparkle"
         label={t("mobile.newMission.submit")}
-        disabled={!agentId || !goal.trim() || create.isPending}
+        loading={create.isPending}
+        disabled={!agentId || !goal.trim()}
         onPress={submit}
       />
     </>
@@ -765,7 +793,7 @@ export function MissionSummaryView({ missionId }: { missionId: string }) {
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   bold: { fontWeight: "600" },
-  preview: { flexDirection: "row", gap: 10, padding: 12, borderRadius: 18 },
+  preview: { flexDirection: "row", gap: 10, padding: 12, borderRadius: 14 },
   emorow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -777,6 +805,7 @@ const styles = StyleSheet.create({
   emoPressed: { transform: [{ scale: 1.15 }] },
   emoText: { fontSize: 26, lineHeight: 34 },
   tiles: { flexDirection: "row", justifyContent: "space-between" },
-  tileBtn: { flex: 1, alignItems: "center", gap: 7, paddingVertical: 6 },
+  tileBtn: { flex: 1 },
+  tileIn: { alignItems: "center", gap: 8, paddingVertical: 6 },
   bigTile: { width: 54, height: 54, borderRadius: 18, alignItems: "center", justifyContent: "center" },
 });

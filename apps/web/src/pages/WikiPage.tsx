@@ -20,6 +20,7 @@ import { WikiAudienceDialog } from "@/components/wiki/WikiAudience";
 import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
 import { AuthorAvatar, PageOutline, typingIn, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import type { VaultFile } from "@/lib/obsidian";
@@ -379,18 +380,22 @@ function WikiNav({
           <div className="wiki-nav__list">{pinned.map((p) => pageRow(p, false))}</div>
         </section>
       )}
-      <nav className="wiki-nav__section" aria-label={t("wiki.tree")}>
-        <span className="wiki-label">{filtering ? t("wiki.results", { count: shown.length }) : t("wiki.tree")}</span>
-        {loading ? (
-          <LoadingList count={5} avatar={false} />
-        ) : (
-          <div className="wiki-nav__list">
-            {root.folders.map((f) => folderRows(f))}
-            {root.pages.map((p) => pageRow(p))}
-            {shown.length === 0 && <p className="small muted wiki-nav__empty">{t("wiki.noMatch")}</p>}
-          </div>
-        )}
-      </nav>
+      {/* An empty wiki has no tree to show (its page says so and how to start): no "Pages" over nothing, and "none
+          with that name" only after a search. */}
+      {(loading || filtering || pages.length > 0) && (
+        <nav className="wiki-nav__section" aria-label={t("wiki.tree")}>
+          <span className="wiki-label">{filtering ? t("wiki.results", { count: shown.length }) : t("wiki.tree")}</span>
+          {loading ? (
+            <LoadingList count={5} avatar={false} />
+          ) : (
+            <div className="wiki-nav__list">
+              {root.folders.map((f) => folderRows(f))}
+              {root.pages.map((p) => pageRow(p))}
+              {filtering && shown.length === 0 && <p className="small muted wiki-nav__empty">{t("wiki.noMatch")}</p>}
+            </div>
+          )}
+        </nav>
+      )}
       {tags.length > 0 && (
         <section className="wiki-nav__section" aria-label={t("wiki.tags")}>
           <span className="wiki-label">{t("wiki.tags")}</span>
@@ -410,7 +415,7 @@ function WikiNav({
         </section>
       )}
       {can(org, "edit_wiki") && (
-        <button type="button" className="wiki-import-card" onClick={onImport}>
+        <button type="button" className="wiki-import-card ac-iconline" onClick={onImport}>
           <ObsidianMark size={20} />
           <span>
             <b>{t("wiki.import.cta")}</b>
@@ -422,7 +427,18 @@ function WikiNav({
   );
 }
 
-function HomeHead({ onNew, onImport, onNav }: { onNew: () => void; onImport: () => void; onNav: () => void }) {
+function HomeHead({
+  onNew,
+  onImport,
+  onNav,
+  empty,
+}: {
+  onNew: () => void;
+  onImport: () => void;
+  onNav: () => void;
+  /** The empty state below takes over its buttons: one way in, in the middle of the page. */
+  empty?: boolean;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   return (
@@ -438,7 +454,7 @@ function HomeHead({ onNew, onImport, onNav }: { onNew: () => void; onImport: () 
           <Button variant="ghost" icon="menu" className="wiki__navbtn" onClick={onNav}>
             {t("wiki.tree")}
           </Button>
-          {can(org, "edit_wiki") && (
+          {can(org, "edit_wiki") && !empty && (
             <>
               <Button onClick={onImport}>
                 <ObsidianMark size={16} />
@@ -495,19 +511,20 @@ function WikiHome({
               params={{ orgId: org.id, slug: p.slug }}
               className="wiki-card"
             >
+              {/* The source tag ends the folder's line: a long folder gives way ("…") instead of running under it. */}
               <span className="wiki-card__where">
                 <Icon name={p.locked ? "lock" : "drive"} size={14} />
-                {p.folder || t("wiki.root")}
+                <span className="wiki-card__folder">{p.folder || t("wiki.root")}</span>
+                {p.sourceType === "obsidian" && (
+                  <span className="wiki-card__src">
+                    <ObsidianMark size={14} />
+                    {t("wiki.legend.obsidian")}
+                  </span>
+                )}
               </span>
-              {p.sourceType === "obsidian" && (
-                <span className="wiki-card__src">
-                  <ObsidianMark size={14} />
-                  {t("wiki.legend.obsidian")}
-                </span>
-              )}
               <b className="wiki-card__title">{p.title}</b>
               {p.excerpt && <span className="wiki-card__text">{p.excerpt}</span>}
-              <span className="wiki-card__by">
+              <span className="wiki-card__by ac-iconline">
                 <AuthorAvatar a={p.updatedBy} />
                 <span>
                   <b>{name(p.updatedBy)}</b>
@@ -614,21 +631,20 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const look = useRightHandLook();
+  const edits = can(org, "edit_wiki");
   return (
     <div className="wiki-home">
-      <HomeHead onNew={onNew} onImport={onImport} onNav={onNav} />
+      <HomeHead onNew={onNew} onImport={onImport} onNav={onNav} empty />
       <EmptyState
-        sky
-        icon="book"
+        size="panel"
+        agent={look}
         title={t("wiki.emptyTitle")}
         actions={
-          can(org, "edit_wiki") && (
+          edits && (
             <div className="wiki-empty__acts">
-              <Button variant="primary" onClick={onImport}>
-                <ObsidianMark size={16} />
-                {t("wiki.import.cta")}
-              </Button>
               <Button
+                variant="primary"
                 loading={busy}
                 disabled={busy}
                 onClick={async () => {
@@ -651,6 +667,10 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
               >
                 {t("wiki.useStarter")}
               </Button>
+              <Button onClick={onImport}>
+                <ObsidianMark size={16} />
+                {t("wiki.import.cta")}
+              </Button>
               <Button variant="ghost" icon="plus" onClick={onNew}>
                 {t("wiki.blankPage")}
               </Button>
@@ -658,16 +678,18 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
           )
         }
       >
-        {t("wiki.emptyText")}
+        {t(edits ? "wiki.emptyText" : "wiki.emptyViewer")}
       </EmptyState>
-      <ul className="wiki-starter" aria-label={t("wiki.starter")}>
-        {starterPages(t).map((p) => (
-          <li key={p.title}>
-            <Icon name="document" size={14} />
-            {p.folder ? `${p.folder} / ${p.title}` : p.title}
-          </li>
-        ))}
-      </ul>
+      {edits && (
+        <ul className="wiki-starter" aria-label={t("wiki.starter")}>
+          {starterPages(t).map((p) => (
+            <li key={p.title}>
+              <Icon name="document" size={14} />
+              {p.folder ? `${p.folder} / ${p.title}` : p.title}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

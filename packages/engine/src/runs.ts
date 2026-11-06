@@ -1,8 +1,9 @@
 import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
-import { PROVIDERS } from "@agenteschat/providers";
-import { pgSafeJson } from "./format";
+import { PROVIDERS, type ProviderCause, type ProviderError, providerCause } from "@agenteschat/providers";
+import { cutText, pgSafeJson } from "./format";
 import { recordRunFinished } from "./operator-events";
 import { standingErrorDetail } from "./standing";
+import { redactCredentials } from "./tool-detail";
 
 const { agentRuns, agentRunSteps } = schema;
 
@@ -30,7 +31,25 @@ export const passedSql = sql<boolean>`((${agentRuns.status} = 'done' and ${agent
 export const computerWaitSql = sql<"queued" | "away" | "line" | null>`(case when ${agentRuns.status} = 'waiting_input'
   and ${agentRuns.waitingMachineId} is not null then (case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'
   then 'queued' else 'away' end)
+  when ${agentRuns.status} = 'running' and ${agentRuns.waitingMachineId} is not null then 'queued'
   when ${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'work_queue' then 'line' end)`;
+
+/**
+ * `computerWaitSql` for a loaded run, for its computer only. The head of a computer's line asks for room by claiming
+ * its run: `running` with its machine kept is that ask, until the computer takes the turn. Nothing changed for anyone
+ * reading: it still waits.
+ */
+export function computerWaitOf(run: Pick<AgentRun, "status" | "waitingMachineId" | "transcript">) {
+  if (!run.waitingMachineId) return null;
+  if (run.status === "running") return "queued" as const;
+  if (run.status !== "waiting_input") return null;
+  const wait = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain;
+  return wait?.code === "busy" ? ("queued" as const) : ("away" as const);
+}
+
+/** `r.status` as people read it (`computerWaitOf`), for a raw select over `agent_runs r`. */
+export const shownStatusSql = sql`(case when r.status = 'running' and r.waiting_machine_id is not null
+  then 'waiting_input' else r.status end)`;
 
 /**
  * For a select over `agent_runs`: waiting on its plan's limit (`plan`) or its budget (`budget`), long work paused near
@@ -94,8 +113,34 @@ const CLI_FAILED = /^[a-z]+(?:_[a-z]+)*_failed$/;
 /** A run that stopped on an error of ours that kept repeating (`gave up` in the executor): its stored text's start. */
 export const OUR_ERROR = "Stopped after an error";
 
-/** Starts a `provider_error:`'s detail when the provider refused the key's account (`run.provider_account`). */
-export const PROVIDER_ACCOUNT = "account: ";
+/** Starts a `provider_error:`'s detail in older rows, when the provider refused the key's account. */
+const PROVIDER_ACCOUNT = "account: ";
+
+const OUR_KEY_CAUSES: ReadonlySet<ProviderCause> = new Set(["no_credit", "invalid_key", "no_access", "rate_limit"]);
+
+/**
+ * A provider failure in the terms the apps word it: a known cause, `ours` (it came on the server's own key, so nothing
+ * of the person's is wrong), or `said` (only the provider's own words, masked and cut, tell).
+ */
+export function providerFailureOf(error: ProviderError) {
+  const found = providerCause(error);
+  const ours = error.platformKey && found !== null && OUR_KEY_CAUSES.has(found);
+  return {
+    cause: ours ? "ours" : (found ?? "said"),
+    provider: error.provider ?? "",
+    detail: cutText(redactCredentials(error.said ?? error.message), 200),
+  };
+}
+
+/** `cause@Provider: detail`, after a stored `provider_error:` or `gave_up:`. Older rows hold only the detail. */
+const PROVIDER_FAILURE =
+  /^(no_credit|invalid_key|no_access|model_unavailable|rate_limit|down|timeout|unreachable|said|ours)@(.*?): ([\s\S]*)$/;
+
+/** A provider failure as a run stores it (`runErrorDetail` reads it back). */
+export function providerFailureText(kind: "provider_error" | "gave_up", error: ProviderError) {
+  const { cause, provider, detail } = providerFailureOf(error);
+  return provider ? `${kind}: ${cause}@${provider}: ${detail}` : `${kind}: ${detail}`;
+}
 
 /** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
 const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
@@ -128,6 +173,13 @@ export function runErrorDetail(error: string | null | undefined): {
   if (error === "account_missing") return { errorCode: "run.account_missing" };
   // Ours, not the person's: the detail (a driver's message) stays for the log, never shown as the reason.
   if (error.startsWith(OUR_ERROR)) return { errorCode: "run.our_error" };
+  const coded = PROVIDER_FAILURE.exec(error.replace(/^(?:provider_error|gave_up):\s*/, ""));
+  if (coded) {
+    const [, cause, provider = "", detail = ""] = coded;
+    return cause === "ours"
+      ? { errorCode: "run.our_error", errorParams: { provider } }
+      : { errorCode: `run.provider_${cause}`, errorParams: { provider, detail } };
+  }
   if (error.startsWith("provider_error:")) {
     const detail = error.slice(15).trim();
     return detail.startsWith(PROVIDER_ACCOUNT)
@@ -166,12 +218,19 @@ export function runErrorDetail(error: string | null | undefined): {
       errorParams: { modelProvider: providerNow(wrong[1] as string), keyProvider: providerNow(wrong[2] as string) },
     };
   }
-  const unregistered = /^No provider registered for (.+)$/.exec(error);
-  if (unregistered)
-    return { errorCode: "run.provider_unavailable", errorParams: { detail: unregistered[1] as string } };
+  if (error.startsWith("No provider registered for ")) return { errorCode: "run.our_error" };
   const unlisted = /^OpenRouter doesn't list (.+) anymore\./.exec(error);
   if (unlisted) return { errorCode: "run.model_unlisted", errorParams: { model: unlisted[1] as string } };
   return { errorCode: "run.failed", errorParams: { detail: error.slice(0, 300) } };
+}
+
+/** The detail of a run error its AI provider caused, on the person's key or the server's: worth another try. */
+export function providerFailure(error: string | null | undefined) {
+  const detail = runErrorDetail(error);
+  const provider =
+    detail?.errorCode.startsWith("run.provider_") ||
+    (detail?.errorCode === "run.our_error" && detail.errorParams?.provider);
+  return provider ? detail : null;
 }
 
 export const isTerminal = (status: RunStatus) => RUN_TRANSITIONS[status].length === 0;
@@ -198,7 +257,7 @@ export async function transitionRun(
     replyMessageId?: string;
     /** A plain object, or `storedTranscript` (keeps what the bridge left on the row). */
     transcript?: Record<string, unknown> | SQL;
-    /** Waiting for this computer to come back (ADR 0032 §5); cleared by any move out of `waiting_input`. */
+    /** Waiting for this computer (ADR 0032 §5), or asking it from its line; cleared by any move that doesn't name it. */
     waitingMachineId?: string | null;
   } = {},
 ): Promise<AgentRun | null> {
@@ -214,7 +273,7 @@ export async function transitionRun(
         : {}),
       ...(isTerminal(to) ? { finishedAt: now } : {}),
       // Only a run waiting for its computer keeps the machine it waits for.
-      ...(to === "waiting_input" ? {} : { waitingMachineId: null }),
+      waitingMachineId: null,
       ...patch,
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))

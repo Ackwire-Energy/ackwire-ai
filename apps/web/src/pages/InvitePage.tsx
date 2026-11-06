@@ -21,7 +21,7 @@ import {
   passwordState,
   webmailOf,
 } from "@agenteschat/client/lib/text";
-import { Button, cx, type Expression, Field, Icon, Input, PixelSpinner, Textarea } from "@agenteschat/ui";
+import { Button, cx, type Expression, Field, Icon, Input, Locked, PixelSpinner, Textarea } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, type KeyboardEvent, type ReactNode, type Ref, useEffect, useRef, useState } from "react";
@@ -139,7 +139,7 @@ function InviteScreen({
       </header>
       {children && (
         <div className="auth__step" key={step}>
-          {children}
+          <Locked when={Boolean(busy)}>{children}</Locked>
         </div>
       )}
     </>
@@ -193,7 +193,7 @@ function OrgLine({ org }: { org: OrgFacts }) {
         </span>
       )}
       <div className="invite__org-text">
-        <b className="invite__org-name ac-captop">{org.name}</b>
+        <b className={cx("invite__org-name", (org.by || crew) && "ac-captop")}>{org.name}</b>
         {org.by && <span>{t("invite.from", { name: org.by })}</span>}
         {crew && (
           <span className="invite__crew">
@@ -1076,33 +1076,35 @@ function CodeField({
     setError(failed);
     if (!failed) {
       setCode("");
-      input.current?.focus();
+      // After the screen unlocks: a disabled field takes no focus.
+      requestAnimationFrame(() => input.current?.focus());
     }
   };
 
   return (
     <>
-      <div className="auth__field">
-        <Input
-          ref={input}
-          className="auth__big ac-input--code"
-          aria-label={t("invite.ask.code")}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          enterKeyHint="done"
-          value={code}
-          readOnly={checking}
-          aria-busy={checking || undefined}
-          invalid={error !== null}
-          onChange={(e) => typedIn(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            if (code.length === CODE_LENGTH && !checking) void check(code);
-          }}
-          autoFocus
-        />
-      </div>
+      <Locked when={checking}>
+        <div className="auth__field">
+          <Input
+            ref={input}
+            className="auth__big ac-input--code"
+            aria-label={t("invite.ask.code")}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            enterKeyHint="done"
+            value={code}
+            aria-busy={checking || undefined}
+            invalid={error !== null}
+            onChange={(e) => typedIn(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              if (code.length === CODE_LENGTH && !checking) void check(code);
+            }}
+            autoFocus
+          />
+        </div>
+      </Locked>
       <ErrorLine error={error} />
       {mail && (
         <Button asChild size="lg" block>

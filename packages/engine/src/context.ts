@@ -658,6 +658,7 @@ export async function buildRunContext(
         .select({
           userId: channelMembers.userId,
           userName: users.name,
+          userHandle: schema.organizationMembers.handle,
           agentId: agents.id,
           agentName: agents.name,
           agentHandle: agents.handle,
@@ -665,6 +666,13 @@ export async function buildRunContext(
         })
         .from(channelMembers)
         .leftJoin(users, eq(users.id, channelMembers.userId))
+        .leftJoin(
+          schema.organizationMembers,
+          and(
+            eq(schema.organizationMembers.userId, channelMembers.userId),
+            eq(schema.organizationMembers.orgId, run.orgId),
+          ),
+        )
         .leftJoin(agents, eq(agents.id, channelMembers.agentId))
         // An archived agent keeps its memberships, but nothing reaches it: never named as here.
         .where(
@@ -678,6 +686,7 @@ export async function buildRunContext(
       {
         userId: string | null;
         userName: string | null;
+        userHandle: string | null;
         agentId: string | null;
         agentName: string | null;
         agentHandle: string | null;
@@ -832,7 +841,11 @@ export async function buildRunContext(
   // The rest of the org's agents: channel members are described in "Where you are".
   const team = options.team ? teamPrompt(teamRows, agent.id, requester, here, talks) : "";
   const memberList = members
-    .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
+    .map((m) =>
+      m.agentHandle
+        ? `${m.agentName} (@${m.agentHandle}, agent)`
+        : `${m.userName ?? "unknown"} (${m.userHandle && channel.kind !== "dm" ? `@${m.userHandle}, ` : ""}person)`,
+    )
     .join(", ");
 
   // A task's conversation (ADR 0145), or an older work thread in a DM (asked to implement it): the task, read from
@@ -911,7 +924,7 @@ export async function buildRunContext(
             ? "- Before saying something was done, or correcting it, check the current state with the matching tool (`list_issues`, `read_artifact`, `list_events`…), not with `search_context`."
             : "",
           options.toolsAvailable
-            ? '- You work in several conversations (channels, DMs, threads). "In the DM", "in private" or "over in #channel" (in Portuguese "no privado", "na DM", "lá no #canal") point to one of them, not to where you should answer: find what they mean in "Your recent work" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. To post in another channel, use `post_message`; to tell a person in private, use `send_dm`: never say you can\'t message people. When someone asks for a PDF of a document, share it: its card has "Download PDF".'
+            ? '- You work in several conversations (channels, DMs, threads). "In the DM", "in private" or "over in #channel" (in Portuguese "no privado", "na DM", "lá no #canal") point to one of them, not to where you should answer: find what they mean in "Your recent work" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. To post in another channel, use `post_message` (told to continue there or out of a thread: at once, with `move_here`); to tell a person in private, use `send_dm`: never say you can\'t message people. When someone asks for a PDF of a document, share it: its card has "Download PDF".'
             : "",
           '- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don\'t reply to them or apologize for not answering them, unless the current message refers to them. When the current message only calls you (just your @handle or name, or a nudge like "and?" / "e aí?"), it points at the same person\'s message just before it: answer that one.',
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
@@ -1342,7 +1355,7 @@ async function routineContext(
   const block = [
     `# This is a routine run\nYour routine «${name}» started this run: background work that nobody watches. Nobody waits for a reply here and nothing you write here is posted; your message reaches people only through hand_off, which posts it in ${place}.`,
     `Its instructions, set up by ${creator ?? "its creator"}:\n${(row?.prompt ?? trigger.body).trim()}`,
-    `What it may do: what you can do in any other run. Besides reading, you may change things inside agentes.chat that people can undo (issues, memory, wiki, Drive files) and work on your own branches (agentes/${agent.handle}/…) and their pull requests. Any change in a connected app asks a person first: an approval card in ${place}, with your reason. Merge, deploy and rollback always do. When its instructions ask you to fix or resolve things and the fix is such a change, hand off your report first (saying what you're asking for), then call that tool with your reason: your run waits for the person's decision, so anything after it waits too. You may also reach other agents and post where ${who} can: tell_agent leaves an agent a note (it wakes and works on it), ask_agent asks one something (the answer reaches you, or ${place} once this run ended), post_message posts in a channel ${who} can post in (an @mention there wakes that agent), and send_dm writes only to ${who}; only agents ${who} can talk to are reached. An @mention in your hand_off message also wakes that agent to work on it, as asked by ${who} (one outside ${place} gets it as a note): mention an agent there only when it should act, and not one you already handed it to with tell_agent. The web is yours to read (search, open pages, your browser) like anywhere else.`,
+    `What it may do: what you can do in any other run. Besides reading, you may change things inside agentes.chat that people can undo (issues, memory, wiki, Drive files) and work on your own branches (agentes/${agent.handle}/…) and their pull requests. Any change in a connected app asks a person first: an approval card in ${place}, with your reason. Merge, deploy and rollback always do. When its instructions ask you to fix or resolve things and the fix is such a change, hand off your report first (saying what you're asking for), then call that tool with your reason: your run waits for the person's decision, so anything after it waits too. You may also reach other agents and post where ${who} can: tell_agent leaves an agent a note (it wakes and works on it), ask_agent asks one something (the answer reaches you, or ${place} once this run ended), post_message posts in a channel ${who} can post in (an @mention there wakes that agent), and send_dm writes only to ${who}; only agents ${who} can talk to are reached. An @mention in your hand_off message also wakes an agent of ${place} to work on it, as asked by ${who} (one outside it hears nothing: use tell_agent): mention an agent there only when it should act, and not one you already handed it to with tell_agent. The web is yours to read (search, open pages, your browser) like anywhere else.`,
     listed("approved")
       ? `Approved ahead for this run: a person already approved these exact actions for this time. Do each now with run_approved_action and its id: it goes out without asking. Don't do them any other way, then report how it went.\n${listed("approved")}`
       : "",
@@ -1759,7 +1772,7 @@ export function quotedLine(meta: Record<string, unknown> | null | undefined): st
   if ((typeof r.excerpt !== "string" || !r.excerpt) && r.mediaKind === "voice") {
     return `(replying to ${who}'s voice message)\n`;
   }
-  if (typeof r.excerpt !== "string" || !r.excerpt) return "";
+  if (typeof r.excerpt !== "string" || !r.excerpt) return `(replying to ${who})\n`;
   return `(replying to ${who}: "${r.excerpt}")\n`;
 }
 
@@ -1825,6 +1838,7 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
   const [m] = await db
     .select({
       name: schema.machines.name,
+      kind: schema.machines.kind,
       os: schema.machines.os,
       access: schema.machines.access,
       executors: schema.machines.executors,
@@ -1838,6 +1852,7 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
   const system = m.executors?.mode === "system";
   return {
     name: m.name,
+    managed: m.kind === "managed",
     folders: m.access.folders.filter((f) => f.path !== shared && grantedTo(f, agentId)).map((f) => f.path),
     tools: m.access.tools,
     shared: shared ? { dir: shared, system, os: m.os } : null,
@@ -1898,6 +1913,8 @@ export function heldSecretsText(rows: { name: string; kind: string; path: string
 /** The block about the agent's connected computer: the folders the machine allows it and the tools that are off. */
 export function machineAccessText(a: {
   name: string;
+  /** The workspace's own computer: nobody there can allow a folder. */
+  managed?: boolean;
   folders: string[];
   tools: { claude: boolean; codex: boolean; commands: boolean };
 }) {
@@ -1915,7 +1932,9 @@ export function machineAccessText(a: {
           .join("\n")}`
       : "Only your own folder there; no other folders are allowed for you.",
     off.length > 0 ? `Turned off on that computer: ${off.join(", ")}.` : "",
-    "Anything else is refused. For another folder, ask its owner with request_folder_access (they decide on that computer); never ask people to change settings by hand.",
+    a.managed
+      ? `${a.tools.commands ? "You can also read and upload from your home, but not its hidden files and folders. " : ""}Anything else is refused, and nobody can allow more here.`
+      : "Anything else is refused. For another folder, ask its owner with request_folder_access (they decide on that computer); never ask people to change settings by hand.",
   ]
     .filter(Boolean)
     .join("\n");

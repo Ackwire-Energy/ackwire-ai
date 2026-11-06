@@ -130,6 +130,7 @@ export function brainPickOptions(
     machines,
     accounts,
     ownerIsMe,
+    held = false,
   }: {
     /** `modelChoices(…)`. */
     api: [string, ModelChoice[]][];
@@ -139,6 +140,8 @@ export function brainPickOptions(
     accounts: AiAccounts["accounts"];
     /** The new agent is the viewer's: only the owner of both the agent and an account chooses it. */
     ownerIsMe: boolean;
+    /** A billing hold stops the plans (`planHoldOf`): that, not the computers, is why they are off. */
+    held?: boolean;
   },
 ): BrainPickOption[] {
   const auto: BrainPickOption = {
@@ -261,7 +264,11 @@ export function brainPickOptions(
           title: name,
           group: name,
           mark: planMark(choice),
-          description: machines.length === 0 ? t("brain.foot.noComputer") : t("brain.foot.unavailable"),
+          description: held
+            ? t("connectAi.billing")
+            : machines.length === 0
+              ? t("brain.foot.noComputer")
+              : t("brain.foot.unavailable"),
           disabled: true,
           free: false,
           keywords: "",
@@ -354,8 +361,8 @@ export function needsOwnSignIn(
 }
 
 /** The list's runs of options under one heading, in order (the phone draws each as a group). */
-export function pickGroups(options: readonly BrainPickOption[]) {
-  const out: { group?: string; options: BrainPickOption[] }[] = [];
+export function pickGroups<O extends Pick<BrainPickOption, "group">>(options: readonly O[]) {
+  const out: { group?: string; options: O[] }[] = [];
   for (const o of options) {
     const last = out.at(-1);
     if (last && last.group === o.group) last.options.push(o);

@@ -22,6 +22,7 @@ import {
   handoffFuse,
   handoffTimeLeft,
   handoffWantsWords,
+  inputProblem,
   jpegSize,
   keyboardEvents,
   keyEvents,
@@ -925,4 +926,12 @@ describe("handoffWantsWords", () => {
     expect(handoffWantsWords({ kind: "takeover", instructions: "Qual?" })).toBe(false);
     expect(handoffWantsWords(null)).toBe(false);
   });
+});
+
+test("what a person's lost input says, by the server's code", () => {
+  expect(inputProblem("input_failed")).toBe("browser.inCard.inputLost");
+  expect(inputProblem("not_in_control")).toBe("browser.inCard.inputLost");
+  expect(inputProblem("no_field")).toBe("browser.inCard.noField");
+  expect(inputProblem("rate_limited")).toBeNull();
+  expect(inputProblem(null)).toBeNull();
 });

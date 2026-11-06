@@ -6,17 +6,38 @@ import {
   type VaultAccess,
   type VaultScope,
 } from "@agenteschat/client";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { secretAad } from "@agenteschat/client/lib/secret-box";
-import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
-import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
+import {
+  secretLabel,
+  secretRefusalKey,
+  secretValueProblem,
+  secretWhere,
+} from "@agenteschat/client/lib/secret-requests";
+import { secretOutcome } from "@agenteschat/client/lib/secret-words";
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, CodeInput, haptics, Icon, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
+import {
+  Button,
+  Chip,
+  CodeInput,
+  fieldText,
+  haptics,
+  Icon,
+  LineIcon,
+  Locked,
+  Segmented,
+  Text,
+  ToggleSwitch,
+  useToast,
+} from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
+import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
@@ -42,7 +63,7 @@ const RETRY_MS = 2 * 60_000;
  * digit and is never saved.
  */
 export function SecretCard({ request }: { request: SecretRequest }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
   const { org } = useOrg();
@@ -86,14 +107,26 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const mine = r.requestedForUserId === meId;
   const person = dir.memberById.get(r.requestedForUserId)?.name ?? t("channel.unknownPerson");
   const pending = r.status === "pending" && !expired;
+  // It ended (an event, its deadline, a refusal): what was typed goes with the field.
+  useEffect(() => {
+    if (!pending) setValue("");
+  }, [pending]);
 
-  const failed = (err: unknown) => {
-    const status = (err as { status?: number }).status;
-    setError(status === 409 ? t("secret.alreadyAnswered") : t("secret.failed"));
-  };
   const done = (res: SecretRequest) => {
     asks?.settle(r.id);
     setAnswered(res);
+  };
+  // Refused: the computer can't take it now and the card goes on, or the request ended and the card says how.
+  const failed = async (err: unknown) => {
+    const away = secretRefusalKey(err);
+    if (away) return setError(t(away, { agent: agentName, time: formatTime(i18n.language, r.expiresAt) }));
+    if ((err as { status?: number }).status !== 409) return setError(t("secret.failed"));
+    const fresh = await api.secrets.get(orgId, r.id).catch(() => null);
+    done(fresh && fresh.status !== "pending" ? fresh : { ...r, status: "canceled", publicKey: null });
+  };
+  const showNewer = async () => {
+    const newer = r.supersededBy ? await api.secrets.get(orgId, r.supersededBy).catch(() => null) : null;
+    if (newer?.messageId) router.push(chatHref(newer.channelId, newer.threadId, newer.messageId));
   };
   const keep = async (input: SecretToVaultInput & { requestId: string }) => {
     setKept("saving");
@@ -141,7 +174,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         });
       }
     } catch (err) {
-      failed(err);
+      await failed(err);
     } finally {
       setBusy(null);
     }
@@ -152,8 +185,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     try {
       done(await api.secrets.decline(orgId, r.id));
     } catch (err) {
-      failed(err);
-      toast({ title: t("mobile.app.failed"), icon: "x" });
+      await failed(err);
     } finally {
       setBusy(null);
     }
@@ -161,6 +193,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const chooseAgents = () =>
     sheet?.open(<AgentPickSheet initial={pick} onChange={setPick} onDone={() => sheet.close()} />);
 
+  const label = secretLabel(t, r, agentName);
   const where = [
     secretWhere(t, r, agentName),
     site && r.username ? t("mobile.vault.card.as", { username: r.username }) : null,
@@ -174,12 +207,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         <AskDone
           done={r.status === "delivered"}
           words={[
-            `${secretOutcome(t, r, mine, person)}: ${markName(r.name)}`,
+            markName(label),
+            secretOutcome(t, r, mine, person, agentName),
             kept === "saved" ? t("mobile.vault.card.saved") : null,
           ]
             .filter(Boolean)
             .join(" · ")}
-          at={secretEndedAt(r)}
           more={{
             label: t("approval.seeDetails"),
             content: (
@@ -189,6 +222,11 @@ export function SecretCard({ request }: { request: SecretRequest }) {
             ),
           }}
         />
+        {r.supersededBy ? (
+          <View style={styles.retry}>
+            <Button variant="ghost" size="sm" label={t("secret.seeNewer")} onPress={() => void showNewer()} />
+          </View>
+        ) : null}
         {kept === "failed" || kept === "dropped" || (kept === "saving" && retry.current) ? (
           <View style={styles.retry}>
             <Icon name="x" size={13} color={c.danger} />
@@ -218,10 +256,10 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       agentId={r.agentId}
       waitsFor={mine ? "you" : t("ask.waitingFor", { name: person })}
       lead={r.purpose}
-      well={{ tile: <IconTile name="lock" size={32} />, title: r.name, detail: where }}
+      well={{ tile: <IconTile name="lock" size={20} />, title: label, detail: where }}
       body={
         mine ? (
-          <>
+          <Locked when={busy !== null} style={styles.body}>
             {code ? (
               <CodeInput
                 length={code}
@@ -230,7 +268,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                   setValue(v);
                   setError(null);
                 }}
-                label={t("mobile.vault.card.codeLabel", { name: r.name })}
+                label={label}
                 error={Boolean(error)}
                 onSubmit={() => void send()}
               />
@@ -242,9 +280,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                     setValue(v);
                     setError(null);
                   }}
-                  placeholder={t("secret.label", { name: r.name })}
+                  placeholder={t("secret.placeholder")}
                   placeholderTextColor={c.faint}
-                  accessibilityLabel={t("secret.label", { name: r.name })}
+                  accessibilityLabel={label}
                   style={[styles.input, { color: c.ink }]}
                   secureTextEntry
                   textContentType="none"
@@ -264,7 +302,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
               </Text>
             ) : null}
             <View style={styles.note}>
-              <Icon name="lock" size={13} color={c.muted} />
+              <LineIcon variant="footnote" name="lock" size={13} color={c.muted} />
               <Text variant="footnote" tone="muted" style={styles.grow}>
                 {code ? t("mobile.vault.card.codeNote") : t("secret.private")}
               </Text>
@@ -280,9 +318,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                   accessibilityState={{ checked: save }}
                   accessibilityLabel={t("mobile.vault.card.save")}
                   accessibilityHint={t("mobile.vault.card.saveText")}
-                  style={styles.saveRow}
+                  style={({ pressed }) => [styles.saveRow, pressed && styles.pressed]}
                 >
-                  <Icon name={site ? "globe" : "key"} size={16} color={c.muted} />
+                  <LineIcon variant="subhead" name={site ? "globe" : "key"} size={16} color={c.muted} />
                   <View style={styles.grow}>
                     <Text variant="subhead" style={styles.semibold}>
                       {t("mobile.vault.card.save")}
@@ -326,7 +364,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                         ))
                       )}
                       {sheet ? (
-                        <Pressable onPress={chooseAgents} accessibilityRole="button" hitSlop={8}>
+                        <Pressable
+                          onPress={chooseAgents}
+                          accessibilityRole="button"
+                          hitSlop={12}
+                          style={({ pressed }) => pressed && styles.pressed}
+                        >
                           <Text variant="subhead" tone="ink2" style={styles.semibold}>
                             {t("mobile.vault.card.choose")}
                           </Text>
@@ -354,11 +397,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                 ) : null}
               </View>
             ) : null}
-          </>
+          </Locked>
         ) : null
       }
+      expiry={<ExpiryLine expiresAt={r.expiresAt} />}
       foot={
-        <AskFoot expiry={<ExpiryLine expiresAt={r.expiresAt} />}>
+        <AskFoot>
           {mine ? (
             <AskButtons
               primary={
@@ -397,19 +441,23 @@ export function SecretCard({ request }: { request: SecretRequest }) {
 }
 
 const styles = StyleSheet.create({
+  // The card's body gives its children this gap: the lock takes their place in it.
+  body: { gap: 8 },
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: "600" },
   field: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     minHeight: 44,
     justifyContent: "center",
   },
-  input: { fontSize: 17, paddingVertical: 10 },
+  input: { ...fieldText("body"), paddingVertical: 10 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   save: { gap: 10, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  saveRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // Its explanation wraps: the icon and the switch stay on the title's line, not centred on the whole row.
+  saveRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   agents: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
   retry: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pressed: { opacity: 0.6 },
 });

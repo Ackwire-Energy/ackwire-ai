@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, count, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { isKnownProvider, PROVIDERS } from "@agenteschat/providers";
 import { actWithUndo } from "./agent-actions";
@@ -37,6 +37,7 @@ import type { WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
 import { teamTools } from "./team-proposals";
 import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
+import { OFFER_CONNECT_APP_TOOL } from "./tools/connector-first";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -46,8 +47,8 @@ const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles }
 export const SETUP_SCOPE = "setup:write";
 export const OFFER_CONNECT_AI_TOOL = "offer_connect_ai";
 export const CREATE_CHANNEL_TOOL = "create_channel";
+export { OFFER_CONNECT_APP_TOOL };
 export const PROPOSE_AGENT_TOOL = "propose_agent";
-export const OFFER_CONNECT_APP_TOOL = "offer_connect_app";
 export const OFFER_INVITES_TOOL = "offer_invites";
 /** Archiving or deleting teammates, one card for them all (ADR 0137 amendment): any agent with setup tools. */
 export const PROPOSE_REMOVE_AGENTS_TOOL = "propose_remove_agents";
@@ -74,7 +75,7 @@ export const OPEN_PAGE_CARD = "action_open_page";
 export const APP_PAGES = {
   billing: "Billing: the plan, payment method and invoices (Stripe's checkout and portal open from there)",
   delete_workspace: "Deleting this workspace (owners): its email code, typed name and grace period",
-  delete_account: "Deleting their own account: its confirmation and grace period",
+  delete_account: "Deleting their whole account, not one workspace: it goes at once and for good after its email code",
   account: "Their profile, password and sign-in methods",
   ai_accounts: "AI accounts and API keys (Settings › Keys), typed only in our dialogs",
   workspace: "Workspace settings: name, logo, time zone and the context every agent reads",
@@ -452,20 +453,24 @@ export function createSetupToolSource(deps: {
             const [person] = matches;
             if (person && person.userId !== requester) people.set(person.userId, person.name);
           }
+          const events = holdEvents(deps.pubsub);
           const channel = await actWithUndo(
             ctx,
             async (db) => {
-              const created = await createChannel(db, requester, ctx.orgId, {
-                name: str(input.name).trim().replace(/^#/, ""),
-                topic: str(input.topic).trim(),
-              });
+              const created = await createChannel(
+                db,
+                requester,
+                ctx.orgId,
+                { name: str(input.name).trim().replace(/^#/, ""), topic: str(input.topic).trim() },
+                events,
+              );
               // Agents first: only they can be refused (their owner or an admin adds them), and a refusal
               // undoes the whole channel before anyone was told they're in it.
               for (const a of agents.rows) {
-                await addChannelMember(db, requester, ctx.orgId, created.id, { agentId: a.id }, deps);
+                await addChannelMember(db, requester, ctx.orgId, created.id, { agentId: a.id }, events);
               }
               for (const userId of people.keys()) {
-                await addChannelMember(db, requester, ctx.orgId, created.id, { userId }, deps);
+                await addChannelMember(db, requester, ctx.orgId, created.id, { userId }, events);
               }
               return created;
             },
@@ -477,6 +482,7 @@ export function createSetupToolSource(deps: {
               after: { name: created.name },
             }),
           );
+          await events.flush();
           const members = [...people.values(), ...agents.rows.map((a) => `@${a.handle}`)];
           return {
             content: `Created #${channel.name}${members.length ? ` with ${members.join(", ")}` : ""}.`,

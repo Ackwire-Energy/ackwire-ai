@@ -16,8 +16,19 @@ import { humanize } from "@agenteschat/client/lib/custom-tools";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { builtinToolText } from "@agenteschat/client/lib/scopes";
-import { Card, Chip, Icon, type IconName, InfoHint, Segmented } from "@agenteschat/ui";
+import {
+  type AgentAppearance,
+  Button,
+  Card,
+  CardHeader,
+  Chip,
+  EmptyState,
+  Icon,
+  type IconName,
+  Segmented,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,6 +38,7 @@ import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 
 type TT = (key: string, options: Record<string, string>) => string;
 
@@ -229,6 +241,7 @@ export function LevelRow({
 export function AccessMatrixSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const look = useRightHandLook();
   const admin = can(org, "manage_agents");
   const agents = useAgents(org.id);
   const list = agents.data ?? [];
@@ -264,30 +277,47 @@ export function AccessMatrixSection() {
 
   return (
     <Card aria-labelledby="sec-access">
-      <div className="row" style={{ gap: 12 }}>
-        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
-          <h2 id="sec-access" className="ac-card__title">
-            {t("access.matrixTitle")}
-          </h2>
-          <InfoHint name={t("common.about", { label: t("access.matrixTitle") })}>{t("access.matrixHint")}</InfoHint>
-        </div>
-        <Segmented
-          size="sm"
-          label={t("access.kindLabel")}
-          value={kind}
-          onValueChange={setKind}
-          options={[
-            { value: "connector", label: t("access.kind.connectors") },
-            { value: "builtin", label: t("access.kind.builtin") },
-          ]}
-        />
-      </div>
+      <CardHeader
+        id="sec-access"
+        icon="agent"
+        title={t("access.matrixTitle")}
+        hint={{ name: t("common.about", { label: t("access.matrixTitle") }), text: t("access.matrixHint") }}
+        action={
+          <Segmented
+            size="sm"
+            label={t("access.kindLabel")}
+            value={kind}
+            onValueChange={setKind}
+            options={[
+              { value: "connector", label: t("access.kind.connectors") },
+              { value: "builtin", label: t("access.kind.builtin") },
+            ]}
+          />
+        }
+      />
       {access.unavailable && <p className="small muted">{t("access.unavailable")}</p>}
       {(agents.isLoading || (list.length > 0 && access.loading)) && (
         <LoadingList count={Math.min(Math.max(list.length, 2), 5)} trailing />
       )}
-      {agents.isSuccess && list.length === 0 && <p className="small muted">{t("access.noAgents")}</p>}
-      {first && columns.length === 0 && <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>}
+      {agents.isSuccess && list.length === 0 && (
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t(can(org, "create_agents") ? "access.noAgentsTitle" : "team.emptyViewerTitle")}
+          actions={
+            can(org, "create_agents") && (
+              <Button asChild variant="primary" icon="plus">
+                <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
+                  {t("shell.createAgent")}
+                </Link>
+              </Button>
+            )
+          }
+        >
+          {t(can(org, "create_agents") ? "access.noAgents" : "team.emptyViewer")}
+        </EmptyState>
+      )}
+      {first && columns.length === 0 && <NoConnectors look={look} />}
       {table && (
         <div className="level-matrix">
           <table>
@@ -379,5 +409,30 @@ export function AccessMatrixSection() {
         </div>
       )}
     </Card>
+  );
+}
+
+/** No connector in the workspace yet, on an agent's access and on the matrix: the way to it, or who has it. */
+export function NoConnectors({ look }: { look: AgentAppearance | true }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const admin = can(org, "manage_connectors");
+  return (
+    <EmptyState
+      size="panel"
+      agent={look}
+      title={t(admin ? "access.noConnectorsTitle" : "access.noConnectorsViewerTitle")}
+      actions={
+        admin && (
+          <Button asChild variant="primary" icon="plus">
+            <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "connectors" }}>
+              {t("connectors.add")}
+            </Link>
+          </Button>
+        )
+      }
+    >
+      {t(admin ? "access.noConnectors" : "access.noConnectorsViewer")}
+    </EmptyState>
   );
 }

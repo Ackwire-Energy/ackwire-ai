@@ -542,11 +542,14 @@ html:not([data-pointer]) .cal-band:focus-visible {
   font-weight: 600;
   color: var(--ink);
 }
+/* An icon and a value that may wrap (a long link): the icon stays on the first line (`.ac-iconline`). */
 .cal-details__row {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+.cal-details__row > :last-child {
+  min-width: 0;
 }
 .cal-details__people {
   list-style: none;
@@ -656,7 +659,10 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-more__title {
   margin: 0 0 6px;
   font-weight: 600;
-  text-transform: capitalize;
+}
+/* Only the first letter: `capitalize` raised every word ("Novembro De 2026"). */
+.cal-more__title::first-letter {
+  text-transform: uppercase;
 }
 .cal-more__list {
   display: flex;
@@ -706,10 +712,6 @@ html:not([data-pointer]) .cal-band:focus-visible {
   flex-direction: column;
   gap: 2px;
 }
-.cal-agenda__empty {
-  margin: 48px auto;
-  text-align: center;
-}
 
 /* Side panel */
 .cal-side {
@@ -739,7 +741,10 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-mini__title {
   flex: 1;
   font-weight: 600;
-  text-transform: capitalize;
+}
+/* Only the first letter: `capitalize` raised every word ("Novembro De 2026"). */
+.cal-mini__title::first-letter {
+  text-transform: uppercase;
 }
 .cal-mini__grid {
   display: grid;

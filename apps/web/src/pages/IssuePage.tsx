@@ -18,10 +18,12 @@ import {
   DetailsSection,
   Field,
   Icon,
+  Locked,
   SavedNote,
   Select,
   TabPanel,
   Tabs,
+  useAutoGrow,
   WorkSweep,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,7 +34,7 @@ import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
-import { IssueWorkBlock } from "@/components/BackgroundWork";
+import { IssueWorkBlock, PrivateTaskBlock } from "@/components/BackgroundWork";
 import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
@@ -237,6 +239,7 @@ export function IssueDetails({
           <TabPanel value="details">
             <WorkBox issue={i} />
             <IssueWorkBlock issue={i} />
+            <PrivateTaskBlock issue={i} />
             {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
             <DetailsSection title={t("issues.description")}>
               <IssueDescription issue={i} hasFiles={createdFiles.length > 0} onSaved={flashSaved} />
@@ -322,6 +325,8 @@ function IssueDescription({ issue: i, hasFiles, onSaved }: { issue: Issue; hasFi
   const sent = useSent<string>(i.description);
   const description = sent.pending ?? i.description;
   const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
+  // As tall as its text where the engine can't size it from CSS (`field-sizing`, which the Mac app's WebKit lacks).
+  useAutoGrow(ref, draft ?? "", draft !== null);
   const save = () => {
     if (draft === null) return;
     const next = draft.trim();
@@ -563,7 +568,7 @@ function WorkBox({ issue: i }: { issue: Issue }) {
   const lines = foldSteps(w.steps, stepText);
   return (
     <section className={cx("issue-work", stalled && "is-stalled")} aria-label={t("issues.work.label", g)}>
-      <div className="issue-work__head">
+      <div className="issue-work__head ac-iconline">
         <AgentAvatar
           agentId={i.assignee.id}
           name={name}
@@ -583,15 +588,17 @@ function WorkBox({ issue: i }: { issue: Issue }) {
           <small>{stalled ? t("issues.work.stalledText", g) : t("issues.work.started", { when })}</small>
         </span>
         {w.state === "running" && w.runId && (
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="stop"
-            loading={stop.isPending}
-            onClick={() => w.runId && stop.mutate(w.runId)}
-          >
-            {t("issues.work.stop")}
-          </Button>
+          <span className="issue-work__tail">
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="stop"
+              loading={stop.isPending}
+              onClick={() => w.runId && stop.mutate(w.runId)}
+            >
+              {t("issues.work.stop")}
+            </Button>
+          </span>
         )}
       </div>
       {stalled ? (
@@ -664,7 +671,7 @@ function AskAgent({ issue }: { issue: Issue }) {
   const g = agentGrammar(agent.name);
   return (
     <section aria-label={t("issues.askSection")} className="issue-ask">
-      <div className="issue-ask__row">
+      <div className="issue-ask__row ac-iconline">
         {avatar({ type: "agent", id: agent.id }, "sm")}
         <span className="issue-ask__text">
           <b>{t("issues.askTitle", { context: g.context, name: agent.name })}</b>
@@ -672,22 +679,17 @@ function AskAgent({ issue }: { issue: Issue }) {
         </span>
       </div>
       <div className="issue-ask__actions">
-        <Button
-          variant="agent"
-          icon="agent"
-          size="sm"
-          disabled={action.isPending}
-          loading={action.isPending}
-          onClick={() => ask(agent)}
-        >
-          {t("issues.askButton", { context: g.context, name: agent.name })}
-        </Button>
-        {others.slice(0, 3).map((a) => (
-          <button key={a.id} type="button" className="issue-ask__other" onClick={() => ask(a)}>
-            {avatar({ type: "agent", id: a.id }, "xs")}
-            {a.name}
-          </button>
-        ))}
+        <Locked when={action.isPending}>
+          <Button variant="agent" icon="agent" size="sm" loading={action.isPending} onClick={() => ask(agent)}>
+            {t("issues.askButton", { context: g.context, name: agent.name })}
+          </Button>
+          {others.slice(0, 3).map((a) => (
+            <button key={a.id} type="button" className="issue-ask__other" onClick={() => ask(a)}>
+              {avatar({ type: "agent", id: a.id }, "xs")}
+              {a.name}
+            </button>
+          ))}
+        </Locked>
       </div>
     </section>
   );
@@ -703,7 +705,7 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
       {loaded && activity.length === 0 && <p className="small muted">{t("issues.noActivity")}</p>}
       {activity.map((a) =>
         a.kind === "event" ? (
-          <div key={a.id} className="issue-event small muted">
+          <div key={a.id} className="issue-event ac-iconline small muted">
             <Icon name={a.event === "agent_asked" ? "agent" : "waiting"} size={16} />
             <span>
               <b className="issue-event__who">{actors.name(a.author)}</b> {issueEventText(t, a)}
@@ -729,7 +731,7 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
             </span>
           </div>
         ) : (
-          <div key={a.id} className="issue-event small muted">
+          <div key={a.id} className="issue-event ac-iconline small muted">
             <Icon name="message" size={16} />
             <span>
               <b className="issue-event__who">{actors.name(a.author)}</b>{" "}

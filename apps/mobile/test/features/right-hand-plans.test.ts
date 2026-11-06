@@ -17,9 +17,9 @@ test("its plan's line: one plain line and Usar uma chave de API, which opens Con
 test("Connect for it offers every plan the phone offers, ChatGPT's too, and its key moves it off the plan", () => {
   const sheet = source("ConnectAi.tsx");
   expect(sheet).not.toContain("claudeCodeOnly");
-  expect(sheet).toContain('setBrain(orgId, one.id, { brain: "model" })');
+  expect(sheet).toContain("rightHandOnKey(api, orgId, one, key");
   const steps = source("ConnectAiSteps.tsx");
-  expect(steps).toContain('(["claude", "chatgpt", "grok", "gemini"] as const).map(');
+  expect(steps).toContain("options={PLAN_CHOICES.map((c) => ({");
 });
 
 test("Settings › Lodi: Sua IA opens Connect, the workspace's plan keeps Atende outras pessoas for whoever sets its AI", () => {

@@ -10,7 +10,11 @@ import { Sheet } from "@/ui";
 interface SheetHost {
   /** `onClose`: called once when this sheet closes (by itself, the scrim, the grabber or `close`). */
   open: (content: ReactNode, options?: { solid?: boolean; onClose?: () => void }) => void;
-  close: () => void;
+  /**
+   * `then`, when a function: once the sheet is gone from the screen (before presenting the photo library, the camera,
+   * a picker). Anything else is ignored, so `close` can be a button's or the scrim's press handler as it is.
+   */
+  close: (then?: unknown) => void;
   /**
    * Hears the sheet open (before it does anything, the keyboard leaving included) and close: the screen under it
    * keeps still meanwhile (a conversation freezes its list). Returns the unsubscribe.
@@ -26,12 +30,26 @@ export function SheetHostProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const onClosed = useRef<(() => void) | null>(null);
   const listeners = useRef(new Set<(open: boolean) => void>());
-  const close = useCallback(() => {
+  // Whether a sheet is on screen (opening, open or still sliding out), and what waits for it to be gone.
+  const shown = useRef(false);
+  const afterGone = useRef<(() => void)[]>([]);
+  const gone = useCallback(() => {
+    shown.current = false;
+    const waiting = afterGone.current;
+    afterGone.current = [];
+    for (const then of waiting) then();
+  }, []);
+  // `then` only when a function: the scrim's press passes its event here.
+  const close = useCallback((then?: unknown) => {
+    if (typeof then === "function") {
+      if (shown.current) afterGone.current.push(then as () => void);
+      else then();
+    }
     setOpen(false);
     for (const l of listeners.current) l(false);
-    const then = onClosed.current;
+    const closed = onClosed.current;
     onClosed.current = null;
-    then?.();
+    closed?.();
   }, []);
   const host = useMemo<SheetHost>(
     () => ({
@@ -40,6 +58,7 @@ export function SheetHostProvider({ children }: { children: ReactNode }) {
         setContent(next);
         setSolid(Boolean(options?.solid));
         onClosed.current = options?.onClose ?? null;
+        shown.current = true;
         setOpen(true);
       },
       close,
@@ -55,7 +74,7 @@ export function SheetHostProvider({ children }: { children: ReactNode }) {
   return (
     <SheetContext.Provider value={host}>
       {children}
-      <Sheet open={open} onClose={close} solid={solid}>
+      <Sheet open={open} onClose={close} solid={solid} onGone={gone}>
         <View style={styles.in}>{content}</View>
       </Sheet>
     </SheetContext.Provider>

@@ -22,14 +22,14 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Icon, type IconName, Text } from "@/ui";
+import { AgentAvatar, Button, Icon, type IconName, LineIcon, Locked, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { requestComposerText } from "../chat/composer-request";
 import { MESSAGE_STICKER } from "../chat/media";
 import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic, useSurface } from "../shared/parts";
@@ -69,8 +69,10 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
   return (
     <View style={styles.intro}>
       <View style={styles.head}>
-        <AgentFace agentId={agent.id} size={36} />
-        <Text variant="body" style={styles.bold}>
+        <OpensAgent agentId={agent.id}>
+          <AgentFace agentId={agent.id} size={36} />
+        </OpensAgent>
+        <Text variant="body" style={[styles.bold, styles.shrink]}>
           {agent.name}
         </Text>
       </View>
@@ -177,8 +179,9 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
       ) : null}
       {presetsOpen ? (
         <>
-          <View style={styles.presets}>
-            {left.map((p) => {
+          {/* Flat rows on the card, divided by hairlines: a tap makes that agent (its "+" says so). */}
+          <Locked when={create.isPending}>
+            {left.map((p, i) => {
               const name = t(`onboarding.presets.${p}.name`);
               return (
                 <Pressable
@@ -192,8 +195,8 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
                   accessibilityLabel={t("rightHand.intro.start.createOne", { name })}
                   style={({ pressed }) => [
                     styles.preset,
-                    { borderColor: c.line2 },
-                    pressed && { backgroundColor: c.sunken },
+                    i > 0 && [styles.divided, { borderTopColor: c.line2 }],
+                    pressed && styles.pressed,
                   ]}
                 >
                   <AgentAvatar agent={fullLook(PRESET_LOOK[p])} size={28} name={name} live={false} />
@@ -205,10 +208,11 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
                       {t(`onboarding.presets.${p}.role`)}
                     </Text>
                   </View>
+                  <Icon name="plus" size={15} color={c.faint} />
                 </Pressable>
               );
             })}
-          </View>
+          </Locked>
           <Button
             variant="secondary"
             size="card"
@@ -340,8 +344,8 @@ function IntroCard({
   const surface = useSurface();
   return (
     <View style={[styles.card, surface]}>
-      <View style={styles.head}>
-        <Icon name={icon} size={16} color={c.ink2} />
+      <View style={styles.cardHead}>
+        <LineIcon name={icon} size={15} color={c.ink2} variant="subhead" />
         <Text variant="subhead" style={[styles.bold, styles.fill]}>
           {title}
         </Text>
@@ -363,16 +367,13 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   sticker: { width: MESSAGE_STICKER, height: MESSAGE_STICKER, marginTop: 4 },
   fill: { flex: 1, minWidth: 0 },
-  card: { marginTop: 6, borderRadius: 16, padding: 14, gap: 10 },
-  presets: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  preset: {
-    flexBasis: "47%",
-    flexGrow: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 8,
-  },
+  // A long name wraps beside the face instead of running past the screen's edge.
+  shrink: { flexShrink: 1 },
+  card: { marginTop: 6, borderRadius: 20, padding: 14, gap: 10 },
+  // A question that wraps keeps its icon on its first line.
+  cardHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  // A ready-made agent to make: at least 44 points to tap.
+  preset: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44, paddingVertical: 8 },
+  divided: { borderTopWidth: StyleSheet.hairlineWidth },
+  pressed: { opacity: 0.6 },
 });

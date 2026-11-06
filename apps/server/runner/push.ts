@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { MachineReplies } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
-import { type Resolved, resolveInWorkspace } from "./paths";
+import { hiddenIn, type Resolved, resolveInWorkspace } from "./paths";
 import { zipFolder } from "./zip";
 
 export const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
@@ -76,8 +76,8 @@ export interface PushOptions {
   resolve?: (p: string) => Promise<Resolved>;
 }
 
-/** What the upload's error body says, for people. */
-async function serverMessage(res: Response): Promise<string> {
+/** What an error body of ours says, for people; `otherwise`, in place of a body that isn't ours (a proxy's page). */
+export async function serverMessage(res: Response, otherwise?: string): Promise<string> {
   const text = await res.text().catch(() => "");
   try {
     const body = JSON.parse(text) as { error?: { message?: unknown } | string; message?: unknown };
@@ -87,7 +87,7 @@ async function serverMessage(res: Response): Promise<string> {
   } catch {
     // not JSON
   }
-  return text.slice(0, 500) || `HTTP ${res.status}`;
+  return otherwise ?? (text.slice(0, 500) || `HTTP ${res.status}`);
 }
 
 /**
@@ -106,10 +106,12 @@ export async function pushPath(opts: PushOptions): Promise<MachineReplies["push"
   if (st.isDirectory()) {
     const folder = target.rel === "" ? path.basename(opts.workspaceReal) : (target.rel.split("/").pop() as string);
     name = `${folder || "workspace"}.zip`;
+    const root = target.root ?? opts.workspaceReal;
     bytes = await zipFolder(target.abs, {
       prefix: folder || "workspace",
       maxBytes,
-      workspaceReal: target.root ?? opts.workspaceReal,
+      workspaceReal: root,
+      ...(target.inHome ? { skip: (abs: string) => hiddenIn(root, abs) } : {}),
     });
   } else if (st.isFile()) {
     if (st.size > maxBytes) throw new RunnerError("too_large", `The file has ${st.size} bytes (max ${maxBytes})`);
@@ -140,10 +142,19 @@ export async function pushPath(opts: PushOptions): Promise<MachineReplies["push"
     });
   } catch (err) {
     if (opts.signal?.aborted) throw new RunnerError("internal", "Canceled");
-    const message = err instanceof Error ? err.message : String(err);
-    throw new RunnerError("upload_failed", `The upload failed: ${message}`);
+    // Not the fetch's own words: they can name the host, and they reach the agent.
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    throw new RunnerError(
+      "upload_failed",
+      timedOut ? "The upload took too long. Try again." : "The upload stopped. Try again.",
+    );
   }
-  if (!res.ok) throw new RunnerError("upload_failed", await serverMessage(res));
+  if (!res.ok) {
+    throw new RunnerError(
+      "upload_failed",
+      await serverMessage(res, `The server refused it (${res.status}). Try again.`),
+    );
+  }
   await res.body?.cancel().catch(() => {});
   return { name, size: bytes.byteLength, sha256, contentType };
 }

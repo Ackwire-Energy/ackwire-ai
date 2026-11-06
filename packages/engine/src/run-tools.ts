@@ -24,7 +24,7 @@ import {
 import { routineBriefOf } from "./routine-brief";
 import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
-import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
+import { publishSecret, type SecretRequestRow, secretLabelOf, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, promptAnswer, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
 import { directoryRole, HARNESS_PREFIX, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
@@ -368,6 +368,7 @@ export interface RunToolScope {
 /** How a call ended, as its `agent.tool` end says it. */
 type ChipEnd = {
   failed?: boolean;
+  slip?: boolean;
   held?: boolean;
   why?: string;
   refusal?: string;
@@ -378,6 +379,7 @@ type ChipEnd = {
 /** The end's fields that say something. */
 const endFields = (end: ChipEnd) => ({
   ...(end.failed ? { failed: true } : {}),
+  ...(end.slip ? { slip: true } : {}),
   ...(end.held ? { held: true } : {}),
   ...(end.why ? { why: end.why } : {}),
   ...(end.refusal ? { refusal: end.refusal } : {}),
@@ -494,7 +496,11 @@ export async function invokeWithChip(
           ? { held: true }
           : prompt
             ? promptEnd(outcome.output)
-            : { failed: outcome.output.isError === true, autoApproved: outcome.autoApproved },
+            : {
+                failed: outcome.output.isError === true,
+                slip: outcome.output.isError === true && codeOf(outcome.output.content) === "tool.invalid_input",
+                autoApproved: outcome.autoApproved,
+              },
       );
       // An action approved ahead went out (or couldn't): its cards, Aprovações and its routine's page show it.
       if (outcome.type === "result" && outcome.ran && deps.pubsub) {
@@ -782,8 +788,9 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .returning();
     if (!request) continue;
     // The card names the key itself: this text is for previews and notifications, a sentence of its own.
-    const message = await card(asked, `${agentName} asked for a key: ${request.name}`, {
-      ...bodyCode("secret_request", { agent: agentName, name: request.name }),
+    const what = secretLabelOf(request);
+    const message = await card(asked, `${agentName} asked for a key: ${what}`, {
+      ...bodyCode("secret_request", { agent: agentName, name: what }),
       secretRequestId: request.id,
       secretRequest: secretRequestView(request),
     });

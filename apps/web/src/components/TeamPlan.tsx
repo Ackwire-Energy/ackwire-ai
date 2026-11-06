@@ -18,7 +18,18 @@ import {
   teamStatus,
   teamUndoable,
 } from "@agenteschat/client/lib/team-plan";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Input, Spinner, Textarea } from "@agenteschat/ui";
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Field,
+  Icon,
+  Input,
+  Locked,
+  Spinner,
+  Textarea,
+} from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
@@ -124,7 +135,15 @@ export function ReplyChips({ message }: { message: Message }) {
 }
 
 /** The team on a card or a template: a row per agent, the routines, the skills and what waits for approval. */
-export function TeamPlanBody({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (agent: TeamAgentDraft) => void }) {
+export function TeamPlanBody({
+  plan,
+  onAdjust,
+  locked,
+}: {
+  plan: TeamPlan;
+  onAdjust?: (agent: TeamAgentDraft) => void;
+  locked?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -136,27 +155,31 @@ export function TeamPlanBody({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a
         {plan.agents.map((a) => (
           <li key={a.handle} className="tp-agent">
             <AgentAvatar name={a.name} appearance={lookOf(a)} size="md" />
-            <span className="tp-agent__text">
+            <span className="tp-agent__text ac-captop">
               <span>
                 <b>{a.name}</b> <span className="muted">{a.role}</span>
               </span>
               <span className="tp-agent__line">{a.line}</span>
             </span>
-            <span className="tp-pill">
-              <Icon name="channel" size={14} />
-              <span>{a.channel}</span>
-              {plan.newChannels.includes(a.channel) && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
+            {/* On the name's line, whatever the description's length. */}
+            <span className="tp-agent__tail ac-captop">
+              <span className="tp-pill">
+                <Icon name="channel" size={14} />
+                <span>{a.channel}</span>
+                {plan.newChannels.includes(a.channel) && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
+              </span>
+              {onAdjust && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t("teamPlan.card.adjustName", { name: a.name })}
+                  disabled={locked}
+                  onClick={() => onAdjust(a)}
+                >
+                  {t("teamPlan.card.adjust")}
+                </Button>
+              )}
             </span>
-            {onAdjust && (
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={t("teamPlan.card.adjustName", { name: a.name })}
-                onClick={() => onAdjust(a)}
-              >
-                {t("teamPlan.card.adjust")}
-              </Button>
-            )}
           </li>
         ))}
       </ul>
@@ -267,7 +290,7 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
           lead={plan.lead || names}
           body={
             <>
-              <TeamPlanBody plan={plan} onAdjust={decides ? setAdjusting : undefined} />
+              <TeamPlanBody plan={plan} onAdjust={decides ? setAdjusting : undefined} locked={busy} />
               {card.error && (
                 <p className="rq__error" role="alert">
                   {teamFailureText(t, card.error, i18n.language)}
@@ -410,22 +433,25 @@ function FirstTaskCard({ message, card }: { message: Message; card: TeamProposal
             {tasks.map((f) => (
               <li key={f.agentId} className="tp-agent">
                 <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
-                <span className="tp-agent__text">
+                <span className="tp-agent__text ac-captop">
                   <b>{f.name}</b>
                   <span className="tp-agent__line">{f.task}</span>
                 </span>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setDraftFor(`agent:${f.agentId}`, f.task);
-                    void navigate({
-                      to: "/org/$orgId/dm/agent/$agentId",
-                      params: { orgId: org.id, agentId: f.agentId },
-                    });
-                  }}
-                >
-                  {t("teamPlan.firstTask.open")}
-                </Button>
+                {/* On the name's line, as on the team card's rows, however long the task runs. */}
+                <span className="tp-agent__tail ac-captop">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setDraftFor(`agent:${f.agentId}`, f.task);
+                      void navigate({
+                        to: "/org/$orgId/dm/agent/$agentId",
+                        params: { orgId: org.id, agentId: f.agentId },
+                      });
+                    }}
+                  >
+                    {t("teamPlan.firstTask.open")}
+                  </Button>
+                </span>
               </li>
             ))}
           </ul>
@@ -497,26 +523,28 @@ function AdjustDialog({
           onSave(v);
         }}
       >
-        <DialogBody>
-          <Field label={t("teamPlan.adjust.name")}>
-            <Input value={v.name} onChange={set("name")} maxLength={80} required />
-          </Field>
-          <Field label={t("teamPlan.adjust.role")}>
-            <Input value={v.role} onChange={set("role")} maxLength={200} />
-          </Field>
-          <Field label={t("teamPlan.adjust.line")}>
-            <Input value={v.line} onChange={set("line")} maxLength={300} required />
-          </Field>
-          <Field label={t("teamPlan.adjust.channel")}>
-            <Input value={v.channel} onChange={set("channel")} maxLength={80} required />
-          </Field>
-          <Field label={t("teamPlan.adjust.instructions")}>
-            <Textarea value={v.instructions} onChange={set("instructions")} rows={5} />
-          </Field>
-          <Field label={t("teamPlan.adjust.firstTask")}>
-            <Input value={v.firstTask} onChange={set("firstTask")} maxLength={500} />
-          </Field>
-        </DialogBody>
+        <Locked when={saving}>
+          <DialogBody>
+            <Field label={t("teamPlan.adjust.name")}>
+              <Input value={v.name} onChange={set("name")} maxLength={80} required />
+            </Field>
+            <Field label={t("teamPlan.adjust.role")}>
+              <Input value={v.role} onChange={set("role")} maxLength={200} />
+            </Field>
+            <Field label={t("teamPlan.adjust.line")}>
+              <Input value={v.line} onChange={set("line")} maxLength={300} required />
+            </Field>
+            <Field label={t("teamPlan.adjust.channel")}>
+              <Input value={v.channel} onChange={set("channel")} maxLength={80} required />
+            </Field>
+            <Field label={t("teamPlan.adjust.instructions")}>
+              <Textarea value={v.instructions} onChange={set("instructions")} rows={5} />
+            </Field>
+            <Field label={t("teamPlan.adjust.firstTask")}>
+              <Input value={v.firstTask} onChange={set("firstTask")} maxLength={500} />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}
@@ -628,9 +656,9 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
         <h3 className="tp-gallery__title">{chosen.name}</h3>
         <p className="muted">{chosen.description}</p>
         <TeamPlanBody plan={chosen.team} />
-        <p className="small muted ac-faceline">
+        <p className={lodi ? "small muted ac-iconline" : "small muted"}>
           {lodi && <AgentAvatar agentId={lodi.id} name={name} size="xs" />}
-          <span className="ac-captop">{t("teamPlan.templates.tailor")}</span>
+          <span>{t("teamPlan.templates.tailor")}</span>
         </p>
       </>
     );
@@ -644,51 +672,53 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
       closeLabel={t("common.close")}
       width={1040}
     >
-      <DialogBody>
-        <div className="tp-gallery">
-          <ul className="tp-gallery__list">
-            {templates.map((x) => (
-              <li key={x.id}>
+      <Locked when={use.isPending}>
+        <DialogBody>
+          <div className="tp-gallery">
+            <ul className="tp-gallery__list">
+              {templates.map((x) => (
+                <li key={x.id}>
+                  <button
+                    type="button"
+                    className="tp-gallery__item ac-iconline"
+                    aria-pressed={x.id === chosen?.id}
+                    onClick={() => setPicked(x.id)}
+                  >
+                    <span className="tp-gallery__faces" aria-hidden="true">
+                      {x.team.agents.map((a) => (
+                        <AgentAvatar key={a.handle} name={a.name} appearance={lookOf(a)} size="xs" />
+                      ))}
+                    </span>
+                    <span className="tp-gallery__text">
+                      <b>{x.name}</b>
+                      <small>{x.sub}</small>
+                    </span>
+                  </button>
+                </li>
+              ))}
+              <li>
                 <button
                   type="button"
-                  className="tp-gallery__item"
-                  aria-pressed={x.id === chosen?.id}
-                  onClick={() => setPicked(x.id)}
+                  className="tp-gallery__item ac-iconline"
+                  onClick={() => {
+                    onClose();
+                    actions?.focusComposer();
+                  }}
                 >
                   <span className="tp-gallery__faces" aria-hidden="true">
-                    {x.team.agents.map((a) => (
-                      <AgentAvatar key={a.handle} name={a.name} appearance={lookOf(a)} size="xs" />
-                    ))}
+                    <Icon name="edit" size={16} />
                   </span>
                   <span className="tp-gallery__text">
-                    <b>{x.name}</b>
-                    <small>{x.sub}</small>
+                    <b>{t("teamPlan.templates.none")}</b>
+                    <small>{t("teamPlan.templates.noneSub", { name })}</small>
                   </span>
                 </button>
               </li>
-            ))}
-            <li>
-              <button
-                type="button"
-                className="tp-gallery__item"
-                onClick={() => {
-                  onClose();
-                  actions?.focusComposer();
-                }}
-              >
-                <span className="tp-gallery__faces" aria-hidden="true">
-                  <Icon name="edit" size={16} />
-                </span>
-                <span className="tp-gallery__text">
-                  <b>{t("teamPlan.templates.none")}</b>
-                  <small>{t("teamPlan.templates.noneSub", { name })}</small>
-                </span>
-              </button>
-            </li>
-          </ul>
-          <div className="tp-gallery__preview">{preview}</div>
-        </div>
-      </DialogBody>
+            </ul>
+            <div className="tp-gallery__preview">{preview}</div>
+          </div>
+        </DialogBody>
+      </Locked>
       <DialogFooter note={chosen ? countsText(t, chosen.team) : null}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button

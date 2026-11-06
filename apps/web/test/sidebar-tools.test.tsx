@@ -82,6 +82,33 @@ describe("the bell", () => {
 });
 
 describe("the tools on top", () => {
+  test("each tool row shows its own grip, saying what it moves; a click on it opens nothing; Início carries the section's", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    const before = router.state.location.pathname;
+    const tasks = within(nav()).getByRole("link", { name: "Tarefas" });
+    const grip = tasks.querySelector(".sidebar__tool-grip") as HTMLElement;
+    expect(grip.getAttribute("title")).toBe("Arraste para mover Tarefas");
+    await click(grip);
+    expect(router.state.location.pathname).toBe(before);
+    const home = within(nav()).getByRole("link", { name: "Início" });
+    expect(home.querySelector(".sidebar__tool-grip")).toBeNull();
+    expect(home.getAttribute("draggable")).toBeNull();
+    const section = within(nav()).getByRole("button", { name: /seção Ferramentas/ });
+    expect(section.getAttribute("title")).toBe("Arraste para mover a seção Ferramentas ou clique para ver as opções");
+  });
+
+  test("a row says its name on hover only in the rail, which hides it: beside the words it would just repeat them", async () => {
+    await go();
+    const row = (name: string) => within(nav()).getByRole("link", { name });
+    expect(row("Tarefas").getAttribute("title")).toBeNull();
+    expect(row("Início").getAttribute("title")).toBeNull();
+    await click(within(nav()).getByRole("button", { name: "Minimizar barra lateral" }));
+    expect(row("Tarefas").getAttribute("title")).toBe("Tarefas");
+    expect(row("Início").getAttribute("title")).toBe("Início");
+    await click(within(nav()).getByRole("button", { name: "Expandir barra lateral" }));
+  });
+
   test("by default Threads, Tarefas, Drive and Equipe, Aprovações while some wait; the rest in More, then Personalizar", async () => {
     await go();
     expect(rows()[0]).toBe("Início");

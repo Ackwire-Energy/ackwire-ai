@@ -14,6 +14,7 @@ import {
   EmptyState,
   Field,
   Icon,
+  Locked,
   PageHeader,
   Textarea,
 } from "@agenteschat/ui";
@@ -24,6 +25,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { isText, SettingChange } from "@/components/ChatCards";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
 
 /** Pending first, then decided; newest first inside each. */
@@ -38,6 +40,7 @@ export function sortProposals(list: Proposal[]) {
 export function ProposalsPage({ agentId }: { agentId?: string }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const look = useRightHandLook();
   const dir = useDirectory(org.id);
   const proposals = useProposals(org.id);
   const decide = useDecideProposal(org.id);
@@ -107,7 +110,11 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
       )}
       <PageHeader title={t("proposals.title")} meta={t("proposals.subtitle", { org: org.name })} />
 
-      {proposals.isSuccess && list.length === 0 && <EmptyState icon="agent">{t("proposals.empty")}</EmptyState>}
+      {proposals.isSuccess && list.length === 0 && (
+        <EmptyState size="page" agent={look} mood="deal" title={t("proposals.emptyTitle")}>
+          {t("proposals.empty")}
+        </EmptyState>
+      )}
 
       {current && (
         <div className="proposals">
@@ -182,7 +189,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
               <div className="row">
                 <span className="ac-eyebrow spacer">{t("proposals.change", { target: targetLabel(current) })}</span>
                 {current.status === "pending" && current.canDecide && isText(current) && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
+                  <Button variant="ghost" size="sm" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
                     {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
                   </Button>
                 )}
@@ -196,7 +203,9 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   }
                   id="prop-edit"
                 >
-                  <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                  <Locked when={decide.isPending || current.stale}>
+                    <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                  </Locked>
                 </Field>
               ) : (
                 <Diff

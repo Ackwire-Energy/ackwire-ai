@@ -9,15 +9,17 @@ import {
   Field,
   Icon,
   Input,
+  Locked,
   Menu,
   MenuHeading,
   MenuItem,
   MenuNote,
   MenuSeparator,
   OptionList,
+  useScrollSides,
 } from "@agenteschat/ui";
 import { type Query, useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { BOARD, columnIdOf, columnsOf, isCustomBoard, STATUS_ICON, useColumnTitle, useStageName } from "@/lib/issues";
@@ -176,6 +178,10 @@ export function Board({
   const [deleting, setDeleting] = useState<IssueColumn | null>(null);
   const grouped = stages !== null && isCustomBoard(columns);
   const byId = new Map(groups.map((g) => [g.id, g]));
+  const wrap = useRef<HTMLDivElement>(null);
+  const more = useScrollSides(wrap);
+  // About two columns at a time, as far as a hand would drag it.
+  const slide = (direction: 1 | -1) => wrap.current?.scrollBy({ left: direction * 520, behavior: "smooth" });
   const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus, foot?: ReactNode) => (
     <section
       key={g.id}
@@ -191,79 +197,105 @@ export function Board({
 
   return (
     <>
-      <div className="issues-boardwrap">
-        <div className={cx("issues-board", grouped && "is-grouped")}>
-          {stages ? (
-            stages.map(({ stage, columns: cols }) => (
-              <section
-                key={stage}
-                className="issues-stage"
-                style={{ "--n": cols.length } as CSSProperties}
-                // A named region only when it groups columns (a plain board names each column).
-                aria-label={grouped ? stageName(stage) : undefined}
-              >
-                {grouped && (
-                  <div className="issues-stage__head">
-                    <Icon name={STATUS_ICON[stage]} size={16} />
-                    <h2>{stageName(stage)}</h2>
-                    <span>{cols.reduce((n, c) => n + dnd.count(c.id), 0)}</span>
+      {/* More columns than the width: the board fades at that side and an arrow there slides it (no scrollbar). */}
+      <div className="issues-boardframe" data-more={more}>
+        {/* A rail of no height that sticks as the page scrolls: the arrows stay in view on a long board. */}
+        <div className="issues-boardframe__rail">
+          <button
+            type="button"
+            className="issues-boardframe__arrow issues-boardframe__arrow--start"
+            aria-label={t("look.previous")}
+            title={t("look.previous")}
+            hidden={more !== "start" && more !== "both"}
+            onClick={() => slide(-1)}
+          >
+            <Icon name="chevronLeft" size={18} />
+          </button>
+          <button
+            type="button"
+            className="issues-boardframe__arrow issues-boardframe__arrow--end"
+            aria-label={t("look.next")}
+            title={t("look.next")}
+            hidden={more !== "end" && more !== "both"}
+            onClick={() => slide(1)}
+          >
+            <Icon name="chevronRight" size={18} />
+          </button>
+        </div>
+        <div ref={wrap} className="issues-boardwrap">
+          <div className={cx("issues-board", grouped && "is-grouped")}>
+            {stages ? (
+              stages.map(({ stage, columns: cols }) => (
+                <section
+                  key={stage}
+                  className="issues-stage"
+                  style={{ "--n": cols.length } as CSSProperties}
+                  // A named region only when it groups columns (a plain board names each column).
+                  aria-label={grouped ? stageName(stage) : undefined}
+                >
+                  {grouped && (
+                    <div className="issues-stage__head">
+                      <Icon name={STATUS_ICON[stage]} size={16} />
+                      <h2>{stageName(stage)}</h2>
+                      <span>{cols.reduce((n, c) => n + dnd.count(c.id), 0)}</span>
+                    </div>
+                  )}
+                  <div className="issues-stage__cols">
+                    {cols.map((col, k) => {
+                      const g = byId.get(col.id);
+                      if (!g) return null;
+                      return column(
+                        g,
+                        <ColumnHead
+                          column={col}
+                          siblings={cols}
+                          index={k}
+                          count={dnd.count(col.id)}
+                          showIcon={!grouped}
+                          renaming={renaming === col.id}
+                          onRename={() => setRenaming(col.id)}
+                          onRenamed={() => setRenaming(null)}
+                          onAddAfter={() => setAdding({ afterId: col.id })}
+                          onDelete={() => setDeleting(col)}
+                        />,
+                        stage,
+                        col.stage === "todo" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon="plus"
+                            block
+                            className="issues-col__add"
+                            aria-label={t("issues.newIn", { column: title(col) })}
+                            onClick={() => onNew(col.id)}
+                          >
+                            {t("issues.new")}
+                          </Button>
+                        ),
+                      );
+                    })}
                   </div>
-                )}
+                </section>
+              ))
+            ) : (
+              <section className="issues-stage" style={{ "--n": groups.length } as CSSProperties}>
                 <div className="issues-stage__cols">
-                  {cols.map((col, k) => {
-                    const g = byId.get(col.id);
-                    if (!g) return null;
-                    return column(
+                  {groups.map((g) =>
+                    column(
                       g,
-                      <ColumnHead
-                        column={col}
-                        siblings={cols}
-                        index={k}
-                        count={dnd.count(col.id)}
-                        showIcon={!grouped}
-                        renaming={renaming === col.id}
-                        onRename={() => setRenaming(col.id)}
-                        onRenamed={() => setRenaming(null)}
-                        onAddAfter={() => setAdding({ afterId: col.id })}
-                        onDelete={() => setDeleting(col)}
-                      />,
-                      stage,
-                      col.stage === "todo" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon="plus"
-                          block
-                          className="issues-col__add"
-                          aria-label={t("issues.newIn", { column: title(col) })}
-                          onClick={() => onNew(col.id)}
-                        >
-                          {t("issues.new")}
-                        </Button>
-                      ),
-                    );
-                  })}
+                      <div className="issues-col__head">
+                        {g.lead}
+                        <h2>{g.name}</h2>
+                        <span className="tabular" data-count={g.id}>
+                          {dnd.count(g.id)}
+                        </span>
+                      </div>,
+                    ),
+                  )}
                 </div>
               </section>
-            ))
-          ) : (
-            <section className="issues-stage" style={{ "--n": groups.length } as CSSProperties}>
-              <div className="issues-stage__cols">
-                {groups.map((g) =>
-                  column(
-                    g,
-                    <div className="issues-col__head">
-                      {g.lead}
-                      <h2>{g.name}</h2>
-                      <span className="tabular" data-count={g.id}>
-                        {dnd.count(g.id)}
-                      </span>
-                    </div>,
-                  ),
-                )}
-              </div>
-            </section>
-          )}
+            )}
+          </div>
         </div>
       </div>
       {stages && (
@@ -497,38 +529,40 @@ export function AddColumnDialog({
           create();
         }}
       >
-        <DialogBody>
-          <Field label={t("issues.columns.name")} id="ic-name">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={40}
-              autoComplete="off"
-              placeholder={t("issues.columns.namePlaceholder")}
-            />
-          </Field>
-          <div className="issues-stagepick">
-            <span className="ac-field__label" id="ic-stage">
-              {t("issues.columns.stageQuestion")}
-            </span>
-            <OptionList
-              layout="tiles"
-              aria-labelledby="ic-stage"
-              value={stage ?? ("" as IssueStatus)}
-              onValueChange={setStage}
-              options={BOARD.map((s) => ({
-                value: s,
-                leading: <Icon name={STATUS_ICON[s]} size={16} />,
-                title: stageName(s),
-                description: t(`issues.columns.stageHint.${s}`),
-              }))}
-            />
-          </div>
-          <p className="issues-explain ac-iconline">
-            <Icon name="arrowRight" size={16} />
-            <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
-          </p>
-        </DialogBody>
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <Field label={t("issues.columns.name")} id="ic-name">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={40}
+                autoComplete="off"
+                placeholder={t("issues.columns.namePlaceholder")}
+              />
+            </Field>
+            <div className="issues-stagepick">
+              <span className="ac-field__label" id="ic-stage">
+                {t("issues.columns.stageQuestion")}
+              </span>
+              <OptionList
+                layout="tiles"
+                aria-labelledby="ic-stage"
+                value={stage ?? ("" as IssueStatus)}
+                onValueChange={setStage}
+                options={BOARD.map((s) => ({
+                  value: s,
+                  leading: <Icon name={STATUS_ICON[s]} size={16} />,
+                  title: stageName(s),
+                  description: t(`issues.columns.stageHint.${s}`),
+                }))}
+              />
+            </div>
+            <p className="issues-explain ac-iconline">
+              <Icon name="arrowRight" size={16} />
+              <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
+            </p>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>
             {t("issues.columns.cancel")}
@@ -623,49 +657,51 @@ function DeleteColumnDialog({
       width={480}
     >
       {n > 0 && (
-        <DialogBody>
-          <div className="issues-dests" role="radiogroup" aria-label={t("issues.columns.destinations")}>
-            {BOARD.map((s) => {
-              const cs = columnsOf(others, s);
-              if (cs.length === 0) return null;
-              return (
-                <div key={s} className="issues-dests__stage">
-                  <span>
-                    <Icon name={STATUS_ICON[s]} size={14} />
-                    {stageName(s)}
-                  </span>
-                  <div className="issues-dests__row">
-                    {cs.map((c) => (
-                      // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
-                      <button
-                        key={c.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={dest === c.id}
-                        className="issues-dest"
-                        onClick={() => setDest(c.id)}
-                      >
-                        {title(c)}
-                      </button>
-                    ))}
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <div className="issues-dests" role="radiogroup" aria-label={t("issues.columns.destinations")}>
+              {BOARD.map((s) => {
+                const cs = columnsOf(others, s);
+                if (cs.length === 0) return null;
+                return (
+                  <div key={s} className="issues-dests__stage">
+                    <span>
+                      <Icon name={STATUS_ICON[s]} size={14} />
+                      {stageName(s)}
+                    </span>
+                    <div className="issues-dests__row">
+                      {cs.map((c) => (
+                        // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
+                        <button
+                          key={c.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={dest === c.id}
+                          className="issues-dest"
+                          onClick={() => setDest(c.id)}
+                        >
+                          {title(c)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          {to && to.stage !== col.stage && (
-            <p className="issues-explain ac-iconline">
-              <Icon name="arrowRight" size={16} />
-              <span>
-                {t("issues.columns.stageChange", {
-                  count: n,
-                  from: stageName(col.stage),
-                  to: stageName(to.stage),
-                })}
-              </span>
-            </p>
-          )}
-        </DialogBody>
+                );
+              })}
+            </div>
+            {to && to.stage !== col.stage && (
+              <p className="issues-explain ac-iconline">
+                <Icon name="arrowRight" size={16} />
+                <span>
+                  {t("issues.columns.stageChange", {
+                    count: n,
+                    from: stageName(col.stage),
+                    to: stageName(to.stage),
+                  })}
+                </span>
+              </p>
+            )}
+          </DialogBody>
+        </Locked>
       )}
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose}>

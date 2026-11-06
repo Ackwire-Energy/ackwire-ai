@@ -73,6 +73,9 @@ export function isTalkerReply(meta: Meta): boolean {
   return (meta?.notice as { kind?: unknown } | undefined)?.kind === "talker_reply";
 }
 
+/** A fast reply given while its task waited (its computer, a person), not while it worked: "enquanto espera". */
+export const talkerWaited = (meta: Meta) => (meta?.talker as { waiting?: unknown } | undefined)?.waiting === true;
+
 /** The routine a report came from: the notice's refs, or the «name» in `from`. */
 export function noticeRoutineName(notice: MessageNotice): string | null {
   if (notice.refs.routineName) return notice.refs.routineName;

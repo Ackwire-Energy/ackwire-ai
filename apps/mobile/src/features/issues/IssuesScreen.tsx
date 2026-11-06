@@ -13,10 +13,13 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, EmptyState, Filters, IconButton, Text } from "@/ui";
-import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
-import { agentLook } from "../shared/logic";
+import { useOrg } from "@/providers/org";
+import { Button, Filters, IconButton, Text, useReducedMotion } from "@/ui";
+import { mayCreate } from "../new/logic";
+import { FirstUse } from "../shared/FirstUse";
+import { useColors, useOrgId, usePullRefresh } from "../shared/hooks";
 import { FocusLive, PushedHeader } from "../shared/parts";
 import { type BoardColumn, issueBoard } from "./logic";
 import { BoardCard, ColumnHeader, useColumnLabel } from "./parts";
@@ -36,7 +39,6 @@ export function IssuesScreen() {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
-  const dir = useDirectory();
   const headerHeight = useHeaderHeight();
   const { width } = useWindowDimensions();
   const issues = useIssues(orgId);
@@ -48,6 +50,7 @@ export function IssuesScreen() {
   const going = useRef<number | null>(null);
   const board = useMemo(() => issueBoard(issues.data ?? [], columns.data ?? []), [issues.data, columns.data]);
   const openNew = () => router.push("/issues/new");
+  const mayNew = mayCreate(useOrg().org, "task");
   const columnWidth = width - PEEK - 16;
   const step = columnWidth + COLUMN_GAP;
   const columnAt = (x: number) => Math.max(0, Math.min(board.length - 1, Math.round(x / step)));
@@ -64,7 +67,10 @@ export function IssuesScreen() {
   const empty = issues.isSuccess && (issues.data ?? []).length === 0;
   return (
     <View style={[styles.screen, { backgroundColor: c.bg, paddingTop: Platform.OS === "ios" ? headerHeight : 0 }]}>
-      <PushedHeader solid={false} right={<IconButton icon="plus" label={t("mobile.issues.new")} onPress={openNew} />} />
+      <PushedHeader
+        solid={false}
+        {...(mayNew ? { right: <IconButton icon="plus" label={t("mobile.issues.new")} onPress={openNew} /> } : {})}
+      />
       <Text variant="display" accessibilityRole="header" numberOfLines={1} style={styles.title}>
         {t("mobile.issues.title")}
       </Text>
@@ -85,13 +91,7 @@ export function IssuesScreen() {
           />
         </View>
       ) : empty ? (
-        <EmptyState
-          sky
-          crew={dir.agents.slice(0, 3).map((a) => ({ ...agentLook(a), id: a.id }))}
-          title={t("mobile.issues.empty")}
-          subtitle={t("mobile.issues.emptyOpen")}
-          action={<Button variant="primary" size="sm" icon="plus" label={t("mobile.issues.new")} onPress={openNew} />}
-        />
+        <FirstUse place="tasks" acts={mayNew} label={t("mobile.issues.new")} onPress={openNew} />
       ) : (
         <>
           <Filters
@@ -142,6 +142,11 @@ function Column({
   const c = useColors();
   const insets = useSafeAreaInsets();
   const columnLabel = useColumnLabel();
+  // A task that moves to another stage while the person watches leaves this column and fades into its new one;
+  // the rest slide into place. The cards there when the board loads don't each fade.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
   let card = 0;
   return (
     <ScrollView
@@ -150,20 +155,28 @@ function Column({
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
-      {b.count === 0 ? (
-        <Text variant="subhead" tone="faint" style={styles.none}>
-          {t("mobile.issues.columnEmpty")}
-        </Text>
-      ) : null}
-      {b.groups.map((g) => (
-        <Fragment key={g.key}>
-          {b.showColumns && g.column ? <ColumnHeader label={columnLabel(g.column)} count={g.items.length} /> : null}
-          {g.items.map((i) => {
-            card += 1;
-            return <BoardCard key={i.id} issue={i} live={card <= LIVE_CARDS} />;
-          })}
-        </Fragment>
-      ))}
+      <LayoutAnimationConfig skipEntering>
+        {b.count === 0 ? (
+          <Animated.View {...fade}>
+            <Text variant="subhead" tone="faint" style={styles.none}>
+              {t("mobile.issues.columnEmpty")}
+            </Text>
+          </Animated.View>
+        ) : null}
+        {b.groups.map((g) => (
+          <Fragment key={g.key}>
+            {b.showColumns && g.column ? <ColumnHeader label={columnLabel(g.column)} count={g.items.length} /> : null}
+            {g.items.map((i) => {
+              card += 1;
+              return (
+                <Animated.View key={i.id} {...fade} layout={layout}>
+                  <BoardCard issue={i} live={card <= LIVE_CARDS} />
+                </Animated.View>
+              );
+            })}
+          </Fragment>
+        ))}
+      </LayoutAnimationConfig>
     </ScrollView>
   );
 }
@@ -174,7 +187,7 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   pager: { paddingLeft: 16, paddingRight: PEEK - COLUMN_GAP, paddingTop: 8, gap: COLUMN_GAP },
-  column: { borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  columnBody: { padding: 10, gap: 9 },
+  column: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  columnBody: { padding: 10, gap: 10 },
   none: { padding: 10, textAlign: "center" },
 });

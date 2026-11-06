@@ -6,6 +6,7 @@ import {
   createBrowserLiveConnection,
   createTouchInput,
   frameMetadata,
+  inputProblem,
   keyEvents,
   PASTE_MAX_BYTES,
   pasteBytes,
@@ -19,7 +20,7 @@ import { useTranslation } from "react-i18next";
 import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { GestureDetector, GestureStateManager, type TouchData, useManualGesture } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
-import { Icon, Text } from "@/ui";
+import { fieldText, Icon, Locked, Text } from "@/ui";
 import { useColors, useConnection } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { keyPastDraft, LIVE_KEYS, type LiveKey, type PageGap, touchOnPage } from "./logic";
@@ -134,15 +135,18 @@ export function TypeBar({
   onText,
   onKey,
   autoFocus,
+  secret: startSecret = false,
 }: {
   onText: (text: string) => void;
   onKey: (key: LiveKey) => void;
   autoFocus?: boolean;
+  /** Opens in its password mode. */
+  secret?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
   const [text, setText] = useState("");
-  const [secret, setSecret] = useState(false);
+  const [secret, setSecret] = useState(startSecret);
   const [keys, setKeys] = useState(false);
   // The draft as typed, read by a held Backspace's repeats before the state catches up.
   const draft = useRef("");
@@ -180,7 +184,8 @@ export function TypeBar({
               onPress={() => key(k)}
               accessibilityRole="button"
               accessibilityLabel={t(`mobile.browser.live.key.${k}`)}
-              style={[styles.keyCap, { backgroundColor: c.sunken }]}
+              hitSlop={KEY_SLOP}
+              style={({ pressed }) => [styles.keyCap, { backgroundColor: c.sunken }, pressed && styles.pressed]}
             >
               <Text variant="footnote" tone="ink2" style={styles.medium}>
                 {KEYCAP[k]}
@@ -191,7 +196,8 @@ export function TypeBar({
             onPress={() => void paste()}
             accessibilityRole="button"
             accessibilityLabel={t("mobile.browser.live.pasteHint")}
-            style={[styles.keyCap, { backgroundColor: c.sunken }]}
+            hitSlop={KEY_SLOP}
+            style={({ pressed }) => [styles.keyCap, { backgroundColor: c.sunken }, pressed && styles.pressed]}
           >
             <Text variant="footnote" tone="ink2" style={styles.medium}>
               {t("mobile.browser.live.paste")}
@@ -210,7 +216,7 @@ export function TypeBar({
           autoFocus={autoFocus}
           placeholder={secret ? t("mobile.browser.live.typeMarkedSecret") : t("mobile.browser.live.typeMarked")}
           placeholderTextColor={c.faint}
-          style={[styles.input, { color: c.ink }]}
+          style={[fieldText("body"), styles.input, { color: c.ink }]}
           secureTextEntry={secret}
           textContentType={secret ? "password" : "none"}
           autoComplete={secret ? "current-password" : "off"}
@@ -226,9 +232,9 @@ export function TypeBar({
           accessibilityState={{ checked: secret }}
           accessibilityLabel={secret ? t("mobile.browser.live.secureOn") : t("mobile.browser.live.secureOff")}
           hitSlop={4}
-          style={tool(secret)}
+          style={({ pressed }) => tool(secret || pressed)}
         >
-          <Icon name="lock" size={17} color={secret ? c.ink : c.muted} />
+          <Icon name="lock" size={18} color={secret ? c.ink : c.muted} />
         </Pressable>
         <Pressable
           onPress={() => setKeys((k) => !k)}
@@ -236,9 +242,9 @@ export function TypeBar({
           accessibilityState={{ expanded: keys }}
           accessibilityLabel={t("mobile.browser.live.keys")}
           hitSlop={4}
-          style={tool(keys)}
+          style={({ pressed }) => tool(keys || pressed)}
         >
-          <Icon name="keyboard" size={17} color={keys ? c.ink : c.muted} />
+          <Icon name="keyboard" size={18} color={keys ? c.ink : c.muted} />
         </Pressable>
         <Pressable
           onPress={send}
@@ -247,7 +253,7 @@ export function TypeBar({
           accessibilityLabel={t("mobile.browser.live.send")}
           style={({ pressed }) => [styles.send, { backgroundColor: c.ink, opacity: !text ? 0.35 : pressed ? 0.8 : 1 }]}
         >
-          <Icon name="send" size={16} color={c.bg} />
+          <Icon name="send" size={18} color={c.bg} />
         </Pressable>
       </View>
     </View>
@@ -302,36 +308,41 @@ export function AddressBar({
   const ready = url.trim().length > 0 && !busy;
   return (
     <View style={styles.typeWrap}>
-      <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
-        <Icon name="globe" size={16} color={c.muted} />
-        <TextInput
-          value={url}
-          onChangeText={(v) => {
-            setUrl(v);
-            setError(null);
-          }}
-          placeholder={t("browser.inCard.goPlaceholder")}
-          placeholderTextColor={c.faint}
-          accessibilityLabel={t("browser.inCard.goLabel")}
-          style={[styles.input, { color: c.ink }]}
-          keyboardType="url"
-          textContentType="URL"
-          autoCapitalize="none"
-          autoCorrect={false}
-          maxLength={2048}
-          returnKeyType="go"
-          onSubmitEditing={() => void go()}
-        />
-        <Pressable
-          onPress={() => void go()}
-          disabled={!ready}
-          accessibilityRole="button"
-          accessibilityLabel={t("browser.inCard.go")}
-          style={({ pressed }) => [styles.send, { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 }]}
-        >
-          <Icon name="right" size={16} color={c.bg} />
-        </Pressable>
-      </View>
+      <Locked when={busy}>
+        <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
+          <Icon name="globe" size={16} color={c.muted} />
+          <TextInput
+            value={url}
+            onChangeText={(v) => {
+              setUrl(v);
+              setError(null);
+            }}
+            placeholder={t("browser.inCard.goPlaceholder")}
+            placeholderTextColor={c.faint}
+            accessibilityLabel={t("browser.inCard.goLabel")}
+            style={[fieldText("body"), styles.input, { color: c.ink }]}
+            keyboardType="url"
+            textContentType="URL"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={2048}
+            returnKeyType="go"
+            onSubmitEditing={() => void go()}
+          />
+          <Pressable
+            onPress={() => void go()}
+            disabled={!ready}
+            accessibilityRole="button"
+            accessibilityLabel={t("browser.inCard.go")}
+            style={({ pressed }) => [
+              styles.send,
+              { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Icon name="right" size={18} color={c.bg} />
+          </Pressable>
+        </View>
+      </Locked>
       {error ? (
         <Text variant="caption" tone="danger" accessibilityRole="alert">
           {error}
@@ -354,6 +365,8 @@ export interface LiveState {
   retry: () => void;
   /** The app's own socket is open: only then can a page come (its "reconnecting" isn't the computer's). */
   online: boolean;
+  /** The last of a person's clicks or keys that didn't reach the page: a new object each time. */
+  lost: { words: NonNullable<ReturnType<typeof inputProblem>> } | null;
 }
 
 /**
@@ -371,6 +384,7 @@ export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: nu
   const [handoff, setHandoff] = useState<{ controllerUserId: string | null } | null | undefined>(undefined);
   const [hidden, setHidden] = useState(false);
   const [online, setOnline] = useState(false);
+  const [lost, setLost] = useState<LiveState["lost"]>(null);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
   // The rate when the watch starts; a change later goes through `setMaxFps` (never a new watch).
   const fps = useRef(maxFps);
@@ -403,6 +417,10 @@ export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: nu
       onError: (code) => {
         if (code === "forbidden" || code === "not_found") setUnavailable("forbidden");
         else if (code === "too_many_browsers") setUnavailable("tooMany");
+        else {
+          const words = inputProblem(code);
+          if (words) setLost({ words });
+        }
       },
     });
     liveRef.current = live;
@@ -439,8 +457,14 @@ export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: nu
     liveRef.current?.sendInput(events);
   }, []);
   const retry = useCallback(() => liveRef.current?.retry(), []);
-  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput, retry, online };
+  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput, retry, online, lost };
 }
+
+/** The field's height and its round buttons: the send button sits concentric in its pill end. */
+const FIELD = 44;
+const FIELD_BUTTON = 34;
+/** A key cap's taps reach the 44 pt the finger needs, above and below (beside it are the other keys). */
+const KEY_SLOP = { top: 5, bottom: 5 };
 
 const styles = StyleSheet.create({
   frame: { flex: 1 },
@@ -453,15 +477,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    borderRadius: 22,
+    borderRadius: FIELD / 2,
     borderWidth: StyleSheet.hairlineWidth,
     paddingLeft: 14,
-    paddingRight: 5,
-    minHeight: 44,
+    paddingRight: (FIELD - FIELD_BUTTON) / 2,
+    minHeight: FIELD,
   },
-  input: { flex: 1, fontSize: 17, paddingVertical: 10 },
-  tool: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  send: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", marginLeft: 2 },
+  input: { flex: 1, paddingVertical: 10 },
+  tool: { width: FIELD_BUTTON, height: FIELD_BUTTON, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  send: {
+    width: FIELD_BUTTON,
+    height: FIELD_BUTTON,
+    borderRadius: FIELD_BUTTON / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 2,
+  },
   keys: { flexDirection: "row", gap: 6, justifyContent: "flex-end" },
-  keyCap: { minWidth: 44, alignItems: "center", paddingVertical: 7, paddingHorizontal: 8, borderRadius: 9 },
+  keyCap: { minWidth: 44, alignItems: "center", paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10 },
+  pressed: { opacity: 0.6 },
 });

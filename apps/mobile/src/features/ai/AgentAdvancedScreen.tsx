@@ -1,4 +1,4 @@
-import type { AgentBrain, AgentBrainInput } from "@agenteschat/client";
+import type { AgentBrain, AgentBrainInput, BrainSpeed } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useModels } from "@agenteschat/client";
 import { signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { EVERYONE_AUDIENCE } from "@agenteschat/client/lib/audience";
@@ -8,6 +8,8 @@ import {
   advancedSummary,
   effortLevel,
   isAdvancedDefault,
+  SPEEDS,
+  viewSpeedFits,
 } from "@agenteschat/client/lib/brain-advanced";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -25,14 +27,15 @@ import { useWidenAsk } from "../chat/ReachLines";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
-import { EffortRamp, useEffortChoice } from "./EffortRamp";
+import { EffortRamp, useBrainChoice, useEffortChoice } from "./EffortRamp";
 import { accountKindOf, agentAccounts } from "./logic";
 import { Note, PlanReplies } from "./parts";
 
 /*
  * An agent's "Configuração avançada" on the phone (ADR 0086), the web's dialog over "Quem pensa" as a screen of its
  * own, opened from "Pensa com" by its owner or an admin: how it thinks (effort on its computer, a ramp with a fixed
- * model and a row that says "Automático" picks it otherwise; the context window, any brain) and who it answers
+ * model and a row that says "Automático" picks it otherwise; Velocidade where it applies; the context window, any
+ * brain) and who it answers
  * ("Atende outras pessoas", answering through the API while its
  * computer is away). Each choice saves at once, like the rest of "Pensa com"; "Voltar ao padrão" puts them all back.
  */
@@ -45,6 +48,7 @@ export const advancedOf = (view: AgentBrain, options?: readonly ContextLimit[]):
   const tokens = isContextLimit(view.contextTokens) ? view.contextTokens : null;
   return {
     effort: effortLevel(view.effort),
+    speed: viewSpeedFits(view) ? view.speed : "standard",
     contextTokens: tokens !== null && (!options || options.includes(tokens)) ? tokens : null,
     onlyOwner: view.onlyOwner,
     fallback: view.fallback,
@@ -91,6 +95,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const now = view ? advancedOf(view, options) : null;
   const may = !busy && view?.canEdit === true;
   const effort = useEffortChoice(agentId, now?.effort);
+  const speed = useBrainChoice<BrainSpeed>(agentId, now?.speed ?? "standard", (value) => ({ speed: value }));
 
   /** Saves at once and says what the row on "Pensa com" will say now (or `done`). */
   const save = async (input: AgentBrainInput, done?: string) => {
@@ -122,6 +127,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
         ? {}
         : {
             ...(autoModel ? {} : { effort: to.effort }),
+            ...(to.speed !== now.speed ? { speed: to.speed } : {}),
             ...(to.onlyOwner !== view.onlyOwner ? { onlyOwner: to.onlyOwner } : {}),
             fallback: to.fallback,
           }),
@@ -164,6 +170,23 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
                   )}
                 </GroupedList>
               </View>
+            ) : null}
+            {viewSpeedFits(view) ? (
+              <>
+                <GroupedHeader>{t("agentPage.work.brain.speed")}</GroupedHeader>
+                <GroupedList>
+                  {SPEEDS.map((s) => (
+                    <GroupedRow
+                      key={s}
+                      label={t(`agentPage.work.brain.speeds.${s}`)}
+                      checked={speed.value === s}
+                      disabled={!view.canEdit}
+                      onPress={() => s !== speed.value && speed.change(s)}
+                    />
+                  ))}
+                </GroupedList>
+                <GroupedFooter>{t("agentPage.work.brain.speedText")}</GroupedFooter>
+              </>
             ) : null}
             <GroupedHeader>{t("agentPage.work.brain.context")}</GroupedHeader>
             <GroupedList>
@@ -250,6 +273,7 @@ const styles = StyleSheet.create({
   in: { paddingHorizontal: 16, paddingTop: 8 },
   loading: { marginTop: 16 },
   // A list without a header keeps a header's room above it.
-  gap: { marginTop: 18 },
-  ramp: { paddingHorizontal: 15, paddingTop: 13, paddingBottom: 12 },
+  gap: { marginTop: 20 },
+  // On the rows' 14 pt edge.
+  ramp: { paddingHorizontal: 14, paddingVertical: 12 },
 });

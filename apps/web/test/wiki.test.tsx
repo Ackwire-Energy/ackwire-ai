@@ -16,7 +16,7 @@ import {
   wrapSelection,
 } from "@agenteschat/client/lib/wiki";
 import { readZip } from "@agenteschat/client/lib/zip";
-import { HOVER_CLOSE_MS } from "@agenteschat/ui";
+import { HOVER_CLOSE_MS, trackInput } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { graphWidth, layoutGraph, neighborsOf } from "@/components/WikiGraph";
@@ -225,6 +225,21 @@ describe("the wiki", () => {
     expect(screen().getByRole("region", { name: "Sobre a página" })).toBeTruthy();
   });
 
+  test("moving a page to the trash promises no restore a person can't do", async () => {
+    await go("wiki/deploy");
+    const more = screen().getByRole("button", { name: "Mais ações" });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Mover para a lixeira" }));
+    expect(screen().getByRole("dialog", { name: "Mover Deploy para a lixeira?" }).textContent).toContain(
+      "Ainda não dá para restaurar pelo app.",
+    );
+  });
+
   test("the visual editor: the page edits as it reads; a changed paragraph saves, the rest as written", async () => {
     const { state } = await go("wiki/onboarding");
     await click(screen().getByRole("button", { name: /^Editar/ }));
@@ -361,7 +376,7 @@ describe("the wiki", () => {
 
   test("empty wiki: a friendly start with the suggested structure", async () => {
     const { state, router } = await go("wiki", seedState(), false);
-    expect(document.body.textContent).toContain("A wiki está vazia");
+    expect(document.body.textContent).toContain("Guarde o que o time precisa saber");
     expect(screen().getByRole("list", { name: "Estrutura sugerida" }).textContent).toContain("Glossário");
     await click(screen().getByRole("button", { name: "Usar a estrutura sugerida" }));
     await settle(10);
@@ -478,10 +493,23 @@ describe("links everywhere", () => {
     await act(() => new Promise((r) => setTimeout(r, HOVER_CLOSE_MS + 20)));
     expect(preview()).toBeNull();
     expect(document.activeElement === box).toBe(true);
+    // Focus a script hands back (a panel closing) opens nothing; the keys' does.
+    trackInput();
+    // Other test files in the same process may have pressed keys: start from a press, as a page load with the mouse would.
+    fireEvent.pointerDown(document.body, { pointerType: "mouse" });
     await act(async () => link.focus());
+    await settle(2);
+    expect(preview()).toBeNull();
+    await act(async () => box.focus());
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "Tab" });
+      link.focus();
+      fireEvent.keyUp(document.body, { key: "Tab" });
+    });
     await settle(2);
     expect(preview()).not.toBeNull();
     expect(document.activeElement === link).toBe(true);
+    await act(async () => fireEvent.pointerDown(document.body));
   });
 
   test("Salvar na wiki from an agent's message appends it with the source", async () => {

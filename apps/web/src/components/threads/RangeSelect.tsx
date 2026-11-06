@@ -13,7 +13,7 @@ import {
   threadTitle,
   timeSpan,
 } from "@agenteschat/client/lib/threads";
-import { Button, Checkbox, Chip, cx, Icon } from "@agenteschat/ui";
+import { Button, Checkbox, Chip, cx, Icon, Locked } from "@agenteschat/ui";
 import {
   type KeyboardEvent,
   type PointerEvent,
@@ -72,6 +72,7 @@ export function useRangeAdjust({
   }, [sel, thread, list]);
   const info = sel ? selectionInfo(list, sel) : null;
   const change = (next: RangeSelection) => {
+    if (mutation.isPending) return;
     setBlind(null);
     setSel(next);
   };
@@ -243,55 +244,57 @@ export function RangeRows({
     );
   };
   return (
-    <section className="thsel" aria-label={t("threads.adjust.rows")}>
-      {list.map((m, j) => {
-        if (runs.hidden.has(m.id)) return null;
-        const inRange = j >= info.ia && j <= info.ib;
-        const left = inRange && sel.excluded.has(m.id);
-        const run = runs.heads.get(m.id);
-        const name = dir.authorName(m.author);
-        const time = formatTime(i18n.language, m.createdAt);
-        const toggle = () => adjust.change(pickRow(list, sel, m.id));
-        return (
-          // biome-ignore lint/a11y: the checkbox (and the caps) are the keyboard way; a tap anywhere on the row does the same
-          <div
-            key={m.id}
-            data-sid={m.id}
-            className={cx(
-              "thsel-row",
-              !inRange && "is-out",
-              inRange && "is-in",
-              left && "is-left",
-              j === info.ia && "is-first",
-              m.id === lastVisible && "is-last",
-              run && "is-collapsed",
-            )}
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest("button, a, [role=checkbox]")) return;
-              toggle();
-            }}
-          >
-            {run ? (
-              <ExcludedLine run={run} onOpen={() => adjust.expand(run.map((x) => x.id))} onInclude={toggleRun(run)} />
-            ) : (
-              <>
-                <Checkbox
-                  className="thsel-row__check"
-                  checked={inRange && !left}
-                  onCheckedChange={toggle}
-                  aria-label={t("threads.adjust.include", { name, time })}
-                />
-                <div className="thsel-row__msg" inert>
-                  {renderMessage(m)}
-                </div>
-              </>
-            )}
-            {j === info.ia && cap("a")}
-            {m.id === lastVisible && cap("b")}
-          </div>
-        );
-      })}
-    </section>
+    <Locked when={adjust.saving}>
+      <section className="thsel" aria-label={t("threads.adjust.rows")}>
+        {list.map((m, j) => {
+          if (runs.hidden.has(m.id)) return null;
+          const inRange = j >= info.ia && j <= info.ib;
+          const left = inRange && sel.excluded.has(m.id);
+          const run = runs.heads.get(m.id);
+          const name = dir.authorName(m.author);
+          const time = formatTime(i18n.language, m.createdAt);
+          const toggle = () => adjust.change(pickRow(list, sel, m.id));
+          return (
+            // biome-ignore lint/a11y: the checkbox (and the caps) are the keyboard way; a tap anywhere on the row does the same
+            <div
+              key={m.id}
+              data-sid={m.id}
+              className={cx(
+                "thsel-row",
+                !inRange && "is-out",
+                inRange && "is-in",
+                left && "is-left",
+                j === info.ia && "is-first",
+                m.id === lastVisible && "is-last",
+                run && "is-collapsed",
+              )}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("button, a, [role=checkbox]")) return;
+                toggle();
+              }}
+            >
+              {run ? (
+                <ExcludedLine run={run} onOpen={() => adjust.expand(run.map((x) => x.id))} onInclude={toggleRun(run)} />
+              ) : (
+                <>
+                  <Checkbox
+                    className="thsel-row__check"
+                    checked={inRange && !left}
+                    onCheckedChange={toggle}
+                    aria-label={t("threads.adjust.include", { name, time })}
+                  />
+                  <div className="thsel-row__msg" inert>
+                    {renderMessage(m)}
+                  </div>
+                </>
+              )}
+              {j === info.ia && cap("a")}
+              {m.id === lastVisible && cap("b")}
+            </div>
+          );
+        })}
+      </section>
+    </Locked>
   );
 }
 
@@ -358,19 +361,21 @@ export function RangeBar({ adjust }: { adjust: RangeAdjust }) {
           {left > 0 && <Chip icon="close">{t("threads.adjust.leftChip", { count: left })}</Chip>}
         </div>
         <div className="thsel-bar__actions">
-          <Button size="sm" variant="ghost" onClick={adjust.cancel}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            icon="check"
-            disabled={!info?.count || Boolean(blind)}
-            loading={adjust.saving}
-            onClick={adjust.save}
-          >
-            {t("common.save")}
-          </Button>
+          <Locked when={adjust.saving}>
+            <Button size="sm" variant="ghost" onClick={adjust.cancel}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              icon="check"
+              disabled={!info?.count || Boolean(blind)}
+              loading={adjust.saving}
+              onClick={adjust.save}
+            >
+              {t("common.save")}
+            </Button>
+          </Locked>
         </div>
       </section>
     </>

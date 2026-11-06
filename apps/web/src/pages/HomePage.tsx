@@ -30,9 +30,10 @@ import {
 } from "@agenteschat/client/lib/home";
 import { waitingParts, waitingText } from "@agenteschat/client/lib/missions";
 import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib/notifications";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
-import { Button, Composer, Icon, PageHeader, Select, SkyGlow } from "@agenteschat/ui";
+import { Button, Composer, cx, EmptyState, Icon, PageHeader, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -42,13 +43,13 @@ import { useMissionsWaitingYou } from "@/components/missions/MissionWaiting";
 import { useNotificationOpener } from "@/components/NotificationOpen";
 import { Face, Headline, SystemFace } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
-import { colorOf } from "@/components/Sky";
 import { HomeMural } from "@/components/widgets/HomeMural";
 import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
 import { agentLine, useAgentPresence } from "@/hooks/usePresence";
 import { TYPED_VALUES } from "@/i18n";
+import { lookOf } from "@/lib/look";
 import { firstStepsHidden, hideFirstSteps } from "@/lib/start";
 import "./home.css";
 // Its "Para você" draws the inbox's rows (Face, SystemFace, the calm card).
@@ -104,6 +105,7 @@ export function HomePage() {
     ? []
     : firstSteps({
         agents: dir.agents.length,
+        made: dir.agents.filter((a) => !isRightHand(a)).length,
         hasAi: ai.data?.any ?? true,
         asked: (statuses.data ?? []).some((s) => s.activeAt !== null),
         people: overview.data?.people ?? 1,
@@ -170,16 +172,17 @@ export function HomePage() {
                 ].slice(0, HOME_ROWS)}
               </ul>
             ) : calm ? (
-              <div className="nt-calm home-calm">
-                <div className="nt-calm__glow">
-                  <SkyGlow color={colorOf(askable[0] ?? dir.agents[0])} />
-                </div>
-                <b>{t("home.calm.title")}</b>
-                <p>{t("home.calm.text")}</p>
-              </div>
-            ) : (
+              <EmptyState
+                size="panel"
+                agent={lookOf(askable[0] ?? dir.agents[0]) ?? true}
+                mood="deal"
+                title={t("home.calm.title")}
+              >
+                {t("home.calm.text")}
+              </EmptyState>
+            ) : loaded ? (
               <p className="wg__empty">{t("home.summary.calm")}</p>
-            ),
+            ) : null,
           horizon: !(waitingCount === 0 && calm),
         }}
         working={{
@@ -379,7 +382,9 @@ function RowBody({
     <>
       <span className="home-row__face">{face}</span>
       <span className="home-row__text">
-        <span className="home-row__title">{title}</span>
+        {/* Over a line of its own, the title's capitals start at the face's top; alone, it sits on the face's
+            first line as the button beside it does. */}
+        <span className={cx("home-row__title", (sub || meta) && "ac-captop")}>{title}</span>
         {sub && <span className="home-row__sub">{sub}</span>}
         {meta && <span className="home-row__meta">{meta}</span>}
       </span>

@@ -23,6 +23,7 @@ import {
   auditWhere,
   TOOL_CALL,
 } from "@agenteschat/client/lib/audit";
+import { humanize } from "@agenteschat/client/lib/custom-tools";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
@@ -32,6 +33,8 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import {
+  Button,
+  EmptyState,
   Filters,
   GroupedFooter,
   GroupedHeader,
@@ -45,6 +48,7 @@ import {
 import { Note } from "../ai/parts";
 import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
+import { useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { copyText, Tile } from "../shared/parts";
 import { chooseAction, Gap, SettingsPage } from "./parts";
@@ -75,6 +79,7 @@ export function AuditScreen({ agentId: first = null }: { agentId?: string | null
   const dir = useDirectory();
   const { orgId, org } = useOrg();
   const admin = can(org, "view_audit");
+  const look = useEmptyLook();
   const [show, setShow] = useState<AuditShow>("all");
   const [agentId, setAgentId] = useState<string | null>(first);
   const audit = useAudit(orgId, auditQueryOf(show, agentId), admin);
@@ -127,7 +132,31 @@ export function AuditScreen({ agentId: first = null }: { agentId?: string | null
             </View>
           ) : null}
           {audit.isSuccess && rows.length === 0 ? (
-            <GroupedFooter>{show === "all" && !agentId ? t("audit.empty") : t("audit.emptyFiltered")}</GroupedFooter>
+            show === "all" && !agentId ? (
+              <EmptyState
+                size="panel"
+                agent={look}
+                mood="deal"
+                title={t("mobile.empty.audit.title")}
+                subtitle={t("mobile.empty.audit.text")}
+              />
+            ) : (
+              <EmptyState
+                size="inline"
+                title={t("audit.emptyFiltered")}
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t("filters.clearAll")}
+                    onPress={() => {
+                      setShow("all");
+                      setAgentId(null);
+                    }}
+                  />
+                }
+              />
+            )
           ) : null}
           {days.map(([day, list]) => (
             <Fragment key={day}>
@@ -216,7 +245,7 @@ function OutcomeLine({ mood, mark, text }: { mood: AuditMood; mark: AuditMark; t
   return (
     <View style={styles.outcome}>
       <LineIcon name={MARK_ICON[mark]} size={13} color={color} variant="caption" />
-      <Text variant="caption" style={[styles.semibold, { color }]} numberOfLines={1}>
+      <Text variant="caption" style={[styles.semibold, { color }, styles.shrink]} numberOfLines={1}>
         {text}
       </Text>
     </View>
@@ -366,7 +395,10 @@ function askedOf(t: TFunction, row: AuditRow) {
   return null;
 }
 
-/** What was sent or kept, a field a row: its name, then its value (a hidden one says so, with a lock). */
+/**
+ * What was sent or kept, a field a row: its name in words ("Issue number", never `issue_number`, as the approval
+ * card says it), then its value (a hidden one says so, with a lock).
+ */
 function KeyValues({ entries }: { entries: [string, unknown][] }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -376,7 +408,7 @@ function KeyValues({ entries }: { entries: [string, unknown][] }) {
         v === AUDIT_HIDDEN ? (
           <GroupedRow
             key={k}
-            label={k}
+            label={humanize(k)}
             below={
               <View style={styles.outcome}>
                 <LineIcon name="lock" size={13} color={c.faint} variant="caption" />
@@ -387,7 +419,7 @@ function KeyValues({ entries }: { entries: [string, unknown][] }) {
             }
           />
         ) : (
-          <GroupedRow key={k} label={k} sub={auditValueText(v)} subLines={6} />
+          <GroupedRow key={k} label={humanize(k)} sub={auditValueText(v)} subLines={6} />
         ),
       )}
     </GroupedList>
@@ -395,9 +427,11 @@ function KeyValues({ entries }: { entries: [string, unknown][] }) {
 }
 
 const styles = StyleSheet.create({
-  note: { paddingHorizontal: 16, paddingTop: 12 },
+  shrink: { flexShrink: 1 },
+  // The other settings screens' note: on the groups' edge, not indented past it.
+  note: { paddingHorizontal: 4, paddingTop: 10 },
   loading: { marginTop: 24 },
-  end: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 },
+  end: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
   outcome: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   time: { fontVariant: ["tabular-nums"] },
   semibold: { fontWeight: "600" },

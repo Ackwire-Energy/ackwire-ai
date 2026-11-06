@@ -28,8 +28,9 @@ test("an agent's answer choices grow with their text and wrap: the island, the c
       "100%",
     ]);
   }
-  // A pill while one line, a rounded box once it wraps: never a radius that reads as a broken pill.
-  expect(last(".ni__choice", "border-radius")).toBe("16px");
+  // Buttons on the ruler's small corner, as the conversation's card and notifications have them: never a pill that
+  // reads as broken once it wraps.
+  expect(last(".ni__choice", "border-radius")).toBe("var(--control-r-sm)");
 });
 
 test("the island's open list keeps a max height and scrolls inside", () => {

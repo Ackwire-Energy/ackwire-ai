@@ -3,11 +3,6 @@
   max-width: none;
   gap: 20px;
 }
-.team-empty {
-  margin: 0;
-  padding: 16px;
-  color: var(--muted);
-}
 .team-eyebrow {
   font-size: 11px;
   font-weight: 600;
@@ -140,6 +135,16 @@
   flex: 1;
   min-width: 0;
   line-height: 1.3;
+}
+/* With a line under the name (a role that wraps in a narrow column): the face at the top, the name's capitals on its
+   top edge (`ac-captop` on the name), the status dot on the name's line, its middle --cap-top under the row's top
+   where the rise puts that line's. One line stays centred on the face. */
+.team-node:has(> .team-node__text > .ac-captop),
+.team-map__who:has(> .team-node__text > .ac-captop) {
+  align-items: flex-start;
+}
+.team-node:has(> .team-node__text > .ac-captop) > .team-node__dot {
+  margin-top: calc(var(--cap-top) - 3.5px);
 }
 .team-node--agent[draggable="true"] {
   cursor: grab;

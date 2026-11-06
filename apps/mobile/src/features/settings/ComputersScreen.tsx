@@ -35,8 +35,9 @@ import { Note, openPage } from "../ai/parts";
 import { SetupWait } from "../computer/SetupWait";
 import { computerIcon } from "../outages/logic";
 import { AgentFace } from "../shared/Face";
+import { firstUseCopy } from "../shared/first-use";
 import { useColors, useMeId } from "../shared/hooks";
-import { goBack, successHaptic } from "../shared/parts";
+import { goBack, Loaded, successHaptic } from "../shared/parts";
 import {
   type AgentComputerPick,
   agentComputerPick,
@@ -115,9 +116,11 @@ export function ComputersScreen() {
           <ActivityIndicator color={c.muted} style={styles.loading} />
         )
       ) : view ? (
-        <WorkspaceComputer view={view} />
+        <Loaded>
+          <WorkspaceComputer view={view} />
+        </Loaded>
       ) : (
-        <>
+        <Loaded>
           <HostComputer />
           <OtherComputers />
           <AgentComputers />
@@ -130,7 +133,7 @@ export function ComputersScreen() {
               onPress={() => openPage(helpUrl("computers", i18n.language))}
             />
           </GroupedList>
-        </>
+        </Loaded>
       )}
     </SettingsPage>
   );
@@ -248,6 +251,8 @@ function OtherComputers() {
   const { orgId, org } = useOrg();
   const machines = useMachines(orgId);
   const list = peoplesMachines(machines.data ?? []);
+  const pairs = can(org, "pair_computers");
+  const noneCopy = firstUseCopy("computers", pairs);
   return (
     <>
       <GroupedHeader>{t("computers.other.title")}</GroupedHeader>
@@ -261,8 +266,11 @@ function OtherComputers() {
         <GroupedList>
           <View style={styles.empty}>
             <ComputerPortrait kind="mac" state="offline" size={96} />
-            <Text variant="callout" tone="ink" style={styles.bold}>
-              {t("computers.other.emptyTitle")}
+            <Text variant="callout" tone="ink" style={[styles.bold, styles.emptyLine]}>
+              {t(noneCopy.title)}
+            </Text>
+            <Text variant="small" tone="muted" style={styles.emptyLine}>
+              {t(noneCopy.text)}
             </Text>
           </View>
         </GroupedList>
@@ -274,8 +282,8 @@ function OtherComputers() {
           ))}
         </GroupedList>
       ) : null}
-      <GroupedFooter>{t("computers.other.text")}</GroupedFooter>
-      {can(org, "pair_computers") ? <ConnectComputer /> : null}
+      {list.length > 0 ? <GroupedFooter>{t("computers.other.text")}</GroupedFooter> : null}
+      {pairs ? <ConnectComputer /> : null}
     </>
   );
 }
@@ -427,6 +435,7 @@ const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10, gap: 10, alignItems: "flex-start" },
   loading: { marginVertical: 16 },
   wait: { padding: 16 },
+  emptyLine: { textAlign: "center" },
   empty: { alignItems: "center", gap: 8, paddingVertical: 20, paddingHorizontal: 16 },
   bold: { fontWeight: "600" },
   link: { textDecorationLine: "underline" },

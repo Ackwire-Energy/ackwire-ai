@@ -29,6 +29,7 @@
     "./sfx": "./src/sfx/synth.ts",
     "./sky/engine": "./src/sky/engine.ts",
     "./sky/math": "./src/sky/math.ts",
+    "./sky/horizon": "./src/sky/horizon.ts",
     "./sky/chart": "./src/sky/chart.ts",
     "./sky/avatar": "./src/sky/avatar.ts",
     "./sky/workspace": "./src/sky/workspace.ts",

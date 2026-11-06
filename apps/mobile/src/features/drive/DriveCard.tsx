@@ -3,8 +3,8 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
-import { CHROME_MAX_SCALE, Icon, type IconName, systemText, Text, useTheme, weights } from "@/ui";
+import { Text as RNText, StyleSheet, View } from "react-native";
+import { CHROME_MAX_SCALE, Icon, type IconName, PressScale, systemText, Text, useTheme, weights } from "@/ui";
 import { encodeFileList } from "../files/logic";
 import { useRemoteFile } from "../files/source";
 import { Face } from "../shared/Face";
@@ -51,13 +51,17 @@ export const DriveCard = memo(function DriveCard({
   const kind = kindKey(a);
   const author = dir.nameOf(a.createdBy);
   return (
-    <Pressable
+    // The card gives under the finger (the open's own tap is its haptic).
+    <PressScale
+      to={0.97}
+      haptic={false}
+      fill={false}
       onPress={() => openDriveItem(a)}
       accessibilityRole="button"
       accessibilityLabel={[a.title, t(`mobile.drive.kind.${kind}`), author, when.short(a.updatedAt)]
         .filter(Boolean)
         .join(", ")}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={styles.card}
     >
       <View style={[styles.preview, surface, highlighted && { borderWidth: 2, borderColor: c.ink }]}>
         <Preview artifact={a} />
@@ -77,7 +81,7 @@ export const DriveCard = memo(function DriveCard({
           {author ? t("mobile.drive.by", { name: author, when: when.short(a.updatedAt) }) : when.short(a.updatedAt)}
         </Text>
       </View>
-    </Pressable>
+    </PressScale>
   );
 });
 
@@ -210,8 +214,7 @@ function ContentPreview({ preview: p }: { preview: Exclude<CardPreview, { kind: 
 
 const styles = StyleSheet.create({
   card: { flex: 1, minWidth: 0 },
-  pressed: { opacity: 0.85 },
-  preview: { aspectRatio: 4 / 3, borderRadius: 16, overflow: "hidden" },
+  preview: { aspectRatio: 4 / 3, borderRadius: 14, overflow: "hidden" },
   pad: { padding: 12, gap: 4 },
   line: { height: 5, borderRadius: 2, marginBottom: 2 },
   docHead: { fontSize: 15, lineHeight: 17, fontWeight: "300", marginBottom: 4 },
@@ -234,7 +237,7 @@ const styles = StyleSheet.create({
     left: 8,
     bottom: 8,
     height: 20,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
@@ -243,6 +246,6 @@ const styles = StyleSheet.create({
   },
   kindText: { fontSize: 11, fontWeight: "700" },
   name: { fontWeight: "600", marginTop: 8 },
-  by: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
+  by: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   grow: { flex: 1, minWidth: 0 },
 });

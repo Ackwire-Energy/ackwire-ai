@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/client";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { messagePath } from "@agenteschat/client/lib/message-links";
 import { can, undoesMemoryChange } from "@agenteschat/client/lib/permissions";
 import {
   appLabel,
@@ -27,7 +28,13 @@ import {
   staleCount,
 } from "@agenteschat/client/lib/proposals";
 import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
-import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
+import {
+  latestSecret,
+  secretLabel,
+  secretRefusalKey,
+  secretValueProblem,
+  secretWhere,
+} from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
 import {
   Button,
@@ -43,7 +50,7 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -56,7 +63,7 @@ import { AgentAvatar } from "./AgentAvatar";
 import { useOpenAgentPanel } from "./agent-panel-context";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useOrg } from "./org-context";
-import { RequestCard, RequestDone, RequestTile, useExpired } from "./RequestCard";
+import { RequestCard, RequestDone, RequestTile, showRequest, useExpired } from "./RequestCard";
 import { savesToVault, VaultSaveBlock, type VaultSaveChoice, vaultSaveDefaults } from "./vault/VaultSave";
 import "./proposals.css";
 
@@ -130,7 +137,13 @@ export function MemoryChangeCard({
           {t("memoryCard.was", { text: update.previousText })}
         </p>
       )}
+      {/* Undo, a button, before the ghost link: as every request card's row, the filled ones first. */}
       <div className="ac-approval__actions ac-acts">
+        {!undone && update.undo && undoesMemoryChange(update, dir.anyAgent(agentId), me.user.id, org, sentAt) && (
+          <Button size="sm" disabled={revert.isPending} loading={revert.isPending} onClick={() => revert.mutate()}>
+            {t("memoryCard.undo")}
+          </Button>
+        )}
         <Button asChild variant="ghost" size="sm">
           <Link
             to="/org/$orgId/agents/$agentId/memory"
@@ -140,11 +153,6 @@ export function MemoryChangeCard({
             {t("memoryCard.open", g)}
           </Link>
         </Button>
-        {!undone && update.undo && undoesMemoryChange(update, dir.anyAgent(agentId), me.user.id, org, sentAt) && (
-          <Button size="sm" disabled={revert.isPending} loading={revert.isPending} onClick={() => revert.mutate()}>
-            {t("memoryCard.undo")}
-          </Button>
-        )}
       </div>
     </div>
   );
@@ -310,6 +318,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
           ) : undefined
         }
         what={target}
+        locked={decide.isPending}
       />
     );
   }
@@ -513,6 +522,7 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
           ) : undefined
         }
         what={tt(head.key, head.values).replace(/<\/?b>/g, "")}
+        locked={decide.isPending}
       />
     );
   }
@@ -553,11 +563,20 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const api = useApi();
   const dir = useDirectory(org.id);
   const live = useLiveStore();
-  const current = useLive((s) => s.questions[question.id]) ?? question;
+  const fresh = useLive((s) => s.questions[question.id]);
+  const current = fresh?.status === "open" && question.status !== "open" ? question : (fresh ?? question);
   const [error, setError] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const [text, setText] = useState("");
   const reopen = useRef<HTMLButtonElement>(null);
+  // Refused because it ended (someone answered, its run stopped): the card closes here, even if no event came.
+  const [ended, setEnded] = useState(false);
+  const refused = (err: unknown, fallback: "question.failed" | "question.skipFailed") => {
+    if ((err as { status?: number }).status !== 409) return setError(t(fallback));
+    setText("");
+    setEnded(true);
+    live.answered({ ...current, status: "answered", answer: null, answeredByUserId: null });
+  };
   const answer = useMutation({
     mutationFn: (input: { choice: string } | { text: string }) => api.questions.answer(org.id, question.id, input),
     // Errors are explained on the card.
@@ -565,16 +584,14 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
     onMutate: () => setError(null),
     onSuccess: (res, input) =>
       live.answered({ ...res, answer: res.answer ?? ("choice" in input ? input.choice : input.text) }),
-    onError: (err) =>
-      setError((err as { status?: number }).status === 409 ? t("question.alreadyAnswered") : t("question.failed")),
+    onError: (err) => refused(err, "question.failed"),
   });
   const skip = useMutation({
     mutationFn: () => api.questions.dismiss(org.id, question.id),
     meta: { silent: true },
     onMutate: () => setError(null),
     onSuccess: (res) => live.answered(res),
-    onError: (err) =>
-      setError((err as { status?: number }).status === 409 ? t("question.alreadyAnswered") : t("question.skipFailed")),
+    onError: (err) => refused(err, "question.skipFailed"),
   });
   const busy = answer.isPending || skip.isPending;
   const agent = dir.anyAgent(question.agentId);
@@ -685,6 +702,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         }
         what={current.text}
         onSubmit={writing ? send : undefined}
+        locked={busy}
       />
     );
   }
@@ -707,7 +725,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
             t("question.dismissedByYou")
           )
         ) : current.answer === null ? (
-          t("question.closed")
+          t(ended ? "question.alreadyAnswered" : "question.closed")
         ) : who ? (
           <Trans
             i18nKey="question.answered"
@@ -741,7 +759,11 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const toast = useToast();
   const dir = useDirectory(org.id);
   const live = useLiveStore();
-  const current = useLive((s) => s.secrets[request.id]) ?? request;
+  const current = latestSecret(
+    useLive((s) => s.secrets[request.id]),
+    request,
+  );
+  const navigate = useNavigate();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   // "Save to the Vault" (ADR 0144): a site's password or a variable, saved after it went to the computer.
@@ -768,9 +790,29 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   // Past its deadline it closes as expired, even before the server's event says so.
   const expired = useExpired(current.status === "pending" ? current.expiresAt : null);
   const pending = current.status === "pending" && !expired;
-  const failed = (err: unknown) => {
-    const status = (err as { status?: number }).status;
-    setError(status === 409 ? t("secret.alreadyAnswered") : t("secret.failed"));
+  // It ended (an event, its deadline, a refusal): what was typed goes with the field.
+  useEffect(() => {
+    if (!pending) setValue("");
+  }, [pending]);
+  // Refused: the computer can't take it now and the card goes on, or the request ended and the card says how.
+  const failed = async (err: unknown) => {
+    const away = secretRefusalKey(err);
+    if (away) return setError(t(away, { agent: agentName, time: formatTime(i18n.language, current.expiresAt) }));
+    if ((err as { status?: number }).status !== 409) return setError(t("secret.failed"));
+    const fresh = await api.secrets.get(org.id, current.id).catch(() => null);
+    live.secretAnswered(
+      fresh && fresh.status !== "pending" ? fresh : { ...current, status: "canceled", publicKey: null },
+    );
+  };
+  // The newer card, when this conversation shows it; else where it is.
+  const showNewer = async () => {
+    const id = current.supersededBy;
+    if (!id) return;
+    if (document.querySelector(`[data-ask-id="${id}"]`)) return showRequest(document.body, id, true);
+    const newer = await api.secrets.get(org.id, id).catch(() => null);
+    if (newer?.messageId) {
+      await navigate({ href: messagePath(org.id, { ...newer, id: newer.messageId }) });
+    }
   };
   const forgetRetry = () => {
     retryable.current = null;
@@ -843,6 +885,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     deliver.mutate({ text: value, choice: savable && keep.on ? keep : null }, { onSettled: () => deliver.reset() });
   };
   const where = secretWhere(t, current, agentName);
+  const label = secretLabel(t, current, agentName);
   const until = t("secret.until", { time: formatTime(i18n.language, current.expiresAt) });
   // Waiting: a request card; only the person asked gets the field (the whole card is its form).
   if (pending) {
@@ -858,8 +901,10 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         lead={current.purpose}
         object={{
           logo: <RequestTile>{host ? <SiteIcon host={host} /> : <Icon name="lock" size={16} />}</RequestTile>,
-          title: current.name,
-          detail: where,
+          title: label,
+          detail: current.username
+            ? t("common.joinSentences", { a: where, b: t("secret.account", { username: current.username }) })
+            : where,
         }}
         body={
           mine ? (
@@ -871,7 +916,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                     length={codeDigits}
                     value={value}
                     onChange={setValue}
-                    label={t("secret.label", { name: current.name })}
+                    label={label}
                     boxLabel={(n, total) => t("vault.card.codeBox", { n, total })}
                     invalid={Boolean(error)}
                     disabled={deliver.isPending}
@@ -882,8 +927,8 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                     autoComplete="off"
                     spellCheck={false}
                     value={value}
-                    placeholder={t("secret.label", { name: current.name })}
-                    aria-label={t("secret.label", { name: current.name })}
+                    placeholder={t("secret.placeholder")}
+                    aria-label={label}
                     invalid={Boolean(error)}
                     onChange={(e) => setValue(e.target.value)}
                     data-1p-ignore
@@ -939,8 +984,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           ) : undefined
         }
         end={until}
-        what={current.name}
+        what={label}
         onSubmit={mine ? submit : undefined}
+        locked={deliver.isPending || decline.isPending}
       />
     );
   }
@@ -952,8 +998,15 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         done={current.status === "delivered"}
         label={t("secret.group", { agent: agentName })}
         more={{ label: t("approval.seeDetails"), content: `${current.purpose}\n${where}` }}
+        action={
+          current.supersededBy ? (
+            <Button size="sm" variant="ghost" onClick={() => void showNewer()}>
+              {t("secret.seeNewer")}
+            </Button>
+          ) : undefined
+        }
       >
-        {secretOutcome(t, current, mine, person)}: <b>{current.name}</b>
+        <b>{label}</b> · {secretOutcome(t, current, mine, person, agentName)}
         {ended && ` · ${whenAt(t, i18n.language, ended)}`}
         {vaultSave === "saved" && ` · ${t("vault.card.saved")}`}
       </RequestDone>

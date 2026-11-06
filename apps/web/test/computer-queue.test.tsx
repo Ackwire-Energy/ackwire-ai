@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Agent, ComputerQueue, Message } from "@agenteschat/client";
+import type { ActiveRun, Agent, ComputerQueue, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
@@ -21,7 +21,18 @@ const in_ = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const row = (id: string) => document.querySelector(`article[data-message-id="${id}"]`) as HTMLElement;
 const turns = () => [...document.querySelectorAll<HTMLElement>(".cq-turn")];
+/** A run with no words yet shows here, not as a block of its own. */
+const thinking = () => document.querySelector(".ac-typing")?.textContent ?? "";
 const orgEvent = (event: Record<string, unknown>) => ({ type: "event", scope: "org", event });
+const atlasWaits = () => ({
+  type: "agent.run",
+  channelId: ENG_ID,
+  threadId: null,
+  agentId: ATLAS_ID,
+  runId: "r-atlas",
+  status: "waiting_input",
+  computer: "queued",
+});
 
 function setup() {
   const state = seedState();
@@ -95,6 +106,20 @@ const said = (over: Partial<Message>) =>
   }) as Message;
 
 describe("a computer's line", () => {
+  test("an agent's picture in it opens its details beside the conversation, and the dialog closes", async () => {
+    const { api } = setup();
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    await click(screen().getByRole("button", { name: "Computador · 2 aguardando" }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Fila de Studio" });
+    await click(within(dialog).getByRole("button", { name: "Perfil de Atlas" }));
+    await settle(6);
+    const panel = screen().getByRole("complementary", { name: "Perfil do Atlas" });
+    expect(screen().queryByRole("dialog", { name: "Fila de Studio" })).toBeNull();
+    expect(panel.contains(document.activeElement)).toBe(true);
+  });
+
   test("the header says who waits and opens the line in place: working now, in line, my request first", async () => {
     const { api } = setup();
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
@@ -302,6 +327,233 @@ describe("a computer's line", () => {
     // (Behind the computer's dialog, so read from the page itself.)
     expect(header.querySelectorAll(".brw-dm")).toHaveLength(1);
     expect(header.querySelector(".cq-btn")).toBeNull();
+  });
+});
+
+describe("a wait in the conversation holds still", () => {
+  const waitingReceipt = {
+    seenBy: [ATLAS_ID],
+    pickedBy: [ATLAS_ID],
+    handled: [{ agentId: ATLAS_ID, runId: "r-atlas", status: "waiting_input" as const, computer: "queued" as const }],
+    blocked: [],
+  };
+  const lineWithout = (q: ComputerQueue, runId: string) => ({
+    ...q,
+    waiting: q.waiting.filter((w) => w.runId !== runId),
+  });
+
+  test("two messages from one person to an agent in line show one wait, after the latest", async () => {
+    const { api, state, me } = setup();
+    const author = { type: "person" as const, id: me };
+    state.messages.push(
+      said({ author, receipts: waitingReceipt }),
+      said({ id: "m-again", author, body: "?", mentionedAgentIds: [], receipts: waitingReceipt }),
+    );
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    expect(turns()).toHaveLength(1);
+    const place = row("m-again").compareDocumentPosition(turns()[0] as HTMLElement);
+    expect(place & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Each message keeps its own receipt, and they say the same.
+    for (const id of ["m-ask", "m-again"])
+      expect(row(id).querySelector(".ac-msg__foot")?.textContent).toContain("é o próximo");
+  });
+
+  test("a second message arrives live: the wait stays one, and the message gets the same receipt", async () => {
+    const { api, state, me } = setup();
+    const author = { type: "person" as const, id: me };
+    state.messages.push(said({ author, receipts: waitingReceipt }));
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(10);
+    const message = said({ id: "m-again", author, body: "?", mentionedAgentIds: [] });
+    const channelEvent = (event: Record<string, unknown>) => ({ type: "event", channelId: ENG_ID, event });
+    await act(async () => {
+      socket.push(channelEvent({ type: "message.created", channelId: ENG_ID, message }));
+      socket.push(
+        channelEvent({
+          type: "agent.run.steered",
+          channelId: ENG_ID,
+          threadId: null,
+          runId: "r-atlas",
+          agentId: ATLAS_ID,
+          messageId: "m-again",
+          computer: "queued",
+        }),
+      );
+    });
+    await settle(6);
+    expect(turns()).toHaveLength(1);
+    expect(row("m-again").querySelector(".ac-msg__foot")?.textContent).toContain("é o próximo");
+    expect(thinking()).not.toContain("pensando");
+  });
+
+  test("a read of the line that lacks the run takes nothing away: the row stays, in plain words", async () => {
+    const { api, state, machines, queue, me } = setup();
+    state.messages.push(said({ author: { type: "person", id: me }, receipts: waitingReceipt }));
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(10);
+    expect(turns()[0]?.textContent).toContain("É o próximo, em cerca de 2 min");
+
+    machines?.setQueue(lineWithout(queue, "r-atlas"));
+    await act(async () => socket.push(orgEvent({ type: "computer.queue", machineId: queue.machineId })));
+    await settle(6);
+    expect(turns()).toHaveLength(1);
+    expect(turns()[0]?.textContent).toContain("Aguardando o computador");
+
+    machines?.setQueue(queue);
+    await act(async () => socket.push(orgEvent({ type: "computer.queue", machineId: queue.machineId })));
+    await settle(6);
+    expect(turns()[0]?.textContent).toContain("É o próximo, em cerca de 2 min");
+  });
+
+  test("the run goes from thinking to the line: its wait shows before the line is read", async () => {
+    const { api, state, machines, queue, me } = setup();
+    machines?.setQueue(lineWithout(queue, "r-atlas"));
+    state.messages.push(
+      said({
+        author: { type: "person", id: me },
+        receipts: { ...waitingReceipt, handled: [{ agentId: ATLAS_ID, runId: "r-atlas", status: "running" }] },
+      }),
+    );
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(10);
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: atlasWaits() }));
+    await settle(6);
+    expect(turns()).toHaveLength(1);
+    expect(turns()[0]?.textContent).toContain("Aguardando o computador");
+  });
+
+  test("back on a hidden tab, the run asking the computer again: one wait, no thinking row", async () => {
+    const { api, state, me, machines, queue } = setup();
+    state.messages.push(said({ author: { type: "person", id: me }, receipts: waitingReceipt }));
+    state.activeRuns = {
+      [ENG_ID]: [
+        {
+          runId: "r-atlas",
+          agentId: ATLAS_ID,
+          channelId: ENG_ID,
+          threadId: null,
+          status: "waiting_input",
+          triggerMessageId: "m-ask",
+          startedAt: in_(-11),
+          heartbeatAt: null,
+          createdAt: in_(-11),
+          pendingMessageIds: [],
+          background: false,
+        } as unknown as ActiveRun,
+      ],
+    };
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(10);
+    expect(turns()).toHaveLength(1);
+    machines?.setQueue(lineWithout(queue, "r-atlas"));
+    const visible = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    const tab = (state: string) => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const realNow = Date.now;
+    await act(async () => tab("hidden"));
+    Date.now = () => realNow() + 60_000;
+    await act(async () => tab("visible"));
+    await settle(8);
+    Date.now = realNow;
+    if (visible) Object.defineProperty(document, "visibilityState", visible);
+    expect(turns()).toHaveLength(1);
+    expect(thinking()).not.toContain("pensando");
+  });
+
+  const backOnTheTab = async () => {
+    const visible = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    const tab = (state: string) => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const realNow = Date.now;
+    await act(async () => tab("hidden"));
+    Date.now = () => realNow() + 60_000;
+    await act(async () => tab("visible"));
+    await settle(8);
+    Date.now = realNow;
+    if (visible) Object.defineProperty(document, "visibilityState", visible);
+  };
+
+  test("the computer took its turn while the tab was hidden: its live row comes back, the wait goes", async () => {
+    const { api, state, machines, queue, me } = setup();
+    const running = {
+      ...waitingReceipt,
+      handled: [{ agentId: ATLAS_ID, runId: "r-atlas", status: "running" as const }],
+    };
+    const asked = said({ author: { type: "person", id: me }, receipts: running });
+    state.messages.push(asked);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(10);
+    const channelEvent = (event: Record<string, unknown>) => ({ type: "event", channelId: ENG_ID, event });
+    const where = { channelId: ENG_ID, threadId: null, agentId: ATLAS_ID, runId: "r-atlas" };
+    await act(async () => socket.push(channelEvent({ type: "agent.thinking", ...where })));
+    await settle(4);
+    expect(thinking()).toContain("pensando");
+    await act(async () => socket.push(channelEvent(atlasWaits())));
+    await settle(4);
+    expect(turns()).toHaveLength(1);
+    expect(thinking()).not.toContain("pensando");
+
+    // Every event of the run starting is lost: only the reads say it.
+    state.messages[state.messages.indexOf(asked)] = { ...asked, receipts: { ...running } };
+    state.activeRuns = {
+      [ENG_ID]: [
+        {
+          ...where,
+          status: "running",
+          triggerMessageId: "m-ask",
+          startedAt: in_(-1),
+          heartbeatAt: in_(0),
+          createdAt: in_(-11),
+          pendingMessageIds: [],
+          background: false,
+        } as unknown as ActiveRun,
+      ],
+    };
+    machines?.setQueue(lineWithout(queue, "r-atlas"));
+    await backOnTheTab();
+    expect(turns()).toHaveLength(0);
+    expect(thinking()).toContain("pensando");
+  });
+
+  test("a receipt that says the line beside the run's live row is no second row", async () => {
+    const { api, state, me } = setup();
+    const running = {
+      ...waitingReceipt,
+      handled: [{ agentId: ATLAS_ID, runId: "r-atlas", status: "running" as const }],
+    };
+    const author = { type: "person" as const, id: me };
+    state.messages.push(said({ author, receipts: running }));
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(10);
+    const channelEvent = (event: Record<string, unknown>) => ({ type: "event", channelId: ENG_ID, event });
+    const where = { channelId: ENG_ID, threadId: null, agentId: ATLAS_ID, runId: "r-atlas" };
+    const message = said({ id: "m-again", author, body: "?", mentionedAgentIds: [] });
+    await act(async () => {
+      socket.push(channelEvent({ type: "agent.thinking", ...where }));
+      socket.push(channelEvent({ type: "message.created", channelId: ENG_ID, message }));
+      // Read while it asked, told just after the computer took the turn.
+      socket.push(channelEvent({ type: "agent.run.steered", ...where, messageId: "m-again", computer: "queued" }));
+    });
+    await settle(6);
+    expect(thinking()).toContain("pensando");
+    expect(turns()).toHaveLength(0);
   });
 });
 

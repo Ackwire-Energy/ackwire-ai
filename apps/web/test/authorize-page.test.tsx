@@ -285,6 +285,19 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0119)", () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  test("one being deleted says so with its date, not that it's paused", async () => {
+    const dueAt = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    await open((fake) =>
+      fake.addConsent(
+        REQ,
+        {},
+        { workspaces: [{ id: ORG_ID, name: "Acme", logo: null, paused: true, current: true, deletion: { dueAt } }] },
+      ),
+    );
+    expect(page().textContent).toContain("Acme (Sendo apagado, some em");
+    expect(page().textContent).not.toContain("Acme (pausado)");
+  });
+
   test("the only workspace paused: says so and links to it; Permitir stays off", async () => {
     await open((apps) =>
       apps.addConsent(REQ, {}, { workspaces: [{ id: ORG_ID, name: "Acme", logo: null, paused: true, current: true }] }),

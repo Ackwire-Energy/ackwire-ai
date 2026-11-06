@@ -42,6 +42,7 @@ import {
   Field,
   Icon,
   Input,
+  Locked,
   Segmented,
   Select,
 } from "@agenteschat/ui";
@@ -337,93 +338,97 @@ export function ImapStep({
         submit();
       }}
     >
-      <DialogBody className="cflow__body">
-        <p className="muted cflow__text">{t(`mail.imapText.${choice}`)}</p>
-        {choice === "other" && (
-          <Field label={t("mail.provider")} id="mail-preset">
-            <Select
-              value={preset}
-              onValueChange={(v) => {
-                setPicked(v);
-                setError(null);
-              }}
-              options={[
-                ...others.map((p) => ({ value: p.id, label: p.label })),
-                { value: CUSTOM_PRESET, label: t("mail.providerCustom") },
-              ]}
+      <Locked when={connectImap.isPending}>
+        <DialogBody className="cflow__body">
+          <p className="muted cflow__text">{t(`mail.imapText.${choice}`)}</p>
+          {choice === "other" && (
+            <Field label={t("mail.provider")} id="mail-preset">
+              <Select
+                value={preset}
+                onValueChange={(v) => {
+                  setPicked(v);
+                  setError(null);
+                }}
+                options={[
+                  ...others.map((p) => ({ value: p.id, label: p.label })),
+                  { value: CUSTOM_PRESET, label: t("mail.providerCustom") },
+                ]}
+              />
+            </Field>
+          )}
+          <Field
+            label={t("mail.address")}
+            id="mail-address"
+            help={webmail ? t("mail.icloudHint", { name: webmail }) : undefined}
+            error={addressError}
+          >
+            <Input
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={address}
+              placeholder={t("mail.addressPlaceholder")}
+              onChange={(e) => setAddress(e.target.value)}
             />
           </Field>
-        )}
-        <Field
-          label={t("mail.address")}
-          id="mail-address"
-          help={webmail ? t("mail.icloudHint", { name: webmail }) : undefined}
-          error={addressError}
-        >
-          <Input
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            value={address}
-            placeholder={t("mail.addressPlaceholder")}
-            onChange={(e) => setAddress(e.target.value)}
-          />
-        </Field>
-        <Field label={t("mail.password")} id="mail-password" help={t("mail.passwordHelp")} error={passwordError}>
-          <Input
-            type="password"
-            autoComplete="off"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setError(null);
-            }}
-          />
-        </Field>
-        <AppPasswordHelp url={current?.appPasswordUrl ?? null} name={current?.label ?? mailChoiceName(t, choice)} />
-        <p className="small muted mail-hint">
-          <Icon name="info" size={14} />
-          <span>{t("mail.dedicated")}</span>
-        </p>
-        {choice === "other" && (
-          <details
-            className="cflow__more"
-            open={advanced || custom}
-            onToggle={(e) => setAdvanced((e.currentTarget as HTMLDetailsElement).open)}
-          >
-            <summary>{t("mail.advanced")}</summary>
-            <div className="cflow__key">
-              <Field label={t("mail.username")} id="mail-username" help={t("mail.usernameHelp")}>
-                <Input autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
-              </Field>
-              {custom && (
-                <>
-                  <div className="mail-host">
-                    <Field label={t("mail.imapHost")} id="mail-imap-host">
-                      <Input value={imapHost} onChange={(e) => setImapHost(e.target.value)} />
-                    </Field>
-                    <Field label={t("mail.port")} id="mail-imap-port">
-                      <Input inputMode="numeric" value={imapPort} onChange={(e) => setImapPort(e.target.value)} />
-                    </Field>
-                  </div>
-                  <div className="mail-host">
-                    <Field label={t("mail.smtpHost")} id="mail-smtp-host">
-                      <Input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} />
-                    </Field>
-                    <Field label={t("mail.port")} id="mail-smtp-port">
-                      <Input inputMode="numeric" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} />
-                    </Field>
-                  </div>
-                  {touched && hostsMissing && <Alert>{t("mail.hostsRequired")}</Alert>}
-                </>
-              )}
-            </div>
-          </details>
-        )}
-        {error && (
-          <Alert>{t(error === "auth" && choice === "icloud" ? "mail.error.auth_icloud" : `mail.error.${error}`)}</Alert>
-        )}
-      </DialogBody>
+          <Field label={t("mail.password")} id="mail-password" help={t("mail.passwordHelp")} error={passwordError}>
+            <Input
+              type="password"
+              autoComplete="off"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError(null);
+              }}
+            />
+          </Field>
+          <AppPasswordHelp url={current?.appPasswordUrl ?? null} name={current?.label ?? mailChoiceName(t, choice)} />
+          <p className="small muted mail-hint">
+            <Icon name="info" size={14} />
+            <span>{t("mail.dedicated")}</span>
+          </p>
+          {choice === "other" && (
+            <details
+              className="cflow__more"
+              open={advanced || custom}
+              onToggle={(e) => setAdvanced((e.currentTarget as HTMLDetailsElement).open)}
+            >
+              <summary>{t("mail.advanced")}</summary>
+              <div className="cflow__key">
+                <Field label={t("mail.username")} id="mail-username" help={t("mail.usernameHelp")}>
+                  <Input autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
+                </Field>
+                {custom && (
+                  <>
+                    <div className="mail-host">
+                      <Field label={t("mail.imapHost")} id="mail-imap-host">
+                        <Input value={imapHost} onChange={(e) => setImapHost(e.target.value)} />
+                      </Field>
+                      <Field label={t("mail.port")} id="mail-imap-port">
+                        <Input inputMode="numeric" value={imapPort} onChange={(e) => setImapPort(e.target.value)} />
+                      </Field>
+                    </div>
+                    <div className="mail-host">
+                      <Field label={t("mail.smtpHost")} id="mail-smtp-host">
+                        <Input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} />
+                      </Field>
+                      <Field label={t("mail.port")} id="mail-smtp-port">
+                        <Input inputMode="numeric" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} />
+                      </Field>
+                    </div>
+                    {touched && hostsMissing && <Alert>{t("mail.hostsRequired")}</Alert>}
+                  </>
+                )}
+              </div>
+            </details>
+          )}
+          {error && (
+            <Alert>
+              {t(error === "auth" && choice === "icloud" ? "mail.error.auth_icloud" : `mail.error.${error}`)}
+            </Alert>
+          )}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={testing ?? t("connectFlow.nothingYet")}>
         <Button type="button" onClick={onClose}>
           {t("common.cancel")}
@@ -525,11 +530,13 @@ function AddressesStep({
   };
   return (
     <>
-      <DialogBody className="cflow__body">
-        <p className="muted cflow__text">{t("mail.addresses.lead")}</p>
-        <AddressesFields account={account} draft={draft} />
-        {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
-      </DialogBody>
+      <Locked when={update.isPending}>
+        <DialogBody className="cflow__body">
+          <p className="muted cflow__text">{t("mail.addresses.lead")}</p>
+          <AddressesFields account={account} draft={draft} />
+          {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={t("mail.addresses.later")}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" disabled={update.isPending} loading={update.isPending} onClick={next}>
@@ -575,10 +582,12 @@ function AddressesDialogBody({ account, onClose }: { account: MailAccount; onClo
     );
   return (
     <>
-      <DialogBody className="cflow__body">
-        <AddressesFields account={account} draft={draft} />
-        {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
-      </DialogBody>
+      <Locked when={update.isPending}>
+        <DialogBody className="cflow__body">
+          <AddressesFields account={account} draft={draft} />
+          {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
@@ -627,24 +636,26 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
   };
   return (
     <>
-      <DialogBody className="cflow__body tr-body">
-        <p className="muted cflow__text">{t("mail.toolsLead", { name: account.address })}</p>
-        {mine ? (
-          <ToolReview
-            name={account.address}
-            tools={tools}
-            state={state}
-            onChange={setState}
-            onMoved={(m) => toast.show(m)}
-          />
-        ) : (
-          <>
-            <OwnerOnlyNote account={account} />
-            <ToolLevelsView tools={tools} />
-          </>
-        )}
-        {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
-      </DialogBody>
+      <Locked when={update.isPending}>
+        <DialogBody className="cflow__body tr-body">
+          <p className="muted cflow__text">{t("mail.toolsLead", { name: account.address })}</p>
+          {mine ? (
+            <ToolReview
+              name={account.address}
+              tools={tools}
+              state={state}
+              onChange={setState}
+              onMoved={(m) => toast.show(m)}
+            />
+          ) : (
+            <>
+              <OwnerOnlyNote account={account} />
+              <ToolLevelsView tools={tools} />
+            </>
+          )}
+          {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={mine ? reviewNote(t, tools, state) : undefined}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" disabled={update.isPending} loading={update.isPending} onClick={mine ? next : onNext}>
@@ -709,59 +720,63 @@ function WhoStep({
 
   return (
     <>
-      <DialogBody className="cflow__body">
-        {agents.isLoading ? (
-          <LoadingList count={3} />
-        ) : list.length === 0 ? (
-          <p className="muted">{t("connectFlow.noAgents")}</p>
-        ) : (
-          <>
-            <div className="cflow__all">
-              <span className="small muted">{t("connectFlow.all")}</span>
-              {LEVELS.map((l) => (
-                <Button
-                  key={l}
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t("connectFlow.allLevel", { level: levelLabel(l) })}
-                  onClick={() =>
-                    setWho(Object.fromEntries(list.filter((a) => levelsFor(a).includes(l)).map((a) => [a.id, l])))
-                  }
-                >
-                  {levelLabel(l)}
-                </Button>
-              ))}
-            </div>
-            <ul className="cflow-agents">
-              {list.map((a) => (
-                <li key={a.id} className="cflow-agent">
-                  <AgentAvatar agentId={a.id} name={a.name} size="sm" />
-                  <span className="cflow-agent__name">
-                    <span>{a.name}</span>
-                    {a.role && <span className="small muted">{a.role}</span>}
-                  </span>
-                  <Segmented
+      <Locked when={grant.isPending}>
+        <DialogBody className="cflow__body">
+          {agents.isLoading ? (
+            <LoadingList count={3} />
+          ) : list.length === 0 ? (
+            <p className="muted">{t("connectFlow.noAgents")}</p>
+          ) : (
+            <>
+              <div className="cflow__all">
+                <span className="small muted">{t("connectFlow.all")}</span>
+                {LEVELS.map((l) => (
+                  <Button
+                    key={l}
                     size="sm"
-                    label={t("connectFlow.levelOf", { name: a.name })}
-                    value={levelOf(a.id)}
-                    onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
-                    options={levelsFor(a).map((l) => ({ value: l, label: levelLabel(l) }))}
-                  />
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        <p className="small muted cflow__asks">
-          <Icon name="lock" />
-          {t("connectFlow.asksCount", { count: MAIL_ACTIONS.approval.length })}
-        </p>
-        <p className="small muted cflow__text">{t("mail.whoLead")}</p>
-        <OwnerOnlyNote account={account} />
-        {grant.isError && <Alert>{errorText(t, grant.error)}</Alert>}
-      </DialogBody>
+                    variant="ghost"
+                    aria-label={t("connectFlow.allLevel", { level: levelLabel(l) })}
+                    onClick={() =>
+                      setWho(Object.fromEntries(list.filter((a) => levelsFor(a).includes(l)).map((a) => [a.id, l])))
+                    }
+                  >
+                    {levelLabel(l)}
+                  </Button>
+                ))}
+              </div>
+              <ul className="cflow-agents">
+                {list.map((a) => (
+                  <li key={a.id} className="cflow-agent">
+                    <AgentAvatar agentId={a.id} name={a.name} size="sm" />
+                    <span className="cflow-agent__name">
+                      <span>{a.name}</span>
+                      {a.role && <span className="small muted">{a.role}</span>}
+                    </span>
+                    <Segmented
+                      size="sm"
+                      label={t("connectFlow.levelOf", { name: a.name })}
+                      value={levelOf(a.id)}
+                      onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
+                      options={levelsFor(a).map((l) => ({ value: l, label: levelLabel(l) }))}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="small muted cflow__asks">
+            <Icon name="lock" />
+            {t("connectFlow.asksCount", { count: MAIL_ACTIONS.approval.length })}
+          </p>
+          <p className="small muted cflow__text">{t("mail.whoLead")}</p>
+          <OwnerOnlyNote account={account} />
+          {grant.isError && <Alert>{errorText(t, grant.error)}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar>
-        <Button onClick={onBack}>{t("connectFlow.back")}</Button>
+        <Button disabled={grant.isPending} onClick={onBack}>
+          {t("connectFlow.back")}
+        </Button>
         <Button
           variant="primary"
           disabled={!agents.isSuccess || grant.isPending}
@@ -820,31 +835,35 @@ function RulesStep({
   const agent = agents.find((a) => a.id === agentId);
   return (
     <>
-      <DialogBody className="cflow__body">
-        <p className="muted cflow__text">{t("mail.rulesLead", { name: account.address })}</p>
-        {agents.length > 1 && (
-          <Segmented
-            size="sm"
-            label={t("mail.rulesAgent")}
-            value={agentId}
-            onValueChange={setAgentId}
-            options={agents.map((a) => ({ value: a.id, label: a.name }))}
-          />
-        )}
-        {agent && (
-          <AgentRules
-            key={agent.id}
-            agentId={agent.id}
-            name={agent.name}
-            account={account}
-            policy={edits[agent.id]}
-            onChange={(policy) => setEdits((e) => ({ ...e, [agent.id]: policy }))}
-          />
-        )}
-        {save.isError && <Alert>{t("mail.agent.saveError.unknown")}</Alert>}
-      </DialogBody>
+      <Locked when={save.isPending}>
+        <DialogBody className="cflow__body">
+          <p className="muted cflow__text">{t("mail.rulesLead", { name: account.address })}</p>
+          {agents.length > 1 && (
+            <Segmented
+              size="sm"
+              label={t("mail.rulesAgent")}
+              value={agentId}
+              onValueChange={setAgentId}
+              options={agents.map((a) => ({ value: a.id, label: a.name }))}
+            />
+          )}
+          {agent && (
+            <AgentRules
+              key={agent.id}
+              agentId={agent.id}
+              name={agent.name}
+              account={account}
+              policy={edits[agent.id]}
+              onChange={(policy) => setEdits((e) => ({ ...e, [agent.id]: policy }))}
+            />
+          )}
+          {save.isError && <Alert>{t("mail.agent.saveError.unknown")}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={t("mail.rulesLater")}>
-        <Button onClick={onBack}>{t("connectFlow.back")}</Button>
+        <Button disabled={save.isPending} onClick={onBack}>
+          {t("connectFlow.back")}
+        </Button>
         <Button variant="primary" disabled={save.isPending} loading={save.isPending} onClick={() => save.mutate()}>
           {Object.keys(edits).length > 0 ? t("mail.rulesSave") : t("mail.rulesSkip")}
         </Button>
@@ -915,7 +934,7 @@ export function MailRow({
     <div className="ac-list__row connected-row">
       <MailIcon choice={choice} size="lg" />
       <span className="list-col connected-row__text">
-        <span className="list-title">
+        <span className="list-title ac-captop">
           <span>{mailChoiceName(t, choice)}</span>
           {account.status === "needs_reconnect" ? (
             <Chip icon="alert" tone="waiting">
@@ -1025,21 +1044,28 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
           submit();
         }}
       >
-        <DialogBody className="cflow__body">
-          <Field
-            label={t("mail.password")}
-            id="mail-reconnect-password"
-            help={t("mail.passwordHelp")}
-            error={touched && !password.trim() ? t("mail.passwordInvalid") : undefined}
-          >
-            <Input type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
-          </Field>
-          <AppPasswordHelp
-            url={preset?.appPasswordUrl ?? null}
-            name={preset?.label ?? (account ? mailChoiceName(t, choiceOf(account)) : "")}
-          />
-          {error ? <Alert>{t(`mail.error.${mailErrorOf(error)}`)}</Alert> : null}
-        </DialogBody>
+        <Locked when={update.isPending}>
+          <DialogBody className="cflow__body">
+            <Field
+              label={t("mail.password")}
+              id="mail-reconnect-password"
+              help={t("mail.passwordHelp")}
+              error={touched && !password.trim() ? t("mail.passwordInvalid") : undefined}
+            >
+              <Input
+                type="password"
+                autoComplete="off"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Field>
+            <AppPasswordHelp
+              url={preset?.appPasswordUrl ?? null}
+              name={preset?.label ?? (account ? mailChoiceName(t, choiceOf(account)) : "")}
+            />
+            {error ? <Alert>{t(`mail.error.${mailErrorOf(error)}`)}</Alert> : null}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={close}>
             {t("common.cancel")}

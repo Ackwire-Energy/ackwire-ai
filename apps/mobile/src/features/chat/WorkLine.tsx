@@ -1,5 +1,6 @@
 import { type Issue, type Message, useApi, useChannels, type WorkView } from "@agenteschat/client";
-import { blockedText, workLine, workPlanProgress } from "@agenteschat/client/lib/long-work";
+import { heldBack } from "@agenteschat/client/lib/issues";
+import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -7,7 +8,7 @@ import { createContext, type ReactNode, useContext, useEffect, useState } from "
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Icon, PixelOrbit, Text, useToast } from "@/ui";
+import { haptics, Icon, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
@@ -56,32 +57,48 @@ function useLine(work: WorkView) {
   return { view, stop, t };
 }
 
-/** The work's thread, where its updates are. */
-const threadHref = (work: WorkView) => chatHref(work.channelId, work.threadId ?? work.anchorMessageId);
+/** The work's thread, where its updates are, on the question it waits on. */
+const threadHref = (work: WorkView) =>
+  chatHref(work.channelId, work.threadId ?? work.anchorMessageId, work.question?.messageId);
 
 function Line({ work, onThread, extra }: { work: WorkView; onThread?: () => void; extra?: ReactNode }) {
   const c = useColors();
   const { view, stop, t } = useLine(work);
   const jump = useContext(JumpToMessageContext);
+  // An icon per state, never a colored dot: the shape says it without the color.
   const mark =
-    view.tone === "done" ? c.ok : view.tone === "failed" ? c.danger : view.tone === "stopped" ? c.muted : c.warn;
+    view.tone === "done"
+      ? { icon: "check" as const, color: c.ok }
+      : view.tone === "failed"
+        ? { icon: "x" as const, color: c.danger }
+        : view.tone === "stopped"
+          ? { icon: "pause" as const, color: c.muted }
+          : { icon: "clock" as const, color: c.warn };
   // Ver resultado: the report where it was asked, scrolled to when this conversation shows it.
   const seeResult = (messageId: string) => {
     if (!jump?.(messageId)) router.push(chatHref(work.channelId, work.homeThreadId));
   };
   return (
     <View style={[styles.line, { backgroundColor: c.plateSoft, borderColor: c.line }]} accessibilityRole="summary">
+      {/* On the first line's reading middle. */}
       <View style={styles.mark}>
         {view.tone === "working" ? (
-          <PixelOrbit color="sky" size={12} />
+          <LineIcon variant="small" size={12}>
+            <PixelOrbit color="sky" size={12} />
+          </LineIcon>
         ) : (
-          <View style={[styles.dot, { backgroundColor: mark }]} />
+          <LineIcon variant="small" name={mark.icon} size={12} color={mark.color} />
         )}
       </View>
       <View style={styles.body}>
         <Text variant="small" tone="ink2">
           {view.text}
         </Text>
+        {view.question ? (
+          <Text variant="small" tone="ink" numberOfLines={2}>
+            {view.question.text}
+          </Text>
+        ) : null}
         {view.update ? (
           <Text variant="small" tone="muted">
             {view.update}
@@ -100,7 +117,10 @@ function Line({ work, onThread, extra }: { work: WorkView; onThread?: () => void
               label={t("work.stop")}
               danger
               disabled={stop.isPending}
-              onPress={() => stop.mutate(view.stop?.runId as string)}
+              onPress={() => {
+                haptics.firm();
+                stop.mutate(view.stop?.runId as string);
+              }}
             />
           ) : null}
           {extra}
@@ -123,14 +143,12 @@ function Action({
 }) {
   const c = useColors();
   return (
+    // 44 tall to the finger; across, no more than the gap to the next action.
     <Pressable
-      onPress={() => {
-        tapHaptic();
-        onPress();
-      }}
+      onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      hitSlop={8}
+      hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
       style={({ pressed }) => pressed && styles.pressed}
     >
       <Text variant="small" style={[styles.action, { color: disabled ? c.faint : danger ? c.danger : c.agent }]}>
@@ -142,14 +160,15 @@ function Action({
 
 /**
  * Under the agent's "Vou cuidar disso": the work's line. Abrir thread only where nothing else opens it: not under a
- * root whose thread link shows (`threaded`), nor inside that thread.
+ * root whose thread link shows (`threaded`), unless it waits on someone, nor inside that thread.
  */
 export function MessageWorkLine({ message, threaded }: { message: Message; threaded?: boolean }) {
   const { thread } = useLocalSearchParams<{ thread?: string }>();
   const work = message.longWork;
   if (!work) return null;
   const inside = thread === (work.threadId ?? work.anchorMessageId);
-  return <Line work={work} onThread={threaded || inside ? undefined : () => router.push(threadHref(work))} />;
+  const hidden = inside || (threaded && !workWaitsOnPerson(work));
+  return <Line work={work} onThread={hidden ? undefined : () => router.push(threadHref(work))} />;
 }
 
 /** On a task's screen: the work's line and the agent's plan. */
@@ -158,7 +177,7 @@ export function IssueWorkLine({ issue }: { issue: Issue }) {
   const c = useColors();
   const work = issue.backgroundWork;
   const blocked = blockedText(t, issue.blocked);
-  if (!work && !blocked) return null;
+  if (!work && !blocked) return <PrivateTaskLine issue={issue} />;
   const progress = work ? workPlanProgress(work) : null;
   return (
     <View style={styles.block}>
@@ -181,10 +200,11 @@ export function IssueWorkLine({ issue }: { issue: Issue }) {
           </Text>
           {work.plan.map((p) => (
             <View key={p.id} style={styles.step}>
-              <Icon
+              <LineIcon
                 name={p.state === "done" ? "check" : p.state === "doing" ? "bolt" : "circle"}
-                size={13}
+                size={15}
                 color={p.state === "done" ? c.ok : p.state === "doing" ? c.agent : c.faint}
+                variant="small"
               />
               <Text variant="small" tone={p.state === "todo" ? "muted" : "ink2"} style={styles.grow}>
                 {p.text}
@@ -201,7 +221,7 @@ export function IssueWorkLine({ issue }: { issue: Issue }) {
  * Mostrar para todos: a card a DM or a private channel holds back, for who may show it to the whole workspace (who
  * asked for the work, its creator, an admin).
  */
-function ShareAction({ issue, work }: { issue: Issue; work: WorkView }) {
+function ShareAction({ issue, work }: { issue: Issue; work?: WorkView }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -218,27 +238,54 @@ function ShareAction({ issue, work }: { issue: Issue; work: WorkView }) {
     },
     onError: () => toast({ title: t("work.shareFailed"), icon: "info" }),
   });
-  const channel = issue.channelId ? channels.data?.find((c) => c.id === issue.channelId) : undefined;
-  const heldBack = Boolean(issue.channelId && channels.data && (!channel || channel.visibility === "private"));
   const mayShare =
-    work.requestedByUserId === meId || (issue.createdBy.type === "person" && issue.createdBy.id === meId) || admin;
-  if (!heldBack || !mayShare) return null;
-  return <Action label={t("work.shareEveryone")} disabled={share.isPending} onPress={() => share.mutate()} />;
+    !work ||
+    work.requestedByUserId === meId ||
+    (issue.createdBy.type === "person" && issue.createdBy.id === meId) ||
+    admin;
+  if (!heldBack(issue, channels.data) || !mayShare) return null;
+  return (
+    <Action
+      label={t("work.shareEveryone")}
+      disabled={share.isPending}
+      onPress={() => {
+        tapHaptic();
+        share.mutate();
+      }}
+    />
+  );
+}
+
+/** A task tied to a private conversation, with no work line to say so: who sees it, and how to show it to everyone. */
+function PrivateTaskLine({ issue }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const channels = useChannels(useOrgId());
+  if (issue.backgroundWork || !heldBack(issue, channels.data)) return null;
+  return (
+    <View style={styles.privateTask}>
+      <Icon name="lock" size={14} color={c.muted} />
+      <Text variant="small" tone="muted" style={styles.grow}>
+        {t("issues.privateTask")}
+      </Text>
+      {issue.createdBy.type === "agent" ? <ShareAction issue={issue} /> : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  privateTask: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
   line: {
     flexDirection: "row",
     gap: 10,
     marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  mark: { width: 16, paddingTop: 3, alignItems: "center" },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  body: { flex: 1, minWidth: 0, gap: 3 },
+  mark: { width: 16, alignItems: "center" },
+  body: { flex: 1, minWidth: 0, gap: 4 },
   actions: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 4, marginTop: 2 },
   action: { fontWeight: "600" },
   pressed: { opacity: 0.6 },

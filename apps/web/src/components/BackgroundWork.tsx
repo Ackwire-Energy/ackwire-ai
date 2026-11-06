@@ -1,7 +1,8 @@
 import { type Issue, type Message, useChannels, type WorkView } from "@agenteschat/client";
-import { blockedText, workLine, workPlanProgress } from "@agenteschat/client/lib/long-work";
+import { heldBack } from "@agenteschat/client/lib/issues";
+import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
-import { WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
+import { Button, Icon, WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -44,8 +45,9 @@ function useWorkLine(work: WorkView) {
 }
 
 /**
- * Under the agent's "Vou cuidar disso": how the work stands, its last update, Tarefa #, Parar, Ver resultado. Once its
- * thread has replies, the thread's own line under it opens the thread (`threaded`): no second way in.
+ * Under the agent's "Vou cuidar disso": how the work stands, its last update or what it asks, Tarefa #, Parar, Ver
+ * resultado. Once its thread has replies, the thread's own line under it opens the thread (`threaded`): no second way
+ * in, unless it waits on someone, who goes straight to the card in the panel.
  */
 export function MessageWorkLine({ message, threaded }: { message: Message; threaded?: boolean }) {
   const work = message.longWork;
@@ -63,10 +65,13 @@ function AnchorLine({ work, threaded }: { work: WorkView; threaded: boolean }) {
       tone={view.tone}
       text={view.text}
       update={view.update}
+      question={view.question?.text}
       actions={
         <>
-          {view.threadId && !threaded && actions?.openThread && (
-            <WorkLineAction onClick={() => actions.openThread?.(view.threadId as string)}>
+          {view.threadId && (!threaded || workWaitsOnPerson(work)) && actions?.openThread && (
+            <WorkLineAction
+              onClick={() => actions.openThread?.(view.threadId as string, view.question?.messageId ?? undefined)}
+            >
               {t("work.openThread")}
             </WorkLineAction>
           )}
@@ -105,6 +110,39 @@ export function IssueWorkBlock({ issue }: { issue: Issue }) {
   return <CardBlock issue={issue} work={work} />;
 }
 
+/**
+ * On a task tied to a private conversation, with no work line to say so: who sees it, and, for one an agent made there,
+ * the way to show it to everyone.
+ */
+export function PrivateTaskBlock({ issue }: { issue: Issue }) {
+  const { org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { t } = useTranslation();
+  const channels = useChannels(org.id);
+  const share = useMutation({
+    mutationFn: () => api.issues.share(org.id, issue.id),
+    onSuccess: () => {
+      toast.show(t("work.shared"));
+      void qc.invalidateQueries({ queryKey: ["org", org.id, "issues"] });
+    },
+    onError: () => toast.show(t("work.shareFailed"), "error"),
+  });
+  if (issue.backgroundWork || !heldBack(issue, channels.data)) return null;
+  return (
+    <p className="issue-private">
+      <Icon name="lock" size={14} />
+      <span>{t("issues.privateTask")}</span>
+      {issue.createdBy.type === "agent" && (
+        <Button size="sm" loading={share.isPending} disabled={share.isPending} onClick={() => share.mutate()}>
+          {t("work.shareEveryone")}
+        </Button>
+      )}
+    </p>
+  );
+}
+
 function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
   const { org, me } = useOrg();
   const api = useApi();
@@ -123,15 +161,18 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
     onError: () => toast.show(t("work.shareFailed"), "error"),
   });
   // Only a card a DM or a private channel holds back, for who may show it (who asked, its creator, an admin).
-  const channel = issue.channelId ? channels.data?.find((c) => c.id === issue.channelId) : undefined;
-  const heldBack = Boolean(issue.channelId && channels.data && (!channel || channel.visibility === "private"));
+  const held = heldBack(issue, channels.data);
   const mayShare =
     work.requestedByUserId === me.user.id ||
     (issue.createdBy.type === "person" && issue.createdBy.id === me.user.id) ||
     can(org, "manage_agents");
   const openConversation = () =>
     view.threadId
-      ? void navigate({ to: "/org/$orgId/threads/$threadId", params: { orgId: org.id, threadId: view.threadId } })
+      ? void navigate({
+          to: "/org/$orgId/threads/$threadId",
+          params: { orgId: org.id, threadId: view.threadId },
+          search: view.question?.messageId ? { m: view.question.messageId } : {},
+        })
       : void navigate({
           to: "/org/$orgId/c/$channelId",
           params: { orgId: org.id, channelId: work.channelId },
@@ -143,6 +184,7 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
         tone={view.tone}
         text={view.text}
         update={view.update ? `${t("work.lastUpdate")}: ${view.update}` : null}
+        question={view.question?.text}
         actions={
           <>
             <WorkLineAction onClick={openConversation}>{t("work.openThread")}</WorkLineAction>
@@ -151,7 +193,7 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
                 {t("work.stop")}
               </WorkLineAction>
             )}
-            {heldBack && mayShare && (
+            {held && mayShare && (
               <WorkLineAction disabled={share.isPending} onClick={() => share.mutate()}>
                 {t("work.shareEveryone")}
               </WorkLineAction>
@@ -184,7 +226,12 @@ export function IssueCardWork({ issue }: { issue: Issue }) {
   const step = live ? (work.plan.find((p) => p.state === "doing") ?? work.plan.find((p) => p.state === "todo")) : null;
   return (
     <span className="issue-card__work">
-      {blocked && <span className="issue-card__blocked">{blocked}</span>}
+      {blocked && (
+        <span className="ac-iconline issue-card__blocked">
+          <Icon name={issue.blocked?.reason === "failed" ? "alert" : "waiting"} size={14} />
+          <span>{blocked}</span>
+        </span>
+      )}
       {live && progress && (
         <span className="issue-card__plan">
           <span className="issue-card__plan-head">

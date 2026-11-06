@@ -2,14 +2,23 @@ import {
   type AgentScope,
   type ExecRequest,
   type ExecResult,
+  FILE_PULL_PROTOCOL,
+  generateSecretKeyPair,
   MAX_INLINE_FILE_BYTES,
+  madePasswordAad,
+  openSecret,
+  PASSWORD_CLASSES,
+  PASSWORD_LENGTH,
+  type PasswordClass,
   policyRefusal,
   type SandboxProvider,
   SECRET_ACTIVATE_PROTOCOL,
   SECRETS_PROTOCOL,
+  VAULT_PASSWORD_PROTOCOL,
   VAULT_PROTOCOL,
 } from "@agenteschat/adapters";
-import { type MachineCaller, MachineRequestError } from "./machine-hub";
+import { ARTIFACT_LIMITS } from "./artifacts";
+import { type MachineCaller, MachineRequestError, type MachineStatus } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
 
 /** Provider id of connected machines; their computer id is the machine id. */
@@ -17,14 +26,25 @@ export const MACHINE_PROVIDER_ID = "machine";
 
 const MB = (n: number) => `${Math.round(n / 1024 / 1024)} MB`;
 
+/** The workspace's own computer has no owner to ask: what the agent can do instead of `request_folder_access`. */
+export const foldersFixedMessage = (name: string) =>
+  `Nobody can allow folders on ${name}, the workspace's own computer: work in your folder, read from your home, or copy what you need into your folder with a command.`;
+
 /**
  * A runner's `not_allowed` (protocol 10): the path is outside every folder
  * this agent may use on the machine, or the tool is off there. Points the
- * agent at `request_folder_access` for a folder. The command policy's own
- * (`policyRefusal`) already says where to go and stays as it is.
+ * agent at `request_folder_access` for a folder, where someone can answer it
+ * (`managed`: nobody can). The command policy's own (`policyRefusal`) already
+ * says where to go and stays as it is.
  */
-export function notAllowedMessage(name: string, detail: string, path?: string) {
+export function notAllowedMessage(name: string, detail: string, path?: string, managed = false) {
   if (policyRefusal(detail)) return detail;
+  if (managed) {
+    const pointer = " (ask for it with request_folder_access)";
+    return detail.includes(pointer)
+      ? `${detail.replace(pointer, ".")} ${foldersFixedMessage(name)}`
+      : `${(detail || "Not allowed on this computer").replace(/\.$/, "")}. Tell the people.`;
+  }
   return `${detail || "Not allowed on this computer."} ${
     path && /^(\/|~|[A-Za-z]:)/.test(path)
       ? `${path} is outside the folders you may use on ${name}: ask its owner for it with request_folder_access (path and a short reason), or work inside your own folder.`
@@ -36,7 +56,7 @@ export function notAllowedMessage(name: string, detail: string, path?: string) {
  * Runner error codes → what the agent reads (and tells the people). The runner's error stays as the `cause` of the
  * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0144 §4).
  */
-function explain(error: unknown, name: string, path?: string): Error {
+function explain(error: unknown, name: string, path?: string, managed = false, tooLarge?: string): Error {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error : new Error(String(error));
   const said = (message: string) => new Error(message, { cause: error });
   switch (error.code) {
@@ -44,19 +64,22 @@ function explain(error: unknown, name: string, path?: string): Error {
       return said(
         `Commands are turned off on the computer ${name} (its runner was started with --no-exec): you can only read, write, list and upload files there. Tell the person; its owner can restart the runner without --no-exec.`,
       );
+    // The runner names what is wrong with the path and what to use instead.
     case "outside_workspace":
-      return said(
-        `${path ?? "That path"} is outside the computer's workspace folder (or a link that leaves it); use paths inside the workspace.`,
-      );
+    case "not_found":
+      return said(error.message);
     case "too_large":
       return said(
-        `${path ?? "The file"} is too large to move this way (max ${MB(MAX_INLINE_FILE_BYTES)}); use upload_file to send big files to the Drive.`,
+        tooLarge ??
+          `${path ?? "The file"} is too large to read here (max ${MB(MAX_INLINE_FILE_BYTES)}). upload_file sends it to the Drive, up to ${MB(ARTIFACT_LIMITS.fileBytes)}.`,
       );
-    case "not_found":
-      return said(`No file or folder ${path ?? ""} on ${name}.`.replace("  ", " "));
+    case "upload_failed":
+      return said(`${path ?? "The file"} didn't reach the Drive. ${error.message}`);
+    case "pull_failed":
+      return said(`${path ?? "The file"} didn't reach ${name}: ${error.message}`);
     case "not_allowed":
       // The command policy's `never` (a push our git proxy refuses): callers read its code, as below.
-      return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path));
+      return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path, managed));
     case "paused":
       return said(
         `The owner paused the computer ${name}: nothing new can start there until they resume it. Tell the people.`,
@@ -72,21 +95,65 @@ function explain(error: unknown, name: string, path?: string): Error {
   }
 }
 
+/** A tool's `length` and `classes`, what a site's rules asked for; anything left out, the strong default. */
+function passwordRules(input: { length?: unknown; classes?: unknown }) {
+  const length = typeof input.length === "number" ? input.length : PASSWORD_LENGTH.default;
+  const given = Array.isArray(input.classes)
+    ? PASSWORD_CLASSES.filter((c) => (input.classes as unknown[]).includes(c))
+    : [];
+  return { length, classes: (given.length > 0 ? given : [...PASSWORD_CLASSES]) as PasswordClass[] };
+}
+
+/**
+ * A new password made on the agent's computer (ADR 0144 §8): it comes back sealed to a key pair made for this one
+ * call, whose private half never leaves this function, so everything between (the hub, a relay, root in system mode)
+ * only ever holds a box. Opened here for the caller to seal into the Vault at once.
+ */
+export async function requestMadePassword(
+  hub: MachineCaller,
+  machineId: string,
+  agent: AgentScope,
+  input: { length?: unknown; classes?: unknown },
+  signal?: AbortSignal,
+): Promise<string> {
+  const status = await hub.status(machineId);
+  const name = status?.name ?? "computer";
+  if (!status || status.protocol < VAULT_PASSWORD_PROTOCOL) throw new Error(vaultUpdateText(name, "make passwords"));
+  const pair = await generateSecretKeyPair();
+  const requestId = crypto.randomUUID();
+  try {
+    const reply = await hub.call<"vault.password">(
+      machineId,
+      { agent, op: "vault.password", requestId, publicKey: pair.publicKey, rules: passwordRules(input) },
+      { signal, timeoutMs: 30_000 },
+    );
+    return await openSecret(pair.privateKey, reply.box, madePasswordAad({ requestId, agentId: String(agent.id) }));
+  } catch (error) {
+    if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
+    if (error instanceof MachineRequestError) throw explain(error, name);
+    throw new Error(`The password from the computer ${name} didn't open. Nothing was saved. Try again.`);
+  }
+}
+
 /**
  * Connected machines as a `SandboxProvider` (ADR 0025): the channel over the hub. A machine is on while its
  * runner is connected; people pair it, and we never create, start or stop it. Files travel base64 up to 5 MB;
- * uploads go through `push`, straight to our upload URL. Every request is for `agent`, which the runner keeps
- * in its own folder of the workspace.
+ * past that the computer moves them itself over HTTP, to our upload URL (`push`) or from our file URL (`pull`).
+ * Every request is for `agent`, which the runner keeps in its own folder of the workspace.
  */
 export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentScope): SandboxProvider {
-  const nameOf = async (id: string) => (await hub.status(id))?.name ?? "computer";
-  const guard = async <T>(id: string, fn: () => Promise<T>, path?: string): Promise<T> => {
+  const guard = async <T>(id: string, fn: () => Promise<T>, path?: string, tooLarge?: string): Promise<T> => {
     try {
       return await fn();
     } catch (error) {
       if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
-      throw explain(error, await nameOf(id), path);
+      const status = await hub.status(id);
+      throw explain(error, status?.name ?? "computer", path, status?.kind === "managed", tooLarge);
     }
+  };
+  const pullRefusal = async (id: string) => {
+    const status = await hub.status(id);
+    return status && status.protocol < FILE_PULL_PROTOCOL ? pullUpdateText(status) : null;
   };
   const execOn = async (
     id: string,
@@ -126,7 +193,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
     async writeFile(id, path, data) {
       if (data.byteLength > MAX_INLINE_FILE_BYTES) {
         throw new Error(
-          `${path} is too large to copy to a connected computer (max ${MB(MAX_INLINE_FILE_BYTES)}); ask the person to put it on that machine.`,
+          `${path} is too large to write in one piece (max ${MB(MAX_INLINE_FILE_BYTES)}). A Drive file reaches the computer whole with import_file, up to ${MB(ARTIFACT_LIMITS.fileBytes)}.`,
         );
       }
       await guard(
@@ -164,7 +231,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       } catch (error) {
         // The runner's own words ("This request's key is gone…"), not the file-tool wording.
         if (error instanceof MachineRequestError && error.code !== "timeout" && error.code !== "canceled") {
-          throw new Error(error.message);
+          throw new Error(error.message, { cause: error });
         }
         throw error;
       }
@@ -173,18 +240,41 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       return guard(
         id,
         () =>
-          hub.call(id, {
-            agent,
-            op: "push",
-            path,
-            url: target.url,
-            uploadId: target.uploadId,
-            maxBytes: target.maxBytes,
-          }),
+          hub
+            .call(id, {
+              agent,
+              op: "push",
+              path,
+              url: target.url,
+              uploadId: target.uploadId,
+              maxBytes: target.maxBytes,
+            })
+            .catch((error: unknown) => {
+              if (!(error instanceof MachineRequestError) || error.code !== "too_large") throw error;
+              throw new Error(
+                `${path} is over the ${MB(target.maxBytes)} the Drive takes per file, so it stayed on the computer. Make it smaller (a video: re-encode it at a lower resolution or bitrate) or send it in parts under ${MB(target.maxBytes)}, then upload again.`,
+                { cause: error },
+              );
+            }),
         path,
+        `${path} is too large to send to the Drive (max ${MB(target.maxBytes)}).`,
       );
     },
+    pullRefusal,
+    async pullFile(id, path, { signal, ...source }) {
+      const refusal = await pullRefusal(id);
+      if (refusal) throw new Error(refusal);
+      await guard(id, () => hub.call(id, { agent, op: "pull", path, ...source }, { signal }), path);
+    },
   };
+}
+
+/** What a computer too old for `pull` answers for a file past what a `write` carries. */
+export function pullUpdateText(status: Pick<MachineStatus, "name" | "kind">) {
+  const what = `receive files over ${MB(MAX_INLINE_FILE_BYTES)}`;
+  return status.kind === "managed"
+    ? `The computer ${status.name} needs an update to ${what}. It updates by itself, so try again later.`
+    : vaultUpdateText(status.name, what);
 }
 
 /** What a computer too old for the Vault answers (ADR 0144): its owner updates the runner. */

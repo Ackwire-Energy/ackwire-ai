@@ -1,9 +1,16 @@
+import type { OrgSummary } from "@agenteschat/client";
+import { useComputerSetup } from "@agenteschat/client";
+import { computerEdition } from "@agenteschat/client/lib/computer";
+import type { keyRefusal } from "@agenteschat/client/lib/errors";
+import { planHoldOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { type CodingPlan, planReplies } from "@agenteschat/client/lib/plans";
 import * as Clipboard from "expo-clipboard";
 import { openBrowserAsync } from "expo-web-browser";
+import type { TFunction } from "i18next";
 import type { ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Linking, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Linking, StyleSheet, TextInput, View } from "react-native";
 import {
   Button,
   fieldText,
@@ -12,15 +19,28 @@ import {
   Icon,
   type IconName,
   InfoHint,
+  LineIcon,
   ProviderLogo,
   Text,
+  textLineOf,
   useTheme,
 } from "@/ui";
+import { BUTTON_SIZES } from "@/ui/Button";
 import { useColors } from "../shared/hooks";
 
 /**
  * The pieces the web's AI panels are made of (`SettingNote`, the numbered `Step`, `OpenPage`), on the phone.
  */
+
+/** The billing hold on this workspace that stops its plans (`planHoldOf`). */
+export const usePlanHold = (orgId: string, org: OrgSummary | null | undefined) =>
+  planHoldOf(computerEdition(useComputerSetup(orgId).data), org?.standing);
+
+/** A plan this workspace's billing hold stops, said where it would sign in (`planHoldPhoneLine`). */
+export function PlanHoldNote({ org }: { org: OrgSummary | null | undefined }) {
+  const { t } = useTranslation();
+  return <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false)}</Note>;
+}
 
 /**
  * A row of an agent's AI (its page, Connect an AI's first group): its maker's mark, its name, the lines under it
@@ -66,7 +86,14 @@ export function Note({
   const c = useColors();
   return (
     <View style={styles.note} accessibilityLiveRegion={live ? "polite" : undefined}>
-      {typeof icon === "string" ? <Icon name={icon} size={15} color={icon === "x" ? c.danger : c.muted} /> : icon}
+      {/* On the words' first line, where the eye reads it, never at the line's top. */}
+      {typeof icon === "string" ? (
+        <LineIcon name={icon} variant="small" size={15} color={icon === "x" ? c.danger : c.muted} />
+      ) : (
+        <LineIcon variant="small" size={15}>
+          {icon}
+        </LineIcon>
+      )}
       <Text variant="small" tone={icon === "x" ? "danger" : "muted"} style={styles.grow}>
         {children}
       </Text>
@@ -175,7 +202,7 @@ export function Step({
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
       <View style={[styles.n, { backgroundColor: state === "done" ? c.ok : state === "later" ? c.plate : c.ink }]}>
         {state === "done" ? (
-          <Icon name="check" size={12} color="#ffffff" />
+          <Icon name="check" size={12} color={c.bg} />
         ) : (
           <Text variant="caption" style={[styles.nText, { color: state === "later" ? c.faint : c.bg }]}>
             {n}
@@ -209,6 +236,14 @@ export function StepText({ children }: { children: ReactNode }) {
 /** Opens a maker's own page (a sign-in, its settings, where a key is made) in the in-app browser. */
 export function openPage(href: string) {
   void openBrowserAsync(href).catch(() => Linking.openURL(href));
+}
+
+/** A stored key its provider refused: why, in the provider's words too, and the page that fixes it. */
+export function alertKeyRefused(t: TFunction, refusal: NonNullable<ReturnType<typeof keyRefusal>>) {
+  Alert.alert(refusal.text, undefined, [
+    { text: t("common.close"), style: "cancel" },
+    ...(refusal.href ? [{ text: refusal.site, onPress: () => openPage(refusal.href) }] : []),
+  ]);
 }
 
 /**
@@ -331,16 +366,30 @@ export function Waiting({ label }: { label: string }) {
   );
 }
 
+/** A step's number, in a circle on its title's first line. */
+const N = 22;
+/** The pasted-key field, and the small Paste button inside it with as much room above, below and after it. */
+const FIELD = 46;
+const PASTE_INSET = (FIELD - BUTTON_SIZES.sm.height) / 2;
+
 const styles = StyleSheet.create({
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingHorizontal: 4 },
   // As a group's footer (`GroupedFooter`).
-  foot: { paddingTop: 7, paddingHorizontal: 16 },
+  foot: { paddingTop: 8, paddingHorizontal: 16 },
   grow: { flex: 1, minWidth: 0 },
   card: { borderRadius: 14, overflow: "hidden" },
-  step: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  divider: { position: "absolute", top: 0, left: 48, right: 0, height: StyleSheet.hairlineWidth },
-  n: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", marginTop: 1 },
-  nText: { fontWeight: "700", fontSize: 12, lineHeight: 14 },
+  step: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  divider: { position: "absolute", top: 0, left: 14 + N + 12, right: 0, height: StyleSheet.hairlineWidth },
+  // Centered where the eye reads the callout title's first line.
+  n: {
+    width: N,
+    height: N,
+    borderRadius: N / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: textLineOf("callout", 1).middle - N / 2,
+  },
+  nText: { fontWeight: "700", lineHeight: 14 },
   text: { flex: 1, minWidth: 0, gap: 4 },
   bold: { fontWeight: "600" },
   side: { marginTop: 6, flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -349,11 +398,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    minHeight: 46,
+    minHeight: FIELD,
     marginTop: 6,
     paddingLeft: 12,
-    paddingRight: 5,
-    borderRadius: 12,
+    paddingRight: PASTE_INSET,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
   // Without "Colar" beside it, the text keeps the same edge on both sides.

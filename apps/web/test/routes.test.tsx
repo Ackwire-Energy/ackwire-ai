@@ -107,10 +107,10 @@ describe("route guards", () => {
     await settle();
     expect(screen().getByRole("heading", { level: 1, name: "Threads" })).toBeTruthy();
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("Assuntos que saíram dos canais e das DMs.");
-    expect(screen().getByText("Nenhuma thread ainda")).toBeTruthy();
+    expect(screen().getByText("Cada assunto na sua própria conversa")).toBeTruthy();
     // All teaches how a thread starts; the other tabs only say they're empty and lead back to All.
     expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
-      "Responda a uma mensagem para abrir uma thread.",
+      "Responda a uma mensagem para abrir uma thread, e o canal continua limpo.",
     );
     cleanup();
     for (const [tab, title] of [

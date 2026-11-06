@@ -593,12 +593,12 @@ describe("Rotinas: every code in the person's words", () => {
 });
 
 describe("Rotinas: the form's two plain questions", () => {
-  test("no routines: the title and Nova rotina, nothing else", async () => {
+  test("no routines: what they give, and the one Nova rotina in the middle of the page", async () => {
     await open([]);
     const empty = document.querySelector(".ac-empty") as HTMLElement;
-    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Nenhuma rotina ainda");
-    expect(empty.querySelector(".ac-empty__text")).toBeNull();
+    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Deixe o trabalho repetido com os agentes");
     expect(within(empty).getByRole("button", { name: "Nova rotina" })).toBeTruthy();
+    expect(screen().getAllByRole("button", { name: "Nova rotina" })).toHaveLength(1);
     expect(document.querySelector(".ac-pagehead")?.querySelectorAll("p")).toHaveLength(1);
   });
 

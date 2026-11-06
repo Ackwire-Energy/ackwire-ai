@@ -225,7 +225,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} è il tuo codice per eliminare uno spazio di lavoro`,
-    subjectAccount: (code) => `${code} è il tuo codice per eliminare il tuo account`,
+    subjectAccount: (code) => `${code} è il tuo codice per eliminare tutto il tuo account`,
     preheader: "Inseriscilo in agentes.chat per confermare. Vale per 10 minuti.",
     headline: "Il tuo codice",
     workspace: (org) => [
@@ -234,9 +234,9 @@ export const words: EmailWords = {
       ". Si chiude subito per tutti e viene eliminato per sempre 7 giorni dopo.",
     ],
     account: (email) => [
-      "Inserisci questo codice per eliminare l’account ",
+      "Inserisci questo codice per eliminare tutto l’account ",
       { b: email },
-      ". Sparisce subito, e gli spazi di lavoro in cui ci sei solo tu si chiudono insieme a lui.",
+      ", non solo uno spazio di lavoro. Viene disconnesso subito ovunque ed eliminato per sempre 7 giorni dopo, e gli spazi di lavoro in cui ci sei solo tu si chiudono insieme a lui.",
     ],
     support: (address) => [
       "Vale per 10 minuti, e senza questo codice non si elimina nulla. Se non sei stato tu, non condividerlo e scrivi a ",
@@ -279,6 +279,27 @@ export const words: EmailWords = {
     note: "Non l’hai collegata tu? Scollegala subito e cambia la password.",
     button: "Vedi le app collegate",
     why: (org) => `Ricevi questa email perché un’app è stata collegata al tuo account in ${org} su agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Il tuo account agentes.chat verrà eliminato il ${day}`,
+    preheader: "Hai 7 giorni per cambiare idea.",
+    headline: "Il tuo account è in fase di eliminazione",
+    body: (email, day, time) => [
+      "Elimineremo l’account ",
+      { b: email },
+      ` il ${day} alle ${time}. È disconnesso ovunque e nessuno può raggiungerti qui finché non torni.`,
+    ],
+    closes: (count, names) => [
+      plural("it", count, {
+        one: "Lo spazio di lavoro in cui c’eri solo tu si è chiuso ora e sparisce nella stessa data: ",
+        other: "Gli spazi di lavoro in cui c’eri solo tu si sono chiusi ora e spariscono nella stessa data: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Hai cambiato idea? Accedi prima di quella data e premi Ripristina.",
+    button: "Accedi per ripristinare",
+    why: "Hai ricevuto questa email perché questo indirizzo ha un account su agentes.chat.",
   },
   accountDeleted: {
     subject: "Il tuo account agentes.chat è stato eliminato",

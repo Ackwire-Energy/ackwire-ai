@@ -9,6 +9,7 @@ import {
   resourcesOf,
 } from "@agenteschat/client/lib/access-levels";
 import { can } from "@agenteschat/client/lib/permissions";
+import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -16,6 +17,8 @@ import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, InfoHint, Segmented, Text, useToast } from "@/ui";
 import { Note } from "../ai/parts";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
+import { mayCreate } from "../new/logic";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors } from "../shared/hooks";
 import { errorHaptic, tapHaptic } from "../shared/parts";
 import { resourceName, useAgentsAccess, useConnectedById, useSetLevels } from "./hooks";
@@ -104,9 +107,23 @@ export function AccessScreen() {
       {agents.isLoading || (list.length > 0 && access.loading) ? (
         <ActivityIndicator color={c.muted} style={styles.loading} />
       ) : null}
-      {agents.isSuccess && list.length === 0 ? <GroupedFooter>{t("access.noAgents")}</GroupedFooter> : null}
-      {first && columns.length === 0 ? (
-        <GroupedFooter>{t("access.noConnectors", { org: org?.name ?? "" })}</GroupedFooter>
+      {agents.isSuccess && list.length === 0 ? (
+        <FirstUse
+          place="agents"
+          size="panel"
+          acts={mayCreate(org, "agent")}
+          label={t("mobile.homeNow.first.create")}
+          onPress={() => router.push("/new-agent")}
+        />
+      ) : null}
+      {first && columns.length === 0 && kind === "connector" ? (
+        <FirstUse
+          place="access"
+          size="panel"
+          acts={can(org, "manage_connectors")}
+          label={t("mobile.empty.access.action")}
+          onPress={() => router.push("/connectors")}
+        />
       ) : null}
       {table
         ? list.map((a) => {
@@ -152,6 +169,6 @@ export function AccessScreen() {
 
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
-  head: { gap: 12, paddingHorizontal: 4, paddingTop: 18, paddingBottom: 4 },
+  head: { gap: 12, paddingHorizontal: 4, paddingTop: 20, paddingBottom: 4 },
   loading: { marginVertical: 16 },
 });

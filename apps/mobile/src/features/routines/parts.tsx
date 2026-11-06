@@ -12,7 +12,7 @@ import { router } from "expo-router";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Icon, PixelOrbit, Text } from "@/ui";
+import { Button, Chip, Icon, LineIcon, PixelOrbit, Text } from "@/ui";
 import { routineHref, widgetHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNamesComputers } from "../shared/hooks";
@@ -184,7 +184,8 @@ export const RoutineRow = memo(function RoutineRow({
       }}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }, done && styles.done]}
     >
-      {divider ? <View style={[styles.divider, { backgroundColor: c.line }]} /> : null}
+      {/* The lists' hairline (`ListRow`'s tone), not the lighter card line. */}
+      {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
       <View style={styles.top}>
         <AgentFace agentId={r.agentId} size={AVATAR} live={live} mode={running ? "run" : paused ? "rest" : "idle"} />
         <View style={styles.main}>
@@ -214,9 +215,8 @@ export const RoutineRow = memo(function RoutineRow({
       </View>
       <View style={styles.below}>
         <View style={styles.when}>
-          <View style={styles.whenIcon}>
-            <Icon name={whenIcon(r)} size={14} color={c.muted} />
-          </View>
+          {/* On the schedule's first line's reading middle (a fixed 2-point nudge sat it above the letters). */}
+          <LineIcon variant="subhead" name={whenIcon(r)} size={14} color={c.muted} />
           <View style={styles.grow}>
             <Text variant="subhead" tone={paused ? "muted" : "ink2"} numberOfLines={2}>
               {whenText(r)}
@@ -251,15 +251,15 @@ const styles = StyleSheet.create({
   usagePause: { gap: 8, paddingTop: 16, paddingHorizontal: 4, alignItems: "flex-start" },
   divider: { position: "absolute", top: 0, right: 0, left: SIDE + AVATAR + GAP, height: StyleSheet.hairlineWidth },
   top: { flexDirection: "row", alignItems: "flex-start", gap: GAP },
-  main: { flex: 1, minWidth: 0, gap: 3, paddingTop: 1 },
+  main: { flex: 1, minWidth: 0, gap: 4, paddingTop: 1 },
   title: { fontWeight: "600" },
-  line: { flexDirection: "row", alignItems: "center", gap: 5, minWidth: 0 },
+  // The delivery's words and the when's below start on one column: 13 + 8 = 14 + 7.
+  line: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
   shrink: { flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
   chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 },
   below: { marginLeft: AVATAR + GAP, gap: 8 },
   when: { flexDirection: "row", alignItems: "flex-start", gap: 7 },
-  whenIcon: { paddingTop: 2 },
   runs: { flexDirection: "row", alignItems: "center", gap: 10 },
   bold: { fontWeight: "600" },
 });

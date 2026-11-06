@@ -2,6 +2,7 @@ import {
   BROWSER_FPS,
   type BrowserHandoff,
   drivesOnDesktop,
+  HANDOFF_OVER,
   handoffIsMine,
   handoffScreen,
   useBrowserHandoff,
@@ -13,13 +14,13 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useToast } from "@/ui";
+import { Button, LineIcon, Text, useToast } from "@/ui";
 import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
-import { tapHaptic, useSurface } from "../shared/parts";
+import { useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { BrowserCard } from "./BrowserCard";
 import { cardStateOf, NOTE_MAX } from "./logic";
@@ -60,7 +61,12 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
     const ok = state === "done";
     return (
       <View style={[styles.done, surface]}>
-        <Icon name={ok ? "checkc" : state === "failed" ? "x" : "clock"} size={16} color={ok ? c.ok : c.muted} />
+        <LineIcon
+          name={ok ? "checkc" : state === "failed" ? "x" : "clock"}
+          variant="small"
+          size={16}
+          color={ok ? c.ok : c.muted}
+        />
         <Text variant="small" tone="muted" style={styles.grow}>
           {state === "failed" && h.note
             ? t("mobile.browser.card.failedNote", { note: h.note })
@@ -78,9 +84,9 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
       <Pressable
         onPress={() => router.push(`/computer/${h.agentId}`)}
         accessibilityRole="button"
-        style={[styles.done, surface]}
+        style={({ pressed }) => [styles.done, surface, pressed && styles.pressed]}
       >
-        <Icon name="laptop" size={16} color={c.muted} />
+        <LineIcon name="laptop" variant="small" size={15} color={c.muted} />
         <Text variant="small" tone="muted" style={styles.grow}>
           {state === "mine"
             ? t("mobile.browser.live.inControl")
@@ -117,27 +123,28 @@ function HandoffAsk({
   const meId = useMeId();
   const dir = useDirectory();
   const toast = useToast();
-  const sheet = useSheet();
   const asks = useAskStore();
   const actions = useBrowserHandoffActions(orgId);
   const agent = dir.agentById.get(h.agentId);
   const name = agent?.name ?? "";
-  const g = genderOf(name);
   // Whose it is goes by ids (the same rule as the line above the composer); a name only says who, once it loads.
   // Someone else's: who it waits for in the header when known, no buttons here.
   const mine = meId !== null && handoffIsMine(h, meId, agent?.ownerUserId, org);
   const asked = h.requestedForUserId ? dir.memberById.get(h.requestedForUserId)?.name : undefined;
-  const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
+  // It ended meanwhile: the card settles on its own (`useBrowserHandoffMutations`), with nothing to tell.
+  const failed = (err: unknown) => {
+    if ((err as { code?: string }).code !== HANDOFF_OVER) toast({ title: t("mobile.app.failed"), icon: "x" });
+  };
 
+  // `Button` gives the press's haptic: none more here, or a press taps twice.
   const take = async () => {
-    tapHaptic();
     onOpened(true);
     try {
       await actions.takeControl(h.id);
       asks?.settle(h.id);
       if (opensScreen) router.push(`/computer/${h.agentId}`);
-    } catch {
-      failed();
+    } catch (err) {
+      failed(err);
     }
   };
   // A push or the inbox opened this request: it takes the control once (first one wins), when it is the person's.
@@ -155,28 +162,7 @@ function HandoffAsk({
     );
   }, [claim, opensScreen, mine, h.id, h.status]);
 
-  // "Agora não": the agent hears it couldn't be done now, with the reason if one is given.
-  const notNow = () => {
-    tapHaptic();
-    sheet.open(
-      <PromptForm
-        title={t("mobile.browser.failed.title")}
-        intro={t(`mobile.browser.failed.intro${g}`, { name })}
-        placeholder={t("mobile.browser.failed.placeholder")}
-        submitLabel={t("mobile.browser.failed.send")}
-        allowEmpty
-        onSubmit={async (text) => {
-          sheet.close();
-          try {
-            await actions.failed(h.id, text.trim().slice(0, NOTE_MAX) || undefined);
-            asks?.settle(h.id);
-          } catch {
-            failed();
-          }
-        }}
-      />,
-    );
-  };
+  const notNow = useNotNow(h, () => asks?.settle(h.id));
 
   return (
     <AskCard
@@ -186,13 +172,14 @@ function HandoffAsk({
       waitsFor={mine ? "you" : asked ? t("ask.waitingFor", { name: asked }) : null}
       lead={h.instructions}
       well={{
-        tile: <IconTile name={desktop ? "laptop" : "globe"} size={32} />,
+        tile: <IconTile name={desktop ? "laptop" : "globe"} size={20} />,
         title: name,
         detail: null,
         more: desktop ? null : { label: t("ask.seeScreen"), content: <ScreenPeek agentId={h.agentId} /> },
       }}
+      expiry={h.expiresAt ? <ExpiryLine createdAt={h.createdAt} expiresAt={h.expiresAt} /> : null}
       foot={
-        <AskFoot expiry={h.expiresAt ? <ExpiryLine createdAt={h.createdAt} expiresAt={h.expiresAt} /> : null}>
+        <AskFoot>
           {mine ? (
             <AskButtons
               primary={
@@ -227,10 +214,11 @@ function ScreenPeek({ agentId }: { agentId: string }) {
 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
+  // A line that wraps keeps its icon on the first.
   done: {
     marginTop: 12,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -238,4 +226,43 @@ const styles = StyleSheet.create({
   },
   peek: { aspectRatio: 16 / 10, borderRadius: 12, overflow: "hidden" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  pressed: { opacity: 0.85 },
 });
+
+/**
+ * "Agora não" on a request for help: the agent hears it couldn't be done now, with the reason if one is given. The
+ * chat's card and the agent's computer ask it the same way.
+ */
+export function useNotNow(h: BrowserHandoff | null, onDone?: () => void) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const dir = useDirectory();
+  const toast = useToast();
+  const sheet = useSheet();
+  const actions = useBrowserHandoffActions(orgId);
+  const name = (h && dir.agentById.get(h.agentId)?.name) ?? "";
+  const g = genderOf(name);
+  // Pressed through a `Button`, which gives the press's haptic.
+  return () => {
+    if (!h) return;
+    sheet.open(
+      <PromptForm
+        title={t("mobile.browser.failed.title")}
+        intro={t(`mobile.browser.failed.intro${g}`, { name })}
+        placeholder={t("mobile.browser.failed.placeholder")}
+        submitLabel={t("mobile.browser.failed.send")}
+        allowEmpty
+        onSubmit={async (text) => {
+          sheet.close();
+          try {
+            await actions.failed(h.id, text.trim().slice(0, NOTE_MAX) || undefined);
+            onDone?.();
+          } catch (err) {
+            // It ended meanwhile: the card settles on its own (`useBrowserHandoffMutations`), with nothing to tell.
+            if ((err as { code?: string }).code !== HANDOFF_OVER) toast({ title: t("mobile.app.failed"), icon: "x" });
+          }
+        }}
+      />,
+    );
+  };
+}

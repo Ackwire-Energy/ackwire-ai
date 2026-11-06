@@ -57,7 +57,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 16,
+    // The kit Card's corner: it is the same raised surface.
+    borderRadius: 20,
   },
   grow: { flex: 1, minWidth: 0 },
   title: { fontWeight: "600" },

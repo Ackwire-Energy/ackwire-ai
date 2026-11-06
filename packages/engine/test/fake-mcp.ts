@@ -7,7 +7,7 @@ import { type McpConnect, mcpSessionOver } from "../src";
  * An in-process MCP server shaped like GitHub's (no network). Records every
  * call and the auth headers each session was opened with.
  */
-export function fakeGithubMcp() {
+export function fakeGithubMcp(options: { issueWrite?: boolean } = {}) {
   const calls: { tool: string; args: Record<string, unknown> }[] = [];
   const sessions: { serverUrl: string; headers: Record<string, string> }[] = [];
   const pr = { owner: z.string(), repo: z.string(), pullNumber: z.number().int() };
@@ -43,6 +43,19 @@ export function fakeGithubMcp() {
         isError: true,
       }),
     );
+    if (options.issueWrite) {
+      server.registerTool(
+        "issue_write",
+        {
+          description: "Create a new or update an existing issue in a GitHub repository.",
+          inputSchema: { owner: z.string(), repo: z.string(), title: z.string().optional() },
+        },
+        async (args) => {
+          calls.push({ tool: "issue_write", args });
+          return { content: [{ type: "text", text: "Created issue #1" }] };
+        },
+      );
+    }
     return server;
   };
 

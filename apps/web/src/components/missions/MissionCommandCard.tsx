@@ -262,7 +262,7 @@ export function BlockedCommands({
                       key={i}
                       text={blockedText(d)}
                       checked={picked.has(i)}
-                      disabled={Boolean(why)}
+                      disabled={Boolean(why) || retry.isPending}
                       onChange={(on) =>
                         setPicked((prev) => {
                           const next = new Set(prev);

@@ -632,10 +632,14 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.closed()).toBe(0);
     expect(rfb().log).toContain("keydown Escape Escape");
 
-    await click(view().getByRole("button", { name: "Devolver" }));
-    // One quiet row: Ada asked nothing, so the note waits behind "Deixar um recado", and Devolver has the focus.
+    // The bar is there from the start, with the keys on the screen: Ada asked nothing, so the note waits behind
+    // "Deixar um recado", and nothing but the person's click hands back.
+    const foot = document.querySelector(".brw-ac__back") as HTMLElement;
+    expect(foot.textContent).toContain("Devolver à Ada");
+    expect(within(foot).queryByRole("button", { name: "Voltar" })).toBeNull();
     expect(view().queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
-    expect(document.activeElement === view().getByRole("button", { name: "Devolver" })).toBe(true);
+    expect(document.activeElement === document.querySelector(".dsk-keys")).toBe(true);
+    expect(calls(t, "browser.done")).toEqual([]);
     await click(view().getByRole("button", { name: "Deixar um recado" }));
     // One line in the middle of its field that grows as it wraps (its height set to its text): all of a note stays
     // in sight, and there is no grip to drag.
@@ -665,6 +669,8 @@ describe("the agent's screen in the computer dialog", () => {
     expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1", "Deixei o arquivo na mesa"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
+    // Watching there is nothing to hand back.
+    expect(document.querySelector(".brw-ac__back")).toBeNull();
   });
 
   test("on the Cloud the line in control has an ⓘ: the screen's text may be checked; never while watching", async () => {
@@ -721,7 +727,6 @@ describe("the agent's screen in the computer dialog", () => {
     const t = await controlled();
     expect(still()).toBeNull();
     await click(view().getByRole("button", { name: "Devolver" }));
-    await click(view().getByRole("button", { name: "Devolver" }));
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
     // Watching as soon as the server says so: no wait for the new connection's picture.
@@ -736,7 +741,6 @@ describe("the agent's screen in the computer dialog", () => {
 
   test("control taken again while a hand back's picture is still held: that picture stays under Assumindo o controle…", async () => {
     const t = await controlled();
-    await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Devolver" }));
     await settle(4);
     expect(still()).not.toBeNull();
@@ -823,7 +827,6 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(4);
     await connected();
     await click(view().getByRole("button", { name: "Devolver" }));
-    await click(view().getByRole("button", { name: "Devolver" }));
     await settle(4);
     await act(async () => ws.serverSends(MODE("watch")));
     await settle(4);
@@ -906,22 +909,35 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.querySelector(".ac-toast")).toBeNull();
   });
 
+  test("the bar leaves the keys on the screen: a press on it takes nothing, and Esc in an empty note brings them back", async () => {
+    const t = await controlled();
+    const foot = document.querySelector(".brw-ac__back") as HTMLElement;
+    // A press on the bar or its button keeps the browser's focus off it, so Enter stays the computer's.
+    expect(fireEvent.mouseDown(foot)).toBe(false);
+    expect(fireEvent.mouseDown(within(foot).getByRole("button", { name: "Devolver" }))).toBe(false);
+    await act(async () => t.field().focus());
+    await click(view().getByRole("button", { name: "Deixar um recado" }));
+    const note = view().getByRole("textbox", { name: "Recado para a Ada" });
+    expect(document.activeElement === note).toBe(true);
+    // In the note, a press stays the field's own, to place the caret.
+    expect(fireEvent.mouseDown(note)).toBe(true);
+    await act(async () => fireEvent.keyDown(note, { key: "Escape" }));
+    expect(view().queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    expect(document.activeElement === t.field()).toBe(true);
+    expect(calls(t, "browser.done")).toEqual([]);
+  });
+
   test("a hand back that fails: said in the head, the note kept to send again", async () => {
     const t = await controlled();
     replaceOn(t.api.browser, "done", async () => {
       throw new ApiError(500, "internal", "Something broke");
     });
-    await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Deixar um recado" }));
     const note = () => view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     await act(async () => fireEvent.change(note(), { target: { value: "Deixei aberto" } }));
     await click(view().getByRole("button", { name: "Devolver" }));
     expect(document.querySelector(".ac-dialog__sub > .cmp-said")?.textContent).toBe("Não deu certo. Tente de novo.");
     expect(document.querySelector(".ac-toast")).toBeNull();
-    expect(note().value).toBe("Deixei aberto");
-    // Voltar and Devolver again: the note opens with its words, nothing sent out of sight.
-    await click(view().getByRole("button", { name: "Voltar" }));
-    await click(view().getByRole("button", { name: "Devolver" }));
     expect(note().value).toBe("Deixei aberto");
   });
 
@@ -945,7 +961,6 @@ describe("the agent's screen in the computer dialog", () => {
 
   test("a hand back keeps the last picture dimmed under Devolvendo à Ada… until the watcher draws, never the cold cover", async () => {
     const t = await controlled();
-    await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Devolver" }));
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
@@ -1146,7 +1161,6 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.closed()).toBe(0);
     // Handed back and taken again: the line has its own words, nothing said from before.
     await click(view().getByRole("button", { name: "Devolver" }));
-    await click(view().getByRole("button", { name: "Devolver" }));
     await settle(4);
     await connected();
     await click(view().getByRole("button", { name: "Assumir o controle" }));
@@ -1206,7 +1220,6 @@ describe("the agent's screen in the computer dialog", () => {
 
     // Handed back with its keyboard up, then taken again: the button starts unpressed. Its return key adds a line to
     // the note, as in the chat; the button hands back.
-    await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Deixar um recado" }));
     const note = view().getByRole("textbox", { name: "Recado para a Ada" });
     expect(fireEvent.keyDown(note, { key: "Enter" })).toBe(true);
@@ -1269,20 +1282,23 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.fullscreenElement).toBeNull();
     expect(t.closed()).toBe(0);
     await click(view().getByRole("button", { name: "Devolver" }));
-    expect(view().getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
+    expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1"]]);
   });
 
-  test("Devolver from full screen leaves it first: the note is the dialog's, never over the screen", async () => {
+  test("Devolver in full screen: there in the bar under the screen, and one click hands back and leaves it", async () => {
     fullScreen();
-    await controlled();
+    const t = await controlled();
     await click(view().getByRole("button", { name: "Tela cheia" }));
     expect(classes()).toContain("is-screen-only");
-    await click(view().getByRole("button", { name: "Devolver" }));
+    // The dialog's head has only full screen and the close: Devolver is the bar's, under the screen.
+    expect(
+      within(document.querySelector(".cmp-acts") as HTMLElement).queryByRole("button", { name: "Devolver" }),
+    ).toBeNull();
+    const foot = document.querySelector(".brw-ac__back") as HTMLElement;
+    await click(within(foot).getByRole("button", { name: "Devolver" }));
+    expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1"]]);
     expect(classes()).not.toContain("is-full");
     expect(document.fullscreenElement).toBeNull();
-    expect(view().getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
-    // No full screen while the hand back is open.
-    expect(view().queryByRole("button", { name: "Tela cheia" })).toBeNull();
   });
 
   // Real time past the bar's 2.5 s: these tests say how long they may take, as the run's later files get 5 s.
@@ -1511,17 +1527,15 @@ describe("the dialog's size (computer.css)", () => {
   const phoneRule = async (selector: string) =>
     (await css()).split("@media (max-width: 640px) {")[1]?.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
 
-  test("a phone's head keeps one row and one height: Hand back in words, any other action its icon alone, the face aside", async () => {
+  test("a phone's head keeps one row and one height: an action its icon alone, the face aside", async () => {
     // No second row for the actions: the head is the kit's one flex row.
     expect(await css()).not.toContain("grid-template-columns: auto minmax(0, 1fr) auto");
-    const square = await phoneRule(".cmp-acts > .ac-btn:has(> .ac-icon):not(.cmp-words)");
+    const square = await phoneRule(".cmp-acts > .ac-btn:has(> .ac-icon)");
     expect(square).toContain("width: var(--control-h-sm)");
     expect(square).toContain("padding: 0");
-    const words = await phoneRule(".cmp-acts > .ac-btn:not(.cmp-words) .cmp-act-label");
+    const words = await phoneRule(".cmp-acts > .ac-btn .cmp-act-label");
     expect(words).toContain("position: absolute");
     expect(words).toContain("clip: rect(0 0 0 0)");
-    // A check alone reads as Done: Hand back keeps its words and drops the check.
-    expect(await phoneRule(".cmp-acts > .cmp-words > .ac-icon")).toContain("display: none");
     // The name and the line under it keep a line each beside the controls: the title names the agent, so the face goes,
     // and either one cut short is still one line.
     expect(await phoneRule(".cmp-dialog .ac-dialog__lead")).toContain("display: none");
@@ -1532,42 +1546,17 @@ describe("the dialog's size (computer.css)", () => {
     // A failed action's words in the line's place wrap whole instead, for the moment they show.
     expect(await phoneRule(".cmp-dialog .ac-dialog__sub:has(> .cmp-said)")).toContain("white-space: normal");
     // An icon alone sits in the middle of its square: no reaching out by its drawing's air there.
-    const square2 = await phoneRule(".cmp-acts > :is(.cmp-take, .cmp-back)");
+    const square2 = await phoneRule(".cmp-acts > .cmp-take");
     expect(square2).toContain("--lead-air: initial");
     expect(square2).toContain("--lead-rise: initial");
     // On a phone the body takes the head's 16 px inset, as the kit's head does there.
     expect(await phoneRule(".cmp-body")).toContain("padding: 16px");
-    // The words that give way are the buttons' names: Take control and Hand back keep them.
+    // The words that give way are the button's name.
     await dialog();
     await connected();
     const take = view().getByRole("button", { name: "Assumir o controle" });
     expect(take.querySelector(".cmp-act-label")?.textContent).toBe("Assumir o controle");
     expect(take.classList.contains("cmp-take")).toBe(true);
-    expect(take.classList.contains("cmp-words")).toBe(false);
-    await click(take);
-    await settle(4);
-    await connected();
-    const back = view().getByRole("button", { name: "Devolver" });
-    expect(back.querySelector(".cmp-act-label")?.textContent).toBe("Devolver");
-    expect([...back.classList]).toEqual(expect.arrayContaining(["cmp-back", "cmp-words"]));
-    cleanup();
-    // 360 px and narrower its words don't fit beside the name: it folds to its square with a give-back arrow, never
-    // the check, which reads as Done. Its words stay its name.
-    const real = window.matchMedia.bind(window);
-    window.matchMedia = ((query: string) =>
-      query === "(max-width: 360px)"
-        ? { matches: true, media: query, addEventListener() {}, removeEventListener() {} }
-        : real(query)) as typeof window.matchMedia;
-    try {
-      await controlled();
-      const folded = view().getByRole("button", { name: "Devolver" });
-      expect(folded.classList.contains("cmp-back")).toBe(true);
-      expect(folded.classList.contains("cmp-words")).toBe(false);
-      expect(folded.querySelector(":scope > svg path")?.getAttribute("d")).toBe(icons.undo[0]?.[1].d);
-      expect(folded.querySelector(".cmp-act-label")?.textContent).toBe("Devolver");
-    } finally {
-      window.matchMedia = real;
-    }
   });
 
   test("on a phone the wait and the page fill the sheet; the screen and its covers are one box, in its middle with all else under it", async () => {
@@ -1710,13 +1699,9 @@ describe("the dialog's size (computer.css)", () => {
   });
 
   test("the head's row stands one gap between what shows: the close and full screen reach out by their glyphs' air", async () => {
-    // Full screen's arrows leave 2.7 of their icon's 20 units on each side; the dialog's × (the kit's) 5.2; a
-    // phone's "Não consegui", its circle alone, 2.7 too.
+    // Full screen's arrows leave 2.7 of their icon's 20 units on each side; the dialog's × (the kit's) 5.2.
     const text = await css();
     expect(rule(text, ".cmp-acts > .cmp-full")).toContain("--glyph-air: calc(var(--control-icon-sm) * 2.7 / 20)");
-    expect(await phoneRule(".cmp-acts > .cmp-couldnt")).toContain(
-      "--glyph-air: calc(var(--control-icon-sm) * 2.7 / 20)",
-    );
     const kit = await Bun.file(
       new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
     ).text();
@@ -1744,7 +1729,7 @@ describe("the dialog's size (computer.css)", () => {
     expect(view().getByRole("button", { name: "Fechar" }).classList.contains("ac-btn--glyph")).toBe(true);
   });
 
-  test("Take control's and Hand back's icons keep the pill's padding by their ink, on its words' capitals' middle", async () => {
+  test("Take control's icon keeps the pill's padding by its ink, on its words' capitals' middle", async () => {
     const kit = await Bun.file(
       new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
     ).text();
@@ -1755,28 +1740,19 @@ describe("the dialog's size (computer.css)", () => {
     expect(lead).toContain("translate: 0 calc(-1 * var(--lead-rise))");
     // One move only: the build's minifier drops a `translate` declared beside a `transform`.
     expect(lead).not.toContain("transform");
-    // The drawings' own air and middles (20 units, half the 1.6 stroke round them): the person's ink from 3.4, its
-    // middle at 10.4, and the check's from 4.7, its middle at 10. A new drawing asks for new numbers here.
+    // The drawing's own air and middle (20 units, half the 1.6 stroke round it): its ink from 3.4, its middle at 10.4.
+    // A new drawing asks for new numbers here.
     expect(icons.person).toEqual([
       ["circle", { cx: "10", cy: "7", r: "3.2" }],
       ["path", { d: "M4.2 17c.7-3 3-4.6 5.8-4.6s5.1 1.6 5.8 4.6" }],
     ]);
-    expect(icons.check).toEqual([["path", { d: "m5.5 10.5 3 3 6-7" }]]);
     const text = await css();
     const take = rule(text, ".cmp-acts > .cmp-take");
     expect(take).toContain("--lead-air: calc(var(--control-icon-sm) * 3.4 / 20)");
     expect(take).toContain("--lead-rise: calc(var(--control-icon-sm) * 0.4 / 20 + var(--cap-mid))");
-    const back = rule(text, ".cmp-acts > .cmp-back");
-    expect(back).toContain("--lead-air: calc(var(--control-icon-sm) * 4.7 / 20)");
-    expect(back).toContain("--lead-rise: var(--cap-mid)");
-    // In the head: Take control watching, Hand back in control.
     await dialog();
     await connected();
     expect(view().getByRole("button", { name: "Assumir o controle" }).classList.contains("cmp-take")).toBe(true);
-    await click(view().getByRole("button", { name: "Assumir o controle" }));
-    await settle(4);
-    await connected();
-    expect(view().getByRole("button", { name: "Devolver" }).classList.contains("cmp-back")).toBe(true);
   });
 
   test("the head's controls sit on the name's capitals in every state, as every dialog's close does", async () => {
@@ -1802,12 +1778,10 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(kit, ".ac-dialog__sub")).toContain("line-height: 18px");
   });
 
-  test("the head's gaps read even by what shows: Take control's and Hand back's ring and shadow get their room", async () => {
-    // Raised buttons show past their box (the default's ring, the primary's blur); the glyphs beside them don't. On a
-    // dark ground the primary's shadow shows nothing: only its edge.
+  test("the head's gaps read even by what shows: Take control's ring and shadow get their room", async () => {
+    // A raised button shows past its box (the default's ring); the glyphs beside it don't.
     const text = await css();
-    expect(rule(text, ".cmp-acts > :is(.cmp-take, .cmp-back)")).toContain("margin-inline: 1.5px");
-    expect(rule(text, '[data-theme="dark"] .cmp-acts > .cmp-back')).toContain("margin-inline: 1px");
+    expect(rule(text, ".cmp-acts > .cmp-take")).toContain("margin-inline: 1.5px");
     const tokens = await Bun.file(
       new URL("../../../packages/ui/src/styles/tokens.css", import.meta.url).pathname,
     ).text();
@@ -1820,18 +1794,16 @@ describe("the dialog's size (computer.css)", () => {
     expect(text).toContain(
       "@media (pointer: coarse) {\n  .ac-dialog.cmp-dialog {\n    --cmp-button: var(--control-h-md);",
     );
-    // A banner, the request and the note sit in the body's column with the screen's stage, which gets what they leave
+    // A banner, the request and the hand-back bar sit in the body's column with the screen's stage, which gets what they leave
     // and shrinks the screen inside it, keeping its shape.
     const column = rule(text, ".cmp-body > .dsk");
     expect(column).toContain("flex: 1 1 0");
     expect(column).toContain("min-height: 0");
     expect(rule(text, ".cmp-body .dsk-stage,\n.cmp-body > .cmp-stage")).toContain("container-type: size");
-    // The window has them where that column holds them: the request over the screen, the note in its line's place.
+    // The window has them where that column holds them: the request over the screen, the bar under its line.
     const t = await controlled();
     const body = () => document.querySelector(".ac-dialog.cmp-dialog > .cmp-body");
-    expect(body()?.querySelector(":scope > .dsk")).toBeTruthy();
-    await click(view().getByRole("button", { name: "Devolver" }));
-    expect(body()?.querySelector(":scope > .dsk > .brw-ac__fail")).toBeTruthy();
+    expect(body()?.querySelector(":scope > .dsk > .dsk-line + .brw-ac__back")).toBeTruthy();
     expect(t.sockets.desktops.length).toBeGreaterThan(0);
   });
 
@@ -1890,7 +1862,10 @@ describe("the dialog's size (computer.css)", () => {
     expect(dialog).toContain("display: grid");
     expect(dialog).toContain("background: var(--screen-bg)");
     const stage = rule(text, ".cmp-dialog.is-screen-only .dsk-stage");
-    expect(stage).toContain("grid-area: 1 / 1 / -1 / -1");
+    // The screen ends over the hand-back bar's row: the bar never covers its foot.
+    expect(dialog).toContain("grid-template: auto auto auto auto 1fr auto / minmax(0, 1fr)");
+    expect(stage).toContain("grid-area: 1 / 1 / 6 / -1");
+    expect(rule(text, ".cmp-dialog.is-screen-only .brw-ac__back")).toContain("grid-area: 6 / 1");
     expect(stage).toContain("container-type: size");
     expect(rule(text, ".cmp-dialog.is-screen-only .dsk-screen")).toContain("width: min(100cqw, 100cqh * 1280 / 900)");
     // The ground is the screen's own in both themes: one token, no dark value of its own.

@@ -1028,12 +1028,14 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
 });
 
 describe("empty conversations", () => {
-  test("a channel: its greeting and the suggestions; a DM with a person: the greeting alone", async () => {
+  test("a channel: its greeting, its line and the suggestions; a DM with a person: the greeting alone", async () => {
     await open(seedState(), `c/${GENERAL_ID}`);
     await settle(4);
     const channel = document.querySelector(".ac-empty") as HTMLElement;
     expect(channel.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi em #general");
-    expect(channel.querySelector(".ac-empty__text")).toBeNull();
+    expect(channel.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Mencione um agente com @ e ele entra na conversa.",
+    );
     cleanup();
     await open(seedState(), "dm/person/u-joao");
     await settle(4);

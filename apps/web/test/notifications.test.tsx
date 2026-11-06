@@ -436,7 +436,7 @@ describe("Notificações", () => {
 
   test("empty: Tudo em dia", async () => {
     await go(seedState({ notifications: [] }));
-    expect(document.querySelector(".nt-calm")?.textContent).toBe(
+    expect(document.querySelector(".ac-empty--page")?.textContent).toBe(
       "Tudo em diaQuando alguém precisar de você, aparece aqui.",
     );
     expect((screen().getByRole("button", { name: "Marcar tudo como lido" }) as HTMLButtonElement).disabled).toBe(true);
@@ -963,7 +963,7 @@ describe("Esperando você: what only points somewhere is one row", () => {
     expect(value(".nt-wi", "grid-template-columns", phone)).toBeUndefined();
     // A ghost reaches into the item's padding and the item clips: its ring goes inside, as the item's own does.
     const ring = value("html:not([data-pointer]) .nt-item:focus-visible", "box-shadow");
-    expect(ring).toStartWith("inset ");
+    expect(ring).toBe("var(--focus-ring-inset)");
     expect(value("html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
   });
 });

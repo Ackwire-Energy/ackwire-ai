@@ -8,7 +8,7 @@ import {
   taskTitle,
 } from "@agenteschat/client/lib/task-manager";
 import { router } from "expo-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,14 +16,14 @@ import { Button, Card, PixelDone, PixelFail, PixelStop, PixelStopped, Section, T
 import { RunSteps } from "../chat/ToolCalls";
 import { chatHref } from "../links/logic";
 import { useOpenQueue } from "../queue/QueueSheet";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useStopper, useTasksToday } from "./hooks";
 import { endedText, rowState, taskSubline } from "./logic";
-import { StateLine, UsingLine } from "./parts";
+import { StateLine, StopConfirm, UsingLine } from "./parts";
 
 /**
  * A task's screen (ADR 0128), pushed from the task manager or an agent's tasks: whose it is, where and who asked, how
@@ -72,11 +72,14 @@ function Live({ task }: { task: ManagedTask }) {
   const state = rowState(task, stopping);
   const title = taskTitle(t, task);
   const inLine = state === "stopping" ? null : linePlace(task);
+  const dir = useDirectory();
+  const nameOf = (id: string) => dir.anyAgent(id)?.name;
+  const [asking, setAsking] = useState(false);
   return (
     <Page
       task={task}
       title={title}
-      sub={taskSubline(t, task, meId, title)}
+      sub={taskSubline(t, task, meId, title, nameOf)}
       rows={[
         {
           key: "state",
@@ -98,16 +101,34 @@ function Live({ task }: { task: ManagedTask }) {
       steps={{ calls: task.steps, live: taskState(task) === "working" }}
       line={inLine?.machineId ?? null}
       stop={
-        task.canStop ? (
-          <Button
-            variant="primary"
-            wide
-            label={t("taskManager.actions.stopTask")}
-            leading={(ink) => <PixelStop size={11} color={ink} moving={false} />}
-            loading={state === "stopping"}
-            onPress={() => stop([task.runId])}
+        !task.canStop ? null : asking ? (
+          <StopConfirm
+            agentId={task.agentId}
+            count={1}
+            helpers={task.helpers}
+            onCancel={() => setAsking(false)}
+            onStop={(reason) => {
+              setAsking(false);
+              stop([task.runId], reason, true);
+            }}
           />
-        ) : null
+        ) : (
+          <>
+            {task.delegation ? (
+              <Text variant="footnote" tone="muted">
+                {t("taskManager.delegated.stopNote", { name: nameOf(task.delegation.agentId) ?? "" })}
+              </Text>
+            ) : null}
+            <Button
+              variant="primary"
+              wide
+              label={t(task.helpers ? "taskManager.actions.stopAll" : "taskManager.actions.stopTask")}
+              leading={(ink) => <PixelStop size={11} color={ink} moving={false} />}
+              loading={state === "stopping"}
+              onPress={() => (task.helpers ? setAsking(true) : stop([task.runId]))}
+            />
+          </>
+        )
       }
     />
   );
@@ -138,7 +159,7 @@ function Ended({ task }: { task: EndedTask }) {
               ) : (
                 <PixelStopped size={10} />
               )}
-              <Text variant="footnote" tone="ink2" style={styles.semibold}>
+              <Text variant="footnote" tone="ink2" style={[styles.semibold, styles.shrink]}>
                 {endedText(t, task, meId)}
               </Text>
             </View>
@@ -170,7 +191,7 @@ function Page({
   line = null,
   stop,
 }: {
-  task: Pick<ManagedTask, "runId" | "agentId" | "channelId" | "threadId" | "background">;
+  task: Pick<ManagedTask, "runId" | "agentId" | "channelId" | "threadId" | "background" | "betweenAgents">;
   title: string;
   sub: string;
   rows: { key: string; label: string; value: ReactNode }[];
@@ -194,8 +215,10 @@ function Page({
       >
         <View style={styles.head}>
           <View style={styles.row}>
-            <AgentFace agentId={task.agentId} size={24} live={false} />
-            <Text variant="small" tone="muted" style={styles.semibold}>
+            <OpensAgent agentId={task.agentId}>
+              <AgentFace agentId={task.agentId} size={24} live={false} />
+            </OpensAgent>
+            <Text variant="small" tone="muted" style={[styles.semibold, styles.shrink]}>
               {agent?.name ?? t("channel.unknownAgent")}
             </Text>
           </View>
@@ -233,7 +256,7 @@ function Page({
               }}
             />
           ) : null}
-          {task.background ? null : (
+          {task.background || task.betweenAgents ? null : (
             <Button
               variant="secondary"
               wide
@@ -253,6 +276,7 @@ function Page({
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   scroll: { paddingTop: 4 },

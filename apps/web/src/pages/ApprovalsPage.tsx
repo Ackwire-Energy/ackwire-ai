@@ -2,6 +2,7 @@ import type { Agent, Approval, ConnectorDef } from "@agenteschat/client";
 import {
   sendHelpers,
   useApprovals,
+  useApprovalsDeciding,
   useCatalog,
   useChannels,
   useCustomServers,
@@ -55,6 +56,7 @@ import {
   Icon,
   type IconName,
   Kbd,
+  Locked,
   PageHeader,
   SearchInput,
   Segmented,
@@ -94,6 +96,7 @@ import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { TaskStepsBlock, useCallLogo } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { TYPED_VALUES } from "@/i18n";
 import { Markdown } from "@/lib/markdown";
 import { useOpenParam } from "@/lib/open-param";
@@ -193,6 +196,7 @@ export function ApprovalsPage() {
   const all = approvals.data ?? [];
   const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
   const query = q.trim().toLowerCase();
+  const look = useRightHandLook();
   const matches = (a: Approval) =>
     !query ||
     [
@@ -354,12 +358,14 @@ export function ApprovalsPage() {
           commands === 0 &&
           !missionWaiting &&
           shownDecided.length === 0 && (
-            <EmptyState sky title={t("approvals.emptyTitle")}>
+            <EmptyState size="page" agent={look} mood="deal" title={t("approvals.emptyTitle")}>
               <HelpLink slug="approvals">{t("approvals.how")}</HelpLink>
             </EmptyState>
           )}
         {approvals.isSuccess && query && shownOpen.length === 0 && shownDecided.length === 0 && (
-          <EmptyState icon="search">{t("approvals.noResults")}</EmptyState>
+          <EmptyState size="panel" actions={<Button onClick={() => setQ("")}>{t("filters.clearSearch")}</Button>}>
+            {t("approvals.noResults")}
+          </EmptyState>
         )}
 
         {(shownOpen.length > 0 || shownDecided.length > 0) && (
@@ -482,7 +488,12 @@ export function ApprovalsPage() {
           </>
         )}
         {approvals.isSuccess && filter !== "pending" && !query && shownOpen.length + shownDecided.length === 0 && (
-          <EmptyState icon="approve">{t("approvals.noResults")}</EmptyState>
+          <EmptyState
+            size="panel"
+            actions={<Button onClick={() => setFilter("pending")}>{t("filters.clearAll")}</Button>}
+          >
+            {t("approvals.noResults")}
+          </EmptyState>
         )}
       </div>
     </div>
@@ -815,43 +826,38 @@ export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; a
     );
   return (
     <div className="ap-refuse">
-      <label htmlFor={id}>{t("approvals.refuseLabel")}</label>
-      <textarea
-        id={id}
-        ref={ref}
-        rows={2}
-        value={reason}
-        placeholder={t("approvals.refusePlaceholder")}
-        onChange={(e) => setReason(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send();
-          if (e.key === "Escape") onCancel();
-        }}
-      />
-      <div className="ap-refuse__suggest">
-        {SUGGESTIONS.map((s) => (
-          <button key={s} type="button" onClick={() => setReason(t(`approvals.suggest.${s}`))}>
-            {t(`approvals.suggest.${s}`)}
-          </button>
-        ))}
-      </div>
-      <div className="ap-refuse__row">
-        <span className="ap-refuse__learn">{t("approvals.refuseLearn", { context: g.context, name: g.name })}</span>
-        <span className="ap-grow" />
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          {t("approvals.back")}
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          kbd={["⌘", "↵"]}
-          loading={decide.isPending}
-          disabled={decide.isPending}
-          onClick={send}
-        >
-          {t("approvals.refuseConfirm")}
-        </Button>
-      </div>
+      <Locked when={decide.isPending}>
+        <label htmlFor={id}>{t("approvals.refuseLabel")}</label>
+        <textarea
+          id={id}
+          ref={ref}
+          rows={2}
+          value={reason}
+          placeholder={t("approvals.refusePlaceholder")}
+          onChange={(e) => setReason(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send();
+            if (e.key === "Escape") onCancel();
+          }}
+        />
+        <div className="ap-refuse__suggest">
+          {SUGGESTIONS.map((s) => (
+            <button key={s} type="button" onClick={() => setReason(t(`approvals.suggest.${s}`))}>
+              {t(`approvals.suggest.${s}`)}
+            </button>
+          ))}
+        </div>
+        <div className="ap-refuse__row">
+          <span className="ap-refuse__learn">{t("approvals.refuseLearn", { context: g.context, name: g.name })}</span>
+          <span className="ap-grow" />
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            {t("approvals.back")}
+          </Button>
+          <Button variant="danger" size="sm" kbd={["⌘", "↵"]} loading={decide.isPending} onClick={send}>
+            {t("approvals.refuseConfirm")}
+          </Button>
+        </div>
+      </Locked>
     </div>
   );
 }
@@ -948,6 +954,11 @@ function RunRow({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const deciding = useApprovalsDeciding(
+    org.id,
+    run.map((a) => a.id),
+  );
   const first = run[0];
   if (!first) return null;
   const name = agent?.name ?? t("channel.unknownAgent");
@@ -967,9 +978,11 @@ function RunRow({
         </span>
       </div>
       <div className="ap-run__acts">
-        <ApproveAll items={run} label={t("approval.run.approve")}>
-          {lead && <ApproveAlways approval={lead} agent={agent} also={approveAlwaysAlso(items, lead)} />}
-        </ApproveAll>
+        <Locked when={deciding}>
+          <ApproveAll items={run} label={t("approval.run.approve")}>
+            {lead && <ApproveAlways approval={lead} agent={agent} also={approveAlwaysAlso(items, lead)} />}
+          </ApproveAll>
+        </Locked>
         <Button size="sm" variant="ghost" aria-expanded={open} onClick={onToggle}>
           {t("approval.run.show")}
         </Button>
@@ -1019,7 +1032,7 @@ function ReviewHead({ approval: a, channel }: { approval: Approval; channel: str
         expression={p === "done" ? "happy" : undefined}
       />
       <div className="ap-review__headText">
-        <p className="ap-review__by">
+        <p className="ap-review__by ac-captop">
           <b>{name}</b> · {by}
         </p>
         <h2 className="ap-review__title" title={title}>
@@ -1314,6 +1327,7 @@ function DecisionBar({
   const name = agent?.name ?? t("channel.unknownAgent");
   const g = agentGrammar(name);
   const p = approvalPhase(a);
+  const deciding = useApprovalsDeciding(org.id, [a.id]);
   if (p === "running")
     return (
       <div className={cx("ap-bar", floating && "ap-bar--float")}>
@@ -1347,12 +1361,14 @@ function DecisionBar({
         {note}
       </p>
       <div className="ap-bar__acts">
-        {approveAlwaysOffered(a) && <ApproveAlways approval={a} agent={agent} also={also} />}
-        <Button onClick={onRefuse}>
-          {t("approval.refuse")}
-          <Kbd>R</Kbd>
-        </Button>
-        <ApproveButton approval={a} />
+        <Locked when={deciding}>
+          {approveAlwaysOffered(a) && <ApproveAlways approval={a} agent={agent} also={also} />}
+          <Button onClick={onRefuse}>
+            {t("approval.refuse")}
+            <Kbd>R</Kbd>
+          </Button>
+          <ApproveButton approval={a} />
+        </Locked>
       </div>
     </div>
   );

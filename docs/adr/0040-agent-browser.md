@@ -138,7 +138,7 @@ A person watching can also **take over** on their own, while the agent may use i
 - The relay sits behind a small interface of ours (`StreamRelay`), in memory today. Frames come from a `FrameSource` (JPEG today).
 - Load: the server only copies bytes. About 25–50 KB per frame; a 2–3 minute login is about 30–75 MB; nothing while nobody watches.
 
-#### 7.1 Sockets of its own, paced by who watches (2026-11-05, runner protocol 46)
+#### 7.1 Sockets of its own, paced by who watches (2026-11-05, runner protocol 49)
 
 The live view lagged, most of all while a person drove the page. Nothing bounded how far behind it could fall: in control the runner forwarded up to 15 frames a second as base64 JSON on its machine socket and skipped one only once 2 MB were waiting there, and the server skipped a viewer's frame only once 1 MB waited on that viewer's realtime socket. A computer's upload that took fewer frames than that queued seconds of pictures, which the person watched replay after each click; and every command, result and chat event waited behind them on the same sockets.
 

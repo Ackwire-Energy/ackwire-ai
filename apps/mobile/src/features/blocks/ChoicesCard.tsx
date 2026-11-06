@@ -147,7 +147,8 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
       <Text variant="body" style={styles.question}>
         {q.question}
       </Text>
-      <View style={styles.options}>
+      {/* Not `Locked`: it closes the keyboard, and in a conversation that's the composer's. */}
+      <View style={[styles.options, answer.isPending && styles.sending]}>
         {q.options.map((o, i) => {
           const on = d.picks[d.step] === i;
           return (
@@ -191,7 +192,8 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             accessibilityRole="button"
             disabled={d.step === 0}
             onPress={() => setDraft(moveStep(d, -1))}
-            hitSlop={8}
+            // An 18-point line: 13 of slop around it gives the 44-point target.
+            hitSlop={13}
           >
             <Text variant="footnote" tone={d.step === 0 ? "faint" : "ink"} style={styles.bold}>
               {t("mobile.choices.back")}
@@ -212,7 +214,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             accessibilityRole="button"
             disabled={d.step === questions.length - 1 || d.picks[d.step] === null}
             onPress={() => setDraft(moveStep(d, 1))}
-            hitSlop={8}
+            hitSlop={13}
           >
             <Text
               variant="footnote"
@@ -246,6 +248,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   question: { paddingHorizontal: 14, paddingTop: 6 },
   options: { gap: 6, padding: 14, paddingTop: 10 },
+  sending: { opacity: 0.6 },
   option: {
     flexDirection: "row",
     alignItems: "flex-start",

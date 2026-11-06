@@ -50,6 +50,22 @@ test("the column's add row: a 24px plus tile and 13px text, so it fits one line 
   expect(last(".member-row__plus", "width")).toBe("32px");
 });
 
+test("a DM's sidebar: a settings row's words keep the column, and its buttons wrap under them", async () => {
+  const css = await Bun.file(new URL("../src/components/agents/agent-sidebar.css", import.meta.url).pathname).text();
+  const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`)).split("}")[0];
+  expect(rule(".dm-side__sec .settings-row")).toContain("flex-wrap: wrap");
+  expect(rule(".dm-side__sec .settings-row > .settings-row__text")).toContain("flex: 1 1 0");
+  const buttons = rule(".dm-side .dm-side__sec .settings-row.settings-row--lead > .settings-row__end");
+  expect(buttons).toContain("flex-basis: 100%");
+  // The name's 22px box belongs beside the words, never around buttons under them.
+  expect(buttons).toContain("height: auto");
+  expect(rule(".dm-side__sec .rh-set__acts")).toContain("flex-wrap: wrap");
+  // Only there: Settings' rows keep their layout.
+  expect(css.match(/^[^\n]*settings-row[^\n]*\{$/gm)?.every((line) => /^(\.dm-side )?\.dm-side__sec/.test(line))).toBe(
+    true,
+  );
+});
+
 test("a DM's floating sidebar: 360px over the chat, and where panels take the whole screen it does too", async () => {
   const css = await builtCss("src/components/agents/agent-sidebar.css");
   const width = (sheet: string) =>

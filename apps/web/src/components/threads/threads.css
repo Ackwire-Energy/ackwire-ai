@@ -73,6 +73,7 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   font-size: 13.5px;
   color: var(--ink2);
 }
+/* The icon sits flat on the card (no tile of its own inside it), in the 28px box its words line up with. */
 .thread-stub__icon {
   width: 28px;
   height: 28px;
@@ -80,8 +81,6 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
-  background: var(--sunken);
   color: var(--ink2);
 }
 .thread-stub__text {
@@ -267,11 +266,14 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
 .consult-answer {
   margin: 4px 12px 8px var(--thread-indent, 64px);
 }
-/* Who is in it, in front of the title (the generic thread mark only when nobody is known). */
+/* Who is in it, in front of the title (the generic thread mark only when nobody is known). Its 24px faces are no
+   taller than the title's line, so they centre on that first line, not on the title and its meta together. */
 .thread-head__who {
   flex: none;
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
+  height: 24px;
   color: var(--faint);
 }
 /* "DM com Theo · 4 respostas · há 2 min": the place may shorten, the count and time never do. */
@@ -365,7 +367,7 @@ html:not([data-pointer]) .thread-title__button:focus-visible {
 }
 html:not([data-pointer]) .thread-context__head:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .thread-context__icon {
   width: 30px;
@@ -844,6 +846,21 @@ html:not([data-pointer]) .thread-line:focus-visible {
   color: var(--ink);
   font-weight: 650;
 }
+/* In a narrow column (the thread panel, a phone) the line never runs past its plate: the time gives way first, then
+   the count, each ending in "…"; the faces and what it needs keep their width. */
+.thread-line > b,
+.thread-line__when,
+.thread-line__when > time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.thread-line__state {
+  flex: none;
+}
+.thread-line__when {
+  flex-shrink: 2;
+}
 .thread-line__who {
   display: inline-flex;
   flex: none;
@@ -908,6 +925,9 @@ html:not([data-pointer]) .thread-line:focus-visible {
   flex: 1 1 auto;
   height: 100%;
   min-height: 0;
+}
+.thread-panel__chat[hidden] {
+  display: none;
 }
 .thread-head--panel {
   padding-left: 18px;
@@ -975,6 +995,20 @@ html:not([data-pointer]) .thread-line:focus-visible {
       display: none;
     }
   }
+  /* A message's time details (the full date and what the reply cost) are one line wider than the panel: anchored to
+     the row and wrapping, as on a phone (the kit's 640px rule), instead of cut off at the panel's edge. */
+  @container thread-dock (max-width: 640px) {
+    .ac-msg__time--details,
+    .ac-msg__gutter-time {
+      position: static;
+    }
+    :is(.ac-msg__time--details, .ac-msg__gutter-time) .ac-msg__tip {
+      left: 12px;
+      width: max-content;
+      max-width: calc(100% - 24px);
+      white-space: normal;
+    }
+  }
 }
 @media (min-width: 861px) and (prefers-reduced-motion: reduce) {
   .thread-panel--docked {
@@ -1025,34 +1059,24 @@ html:not([data-pointer]) .thread-line:focus-visible {
   top: 14px;
   right: 14px;
 }
+/* The cover's buttons end the buttons' own 6px before the × (14px in, one small control wide). */
 .thread-panel--wide .agp-cover__acts {
-  right: 48px;
+  right: calc(14px + var(--control-h-sm) + 6px);
 }
 .thread-panel--wide .page__header,
 .thread-panel--wide .agp-tabs .ac-tabs {
   padding-right: 48px;
 }
-/* The agent's page docked beside its conversation: as wide as the conversation lets it, up to the page's own 900px,
-   the conversation keeping its 400px like beside a thread. */
-@media (min-width: 861px) {
-  .thread-panel--docked.thread-panel--wide {
-    width: clamp(360px, calc(100% - 400px), 900px);
-  }
-  @container channel-body (max-width: 719px) {
-    .thread-panel--docked.thread-panel--wide {
-      width: auto;
-    }
-  }
-}
-/* Under a panel: the conversation dims like under a dialog (.ac-dialog__scrim, e.g. a routine's details),
-   and a click there closes the panel. */
+/* Under a panel that floats (not one docked in a conversation): the whole window dims like under a dialog
+   (.ac-dialog__scrim, e.g. a routine's details), the sidebar too, and a click there closes the panel. */
 .thread-panel__scrim {
-  position: absolute;
+  position: fixed;
   z-index: 29;
   inset: 0;
   padding: 0;
   border: 0;
-  background: rgba(10, 10, 10, 0.4);
+  /* The dialog's own dim (`--scrim`), so both read the same in each theme. */
+  background: var(--scrim);
   cursor: default;
   animation: thread-scrim-in 0.24s var(--out);
 }
@@ -1070,6 +1094,12 @@ html:not([data-pointer]) .thread-line:focus-visible {
   .thread-panel__scrim {
     display: none;
   }
+}
+/* A page's entrance (`page-in`) holds its last frame, and a transform held there makes the page, not the window, what
+   `position: fixed` fills, and a layer under the sidebar's: the sidebar would stay out of the scrim. Only the holding
+   stops: `animation: none` would play the entrance again when the panel closes. */
+main.shell__main:has(.thread-panel__scrim) {
+  animation-fill-mode: backwards;
 }
 /* The pinned bar: one slim line under the conversation's header, the latest pin; a click lists them all. */
 .pinbar {

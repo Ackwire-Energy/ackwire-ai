@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { en } from "@agenteschat/i18n/en";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
@@ -482,6 +482,27 @@ export async function accountBlock(db: Executor, userId: string) {
 /** Whether this account is blocked (`setUserBlocked`). */
 export async function isUserBlocked(db: Executor, userId: string) {
   return (await accountBlock(db, userId)) !== null;
+}
+
+/**
+ * An account in use: not blocked, and not waiting for its deletion (ADR 0088 §10). Anything else counts as nobody:
+ * no membership, no mention, no DM, no email or push.
+ */
+export const accountInUse = sql<boolean>`(${users.blockedAt} is null and ${users.deletionDueAt} is null)`;
+
+/** Whether this account can't join or make anything: blocked, or waiting for its deletion. */
+export async function accountClosed(db: Executor, userId: string) {
+  const [row] = await db.select({ open: accountInUse }).from(users).where(eq(users.id, userId));
+  return row?.open !== true;
+}
+
+/** Whether this account waits for its deletion (ADR 0088 §10). */
+export async function deletionPending(db: Executor, userId: string) {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), isNotNull(users.deletionDueAt)));
+  return !!row;
 }
 
 /**

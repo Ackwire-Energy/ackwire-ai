@@ -64,6 +64,7 @@ import {
   InfoHint,
   Input,
   Kbd,
+  Locked,
   Logo,
   modKey,
   ProviderLogo,
@@ -96,6 +97,7 @@ import {
   type PlanChoice,
   usd,
 } from "@/components/AgentFields";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { ImportFlow, useImportFlow } from "@/components/ImportFlow";
@@ -364,6 +366,7 @@ function NewAgentFlow({
     [models.data, credentials.data, platform.data],
   );
   const usable = useMemo(() => usableModels(choices), [choices]);
+  const held = usePlanHold() !== null;
   // "Quem pensa": what the agent's page offers, every plan on every computer that runs it, in one list.
   const brainOptions = useMemo(
     () =>
@@ -372,8 +375,9 @@ function NewAgentFlow({
         machines: brainMachines.data ?? [],
         accounts: aiAccounts.data?.accounts ?? [],
         ownerIsMe: owner === me.user.id,
+        held,
       }),
-    [t, locale, choices, brainMachines.data, aiAccounts.data, owner, me.user.id],
+    [t, locale, choices, brainMachines.data, aiAccounts.data, owner, me.user.id, held],
   );
   const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
 
@@ -1229,7 +1233,7 @@ function NewAgentFlow({
               </ul>
             </>
           ) : (
-            <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
+            <p className="small muted">{t(managesAgents ? "access.noConnectors" : "access.noConnectorsViewer")}</p>
           )}
           {managesAgents && (
             <Link
@@ -1646,9 +1650,11 @@ function NewAgentFlow({
       <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} onLeave={onClose} />
       <div className="newag__work">
         <main className="newag__main">
-          <div className="newag__content" key={step}>
-            {views[step]()}
-          </div>
+          <Locked when={create.isPending || deny.isPending}>
+            <div className="newag__content" key={step}>
+              {views[step]()}
+            </div>
+          </Locked>
           <div className="newag__foot">
             <span className="newag__hint" data-bad={footErrors.length > 0 || undefined}>
               {importing ? null : footErrors.length > 0 ? (
@@ -1661,7 +1667,13 @@ function NewAgentFlow({
               )}
             </span>
             {index > 0 || importing ? (
-              <Button variant="ghost" size="lg" icon="chevronLeft" onClick={back}>
+              <Button
+                variant="ghost"
+                size="lg"
+                icon="chevronLeft"
+                disabled={create.isPending || deny.isPending}
+                onClick={back}
+              >
                 {t("common.back")}
               </Button>
             ) : onClose ? (

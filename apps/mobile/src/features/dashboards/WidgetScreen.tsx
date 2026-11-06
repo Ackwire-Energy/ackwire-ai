@@ -24,6 +24,8 @@ import {
   GroupedRow,
   Icon,
   IconButton,
+  LineIcon,
+  Locked,
   PressScale,
   systemText,
   Text,
@@ -167,6 +169,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
           onPress: () =>
             remove.mutate(w.id, {
               onSuccess: () => {
+                successHaptic();
                 toast({ title: t("mobile.dashboards.widget.removed") });
                 goBack();
               },
@@ -228,10 +231,12 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
         />
         {w.status === "failed" && w.failure ? (
           <View style={styles.failure}>
-            <Icon name="info" size={16} color={c.warn} />
-            <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
-              {words.failure(w)}
-            </Text>
+            <View style={styles.failureLine}>
+              <LineIcon name="info" size={13} color={c.warn} variant="footnote" />
+              <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
+                {words.failure(w)}
+              </Text>
+            </View>
             {w.canEdit ? (
               <Button
                 size="sm"
@@ -257,19 +262,21 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
               />
               {open === "title" ? (
                 <View style={styles.alert}>
-                  <TextArea
-                    value={title}
-                    onChangeText={setTitle}
-                    placeholder={t("mobile.dashboards.widget.titlePlaceholder")}
-                    accessibilityLabel={t("mobile.dashboards.widget.title")}
-                    multiline={false}
-                    minHeight={46}
-                    style={styles.condition}
-                    maxLength={WIDGET_LIMITS.title}
-                    returnKeyType="done"
-                    autoFocus
-                    onSubmitEditing={saveTitle}
-                  />
+                  <Locked when={update.isPending}>
+                    <TextArea
+                      value={title}
+                      onChangeText={setTitle}
+                      placeholder={t("mobile.dashboards.widget.titlePlaceholder")}
+                      accessibilityLabel={t("mobile.dashboards.widget.title")}
+                      multiline={false}
+                      minHeight={46}
+                      style={styles.condition}
+                      maxLength={WIDGET_LIMITS.title}
+                      returnKeyType="done"
+                      autoFocus
+                      onSubmitEditing={saveTitle}
+                    />
+                  </Locked>
                   <View style={styles.alertSave}>
                     <Button
                       size="sm"
@@ -316,21 +323,23 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
           />
           {open === "alert" ? (
             <View style={styles.alert}>
-              <GroupedRow label={t("widgets.alert.label")} toggle={alertOn} onPress={() => setAlertOn((v) => !v)} />
-              {alertOn ? (
-                <TextArea
-                  value={condition}
-                  onChangeText={setCondition}
-                  placeholder={t("widgets.alert.placeholder")}
-                  accessibilityLabel={t("widgets.alert.condition")}
-                  multiline={false}
-                  minHeight={46}
-                  style={styles.condition}
-                  maxLength={CONDITION_MAX}
-                  returnKeyType="done"
-                  onSubmitEditing={saveAlert}
-                />
-              ) : null}
+              <Locked when={update.isPending} style={styles.alertFields}>
+                <GroupedRow label={t("widgets.alert.label")} toggle={alertOn} onPress={() => setAlertOn((v) => !v)} />
+                {alertOn ? (
+                  <TextArea
+                    value={condition}
+                    onChangeText={setCondition}
+                    placeholder={t("widgets.alert.placeholder")}
+                    accessibilityLabel={t("widgets.alert.condition")}
+                    multiline={false}
+                    minHeight={46}
+                    style={styles.condition}
+                    maxLength={CONDITION_MAX}
+                    returnKeyType="done"
+                    onSubmitEditing={saveAlert}
+                  />
+                ) : null}
+              </Locked>
               <View style={styles.alertSave}>
                 <Button
                   size="sm"
@@ -438,29 +447,31 @@ function AskChange({ widget: w, name }: { widget: WidgetDetail; name: string }) 
           locations={[0, 0.3]}
           style={StyleSheet.absoluteFill}
         />
-        <View style={[styles.field, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder={t("widgets.menu.change", { name })}
-            placeholderTextColor={c.faint}
-            accessibilityLabel={t("widgets.panel.ask")}
-            multiline
-            maxLength={1000}
-            style={[styles.input, systemText("body"), { color: c.ink }]}
-          />
-          <PressScale
-            to={0.9}
-            onPress={send}
-            disabled={!ready}
-            accessibilityRole="button"
-            accessibilityLabel={t("widgets.panel.send")}
-            style={[styles.send, { backgroundColor: ready ? c.ink : c.plate }]}
-            contentStyle={styles.sendIn}
-          >
-            <Icon name="send" size={18} color={ready ? c.bg : c.faint} />
-          </PressScale>
-        </View>
+        <Locked when={ask.isPending}>
+          <View style={[styles.field, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder={t("widgets.menu.change", { name })}
+              placeholderTextColor={c.faint}
+              accessibilityLabel={t("widgets.panel.ask")}
+              multiline
+              maxLength={1000}
+              style={[styles.input, systemText("body"), { color: c.ink }]}
+            />
+            <PressScale
+              to={0.9}
+              onPress={send}
+              disabled={!ready}
+              accessibilityRole="button"
+              accessibilityLabel={t("widgets.panel.send")}
+              style={[styles.send, { backgroundColor: ready ? c.ink : c.plate }]}
+              contentStyle={styles.sendIn}
+            >
+              <Icon name="send" size={18} color={ready ? c.bg : c.faint} />
+            </PressScale>
+          </View>
+        </Locked>
       </View>
     </KeyboardStickyView>
   );
@@ -474,7 +485,10 @@ const styles = StyleSheet.create({
   centerText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   failure: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingTop: 10 },
+  // The icon on the reason's first line when it wraps (the button stays centered beside the reason).
+  failureLine: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "flex-start", gap: 8 },
   alert: { gap: 8, paddingBottom: 12 },
+  alertFields: { gap: 8 },
   condition: { marginHorizontal: 14 },
   alertSave: { alignItems: "flex-end", paddingHorizontal: 14 },
   gap: { height: 20 },

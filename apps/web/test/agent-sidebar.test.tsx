@@ -123,7 +123,8 @@ describe("the toggle", () => {
     await openDm();
     const body = screen().getByRole("main").querySelector(":scope > .channel__body") as HTMLElement;
     expect(body.lastElementChild).toBe(side());
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Perfil de Ada" })));
+    const header = screen().getByRole("main").querySelector(".channel__header") as HTMLElement;
+    await act(async () => fireEvent.click(within(header).getByRole("button", { name: "Perfil de Ada" })));
     await settle(6);
     expect(side()).toBeNull();
     expect(toggle()?.getAttribute("aria-pressed")).toBe("false");
@@ -253,6 +254,23 @@ describe("what the viewer sees", () => {
     expect(thinks.textContent).toContain("Responsável");
     const tasks = section("Tarefas recentes") as HTMLElement;
     expect(within(tasks).getByRole("link", { name: /Relatório de faltas/ })).toBeTruthy();
+  });
+});
+
+describe("Como pensa", () => {
+  const thinks = async (speed?: "fast") => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "codex", model: "GPT-6.1 Sol", ...(speed ? { speed } : {}) };
+    await openDm({ state });
+    return (section("Como pensa") as HTMLElement).textContent;
+  };
+
+  test("says Rápida next to the model when that is its speed, and nothing at the standard one", async () => {
+    expect(await thinks("fast")).toMatch(/GPT-6\.1 Sol pelo plano do ChatGPT.* · Rápida/);
+    cleanup();
+    expect(await thinks()).not.toContain("Rápida");
   });
 });
 

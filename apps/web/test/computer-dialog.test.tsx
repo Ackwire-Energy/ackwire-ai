@@ -13,7 +13,6 @@ import type {
   SocketFactory,
 } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
-import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
 import { useChannelRealtime } from "@/realtime/context";
@@ -414,15 +413,43 @@ describe("the computer dialog, live", () => {
     expect(box().querySelector(":scope > .cmp-body > .dsk > .cmp-asked")?.textContent).toBe(
       "“Entrar no banco com o token da empresa”",
     );
-    // A check alone says Pronto, so on a phone it shows the check alone (only a take over's Devolver keeps its words).
-    const done = view().getByRole("button", { name: "Pronto" });
-    expect(done.classList.contains("cmp-back")).toBe(true);
-    expect(done.classList.contains("cmp-words")).toBe(false);
-    // Its circle alone on a phone, as Pronto shows its check: its words stay its name.
-    const couldnt = view().getByRole("button", { name: "Não consegui" });
-    expect(couldnt.querySelector(":scope > svg path")?.getAttribute("d")).toBe(icons.block[1]?.[1].d);
-    expect(couldnt.querySelector(":scope > .cmp-act-label")?.textContent).toBe("Não consegui");
-    expect(couldnt.className).toContain("cmp-couldnt ac-btn--glyph");
+    // Both ways out in the bar under the screen, the main one on the right, none in the head.
+    const foot = box().querySelector(".dsk > .brw-ac__back") as HTMLElement;
+    expect([...foot.querySelectorAll("button")].map((b) => b.textContent)).toEqual([
+      "Deixar um recado",
+      "Não consegui",
+      "Pronto",
+    ]);
+    expect(foot.textContent).toContain("Devolver à Ada");
+    expect(box().querySelector(".cmp-acts")?.textContent).not.toMatch(/Pronto|Não consegui/);
+  });
+
+  test("Não consegui on the screen takes the words written in the bar, and Pronto waits for its answer", async () => {
+    const t = await dialog({ handoff: screenAsk() });
+    await click(within(box().querySelector(".cmp-banner") as HTMLElement).getByRole("button", { name: "Ajudar" }));
+    await settle(4);
+    const foot = box().querySelector(".dsk > .brw-ac__back") as HTMLElement;
+    // Together, so they wrap as one and the main one never sits alone under the other.
+    expect(foot.querySelector(".brw-ac__ways")?.textContent).toBe("Não conseguiPronto");
+    await click(within(foot).getByRole("button", { name: "Deixar um recado" }));
+    await act(async () =>
+      fireEvent.change(within(foot).getByRole("textbox", { name: "Recado para a Ada" }), {
+        target: { value: "O token venceu" },
+      }),
+    );
+    const browser = t.api.browser as { failed: (...args: unknown[]) => Promise<unknown> };
+    const failed = browser.failed;
+    let answer = () => {};
+    browser.failed = (...args) =>
+      new Promise((done) => {
+        answer = () => done(failed(...args));
+      });
+    await click(within(foot).getByRole("button", { name: "Não consegui" }));
+    await click(within(foot).getByRole("button", { name: "Pronto" }));
+    expect(calls(t, "browser.done")).toEqual([]);
+    await act(async () => answer());
+    await settle(4);
+    expect(calls(t, "browser.failed")).toEqual([[ORG_ID, "h-screen", "O token venceu"]]);
   });
 
   test("a sign-in request in the browser, its window on the screen: who may drive the screen helps on the whole screen, the request on top", async () => {
@@ -523,7 +550,6 @@ describe("switching between the page and the screen, and watching the page", () 
     await act(async () => t.sockets.realtime.last().push(pageFrame));
     await settle(2);
     expect(box().querySelector(".brw-ac.is-surface.is-control")).not.toBeNull();
-    await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Devolver" }));
     await settle(6);
     expect(calls(t, "browser.done")).toEqual([[ORG_ID, "h-page"]]);

@@ -24,6 +24,10 @@ export const SCREEN_KEYS = {
   Enter: { keysym: 0xff0d, code: "Enter" },
   Backspace: { keysym: 0xff08, code: "Backspace" },
   Escape: { keysym: 0xff1b, code: "Escape" },
+  ArrowLeft: { keysym: 0xff51, code: "ArrowLeft" },
+  ArrowUp: { keysym: 0xff52, code: "ArrowUp" },
+  ArrowRight: { keysym: 0xff53, code: "ArrowRight" },
+  ArrowDown: { keysym: 0xff54, code: "ArrowDown" },
 } as const;
 export type ScreenKey = keyof typeof SCREEN_KEYS;
 

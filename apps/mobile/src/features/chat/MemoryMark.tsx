@@ -7,13 +7,12 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AgentReadingBook } from "@/agent/ReadingBook";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Text, useToast } from "@/ui";
+import { Button, Card, Locked, Text, useToast } from "@/ui";
 import { canEditMemories } from "../agents/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
-import { tapHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 
@@ -44,13 +43,11 @@ export function MemoryMarks({ message, divided }: { message: Message; divided: b
         return (
           <Pressable
             key={memory.id}
-            onPress={() => {
-              tapHaptic();
-              sheet.open(<MemorySheet message={message} memory={memory} onClose={sheet.close} />);
-            }}
+            onPress={() => sheet.open(<MemorySheet message={message} memory={memory} onClose={sheet.close} />)}
             accessibilityRole="button"
             accessibilityLabel={t("memoryMark.label", { name, text: short(memory.text) })}
-            hitSlop={4}
+            // 44 tall to the finger; across, within the row's gap.
+            hitSlop={{ top: 7, bottom: 7, left: 3, right: 3 }}
             style={({ pressed }) => [
               styles.mark,
               { backgroundColor: c.raised, borderColor: c.line },
@@ -148,13 +145,15 @@ function MemorySheet({ message, memory, onClose }: { message: Message; memory: M
           </View>
         </Card>
       ) : mode === "edit" ? (
-        <TextArea
-          value={draft}
-          onChangeText={setDraft}
-          accessibilityLabel={t("memoryMark.fixLabel")}
-          maxLength={2000}
-          autoFocus
-        />
+        <Locked when={fix.isPending}>
+          <TextArea
+            value={draft}
+            onChangeText={setDraft}
+            accessibilityLabel={t("memoryMark.fixLabel")}
+            maxLength={2000}
+            autoFocus
+          />
+        </Locked>
       ) : (
         <Card>
           <View style={styles.fact}>
@@ -179,7 +178,13 @@ function MemorySheet({ message, memory, onClose }: { message: Message; memory: M
       ) : mode === "edit" ? (
         <View style={styles.row}>
           <View style={styles.grow}>
-            <Button variant="secondary" wide label={t("mobile.common.cancel")} onPress={() => setMode("card")} />
+            <Button
+              variant="secondary"
+              wide
+              label={t("mobile.common.cancel")}
+              disabled={fix.isPending}
+              onPress={() => setMode("card")}
+            />
           </View>
           <View style={styles.grow}>
             <Button
@@ -205,6 +210,7 @@ function MemorySheet({ message, memory, onClose }: { message: Message; memory: M
                   wide
                   icon="pen"
                   label={t("memoryMark.fix")}
+                  disabled={forget.isPending}
                   onPress={() => {
                     setDraft(text);
                     setMode("edit");
@@ -246,7 +252,7 @@ const styles = StyleSheet.create({
     height: 30,
     paddingLeft: 4,
     paddingRight: 5,
-    borderRadius: 9,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",

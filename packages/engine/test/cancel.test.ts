@@ -52,7 +52,7 @@ describe("canceling a run", () => {
     });
     const events = f.listen(f.general.id);
     await ask("@dev analisa os logs");
-    onFirst("agent.delta", (e) => {
+    onFirst("agent.typing", (e) => {
       void cancelRun(deps(), f.owner.id, f.org.id, String(e.runId)).finally(release);
     });
     await drainOutbox(f.db, f.handlers);
@@ -79,7 +79,7 @@ describe("canceling a run", () => {
     expect(audit).toMatchObject({ actorId: f.owner.id, targetId: run?.id });
   });
 
-  test("during a tool call: running code is killed, no further model call, the narration is kept", async () => {
+  test("during a tool call: running code is killed, no further model call, its working text stays out of the chat", async () => {
     f = await setup({
       machines: true,
       reply: (_req: ModelRequest, call: number) =>
@@ -106,7 +106,10 @@ describe("canceling a run", () => {
     expect(runner.sent.some((s) => s.type === "cancel")).toBe(true);
     expect(f.provider.calls).toHaveLength(1);
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
-    expect(main.at(-1)?.body).toBe("Vou compilar.\n\n_Stopped by ana._");
+    expect(main.at(-1)?.body).toBe("_Stopped by ana._");
+    // Still in the run's activity.
+    const [called] = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "model_call"));
+    expect(called?.data).toMatchObject({ narration: "Vou compilar." });
   });
 
   test("while queued: it never starts and its job is dropped", async () => {

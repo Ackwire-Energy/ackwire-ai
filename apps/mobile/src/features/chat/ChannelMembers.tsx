@@ -7,7 +7,7 @@ import {
   useChannels,
   useRoster,
 } from "@agenteschat/client";
-import { listsAgent } from "@agenteschat/client/lib/audience";
+import { listsAgent, opensDetails } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
@@ -20,11 +20,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Icon, Row, SearchField, Text, useToast } from "@/ui";
-import { Face } from "../shared/Face";
+import { Button, Card, Count, Icon, Locked, Row, SearchField, Text, useToast, weights } from "@/ui";
+import { Face, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
-import { ActionList, Tile, tapHaptic } from "../shared/parts";
+import { ActionList, successHaptic, Tile, tapHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 
 /** Above this many members the list gets a search field (as the web's channel details). */
@@ -95,9 +95,12 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
   const people = shown.filter((w) => w.kind === "person");
   const agentCount = all.filter((w) => w.kind === "agent").length;
 
-  const open = (w: Who) => {
-    tapHaptic();
+  const open = (w: Who) =>
     sheet.open(<MemberOptions channelId={channelId} channelName={channelName} who={w} removable={editable} />);
+  // No options to give here: the row is the way to the agent, as its picture is in the options.
+  const seeAgent = (id: string) => {
+    sheet.close();
+    router.push(`/agent/${id}`);
   };
   const group = (label: string, count: number, list: Who[]) =>
     list.length > 0 ? (
@@ -106,9 +109,8 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
           <Text variant="footnote" tone="faint" style={styles.bold}>
             {label}
           </Text>
-          <Text variant="footnote" tone="faint">
-            {count}
-          </Text>
+          {/* Tabular figures, as every count in the app (`Count`). */}
+          <Count value={count} size={13} weight={weights.medium} color={c.faint} />
         </View>
         <Card>
           {list.map((w) => {
@@ -126,7 +128,9 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
                       onPress: () => open(w),
                       meta: <Icon name="more" size={18} color={c.faint} />,
                     }
-                  : {})}
+                  : w.kind === "agent" && opensDetails(dir.anyAgent(w.id))
+                    ? { onPress: () => seeAgent(w.id) }
+                    : {})}
               />
             );
           })}
@@ -220,6 +224,7 @@ function MemberOptions({
     mutationFn: () =>
       api.chat.removeMember(orgId, channelId, who.kind === "agent" ? { agentId: who.id } : { userId: who.id }),
     onSuccess: () => {
+      successHaptic();
       refresh();
       back();
     },
@@ -240,7 +245,11 @@ function MemberOptions({
   return (
     <>
       <SheetTitle
-        leading={<Face who={{ type: who.kind, id: who.id }} size={36} live={false} />}
+        leading={
+          <OpensAgent agentId={who.id}>
+            <Face who={{ type: who.kind, id: who.id }} size={36} live={false} />
+          </OpensAgent>
+        }
         title={who.name}
         subtitle={lineOf(t, { ...who, autoReply }, routing)}
       />
@@ -383,22 +392,24 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
             : t("channelMembers.addEveryone", { org: org?.name ?? "", channel: channelName })}
         </Text>
       ) : (
-        <Card>
-          {rows.map((w) => {
-            const key = `${w.kind}:${w.id}`;
-            const on = selected.has(key);
-            return (
-              <Row
-                key={key}
-                leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} />}
-                title={w.name}
-                subtitle={w.line}
-                meta={<Icon name={on ? "checkc" : "circle"} size={20} color={on ? c.ink : c.faint} />}
-                onPress={() => toggle(key)}
-              />
-            );
-          })}
-        </Card>
+        <Locked when={add.isPending}>
+          <Card>
+            {rows.map((w) => {
+              const key = `${w.kind}:${w.id}`;
+              const on = selected.has(key);
+              return (
+                <Row
+                  key={key}
+                  leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} />}
+                  title={w.name}
+                  subtitle={w.line}
+                  meta={<Icon name={on ? "checkc" : "circle"} size={20} color={on ? c.ink : c.faint} />}
+                  onPress={() => toggle(key)}
+                />
+              );
+            })}
+          </Card>
+        </Locked>
       )}
       {elsewhere.length > 0 ? <ActionList items={elsewhere} /> : null}
       <View style={styles.actions}>
@@ -408,7 +419,8 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
             variant="primary"
             wide
             label={t("channelMembers.addConfirm", { count: selected.size })}
-            disabled={selected.size === 0 || add.isPending}
+            loading={add.isPending}
+            disabled={selected.size === 0}
             onPress={() => add.mutate()}
           />
         </View>

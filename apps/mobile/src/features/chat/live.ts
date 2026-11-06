@@ -20,6 +20,7 @@ import {
   cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
+  cacheReceipts,
   cacheTeamCard,
   catchUpChannel,
   consultSeeds,
@@ -29,6 +30,7 @@ import {
   emptyStreams,
   expectReply,
   expireTyping,
+  guessedFrom,
   guessReceipt,
   keys,
   type LiveConsult,
@@ -40,10 +42,13 @@ import {
   type ReceiptsState,
   reconcileConsults,
   reconcileRuns,
+  refreshRepliedThread,
+  repliedThread,
   runsInChannel,
   type SecretRequest,
   type StreamsState,
   seedReceipt,
+  seedReceipts,
   staleProvisional,
   startThreadCache,
   stopTyping,
@@ -53,7 +58,6 @@ import {
   useApi,
 } from "@agenteschat/client";
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
-import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
@@ -82,7 +86,8 @@ type Action =
   | { type: "reconcile"; channelId: string; active: Parameters<typeof reconcileRuns>[2]; at: number; askedAt: number }
   | { type: "consults"; channelId: string; open: OpenConsult[]; at: number; askedAt: number }
   | { type: "expect"; channelId: string; threadId: string; messageId: string; agentIds: string[]; at: number }
-  | { type: "seed"; messages: readonly Message[] }
+  /** `before`: the receipts when the read was asked for; one that hasn't changed since takes the read as it is. */
+  | { type: "seed"; messages: readonly Message[]; before?: ReceiptsState }
   | { type: "stopping"; runId: string; byUserId: string }
   | { type: "unstopping"; runId: string }
   | { type: "dismiss"; runId: string }
@@ -121,8 +126,7 @@ function reduce(state: LiveState, action: Action): LiveState {
       return typing === state.typing ? state : { ...state, typing };
     }
     case "seed": {
-      let receipts = state.receipts;
-      for (const m of action.messages) receipts = seedReceipt(receipts, m);
+      const receipts = seedReceipts(state.receipts, action.messages, action.before);
       return receipts === state.receipts ? state : { ...state, receipts };
     }
     case "reconcile":
@@ -138,7 +142,11 @@ function reduce(state: LiveState, action: Action): LiveState {
     case "expect": {
       let streams = state.streams;
       for (const agentId of action.agentIds)
-        streams = expectReply(streams, { channelId: action.channelId, threadId: action.threadId, agentId }, action.at);
+        streams = expectReply(
+          streams,
+          { channelId: action.channelId, threadId: action.threadId, agentId, messageId: action.messageId },
+          action.at,
+        );
       // The message's receipt guesses the same agents until the server says (unconfirmed; the sweep drops it).
       return { ...state, streams, receipts: guessReceipt(state.receipts, action.messageId, action.agentIds) };
     }
@@ -151,12 +159,12 @@ function reduce(state: LiveState, action: Action): LiveState {
     case "sweep": {
       const stale = staleProvisional(state.streams, action.at, PROVISIONAL_TTL_MS);
       if (stale.length === 0) return state;
-      const threads = new Set(stale.map((r) => r.threadId));
+      const asked = new Set(stale.map(guessedFrom));
       // A guess the server never confirmed goes with its "pensando…" (the conversation resyncs right after).
       const receipts = Object.fromEntries(
-        Object.entries(state.receipts).filter(([id, r]) => !(threads.has(id) && !r.confirmed)),
+        Object.entries(state.receipts).filter(([id, r]) => !(asked.has(id) && !r.confirmed)),
       );
-      return { ...state, streams: dropProvisional(state.streams, threads), receipts };
+      return { ...state, streams: dropProvisional(state.streams, new Set(stale.map((r) => r.threadId))), receipts };
     }
   }
 }
@@ -221,19 +229,19 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "agent.consultation":
       void qc.invalidateQueries({ queryKey: keys.consultations(orgId, channelId) });
       break;
-    case "message.created":
+    case "message.created": {
       if (event.message) cacheMessage(qc, orgId, event.message);
       else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       // A new top-level message may get agent replies in its thread: start that list.
       if (event.message) startThreadCache(qc, orgId, event.message);
-      // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it. An agent's
-      // sticker or GIF after its reply (ADR 0091) changes none of them.
-      if (event.message?.threadId && !isMediaAfterReply(event.message.meta))
-        void qc.invalidateQueries({ queryKey: ["org", orgId, "threads", "channel", channelId] });
+      // A reply: its root's "2 respostas" link and the thread's header.
+      const threadId = repliedThread(event);
+      if (threadId) refreshRepliedThread(qc, orgId, threadId);
       // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
       break;
+    }
     // A DM between people: the other one read it ("Visto" moves).
     case "channel.read":
       cacheDmRead(qc, orgId, event);
@@ -391,7 +399,14 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     const offSubscribed = connection?.onSubscribed((id) => {
       if (id !== channelId) return;
       check();
-      void catchUpChannel(api, qc, orgId, channelId);
+      const before = stateRef.current.receipts;
+      void catchUpChannel(api, qc, orgId, channelId).then((read) => {
+        if (!alive) return;
+        dispatch({ type: "seed", messages: read, before });
+        cacheReceipts(qc, orgId, channelId, read);
+      });
+      // The lines of its computers too: a `computer.queue` it missed leaves a wait's place unsaid.
+      void qc.invalidateQueries({ queryKey: [...keys.machines(orgId), "queue"] });
     });
     return () => {
       alive = false;

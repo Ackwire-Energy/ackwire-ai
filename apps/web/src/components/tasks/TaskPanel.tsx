@@ -2,12 +2,20 @@ import type { EndedTask, ManagedTask } from "@agenteschat/client";
 import { TASK_MANAGER_POLL_MS, useTaskSteps } from "@agenteschat/client";
 import { type Activity, activityVerb, toolActivity } from "@agenteschat/client/lib/activity";
 import { capitalize } from "@agenteschat/client/lib/format";
-import { endedState, taskClock, taskState, taskTitle, taskWhere } from "@agenteschat/client/lib/task-manager";
+import {
+  delegationText,
+  endedState,
+  taskClock,
+  taskState,
+  taskTitle,
+  taskWhere,
+} from "@agenteschat/client/lib/task-manager";
 import { Button, Chip, PixelStop } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { TaskStepsBlock } from "@/components/ToolCalls";
@@ -74,7 +82,9 @@ export function TaskPanel({
       ? t("taskManager.askedByYou")
       : t("taskManager.askedBy", { name: last.requester.name })
     : null;
-  const meta = [name, taskWhere(t, source), source.background ? null : asked].filter(Boolean).join(" · ");
+  const nameOf = (id: string) => dir.anyAgent(id)?.name;
+  const chain = last ? delegationText(t, last, nameOf, me.user.id) : null;
+  const meta = [name, taskWhere(t, source), source.background ? null : (chain ?? asked)].filter(Boolean).join(" · ");
   // How it ended: the page's list, else my own stop on its way there.
   const end = task ? null : ended ? endedState(ended) : stopping ? "stopped" : null;
   const stopper = ended?.stoppedBy ?? (stopping ? { userId: me.user.id, name: me.user.name } : null);
@@ -115,8 +125,10 @@ export function TaskPanel({
       />
       <aside className="thread-panel tm-panel" aria-label={title}>
         <header className="channel__header thread-head thread-head--panel">
-          <span className="thread-head__who" aria-hidden="true">
-            <AgentAvatar agentId={source.agentId} name={name} size="sm" />
+          <span className="thread-head__who">
+            <OpensAgent agentId={source.agentId}>
+              <AgentAvatar agentId={source.agentId} name={name} size="sm" />
+            </OpensAgent>
           </span>
           <div className="thread-head__text">
             <h2 className="channel__title thread-title">
@@ -182,14 +194,19 @@ export function TaskPanel({
         </div>
 
         <footer className="tm-panel__foot">
-          {!source.background && (
+          {task?.delegation && task.canStop && (
+            <p className="tm-panel__note">
+              {t("taskManager.delegated.stopNote", { name: nameOf(task.delegation.agentId) ?? "" })}
+            </p>
+          )}
+          {!source.background && !source.betweenAgents && (
             <Button size="sm" variant="ghost" icon="message" onClick={() => openTask(source)}>
               {t("taskManager.actions.open")}
             </Button>
           )}
           {task?.canStop && (
             <StopTaskButton
-              label={t("taskManager.actions.stopTask")}
+              label={t(task.helpers ? "taskManager.actions.stopAll" : "taskManager.actions.stopTask")}
               stopping={stopping}
               onClick={onStop}
               className="tm-panel__stop"

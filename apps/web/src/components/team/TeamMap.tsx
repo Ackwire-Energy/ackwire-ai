@@ -1,14 +1,16 @@
 import type { Routine, Team, TeamAgent } from "@agenteschat/client";
 import { useAgentGroups, useApprovals, useProposeChannelMove, useRoutines } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { can } from "@agenteschat/client/lib/permissions";
 import { mapColumns } from "@agenteschat/client/lib/team-views";
 import { excerpt } from "@agenteschat/client/lib/text";
-import { Icon } from "@agenteschat/ui";
+import { Button, EmptyState, Icon } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type DragEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 import { useWhen } from "@/pages/RoutinesPage";
 import { ChannelName, useTeamLookups } from "./shared";
@@ -34,7 +36,7 @@ interface Line {
  */
 export function TeamMap({ team }: { team: Team }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const groups = useAgentGroups(org.id).data ?? [];
   const look = useTeamLookups(groups);
   const routines = useRoutines(org.id).data ?? [];
@@ -174,7 +176,35 @@ export function TeamMap({ team }: { team: Team }) {
           },
         };
 
-  if (columns.length === 0) return <p className="team-empty">{t("team.map.empty")}</p>;
+  // Every agent still outside the channels: there's no map to draw yet. One in a channel I don't see is placed.
+  if (columns.every((c) => c.channelId === null && c.agents.every((a) => !a.channelIds?.length))) {
+    // The one agent this person may place: an agent's channels are its owner's or who manages agents' to change.
+    const first = team.agents.find(
+      (a) => !look.isLodi(a) && (can(org, "manage_agents") || a.ownerUserId === me.user.id),
+    );
+    return (
+      <EmptyState
+        size="page"
+        agent={lookOf(look.lodi) ?? true}
+        title={t("team.map.emptyTitle")}
+        actions={
+          first && (
+            <Button asChild variant="primary" icon="channel">
+              <Link
+                to="/org/$orgId/agents/$agentId"
+                params={{ orgId: org.id, agentId: first.id }}
+                search={{ tab: "settings", sec: "channels" }}
+              >
+                {t("team.map.emptyAction")}
+              </Link>
+            </Button>
+          )
+        }
+      >
+        {t(first ? "team.map.empty" : "team.map.emptyViewer")}
+      </EmptyState>
+    );
+  }
   // Channels with no agent yet: chips under the columns, to drop an agent on.
   const others = look.channelOrder.filter((id) => !columns.some((c) => c.channelId === id));
   const seen = new Set<string>();
@@ -195,7 +225,7 @@ export function TeamMap({ team }: { team: Team }) {
                 <span key={id} className="team-node team-node--person" data-map-person={id}>
                   <PersonAvatar id={id} name={m?.name ?? ""} size="sm" presence />
                   <span className="team-node__text">
-                    <b>{m?.name}</b>
+                    <b className="ac-captop">{m?.name}</b>
                     <span className="muted">{m ? t(`roles.${m.role}`) : ""}</span>
                   </span>
                 </span>
@@ -274,7 +304,7 @@ export function TeamMap({ team }: { team: Team }) {
           >
             <AgentAvatar agentId={look.lodi.id} name={look.lodi.name} size="sm" />
             <span className="team-node__text">
-              <b>{look.lodi.name}</b>
+              <b className="ac-captop">{look.lodi.name}</b>
               <span className="muted">{t("team.map.lodi")}</span>
             </span>
           </Link>
@@ -326,7 +356,7 @@ function MapCard({
       >
         <AgentAvatar agentId={agent.id} name={agent.name} size="md" />
         <span className="team-node__text">
-          <b>{agent.name}</b>
+          <b className={agent.role ? "ac-captop" : undefined}>{agent.name}</b>
           {agent.role && <span className="muted">{agent.role}</span>}
         </span>
       </Link>

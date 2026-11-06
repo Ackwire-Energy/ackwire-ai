@@ -14,6 +14,7 @@ import { type NoticePrefs, noticeOn, readNoticePrefs } from "./notice-prefs";
 import type { NotificationActor, NotificationLatest, NotificationSource } from "./notifications";
 import { enqueue } from "./outbox";
 import { type PushTextInput, pushLocale, renderPush } from "./push-messages";
+import { accountClosed } from "./standing";
 
 const { pushDevices, notifications, agents, users, approvals, sessions } = schema;
 
@@ -125,6 +126,7 @@ export async function registerPushDevice(
   input: PushDeviceInput,
   now = new Date(),
 ): Promise<boolean> {
+  if (await accountClosed(db, userId)) return false;
   if (input.platform === "web") {
     const [live] = await db
       .select({ id: sessions.id })

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, IconButton, Text, useTheme } from "@/ui";
+import { FirstUse } from "../shared/FirstUse";
 import { usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { PushedHeader } from "../shared/parts";
@@ -101,20 +102,7 @@ function Board({ id }: { id: string }) {
         )}
         <ProposalBanner board={board} />
         {widgets.length === 0 ? (
-          <View style={[styles.empty, { borderColor: c.line2 }]}>
-            <Text variant="title" tone="ink" style={styles.centerText}>
-              {t("dashboards.empty.title")}
-            </Text>
-            <Text variant="subhead" tone="muted" style={styles.centerText}>
-              {t("dashboards.empty.text")}
-            </Text>
-            {board.canEdit ? (
-              // The button sizes to its label and sits at the start on its own: centered under the text.
-              <View style={styles.emptyAction}>
-                <Button variant="primary" size="sm" icon="plus" label={t("widgets.add.label")} onPress={add} />
-              </View>
-            ) : null}
-          </View>
+          <FirstUse place="board" size="panel" acts={board.canEdit} label={t("widgets.add.label")} onPress={add} />
         ) : (
           <View style={styles.grid}>
             {rows.map((items) => (
@@ -133,6 +121,9 @@ function Board({ id }: { id: string }) {
   );
 }
 
+/** Between the widgets, across and down. */
+const GAP = 10;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, gap: 10 },
@@ -140,18 +131,9 @@ const styles = StyleSheet.create({
   centerText: { textAlign: "center" },
   barRight: { flexDirection: "row", alignItems: "center" },
   meta: { paddingHorizontal: 4 },
-  grid: { gap: 10 },
-  row: { flexDirection: "row", gap: 10 },
+  grid: { gap: GAP },
+  row: { flexDirection: "row", gap: GAP },
   cell: { flex: 1, minWidth: 0 },
-  half: { width: "50%", paddingRight: 5 },
-  empty: {
-    alignItems: "center",
-    gap: 6,
-    marginTop: 14,
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-    borderRadius: 22,
-    borderWidth: 1.5,
-  },
-  emptyAction: { alignSelf: "center", marginTop: 10 },
+  // A lone half widget as wide as one in a row of two: half the row, less half the gap between them.
+  half: { width: "50%", paddingRight: GAP / 2 },
 });

@@ -91,6 +91,7 @@ import {
   type IconName,
   InfoHint,
   Input,
+  Locked,
   Menu,
   PageHeader,
   RecurrencePicker,
@@ -108,6 +109,7 @@ import {
   Tabs,
   Textarea,
   Toolbar,
+  useAutoGrow,
   zonedInstant,
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -116,6 +118,7 @@ import { type CSSProperties, type ReactNode, useDeferredValue, useEffect, useMem
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { CancelAhead } from "@/components/ApprovalItem";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { useActors } from "@/components/actors";
 import {
   type ConnectorTriggerDraft,
@@ -137,6 +140,8 @@ import { useOrg } from "@/components/org-context";
 import { RoutineReachWarnings } from "@/components/RoutineReachWarnings";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { lookOf } from "@/lib/look";
@@ -282,7 +287,8 @@ export function useWhen() {
 /** Rotinas: scheduled and event-driven agent tasks. */
 export function RoutinesPage() {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
   const routines = useRoutines(org.id);
   const now = useNow();
   const [creating, setCreating] = useState(false);
@@ -292,6 +298,11 @@ export function RoutinesPage() {
   const [status, setStatus] = useState<"all" | "active" | "paused" | "event">("all");
   const [q, setQ] = useState("");
   const list = routines.data ?? [];
+  // After the directory: who may create hangs on the agents they own.
+  const noRoutines = routines.isSuccess && list.length === 0 && !dir.loading;
+  const look = useRightHandLook();
+  // The server's rule: who manages routines, or an agent's owner for that agent.
+  const mayCreate = can(org, "manage_routines") || dir.agents.some((a) => a.ownerUserId === me.user.id);
   const [agents, setAgents] = useState<string[]>([]);
   const copy = useFilterCopy();
   const agentOptions = useActorFilterOptions().filter((o) => o.value.startsWith("agent:"));
@@ -359,25 +370,37 @@ export function RoutinesPage() {
           title={t("routines.title")}
           meta={t("routines.subtitle")}
           actions={
-            <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-              {t("routines.new")}
-            </Button>
+            // The empty state takes over this button: one way in, in the middle of the page.
+            mayCreate &&
+            !noRoutines && (
+              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+                {t("routines.new")}
+              </Button>
+            )
           }
         />
         {routines.isLoading && <LoadingCards count={3} />}
         {routines.isError && !routines.data && (
           <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
         )}
-        {routines.isSuccess && list.length === 0 && (
+        {noRoutines && (
           <EmptyState
-            sky
-            title={t("routines.emptyTitle")}
+            size="page"
+            agent={look}
+            title={t(mayCreate ? "routines.emptyTitle" : "routines.emptyViewerTitle")}
             actions={
-              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-                {t("routines.new")}
-              </Button>
+              mayCreate && (
+                <>
+                  <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+                    {t("routines.new")}
+                  </Button>
+                  <AskAgentButton draft={t("routines.askText")} />
+                </>
+              )
             }
-          />
+          >
+            {t(mayCreate ? "routines.empty" : "routines.emptyViewer")}
+          </EmptyState>
         )}
         {list.length > 0 && (
           <>
@@ -436,7 +459,22 @@ export function RoutinesPage() {
             {group(status === "paused" ? t("routines.groupPaused") : t("routines.groupLive"), live)}
             {group(t("routines.groupPaused"), paused)}
             {live.length === 0 && paused.length === 0 && filtered && (
-              <EmptyState icon="search" title={t("routines.noResults")} />
+              <EmptyState
+                size="panel"
+                actions={
+                  <Button
+                    onClick={() => {
+                      setAgents([]);
+                      setQ("");
+                      setStatus("all");
+                    }}
+                  >
+                    {copy.clearAll}
+                  </Button>
+                }
+              >
+                {t("routines.noResults")}
+              </EmptyState>
             )}
             {done.length > 0 && status === "all" && (
               <section className="routines-group" aria-label={t("routines.done")}>
@@ -946,7 +984,10 @@ function RoutineRow({
         open={deleting}
         onOpenChange={(o) => !o && setDeleting(false)}
         title={t("routines.deleteTitle", { name: title })}
-        description={running ? t("routines.deleteBodyRunning") : t("routines.deleteBody")}
+        description={t("common.joinSentences", {
+          a: running ? t("routines.deleteBodyRunning") : t("routines.deleteBody"),
+          b: t("common.cantUndo"),
+        })}
         closeLabel={t("common.close")}
         width={440}
       >
@@ -1355,7 +1396,7 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                             to="/org/$orgId/approvals"
                             params={{ orgId: org.id }}
                             search={{ open: a.id }}
-                            className="routine-ahead__title"
+                            className="routine-ahead__title ac-captop"
                           >
                             {approvalTitle(t, { ...a, email: null })}
                           </Link>
@@ -1366,7 +1407,7 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                           </small>
                         </span>
                         {a.canCancel && (
-                          <span className="ac-acts">
+                          <span className="ac-acts ac-captop">
                             <CancelAhead id={a.id} />
                           </span>
                         )}
@@ -1473,6 +1514,8 @@ function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () 
   const sent = useSent<string>(r.prompt ?? "");
   const prompt = sent.pending ?? r.prompt ?? "";
   const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
+  // As tall as its text where the engine can't size it from CSS (`field-sizing`, which the Mac app's WebKit lacks).
+  useAutoGrow(ref, draft ?? "", draft !== null);
   if (!r.canSeeDetails || r.prompt === null) return <p className="small muted">{t("routines.detailsHidden")}</p>;
   if (isWidgetRoutine(r))
     return (
@@ -2470,220 +2513,222 @@ function RoutineDialog({
           submit();
         }}
       >
-        <DialogBody>
-          {!part && agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
-          {!editing && !prompt.trim() && (
-            <fieldset className="routine-presets">
-              <legend className="ac-eyebrow">{t("routines.presets.title")}</legend>
-              <div className="routine-presets__list">
-                {PRESETS.map((p) => (
-                  <button key={p.key} type="button" className="routine-preset" onClick={() => applyPreset(p)}>
-                    <span className="routine-preset__icon" aria-hidden="true">
-                      <Icon name={p.icon} size={16} />
-                    </span>
-                    <span>
-                      <b>{t(`routines.presets.${p.key}.name`)}</b>
-                      <small>{t(`routines.presets.${p.key}.text`)}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-          )}
-          {!part ? (
-            <div className="grid-fields">
-              <Field label={t("routines.form.agent")} id="nr-agent">
-                <Select
-                  value={agentId || undefined}
-                  onValueChange={setAgentId}
-                  options={agents.map((a) => ({
-                    value: a.id,
-                    label: a.name,
-                    description: a.role || undefined,
-                    leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
-                  }))}
-                />
-              </Field>
-              {targetField}
-            </div>
-          ) : (
-            part === "where" && targetField
-          )}
-          {!part && (
-            <>
-              <Field
-                label={t("routines.form.what")}
-                id="nr-what"
-                error={touched && !prompt.trim() ? t("routines.form.required") : undefined}
-              >
-                <Textarea
-                  rows={3}
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder={t("routines.form.whatPlaceholder")}
-                />
-              </Field>
-              <Field label={t("routines.form.name")} id="nr-name">
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
-              </Field>
-            </>
-          )}
-          {shows("when") && (
-            <>
-              <div className="routine-kind">
-                <span className="ac-field__label">{t("routines.form.when")}</span>
-                <Segmented
-                  label={t("routines.form.when")}
-                  value={kind}
-                  onValueChange={setKind}
-                  options={[
-                    { value: "schedule" as const, label: t("routines.form.kind.schedule") },
-                    { value: "event" as const, label: t("routines.form.kind.event") },
-                    ...(hasMail ? [{ value: "email" as const, label: t("routines.form.kind.email") }] : []),
-                    ...(hasMillionSend
-                      ? [{ value: "connector" as const, label: t("routines.form.kind.connector") }]
-                      : []),
-                    { value: "webhook" as const, label: t("routines.form.kind.webhook") },
-                  ]}
-                />
-              </div>
-              {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
-              {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
-              {kind === "webhook" &&
-                (routine?.trigger.type === "webhook" ? (
-                  <WebhookPanel routine={routine} runs={routine.recentRuns} />
-                ) : (
-                  <p className="routine-note small ac-iconline">
-                    <Icon name="link" size={14} />
-                    <span>{t("routines.webhook.newNote")}</span>
-                  </p>
-                ))}
-              {kind === "schedule" && (
-                <div className="routine-when">
-                  <div className="routine-when__head">
-                    <span className="routine-when__sentence" aria-live="polite">
-                      {ruleSentence(t, i18n.language, rule, new Date(), false)}
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      icon="repeat"
-                      aria-expanded={pickerOpen}
-                      onClick={() => setPickerOpen((o) => !o)}
-                    >
-                      {t("routines.form.adjust")}
-                    </Button>
-                  </div>
-                  {!pickerOpen && upcoming.length > 0 && (
-                    <div className="ac-recur__upcoming">
-                      <span className="ac-recur__label">{t("routines.form.next")}</span>
-                      <ol>
-                        {upcoming.map((label) => (
-                          <li key={label} className="tabular">
-                            {label}
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
-                  {pickerOpen && (
-                    <RecurrencePicker
-                      value={rule}
-                      onChange={pickRule}
-                      labels={recurrenceLabels(t, i18n.language, rule)}
-                      locale={i18n.language}
-                      upcoming={upcoming}
-                      hideTimezone
-                    />
-                  )}
+        <Locked when={action.isPending}>
+          <DialogBody>
+            {!part && agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
+            {!editing && !prompt.trim() && (
+              <fieldset className="routine-presets">
+                <legend className="ac-eyebrow">{t("routines.presets.title")}</legend>
+                <div className="routine-presets__list">
+                  {PRESETS.map((p) => (
+                    <button key={p.key} type="button" className="routine-preset" onClick={() => applyPreset(p)}>
+                      <span className="routine-preset__icon" aria-hidden="true">
+                        <Icon name={p.icon} size={16} />
+                      </span>
+                      <span>
+                        <b className="ac-captop">{t(`routines.presets.${p.key}.name`)}</b>
+                        <small>{t(`routines.presets.${p.key}.text`)}</small>
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              )}
-              {kind === "schedule" && (
-                <>
-                  {!once && (
-                    <Field label={t("routines.form.frequency")} id="nr-when" error={phraseError()}>
-                      <Input
-                        value={phrase}
-                        onChange={(e) => typePhrase(e.target.value)}
-                        placeholder={t("recurrence.phrasePlaceholder")}
-                      />
-                    </Field>
-                  )}
-                  <Field label={t("routines.form.timezone")} id="nr-zone">
-                    <ZoneSelect value={zone} onChange={setZone} />
-                  </Field>
-                </>
-              )}
-              {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
-                <p className="routine-utc-hint small ac-iconline">
-                  <Icon name="waiting" size={14} />
-                  <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
-                  <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
-                    {t("routines.form.keepUtc")}
-                  </button>
-                </p>
-              )}
-              {kind !== "event" ? null : (
-                <Field
-                  label={t("routines.form.event")}
-                  id="nr-event"
-                  hint={{
-                    name: t("common.about", { label: t("routines.form.event") }),
-                    text: t("routines.form.eventHelp", { org: org.name }),
-                  }}
-                >
+              </fieldset>
+            )}
+            {!part ? (
+              <div className="grid-fields">
+                <Field label={t("routines.form.agent")} id="nr-agent">
                   <Select
-                    value={event}
-                    onValueChange={(v) => setEvent(v as RoutineEvent)}
-                    options={ROUTINE_EVENTS.map((e) => ({ value: e, label: t(`routines.event.${e}`) }))}
+                    value={agentId || undefined}
+                    onValueChange={setAgentId}
+                    options={agents.map((a) => ({
+                      value: a.id,
+                      label: a.name,
+                      description: a.role || undefined,
+                      leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
+                    }))}
                   />
                 </Field>
-              )}
-              {busy && (
-                <p className="routine-note small ac-iconline" role="status">
-                  <Icon name="computer" size={14} />
-                  <span>{say(busy)}</span>
-                </p>
-              )}
-            </>
-          )}
-          {!part && (
-            <>
-              <div className="routine-kind">
-                <span className="ac-hintline">
-                  <span className="ac-field__label">{t("routines.form.report")}</span>
-                  <InfoHint name={t("common.about", { label: t("routines.form.report") })}>
-                    {t("routines.report.hint")}
-                  </InfoHint>
-                </span>
-                <Segmented
-                  label={t("routines.form.report")}
-                  value={report}
-                  onValueChange={setReport}
-                  options={(["always", "when_new"] as const).map((v) => ({
-                    value: v,
-                    label: t(`routines.report.${v}`),
-                  }))}
+                {targetField}
+              </div>
+            ) : (
+              part === "where" && targetField
+            )}
+            {!part && (
+              <>
+                <Field
+                  label={t("routines.form.what")}
+                  id="nr-what"
+                  error={touched && !prompt.trim() ? t("routines.form.required") : undefined}
+                >
+                  <Textarea
+                    rows={3}
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder={t("routines.form.whatPlaceholder")}
+                  />
+                </Field>
+                <Field label={t("routines.form.name")} id="nr-name">
+                  <Input value={name} onChange={(e) => setName(e.target.value)} />
+                </Field>
+              </>
+            )}
+            {shows("when") && (
+              <>
+                <div className="routine-kind">
+                  <span className="ac-field__label">{t("routines.form.when")}</span>
+                  <Segmented
+                    label={t("routines.form.when")}
+                    value={kind}
+                    onValueChange={setKind}
+                    options={[
+                      { value: "schedule" as const, label: t("routines.form.kind.schedule") },
+                      { value: "event" as const, label: t("routines.form.kind.event") },
+                      ...(hasMail ? [{ value: "email" as const, label: t("routines.form.kind.email") }] : []),
+                      ...(hasMillionSend
+                        ? [{ value: "connector" as const, label: t("routines.form.kind.connector") }]
+                        : []),
+                      { value: "webhook" as const, label: t("routines.form.kind.webhook") },
+                    ]}
+                  />
+                </div>
+                {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
+                {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
+                {kind === "webhook" &&
+                  (routine?.trigger.type === "webhook" ? (
+                    <WebhookPanel routine={routine} runs={routine.recentRuns} />
+                  ) : (
+                    <p className="routine-note small ac-iconline">
+                      <Icon name="link" size={14} />
+                      <span>{t("routines.webhook.newNote")}</span>
+                    </p>
+                  ))}
+                {kind === "schedule" && (
+                  <div className="routine-when">
+                    <div className="routine-when__head">
+                      <span className="routine-when__sentence" aria-live="polite">
+                        {ruleSentence(t, i18n.language, rule, new Date(), false)}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        icon="repeat"
+                        aria-expanded={pickerOpen}
+                        onClick={() => setPickerOpen((o) => !o)}
+                      >
+                        {t("routines.form.adjust")}
+                      </Button>
+                    </div>
+                    {!pickerOpen && upcoming.length > 0 && (
+                      <div className="ac-recur__upcoming">
+                        <span className="ac-recur__label">{t("routines.form.next")}</span>
+                        <ol>
+                          {upcoming.map((label) => (
+                            <li key={label} className="tabular">
+                              {label}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    {pickerOpen && (
+                      <RecurrencePicker
+                        value={rule}
+                        onChange={pickRule}
+                        labels={recurrenceLabels(t, i18n.language, rule)}
+                        locale={i18n.language}
+                        upcoming={upcoming}
+                        hideTimezone
+                      />
+                    )}
+                  </div>
+                )}
+                {kind === "schedule" && (
+                  <>
+                    {!once && (
+                      <Field label={t("routines.form.frequency")} id="nr-when" error={phraseError()}>
+                        <Input
+                          value={phrase}
+                          onChange={(e) => typePhrase(e.target.value)}
+                          placeholder={t("recurrence.phrasePlaceholder")}
+                        />
+                      </Field>
+                    )}
+                    <Field label={t("routines.form.timezone")} id="nr-zone">
+                      <ZoneSelect value={zone} onChange={setZone} />
+                    </Field>
+                  </>
+                )}
+                {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
+                  <p className="routine-utc-hint small ac-iconline">
+                    <Icon name="waiting" size={14} />
+                    <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
+                    <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
+                      {t("routines.form.keepUtc")}
+                    </button>
+                  </p>
+                )}
+                {kind !== "event" ? null : (
+                  <Field
+                    label={t("routines.form.event")}
+                    id="nr-event"
+                    hint={{
+                      name: t("common.about", { label: t("routines.form.event") }),
+                      text: t("routines.form.eventHelp", { org: org.name }),
+                    }}
+                  >
+                    <Select
+                      value={event}
+                      onValueChange={(v) => setEvent(v as RoutineEvent)}
+                      options={ROUTINE_EVENTS.map((e) => ({ value: e, label: t(`routines.event.${e}`) }))}
+                    />
+                  </Field>
+                )}
+                {busy && (
+                  <p className="routine-note small ac-iconline" role="status">
+                    <Icon name="computer" size={14} />
+                    <span>{say(busy)}</span>
+                  </p>
+                )}
+              </>
+            )}
+            {!part && (
+              <>
+                <div className="routine-kind">
+                  <span className="ac-hintline">
+                    <span className="ac-field__label">{t("routines.form.report")}</span>
+                    <InfoHint name={t("common.about", { label: t("routines.form.report") })}>
+                      {t("routines.report.hint")}
+                    </InfoHint>
+                  </span>
+                  <Segmented
+                    label={t("routines.form.report")}
+                    value={report}
+                    onValueChange={setReport}
+                    options={(["always", "when_new"] as const).map((v) => ({
+                      value: v,
+                      label: t(`routines.report.${v}`),
+                    }))}
+                  />
+                </div>
+                <div className="routine-own-actions">
+                  <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
+                  <OwnActions routine={routine} />
+                </div>
+                <RoutineReachWarnings
+                  prompt={prompt}
+                  agentId={agentId || null}
+                  creatorUserId={routine?.createdByUserId}
                 />
-              </div>
-              <div className="routine-own-actions">
-                <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
-                <OwnActions routine={routine} />
-              </div>
-              <RoutineReachWarnings
-                prompt={prompt}
-                agentId={agentId || null}
-                creatorUserId={routine?.createdByUserId}
-              />
-            </>
-          )}
-        </DialogBody>
+              </>
+            )}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("routines.form.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={action.isPending || !agentId || !scheduleOk}>
+          <Button type="submit" variant="primary" disabled={!agentId || !scheduleOk} loading={action.isPending}>
             {editing ? t("routines.form.save") : t("routines.form.create")}
           </Button>
         </DialogFooter>

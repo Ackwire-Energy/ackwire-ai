@@ -57,25 +57,38 @@ type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "defaul
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
+export interface LiveTurn {
+  turn: number;
+  text: string;
+  /** Where the body starts: past the last call. With `stretches`, the current stretch's start (`agent.delta.from`). */
+  from: number;
+  /** Its brain says when each call ended (`createDeltaPublisher`). */
+  stretches?: boolean;
+  /** A call started in this stretch: the app moved it to the narration, and the rest of it goes there too. */
+  spoke?: boolean;
+}
+
 /**
  * The text each run executing here has streamed so far in its current model call (what its `agent.delta` events
- * carried), until that call ends; `from`: where its body starts, past the text before the call's last tool (the app
- * moved that to the narration). An app opened mid-answer reads it with the active runs and goes on from there.
+ * carried), until that call ends. An app opened mid-answer reads it with the active runs and goes on from there.
  * ponytail: per process; a request served by another replica gets none and the app shows the waiting row until the
  * call ends, as before. Ask the run's replica over pub/sub if replicas ever split one workspace.
  */
-export const liveTurns = new Map<string, { turn: number; text: string; from: number }>();
+export const liveTurns = new Map<string, LiveTurn>();
 
 /** A tool starts inside the model call (a computer brain's): the body so far became narration. */
 export function liveTurnToolStarted(runId: string) {
   const live = liveTurns.get(runId);
-  if (live) live.from = live.text.length;
+  if (live?.stretches) live.spoke = true;
+  else if (live) live.from = live.text.length;
 }
 
 /** What `GET …/active-runs` gives of it: the body so far and where it starts in the call's text (`agent.delta.at`). */
 export function liveTurnOf(runId: string) {
   const live = liveTurns.get(runId);
-  return live ? { turn: live.turn, at: live.from, text: live.text.slice(live.from) } : undefined;
+  if (!live) return undefined;
+  const at = live.spoke ? live.text.length : live.from;
+  return { turn: live.turn, at, text: live.text.slice(at) };
 }
 
 const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default", "alone"]);
@@ -127,21 +140,12 @@ export type ChannelEvent =
       turn: number;
       /** Where `text` starts in its turn's text (UTF-16 units): an app that missed a piece sees the hole. */
       at?: number;
-    }
-  /**
-   * The text the agent streamed before calling tools was progress narration
-   * ("Go isn't installed; I'll try…"), not the answer: show it as a step
-   * of the work and clear it from the live reply. The message holds only the
-   * final answer.
-   */
-  | {
-      type: "agent.narration";
-      channelId: string;
-      threadId: string | null;
-      runId: string;
-      agentId: string;
-      turn: number;
-      text: string;
+      /**
+       * Where its stretch starts in the turn's text: a computer brain's turn holds many, one between each two calls.
+       * Brains keep text back, so a stretch's end can arrive after the next call's start: this says what it finishes.
+       * Only from a brain that says when each call ended (`createDeltaPublisher`).
+       */
+      from?: number;
     }
   /** An agent run changed state (`running` = typing indicator). */
   | {
@@ -245,6 +249,8 @@ export type ChannelEvent =
       command?: string;
       /** On the end (`tool: null`): the tool answered with an error. Never the error itself (it can carry data). */
       failed?: boolean;
+      /** On a failed end: the gateway refused its arguments, the tool never ran. */
+      slip?: boolean;
       /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
       held?: boolean;
       /** On the end: a rule ("Aprovar sempre") let it run without asking, whose person, a reads one or not. */
@@ -768,6 +774,20 @@ export const publishVaultChanged = (pubsub: PubSub | undefined, orgId: string) =
     orgId,
     event: { type: "vault.changed", orgId } satisfies VaultChangedEvent,
   });
+
+/**
+ * The team changed (an agent made, renamed, given a look, archived, back or deleted): the apps read their lists again.
+ * Nothing else goes out: what each person may see of it stays behind the agents' own endpoints.
+ */
+export const publishAgentsChanged = (pubsub: PubSub | undefined, orgId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "agents.changed" } });
+
+/**
+ * A channel was made, renamed, archived, back or deleted, or its members changed. On the org's topic, unlike
+ * `channel.member_*`: a channel made a moment ago has nobody subscribed to it yet. Same contract as the agents': no ids.
+ */
+export const publishChannelsChanged = (pubsub: PubSub | undefined, orgId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "channels.changed" } });
 
 /** An event for one person (forwarded to every connection they have open in that organization). */
 export type UserEvent = { type: string; [key: string]: unknown };

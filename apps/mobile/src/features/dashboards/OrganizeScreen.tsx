@@ -21,7 +21,17 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
-import { GroupedFooter, haptics, IconButton, Segmented, Text, useReducedMotion, useTheme, useToast } from "@/ui";
+import {
+  GroupedFooter,
+  haptics,
+  IconButton,
+  Locked,
+  Segmented,
+  Text,
+  useReducedMotion,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useDirectory, useOrgId } from "../shared/hooks";
@@ -167,6 +177,7 @@ function Arrange({ board }: { board: Dashboard }) {
           onPress: () =>
             remove.mutate(item.id, {
               onSuccess: () => {
+                successHaptic();
                 setItems((list) => list.filter((x) => x.id !== item.id));
                 toast({ title: t("mobile.dashboards.widget.removed") });
               },
@@ -188,31 +199,33 @@ function Arrange({ board }: { board: Dashboard }) {
       <ScrollView
         scrollEnabled={lifted === null}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         <GroupedFooter>{t("mobile.dashboards.organize.hint")}</GroupedFooter>
         {widgets.length === 0 ? (
           <Text variant="subhead" tone="muted" style={styles.empty}>
-            {t("dashboards.empty.title")}
+            {t("dashboards.empty.text")}
           </Text>
         ) : null}
-        <View style={{ height: widgets.length ? widgets.length * (rowH + GAP) - GAP : 0 }}>
-          {widgets.map((item) => (
-            <OrganizeRow
-              key={item.id}
-              item={item}
-              place={widgetPlace(items, item.id)}
-              lifted={lifted === item.id}
-              motion={motion}
-              onLayoutHeight={(h) => measure(item.id, h)}
-              onLift={lift}
-              onDrop={drop}
-              onMove={(by) => move(item.id, by)}
-              onSize={(size) => resize(item.id, size)}
-              onRemove={() => confirmRemove(item)}
-            />
-          ))}
-        </View>
+        <Locked when={save.isPending}>
+          <View style={{ height: widgets.length ? widgets.length * (rowH + GAP) - GAP : 0 }}>
+            {widgets.map((item) => (
+              <OrganizeRow
+                key={item.id}
+                item={item}
+                place={widgetPlace(items, item.id)}
+                lifted={lifted === item.id}
+                motion={motion}
+                onLayoutHeight={(h) => measure(item.id, h)}
+                onLift={lift}
+                onDrop={drop}
+                onMove={(by) => move(item.id, by)}
+                onSize={(size) => resize(item.id, size)}
+                onRemove={() => confirmRemove(item)}
+              />
+            ))}
+          </View>
+        </Locked>
       </ScrollView>
     </View>
   );
@@ -386,9 +399,9 @@ const styles = StyleSheet.create({
   empty: { textAlign: "center", paddingVertical: 32 },
   slot: { position: "absolute", top: 0, left: 0, right: 0 },
   row: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderBottomRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
     borderBottomLeftRadius: 6,
     paddingLeft: 12,
     paddingRight: 4,

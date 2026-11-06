@@ -1,11 +1,14 @@
 import { type Message, useStopReason } from "@agenteschat/client";
+import { seesDetails } from "@agenteschat/client/lib/audience";
 import type { StoppedNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, LineIcon, Text, useToast } from "@/ui";
+import { openAgentAi } from "../ai/AgentAiScreen";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { ReasonField } from "../task-manager/parts";
+import { LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
 
 /**
  * A person stopped one of the agent's tasks (ADR 0128): one calm line where the task was, "Você parou esta tarefa ·
@@ -47,9 +50,9 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
   return (
     <View style={styles.line}>
       <View style={styles.head}>
-        <LineIcon name="stop" size={13} color={c.faint} variant="caption" />
-        <Text variant="caption" tone="faint" style={styles.grow}>
-          <Text variant="caption" tone="muted" style={styles.bold}>
+        <LineIcon name="stop" size={LINE_MARK} color={c.faint} variant="small" />
+        <Text variant="small" tone="faint" style={styles.grow}>
+          <Text variant="small" tone="muted" style={styles.bold}>
             {who}
           </Text>
           {` · ${when.time(message.createdAt)}`}
@@ -59,7 +62,7 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
             <>
               {" · "}
               <Text
-                variant="caption"
+                variant="small"
                 tone="muted"
                 style={styles.bold}
                 onPress={() => setWriting(true)}
@@ -96,11 +99,46 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
   );
 }
 
+/** Under a reply that came at standard speed because Fast was refused (`meta.speedFallback`), with the way to the agent. */
+export function SpeedFallbackLine({ message }: { message: Message }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const dir = useDirectory();
+  const agent = dir.agentById.get(message.author.id ?? "");
+  return (
+    <View style={styles.inRow}>
+      <View style={styles.head}>
+        <LineIcon name="info" size={LINE_MARK} color={c.faint} variant="small" />
+        <Text variant="small" tone="faint" style={styles.grow}>
+          {t("chat.speedFallback.text")}
+          {agent && seesDetails(agent) ? (
+            <>
+              {" "}
+              <Text
+                variant="small"
+                tone="muted"
+                style={styles.bold}
+                onPress={() => openAgentAi(agent.id)}
+                accessibilityRole="link"
+                suppressHighlighting
+              >
+                {t("chat.speedFallback.action")}
+              </Text>
+            </>
+          ) : null}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // Aligned with the messages' words, as the other automatic lines (`EventLine`).
-  line: { marginVertical: 4, paddingLeft: 56, paddingRight: 16 },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  line: { marginVertical: 4, paddingLeft: MSG_TEXT, paddingRight: 16 },
+  inRow: { marginTop: 4 },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  form: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, marginLeft: 19 },
+  // Under the words, not the mark.
+  form: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, marginLeft: LINE_MARK + LINE_GAP },
 });

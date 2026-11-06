@@ -7,7 +7,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Count, Filters, Text, useToast } from "@/ui";
+import { EmptyState, Filters, SectionHeader, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -22,6 +22,7 @@ import {
   searchCounts,
   searchResults,
 } from "./logic";
+import { RESULT_LEAD } from "./SearchFilters";
 
 const ACTION_ICON = { newConversation: "compose", newTask: "target", newAgent: "agent" } as const;
 
@@ -99,20 +100,22 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {words && r.agents.length + r.channels.length + r.dms.length > 0 ? (
-          <Group title={t("mobile.find.conversations")} count={r.agents.length + r.channels.length + r.dms.length}>
+          <Group title={t("mobile.find.conversations")}>
             <ActionList
               items={[
                 ...r.agents.map((a) => ({
                   key: `a:${a.id}`,
-                  leading: <AgentFace agentId={a.id} size={38} live={false} />,
+                  leading: <AgentFace agentId={a.id} size={RESULT_LEAD} live={false} />,
                   label: a.name,
+                  oneLine: true,
                   ...(a.role ? { hint: a.role } : {}),
                   onPress: () => router.push(`/agent/${a.id}`),
                 })),
                 ...r.dms.map((d) => ({
                   key: `d:${d.channelId}`,
-                  leading: <Face who={{ type: d.with.type, id: d.with.id }} size={38} live={false} />,
+                  leading: <Face who={{ type: d.with.type, id: d.with.id }} size={RESULT_LEAD} live={false} />,
                   label: d.with.name,
+                  oneLine: true,
                   ...(d.lastMessage
                     ? {
                         hint: previewBody(
@@ -127,8 +130,9 @@ export function SearchResults({ q }: { q: string }) {
                 })),
                 ...r.channels.map((ch) => ({
                   key: `c:${ch.id}`,
-                  leading: <Tile icon="hash" size={38} />,
+                  leading: <Tile icon="hash" size={RESULT_LEAD} />,
                   label: ch.name,
+                  oneLine: true,
                   ...(ch.topic ? { hint: ch.topic } : {}),
                   onPress: () => router.push(chatHref(ch.id)),
                 })),
@@ -137,7 +141,7 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {r.team.length > 0 ? (
-          <Group title={t("searchPage.kinds.action")} count={r.team.length}>
+          <Group title={t("searchPage.kinds.action")}>
             <ActionList
               items={r.team.map((h) => {
                 const channelId = h.channelIds[0] ?? "";
@@ -145,9 +149,9 @@ export function SearchResults({ q }: { q: string }) {
                 return {
                   key: h.sourceId,
                   leading: h.author ? (
-                    <AgentFace agentId={h.author.id} size={34} live={false} />
+                    <AgentFace agentId={h.author.id} size={RESULT_LEAD} live={false} />
                   ) : (
-                    <Tile icon="reply" size={34} />
+                    <Tile icon="reply" size={RESULT_LEAD} />
                   ),
                   label: previewOf(h.snippet || h.title),
                   hint: [
@@ -164,14 +168,14 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {r.messages.length > 0 ? (
-          <Group title={t("mobile.find.messages")} count={r.messages.length}>
+          <Group title={t("mobile.find.messages")}>
             <ActionList
               items={r.messages.map((h) => {
                 const channelId = h.channelIds[0] ?? "";
                 const where = channelName(channelId);
                 return {
                   key: h.sourceId,
-                  leading: <Tile icon="chat" size={34} />,
+                  leading: <Tile icon="chat" size={RESULT_LEAD} />,
                   label: previewOf(hitText(t, h) || h.title),
                   hint: [where ? t("mobile.chats.waitIn", { where: `#${where}` }) : null, when.short(h.createdAt)]
                     .filter(Boolean)
@@ -183,13 +187,13 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {r.files.length > 0 ? (
-          <Group title={t("mobile.find.files")} count={r.files.length}>
+          <Group title={t("mobile.find.files")}>
             <ActionList
               items={r.files.map((h) => {
                 const where = channelName(h.channelIds[0]);
                 return {
                   key: h.sourceId,
-                  leading: <Tile icon="doc" size={34} />,
+                  leading: <Tile icon="doc" size={RESULT_LEAD} />,
                   label: h.title || t("mobile.chat.file"),
                   hint: [where ? t("mobile.chats.waitIn", { where: `#${where}` }) : null, when.short(h.createdAt)]
                     .filter(Boolean)
@@ -201,32 +205,27 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {words && isEmpty(r) && !hits.isFetching ? (
-          <Text tone="faint" style={styles.empty}>
-            {t("mobile.find.nothing", { q: q.trim() })}
-          </Text>
+          <EmptyState size="inline" title={t("mobile.find.nothing", { q: q.trim() })} />
         ) : null}
       </View>
     </View>
   );
 }
 
-function Group({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+/**
+ * A group of results under the app's section header (its title at the screen's 20, the list at 16); its count is on
+ * the group's filter chip above, said once.
+ */
+function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <View style={styles.group}>
-      <View style={styles.groupTitle}>
-        <Text variant="label" accessibilityRole="header">
-          {title}
-        </Text>
-        {count !== undefined ? <Count value={count} size={14} /> : null}
-      </View>
-      {children}
+    <View>
+      <SectionHeader title={title} />
+      <View style={styles.list}>{children}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  res: { paddingHorizontal: 16, paddingTop: 2 },
-  group: { marginTop: 14, gap: 8 },
-  groupTitle: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4 },
-  empty: { textAlign: "center", paddingVertical: 40 },
+  res: { paddingTop: 2 },
+  list: { paddingHorizontal: 16 },
 });

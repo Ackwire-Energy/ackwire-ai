@@ -17,6 +17,7 @@ import { entriesOffScreen } from "@agenteschat/client/lib/activity";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOpen, messageProposalCards, proposalTarget, proposerOf } from "@agenteschat/client/lib/proposals";
+import { secretLabel } from "@agenteschat/client/lib/secret-requests";
 import {
   type ComponentRef,
   createContext,
@@ -43,12 +44,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { Sky } from "@/sky/Sky";
-import { CHROME_MAX_SCALE, Fuse, Icon, Text, useReducedMotion, useTheme } from "@/ui";
+import { CHROME_MAX_SCALE, Fuse, Icon, type IconName, LineIcon, Text, useReducedMotion, useTheme } from "@/ui";
 import { approvalTitleText } from "../approvals/parts";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook, fuseRemaining } from "../shared/logic";
-import { tapHaptic } from "../shared/parts";
+import { tapHaptic, useSurface } from "../shared/parts";
 import {
   type AskKind,
   type AskStore,
@@ -62,7 +63,16 @@ import {
   timerDelay,
 } from "./ask-store";
 import { LineStop, useRowsInView } from "./LiveRows";
-import { approvalIdOf, lineStops, markedParts, markName, questionOf, workingEntries } from "./logic";
+import {
+  approvalIdOf,
+  LINE_GAP,
+  LINE_MARK,
+  lineStops,
+  markedParts,
+  markName,
+  questionOf,
+  workingEntries,
+} from "./logic";
 import type { RowSight } from "./row-sight";
 
 /**
@@ -185,10 +195,14 @@ function ApprovalProbe({ id, messageId, order }: { id: string; messageId: string
 }
 
 function SecretProbe({ request: s, messageId, order }: { request: SecretRequest; messageId: string; order: number }) {
+  const { t } = useTranslation();
   const meId = useMeId();
+  const dir = useDirectory();
   const expired = useExpired(s.expiresAt);
   const waits = s.status === "pending" && !expired && s.requestedForUserId === meId;
-  const ask = waits ? { id: s.id, kind: "secret" as const, agentId: s.agentId, what: s.name, messageId, order } : null;
+  const agent = dir.anyAgent(s.agentId)?.name ?? t("channel.unknownAgent");
+  const what = secretLabel(t, s, agent);
+  const ask = waits ? { id: s.id, kind: "secret" as const, agentId: s.agentId, what, messageId, order } : null;
   return <Report id={s.id} ask={ask} />;
 }
 
@@ -380,20 +394,36 @@ export interface AskWell {
   more?: { label: string; content: ReactNode; open?: boolean; onToggle?: () => void } | null;
 }
 
+/** Each kind of request by its icon on the card's top line (amber while it waits on the person); Atividade's too. */
+export const ASK_ICON: Record<AskKind, IconName> = {
+  approval: "shield",
+  secret: "key",
+  question: "help",
+  browser: "globe",
+  desktop: "laptop",
+  proposal: "pen",
+  agent: "agent",
+  team: "members",
+  firstTask: "target",
+};
+
 /**
- * The request card. `waitsFor`: "you" when the person decides (amber, breathing), what to say when someone else
- * does ("esperando Ana", "Aguardando um admin"), null to say nothing. The well holds the thing it is about; `body`
- * sits under it (a secret's field); `foot` is the strip with the expiry and the decision (`AskFoot`), none when
- * there is neither. In a conversation the card tells it where it is (`id`), for the line above the composer.
+ * The request card, the same as Atividade's and Conversas' waiting cards (`WaitingCard`): the app's card with its cut
+ * corner, the kind on top with its icon (amber when the person decides) and, at its right, the fuse to `expiry`
+ * (`ExpiryLine`) or who else decides (`waitsFor`: "esperando Ana", "Aguardando um admin"); then the request in
+ * words, why it was asked in muted, and the thing it is about on one quiet line (`well`: its mark, its details and,
+ * with `more`, the rest it opens). With no well, `lead` is the request itself. `body` sits under it (a secret's
+ * field); `foot` holds the decision (`AskFoot`). In a conversation the card tells it where it is (`id`), for the line
+ * above the composer.
  */
 export function AskCard({
   id,
   kind,
-  agentId,
   waitsFor,
   lead,
   well,
   body,
+  expiry,
   foot,
 }: {
   id: string;
@@ -403,111 +433,111 @@ export function AskCard({
   lead: string;
   well?: AskWell | null;
   body?: ReactNode;
+  /** Its deadline (`ExpiryLine`), at the top line's right while the person decides. */
+  expiry?: ReactNode;
   foot?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
   const c = useColors();
+  const surface = useSurface();
   const reduced = useReducedMotion();
   const store = useAskStore();
   const slot = useRef<ComponentRef<typeof View>>(null);
   const [openHere, setOpen] = useState(false);
   const open = well?.more?.open ?? openHere;
-  const color = agentLook(dir.agentById.get(agentId)).color;
-  const label = t(`ask.kind.${kind}`);
+  const toggle = () => {
+    tapHaptic();
+    if (well?.more?.onToggle) well.more.onToggle();
+    else setOpen((o) => !o);
+  };
   useLayoutEffect(() => {
     const card = slot.current;
     if (!store || !card) return;
     return store.register(id, card);
   }, [store, id]);
+  const title = well ? well.title : lead;
+  const why = well ? lead : null;
+  const source =
+    well && (well.detail || well.more) ? (
+      <>
+        <View style={styles.sourceMark}>{well.tile}</View>
+        <Text
+          variant="footnote"
+          tone="faint"
+          numberOfLines={well.more ? (open ? 3 : 1) : undefined}
+          style={styles.grow}
+        >
+          {well.detail || well.more?.label}
+        </Text>
+        {well.more ? (
+          <LineIcon variant="footnote" size={13}>
+            <View style={open ? styles.flip : undefined}>
+              <Icon name="chev" size={13} color={c.faint} />
+            </View>
+          </LineIcon>
+        ) : null}
+      </>
+    ) : null;
   return (
     // A plain view the conversation measures (never flattened away), around the card that fades in.
     <View ref={slot} collapsable={false} style={styles.slot}>
-      <Animated.View
-        entering={reduced ? undefined : FadeIn.duration(300)}
-        style={[styles.card, !foot && styles.footless, { backgroundColor: c.raised, borderColor: c.line2 }]}
-      >
-        <Sky color={color} surface="raised" depth={0.95} fade={0} style={styles.sky} />
-        {/* Label and state share a line while they fit; the state wraps under the label, never cutting it. */}
-        <View style={styles.head}>
-          <Text variant="footnote" tone="muted" style={styles.semibold}>
-            {label}
-          </Text>
-          {waitsFor === "you" ? (
-            <View style={styles.state}>
-              <WaitMark />
-              <Text variant="caption" style={[styles.semibold, { color: c.amber }]}>
-                {t("ask.waitingYou")}
+      <Animated.View entering={reduced ? undefined : FadeIn.duration(300)} style={[styles.card, surface]}>
+        <View style={styles.clip}>
+          <View style={styles.head}>
+            <Icon name={ASK_ICON[kind]} size={13} color={waitsFor === "you" ? c.amber : c.muted} />
+            <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.grow]}>
+              {t(`ask.kind.${kind}`)}
+            </Text>
+            {waitsFor === "you" ? (
+              expiry
+            ) : waitsFor ? (
+              <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+                {waitsFor}
               </Text>
-            </View>
-          ) : waitsFor ? (
-            <Text variant="caption" tone="muted" style={styles.semibold}>
-              {waitsFor}
+            ) : null}
+          </View>
+          {title ? (
+            <Text variant="title" tone="ink" numberOfLines={well && !well.more ? undefined : 4}>
+              {title}
             </Text>
           ) : null}
+          {why ? (
+            <Text variant="small" tone="muted" style={styles.why}>
+              {why}
+            </Text>
+          ) : null}
+          {source ? (
+            well?.more ? (
+              <Pressable
+                onPress={toggle}
+                accessibilityRole="button"
+                accessibilityHint={well.more.label}
+                accessibilityState={{ expanded: open }}
+                hitSlop={10}
+                style={({ pressed }) => [styles.source, open && styles.sourceOpen, pressed && styles.pressed]}
+              >
+                {source}
+              </Pressable>
+            ) : (
+              <View style={styles.source}>{source}</View>
+            )
+          ) : null}
+          {open && well?.more ? (
+            <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} style={styles.exact}>
+              {well.more.content}
+            </Animated.View>
+          ) : null}
+          {body ? <View style={styles.body}>{body}</View> : null}
+          {foot}
         </View>
-        {lead ? (
-          <Text variant="callout" tone="ink" style={styles.lead}>
-            {lead}
-          </Text>
-        ) : null}
-        {well ? (
-          <View style={[styles.well, { backgroundColor: c.sunken }]}>
-            <View style={styles.tile}>{well.tile}</View>
-            <View style={styles.wellText}>
-              <Text variant="small" tone="ink" numberOfLines={2} style={styles.wellTitle}>
-                {well.title}
-              </Text>
-              {well.detail ? (
-                <Text variant="footnote" tone="muted" numberOfLines={3}>
-                  {well.detail}
-                </Text>
-              ) : null}
-              {well.more ? (
-                // The phone has no room at the well's right: "Ver …" is its third line.
-                <Pressable
-                  onPress={() => {
-                    tapHaptic();
-                    if (well.more?.onToggle) well.more.onToggle();
-                    else setOpen((o) => !o);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: open }}
-                  hitSlop={6}
-                  style={({ pressed }) => [styles.more, pressed && styles.pressed]}
-                >
-                  <Text variant="footnote" tone="ink2" style={styles.semibold}>
-                    {well.more.label}
-                  </Text>
-                  <View style={open ? styles.flip : undefined}>
-                    <Icon name="chev" size={13} color={c.muted} />
-                  </View>
-                </Pressable>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
-        {open && well?.more ? (
-          <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} style={styles.exact}>
-            {well.more.content}
-          </Animated.View>
-        ) : null}
-        {body ? <View style={styles.body}>{body}</View> : null}
-        {foot}
       </Animated.View>
     </View>
   );
 }
 
-/** The card's last strip, edge to edge under a hairline: when it expires, then the decision. */
-export function AskFoot({ expiry, children }: { expiry?: ReactNode; children?: ReactNode }) {
-  const c = useColors();
-  return (
-    <View style={[styles.foot, { borderTopColor: c.line }]}>
-      {expiry}
-      {children}
-    </View>
-  );
+/** The card's decision, under what it asks: its buttons (and a hint under them). */
+export function AskFoot({ children }: { children?: ReactNode }) {
+  return <View style={styles.foot}>{children}</View>;
 }
 
 /**
@@ -525,53 +555,68 @@ export function AskButtons({ primary, secondary }: { primary: ReactNode; seconda
   );
 }
 
-/** The amber fuse burning to the expiry and "expira em 23 h", left-aligned; without a start, the words alone. */
+/**
+ * The amber fuse burning to the expiry and the time left ("23 h"; "expira em 23 h" read aloud), for the card's top
+ * line; without a start, the time alone.
+ */
 export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null; expiresAt: string }) {
   const { t } = useTranslation();
   const c = useColors();
   const now = useNow(15_000);
   const left = timeLeft(t, expiresAt, new Date(now));
   return (
-    <View style={styles.expiry}>
+    <View
+      style={styles.expiry}
+      accessible
+      accessibilityLabel={left ? t("approval.expiresDetail", { time: left }) : t("approval.expired")}
+    >
       {createdAt ? (
         <View style={styles.fuse}>
           <Fuse color="amber" remaining={fuseRemaining(createdAt, expiresAt, now)} />
         </View>
       ) : null}
-      <Text variant="caption" style={[styles.expiryText, { color: c.amber }]}>
-        {left ? t("approval.expiresDetail", { time: left }) : t("approval.expired")}
+      <Text
+        variant="footnote"
+        numberOfLines={1}
+        maxFontSizeMultiplier={CHROME_MAX_SCALE}
+        style={[styles.expiryText, { color: c.amber }]}
+      >
+        {left || t("approval.expired")}
       </Text>
     </View>
   );
 }
 
 /**
- * A decided request: no card, one quiet line in the conversation. A pixel mark (a green square when it went through,
- * a bar when it didn't), its words (what `markName` wraps in bold) and, with `at`, when it ended. The words wrap
- * rather than lose the outcome. With `more`, the line opens the rest under it; the line has no room for `label`, so
- * it reaches screen readers as the hint.
+ * A decided request: no card, one line in the conversation where the message's text starts, as every event in a
+ * message is drawn: a mark on its first line (a check in green when it went through, an × when it didn't)
+ * and its words (what `markName` wraps in bold) on one line. With `more`, the line opens the rest under it (and
+ * the words in full); the line has no room for `label`, so it reaches screen readers as the hint.
  */
 export function AskDone({
   done,
   words,
-  at,
   more,
 }: {
   done: boolean;
   words: string;
-  at?: string | null;
-  more?: { label: string; content: ReactNode };
+  more?: { label: string; content: ReactNode } | null;
 }) {
   const c = useColors();
-  const when = useWhen();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
   const line = (
     <>
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.doneMark}>
-        <View style={[done ? styles.donePixel : styles.doneBar, { backgroundColor: done ? c.ok : c.faint }]} />
+        <Icon name={done ? "check" : "x"} size={LINE_MARK} color={done ? c.ok : c.faint} />
       </View>
-      <Text variant="small" tone="muted" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.doneWords}>
+      <Text
+        variant="small"
+        tone="muted"
+        numberOfLines={open ? undefined : 1}
+        maxFontSizeMultiplier={CHROME_MAX_SCALE}
+        style={styles.doneWords}
+      >
         {markedParts(words).map((p, i) =>
           p.bold ? (
             // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
@@ -582,13 +627,19 @@ export function AskDone({
             p.text
           ),
         )}
-        {at ? ` · ${when.short(at)}` : null}
       </Text>
     </>
   );
-  if (!more) return <View style={styles.done}>{line}</View>;
+  // A card turning into this line fades into it (an old one fades as it scrolls in, as the cards do).
+  const enter = reduced ? undefined : FadeIn.duration(160);
+  if (!more)
+    return (
+      <Animated.View entering={enter} style={styles.done}>
+        {line}
+      </Animated.View>
+    );
   return (
-    <>
+    <Animated.View entering={enter}>
       <Pressable
         onPress={() => {
           tapHaptic();
@@ -597,18 +648,20 @@ export function AskDone({
         accessibilityRole="button"
         accessibilityHint={more.label}
         accessibilityState={{ expanded: open }}
-        hitSlop={8}
+        hitSlop={12}
         style={({ pressed }) => [styles.done, pressed && styles.pressed]}
       >
         {line}
-        <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={13} color={c.muted} />
+        <View style={[styles.doneMark, open ? styles.flip : undefined]}>
+          <Icon name="chev" size={13} color={c.faint} />
         </View>
       </Pressable>
       {open ? (
-        <Animated.View entering={reduced ? undefined : FadeIn.duration(220)}>{more.content}</Animated.View>
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} style={styles.doneMore}>
+          {more.content}
+        </Animated.View>
       ) : null}
-    </>
+    </Animated.View>
   );
 }
 
@@ -668,10 +721,8 @@ export function AskBar({
     canStop,
     rowInView,
   );
-  const see = () => {
-    tapHaptic();
-    onSee();
-  };
+  // "See" scrolls to the card: no haptic.
+  const see = onSee;
   return (
     <View style={styles.dock}>
       <Animated.View
@@ -687,7 +738,7 @@ export function AskBar({
           onPress={see}
           accessibilityRole="button"
           accessibilityLabel={`${plain}. ${t("ask.bar.see")}`}
-          style={styles.words}
+          style={({ pressed }) => [styles.words, pressed && styles.pressed]}
         >
           <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
             {parts.map((p, i) =>
@@ -708,7 +759,13 @@ export function AskBar({
           </Text>
         ) : null}
         <View style={[styles.sep, { backgroundColor: c.line }]} />
-        <Pressable onPress={see} accessibilityElementsHidden importantForAccessibility="no" hitSlop={8}>
+        <Pressable
+          onPress={see}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          hitSlop={8}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
           <Text
             variant="caption"
             tone="ink"
@@ -726,83 +783,45 @@ export function AskBar({
 
 const styles = StyleSheet.create({
   slot: { marginTop: 12 },
-  // Flat on the conversation (a hairline, no heavy shadow), with the app's cut corner at the bottom left.
-  card: {
-    paddingTop: 12,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
-    borderWidth: StyleSheet.hairlineWidth,
+  // The app's card (`useSurface`) with its cut corner at the bottom left, as the waiting cards.
+  card: { borderRadius: 20, borderBottomLeftRadius: 6 },
+  clip: {
+    borderRadius: 20,
+    borderBottomLeftRadius: 6,
     overflow: "hidden",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 8,
   },
-  // No strip to close it (nothing to decide here, no expiry): the card's own padding does.
-  footless: { paddingBottom: 14 },
-  sky: { position: "absolute", top: 0, left: 0, right: 0, height: 8, opacity: 0.7 },
-  head: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-between",
-    columnGap: 8,
-    rowGap: 2,
-    minHeight: 20,
-  },
-  state: { flexDirection: "row", alignItems: "center", gap: 6 },
+  head: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
   semibold: { fontWeight: "600" },
-  lead: { marginTop: 8, lineHeight: 23 },
-  well: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderBottomLeftRadius: 4,
-  },
-  tile: { marginTop: 2 },
-  wellText: { flex: 1, minWidth: 0, gap: 1 },
-  wellTitle: { fontWeight: "600", fontSize: 14, lineHeight: 19 },
-  more: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    alignSelf: "flex-start",
-    minHeight: 28,
-    marginTop: 2,
-  },
+  medium: { fontWeight: "500" },
+  grow: { flex: 1, minWidth: 0 },
+  shrink: { flexShrink: 1 },
+  why: { marginTop: -4 },
+  // The thing it is about, one quiet line: its mark, its details, the chevron when it opens more.
+  source: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", minHeight: 24 },
+  // Open, its details take up to three lines: the mark and the chevron stay on the first.
+  sourceOpen: { alignItems: "flex-start" },
+  sourceMark: { flexShrink: 0 },
   pressed: { opacity: 0.7 },
   flip: { transform: [{ rotate: "180deg" }] },
-  exact: { marginTop: 8, gap: 10 },
-  body: { marginTop: 12, gap: 8 },
-  foot: {
-    marginTop: 14,
-    marginHorizontal: -14,
-    paddingTop: 12,
-    paddingHorizontal: 14,
-    paddingBottom: 14,
-    gap: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
+  exact: { gap: 10 },
+  body: { gap: 8 },
+  foot: { marginTop: 4, gap: 10 },
   buttons: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   primary: { flexGrow: 1.5, flexShrink: 1, minWidth: 0 },
   secondary: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
-  expiry: { flexDirection: "row", alignItems: "center", gap: 8 },
-  fuse: { width: 56 },
+  expiry: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
+  fuse: { width: 44 },
   expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
-  // A decided request: a line on the conversation itself, nothing around it.
-  done: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-    marginTop: 6,
-  },
-  doneMark: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
-  donePixel: { width: 5, height: 5 },
-  doneBar: { width: 8, height: 2 },
-  doneWords: { flexShrink: 1, fontSize: 14, lineHeight: 19 },
+  // A decided request: an event line on the conversation itself, nothing around it; the mark on the first line's
+  // reading middle (a 20-point line), the words to the end of the column.
+  done: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP, alignSelf: "stretch", marginTop: 8 },
+  doneMark: { height: 20, justifyContent: "center" },
+  doneWords: { flex: 1, minWidth: 0 },
+  // Under the words, not the mark.
+  doneMore: { marginTop: 6, marginLeft: LINE_MARK + LINE_GAP, gap: 4 },
   // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.
   dock: { paddingHorizontal: 4, paddingBottom: 6 },
   pill: {

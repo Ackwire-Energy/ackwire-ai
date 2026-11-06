@@ -133,6 +133,8 @@ export interface ReplyRef {
   excerpt: string;
   /** The quoted message's GIF, sticker (ADR 0091) or voice (ADR 0100): a quote of one with no text still says what it was. */
   mediaKind?: MessageMedia["kind"] | "voice";
+  /** The original is gone (`withGoneQuotes`, when listed): its words and author go with it. */
+  deleted?: true;
 }
 
 export const REPLY_EXCERPT_LENGTH = 200;
@@ -308,7 +310,8 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
       handled: mine.map((r) => ({
         agentId: r.agentId,
         runId: r.id,
-        status: r.status,
+        // Asking its computer from the line it still waits, as `computer` says.
+        status: r.computer === "queued" ? ("waiting_input" as const) : r.status,
         ...(r.error === NO_AI ? { reason: NO_AI } : {}),
         ...(r.status === "failed" && r.error !== NO_AI ? runErrorDetail(r.error) : {}),
         ...(r.outage ? { outage: true as const } : {}),
@@ -346,6 +349,78 @@ export function parseMentionHandles(body: string): string[] {
     if (match[2]) found.add(match[2].toLowerCase());
   }
   return [...found];
+}
+
+/** Code and links, as the apps show them (a fence nobody closed runs to the end): what stands there stays as written. */
+const CODE_OR_LINK = /```[\s\S]*?(?:```|$)|`[^`\n]+`|\[[^\]]*\]\([^)\s]*\)|https?:\/\/\S+/;
+
+/**
+ * An agent's text with each `@Full Name` of a person among `members` as their `@handle`, its real mention: agents write
+ * the names they read, and a mention is one word. Only the whole name, the longest one first, ignoring case. A name two
+ * members share, or the full name of someone outside the conversation (`outsiders`), mentions nobody: it loses its @, or
+ * `@Ana` of `@Ana Souza` would reach whoever holds that handle. A name that is also a member's handle already mentions
+ * them, and code, links and package scopes (`@ana/kit`) stay as written.
+ */
+export function mentionsByName(
+  body: string,
+  members: { name: string | null; handle: string | null; person: boolean }[],
+  outsiders: (string | null)[] = [],
+): string {
+  const key = (name: string) => name.trim().normalize("NFC").toLowerCase();
+  const named = new Map<string, typeof members>();
+  for (const m of members) {
+    const name = key(m.name ?? "");
+    if (name) named.set(name, [...(named.get(name) ?? []), m]);
+  }
+  // One word is a handle's business, whoever holds it.
+  const elsewhere = outsiders.map((n) => key(n ?? "")).filter((n) => n.includes(" "));
+  if (named.size === 0 && elsewhere.length === 0) return body;
+  const handles = new Set(members.map((m) => m.handle));
+  const names = [...new Set([...named.keys(), ...elsewhere].flatMap((n) => [n, n.normalize("NFD")]))]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const mention = new RegExp(
+    `${CODE_OR_LINK.source}|(^|[^\\p{L}\\p{N}_@./])@(${names})(?![\\p{L}\\p{N}_@/-]|\\.[\\p{L}\\p{N}])`,
+    "giu",
+  );
+  return body.replace(mention, (whole, before: string | undefined, written: string | undefined) => {
+    if (written === undefined) return whole;
+    const name = key(written);
+    if (handles.has(name)) return whole;
+    const [one, other] = named.get(name) ?? [];
+    if (!one || other) return `${before}${written}`;
+    return one.person && one.handle ? `${before}@${one.handle}` : whole;
+  });
+}
+
+/** `mentionsByName` for a message going to `channelId`: its people and agents, an agent's message only. */
+async function withNamedMentions(tx: Executor, input: NewMessage, body: string) {
+  if (input.author.type !== "agent" || !/@\p{L}/u.test(body)) return body;
+  const { organizationMembers, users } = schema;
+  // ponytail: reads every member's name for such a message; filter by the text in SQL if a workspace's size calls for it.
+  const people = await tx
+    .select({ name: users.name, handle: organizationMembers.handle, here: channelMembers.userId })
+    .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .leftJoin(
+      channelMembers,
+      and(eq(channelMembers.channelId, input.channelId), eq(channelMembers.userId, organizationMembers.userId)),
+    )
+    .where(eq(organizationMembers.orgId, input.orgId));
+  const teammates = await tx
+    .select({ name: agents.name, handle: agents.handle })
+    .from(channelMembers)
+    .innerJoin(agents, eq(agents.id, channelMembers.agentId))
+    .where(and(eq(channelMembers.channelId, input.channelId), isNull(agents.archivedAt)));
+  return mentionsByName(
+    body,
+    [
+      ...people.filter((p) => p.here).map((p) => ({ ...p, person: true })),
+      ...teammates.map((a) => ({ ...a, person: false })),
+    ],
+    people.filter((p) => !p.here).map((p) => p.name),
+  );
 }
 
 /**
@@ -564,7 +639,7 @@ export async function insertMessageWithRuns(
   /** A resend (same person and `clientId`): `message` is the one already written; nothing was written now. */
   duplicate: boolean;
 }> {
-  const body = input.body.trim();
+  const body = await withNamedMentions(tx, input, input.body.trim());
   // Files alone are a message (`meta.artifacts`), and so is a GIF or a sticker (`meta.media`, ADR 0091): the
   // text may be empty then.
   const attached = input.meta?.artifacts;
@@ -1024,7 +1099,7 @@ export async function postPersonMessage(
     clientId?: string | null;
     /** Server-side attachments (e.g. `{ issueId }` when asking an agent to implement an issue). */
     meta?: Record<string, unknown>;
-    /** Quote reply: the message this one answers (same channel). Stored as `meta.replyTo`. */
+    /** Quote reply: the message this one answers (same channel; in a thread, that thread). Stored as `meta.replyTo`. */
     replyTo?: string | null;
     /** Files (artifact ids) uploaded for this message, or files of this channel. Stored as `meta.artifacts`. */
     attachments?: string[];
@@ -1057,7 +1132,7 @@ export async function postPersonMessage(
   if (resent) return resendView(deps, orgId, resent);
   // Quote, files and media: checked and resolved here, so the run's context reads them from the meta (no query there).
   const [replyTo, files, media] = await Promise.all([
-    input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo) : null,
+    input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo, input.threadId) : null,
     input.attachments?.length ? attachmentRefsFor(deps.db, userId, orgId, channelId, input.attachments) : null,
     input.media ? resolveMedia(deps, orgId, input.media) : null,
   ]);
@@ -1347,8 +1422,17 @@ async function resolveMedia(
   return { kind: "sticker", agentId: agent.id, mood: input.mood };
 }
 
-/** The quoted message (one statement, with its author's name): it must be a live message of this channel. */
-async function replyRefFor(db: Database, orgId: string, channelId: string, messageId: string): Promise<ReplyRef> {
+/**
+ * The quoted message (one statement, with its author's name): a live message of this channel and, from a thread, of
+ * that thread. The main timeline stays open to the channel: it shows the agents' replies, which live in their threads.
+ */
+async function replyRefFor(
+  db: Database,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  threadId?: string | null,
+): Promise<ReplyRef> {
   const [row] = await db
     .select({
       id: messages.id,
@@ -1367,8 +1451,9 @@ async function replyRefFor(db: Database, orgId: string, channelId: string, messa
     .leftJoin(schema.users, eq(schema.users.id, messages.authorUserId))
     .leftJoin(agents, eq(agents.id, messages.authorAgentId))
     .where(and(eq(messages.id, messageId), eq(messages.orgId, orgId)));
-  if (!row || row.deletedAt || row.channelId !== channelId) {
-    throw new ValidationError("replyTo must be a message of this channel", "message.reply_not_found");
+  const elsewhere = threadId && row?.id !== threadId && row?.threadId !== threadId;
+  if (!row || row.deletedAt || row.channelId !== channelId || elsewhere) {
+    throw new ValidationError("replyTo must be a message of this conversation", "message.reply_not_found");
   }
   const person = row.authorType === "person";
   const media = mediaOf(row.meta);
@@ -1377,10 +1462,16 @@ async function replyRefFor(db: Database, orgId: string, channelId: string, messa
     threadId: row.threadId,
     author: { type: row.authorType, id: person ? row.authorUserId : row.authorAgentId },
     authorName: (person ? row.userName : row.agentName) ?? "",
-    excerpt: replyExcerpt(readableBody(row.body, row.meta)),
+    // A file with no words is quoted by its name, so people and agents still see what is answered.
+    excerpt: replyExcerpt(readableBody(row.body, row.meta) || fileNameOf(row.meta)),
     ...(voiceOf(row.meta) ? { mediaKind: "voice" as const } : media ? { mediaKind: media.kind } : {}),
   };
 }
+
+const fileNameOf = (meta: Record<string, unknown>) => {
+  const title = (meta.artifacts as { title?: unknown }[] | undefined)?.[0]?.title;
+  return typeof title === "string" ? title : "";
+};
 
 /** Files for a message: the person's own uploads or files of this channel, not deleted. */
 async function attachmentRefsFor(db: Database, userId: string, orgId: string, channelId: string, ids: string[]) {
@@ -1454,13 +1545,20 @@ export async function listMessages(
   if (options.threadId) {
     const root = await getMessage(db, orgId, options.threadId);
     if (!root || root.channelId !== channelId) throw new NotFoundError("Thread not found");
+    // The latest ones, as the channel's list: past the limit, a reply just said must not be the one left out.
     const replies = await db
       .select()
       .from(messages)
-      .where(and(scope, eq(messages.threadId, options.threadId)))
-      .orderBy(asc(messages.createdAt), asc(messages.id))
+      .where(
+        and(
+          scope,
+          eq(messages.threadId, options.threadId),
+          options.before ? lt(messages.createdAt, options.before) : undefined,
+        ),
+      )
+      .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(limit);
-    return withReceipts(db, orgId, [root, ...replies]);
+    return withReceipts(db, orgId, [root, ...replies.reverse()]);
   }
   const rows = await db
     .select()
@@ -1629,5 +1727,23 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...longWorkOf(m, works),
     };
   });
-  return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));
+  return withGoneQuotes(db, orgId, await withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views)));
+}
+
+/** A quote of a message deleted since keeps only that: the words saved with it go when the original does. */
+async function withGoneQuotes(db: Database, orgId: string, views: MessageView[]): Promise<MessageView[]> {
+  const quoteOf = (v: MessageView) => v.meta.replyTo as ReplyRef | undefined;
+  const ids = [...new Set(views.flatMap((v) => quoteOf(v)?.messageId ?? []))];
+  if (ids.length === 0) return views;
+  const live = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids), isNull(messages.deletedAt)));
+  const alive = new Set(live.map((m) => m.id));
+  return views.map((v) => {
+    const quote = quoteOf(v);
+    if (!quote || alive.has(quote.messageId)) return v;
+    const { mediaKind: _gone, ...kept } = quote;
+    return { ...v, meta: { ...v.meta, replyTo: { ...kept, authorName: "", excerpt: "", deleted: true } } };
+  });
 }

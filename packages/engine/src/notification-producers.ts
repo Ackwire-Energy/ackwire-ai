@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { autonomyNoteFor, proposalCardOf } from "./brakes";
@@ -21,6 +21,7 @@ import {
   retargetNotifications,
 } from "./notifications";
 import { maySql, type RolePermission } from "./permissions";
+import { secretLabelOf } from "./secrets";
 import { stretchCardOf } from "./stretch";
 import { teamWeekCardOf } from "./team-week";
 
@@ -437,7 +438,7 @@ export async function notifySecretRequest(deps: NotificationDeps, r: typeof sche
       ...(channel?.kind === "dm" ? { dmId: r.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
     },
-    latest: { title: r.name, text: notificationSnippet(r.purpose), expiresAt: r.expiresAt.toISOString() },
+    latest: { title: secretLabelOf(r), text: notificationSnippet(r.purpose), expiresAt: r.expiresAt.toISOString() },
   });
 }
 
@@ -1428,19 +1429,36 @@ const toolChangedGroup = (connectionId: string) => `connector_tool_changed:${con
 /**
  * A connected MCP server changed tools an admin approved (ADR 0117): who manages connectors hears it once per change,
  * `source.label` the connection's name and `latest.title` the tools. Resolved when nothing of it waits any more.
+ * One waiting row per server: its review lists every pending change, so a newer change replaces the older row
+ * (two "TikTok changed tools" cards opened the same review).
  */
 export async function notifyToolChanged(
   deps: NotificationDeps,
   connection: { id: string; orgId: string; label: string },
   tools: { name: string; fingerprint: string }[],
 ) {
+  const prefix = toolChangedGroup(connection.id);
+  const groupKey = `${prefix}${tools[0]?.fingerprint ?? ""}`;
+  // The same change again (a retried job) keeps its row; only older changes of this server give way.
+  const older = await deps.db
+    .select({ id: schema.notifications.id })
+    .from(schema.notifications)
+    .where(
+      and(
+        eq(schema.notifications.orgId, connection.orgId),
+        isNull(schema.notifications.doneAt),
+        sql`${schema.notifications.groupKey} like ${`${prefix}%`}`,
+        ne(schema.notifications.groupKey, groupKey),
+      ),
+    );
+  if (older.length) await resolveNotifications(deps, connection.orgId, { ids: older.map((r) => r.id) });
   await notify(deps, {
     orgId: connection.orgId,
     userIds: await adminsOf(deps, connection.orgId, "manage_connectors"),
     kind: "connector_tool_changed",
-    groupKey: `${toolChangedGroup(connection.id)}${tools[0]?.fingerprint ?? ""}`,
+    groupKey,
     waiting: true,
-    source: { label: connection.label },
+    source: { label: connection.label, connectionId: connection.id },
     latest: { title: tools.map((t) => t.name).join(", ") },
   });
 }

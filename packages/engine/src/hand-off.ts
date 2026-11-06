@@ -1,10 +1,11 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { routineBriefOfRun } from "./background";
+import { sameSentence } from "./context/items";
 import { deliverNotice, publishDelivery } from "./delivery";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
-import { insertMessage, type Message, unreachedAgents } from "./messages";
+import { insertMessage, type Message, unreachedAgents, unreachedNote } from "./messages";
 import { runReadOutsideById } from "./outside";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
@@ -87,7 +88,7 @@ export async function deliverRoutineReport(
   if (!open) return null;
   const relays = await runReadOutsideById(tx, run.orgId, run.id);
   if (!input.wake) {
-    // Agents it names outside that conversation: the routine hands it to them (`settleReach`).
+    // Agents it names outside that conversation: its mention reaches nobody, and the tool's result says so.
     const unreached = await unreachedAgents(tx, {
       orgId: run.orgId,
       channelId: brief.deliverTo.channelId,
@@ -262,6 +263,17 @@ async function holdUntried(deps: HandOffDeps, ctx: ToolContext, text: string): P
 export type AskVerdict = "findable" | "secret" | "person" | "none";
 
 /**
+ * Says it needs nothing, with no question and no "nothing but your ok" in it: a card over this keeps a person from
+ * nothing. The judge reads that in any language; this list holds when it fails, when there is none, and when it calls
+ * the note a person's to answer.
+ * ponytail: the common wordings of pt, en, es, fr, de and it; other languages rest on the judge alone.
+ */
+const SAYS_NEEDS_NOTHING =
+  /(?:n[ãa]o preciso de (?:mais )?nada|i (?:don'?t|do not) need anything|i need nothing|no necesito (?:nada|más nada)|je n'ai besoin de rien|ich brauche (?:gerade |jetzt |momentan )?nichts|non ho bisogno di nulla)(?![^.!\n]*[\s,](?:al[ée]m|exceto|salvo|s[óo]|apenas|but|except|besides|other than|just|only|excepto|s[óo]lo|m[áa]s|sauf|seulement|d'autre|au(?:ß|ss)er|nur|tranne|oltre)[\s,])/i;
+
+export const saysNeedsNothing = (text: string) => !/[?？]/.test(text) && SAYS_NEEDS_NOTHING.test(text);
+
+/**
  * One judge call on an `ask_user` question (kind `ask_check`, recorded like every judgment): `secret` at p ≥ 0.5
  * and at least the others, then `none` and `findable` the same way, otherwise `person`. A needless hold costs
  * one more call of the agent; a findable question asked, or one that asks nothing, costs the person a wait.
@@ -315,7 +327,7 @@ export async function askVerdict(
   if (wins("secret")) return "secret";
   if (wins("none")) return "none";
   if (wins("findable")) return "findable";
-  return "person";
+  return saysNeedsNothing(input.question) ? "none" : "person";
 }
 
 /** A question naming a secret, read when the judge fails: a missed one would be typed into the chat in plain text. */
@@ -325,6 +337,34 @@ const NAMES_SECRET =
 /** What the run reads when its question asks the person for nothing it needs (`none`). */
 export const ASKS_NOTHING =
   "Not asked: this asks the person for nothing you need to go on. Say it in your reply instead, as a plain offer if it is one, and end your turn: nobody waits on it.";
+
+/** How many of a run's last questions a new one is compared with. */
+const RECENT_QUESTIONS = 5;
+
+/**
+ * What the run reads when a question is the same as, or nearly the same as, one it already asked (a withdrawn one may
+ * come back): what came of the first, instead of a second card. Null: not asked yet.
+ */
+export async function repeatedAsk(db: Executor, run: { id: string; orgId: string }, text: string) {
+  const asked = await db
+    .select()
+    .from(schema.agentQuestions)
+    .where(
+      and(
+        eq(schema.agentQuestions.orgId, run.orgId),
+        eq(schema.agentQuestions.runId, run.id),
+        ne(schema.agentQuestions.status, "canceled"),
+      ),
+    )
+    .orderBy(desc(schema.agentQuestions.createdAt))
+    .limit(RECENT_QUESTIONS);
+  const same = asked.find((q) => sameSentence(q.text, text));
+  if (!same) return null;
+  if (same.status === "open") return "Not asked: you already asked this and it is still open. Wait for the answer.";
+  // Loaded here, as `questions.ts` loads this file.
+  const { questionResult } = await import("./questions");
+  return `Not asked: you already asked this in this run. ${questionResult(same).content}`;
+}
 
 /**
  * What a model brain wrote in this turn before its tool calls: its `model_call` step is saved before they run. A
@@ -356,10 +396,12 @@ const SECRET_IN_CHAT = "Not asked: a secret typed in the chat stays in the conve
  * the next findable question is asked), a secret asked as a chat question is refused every time and turned to
  * `request_secret` (on a judge error, a question naming a secret is refused too), and one that asks the person for
  * nothing the run needs (a status note, an optional offer) is refused every time, so the run never waits on it (on a
- * judge error it is asked). Null: ask it.
+ * judge error it is asked, unless it says so itself). One it already asked is refused before any of this. Null: ask it.
  */
 export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question: string): Promise<string | null> {
-  if (!deps.judge) return null;
+  const repeated = await repeatedAsk(ctx.db, { id: ctx.runId, orgId: ctx.orgId }, question);
+  if (repeated) return repeated;
+  if (!deps.judge) return saysNeedsNothing(question) ? ASKS_NOTHING : null;
   const { findableNudge } = await import("./continuation");
   const [run] = await ctx.db
     .select()
@@ -380,7 +422,7 @@ export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question:
     means,
     tried,
     reply,
-  }).catch((): AskVerdict => (NAMES_SECRET.test(question) ? "secret" : "person"));
+  }).catch((): AskVerdict => (NAMES_SECRET.test(question) ? "secret" : saysNeedsNothing(question) ? "none" : "person"));
   if (verdict === "person" || (verdict === "findable" && held.includes("findable"))) return null;
   await addRunStep(ctx.db, run, "context", {
     continuation: { outcome: "continue", rule: verdict, held: "ask_user", count: held.length + 1 },
@@ -404,7 +446,7 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
   const tool: ToolDefinition = {
     name: HAND_OFF_TOOL,
     description:
-      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. An agent it @mentions wakes and works on it (one outside that conversation gets it as a note). Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
+      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. An agent of that conversation it @mentions wakes and works on it; one outside it hears nothing (tell_agent reaches it). Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -456,11 +498,13 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
       });
       if ("refused" in handed) return { content: handed.refused ?? "", isError: true };
       await publishDelivery(deps.pubsub, handed.delivered);
+      const missed = handed.delivered.message.meta.unreachedAgents;
+      const note = Array.isArray(missed) ? unreachedNote(missed as string[], "that conversation", false) : "";
       return {
         content:
           input.wake_me === true
             ? "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked; nothing else is posted."
-            : "Posted. Finish your work now and end with a short record of what you checked (it is not posted); nothing else is posted.",
+            : `Posted.${note ? ` ${note}` : ""} Finish your work now and end with a short record of what you checked (it is not posted); nothing else is posted.`,
         data: { handedOff: { messageId: handed.delivered.message.id } },
       };
     },

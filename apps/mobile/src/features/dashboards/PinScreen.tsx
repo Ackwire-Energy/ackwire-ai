@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useTheme, useToast } from "@/ui";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, Text, useTheme, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
@@ -78,87 +78,89 @@ export function PinScreen() {
       />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
-        {draft && chart ? (
-          <>
-            <View style={styles.preview}>
-              <WidgetCard
-                big
-                widget={{
-                  title: chart.title,
-                  spec: chart.spec,
-                  status: "ok",
-                  agentId: draft.agentId,
-                  refreshedAt: null,
-                  schedule: keep ? schedule : "manual",
-                  ...sizeToLayout(sized),
-                }}
-                footer={null}
-              />
-            </View>
-            {draft.blocks.length > 1 ? (
-              <>
-                <GroupedHeader>{t("mobile.dashboards.pin.which")}</GroupedHeader>
-                <View style={styles.bleed}>
-                  <ChoiceChips
-                    items={draft.blocks.map((b, i) => ({
-                      key: String(i),
-                      label: chartBlockToWidgetSpec(b)?.title ?? String(i + 1),
-                    }))}
-                    value={String(index)}
-                    onChange={(k) => setIndex(Number(k))}
-                  />
-                </View>
-              </>
-            ) : null}
-
-            <GroupedHeader>{t("widgets.sizes.label")}</GroupedHeader>
-            <SizeChoice value={sized} onChange={setSize} />
-
-            <View style={styles.gap} />
-            <GroupedList>
-              <GroupedRow
-                icon="clock"
-                label={t("dashboards.newWidget.keepUpdated")}
-                sub={keep ? t("dashboards.newWidget.steps.redoesHint") : t("dashboards.newWidget.onlyPin")}
-                toggle={keep}
-                onPress={() => setKeep((v) => !v)}
-              />
-            </GroupedList>
-            {keep ? (
-              <>
-                <View style={styles.gap} />
-                <View style={styles.bleed}>
-                  <ScheduleChoice value={schedule} onChange={setSchedule} without="manual" />
-                </View>
-                <GroupedFooter>
-                  {t("dashboards.newWidget.steps.redoes", {
-                    name: look.name,
-                    schedule: t(`widgets.schedulesInline.${schedule}`),
-                  })}
-                </GroupedFooter>
-              </>
-            ) : null}
-
-            <GroupedHeader>{t("dashboards.newWidget.destination")}</GroupedHeader>
-            <GroupedList>
-              {destinations.map((d) => (
-                <GroupedRow
-                  key={d.id}
-                  icon={d.home ? "home" : "chart"}
-                  label={d.home ? t("dashboards.home") : (d.title ?? "")}
-                  checked={d.id === destination?.id}
-                  onPress={() => setDest(d.id)}
+        <Locked when={pin.isPending}>
+          {draft && chart ? (
+            <>
+              <View style={styles.preview}>
+                <WidgetCard
+                  big
+                  widget={{
+                    title: chart.title,
+                    spec: chart.spec,
+                    status: "ok",
+                    agentId: draft.agentId,
+                    refreshedAt: null,
+                    schedule: keep ? schedule : "manual",
+                    ...sizeToLayout(sized),
+                  }}
+                  footer={null}
                 />
-              ))}
-            </GroupedList>
-          </>
-        ) : (
-          <Text tone="muted" style={styles.gone}>
-            {t("dashboards.errors.blockNotFound")}
-          </Text>
-        )}
+              </View>
+              {draft.blocks.length > 1 ? (
+                <>
+                  <GroupedHeader>{t("mobile.dashboards.pin.which")}</GroupedHeader>
+                  <View style={styles.bleed}>
+                    <ChoiceChips
+                      items={draft.blocks.map((b, i) => ({
+                        key: String(i),
+                        label: chartBlockToWidgetSpec(b)?.title ?? String(i + 1),
+                      }))}
+                      value={String(index)}
+                      onChange={(k) => setIndex(Number(k))}
+                    />
+                  </View>
+                </>
+              ) : null}
+
+              <GroupedHeader>{t("widgets.sizes.label")}</GroupedHeader>
+              <SizeChoice value={sized} onChange={setSize} />
+
+              <View style={styles.gap} />
+              <GroupedList>
+                <GroupedRow
+                  icon="clock"
+                  label={t("dashboards.newWidget.keepUpdated")}
+                  sub={keep ? t("dashboards.newWidget.steps.redoesHint") : t("dashboards.newWidget.onlyPin")}
+                  toggle={keep}
+                  onPress={() => setKeep((v) => !v)}
+                />
+              </GroupedList>
+              {keep ? (
+                <>
+                  <View style={styles.gap} />
+                  <View style={styles.bleed}>
+                    <ScheduleChoice value={schedule} onChange={setSchedule} without="manual" />
+                  </View>
+                  <GroupedFooter>
+                    {t("dashboards.newWidget.steps.redoes", {
+                      name: look.name,
+                      schedule: t(`widgets.schedulesInline.${schedule}`),
+                    })}
+                  </GroupedFooter>
+                </>
+              ) : null}
+
+              <GroupedHeader>{t("dashboards.newWidget.destination")}</GroupedHeader>
+              <GroupedList>
+                {destinations.map((d) => (
+                  <GroupedRow
+                    key={d.id}
+                    icon={d.home ? "home" : "chart"}
+                    label={d.home ? t("dashboards.home") : (d.title ?? "")}
+                    checked={d.id === destination?.id}
+                    onPress={() => setDest(d.id)}
+                  />
+                ))}
+              </GroupedList>
+            </>
+          ) : (
+            <Text tone="muted" style={styles.gone}>
+              {t("dashboards.errors.blockNotFound")}
+            </Text>
+          )}
+        </Locked>
       </ScrollView>
     </View>
   );

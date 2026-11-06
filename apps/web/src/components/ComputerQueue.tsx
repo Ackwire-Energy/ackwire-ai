@@ -1,6 +1,8 @@
-import type { Message, ComputerQueue as Queue, QueueWaiting, QueueWhere } from "@agenteschat/client";
+import type { Message, ComputerQueue as Queue, QueueWhere } from "@agenteschat/client";
 import { receiptView, useChannels, useDms, useMachineQueue, useMachines } from "@agenteschat/client";
 import {
+  type ConversationWait,
+  conversationWaits,
   durationText,
   fanChipText,
   fanOutOf,
@@ -12,6 +14,7 @@ import {
   queueAllStartedText,
   queueButtonText,
   queuedNextText,
+  queueFillText,
   queueLeftText,
   queueLiveText,
   queuePurposeText,
@@ -33,11 +36,14 @@ import {
   Message as MessageRow,
   useNow,
 } from "@agenteschat/ui";
+import { useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
+import { StopTaskButton, useTaskStop } from "@/components/tasks/TaskBits";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useLive } from "@/realtime/context";
 import "./computer-queue.css";
@@ -78,6 +84,7 @@ function useQueueNames(): QueueNames & { place: (w: QueueWhere) => QueuePlace } 
     agent: (id) => dir.agentById.get(id)?.name,
     person: (id) => dir.memberById.get(id)?.name,
     place: (w) => {
+      if (w.agents) return { kind: "agents" };
       const channel = channels.data?.find((c) => c.id === w.channelId);
       if (channel) return { kind: "channel", name: channel.name, thread: w.threadId !== null };
       if (dms.data?.some((d) => d.channelId === w.channelId)) return { kind: "dm", mine: true };
@@ -100,7 +107,7 @@ export function SeeQueue({ machineId }: { machineId: string }) {
   );
 }
 
-/** The computer's line: how full it is, every turn working on it, and the order of the rest. */
+/** The computer's line: how full it is, what fills it, every turn working on it, and the order of the rest. */
 export function QueueDialog({
   machineId,
   open,
@@ -137,7 +144,7 @@ export function QueueDialog({
     >
       <DialogBody>
         {queue ? (
-          <QueueLists queue={queue} names={names} now={now} />
+          <QueueLists queue={queue} names={names} now={now} onLeave={() => onOpenChange(false)} />
         ) : q.isError ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : (
@@ -155,23 +162,89 @@ export function QueueDialog({
   );
 }
 
-function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typeof useQueueNames>; now: number }) {
+/** A row's text, opening its task where the viewer sees it, then its stop. */
+function QueueRowBody({
+  row,
+  name,
+  onOpen,
+  onStop,
+  stopping,
+  children,
+}: {
+  row: { canOpen?: boolean; canStop?: boolean };
+  name: string;
+  onOpen: () => void;
+  onStop: () => void;
+  stopping: boolean;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {row.canOpen ? (
+        <button
+          type="button"
+          className="cq__text cq__open"
+          aria-label={`${t("queue.openTask")}: ${name}`}
+          onClick={onOpen}
+        >
+          {children}
+        </button>
+      ) : (
+        <span className="cq__text">{children}</span>
+      )}
+      {row.canStop && (
+        <StopTaskButton label={t("taskManager.actions.stop")} title={name} stopping={stopping} onClick={onStop} />
+      )}
+    </>
+  );
+}
+
+function QueueLists({
+  queue,
+  names,
+  now,
+  onLeave,
+}: {
+  queue: Queue;
+  names: ReturnType<typeof useQueueNames>;
+  now: number;
+  /** An agent's picture or a task opened elsewhere: the dialog gives way. */
+  onLeave: () => void;
+}) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const navigate = useNavigate();
+  const { stop, stopping } = useTaskStop();
   const view = queueView(queue, names.viewerId);
   const allStarted = queueAllStartedText(t, view, now);
+  const fill = queueFillText(t, view.working);
   const agentName = (id: string) => names.agent(id) ?? t("channel.unknownAgent");
+  const open = (runId: string) => {
+    onLeave();
+    void navigate({ to: "/org/$orgId/task-manager", params: { orgId: org.id }, search: { task: runId } });
+  };
   return (
     <div className="cq">
       <section className="cq__group">
         <h3 className="cq__title">
           <span>{t("queue.workingNow", { n: view.working.length })}</span>
         </h3>
+        {fill && <p className="cq__fill">{fill}</p>}
         {view.working.length === 0 && <p className="cq__empty">{t("queue.nothingWorking")}</p>}
         <ol className="cq__rows">
           {view.working.map((w) => (
             <li key={w.runId} className="cq__row" data-mine={w.mine || undefined}>
-              <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="thinking" />
-              <span className="cq__text">
+              <OpensAgent agentId={w.agentId} onOpen={onLeave}>
+                <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="thinking" />
+              </OpensAgent>
+              <QueueRowBody
+                row={w}
+                name={agentName(w.agentId)}
+                onOpen={() => open(w.runId)}
+                onStop={() => stop([w.runId], undefined, true)}
+                stopping={stopping.has(w.runId)}
+              >
                 <span className="cq__l1">
                   <b>{agentName(w.agentId)}</b>
                   <span className="cq__time">{queueLeftText(t, w, now)}</span>
@@ -183,7 +256,7 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
                     durationText(t, Math.max(0, now - Date.parse(w.startedAt))),
                   ].join(" · ")}
                 </span>
-              </span>
+              </QueueRowBody>
             </li>
           ))}
         </ol>
@@ -197,8 +270,16 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
           <ol className="cq__rows">
             {view.waiting.map((w) => (
               <li key={w.runId} className="cq__row" data-mine={w.mine || undefined}>
-                <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="idle" />
-                <span className="cq__text">
+                <OpensAgent agentId={w.agentId} onOpen={onLeave}>
+                  <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="idle" />
+                </OpensAgent>
+                <QueueRowBody
+                  row={w}
+                  name={agentName(w.agentId)}
+                  onOpen={() => open(w.runId)}
+                  onStop={() => stop([w.runId], undefined, true)}
+                  stopping={stopping.has(w.runId)}
+                >
                   <span className="cq__l1">
                     <b>{agentName(w.agentId)}</b>
                     <span className="cq__nth">{nthText(t, i18n.language, w.position)}</span>
@@ -208,7 +289,7 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
                     {[queuePurposeText(t, w.purpose, names), queueWhereText(t, names.place(w.where))].join(" · ")}
                   </span>
                   {w.mine && w.people && <Chip className="cq-first">{t("queue.youFirst")}</Chip>}
-                </span>
+                </QueueRowBody>
               </li>
             ))}
           </ol>
@@ -230,7 +311,7 @@ function useQueueWaits(message: Message) {
   const rows = agents.flatMap((id) => waitingFor(q.data, receipt, id, message.channelId) ?? []);
   // The fan-out strip says where each stands instead.
   const fanned = fanShows(message, fanOutOf(receipt, q.data), receipt);
-  return { agents, machineId, queue: q.data, rows: fanned ? [] : rows };
+  return { agents, rows: fanned ? [] : rows };
 }
 
 /**
@@ -246,47 +327,48 @@ export function QueuedWords({ message, fallback }: { message: Message; fallback:
   return <span>{next ? queuedNextText(t, next) : fallback}</span>;
 }
 
+const sameWaits = (a: ConversationWait[], b: ConversationWait[]) =>
+  a.length === b.length && a.every((w, i) => w.agentId === b[i]?.agentId && w.runId === b[i]?.runId);
+
 /**
- * Where "thinking" shows otherwise, for each agent of a message that waits in line for its computer: the agent's turn
- * (its face, its name), "Waiting for the computer. Next up, in about 1 min" or "In line, 4th. After Ada, Kai and
- * Ravi", "You go first" on the viewer's own request, and "See queue". Nothing while the line doesn't know the turn
- * (the receipt says it) or while the fan-out strip shows.
+ * Where "thinking" shows, at the end of the conversation, for each run of these messages that waits in line for its
+ * computer: one turn per run, whatever number of messages went into it. It lives as long as the receipts say the run
+ * waits, and its computer's line only adds to it.
  */
-export function QueueWaitTurns({ message }: { message: Message }) {
-  const { machineId, queue, rows } = useQueueWaits(message);
-  if (!machineId || rows.length === 0) return null;
+export function QueueWaitTurns({ channelId, messages }: { channelId: string; messages: readonly Message[] }) {
+  const waits = useLive((s) => conversationWaits(messages, s.receipts, (id) => id in s.streams.runs), sameWaits);
   return (
     <>
-      {rows.map((w) => (
-        <QueueWaitTurn key={w.runId} waiting={w} queue={queue} machineId={machineId} />
+      {waits.map((w) => (
+        <QueueWaitTurn key={w.runId ?? w.agentId} wait={w} channelId={channelId} />
       ))}
     </>
   );
 }
 
-function QueueWaitTurn({
-  waiting: w,
-  queue,
-  machineId,
-}: {
-  waiting: QueueWaiting;
-  queue: Queue | undefined;
-  machineId: string;
-}) {
+/**
+ * The agent's turn (its face, its name): "Waiting for the computer. Next up, in about 1 min" or "In line, 4th. After
+ * Ada, Kai and Ravi", "You go first" on the viewer's own request, and "See queue"; "Waiting for the computer" until
+ * the line knows the turn.
+ */
+function QueueWaitTurn({ wait: { agentId, runId }, channelId }: { wait: ConversationWait; channelId: string }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const now = useNow(30_000);
+  const machineId = useAgentMachineId(agentId);
+  const queue = useMachineQueue(org.id, machineId).data;
+  const w = waitingFor(queue, runId ? { runOf: { [agentId]: runId } } : undefined, agentId, channelId);
   const agentName = (id: string) => dir.agentById.get(id)?.name;
-  const name = agentName(w.agentId) ?? t("channel.unknownAgent");
-  const text = queueLiveText(t, i18n.language, queue, w.runId, agentName, now);
-  const first = w.people && w.purpose.kind === "person" && w.purpose.userId === me.user.id;
+  const name = agentName(agentId) ?? t("channel.unknownAgent");
+  const text = w ? queueLiveText(t, i18n.language, queue, w.runId, agentName, now) : t("queue.live.waiting");
+  const first = w?.people && w.purpose.kind === "person" && w.purpose.userId === me.user.id;
   return (
     <MessageRow
       agent
       stacked
       className="cq-turn"
-      avatar={<AgentAvatar agentId={w.agentId} name={name} state="idle" />}
+      avatar={<AgentAvatar agentId={agentId} name={name} state="idle" />}
       author={name}
       time={null}
     >
@@ -296,7 +378,7 @@ function QueueWaitTurn({
       </p>
       <span className="cq-turn__acts">
         {first && <Chip className="cq-first">{t("queue.youFirst")}</Chip>}
-        <SeeQueue machineId={machineId} />
+        {machineId && <SeeQueue machineId={machineId} />}
       </span>
     </MessageRow>
   );

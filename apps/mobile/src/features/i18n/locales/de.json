@@ -203,7 +203,6 @@
       "active": "Läuft",
       "proposed": "Vorgeschlagen"
     },
-    "empty": "Noch keine Chats.",
     "sayHi": "Sag {{name}} Hallo.",
     "channelEmpty": "Noch keine Nachrichten. Starte die Unterhaltung.",
     "closed": "Geschlossen",
@@ -252,7 +251,6 @@
     "channelFine": "Für ein Team oder ein Thema.",
     "chatSearch": "Nach einer Person oder einem Agenten suchen",
     "people": "Personen",
-    "nobody": "Noch niemand hier.",
     "search": "Person oder Agent",
     "create": "Erstellen",
     "agentHint": "Ein Name und was er tut",
@@ -305,7 +303,6 @@
     "switchNone": "Keine Unterhaltung mit diesem Namen.",
     "switchWorking": "arbeitet",
     "join": "Dem Kanal beitreten",
-    "empty": "Hier hat noch niemand geschrieben.",
     "sending": "Wird gesendet…",
     "failed": "Nicht gesendet · Erneut versuchen",
     "notSent": "Die Nachricht wurde nicht gesendet.",
@@ -321,6 +318,7 @@
     },
     "steer": {
       "waiting": "{{name}} liest es bei der nächsten Pause",
+      "computer": "{{name}} liest es, sobald der Computer frei ist",
       "now": "{{name}} hat angehalten, um es zu lesen",
       "delivered": "{{name}} hat es erhalten",
       "held": "{{name}} liest es nach deiner Entscheidung",
@@ -650,9 +648,7 @@
     "section": {
       "missions": "Missionen",
       "threads": "Threads"
-    },
-    "empty": "Noch keine Threads oder Missionen",
-    "emptyHint": "Halte eine Nachricht gedrückt, um im Thread zu antworten oder sie in eine Mission umzuwandeln."
+    }
   },
   "agents": {
     "title": "Agenten",
@@ -666,9 +662,6 @@
     "create": "Agent erstellen",
     "created": "{{name}} ist jetzt im Team",
     "createFailed": "Der Agent ließ sich nicht erstellen. Vielleicht ist der Name schon vergeben.",
-    "empty": "Noch keine Agenten.",
-    "noneForYou": "Noch arbeitet kein Agent mit dir.",
-    "noneForYouHint": "Bitte einen Admin um Zugriff.",
     "freeSection": "Frei",
     "noGroupSection": "Keine Abteilung"
   },
@@ -983,8 +976,8 @@
     }
   },
   "delete": {
-    "title": "Dein Konto löschen",
     "intro": "Das lässt sich nicht rückgängig machen.",
+    "introGrace": "Du hast 7 Tage Zeit, es dir anders zu überlegen.",
     "goes": {
       "account": "Dein Konto, dein Zugriff und deine Sitzungen sind weg.",
       "orgs": "Workspaces, in denen du das einzige Mitglied bist, werden gelöscht.",
@@ -1063,8 +1056,6 @@
       "canceled": "Abgebrochen"
     },
     "until": "fällig {{date}}",
-    "empty": "Hier gibt es keine Aufgaben",
-    "emptyOpen": "Du kannst auch in einem Chat um eine bitten.",
     "loadFailed": "Die Aufgaben ließen sich nicht laden.",
     "createdBy": "erstellt von {{name}}",
     "fromMessage": "aus einer Nachricht",
@@ -1139,8 +1130,6 @@
       "file": "Datei"
     },
     "by": "{{name}} · {{when}}",
-    "empty": "Noch nichts im Drive",
-    "emptySub": "Was Agenten und Personen in Chats erstellen oder senden, erscheint hier.",
     "noResults": "Nichts mit diesen Filtern.",
     "loadFailed": "Der Drive ließ sich nicht laden.",
     "more": "Mehr zeigen"
@@ -1157,8 +1146,6 @@
     "recent": "Gerade gelernt",
     "mostUsed": "Am meisten genutzt",
     "noMatch": "Keine Erinnerung dazu.",
-    "emptyTitle": "Noch nichts gelernt",
-    "empty": "Während sie mit dir arbeiten, behalten die Agenten hier, was sie lernen.",
     "gone": "Diese Erinnerung gibt es nicht mehr.",
     "of": "Gedächtnis von {{name}}",
     "line_one": "{{name}} · {{count}}-mal genutzt",
@@ -1181,8 +1168,6 @@
     "usedBy": "Agenten, die sie nutzen",
     "readsWeek_one": "{{count}}-mal gelesen diese Woche",
     "readsWeek_other": "{{count}}-mal gelesen diese Woche",
-    "empty": "Tippe auf Neue Seite, um die erste zu schreiben.",
-    "missing": "Diese Seite gibt es nicht mehr oder sie wurde umbenannt.",
     "blank": "Leere Seite.",
     "folderGone": "Dieser Ordner hat keine Seiten mehr.",
     "reads_one": "{{count}}-mal",
@@ -1246,6 +1231,9 @@
     "review": "Prüfen",
     "answer": "Antworten",
     "open": "Öffnen",
+    "toolsTitle": "Hat Tools geändert, die du freigegeben hast",
+    "toolsWhy": "Die Agenten nutzen die freigegebene Version, bis du die neue annimmst.",
+    "reviewChanges": "Änderungen prüfen",
     "clear": {
       "title": "Nichts wartet auf dich",
       "text": "Wenn ein Agent dich braucht, erscheint es zuerst hier."
@@ -1494,7 +1482,11 @@
         "Tab": "Tab",
         "Enter": "Eingabe",
         "Backspace": "Löschen",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Pfeil nach links",
+        "ArrowUp": "Pfeil nach oben",
+        "ArrowDown": "Pfeil nach unten",
+        "ArrowRight": "Pfeil nach rechts"
       },
       "unavailable": {
         "reconnectingF": "Verbindung wird wiederhergestellt…",
@@ -1547,8 +1539,6 @@
     "connected": "Verbunden",
     "suggested": "Vorgeschlagen für {{org}}",
     "all": "Alle",
-    "empty": "Deine Agenten nutzen noch nichts",
-    "emptySub": "Verbinde einen Dienst, dann fangen sie an, darin zu lesen und zu arbeiten.",
     "noResults": "Kein Dienst mit diesem Namen. Versuch es mit seiner Adresse.",
     "soon": "Bald",
     "loadFailed": "Die Konnektoren ließen sich nicht laden.",
@@ -1678,11 +1668,8 @@
   },
   "ai": {
     "yourPlan": "Dein KI-Abo",
-    "coding": "Coding-Abo",
-    "codingSub": "GLM, Kimi, MiniMax oder OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM und andere",
     "plansFoot": "Agenten denken mit deinem Abo, ohne API-Schlüssel. Es meldet sich auf dem Computer des Agenten an.",
-    "whichPlan": "Welches Abo",
-    "codingFoot": "Ein Coding-Abo meldet sich mit seinem eigenen Schlüssel auf dem Computer des Agenten an.",
     "change": "Ändern",
     "how": "So verbindest du",
     "whose": "Wessen Schlüssel",
@@ -1768,13 +1755,6 @@
       "login": "Eine Website, ein Benutzername und ein Passwort. Agenten melden sich an, ohne das Passwort zu sehen.",
       "key": "Ein API-Schlüssel oder Token. Agenten verwenden ihn in einem Befehl, ohne ihn zu sehen.",
       "contact": "Name, Firma, E-Mail, Telefon und Adresse, die Agenten in Formulare eintragen."
-    },
-    "empty": {
-      "personalTitle": "Noch nichts von dir",
-      "personalText": "Speichere hier ein Login oder einen Schlüssel, und deine Agenten verwenden es, wenn du sie darum bittest.",
-      "teamTitle": "Noch nichts geteilt",
-      "teamText": "Speichere die Logins und Schlüssel, die deine Agenten für das Team verwenden.",
-      "teamReadText": "Wenn jemand ein Login oder einen Schlüssel mit dir teilt, erscheint es hier."
     },
     "import": {
       "title": "Von einem Computer importieren",
@@ -1963,7 +1943,6 @@
       "as": "Meldet sich als {{username}} an.",
       "saved": "Im Vault gespeichert",
       "notSaved": "Gesendet, aber nicht im Vault gespeichert",
-      "codeLabel": "Code für {{name}}",
       "codeIncomplete": "Gib jede Ziffer des Codes ein.",
       "codeNote": "Wird verschlüsselt direkt an den Computer gesendet. Codes werden nie gespeichert."
     }
@@ -2048,5 +2027,127 @@
   "team": {
     "entry": "Liste, Organigramm und Karte",
     "mapHint": "Um einen Agenten in einen anderen Kanal zu verschieben, nutze die Karte im Web oder sprich mit {{name}}."
+  },
+  "empty": {
+    "agents": {
+      "title": "Stell dein Agenten-Team zusammen",
+      "text": "Jeder Agent übernimmt eine Rolle und arbeitet direkt im Chat mit dir.",
+      "viewerTitle": "Hier ist dein Agenten-Team",
+      "viewerText": "Wer in diesem Workspace Agenten erstellt, fügt den ersten hinzu, und er erscheint hier."
+    },
+    "agentsForYou": {
+      "title": "Deine Agenten erscheinen hier",
+      "text": "Wer die Agenten verwaltet, legt fest, welche mit dir arbeiten."
+    },
+    "drive": {
+      "title": "Alles, was das Team erstellt, an einem Ort",
+      "text": "Berichte, Tabellen und Dateien von Agenten und Personen bleiben hier und sind leicht zu finden.",
+      "viewerTitle": "Finde, was das Team erstellt",
+      "viewerText": "Was Agenten und Personen in Chats erstellen, erscheint hier."
+    },
+    "tasks": {
+      "title": "Gib dem Team Arbeit ab",
+      "text": "Erstelle eine Aufgabe für einen Agenten oder eine Person und verfolge sie bis zum Ende.",
+      "viewerTitle": "Verfolge die Arbeit des Teams",
+      "viewerText": "Aufgaben erscheinen hier, sobald jemand die erste erstellt."
+    },
+    "routines": {
+      "title": "Überlass wiederkehrende Arbeit deinen Agenten",
+      "text": "Eine Routine läuft von selbst, nach Zeitplan oder wenn etwas passiert.",
+      "viewerTitle": "Sieh, was von selbst läuft",
+      "viewerText": "Wer Routinen verwaltet oder einen Agenten besitzt, erstellt sie, und sie erscheinen hier."
+    },
+    "wiki": {
+      "title": "Halte fest, was das Team wissen muss",
+      "text": "Personen und Agenten lesen diese Seiten, damit alle mit denselben Informationen arbeiten.",
+      "viewerTitle": "Schlag nach, was das Team weiß",
+      "viewerText": "Wer das Wiki bearbeitet, schreibt die erste Seite, und sie erscheint hier."
+    },
+    "memory": {
+      "title": "Deine Agenten lernen beim Arbeiten",
+      "text": "Was sie aus Gesprächen mitnehmen, bleibt hier, damit du siehst, was sie wissen.",
+      "ask": "Ich erzähle dir, wie wir hier arbeiten.",
+      "noneForAgent": "Keine Erinnerung von diesem Agenten."
+    },
+    "threads": {
+      "title": "Jedes Thema in seinem eigenen Gespräch",
+      "text": "Halte eine Nachricht gedrückt, um im Thread zu antworten oder sie in eine Mission umzuwandeln.",
+      "action": "Zu den Chats"
+    },
+    "chats": {
+      "title": "Sprich mit deinen Agenten",
+      "text": "Bitte in einem Chat um etwas, und ein Agent macht sich an die Arbeit.",
+      "action": "Neuer Chat"
+    },
+    "channels": {
+      "title": "Bring Personen und Agenten in einem Kanal zusammen",
+      "text": "Jeder Kanal versammelt alle, die sich um ein Thema kümmern.",
+      "viewerTitle": "Hier sind die Kanäle des Teams",
+      "viewerText": "Wer Kanäle erstellt, öffnet den ersten, und er erscheint hier.",
+      "action": "Kanal erstellen"
+    },
+    "people": {
+      "title": "Arbeite hier mit deinem Team",
+      "text": "Lade Personen ein, um mit ihnen und deinen Agenten an einem Ort zu sprechen.",
+      "viewerTitle": "Dein Team erscheint hier",
+      "viewerText": "Wer Personen einlädt, holt den Rest des Teams dazu, und sie erscheinen hier."
+    },
+    "chat": {
+      "title": "Alles beginnt mit einer Nachricht",
+      "text": "Schreib unten, und alle hier sehen es.",
+      "viewerTitle": "Nachrichten erscheinen hier",
+      "viewerText": "Wenn jemand schreibt, liest du es hier."
+    },
+    "ai": {
+      "title": "Gib deinen Agenten eine KI zum Denken",
+      "text": "Verbinde einen Plan, den du schon bezahlst, und sie arbeiten damit."
+    },
+    "vaultPersonal": {
+      "title": "Bewahre deine Logins sicher auf",
+      "text": "Speichere ein Login oder einen Schlüssel, und deine Agenten nutzen es, wenn du sie bittest."
+    },
+    "vaultTeam": {
+      "title": "Teile Logins, ohne Passwörter weiterzugeben",
+      "text": "Speichere die Logins und Schlüssel, die deine Agenten für das Team verwenden.",
+      "viewerTitle": "Die Logins des Teams erscheinen hier",
+      "viewerText": "Wenn jemand ein Login oder einen Schlüssel mit dir teilt, erscheint es hier."
+    },
+    "skills": {
+      "title": "Zeig deinen Agenten, wie ihr arbeitet",
+      "text": "Ein Skill enthält die Schritte einer Aufgabe, und Agenten öffnen ihn bei Bedarf."
+    },
+    "apps": {
+      "title": "Beauftrage deine Agenten aus anderen Apps",
+      "text": "Verbinde Claude oder eine andere App und gib Aufgaben, ohne sie zu verlassen."
+    },
+    "access": {
+      "title": "Wähle, was jeder Agent nutzen darf",
+      "text": "Verbinde einen Dienst und lege hier den Zugriff jedes Agenten fest.",
+      "viewerTitle": "Der Zugriff jedes Agenten erscheint hier",
+      "viewerText": "Wer die Konnektoren verwaltet, verbindet den ersten Dienst.",
+      "action": "Dienst verbinden"
+    },
+    "board": {
+      "title": "Sieh das Wichtige auf einem Dashboard",
+      "text": "Füge ein Widget hinzu, bitte einen Agenten darum oder hefte einen Block aus dem Chat an.",
+      "viewerTitle": "Dieses Dashboard nimmt Gestalt an",
+      "viewerText": "Wer dieses Dashboard bearbeitet, fügt die Widgets hinzu, und sie erscheinen hier."
+    },
+    "computers": {
+      "title": "Gib deinen Agenten einen weiteren Computer",
+      "text": "Verbinde mit einem Code einen Mac mini zu Hause oder einen anderen Server.",
+      "viewerTitle": "Weitere Computer erscheinen hier",
+      "viewerText": "Wer Computer verbindet, fügt sie hinzu, und sie erscheinen hier."
+    },
+    "connectors": {
+      "title": "Gib deinen Agenten echte Werkzeuge",
+      "text": "Verbinde einen Dienst, und sie können darin lesen und handeln.",
+      "viewerTitle": "Die Werkzeuge deiner Agenten erscheinen hier",
+      "viewerText": "Wer die Konnektoren verwaltet, verbindet die Dienste unten."
+    },
+    "audit": {
+      "title": "Nichts zu prüfen",
+      "text": "Wenn ein Agent außerhalb des Gesprächs etwas tut, erscheint es hier."
+    }
   }
 }

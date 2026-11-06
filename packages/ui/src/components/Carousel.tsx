@@ -1,5 +1,6 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useRef } from "react";
 import { cx } from "../cx";
+import { useScrollSides } from "../hooks/useScrollSides";
 import { Icon } from "../icons/Icon";
 
 export interface CarouselProps {
@@ -19,38 +20,18 @@ export interface CarouselProps {
  */
 export function Carousel({ label, previousLabel, nextLabel, children, className }: CarouselProps) {
   const track = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ start: true, end: true });
-  const measure = useCallback(() => {
-    const el = track.current;
-    if (!el) return;
-    setEdges({ start: el.scrollLeft <= 1, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 1 });
-  }, []);
-  useEffect(() => {
-    const el = track.current;
-    if (!el) return;
-    measure();
-    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    resize?.observe(el);
-    el.addEventListener("scroll", measure, { passive: true });
-    return () => {
-      resize?.disconnect();
-      el.removeEventListener("scroll", measure);
-    };
-  }, [measure]);
+  const more = useScrollSides(track);
   const go = (direction: 1 | -1) => {
     const el = track.current;
     el?.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
   };
   return (
-    <div
-      className={cx("ac-carousel", className)}
-      data-more={edges.start ? (edges.end ? undefined : "end") : edges.end ? "start" : "both"}
-    >
+    <div className={cx("ac-carousel", className)} data-more={more}>
       <button
         type="button"
         className="ac-carousel__arrow"
         aria-label={previousLabel}
-        disabled={edges.start}
+        disabled={more !== "start" && more !== "both"}
         onClick={() => go(-1)}
       >
         <Icon name="chevronLeft" size={14} />
@@ -63,7 +44,7 @@ export function Carousel({ label, previousLabel, nextLabel, children, className 
         type="button"
         className="ac-carousel__arrow"
         aria-label={nextLabel}
-        disabled={edges.end}
+        disabled={more !== "end" && more !== "both"}
         onClick={() => go(1)}
       >
         <Icon name="chevronRight" size={14} />

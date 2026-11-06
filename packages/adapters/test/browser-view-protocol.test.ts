@@ -19,7 +19,7 @@ const META = {
   title: "Shop",
 };
 
-test("protocol 46: browser.view.open names the live view's data socket (ADR 0040 §7.1)", () => {
+test("protocol 49: browser.view.open names the live view's data socket (ADR 0040 §7.1)", () => {
   expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(BROWSER_VIEW_PROTOCOL);
   expect(MACHINE_OPS).toContain("browser.view.open");
   const open = { type: "request", id: "r1", op: "browser.view.open", streamId: "x".repeat(43) };

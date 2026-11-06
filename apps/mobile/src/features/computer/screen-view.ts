@@ -21,6 +21,8 @@ export const MAX_SCALE = 2.4;
 
 /** In control, the view never starts smaller than this much over the whole screen: its targets need the room. */
 const CONTROL_ZOOM = 1.25;
+/** Upright the box is narrow: control starts this close, so the field it stopped at reads without a pinch. */
+const CONTROL_ZOOM_UPRIGHT = 2.2;
 
 /** How near an edge of the view the cursor goes before the view follows it, as a share of the view's short side. */
 const FOLLOW_MARGIN = 0.2;
@@ -51,7 +53,8 @@ export const fitScale = (box: Size, desk: Size) => {
 export const controlScale = (box: Size, desk: Size) => {
   "worklet";
   const fit = fitScale(box, desk);
-  return clamp(Math.max(box.width / desk.width, box.height / desk.height, fit * CONTROL_ZOOM), fit, MAX_SCALE);
+  const zoom = box.width / box.height < desk.width / desk.height ? CONTROL_ZOOM_UPRIGHT : CONTROL_ZOOM;
+  return clamp(Math.max(box.width / desk.width, box.height / desk.height, fit * zoom), fit, MAX_SCALE);
 };
 
 /** The camera's corner kept on the desktop, centered on any side the box is larger than it. */
@@ -123,6 +126,16 @@ export const followCursor = (camera: Point, s: number, cursor: Point, box: Size,
   if (py < margin) y -= (margin - py) / s;
   else if (py > box.height - margin) y += (py - box.height + margin) / s;
   return boundCamera(x, y, s, box, desk);
+};
+
+/**
+ * The box changed size under the same view (the keyboard came or went): the zoom the person had stays, as far as the
+ * new box allows, and the view moves only as much as keeps the cursor in sight.
+ */
+export const keepView = (camera: Point, s: number, cursor: Point, box: Size, desk: Size) => {
+  "worklet";
+  const next = clamp(s, fitScale(box, desk), MAX_SCALE);
+  return { s: next, camera: followCursor(camera, next, cursor, box, desk) };
 };
 
 /** How soon after a tap a touch that moves presses and drags: a trackpad's tap and drag. */

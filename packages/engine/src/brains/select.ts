@@ -10,7 +10,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
-import { claudeCodeModel, modelLimitOf, ownLimitsModel, planOf } from "@agenteschat/providers/plans";
+import { claudeCodeModel, modelLimitOf, ownLimitsModel, planOf, speedFits } from "@agenteschat/providers/plans";
 import { planState, planWindows } from "@agenteschat/ui/plan-state";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
@@ -554,6 +554,22 @@ export async function planIsOwners(
 export function brainEffortFor(agent: Pick<Agent, "brain" | "brainEffort">, kind: BrainKind): BrainEffort | undefined {
   if (kind === "model" || kindOf(agent.brain) !== kind) return undefined;
   return isBrainEffort(agent.brainEffort) ? agent.brainEffort : undefined;
+}
+
+/**
+ * Fast mode for this turn (ADR 0149): an agent set to it, thinking with its own brain on a sign-in and model that
+ * support it, answering in a conversation. A routine, long work, an issue or a mission spends the plan with nobody
+ * waiting (`unattended`), so they stay at standard speed, and the right hand has no such setting.
+ */
+export function brainSpeedFor(
+  agent: Pick<Agent, "brain" | "brainSpeed"> & { builtin?: string | null },
+  plan: Pick<BrainPlan, "kind" | "model" | "account" | "missionId">,
+  run: Pick<AgentRun, "background" | "workId">,
+  unattended: boolean,
+): "fast" | undefined {
+  if (agent.brainSpeed !== "fast" || isRightHand(agent) || kindOf(agent.brain) !== plan.kind) return undefined;
+  if (unattended || run.background || run.workId || plan.missionId) return undefined;
+  return speedFits({ kind: plan.kind, provider: plan.account?.provider, model: plan.model }) ? "fast" : undefined;
 }
 
 /** A conversation's session is picked up again only this soon after its last turn (its prompt cache is gone after). */

@@ -5,8 +5,10 @@
   "common": {
     "close": "Sluiten",
     "joinSentences": "{{a}} {{b}}",
+    "cantUndo": "Dit kan niet ongedaan worden gemaakt.",
     "removeName": "{{name}} verwijderen",
     "about": "Over {{label}}",
+    "askAgent": "Vraag het {{name}}",
     "previousMonth": "Vorige maand",
     "nextMonth": "Volgende maand",
     "chooseDate": "Kies een datum",
@@ -1012,7 +1014,6 @@
     "keyFromOther": "Is hij van een andere aanbieder?",
     "anthropicWorkspace": "Workspace-ID van Claude Console",
     "anthropicWorkspaceHelp": "Alleen voor een sleutel die in meer dan één workspace werkt. De ID begint met wrkspc_.",
-    "platformKeyDesc": "Geen eigen sleutel: agents gebruiken de Claude-sleutel van deze server. Je ziet de kosten van elke agent.",
     "computer": {
       "title": "Waar gaan we werken?",
       "lead": "Agents werken op een computer, en gevoelige acties vragen nog steeds om je goedkeuring.",
@@ -1350,7 +1351,8 @@
       "toolsTitle": "Bovenaan",
       "order": "Volgorde van de onderdelen",
       "orderHint": "Sleep of gebruik de pijlen. Bijvoorbeeld agents eerst.",
-      "drag": "{{name}} slepen"
+      "moveSection": "Sleep om de sectie {{name}} te verplaatsen of klik voor opties",
+      "moveTool": "Sleep om {{name}} te verplaatsen"
     },
     "inviteHint": "Via e-mail of link",
     "profileHint": "Naam, foto en @",
@@ -1363,6 +1365,7 @@
     "addPasswordReauth": "Log opnieuw in om een wachtwoord toe te voegen.",
     "yourWorkspaces": "Je werkruimtes",
     "youAreHere": "Je bent hier",
+    "createdOn": "Gemaakt op {{date}}",
     "newWorkspace": "Nieuwe werkruimte",
     "wiki": "Wiki",
     "settings": "Instellingen",
@@ -1528,8 +1531,10 @@
     "workingNow": "Nu aan het werk",
     "available": "Beschikbaar",
     "archived": "Gearchiveerd",
-    "emptyTitle": "Nog geen agents",
-    "empty": "Maak de eerste agent om het team op te bouwen.",
+    "emptyTitle": "Stel je team van agents samen",
+    "empty": "Elke agent heeft een rol en werkt samen met mensen, in dezelfde kanalen.",
+    "emptyViewerTitle": "Je team van agents verschijnt hier",
+    "emptyViewer": "Wie agents mag maken stelt het team samen, en elke agent verschijnt hier.",
     "list": {
       "agents": "Agenten",
       "people": "Mensen",
@@ -1582,7 +1587,10 @@
       "waiting_other": "{{count}} verzoeken wachten op goedkeuring",
       "moreRoutines_one": "en nog {{count}} routine",
       "moreRoutines_other": "en nog {{count}} routines",
-      "empty": "Nog geen agent zit in een kanaal.",
+      "empty": "Voeg een agent toe aan een kanaal en hij verschijnt hier, met wie hem beheert.",
+      "emptyTitle": "Zie waar elke agent werkt",
+      "emptyAction": "Aan een kanaal toevoegen",
+      "emptyViewer": "Wie de agents beheert, voegt ze toe aan kanalen, en de kaart verschijnt hier.",
       "others": "Andere kanalen"
     },
     "sectors": {
@@ -1604,8 +1612,10 @@
         "noLead": "Nog geen hoofd. Kies wie voor deze afdeling zorgt.",
         "noBackup": "Geen vervanger. Als het hoofd weg is, neemt niemand het over."
       },
-      "emptyTitle": "Nog geen afdelingen",
-      "empty": "Afdelingen delen de agenten in per gebied, zoals Verkoop of Support. Ze verschijnen als secties in ieders lijsten."
+      "emptyTitle": "Deel het team in per gebied",
+      "empty": "Elke afdeling heeft een hoofd, zodat iedereen ziet wie waarvoor zorgt.",
+      "emptyViewerTitle": "Zie wie waarvoor zorgt",
+      "emptyViewer": "Wie de agenten beheert, maakt de afdelingen. Ze verschijnen dan hier."
     },
     "usage": {
       "lead": "Wat elke persoon deze maand van de agenten gebruikt, en de limieten.",
@@ -1711,6 +1721,12 @@
     "linkCopied": "Link gekopieerd.",
     "reply": "Beantwoorden",
     "quoteOf": "Antwoord op {{name}}: {{excerpt}}. Bekijk het bericht",
+    "quoteGone": "Oorspronkelijk bericht verwijderd",
+    "jumpTooFar": "Dit bericht ligt te ver terug om hier te openen.",
+    "quoteNoWords": "Bericht zonder tekst",
+    "replyingTo": "Antwoord aan {{name}}",
+    "cancelReply": "Antwoord annuleren",
+    "jumpMissing": "Dat bericht is hier niet te bereiken. Het is misschien verwijderd of te oud.",
     "emoji": "Emoji",
     "uploading": "uploaden…",
     "uploadFailed": "is niet geüpload",
@@ -1926,6 +1942,10 @@
       "configure": "Instellen",
       "nameStory": "De naam komt van lodestar, de ster waarop zeelieden koers houden."
     },
+    "saved": {
+      "workspace": "{{name}} denkt nu met {{label}} voor iedereen zonder eigen abonnement.",
+      "mine": "Je gesprek met {{name}} denkt nu met {{label}}. Alleen dat van jou."
+    },
     "settings": {
       "name": "Naam en uiterlijk",
       "nameHelp": "In de zijbalk staat er altijd “{{label}}” bij.",
@@ -1946,6 +1966,8 @@
       "connectMine": "Mijn abonnement koppelen",
       "useWorkspace": "Die van de workspace gebruiken",
       "fallbackKey": "Zonder eigen abonnement gebruikt het de API-sleutel van de workspace.",
+      "fallbackKeyOf": "Zonder eigen abonnement gebruikt het de sleutel van de workspace: {{label}}.",
+      "fallbackNoKey": "De workspace heeft nog geen API-sleutel, dus zonder eigen abonnement antwoordt hier niemand je.",
       "fallbackPlan": "Zonder eigen abonnement gebruikt het het abonnement van {{owner}}, dat iedereen antwoordt.",
       "fallbackYours": "Zonder ander abonnement gebruikt het dat van de workspace, dat van jou is.",
       "fallbackNone": "Zonder eigen abonnement kan {{name}} je niet antwoorden: het abonnement van de workspace antwoordt alleen {{owner}}.",
@@ -2214,9 +2236,25 @@
       "title": "Al gekoppeld",
       "titleFor": "Al gekoppeld, voor {{name}}",
       "titleFor_female": "Al gekoppeld, voor {{name}}",
-      "other": "Of koppel een ander"
+      "other": "Of koppel een ander",
+      "manageKeys": "Sleutels beheren of verwijderen"
     },
+    "billing": "Een abonnement meldt zich aan op de computer van de workspace, en die computer hoort bij een actief agentes.chat-abonnement.",
+    "billingWeb": "Kies er een op het web, op agentes.chat.",
     "orPayGo": "Of betaal per gebruik",
+    "pay": {
+      "label": "Hoe betaal je?",
+      "plan": "Met abonnement",
+      "key": "Met API-sleutel"
+    },
+    "pick": {
+      "plan": "Abonnement",
+      "placeholder": "Kies een abonnement",
+      "search": "Aanbieders zoeken",
+      "searchPlaceholder": "Naam van de aanbieder",
+      "noResults": "Geen aanbieder gevonden",
+      "list": "Aanbieders"
+    },
     "plan": {
       "claude": {
         "title": "Je Claude-abonnement",
@@ -2264,10 +2302,12 @@
       "paste": "Plak hem hier",
       "forAll": "Elke agent zonder abonnement denkt ermee.",
       "saved": "Opgeslagen. Elke agent zonder abonnement denkt ermee.",
+      "savedUnchecked": "Opgeslagen, maar {{provider}} gaf geen antwoord, dus de sleutel kon niet worden gecontroleerd. Als hij faalt, staat de reden in het gesprek.",
+      "held": "Agents gebruiken hem zodra het agentes.chat-abonnement van de workspace actief is.",
+      "savedHeld": "Opgeslagen. Agents gebruiken hem zodra het agentes.chat-abonnement van de workspace actief is.",
       "notPlan": "De sleutel van een codeerabonnement hoort bij die eigen optie hierboven.",
       "billing": "Zet facturering aan voor het project van de sleutel. Zonder facturering mag Google gebruiken wat je agents versturen.",
-      "privacy": "Je privacyinstellingen in OpenRouter bepalen welke aanbieders mogen bewaren wat je agents versturen.",
-      "platform": "Deze server"
+      "privacy": "Je privacyinstellingen in OpenRouter bepalen welke aanbieders mogen bewaren wat je agents versturen."
     },
     "wait": {
       "signIn": "Je logt hier in zodra de computer klaar is.",
@@ -2961,11 +3001,16 @@
   "secret": {
     "group": "Geheim verzoek van {{agent}}",
     "chip": "Wacht",
-    "targetEnv": "Komt als de variabele {{name}} op de computer van {{agent}}.",
+    "targetEnv": "Gaat naar de computer van {{agent}}, voor zijn opdrachten.",
     "targetFile": "Komt in het bestand {{path}} op de computer van {{agent}}.",
     "targetSite": "Alleen de browser van {{agent}} typt het, op {{host}}. Het blijft buiten de opdrachten van {{agent}}.",
     "replaces": "Vervangt de sleutel die {{agent}} al onder deze naam heeft.",
-    "label": "Waarde van {{name}}",
+    "labelPassword": "Wachtwoord voor {{host}}",
+    "labelCode": "Code voor {{host}}",
+    "labelKey": "Een sleutel voor de computer van {{agent}}",
+    "labelFile": "Het bestand {{path}}",
+    "placeholder": "Typ het hier",
+    "account": "Gebruiker: {{username}}.",
     "private": "Versleuteld rechtstreeks naar de computer gestuurd. Het blijft buiten de chat en uit handen van de agent.",
     "send": "Sturen",
     "decline": "Weigeren",
@@ -2973,8 +3018,17 @@
     "waitingFor": "Alleen {{person}} kan antwoorden.",
     "outcomeBy": "Geleverd door {{person}}",
     "outcomeByYou": "Geleverd door jou",
-    "outcomeWithdrawn": "Niet meer nodig",
-    "alreadyAnswered": "Dit verzoek is al beantwoord of verlopen.",
+    "outcomeWithdrawn": "{{agent}} heeft dit niet meer nodig.",
+    "endedDeclined": "Geweigerd. {{agent}} gaat zonder dit verder.",
+    "endedExpired": "Niemand antwoordde op tijd. {{agent}} gaat zonder dit verder en kan het opnieuw vragen.",
+    "endedRunStopped": "De taak van {{agent}} stopte vóór het antwoord. Vraag het {{agent}} opnieuw als je het nog nodig hebt.",
+    "endedSuperseded": "{{agent}} vroeg het opnieuw in een nieuwer verzoek.",
+    "endedComputer": "Dit bereikt {{agent}} niet meer: de computer die het vroeg is veranderd. Vraag {{agent}} om het opnieuw te vragen.",
+    "endedPersonLeft": "{{person}} heeft de workspace verlaten voor het antwoord.",
+    "endedClosed": "Dit verzoek is gesloten voordat iemand antwoordde. Vraag het {{agent}} opnieuw als je het nog nodig hebt.",
+    "seeNewer": "Nieuwer verzoek bekijken",
+    "computerAway": "De computer van {{agent}} antwoordt nu niet. Dit verzoek blijft open tot {{time}}. Probeer het zo opnieuw.",
+    "computerPaused": "De computer van {{agent}} is door de eigenaar gepauzeerd. Dit verzoek blijft open tot {{time}}.",
     "failed": "Kon het niet leveren. Staat de computer van de agent aan?",
     "empty": "Typ de waarde.",
     "tooLarge": "Te groot (maximaal 16 KB)."
@@ -3006,9 +3060,9 @@
       "noMatch": "Niets hier komt overeen met deze zoekopdracht.",
       "clearFilters": "Zoekopdracht wissen",
       "personalNote": "Alleen jij ziet deze items. Je agenten gebruiken ze alleen als je erom vraagt.",
-      "personalEmpty": "Nog niets opgeslagen",
+      "personalEmpty": "Bewaar je logins en sleutels veilig",
       "personalEmptyText": "Alleen jij ziet deze items. Je agenten gebruiken ze alleen als je erom vraagt.",
-      "teamEmpty": "Nog niets gedeeld met het team",
+      "teamEmpty": "Deel logins zonder wachtwoorden door te geven",
       "teamEmptyText": "Sla een login, een sleutel of contactgegevens één keer op en kies welke agenten het mogen gebruiken.",
       "sharedEmpty": "Nog niets met je gedeeld",
       "sharedEmptyText": "Als iemand een login of sleutel van het team met je deelt, verschijnt die hier."
@@ -4196,6 +4250,12 @@
           "high": "Denkt meer na bij moeilijke taken. Trager en duurder.",
           "max": "Denkt zoveel mogelijk na. Veel trager en duurder."
         },
+        "speed": "Snelheid",
+        "speeds": {
+          "standard": "Standaard",
+          "fast": "Snel"
+        },
+        "speedText": "Antwoordt sneller in gesprekken en verbruikt het abonnement 2,5× zo snel. Routines en lange taken blijven op standaard.",
         "modelLine": {
           "opus": "De krachtigste. Verbruikt het abonnement sneller.",
           "sonnet": "Gebalanceerd. Goed voor bijna alles.",
@@ -4218,10 +4278,13 @@
           "contents": {
             "model": "Contextvenster",
             "auto": "Contextvenster en wie het antwoordt",
-            "fixed": "Inspanning, contextvenster en wie het antwoordt"
+            "fixed": "Inspanning, contextvenster en wie het antwoordt",
+            "autoSpeed": "Snelheid, contextvenster en wie het antwoordt",
+            "fixedSpeed": "Inspanning, snelheid, contextvenster en wie het antwoordt"
           },
           "allDefault": "Alles standaard",
           "effort": "Inspanning: {{level}}",
+          "speed": "Snelheid: snel",
           "context": "Context: {{size}}",
           "sharing": "Antwoordt andere mensen",
           "waits": "Wacht op de computer"
@@ -4540,7 +4603,6 @@
       "builtinHelp": "Drive, taken, geheugen en meer",
       "noMatch": "Niets gevonden voor “{{q}}”",
       "noneHere": "Niets in dit filter",
-      "clear": "Wis de zoekopdracht of het filter.",
       "library": "Skillbibliotheek",
       "fineTune": "Fijnafstemming per tool doe je in de connector. Hier is het één niveau per app.",
       "always": {
@@ -4570,7 +4632,8 @@
       "decides": "{{who}} beslist.",
       "adminDecides": "Een beheerder beslist.",
       "learned": "Wat hij leerde",
-      "learnedEmpty": "Nog niets zelf geleerd. Correcties, voorkeuren en werkwijzen die hij ontdekt, verschijnen hier.",
+      "learnedEmpty": "Correcties, voorkeuren en werkwijzen die hij ontdekt, verschijnen hier.",
+      "learnedEmptyTitle": "Leert van elke correctie",
       "howTo": "Werkwijze",
       "disputed": "Betwist",
       "edit": "Bewerken",
@@ -4626,7 +4689,8 @@
         "routines": "Routines"
       },
       "noneFilter": "Niets met dit filter.",
-      "clear": "Probeer een ander woord of wis het filter.",
+      "emptyTitle": "Volg elk werk",
+      "emptyText": "De stappen en kosten van elke klus van {{name}} verschijnen hier.",
       "showing": "{{shown}} van {{total}} getoond.",
       "more": "Meer laden",
       "direct": "Direct bericht",
@@ -4648,6 +4712,15 @@
         "provider_error": "De modelaanbieder gaf een fout: {{detail}}",
         "provider_account": "De aanbieder heeft de sleutel geweigerd: die is misschien ongeldig, zonder tegoed of over het quotum.",
         "provider_unavailable": "De modelaanbieder reageerde niet: {{detail}}",
+        "provider_no_credit": "Geen tegoed meer bij {{provider}}. Voeg daar tegoed toe of gebruik een andere sleutel.",
+        "provider_invalid_key": "De sleutel is geweigerd door {{provider}}: die is ongeldig of ingetrokken. Gebruik een andere sleutel.",
+        "provider_no_access": "Geweigerd door {{provider}}: {{detail}}",
+        "provider_model_unavailable": "Dit model is nu niet beschikbaar bij {{provider}}. Kies een ander model.",
+        "provider_rate_limit": "Te veel verzoeken aan {{provider}} op dit moment. Vraag het over een poosje opnieuw.",
+        "provider_down": "De AI van {{provider}} is uitgevallen of overbelast. Vraag het over een poosje opnieuw.",
+        "provider_timeout": "Geen tijdig antwoord van {{provider}}. Vraag het over een poosje opnieuw.",
+        "provider_unreachable": "De verbinding van onze server met {{provider}} is mislukt. Vraag het over een poosje opnieuw.",
+        "provider_said": "Het antwoord van {{provider}}: {{detail}}",
         "canceled": "Iemand heeft de taak gestopt.",
         "interrupted": "Onderbroken door een herstart van de server.",
         "missing_credential": "De werkruimte heeft geen sleutel voor {{provider}}.",
@@ -4689,7 +4762,7 @@
       "audience": "Wie mag praten",
       "channels": "Kanalen",
       "computer": "Computer",
-      "danger": "Archiveren",
+      "danger": "Archiveren of verwijderen",
       "keySafe": "De sleutel blijft versleuteld op de server. Niemand ziet hem.",
       "spentOf": "uitgegeven in {{month}}, van {{amount}}",
       "spentOfDefault": "uitgegeven in {{month}}, van {{amount}} (standaard van de werkruimte)",
@@ -4746,10 +4819,10 @@
       "all": "Alle",
       "changedOther": "Bestand van {{owner}}, gewijzigd door {{name}}",
       "changedOther_female": "Bestand van {{owner}}, gewijzigd door {{name}}",
-      "empty": "{{name}} heeft nog geen bestanden gemaakt",
-      "empty_female": "{{name}} heeft nog geen bestanden gemaakt",
-      "emptyText": "Als {{name}} een bestand levert in een gesprek, verschijnt het hier.",
-      "emptyText_female": "Als {{name}} een bestand levert in een gesprek, verschijnt het hier.",
+      "empty": "Vraag om een rapport, een tabel of een document",
+      "emptyText": "Alles wat {{name}} in een gesprek oplevert, wordt hier bewaard.",
+      "ask": "Om een bestand vragen",
+      "askText": "Zet een samenvatting van je werk in een bestand.",
       "note": "Alleen bestanden uit gesprekken die jij kunt zien."
     },
     "panel": {
@@ -4813,8 +4886,9 @@
     "archive": "Archiveren",
     "restore": "Terugzetten",
     "emptySearch": "Niets gevonden voor „{{q}}”.",
-    "empty": "Hier staat nog niets. {{name}} leert terwijl het team met hem praat.",
-    "empty_female": "Hier staat nog niets. {{name}} leert terwijl het team met haar praat.",
+    "emptyTab": "Hier is voorlopig niets.",
+    "emptyTitle": "Het geheugen van {{name}} begint hier",
+    "emptyText": "Elk gesprek leert iets nieuws over hoe het team werkt.",
     "how": "Hoe het geheugen werkt",
     "editTitle": "{{kind}} bewerken",
     "text": "Tekst",
@@ -4880,7 +4954,8 @@
     "refuseNote": "Door te weigeren leert {{name}} dit niet nog eens voor te stellen.",
     "added": "Toegevoegd: ",
     "removed": "Verwijderd: ",
-    "empty": "Nog geen voorstellen. Als iemand een agent om een wijziging vraagt, of een les terugkomt, verschijnt het hier.",
+    "empty": "Als iemand een agent om een wijziging vraagt, of een les zich herhaalt, verschijnt het voorstel hier.",
+    "emptyTitle": "Niets te beoordelen",
     "titleInstructions": "Instructies van {{name}} bijwerken",
     "titleRole": "Rol van {{name}} wijzigen",
     "titleAccess": "Toegang van {{name}} wijzigen",
@@ -5647,7 +5722,7 @@
     },
     "vault_write": {
       "label": "Contacten in de Vault bewerken",
-      "description": "Contactgegevens in de Vault opslaan en bijwerken, de gebruikersnaam van een opgeslagen login of een beschrijving wijzigen, en verwijderen wat hij heeft opgeslagen."
+      "description": "Contactgegevens in de Vault opslaan en bijwerken, de gebruikersnaam van een opgeslagen login of een beschrijving wijzigen, wachtwoorden maken voor accounts die hij aanmaakt, en verwijderen wat hij heeft opgeslagen."
     },
     "github_git_read": {
       "label": "Repositories klonen (git)",
@@ -5679,7 +5754,7 @@
     "filters": "Taken filteren",
     "unassigned_one": "{{count}} niet toegewezen",
     "unassigned_other": "{{count}} niet toegewezen",
-    "emptyTitle": "Nog geen taken",
+    "emptyTitle": "Geef werk een eigenaar en een datum",
     "panelLabel": "Taak #{{number}}",
     "openPage": "De pagina van de taak openen",
     "close": "Sluiten",
@@ -5863,7 +5938,9 @@
     "agentRole": "Agent · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Maak er een, of vraag het in de chat: “Lia, maak een taak voor deze fout”.",
+    "empty": "Een taak zegt wie wat doet, mens of agent, en laat zien hoe het ervoor staat.",
+    "emptyViewerTitle": "Zie wie wat doet",
+    "emptyViewer": "Wie in de werkruimte mag schrijven, maakt taken, en ze verschijnen hier.",
     "noResults": "Geen taken die bij deze filters passen.",
     "columnEmpty": "Niets hier.",
     "form": {
@@ -5904,6 +5981,7 @@
     "createdByShort": "Gemaakt door {{name}}",
     "fromMessage": "uit <0>een bericht in #{{channel}}</0>",
     "fromAgent": "uit een verzoek aan een agent",
+    "privateTask": "Alleen mensen in dit gesprek zien deze taak.",
     "subIssues_one": "Subtaken · {{count}}",
     "subIssues_other": "Subtaken · {{count}}",
     "fromWebhook": "uit een event van {{provider}}",
@@ -5923,6 +6001,7 @@
     "askTitle_female": "Vraag {{name}} om deze taak te doen",
     "askText": "{{name}} leest wat hij nodig heeft, zet het plan hier in een reactie en voert het uit. Alles wat gevoelig is, zoals publiceren, vraagt om jouw goedkeuring.",
     "askText_female": "{{name}} leest wat zij nodig heeft, zet het plan hier in een reactie en voert het uit. Alles wat gevoelig is, zoals publiceren, vraagt om jouw goedkeuring.",
+    "askFirst": "Help me de eerste taken van het team te maken.",
     "askButton": "Vraag {{name}}",
     "askButton_female": "Vraag {{name}}",
     "askSection": "Vraag het een agent",
@@ -6118,7 +6197,11 @@
     "groupLive": "Live",
     "groupPaused": "Gepauzeerd",
     "noResults": "Geen routines die bij deze filters passen.",
-    "emptyTitle": "Nog geen routines",
+    "emptyTitle": "Laat terugkerend werk aan je agents over",
+    "empty": "Een routine draait vanzelf op het gekozen moment en levert waar je wilt.",
+    "emptyViewerTitle": "Zie wat vanzelf draait",
+    "emptyViewer": "Wie de agents beheert, maakt routines, en ze verschijnen hier.",
+    "askText": "Help me een routine in te stellen.",
     "runningNow": "Nu bezig…",
     "neverRan": "Nog niet gedraaid",
     "silentOf": "Stil in {{count}} van {{total}}",
@@ -6929,7 +7012,8 @@
       "openThread": "Thread openen"
     },
     "empty": {
-      "title": "Nog geen missies"
+      "title": "Stel een doel en volg de agent",
+      "viewer": "Wie werk aan agents mag geven, opent missies, en ze verschijnen hier."
     },
     "new": {
       "noEligibleTitle": "Nog geen agent kan een missie voor je uitvoeren",
@@ -7201,8 +7285,8 @@
     "empty": {
       "missionsTitle": "Nog geen missies",
       "missions": "Een missie is een thread met een plan, besluiten en het werk van een agent op zijn computer.",
-      "allTitle": "Nog geen threads",
-      "all": "Antwoord op een bericht om een thread te openen.",
+      "allTitle": "Elk onderwerp in een eigen gesprek",
+      "all": "Reageer op een bericht om een thread te openen, en het kanaal blijft overzichtelijk.",
       "workingTitle": "Er is nu geen agent aan het werk",
       "closedTitle": "Hier is niets gesloten",
       "archivedTitle": "Geen gearchiveerde threads",
@@ -7287,6 +7371,7 @@
       "in": "thread in #{{channel}}",
       "dmWith": "DM met {{name}}",
       "backTo": "Terug naar {{where}}",
+      "backToResults": "Terug naar de resultaten",
       "back": "Terug naar #{{channel}}",
       "more": "Meer threadacties",
       "rename": "Hernoemen",
@@ -7639,7 +7724,9 @@
     "lastResult": "laatste: {{result}}",
     "upcomingMeta": "{{day}} · {{time}}",
     "emptyHint": "Niets gepland. Sleep om te maken of druk op N",
-    "agendaEmpty": "Niets in de komende 30 dagen.",
+    "agendaEmpty": "Afspraken en routines van de komende 30 dagen verschijnen hier.",
+    "agendaEmptyTitle": "Agenda vrij voor de komende 30 dagen",
+    "noResults": "Niets met dit filter.",
     "more": "+{{count}} meer",
     "allDay": "Hele dag",
     "now": "Nu",
@@ -7695,7 +7782,8 @@
     "installSubmit": "Installeren",
     "installed": "{{name}} geïnstalleerd.",
     "unavailable": "Skills zijn nog niet beschikbaar op deze server.",
-    "empty": "Nog geen skills.",
+    "emptyTitle": "Leer het één keer en elke agent weet het",
+    "emptyText": "Een skill is een werkwijze die agents volgen wanneer het werk erom vraagt.",
     "seeAll": "Alle {{count}} skills bekijken",
     "search": "Skills zoeken",
     "noResults": "Geen skill past bij “{{q}}”.",
@@ -7847,6 +7935,7 @@
     "removeAgents_one": "{{names}} gebruikt deze skill en verliest de toegang ertoe.",
     "removeAgents_other": "{{names}} gebruiken deze skill en verliezen de toegang ertoe.",
     "removeNone": "Geen agent gebruikt deze skill.",
+    "removeGone": "Hij verlaat de werkruimte en dit kan niet ongedaan worden gemaakt.",
     "removed": "{{name}} verwijderd.",
     "agentTitle": "Skills",
     "agentSubtitle": "Wat {{name}} kan openen als het nodig is.",
@@ -7983,7 +8072,9 @@
         "runnerOld": "Het agentes.chat-programma op {{computer}} is verouderd en een update is onderweg. Dit verandert vanzelf als het klaar is.",
         "execOff": "{{computer}} kan {{program}} nog niet uitvoeren. We zijn ermee bezig, en dit verandert vanzelf.",
         "toolOff": "{{program}} is nog niet toegestaan op {{computer}}. Dat ligt aan ons: probeer het later opnieuw.",
-        "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is."
+        "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is.",
+        "stuck": "{{program}} is nog niet klaar op {{computer}}, en dit verandert niet vanzelf. Gebruik voorlopig een API-sleutel en probeer dit abonnement later opnieuw.",
+        "away": "{{computer}} is langer weg dan een herstart duurt. Gebruik voorlopig een API-sleutel en probeer dit abonnement later opnieuw."
       }
     },
     "done": {
@@ -7993,7 +8084,9 @@
     "page": {
       "title": "Je abonnementen",
       "hint": "Elk abonnement blijft op de computer waarop het gekoppeld is, en wie die computer beheert, kan erbij. agentes.chat bewaart alleen de naam, het e-mailadres en het gebruik.",
-      "empty": "Nog geen abonnementen.",
+      "empty": "Log in met je account en de agents denken ermee.",
+      "emptyTitle": "Gebruik het AI-abonnement dat je al betaalt",
+      "emptyViewer": "Wie de AI van de werkruimte beheert, verbindt een abonnement, en het verschijnt hier.",
       "connect": "AI koppelen",
       "keyEnds": "sleutel …{{hint}}",
       "on": "op {{computer}}",
@@ -8455,8 +8548,9 @@
     "noMatch": "Geen pagina met die naam.",
     "tags": "Tags",
     "recent": "Recent bewerkt",
-    "emptyTitle": "De wiki is leeg",
+    "emptyTitle": "Bewaar wat het team moet weten",
     "emptyText": "Begin met één pagina. Een structuur die meestal werkt:",
+    "emptyViewer": "Wie de wiki bewerkt, maakt pagina's, en ze verschijnen hier.",
     "createFirst": "De eerste pagina maken",
     "useStarter": "De voorgestelde structuur gebruiken",
     "starter": "Voorgestelde structuur",
@@ -8474,6 +8568,7 @@
     "byFor": "door {{name}}, gevraagd door {{person}}",
     "missingTitle": "Deze pagina bestaat nog niet",
     "missingText": "Iemand heeft ernaar gelinkt. Maak hem en schrijf wat er ontbreekt.",
+    "missingViewer": "Iemand heeft ernaar gelinkt. Wie de wiki bewerkt, kan hem maken.",
     "missingHint": "{{title}} bestaat nog niet: klik om hem te maken",
     "previewOf": "Voorbeeld van {{title}}",
     "createPage": "Pagina maken",
@@ -8616,7 +8711,7 @@
     "noAccessText": "Hij is alleen voor bepaalde mensen. Heb je hem nodig, vraag het dan aan wie voor de wiki zorgt.",
     "delete": "Naar de prullenbak",
     "deleteTitle": "{{title}} naar de prullenbak verplaatsen?",
-    "deleteText": "Links ernaartoe worden “te maken pagina”. Je kunt hem later terugzetten.",
+    "deleteText": "Links ernaartoe worden “te maken pagina”. Je kunt hem nog niet terugzetten vanuit de app.",
     "deleted": "{{title}} is naar de prullenbak verplaatst.",
     "noBacklinksHint": "Nog geen pagina linkt hiernaartoe. Schrijf [[{{title}}]] in een andere.",
     "allVersions": "Alle {{count}} versies bekijken",
@@ -8841,6 +8936,7 @@
     "stuck": "Gestopt omdat hij vastliep",
     "steer": {
       "waiting": "{{name}} leest het bij de volgende pauze",
+      "computer": "{{name}} leest het zodra de computer vrij is",
       "now": "{{name}} stopte om het te lezen",
       "delivered": "{{name}} heeft het ontvangen",
       "held": "{{name}} leest het na jouw besluit",
@@ -8939,6 +9035,7 @@
       "tool_off": "{{program}} staat uit op {{computer}}. Zet het daar aan, in de agentes.chat-app: Voorkeuren → Tools.",
       "tool_offLinux": "{{program}} staat uit op {{computer}}. Zet het daar aan, in de agentes.chat-app of met {{command}}.",
       "not_installed": "{{program}} is niet geïnstalleerd op {{computer}}.",
+      "not_reported": "{{computer}} controleert nog welke programma's erop staan. Dit verandert vanzelf als het klaar is.",
       "outdated": "De versie op {{computer}} is oud. Werk Codex bij om het te gebruiken.",
       "no_computerCloud": "Klaar zodra {{computer}} klaar is."
     },
@@ -9015,6 +9112,18 @@
     "startsIn": "start over ~{{n}} min",
     "startsAfter": "start zodra {{after}} klaar is",
     "left": "nog ~{{n}} min",
+    "overdue": "duurt langer dan normaal",
+    "openTask": "Taak openen",
+    "fill": {
+      "agent_one": "{{count}} gevraagd door een agent",
+      "agent_other": "{{count}} gevraagd door agents",
+      "person_one": "{{count}} voor een persoon",
+      "person_other": "{{count}} voor mensen",
+      "routine_one": "{{count}} routine",
+      "routine_other": "{{count}} routines",
+      "work_one": "{{count}} lange taak",
+      "work_other": "{{count}} lange taken"
+    },
     "who": "{{name}}",
     "away": "Weg sinds {{time}}",
     "purpose": {
@@ -9030,12 +9139,13 @@
       "yourDm": "je DM",
       "dm": "DM met {{name}}",
       "thread": "een thread in #{{name}}",
+      "agents": "een gesprek tussen agents",
       "private": "een privégesprek"
     },
     "live": {
       "nextEta": "Wacht op de computer. Is de volgende, over ongeveer {{n}} min",
-      "nextAfter": "Wacht op de computer. Is de volgende zodra {{after}} klaar is",
       "next": "Wacht op de computer. Is de volgende",
+      "waiting": "Wacht op de computer",
       "behind": "In de wachtrij, {{nth}}. Na {{names}}",
       "position": "In de wachtrij, {{nth}}"
     },
@@ -9092,8 +9202,12 @@
     "noTools": "Nog geen tools.",
     "toolsMore_one": "{{tools}} en nog {{count}}",
     "toolsMore_other": "{{tools}} en nog {{count}}",
-    "noAgents": "Nog geen agents. Maak een agent aan om die toegang tot connectors te geven.",
-    "noConnectors": "{{org}} heeft nog geen dienst gekoppeld.",
+    "noAgents": "Maak een agent om te bepalen welke apps hij gebruikt en wat hij daarin doet.",
+    "noAgentsTitle": "Geef elke agent de juiste toegang",
+    "noConnectors": "Verbind de apps van de werkruimte één keer en stel hier de toegang van elke agent in.",
+    "noConnectorsTitle": "Kies wat elke agent mag gebruiken",
+    "noConnectorsViewerTitle": "Zie wat agents kunnen gebruiken",
+    "noConnectorsViewer": "Wie de connectors beheert, voegt de apps toe, en ze verschijnen hier.",
     "unavailable": "Toegangsbeheer is nog niet beschikbaar op deze server.",
     "area": {
       "context": "Context en geheugen",
@@ -9313,8 +9427,9 @@
     "by": "Gemaakt door",
     "where": "Waar",
     "when": "Bijgewerkt",
-    "emptyTitle": "Nog geen bestanden",
-    "emptyText": "Sleep bestanden hierheen om ze te uploaden.",
+    "emptyTitle": "Alles wat het team maakt, op één plek",
+    "emptyText": "Bestanden van agents en mensen staan hier. Upload die van jou of sleep ze naar deze pagina.",
+    "emptyViewer": "Wat agents en mensen in gesprekken maken, wordt hier bewaard.",
     "noResults": "Geen bestanden die bij deze filters passen.",
     "clear": "Filters wissen",
     "noResultsHint": "Probeer een andere zoekopdracht of wis de filters.",
@@ -9606,7 +9721,8 @@
     "searchPlaceholder": "Zoek op naam of op wat het doet",
     "empty": "Geen connector gevonden voor “{{q}}”",
     "emptyText": "Je kunt elke dienst koppelen via zijn adres.",
-    "none": "Nog geen connectors.",
+    "none": "Agents gaan in je tools werken, met alleen de toegang die jij geeft.",
+    "noneTitle": "Verbind de apps van je team",
     "connectedFilter": "Gekoppeld",
     "suggested": "Aanbevolen voor {{org}}",
     "more": "Meer diensten",
@@ -10996,6 +11112,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Deze persoon zit niet in dit gesprek en ziet deze taak dus niet."
+    },
     "connector": {
       "labelTaken": "Een andere connector heeft deze naam al.",
       "labelInvalid": "De naam moet 1 tot 80 tekens hebben.",
@@ -11018,6 +11137,7 @@
       "titleNoLetters": "Een titel heeft letters of cijfers nodig.",
       "lockAdminsOnly": "Alleen beheerders vergrendelen pagina's."
     },
+    "replyGone": "Het bericht waarop je reageerde is er niet meer.",
     "media": {
       "off": "GIF's en stickers staan uit in deze werkruimte.",
       "notFound": "Die GIF is niet meer beschikbaar. Kies een andere.",
@@ -11221,6 +11341,7 @@
       "undoForbidden": "Alleen de persoon voor wie de agent werkte, zijn eigenaar of een beheerder kan dit ongedaan maken."
     },
     "account": {
+      "notRestorable": "Dit account kan niet meer hersteld worden.",
       "notOwner": "Alleen wie dit account of abonnement heeft gekoppeld, kan dit doen."
     },
     "channel": {
@@ -11473,7 +11594,10 @@
     "other": {
       "title": "Andere computers",
       "text": "Gekoppeld met een code, zoals een Mac mini thuis of een andere server. Wat elke computer toestaat, stel je op die computer zelf in.",
-      "emptyTitle": "Nog geen andere computer"
+      "emptyTitle": "Laat agents op elke computer draaien",
+      "emptyText": "Verbind een Mac mini thuis of een andere server met een code, en agents werken erop.",
+      "emptyViewerTitle": "De computers van het team verschijnen hier",
+      "emptyViewer": "Wie computers mag verbinden, voegt er een toe, en hij verschijnt hier."
     }
   },
   "outage": {
@@ -11584,7 +11708,8 @@
     "server": "Serveradres",
     "serverHelp": "Plak het in de app die je koppelt.",
     "serverCopied": "Adres gekopieerd",
-    "empty": "Geen apps gekoppeld. Koppel Claude of een andere app om agents taken te geven zonder die app te verlaten.",
+    "empty": "Verbind Claude of een andere app en vraag agents om taken zonder die app te verlaten.",
+    "emptyTitle": "Bereik je agents vanuit waar je al werkt",
     "connected": "Gekoppeld",
     "onThisComputer": "op deze computer",
     "access": {
@@ -11843,7 +11968,8 @@
     },
     "agent": "Agent",
     "anyAgent": "Alle agents",
-    "empty": "Hier staat nog niets. Als een agent iets buiten het gesprek doet, verschijnt het hier.",
+    "empty": "Als een agent iets buiten een gesprek doet, verschijnt het hier.",
+    "emptyTitle": "Alles wat agents doen wordt vastgelegd",
     "emptyFiltered": "Niets met dit filter.",
     "loadMore": "Meer laden",
     "outcome": {
@@ -12193,6 +12319,10 @@
     "keyValue": "API-sleutel",
     "keyInvalid": "Plak de API-sleutel (minstens 8 tekens).",
     "keyRefused": "De provider accepteerde deze sleutel niet.",
+    "keyNoCredit": "{{provider}} zegt dat deze sleutel geen tegoed heeft. Voeg daar tegoed toe en sla hem opnieuw op. Er is niets opgeslagen.",
+    "keyDenied": "{{provider}} liet deze sleutel geen aanroep doen. Controleer daar zijn rechten en sla hem opnieuw op. Er is niets opgeslagen.",
+    "keySaid": "{{provider}} zei: {{said}}",
+    "keyInUse": "{{agents}} denken nog met deze sleutel.",
     "keyManagement": "Dit is een beheersleutel. Maak een gewone API-sleutel.",
     "autoModels": {
       "title": "Modellen voor Automatisch",
@@ -12213,7 +12343,13 @@
     "remove": "Verwijderen",
     "removeTitle": "De sleutel {{label}} verwijderen",
     "removeText": "De sleutel is voorgoed weg. Als een agent hem nog gebruikt, weigert de server: wijzig eerst de sleutel van die agents.",
-    "noKeys": "Nog geen sleutels.",
+    "removeUnused": "De sleutel is voorgoed weg. Geen enkele agent denkt ermee.",
+    "removeUsedOther_one": "{{agents}} denkt met deze sleutel. Zonder hem gaat de agent naar een andere sleutel, of vraagt om een AI als er geen bij zijn model past.",
+    "removeUsedOther_other": "{{agents}} denken met deze sleutel. Zonder hem gaan ze naar een andere sleutel, of vragen om een AI als er geen bij hun model past.",
+    "removeUsedNone_one": "{{agents}} denkt met deze sleutel en heeft niets anders. Zonder hem antwoordt de agent niet meer tot je een andere AI verbindt.",
+    "removeUsedNone_other": "{{agents}} denken met deze sleutel en hebben niets anders. Zonder hem antwoorden ze niet meer tot je een andere AI verbindt.",
+    "noKeys": "Met een API-sleutel betaal je de aanbieder rechtstreeks en kies je de modellen.",
+    "noKeysTitle": "Gebruik je eigen AI-sleutel",
     "platformAvailable": "De Claude-sleutel van deze server is ook beschikbaar.",
     "usageTitle": "API-uitgaven per soort",
     "usageAgentLine": "{{spent}} van {{budget}}",
@@ -12329,7 +12465,8 @@
     },
     "export": "CSV exporteren",
     "limitsHint": "Stel een limiet per persoon in bij Limieten",
-    "empty": "Niemand heeft deze maand al agents gebruikt.",
+    "empty": "Zodra iemand met een agent praat, verschijnt het gebruik van deze maand hier.",
+    "emptyTitle": "Zie wat iedereen met de agents doet",
     "owner": "Eigenaar",
     "member": "Lid",
     "columns": {
@@ -12451,7 +12588,7 @@
     "estimate": "Abonnementen zeggen alleen hoeveel het hele account gebruikte. Het deel van elke agent is een schatting, op basis van wat elk eraan uitgaf.",
     "accounts": {
       "title": "Abonnementsaccounts",
-      "empty": "Nog geen agent denkt met een abonnement."
+      "empty": "Verbind een abonnement en volg hier hoeveel elke agent gebruikt."
     },
     "api": {
       "title": "API van de werkruimte"
@@ -12551,6 +12688,8 @@
     "autoUpdate": "Nog mee bezig ({{duration}}).",
     "autoUpdateNow": "Nu: {{now}}.",
     "statusReply": "Ik ben er nog mee bezig ({{duration}}). Ik lees je bericht na deze stap.",
+    "statusReplyQueued": "Ik wacht op de computer ({{duration}}). Ik lees je bericht zodra ik aan de beurt ben.",
+    "statusReplyAway": "Ik wacht tot mijn computer terug is. Ik lees je bericht zodra hij terug is.",
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",
@@ -12581,6 +12720,10 @@
     "working": "Op de achtergrond"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT weigerde de snelheid Snel voor dit account of model, dus dit antwoord kwam op standaardsnelheid.",
+      "action": "Agent openen"
+    },
     "usageWhen": {
       "at": "om {{time}}",
       "on": "{{day}} om {{time}}",
@@ -12627,6 +12770,7 @@
       "waitingAgents_female": "{{name}} heeft een deel doorgegeven en wacht op antwoord"
     },
     "consultPair": {
+      "took": "duurde {{time}}",
       "asking": "vraagt",
       "working": "bezig",
       "waitingApproval": "wacht op goedkeuring",
@@ -12688,7 +12832,9 @@
       "show": "Tonen",
       "hide": "Verbergen",
       "talker": "tijdens het werk",
-      "talkerTip": "Antwoordde zonder de lopende taak te stoppen."
+      "talkerTip": "Antwoordde zonder de lopende taak te stoppen.",
+      "talkerWaiting": "tijdens het wachten",
+      "talkerWaitingTip": "Antwoordde terwijl de taak wacht."
     },
     "joined": {
       "label": "deed mee",
@@ -12897,6 +13043,8 @@
     "sayHiAgent_female": "Zeg hoi tegen {{name}}",
     "sayHiPerson": "Zeg hoi tegen {{name}}",
     "sayHiChannel": "Zeg hoi in #{{channel}}",
+    "sayHiText": "Vermeld een agent met @ en hij doet mee.",
+    "readOnlyEmpty": "Berichten verschijnen hier",
     "suggestions": "Suggesties om te beginnen",
     "suggest": {
       "dev1": "Wat is er kapotgegaan sinds de laatste deploy?",
@@ -12964,6 +13112,13 @@
       "brain_unavailable_outdated": "Het programma op mijn computer heeft een update nodig voordat {{brain}} kan antwoorden. Ik antwoord zodra het bijgewerkt is.",
       "brain_unavailable_plan_owner": "{{brain}} zou denken met een abonnement dat niet van mijn eigenaar is, dus ik gebruik het niet. Koppel het account van mijn eigenaar op mijn pagina.",
       "provider_unavailable": "Mijn AI-aanbieder reageert nu niet. Ik antwoord zodra die terug is.",
+      "provider_wait_rate_limit": "{{provider}} beperkt nu de verzoeken van deze sleutel. Ik antwoord zodra dat weer kan.",
+      "provider_wait_down": "{{provider}} is nu uitgevallen of overbelast. Ik antwoord zodra die terug is.",
+      "provider_wait_timeout": "{{provider}} doet er te lang over om te reageren. Ik antwoord zodra die reageert.",
+      "provider_wait_unreachable": "De verbinding van onze server met {{provider}} is mislukt. Ik antwoord zodra die terug is.",
+      "provider_wait_said": "{{provider}} antwoordde met een fout ({{detail}}). Ik probeer het opnieuw en antwoord zodra het werkt.",
+      "provider_wait_ours": "Iets aan onze kant blokkeert mijn AI, niet jouw account. Ik antwoord zodra het is opgelost.",
+      "provider_back": "Mijn AI is terug.",
       "brain_busy": "Mijn computer is nu bezig met andere taken. Ik antwoord zodra hij vrij is.",
       "brain_queued": "Ik sta nog in de rij voor de computer. Ik antwoord zodra hij ruimte heeft.",
       "brain_interrupted": "{{brain}} stopte voordat het klaar was. Al gedaan, niet herhaald: {{tools}}.",
@@ -12986,6 +13141,7 @@
       "usage_paused_budget": "{{agent}} heeft dit werk gepauzeerd · maandbudget op {{percent}}%",
       "work_auto_moved": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates, de volgende over ongeveer {{minutes}} min.",
       "work_auto_movedOver": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates.",
+      "moved_on": "Gaat verder in {{link}}",
       "work_end_done": "Klaar ({{minutes}} min).",
       "work_end_failed": "Dit werk op de achtergrond is niet afgerond ({{minutes}} min).",
       "work_end_failedWhy": "Dit werk op de achtergrond is niet afgerond ({{minutes}} min): {{why}}.",
@@ -13266,6 +13422,10 @@
       "label": "Skillscript uitvoeren",
       "description": "Voert het script van een skill uit in de omgeving."
     },
+    "vault_make_password": {
+      "label": "Wachtwoord maken",
+      "description": "Maakt een sterk wachtwoord op zijn computer en bewaart het als sleutel in de Vault, zonder het te zien."
+    },
     "computer_status": {
       "label": "Computer controleren",
       "description": "Zegt welke computer het is en of hij reageert."
@@ -13321,6 +13481,10 @@
     "browser_type_secret": {
       "label": "Wachtwoord typen",
       "description": "Typt een wachtwoord dat je gaf in een wachtwoord- of codeveld, zonder het te zien."
+    },
+    "browser_make_password": {
+      "label": "Wachtwoord maken",
+      "description": "Maakt een sterk wachtwoord voor een site op zijn computer, bewaart het in de Vault en typt het, zonder het te zien."
     },
     "browser_wait": {
       "label": "Wachten op de pagina",
@@ -13388,6 +13552,8 @@
       "title": "Browserprofielen",
       "sub": "Log één keer in op sites en kies welke agents elk profiel gebruiken.",
       "empty": "Maak een profiel, log één keer in op de sites ervan en kies welke agents het mogen gebruiken. Elke agent houdt een eigen browser.",
+      "emptyTitle": "Log maar één keer in",
+      "emptyViewer": "Wie deze computer beheert, maakt profielen, en ze verschijnen hier.",
       "new": "Nieuw profiel",
       "free": "Vrij",
       "inUse": "In gebruik door <who/>",
@@ -13660,6 +13826,8 @@
       "paste": "Plakken",
       "pasteHint": "Plak wat je hebt gekopieerd in de pagina",
       "pasteBlocked": "Je browser liet niet lezen wat je hebt gekopieerd. Gebruik {{keys}} op de pagina.",
+      "inputLost": "Dat is niet bij de pagina aangekomen, dus er is niets geklikt of getypt. Probeer het opnieuw.",
+      "noField": "Er is geen veld geselecteerd op de pagina, dus dat is niet getypt. Selecteer het veld en typ opnieuw.",
       "goLabel": "Adres van de site",
       "goPlaceholder": "Typ een adres, zoals example.com",
       "go": "Openen",
@@ -13670,8 +13838,6 @@
       "goFailed": "De site ging niet open. Controleer het adres.",
       "backTitle": "Teruggeven aan {{name}}",
       "backTitle_female": "Teruggeven aan {{name}}",
-      "doneTitle": "Klaar. Een notitie voor {{name}}?",
-      "doneTitle_female": "Klaar. Een notitie voor {{name}}?",
       "backLabel": "Notitie voor {{name}}",
       "backLabel_female": "Notitie voor {{name}}",
       "backPlaceholder": "Optioneel: iets wat {{name}} moet weten?",
@@ -13711,6 +13877,7 @@
         "browser_scroll": "Door de pagina gescrold",
         "browser_upload": "Een bestand geüpload",
         "browser_type_secret": "Een wachtwoord getypt",
+        "browser_make_password": "Een wachtwoord gemaakt",
         "browser_wait": "Op de pagina gewacht",
         "browser_screenshot": "Een screenshot gemaakt",
         "browser_ask_person": "Om hulp gevraagd",
@@ -13731,6 +13898,7 @@
     "suspendedFor": "Deze werkruimte is geschorst: {{reason}}",
     "bannerSub": "Je kunt hier nog lezen en schrijven. Agents antwoorden en werken niet zolang hij in de wacht staat.",
     "label": "Status van de werkruimte",
+    "row": "Niet beschikbaar",
     "screen": {
       "title": "Deze werkruimte is niet beschikbaar",
       "text": "De gesprekken en agents zijn voorlopig gesloten.",
@@ -13818,22 +13986,45 @@
   },
   "deleting": {
     "title": "{{name}} wordt verwijderd",
-    "text": "{{by}} heeft hem op {{date}} verwijderd. Op {{due}} is hij definitief weg.",
-    "textLate": "{{by}} heeft hem op {{date}} verwijderd.",
+    "text": "Deze werkruimte wordt al verwijderd. Je hoeft niets te doen, hij verdwijnt op {{date}}.",
+    "textLate": "Deze werkruimte wordt al verwijderd. Je hoeft niets te doen.",
+    "by": "{{by}} heeft hem op {{date}} verwijderd.",
+    "row": "Wordt verwijderd, weg op {{date}}",
+    "rowLate": "Wordt verwijderd",
     "someone": "Iemand",
     "restore": "Werkruimte herstellen",
     "membersOnly": "Alleen een eigenaar kan hem herstellen.",
     "restored": "{{name}} is terug"
   },
+  "accountDeleting": {
+    "title": "Je account wordt verwijderd",
+    "text": "Het verdwijnt op {{due}} definitief, samen met de werkruimtes waar alleen jij in zit.",
+    "textLate": "Het verdwijnt zo.",
+    "what": "Tot die tijd kan niemand je hier bereiken en krijg je geen meldingen. Herstel je het, dan is alles weer zoals het was.",
+    "plans": "De abonnementen die je betaalt, blijven zonder verlenging. Er wordt niets in rekening gebracht tot je er een weer aanzet.",
+    "restore": "Account herstellen",
+    "restored": "Je account is terug"
+  },
   "deleteAccount": {
     "menu": "Account verwijderen",
     "card": {
-      "text": "Je verlaat elke werkruimte en je account wordt definitief verwijderd.",
-      "button": "Account verwijderen…"
+      "text": "Je verlaat elke werkruimte en je account wordt 7 dagen later definitief verwijderd. Tot die tijd kun je het herstellen.",
+      "button": "Account verwijderen…",
+      "oneWorkspace": "Wil je alleen deze werkruimte verwijderen? Dat kan bij Algemeen.",
+      "leaveWorkspace": "Wil je alleen deze werkruimte verlaten? Dat kan bij Leden."
     },
-    "title": "Je account verwijderen?",
-    "closes_one": "{{names}} sluit nu en wordt op {{date}} definitief verwijderd. Je bent daar de enige.",
-    "closes_other": "{{names}} sluiten nu en worden op {{date}} definitief verwijderd. Je bent daar de enige.",
+    "title": "Je hele account verwijderen?",
+    "intro": "Dit verwijdert je hele account, niet alleen één werkruimte.",
+    "when": "Je account verdwijnt op {{date}} definitief. Log tot die tijd in om het te herstellen.",
+    "whole": "Je hele account",
+    "oneWorkspace": "Wil je maar één werkruimte verwijderen? Je account blijft.",
+    "closes": "{{name}} sluit nu. Je bent daar de enige, dus hij wordt op {{date}} definitief verwijderd.",
+    "closesWith": "{{name}} sluit nu, met {{what}}. Je bent daar de enige, dus hij wordt op {{date}} definitief verwijderd.",
+    "closesEmpty": "{{name}} sluit nu, zonder agenten of berichten. Je bent daar de enige, dus hij wordt op {{date}} definitief verwijderd.",
+    "agentCount_one": "{{value}} agent",
+    "agentCount_other": "{{value}} agenten",
+    "messageCount_one": "{{value}} bericht",
+    "messageCount_other": "{{value}} berichten",
     "leaves": "Je verlaat {{names}}.",
     "messages": "Je berichten blijven in de werkruimtes staan, zonder je naam.",
     "computers_one": "Je computer die aan {{name}} gekoppeld is, wordt eruit verwijderd: {{computers}}.",
@@ -13851,7 +14042,7 @@
     "finishSetup": "Inrichting afronden",
     "deleteOrg": "{{name}} verwijderen",
     "submit": "Account verwijderen",
-    "deleted": "Account verwijderd"
+    "deleted": "Je account verdwijnt op {{date}} definitief. Log daarvoor in om het te herstellen."
   },
   "billing": {
     "open": "Abonnement en facturatie openen",
@@ -14274,6 +14465,18 @@
     "tasks_one": "{{count}} taak",
     "tasks_other": "{{count}} taken",
     "free": "Vrij",
+    "hiddenTasks_one": "{{count}} taak die je niet ziet",
+    "hiddenTasks_other": "{{count}} taken die je niet ziet",
+    "hiddenLine_one": "Nog {{count}} taak in gesprekken die je niet ziet.",
+    "hiddenLine_other": "Nog {{count}} taken in gesprekken die je niet ziet.",
+    "helpers_one": "{{count}} hulp",
+    "helpers_other": "{{count}} hulpen",
+    "delegated": {
+      "fromPerson": "gestart door {{name}}",
+      "fromYou": "gestart door jou",
+      "fromRoutine": "gestart door de routine {{name}}",
+      "stopNote": "Als je hem stopt, hoort {{name}} dat en vraagt die het niet uit zichzelf opnieuw."
+    },
     "columns": {
       "task": "Taak",
       "state": "Status",
@@ -14283,6 +14486,7 @@
     },
     "sections": {
       "asked": "Gevraagd door mensen",
+      "delegated": "Gevraagd door agents",
       "background": "Routines op de achtergrond"
     },
     "state": {
@@ -14354,6 +14558,9 @@
       "openManager": "Openen in Taakbeheer"
     },
     "confirm": {
+      "chainTitle_one": "{{name}} en {{count}} hulp stoppen?",
+      "chainTitle_other": "{{name}} en {{count}} hulpen stoppen?",
+      "chainBody": "Wat al gedaan is blijft bewaard, en iedereen hoort het.",
       "title_one": "De taak van {{name}} stoppen?",
       "title_other": "De {{count}} taken van {{name}} stoppen?",
       "body": "Wat al gedaan is, blijft bewaard, en {{name}} hoort dat jij het hebt gestopt.",
@@ -14718,8 +14925,9 @@
       "kept": "Alleen jij ziet “{{title}}”"
     },
     "empty": {
-      "title": "Leeg dashboard",
-      "text": "Voeg widgets toe: vraag het een agent of zet een blok uit de chat vast."
+      "title": "Houd je cijfers bij",
+      "text": "Vraag een agent om een widget of maak een blok uit de chat vast, en het blijft hier actueel.",
+      "viewer": "Wie dit dashboard bewerkt, voegt widgets toe, en ze verschijnen hier."
     },
     "onlyHome": "Maak met “Nieuw dashboard” een dashboard voor de werkruimte of voor sommige rollen.",
     "create": {

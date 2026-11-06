@@ -52,8 +52,8 @@ describe("narration keyed by turn", () => {
     ]);
     expect(s.runs.r?.stopping).toBe(true);
     s = run([{ type: "agent.run.read", channelId: "c", runId: "r", agentId: "ada", messageIds: ["m9"] } as Ev], s);
-    // The text so far became narration, but the row keeps its place in the timeline.
-    expect(s.runs.r?.text).toBe("");
+    // What it wrote stays where it was, and it is still writing.
+    expect(s.runs.r?.text).toBe("Trabalhando");
     expect(isWriting(s.runs.r as NonNullable<typeof s.runs.r>)).toBe(true);
     expect(s.runs.r?.work?.at(-1)).toEqual({ kind: "steer", messageId: "m9" });
   });

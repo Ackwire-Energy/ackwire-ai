@@ -40,6 +40,7 @@ import {
   AvatarStack,
   Button,
   Card,
+  CardHeader,
   Chip,
   ComputerIcon,
   ComputerPortrait,
@@ -52,6 +53,7 @@ import {
   InfoHint,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   MenuSeparator,
@@ -67,6 +69,7 @@ import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ThisMacButton, useAgentsHere, useIsThisMac } from "@/components/ThisMac";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { BrowserProfilesCard } from "./browser/BrowserProfiles";
@@ -483,11 +486,13 @@ function RenameDialog({ machine, onClose }: { machine: Machine | null; onClose: 
           );
         }}
       >
-        <DialogBody>
-          <Field label={t("machines.name")} id="machine-rename" error={error ?? undefined}>
-            <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
-          </Field>
-        </DialogBody>
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <Field label={t("machines.name")} id="machine-rename" error={error ?? undefined}>
+              <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}
@@ -608,35 +613,31 @@ export function MachinesSection() {
   const canPair = can(org, "pair_computers");
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
+  const look = useRightHandLook();
   // This server's computer and the workspace's own have cards of their own: this list is people's.
   const list = (machines.data ?? []).filter((m) => m.kind !== "managed" && m.kind !== "host");
   return (
     <>
       <Card aria-labelledby="sec-machines">
-        <div className="computers-card__head">
-          <span className="computers-card__title">
-            <span className="ac-hintline">
-              <h2 id="sec-machines" className="ac-card__title">
-                {t("computers.other.title")}
-              </h2>
-              <InfoHint name={t("common.about", { label: t("computers.other.title") })}>
-                {t("computers.other.text")}
-              </InfoHint>
-            </span>
-          </span>
-          <DownloadMacButton />
-        </div>
+        <CardHeader
+          id="sec-machines"
+          icon="computer"
+          title={t("computers.other.title")}
+          hint={{ name: t("common.about", { label: t("computers.other.title") }), text: t("computers.other.text") }}
+          action={<DownloadMacButton />}
+        />
         {machines.isLoading && <LoadingList count={2} trailing />}
         {machines.isError && !machines.data && (
           <ErrorState error={machines.error} onRetry={() => void machines.refetch()} />
         )}
         {machines.isSuccess && list.length === 0 && (
-          <div className="computers-empty">
-            <ComputerPortrait kind="mac" state="offline" size={96} />
-            <span className="computers-empty__text">
-              <b>{t("computers.other.emptyTitle")}</b>
-            </span>
-          </div>
+          <EmptyState
+            size="panel"
+            agent={look}
+            title={t(canPair ? "computers.other.emptyTitle" : "computers.other.emptyViewerTitle")}
+          >
+            {t(canPair ? "computers.other.emptyText" : "computers.other.emptyViewer")}
+          </EmptyState>
         )}
         {list.length > 0 && (
           <List aria-label={t("computers.other.title")}>
@@ -648,9 +649,7 @@ export function MachinesSection() {
       </Card>
       {canPair && (
         <Card aria-labelledby="sec-machines-connect">
-          <h2 id="sec-machines-connect" className="ac-card__title">
-            {t("machines.download.title")}
-          </h2>
+          <CardHeader id="sec-machines-connect" icon="plus" title={t("machines.download.title")} />
           <ConnectComputer orgId={org.id} />
         </Card>
       )}
@@ -752,9 +751,7 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
   const here = useIsThisMac(org.id, m.id);
   return (
     <Card aria-labelledby="sec-machine-folders">
-      <h2 id="sec-machine-folders" className="ac-card__title">
-        {t("machines.access.folders")}
-      </h2>
+      <CardHeader id="sec-machine-folders" icon="drive" title={t("machines.access.folders")} />
       {!access && m.canManage && here ? (
         <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <p className="small muted" style={{ margin: 0, flex: 1, minWidth: 200 }}>
@@ -808,41 +805,43 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
                   <span className="machine-folder__name">{folder}</span>
                   <code className="machine-folder__path">{f.path}</code>
                 </span>
-                {f.agents.length > 0 ? (
-                  <span className="machine-folder__agents">
-                    <span className="ac-visually-hidden">
-                      {t("machines.access.usedBy", { folder })}: {joinNames(f.agents.map(nameOf), t)}
+                <span className="machine-folder__tail ac-captail">
+                  {f.agents.length > 0 ? (
+                    <span className="machine-folder__agents">
+                      <span className="ac-visually-hidden">
+                        {t("machines.access.usedBy", { folder })}: {joinNames(f.agents.map(nameOf), t)}
+                      </span>
+                      <AvatarStack aria-hidden="true">
+                        {f.agents.map((id) => (
+                          <AgentAvatar key={id} agentId={id} size="sm" name={nameOf(id)} />
+                        ))}
+                      </AvatarStack>
                     </span>
-                    <AvatarStack aria-hidden="true">
-                      {f.agents.map((id) => (
-                        <AgentAvatar key={id} agentId={id} size="sm" name={nameOf(id)} />
-                      ))}
-                    </AvatarStack>
-                  </span>
-                ) : (
-                  <span className="small muted">{t("machines.access.nobody")}</span>
-                )}
-                {canReduceAccess(m) && (
-                  <Menu
-                    align="end"
-                    label={label}
-                    trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} />}
-                  >
-                    <MenuItem icon="trash" danger onSelect={() => onReduce({ kind: "folder", path: f.path })}>
-                      {t("machines.access.removeAll")}
-                    </MenuItem>
-                    {f.agents.length > 0 && <MenuSeparator />}
-                    {f.agents.map((id) => (
-                      <MenuItem
-                        key={id}
-                        icon="close"
-                        onSelect={() => onReduce({ kind: "folder", path: f.path, agent: { id, name: nameOf(id) } })}
-                      >
-                        {t("machines.access.removeAgent", { name: nameOf(id) })}
+                  ) : (
+                    <span className="small muted">{t("machines.access.nobody")}</span>
+                  )}
+                  {canReduceAccess(m) && (
+                    <Menu
+                      align="end"
+                      label={label}
+                      trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} />}
+                    >
+                      <MenuItem icon="trash" danger onSelect={() => onReduce({ kind: "folder", path: f.path })}>
+                        {t("machines.access.removeAll")}
                       </MenuItem>
-                    ))}
-                  </Menu>
-                )}
+                      {f.agents.length > 0 && <MenuSeparator />}
+                      {f.agents.map((id) => (
+                        <MenuItem
+                          key={id}
+                          icon="close"
+                          onSelect={() => onReduce({ kind: "folder", path: f.path, agent: { id, name: nameOf(id) } })}
+                        >
+                          {t("machines.access.removeAgent", { name: nameOf(id) })}
+                        </MenuItem>
+                      ))}
+                    </Menu>
+                  )}
+                </span>
               </div>
             );
           })}
@@ -859,9 +858,7 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
   if (!access) return null;
   return (
     <Card aria-labelledby="sec-machine-tools">
-      <h2 id="sec-machine-tools" className="ac-card__title">
-        {t("machines.access.tools")}
-      </h2>
+      <CardHeader id="sec-machine-tools" icon="cog" title={t("machines.access.tools")} />
       <List aria-label={t("machines.access.tools")}>
         {MACHINE_TOOLS.map((tool) => {
           const on =
@@ -869,6 +866,9 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
               ? (access.tools[tool] ?? access.tools.codex)
               : access.tools[tool];
           const name = t(`machines.access.tool.${tool}`);
+          // Commands, on, has a line under its name: the name rises to its tile's top and its state stays on the
+          // name's line. A name alone centres on the tile, its state with it.
+          const warn = tool === "commands" && on;
           return (
             <div key={tool} className="ac-list__row machine-tool" data-tool={tool}>
               {tool === "commands" ? (
@@ -879,22 +879,24 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
                 <ProviderLogo id={tool} size="sm" off={!on} />
               )}
               <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
-                <span className="ac-hintline">
+                <span className={warn ? "ac-hintline ac-captop" : "ac-hintline"}>
                   <span className="machine-folder__name">{name}</span>
                   <InfoHint name={t("common.about", { label: name })}>{t(`machines.access.toolText.${tool}`)}</InfoHint>
                 </span>
-                {tool === "commands" && on && <span className="small muted">{t("machines.access.commandsWarn")}</span>}
+                {warn && <span className="small muted">{t("machines.access.commandsWarn")}</span>}
               </span>
-              <Chip icon={on ? "check" : "dash"}>{on ? t("machines.access.on") : t("machines.access.off")}</Chip>
-              {on && canReduceAccess(m) && (
-                <Button
-                  size="sm"
-                  aria-label={t("machines.access.disableLabel", { tool: name })}
-                  onClick={() => onReduce({ kind: "tool", tool })}
-                >
-                  {t("machines.access.disable")}
-                </Button>
-              )}
+              <span className={warn ? "machine-tool__tail ac-captail ac-captop" : "machine-tool__tail"}>
+                <Chip icon={on ? "check" : "dash"}>{on ? t("machines.access.on") : t("machines.access.off")}</Chip>
+                {on && canReduceAccess(m) && (
+                  <Button
+                    size="sm"
+                    aria-label={t("machines.access.disableLabel", { tool: name })}
+                    onClick={() => onReduce({ kind: "tool", tool })}
+                  >
+                    {t("machines.access.disable")}
+                  </Button>
+                )}
+              </span>
             </div>
           );
         })}
@@ -917,9 +919,7 @@ function GrantCard({ machine: m }: { machine: Machine }) {
   const app = allowsInApp(m.os);
   return (
     <Card aria-labelledby="sec-machine-grant">
-      <h2 id="sec-machine-grant" className="ac-card__title">
-        {t("machines.access.grantTitle")}
-      </h2>
+      <CardHeader id="sec-machine-grant" icon="lock" title={t("machines.access.grantTitle")} />
       {m.canManage && here ? (
         <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <p className="small" style={{ margin: 0, flex: 1, minWidth: 200 }}>

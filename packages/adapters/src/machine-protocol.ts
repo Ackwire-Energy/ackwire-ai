@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 46;
+export const MACHINE_PROTOCOL_VERSION = 49;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -514,6 +514,32 @@ export const ANTIGRAVITY_PROTOCOL = 44;
  */
 export const VAULT_PROTOCOL = 45;
 /**
+ * From this protocol on (ADR 0149): `brain.turn` carries `speed`, and a Codex turn that failed at that speed before
+ * anything happened goes again at standard speed, with a `speed_fallback` event right before its `done`. An older
+ * runner never sees it.
+ */
+export const SPEED_PROTOCOL = 46;
+/**
+ * From this protocol on: `pull`. A file too big for a `write` is fetched by the computer itself from a one-use URL of
+ * ours and lands whole or not at all. An older runner takes files up to `MAX_INLINE_FILE_BYTES` only.
+ */
+export const FILE_PULL_PROTOCOL = 47;
+/**
+ * From this protocol on (ADR 0144 §8): `vault.password` makes a password in the agent's process (its worker in system
+ * mode) and answers it sealed to the one-use public key the request carries, so it reaches the Vault as a box: no
+ * command line, log or relay on the way reads it. The server sends it to no older runner.
+ */
+export const VAULT_PASSWORD_PROTOCOL = 48;
+/** What a password is made of. */
+export const PASSWORD_CLASSES = ["lower", "upper", "digits", "symbols"] as const;
+export type PasswordClass = (typeof PASSWORD_CLASSES)[number];
+/** The shape of a password `vault.password` makes: a site's own rules, as the agent read them. */
+export interface PasswordRules {
+  length: number;
+  classes: PasswordClass[];
+}
+export const PASSWORD_LENGTH = { min: 8, max: 128, default: 20 } as const;
+/**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
@@ -529,7 +555,7 @@ export const SITE_SECRET_TTL_MS = 15 * 60_000;
  * delays a command. Without the view (it closed, or an older server) frames go as `browser.frame` as before. The
  * server sends `browser.view.open` to no older runner.
  */
-export const BROWSER_VIEW_PROTOCOL = 46;
+export const BROWSER_VIEW_PROTOCOL = 49;
 /** Live view frames (ADR 0040 §7.1), on each hop: computer → server, and server → each person watching. */
 export const BROWSER_VIEW = {
   /**
@@ -613,6 +639,12 @@ export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 export const BRAIN_EFFORTS: readonly BrainEffort[] = ["low", "medium", "high", "xhigh", "max"];
 export const isBrainEffort = (v: unknown): v is BrainEffort =>
   typeof v === "string" && (BRAIN_EFFORTS as readonly string[]).includes(v);
+
+/** How fast an agent answers in conversations (ADR 0149): `fast` is the provider's Fast mode. */
+export type BrainSpeed = "standard" | "fast";
+export const BRAIN_SPEEDS: readonly BrainSpeed[] = ["standard", "fast"];
+export const isBrainSpeed = (v: unknown): v is BrainSpeed =>
+  typeof v === "string" && (BRAIN_SPEEDS as readonly string[]).includes(v);
 
 /** A `brain.turn`'s `contextTokens` the runner applies (protocol 28): a whole number of tokens in a sane range. */
 export const isContextTokens = (v: unknown): v is number =>
@@ -898,7 +930,7 @@ export const STREAM_CLOSE = {
   /** A side doesn't keep up: its backlog passed the limit. */
   tooSlow: 1013,
   /**
-   * Protocol 46: the runner closed a browser's live view that got no acknowledgement in `BROWSER_VIEW.stallMs` (its
+   * Protocol 49: the runner closed a browser's live view that got no acknowledgement in `BROWSER_VIEW.stallMs` (its
    * link too slow, or dead). In 3000-4999 because the standard WebSocket client (Node's) refuses to send 1013.
    */
   viewTooSlow: 4413,
@@ -963,7 +995,7 @@ export type StreamControl =
   | { type: "resize"; cols: number; rows: number }
   | { type: "exit"; code: number | null }
   | { type: "mode"; mode: DesktopMode }
-  /** Protocol 46: a browser view's frame arrived (server → runner): one more may go (`BROWSER_VIEW`). */
+  /** Protocol 49: a browser view's frame arrived (server → runner): one more may go (`BROWSER_VIEW`). */
   | { type: "ack" };
 
 /**
@@ -1025,7 +1057,7 @@ export interface BrowserFrameMetadata {
   deviceWidth: number;
   deviceHeight: number;
   pageScaleFactor?: number;
-  /** Protocol 46: when the computer captured it (epoch ms, its own clock), to measure how late pictures arrive. */
+  /** Protocol 49: when the computer captured it (epoch ms, its own clock), to measure how late pictures arrive. */
   capturedAt?: number;
   /** The active tab's URL when the frame was taken. */
   url?: string;
@@ -1148,7 +1180,7 @@ export const HELLO_TIMEOUT_MS = 10_000;
 export const HEARTBEAT_MS = 25_000;
 /** Largest text frame either side accepts (a `write` of 5 MB is about 6.7 MB in base64). */
 export const MAX_FRAME_BYTES = 8 * 1024 * 1024;
-/** `read`/`write` bodies (base64 in JSON); larger files go through `push`. */
+/** `read`/`write` bodies (base64 in JSON); larger files go through `push` and `pull`. */
 export const MAX_INLINE_FILE_BYTES = 5 * 1024 * 1024;
 
 export const MACHINE_TOKEN_PREFIX = "agm_";
@@ -1337,7 +1369,9 @@ export type WireBrainEvent =
    */
   | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
-  | { type: "steer_read"; uuids: string[] };
+  | { type: "steer_read"; uuids: string[] }
+  /** Protocol 46: Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
+  | { type: "speed_fallback"; message: string };
 
 /**
  * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
@@ -1411,6 +1445,8 @@ export interface BrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /** Protocol 46: `fast` asks for the provider's Fast mode on this turn; absent: standard speed. */
+  speed?: BrainSpeed;
   /**
    * `opencode`: no account on a computer nobody connected, so OpenCode's own free tier alone (`opencode/*` models,
    * no key from the runner's env); ADR 0132.
@@ -1418,6 +1454,11 @@ export interface BrainTurnRequest {
   freeTier?: boolean;
   /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
   contextTokens?: number;
+  /**
+   * A person waits on this turn (first rank of the computer's line): it may take the runner's reserved slot
+   * (`PERSON_TURN_MIN_FREE_BYTES`). No protocol step: a runner that doesn't read it admits the turn like any other.
+   */
+  personWaiting?: boolean;
 }
 
 /** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */
@@ -1753,6 +1794,17 @@ export type MachineRequest = (
       uploadId: string;
       maxBytes: number;
     }
+  /** Protocol 47 (`FILE_PULL_PROTOCOL`): `write`'s path rules, the bytes fetched from `url` instead of sent here. */
+  | {
+      op: "pull";
+      path: string;
+      /** Absolute URL of our file endpoint (`GET`, machine token as bearer), good for one fetch. */
+      url: string;
+      pullId: string;
+      size: number;
+      /** Hex; absent for a stored file with no recorded hash (a skill's), which is then checked by size alone. */
+      sha256?: string;
+    }
   /**
    * Protocol 12: one `agent-browser` command in the request's agent's session
    * (`open`, `snapshot`, `click`…; `args` as on its command line, without
@@ -1779,7 +1831,7 @@ export type MachineRequest = (
   /** Protocol 12: start (or change the mode of) the agent's stream: `browser.frame` frames until `browser.stream.stop`. */
   | { op: "browser.stream.start"; mode: BrowserStreamMode }
   /**
-   * Protocol 46: the live view's own socket for the agent's (or the profile's) browser: the runner dials the data
+   * Protocol 49: the live view's own socket for the agent's (or the profile's) browser: the runner dials the data
    * socket `streamId` names and answers once the server took it (`BROWSER_VIEW_PROTOCOL`).
    */
   | { op: "browser.view.open"; streamId: string }
@@ -1824,6 +1876,8 @@ export type MachineRequest = (
   | { op: "desktop.text" }
   /** Protocol 45: a one-use key the request's agent's Vault values are sealed to (ADR 0144). */
   | { op: "vault.key" }
+  /** `requestId` and `publicKey`: what the answer is sealed to (`madePasswordAad`). */
+  | { op: "vault.password"; requestId: string; publicKey: string; rules: PasswordRules }
 ) & {
   agent?: AgentScope;
   /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
@@ -1847,6 +1901,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "write",
   "list",
   "push",
+  "pull",
   "secret",
   "account",
   "task.start",
@@ -1880,6 +1935,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.apps",
   "desktop.text",
   "vault.key",
+  "vault.password",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1899,6 +1955,8 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
+  /** What landed at the path: its bytes and SHA-256 (hex). */
+  pull: { size: number; sha256: string };
   /**
    * `keypair`: public key, and `sites` from a runner that keeps a `site` target out of its commands; `deliver`/
    * `activate`: size; an older activation may be superseded.
@@ -1953,8 +2011,11 @@ export interface MachineReplies {
   "browser.stream.start": { mode: BrowserStreamMode };
   "browser.stream.stop": { stopped: boolean };
   /** Events sent to the page. */
-  /** `failed`: events the browser didn't confirm (absent when all went through). */
-  "browser.input": { accepted: number; failed?: number };
+  /**
+   * `failed`: events the browser didn't confirm (absent when all went through). `nowhere`: text went to a page with
+   * nothing focused that takes it.
+   */
+  "browser.input": { accepted: number; failed?: number; nowhere?: boolean };
   /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
   "browser.batch": {
     answers: { success: boolean; data: unknown; error?: string; code?: string }[];
@@ -2004,6 +2065,7 @@ export interface MachineReplies {
   "desktop.text": { text: string } | { same: true };
   /** Protocol 45: the key's id, its public key (raw P-256, base64) and when it stops opening anything (ISO). */
   "vault.key": { vaultKey: { keyId: string; publicKey: string; expiresAt: string } };
+  "vault.password": { box: WireSecretBox };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
@@ -2022,6 +2084,8 @@ export type MachineErrorCode =
   | "exec_disabled"
   | "too_large"
   | "upload_failed"
+  /** Protocol 47: a `pull` didn't land; its message says why, for people. */
+  | "pull_failed"
   /**
    * `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`); `brain.turn` while the computer
    * has no room for one more turn (ADR 0025 §5, admission). Try again later.
@@ -2447,6 +2511,8 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         .map((u) => u.slice(0, 64));
       return uuids.length ? { type: "steer_read", uuids } : null;
     }
+    case "speed_fallback":
+      return { type: "speed_fallback", message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message) };
     default:
       return null;
   }
@@ -3287,7 +3353,7 @@ const BROWSER_FRAME_VERSION = 1;
 const BROWSER_FRAME_HEADER_MAX = 16 * 1024;
 
 /**
- * A live view frame as bytes (protocol 46, ADR 0040 §7.1): a version byte (1), the header's length (4 bytes, big
+ * A live view frame as bytes (protocol 49, ADR 0040 §7.1): a version byte (1), the header's length (4 bytes, big
  * endian), the header as UTF-8 JSON, then the JPEG. The runner sends it on its view's data socket and the server
  * passes the same bytes on to each person's frame socket; the apps read it with their own copy of this layout
  * (`packages/client/src/browser/frame-bytes.ts`).

@@ -4,16 +4,30 @@ import {
   ANTIGRAVITY_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainEffort,
+  type BrainSpeed,
   CURSOR_PROTOCOL,
   GROK_PROTOCOL,
   isBrainEffort,
+  isBrainSpeed,
   OPENCODE_PROTOCOL,
   type OwnPlanUsage,
   PLAN_KEYS_PROTOCOL,
   type PlanUsage,
   type PubSub,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  type Executor,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import {
   AUTO_MODEL,
   type ContextLimit,
@@ -22,6 +36,8 @@ import {
   isAutoModel,
   isContextLimit,
   MODEL_CATALOG,
+  modelProvider,
+  parseCustomModel,
 } from "@agenteschat/providers";
 import {
   ANTIGRAVITY_MODELS,
@@ -32,6 +48,7 @@ import {
   OPENCODE_FREE_MODELS,
   planModel,
   planOf,
+  speedFits,
 } from "@agenteschat/providers/plans";
 import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
 import {
@@ -46,6 +63,7 @@ import {
 import { recordAudit } from "./audit";
 import { BRAIN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
+import { defaultCredentials, providerKeyOf } from "./credentials";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
   defaultAccountLabel,
@@ -76,6 +94,7 @@ import { resolveNotifications } from "./notifications";
 import { can, getMembership, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRightHand, personalBrain } from "./right-hand";
+import { orgModelProvider } from "./router";
 import { closedRefusal } from "./standing";
 import { wakeAgentUsageWaits } from "./usage-pause";
 
@@ -268,7 +287,15 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
 }
 
 /** Why a computer brain can't be chosen right now. */
-export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
+export type BrainUnavailable =
+  | "no_computer"
+  | "exec_off"
+  | "runner_old"
+  | "tool_off"
+  | "not_installed"
+  | "outdated"
+  /** Its runner hasn't said which CLIs it has yet (`detectedAt`): nobody knows whether this one is there. */
+  | "not_reported";
 
 export interface BrainOption {
   kind: BrainKind;
@@ -294,6 +321,10 @@ type MachineLike = Parameters<typeof machineExecutors>[0] & {
   } | null;
 } & Parameters<typeof machineOnline>[0];
 
+/** A CLI the computer doesn't list: gone only once its runner has looked (the same check the turns make). */
+const missingCli = (machine: MachineLike): BrainUnavailable =>
+  machine.executors?.detectedAt ? "not_installed" : "not_reported";
+
 /**
  * What the agent's computer can think with; the model brain always. A
  * computer brain needs the runner's `brain.turn` (`BRAIN_PROTOCOL`, the same
@@ -309,7 +340,7 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
     else if (machine.protocol < BRAIN_PROTOCOL) reason = "runner_old";
     else if (machine.access?.tools && machine.access.tools[executor] === false) reason = "tool_off";
     else if (!found?.available.includes(executor))
-      reason = executor === "codex" && found?.codexTooOld ? "outdated" : "not_installed";
+      reason = executor === "codex" && found?.codexTooOld ? "outdated" : missingCli(machine);
     return {
       kind,
       available: !reason,
@@ -349,7 +380,7 @@ function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode" | "g
   )
     reason = "runner_old";
   else if (tools && (tools[kind] ?? tools.codex) === false) reason = "tool_off";
-  else if (!machine.executors?.[kind]) reason = "not_installed";
+  else if (!machine.executors?.[kind]) reason = missingCli(machine);
   return {
     kind,
     available: !reason,
@@ -385,6 +416,8 @@ export interface RightHandWorkspaceAi {
   ownerId: string | null;
   /** It thinks for the caller: a key, a plan its owner lets serve everyone ("Atende outras pessoas"), or theirs. */
   servesYou: boolean;
+  /** On a key: the workspace's key it thinks with, by its provider and name; null with none (the server's may serve). */
+  key?: { provider: string; label: string } | null;
 }
 
 export interface AgentBrainView {
@@ -411,6 +444,8 @@ export interface AgentBrainView {
   account: string | null;
   /** How hard its computer brain thinks; `auto` = picked per run; null = the CLI's default. */
   effort: BrainEffortSetting | null;
+  /** How fast it answers in conversations (ADR 0149): kept whatever it thinks with, applied only where it fits. */
+  speed: BrainSpeed;
   /** The most context it reads, in tokens (`CONTEXT_LIMITS`, any brain); null = its model's window. */
   contextTokens: ContextLimit | null;
   /**
@@ -575,6 +610,7 @@ function view(
     canEdit: true,
     account: agent.brainAccountId,
     effort: isBrainEffortSetting(agent.brainEffort) ? agent.brainEffort : null,
+    speed: isBrainSpeed(agent.brainSpeed) ? agent.brainSpeed : "standard",
     contextTokens: isContextLimit(agent.contextTokens) ? agent.contextTokens : null,
     ...accounts,
     // The right hand keeps its audience: the switch says whether other people's DMs think with the plan.
@@ -635,10 +671,32 @@ async function personalAgent(db: Database, agent: Agent, userId: string, account
   return { ...(await settingsAgent(db, mine, userId, account ?? first?.id)), ownerUserId: userId };
 }
 
+/** The workspace's key the right hand's model thinks with, in the order its calls take: null where they'd find none. */
+async function workspaceKey(db: Database, agent: Agent) {
+  const pinned = parseCustomModel(agent.model)?.credentialId ?? agent.credentialId;
+  const [provider, defaults, rows] = await Promise.all([
+    isAutoModel(agent.model) ? orgModelProvider(db, agent.orgId) : modelProvider(agent.model),
+    defaultCredentials(db, agent.orgId),
+    db
+      .select({
+        id: schema.providerCredentials.id,
+        provider: schema.providerCredentials.provider,
+        label: schema.providerCredentials.label,
+        revokedAt: schema.providerCredentials.revokedAt,
+      })
+      .from(schema.providerCredentials)
+      .where(eq(schema.providerCredentials.orgId, agent.orgId))
+      .orderBy(asc(schema.providerCredentials.createdAt)),
+  ]);
+  const key = pinned ? rows.find((r) => r.id === pinned && !r.revokedAt) : providerKeyOf(rows, defaults, provider);
+  return key ? { provider: key.provider, label: key.label } : null;
+}
+
 /** What everyone's DM with the right hand thinks with while they have no AI of their own (its `agents` row). */
 async function workspaceAi(db: Database, agent: Agent, userId: string): Promise<RightHandWorkspaceAi> {
   const brain = brainOf(agent.brain);
-  if (brain === "model" || !agent.brainAccountId) return { brain: "model", ownerId: null, servesYou: true };
+  if (brain === "model" || !agent.brainAccountId)
+    return { brain: "model", ownerId: null, servesYou: true, key: await workspaceKey(db, agent) };
   const ownerId = await accountOwnerOf(db, agent.orgId, agent.brainAccountId);
   return { brain, ownerId, servesYou: agent.planForOthers || ownerId === userId };
 }
@@ -844,7 +902,10 @@ export async function getAgentBrain(
     candidateMachines(deps.db, userId, orgId, admin, agent.machineId),
     machineLook.then((m) => brainAccounts(deps.db, userId, orgId, agent, m, others)),
   ]);
-  return view(agent, machine, machines, accounts, userId, others);
+  return {
+    ...view(agent, machine, machines, accounts, userId, others),
+    ...(access.scope ? { workspaceAi: await workspaceAi(deps.db, access.agent, userId) } : {}),
+  };
 }
 
 /**
@@ -886,6 +947,8 @@ export interface AgentBrainInput {
   moveAccount?: unknown;
   /** `low`…`max`, `auto` (picked per run), or null for the CLI's default. Omitted = keep it. */
   effort?: unknown;
+  /** `standard` or `fast`, kept through any change of brain, account or model. Omitted = keep it. */
+  speed?: unknown;
   /** One of `CONTEXT_LIMITS`, or null for the model's window; kept through brain switches. Omitted = keep it. */
   contextTokens?: unknown;
 }
@@ -1016,6 +1079,11 @@ export async function setAgentBrain(
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
   const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffortSetting | null);
+  if (input.speed !== undefined && !isBrainSpeed(input.speed)) {
+    throw new ValidationError("Choose standard or fast", "brain.invalid_speed");
+  }
+  // The right hand has no speed of its own: each person's DM thinks with their plan.
+  const speed = rightHand || input.speed === undefined ? agent.brainSpeed : input.speed;
   if (input.contextTokens !== undefined && input.contextTokens !== null && !isContextLimit(input.contextTokens)) {
     throw new ValidationError("Choose 200000, 400000 or 1000000 tokens", "brain.invalid_context");
   }
@@ -1042,6 +1110,7 @@ export async function setAgentBrain(
     extraUsage !== agent.brainExtraUsage ||
     account !== agent.brainAccountId ||
     effort !== agent.brainEffort ||
+    speed !== agent.brainSpeed ||
     contextTokens !== agent.contextTokens ||
     planForOthers !== agent.planForOthers;
   if (!thinks && !audience) return view(agent, machine, machines, accounts, userId, others);
@@ -1088,6 +1157,7 @@ export async function setAgentBrain(
         brainAccountId: account,
         brainAccountLentBy: lentBy,
         brainEffort: effort,
+        brainSpeed: speed,
         contextTokens,
         planForOthers,
         // The people and roles lists stay while it is its owner's only, for when it is let out again.
@@ -1150,9 +1220,10 @@ export async function setAgentBrain(
           extraUsage: agent.brainExtraUsage,
           account: agent.brainAccountId,
           effort: agent.brainEffort,
+          speed: agent.brainSpeed,
           contextTokens: agent.contextTokens,
         },
-        to: { brain, model, fallback, extraUsage, account, effort, contextTokens },
+        to: { brain, model, fallback, extraUsage, account, effort, speed, contextTokens },
         ...(rightHand ? { planForOthers: { from: agent.planForOthers, to: planForOthers } } : {}),
         ...options.audit,
       },
@@ -1185,6 +1256,7 @@ export async function setAgentBrain(
     brainAccountId: account,
     brainAccountLentBy: lentBy,
     brainEffort: effort,
+    brainSpeed: speed,
     contextTokens,
     planForOthers,
     ...(audience ? { audienceMode: audience.mode } : {}),
@@ -1520,6 +1592,8 @@ export interface AgentBrainSummary {
   account?: string;
   /** That account's limits as the runner last reported them; absent: not known yet. */
   usage?: PlanUsage;
+  /** Set to Rápida where that applies to what it thinks with (ADR 0149); absent: standard speed. */
+  speed?: "fast";
 }
 
 /**
@@ -1552,6 +1626,8 @@ export async function agentBrainSummaries(
     machineId: string | null;
     ownerUserId: string | null;
     brainAccountId?: string | null;
+    brainSpeed?: string;
+    builtin?: string | null;
   }[],
 ): Promise<Map<string, AgentBrainSummary>> {
   const out = new Map<string, AgentBrainSummary>();
@@ -1617,6 +1693,11 @@ export async function agentBrainSummaries(
       ...(provider ? { provider } : {}),
       ...(plan ? { account: plan.account } : {}),
       ...(plan?.usage ? { usage: plan.usage } : {}),
+      ...(a.brainSpeed === "fast" &&
+      !isRightHand(a) &&
+      speedFits({ kind, provider: row?.provider, model: a.brainModel })
+        ? { speed: "fast" as const }
+        : {}),
     });
   }
   return out;
@@ -1648,6 +1729,8 @@ export interface AiComputer {
     antigravity: boolean;
     key: boolean;
   };
+  /** Why a CLI of `brains` can't think there, as `brainOptions` says it. */
+  off: Partial<Record<BrainKind, BrainUnavailable>>;
   /** What it can think with now: Claude Code (Claude and the coding plans), Codex (ChatGPT), Cursor, OpenCode, Grok, Antigravity. */
   brains: {
     claude_code: boolean;
@@ -1714,6 +1797,7 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
           antigravity: sharesSignIns(m, "antigravity"),
           key: sharesSignIns(m, "key"),
         },
+        off: Object.fromEntries(options.flatMap((o) => (o.reason ? [[o.kind, o.reason]] : []))),
         brains: {
           claude_code: can("claude_code"),
           codex: can("codex"),

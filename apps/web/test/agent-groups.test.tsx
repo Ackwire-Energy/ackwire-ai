@@ -71,7 +71,7 @@ const pick = async (label: string, option: string) => {
 describe("setores on Equipe (ADR 0083, ADR 0148)", () => {
   test("no groups: an empty state that says what setores are, and a way to create one", async () => {
     await team();
-    expect(view().textContent).toContain("Nenhum setor ainda");
+    expect(view().textContent).toContain("Organize o time por área");
     expect(within(view()).getByRole("button", { name: "Criar setor" })).toBeTruthy();
   });
 
@@ -190,6 +190,39 @@ describe("setores on Equipe (ADR 0083, ADR 0148)", () => {
     await settle(3);
     expect(group("Integrations").agents()).toEqual(["Ada", "Atlas"]);
     expect(group("Sem setor").agents()).toEqual([]);
+  });
+});
+
+describe("Organograma › Por setor with no setor", () => {
+  const bySector = async (state: ReturnType<typeof seedState>) => {
+    state.agentGroups = [];
+    localStorage.setItem("agentes.team.view", "chart");
+    await go(state, "team");
+    await click(screen().getByRole("radio", { name: "Por setor" }));
+  };
+
+  test("says what setores give, and its button creates the first one in place", async () => {
+    const state = seedState();
+    await bySector(state);
+    const empty = document.querySelector(".team-chart .ac-empty--page") as HTMLElement;
+    expect(empty.textContent).toContain("Organize o time por área");
+    expect(empty.querySelector(".ac-sticker")).not.toBeNull();
+    await click(within(empty).getByRole("button", { name: "Criar setor" }));
+    const dialog = screen().getByRole("dialog", { name: "Novo setor" });
+    await type(within(dialog).getByLabelText("Nome"), "Vendas");
+    await click(within(dialog).getByRole("button", { name: "Criar setor" }));
+    expect(calls(state, "agentGroups.create")).toEqual([[{ name: "Vendas", color: "graphite", icon: "person" }]]);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(document.querySelector(".team-chart .ac-empty")).toBeNull();
+    expect(screen().getByRole("region", { name: "Vendas" })).toBeTruthy();
+  });
+
+  test("who can't manage agents gets the honest line and no button", async () => {
+    const state = asMember();
+    await bySector(state);
+    const empty = document.querySelector(".team-chart .ac-empty--page") as HTMLElement;
+    expect(empty.textContent).toContain("Quem gerencia os agentes cria os setores");
+    expect(within(empty).queryByRole("button")).toBeNull();
   });
 });
 

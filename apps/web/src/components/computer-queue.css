@@ -56,6 +56,31 @@ html:not([data-pointer]) .cq-link:focus-visible {
   font-weight: 500;
   color: var(--faint);
 }
+.cq__fill {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink);
+}
+.cq__open {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .cq__open:hover .cq__l1 b {
+    color: var(--agent);
+  }
+}
+html:not([data-pointer]) .cq__open:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
 .cq__empty,
 .cq__rule {
   margin: 0;
@@ -75,13 +100,13 @@ html:not([data-pointer]) .cq-link:focus-visible {
 /* Face, then two lines: who and when, then what and where. The face sits on the first line. */
 .cq__row {
   display: grid;
-  grid-template-columns: 20px 1fr;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px;
   padding: 8px;
   border-radius: 8px;
 }
-.cq__row > .ac-avatar {
+.cq__row .ac-avatar {
   margin: 1px;
 }
 .cq__row[data-mine] {
@@ -240,11 +265,7 @@ html:not([data-pointer]) .cq-link:focus-visible {
   }
 }
 
-/* An agent's usage line (UsageQueue.tsx): the row answering now, a row's "Não rodar", and "Não rodar nenhuma" asked in place. */
-.cq__time[data-now] {
-  color: var(--agent);
-  font-weight: 600;
-}
+/* An agent's usage line (UsageQueue.tsx): a row's "Não rodar", and "Não rodar nenhuma" asked in place. */
 .cq-confirm {
   display: flex;
   margin: 0;

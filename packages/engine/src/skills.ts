@@ -1,5 +1,5 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, eq, gt, inArray, isNull, lte, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { mapInBatches } from "./batches";
@@ -1644,7 +1644,14 @@ export async function skillFile(deps: SkillDeps, s: SkillRow, path: string, vers
   const store = await deps.blobs.forConfig(s.orgId, f.storageConfigId);
   const object = await store.get(f.blobKey);
   if (!object) throw new NotFoundError(`The stored file ${path} is missing`);
-  return { path, mime: f.mime, size: f.size, data: object.body, text: classifyFile(path).kind === "text" };
+  return {
+    path,
+    mime: f.mime,
+    size: f.size,
+    data: object.body,
+    text: classifyFile(path).kind === "text",
+    stored: { storageConfigId: f.storageConfigId, blobKey: f.blobKey, size: f.size },
+  };
 }
 
 export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string, version = s.version) {
@@ -1670,10 +1677,10 @@ export async function getSkillFile(
 }
 
 /**
- * Every kept file of the skill's version (text, binaries and scripts), with bytes: what `run_skill_script` copies
- * onto the computer.
+ * Every kept file of the skill's version (text, binaries and scripts) up to `maxBytes`, with bytes: what
+ * `run_skill_script` writes onto the computer.
  */
-export async function skillFolderFiles(deps: SkillDeps, s: SkillRow, paths?: string[]) {
+export async function skillFolderFiles(deps: SkillDeps, s: SkillRow, paths?: string[], maxBytes?: number) {
   const rows = await deps.db
     .select()
     .from(skillFiles)
@@ -1682,6 +1689,7 @@ export async function skillFolderFiles(deps: SkillDeps, s: SkillRow, paths?: str
         eq(skillFiles.skillId, s.id),
         eq(skillFiles.version, s.version),
         paths ? inArray(skillFiles.path, paths) : undefined,
+        maxBytes === undefined ? undefined : lte(skillFiles.size, maxBytes),
       ),
     );
   const read = await mapInBatches(rows, BLOB_BATCH, async (f) => {
@@ -1691,4 +1699,17 @@ export async function skillFolderFiles(deps: SkillDeps, s: SkillRow, paths?: str
     return object ? { path: f.path, status: f.status as SkillFileStatus, data: object.body } : null;
   });
   return read.filter((f) => f !== null);
+}
+
+/** The rest of what `skillFolderFiles` leaves out past `minBytes`, unread: these reach a computer by `copyToComputer`. */
+export async function skillFilesOver(db: Database, s: SkillRow, minBytes: number) {
+  const rows = await db
+    .select()
+    .from(skillFiles)
+    .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, s.version), gt(skillFiles.size, minBytes)));
+  return rows.flatMap((f) =>
+    f.status === "ignored" || !f.blobKey
+      ? []
+      : [{ path: f.path, storageConfigId: f.storageConfigId, blobKey: f.blobKey, size: f.size }],
+  );
 }

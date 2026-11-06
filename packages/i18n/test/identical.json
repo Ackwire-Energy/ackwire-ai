@@ -416,9 +416,13 @@
       "teamPlan.card.skills",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
-      "team.list.col.roles"
+      "team.list.col.roles",
+      "connectAi.pick.plan"
     ],
     "fr": [
+      "deleteAccount.agentCount",
+      "deleteAccount.messageCount",
+      "queue.fill.routine",
       "access.agentCol",
       "agent.builtinName",
       "agent.handleLabel",
@@ -763,7 +767,8 @@
       "team.sectors.routines",
       "files.video.pause",
       "files.video.volume",
-      "taskManager.waitGroup.routines"
+      "taskManager.waitGroup.routines",
+      "agentPage.work.brain.speeds.standard"
     ],
     "de": [
       "access.agentCol",
@@ -1123,9 +1128,11 @@
       "team.list.col.agent",
       "team.list.col.person",
       "approvals.review.state",
-      "agentSide.label"
+      "agentSide.label",
+      "agentPage.work.brain.speeds.standard"
     ],
     "it": [
+      "queue.fill.routine",
       "access.area.browser",
       "access.area.desktop",
       "access.cell",
@@ -1411,9 +1418,12 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "files.video.volume",
-      "taskManager.waitGroup.routines"
+      "taskManager.waitGroup.routines",
+      "agentPage.work.brain.speeds.standard"
     ],
     "nl": [
+      "deleteAccount.agentCount",
+      "queue.fill.routine",
       "access.agentCol",
       "access.area.browser",
       "access.area.skills",
@@ -2611,9 +2621,11 @@
       "endpoint.styles.openai",
       "endpoint.styles.anthropic",
       "teamTemplates.agents.ada.role",
-      "teamTemplates.channels.ada"
+      "teamTemplates.channels.ada",
+      "connectAi.pick.plan"
     ],
     "pl": [
+      "deleteAccount.agentCount",
       "access.agentCol",
       "agent.builtinName",
       "agentPage.fields.model",
@@ -2831,7 +2843,8 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.agents",
-      "team.list.col.agent"
+      "team.list.col.agent",
+      "connectAi.pick.plan"
     ],
     "ru": [
       "agent.builtinName",

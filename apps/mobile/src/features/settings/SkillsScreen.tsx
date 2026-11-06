@@ -21,7 +21,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
-import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   changedByText,
@@ -37,6 +37,7 @@ import {
   skillPendingViews,
   skillPickOf,
   skillRefusalText,
+  skillRemovalText,
   skillSourceViaText,
   skillUpdateErrorText,
   skillUpdateWords,
@@ -55,6 +56,7 @@ import { useOrg } from "@/providers/org";
 import {
   Button,
   DiffView,
+  EmptyState,
   Filters,
   GroupedFooter,
   GroupedHeader,
@@ -69,6 +71,7 @@ import { SocialMark } from "@/ui/auth/SocialMarks";
 import { Note } from "../ai/parts";
 import { MessageText } from "../chat/MessageText";
 import { ConnectSheet } from "../connectors/ConnectSheet";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors } from "../shared/hooks";
 import { goBack, successHaptic } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
@@ -97,6 +100,8 @@ export function SkillsScreen() {
   const [q, setQ] = useState("");
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   const shown = searchSkills(list, q);
+  const none = skills.isSuccess && list.length === 0;
+  const install = () => router.push("/settings/skills/new");
   return (
     <SettingsPage title={t("skills.title")}>
       <GroupedFooter>{t("settings.sectionText.skills")}</GroupedFooter>
@@ -110,15 +115,14 @@ export function SkillsScreen() {
         </View>
       ) : (
         <>
-          <Gap />
-          <GroupedList>
-            <GroupedRow
-              icon="plus"
-              label={t("skills.install")}
-              chevron
-              onPress={() => router.push("/settings/skills/new")}
-            />
-          </GroupedList>
+          {none ? null : (
+            <>
+              <Gap />
+              <GroupedList>
+                <GroupedRow icon="plus" label={t("skills.install")} chevron onPress={install} />
+              </GroupedList>
+            </>
+          )}
           {settings.data ? (
             <>
               <Gap />
@@ -154,9 +158,15 @@ export function SkillsScreen() {
               <Note icon="x">{t("common.loadFailed")}</Note>
             </View>
           ) : null}
-          {skills.isSuccess && list.length === 0 ? <GroupedFooter>{t("skills.empty")}</GroupedFooter> : null}
+          {none ? <FirstUse place="skills" size="panel" acts label={t("skills.install")} onPress={install} /> : null}
           {list.length > 0 && shown.length === 0 ? (
-            <GroupedFooter>{t("skills.noResults", { q: q.trim() })}</GroupedFooter>
+            <EmptyState
+              size="inline"
+              title={t("skills.noResults", { q: q.trim() })}
+              action={
+                <Button variant="secondary" size="sm" label={t("filters.clearSearch")} onPress={() => setQ("")} />
+              }
+            />
           ) : null}
           {shown.length > 0 ? (
             <GroupedList>
@@ -224,16 +234,7 @@ export function SkillScreen({ id }: { id: string }) {
   const remove = (item: SkillDetail) =>
     confirmAction({
       title: t("skills.removeTitle", { name: item.name }),
-      text:
-        users.length > 0
-          ? t("skills.removeAgents", {
-              count: users.length,
-              names: joinNames(
-                users.map((a) => a.name),
-                t,
-              ),
-            })
-          : t("skills.removeNone"),
+      text: skillRemovalText(t, users),
       action: t("skills.remove"),
       cancel: t("common.cancel"),
       onConfirm: () =>
@@ -787,6 +788,7 @@ function InstallSkill({ initialUrl }: { initialUrl?: string }) {
     <SettingsPage
       title={t("skills.install")}
       action={{ label: t("skills.installSubmit"), disabled: busy, onPress: () => void submit() }}
+      locked={busy}
     >
       <View style={styles.tabs}>
         <Segmented
@@ -996,6 +998,7 @@ export function EditSkillScreen({ id }: { id: string }) {
       title={t("skills.edit")}
       subtitle={s?.name}
       action={{ label: t("skills.save"), disabled: !ready, onPress: save }}
+      locked={action.isPending}
     >
       {!form ? (
         skill.isError ? (

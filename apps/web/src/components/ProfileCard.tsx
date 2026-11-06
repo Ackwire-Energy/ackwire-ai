@@ -38,7 +38,7 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { clearsText, isOutOfOffice } from "@agenteschat/client/lib/presence";
+import { isOutOfOffice, statusEndNote } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
@@ -49,6 +49,7 @@ import {
   Button,
   EmojiPickerPopover,
   Icon,
+  Locked,
   Menu,
   Meter,
   PlanMeter,
@@ -68,6 +69,7 @@ import { useOpensComputer } from "@/components/computer/facts";
 import { useOpenComputer } from "@/components/computer/open";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { LetMeTalkButton, useWidenAsk } from "@/components/ReachLines";
 import { useEmojiLabels } from "@/components/Reactions";
@@ -122,6 +124,11 @@ export function ProfileTrigger({
   const agentEntries = useAgentMenu();
   const personEntries = usePersonMenu();
   const button = useRef<HTMLButtonElement>(null);
+  // The trigger takes the focus before the card goes: what opens from the card (the agent's panel) gives it back there.
+  const leave = () => {
+    if (document.activeElement?.closest(".mcard__frame")) button.current?.focus();
+    card.close();
+  };
   const menu = entityMenu(() => {
     if (actor.type === "agent") {
       const agent = dir.agentById.get(actor.id);
@@ -156,9 +163,9 @@ export function ProfileTrigger({
         // A press inside a card the pointer opened keeps it (its menus and pickers open outside it).
         <div className="mcard__frame" onPointerDownCapture={() => card.open === "hover" && card.onOpenChange(true)}>
           {actor.type === "agent" ? (
-            <AgentCard agentId={actor.id} onDone={card.close} />
+            <AgentCard agentId={actor.id} onDone={leave} />
           ) : (
-            <PersonCard userId={actor.id} onDone={card.close} />
+            <PersonCard userId={actor.id} onDone={leave} />
           )}
         </div>
       )}
@@ -252,33 +259,42 @@ function MessageBox({ target, label, onSent }: { target: DmTarget; label: string
     );
   };
   return (
-    <div className="ac-input-affix mcard__dm">
-      <input
-        ref={field}
-        value={text}
-        placeholder={label}
-        aria-label={label}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-          e.preventDefault();
-          submit();
-        }}
-      />
-      <EmojiPickerPopover
-        labels={emojiLabels}
-        side="top"
-        align="end"
-        onPick={(emoji) => {
-          setText((v) => v + emoji);
-          field.current?.focus();
-        }}
-        trigger={
-          <button type="button" className="mcard__emoji" aria-label={t("presence.emoji")} title={t("presence.emoji")}>
-            <Icon name="smile" size={18} />
-          </button>
-        }
-      />
+    <div className="mcard__foot">
+      <Locked when={send.isPending}>
+        <div className="ac-input-affix mcard__dm">
+          <input
+            ref={field}
+            value={text}
+            placeholder={label}
+            aria-label={label}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+              e.preventDefault();
+              submit();
+            }}
+          />
+          <EmojiPickerPopover
+            labels={emojiLabels}
+            side="top"
+            align="end"
+            onPick={(emoji) => {
+              setText((v) => v + emoji);
+              field.current?.focus();
+            }}
+            trigger={
+              <button
+                type="button"
+                className="mcard__emoji"
+                aria-label={t("presence.emoji")}
+                title={t("presence.emoji")}
+              >
+                <Icon name="smile" size={18} />
+              </button>
+            }
+          />
+        </div>
+      </Locked>
     </div>
   );
 }
@@ -297,6 +313,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
   // Presence and line as the others see them (ADR 0084): a hidden person reads offline, to themselves hidden.
   const shown = usePersonPresence(userId);
   const line = shown?.status ? personLine(shown.status) : null;
+  const endNote = shown?.status && statusEndNote(t, i18n.language, shown.status.until, userId === me.user.id);
   const seen = person?.lastSeenAt
     ? t("presence.seen", { when: relativeTime(t, i18n.language, person.lastSeenAt) })
     : null;
@@ -350,7 +367,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
           </span>
           <span>
             {line.text}
-            <small>{clearsText(t, i18n.language, shown.status.until)}</small>
+            {endNote && <small>{endNote}</small>}
           </span>
         </div>
       )}
@@ -485,7 +502,11 @@ function RightHandCardBody({ agent, onDone }: { agent: Agent; onDone: () => void
     <CardShell
       agent
       sky={<ProfileSky color={colorOf(agent)} />}
-      face={<AgentAvatar agentId={agent.id} size="lg" name={agent.name} />}
+      face={
+        <OpensAgent agentId={agent.id} onOpen={onDone}>
+          <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
+        </OpensAgent>
+      }
     >
       <div className="list-col mcard__names">
         <span className="profile-card__name">{agent.name}</span>
@@ -592,14 +613,16 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       agent
       sky={<ProfileSky color={colorOf(agent)} busy={busy} />}
       face={
-        <AgentAvatar
-          agentId={agent.id}
-          size="lg"
-          name={agent.name}
-          presence={shown?.presence ?? null}
-          presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
-          asleep={isOutOfOffice(shown?.line)}
-        />
+        <OpensAgent agentId={agent.id} onOpen={onDone}>
+          <AgentAvatar
+            agentId={agent.id}
+            size="lg"
+            name={agent.name}
+            presence={shown?.presence ?? null}
+            presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
+            asleep={isOutOfOffice(shown?.line)}
+          />
+        </OpensAgent>
       }
       act={
         toComputer && (
@@ -758,15 +781,17 @@ function AudienceEdit({ agent }: { agent: Agent }) {
         }
       >
         <span className="mcard-audience__title">{t("audience.title", g)}</span>
-        <AudienceChoice
-          compact
-          value={draft}
-          onChange={setDraft}
-          ownerUserId={agent.ownerUserId}
-          agentName={agent.name}
-          idPrefix={`mcard-audience-${agent.id}`}
-          onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
-        />
+        <Locked when={update.isPending}>
+          <AudienceChoice
+            compact
+            value={draft}
+            onChange={setDraft}
+            ownerUserId={agent.ownerUserId}
+            agentName={agent.name}
+            idPrefix={`mcard-audience-${agent.id}`}
+            onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
+          />
+        </Locked>
         {!valid && (
           <span className="small mcard-audience__err" role="alert">
             {draft.mode === "owner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone")}
@@ -779,7 +804,8 @@ function AudienceEdit({ agent }: { agent: Agent }) {
           <Button
             size="sm"
             variant="primary"
-            disabled={!valid || update.isPending}
+            disabled={!valid}
+            loading={update.isPending}
             onClick={async () => {
               if (!(await asks.ask(draft)([]))) return;
               update.mutate(

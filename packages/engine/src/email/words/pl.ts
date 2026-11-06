@@ -255,7 +255,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} to twój kod do usunięcia przestrzeni roboczej`,
-    subjectAccount: (code) => `${code} to twój kod do usunięcia konta`,
+    subjectAccount: (code) => `${code} to twój kod do usunięcia całego konta`,
     preheader: "Wpisz go w agentes.chat, żeby potwierdzić. Działa przez 10 minut.",
     headline: "Twój kod",
     workspace: (org) => [
@@ -264,9 +264,9 @@ export const words: EmailWords = {
       ". Od razu zamknie się dla wszystkich, a po 7 dniach zostanie usunięta na dobre.",
     ],
     account: (email) => [
-      "Wpisz ten kod, żeby usunąć konto ",
+      "Wpisz ten kod, żeby usunąć całe konto ",
       { b: email },
-      ". Zniknie od razu, a razem z nim zamkną się przestrzenie robocze, w których jesteś tylko ty.",
+      ", a nie tylko jedną przestrzeń roboczą. Od razu zostanie wylogowane wszędzie i po 7 dniach usunięte na dobre, a razem z nim zamkną się przestrzenie robocze, w których jesteś tylko ty.",
     ],
     support: (address) => [
       "Działa przez 10 minut i bez niego nic nie zostanie usunięte. Jeśli to nie ty, nikomu go nie podawaj i napisz na ",
@@ -311,6 +311,28 @@ export const words: EmailWords = {
     button: "Zobacz podłączone aplikacje",
     why: (org) =>
       `Otrzymujesz tę wiadomość, ponieważ do twojego konta w przestrzeni roboczej ${org} w agentes.chat podłączono aplikację.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Twoje konto agentes.chat zostanie usunięte ${day}`,
+    preheader: "Masz 7 dni, żeby zmienić zdanie.",
+    headline: "Twoje konto jest usuwane",
+    body: (email, day, time) => [
+      "Usuniemy konto ",
+      { b: email },
+      ` ${day} o ${time}. Zostało wylogowane wszędzie i nikt nie może się tu z tobą skontaktować, dopóki nie wrócisz.`,
+    ],
+    closes: (count, names) => [
+      plural("pl", count, {
+        one: "Przestrzeń robocza, w której nie było nikogo poza tobą, właśnie się zamknęła i zniknie tego samego dnia: ",
+        other:
+          "Przestrzenie robocze, w których nie było nikogo poza tobą, właśnie się zamknęły i znikną tego samego dnia: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Zmieniasz zdanie? Zaloguj się przed tą datą i naciśnij Przywróć.",
+    button: "Zaloguj się, aby przywrócić",
+    why: "Otrzymujesz tę wiadomość, ponieważ ten adres ma konto w agentes.chat.",
   },
   accountDeleted: {
     subject: "Twoje konto agentes.chat zostało usunięte",

@@ -9,9 +9,10 @@ import {
   type TokenPrices,
   usdToNanoUsd,
 } from "./catalog";
-import { openAIError } from "./openai";
+import { openAIError, saidIn } from "./openai";
 import {
   type ContentBlock,
+  deniedError,
   estimateTokens,
   laidOut,
   type ModelProvider,
@@ -472,24 +473,35 @@ function costOf(u: Usage): number | undefined {
 }
 
 /** A failure by its status: HTTP, or the code of an error inside the stream (which arrives with HTTP 200). */
-function statusError(status: number | undefined): ProviderError {
+function statusError(status: number | undefined, said = ""): ProviderError {
   if (status === 401) return new ProviderError("invalid provider API key", false, 401);
   if (status === 402) return new ProviderError("no prepaid credit left at the provider", false, 402);
-  if (status === 403) return new ProviderError("provider denied access", false, 403);
+  if (status === 403) return deniedError(null, said);
   if (status === 429) return new ProviderError("rate limited by provider", true, 429);
   if (status === undefined || status === 408 || status >= 500) return new ProviderError("provider error", true, status);
-  return new ProviderError(`provider rejected the request (${status})`, false, status);
+  return new ProviderError(`provider rejected the request (${status})${said ? `: ${said}` : ""}`, false, status);
 }
 
 function routerError(error: unknown, compatible: boolean): ProviderError {
   if (error instanceof OpenAI.APIConnectionError || error instanceof OpenAI.APIUserAbortError)
     return openAIError(error);
   if (error instanceof OpenAI.APIError) {
-    const mapped = statusError(error.status ?? (Number(error.code) || undefined));
+    const status = error.status ?? (Number(error.code) || undefined);
+    const said = saidIn(error);
     // A workspace's own endpoint: its admin reads the server's words to fix it (a model name, a missing feature).
-    return compatible && error.message
-      ? new ProviderError(`${mapped.message}: ${error.message.slice(0, 300)}`, mapped.retryable, mapped.status)
-      : mapped;
+    if (compatible && error.message) {
+      const mapped = statusError(status);
+      return new ProviderError(
+        `${mapped.message}: ${error.message.slice(0, 300)}`,
+        mapped.retryable,
+        mapped.status,
+        undefined,
+        said,
+      );
+    }
+    const mapped = statusError(status, said);
+    mapped.said = said;
+    return mapped;
   }
   return openAIError(error);
 }

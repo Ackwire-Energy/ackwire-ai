@@ -85,7 +85,7 @@ html:not([data-pointer]) .home-sec__more:focus-visible {
 }
 html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .home-row__face {
   display: flex;
@@ -119,10 +119,24 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   line-height: 18px;
   color: var(--muted);
 }
-/* The button sits on the first line, beside the title. */
+/* The button sits on the first line, beside the title: centred on its 20px line, and with the title's rise to the
+   face's top when a line follows it (RowBody puts `.ac-captop` on it then; the rise is measured in the button's 13px
+   type, within half a pixel of the title's). */
 .home-row__act {
   align-self: start;
-  margin-top: -4px;
+  margin-top: calc((20px - var(--control-h-sm)) / 2);
+}
+.home-row:has(> .home-row__text > .ac-captop) > .home-row__act {
+  margin-top: calc((20px - var(--control-h-sm)) / 2 + var(--cap-top) - 10px);
+}
+/* Touch grows a small button to 40px. */
+@media (pointer: coarse) {
+  .home-row__act {
+    margin-top: calc((20px - var(--control-h-md)) / 2);
+  }
+  .home-row:has(> .home-row__text > .ac-captop) > .home-row__act {
+    margin-top: calc((20px - var(--control-h-md)) / 2 + var(--cap-top) - 10px);
+  }
 }
 /* A system face (a computer, a request to join): the same 32px tile as a person's. */
 .home-row__sys {
@@ -148,10 +162,6 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   color: var(--muted);
 }
 
-.home-calm {
-  margin-bottom: 0;
-}
-
 /* The mural's head: its title and count, Organize and + at its end. */
 .home-sec__acts {
   display: flex;
@@ -162,10 +172,6 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
 .home-sec__acts .home-sec__more {
   margin-left: 0;
   margin-right: 8px;
-}
-/* A fixed tile: its rows from edge to edge; the calm card fills it without a frame of its own. */
-.home-mural .wg--fixed .home-calm {
-  margin: 0 16px 8px;
 }
 .home-mural .wg--fixed .wg__head .home-sec__more {
   margin-right: 6px;

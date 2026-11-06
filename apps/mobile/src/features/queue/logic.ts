@@ -19,12 +19,16 @@ export function machineOfAgents(
   return null;
 }
 
-/** Where a turn answers: one of my DMs, a channel I can see (or a thread in it), else a private conversation. */
+/**
+ * Where a turn answers: agents' private conversation for who may see that work, one of my DMs, a channel I can see
+ * (or a thread in it), else a private conversation.
+ */
 export function queuePlace(
   where: QueueWhere,
   channels: readonly Pick<Channel, "id" | "name" | "visibility" | "isMember">[] | undefined,
   dms: readonly Pick<DirectMessage, "channelId">[] | undefined,
 ): QueuePlace {
+  if (where.agents) return { kind: "agents" };
   if (dms?.some((d) => d.channelId === where.channelId)) return { kind: "dm", mine: true };
   const ch = channels?.find((c) => c.id === where.channelId);
   if (!ch || (ch.visibility === "private" && !ch.isMember)) return { kind: "hidden" };

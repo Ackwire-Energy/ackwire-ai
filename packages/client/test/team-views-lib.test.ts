@@ -4,6 +4,7 @@ import {
   chartByPerson,
   filterTeam,
   mapColumns,
+  noSectorsCopy,
   reportsTo,
   sectorGap,
   sectorReach,
@@ -31,6 +32,11 @@ const eng: AgentGroup = { id: "g-eng", name: "Engenharia", agentIds: ["Kai", "Ad
 const members = new Set(["u-lukas", "u-amara"]);
 
 describe("Equipe's views (ADR 0148)", () => {
+  test("an empty Setores offers the first one only to who can create it", () => {
+    expect(noSectorsCopy(true).title).toBe("team.sectors.emptyTitle");
+    expect(noSectorsCopy(false).text).toBe("team.sectors.emptyViewer");
+  });
+
   test("the list: a filter, then a search by name, role or a channel's name", () => {
     const names = (list: TeamAgent[]) => list.map((a) => a.name);
     const all = [ada, kai, milo];

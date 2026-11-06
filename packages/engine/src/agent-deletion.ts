@@ -4,7 +4,7 @@ import { recordAudit } from "./audit";
 import { invalidateOrg } from "./cache";
 import { stopOrgWork } from "./cancel";
 import { NotFoundError } from "./errors";
-import { publishOrgEvent } from "./events";
+import { publishAgentsChanged, publishChannelsChanged, publishOrgEvent } from "./events";
 import { announceReleasedAccounts, releaseAgentLogin } from "./machine-accounts";
 import { publishMachineAgentsChanged } from "./machines";
 import { concludeMission, type MissionDeps, OPEN_MISSION_STATUSES } from "./missions";
@@ -101,6 +101,7 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
         brainFallback: true,
         brainAccountId: null,
         brainEffort: null,
+        brainSpeed: "standard",
         browserAllowedDomains: null,
         browserMachineId: null,
         operatorHoldAt: null,
@@ -190,6 +191,8 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
   for (const { groupKey } of waiting) await resolveNotifications(deps, orgId, { groupKey });
   await announceReleasedAccounts(deps.pubsub, released);
   for (const dm of dms) await publishOrgEvent(deps.pubsub, { type: "channel.archived", orgId, channelId: dm.id });
+  await publishAgentsChanged(deps.pubsub, orgId);
+  await publishChannelsChanged(deps.pubsub, orgId);
   // Its computer lists its agents again without it: the runner stops its desktop and takes back lent folders.
   await publishMachineAgentsChanged(deps.pubsub, orgId);
 }

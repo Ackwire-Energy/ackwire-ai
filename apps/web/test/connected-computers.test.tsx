@@ -284,8 +284,8 @@ describe("Configurações → Computadores", () => {
     expect(screen().queryByRole("region", { name: "Onde os agentes trabalham" })).toBeNull();
     expect(body.textContent).not.toMatch(/Na nuvem|No seu computador|Computador na nuvem/);
     expect(screen().getByRole("region", { name: "Outros computadores" })).toBeTruthy();
-    // The empty state is its title: how to connect one is the card right under it.
-    expect(screen().getByText("Nenhum outro computador ainda")).toBeTruthy();
+    // How to connect one is the card right under it: the empty state's button goes there.
+    expect(screen().getByText("Rode agentes em qualquer computador")).toBeTruthy();
     expect(body.textContent).not.toContain("Conecte um Mac pelo app agentes");
     expect(screen().getByRole("region", { name: "Conectar outro computador" })).toBeTruthy();
     // Never internal names in the UI.
@@ -583,7 +583,13 @@ describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
     computer: "MacBook do Walter",
     command: "agentes-runner folders allow /Users/you/Projects/loja-v5 --agent ada",
   };
-  const post = (state: ReturnType<typeof seedState>, id: string, bodyCode: string, bodyParams: object) => {
+  const post = (
+    state: ReturnType<typeof seedState>,
+    id: string,
+    bodyCode: string,
+    bodyParams: object,
+    machineId?: string,
+  ) => {
     const base = state.messages[0] as (typeof state.messages)[number];
     state.messages.push({
       ...base,
@@ -592,10 +598,22 @@ describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
       author: { type: "agent", id: ADA_ID },
       body: "Ada asked for a folder.",
       mentionedAgentIds: [],
-      meta: { bodyCode, bodyParams },
+      meta: { bodyCode, bodyParams, ...(machineId ? { machineAccess: { machineId } } : {}) },
       createdAt: new Date().toISOString(),
     });
   };
+
+  test("a note about the workspace's own computer shows no command: nobody can run it there", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const m = fakeMachinesOf.get(api)?.pair({ name: "Computador da Acme", kind: "managed" }) as Machine;
+    post(state, "m-ask", "machine_access_requested", params, m.id);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const ask = document.querySelector('[data-message-id="m-ask"]') as HTMLElement;
+    expect(ask.textContent).not.toContain("Rode no Terminal dele");
+    expect(ask.querySelector(".machine-command__code")).toBeNull();
+  });
 
   test("waiting on the computer, with the command for a computer without the app; then Liberado", async () => {
     const state = seedState();

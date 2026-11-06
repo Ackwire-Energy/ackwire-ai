@@ -319,6 +319,28 @@ describe("the author's own plan", () => {
     }
   });
 
+  test("in a thread too: a reply to one agent's message goes to that agent, whoever spoke last", async () => {
+    const { hub, handlers } = await plansOnly();
+    const ops = await createAgent(f.db, f.owner.id, f.org.id, { name: "Ops", handle: "ops" }, { model: "auto" });
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ops.id });
+    const root = await byAgent(f.agent.id, "O deploy de ontem falhou.");
+    const inThread = (agentId: string, body: string) =>
+      insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        threadId: root.id,
+        author: { type: "agent", agentId, runId: null, hop: 1, stretchId: null },
+        body,
+      });
+    const report = await inThread(f.agent.id, "Falhou na migração.");
+    await inThread(ops.id, "Os discos estão bem.");
+    await drain(handlers);
+    const quoted = await post(f.owner.id, "por que falhou?", { threadId: root.id, replyTo: report.id });
+    await drain(handlers);
+    expect(hub.calls).toHaveLength(0);
+    expect(await decisionOf(quoted.id)).toMatchObject({ strategy: "rule:reply", selectedAgentIds: [f.agent.id] });
+  });
+
   test("an agent's own message goes through Jev or a model only: no plan, no rule", async () => {
     const { hub, handlers } = await plansOnly();
     const ops = await createAgent(f.db, f.owner.id, f.org.id, { name: "Ops", handle: "ops" }, { model: "auto" });

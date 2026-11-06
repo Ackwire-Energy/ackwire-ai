@@ -273,9 +273,26 @@ html:not([data-pointer]) .dm-side__row--link:focus-visible {
   margin: 0;
   color: var(--ink);
 }
-/* Its plan for this person, in a column this narrow: the row's text under its icon's line. */
+/* Its plan for this person, in a column this narrow: the words take the row beside the icon and the buttons go under
+   them, from their edge (the 30px icon and the 12px gap); beside the words they squeezed them to a word a line. */
 .dm-side__sec .settings-row {
+  flex-wrap: wrap;
+  gap: 10px 12px;
   padding: 0 0 10px;
+  border-top: 0;
+}
+.dm-side__sec .settings-row > .settings-row__text {
+  flex: 1 1 0;
+}
+/* Stronger than the rule that keeps an end on the name's 22px line (a lead row with help text). */
+.dm-side .dm-side__sec .settings-row.settings-row--lead > .settings-row__end {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  height: auto;
+  padding-left: 42px;
+}
+.dm-side__sec .rh-set__acts {
+  flex-wrap: wrap;
 }
 /* The header's toggle: a plate while it is open. */
 .dm-side-toggle.ac-btn[aria-pressed="true"] {

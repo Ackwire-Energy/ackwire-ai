@@ -2516,8 +2516,8 @@ test.if(posix)("a person's input goes through the daemon's command relay, in ord
     expect(res).toEqual({ accepted: 6 });
     // Nothing goes over the stream socket but the frame rate.
     expect(socket.sent).toEqual([]);
-    expect(relay.received.map((r) => r.path)).toEqual(Array(5).fill("/api/command"));
-    expect(relay.received.map((r) => r.origin)).toEqual(Array(5).fill(`http://127.0.0.1:${relay.port}`));
+    expect(relay.received.map((r) => r.path)).toEqual(Array(6).fill("/api/command"));
+    expect(relay.received.map((r) => r.origin)).toEqual(Array(6).fill(`http://127.0.0.1:${relay.port}`));
     expect(relay.received.every((r) => r.type === "application/json")).toBe(true);
     expect(relay.received.map((r) => r.body.type ?? r.body.action)).toEqual([
       "mouseMoved",
@@ -2525,11 +2525,12 @@ test.if(posix)("a person's input goes through the daemon's command relay, in ord
       "mouseReleased",
       "press",
       "keyboard",
+      "evaluate",
     ]);
     expect(relay.received[1]?.body).toMatchObject({ action: "input_mouse", x: 5, y: 6, button: "left", clickCount: 1 });
     expect(relay.received[3]?.body).toMatchObject({ action: "press", key: "Enter" });
     expect(relay.received[4]?.body).toMatchObject({ subaction: "insertText", text: "senha-ção" });
-    expect(new Set(relay.received.map((r) => r.body.id)).size).toBe(5);
+    expect(new Set(relay.received.map((r) => r.body.id)).size).toBe(6);
     // Never typed text on a command line.
     expect(t.logged().some((c) => c.args.join(" ").includes("senha") || c.stdin.includes("senha"))).toBe(false);
     // Two batches sent at once still reach the browser in the order they came.
@@ -2539,6 +2540,43 @@ test.if(posix)("a person's input goes through the daemon's command relay, in ord
       t.manager.input(dev, [{ kind: "mouse", type: "mouseReleased", x: 1, y: 1 }]),
     ]);
     expect(relay.received.map((r) => r.body.type)).toEqual(["mousePressed", "mouseReleased"]);
+  } finally {
+    relay.server.stop(true);
+  }
+});
+
+test.if(posix)("text with nothing on the page to take it is said, and the picture is taken again", async () => {
+  const t = setup({ firstFrameMs: 5 });
+  let takes: unknown = false;
+  const relay = fakeRelay((body) => (body.action === "evaluate" ? { data: { result: takes } } : { success: true }));
+  try {
+    await t.act("open", ["https://shop.example.com"]);
+    t.page({ port: relay.port });
+    await t.manager.streamStart(dev, "control");
+    const socket = t.sockets[0] as FakeSocket;
+    socket.push({ type: "status", connected: true, viewportWidth: 1280, viewportHeight: 720 });
+    socket.push({ type: "frame", seq: 7, data: "/9j/B", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+    const pictures = () => t.frames.filter((f) => f.type === "browser.frame").length;
+    const before = pictures();
+    // Chrome answers `Input.insertText` the same whether or not the text landed.
+    expect(await t.manager.input(dev, [{ kind: "text", text: "a" }])).toEqual({ accepted: 1, nowhere: true });
+    await waitFor(() => pictures() > before);
+    // Once per batch, and only for text.
+    relay.received.length = 0;
+    await t.manager.input(dev, [
+      { kind: "text", text: "a" },
+      { kind: "text", text: "b" },
+      { kind: "key", type: "keyDown", key: "Enter" },
+    ]);
+    expect(relay.received.filter((r) => r.body.action === "evaluate")).toHaveLength(1);
+    relay.received.length = 0;
+    await t.manager.input(dev, [{ kind: "key", type: "keyDown", key: "Enter" }]);
+    expect(relay.received.some((r) => r.body.action === "evaluate")).toBe(false);
+    takes = true;
+    expect(await t.manager.input(dev, [{ kind: "text", text: "a" }])).toEqual({ accepted: 1 });
+    // The page couldn't be asked: nothing is said on a guess.
+    takes = undefined;
+    expect(await t.manager.input(dev, [{ kind: "text", text: "a" }])).toEqual({ accepted: 1 });
   } finally {
     relay.server.stop(true);
   }
@@ -3269,7 +3307,7 @@ test.if(posix)("a code goes one character per field, each field checked where it
   // As many fields as characters, each one once.
   expect(await typeCode(refs.slice(0, 4))).toMatchObject({
     success: false,
-    error: expect.stringContaining("one character for each"),
+    error: expect.stringContaining("A password goes in one field at a time"),
   });
   expect(await errorCode(() => typeCode(["@e1", "@e1", "@e2", "@e3", "@e4", "@e5"]))).toBe("bad_request");
   // A field that isn't a code's stops it there.

@@ -21,7 +21,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { AgentAvatar, Button, Card, Icon, LogoMark, Text, Toggle, useTheme } from "@/ui";
+import { AgentAvatar, Button, Card, Icon, LineIcon, Locked, LogoMark, Text, Toggle, useTheme } from "@/ui";
 import { openPage } from "../ai/parts";
 import { tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
@@ -94,11 +94,10 @@ export function AiAppImport({ orgId }: { orgId: string }) {
         <Text variant="footnote" tone="ink2">
           {`3. ${t("onboarding.import.aiApp.paste")}`}
         </Text>
-        <View style={[styles.prompt, { backgroundColor: c.sunken, borderColor: c.line }]}>
-          <Text selectable variant="footnote" tone="ink2">
-            {option.prompt}
-          </Text>
-        </View>
+        {/* Flat in the card, never a plate in a card: the words to paste, selectable. */}
+        <Text selectable variant="footnote" tone="ink2">
+          {option.prompt}
+        </Text>
         <Button
           variant="secondary"
           size="sm"
@@ -121,8 +120,11 @@ export function AiAppImport({ orgId }: { orgId: string }) {
   );
 }
 
+/** A source's mark in its row. */
+const MARK = 34;
+
 /** A source's logo on a neutral tile: our own mark for our export, an icon for any other app. */
-function SourceMark({ card, size = 34 }: { card: ImportCard; size?: number }) {
+function SourceMark({ card, size = MARK }: { card: ImportCard; size?: number }) {
   const { colors: c, scheme } = useTheme();
   const logo = card === "other" || card === "agenteschat" ? null : IMPORT_LOGO[card];
   return (
@@ -177,41 +179,43 @@ function Picker({ imp }: { imp: AgentImport }) {
 
   return (
     <>
-      <Card>
-        {IMPORT_CARDS.map((card, i) => {
-          const on = imp.card === card;
-          const name = cardName(t, card);
-          return (
-            <View key={card}>
-              <Pressable
-                onPress={() => {
-                  tapHaptic();
-                  imp.setCard(on ? null : card);
-                }}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={name}
-                style={({ pressed }) => [
-                  styles.source,
-                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-                  pressed && { backgroundColor: c.sunken },
-                ]}
-              >
-                <SourceMark card={card} />
-                <Text variant="body" style={styles.fill}>
-                  {name}
-                </Text>
-                {on ? <Icon name="checkc" size={22} color={c.ink} /> : null}
-              </Pressable>
-              {on && !isRequestCard(card) ? (
-                <View style={styles.where}>
-                  <Note icon="info">{t(`mobile.newAgent.import.where.${card}`)}</Note>
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
-      </Card>
+      <Locked when={busy}>
+        <Card>
+          {IMPORT_CARDS.map((card, i) => {
+            const on = imp.card === card;
+            const name = cardName(t, card);
+            return (
+              <View key={card}>
+                <Pressable
+                  onPress={() => {
+                    tapHaptic();
+                    imp.setCard(on ? null : card);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={name}
+                  style={({ pressed }) => [
+                    styles.source,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                    pressed && { backgroundColor: c.sunken },
+                  ]}
+                >
+                  <SourceMark card={card} />
+                  <Text variant="body" style={styles.fill}>
+                    {name}
+                  </Text>
+                  {on ? <Icon name="checkc" size={24} color={c.ink} /> : null}
+                </Pressable>
+                {on && !isRequestCard(card) ? (
+                  <View style={styles.where}>
+                    <Note icon="info">{t(`mobile.newAgent.import.where.${card}`)}</Note>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </Card>
+      </Locked>
 
       {isRequestCard(imp.card) ? <RequestSteps key={imp.card} card={imp.card} /> : null}
 
@@ -235,18 +239,19 @@ function Picker({ imp }: { imp: AgentImport }) {
       <Text variant="footnote" tone="faint" style={styles.gapTop}>
         {t("mobile.newAgent.import.pasteTitle")}
       </Text>
-      <TextArea
-        value={text}
-        onChangeText={setText}
-        editable={!busy}
-        autoCapitalize="none"
-        autoCorrect={false}
-        spellCheck={false}
-        placeholder={t("onboarding.import.pastePlaceholder")}
-        accessibilityLabel={t("mobile.newAgent.import.pasteTitle")}
-        minHeight={160}
-        style={styles.paste}
-      />
+      <Locked when={busy}>
+        <TextArea
+          value={text}
+          onChangeText={setText}
+          autoCapitalize="none"
+          autoCorrect={false}
+          spellCheck={false}
+          placeholder={t("onboarding.import.pastePlaceholder")}
+          accessibilityLabel={t("mobile.newAgent.import.pasteTitle")}
+          minHeight={160}
+          style={styles.paste}
+        />
+      </Locked>
       <View style={styles.actions}>
         <Button
           variant="secondary"
@@ -402,7 +407,11 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
               ]
                 .filter(Boolean)
                 .join(". ")}
-              style={[styles.agent, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
+              style={({ pressed }) => [
+                styles.agent,
+                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                pressed && { backgroundColor: c.sunken },
+              ]}
             >
               <AgentAvatar agent={fullLook(a.appearance)} size={40} name={a.name} live={false} />
               <View style={styles.fill}>
@@ -418,7 +427,7 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
                   </Text>
                 ) : null}
               </View>
-              {a.free ? <Icon name={a.on ? "checkc" : "circle"} size={22} color={a.on ? c.ink : c.faint} /> : null}
+              {a.free ? <Icon name={a.on ? "checkc" : "circle"} size={24} color={a.on ? c.ink : c.faint} /> : null}
             </Pressable>
           );
         })}
@@ -496,7 +505,7 @@ function Note({ icon, children }: { icon: "info" | "lock" | "check"; children: s
   const { colors: c } = useTheme();
   return (
     <View style={styles.note}>
-      <Icon name={icon} size={16} color={c.faint} />
+      <LineIcon name={icon} size={16} color={c.faint} variant="footnote" />
       <Text variant="footnote" tone="muted" style={styles.fill}>
         {children}
       </Text>
@@ -518,17 +527,17 @@ const styles = StyleSheet.create({
   paste: { maxHeight: 320 },
   bold: { fontWeight: "600" },
   gapTop: { marginTop: 14 },
-  tile: { borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
+  tile: { borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
   source: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 14 },
   reading: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
   failure: { gap: 8, alignItems: "flex-start" },
   request: { gap: 8, padding: 14, alignItems: "flex-start" },
-  prompt: { alignSelf: "stretch", padding: 10, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
   previewHead: { flexDirection: "row", alignItems: "center", gap: 12 },
   agent: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
   kindRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
-  where: { paddingLeft: 60, paddingRight: 14, paddingBottom: 12 },
+  // Under the source's name: the row's side, its mark and the gap.
+  where: { paddingLeft: 14 + MARK + 12, paddingRight: 14, paddingBottom: 12 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 6 },
   todos: { gap: 10, marginTop: 14 },
   todo: { flexDirection: "row", alignItems: "center", gap: 12 },

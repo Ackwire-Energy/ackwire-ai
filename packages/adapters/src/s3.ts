@@ -17,6 +17,9 @@ export interface S3Settings {
   pathStyle: boolean;
 }
 
+/** How long a streamed object may take: the whole read, at the pace of whoever receives it. */
+const STREAM_TIMEOUT_MS = 10 * 60_000;
+
 export type StorageErrorCode =
   | "auth"
   | "bucket_missing"
@@ -132,7 +135,7 @@ export function createS3BlobStore(
   async function send(
     method: "GET" | "PUT" | "DELETE" | "HEAD",
     key: string,
-    init: { query?: Record<string, string>; body?: Uint8Array; contentType?: string } = {},
+    init: { query?: Record<string, string>; body?: Uint8Array; contentType?: string; timeoutMs?: number } = {},
   ): Promise<Response> {
     const { origin, host, path } = locate(settings, key);
     const query = init.query ?? {};
@@ -161,7 +164,7 @@ export function createS3BlobStore(
         headers: { ...sendHeaders, authorization },
         body: init.body,
         redirect: "manual",
-        signal: AbortSignal.timeout(options.timeoutMs ?? 15_000),
+        signal: AbortSignal.timeout(init.timeoutMs ?? options.timeoutMs ?? 15_000),
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -171,6 +174,17 @@ export function createS3BlobStore(
 
   const fail = async (res: Response) => s3Error(res.status, await res.text().catch(() => ""));
 
+  async function object(key: string, timeoutMs?: number) {
+    const res = await send("GET", key, { ...(timeoutMs ? { timeoutMs } : {}) });
+    if (res.status === 404) {
+      const err = await fail(res);
+      if (err.code === "not_found") return null;
+      throw err;
+    }
+    if (!res.ok) throw await fail(res);
+    return res;
+  }
+
   return {
     kind: "s3",
     async put(key, body, { contentType }) {
@@ -178,17 +192,15 @@ export function createS3BlobStore(
       if (!res.ok) throw await fail(res);
     },
     async get(key) {
-      const res = await send("GET", key);
-      if (res.status === 404) {
-        const err = await fail(res);
-        if (err.code === "not_found") return null;
-        throw err;
-      }
-      if (!res.ok) throw await fail(res);
+      const res = await object(key);
+      if (!res) return null;
       return {
         body: new Uint8Array(await res.arrayBuffer()),
         contentType: res.headers.get("content-type") ?? "application/octet-stream",
       };
+    },
+    async stream(key) {
+      return (await object(key, STREAM_TIMEOUT_MS))?.body ?? null;
     },
     async delete(key) {
       const res = await send("DELETE", key);

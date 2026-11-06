@@ -10,6 +10,7 @@ import {
   enqueue,
   enqueueAutonomyReport,
   enqueueIdleReflections,
+  enqueueOverdueAccountDeletions,
   enqueueOverdueDeletions,
   enqueueSkillUpdates,
   enqueueTeamWeeks,
@@ -222,9 +223,10 @@ export function startWorkers(deps: WorkerDeps) {
 
   every("deletions", WORKER_INTERVALS_MS.deletions, async () => {
     await pruneDeletionCodes(db);
+    const accounts = await enqueueOverdueAccountDeletions(db);
     const due = await enqueueOverdueDeletions(db);
-    if (due > 0) {
-      log.info("workspace deletions due", { due });
+    if (due + accounts > 0) {
+      log.info("workspace deletions due", { due, accounts });
       void ticks.get("outbox")?.();
     }
   });

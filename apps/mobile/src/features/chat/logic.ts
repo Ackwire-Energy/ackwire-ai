@@ -27,6 +27,7 @@ import {
   noticeRoutineName,
   skippedHandles,
 } from "@agenteschat/client/lib/notices";
+import { replyOf } from "@agenteschat/client/lib/reply";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { usagePauseCardOf } from "@agenteschat/client/lib/usage-pause";
@@ -41,6 +42,18 @@ import { continuesReply } from "./media";
  * group, what each message carries (cards from `meta`), the working line,
  * reactions, pins, the slash commands and a small Markdown reader.
  */
+
+// ── Layout ───────────────────────────────────────────────────────────────────
+
+/** A message row's side inset, its avatar column and the gap to the words (MessageRow, LiveRows, the queue's turn). */
+export const MSG_INSET = 14;
+export const MSG_AVATAR = 34;
+export const MSG_GAP = 12;
+/** Where a message's words start: event lines, receipts and what hangs under a message line up there. */
+export const MSG_TEXT = MSG_INSET + MSG_AVATAR + MSG_GAP;
+/** An event line's mark (its "small" words' size) and the gap to them: what unfolds under it starts there. */
+export const LINE_MARK = 15;
+export const LINE_GAP = 8;
 
 // ── Timeline ─────────────────────────────────────────────────────────────────
 
@@ -126,10 +139,12 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
       lastDay = day;
       prev = null;
     }
-    // A fast reply while its task works keeps its header ("enquanto trabalha"), as on the web.
+    // A fast reply while its task works keeps its header ("enquanto trabalha"), and a reply to a message starts its
+    // own block under its quote, as on the web.
     const grouped =
-      continuesReply(prev, m) ||
-      (!standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m));
+      !replyOf(m.meta) &&
+      (continuesReply(prev, m) ||
+        (!standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m)));
     const last = rows.at(-1);
     const above = grouped && last?.kind === "message" ? last : undefined;
     if (above) above.continued = true;

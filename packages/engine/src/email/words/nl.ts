@@ -236,7 +236,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} is je code om een werkruimte te verwijderen`,
-    subjectAccount: (code) => `${code} is je code om je account te verwijderen`,
+    subjectAccount: (code) => `${code} is je code om je hele account te verwijderen`,
     preheader: "Typ hem in agentes.chat om te bevestigen. Hij werkt 10 minuten.",
     headline: "Je code",
     workspace: (org) => [
@@ -245,9 +245,9 @@ export const words: EmailWords = {
       " te verwijderen. Hij gaat meteen voor iedereen dicht en wordt 7 dagen later definitief verwijderd.",
     ],
     account: (email) => [
-      "Typ deze code om het account ",
+      "Typ deze code om het hele account ",
       { b: email },
-      " te verwijderen. Het verdwijnt meteen, en de werkruimtes waar alleen jij in zit gaan mee dicht.",
+      " te verwijderen, niet alleen één werkruimte. Het wordt meteen overal uitgelogd en 7 dagen later definitief verwijderd, en de werkruimtes waar alleen jij in zit gaan mee dicht.",
     ],
     support: (address) => [
       "Hij werkt 10 minuten, en zonder deze code wordt er niets verwijderd. Was jij het niet? Deel hem dan niet en schrijf naar ",
@@ -291,6 +291,27 @@ export const words: EmailWords = {
     note: "Heb je hem niet gekoppeld? Ontkoppel hem nu en wijzig je wachtwoord.",
     button: "Gekoppelde apps bekijken",
     why: (org) => `Je krijgt deze e-mail omdat er een app is gekoppeld aan je account in ${org} op agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Je agentes.chat-account wordt op ${day} verwijderd`,
+    preheader: "Je hebt 7 dagen om van gedachten te veranderen.",
+    headline: "Je account wordt verwijderd",
+    body: (email, day, time) => [
+      "We verwijderen het account ",
+      { b: email },
+      ` op ${day} om ${time}. Het is overal uitgelogd en niemand kan je hier bereiken tot je terug bent.`,
+    ],
+    closes: (count, names) => [
+      plural("nl", count, {
+        one: "De werkruimte waar alleen jij in zat is nu gesloten en verdwijnt op dezelfde datum: ",
+        other: "De werkruimtes waar alleen jij in zat zijn nu gesloten en verdwijnen op dezelfde datum: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Toch van gedachten veranderd? Log voor die datum in en druk op Herstellen.",
+    button: "Inloggen om te herstellen",
+    why: "Je krijgt deze e-mail omdat dit adres een account heeft op agentes.chat.",
   },
   accountDeleted: {
     subject: "Je agentes.chat-account is verwijderd",

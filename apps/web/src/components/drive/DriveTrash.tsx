@@ -11,6 +11,7 @@ import { useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
 import { useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
 import { itemIcon } from "./DriveItems";
 
@@ -26,6 +27,7 @@ export function DriveTrash() {
   const { org } = useOrg();
   const api = useApi();
   const toast = useToast();
+  const look = useRightHandLook();
   const trash = useArtifactTrash(org.id);
   const remover = useDeleteArtifact();
   const authorName = useAuthorName();
@@ -49,7 +51,7 @@ export function DriveTrash() {
   if (trash.isError && !trash.data) return <ErrorState error={trash.error} onRetry={() => void trash.refetch()} />;
   if (list.length === 0) {
     return (
-      <EmptyState icon="trash" title={t("artifacts.trashEmpty")}>
+      <EmptyState size="page" agent={look} mood="deal" title={t("artifacts.trashEmpty")}>
         {t("drive.trashEmptyText")}
       </EmptyState>
     );
@@ -75,10 +77,12 @@ export function DriveTrash() {
                 <b>{a.title}</b>
                 <small>
                   <ActorAvatar size="xs" actor={a.createdBy} name={authorName(a.createdBy)} />
-                  {t("drive.trashBy", {
-                    name: authorName(a.createdBy),
-                    when: relativeTime(t, i18n.language, a.deletedAt),
-                  })}
+                  <span className="drive-trash__by">
+                    {t("drive.trashBy", {
+                      name: authorName(a.createdBy),
+                      when: relativeTime(t, i18n.language, a.deletedAt),
+                    })}
+                  </span>
                 </small>
               </span>
               <Chip

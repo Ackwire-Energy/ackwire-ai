@@ -69,7 +69,8 @@ export interface ComposerProps {
   onSend: (text: string, how: SendHow) => void;
   /** Someone is working here (null otherwise). */
   working?: ComposerWorking | null;
-  onPlus: () => void;
+  /** The "+" for attachments and actions; left out where there are none (the agent's computer). */
+  onPlus?: () => void;
   /**
    * Pills above the field while it is empty; tapping one puts its `text` (default: the `label`) in the field
    * ("Pedir revisão do Caio" fills "Pede para o Caio revisar antes").
@@ -90,6 +91,10 @@ export interface ComposerProps {
    * empty, and the field focused. Once per request (`at`).
    */
   prefill?: { text: string; at: number } | null;
+  /** A change here brings the keyboard up ("Responder" on a message). */
+  focusAt?: number;
+  /** Right above the field ("Respondendo a Ana"). */
+  banner?: ReactNode;
   /** Each change that leaves text in the field ("está digitando…" for the others; the screen throttles it). */
   onType?: (text: string) => void;
   /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
@@ -131,6 +136,8 @@ export function Composer({
   mentionAt,
   insertMention,
   prefill,
+  focusAt,
+  banner,
   onType,
   media,
   voice,
@@ -152,6 +159,9 @@ export function Composer({
     setText((current) => (current.trim() ? current : handed));
     input.current?.focus();
   }, [prefillAt]);
+  useEffect(() => {
+    if (focusAt) input.current?.focus();
+  }, [focusAt]);
   const has = text.trim().length > 0;
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
   const stopMode = Boolean(working?.stop) && !has && !voice?.active;
@@ -212,13 +222,15 @@ export function Composer({
               key={s.label}
               onPress={() => put(s.text ?? s.label)}
               accessibilityRole="button"
+              // 32 tall: the slop reaches 44 without pushing the field down.
+              hitSlop={{ top: 6, bottom: 6 }}
               style={[styles.pill, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
             >
               <View style={styles.pillIn}>
-                <Icon name={s.icon} size={14} color={colors.muted} />
+                <Icon name={s.icon} size={15} color={colors.muted} />
                 <RNText
                   maxFontSizeMultiplier={CHROME_MAX_SCALE}
-                  style={[systemText("subhead", weights.medium), styles.pillText, { color: colors.ink2 }]}
+                  style={[systemText("subhead", weights.medium), { color: colors.ink2 }]}
                 >
                   {s.label}
                 </RNText>
@@ -244,22 +256,24 @@ export function Composer({
           />
         </Animated.View>
       ) : null}
+      {banner}
       <View style={styles.row}>
-        {voice?.leading ?? (
-          <PressScale
-            to={0.9}
-            onPress={onPlus}
-            accessibilityRole="button"
-            accessibilityLabel={t("mobile.a11y.attach")}
-            style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
-          >
-            <Glass style={styles.plusGlass} intensity={50}>
-              <View style={styles.center}>
-                <Icon name="plus" size={22} color={colors.ink2} />
-              </View>
-            </Glass>
-          </PressScale>
-        )}
+        {voice?.leading ??
+          (onPlus ? (
+            <PressScale
+              to={0.9}
+              onPress={onPlus}
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.a11y.attach")}
+              style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
+            >
+              <Glass style={styles.plusGlass} intensity={50}>
+                <View style={styles.center}>
+                  <Icon name="plus" size={24} color={colors.ink2} />
+                </View>
+              </Glass>
+            </PressScale>
+          ) : null)}
         <View
           style={[
             styles.field,
@@ -280,27 +294,35 @@ export function Composer({
               {face}
             </Animated.View>
           ) : null}
-          <TextInput
-            ref={input}
-            {...(inputNativeID ? { nativeID: inputNativeID } : {})}
-            value={text}
-            onChangeText={(next) => {
-              setText(next);
-              if (next.trim()) onType?.(next);
-            }}
-            {...(selection ? { selection } : {})}
-            onSelectionChange={(e) => {
-              setCaret(e.nativeEvent.selection.end);
-              if (selection) setSelection(undefined);
-            }}
-            placeholder={placeholder}
-            placeholderTextColor={colors.faint}
-            multiline
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            accessibilityLabel={placeholder}
-            style={[inputText, { color: colors.ink }]}
-          />
+          {/* The placeholder is ours, on one line (cut with "…"): a long one wrapped and grew the empty field. */}
+          <View style={styles.inputBox}>
+            {!text ? (
+              <View style={styles.placeholder} pointerEvents="none">
+                <RNText numberOfLines={1} style={[placeholderText, { color: colors.faint }]}>
+                  {placeholder}
+                </RNText>
+              </View>
+            ) : null}
+            <TextInput
+              ref={input}
+              {...(inputNativeID ? { nativeID: inputNativeID } : {})}
+              value={text}
+              onChangeText={(next) => {
+                setText(next);
+                if (next.trim()) onType?.(next);
+              }}
+              {...(selection ? { selection } : {})}
+              onSelectionChange={(e) => {
+                setCaret(e.nativeEvent.selection.end);
+                if (selection) setSelection(undefined);
+              }}
+              multiline
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              accessibilityLabel={placeholder}
+              style={[inputText, styles.inputFill, { color: colors.ink }]}
+            />
+          </View>
           {mediaButton ? (
             <Animated.View
               entering={reducedMotion ? undefined : FadeIn.duration(140)}
@@ -316,7 +338,7 @@ export function Composer({
                 style={styles.media}
               >
                 <View style={styles.center}>
-                  <Icon name="sticker" size={22} color={colors.muted} />
+                  <Icon name="sticker" size={20} color={colors.muted} />
                 </View>
               </PressScale>
             </Animated.View>
@@ -400,24 +422,36 @@ const inputText: TextStyle = {
   paddingHorizontal: 0,
   ...Platform.select<TextStyle>({
     ios: { paddingTop: 8, paddingBottom: 8 },
+    // The one line centered in the send button's height: the field is exactly as tall.
     default: {
       lineHeight: body.lineHeight,
-      paddingTop: 7,
-      paddingBottom: 7,
+      paddingTop: (SEND - (body.lineHeight ?? SEND)) / 2,
+      paddingBottom: (SEND - (body.lineHeight ?? SEND)) / 2,
       textAlignVertical: "center",
       includeFontPadding: false,
     },
   }),
 };
 
+/** The placeholder's words, as the field's own text sits on its first line. */
+const placeholderText: TextStyle = {
+  fontSize: body.fontSize,
+  fontWeight: body.fontWeight,
+  letterSpacing: body.letterSpacing,
+  ...Platform.select<TextStyle>({ android: { lineHeight: body.lineHeight, includeFontPadding: false } }),
+};
+
 const styles = StyleSheet.create({
+  inputBox: { flex: 1, minWidth: 0 },
+  inputFill: { flex: 0, width: "100%" },
+  // Over the empty field's one line, centered on it.
+  placeholder: { position: "absolute", left: 0, right: 0, bottom: 0, height: SEND, justifyContent: "center" },
   // The row runs to the screen edges (past the composer's own inset) so a long last chip scrolls instead of
   // being cut at the padding.
   pillsBleed: { marginHorizontal: -10 },
   pills: { gap: 6, paddingHorizontal: 14, paddingBottom: 8 },
   pill: { height: 32, borderRadius: 999 },
   pillIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12 },
-  pillText: { fontSize: 14, lineHeight: 18 },
   row: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   plus: { width: FIELD, height: FIELD, borderRadius: FIELD / 2 },
   plusGlass: { flex: 1, borderRadius: FIELD / 2 },

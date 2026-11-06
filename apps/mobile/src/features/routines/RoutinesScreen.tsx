@@ -3,9 +3,23 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Button, EmptyState, Filters, Icon, IconButton, SearchField, SectionHeader, Segmented, Text } from "@/ui";
-import { useColors, useDirectory, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
-import { agentLook } from "../shared/logic";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
+import {
+  Button,
+  EmptyState,
+  Filters,
+  Icon,
+  IconButton,
+  SearchField,
+  SectionHeader,
+  Segmented,
+  Text,
+  useReducedMotion,
+} from "@/ui";
+import { mayCreate } from "../new/logic";
+import { FirstUse } from "../shared/FirstUse";
+import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useWhenText } from "./hooks";
@@ -38,6 +52,7 @@ function RoutineList() {
   const c = useColors();
   const orgId = useOrgId();
   const dir = useDirectory();
+  const meId = useMeId();
   const routines = useRoutines(orgId);
   const pull = usePullRefresh(routines.refetch);
   const now = useNow(60_000);
@@ -63,16 +78,31 @@ function RoutineList() {
     return () => clearInterval(timer);
   }, [working, refetch]);
   const openNew = () => router.push("/routines/new");
+  const clear = () => {
+    setQ("");
+    setStatus("all");
+    setAgentId(null);
+  };
+  const ownsAgent = Boolean(meId) && dir.agents.some((a) => a.ownerUserId === meId);
+  const mayNew = mayCreate(useOrg().org, "routine", { ownsAgent });
+  // A routine paused, resumed, deleted or filtered out while the person watches fades, and the rest slide into place.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
   let row = 0;
   const rows = (items: Routine[]) =>
     items.map((r, i) => {
       row += 1;
-      return <RoutineRow key={r.id} routine={r} now={now} divider={i > 0} live={row <= LIVE_ROWS} />;
+      return (
+        <Animated.View key={r.id} {...fade} layout={layout}>
+          <RoutineRow routine={r} now={now} divider={i > 0} live={row <= LIVE_ROWS} />
+        </Animated.View>
+      );
     });
   return (
     <PushedLargeTitle
       title={t("routines.title")}
-      right={<IconButton icon="plus" label={t("routines.new")} onPress={openNew} />}
+      {...(mayNew ? { right: <IconButton icon="plus" label={t("routines.new")} onPress={openNew} /> } : {})}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <View style={styles.head}>
@@ -92,87 +122,89 @@ function RoutineList() {
           <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={() => void refetch()} />
         </View>
       ) : list.length === 0 ? (
-        <EmptyState
-          sky
-          crew={dir.agents.slice(0, 3).map((a) => ({ ...agentLook(a), id: a.id }))}
-          title={t("routines.emptyTitle")}
-          action={<Button variant="primary" size="sm" icon="plus" label={t("routines.new")} onPress={openNew} />}
-        />
+        <FirstUse place="routines" acts={mayNew} label={t("routines.new")} onPress={openNew} />
       ) : (
-        <>
-          <RoutineHorizon routines={list} now={now} />
-          <View style={styles.search}>
-            <SearchField
-              value={q}
-              onChangeText={setQ}
-              placeholder={t("routines.search")}
-              accessibilityLabel={t("routines.search")}
-              returnKeyType="search"
-            />
-          </View>
-          {/* Four choices with their counts can be wider than a small phone: they scroll sideways there. */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.status}
-          >
-            <Segmented
-              items={STATUS_FILTERS.map((s) => ({
-                key: s,
-                label: t(`routines.status.${s}`),
-                count: sections.counts[s],
-              }))}
-              value={status}
-              onChange={(k) => setStatus(k as StatusFilter)}
-            />
-          </ScrollView>
-          {agents.length > 1 ? (
-            <Filters
-              items={[
-                { key: "", label: t("mobile.routines.anyAgent") },
-                ...agents.map((id) => ({ key: id, label: dir.nameOf({ type: "agent", id }) })),
-              ]}
-              value={agentId ?? ""}
-              onChange={(k) => setAgentId(k || null)}
-            />
-          ) : null}
-          {sections.live.length > 0 ? (
-            <>
-              <SectionHeader
-                title={status === "paused" ? t("routines.groupPaused") : t("routines.groupLive")}
-                count={sections.live.length}
+        // Loaded, the list fades in over the spinner; the rows it starts with don't each fade again.
+        <Animated.View {...fade}>
+          <LayoutAnimationConfig skipEntering>
+            <RoutineHorizon routines={list} now={now} />
+            <View style={styles.search}>
+              <SearchField
+                value={q}
+                onChangeText={setQ}
+                placeholder={t("routines.search")}
+                accessibilityLabel={t("routines.search")}
+                returnKeyType="search"
               />
-              {rows(sections.live)}
-            </>
-          ) : null}
-          {sections.paused.length > 0 ? (
-            <>
-              <SectionHeader title={t("routines.groupPaused")} count={sections.paused.length} />
-              {rows(sections.paused)}
-            </>
-          ) : null}
-          {sections.live.length === 0 && sections.paused.length === 0 && sections.filtered ? (
-            <EmptyState icon="search" title={t("routines.noResults")} />
-          ) : null}
-          {sections.done.length > 0 && status === "all" ? (
-            <>
-              <Pressable
-                onPress={() => setShowDone((v) => !v)}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: showDone }}
-                hitSlop={4}
-                style={styles.doneToggle}
-              >
-                <Icon name={showDone ? "chev" : "right"} size={14} color={c.muted} />
-                <Text variant="small" tone="muted" style={styles.bold}>
-                  {t("routines.doneToggle", { count: sections.done.length })}
-                </Text>
-              </Pressable>
-              {showDone ? rows(sections.done) : null}
-            </>
-          ) : null}
-        </>
+            </View>
+            {/* Four choices with their counts can be wider than a small phone: they scroll sideways there. */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.status}
+            >
+              <Segmented
+                items={STATUS_FILTERS.map((s) => ({
+                  key: s,
+                  label: t(`routines.status.${s}`),
+                  count: sections.counts[s],
+                }))}
+                value={status}
+                onChange={(k) => setStatus(k as StatusFilter)}
+              />
+            </ScrollView>
+            {agents.length > 1 ? (
+              <Filters
+                items={[
+                  { key: "", label: t("mobile.routines.anyAgent") },
+                  ...agents.map((id) => ({ key: id, label: dir.nameOf({ type: "agent", id }) })),
+                ]}
+                value={agentId ?? ""}
+                onChange={(k) => setAgentId(k || null)}
+              />
+            ) : null}
+            {/* No count on these headers: the status choices above already say how many are live and paused. */}
+            {sections.live.length > 0 ? (
+              <Animated.View {...fade} layout={layout}>
+                <SectionHeader title={status === "paused" ? t("routines.groupPaused") : t("routines.groupLive")} />
+                {rows(sections.live)}
+              </Animated.View>
+            ) : null}
+            {sections.paused.length > 0 ? (
+              <Animated.View {...fade} layout={layout}>
+                <SectionHeader title={t("routines.groupPaused")} />
+                {rows(sections.paused)}
+              </Animated.View>
+            ) : null}
+            {sections.live.length === 0 && sections.paused.length === 0 && sections.filtered ? (
+              <Animated.View {...fade} layout={layout}>
+                <EmptyState
+                  size="inline"
+                  title={t("routines.noResults")}
+                  action={<Button variant="secondary" size="sm" label={t("filters.clearAll")} onPress={clear} />}
+                />
+              </Animated.View>
+            ) : null}
+            {sections.done.length > 0 && status === "all" ? (
+              <Animated.View {...fade} layout={layout}>
+                <Pressable
+                  onPress={() => setShowDone((v) => !v)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showDone }}
+                  hitSlop={4}
+                  style={({ pressed }) => [styles.doneToggle, pressed && styles.pressed]}
+                >
+                  <Icon name={showDone ? "chev" : "right"} size={15} color={c.muted} />
+                  <Text variant="small" tone="muted" style={styles.bold}>
+                    {t("routines.doneToggle", { count: sections.done.length })}
+                  </Text>
+                </Pressable>
+                {showDone ? rows(sections.done) : null}
+              </Animated.View>
+            ) : null}
+          </LayoutAnimationConfig>
+        </Animated.View>
       )}
     </PushedLargeTitle>
   );
@@ -185,5 +217,6 @@ const styles = StyleSheet.create({
   search: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
   status: { paddingHorizontal: 16, paddingBottom: 8 },
   doneToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 20, paddingVertical: 14 },
+  pressed: { opacity: 0.6 },
   bold: { fontWeight: "600" },
 });

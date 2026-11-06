@@ -6,6 +6,7 @@ import {
   useApi,
   useCredentials,
   useMachines,
+  usePlatformKey,
   useSettings,
   useUpdateSettings,
 } from "@agenteschat/client";
@@ -13,13 +14,15 @@ import {
   accountTitle,
   agentsToGive,
   endsOnClaude,
+  keyRemovalText,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
 } from "@agenteschat/client/lib/ai-accounts";
+import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { agentAi, aiStateOf, uncheckedKeyLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import { providerLabel } from "@agenteschat/client/lib/providers";
@@ -29,13 +32,14 @@ import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Chip, InfoHint, ProviderLogo, Row, Text, useToast } from "@/ui";
+import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
-import { PushedHeader } from "../shared/parts";
+import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
 import { openConnectAi } from "./NoAiCard";
-import { Note } from "./parts";
+import { alertKeyRefused, Note, PlanHoldNote, usePlanHold } from "./parts";
 
 /*
  * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", first the sign-ins of the
@@ -91,6 +95,7 @@ export function AiAccountsScreen() {
   const meId = useMeId();
   const status = useAiStatus(orgId);
   const [again, setAgain] = useState<Account | null>(null);
+  const hold = usePlanHold(orgId, org);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
@@ -99,7 +104,10 @@ export function AiAccountsScreen() {
   const own = ownSignIns(ai.data);
   const several = onSeveralComputers(rows);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
-  const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
+  const failed = () => {
+    errorHaptic();
+    toast({ title: t("agentPage.work.failed"), icon: "x" });
+  };
 
   const rename = (a: Account) => {
     if (Platform.OS !== "ios") return;
@@ -114,6 +122,7 @@ export function AiAccountsScreen() {
             const name = (value ?? "").trim().slice(0, 40);
             if (!name || name === a.label) return;
             api.machines.renameAccount(orgId, a.machineId, a.id, name).then(() => {
+              successHaptic();
               toast({ title: t("aiAccounts.page.renamed", { label: name }), icon: "check" });
               refetch();
             }, failed);
@@ -129,6 +138,7 @@ export function AiAccountsScreen() {
   // One more of the person's agents thinks with an account made for all of them there: no sign-in.
   const give = (a: Account, agent: { id: string; name: string }) =>
     api.agents.setBrain(orgId, agent.id, { brain: a.kind, account: a.id }).then(() => {
+      successHaptic();
       toast({ title: t("aiAccounts.done.savedAgent", { agent: agent.name, label: a.label }), icon: "check" });
       refetch();
       for (const key of [keys.agents(orgId), keys.aiStatus(orgId), keys.agentBrain(orgId, agent.id)])
@@ -154,6 +164,7 @@ export function AiAccountsScreen() {
           style: "destructive",
           onPress: () =>
             api.machines.removeAccount(orgId, a.machineId, a.id).then(() => {
+              successHaptic();
               toast({ title: t("aiAccounts.page.disconnected", { label: a.label }), icon: "check" });
               refetch();
               void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
@@ -195,6 +206,8 @@ export function AiAccountsScreen() {
     );
   };
 
+  // Under a hold its note says what comes first: an invitation to connect a plan would contradict it.
+  const none = !hold && ai.isSuccess && rows.length === 0 && own.length === 0;
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("mobile.ai.row")} solid={false} grouped />
@@ -213,21 +226,21 @@ export function AiAccountsScreen() {
             </Text>
           </InfoHint>
         </View>
+        {hold && !again ? <PlanHoldNote org={org} /> : null}
         {ai.isLoading ? <ActivityIndicator color={c.muted} /> : null}
         {ai.isError ? <Note icon="x">{t("common.loadFailed")}</Note> : null}
-        {ai.isSuccess && rows.length === 0 && own.length === 0 ? (
-          <Text variant="small" tone="muted">
-            {t("aiAccounts.page.empty")}
-          </Text>
+        {none ? (
+          <FirstUse place="ai" size="panel" acts label={t("aiAccounts.page.connect")} onPress={() => openConnectAi()} />
         ) : null}
+        {/* Settings' own groups on the grouped gray: the mark in the 32 pt column, the hairline from the text on. */}
         {own.length > 0 ? (
-          <Card>
+          <GroupedList>
             {own.map((o) => (
-              <Row
+              <GroupedRow
                 key={o.key}
                 leading={<ProviderLogo id={o.kind} size="sm" />}
-                title={ownSignInTitle(t, o)}
-                subtitle={t("aiAccounts.page.ownOn", { computer: o.computer })}
+                label={ownSignInTitle(t, o)}
+                sub={t("aiAccounts.page.ownOn", { computer: o.computer })}
                 below={
                   o.usage ? (
                     <View style={styles.below}>
@@ -237,10 +250,10 @@ export function AiAccountsScreen() {
                 }
               />
             ))}
-          </Card>
+          </GroupedList>
         ) : null}
         {rows.length > 0 ? (
-          <Card>
+          <GroupedList>
             {rows.map((a) => {
               const plan = planOf(a.provider);
               const out = a.status === "signed_out";
@@ -252,12 +265,12 @@ export function AiAccountsScreen() {
                   : t("aiAccounts.page.noAgent"),
               ].filter(Boolean);
               return (
-                <Row
+                <GroupedRow
                   key={a.id}
                   leading={<ProviderLogo id={a.provider ?? a.kind} size="sm" off={out} />}
-                  title={accountTitle(a)}
-                  subtitle={facts.join(" · ")}
-                  chevron
+                  label={accountTitle(a)}
+                  sub={facts.join(" · ")}
+                  more
                   onPress={() => actions(a)}
                   below={
                     out || a.usage || (plan && !plan.usage) ? (
@@ -280,17 +293,20 @@ export function AiAccountsScreen() {
                 />
               );
             })}
-          </Card>
+          </GroupedList>
         ) : null}
         {again ? (
-          <Card>
-            <View style={styles.again}>
-              <View style={styles.againHead}>
-                <Text variant="callout" tone="ink" style={[styles.bold, styles.grow]}>
-                  {again.label}
-                </Text>
-                <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
-              </View>
+          // On the page, not in a card: the steps draw their own.
+          <View style={styles.again}>
+            <View style={styles.againHead}>
+              <Text variant="callout" tone="ink" style={[styles.bold, styles.grow]}>
+                {again.label}
+              </Text>
+              <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
+            </View>
+            {hold ? (
+              <PlanHoldNote org={org} />
+            ) : (
               <AddAccount
                 machineId={again.machineId}
                 kind={again.kind}
@@ -304,18 +320,20 @@ export function AiAccountsScreen() {
                   refetch();
                 }}
               />
-            </View>
-          </Card>
+            )}
+          </View>
         ) : null}
-        <View style={styles.start}>
-          <Button
-            size="sm"
-            variant={rows.length || own.length ? "secondary" : "primary"}
-            icon="plus"
-            label={t("aiAccounts.page.connect")}
-            onPress={() => openConnectAi()}
-          />
-        </View>
+        {none ? null : (
+          <View style={styles.start}>
+            <Button
+              size="sm"
+              variant={rows.length || own.length ? "secondary" : "primary"}
+              icon="plus"
+              label={t("aiAccounts.page.connect")}
+              onPress={() => openConnectAi()}
+            />
+          </View>
+        )}
         {can(org, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
       </ScrollView>
     </View>
@@ -325,7 +343,8 @@ export function AiAccountsScreen() {
 /** The workspace's API keys (the web's "Chaves de provedor"): the default one, a key swapped or deleted. */
 function KeysSection({ locale }: { locale: string }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const held = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -335,7 +354,13 @@ function KeysSection({ locale }: { locale: string }) {
   const update = useUpdateSettings(orgId);
   const live = (credentials.data ?? []).filter((k) => !k.revokedAt);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-  const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
+  const failed = (error: unknown) => {
+    errorHaptic();
+    const refusal = keyRefusal(t, error);
+    if (refusal) alertKeyRefused(t, refusal);
+    else toast({ title: errorText(t, error), icon: "x" });
+  };
+  const platform = usePlatformKey(orgId);
 
   const rotate = (k: Credential) => {
     if (Platform.OS !== "ios") return;
@@ -349,8 +374,15 @@ function KeysSection({ locale }: { locale: string }) {
           onPress: (value?: string) => {
             const apiKey = (value ?? "").trim();
             if (apiKey.length < 8) return;
-            api.agents.rotateCredential(orgId, k.id, { apiKey }).then(() => {
-              toast({ title: t("settings.rotated"), icon: "check" });
+            api.agents.rotateCredential(orgId, k.id, { apiKey }).then((saved) => {
+              successHaptic();
+              toast({
+                title:
+                  saved.check === "unchecked"
+                    ? uncheckedKeyLine(t, providerLabel(k.provider), held)
+                    : t("settings.rotated"),
+                icon: "check",
+              });
               refetch();
             }, failed);
           },
@@ -360,12 +392,18 @@ function KeysSection({ locale }: { locale: string }) {
     );
   };
   const remove = (k: Credential) =>
-    Alert.alert(t("settings.removeTitle", { label: k.label }), t("settings.removeText"), [
+    Alert.alert(t("settings.removeTitle", { label: k.label }), keyRemovalText(t, k, live, platform.data === true), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("settings.remove"),
         style: "destructive",
-        onPress: () => api.agents.removeCredential(orgId, k.id, true).then(refetch, failed),
+        onPress: () =>
+          api.agents.removeCredential(orgId, k.id, true, true).then(() => {
+            successHaptic();
+            refetch();
+            void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+            void qc.invalidateQueries({ queryKey: keys.agentPages(orgId) });
+          }, failed),
       },
     ]);
   const actions = (k: Credential, isDefault: boolean) =>
@@ -376,7 +414,7 @@ function KeysSection({ locale }: { locale: string }) {
           ? []
           : [{ label: t("settings.makeDefault"), onPress: () => update.mutate({ defaultCredentialId: k.id }) }]),
         ...(Platform.OS === "ios" ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
-        ...(isDefault ? [] : [{ label: t("settings.remove"), destructive: true, onPress: () => remove(k) }]),
+        { label: t("settings.remove"), destructive: true, onPress: () => remove(k) },
       ],
       t("common.cancel"),
     );
@@ -398,27 +436,26 @@ function KeysSection({ locale }: { locale: string }) {
         </Text>
       ) : null}
       {live.length > 0 ? (
-        <Card>
+        <GroupedList>
           {live.map((k) => {
             const isDefault = settings.data?.defaultCredentialId === k.id;
             return (
-              <Row
+              <GroupedRow
                 key={k.id}
                 leading={<ProviderLogo id={k.provider} size="sm" />}
-                title={k.label}
-                subtitle={`${providerLabel(k.provider)} · ${t("settings.keyEndsIn", { hint: k.keyHint })} · ${t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) })}`}
-                meta={isDefault ? <Chip icon="check" label={t("settings.default")} /> : undefined}
-                chevron
+                label={k.label}
+                sub={[
+                  providerLabel(k.provider),
+                  t("settings.keyEndsIn", { hint: k.keyHint }),
+                  t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) }),
+                ].join(" · ")}
+                value={isDefault ? t("settings.default") : undefined}
+                more
                 onPress={() => actions(k, isDefault)}
               />
             );
           })}
-        </Card>
-      ) : null}
-      {live.some((k) => settings.data?.defaultCredentialId === k.id) ? (
-        <Text variant="small" tone="faint">
-          {t("settings.removeDefaultBlocked")}
-        </Text>
+        </GroupedList>
       ) : null}
       <View style={styles.start}>
         <Button
@@ -435,17 +472,14 @@ function KeysSection({ locale }: { locale: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 18, paddingTop: 8, gap: 12 },
+  // The settings screens' side margin: the groups on the same 16 pt edge as everywhere else.
+  in: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   sectionHead: { gap: 4, paddingHorizontal: 2 },
-  keysHead: { marginTop: 18 },
+  keysHead: { marginTop: 20 },
   below: { gap: 8, marginTop: 6 },
-  meter: { gap: 4 },
-  meterLine: { flexDirection: "row", justifyContent: "space-between" },
-  bar: { height: 6, borderRadius: 3, overflow: "hidden" },
-  fill: { height: 6, borderRadius: 3 },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
   start: { alignSelf: "flex-start" },
-  again: { padding: 14, gap: 12 },
-  againHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  again: { gap: 12 },
+  againHead: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 2 },
 });

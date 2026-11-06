@@ -17,11 +17,13 @@ import {
   INTERRUPTED_BY_RESTART,
   replyThreadOf,
   runErrorDetail,
+  shownStatusSql,
   transitionRun,
 } from "./runs";
+import { cancelSecretRequests, publishSecret, syncSecretMessage } from "./secrets";
 import { USAGE_WAIT_CODES } from "./usage-pause";
 
-const { agentRuns, agentRunSteps, outbox, channels, approvals, secretRequests } = schema;
+const { agentRuns, agentRunSteps, outbox, channels, approvals } = schema;
 
 /** A run is resumed at most this many times after a dead worker; then it fails. */
 const MAX_RECOVERIES = 2;
@@ -255,16 +257,14 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
     if (!(await claimStale(tx, run.id, at))) return null;
     const failed = await transitionRun(tx, run.id, "running", "failed", { error: INTERRUPTED_BY_RESTART });
     if (!failed) return null;
-    // A running run's open requests come from the step that was cut, whose cards were never posted: nobody can
-    // answer them.
+    // A running run's open requests mostly come from the step that was cut, whose cards were never posted: nobody can
+    // answer them. A secret's card may be up, though (a run with two asks, one already answered): it says so at once.
     await tx
       .update(approvals)
       .set({ status: "canceled", decidedAt: at.now })
       .where(and(eq(approvals.runId, run.id), eq(approvals.status, "pending")));
-    await tx
-      .update(secretRequests)
-      .set({ status: "canceled" })
-      .where(and(eq(secretRequests.runId, run.id), eq(secretRequests.status, "pending")));
+    const closedSecrets = await cancelSecretRequests(tx, run.id);
+    for (const row of closedSecrets) await syncSecretMessage(tx, row);
     // A routine's background run never posts by itself (ADR 0053 §5): its ledger says it was cut off.
     const message = run.background
       ? null
@@ -290,9 +290,10 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
           inArray(outbox.status, ["pending", "processing"]),
         ),
       );
-    return { message };
+    return { message, closedSecrets };
   });
   if (!result) return false;
+  for (const row of result.closedSecrets) await publishSecret(deps, row, "secret.updated");
   if (run.background) {
     await closeRoutineRun(deps, run, { status: "failed", code: "interrupted" }).catch(() => null);
   }
@@ -348,7 +349,8 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     pending: string[] | string | null;
     background: boolean | string;
   }>(
-    await db.execute(sql`select r.id, r.agent_id, r.status, r.thread_root_id, r.trigger_message_id, r.started_at,
+    // Asking its computer from the line (`computerWaitOf`) it still waits: no "thinking" row for the ask.
+    await db.execute(sql`select r.id, r.agent_id, ${shownStatusSql} as status, r.thread_root_id, r.trigger_message_id, r.started_at,
         r.heartbeat_at, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending,
         (r.background or r.work_id is not null) as background
       from ${agentRuns} r join ${channels} c on c.id = r.channel_id

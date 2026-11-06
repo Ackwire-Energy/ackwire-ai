@@ -88,9 +88,9 @@ async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
     const what = brainWait.code === "budget" ? "its monthly budget to renew" : "its plan's usage limit to reset";
     out.push(`${what} (it picks up by itself${brainWait.until ? ` around ${brainWait.until}` : ""})`);
   } else if (run.waitingMachineId) {
-    const code = brainWait?.code;
+    // No stored wait with a machine kept: it is asking from the line (`computerWaitOf`).
     out.push(
-      code === "busy"
+      !brainWait || brainWait.code === "busy"
         ? "room on its computer (busy with other tasks)"
         : "its computer to come back online (it is offline)",
     );

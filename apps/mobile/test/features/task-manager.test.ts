@@ -94,6 +94,23 @@ describe("a task's row (ADR 0128)", () => {
     expect(taskSubline(t, dm, "me", taskTitle(t, dm))).toBe("Você pediu");
   });
 
+  test("a task agents asked of each other says who asked and what started it; helpers are counted", async () => {
+    const t = await translator("pt-BR");
+    const helper = task({
+      runId: "r3",
+      betweenAgents: true,
+      label: "Vê o log",
+      requester: null,
+      delegation: { agentId: "a1", origin: { kind: "person", userId: "u2", name: "Ana" } },
+    });
+    const name = (id: string) => (id === "a1" ? "Theo" : undefined);
+    expect(taskSubline(t, helper, "me", "Vê o log", name)).toBe(
+      "Conversa entre agentes · a pedido de Theo · começou com Ana",
+    );
+    const boss = task({ runId: "r4", label: "Bugs", requester: null, helpers: 3 });
+    expect(taskSubline(t, boss, "me", "Bugs")).toContain("3 ajudantes");
+  });
+
   test("an agent's row: how its tasks stand, or queued when they only wait their turn", async () => {
     const t = await translator("pt-BR");
     expect(groupLine(t, { working: 1, waiting: 1 })).toEqual({

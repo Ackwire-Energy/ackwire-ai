@@ -8,11 +8,11 @@ import { Link } from "@tanstack/react-router";
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
-import { useAgentDrag } from "@/components/AgentGroups";
+import { GroupNameDialog, useAgentDrag } from "@/components/AgentGroups";
 import { useOrg } from "@/components/org-context";
 import { OrgMark } from "@/components/ProfilePhoto";
 import { colorOf } from "@/components/Sky";
-import { SectorMark, sectorStyle, useTeamLookups } from "./shared";
+import { NoSectors, SectorMark, sectorStyle, useTeamLookups } from "./shared";
 
 /**
  * Equipe › Organograma (ADR 0148): the workspace on top with its right hand, then each person with the agents that
@@ -58,7 +58,7 @@ function AgentNode({ agent, drag }: { agent: TeamAgent; drag?: ReturnType<Return
     >
       <AgentAvatar agentId={agent.id} name={agent.name} size="sm" />
       <span className="team-node__text">
-        <b>{agent.name}</b>
+        <b className={agent.role ? "ac-captop" : undefined}>{agent.name}</b>
         {agent.role && <span className="muted">{agent.role}</span>}
       </span>
       <span
@@ -84,7 +84,7 @@ function ByPerson({ team, groups }: { team: Team; groups: AgentGroup[] }) {
         <span className="team-node team-node--org">
           <OrgMark logo={org.logo} size={32} />
           <span className="team-node__text">
-            <b>{org.name}</b>
+            <b className="ac-captop">{org.name}</b>
             <span className="muted">{t("team.chart.workspace")}</span>
           </span>
         </span>
@@ -96,7 +96,7 @@ function ByPerson({ team, groups }: { team: Team; groups: AgentGroup[] }) {
           >
             <AgentAvatar agentId={lodi.id} name={lodi.name} size="md" />
             <span className="team-node__text">
-              <b>{lodi.name}</b>
+              <b className="ac-captop">{lodi.name}</b>
               <span className="muted">{t("rightHand.label")}</span>
             </span>
           </Link>
@@ -113,7 +113,7 @@ function ByPerson({ team, groups }: { team: Team; groups: AgentGroup[] }) {
                   <>
                     <PersonAvatar id={c.personId} name={m.name} size="sm" presence />
                     <span className="team-node__text">
-                      <b>{m.name}</b>
+                      <b className="ac-captop">{m.name}</b>
                       <span className="muted team-sector">
                         {role ? (
                           <>
@@ -151,12 +151,12 @@ function BySector({ team, groups }: { team: Team; groups: AgentGroup[] }) {
   const look = useTeamLookups(groups);
   const arranges = can(org, "manage_agents");
   const drag = useAgentDrag(groups);
+  const [creating, setCreating] = useState(false);
   const by = agentSections(
     team.agents.filter((a) => !look.isLodi(a)),
     groups,
     (a) => a.id,
   );
-  if (groups.length === 0) return <p className="team-empty">{t("team.sectors.emptyTitle")}</p>;
   const column = (key: string, group: AgentGroup | null, agents: TeamAgent[]) => {
     const leads = [...new Set(agents.map((a) => reportsTo(a, groups, look.members)).filter(Boolean))];
     const others = agents.filter((a) => a.id !== drag.dragging);
@@ -198,9 +198,16 @@ function BySector({ team, groups }: { team: Team; groups: AgentGroup[] }) {
     );
   };
   return (
-    <div className="team-frames">
-      {by.groups.map(({ group, items }) => column(group.id, group, items))}
-      {by.ungrouped.length > 0 && column("none", null, by.ungrouped)}
-    </div>
+    <>
+      {groups.length === 0 ? (
+        <NoSectors lodi={look.lodi} onCreate={arranges ? () => setCreating(true) : undefined} />
+      ) : (
+        <div className="team-frames">
+          {by.groups.map(({ group, items }) => column(group.id, group, items))}
+          {by.ungrouped.length > 0 && column("none", null, by.ungrouped)}
+        </div>
+      )}
+      {creating && <GroupNameDialog purpose={{ mode: "create" }} onClose={() => setCreating(false)} />}
+    </>
   );
 }

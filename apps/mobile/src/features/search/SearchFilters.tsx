@@ -21,7 +21,8 @@ import {
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Filters, Icon, Text } from "@/ui";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { Button, EmptyState, Filters, Icon, PressScale, SectionHeader, Text, useReducedMotion } from "@/ui";
 import { Note } from "../ai/parts";
 import { Face } from "../shared/Face";
 import { useColors, useOrgId, useWhen } from "../shared/hooks";
@@ -29,33 +30,48 @@ import { previewOf } from "../shared/logic";
 import { ActionList, Tile } from "../shared/parts";
 import { hitHref } from "./logic";
 
+/** One size for every result's face or tile, in the search tab and in a conversation's search. */
+export const RESULT_LEAD = 32;
+
+const CHIP_IN = FadeIn.duration(160);
+const CHIP_OUT = FadeOut.duration(120);
+
 /** The filters on the box (ADR 0123): each a pill with its ×. */
 export function FilterChips({ chips, onRemove }: { chips: SearchChip[]; onRemove: (chip: SearchChip) => void }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
+  const reduced = useReducedMotion();
+  // A filter added or taken off while the box shows fades and the others slide; those there when it mounts just show.
+  const motion = reduced ? {} : { entering: CHIP_IN, exiting: CHIP_OUT, layout: LinearTransition };
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.chips}
-    >
-      {chips.map((chip) => {
-        const label = searchChipLabel(t, i18n.language, chip);
-        return (
-          <Pressable
-            key={searchChipKey(chip)}
-            onPress={() => onRemove(chip)}
-            accessibilityRole="button"
-            accessibilityLabel={t("searchPage.removeFilter", { filter: label })}
-            style={[styles.chip, { backgroundColor: c.sunken }]}
-          >
-            <Text variant="subhead">{label}</Text>
-            <Icon name="x" size={14} color={c.muted} />
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <LayoutAnimationConfig skipEntering skipExiting>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.chips}
+      >
+        {chips.map((chip) => {
+          const label = searchChipLabel(t, i18n.language, chip);
+          return (
+            <Animated.View key={searchChipKey(chip)} {...motion}>
+              <PressScale
+                onPress={() => onRemove(chip)}
+                accessibilityRole="button"
+                accessibilityLabel={t("searchPage.removeFilter", { filter: label })}
+                // A 32-point pill: the slop makes its target 44 without spacing the row out.
+                hitSlop={{ top: 6, bottom: 6 }}
+                fill={false}
+                contentStyle={[styles.chip, { backgroundColor: c.sunken }]}
+              >
+                <Text variant="subhead">{label}</Text>
+                <Icon name="x" size={15} color={c.muted} />
+              </PressScale>
+            </Animated.View>
+          );
+        })}
+      </ScrollView>
+    </LayoutAnimationConfig>
   );
 }
 
@@ -81,27 +97,23 @@ export function SearchOptions({
   const { t } = useTranslation();
   return (
     <View>
-      <Text variant="label" accessibilityRole="header" style={styles.head}>
-        {t("searchPage.options")}
-      </Text>
+      <SectionHeader title={t("searchPage.options")} />
       <Filters
         items={ops.map((op) => ({ key: op, label: `${words.ops[op]}:` }))}
         value=""
         onChange={(op) => onInsert(`${words.ops[op as keyof SearchWords["ops"]]}:`)}
       />
       {recent.length > 0 ? (
-        <View style={[styles.res, styles.group]}>
-          <View style={styles.groupTitle}>
-            <Text variant="label" accessibilityRole="header">
-              {t("searchPage.recent")}
-            </Text>
-            <Pressable onPress={onClearRecent} accessibilityRole="button" hitSlop={8}>
-              <Text tone="faint">{t("searchPage.clearRecent")}</Text>
-            </Pressable>
-          </View>
-          <ActionList
-            items={recent.map((r) => ({ key: r, icon: "clock", label: r, onPress: () => onPickRecent(r) }))}
+        <View>
+          <SectionHeader
+            title={t("searchPage.recent")}
+            action={{ label: t("searchPage.clearRecent"), onPress: onClearRecent, chevron: false }}
           />
+          <View style={styles.list}>
+            <ActionList
+              items={recent.map((r) => ({ key: r, icon: "clock", label: r, onPress: () => onPickRecent(r) }))}
+            />
+          </View>
         </View>
       ) : null}
     </View>
@@ -133,6 +145,7 @@ export function OperatorPicker({
           leading: <Face who={a} size={30} live={false} />,
           label: a.name,
           ...(a.handle ? { hint: `@${a.handle}` } : {}),
+          oneLine: true,
           onPress: () => onPick({ op, actor: a }, rest),
         }))
       : op === "in"
@@ -140,6 +153,7 @@ export function OperatorPicker({
             key: p.id,
             leading: <Tile icon={p.dm ? "chat" : "hash"} size={30} />,
             label: p.dm ? t("searchPage.dm", { name: p.name }) : p.name,
+            oneLine: true,
             onPress: () => onPick({ op, place: p }, rest),
           }))
         : op === "has"
@@ -166,14 +180,14 @@ export function OperatorPicker({
               : // Dates are typed (`before:2026-10-01`), the format is the hint.
                 [];
   return (
-    <View style={styles.group}>
-      <Text variant="label" accessibilityRole="header" style={styles.head}>
-        {t(`searchPage.option.${op}`)}
-      </Text>
+    <View>
+      <SectionHeader title={t(`searchPage.option.${op}`)} />
       {items.length > 0 ? (
-        <ActionList items={items} />
+        <View style={styles.list}>
+          <ActionList items={items} />
+        </View>
       ) : (
-        <Text tone="faint" style={styles.head}>
+        <Text tone="faint" style={styles.hint}>
           {op === "in"
             ? t("searchPage.noPlace")
             : op === "from" || op === "mentions"
@@ -243,46 +257,59 @@ export function FilteredResults({
                 : ""}
           </Text>
           {onClear && chips.length > 0 ? (
-            <Pressable onPress={onClear} accessibilityRole="button" hitSlop={8} style={styles.clear}>
+            <Pressable
+              onPress={onClear}
+              accessibilityRole="button"
+              hitSlop={11}
+              style={({ pressed }) => [styles.clear, pressed && styles.pressed]}
+            >
               <Text tone="faint">{t("searchPage.filtersApplied", { count: chips.length })}</Text>
-              <Icon name="x" size={14} color={c.muted} />
+              <Icon name="x" size={17} color={c.muted} />
             </Pressable>
           ) : null}
         </View>
         {hits.isLoading ? <ActivityIndicator color={c.muted} style={styles.empty} /> : null}
         {hits.isError && !hits.data ? (
-          <View style={styles.group}>
+          <View style={[styles.list, styles.failed]}>
             <Note icon="x">{t("common.loadFailed")}</Note>
             <Button size="sm" variant="secondary" label={t("common.retry")} onPress={() => void hits.refetch()} />
           </View>
         ) : null}
         {groupHitsByPlace(list).map((g) => (
-          <View key={g.key} style={styles.group}>
-            <Text variant="label" accessibilityRole="header" style={styles.groupTitle}>
-              {g.thread ? threadName(g.thread.title, g.channelId) : placeName(g.channelId)}
-            </Text>
-            <ActionList
-              items={g.hits.map((h) => ({
-                key: h.sourceId,
-                leading: h.author ? <Face who={h.author} size={34} live={false} /> : <Tile icon="chat" size={34} />,
-                label: previewOf(hitText(t, h)),
-                marks: terms,
-                hint: [h.author?.name, when.short(h.createdAt)].filter(Boolean).join(" · "),
-                onPress: () => {
-                  onOpen();
-                  if (onPick) onPick(h);
-                  else router.push(hitHref(h));
-                },
-              }))}
-            />
+          <View key={g.key}>
+            <SectionHeader title={g.thread ? threadName(g.thread.title, g.channelId) : placeName(g.channelId)} />
+            <View style={styles.list}>
+              <ActionList
+                items={g.hits.map((h) => ({
+                  key: h.sourceId,
+                  leading: h.author ? (
+                    <Face who={h.author} size={RESULT_LEAD} live={false} />
+                  ) : (
+                    <Tile icon="chat" size={RESULT_LEAD} />
+                  ),
+                  label: previewOf(hitText(t, h)),
+                  marks: terms,
+                  hint: [h.author?.name, when.short(h.createdAt)].filter(Boolean).join(" · "),
+                  onPress: () => {
+                    onOpen();
+                    if (onPick) onPick(h);
+                    else router.push(hitHref(h));
+                  },
+                }))}
+              />
+            </View>
           </View>
         ))}
         {hits.isSuccess && list.length === 0 ? (
-          <Text tone="faint" style={styles.empty}>
-            {t("mobile.find.nothing", {
+          <EmptyState
+            size="inline"
+            title={t("mobile.find.nothing", {
               q: text.trim() || chips.map((c) => searchChipLabel(t, i18n.language, c)).join(" "),
             })}
-          </Text>
+            {...(onClear && chips.length > 0
+              ? { action: <Button variant="secondary" size="sm" label={t("filters.clearAll")} onPress={onClear} /> }
+              : {})}
+          />
         ) : null}
       </View>
     </View>
@@ -292,24 +319,21 @@ export function FilteredResults({
 const styles = StyleSheet.create({
   chips: { gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 12, borderRadius: 999 },
-  head: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
-  res: { paddingHorizontal: 16, paddingTop: 2 },
-  group: { marginTop: 14, gap: 8 },
-  groupTitle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    paddingHorizontal: 4,
-  },
+  // The operator's empty state, at the headers' text column.
+  hint: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
+  // The section headers run edge to edge (their text at 20); the lists under them keep the 16-point margin.
+  res: { paddingTop: 2 },
+  list: { paddingHorizontal: 16 },
+  failed: { marginTop: 14, gap: 8 },
   bar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 20,
     paddingTop: 8,
   },
   clear: { flexDirection: "row", alignItems: "center", gap: 4 },
-  empty: { textAlign: "center", paddingVertical: 40 },
+  pressed: { opacity: 0.6 },
+  empty: { textAlign: "center", paddingVertical: 40, paddingHorizontal: 16 },
 });

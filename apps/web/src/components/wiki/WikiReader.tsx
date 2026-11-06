@@ -17,6 +17,7 @@ import {
   EmptyState,
   Icon,
   Kbd,
+  Locked,
   Menu,
   modKey,
   Popover,
@@ -35,6 +36,7 @@ import { WikiEditor } from "@/components/WikiEditor";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { readComposerDraft, writeComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { type EmbedRenderer, Markdown } from "@/lib/markdown";
@@ -647,6 +649,7 @@ export function WikiReader({
   const [asking, setAsking] = useState<string | null>(null);
   const embed = useEmbedRenderer(page.data?.source?.attachments);
   const folders = [...new Set(pages.map((x) => x.folder).filter(Boolean))].sort();
+  const look = useRightHandLook();
   // Who edits pages (and pins, moves and deletes them); a locked page, and locking it, only who configures.
   const writes = can(org, "edit_wiki") && p?.canEdit !== false;
   const admin = can(org, "configure");
@@ -799,19 +802,23 @@ export function WikiReader({
     return missing ? (
       <div className="wiki-doc">
         <EmptyState
-          icon="book"
+          size="page"
+          agent={look}
+          mood="thinking"
           title={t("wiki.missingTitle")}
           actions={
-            <Button
-              variant="primary"
-              icon="plus"
-              onClick={() => onCreate(title.charAt(0).toUpperCase() + title.slice(1))}
-            >
-              {t("wiki.createPage")}
-            </Button>
+            can(org, "edit_wiki") && (
+              <Button
+                variant="primary"
+                icon="plus"
+                onClick={() => onCreate(title.charAt(0).toUpperCase() + title.slice(1))}
+              >
+                {t("wiki.createPage")}
+              </Button>
+            )
           }
         >
-          {t("wiki.missingText")}
+          {t(can(org, "edit_wiki") ? "wiki.missingText" : "wiki.missingViewer")}
         </EmptyState>
       </div>
     ) : (
@@ -892,7 +899,6 @@ export function WikiReader({
           </span>
         )}
         <Button
-          size="sm"
           variant="ghost"
           icon="code"
           className="wiki-top__md"
@@ -959,7 +965,7 @@ export function WikiReader({
           <div className="wiki-top__acts">{actions}</div>
         </div>
         {editing ? (
-          <>
+          <Locked when={action.isPending}>
             <TitleField
               value={draft.title}
               onChange={(title) => setDraft({ ...draft, title })}
@@ -998,7 +1004,7 @@ export function WikiReader({
               />
             )}
             {mode === "visual" && <p className="wiki-hintline small muted">{t("wiki.rich.hint", { key: modKey() })}</p>}
-          </>
+          </Locked>
         ) : (
           p && (
             <>

@@ -180,6 +180,23 @@ describe("Usar em outros agentes", () => {
     expect(again).toEqual([{ agentId: w.dev, status: "same" }]);
   });
 
+  test("Velocidade goes to the agents picked, never into what new agents start with; left out, each keeps its own", async () => {
+    const w = await world();
+    const setup = { ...ANA_CLAUDE(w.mac), speed: "fast" };
+    const ids = [w.dev];
+    await applyAgentSetup(w.deps, w.fx.owner.id, w.fx.org.id, { setup, agentIds: ids });
+    expect(await w.row(w.dev)).toMatchObject({ brainSpeed: "fast" });
+    expect(await w.stored()).not.toHaveProperty("speed");
+    expect(await applyAgentSetup(w.deps, w.fx.owner.id, w.fx.org.id, { setup, agentIds: ids })).toEqual([
+      { agentId: w.dev, status: "same" },
+    ]);
+    await applyAgentSetup(w.deps, w.fx.owner.id, w.fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: ids });
+    expect(await w.row(w.dev)).toMatchObject({ brainSpeed: "fast" });
+    await expect(
+      applyAgentSetup(w.deps, w.fx.owner.id, w.fx.org.id, { setup: { ...setup, speed: "turbo" }, agentIds: ids }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
   test("a model the other plan has: the agent keeps its owner's plan and takes the rest", async () => {
     const w = await world();
     const sonnet = { ...ANA_CLAUDE(w.mac), model: "sonnet", contextTokens: 400_000 };

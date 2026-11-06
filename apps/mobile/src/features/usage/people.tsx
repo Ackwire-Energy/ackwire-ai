@@ -120,7 +120,7 @@ export function MyUsageCard() {
       {data.agents.map((a) => (
         <View key={a.agentId} style={styles.line}>
           <Face who={{ type: "agent", id: a.agentId }} size={22} live={false} />
-          <Text variant="subhead" tone="ink" style={styles.grow}>
+          <Text variant="subhead" tone="ink" numberOfLines={1} style={styles.grow}>
             {dir.nameOf({ type: "agent", id: a.agentId })}
           </Text>
           <Text variant="footnote" tone="muted" style={styles.tabular}>

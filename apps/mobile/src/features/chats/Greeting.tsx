@@ -1,13 +1,16 @@
 import { useMe } from "@agenteschat/client";
 import { router } from "expo-router";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Card, Icon, Sky, Text, WorkspaceSky } from "@/ui";
+import { mayCreate } from "../new/logic";
 import { AgentFace } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory } from "../shared/hooks";
 import { firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
-import { useHiddenAgents } from "../shared/queries";
 import { FIRST_AGENT_EXAMPLES } from "./examples";
 import { type FinishedItem, finishedKey, greetingLine } from "./now";
 
@@ -30,37 +33,43 @@ const FACE = 18;
 /** Opens Agentes (who is working, doing what). */
 const openAgents = () => router.navigate("/agents");
 
-/** The workspace's sky behind Conversas' bar, large title and greeting, fading out toward the list. */
+/**
+ * The workspace's sky behind Conversas' bar, large title and greeting: faint, so the title and the right hand's field
+ * lead, and gone before the field.
+ */
 export function GreetingSky() {
-  return <WorkspaceSky fade={0.45} style={StyleSheet.absoluteFill} />;
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.sky]}>
+      <WorkspaceSky fade={0.22} style={StyleSheet.absoluteFill} />
+    </View>
+  );
 }
 
 /**
- * The greeting under Conversas' large title, scrolling away with the list: "Boa noite, Walter", then one short
- * line with the agents' own faces in it: what one finished (its face before its name; opens where it happened),
- * else who works now (their faces, working, before the count; opens Agentes; the list below says what each
- * does), else everyone's faces resting, eyes closed. Who works and who rests are the agents Agentes lists.
+ * The greeting under Conversas' large title, scrolling away with the list: "Boa noite, Ana", then, only when there
+ * is news, one short line with the agents' own faces in it: what one finished (its face before its name; opens where
+ * it happened), else who works now (their faces, working, before the count; opens Agentes; the list below says what
+ * each does). Nobody at work: the greeting alone. `after` follows on the sky (the right hand's field).
  */
 export function Greeting({
   working,
   finished,
   onFinishedPress,
+  after,
 }: {
   working: readonly string[];
   /** The newest thing an agent finished (null: nothing new). */
   finished: FinishedItem | null;
   /** Tapped what finished (it opens there and is taken off). */
   onFinishedPress?: (f: FinishedItem) => void;
+  /** Under it, on the sky: the way to ask the right hand (`RightHandAsk`). */
+  after?: ReactNode;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  const { hidden } = useHiddenAgents();
   const greeting = useGreeting();
   const line = greetingLine(finished, working.length);
-  const workingText =
-    line.kind === "working"
-      ? t("mobile.chats.workingNowLine", { count: line.working })
-      : t("mobile.chats.nobodyWorking");
+  const workingText = line.kind === "working" ? t("mobile.chats.workingNowLine", { count: line.working }) : "";
   const finishedName = line.kind === "finished" ? (dir.agentById.get(line.finished.agentId)?.name ?? "") : "";
   const finishedText =
     line.kind === "finished" ? t(finishedKey(line.finished), { what: line.finished.what ?? "" }) : "";
@@ -76,50 +85,46 @@ export function Greeting({
       </Text>
     </View>
   );
-  const resting = line.kind === "idle" ? dir.agents.filter((a) => !hidden.has(a.id)).map((a) => a.id) : [];
   return (
     <View style={styles.mini}>
       <Text variant="body" tone="ink2" numberOfLines={1}>
         {greeting}
       </Text>
-      <View style={styles.line}>
-        {line.kind === "finished" ? (
-          <Pressable
-            onPress={() => openFinished(line.finished)}
-            accessibilityRole="button"
-            accessibilityLabel={`${finishedName} ${finishedText}`}
-            hitSlop={8}
-            style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
-          >
-            <AgentFace agentId={line.finished.agentId} size={FACE} framed />
-            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {finishedName ? (
-                <Text variant="footnote" tone="ink2" style={styles.bold}>
-                  {`${finishedName} `}
-                </Text>
-              ) : null}
-              {finishedText}
-            </Text>
-          </Pressable>
-        ) : line.kind === "working" ? (
-          <Pressable
-            onPress={openAgents}
-            accessibilityRole="button"
-            accessibilityLabel={workingText}
-            hitSlop={8}
-            style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
-          >
-            {workingPart}
-          </Pressable>
-        ) : (
-          <View style={styles.part}>
-            {resting.length > 0 ? <Faces ids={resting} mode="rest" /> : null}
-            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {workingText}
-            </Text>
-          </View>
-        )}
-      </View>
+      {/* Nobody at work and nothing new: the greeting alone (no line of sleeping faces). */}
+      {line.kind === "idle" ? null : (
+        <View style={styles.line}>
+          {line.kind === "finished" ? (
+            <Pressable
+              onPress={() => openFinished(line.finished)}
+              accessibilityRole="button"
+              accessibilityLabel={`${finishedName} ${finishedText}`}
+              hitSlop={13}
+              style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
+            >
+              <AgentFace agentId={line.finished.agentId} size={FACE} framed />
+              <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+                {finishedName ? (
+                  <Text variant="footnote" tone="ink2" style={styles.bold}>
+                    {`${finishedName} `}
+                  </Text>
+                ) : null}
+                {finishedText}
+              </Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={openAgents}
+              accessibilityRole="button"
+              accessibilityLabel={workingText}
+              hitSlop={13}
+              style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
+            >
+              {workingPart}
+            </Pressable>
+          )}
+        </View>
+      )}
+      {after ? <View style={styles.after}>{after}</View> : null}
     </View>
   );
 }
@@ -140,14 +145,16 @@ function Faces({ ids, mode }: { ids: readonly string[]; mode: "run" | "rest" }) 
 /**
  * Conversas with nothing in it yet: the sky with an agent about to
  * be born, one primary "Criar meu primeiro agente", and examples of what an agent can do (each opens "Novo
- * agente" with "o que faz" filled in).
+ * agente" with "o que faz" filled in). Who can't create agents gets the place's line instead.
  */
 export function FirstAgentEmpty() {
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
+  const { org } = useOrg();
   const newAgent = (what?: string) =>
     router.push(what ? { pathname: "/new-agent", params: { what } } : { pathname: "/new-agent" });
+  if (!mayCreate(org, "agent")) return <FirstUse place="agents" acts={false} />;
   return (
     <View>
       <View style={[styles.empty, surface]}>
@@ -181,13 +188,10 @@ export function FirstAgentEmpty() {
               key={ex.key}
               onPress={() => newAgent(t(`mobile.chats.first.example.${ex.key}.what`))}
               accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.idea,
-                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 },
-                pressed && { backgroundColor: c.sunken },
-              ]}
+              style={({ pressed }) => [styles.idea, pressed && { backgroundColor: c.sunken }]}
             >
-              <Tile icon={ex.icon} />
+              {i > 0 ? <View style={[styles.sep, { backgroundColor: c.line2 }]} /> : null}
+              <Tile icon={ex.icon} size={IDEA_TILE} />
               <View style={styles.grow}>
                 <Text variant="callout" style={styles.bold}>
                   {t(`mobile.chats.first.example.${ex.key}.title`)}
@@ -205,28 +209,58 @@ export function FirstAgentEmpty() {
   );
 }
 
+/** The empty state's card: its padding, which the sky runs past to the card's edges. */
+const EMPTY_PAD = 20;
+/** An example's row: its inset, the tile and the gap to the words (the hairline starts at the words). */
+const IDEA_INSET = 14;
+const IDEA_TILE = 36;
+const IDEA_GAP = 12;
+
 const styles = StyleSheet.create({
-  mini: { paddingHorizontal: 20, paddingBottom: 18 },
-  line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  sky: { opacity: 0.5 },
+  mini: { paddingHorizontal: 20, paddingBottom: 16 },
+  line: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  after: { marginTop: 14, marginHorizontal: -4 },
   part: { flexDirection: "row", alignItems: "center", gap: 6 },
   shrink: { flexShrink: 1 },
   pressed: { opacity: 0.6 },
   faces: { flexDirection: "row" },
-  overlap: { marginLeft: -5 },
-  empty: { marginHorizontal: 16, marginTop: 6, borderRadius: 28, overflow: "hidden", padding: 22, paddingTop: 0 },
-  emptySky: { height: 150, marginHorizontal: -22, alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  overlap: { marginLeft: -6 },
+  empty: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    borderRadius: 20,
+    overflow: "hidden",
+    padding: EMPTY_PAD,
+    paddingTop: 0,
+  },
+  emptySky: {
+    height: 150,
+    marginHorizontal: -EMPTY_PAD,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
   center: { textAlign: "center" },
-  emptyText: { marginTop: 6, marginBottom: 18 },
+  emptyText: { marginTop: 6, marginBottom: 20 },
   acts: { gap: 8 },
-  ideas: { paddingHorizontal: 16, paddingTop: 18 },
+  ideas: { paddingHorizontal: 16, paddingTop: 20 },
   ideasTitle: { paddingHorizontal: 4, paddingBottom: 8 },
   idea: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
+    gap: IDEA_GAP,
+    paddingHorizontal: IDEA_INSET,
     paddingVertical: 12,
     minHeight: 56,
+  },
+  // Between rows, inset to the text, as every list's hairline.
+  sep: {
+    position: "absolute",
+    top: 0,
+    left: IDEA_INSET + IDEA_TILE + IDEA_GAP,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
   },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },

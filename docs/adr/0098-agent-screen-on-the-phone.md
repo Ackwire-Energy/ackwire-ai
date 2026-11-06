@@ -21,7 +21,7 @@ Nothing on the server needs to change for a first version:
 - A socket changes mode in place (ADR 0058 §17), and `@agenteschat/client` already has the close codes, states, retries and `desktopMode`.
 - `CONTROL_GRACE_MS` gives a person who drops 2 minutes to come back.
 - The web's `DesktopLink` hands noVNC a channel of its own, so noVNC doesn't care what carries its bytes.
-- The phone has the entry (`AgentComputerRow`), the full-screen view (`/computer/<agentId>`), the request card, the push that opens it, the live steps of the run, and `TypeBar` (whole text into the focused field, with a password mode, key row and the system's autofill).
+- The phone has the entry (`AgentComputerButton`, beside Conversar on the agent's profile), the full-screen view (`/computer/<agentId>`), the request card, the push that opens it, the live steps of the run, and the keyboard on the screen (key by key, with `TypeBar` for a password and the system's autofill).
 
 ### Why the phone is not a small laptop
 
@@ -58,7 +58,11 @@ Sideways, in control, the trade changes, so the phone gets the other answer. Lyi
 
 ### 4. Typing
 
-The app's `TypeBar`, not key by key: a whole text goes to the field in focus, the same words and password mode as the browser, so the system's autofill and passwords work and a password never lands in the conversation. A key row has Esc, Tab, Enter and Delete, and the field takes the phone's own paste. Text goes as on the web (ADR 0058 §16): typed as characters where noVNC can, pasted otherwise.
+Straight onto the screen, key by key, as on a computer: the keyboard button opens the phone's keyboard over the screen and each key goes there as it is pressed, with nothing typed twice and no draft in between. The keys go to a field nobody sees, as the web's `useScreenKeys` does, read as what changed in it (`typedSince`: Backspaces for what went, then what came), so a swiped word or the keyboard's own paste arrives whole; on an empty field Backspace changes nothing, so the key itself is read; Return is Enter. A row over the keyboard has what a phone keyboard lacks (Esc, Tab and the arrows), Paste, and Password. While typing, a tap on the screen clicks where it lands, since the trackpad is under the keyboard, so another field can be picked without closing it. The keyboard coming or going keeps the zoom the person had and moves the view only as much as keeps the cursor in sight (`keepView`); the view frames the screen again only when control, the phone's side or the desktop's size changes.
+
+Password opens the app's `TypeBar` in its password mode instead: a whole text to the field in focus, the same words as the browser, so the system's saved passwords work and a password never lands in the conversation. Text goes as on the web (ADR 0058 §16): typed as characters where noVNC can, pasted otherwise.
+
+At first typing was `TypeBar` alone, a whole text sent with a button, chosen for the system's autofill. In use it read as a chat box rather than the computer's keyboard: nothing showed on the screen until sending, and each correction was a round trip. Key by key with the password field one tap away keeps both.
 
 ### 5. Watching
 

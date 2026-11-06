@@ -90,6 +90,7 @@ describe("permissions", () => {
         showActivity: false,
         agentStyle: null,
         chatPrefs: {},
+        orgCreatedAt: expect.any(Date),
       },
     ]);
     const members = await f.db

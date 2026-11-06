@@ -101,15 +101,16 @@ export function useSectionOrder(orgId: string) {
           type="button"
           className="sidebar__grip"
           draggable
-          aria-label={t("shell.sidebarSetup.drag", { name: sectionName(t, id) })}
-          title={t("shell.sidebarSetup.drag", { name: sectionName(t, id) })}
+          aria-label={t("shell.sidebarSetup.moveSection", { name: sectionName(t, id) })}
+          title={t("shell.sidebarSetup.moveSection", { name: sectionName(t, id) })}
           onDragStart={(e) => {
             dragging.current = id;
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData(SECTION_DRAG, id);
-            // The ghost is the section's header row (the tools: their first row), not the whole section over the others.
+            // The ghost is the section's header row, not a long list over the others; the tools have no header, so all
+            // of them, which is what moves.
             const head = e.currentTarget.parentElement?.querySelector<HTMLElement>(
-              ".sidebar__section-head, .sidebar__item",
+              ".sidebar__tools, .sidebar__section-head",
             );
             if (head) {
               const r = head.getBoundingClientRect();

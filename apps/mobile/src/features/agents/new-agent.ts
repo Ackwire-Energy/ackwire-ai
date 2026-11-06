@@ -1,3 +1,4 @@
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { handleProblem, type RoleId } from "@agenteschat/client/lib/new-agent";
 
 /**
@@ -26,3 +27,13 @@ export function stepBlocked(step: PhoneStep, d: PhoneDraft): boolean {
 
 /** The first step that can't go on (-1 when it can be created). */
 export const firstBlockedStep = (d: PhoneDraft) => NEW_AGENT_PHONE_STEPS.findIndex((s) => stepBlocked(s, d));
+
+/**
+ * A preset's line under its name: what it does, then who it starts as ("Codes, reviews PRs and investigates bugs ·
+ * starts as Ada"). Each description is a sentence of its own in every language, so its closing stop goes before
+ * the "·", and the part after it starts in lower case, unless it starts with the agent's name ("Adaとして開始").
+ */
+export function roleLine(desc: string, startsAs: string, name: string, locale?: string): string {
+  const after = startsAs.startsWith(name) ? startsAs : lowerFirst(startsAs, locale);
+  return `${desc.replace(/[.。．]\s*$/u, "")} · ${after}`;
+}

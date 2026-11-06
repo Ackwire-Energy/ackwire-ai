@@ -1067,8 +1067,7 @@ describe("tools on a connected machine", () => {
     );
     expect(away.content).not.toContain("runner");
     const folder = await call(ctx, "request_folder_access", { path: "/srv/site", reason: "the site" });
-    expect(folder).toMatchObject({ isError: true });
-    expect(folder.content).toContain("isn't answering right now. It usually comes back within minutes.");
+    expect(folder.content).toContain("Nobody can allow folders on Build box");
     expect(folder.content).not.toContain("runner");
   });
 
@@ -1110,7 +1109,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
 
   /** An agent that asks for NPM_TOKEN when told "publica", then says what it got (`before`: ahead of the ask). */
   async function asking(
-    target: ({ target: "env" } | { target: "file"; path: string }) & { site?: string } = { target: "env" },
+    target: ({ target?: "env" } | { target: "file"; path: string }) & { site?: string } = { target: "env" },
     runnerOptions: FakeRunnerOptions = {},
     before?: () => Promise<unknown>,
   ) {
@@ -1157,6 +1156,17 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       secretAad({ requestId: view.id, orgId: f.org.id, name: view.name, target: view.target }),
     );
 
+  test("a secret's file written in full in the agent's folder is kept as the path it is there", async () => {
+    const id8 = () => f.agent.id.replace(/-/g, "").slice(0, 8);
+    const { row } = await asking({
+      target: "file",
+      get path() {
+        return `/home/ag-${id8()}/dev-${id8()}/.npmrc`;
+      },
+    });
+    expect(row.targetPath).toBe(".npmrc");
+  });
+
   test("the run waits on a card; only the person asked delivers; the value reaches the machine and nothing else", async () => {
     const { runner, row, paired } = await asking();
     const [run] = await f.db.select().from(schema.agentRuns);
@@ -1184,10 +1194,10 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       publicKey: row.publicKey,
     });
     // Its text is for previews and notifications, a sentence that names who asked (the card names the key).
-    expect(card?.body).toBe(`${f.agent.name} asked for a key: NPM_TOKEN`);
+    expect(card?.body).toBe(`${f.agent.name} asked for a key: Npm token`);
     expect((card?.meta as { bodyParams?: unknown } | undefined)?.bodyParams).toEqual({
       agent: f.agent.name,
-      name: "NPM_TOKEN",
+      name: "Npm token",
     });
 
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
@@ -1357,7 +1367,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       .where(eq(schema.messages.id, again?.messageId as string));
     expect((card?.meta as { secretRequest?: SecretRequestView } | undefined)?.secretRequest).toMatchObject({
       name: "TYPESAFE_API_KEY",
-      purpose: "A chave TYPESAFE_API_KEY foi recusada (401). Manda uma nova?",
+      purpose: "A chave Typesafe api key foi recusada (401). Manda uma nova?",
       replaces: true,
     });
 
@@ -1388,6 +1398,31 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     ]);
     expect(everything).not.toContain(OLD);
     expect(everything).not.toContain(NEW);
+  });
+
+  test("a `path` with no `target` is a file, so what a person types lands where it was asked for", async () => {
+    const { row } = await asking({ path: ".npmrc" } as never);
+    expect(row).toMatchObject({ name: "NPM_TOKEN", targetKind: "file", targetPath: ".npmrc" });
+  });
+
+  test("`target` is env unless it says file; anything else is refused with the values", async () => {
+    const { row } = await asking({});
+    expect(row).toMatchObject({ name: "NPM_TOKEN", targetPath: null });
+    const [run] = await f.db.select().from(schema.agentRuns);
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id as string,
+      channelId: f.general.id,
+      threadRootId: run?.threadRootId as string,
+      triggerMessageId: run?.triggerMessageId as string,
+    };
+    const input = { name: "OTHER_TOKEN", purpose: "outro pacote", target: "my home folder" };
+    const refused = await f.tools?.invoke(ctx, { toolUseId: "t1", name: "request_secret", input });
+    expect(refused).toMatchObject({ type: "result", output: { isError: true } });
+    expect(refused?.type === "result" ? refused.output.content : "").toContain('must be one of "env", "file"');
+    expect(await f.db.select().from(schema.secretRequests)).toHaveLength(1);
   });
 
   test("one run asks once per key: a second ask waits on the open card, and once given it isn't asked again until tried", async () => {
@@ -1947,7 +1982,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
 
   test("a site's password is the browser's alone where the runner keeps it so: its card, its box and the agent say so", async () => {
     const SITE = "https://dashboard.stripe.com";
-    const { runner, row } = await asking({ target: "env", site: "dashboard.stripe.com/login" }, { sites: true });
+    const { runner, row } = await asking({ site: "dashboard.stripe.com/login" }, { sites: true });
     expect(row).toMatchObject({ targetKind: "site", site: SITE });
     const [card] = await f.db
       .select()
@@ -1994,7 +2029,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const n = await notice();
     expect(n).toMatchObject({ userId: f.owner.id, kind: "secret_request", waiting: true, doneAt: null });
     expect(n?.latest).toMatchObject({
-      title: "NPM_TOKEN",
+      title: "Npm token",
       text: "publicar o pacote no npm",
       expiresAt: row.expiresAt.toISOString(),
     });

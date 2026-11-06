@@ -2,7 +2,7 @@ import type { Message, MessageMemory } from "@agenteschat/client";
 import { cacheMessageMemories, keys } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { editsMemory } from "@agenteschat/client/lib/permissions";
-import { AgentReadingBook, Button, Input, Popover, useHoverCard } from "@agenteschat/ui";
+import { AgentReadingBook, Button, Input, Locked, Popover, useHoverCard } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -180,13 +180,15 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
                 else setEditing(false);
               }}
             >
-              <Input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                aria-label={t("memoryMark.fixLabel")}
-                maxLength={2000}
-                autoFocus
-              />
+              <Locked when={fix.isPending}>
+                <Input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  aria-label={t("memoryMark.fixLabel")}
+                  maxLength={2000}
+                  autoFocus
+                />
+              </Locked>
               <div className="msg-mem__actions msg-mem__actions--end">
                 <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
                   {t("common.cancel")}
@@ -207,23 +209,25 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
                   })}
                 </small>
               </div>
-              <div className="msg-mem__actions">
-                {fixButton}
-                {canEdit && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon="trash"
-                    className="msg-mem__forget"
-                    loading={forget.isPending}
-                    onClick={() => forget.mutate()}
-                  >
-                    {t("memoryMark.forget")}
-                  </Button>
-                )}
-                <span className="msg-mem__grow" />
-                {memoryLink}
-              </div>
+              <Locked when={forget.isPending}>
+                <div className="msg-mem__actions">
+                  {fixButton}
+                  {canEdit && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon="trash"
+                      className="msg-mem__forget"
+                      loading={forget.isPending}
+                      onClick={() => forget.mutate()}
+                    >
+                      {t("memoryMark.forget")}
+                    </Button>
+                  )}
+                  <span className="msg-mem__grow" />
+                  {memoryLink}
+                </div>
+              </Locked>
             </>
           )}
         </div>

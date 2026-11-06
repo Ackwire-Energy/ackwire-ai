@@ -11,6 +11,7 @@ import {
   LOCKED_BRAIN_PROTOCOL,
   type PubSub,
   parseBrainEvent,
+  SPEED_PROTOCOL,
   STEER_PROTOCOL,
   type WireBrainEvent,
 } from "@agenteschat/adapters";
@@ -207,6 +208,15 @@ export function contextFields(
 ): Pick<BrainTurnRequest, "contextTokens"> {
   if (!turn.contextTokens || (protocol !== undefined && protocol < CONTEXT_LIMIT_PROTOCOL)) return {};
   return { contextTokens: turn.contextTokens };
+}
+
+/** The turn's speed, sent only to a runner that knows it (`SPEED_PROTOCOL`). */
+export function speedFields(
+  protocol: number | undefined,
+  turn: Pick<BrainTurn, "speed">,
+): Pick<BrainTurnRequest, "speed"> {
+  if (!turn.speed || (protocol !== undefined && protocol < SPEED_PROTOCOL)) return {};
+  return { speed: turn.speed };
 }
 
 /** Why the turn can't go to this machine now (null: it can). With an account, the account decides the sign-in. */
@@ -416,6 +426,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           ...(permissions ? { permissions } : {}),
           ...accountFields(status?.protocol, turn),
           ...contextFields(status?.protocol, turn),
+          ...(turn.personWaiting ? { personWaiting: true } : {}),
         };
         deps.hub
           .call<"brain.turn">(

@@ -16,7 +16,8 @@
   border-radius: 16px 16px 16px 4px;
 }
 .rq > :not(.ac-approval__sky),
-.rq__form > * {
+.rq > .ac-locked > *,
+.rq__form > .ac-locked > * {
   position: relative;
 }
 .rq__form {
@@ -106,7 +107,6 @@
   width: 32px;
   height: 32px;
 }
-/* Two lines that never wrap: the name and its detail end in "…". */
 .rq__wt {
   flex: 1;
   min-width: 0;
@@ -114,11 +114,10 @@
   flex-direction: column;
   gap: 1px;
 }
+/* What it asks and where it goes wrap: cut, they hide the meaning. */
 .rq__wt b,
 .rq__wt small {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .rq__wt b {
   font-size: 14px;
@@ -259,26 +258,39 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 
 /*
- * A decided request (RequestDone): no card, one quiet line. A pixel mark, words that end in "…" rather than wrap, and
- * "Ver …" right after them.
+ * A decided request (RequestDone): no card, one quiet line. A pixel mark, words that wrap, and "Ver …" right after them.
  */
 .rq-done {
   max-width: var(--msg-card-w);
   margin-top: 2px;
 }
+/* Right under the name it is the message's words, not a card: a message with a request stacks its body with the
+   cards' 8px gap (`stacked`), which pulled the line away from the name; it sits 2px under it, as a text does. */
+.ac-msg__head + .rq-done {
+  margin-top: -6px;
+}
 .rq-done__line {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-size: 13px;
+  line-height: 20px;
   color: var(--muted);
 }
+/* The mark and the buttons stand on the first line of its words, however many they wrap to. */
 .rq-done__mark {
   flex: none;
   display: inline-grid;
   place-items: center;
   width: 14px;
-  height: 14px;
+  height: 20px;
+}
+.rq-done__line > .ac-btn {
+  flex: none;
+  margin-block: -6px;
+}
+.rq-done__line > .rq__more {
+  margin-block: -2px;
 }
 .rq-done__mark > span {
   width: 8px;
@@ -292,9 +304,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 .rq-done__text {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .rq-done__text b {
   font-weight: 600;
@@ -430,7 +440,8 @@ html:not([data-pointer]) .rq__more:focus-visible {
 /* A settings card's lines (ADR 0137): the setting, then what it was struck through, an arrow and what it becomes. */
 .rq__settings {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  /* The setting's name up to 40% (wrapping past it), so in a narrow thread its value keeps the rest. */
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
   gap: 8px 24px;
   margin: 16px 0 0;
 }
@@ -513,7 +524,14 @@ html:not([data-pointer]) .rh-intro__preset:focus-visible {
   color: var(--muted);
   font-size: 12px;
 }
-@media (max-width: 760px) {
+/* Four across only on the full-width card: in a narrower chat (its agent's page or a thread docked beside it, a
+   phone) four left each name ~40px, so two across. By the card's width, not the window's; `width: 100%` keeps the
+   card's width set from outside, as a container needs. */
+.rq:has(.rh-intro__presets) {
+  container: rh-intro / inline-size;
+  width: 100%;
+}
+@container rh-intro (max-width: 619px) {
   .rh-intro__presets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

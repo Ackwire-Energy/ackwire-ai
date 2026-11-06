@@ -49,7 +49,7 @@ export interface BrowserViewsOptions {
 }
 
 /**
- * The live views of the agents' browsers on this computer (ADR 0040 §7.1, protocol 46): one data socket per agent
+ * The live views of the agents' browsers on this computer (ADR 0040 §7.1, protocol 49): one data socket per agent
  * (or browser profile) the server asked for with `browser.view.open`, held by the process that holds the server's
  * connection (root in system mode: the workers pass their frames up as before, and only root has the machine's
  * token). That agent's frames go there as bytes (`encodeBrowserFrame`), never as `browser.frame` on the machine

@@ -25,7 +25,7 @@ import {
   requireSession,
   security,
 } from "./context";
-import { AccountKind, MachineAccount, PlanUsage } from "./schemas";
+import { AccountKind, BrainUnavailable, MachineAccount, PlanUsage } from "./schemas";
 import { SecretBox } from "./secrets";
 
 const tags = ["Connected computers"];
@@ -267,6 +267,9 @@ export function machineAccountRoutes(deps: AppDeps) {
                       description:
                         "A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's, a coding plan's key.",
                     }),
+                  off: z
+                    .record(z.string(), BrainUnavailable)
+                    .openapi({ description: "Why a CLI of `brains` can't think there, by its kind." }),
                   brains: z
                     .object({
                       claude_code: z.boolean(),

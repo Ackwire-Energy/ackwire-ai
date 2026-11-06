@@ -177,7 +177,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
           </Text>
         ))}
         {managed && m.networkTransition && (
-          <Text>
+          <Text variant="small" tone="muted" style={styles.center}>
             {t(m.networkTransition.state === "draining" ? "machines.egress.draining" : "machines.egress.restart", {
               when: new Date(m.networkTransition.deadline).toLocaleTimeString(),
             })}
@@ -188,7 +188,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
             {countryFlagSvg(m.egress.country) ? (
               <SvgXml xml={countryFlagSvg(m.egress.country) as string} width={20} height={14} />
             ) : (
-              <Icon name="globe" size={14} color={c.muted} />
+              <Icon name="globe" size={15} color={c.muted} />
             )}
             <Text variant="small" tone="muted">
               {t("machines.egress.line", { ip: m.egress.ip })}
@@ -839,6 +839,7 @@ export function RenameMachineScreen({ machineId }: { machineId: string }) {
     <SettingsPage
       title={t("machines.renameTitle")}
       action={{ label: t("common.save"), disabled: !ready, onPress: save }}
+      locked={action.isPending}
     >
       <GroupedHeader>{t("machines.name")}</GroupedHeader>
       <TextArea

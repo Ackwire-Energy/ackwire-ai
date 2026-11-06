@@ -119,7 +119,6 @@
 }
 .ac-msg--mentions-me[data-look="bubbles"] .ac-msg__text {
   background: color-mix(in srgb, var(--attention) 13%, var(--msg-bubble));
-  box-shadow: inset 2px 0 0 var(--attention);
 }
 /* Mine: on the right in the tint or the solid color, its width the same as anyone's. */
 .ac-msg--own[data-look="bubbles"] {
@@ -157,6 +156,10 @@
 }
 .ac-msg--own[data-look="bubbles"][data-tone="strong"] .ac-msg__stamp .ac-receipt__check {
   color: var(--stamp-ink);
+}
+.ac-msg[data-look="bubbles"] > .ac-msg__reply {
+  --reply-face: 32px;
+  --reply-gap: 8px;
 }
 /* Name inside the bubble, in its color; a DM's two speakers leave it to screen readers. */
 .ac-msg__bubble-head {
@@ -319,6 +322,22 @@
   color: var(--faint);
   font-variant-numeric: tabular-nums;
   user-select: none;
+}
+/* A reply: the row's own line goes under the quote's, and the curve joins it from the small face. */
+.ac-msg[data-look="compact"] > .ac-msg__reply {
+  margin-bottom: 2px;
+  padding-left: 0;
+}
+.ac-msg[data-look="compact"] > .ac-msg__reply::before {
+  left: -18px;
+  width: 13px;
+  bottom: -3px;
+}
+.ac-msg[data-look="compact"]:has(> .ac-msg__reply) > .ac-msg__clock {
+  top: 25px;
+}
+.ac-msg[data-look="compact"]:has(> .ac-msg__reply) > .ac-msg__avatar {
+  top: 24px;
 }
 .ac-msg[data-look="compact"] .ac-msg__avatar {
   position: absolute;

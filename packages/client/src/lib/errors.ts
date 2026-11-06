@@ -5,6 +5,7 @@ import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
 import { lowerFirst } from "./format";
 import { limitRefusalText } from "./limits";
+import { providerOf } from "./providers";
 import { endSentence } from "./text";
 
 /** No sign-in in the last 10 minutes, which adding a password takes. */
@@ -178,6 +179,8 @@ const KNOWN = {
   "invitation.ask_to_join": "errors.invitation.askToJoin",
   "org.create_invite_only": "errors.org.createInviteOnly",
   "org.not_restorable": "errors.org.notRestorable",
+  "account.not_restorable": "errors.account.notRestorable",
+  "issue.assignee_outside": "errors.issue.assigneeOutside",
   [REAUTH_PASSWORD]: "errors.reauth.password",
   [REAUTH_SIGN_IN]: "errors.reauth.signIn",
   EARLY_ACCESS_OTHER_EMAIL: "auth.earlyAccess.otherEmail",
@@ -195,9 +198,13 @@ const KNOWN = {
   jev_key_invalid: "jev.steps.invalid",
   // GIPHY refused the key pasted for GIFs (ADR 0091): said under its field, nothing kept.
   gif_key_invalid: "settings.media.giphy.invalid",
-  // A provider's own check refused a key on save (OpenRouter's): nothing kept.
+  // A key's test call on save: nothing kept (`keyRefusal` adds the provider's words and where to fix it).
   provider_key_invalid: "settings.keyRefused",
+  provider_key_no_credit: "settings.keyNoCredit",
+  provider_key_denied: "settings.keyDenied",
   provider_key_management: "settings.keyManagement",
+  "credential.in_use": "settings.keyInUse",
+  "credential.default": "settings.removeDefaultBlocked",
   "github.repo_missing": "errors.github.repoMissing",
   "github.ref_missing": "errors.github.refMissing",
   // `count`: minutes until GitHub stops limiting the server.
@@ -228,6 +235,7 @@ const KNOWN = {
   "wiki.title_empty_slug": "errors.wiki.titleNoLetters",
   // GIFs and stickers (ADR 0091): off in the workspace (or no GIF search on this server), a GIF gone, or the GIF
   // search not answering.
+  "message.reply_not_found": "errors.replyGone",
   "message.media_off": "errors.media.off",
   "message.media_not_found": "errors.media.notFound",
   "gifs.off": "errors.media.gifsOff",
@@ -606,6 +614,22 @@ export const oauthReturnText = (t: TFunction, code: string): string => {
   return t("oauthReturn.failed");
 };
 
+/** A key the provider refused on its test call, as a dialog says it: why, its words, and the page that fixes it. */
+export function keyRefusal(t: TFunction, error: unknown): { text: string; href: string; site: string } | null {
+  if (!(error instanceof ApiError) || !KEY_REFUSALS.has(error.code ?? "")) return null;
+  const { provider = "", said = "" } = (error.params ?? {}) as { provider?: string; said?: string };
+  const maker = providerOf(provider);
+  const site = (error.code === "provider_key_no_credit" ? maker?.credit : undefined) ?? maker?.site;
+  const why = errorText(t, error);
+  return {
+    text: said ? `${endSentence(why)} ${t("settings.keySaid", { provider, said })}` : why,
+    href: site ? `https://${site}` : "",
+    site: site?.split("/")[0] ?? "",
+  };
+}
+
+const KEY_REFUSALS = new Set(["provider_key_invalid", "provider_key_no_credit", "provider_key_denied"]);
+
 /**
  * A failed request in the person's words: a code the app knows, a file too big, a refusal, no answer (offline or the
  * server out of reach), else `untranslatedText`. Never a raw error's own words ("Failed to fetch", "Bad Gateway").
@@ -626,6 +650,9 @@ const KEY_FAILURES = new Set([
   "run.credential_revoked",
   "run.credential_wrong_provider",
   "run.provider_account",
+  "run.provider_no_credit",
+  "run.provider_invalid_key",
+  "run.provider_no_access",
 ]);
 
 /**
@@ -636,7 +663,8 @@ export function failedRunFix(
   code: string | null | undefined,
   who: { keys: boolean; admin: boolean; owner: boolean },
 ): "useKey" | "changeModel" | null {
-  if (code === "run.model_unlisted") return who.admin || who.owner ? "changeModel" : null;
+  if (code === "run.model_unlisted" || code === "run.provider_model_unavailable")
+    return who.admin || who.owner ? "changeModel" : null;
   return code && KEY_FAILURES.has(code) && who.keys ? "useKey" : null;
 }
 

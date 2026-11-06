@@ -1,6 +1,6 @@
 import { editorsInput, useCreateDashboard } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Input } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Input, Locked } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { type RefObject, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -78,18 +78,20 @@ function NewDashboardBody({ nameRef, onClose }: { nameRef: RefObject<HTMLInputEl
         submit();
       }}
     >
-      <DialogBody className="db-dialog__body">
-        <Field label={t("dashboards.create.name")} id={`${id}-name`} help={t("dashboards.create.askHint")}>
-          <Input
-            ref={nameRef}
-            value={title}
-            maxLength={80}
-            placeholder={t("dashboards.create.namePlaceholder")}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </Field>
-        <AudienceFields value={audience} onChange={setAudience} />
-      </DialogBody>
+      <Locked when={create.isPending}>
+        <DialogBody className="db-dialog__body">
+          <Field label={t("dashboards.create.name")} id={`${id}-name`} help={t("dashboards.create.askHint")}>
+            <Input
+              ref={nameRef}
+              value={title}
+              maxLength={80}
+              placeholder={t("dashboards.create.namePlaceholder")}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </Field>
+          <AudienceFields value={audience} onChange={setAudience} />
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>
           {t("common.cancel")}

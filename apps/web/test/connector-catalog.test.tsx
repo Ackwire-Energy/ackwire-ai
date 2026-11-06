@@ -698,7 +698,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     };
     const { router } = await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
-    expect(screen().getByRole("region", { name: "Conectores" }).textContent).toContain("Nenhum conector ainda.");
+    expect(screen().getByRole("region", { name: "Conectores" }).textContent).toContain("Conecte os apps do seu time");
     // The window moves in the page (no reload): the lists read before the sign-in are still cached.
     await act(async () => router.history.push(`/desktop/connector?org=${ORG_ID}&state=s1&code=c1`));
     await settle(12);

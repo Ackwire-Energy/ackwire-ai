@@ -6,19 +6,31 @@ import {
 } from "@agenteschat/client/lib/machine-outages";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Icon, ProviderLogo, SheetScreen, Text, useToast } from "@/ui";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import {
+  Button,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  LineIcon,
+  Locked,
+  ProviderLogo,
+  SheetScreen,
+  Text,
+  useToast,
+} from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
-import { successHaptic, Tile, tapHaptic } from "../shared/parts";
+import { successHaptic, tapHaptic } from "../shared/parts";
 import { computerIcon, type MachineOutage, moveToast, sheetDesc, targetText, waitingText } from "./logic";
 import { useMachineOutages, useMoveAgents } from "./queries";
 
 /**
  * "Trocar o computador", a native form sheet: "Para onde" (only the
  * targets that can run the waiting agents' brains; one that can't take them now is disabled with the reason),
- * "Quem troca" (a check per agent with what it has waiting), the plain hint that a task that already changed
+ * "Quem troca" (a switch per agent with what it has waiting), the plain hint that a task that already changed
  * files on the old computer waits for it, then "Trocar N agentes" and "Agora não". The result is a toast.
  */
 export function SwitchComputerSheet({ machineId, onClose }: { machineId: string; onClose: () => void }) {
@@ -60,7 +72,6 @@ function SwitchForm({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const c = useColors();
   const toast = useToast();
   const move = useMoveAgents();
   // Everyone switches unless unchecked (agents that start waiting while the sheet is open join checked).
@@ -75,8 +86,8 @@ function SwitchForm({
   const target = options.find((x) => x.key === targetKey) ?? null;
   const count = chosen.size;
 
+  // The switch's row gives its own tap (`GroupedRow`).
   const toggle = (agentId: string) => {
-    tapHaptic();
     setUnchecked((prev) => {
       const next = new Set(prev);
       if (next.has(agentId)) next.delete(agentId);
@@ -118,75 +129,59 @@ function SwitchForm({
         {sheetDesc(t, o, chosen)}
       </Text>
 
-      <SectionLabel label={t("mobile.outage.sheet.where")} />
-      {options.length > 0 ? (
-        <Card>
-          <View accessibilityRole="radiogroup" accessibilityLabel={t("mobile.outage.sheet.where")}>
-            {options.map((x, i) => (
-              <TargetRow
+      {/* Settings' groups: each header on its group and each note under it, at the groups' own spacing. */}
+      <Locked when={move.isPending}>
+        <GroupedHeader>{t("mobile.outage.sheet.where")}</GroupedHeader>
+        <GroupedList>
+          {options.map((x) => {
+            const text = targetText(t, x);
+            // Only "Has Claude Code and Codex" names the brains: each gets its maker's mark.
+            const marked = x.enabled && x.brains.length > 0 && Boolean(text.desc);
+            return (
+              <GroupedRow
                 key={x.key}
-                option={x}
-                selected={x.key === targetKey}
-                divider={i > 0}
+                icon={computerIcon(x.platform)}
+                label={text.title}
+                value={text.tag ?? undefined}
+                {...(marked
+                  ? { below: <BrainsLine brains={x.brains} text={text.desc} /> }
+                  : { belowText: text.desc || undefined })}
+                checked={x.key === targetKey}
+                faint={!x.enabled}
+                disabled={!x.enabled}
                 onPress={() => {
                   tapHaptic();
                   setPicked(x.key);
                 }}
               />
-            ))}
-          </View>
-        </Card>
-      ) : null}
-      {!options.some((x) => x.enabled) ? (
-        <Text variant="small" tone="muted">
-          {t("mobile.outage.sheet.none")}
-        </Text>
-      ) : null}
+            );
+          })}
+        </GroupedList>
+        {!options.some((x) => x.enabled) ? <GroupedFooter>{t("mobile.outage.sheet.none")}</GroupedFooter> : null}
 
-      <SectionLabel label={t("mobile.outage.sheet.who")} />
-      <Card>
-        {o.agents.map((a, i) => {
-          const on = chosen.has(a.agentId);
-          const waiting = waitingText(t, a);
-          return (
-            <Pressable
+        <GroupedHeader>{t("mobile.outage.sheet.who")}</GroupedHeader>
+        <GroupedList>
+          {o.agents.map((a) => (
+            <GroupedRow
               key={a.agentId}
+              leading={<AgentFace agentId={a.agentId} size={28} mode="rest" live={false} />}
+              label={a.name}
+              value={waitingText(t, a)}
+              toggle={chosen.has(a.agentId)}
               onPress={() => toggle(a.agentId)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: on }}
-              accessibilityLabel={`${a.name}, ${waiting}`}
-              style={({ pressed }) => [
-                styles.row,
-                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-                pressed && { backgroundColor: c.sunken },
-              ]}
-            >
-              <Icon name={on ? "checkc" : "circle"} size={22} color={on ? c.ink : c.faint} />
-              <AgentFace agentId={a.agentId} size={28} mode="rest" live={false} />
-              <Text variant="body" tone="ink" numberOfLines={1} style={styles.grow}>
-                {a.name}
-              </Text>
-              <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
-                {waiting}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </Card>
-
-      <View style={[styles.hint, { backgroundColor: c.sunken }]}>
-        <Icon name="help" size={16} color={c.muted} />
-        <Text variant="small" tone="muted" style={styles.grow}>
-          {t("mobile.outage.sheet.hint", { computer: o.name })}
-        </Text>
-      </View>
+            />
+          ))}
+        </GroupedList>
+        <GroupedFooter>{t("mobile.outage.sheet.hint", { computer: o.name })}</GroupedFooter>
+      </Locked>
 
       <View style={styles.acts}>
         <Button
           variant="primary"
           wide
           label={t("mobile.outage.sheet.submit", { count })}
-          disabled={!target || count === 0 || move.isPending}
+          loading={move.isPending}
+          disabled={!target || count === 0}
           onPress={submit}
         />
         <Button variant="ghost" wide label={t("mobile.outage.sheet.later")} onPress={onClose} />
@@ -195,82 +190,25 @@ function SwitchForm({
   );
 }
 
-/** The small heading above a group (`.sect-h`). */
-function SectionLabel({ label }: { label: string }) {
+/** A target's line naming the brains it has, each after its maker's mark (on the line's first line). */
+function BrainsLine({ brains, text }: { brains: TargetOption["brains"]; text: string }) {
   return (
-    <Text variant="footnote" tone="muted" accessibilityRole="header" style={styles.section}>
-      {label}
-    </Text>
-  );
-}
-
-/** One target (our option row): the computer's tile, its name and tag, the line under it, a check when chosen. */
-function TargetRow({
-  option: x,
-  selected,
-  divider,
-  onPress,
-}: {
-  option: TargetOption;
-  selected: boolean;
-  divider: boolean;
-  onPress: () => void;
-}) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const text = targetText(t, x);
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={!x.enabled}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected, disabled: !x.enabled }}
-      accessibilityLabel={[text.title, text.tag, text.desc].filter(Boolean).join(", ")}
-      style={({ pressed }) => [
-        styles.row,
-        divider && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-        pressed && { backgroundColor: c.sunken },
-        !x.enabled && styles.off,
-      ]}
-    >
-      <Tile icon={computerIcon(x.platform)} size={36} />
-      <View style={styles.grow}>
-        <View style={styles.titleLine}>
-          <Text variant="body" tone="ink" numberOfLines={1} style={styles.shrink}>
-            {text.title}
-          </Text>
-          {text.tag ? <Chip label={text.tag} /> : null}
-        </View>
-        {text.desc ? (
-          <View style={styles.descLine}>
-            {/* Only "Tem o Claude Code e o Codex" names the brains: each gets its maker's mark. */}
-            {x.enabled ? x.brains.map((b) => <ProviderLogo key={b} id={b} size="xs" />) : null}
-            <Text variant="small" tone="faint" numberOfLines={2} style={styles.shrink}>
-              {text.desc}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-      {selected ? <Icon name="check" size={18} color={c.ink} /> : null}
-    </Pressable>
+    <View style={styles.descLine}>
+      {brains.map((b) => (
+        <LineIcon key={b} variant="footnote" size={14}>
+          <ProviderLogo id={b} size="xs" />
+        </LineIcon>
+      ))}
+      <Text variant="footnote" tone="faint" numberOfLines={2} style={styles.shrink}>
+        {text}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { fontWeight: "600", marginTop: 6, marginHorizontal: 4 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    minHeight: 54,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  titleLine: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
-  descLine: { flexDirection: "row", alignItems: "center", gap: 5, minWidth: 0 },
-  off: { opacity: 0.5 },
-  hint: { flexDirection: "row", gap: 8, padding: 12, borderRadius: 14 },
+  // The marks stay on the first of its two lines.
+  descLine: { flexDirection: "row", alignItems: "flex-start", gap: 6, minWidth: 0 },
   acts: { gap: 8, marginTop: 4 },
-  grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
 });

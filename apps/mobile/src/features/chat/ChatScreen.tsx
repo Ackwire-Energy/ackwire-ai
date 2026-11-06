@@ -1,6 +1,7 @@
 import {
   type Agent,
   type ArtifactDetail,
+  type ArtifactRef,
   type BrowserHandoff,
   type ConnectionStatus,
   heldTakeoversHere,
@@ -11,6 +12,7 @@ import {
   type MessageMedia,
   type MessagePin,
   type ReceiptsState,
+  type ReplyRef,
   type RunConsultation,
   type SearchHit,
   sendHelpers,
@@ -44,8 +46,9 @@ import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { firstUnreadId, opensAtLastRead } from "@agenteschat/client/lib/chat-look";
+import { type ConversationWait, conversationWaits } from "@agenteschat/client/lib/computer-queue";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
@@ -60,6 +63,7 @@ import {
 import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { pinsIn } from "@agenteschat/client/lib/pins";
+import { localMeta } from "@agenteschat/client/lib/reply";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
@@ -99,6 +103,7 @@ import {
   Count,
   Icon,
   IconButton,
+  LineIcon,
   PressScale,
   type SendHow,
   Text,
@@ -112,13 +117,14 @@ import { threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
-import { FanStrip } from "../queue/parts";
+import { FanStrip, QueueWaitRow } from "../queue/parts";
 import { DmQueueButton, QueueButton, useAgentsQueue, useOpenQueue } from "../queue/QueueSheet";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { RightHandIntro } from "../right-hand/Intro";
 import { ConversationSearch } from "../search/ConversationSearch";
 import { hitTarget } from "../search/logic";
-import { AgentFace, Face } from "../shared/Face";
+import { AgentFace, Face, OpensAgent } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useMyHandle, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, previewOf } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
@@ -150,6 +156,7 @@ import {
   buildRows,
   type ChatRow,
   dayInView,
+  MSG_TEXT,
   mayStopRun,
   mergeTimeline,
   parseSlash,
@@ -168,6 +175,7 @@ import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinnedBar, PinsSheet } from "./PinsSheet";
+import { QuoteBar } from "./QuoteLine";
 import { AgentLocked } from "./ReachLines";
 import { RowSight } from "./row-sight";
 import {
@@ -205,6 +213,8 @@ type Row =
   | ChatRow
   | { kind: "marker"; key: string; text: string }
   | { kind: "run"; key: string; run: LiveRun }
+  /** A run in line for its computer (`conversationWaits`): no live row of its own, this one for all its messages. */
+  | { kind: "wait"; key: string; wait: ConversationWait }
   /** An agent's browser card: its live run in the browser, or (no run row) a take over held here. */
   | { kind: "browser"; key: string; run: LiveRun; handoff?: undefined }
   | { kind: "browser"; key: string; run: null; handoff: BrowserHandoff }
@@ -549,7 +559,18 @@ function Chat({
   // ── Rows ──
   // One waiting card per agent and computer: an older "my computer is away" gives way to the newer one.
   const superseded = useMemo(() => supersededBrainNotices(list), [list]);
+  const waitsNow = conversationWaits(isThread ? list : list.filter((m) => !m.threadId), live.receipts, (id) =>
+    live.runs.some((r) => r.runId === id),
+  );
+  const waitsKey = waitsNow.map((w) => `${w.agentId}:${w.runId}`).join(" ");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: new only when the waits change, not on every receipt
+  const waits = useMemo(() => waitsNow, [waitsKey]);
   const rows = useMemo<Row[]>(() => {
+    const waitRows = waits.map((wait) => ({
+      kind: "wait" as const,
+      key: `wait-${wait.runId ?? wait.agentId}`,
+      wait,
+    }));
     // A saved reply that was live here keeps its block's key (only the run's last message: keys stay unique).
     const drawn = new Set(shownRuns.map((r) => r.runId));
     const asTurns = (chatRows: ChatRow[]): Row[] => {
@@ -598,6 +619,7 @@ function Chat({
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
+        ...waitRows,
         ...runRowsOf(turnOrder(shownRuns)),
       ];
     }
@@ -607,9 +629,24 @@ function Chat({
       ...asTurns(buildRows(list, hidden)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
+      ...waitRows,
       ...runRowsOf(turnOrder(shownRuns)),
     ];
-  }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
+  }, [
+    isThread,
+    threadId,
+    list,
+    thread.data,
+    channel?.name,
+    dm,
+    shownRuns,
+    turnKeyOf,
+    browsing,
+    held,
+    superseded,
+    t,
+    waits,
+  ]);
   const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
   // Questions agents asked other agents, in the pair row before the replies that asked (`ConsultGroup`): how each
   // answer's notice draws (hidden under a reply close by, one line to one farther up), and the working line without
@@ -832,11 +869,25 @@ function Chat({
       // A GIF or a sticker alone routes to nobody, so it gets no clock to keep.
       if (channel && channelAgents.length > 0 && !isMediaAlone(message)) live.picking(message.id);
     },
-    onFailed: (_error, { waits }) => {
-      if (!waits) toast({ title: t("mobile.chat.notSent"), icon: "x" });
+    onFailed: (error, { waits }) => {
+      if (waits) return;
+      const gone = errorCode(error) === "message.reply_not_found";
+      toast({ title: gone ? errorText(t, error) : t("mobile.chat.notSent"), icon: "x" });
     },
   });
   const { send, retry } = sendHelpers(post);
+  // "Responder" in a thread: the next message answers this one (`meta.replyTo`).
+  const [quote, setQuote] = useState<Message | null>(null);
+  const [replyAt, setReplyAt] = useState(0);
+  const onReply = useCallback((m: Message) => {
+    setQuote(m);
+    setReplyAt(Date.now());
+  }, []);
+  const takeQuote = (files: ArtifactRef[] = []) => {
+    if (!quote) return files.length > 0 ? localMeta(null, "", files) : undefined;
+    setQuote(null);
+    return localMeta(quote, dir.nameOf(quote.author), files);
+  };
   // Rows keep the same callback (so a streaming reply doesn't re-render every message).
   const retryRef = useRef(retry);
   retryRef.current = retry;
@@ -895,7 +946,8 @@ function Chat({
     if (!text) return;
     const cmd = parseSlash(text);
     if (!cmd) {
-      send(text, threadId, how === "now" ? { steer: "now" } : undefined);
+      const meta = takeQuote();
+      send(text, threadId, how === "now" ? { ...meta, steer: "now" } : meta);
       toEnd();
       return;
     }
@@ -952,12 +1004,16 @@ function Chat({
     orgId,
     channelId,
     threadId,
+    replyTo: quote?.id ?? null,
     authorId: meId ?? "",
     enabled: Boolean(meId && settings?.voiceAvailable && settings.voiceMessages),
-    afterSend: toEnd,
+    afterSend: () => {
+      setQuote(null);
+      toEnd();
+    },
   });
   const sendMedia = (media: MessageMedia) => {
-    send("", threadId, { media });
+    send("", threadId, { ...takeQuote(), media });
     toEnd();
     sheet.close();
   };
@@ -981,14 +1037,18 @@ function Chat({
         channelId,
         ...(threadId ? { threadId } : {}),
       });
-      send("", threadId, { artifacts: [{ id: saved.id, version: saved.version, title: saved.title }] });
+      send("", threadId, takeQuote([{ id: saved.id, version: saved.version, title: saved.title }]));
       toEnd();
     } catch {
       toast({ title: t("mobile.chat.uploadFailed"), icon: "x" });
     }
   };
   const onPlus = async (pick: PlusPick) => {
-    sheet.close();
+    // The library, the camera and the files picker open once the sheet is gone: presented over it while it slid out,
+    // iOS took them away with it and the app waited for an answer that never came.
+    const system = pick === "camera" || pick === "photos" || pick === "file";
+    if (system) await new Promise<void>((done) => sheet.close(done));
+    else sheet.close();
     switch (pick) {
       case "camera": {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -1035,6 +1095,12 @@ function Chat({
 
   // ── Long press ──
   const canMission = !mission && (Boolean(dm) || Boolean(channel));
+  const canReply =
+    isThread &&
+    member &&
+    thread.data?.state !== "archived" &&
+    channel?.can?.post !== false &&
+    (!dmAgent || canTalk(dmAgent));
   // biome-ignore lint/correctness/useExhaustiveDependencies: openNewMission reads the latest state when called
   const onLongPress = useCallback(
     (m: Message) =>
@@ -1046,9 +1112,10 @@ function Chat({
           thread={linkThreads.get(m.threadId ?? m.id)}
           onMission={(goal, rootId) => openNewMission(goal, rootId)}
           onRemind={(message) => openRemind({ message })}
+          {...(canReply ? { onReply } : {})}
         />,
       ),
-    [sheet, canMission, isThread, linkThreads],
+    [sheet, canMission, isThread, linkThreads, canReply, onReply],
   );
 
   // ── Pins ──
@@ -1058,31 +1125,52 @@ function Chat({
   const [seek, setSeek] = useState<string | null>(focusId);
   const [flashId, setFlashId] = useState<string | null>(null);
   const seekPages = useRef(0);
+  const seekPressed = useRef(false);
   const seekReady = isThread ? threadMessages.isSuccess && !threadMessages.isPlaceholderData : top.isSuccess;
+  const seekRefreshing = isThread ? threadMessages.isFetching : top.isFetching;
   useEffect(() => {
     if (!seek || !seekReady) return;
     const index = shownRows.findIndex((r) => r.kind === "message" && r.message.id === seek);
     if (index >= 0) {
       setSeek(null);
+      seekPressed.current = false;
       letGo();
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
       setFlashId(seek);
       return;
     }
     if (isThread || olderDone || seekPages.current >= SEEK_MAX_PAGES) {
+      // A cached page refreshing may still bring it.
+      if (seekRefreshing) return;
       setSeek(null);
+      if (seekPressed.current) toast({ title: t("channel.jumpTooFar") });
+      else toast({ title: t("channel.jumpMissing"), icon: "x" });
+      seekPressed.current = false;
       return;
     }
     if (!loadingOlder) {
       seekPages.current += 1;
       loadOlder();
     }
-  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo]);
+  }, [seek, seekReady, seekRefreshing, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo, t, toast]);
   useEffect(() => {
     if (!flashId) return;
     const timer = setTimeout(() => setFlashId(null), FLASH_MS);
     return () => clearTimeout(timer);
   }, [flashId]);
+  const onQuote = useCallback(
+    (reply: ReplyRef) => {
+      // A thread's reply isn't a row of the conversation: it is on the thread's screen.
+      if (!isThread && reply.threadId) {
+        router.push(chatHref(channelId, reply.threadId, reply.messageId));
+        return;
+      }
+      seekPages.current = 0;
+      seekPressed.current = true;
+      setSeek(reply.messageId);
+    },
+    [isThread, channelId],
+  );
   const goToPin = (pin: MessagePin) => {
     sheet.close();
     const target = pinTarget(pin, threadId);
@@ -1330,12 +1418,19 @@ function Chat({
             title={title}
             {...(optionsLine ? { subtitle: optionsLine } : {})}
             leading={
-              dm ? <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} /> : <Tile icon="hash" />
+              dm ? (
+                <OpensAgent agentId={dm.with.id}>
+                  <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} />
+                </OpensAgent>
+              ) : (
+                <Tile icon="hash" />
+              )
             }
             agentId={dmAgentId}
             about={personDm ? <PersonStatusCard userId={personDm} /> : undefined}
             onPins={openPins}
             onMembers={channel && !dm ? openMembers : undefined}
+            onSearch={dm && searchPlace ? openSearch : undefined}
           />,
         );
   // Holding the pill: "Trocar de conversa". The pick swaps the conversation in place (the route's params; the
@@ -1393,12 +1488,7 @@ function Chat({
         subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
-        extraActions={
-          (dmAgentId ? 1 : 0) +
-          (queueShown ? 1 : 0) +
-          (agentTasks ? tasksBadge(agentTasks).room : 0) +
-          (searchPlace ? 1 : 0)
-        }
+        extraActions={(dmAgentId ? 1 : 0) + (queueShown ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
         label={
@@ -1471,7 +1561,10 @@ function Chat({
         ) : dmComputer ? (
           <DmComputerButton agentId={dmComputer.agentId} onOpen={leavePlace} />
         ) : null}
-        {searchPlace ? <IconButton icon="search" label={t("searchPage.searchHere")} onPress={openSearch} /> : null}
+        {/* A DM searches from its "…" (its name and the agent's own buttons keep the room). */}
+        {searchPlace && !dm ? (
+          <IconButton icon="search" label={t("searchPage.searchHere")} onPress={openSearch} />
+        ) : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
       </>
     ) : null;
@@ -1481,9 +1574,8 @@ function Chat({
       ? t("issues.commentPlaceholder")
       : t("mobile.chat.reply")
     : dm
-      ? rightHand
-        ? `${t("mobile.chat.messageTo", { name: dm.with.name })} · ${t("rightHand.composerHint")}`
-        : t("mobile.chat.messageTo", { name: dm.with.name })
+      ? // One line on the phone: the right hand's "nada muda sem você" doesn't fit beside its name.
+        t("mobile.chat.messageTo", { name: dm.with.name })
       : t("mobile.chat.messageIn", { channel: channel ? `#${channel.name}` : "" });
   // What to say next comes from the latest card: a code change, a file; none
   // while the agent works, asks or waits for an approval.
@@ -1578,6 +1670,8 @@ function Chat({
               <TurnRow run={item.run} bodyOf={bodyOf} />
             </Animated.View>
           );
+        case "wait":
+          return <QueueWaitRow channelId={channelId} wait={item.wait} />;
         case "unseen":
           return <UnseenLine fading={item.fading} />;
         case "browser": {
@@ -1630,6 +1724,7 @@ function Chat({
                 inThread={isThread}
                 onLongPress={onLongPress}
                 onRetry={onRetry}
+                onQuote={onQuote}
                 receipt={item.message.id === markAt ? receipt : undefined}
                 seenBy={item.message.id === seenId ? seenBy : undefined}
               />
@@ -1652,10 +1747,12 @@ function Chat({
     [
       when,
       meId,
+      channelId,
       isThread,
       linkThreads,
       onLongPress,
       onRetry,
+      onQuote,
       isFresh,
       openBrowsers,
       toggleBrowser,
@@ -1980,9 +2077,8 @@ function Chat({
                     />
                   ) : (
                     <View style={[styles.center, { paddingBottom: composerHeight }]}>
-                      <Text tone="faint" style={styles.emptyText}>
-                        {t("mobile.chat.empty")}
-                      </Text>
+                      {/* No button: the composer under it is the next step. */}
+                      <FirstUse place="chat" size="panel" acts={member && channel?.can?.post !== false} />
                     </View>
                   )}
                 </View>
@@ -2044,8 +2140,6 @@ function Chat({
                     runs={runs}
                     consults={lineConsults}
                     typing={typing}
-                    canStop={canStop}
-                    onStop={stopRun}
                     onOpenBrowser={(agentId) => {
                       // The agent's browser card opens in the conversation (at the end), not another screen.
                       toggleBrowser(agentId, true);
@@ -2075,6 +2169,10 @@ function Chat({
                     mentionAt={refQuery}
                     insertMention={insertRef}
                     prefill={prefill}
+                    focusAt={replyAt}
+                    banner={
+                      quote ? <QuoteBar name={dir.nameOf(quote.author)} onCancel={() => setQuote(null)} /> : undefined
+                    }
                     mention={({ query, sigil, pick }) =>
                       sigil === "#" ? (
                         <ChannelPicker query={query} pick={pick} />
@@ -2116,7 +2214,7 @@ function Chat({
 function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, reducedMotion } = useTheme();
   const nameOf = (who: string) => {
     const at = who.indexOf(":");
     return dir.nameOf({ type: who.slice(0, at), id: who.slice(at + 1) });
@@ -2130,11 +2228,17 @@ function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) 
     unseen.mentionsMe ? t("mobile.chat.unseen.mentionsYou") : "",
   ].filter(Boolean);
   return (
-    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} pointerEvents="box-none">
+    <Animated.View
+      entering={reducedMotion ? undefined : FadeIn.duration(160)}
+      exiting={reducedMotion ? undefined : FadeOut.duration(120)}
+      pointerEvents="box-none"
+    >
       <PressScale
         to={0.92}
         onPress={onPress}
         accessibilityRole="button"
+        // A 40-point circle: 4 around it gives the 48 a thumb needs.
+        hitSlop={4}
         accessibilityLabel={
           said.length > 0 ? t("mobile.chat.toLatestNew", { text: said.join(" · ") }) : t("mobile.chat.toLatest")
         }
@@ -2210,7 +2314,8 @@ function Connection({ status }: { status: ConnectionStatus }) {
       accessibilityLiveRegion="polite"
       style={[styles.conn, { backgroundColor: back ? withOpacity(c.ok, 0.14) : c.warnSoft }]}
     >
-      <Icon name={back ? "check" : "wifi"} size={15} color={back ? c.ok : c.warn} />
+      {/* On the first line: the offline sentence wraps, and centred on both lines the icon floated between them. */}
+      <LineIcon variant="small" name={back ? "check" : "wifi"} size={15} color={back ? c.ok : c.warn} />
       <Text variant="small" style={[styles.connText, { color: back ? c.ok : c.warn }]}>
         {back ? t("mobile.chat.connection.back") : t("mobile.chat.connection.down")}
       </Text>
@@ -2220,12 +2325,11 @@ function Connection({ status }: { status: ConnectionStatus }) {
 
 const styles = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
-  // Under the agent's words, like a card on its message (MessageRow: 14 + 34 avatar + 11 gap).
-  browserRow: { paddingLeft: 59, paddingRight: 16, paddingBottom: 6 },
+  // Under the agent's words, like a card on its message.
+  browserRow: { paddingLeft: MSG_TEXT, paddingRight: 16, paddingBottom: 6 },
   screen: { flex: 1 },
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  emptyText: { textAlign: "center" },
   pin: { paddingHorizontal: 12, paddingBottom: 10 },
   pinBelowBar: { paddingTop: 10 },
   day: { alignSelf: "center", textAlign: "center", marginTop: 16, marginBottom: 6, fontWeight: "600" },
@@ -2244,11 +2348,11 @@ const styles = StyleSheet.create({
   unseenRule: { flex: 1, height: StyleSheet.hairlineWidth * 2, opacity: 0.45 },
   conn: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     marginHorizontal: 4,
     marginBottom: 6,
-    paddingVertical: 7,
+    paddingVertical: 8,
     paddingHorizontal: 10,
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,

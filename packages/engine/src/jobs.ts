@@ -108,7 +108,13 @@ import { runVaultSync, VAULT_SYNC_JOB, type VaultDeps } from "./vault";
 import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 import { saveWaitlistContact } from "./waitlist";
 import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
-import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
+import {
+  ACCOUNT_DELETE_JOB,
+  type DeletionDeps,
+  ORG_DELETE_JOB,
+  purgeAccount,
+  purgeWorkspace,
+} from "./workspace-deletion";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {
@@ -139,6 +145,10 @@ export interface JobDeps extends RunExecutorDeps {
   push?: PushSender | null;
   /** Web Push to browsers (job `push.send`, ADR 0071); absent = off. */
   webPush?: WebPushSender | null;
+  /** This server sends email: a deleted account is told (job `account.delete`). */
+  accountEmails?: DeletionDeps["emails"];
+  /** Revokes an account's Apple sign-in at its deletion (job `account.delete`); absent/null = Apple sign-in off. */
+  appleRevoke?: Parameters<typeof purgeAccount>[0]["appleRevoke"];
   /** Who has the app open: pushes not waiting on them hold a little (ADR 0071 §7); absent = never held. */
   presence?: Presence | null;
   /** GIF search (ADR 0091): an agent's GIF after its reply (job `agents.media`); absent = its own stickers only. */
@@ -279,11 +289,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
    */
   async function delegatedAgents(
     message: NonNullable<Awaited<ReturnType<typeof getMessage>>>,
-    outside: string[] = [],
+    outside: string[],
     /** `wakeAll`: a routine was told to name only agents that must act, so each one it names wakes. */
-    options: { record?: boolean; wakeAll?: boolean } = {},
+    options: { wakeAll?: boolean } = {},
   ) {
-    const ids = [...message.mentionedAgentIds, ...outside];
+    const ids = message.mentionedAgentIds.filter((id) => !outside.includes(id));
     const targets = ids.length
       ? await deps.db
           .select({
@@ -344,28 +354,23 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     const bar = (id: string) =>
       crowded.has(id) ? Math.max(mentionThreshold, DEEP_MENTION_THRESHOLD) : mentionThreshold;
     const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= bar(t.id)).map((t) => t.id);
-    // Not when the router still decides this message: its decision row is what it reads to skip (`already_routed`).
-    if (options.record !== false)
-      await deps.db
-        .insert(schema.routingDecisions)
-        .values({
-          orgId: message.orgId,
-          channelId: message.channelId,
-          messageId: message.id,
-          strategy,
-          candidates: others.map((t) => ({ agentId: t.id, score: scores.get(t.id) ?? 0 })),
-          selectedAgentIds: allowed,
-          reason: others
-            .map((t) => `@${t.handle}: ${(scores.get(t.id) ?? 0).toFixed(2)}`)
-            .join(", ")
-            .slice(0, 500),
-          error,
-        })
-        .onConflictDoNothing();
-    return {
-      allowed,
-      referenced: others.filter((t) => !allowed.includes(t.id) && !outside.includes(t.id)).map((t) => t.id),
-    };
+    await deps.db
+      .insert(schema.routingDecisions)
+      .values({
+        orgId: message.orgId,
+        channelId: message.channelId,
+        messageId: message.id,
+        strategy,
+        candidates: others.map((t) => ({ agentId: t.id, score: scores.get(t.id) ?? 0 })),
+        selectedAgentIds: allowed,
+        reason: others
+          .map((t) => `@${t.handle}: ${(scores.get(t.id) ?? 0).toFixed(2)}`)
+          .join(", ")
+          .slice(0, 500),
+        error,
+      })
+      .onConflictDoNothing();
+    return { allowed, referenced: others.filter((t) => !allowed.includes(t.id)).map((t) => t.id) };
   }
 
   const brakeJudge = () => (deps.context ? judgeOf(deps.context) : null);
@@ -415,7 +420,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
 
   /**
    * The org's agents an agent's message @named outside this conversation (`meta.unreachedAgents`, written with it):
-   * their mention reached nobody, so `settleReach` hands it to them (or says why not).
+   * that mention reaches nobody, not even the right hand, which a person's @ reaches in any channel. The agent has
+   * `tell_agent` and `ask_agent` for that on purpose: a name it only passes by wakes no one.
    */
   async function outsideAgents(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
     const handles = Array.isArray(message.meta.unreachedAgents)
@@ -586,7 +592,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
         // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
         // The brakes' digest and loop stop (ADR 0131) are for a person too.
-        if (message.meta.notice || message.meta.noAi || message.meta.actionCard || message.meta.autonomyNote) return;
+        // A run's line that it moved on (`moveRun`) is no news for anyone either.
+        if (
+          message.meta.notice ||
+          message.meta.noAi ||
+          message.meta.actionCard ||
+          message.meta.autonomyNote ||
+          message.meta.movedOn
+        )
+          return;
         // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01): its mentions wake
         // the agents it names for its creator, like any agent's (the router stays out). With no creator left it
         // has nobody's reach and wakes nobody. Never silently: the agents it named and its run's tell_agent
@@ -595,9 +609,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         const routineAuthority = routineRun ? await runAuthorityById(deps.db, message.orgId, routineRun) : null;
         const actingRoutine = routineAuthority ? routineCreatorOf(routineAuthority) : null;
         if (message.meta.routine && !message.meta.reminder && !message.agentRunId && !actingRoutine) {
-          const [refused, outside] = await Promise.all([refusedReach(message), outsideAgents(message)]);
           const named = message.mentionedAgentIds.filter((id) => id !== message.authorAgentId);
-          await settleReach(deps, message, { outside, blocked: [...new Set([...refused, ...named])] });
+          await settleReach(deps, message, { blocked: [...(await refusedReach(message)), ...named] });
           return;
         }
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
@@ -608,7 +621,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           const handed = await delegatedAgents(message, outside, { wakeAll: Boolean(actingRoutine) });
           // An agent the routine's run already handed this to (tell_agent) has it: the mention doesn't wake it again.
           const told = routineRun ? await consultedBy(message.orgId, routineRun) : [];
-          let allowed = handed.allowed.filter((id) => !outside.includes(id) && !told.includes(id));
+          let allowed = handed.allowed.filter((id) => !told.includes(id));
           // In an open mission's thread, another agent acts for the person behind it: only the
           // mission's owner and deciders make the mission's agent work (ADR 0029).
           if (message.threadId && allowed.length > 0) {
@@ -634,15 +647,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
             ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
             : { runs: [] };
           const dropped = "dropped" in res ? (res.dropped ?? []) : [];
-          // Never silent: who its mention didn't reach hears it as a note, or the people here read why not.
+          // A member its mention didn't reach hears it as a note, or the people here read why not.
           const reach = await settleReach(deps, message, {
-            outside: await onlyCallable(
-              message,
-              handed.allowed.filter((id) => outside.includes(id)),
-            ),
-            blocked: [
-              ...new Set([...dropped.filter((d) => d.reason === "audience").map((d) => d.agentId), ...refused]),
-            ],
+            blocked: [...dropped.filter((d) => d.reason === "audience").map((d) => d.agentId), ...refused],
           });
           // A member consulted by note instead (it takes consultations) was reached: no "wasn't woken" notice.
           const consulted = new Set(reach.filter((e) => e.consultationId).map((e) => e.agentId));
@@ -660,17 +667,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           });
           return;
         }
-        // Only agents outside the conversation named: a note to the ones it needs, settled once the router decided.
-        const reach = {
-          outside:
-            outside.length > 0
-              ? await onlyCallable(
-                  message,
-                  (await delegatedAgents(message, outside, { record: false, wakeAll: Boolean(actingRoutine) })).allowed,
-                )
-              : [],
-          blocked: refused,
-        };
         try {
           // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
           // channels, never in a mission's thread (the mission's own turns run it). Once that is settled, a
@@ -685,7 +681,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           await enqueueAgentMedia(deps.db, message, where);
           return;
         } finally {
-          await settleReach(deps, message, reach);
+          await settleReach(deps, message, { blocked: refused });
         }
       }
       if (message.mentionedAgentIds.length > 0) {
@@ -890,6 +886,19 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         { db: deps.db, pubsub: deps.pubsub, connectors: deps.connectors, mail: deps.mail, log: deps.log },
         String(job.payload.orgId),
         { finalAttempt: ctx.finalAttempt },
+      );
+    },
+    // An account whose deletion's date came (`purgeAccount`): a no-op once restored or gone.
+    [ACCOUNT_DELETE_JOB]: async (job) => {
+      await purgeAccount(
+        {
+          db: deps.db,
+          pubsub: deps.pubsub,
+          hub: deps.sandbox?.machines?.hub,
+          emails: deps.accountEmails,
+          appleRevoke: deps.appleRevoke,
+        },
+        String(job.payload.userId),
       );
     },
     "email.send": async (job, ctx) => {

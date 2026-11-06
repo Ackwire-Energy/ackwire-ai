@@ -30,6 +30,7 @@ import {
   DialogFooter,
   InfoHint,
   Input,
+  ProviderLogo,
   Select,
   Switch,
 } from "@agenteschat/ui";
@@ -40,6 +41,7 @@ import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { LookRows, ModelSelect, modelOptions } from "@/components/AgentFields";
+import { PlanHold, usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi } from "@/components/ConnectAi";
 import { PrefRow } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
@@ -85,8 +87,8 @@ export function RightHandSettingsSection() {
 function PlanLine({ kind, label, owner }: { kind: PlanKind; label?: string; owner?: string }) {
   const { t } = useTranslation();
   return (
-    <span className="rh-set__planline">
-      <BrainLogo kind={kind} size="sm" />
+    <span className="rh-set__planline ac-iconline">
+      <BrainLogo kind={kind} size="xs" />
       <b>{label ?? t(`aiAccounts.connect.${kind}`)}</b>
       {owner && <span className="muted">{t("rightHand.settings.planOwner", { owner })}</span>}
     </span>
@@ -115,7 +117,8 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   const first = (id: string | null | undefined) => (id ? dir.memberById.get(id)?.name.split(" ")[0] : undefined);
   const ws = view?.workspaceAi;
   const wsKind = planKind(ws?.brain);
-  const fallback = ws ? rightHandFallback(t, ws, me.user.id, g, (id) => first(id)) : null;
+  const platform = usePlatformKey(org.id).data === true;
+  const fallback = ws ? rightHandFallback(t, ws, me.user.id, g, (id) => first(id), platform) : null;
   const back = () =>
     void api.agents
       .setBrain(org.id, agent.id, { scope: "mine", brain: "model" })
@@ -140,8 +143,8 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
             />
           ) : (
             fallback && (
-              <span className="rh-set__planline">
-                {wsKind && <BrainLogo kind={wsKind} size="sm" />}
+              <span className="rh-set__planline ac-iconline">
+                {wsKind && <BrainLogo kind={wsKind} size="xs" />}
                 {fallback}
               </span>
             )
@@ -183,10 +186,13 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
+  const hold = usePlanHold();
+  const connect = useConnectAi();
   // The workspace's AI (ADR 0137 §11): what every DM thinks with while its person has no plan of their own.
   const kind = planKind(agent.brain?.kind);
   const view = useAgentBrain(org.id, agent.id, true, false, "workspace").data;
   const signIn = view?.accounts.find((a) => a.id === view.account);
+  const key = view?.workspaceAi?.key;
   const ownerId = signIn?.ownerId;
   const planOwner = ownerId ? dir.memberById.get(ownerId)?.name.split(" ")[0] : undefined;
   const save = (patch: Parameters<typeof update.mutate>[0], onSuccess?: () => void) =>
@@ -222,6 +228,14 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const opened = view ? !view.onlyOwner : false;
   return (
     <>
+      {hold && (
+        <Card className="ai-panel">
+          <PlanHold
+            hold={hold}
+            onKey={connect ? () => connect.open({ agentId: agent.id, intent: "api_key" }) : undefined}
+          />
+        </Card>
+      )}
       <Card>
         <div className="settings-rows">
           <PrefRow
@@ -259,8 +273,15 @@ function RightHandForm({ agent }: { agent: Agent }) {
             help={
               <>
                 <span>{t(kind ? "rightHand.settings.planHelp" : "rightHand.settings.workspaceHelp", g)}</span>
-                {kind && (
+                {kind ? (
                   <PlanLine kind={kind} label={signIn?.label} owner={ownerId !== me.user.id ? planOwner : undefined} />
+                ) : (
+                  key && (
+                    <span className="rh-set__planline ac-iconline">
+                      <ProviderLogo id={key.provider} size="sm" />
+                      <b>{key.label}</b>
+                    </span>
+                  )
                 )}
               </>
             }
@@ -286,7 +307,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
               )
             }
           />
-          {!kind && (
+          {!kind && !hold && (
             <PrefRow
               id="rh-plan"
               icon="plug"

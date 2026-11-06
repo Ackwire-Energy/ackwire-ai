@@ -246,8 +246,8 @@ describe("artifact viewer", () => {
     expect(file.textContent).toContain("Adicionado: ");
     // No green or red: only the neutral diff classes.
     expect(dialog.innerHTML).not.toMatch(/\b(green|red)\b|#0f0|#f00/i);
-    await click(within(dialog).getByRole("button", { name: "Lado a lado" }));
-    expect(within(dialog).getByRole("button", { name: "Lado a lado" }).getAttribute("aria-pressed")).toBe("true");
+    await click(within(dialog).getByRole("radio", { name: "Lado a lado" }));
+    expect(within(dialog).getByRole("radio", { name: "Lado a lado" }).getAttribute("aria-checked")).toBe("true");
     const split = file.querySelector('[data-mode="split"]') as HTMLElement;
     const changed = Array.from(split.querySelectorAll(".artifact-split__row")).find((r) =>
       r.textContent?.includes("const total"),
@@ -518,9 +518,12 @@ describe("Drive", () => {
 
   test("empty state when there is nothing yet", async () => {
     await goDrive({ seed: false });
-    expect(screen().getByText("Nenhum arquivo ainda")).toBeTruthy();
-    // The one line that fills it, under a subtitle that already says what the Drive holds.
-    expect(document.querySelector(".ac-empty__text")?.textContent).toBe("Arraste arquivos para cá para enviar.");
+    expect(screen().getByText("Tudo o que o time cria, num só lugar")).toBeTruthy();
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Os arquivos de agentes e pessoas ficam aqui. Envie os seus ou arraste para esta página.",
+    );
+    // One way to upload, in the middle of the page.
+    expect(screen().getAllByRole("button", { name: "Enviar arquivo" })).toHaveLength(1);
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "Tudo o que pessoas e agentes criaram ou enviaram.",
     );

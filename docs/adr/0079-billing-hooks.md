@@ -60,6 +60,7 @@ Bytes count in GiB (1024³), the unit the apps print. The storage check takes no
 ### 6. What people see
 
 - The server's words name no plan, price or currency. A billing hold says its code's words, and owners and admins get the button that fixes it on the billing service; other members read that whoever runs the workspace can. Settings gets "Plan and billing" for owners and admins only where `billingUrl` is set.
+- A plan a hold stops says so where it would sign in, on every plan and every screen that offers one (`planGate`'s `billing`, `PlanHold`): owners and admins get the button, others read that whoever runs the workspace can. Whoever may add an API key gets the way to it, and its panel says it starts with the plan: a hold stops the Model Gateway, keys included (`connectAi.key.held`). A self-hosted server never gets this (`planHoldOf`).
 - The phone app shows the words and never a button or a link to pay: the stores allow paying only through their own purchase flow. The desktop app loads the site and gets the site's buttons. A full workspace's note on the phone never names Plan and billing, a seat to add or a plan to change (App Store 3.1.1): on a server with a billing service it says only that every paid seat is taken and, to anyone but the payer, to talk to whoever pays (`membersFullWhoPhone`); without one, the words of every app.
 
 ## Consequences

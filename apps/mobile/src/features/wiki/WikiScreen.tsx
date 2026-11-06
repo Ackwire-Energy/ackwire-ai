@@ -11,15 +11,16 @@ import {
   type WikiPageSummary,
   type WikiVersion,
 } from "@agenteschat/client";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { toggleTask } from "@agenteschat/client/lib/wiki";
+import { titleOfSlug, toggleTask } from "@agenteschat/client/lib/wiki";
 import { type DiffLine, diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
@@ -27,11 +28,16 @@ import {
   DiffView,
   EmptyState,
   fieldText,
+  Icon,
   IconButton,
+  LineIcon,
+  Locked,
+  PressScale,
   Row,
   SearchField,
   SectionHeader,
   Text,
+  useReducedMotion,
   useToast,
 } from "@/ui";
 import { Note } from "../ai/parts";
@@ -40,6 +46,7 @@ import { aroundStar, wikiMap } from "../constellation/logic";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
+import { FirstUse, useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { ActionList, copyText, goBack, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
@@ -97,6 +104,9 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
     map?.stars.find((s) => s.kind === "page");
   const when = (iso: string) => relativeTime(t, i18n.language, iso);
   const title = folder ? (folder.split("/").pop() ?? folder) : t("wiki.title");
+  // The home and the search's results cross-fade as a search starts and ends, and fade in when they load.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
   const pageRow = (p: WikiPageSummary, i: number, sub?: string) => (
     <Row
       key={p.id}
@@ -148,21 +158,33 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           </View>
         ) : null}
         {tree.isSuccess && pages.length === 0 ? (
-          <EmptyState icon="file" title={t("wiki.emptyTitle")} subtitle={t("mobile.wiki.empty")} />
+          <FirstUse
+            place="wiki"
+            size="panel"
+            acts={writes}
+            label={t("wiki.newPage")}
+            onPress={() => newWikiPage(folder ? { folder } : {})}
+          />
         ) : null}
         {search ? (
           found.length === 0 ? (
             pages.length > 0 ? (
-              <EmptyState icon="search" title={t("wiki.noMatch")} />
+              <EmptyState
+                size="inline"
+                title={t("wiki.noMatch")}
+                action={
+                  <Button variant="secondary" size="sm" label={t("filters.clearSearch")} onPress={() => setQ("")} />
+                }
+              />
             ) : null
           ) : (
-            <>
+            <Animated.View key="found" {...fade}>
               <SectionHeader title={t("wiki.results", { count: found.length })} />
               {found.map((p, i) => pageRow(p, i, p.folder || undefined))}
-            </>
+            </Animated.View>
           )
         ) : home ? (
-          <>
+          <Animated.View key="home" {...fade}>
             {map && star && !folder && map.stars.length > 1 ? (
               <StarCard
                 label={t("mobile.wiki.map")}
@@ -251,28 +273,25 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
                 ))}
               </>
             ) : null}
-          </>
+          </Animated.View>
         ) : tree.isSuccess && pages.length > 0 ? (
           <EmptyState icon="archive" title={t("mobile.wiki.folderGone")} />
         ) : null}
       </PushedLargeTitle>
-      {writes ? (
-        <Pressable
+      {writes && !(tree.isSuccess && pages.length === 0) ? (
+        <PressScale
           accessibilityRole="button"
           accessibilityLabel={t("wiki.newPage")}
           onPress={() => newWikiPage(folder ? { folder } : {})}
-          style={({ pressed }) => [
-            styles.fab,
-            { backgroundColor: c.ink, bottom: insets.bottom + 18, opacity: pressed ? 0.85 : 1 },
-          ]}
+          sink
+          style={[styles.fab, { backgroundColor: c.ink, bottom: insets.bottom + 16 }]}
+          contentStyle={styles.fabIn}
         >
-          <Text variant="title2" style={[styles.fabPlus, { color: c.bg }]}>
-            +
-          </Text>
+          <Icon name="plus" size={18} color={c.bg} />
           <Text variant="callout" style={[styles.fabText, { color: c.bg }]}>
             {t("wiki.newPage")}
           </Text>
-        </Pressable>
+        </PressScale>
       ) : null}
     </View>
   );
@@ -356,6 +375,7 @@ function WikiPage({ slug }: { slug: string }) {
   // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0085).
   const page = useWikiPage(orgId, slug);
   const writes = can(org, "edit_wiki") && page.data?.canEdit !== false;
+  const look = useEmptyLook();
   const admin = can(org, "configure");
   // Who sees a page: people who write the wiki and manage roles (the server checks the same).
   const choosesAudience = writes && can(org, "manage_roles");
@@ -404,6 +424,7 @@ function WikiPage({ slug }: { slug: string }) {
           void api.wiki
             .remove(orgId, p.slug)
             .then(() => {
+              successHaptic();
               void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
               toast({ title: t("wiki.deleted", { title: p.title }) });
               goBack();
@@ -510,7 +531,7 @@ function WikiPage({ slug }: { slug: string }) {
                       accessibilityLabel={t("wiki.edit")}
                       onPress={() => writeWikiPage({ slug: p.slug })}
                       hitSlop={6}
-                      style={styles.barWord}
+                      style={({ pressed }) => [styles.barWord, pressed && styles.pressedWord]}
                     >
                       <Text variant="callout" style={[styles.barWordText, { color: c.agent }]}>
                         {t("wiki.edit")}
@@ -531,8 +552,38 @@ function WikiPage({ slug }: { slug: string }) {
         {page.isError && !p ? (
           (page.error as { code?: string } | null)?.code === "wiki.no_access" ? (
             <EmptyState icon="lock" title={t("wiki.noAccessTitle")} subtitle={t("wiki.noAccessText")} />
+          ) : (page.error as { status?: number } | null)?.status === 404 ? (
+            <EmptyState
+              size="panel"
+              agent={look}
+              title={t("wiki.missingTitle")}
+              subtitle={t(writes ? "wiki.missingText" : "wiki.missingViewer")}
+              {...(writes
+                ? {
+                    action: (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon="plus"
+                        label={t("wiki.createPage")}
+                        onPress={() => newWikiPage({ title: capitalize(titleOfSlug(slug), i18n.language) })}
+                      />
+                    ),
+                  }
+                : {})}
+            />
           ) : (
-            <EmptyState icon="file" title={t("wiki.missingTitle")} subtitle={t("mobile.wiki.missing")} />
+            <View style={styles.center}>
+              <Text tone="muted" style={styles.centerText}>
+                {t("common.loadFailed")}
+              </Text>
+              <Button
+                variant="secondary"
+                size="sm"
+                label={t("mobile.common.retry")}
+                onPress={() => void page.refetch()}
+              />
+            </View>
           )
         ) : null}
         {p ? (
@@ -547,8 +598,11 @@ function WikiPage({ slug }: { slug: string }) {
               <Text variant="display2" accessibilityRole="header">
                 {p.title}
               </Text>
-              <View style={styles.byline}>
-                <Face who={p.updatedBy} size={18} />
+              {/* Top-aligned, the face on the first line: a long "by … for …" line wraps under it. */}
+              <View style={[styles.byline, styles.top]}>
+                <LineIcon variant="footnote" size={18}>
+                  <Face who={p.updatedBy} size={18} />
+                </LineIcon>
                 <Text variant="footnote" tone="faint" style={styles.grow}>
                   {by} · {relativeTime(t, i18n.language, p.updatedAt)} · v{p.version}
                 </Text>
@@ -691,6 +745,7 @@ export function WikiHistoryScreen({ slug }: { slug: string }) {
       failed(e);
     }
   };
+  const reduced = useReducedMotion();
   const noteOf = (v: WikiVersion) =>
     v.noteCode ? t(`wiki.note.${v.noteCode}`, v.noteParams ?? {}) : (v.note ?? undefined);
   return (
@@ -718,12 +773,12 @@ export function WikiHistoryScreen({ slug }: { slug: string }) {
               onPress={() => void show(v.version)}
             />
             {open?.version === v.version ? (
-              <View style={styles.diffWrap}>
+              <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.diffWrap}>
                 <Text variant="footnote" tone="faint">
                   {t("wiki.versionDiff", { version: v.version })}
                 </Text>
                 <DiffView lines={open.lines} />
-              </View>
+              </Animated.View>
             ) : null}
           </View>
         );
@@ -787,34 +842,36 @@ export function WikiMoveScreen({ slug }: { slug: string }) {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.form}
       >
-        <Text variant="footnote" tone="faint">
-          {t("wiki.form.title")}
-        </Text>
-        <TextInput
-          value={title ?? p?.title ?? ""}
-          onChangeText={setTitle}
-          placeholder={t("wiki.form.titlePlaceholder")}
-          placeholderTextColor={c.faint}
-          style={field}
-        />
-        <Text variant="footnote" tone="faint">
-          {t("wiki.renameHelp")}
-        </Text>
-        <Text variant="footnote" tone="faint" style={styles.gapTop}>
-          {t("wiki.form.folder")}
-        </Text>
-        <TextInput
-          value={folder ?? p?.folder ?? ""}
-          onChangeText={setFolder}
-          placeholder={t("wiki.form.folderPlaceholder")}
-          placeholderTextColor={c.faint}
-          autoCapitalize="words"
-          style={field}
-        />
-        <FolderChips folders={folders} value={nextFolder} onPick={setFolder} />
-        <Text variant="footnote" tone="faint">
-          {t("wiki.form.folderHelp")}
-        </Text>
+        <Locked when={saving} style={styles.formFields}>
+          <Text variant="footnote" tone="faint">
+            {t("wiki.form.title")}
+          </Text>
+          <TextInput
+            value={title ?? p?.title ?? ""}
+            onChangeText={setTitle}
+            placeholder={t("wiki.form.titlePlaceholder")}
+            placeholderTextColor={c.faint}
+            style={field}
+          />
+          <Text variant="footnote" tone="faint">
+            {t("wiki.renameHelp")}
+          </Text>
+          <Text variant="footnote" tone="faint" style={styles.gapTop}>
+            {t("wiki.form.folder")}
+          </Text>
+          <TextInput
+            value={folder ?? p?.folder ?? ""}
+            onChangeText={setFolder}
+            placeholder={t("wiki.form.folderPlaceholder")}
+            placeholderTextColor={c.faint}
+            autoCapitalize="words"
+            style={field}
+          />
+          <FolderChips folders={folders} value={nextFolder} onPick={setFolder} />
+          <Text variant="footnote" tone="faint">
+            {t("wiki.form.folderHelp")}
+          </Text>
+        </Locked>
       </ScrollView>
     </View>
   );
@@ -845,7 +902,12 @@ export function FolderChips({
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
             onPress={() => onPick(f)}
-            style={[styles.chip, { backgroundColor: on ? c.ink : c.sunken }]}
+            hitSlop={4}
+            style={({ pressed }) => [
+              styles.chip,
+              { backgroundColor: on ? c.ink : c.sunken },
+              pressed && styles.pressedWord,
+            ]}
           >
             <Text variant="subhead" style={{ color: on ? c.bg : c.ink2 }}>
               {f || t("wiki.root")}
@@ -866,37 +928,36 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   pins: { gap: 10, paddingHorizontal: 16, paddingBottom: 4 },
-  pin: { width: 210, borderRadius: 16, padding: 14, gap: 5 },
+  pin: { width: 210, borderRadius: 20, padding: 14, gap: 4 },
   pressed: { opacity: 0.85 },
+  pressedWord: { opacity: 0.6 },
   byline: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  top: { alignItems: "flex-start" },
+  // On the buttons' ruler (48, `Button` md), its icon as theirs (18); 16 in from the edge, as the page's sides.
   fab: {
     position: "absolute",
-    right: 18,
-    height: 52,
-    borderRadius: 26,
-    paddingLeft: 16,
-    paddingRight: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    right: 16,
+    height: 48,
+    borderRadius: 24,
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  fabPlus: { lineHeight: 26 },
   barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
   barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
   barWordText: { fontWeight: "600" },
+  fabIn: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 16, paddingRight: 20 },
   fabText: { fontWeight: "600" },
   page: { paddingHorizontal: 20, paddingTop: 8, gap: 4 },
   note: { paddingTop: 10 },
   body: { paddingTop: 14 },
   diffWrap: { paddingHorizontal: 20, paddingBottom: 12, gap: 6 },
   form: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, gap: 8 },
+  formFields: { gap: 8 },
   field: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
   gapTop: { marginTop: 12 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingVertical: 4 },
-  chip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 4 },
+  chip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
 });

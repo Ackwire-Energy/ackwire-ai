@@ -4,7 +4,8 @@
  */
 .live-block {
   position: relative;
-  max-width: 600px;
+  /* The one width every card in a message shares (the request card, the tools, a chart). */
+  max-width: var(--msg-card-w);
   margin: 4px 0 8px;
   background: var(--raised);
   box-shadow: 0 0 0 1px var(--line2);
@@ -74,6 +75,7 @@
   padding: 0 8px 8px;
 }
 @media (prefers-reduced-motion: reduce) {
+  .live-block__frame,
   .live-block__view {
     transition: none;
   }
@@ -175,6 +177,11 @@
   inset: 0 auto 0 0;
   background: var(--plate);
   transition: width 0.3s var(--ease-out, ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .poll__fill {
+    transition: none;
+  }
 }
 .poll__box {
   flex: none;
