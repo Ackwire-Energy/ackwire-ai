@@ -2222,6 +2222,19 @@
     "billing": "Plan, çalışma alanının bilgisayarında oturum açar ve bilgisayar etkin bir agentes.chat planıyla gelir.",
     "billingWeb": "Web'de, agentes.chat'te bir plan seç.",
     "orPayGo": "Ya da kullandıkça ödeyin",
+    "pay": {
+      "label": "Nasıl ödersiniz?",
+      "plan": "Planla",
+      "key": "API anahtarıyla"
+    },
+    "pick": {
+      "plan": "Plan",
+      "placeholder": "Plan seçin",
+      "search": "Sağlayıcı ara",
+      "searchPlaceholder": "Sağlayıcı adı",
+      "noResults": "Sağlayıcı bulunamadı",
+      "list": "Sağlayıcılar"
+    },
     "plan": {
       "claude": {
         "title": "Claude planınız",

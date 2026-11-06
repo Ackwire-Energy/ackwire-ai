@@ -15,6 +15,7 @@ import {
   accountSaved,
   agentAccounts,
   existingRows,
+  flowBack,
   modelInput,
   modelRows,
   modelSections,
@@ -401,6 +402,17 @@ describe("the agent's AI", () => {
     expect(home.indexOf('t("connectAi.have.title")')).toBeGreaterThan(-1);
     expect(home.indexOf('t("connectAi.have.title")')).toBeLessThan(home.indexOf('t("mobile.ai.yourPlan")'));
     expect(home).toContain("<AiRow");
+    // A plan or a key, one row each; whose is one searched list, the plan's page and the key's steps as before.
+    expect(home).toContain('onView({ page: "plans" })');
+    expect(home).toContain('onView({ page: "key" })');
+    const plans = connect.slice(connect.indexOf("function Plans("), connect.indexOf("function Makers("));
+    expect(plans).toContain("<PickList");
+    expect(plans).toContain("options={PLAN_CHOICES.map(");
+    expect(plans).toContain('onView({ page: "plan", choice: o.value })');
+    const makers = connect.slice(connect.indexOf("function Makers("));
+    expect(makers).toContain("<PickList");
+    expect(makers).toContain("...PROVIDERS.map(");
+    expect(connect.slice(connect.indexOf("function KeyPage("))).toContain("onPress={onMakers}");
     expect(connect).toContain("existingRows(t, gates.view, credentials.data ?? [], forAgent.name)");
     // The workspace's keys only in Connect an AI (a sheet), as on the web: the first run's saved key already serves
     // every agent with no plan.
@@ -994,5 +1006,17 @@ describe("Seus planos' rows", () => {
     const row = readFileSync(join(import.meta.dir, "../../src/ui/Row.tsx"), "utf8");
     expect(row).toContain("padding: 14,");
     expect(row).not.toContain("paddingVertical");
+  });
+});
+
+describe("Back in Connect an AI", () => {
+  test("a plan picked from the list goes back to the list, a sign-in from a row of what the person has to that row", () => {
+    const plan = { page: "plan", choice: "chatgpt" } as const;
+    expect(flowBack(plan, false)).toEqual({ page: "plans" });
+    expect(flowBack(plan, true)).toEqual({ page: "home" });
+    expect(flowBack({ page: "plans" }, false)).toEqual({ page: "home" });
+    expect(flowBack({ page: "makers" }, false)).toEqual({ page: "key" });
+    expect(flowBack({ page: "key" }, false)).toEqual({ page: "home" });
+    expect(flowBack({ page: "home" }, false)).toBeNull();
   });
 });

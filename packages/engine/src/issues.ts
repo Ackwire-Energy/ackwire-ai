@@ -435,9 +435,12 @@ async function backgroundWorksOf(db: Database, rows: IssueRow[]): Promise<Map<st
     orgId,
     latest.map((l) => l.id),
   );
+  const channelOf = new Map(rows.map((r) => [r.id, r.channelId]));
   for (const l of latest) {
     const v = views.get(l.id);
-    if (v && l.issueId) out.set(l.issueId, v);
+    if (!v || !l.issueId) continue;
+    // A card shown to everyone reaches past its work's conversation: what the work asks in there stays in there.
+    out.set(l.issueId, channelOf.get(l.issueId) === v.channelId ? v : { ...v, question: null });
   }
   return out;
 }

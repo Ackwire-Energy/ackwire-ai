@@ -1771,11 +1771,8 @@
   },
   "ai": {
     "yourPlan": "Tu plan de IA",
-    "coding": "Plan de programación",
-    "codingSub": "GLM, Kimi, MiniMax u OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM y otros",
     "plansFoot": "Los agentes piensan con tu plan, sin clave de API. Inicia sesión en la computadora del agente.",
-    "whichPlan": "Qué plan",
-    "codingFoot": "Un plan de programación inicia sesión con su propia clave, en la computadora del agente.",
     "change": "Cambiar",
     "how": "Cómo conectar",
     "whose": "De quién es la clave",

@@ -1589,11 +1589,8 @@
   },
   "ai": {
     "yourPlan": "내 AI 요금제",
-    "coding": "코딩 요금제",
-    "codingSub": "GLM, Kimi, MiniMax 또는 OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM 등",
     "plansFoot": "에이전트가 내 요금제로 생각해요. API 키는 필요 없어요. 에이전트의 컴퓨터에서 로그인해요.",
-    "whichPlan": "어떤 요금제인가요",
-    "codingFoot": "코딩 요금제는 자체 키로 에이전트의 컴퓨터에서 로그인해요.",
     "change": "변경",
     "how": "연결 방법",
     "whose": "누구의 키인가요",

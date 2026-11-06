@@ -51,6 +51,7 @@ import {
 } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { useOrg } from "@/components/org-context";
+import { ProviderKeySelect } from "@/components/ProviderKey";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
@@ -274,7 +275,7 @@ function ConnectAiDialog({
     onConnected();
   };
   const saveKey = () => {
-    if (draft.provider === "platform" || draft.provider === CUSTOM_PROVIDER) return;
+    if (draft.provider === CUSTOM_PROVIDER) return;
     setRefused(null);
     const provider = providerLabel(draft.provider);
     add.mutate(
@@ -343,7 +344,6 @@ function ConnectAiDialog({
           : t("connectAi.title.any")
       }
       closeLabel={t("common.close")}
-      // Three plans a row, each name on one line even when chosen, as in the setup's column.
       width={600}
     >
       <DialogBody>
@@ -397,6 +397,17 @@ function ConnectAiDialog({
                 setPickedTarget(defaultTarget({ agents, hasAi, set: setOf(next) }));
             }}
             dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
+            busy={add.isPending}
+            keySelect={
+              mayAddKey &&
+              !keySaved && (
+                <ProviderKeySelect
+                  value={draft.provider}
+                  disabled={add.isPending}
+                  onChange={(provider) => setDraft((d) => ({ ...d, provider }))}
+                />
+              )
+            }
             panel={
               choice === "key" ? (
                 <KeyPanel

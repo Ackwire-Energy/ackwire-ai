@@ -2147,6 +2147,19 @@
     "billing": "Paket masuk di komputer workspace, dan komputer itu datang dengan paket agentes.chat yang aktif.",
     "billingWeb": "Pilih satu di web, di agentes.chat.",
     "orPayGo": "Atau bayar sesuai pemakaian",
+    "pay": {
+      "label": "Bagaimana kamu membayar?",
+      "plan": "Dengan paket",
+      "key": "Dengan kunci API"
+    },
+    "pick": {
+      "plan": "Paket",
+      "placeholder": "Pilih paket",
+      "search": "Cari penyedia",
+      "searchPlaceholder": "Nama penyedia",
+      "noResults": "Penyedia tidak ditemukan",
+      "list": "Penyedia"
+    },
     "plan": {
       "claude": {
         "title": "Paket Claude-mu",

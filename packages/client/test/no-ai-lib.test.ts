@@ -456,14 +456,14 @@ describe("the agent a plan starts on, and the order of the plans", () => {
     expect(firstAgent([], () => false)).toBeUndefined();
   });
 
-  test("Claude, ChatGPT, Cursor, OpenCode, Grok, Gemini, then the coding plans; ChatGPT signs in through Codex, the others through their own CLIs", () => {
+  test("Claude, ChatGPT, Gemini, Grok, Cursor, OpenCode, then the coding plans; ChatGPT signs in through Codex, the others through their own CLIs", () => {
     expect(PLAN_CHOICES).toEqual([
       "claude",
       "chatgpt",
+      "gemini",
+      "grok",
       "cursor",
       "zen",
-      "grok",
-      "gemini",
       "zai",
       "kimi",
       "minimax",
@@ -472,10 +472,10 @@ describe("the agent a plan starts on, and the order of the plans", () => {
     expect(PLAN_CHOICES.map((c: PlanChoice) => kindOf(c))).toEqual([
       "claude_code",
       "codex",
+      "antigravity",
+      "grok",
       "cursor",
       "opencode",
-      "grok",
-      "antigravity",
       "claude_code",
       "claude_code",
       "claude_code",

@@ -1771,11 +1771,8 @@
   },
   "ai": {
     "yourPlan": "Votre abonnement IA",
-    "coding": "Abonnement de code",
-    "codingSub": "GLM, Kimi, MiniMax ou OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM et d'autres",
     "plansFoot": "Les agents réfléchissent avec votre abonnement, sans clé API. Il se connecte sur l'ordinateur de l'agent.",
-    "whichPlan": "Quel abonnement",
-    "codingFoot": "Un abonnement de code se connecte avec sa propre clé, sur l'ordinateur de l'agent.",
     "change": "Changer",
     "how": "Comment se connecter",
     "whose": "Clé de qui",

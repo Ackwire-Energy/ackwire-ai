@@ -2259,6 +2259,20 @@ export const en = {
     /** After `billing`, on the phone, where paying isn't offered. */
     billingWeb: "Choose one on the web, at agentes.chat.",
     orPayGo: "Or pay as you go",
+    /** The two ways to pay, on a control the width of a phone: keep them short. */
+    pay: {
+      label: "How do you pay?",
+      plan: "With a plan",
+      key: "With an API key",
+    },
+    pick: {
+      plan: "Plan",
+      placeholder: "Choose a plan",
+      search: "Search providers",
+      searchPlaceholder: "Provider name",
+      noResults: "No provider found",
+      list: "Providers",
+    },
     plan: {
       claude: { title: "Your Claude plan", tiers: "Pro, Max, Ultra, Team or Enterprise" },
       chatgpt: { title: "Your ChatGPT plan", tiers: "Plus, Pro, Business or Enterprise" },

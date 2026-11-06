@@ -2140,6 +2140,19 @@
     "billing": "套餐登录在工作区的电脑上，而这台电脑需要有效的 agentes.chat 套餐才会提供。",
     "billingWeb": "请在网页上的 agentes.chat 选择一个。",
     "orPayGo": "或按量付费",
+    "pay": {
+      "label": "你怎么付费？",
+      "plan": "用套餐",
+      "key": "用 API 密钥"
+    },
+    "pick": {
+      "plan": "套餐",
+      "placeholder": "选择套餐",
+      "search": "搜索服务商",
+      "searchPlaceholder": "服务商名称",
+      "noResults": "没有找到服务商",
+      "list": "服务商"
+    },
     "plan": {
       "claude": {
         "title": "你的 Claude 套餐",

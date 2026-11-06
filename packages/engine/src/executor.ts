@@ -1062,7 +1062,11 @@ async function executeRunInner(
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const stored = run.transcript as unknown as Transcript | null;
       // Resumes when the last decision or answer comes in.
-      if (await pauseOpen(db, run.id, stored)) return;
+      if (await pauseOpen(db, run.id, stored)) {
+        // One answer of several: the work's line goes on to what it still asks.
+        await pauseWorkTimer({ db, pubsub: deps.pubsub }, run).catch(() => {});
+        return;
+      }
       // Decided while the computer turn that asked still runs: its job resumes the run when that turn ends
       // (`suspendedByBridge`), so the brain's session never takes two turns at once.
       if (stored?.pending?.calls.some((c) => c.inTurn) && (await runJobElsewhere(db, run.id, options.jobId))) return;

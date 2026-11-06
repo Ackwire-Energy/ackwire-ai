@@ -1680,11 +1680,8 @@
   },
   "ai": {
     "yourPlan": "Je AI-abonnement",
-    "coding": "Codeerabonnement",
-    "codingSub": "GLM, Kimi, MiniMax of OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM en anderen",
     "plansFoot": "Agents denken met je abonnement, geen API-sleutel nodig. Het logt in op de computer van de agent.",
-    "whichPlan": "Welk abonnement",
-    "codingFoot": "Een codeerabonnement logt in met een eigen sleutel, op de computer van de agent.",
     "change": "Wijzigen",
     "how": "Hoe koppelen",
     "whose": "Van wie is de sleutel",

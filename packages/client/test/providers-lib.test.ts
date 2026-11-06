@@ -16,9 +16,11 @@ const AIZA = "AIzaSyD-sample0only1key2for3tests4567";
 const OPENROUTER = ["sk", "or", "v1", "0123456789abcdef".repeat(4)].join("-");
 
 describe("whose key is it", () => {
-  test("the same providers as the server's catalog, in its order: Claude, OpenAI, Gemini, then the rest", () => {
+  test("the same providers as the server's catalog, the most used first: Claude, OpenAI, Gemini, OpenRouter", () => {
     // A workspace's own endpoint (`custom`) has a form of its own, never a key's.
-    expect(PROVIDERS.map((p) => p.id)).toEqual(PROVIDER_IDS.filter((id) => id !== "custom"));
+    const ids = PROVIDERS.map((p) => p.id);
+    expect([...ids].sort()).toEqual(PROVIDER_IDS.filter((id) => id !== "custom").sort());
+    expect(ids.slice(0, 4)).toEqual(["anthropic", "openai", "gemini", "openrouter"]);
   });
 
   test("a Gemini key, either kind AI Studio hands out, fits Gemini alone, whichever provider was chosen", () => {

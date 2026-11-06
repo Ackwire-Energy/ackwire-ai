@@ -1589,11 +1589,8 @@
   },
   "ai": {
     "yourPlan": "あなたのAIプラン",
-    "coding": "コーディングプラン",
-    "codingSub": "GLM、Kimi、MiniMax、OpenCode",
+    "plansSub": "Claude、ChatGPT、Gemini、GLMなど",
     "plansFoot": "エージェントはあなたのプランで考えます。APIキーは不要です。エージェントのコンピューターでログインします。",
-    "whichPlan": "プランの種類",
-    "codingFoot": "コーディングプランは、エージェントのコンピューターで専用のキーを使ってログインします。",
     "change": "変更",
     "how": "接続方法",
     "whose": "誰のキーか",

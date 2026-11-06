@@ -1685,11 +1685,8 @@ export const featureKeysEn = {
   },
   ai: {
     yourPlan: "Your AI plan",
-    coding: "Coding plan",
-    codingSub: "GLM, Kimi, MiniMax or OpenCode",
+    plansSub: "Claude, ChatGPT, Gemini, GLM and others",
     plansFoot: "Agents think with your plan, no API key needed. It signs in on the agent's computer.",
-    whichPlan: "Which plan",
-    codingFoot: "A coding plan signs in with its own key, on the agent's computer.",
     change: "Change",
     how: "How to connect",
     whose: "Whose key",

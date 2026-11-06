@@ -2316,6 +2316,19 @@
     "billing": "Un forfait se connecte sur l'ordinateur du workspace, et l'ordinateur vient avec un forfait agentes.chat actif.",
     "billingWeb": "Choisissez-en un sur le web, sur agentes.chat.",
     "orPayGo": "Ou payer à l'usage",
+    "pay": {
+      "label": "Comment payez-vous ?",
+      "plan": "Avec un abonnement",
+      "key": "Avec une clé API"
+    },
+    "pick": {
+      "plan": "Abonnement",
+      "placeholder": "Choisir un abonnement",
+      "search": "Chercher des fournisseurs",
+      "searchPlaceholder": "Nom du fournisseur",
+      "noResults": "Aucun fournisseur trouvé",
+      "list": "Fournisseurs"
+    },
     "plan": {
       "claude": {
         "title": "Votre abonnement Claude",

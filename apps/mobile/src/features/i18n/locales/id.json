@@ -1589,11 +1589,8 @@
   },
   "ai": {
     "yourPlan": "Paket AI-mu",
-    "coding": "Paket coding",
-    "codingSub": "GLM, Kimi, MiniMax, atau OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM, dan lainnya",
     "plansFoot": "Agen berpikir dengan paketmu, tanpa perlu kunci API. Paket masuk di komputer agen.",
-    "whichPlan": "Paket yang mana",
-    "codingFoot": "Paket coding masuk dengan kuncinya sendiri, di komputer agen.",
     "change": "Ganti",
     "how": "Cara menghubungkan",
     "whose": "Kunci milik siapa",

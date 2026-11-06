@@ -354,8 +354,8 @@ export function needsOwnSignIn(
 }
 
 /** The list's runs of options under one heading, in order (the phone draws each as a group). */
-export function pickGroups(options: readonly BrainPickOption[]) {
-  const out: { group?: string; options: BrainPickOption[] }[] = [];
+export function pickGroups<O extends Pick<BrainPickOption, "group">>(options: readonly O[]) {
+  const out: { group?: string; options: O[] }[] = [];
   for (const o of options) {
     const last = out.at(-1);
     if (last && last.group === o.group) last.options.push(o);

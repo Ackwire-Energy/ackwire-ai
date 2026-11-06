@@ -2318,6 +2318,19 @@
     "billing": "Un piano accede sul computer del workspace, e il computer arriva con un piano agentes.chat attivo.",
     "billingWeb": "Scegline uno sul web, su agentes.chat.",
     "orPayGo": "Oppure paga a consumo",
+    "pay": {
+      "label": "Come paghi?",
+      "plan": "Con un piano",
+      "key": "Con una chiave API"
+    },
+    "pick": {
+      "plan": "Piano",
+      "placeholder": "Scegli un piano",
+      "search": "Cerca provider",
+      "searchPlaceholder": "Nome del provider",
+      "noResults": "Nessun provider trovato",
+      "list": "Provider"
+    },
     "plan": {
       "claude": {
         "title": "Il tuo piano Claude",
