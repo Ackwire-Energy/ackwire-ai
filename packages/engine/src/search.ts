@@ -9,6 +9,7 @@ import type {
 import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
 import { agentIdsSeen, isPlaybook } from "./audience";
 import { caches } from "./cache";
+import { personAgentDmKey } from "./dms";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { mediaOf } from "./media";
@@ -20,7 +21,7 @@ import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
 import { visibleWikiPageIds } from "./wiki-links";
 
-const { messages, channelMembers, channels, contextItems } = schema;
+const { messages, channelMembers, channels, contextItems, organizationMembers, routines } = schema;
 
 export interface SearchDeps {
   db: Database;
@@ -187,6 +188,8 @@ async function loadAgentChannels(db: Database, orgId: string, agentId: string) {
  * DMs it belongs to stay out, so a question in one place can't pull private
  * conversations from another. A routine's room (ADR 0053 §4) is read only by
  * that routine's own runs: never by another routine's run or a conversation's.
+ * A routine's run also reads the conversation it reports to, private or a DM,
+ * while its creator is still in it (`routineReportChannel`).
  */
 export async function agentSearchChannels(db: Database, orgId: string, agentId: string, currentChannelId: string) {
   const rows = (await caches.scopes.getOrLoad(`${orgId}:${agentId}:visible-kind`, async () =>
@@ -201,12 +204,62 @@ export async function agentSearchChannels(db: Database, orgId: string, agentId: 
       .innerJoin(channels, eq(channels.id, channelMembers.channelId))
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt))),
   )) as { id: string; visibility: string; kind: string; dmKey: string | null }[];
+  const room = rows.find((r) => r.id === currentChannelId && isRoutineRoomKey(r.dmKey));
+  const reports = room?.dmKey ? await routineReportChannel(db, orgId, agentId, room.dmKey) : null;
   return rows
     .filter(
       (r) =>
-        r.id === currentChannelId || (r.visibility === "public" && r.kind === "channel" && !isRoutineRoomKey(r.dmKey)),
+        r.id === currentChannelId ||
+        r.id === reports ||
+        (r.visibility === "public" && r.kind === "channel" && !isRoutineRoomKey(r.dmKey)),
     )
     .map((r) => r.id);
+}
+
+/**
+ * The conversation the routine of this room reports to, when its creator is still a member of it and of the
+ * workspace: its runs summarize it, so they read what the creator reads there and nothing else. Null otherwise.
+ */
+async function routineReportChannel(db: Database, orgId: string, agentId: string, roomKey: string) {
+  const routineId = roomKey.match(/\|r:([^|]+)$/)?.[1];
+  if (!routineId) return null;
+  const [routine] = await db
+    .select({ target: routines.target, creator: routines.createdByUserId })
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, orgId),
+        eq(routines.id, routineId),
+        eq(routines.agentId, agentId),
+        isNull(routines.deletedAt),
+      ),
+    );
+  const creator = routine?.creator;
+  if (!creator) return null;
+  const target = routine.target as { type?: unknown; channelId?: unknown };
+  const channelId =
+    (target.type === "channel" || target.type === "conversation") && typeof target.channelId === "string"
+      ? target.channelId
+      : target.type === "dm"
+        ? (
+            await db
+              .select({ id: channels.id })
+              .from(channels)
+              .where(and(eq(channels.orgId, orgId), eq(channels.dmKey, personAgentDmKey(creator, agentId))))
+          )[0]?.id
+        : undefined;
+  if (!channelId) return null;
+  const [reads] = await db
+    .select({ id: channelMembers.id })
+    .from(channelMembers)
+    .innerJoin(
+      organizationMembers,
+      and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, channelMembers.userId)),
+    )
+    .where(
+      and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, creator)),
+    );
+  return reads ? channelId : null;
 }
 
 /** Channels a person can read: the ones they belong to. */
