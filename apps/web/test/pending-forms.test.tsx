@@ -10,7 +10,8 @@ import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
-const off = (el: Element) => el.matches(":disabled");
+/** happy-dom's `:disabled` doesn't see a fieldset's, as a browser does. */
+const off = (el: Element) => el.hasAttribute("disabled") || el.closest("fieldset[disabled]") !== null;
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 
@@ -32,7 +33,7 @@ describe("a form whose action is on its way", () => {
     await settle(5);
     const email = screen().getByLabelText("E-mail") as HTMLInputElement;
     await type(email, "ada@acme.com");
-    await click(screen().getByRole("button", { name: /Continuar/ }));
+    await click(screen().getByRole("button", { name: /^Continuar(?! com)/ }));
     expect(off(email)).toBe(true);
     expect(email.value).toBe("ada@acme.com");
     await call.fail(new NetworkError(new TypeError("Failed to fetch")));
@@ -49,8 +50,13 @@ describe("a form whose action is on its way", () => {
     await settle(8);
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     const plus = within(nav).getByRole("button", { name: "Novo canal ou categoria" });
-    await act(async () => fireEvent.keyDown(plus, { key: "Enter" }));
+    await act(async () => {
+      fireEvent.keyDown(plus, { key: "Enter" });
+      fireEvent.keyUp(plus, { key: "Enter" });
+    });
+    await settle(2);
     await click(screen().getByRole("menuitem", { name: "Novo canal" }));
+    await settle(2);
     const dialog = within(screen().getByRole("dialog", { name: "Criar canal" }));
     const name = dialog.getByLabelText("Nome") as HTMLInputElement;
     await type(name, "lancamento");
