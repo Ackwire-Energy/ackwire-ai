@@ -2487,6 +2487,8 @@
     "own": {
       "shared": "Konto wspólne dla twoich agentów",
       "sharedLower": "konto wspólne dla twoich agentów",
+      "free": "Darmowe modele OpenCode",
+      "freeLower": "darmowe modele OpenCode",
       "one": "Konto tylko dla: {{name}}",
       "each": "Osobne konto dla każdego"
     },

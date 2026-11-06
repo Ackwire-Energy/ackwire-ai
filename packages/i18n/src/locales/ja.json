@@ -2227,6 +2227,8 @@
     "own": {
       "shared": "エージェントが共有するアカウント",
       "sharedLower": "エージェントが共有するアカウント",
+      "free": "OpenCode の無料モデル",
+      "freeLower": "OpenCode の無料モデル",
       "one": "{{name}}専用のアカウント",
       "each": "それぞれ専用のアカウント"
     },
