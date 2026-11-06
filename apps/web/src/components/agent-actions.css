@@ -192,6 +192,11 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   gap: 6px;
   margin-left: calc(-1 * var(--msg-lead));
 }
+/* A line across the conversation stands between turns, as the list's own pair line does: the turn's gap on both sides,
+   of which the body's part gap is one. */
+.ag-rcs .ag-rc--talk {
+  padding-block: calc(var(--msg-turn-gap) - var(--msg-part-gap));
+}
 .ag-rc--talk > .ag-rc__btn {
   min-height: 26px;
   font-size: 13px;

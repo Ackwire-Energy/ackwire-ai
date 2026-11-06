@@ -10871,6 +10871,9 @@ export const ptBR = {
         "Todas as vagas deste workspace estão ocupadas agora. Peça a quem convidou você para abrir uma vaga.",
       deleting: "Este workspace está sendo apagado.",
       notRestorable: "Este workspace não pode mais ser restaurado.",
+      /** Apps can't connect to a workspace on hold or suspended (`workspace_paused`). */
+      paused:
+        "Este workspace está pausado, então não conecta apps agora. O aviso no topo do workspace diz como reativá-lo.",
     },
     reauth: {
       code: "Digite o código que mandamos por email.",

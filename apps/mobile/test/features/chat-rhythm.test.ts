@@ -89,5 +89,7 @@ describe("one rhythm, the web's numbers (chat-rhythm-css.test.ts holds them to t
     expect(group.match(/<View style=\{\[styles\.rule/g)).toHaveLength(2);
     expect(styleOf(group, "rule")).toContain("flex: 1");
     expect(group).not.toContain("marginBottom: -6");
+    // Inside a message, between turns too: the body's part gap and the line's own room make the turn's.
+    expect(group).toContain("marginVertical: rhythm.turn - rhythm.part");
   });
 });

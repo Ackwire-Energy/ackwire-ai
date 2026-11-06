@@ -11198,7 +11198,8 @@
       "createInviteOnly": "Nieuwe werkruimtes hebben voorlopig een uitnodiging nodig.",
       "membersFull": "Alle plekken in deze werkruimte zijn nu bezet. Vraag wie je heeft uitgenodigd om een plek vrij te maken.",
       "deleting": "Deze werkruimte wordt verwijderd.",
-      "notRestorable": "Deze werkruimte kan niet meer hersteld worden."
+      "notRestorable": "Deze werkruimte kan niet meer hersteld worden.",
+      "paused": "Deze werkruimte is gepauzeerd en kan nu geen apps koppelen. De melding bovenaan de werkruimte zegt hoe je hem weer activeert."
     },
     "reauth": {
       "code": "Typ de code die we je hebben gemaild.",

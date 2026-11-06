@@ -5,6 +5,8 @@ export interface PushStrings {
   approvalTitle: (actor: string) => string;
   approvalBody: string;
   approvalHighRisk: (what: string) => string;
+  /** A high-risk ask with no words of its own to show: the warning alone. */
+  approvalHighRiskBody: string;
   approvalFromRoutine: (routine: string) => string;
   questionTitle: (actor: string) => string;
   questionBody: string;
@@ -71,6 +73,7 @@ export const en: PushStrings = {
   approvalTitle: (a) => `${a} needs your approval`,
   approvalBody: "Tap to see the request.",
   approvalHighRisk: (what) => `${what}. Open the app to review it.`,
+  approvalHighRiskBody: "A high-risk request. Open the app to review it.",
   approvalFromRoutine: (routine) => `Routine «${routine}»`,
   questionTitle: (a) => `${a} has a question for you`,
   questionBody: "Tap to answer.",

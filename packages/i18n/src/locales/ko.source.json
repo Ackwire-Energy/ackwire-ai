@@ -26968,6 +26968,9 @@
   "errors.org.notRestorable": {
     "value": "This workspace can't be restored anymore."
   },
+  "errors.org.paused": {
+    "value": "This workspace is paused, so it can't connect apps now. The banner at the top of the workspace says how to bring it back."
+  },
   "errors.reauth.code": {
     "value": "Type the code we emailed you."
   },

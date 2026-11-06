@@ -505,7 +505,8 @@ export const MessageRow = memo(function MessageRow({
   }
 
   // Under a name, or in a bubble with it: the same line, its time last. In `bubbles` it goes in the bubble's end when
-  // there is one; in a DM the line is only what a tag has to say.
+  // there is one; in a DM's bubble the line is only what a tag has to say. A row with no bubble (a card alone) keeps
+  // the name ahead of its time, as anywhere else: a time alone beside a face reads as a broken line.
   const who = (inBubble: boolean) => (
     <View
       style={[
@@ -514,7 +515,7 @@ export const MessageRow = memo(function MessageRow({
         (inBubble || compact || !words) && styles.whoTight,
       ]}
     >
-      {!bubbled || look.names ? (
+      {!inBubble || look.names ? (
         <Text
           variant="footnote"
           tone="ink2"

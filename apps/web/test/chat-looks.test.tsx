@@ -128,6 +128,28 @@ describe("each style in a channel and in a DM", () => {
   });
 });
 
+describe("a row with no bubble in a DM", () => {
+  test("keeps its name ahead of its time, as in a channel: a time alone beside a face reads as a broken line", async () => {
+    const state = seedState();
+    const channelId = seedDm(state, { type: "agent", id: ADA_ID }, { body: "x" });
+    state.messages = [
+      ...state.messages.filter((m) => m.channelId !== channelId),
+      said(channelId, "w1", "u-walter", "Pode subir?", 20),
+      { ...said(channelId, "c1", ADA_ID, "", 10), meta: { approvalId: "ap-merge" } } as Message,
+    ];
+    const approval = state.approvals.find((a) => a.id === "ap-merge");
+    if (approval) Object.assign(approval, { channelId, threadId: null, messageId: "c1" });
+    await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(withChatPrefs(state)) });
+    await settle(10);
+    const card = row("c1");
+    expect(card.dataset.look).toBe("bubbles");
+    expect(card.dataset.names).toBeUndefined();
+    const head = card.querySelector(".ac-msg__head") as HTMLElement;
+    expect(head.querySelector(".ac-msg__author")?.textContent).toContain("Ada");
+    expect(head.querySelector(".ac-msg__time")?.textContent).toContain(":");
+  });
+});
+
 describe("a reply being written in Bolhas", () => {
   test("its time stays in the bubble, ahead of how long it has been at work", async () => {
     const state = seedState();

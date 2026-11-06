@@ -7,6 +7,7 @@ export const strings: Partial<PushStrings> = {
   approvalTitle: (a) => `${a} braucht deine Freigabe`,
   approvalBody: "Tippe, um die Anfrage zu sehen.",
   approvalHighRisk: (what) => `${what}. Öffne die App, um es zu prüfen.`,
+  approvalHighRiskBody: "Eine Anfrage mit hohem Risiko. Öffne die App, um sie zu prüfen.",
   approvalFromRoutine: (routine) => `Routine „${routine}“`,
   questionTitle: (a) => `${a} hat eine Frage an dich`,
   questionBody: "Tippe, um zu antworten.",

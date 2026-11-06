@@ -11137,7 +11137,8 @@
       "createInviteOnly": "Neue Workspaces brauchen vorerst eine Einladung.",
       "membersFull": "Alle Plätze in diesem Workspace sind gerade belegt. Bitte die Person, die dich eingeladen hat, einen Platz freizumachen.",
       "deleting": "Dieser Workspace wird gerade gelöscht.",
-      "notRestorable": "Dieser Workspace kann nicht mehr wiederhergestellt werden."
+      "notRestorable": "Dieser Workspace kann nicht mehr wiederhergestellt werden.",
+      "paused": "Dieser Workspace ist pausiert und kann gerade keine Apps verbinden. Der Hinweis oben im Workspace sagt, wie du ihn reaktivierst."
     },
     "reauth": {
       "code": "Gib den Code ein, den wir dir per E-Mail geschickt haben.",

@@ -75,6 +75,14 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
   });
   switch (input.kind) {
     case "approval": {
+      // High risk and no title to show (the tool's is English, so only an English push has it): the warning alone.
+      if (input.highRisk && !(locale === "en" && what)) {
+        const by = input.routine?.trim();
+        return out(
+          s.approvalTitle(actor),
+          by ? `${s.approvalFromRoutine(by)}: ${s.approvalHighRiskBody}` : s.approvalHighRiskBody,
+        );
+      }
       // Asked by a routine while nobody watched: its name leads, so the person knows where it comes from.
       const routine = input.routine?.trim();
       const from = (body: string) => (routine ? `${s.approvalFromRoutine(routine)}: ${body}` : body);

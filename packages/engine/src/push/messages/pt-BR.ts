@@ -6,6 +6,7 @@ export const ptBR: PushStrings = {
   approvalTitle: (a) => `${a} precisa da sua aprovação`,
   approvalBody: "Toque para ver o pedido.",
   approvalHighRisk: (what) => `${what}. Abra o app para revisar com calma.`,
+  approvalHighRiskBody: "Pedido de alto risco. Abra o app para revisar com calma.",
   approvalFromRoutine: (routine) => `Rotina «${routine}»`,
   questionTitle: (a) => `${a} tem uma pergunta para você`,
   questionBody: "Toque para responder.",

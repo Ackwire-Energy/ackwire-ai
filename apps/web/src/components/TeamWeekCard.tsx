@@ -25,7 +25,6 @@ import {
   teamWeekRowState,
   teamWeekRowText,
   teamWeekWhen,
-  weekDay,
 } from "@agenteschat/client/lib/team-week";
 import { Button, Icon, Popover, Select } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -105,10 +104,8 @@ export function TeamWeekCardView({ message, card }: { message: Message; card: Te
   const { stats } = card;
   const dismissed = !!card.dismissedAt;
   return (
+    // Its week ("Como foi a semana do time, de 28 out. a 3 nov.") is the message's text, above.
     <div className="tw">
-      <p className="tw__intro">
-        {t("chat.body.team_week", { from: weekDay(locale, card.from), to: weekDay(locale, card.to) })}
-      </p>
       {/* biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset */}
       <div className="rq tw__card" role="group" aria-label={t("teamWeek.title")}>
         <div className="rq__head">

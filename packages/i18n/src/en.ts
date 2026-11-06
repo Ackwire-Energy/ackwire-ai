@@ -10749,6 +10749,9 @@ export const en = {
       membersFull: "Every seat in this workspace is taken right now. Ask whoever invited you to open a seat.",
       deleting: "This workspace is being deleted.",
       notRestorable: "This workspace can't be restored anymore.",
+      /** Apps can't connect to a workspace on hold or suspended (`workspace_paused`). */
+      paused:
+        "This workspace is paused, so it can't connect apps now. The banner at the top of the workspace says how to bring it back.",
     },
     reauth: {
       code: "Type the code we emailed you.",

@@ -145,7 +145,12 @@ export function ConsultPairRow({
       style={[
         styles.line,
         inline
-          ? { marginLeft: LINE_INSET - inset.left, marginRight: LINE_INSET - inset.right }
+          ? {
+              marginLeft: LINE_INSET - inset.left,
+              marginRight: LINE_INSET - inset.right,
+              // Between turns, as the list's own line: the turn's gap on both sides, of which the body's part is one.
+              marginVertical: rhythm.turn - rhythm.part,
+            }
           : { marginTop: gap ?? rhythm.turn, paddingHorizontal: LINE_INSET },
       ]}
     >

@@ -702,7 +702,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     keyHint: null,
     ...over,
   });
-  const team = acct({ id: "acct_team", email: "contato@estudio.example" });
+  const team = acct({ id: "acct_team", email: "team@example.com" });
   const pessoal = acct({
     id: "acct_pessoal",
     label: "Claude Pessoal",
@@ -758,7 +758,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(picker.firstElementChild?.textContent).toBe("Já conectadas");
     const rows = [...picker.querySelectorAll(":scope > .ac-option")].map((o) => shownText(o));
     expect(rows.slice(0, 5)).toEqual([
-      "Claude Teamcontato@estudio.example",
+      "Claude Teamteam@example.com",
       "Claude Pessoal · MaxTambém usada por Atlas",
       "ChatGPT PlusTambém usada por Atlas",
       "Claude da AcmeClaude · termina em 7f2aPago por uso. Conta no orçamento da Ada.",
