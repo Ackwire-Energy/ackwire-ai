@@ -801,7 +801,7 @@ describe("the agent asks for help on its desktop", () => {
     expect(notice?.source).toMatchObject({ channelId: f.general.id, messageId: h?.id });
   });
 
-  test("several may drive it and none is in the conversation or asked: no DM opens with one of them, all get the request on the computer", async () => {
+  test("several may drive it and none is in the conversation or asked: no DM opens with one of them, all get the card in the channel administrators read", async () => {
     const { systemMode } = await start({ agent: true });
     await systemMode();
     await f.db.update(schema.agents).set({ ownerUserId: null }).where(eq(schema.agents.id, f.agent.id));
@@ -827,7 +827,14 @@ describe("the agent asks for help on its desktop", () => {
       .from(schema.notifications)
       .where(eq(schema.notifications.groupKey, `browser_handoff:${h?.id}`));
     expect(notified.map((n) => n.userId).sort()).toEqual([f.owner.id, bia.id].sort());
-    for (const n of notified) expect(n.source).toEqual({ handoffId: h?.id, agentId: f.agent.id, screen: "desktop" });
+    for (const n of notified)
+      expect(n.source).toMatchObject({
+        channelId: f.general.id,
+        messageId: h?.id,
+        handoffId: h?.id,
+        agentId: f.agent.id,
+        screen: "desktop",
+      });
   });
 
   test("who is asked: the owner when they may drive it, else everyone who may; nobody on a computer nobody paired", async () => {
