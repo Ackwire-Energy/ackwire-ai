@@ -234,8 +234,7 @@ describe("agents at work in the list", () => {
       dms: [dm("d1", "Dev", 0, 10), { ...dm("d2", "Iris", 0, null), openedAt: now }, dm("d3", "Ana", 0, null)],
       threads: [],
     });
-    expect(rows.map((r) => r.key).slice(0, 2)).toEqual(["d:d2", "d:d1"]);
-    expect(rows.at(-1)?.key).toBe("d:d3");
+    expect(rows.map((r) => r.key)).toEqual(["d:d2", "d:d1", "d:d3", "c:c1"]);
   });
 
   test("without who is working, nobody is", () => {
