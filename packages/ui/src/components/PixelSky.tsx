@@ -51,6 +51,7 @@ export function glowOptions(color: AgentColor, surface = "--bg", bare = false): 
   return {
     pixel: 4,
     surface,
+    seeThrough: bare,
     palette: (bg) => glowTones(color, bg),
     light: 0,
     base: (u, v, t) => {

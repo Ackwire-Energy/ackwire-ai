@@ -70,6 +70,8 @@ export interface SkyOptions {
   /** Field value inside calm zones (default 6/7) and the fade around them, in sky pixels. */
   calmV?: number;
   calmPad?: number;
+  /** The first tone paints nothing: what's behind shows, whatever the surface (a card's gradient, a tile). */
+  seeThrough?: boolean;
   /** Draws over the field (e.g. one sprite of its own) before the frame is shown. */
   after?: (frame: SkyFrame) => void;
 }
@@ -265,7 +267,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     const key = list.join();
     if (key !== toneKey) {
       toneKey = key;
-      tones = list.map(pixelOf);
+      tones = list.map((tone, i) => (o.seeThrough && i === 0 ? 0 : pixelOf(tone)));
     }
     const levels = tones.length - 1;
     const r = host.getBoundingClientRect();
