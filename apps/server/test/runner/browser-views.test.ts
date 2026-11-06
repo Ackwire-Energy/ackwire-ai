@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { decodeBrowserFrame, type RunnerFrame, STREAM_CLOSE } from "@agenteschat/adapters/machine-protocol";
+import {
+  BROWSER_VIEW,
+  decodeBrowserFrame,
+  type RunnerFrame,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters/machine-protocol";
 import { BrowserViews } from "../../runner/browser-views";
 import type { DataListener, DataSocket } from "../../runner/streams";
 import { waitFor } from "./helpers";
@@ -11,20 +16,28 @@ class FakeData {
   sent: Uint8Array[] = [];
   closed: { code?: number; reason?: string } | null = null;
   listener: DataListener | null = null;
-  readonly socket: DataSocket = {
-    send: (data) => {
-      if (typeof data !== "string") this.sent.push(data);
-    },
-    close: (code, reason) => {
-      if (this.closed) return;
-      this.closed = { code, reason };
-      this.listener?.closed();
-    },
-    bufferedAmount: 0,
-    listen: (on) => {
-      this.listener = on;
-    },
-  };
+  /** Bytes still waiting to leave (the socket's `bufferedAmount`). */
+  buffered = 0;
+  readonly socket: DataSocket;
+  constructor() {
+    const fake = this;
+    this.socket = {
+      send: (data) => {
+        if (typeof data !== "string") fake.sent.push(data);
+      },
+      close: (code, reason) => {
+        if (fake.closed) return;
+        fake.closed = { code, reason };
+        fake.listener?.closed();
+      },
+      get bufferedAmount() {
+        return fake.buffered;
+      },
+      listen: (on) => {
+        fake.listener = on;
+      },
+    };
+  }
   /** The server answers a frame. */
   ack() {
     this.listener?.control?.({ type: "ack" });
@@ -45,6 +58,8 @@ const frame = (agentId: string, seq: number): Frame => ({
 
 function setup(opts: { window?: number; stallMs?: number } = {}) {
   const dialed: { streamId: string; data: FakeData }[] = [];
+  const logs: string[] = [];
+  const rooms: string[] = [];
   const views = new BrowserViews({
     ...opts,
     dial: async (streamId) => {
@@ -52,8 +67,10 @@ function setup(opts: { window?: number; stallMs?: number } = {}) {
       dialed.push({ streamId, data });
       return data.socket;
     },
+    log: (line) => logs.push(line),
   });
-  return { views, dialed, last: () => dialed.at(-1)?.data as FakeData };
+  views.onRoom = (agentId) => rooms.push(agentId);
+  return { views, dialed, logs, rooms, last: () => dialed.at(-1)?.data as FakeData };
 }
 
 test("an agent with no view: its frames are the caller's to send as before", () => {
@@ -84,13 +101,135 @@ test("a view's frames go as bytes, at most the window's on their way; only the n
   expect(views.push(frame("bia", 1))).toBe(false);
 });
 
-test("a full window with no ack for a while sends the newest frame anyway", async () => {
-  const { views, last } = setup({ window: 1, stallMs: 5 });
+test("the window is the contract's on every hop", async () => {
+  const { views, last } = setup();
   await views.open("ana", "S".repeat(43));
-  for (const seq of [1, 2, 3]) views.push(frame("ana", seq));
+  for (let seq = 1; seq <= BROWSER_VIEW.window + 2; seq++) views.push(frame("ana", seq));
+  expect(last().seqs()).toHaveLength(BROWSER_VIEW.window);
+  views.end("ana");
+});
+
+test("a full window with no ack for a while is a dead socket: the view ends, and frames go as before", async () => {
+  const { views, last, logs, rooms } = setup({ window: 1, stallMs: 5 });
+  await views.open("ana", "S".repeat(43));
+  for (const seq of [1, 2, 3]) expect(views.push(frame("ana", seq))).toBe(true);
   expect(last().seqs()).toEqual([1]);
-  await waitFor(() => last().seqs().length === 2);
-  expect(last().seqs()).toEqual([1, 3]);
+  await waitFor(() => last().closed !== null);
+  // Never written into the dead socket: the server opens a new view.
+  expect(last().seqs()).toEqual([1]);
+  expect(last().closed?.code).toBe(STREAM_CLOSE.tooSlow);
+  expect(views.viewing()).toEqual([]);
+  expect(views.push(frame("ana", 4))).toBe(false);
+  // Its stream sends its next frame, now on the machine socket.
+  expect(rooms).toEqual(["ana"]);
+  // One line says what it did: 1 sent, 2 waited and 3 took its place.
+  expect(logs).toHaveLength(1);
+  expect(logs[0]).toContain("no acknowledgement");
+  expect(logs[0]).toContain("1 frames");
+  expect(logs[0]).toContain("1 skipped");
+  // A late ack of the dead socket changes nothing.
+  last().ack();
+  expect(rooms).toEqual(["ana"]);
+});
+
+test("a full window stalls with nothing waiting too: a paced stream sends nothing until there is room", async () => {
+  const { views, last, rooms } = setup({ window: 1, stallMs: 5 });
+  await views.open("ana", "S".repeat(43));
+  views.push(frame("ana", 1));
+  await waitFor(() => last().closed !== null);
+  expect(last().closed?.code).toBe(STREAM_CLOSE.tooSlow);
+  expect(rooms).toEqual(["ana"]);
+});
+
+test("a full window whose bytes are still leaving is a slow uplink, not a dead socket: it waits for the ack", async () => {
+  const { views, last } = setup({ window: 1, stallMs: 50 });
+  await views.open("ana", "S".repeat(43));
+  const data = last();
+  data.buffered = 300_000;
+  views.push(frame("ana", 1));
+  views.push(frame("ana", 2));
+  // Past one stall: half of it left meanwhile.
+  data.buffered = 150_000;
+  await new Promise((r) => setTimeout(r, 75));
+  expect(data.closed).toBeNull();
+  data.buffered = 0;
+  data.ack();
+  expect(data.seqs()).toEqual([1, 2]);
+  // Then nothing leaves and no ack comes: a dead socket.
+  await waitFor(() => data.closed !== null);
+  expect(data.closed?.code).toBe(STREAM_CLOSE.tooSlow);
+});
+
+test("a socket that keeps draining but never acks still ends, after a few stalls", async () => {
+  const { views, last } = setup({ window: 1, stallMs: 10 });
+  await views.open("ana", "S".repeat(43));
+  const data = last();
+  data.buffered = 1_000_000;
+  const start = Date.now();
+  views.push(frame("ana", 1));
+  const draining = setInterval(() => {
+    data.buffered = Math.max(1, data.buffered - 1000);
+  }, 2);
+  try {
+    await waitFor(() => data.closed !== null);
+  } finally {
+    clearInterval(draining);
+  }
+  expect(data.closed?.code).toBe(STREAM_CLOSE.tooSlow);
+  expect(Date.now() - start).toBeGreaterThanOrEqual(30);
+});
+
+test("a new view starts with the agent's newest frame, until its stream ends", async () => {
+  const { views, dialed } = setup({ window: 1, stallMs: 5 });
+  await views.open("ana", "A".repeat(43));
+  const first = dialed[0]?.data as FakeData;
+  for (const seq of [1, 2, 3]) views.push(frame("ana", seq));
+  await waitFor(() => first.closed !== null);
+  // 3 waited in the dead view and never went: an idle page sends nothing newer, so the next view starts with it.
+  await views.open("ana", "B".repeat(43));
+  expect((dialed[1] as { data: FakeData }).data.seqs()).toEqual([3]);
+  // The server closed it; frames meanwhile went on the machine socket, and the newest of them is the next view's.
+  (dialed[1] as { data: FakeData }).data.socket.close(STREAM_CLOSE.restarting);
+  expect(views.push(frame("ana", 4))).toBe(false);
+  await views.open("ana", "C".repeat(43));
+  expect((dialed[2] as { data: FakeData }).data.seqs()).toEqual([4]);
+  // The stream ended: a view of its next stream waits for that stream's frames.
+  views.end("ana");
+  await views.open("ana", "D".repeat(43));
+  expect((dialed[3] as { data: FakeData }).data.seqs()).toEqual([]);
+  // So does one after the connection dropped.
+  views.push(frame("ana", 5));
+  views.closeAll();
+  await views.open("ana", "E".repeat(43));
+  expect((dialed[4] as { data: FakeData }).data.seqs()).toEqual([]);
+  views.closeAll();
+});
+
+test("room: said when an ack frees the window with nothing waiting, and when the view ends", async () => {
+  const { views, last, rooms } = setup({ window: 2 });
+  // No view: always room.
+  expect(views.room("ana")).toBe(true);
+  expect(views.has("ana")).toBe(false);
+  await views.open("ana", "S".repeat(43));
+  expect(views.has("ana")).toBe(true);
+  views.push(frame("ana", 1));
+  expect(views.room("ana")).toBe(true);
+  views.push(frame("ana", 2));
+  expect(views.room("ana")).toBe(false);
+  views.push(frame("ana", 3));
+  expect(views.room("ana")).toBe(false);
+  // The ack sends 3, which fills the window again: no room to say yet.
+  last().ack();
+  expect(last().seqs()).toEqual([1, 2, 3]);
+  expect(rooms).toEqual([]);
+  last().ack();
+  expect(views.room("ana")).toBe(true);
+  expect(rooms).toEqual(["ana"]);
+  // Another agent's room is its own.
+  expect(views.room("bia")).toBe(true);
+  views.end("ana");
+  expect(rooms).toEqual(["ana", "ana"]);
+  expect(views.room("ana")).toBe(true);
 });
 
 test("a view ends with its stream, its socket, the connection, or a new view of the same agent", async () => {

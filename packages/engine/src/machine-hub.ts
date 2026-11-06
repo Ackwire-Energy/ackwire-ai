@@ -1410,15 +1410,15 @@ export function createMachineHub(deps: MachineHubDeps) {
     /** Whether this replica holds the machine's socket. */
     isLocal: (machineId: string) => local.has(machineId),
 
-    /**
-     * `browser.handoff` to a computer whose socket is here (protocol 12+), for
-     * its desktop app; false when it isn't here or too old (nothing to do).
-     */
     /** The protocol of a computer whose socket is here; null when it isn't here. */
     localProtocol(machineId: string): number | null {
       return local.get(machineId)?.protocol ?? null;
     },
 
+    /**
+     * `browser.handoff` to a computer whose socket is here (protocol 12+), for
+     * its desktop app; false when it isn't here or too old (nothing to do).
+     */
     sendBrowserHandoff(machineId: string, agentId: string, handoff: BrowserHandoffInfo | null): boolean {
       const conn = local.get(machineId);
       if (!conn || conn.protocol < BROWSER_PROTOCOL) return false;

@@ -66,7 +66,8 @@ export interface Stream extends StreamInput {
  */
 export interface ClaimedStream {
   data(data: string | Uint8Array): void;
-  closed(): void;
+  /** Its socket ended; `code` as the runner closed it (`STREAM_CLOSE`), absent when the server ended it. */
+  closed(code?: number): void;
 }
 
 /** A data socket the runner opened: its stream once its hello named one. */
@@ -483,7 +484,7 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
       waiting.delete(link);
       if (link.claimed) {
         claimed.delete(link);
-        link.claimed.closed();
+        link.claimed.closed(code);
         return;
       }
       if (link.stream) {

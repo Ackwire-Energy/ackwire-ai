@@ -28,6 +28,16 @@ test("a frame socket's bytes read back as the frame the server sent", () => {
   expect(decodeBrowserFrameBytes(new Uint8Array([1, 0, 0]))).toBeNull();
 });
 
+test("when the computer captured a frame comes along both ways, to measure how late pictures arrive", () => {
+  const metadata = { ...META, capturedAt: 1_700_000_000_123 };
+  expect(decodeBrowserFrameBytes(frameBytes({ seq: 5, metadata }, JPEG))?.metadata.capturedAt).toBe(1_700_000_000_123);
+  const parsed = parseBrowserLiveMessage({ type: "browser.frame", agentId: "a1", seq: 5, data: "/9j/", metadata });
+  expect(parsed?.type === "browser.frame" ? parsed.metadata.capturedAt : null).toBe(1_700_000_000_123);
+  // Anything but a number is left out.
+  const odd = { ...META, capturedAt: "soon" };
+  expect(decodeBrowserFrameBytes(frameBytes({ seq: 5, metadata: odd }, JPEG))?.metadata).toEqual(META);
+});
+
 test("a frame with bytes is a live view frame like one with base64; both draw and map clicks the same", () => {
   const jpeg = new Uint8Array(JPEG);
   const fromBytes = parseBrowserLiveMessage({ type: "browser.frame", agentId: "a1", seq: 1, jpeg, metadata: META });

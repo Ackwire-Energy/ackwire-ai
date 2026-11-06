@@ -647,7 +647,7 @@ describe("the browser and the desktop show one window", () => {
       hub: { isLocal: () => true, call: async () => ({}) } as unknown as MachineHub,
     });
     const card: BrowserLiveMessage[] = [];
-    const stopCard = await live.watch({ userId: bia.id, send: (m) => card.push(m) }, f.org.id, f.agent.id);
+    const { stop: stopCard } = await live.watch({ userId: bia.id, send: (m) => card.push(m) }, f.org.id, f.agent.id);
     const desktopView = await open(bia.id, WATCH);
     const message = await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@dev check it" });
     const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, message.id));

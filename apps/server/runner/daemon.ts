@@ -967,7 +967,7 @@ export class RunnerDaemon implements RequestObserver {
     // Frames go out on whatever connection this session has at the time (it reconnects by itself).
     let live: RunnerConnection | null = null;
     // The live views of the agents' browsers (ADR 0040 §7.1): a viewed agent's frames go on a socket of their own.
-    const views = new BrowserViews({ dial: (streamId) => streams.dial(streamId, "browserView") });
+    const views = new BrowserViews({ dial: (streamId) => streams.dial(streamId, "browserView"), log });
     const toServer = (frame: RunnerFrame): boolean => {
       if (frame.type === "browser.frame" && views.push(frame)) return true;
       if (frame.type === "browser.stream.ended") views.end(frame.agentId);
@@ -977,6 +977,8 @@ export class RunnerDaemon implements RequestObserver {
       home,
       log,
       send: toServer,
+      // Chrome's next picture comes once this one's view has room (`pacing=ack`).
+      frameRoom: (agentId) => views.room(agentId),
       secret: (agent, name) => secretValue(secretsDir, agent, name),
       onChange: () => queueMicrotask(() => this.browsersChanged()),
       desktops: this.desktops,
@@ -1137,6 +1139,11 @@ export class RunnerDaemon implements RequestObserver {
         log,
       });
     }
+    // A view with room again, or ended: the agent's stream sends its next frame, here or from its worker.
+    views.onRoom = (agentId) => {
+      browser.room(agentId);
+      supervisor?.browserRoom(agentId);
+    };
     // Agents working as this runner's user: what their browsers' first command would install is installed now (in
     // system mode, the installer shares it with every agent).
     if (!supervisor && this.access().tools.browser === true) void browser.prepareInBackground();

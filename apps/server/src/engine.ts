@@ -469,8 +469,15 @@ export function buildEngine(o: EngineOptions) {
   // The agent's Chrome started ahead of its first command (ADR 0040 §11): a head start, so a refusal costs nothing.
   const warmBrowser = (at: Parameters<typeof warmAgentBrowser>[2]) =>
     void warmAgentBrowser(db, machineHub, at).catch(() => {});
-  // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
-  const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub, warm: warmBrowser });
+  // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory. Its log says how each
+  // view's own socket went (§7.1).
+  const browserLive = createBrowserLive({
+    db,
+    pubsub: adapters.pubsub,
+    hub: machineHub,
+    warm: warmBrowser,
+    log: o.log,
+  });
   machineHub.setBrowserHooks(browserLive.hubHooks);
   // agentes.chat Cloud reads the screen's text while a person is in control (ADR 0076); a self-hosted server never.
   const sessions = config.SESSION_SCREENING ? createSessionScreening({ db, hub: machineHub, log: o.log }) : null;

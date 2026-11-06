@@ -9,8 +9,8 @@ import type { BrowserFrameMetadata } from "./live";
 export interface BrowserFrameBytes {
   seq: number;
   metadata: BrowserFrameMetadata;
-  /** The JPEG, a view into the bytes received (no copy). */
-  jpeg: Uint8Array;
+  /** The JPEG, a view into the bytes received (no copy), over an `ArrayBuffer` so it is a `Blob` part as it is. */
+  jpeg: Uint8Array<ArrayBuffer>;
 }
 
 const VERSION = 1;
@@ -20,7 +20,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
 /** A frame socket's binary message, checked; null when it isn't a frame. */
-export function decodeBrowserFrameBytes(data: ArrayBuffer | Uint8Array): BrowserFrameBytes | null {
+export function decodeBrowserFrameBytes(data: ArrayBuffer | Uint8Array<ArrayBuffer>): BrowserFrameBytes | null {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
   if (bytes.byteLength < 6 || bytes[0] !== VERSION) return null;
   const length = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(1);
@@ -40,6 +40,7 @@ export function decodeBrowserFrameBytes(data: ArrayBuffer | Uint8Array): Browser
       deviceWidth: m.deviceWidth,
       deviceHeight: m.deviceHeight,
       ...(num(m.pageScaleFactor) ? { pageScaleFactor: m.pageScaleFactor } : {}),
+      ...(num(m.capturedAt) ? { capturedAt: m.capturedAt } : {}),
       ...(typeof m.url === "string" ? { url: m.url } : {}),
       ...(typeof m.title === "string" && m.title ? { title: m.title } : {}),
     },

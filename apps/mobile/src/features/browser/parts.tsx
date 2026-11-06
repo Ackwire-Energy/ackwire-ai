@@ -360,8 +360,10 @@ export interface LiveState {
  * Watches the agent's browser on the app's realtime socket while `enabled` (the card is open), as the
  * web's `useBrowserLive`: frames, who is in control, why it can't be shown. Watches again after the
  * socket reconnects; the shared connection retries on its own while the computer is "reconnecting".
+ * `maxFps`: the frames a second this view needs (`BROWSER_FPS.preview` for a small picture; none for the
+ * stream's own rate), changed in place as the card opens or closes (ADR 0040 §7.1).
  */
-export function useLiveConnection(agentId: string, enabled: boolean): LiveState {
+export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: number): LiveState {
   const connection = useConnection();
   const [frame, setFrame] = useState<BrowserFrame | null>(null);
   const [unavailable, setUnavailable] = useState<Unavailable>(null);
@@ -370,6 +372,9 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
   const [hidden, setHidden] = useState(false);
   const [online, setOnline] = useState(false);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
+  // The rate when the watch starts; a change later goes through `setMaxFps` (never a new watch).
+  const fps = useRef(maxFps);
+  fps.current = maxFps;
 
   useEffect(() => {
     if (!connection || !enabled) return;
@@ -379,6 +384,7 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       // Shared per socket: one watch per agent however often the card re-renders or remounts.
       watcher: connection.browserWatcher,
       agentId,
+      maxFps: fps.current,
       onFrame: (f) => {
         setUnavailable(null);
         setFrame(f);
@@ -424,6 +430,10 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       setHidden(false);
     };
   }, [connection, agentId, enabled]);
+
+  useEffect(() => {
+    liveRef.current?.setMaxFps(maxFps);
+  }, [maxFps]);
 
   const sendInput = useCallback((events: BrowserInputEvent[]) => {
     liveRef.current?.sendInput(events);

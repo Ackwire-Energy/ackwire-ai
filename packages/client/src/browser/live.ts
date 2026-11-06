@@ -1,6 +1,6 @@
 import type { BrowserHandoff } from "../api/types";
 import { BACKOFF_MS, type Timers } from "../realtime/connection";
-import type { BrowserWatcher } from "./watches";
+import { type BrowserWatch, type BrowserWatcher, browserFps, browserWatchFrame } from "./watches";
 
 /**
  * The agent browser's live view (ADR 0040 §7) over the realtime socket
@@ -14,6 +14,8 @@ export interface BrowserFrameMetadata {
   deviceWidth: number;
   deviceHeight: number;
   pageScaleFactor?: number;
+  /** When the computer captured it (epoch ms, its own clock), to measure how late pictures arrive (ADR 0040 §7.1). */
+  capturedAt?: number;
   url?: string;
   /** Written by the site (show it as text); absent from older runners. */
   title?: string;
@@ -28,8 +30,8 @@ export interface BrowserFrame {
   seq: number;
   /** Base64 JPEG. */
   data?: string;
-  /** The JPEG's bytes. */
-  jpeg?: Uint8Array;
+  /** The JPEG's bytes (backed by an `ArrayBuffer`: a `Blob` part as it is, never copied). */
+  jpeg?: Uint8Array<ArrayBuffer>;
   metadata: BrowserFrameMetadata;
 }
 
@@ -129,8 +131,13 @@ export function parseBrowserLiveMessage(v: unknown): BrowserLiveMessage | null {
   switch (v.type) {
     case "browser.frame": {
       const m = v.metadata;
+      // Bytes come only from the frame socket's reading (`decodeBrowserFrameBytes`), over an `ArrayBuffer`.
       const picture =
-        typeof v.data === "string" ? { data: v.data } : v.jpeg instanceof Uint8Array ? { jpeg: v.jpeg } : null;
+        typeof v.data === "string"
+          ? { data: v.data }
+          : v.jpeg instanceof Uint8Array
+            ? { jpeg: v.jpeg as Uint8Array<ArrayBuffer> }
+            : null;
       if (!picture || !num(v.seq) || !isObject(m) || !num(m.deviceWidth) || !num(m.deviceHeight)) return null;
       return {
         type: "browser.frame",
@@ -141,6 +148,7 @@ export function parseBrowserLiveMessage(v: unknown): BrowserLiveMessage | null {
           deviceWidth: m.deviceWidth as number,
           deviceHeight: m.deviceHeight as number,
           ...(num(m.pageScaleFactor) ? { pageScaleFactor: m.pageScaleFactor as number } : {}),
+          ...(num(m.capturedAt) ? { capturedAt: m.capturedAt as number } : {}),
           ...(typeof m.url === "string" ? { url: m.url } : {}),
           ...(typeof m.title === "string" && m.title ? { title: m.title } : {}),
         },
@@ -204,6 +212,11 @@ export interface BrowserLiveOptions {
    * connection sends `browser.watch` / `browser.unwatch` itself.
    */
   watcher?: BrowserWatcher;
+  /**
+   * Frames a second this view needs (ADR 0040 §7.1): `BROWSER_FPS.preview` for a small picture; none for whatever
+   * the stream sends. Views of one agent share the most any of them needs; `setMaxFps` changes it in place.
+   */
+  maxFps?: number;
   /** The clock for hover throttling and the time each mouse event says it was made (tests). */
   now?: () => number;
 }
@@ -223,6 +236,8 @@ export interface BrowserLiveConnection {
   resume(): void;
   /** Watch again now (Try again on a page that never came): the server answers with the status and the newest page. */
   retry(): void;
+  /** The frames a second this view needs now (it opened, closed, took control): asked of the server in place. */
+  setMaxFps(maxFps?: number): void;
   /** Stops watching (`browser.unwatch`) and any pending retry. */
   close(): void;
 }
@@ -241,8 +256,17 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
   let attempt = 0;
   let retry: unknown = null;
   let closed = false;
-  let release: (() => void) | null = null;
-  const watch = () => (watcher ? watcher.rewatch(agentId) : options.send({ type: "browser.watch", agentId }));
+  let release: BrowserWatch | null = null;
+  let fps = options.maxFps;
+  /** Without a shared watcher: whether this view's own watch is on the server (a rate change is said only then). */
+  let watched = false;
+  const watch = () => {
+    if (watcher) watcher.rewatch(agentId);
+    else {
+      watched = true;
+      options.send(browserWatchFrame(agentId, browserFps(fps)));
+    }
+  };
   /** `browser.watch` again after a backoff (a repeated watch restarts the view on the server). */
   const retryLater = () => {
     clearRetry();
@@ -316,7 +340,7 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
       closed = false;
       attempt = 0;
       if (!watcher) watch();
-      else if (!release) release = watcher.acquire(agentId);
+      else if (!release) release = watcher.acquire(agentId, fps);
     },
     resume() {
       if (closed) return;
@@ -404,9 +428,19 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
       if (hover) hoverSoon();
       return true;
     },
+    setMaxFps(next) {
+      if (next === fps) return;
+      const before = browserFps(fps);
+      fps = next;
+      if (closed) return;
+      if (release) release.setMaxFps(next);
+      else if (!watcher && watched && browserFps(next) !== before)
+        options.send({ type: "browser.fps", agentId, maxFps: browserFps(next) });
+    },
     close() {
       if (closed) return;
       closed = true;
+      watched = false;
       clearRetry();
       dropHover();
       if (flushTimer !== null) timers.clearTimeout(flushTimer);

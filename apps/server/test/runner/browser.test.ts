@@ -10,6 +10,7 @@ import {
   browserSetupOf,
   CHROME_FAILURES,
   chromeFailureKind,
+  decodeBrowserFrame,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
   parseRunnerFrame,
@@ -30,6 +31,7 @@ import {
   CHROME_ARGS,
   ChromeStartError,
   captureMarks,
+  captureTime,
   chromeCandidates,
   chromeLaunchArgs,
   chromeUserAgent,
@@ -50,6 +52,7 @@ import {
   type StreamSocket,
   selectFieldScript,
 } from "../../runner/browser";
+import { BrowserViews } from "../../runner/browser-views";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
 import { handleSecret, secretValue } from "../../runner/secrets";
@@ -2146,7 +2149,8 @@ test.if(posix)("the stream relays frames with the page's URL, changes mode, and 
   await t.act("open", ["https://shop.example.com"]);
   expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
   const socket = t.sockets[0] as FakeSocket;
-  expect(socket.url).toBe("ws://127.0.0.1:41234/?maxFps=5");
+  // One frame at a time, each once the last is acknowledged (ADR 0040 §7.1).
+  expect(socket.url).toBe("ws://127.0.0.1:41234/?pacing=ack&maxFps=5");
   socket.push({ type: "url", url: "https://shop.example.com/cart" });
   socket.push({
     type: "frame",
@@ -2161,12 +2165,23 @@ test.if(posix)("the stream relays frames with the page's URL, changes mode, and 
       agentId: dev.id,
       seq: 7,
       data: "/9j/AAA",
-      metadata: { deviceWidth: 1280, deviceHeight: 720, pageScaleFactor: 1, url: "https://shop.example.com/cart" },
+      metadata: {
+        deviceWidth: 1280,
+        deviceHeight: 720,
+        pageScaleFactor: 1,
+        capturedAt: expect.any(Number),
+        url: "https://shop.example.com/cart",
+      },
     },
   ]);
   expect(await t.manager.streamStart(dev, "control")).toEqual({ mode: "control" });
   expect(t.sockets).toHaveLength(1);
-  expect(socket.sent).toEqual([{ type: "config", maxFps: 15 }]);
+  // Each frame acknowledged, the one dropped too (nothing comes after it until it is).
+  expect(socket.sent).toEqual([
+    { type: "ack", seq: 7 },
+    { type: "ack", seq: 8 },
+    { type: "config", pacing: "ack", maxFps: 15 },
+  ]);
   expect(await t.manager.streamStop(dev)).toEqual({ stopped: true });
   expect(socket.closed).toBe(true);
   expect(t.frames.at(-1)).toEqual({ type: "browser.stream.ended", agentId: dev.id, reason: "stopped" });
@@ -2216,7 +2231,13 @@ test.if(posix)(
       agentId: dev.id,
       seq: 0,
       data: expect.stringMatching(/^\/9j\//), // the JPEG the fake writes for a .jpg
-      metadata: { deviceWidth: 1280, deviceHeight: 720, url: "https://shop.example.com/", title: "Loja" },
+      metadata: {
+        deviceWidth: 1280,
+        deviceHeight: 720,
+        capturedAt: expect.any(Number),
+        url: "https://shop.example.com/",
+        title: "Loja",
+      },
     });
     const shot = t.logged().find((c) => c.args.includes("screenshot"));
     expect(shot?.args.slice(-6)).toEqual([
@@ -2237,7 +2258,12 @@ test.if(posix)(
       agentId: dev.id,
       seq: 3,
       data: "/9j/B",
-      metadata: { deviceWidth: 1280, deviceHeight: 720, url: "https://shop.example.com/cart" },
+      metadata: {
+        deviceWidth: 1280,
+        deviceHeight: 720,
+        capturedAt: expect.any(Number),
+        url: "https://shop.example.com/cart",
+      },
     });
     await t.manager.streamStop(dev);
   },
@@ -2284,7 +2310,7 @@ test.if(posix)("two starts at once open one socket; a stop sent meanwhile closes
   expect(a).toEqual({ mode: "watch" });
   expect(b).toEqual({ mode: "control" });
   expect(t.sockets).toHaveLength(1);
-  expect((t.sockets[0] as FakeSocket).sent).toEqual([{ type: "config", maxFps: 15 }]);
+  expect((t.sockets[0] as FakeSocket).sent).toEqual([{ type: "config", pacing: "ack", maxFps: 15 }]);
   await t.manager.streamStop(dev);
   const opening = t.manager.streamStart(dev, "watch");
   const stopped = t.manager.streamStop(dev);
@@ -2306,6 +2332,138 @@ test.if(posix)("a stream that closes on the machine says so; one dropped with th
   expect((t.sockets[1] as FakeSocket).closed).toBe(true);
   expect(t.frames).toHaveLength(count);
 });
+
+test("a frame's capture time: epoch seconds as CDP gives it, or milliseconds; never another clock", () => {
+  expect(captureTime(1_762_300_000.25)).toBe(1_762_300_000_250);
+  expect(captureTime(1_762_300_000_250)).toBe(1_762_300_000_250);
+  // Seconds since the browser started, or nothing usable.
+  expect(captureTime(12_345.6)).toBeNull();
+  expect(captureTime(undefined)).toBeNull();
+  expect(captureTime("1762300000")).toBeNull();
+  expect(captureTime(Number.NaN)).toBeNull();
+  expect(captureTime(-1)).toBeNull();
+});
+
+test.if(posix)(
+  "pacing: agent-browser's next frame comes once there is room for it; a start or a skipped frame never hold it",
+  async () => {
+    let room = true;
+    const t = setup({ frameRoom: () => room, sourceAckMs: 60_000 });
+    await t.act("open", ["https://shop.example.com"]);
+    await t.manager.streamStart(dev, "watch");
+    const socket = t.sockets[0] as FakeSocket;
+    const acks = () => socket.sent.filter((m) => m.type === "ack").map((m) => m.seq);
+    const size = { deviceWidth: 1280, deviceHeight: 720 };
+    const frame = (seq: number, metadata: Record<string, unknown> = {}) =>
+      socket.push({ type: "frame", seq, data: "/9j/A", metadata: { ...size, ...metadata } });
+    frame(1);
+    expect(acks()).toEqual([1]);
+    // No room: acknowledged only when there is.
+    room = false;
+    frame(2);
+    expect(acks()).toEqual([1]);
+    t.manager.room("someone-else");
+    expect(acks()).toEqual([1]);
+    t.manager.room(dev.id);
+    expect(acks()).toEqual([1, 2]);
+    // Nothing waits: room says nothing more.
+    t.manager.room(dev.id);
+    expect(acks()).toEqual([1, 2]);
+    // A start again (the server's new view, or none) never leaves a frame waiting.
+    frame(3);
+    expect(await t.manager.streamStart(dev, "control")).toEqual({ mode: "control" });
+    expect(acks()).toEqual([1, 2, 3]);
+    // A frame that isn't relayed is acknowledged all the same.
+    socket.push({ type: "frame", seq: 4, data: "/9j/A", metadata: {} });
+    expect(acks()).toEqual([1, 2, 3, 4]);
+    // Frames say when Chrome captured them.
+    frame(5, { timestamp: 1_762_300_000.5 });
+    const last = t.frames.at(-1);
+    expect(last?.type === "browser.frame" && last.metadata.capturedAt).toBe(1_762_300_000_500);
+    room = true;
+    t.manager.room(dev.id);
+    expect(acks()).toEqual([1, 2, 3, 4, 5]);
+    // A frame with no usable seq is acknowledged as the last one: the next frame still comes.
+    const relayed = t.frames.length;
+    socket.push({ type: "frame", data: "/9j/A", metadata: size });
+    expect(acks()).toEqual([1, 2, 3, 4, 5, 5]);
+    expect(t.frames).toHaveLength(relayed);
+    frame(6);
+    expect(acks()).toEqual([1, 2, 3, 4, 5, 5, 6]);
+    // A stream that ended owes nothing: no ack after its stop.
+    await t.manager.streamStop(dev);
+    t.manager.room(dev.id);
+    expect(acks()).toEqual([1, 2, 3, 4, 5, 5, 6]);
+  },
+);
+
+test.if(posix)("pacing: a frame whose room never comes is acknowledged after a while anyway", async () => {
+  const t = setup({ frameRoom: () => false, sourceAckMs: 5 });
+  await t.act("open", ["https://shop.example.com"]);
+  await t.manager.streamStart(dev, "watch");
+  const socket = t.sockets[0] as FakeSocket;
+  socket.push({ type: "frame", seq: 1, data: "/9j/A", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+  expect(socket.sent).toEqual([]);
+  await waitFor(() => socket.sent.length === 1);
+  expect(socket.sent).toEqual([{ type: "ack", seq: 1 }]);
+  await t.manager.streamStop(dev);
+});
+
+test.if(posix)(
+  "pacing with a live view: Chrome's next frame waits while the view's window is full, and never outlives the view",
+  async () => {
+    const server = { ack: () => {}, closed: () => {} };
+    const viewed: number[] = [];
+    const views = new BrowserViews({
+      window: 2,
+      dial: async () => ({
+        send: (bytes) => {
+          if (typeof bytes !== "string") viewed.push(decodeBrowserFrame(bytes)?.seq ?? -1);
+        },
+        close: () => server.closed(),
+        bufferedAmount: 0,
+        listen: (on) => {
+          server.ack = () => on.control?.({ type: "ack" });
+          server.closed = () => on.closed();
+        },
+      }),
+    });
+    // As the runner wires them: a viewed agent's frames go to its view, which says when it has room.
+    const t = setup({
+      send: (f) => {
+        if (f.type === "browser.frame") views.push(f);
+        return true;
+      },
+      frameRoom: (agentId) => views.room(agentId),
+      sourceAckMs: 60_000,
+    });
+    views.onRoom = (agentId) => t.manager.room(agentId);
+    await t.act("open", ["https://shop.example.com"]);
+    await t.manager.streamStart(dev, "watch");
+    await views.open(dev.id, "S".repeat(43));
+    const socket = t.sockets[0] as FakeSocket;
+    const acks = () => socket.sent.filter((m) => m.type === "ack").map((m) => m.seq);
+    const frame = (seq: number) =>
+      socket.push({ type: "frame", seq, data: "/9j/A", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+    frame(1);
+    expect(acks()).toEqual([1]);
+    // The window is full: Chrome sends nothing more until the server answers.
+    frame(2);
+    expect(viewed).toEqual([1, 2]);
+    expect(acks()).toEqual([1]);
+    server.ack();
+    expect(acks()).toEqual([1, 2]);
+    // The view ends: the frame waiting is acknowledged, and the next ones go as before.
+    frame(3);
+    expect(acks()).toEqual([1, 2]);
+    views.end(dev.id);
+    expect(acks()).toEqual([1, 2, 3]);
+    frame(4);
+    expect(acks()).toEqual([1, 2, 3, 4]);
+    expect(viewed).toEqual([1, 2, 3]);
+    await t.manager.streamStop(dev);
+  },
+);
 
 /** agent-browser's command relay on the stream port: records each command and answers like the daemon. */
 function fakeRelay(answer: (body: Record<string, unknown>) => Record<string, unknown> = () => ({ success: true })) {

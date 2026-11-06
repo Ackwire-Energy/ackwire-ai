@@ -131,6 +131,8 @@ export class WorkerLink {
   private nextGit = 0;
   onState: (state: WorkerState) => void = () => {};
   onDesktopTaken: () => void = () => {};
+  /** Root: the agent's live view has room for its browser's next frame, or (`view` false) it has none. */
+  onBrowserRoom: (agentId: string, view: boolean) => void = () => {};
   onSecretInstall: (id: string, agent: AgentScope, secret: ActivatedSecret) => void = () => {};
   /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
   onShow: (showId: string, agent: AgentScope) => void = () => {};
@@ -210,6 +212,9 @@ export class WorkerLink {
       }
       case "desktop.taken":
         this.onDesktopTaken();
+        return;
+      case "browser.room":
+        if (typeof f.agentId === "string") this.onBrowserRoom(f.agentId, f.view === true);
         return;
       case "upload.reply":
         if (typeof f.uploadId === "string") this.uploads.get(f.uploadId)?.(f as never);
@@ -501,6 +506,8 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const lease = () => {
     if (browser.onDesktopInUse(o.agentId)) link.browserOnDesktop();
   };
+  // Agents whose live view is root's (ADR 0040 §7.1): their stream's next frame waits for root's `browser.room`.
+  const viewed = new Set<string>();
   const browser = new BrowserManager({
     home,
     privateNetwork: () => state.privateNetwork === true,
@@ -513,6 +520,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
       : {}),
     log,
     send: (frame) => live?.send(frame) ?? false,
+    frameRoom: (agentId) => !viewed.has(agentId),
     secret: (agent, name) => secretValue(secretsDir, agent, name),
     desktops: {
       ensure: ensureDesktop("browser"),
@@ -538,6 +546,11 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     if (!peek) return { closed: await brains.reclaimIdle(spare) };
     const idle = brains.idleCandidate(spare);
     return idle ? { closed: false, idle } : { closed: false };
+  };
+  link.onBrowserRoom = (agentId, view) => {
+    if (view) viewed.add(agentId);
+    else viewed.delete(agentId);
+    browser.room(agentId);
   };
   link.onDesktopTaken = () => {
     desktopUse.stopInput(o.agentId);
@@ -622,6 +635,8 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     onState: (s) => {
       if (s === "online") return;
       browser.stopStreams();
+      // Root's views went with the session: the next one says again.
+      viewed.clear();
       browser.clearHandoffs();
     },
   });

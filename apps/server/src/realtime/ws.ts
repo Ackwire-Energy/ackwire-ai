@@ -17,14 +17,16 @@ import { and, type Database, eq, inArray, isNotNull, isNull, or, schema, sql } f
 import {
   activityAudience,
   announcePresence,
-  type BrowserFrame,
+  type BrowserFrameMessage,
   type BrowserLive,
+  browserFrameBase64,
   browserFrameBytes,
   closedRefusal,
   closesWorkspace,
   ForbiddenError,
   getMembership,
   isConnected,
+  type LiveWatch,
   NotFoundError,
   type OrgEvent,
   profileIdOfKey,
@@ -42,7 +44,11 @@ import {
   BROWSER_INPUT_PER_SECOND,
   type BrowserClientFrame,
   createViewerPacer,
+  FRAME_RENEW_MS,
   FRAME_TICKET_MS,
+  fpsInterval,
+  LEGACY_INTERVAL_MS,
+  MAX_FRAME_BACKLOG,
   MAX_WATCHED_BROWSERS,
   parseBrowserClientFrame,
   parseFrameSocketMessage,
@@ -113,6 +119,10 @@ export interface BrowserSocketData {
   browserPacers: Map<string, ViewerPacer>;
   /** Their frame sockets (`/api/browser/frames`), where the pictures go as bytes instead of on this socket. */
   frameSockets: Map<string, Bun.ServerWebSocket<FrameSocketData>>;
+  /** The live view's frames from this socket, numbered as they came (a watch awaits its checks, a rate doesn't). */
+  browserOrder: number;
+  /** Each agent's newest `browser.fps` and its number: a watch still in its checks when it came takes that rate. */
+  browserFps: Map<string, { maxFps: number; order: number }>;
 }
 
 /**
@@ -123,6 +133,11 @@ export interface FrameSocketData {
   kind: "browser.frames";
   owner: Bun.ServerWebSocket<BrowserSocketData>;
   agentId: string;
+  /**
+   * The window its acks count for: the view's ticket named it, and a watch again of the same agent on the same
+   * realtime socket points it to the new view's (the socket stays open across watches).
+   */
+  pacer: ViewerPacer;
   /** An idle page sends nothing: pings keep proxies from dropping the socket. */
   pinger?: ReturnType<typeof setInterval>;
 }
@@ -374,6 +389,49 @@ export function createRealtime(deps: RealtimeDeps) {
     string,
     { owner: BrowserSocket; agentId: string; pacer: ViewerPacer; expires: number }
   >();
+  /** Views that stream here and asked for a frame socket: only they get one again (`browser.frames.renew`). */
+  const frameViews = new WeakSet<ViewerPacer>();
+  /** When each view last got a ticket on `browser.frames.renew`. */
+  const renewedAt = new WeakMap<ViewerPacer, number>();
+
+  /** The view's frame socket, while it is open. */
+  const openFrameSocket = (ws: BrowserSocket, agentId: string) => {
+    const frames = ws.data.frameSockets.get(agentId);
+    return frames?.readyState === 1 ? frames : null;
+  };
+
+  /** The view's frame socket goes: the view ended for good (unwatched, refused, its realtime socket closed). */
+  const closeFrameSocket = (ws: BrowserSocket, agentId: string) => {
+    const frames = ws.data.frameSockets.get(agentId);
+    ws.data.frameSockets.delete(agentId);
+    frames?.close(1000, "the view ended");
+  };
+
+  /** A ticket for the view's frame socket; one that view had before stops working. */
+  function sendFrameTicket(ws: BrowserSocket, agentId: string, pacer: ViewerPacer) {
+    const ticket = randomBytes(24).toString("base64url");
+    const now = Date.now();
+    for (const [old, t] of frameTickets) {
+      if (t.expires <= now || (t.owner === ws && t.agentId === agentId)) frameTickets.delete(old);
+    }
+    frameTickets.set(ticket, { owner: ws, agentId, pacer, expires: now + FRAME_TICKET_MS });
+    send(ws, { type: "browser.frames", agentId, ticket });
+  }
+
+  /**
+   * `browser.frames.renew`: the view's frame socket closed (a network change, a proxy) while the view goes on. A new
+   * ticket for the same view, without watching again (which would restart it); one a second at most. Even while one
+   * still looks open here: a socket left half-open is only noticed at the idle timeout, and until then every picture
+   * would go into it. The client asks only once its own closed, and the new socket replaces the old (`open`).
+   */
+  function renewFrames(ws: BrowserSocket, agentId: string) {
+    const pacer = ws.data.browserPacers.get(agentId);
+    if (!pacer || !frameViews.has(pacer)) return;
+    const now = Date.now();
+    if (now - (renewedAt.get(pacer) ?? 0) < FRAME_RENEW_MS) return;
+    renewedAt.set(pacer, now);
+    sendFrameTicket(ws, agentId, pacer);
+  }
 
   /**
    * `GET /api/browser/frames?ticket=`: a watched browser's frame socket. The ticket is the whole check: only the
@@ -388,35 +446,60 @@ export function createRealtime(deps: RealtimeDeps) {
     if (owner.readyState !== 1 || owner.data.browserPacers.get(agentId) !== pacer) {
       return new Response("That view ended", { status: 410 });
     }
-    const data: FrameSocketData = { kind: "browser.frames", owner, agentId };
+    const data: FrameSocketData = { kind: "browser.frames", owner, agentId, pacer };
     return server.upgrade(req, { data }) ? undefined : new Response("WebSocket upgrade failed", { status: 400 });
   }
 
   const frameSocket = {
     open(socket: Bun.ServerWebSocket<FrameSocketData>) {
-      const { owner, agentId } = socket.data;
-      // The view ended while it opened.
-      if (owner.readyState !== 1 || !owner.data.browserPacers.has(agentId)) return socket.close(1000, "the view ended");
+      const { owner, agentId, pacer } = socket.data;
+      // The view ended, or a newer watch replaced it, while it opened.
+      if (owner.readyState !== 1 || owner.data.browserPacers.get(agentId) !== pacer) {
+        return socket.close(1000, "the view ended");
+      }
       const old = owner.data.frameSockets.get(agentId);
       owner.data.frameSockets.set(agentId, socket);
-      old?.close(1000, "replaced");
       socket.data.pinger = setInterval(() => socket.ping(), STREAM_LIMITS.pingMs);
+      if (old) {
+        old.close(1000, "replaced");
+        // The frames on their way there are never acked here: the window starts again.
+        pacer.reset();
+      }
     },
     message(socket: Bun.ServerWebSocket<FrameSocketData>, raw: string | Buffer) {
       const { owner, agentId } = socket.data;
       if (owner.data.frameSockets.get(agentId) !== socket) return;
-      if (parseFrameSocketMessage(raw)?.type === "ack") owner.data.browserPacers.get(agentId)?.ack();
+      // Its own view's window: after a watch again, the new view's.
+      if (parseFrameSocketMessage(raw)?.type === "ack") socket.data.pacer.ack();
     },
     close(socket: Bun.ServerWebSocket<FrameSocketData>) {
       clearInterval(socket.data.pinger);
       const { owner, agentId } = socket.data;
-      // Its pictures go on the realtime socket again, in the same window.
-      if (owner.data.frameSockets.get(agentId) === socket) owner.data.frameSockets.delete(agentId);
+      if (owner.data.frameSockets.get(agentId) !== socket) return;
+      owner.data.frameSockets.delete(agentId);
+      // Its pictures go on the realtime socket again; the ones it never acked don't hold the window shut.
+      socket.data.pacer.reset();
     },
   };
 
-  /** An agent's browser on this socket (ADR 0040): watch, stop watching, a person's input. */
-  async function browserMessage(ws: BrowserSocket, frame: BrowserClientFrame): Promise<void> {
+  /** Rates (`browser.fps`) one socket keeps for watches still starting: a few more than the browsers it may watch. */
+  const MAX_KEPT_RATES = MAX_WATCHED_BROWSERS * 4;
+
+  /**
+   * `browser.fps`: the view's rate, changed at once. Kept with its number too: a watch of the same agent that came
+   * before it may still be in its checks (they await), and creates its window after this; it takes this rate then.
+   */
+  function browserRate(ws: BrowserSocket, agentId: string, maxFps: number, order: number) {
+    const rates = ws.data.browserFps;
+    if (rates.has(agentId) || rates.size < MAX_KEPT_RATES) rates.set(agentId, { maxFps, order });
+    ws.data.browserPacers.get(agentId)?.setMinInterval(fpsInterval(maxFps));
+  }
+
+  /**
+   * An agent's browser on this socket (ADR 0040): watch, stop watching. `order`: the frame's number on this socket,
+   * given as it came, before any check awaited.
+   */
+  async function browserMessage(ws: BrowserSocket, frame: BrowserClientFrame, order: number): Promise<void> {
     const live = deps.browserLive;
     if (!live) return;
     const { agentId } = frame;
@@ -424,8 +507,13 @@ export function createRealtime(deps: RealtimeDeps) {
     if (frame.type === "browser.unwatch") {
       ws.data.browsers.get(agentId)?.();
       ws.data.browsers.delete(agentId);
+      // Its rate goes too, unless one came after the unwatch (for a watch again behind it).
+      if ((ws.data.browserFps.get(agentId)?.order ?? order) < order) ws.data.browserFps.delete(agentId);
+      // Unwatched for good: its frame socket goes too (a watch again keeps it).
+      closeFrameSocket(ws, agentId);
       return;
     }
+    if (frame.type !== "browser.watch") return;
     const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
     if (!limit.allowed) return send(ws, { type: "error", code: "rate_limited", agentId });
     const previous = ws.data.browsers.get(agentId);
@@ -444,40 +532,86 @@ export function createRealtime(deps: RealtimeDeps) {
     const starting = () => {};
     startingBrowsers.add(starting);
     ws.data.browsers.set(agentId, starting);
-    let stop: () => void;
-    // Before the watch: it sends the status and the newest frame at once.
+    // A client that answers frames (`acks`): a window, its own rate, and a frame socket when it asks for one.
+    const paced = frame.acks === true;
+    /** Where the pictures go is backed up past `MAX_FRAME_BACKLOG` (a slow phone link, a client that never reads). */
+    const backedUp = () => (openFrameSocket(ws, agentId) ?? ws).getBufferedAmount() > MAX_FRAME_BACKLOG;
+    const deliver = (message: { type: string }): boolean => {
+      if (ws.readyState !== 1) return false;
+      if (message.type !== "browser.frame") {
+        send(ws, message);
+        return true;
+      }
+      // The same frame object every viewer got (ADR 0040 §7.1): its bytes and base64 are made once, for all of them.
+      const picture = message as BrowserFrameMessage;
+      const frames = paced ? openFrameSocket(ws, agentId) : null;
+      // Bun's send answers 0 when it dropped the message (closing, or past its own limit): sent nothing, so it takes
+      // no room in the window, which no ack would ever free. -1 is queued: on its way.
+      if (frames) {
+        // Backed up (a client that acks what it never read): skipped, the newest goes next.
+        if (frames.getBufferedAmount() > MAX_FRAME_BACKLOG) return false;
+        return frames.send(browserFrameBytes(picture)) !== 0;
+      }
+      // This socket takes it as base64, never with the bytes; `ack`: answer it once drawn.
+      const { bytes: _bytes, jpeg: _jpeg, data: _data, ...rest } = picture;
+      const json = { ...rest, data: browserFrameBase64(picture), ...(paced ? { ack: true } : {}) };
+      return ws.send(JSON.stringify(json)) !== 0;
+    };
+    // Before the watch: it sends the status and the newest frame at once. Apps that answer no frames get what they
+    // always got: the newest frame once a second while watching, the stream's own rate while this person drives it.
+    const legacyPacer = (inner: ViewerPacer): ViewerPacer => ({
+      ...inner,
+      send(message) {
+        if (message.type === "browser.status") {
+          const status = message as { mode?: unknown; controllerUserId?: unknown; hidden?: unknown };
+          const driving = status.mode === "control" && status.controllerUserId === user.id && status.hidden !== true;
+          inner.setMinInterval(driving ? 0 : LEGACY_INTERVAL_MS);
+        }
+        inner.send(message);
+      },
+    });
     ws.data.browserPacers.get(agentId)?.close();
-    const deliver = (message: { type: string }) => {
-      if (ws.readyState !== 1) return;
-      if (message.type !== "browser.frame") return send(ws, message);
-      const picture = message as { type: "browser.frame" } & BrowserFrame;
-      // Its own socket takes the picture as bytes; this one only as base64, never with the bytes.
+    // A `browser.fps` that came after this watch, while its checks awaited, is the rate the client wants now.
+    const rate = ws.data.browserFps.get(agentId);
+    const maxFps = rate && rate.order > order ? rate.maxFps : frame.maxFps;
+    const pacer = paced
+      ? createViewerPacer(deliver, {
+          minIntervalMs: maxFps ? fpsInterval(maxFps) : 0,
+          onRoom: () => live.viewerReady(agentId),
+        })
+      : legacyPacer(
+          createViewerPacer(deliver, { window: Number.POSITIVE_INFINITY, minIntervalMs: LEGACY_INTERVAL_MS }),
+        );
+    if (paced) {
+      ws.data.browserPacers.set(agentId, pacer);
+      // A frame socket open from an earlier watch stays: its acks count for this view now.
       const frames = ws.data.frameSockets.get(agentId);
-      if (frames?.readyState === 1) return void frames.send(browserFrameBytes(picture));
-      const { bytes: _, ...json } = picture;
-      send(ws, json);
-    };
-    const watching = frame.type === "browser.watch" ? frame : null;
-    const pacer = watching?.acks ? createViewerPacer(deliver) : null;
-    if (pacer) ws.data.browserPacers.set(agentId, pacer);
-    else ws.data.browserPacers.delete(agentId);
+      if (frames) frames.data.pacer = pacer;
+    } else {
+      ws.data.browserPacers.delete(agentId);
+      // Nobody answers frames there any more.
+      closeFrameSocket(ws, agentId);
+    }
     const ended = () => {
-      pacer?.close();
+      pacer.close();
       if (ws.data.browserPacers.get(agentId) === pacer) ws.data.browserPacers.delete(agentId);
-      const frames = ws.data.frameSockets.get(agentId);
-      ws.data.frameSockets.delete(agentId);
-      frames?.close(1000, "the view ended");
     };
+    let watch: LiveWatch;
     try {
       const profileId = profileIdOfKey(agentId);
       if (profileId) await requireProfileWatcher(deps.db, user.id, orgId, profileId);
       else await requireBrowserAccess(deps.db, user.id, orgId, agentId);
-      stop = await live.watch(
+      watch = await live.watch(
         {
           userId: user.id,
-          send: pacer ? (message) => pacer.send(message) : deliver,
-          // Backed up (a slow phone link): skip frames, the next one sent is the newest.
-          busy: () => ws.getBufferedAmount() > 1024 * 1024,
+          send: (message) => pacer.send(message),
+          // Backed up (a slow phone link): skip frames, the next one sent is the newest. Its frame socket when it
+          // has one: that is where the pictures go.
+          busy: backedUp,
+          // The computer sends the next frame only while some viewer has room for it (ADR 0040 §7.1); a backed-up
+          // socket has none, it would skip the frame. Nothing tells when it drains: the owed ack goes within
+          // `BROWSER_VIEW.ackOwedMs` anyway.
+          ...(paced ? { room: () => pacer.room() && !backedUp() } : {}),
         },
         orgId,
         agentId,
@@ -486,28 +620,29 @@ export function createRealtime(deps: RealtimeDeps) {
       ended();
       startingBrowsers.delete(starting);
       // Whatever failed, the placeholder goes: a later `browser.watch` tries again.
-      if (ws.data.browsers.get(agentId) === starting) ws.data.browsers.delete(agentId);
+      if (ws.data.browsers.get(agentId) === starting) {
+        ws.data.browsers.delete(agentId);
+        // Refused or failed: no socket of its own stays open for it.
+        closeFrameSocket(ws, agentId);
+      }
       const code = error instanceof NotFoundError ? "not_found" : error instanceof ForbiddenError ? "forbidden" : "";
       if (code) return send(ws, { type: "error", code, agentId });
       return send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: "try again" });
     }
     startingBrowsers.delete(starting);
-    const watched = stop;
-    stop = () => {
-      watched();
+    const { stop: unwatch, streaming } = watch;
+    const stop = () => {
+      unwatch();
       ended();
     };
-    // Closed or unwatched while it was starting: stop at once.
+    // Closed or unwatched while it was starting: stop at once (an unwatch closed its frame socket).
     if (ws.readyState !== 1 || ws.data.browsers.get(agentId) !== starting) return stop();
     ws.data.browsers.set(agentId, stop);
-    // A client that answers frames takes them on a socket of their own (ADR 0040 §7.1), opened with this ticket.
-    if (pacer && watching?.frames) {
-      const ticket = randomBytes(24).toString("base64url");
-      const now = Date.now();
-      for (const [old, t] of frameTickets) if (t.expires <= now) frameTickets.delete(old);
-      frameTickets.set(ticket, { owner: ws, agentId, pacer, expires: now + FRAME_TICKET_MS });
-      send(ws, { type: "browser.frames", agentId, ticket });
-    }
+    // A client that answers frames takes them on a socket of their own (ADR 0040 §7.1), opened with a ticket: only
+    // while its frames come to this server, and only when none is open for this view already.
+    if (!paced || !frame.frames || !streaming) return;
+    frameViews.add(pacer);
+    if (!openFrameSocket(ws, agentId)) sendFrameTicket(ws, agentId, pacer);
   }
 
   const realtime = {
@@ -555,6 +690,8 @@ export function createRealtime(deps: RealtimeDeps) {
         browsers: new Map(),
         browserPacers: new Map(),
         frameSockets: new Map(),
+        browserOrder: 0,
+        browserFps: new Map(),
       };
       return server.upgrade(req, { data }) ? undefined : new Response("WebSocket upgrade failed", { status: 400 });
     },
@@ -653,12 +790,19 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isStream(socket)) return deps.streams?.message(socket, raw);
         const ws = socket as BrowserSocket;
         const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
+        // Numbered as it came, before anything awaits: a rate sent after a watch must win over it (`browserRate`).
+        const order = browserFrame ? ++ws.data.browserOrder : 0;
         if (browserFrame?.type === "browser.input") return browserInput(ws, browserFrame);
         // A frame drawn: nothing to check, it only lets the next frame of a view this socket already has go.
         if (browserFrame?.type === "browser.ack") return void ws.data.browserPacers.get(browserFrame.agentId)?.ack();
+        // A view this socket has or is starting, at another rate (a card opened or closed): nothing to check either.
+        if (browserFrame?.type === "browser.fps") {
+          return browserRate(ws, browserFrame.agentId, browserFrame.maxFps, order);
+        }
         if (!(await liveSession(ws))) return;
+        if (browserFrame?.type === "browser.frames.renew") return renewFrames(ws, browserFrame.agentId);
         if (browserFrame) {
-          return browserMessage(ws, browserFrame).catch(() => {
+          return browserMessage(ws, browserFrame, order).catch(() => {
             if (ws.readyState === 1) {
               send(ws, { type: "browser.unavailable", agentId: browserFrame.agentId, reason: "unavailable" });
             }
@@ -737,6 +881,8 @@ export function createRealtime(deps: RealtimeDeps) {
         ws.data.subscriptions.clear();
         for (const stop of ws.data.browsers.values()) stop();
         ws.data.browsers.clear();
+        for (const agentId of [...ws.data.frameSockets.keys()]) closeFrameSocket(ws, agentId);
+        ws.data.browserFps.clear();
         for (const off of ws.data.system) off();
         ws.data.system = [];
         await deps.presence.disconnect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);

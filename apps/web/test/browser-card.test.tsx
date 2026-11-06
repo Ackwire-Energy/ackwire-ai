@@ -804,8 +804,19 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     await act(async () =>
       socket.push({ type: "browser.status", agentId: ADA_ID, mode: "watch", controllerUserId: null, handoff: null }),
     );
-    await act(async () => socket.push(page()));
+    // A server that paces the view asks for answers (`ack: true`): it takes rate changes too.
+    await act(async () => socket.push({ ...page(), ack: true }));
     expect(card.querySelector(".brw-dim")).toBeNull();
+    // In the conversation and full screen alike the page gets the stream's own rate (ADR 0040 §7.1): no limit asked,
+    // and going full screen changes nothing, never a new watch, which would restart the view.
+    const asked = socket.sent.filter((f) => (f as { type: string }).type === "browser.watch");
+    expect(asked.every((f) => (f as { maxFps?: number }).maxFps === undefined)).toBe(true);
+    const watched = watches(socket);
+    const rates = () => socket.sent.filter((f) => (f as { type: string }).type === "browser.fps");
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tela cheia" })));
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Sair da tela cheia" })));
+    expect(rates()).toHaveLength(0);
+    expect(watches(socket)).toBe(watched);
     // Closed, nothing waiting: the cover says so plainly, and the logins sentence once, not under the title too.
     await act(async () => socket.push({ type: "browser.unavailable", agentId: ADA_ID, reason: "closed" }));
     expect(cover()).toContain("O navegador da Ada está fechado.");

@@ -23,9 +23,14 @@ import { steerStore } from "./steer";
  * - watches agents' browsers with `acks` and `frames` (ADR 0040 §7.1): each watched browser's pictures come as
  *   bytes on a frame socket of their own (`/api/browser/frames`, opened with the ticket `browser.frames` brings),
  *   so a picture never holds up a message; each one is answered once it could be drawn (after the next animation
- *   frame), and the server keeps only a couple on their way, so a slow link or a busy page shows the newest
+ *   frame), and the server keeps only a few on their way, so a slow link or a busy page shows the newest
  *   picture instead of a backlog. Until that socket is open, or after it closed, they come here as base64 and are
- *   answered with `browser.ack`.
+ *   answered with `browser.ack` (only those the server marks `ack: true`: an older server knows no acks, nor
+ *   `browser.fps`, which waits until the server shows it paces). A frame socket that closes on its own while the
+ *   browser is still watched is asked for again (`browser.frames.renew`, with backoff); it stays open across watches
+ *   of the same agent and goes with the unwatch. Without
+ *   `browserFrameSockets` (the phone: its binary messages cost more on the JS thread than base64 does) the pictures
+ *   stay on this socket, answered all the same.
  */
 
 export type ServerFrame =
@@ -42,6 +47,8 @@ export type ServerFrame =
 
 /** A watched browser's frame socket (ADR 0040 §7.1): opened with a ticket from `browser.frames`. */
 export const BROWSER_FRAMES_PATH = "/api/browser/frames";
+/** The waits before asking again for a frame socket that closed on its own; a frame that comes starts them over. */
+export const BROWSER_FRAMES_RENEW_MS = [1000, 2000, 4000];
 
 export type ConnectionStatus = "idle" | "connecting" | "open" | "reconnecting" | "closed";
 
@@ -110,6 +117,13 @@ function originOf(base: string): { protocol: string; host: string } {
   return { protocol: (m[1] as string).toLowerCase(), host: m[2] as string };
 }
 
+/** A frame socket's binary message as bytes over an `ArrayBuffer`; null for anything else. */
+function frameBytesOf(data: unknown): ArrayBuffer | Uint8Array<ArrayBuffer> | null {
+  if (data instanceof ArrayBuffer) return data;
+  if (data instanceof Uint8Array && data.buffer instanceof ArrayBuffer) return data as Uint8Array<ArrayBuffer>;
+  return null;
+}
+
 /** Parses a server frame; `null` for anything we don't understand (ignored). */
 export function parseServerFrame(data: unknown): ServerFrame | null {
   if (typeof data !== "string") return null;
@@ -135,6 +149,21 @@ export class RealtimeConnection {
   private readonly browserListeners = new Set<(frame: Record<string, unknown>) => void>();
   /** Each watched browser's frame socket, by agent. */
   private readonly frameSockets = new Map<string, SocketLike>();
+  /**
+   * The `seq` of the last frame each agent's frame socket brought: a frame of theirs here that is no newer (sent
+   * before the switch) is answered but not drawn over it; a newer one (the server went back to this socket first) is
+   * drawn. Forgotten when that socket goes or the view starts again (its numbers may start over).
+   */
+  private readonly lastBytesSeq = new Map<string, number>();
+  /** Asking again for a frame socket that closed on its own: the pending ask and how many were made since a frame. */
+  private readonly renewals = new Map<string, { timer: unknown; attempt: number }>();
+  /**
+   * Whether the server on this socket paces views (a frame with `ack: true`, a frame socket's ticket): only such a
+   * server knows `browser.fps`; an older one would count each as a bad message.
+   */
+  private serverPaces = false;
+  /** The rate each agent's views need, held until the server shows it paces (the watch already said the one before). */
+  private readonly pendingFps = new Map<string, number>();
   private readonly browserWatches = createBrowserWatches({
     send: (frame) => this.sendBrowserFrame(frame),
     timers: {
@@ -164,6 +193,12 @@ export class RealtimeConnection {
       /** How long after a ping with nothing heard back the socket counts as dead and is replaced. */
       pongTimeoutMs?: number;
       backoffMs?: number[];
+      /**
+       * Watched browsers' pictures as bytes on a frame socket each (ADR 0040 §7.1); default true. The phone says no:
+       * React Native hands binary messages to JS as base64 decoded in JS, and its image view takes the server's
+       * base64 as it is.
+       */
+      browserFrameSockets?: boolean;
     },
   ) {}
 
@@ -181,6 +216,7 @@ export class RealtimeConnection {
     this.stopped = true;
     this.clearTimers();
     this.closeFrameSockets();
+    this.forgetPacing();
     const socket = this.socket;
     this.socket = null;
     if (socket) {
@@ -274,12 +310,53 @@ export class RealtimeConnection {
     return this.browserWatches;
   }
 
-  /** Sends a live-view frame (`browser.watch`, `browser.unwatch`, `browser.input`); dropped while not connected. */
+  /** Whether watched browsers' pictures come on frame sockets of their own. */
+  private get frameSocketsOn() {
+    return this.options.browserFrameSockets !== false;
+  }
+
+  /**
+   * Sends a live-view frame (`browser.watch`, `browser.fps`, `browser.unwatch`, `browser.input`); dropped while not
+   * connected. `browser.fps` waits until the server shows it paces views (`markPacing`), the last one per agent.
+   */
   sendBrowserFrame(frame: { type: `browser.${string}`; agentId: string; [key: string]: unknown }) {
-    // Every watch from this socket answers frames and takes them on their own socket: `handle` does both, for
-    // every view of that agent at once. A view that goes takes its frame socket with it.
-    if (frame.type === "browser.unwatch") this.closeFrameSocket(frame.agentId);
-    this.send(frame.type === "browser.watch" ? { ...frame, acks: true, frames: true } : frame);
+    const { agentId } = frame;
+    // Every watch from this socket answers frames, and takes them on their own socket where it may: `handle` does
+    // both, for every view of that agent at once. A view that goes takes its frame socket with it.
+    if (frame.type === "browser.unwatch") {
+      this.closeFrameSocket(agentId);
+      this.pendingFps.delete(agentId);
+    }
+    if (frame.type === "browser.watch") {
+      // The server starts the view again and sends its newest page on whichever path is open: what comes next is
+      // drawn, from either. A frame socket still open stays (the server keeps it across watches); a renewal waiting
+      // still goes unless this watch's ticket opened one first, and renewals count from the first wait again. The
+      // watch says the rate the views need now.
+      this.lastBytesSeq.delete(agentId);
+      this.pendingFps.delete(agentId);
+      this.restartRenewals(agentId);
+      this.send({ ...frame, acks: true, ...(this.frameSocketsOn ? { frames: true } : {}) });
+      return;
+    }
+    if (frame.type === "browser.fps" && !this.serverPaces) {
+      if (typeof frame.maxFps === "number") this.pendingFps.set(agentId, frame.maxFps);
+      return;
+    }
+    this.send(frame);
+  }
+
+  /** The server showed it paces views: the rates held for it go now. */
+  private markPacing() {
+    if (this.serverPaces) return;
+    this.serverPaces = true;
+    for (const [agentId, maxFps] of this.pendingFps) this.send({ type: "browser.fps", agentId, maxFps });
+    this.pendingFps.clear();
+  }
+
+  /** A new socket may reach another server (a deploy, an older replica): it shows again whether it paces. */
+  private forgetPacing() {
+    this.serverPaces = false;
+    this.pendingFps.clear();
   }
 
   /** Runs `fn` once the views could draw what they just got (a hidden tab draws nothing, so it runs late). */
@@ -289,30 +366,37 @@ export class RealtimeConnection {
     else fn();
   }
 
-  /** A frame from the realtime socket went to the views: answered here once they could draw it. */
-  private ackBrowserFrame(agentId: string, seq: unknown) {
-    this.afterDraw(() => this.send({ type: "browser.ack", agentId, ...(typeof seq === "number" ? { seq } : {}) }));
+  /** A frame from the realtime socket that asks for an answer (`ack: true`): answered once the views could draw it. */
+  private ackBrowserFrame(agentId: string, seq: unknown, now = false) {
+    const ack = () => this.send({ type: "browser.ack", agentId, ...(typeof seq === "number" ? { seq } : {}) });
+    if (now) ack();
+    else this.afterDraw(ack);
   }
 
   /**
    * `browser.frames`: the ticket for a watched browser's frame socket. Its bytes go to the views as frames with
-   * `jpeg`, each answered there once drawn. A new ticket (the view started again) replaces the socket.
+   * `jpeg`, each answered there once drawn. A new ticket (the server lost the old socket) replaces the socket.
    */
   private openFrameSocket(agentId: string, ticket: string) {
-    this.closeFrameSocket(agentId);
+    // A renewal's count stays: a ticket whose socket closes before any frame comes doesn't start the waits over.
+    this.dropFrameSocket(agentId);
     let socket: SocketLike;
     try {
       socket = this.options.createSocket(framesUrl(this.options.url, ticket));
     } catch {
+      this.renewFrameSocket(agentId);
       return;
     }
     (socket as { binaryType?: string }).binaryType = "arraybuffer";
     this.frameSockets.set(agentId, socket);
     socket.onmessage = (ev) => {
       if (this.frameSockets.get(agentId) !== socket) return;
-      const data = ev.data;
-      const decoded = data instanceof ArrayBuffer || data instanceof Uint8Array ? decodeBrowserFrameBytes(data) : null;
+      const bytes = frameBytesOf(ev.data);
+      const decoded = bytes ? decodeBrowserFrameBytes(bytes) : null;
       if (!decoded) return;
+      // It works: a later close asks again from the shortest wait.
+      this.stopRenewal(agentId);
+      this.lastBytesSeq.set(agentId, decoded.seq);
       const frame = { type: "browser.frame", agentId, ...decoded };
       for (const l of this.browserListeners) l(frame);
       this.afterDraw(() => {
@@ -322,13 +406,65 @@ export class RealtimeConnection {
     socket.onerror = () => {
       // `onclose` follows.
     };
-    // Its frames come on the realtime socket again meanwhile; the next watch brings a new ticket.
+    // Its frames come on the realtime socket again meanwhile (drawn from now on), and a new socket is asked for
+    // while the browser is still watched.
     socket.onclose = () => {
-      if (this.frameSockets.get(agentId) === socket) this.frameSockets.delete(agentId);
+      if (this.frameSockets.get(agentId) !== socket) return;
+      this.frameSockets.delete(agentId);
+      this.lastBytesSeq.delete(agentId);
+      this.renewFrameSocket(agentId);
     };
   }
 
+  /**
+   * A frame socket closed on its own (a proxy's restart, a network change): while its browser is still watched, a
+   * new ticket for the same view (`browser.frames.renew`, never a new watch: that would restart the view), after
+   * 1 s, 2 s, 4 s, then no more until a frame comes or the view starts again (`browser.watch`: `restartRenewals`);
+   * it stays on this socket meanwhile.
+   */
+  private renewFrameSocket(agentId: string) {
+    const prev = this.renewals.get(agentId);
+    if (prev && prev.timer !== null) return;
+    const attempt = prev?.attempt ?? 0;
+    const wait = BROWSER_FRAMES_RENEW_MS[attempt];
+    if (wait === undefined || !this.browserWatches.watching().includes(agentId)) return;
+    const entry = { attempt: attempt + 1, timer: null as unknown };
+    entry.timer = this.timers.setTimeout(() => {
+      entry.timer = null;
+      if (this.frameSockets.has(agentId) || !this.browserWatches.watching().includes(agentId)) return;
+      this.send({ type: "browser.frames.renew", agentId });
+    }, wait);
+    this.renewals.set(agentId, entry);
+  }
+
+  /** Cancels a pending renewal and starts the waits over (a frame came, the view went). */
+  private stopRenewal(agentId: string) {
+    const entry = this.renewals.get(agentId);
+    if (!entry) return;
+    if (entry.timer !== null) this.timers.clearTimeout(entry.timer);
+    this.renewals.delete(agentId);
+  }
+
+  /**
+   * The view starts again (`browser.watch`): the next frame socket that closes before a frame came is asked for
+   * from the first wait. A renewal already waiting still goes, as the first of the new count.
+   */
+  private restartRenewals(agentId: string) {
+    const entry = this.renewals.get(agentId);
+    if (!entry) return;
+    if (entry.timer === null) this.renewals.delete(agentId);
+    else entry.attempt = 1;
+  }
+
+  /** The view goes (unwatched, the socket lost): its frame socket, and any renewal, with it. */
   private closeFrameSocket(agentId: string) {
+    this.stopRenewal(agentId);
+    this.dropFrameSocket(agentId);
+  }
+
+  /** Closes this agent's frame socket, if any: its frames come here from now on, and are drawn. */
+  private dropFrameSocket(agentId: string) {
+    this.lastBytesSeq.delete(agentId);
     const socket = this.frameSockets.get(agentId);
     if (!socket) return;
     this.frameSockets.delete(agentId);
@@ -340,7 +476,8 @@ export class RealtimeConnection {
   }
 
   private closeFrameSockets() {
-    for (const agentId of [...this.frameSockets.keys()]) this.closeFrameSocket(agentId);
+    const agents = new Set([...this.frameSockets.keys(), ...this.renewals.keys(), ...this.lastBytesSeq.keys()]);
+    for (const agentId of agents) this.closeFrameSocket(agentId);
   }
 
   /**
@@ -416,6 +553,7 @@ export class RealtimeConnection {
     this.clearTimers();
     // The server forgot this socket's views: their frame sockets go, and the watches made again bring new ones.
     this.closeFrameSockets();
+    this.forgetPacing();
     if (!this.stopped) this.scheduleReconnect();
   }
 
@@ -424,13 +562,27 @@ export class RealtimeConnection {
     if (frame.type.startsWith("browser.") || (frame.type === "error" && typeof frame.agentId === "string")) {
       if (frame.type === "browser.frames" && typeof frame.agentId === "string") {
         const ticket = (frame as { ticket?: unknown }).ticket;
-        if (typeof ticket === "string") this.openFrameSocket(frame.agentId, ticket);
+        this.markPacing();
+        if (typeof ticket === "string" && this.frameSocketsOn) this.openFrameSocket(frame.agentId, ticket);
+        return;
+      }
+      if (frame.type === "browser.frame" && typeof frame.agentId === "string") {
+        // Only a server that paces this view asks for answers: an older one would count each as a bad message.
+        const ack = (frame as { ack?: unknown }).ack === true;
+        if (ack) this.markPacing();
+        const seq = (frame as { seq?: unknown }).seq;
+        const bytesSeq = this.lastBytesSeq.get(frame.agentId);
+        // No newer than the frame socket's last picture (sent before the switch): answered, never drawn over it.
+        // A newer one (the server went back to this socket before its close reached here) is drawn.
+        if (bytesSeq !== undefined && typeof seq === "number" && seq <= bytesSeq) {
+          if (ack) this.ackBrowserFrame(frame.agentId, seq, true);
+          return;
+        }
+        for (const l of this.browserListeners) l(frame as Record<string, unknown>);
+        if (ack) this.ackBrowserFrame(frame.agentId, seq);
         return;
       }
       for (const l of this.browserListeners) l(frame as Record<string, unknown>);
-      if (frame.type === "browser.frame" && typeof frame.agentId === "string") {
-        this.ackBrowserFrame(frame.agentId, (frame as { seq?: unknown }).seq);
-      }
       return;
     }
     if (frame.type === "event" && "scope" in frame) {

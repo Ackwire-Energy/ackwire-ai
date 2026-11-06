@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { decodeBrowserFrame, encodeBrowserFrame, type ServerFrame } from "@agenteschat/adapters";
+import { decodeBrowserFrame, encodeBrowserFrame, type ServerFrame, STREAM_CLOSE } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   BROWSER_SCOPE,
+  type BrowserLiveDeps,
   type BrowserLiveMessage,
+  browserFrameBase64,
   browserFrameBytes,
   createBrowserLive,
   createBrowserToolSource,
@@ -34,8 +36,9 @@ const PAGE = { snapshot: '- heading "agentes.chat" [ref=e1]', origin: "https://a
 /**
  * A runner over an in-memory socket that answers the live view's ops. `dead`: its socket's close never
  * arrives (a runner that restarted behind a proxy). `closedBrowser`: its agent's browser isn't open.
+ * `viewError`: what it answers `browser.view.open` with.
  */
-function browserRunner(hub: MachineHub, opts: { dead?: boolean; closedBrowser?: boolean } = {}) {
+function browserRunner(hub: MachineHub, opts: { dead?: boolean; closedBrowser?: boolean; viewError?: string } = {}) {
   const got: Request[] = [];
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const socket = {
@@ -55,6 +58,14 @@ function browserRunner(hub: MachineHub, opts: { dead?: boolean; closedBrowser?: 
           });
         }
         if (frame.op === "browser.stream.stop") return ok({ stopped: true });
+        if (frame.op === "browser.view.open" && opts.viewError) {
+          return void reply({
+            type: "result",
+            id: frame.id,
+            ok: false,
+            error: { code: opts.viewError, message: "no view socket" },
+          });
+        }
         if (frame.op === "browser.warm") return ok({ started: false });
         if (frame.op === "browser.batch") {
           const { commands } = frame as unknown as { commands: { command: string }[] };
@@ -96,13 +107,13 @@ function browserRunner(hub: MachineHub, opts: { dead?: boolean; closedBrowser?: 
   };
 }
 
-async function liveSetup() {
+async function liveSetup(extra: Partial<BrowserLiveDeps> = {}) {
   f = await setup({ machines: true });
   const hub = f.machineHub as MachineHub;
   const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "VPS" });
   await f.db.update(schema.agents).set({ machineId: paired.machineId }).where(eq(schema.agents.id, f.agent.id));
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
-  const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, stopDelayMs: 1 });
+  const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, stopDelayMs: 1, ...extra });
   hub.setBrowserHooks(live.hubHooks);
   const got: BrowserLiveMessage[] = [];
   const viewer = { userId: f.owner.id, send: (m: BrowserLiveMessage) => got.push(m) };
@@ -120,7 +131,8 @@ test("a runner at protocol 46 gets the view's own socket: frames come as bytes, 
   const { hub, paired, live, got, viewer } = await liveSetup();
   const runner = browserRunner(hub);
   await runner.hello(paired.token);
-  const stop = await live.watch(viewer, f.org.id, f.agent.id);
+  const { stop, streaming } = await live.watch(viewer, f.org.id, f.agent.id);
+  expect(streaming).toBe(true);
   await until(() => runner.views().length === 1 && runner.starts().length === 1);
   const open = runner.views()[0] as Request & { streamId: string };
   expect(open).toMatchObject({ op: "browser.view.open", agent: { id: f.agent.id } });
@@ -134,16 +146,28 @@ test("a runner at protocol 46 gets the view's own socket: frames come as bytes, 
   expect(view).not.toBeNull();
   expect(live.claimView(open.streamId, paired.machineId, fakeSocket().socket)).toBeNull();
   const jpeg = new Uint8Array([0xff, 0xd8, 1, 2, 3, 0xff, 0xd9]);
-  const metadata = { deviceWidth: 1280, deviceHeight: 800, url: "https://shop.example.com/" };
+  // When the computer captured it goes on with it, to measure how late pictures arrive.
+  const metadata = {
+    deviceWidth: 1280,
+    deviceHeight: 800,
+    capturedAt: 1_760_000_000_000,
+    url: "https://shop.example.com/",
+  };
   view?.data(encodeBrowserFrame({ seq: 2, metadata }, jpeg));
-  // Answered at once, so the runner may send the next.
+  // Answered at once (a viewer with no window always has room), so the runner may send the next.
   expect(socket.sent).toEqual(['{"type":"ack"}']);
   expect(seqs()).toEqual([1, 2]);
   const last = [...got].reverse().find((m) => m.type === "browser.frame");
   if (last?.type !== "browser.frame") throw new Error("no frame");
-  // Base64 for the realtime socket, the same bytes for a frame socket.
+  expect(last.metadata).toEqual(metadata);
+  // Neither base64 nor bytes are made before a viewer needs them; then once, on the frame every viewer shares.
+  expect(last.data).toBeUndefined();
+  expect(last.bytes).toBeUndefined();
+  expect(browserFrameBase64(last)).toBe(Buffer.from(jpeg).toString("base64"));
   expect(last.data).toBe(Buffer.from(jpeg).toString("base64"));
-  expect(decodeBrowserFrame(browserFrameBytes(last))).toMatchObject({ seq: 2, metadata });
+  const bytes = browserFrameBytes(last);
+  expect(browserFrameBytes(last)).toBe(bytes);
+  expect(decodeBrowserFrame(bytes)).toMatchObject({ seq: 2, metadata });
   // Garbage is answered too (it must not hold the window shut), and shows nothing.
   view?.data(new Uint8Array([9, 9, 9]));
   expect(socket.sent).toHaveLength(2);
@@ -158,11 +182,132 @@ test("a runner at protocol 46 gets the view's own socket: frames come as bytes, 
   live.close();
 });
 
+test("a view frame's ack waits for a viewer with room, and goes after ackOwedMs at the latest", async () => {
+  const { hub, paired, live, got } = await liveSetup({ viewAckOwedMs: 40 });
+  const runner = browserRunner(hub);
+  await runner.hello(paired.token);
+  // A viewer whose window is full: the test says when it has room again.
+  let room = false;
+  const viewer = { userId: f.owner.id, send: (m: BrowserLiveMessage) => got.push(m), room: () => room };
+  const { stop } = await live.watch(viewer, f.org.id, f.agent.id);
+  await until(() => runner.views().length === 1);
+  const socket = fakeSocket();
+  const view = live.claimView(runner.views()[0]?.streamId ?? "", paired.machineId, socket.socket);
+  const frame = (seq: number) =>
+    encodeBrowserFrame({ seq, metadata: { deviceWidth: 1280, deviceHeight: 800 } }, new Uint8Array([0xff, 0xd8]));
+  view?.data(frame(1));
+  // Shown, but nobody here could take another: the computer is not let send more yet.
+  expect(got.some((m) => m.type === "browser.frame" && m.seq === 1)).toBe(true);
+  expect(socket.sent).toEqual([]);
+  live.viewerReady(f.agent.id);
+  expect(socket.sent).toEqual([]);
+  // The viewer drew it: the ack it owed goes.
+  room = true;
+  live.viewerReady(f.agent.id);
+  expect(socket.sent).toEqual(['{"type":"ack"}']);
+  // Nothing more owed: another ready sends nothing.
+  live.viewerReady(f.agent.id);
+  expect(socket.sent).toHaveLength(1);
+  // A viewer that never draws again (a hidden tab): the owed ack goes anyway, before the runner gives up on it.
+  room = false;
+  view?.data(frame(2));
+  expect(socket.sent).toHaveLength(1);
+  await until(() => socket.sent.length === 2);
+  expect(socket.sent).toHaveLength(2);
+  stop();
+  live.close();
+});
+
+test("a view socket that drops while its stream runs is opened again, with backoff", async () => {
+  const { hub, paired, live, viewer } = await liveSetup({ viewRetryMs: [5, 30] });
+  const runner = browserRunner(hub);
+  await runner.hello(paired.token);
+  const { stop } = await live.watch(viewer, f.org.id, f.agent.id);
+  await until(() => runner.views().length === 1);
+  const { machineId } = paired;
+  const claim = (i: number) => live.claimView(runner.views()[i]?.streamId ?? "", machineId, fakeSocket().socket);
+  // A blip: the first wait.
+  claim(0)?.closed();
+  await until(() => runner.views().length === 2);
+  expect(runner.views()).toHaveLength(2);
+  // It brings a frame, so it works: the next drop starts the waits again from the first.
+  const second = claim(1);
+  const metadata = { deviceWidth: 1280, deviceHeight: 800 };
+  second?.data(encodeBrowserFrame({ seq: 1, metadata }, new Uint8Array([0xff, 0xd8])));
+  second?.closed();
+  await until(() => runner.views().length === 3);
+  expect(runner.views()).toHaveLength(3);
+  claim(2)?.closed();
+  await Bun.sleep(15);
+  // The second wait is longer.
+  expect(runner.views()).toHaveLength(3);
+  await until(() => runner.views().length === 4);
+  expect(runner.views()).toHaveLength(4);
+  // Out of tries: its frames stay on the machine socket until the next stream.
+  claim(3)?.closed();
+  await Bun.sleep(60);
+  expect(runner.views()).toHaveLength(4);
+  stop();
+  live.close();
+});
+
+test("a view closed as too slow for its link keeps its backoff, even when the next one brings a frame", async () => {
+  const { hub, paired, live, viewer } = await liveSetup({ viewRetryMs: [5, 30] });
+  const runner = browserRunner(hub);
+  await runner.hello(paired.token);
+  const { stop } = await live.watch(viewer, f.org.id, f.agent.id);
+  await until(() => runner.views().length === 1);
+  const { machineId } = paired;
+  const claim = (i: number) => live.claimView(runner.views()[i]?.streamId ?? "", machineId, fakeSocket().socket);
+  const metadata = { deviceWidth: 1280, deviceHeight: 800 };
+  claim(0)?.closed(STREAM_CLOSE.tooSlow);
+  await until(() => runner.views().length === 2);
+  // Its first frame proves nothing about the link: the next drop waits the longer time.
+  const second = claim(1);
+  second?.data(encodeBrowserFrame({ seq: 1, metadata }, new Uint8Array([0xff, 0xd8])));
+  second?.closed(STREAM_CLOSE.tooSlow);
+  await Bun.sleep(15);
+  expect(runner.views()).toHaveLength(2);
+  await until(() => runner.views().length === 3);
+  // Out of tries.
+  claim(2)?.closed(STREAM_CLOSE.tooSlow);
+  await Bun.sleep(60);
+  expect(runner.views()).toHaveLength(3);
+  stop();
+  live.close();
+});
+
+test("a view the computer refuses stays on the machine socket: no other try", async () => {
+  const { hub, paired, live, viewer } = await liveSetup({ viewRetryMs: [5] });
+  const runner = browserRunner(hub, { viewError: "not_allowed" });
+  await runner.hello(paired.token);
+  const { stop } = await live.watch(viewer, f.org.id, f.agent.id);
+  await until(() => runner.views().length === 1);
+  await Bun.sleep(40);
+  expect(runner.views()).toHaveLength(1);
+  stop();
+  live.close();
+});
+
+test("a view the computer couldn't open (away for a moment) is tried again", async () => {
+  const { hub, paired, live, viewer } = await liveSetup({ viewRetryMs: [5] });
+  const runner = browserRunner(hub, { viewError: "unreachable" });
+  await runner.hello(paired.token);
+  const { stop } = await live.watch(viewer, f.org.id, f.agent.id);
+  await until(() => runner.views().length === 2);
+  expect(runner.views()).toHaveLength(2);
+  // Out of tries.
+  await Bun.sleep(40);
+  expect(runner.views()).toHaveLength(2);
+  stop();
+  live.close();
+});
+
 test("the stream's own socket closes when the stream stops", async () => {
   const { hub, paired, live, viewer } = await liveSetup();
   const runner = browserRunner(hub);
   await runner.hello(paired.token);
-  const stop = await live.watch(viewer, f.org.id, f.agent.id);
+  const { stop } = await live.watch(viewer, f.org.id, f.agent.id);
   await until(() => runner.views().length === 1);
   const socket = fakeSocket();
   live.claimView((runner.views()[0] as Request & { streamId: string }).streamId, paired.machineId, socket.socket);

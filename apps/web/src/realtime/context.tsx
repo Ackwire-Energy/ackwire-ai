@@ -995,11 +995,16 @@ const EMPTY_LIVE: BrowserLiveState = {
  * Watches an agent's browser on the org's socket while mounted (`enabled`):
  * frames, who is in control, and why it can't be shown. Watches again when
  * the socket reconnects, and on `retry`. `sendInput` is for the person in control.
+ * `maxFps`: the frames a second this view needs (`BROWSER_FPS.preview` for a small picture; none for the stream's
+ * own rate), changed in place, never with a new watch (ADR 0040 §7.1).
  */
-export function useBrowserLive(agentId: string, enabled = true) {
+export function useBrowserLive(agentId: string, enabled = true, maxFps?: number) {
   const { connection } = useRealtime();
   const [state, setState] = useState<BrowserLiveState>(EMPTY_LIVE);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
+  // The rate when the watch starts; a change later goes through `setMaxFps`.
+  const fps = useRef(maxFps);
+  fps.current = maxFps;
   useEffect(() => {
     if (!connection || !enabled) return;
     setState(EMPTY_LIVE);
@@ -1008,6 +1013,7 @@ export function useBrowserLive(agentId: string, enabled = true) {
       // Shared per socket: the card, the bar and the full view of one agent are one watch.
       watcher: connection.browserWatcher,
       agentId,
+      maxFps: fps.current,
       // An answer means the watch went through: an earlier refusal (too many browsers) no longer holds.
       onFrame: (frame) =>
         setState((s) => ({ ...s, frame, unavailable: null, ended: false, endedBy: null, error: null })),
@@ -1042,6 +1048,9 @@ export function useBrowserLive(agentId: string, enabled = true) {
       liveRef.current = null;
     };
   }, [connection, agentId, enabled]);
+  useEffect(() => {
+    liveRef.current?.setMaxFps(maxFps);
+  }, [maxFps]);
   const sendInput = useCallback((events: BrowserInputEvent[]) => liveRef.current?.sendInput(events) ?? false, []);
   const retry = useCallback(() => liveRef.current?.retry(), []);
   return { ...state, sendInput, retry };

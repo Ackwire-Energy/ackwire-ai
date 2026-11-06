@@ -231,6 +231,11 @@ export type WorkerLinkFrame =
   | { type: "brain.reclaim"; reclaimId: string; spare?: string; peek?: boolean }
   /** From the worker: whether it closed one, or (`peek`) when the one it would close was last used. */
   | ({ type: "brain.reclaimed"; reclaimId: string } & BrainReclaimed)
+  /**
+   * To the worker: its agent's live view has room for the browser's next frame, or (`view: false`) there is no view
+   * and frames needn't wait for this (ADR 0040 §7.1, `BrowserManager.room`).
+   */
+  | { type: "browser.room"; agentId: string; view: boolean }
   /** To the worker: Browser was clicked on its agent's desktop (`BrowserManager.show`). */
   | { type: "browser.show"; showId: string; agent: AgentScope }
   /** From the worker: `agent-browser` downloads first. */
@@ -300,7 +305,7 @@ export interface SupervisorOptions {
   /** A frame for the server; false while it is offline. */
   send: (frame: RunnerFrame) => boolean;
   /** Protocol 46: the agents' browsers' live views, where a viewed agent's frames go instead (ADR 0040 §7.1). */
-  views?: Pick<BrowserViews, "push" | "end">;
+  views?: Pick<BrowserViews, "push" | "end" | "room" | "has">;
   state: () => WorkerState;
   log: (line: string) => void;
   fetch?: FetchLike;
@@ -367,6 +372,8 @@ interface Worker {
   ready: boolean;
   networkRetiring: boolean;
   browserStreaming: boolean;
+  /** This session was told its agent's frames wait for `browser.room` (its live view is open). */
+  browserPaced: boolean;
   networkStopTimer: ReturnType<typeof setTimeout> | null;
   /** The `worker.state` line this session last got. */
   state: string;
@@ -641,6 +648,20 @@ export class Supervisor {
     if (w && this.online) this.send(w, frame);
   }
 
+  /**
+   * Its agent's live view has room for the next frame, or it has no view (`BrowserViews.onRoom`): the worker's stream
+   * sends it (`browser.room`). Said for each frame while the view is open; once when it is gone, and the worker sends
+   * its frames without waiting until a view takes one again.
+   */
+  browserRoom(agentId: string) {
+    const w = this.workers.get(agentId);
+    if (!w?.ready) return;
+    const view = this.opts.views?.has(agentId) === true;
+    if (!view && !w.browserPaced) return;
+    w.browserPaced = view;
+    this.send(w, { type: "browser.room", agentId, view });
+  }
+
   /** A person takes control of the agent's desktop: its worker stops what the agent's pointer and keys are doing. */
   desktopTaken(agentId: string) {
     const w = this.workers.get(agentId);
@@ -890,6 +911,7 @@ export class Supervisor {
         ready: false,
         networkRetiring: false,
         browserStreaming: false,
+        browserPaced: false,
         networkStopTimer: null,
         state: "",
         startedAt: 0,
@@ -1013,6 +1035,7 @@ export class Supervisor {
     w.ready = false;
     w.browserLeaseAt = 0;
     w.browserStreaming = false;
+    w.browserPaced = false;
     this.endSession(
       w,
       "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
@@ -1025,6 +1048,7 @@ export class Supervisor {
     if (this.closed) return;
     this.opts.log(`[${w.user.user}] stopped${typeof code === "number" ? ` (exit ${code})` : ""}`);
     // The live view of its agent's browser went with it: the server would otherwise keep a stream nothing sends.
+    this.opts.views?.end(w.user.id);
     if (this.online) this.opts.send({ type: "browser.stream.ended", agentId: w.user.id, reason: "closed" });
     if (w.waiters.size > 0 || [...this.owners.values()].some((o) => o.agentId === w.user.id)) this.launch(w);
   }
@@ -1159,16 +1183,24 @@ export class Supervisor {
         return;
       }
       case "browser.frame":
-      case "browser.stream.ended":
+      case "browser.stream.ended": {
         if (f.agentId !== w.user.id) return;
         w.browserStreaming = f.type === "browser.frame";
-        // Its live view's socket counts what it sends (`DataSockets`, as `browserView`).
-        if (f.type === "browser.frame" && this.opts.views?.push(f)) return;
-        if (f.type === "browser.stream.ended") this.opts.views?.end(f.agentId);
+        // Its live view's socket counts what it sends (`DataSockets`, as `browserView`); the worker's stream sends the
+        // next frame once the view has room for it.
+        const views = this.opts.views;
+        if (f.type === "browser.frame" && views?.push(f)) {
+          if (views.room(f.agentId)) this.browserRoom(f.agentId);
+          return;
+        }
+        if (f.type === "browser.stream.ended") views?.end(f.agentId);
+        // No view (any more): its frames needn't wait (said once).
+        if (f.type === "browser.frame" && w.browserPaced) this.browserRoom(f.agentId);
         if (this.opts.send(f) && f.type === "browser.frame" && this.opts.relayed) {
           this.opts.relayed.browserView.up += Buffer.byteLength(line);
         }
         return;
+      }
       default:
         // `pong`, and the computer's own frames (pause, access, accounts): never a worker's.
         return;
@@ -1179,6 +1211,8 @@ export class Supervisor {
   private hello(w: Worker) {
     this.endSession(w, "The agent's worker started over. Try again.");
     w.ready = true;
+    // A new session's stream starts unpaced: its view, if any, says otherwise with its first frame.
+    w.browserPaced = false;
     w.state = "";
     this.sendState(w);
     if (this.online) this.welcome(w);

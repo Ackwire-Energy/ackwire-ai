@@ -110,23 +110,35 @@ export interface BrowserPage {
   title?: string;
 }
 
-/** One image of an agent's browser on its way to viewers. Never stored. */
+/**
+ * One image of an agent's browser on its way to viewers. Never stored. It has `data` (a frame from the machine
+ * socket) or `jpeg` (one from a live view's own socket, ADR 0040 §7.1), and gets the other forms only when a viewer
+ * needs them: `browserFrameBase64`, `browserFrameBytes`.
+ */
 export interface BrowserFrame {
   agentId: string;
   seq: number;
-  /** Base64 JPEG, for the viewers on the realtime socket (older apps). */
-  data: string;
+  /** Base64 JPEG, for the viewers on the realtime socket (older apps), made once for all of them. */
+  data?: string;
   metadata: BrowserFrameMetadata;
+  /** The JPEG as it came on a live view's own socket. Never sent as JSON. */
+  jpeg?: Uint8Array;
   /**
    * The same frame as bytes for a viewer's frame socket (`encodeBrowserFrame`, ADR 0040 §7.1), made once for all
-   * of them by `browserFrameBytes`. Never sent as JSON.
+   * of them. Never sent as JSON.
    */
   bytes?: Uint8Array;
 }
 
+/**
+ * A frame as every viewer gets it: one shared object, so the base64 and the bytes made for one viewer serve all of
+ * them (ADR 0040 §7.1). Viewers never change it otherwise.
+ */
+export type BrowserFrameMessage = { type: "browser.frame" } & BrowserFrame;
+
 /** Someone watching an agent's browser: gets frames, newest first (stale ones are dropped). */
 export interface BrowserViewer {
-  send(frame: BrowserFrame): void;
+  send(frame: BrowserFrameMessage): void;
 }
 
 /**
@@ -135,7 +147,8 @@ export interface BrowserViewer {
  * Redis pub/sub can implement it later without touching the runner or screens.
  */
 export interface StreamRelay {
-  publish(agentId: string, frame: BrowserFrame): void;
+  /** Returns how many viewers skipped it (their socket was backed up). */
+  publish(agentId: string, frame: BrowserFrameMessage): number;
   /** Starts sending this agent's frames to the viewer; call the result to stop. */
   subscribe(agentId: string, viewer: BrowserViewer): () => void;
   /** Whether anyone watches this agent's browser (the stream runs only then). */

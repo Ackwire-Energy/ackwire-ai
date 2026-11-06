@@ -9,6 +9,7 @@ import type {
   ScreenKind,
 } from "@agenteschat/client";
 import {
+  browserFrameDataUrl,
   browserSiteUrl,
   browserSteps,
   controlledBy,
@@ -88,7 +89,7 @@ import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
 import { useComputerEdition } from "../WorkspaceComputer";
 import { AddressBar } from "./AddressBar";
-import { frameUrl, useFrameSrc } from "./frame-src";
+import { LivePicture } from "./LivePicture";
 import { requestBrowserCard, useBrowserCardRequest } from "./open";
 import { SiteIcon, siteName } from "./SiteIcon";
 import "./browser.css";
@@ -405,17 +406,22 @@ export function BrowserCard({
     return () => io.disconnect();
   }, []);
   const watching = !chat || visible || holding;
+  const [full, setFull] = useState(false);
+  // The page shown here is how people follow the agent's work: it gets the stream's own rate everywhere (only the
+  // phone's small thumbnails ask for less, ADR 0040 §7.1).
   const live = useBrowserLive(profile ? profileLiveKey(profile.id) : agentId, watching);
   const profileActions = useBrowserProfileMutations(org.id);
   // After Devolver on a profile: who may use it now, in place of the page.
   const [handedProfile, setHandedProfile] = useState(false);
-  const [still, setStill] = useState<typeof live.frame>(null);
+  // The last page that came, kept while a view that starts again has none yet. Read while rendering (not set in an
+  // effect), so each frame renders the card once, not twice.
+  const lastFrame = useRef<BrowserFrame | null>(null);
+  if (live.frame) lastFrame.current = live.frame;
+  const still = lastFrame.current;
   const [stoppedAt, setStoppedAt] = useState<string | null>(null);
   useEffect(() => {
-    if (!live.frame) return;
-    setStill(live.frame);
     // A new page after Parar: the browser is open again (the agent, or a person opening a site).
-    setStoppedAt(null);
+    if (live.frame) setStoppedAt(null);
   }, [live.frame]);
   const openQ = useAgentBrowserHandoff(org.id, agentId, !profile);
   // Watching is for everyone behind its work; driving it only for admins, its owner and who it asked (ADR 0040).
@@ -457,7 +463,6 @@ export function BrowserCard({
   const [keysOpen, setKeysOpen] = useState(false);
   // On touch the text bar types into the page; a mouse and keyboard type into it directly (`onPageKey`).
   const touch = useMatchMedia(TOUCH);
-  const [full, setFull] = useState(false);
   // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
   const [capturing, setCapturing] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -625,7 +630,6 @@ export function BrowserCard({
 
   // What is shown of the page: nothing while it is closed, opening or hidden (only a stale frame is held).
   const frame = closed || opening || hidden ? null : live.frame;
-  const src = useFrameSrc(frame);
   // Only a page that was clicked into takes the wheel (a native listener: the conversation's scroll is
   // stopped only then); anywhere else the wheel scrolls the conversation.
   const wheelTo = useRef<(e: globalThis.WheelEvent) => void>(() => {});
@@ -708,7 +712,8 @@ export function BrowserCard({
     kept.current = null;
     return () => {
       const { still: last, inControl: control } = leaving.current;
-      const src = last ? frameUrl(last) : null;
+      // As a `data:` URL: the view that takes it may hold it as long as it likes, and nothing has to free it.
+      const src = last ? browserFrameDataUrl(last) : null;
       kept.current = src ? { src, control } : null;
     };
   }, [kept]);
@@ -1129,7 +1134,7 @@ export function BrowserCard({
     </small>
   );
   const cover =
-    switchingTo && (src || keptSrc) ? (
+    switchingTo && (frame || keptSrc) ? (
       <Cover clear color={color} spinner text={switchingTo} />
     ) : asking.asking ? (
       <Cover
@@ -1324,7 +1329,7 @@ export function BrowserCard({
       )}
       <div className={showLog ? "brw-ac__body brw-ac__body--split" : "brw-ac__body"}>
         <div className="brw-ac__stage" {...asking.stage}>
-          {src ? (
+          {frame ? (
             // biome-ignore lint/a11y/noStaticElementInteractions: the page takes the person's keys while in control
             <div
               ref={pageRef}
@@ -1347,7 +1352,7 @@ export function BrowserCard({
               }}
             >
               {inControl && <textarea ref={pasteRef} className="brw-paste" tabIndex={-1} aria-hidden="true" />}
-              <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
+              <LivePicture frame={frame} alt={t("browser.live.page", g)} imgRef={imgRef} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
               {(sliding || scrolling) && (
                 <span className="brw-ac__capture" role="status" data-esc-layer="">

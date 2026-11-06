@@ -851,11 +851,6 @@ export const PROFILES_SYSTEM_MODE =
 const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Protocol 34 (ADR 0110): a `browser.*` op in a browser profile's session. The session is keyed by the profile
- * (`profile:<id>`), its folder is under the runner's home, and its Chrome is always headless; `agent` only says who
- * acts. Single mode only: in system mode a profile needs an OS user of its own (phase 2), so it is refused.
- */
-/**
  * `browser.view.open` (protocol 46): the data socket of an agent's live view, or a browser profile's (its frames
  * carry `profile:<id>` where an agent's id would be). Dialed here, whichever process runs that browser: in system
  * mode root's, which passes the worker's frames on to it.
@@ -875,6 +870,11 @@ async function openBrowserView(
   return ctx.browserViews.open(key, req.streamId);
 }
 
+/**
+ * Protocol 34 (ADR 0110): a `browser.*` op in a browser profile's session. The session is keyed by the profile
+ * (`profile:<id>`), its folder is under the runner's home, and its Chrome is always headless; `agent` only says who
+ * acts. Single mode only: in system mode a profile needs an OS user of its own (phase 2), so it is refused.
+ */
 async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, scope: RequestScope) {
   if (ctx.systemMode?.()) throw new RunnerError("not_allowed", PROFILES_SYSTEM_MODE);
   const browser = ctx.browser;

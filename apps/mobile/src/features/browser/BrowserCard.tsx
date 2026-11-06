@@ -1,4 +1,5 @@
 import {
+  BROWSER_FPS,
   type BrowserHandoff,
   browserFrameDataUrl,
   browserSteps,
@@ -125,7 +126,13 @@ export function BrowserCard({
   const holding = Boolean(meId) && handoff?.status === "active" && handoff.controllerUserId === meId;
   const working = Boolean(run) || busy;
   const watching = open || working || holding;
-  const live = useLiveConnection(profile ? profileLiveKey(profile.id) : agentId, watching || Boolean(profile));
+  // Closed, the card's picture is a thumbnail: a frame a second is plenty, on mobile data too (ADR 0040 §7.1).
+  // Open, the page at the stream's own rate (several views of one agent get the most any of them needs).
+  const live = useLiveConnection(
+    profile ? profileLiveKey(profile.id) : agentId,
+    watching || Boolean(profile),
+    open ? undefined : BROWSER_FPS.preview,
+  );
   const controller = live.handoff?.controllerUserId ?? live.controllerUserId ?? handoff?.controllerUserId ?? null;
   const mine = Boolean(meId) && controller === meId;
   const waiting = handoff?.status === "pending";
