@@ -1080,9 +1080,8 @@ export function useBrowserLive(agentId: string, enabled = true, maxFps?: number)
   return { ...state, sendInput, retry };
 }
 
-/** The socket's status; "idle" outside a workspace (no socket there). */
 export function useConnectionStatus(): ConnectionStatus {
-  const connection = useContext(RealtimeContext)?.connection ?? null;
+  const { connection } = useRealtime();
   const [status, setStatus] = useState<ConnectionStatus>(connection?.status ?? "idle");
   useEffect(() => {
     if (!connection) return;

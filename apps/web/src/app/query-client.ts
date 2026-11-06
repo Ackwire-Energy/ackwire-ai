@@ -1,5 +1,6 @@
 import { ApiError } from "@agenteschat/client";
-import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
+import { LiveQueryClient } from "@agenteschat/client/lib/live-query-client";
+import { MutationCache, QueryCache } from "@tanstack/react-query";
 
 /**
  * Queries show their errors inline; a
@@ -12,7 +13,7 @@ export function createQueryClient(handlers: {
   /** A failed write in the person's words (`errorText`). */
   describeError: (error: unknown) => string;
 }) {
-  return new QueryClient({
+  return new LiveQueryClient({
     defaultOptions: {
       queries: {
         retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 2,

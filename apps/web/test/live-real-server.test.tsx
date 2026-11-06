@@ -75,7 +75,7 @@ const userId = async (b: Browser) => ((await (await b("/api/app/me")).json()) as
 
 let seq = 0;
 /** Me (the owner, my app open in #general), an admin and a member. */
-async function workspace(options: { socketOpens?: Promise<void> } = {}) {
+async function workspace(options: AppOptions = {}) {
   const n = ++seq;
   const me = browser(t);
   await signUp(me, `me${n}@example.com`);
@@ -84,14 +84,24 @@ async function workspace(options: { socketOpens?: Promise<void> } = {}) {
   const member = await joinByInvitation(t, me, orgId, `member${n}@example.com`);
   const ids = { me: await userId(me), admin: await userId(admin), member: await userId(member) };
   const names = { me: `me${n}`, admin: `admin${n}`, member: `member${n}` };
-  await openApp(me, `/org/${orgId}/c/${channelId}`, options.socketOpens);
+  await openApp(me, `/org/${orgId}/c/${channelId}`, options);
   await real();
   const people = { me, admin, member };
   return { orgId, general: channelId, ids, names, people, as: { admin: orgApi(admin, orgId), me: orgApi(me, orgId) } };
 }
 
-/** The web app, signed in as `b`; its socket dials once `socketOpens` settles. */
-async function openApp(b: Browser, path: string, socketOpens?: Promise<void>) {
+type Http = ReturnType<typeof createHttpApi>;
+interface AppOptions {
+  /** The socket dials once this settles. */
+  socketOpens?: Promise<void>;
+  /** Changes the app's HTTP client (a read held on its way back). */
+  api?: (http: Http) => void;
+  /** Every frame the app's socket gets, before the app does. */
+  onFrame?: (frame: { type?: string; event?: { type?: string; userId?: string } }) => void;
+}
+
+/** The web app, signed in as `b`. */
+async function openApp(b: Browser, path: string, { socketOpens, api, onFrame }: AppOptions = {}) {
   media = spyOn(window, "matchMedia").mockImplementation(
     (q: string) =>
       ({
@@ -109,9 +119,11 @@ async function openApp(b: Browser, path: string, socketOpens?: Promise<void>) {
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws${url.slice(url.indexOf("?"))}`, {
       headers: { cookie: b.cookie(), origin: ORIGIN },
     } as unknown as string[]);
+    if (onFrame) ws.addEventListener("message", (e) => onFrame(JSON.parse(String(e.data))));
     sockets.push(ws);
     return ws;
   };
+  api?.(http);
   const createSocket = (socketOpens ? slowSocket(dial, socketOpens) : dial) as unknown as SocketFactory;
   return renderApp(path, { api: http, createSocket });
 }
@@ -228,6 +240,37 @@ describe("a channel someone else makes while my app is open", () => {
     await live();
     expect(memberNames()).toEqual([w.names.admin, w.names.me, w.names.member].sort());
   });
+  test("someone added while the column's first read is on its way", async () => {
+    let release = () => {};
+    const held = new Promise<void>((r) => (release = r));
+    let channelId = "";
+    let reading = () => {};
+    const read = new Promise<void>((r) => (reading = r));
+    const w = await workspace({
+      api: (http) => {
+        const members = http.chat.members;
+        http.chat.members = async (orgId, id) => {
+          const list = await members(orgId, id);
+          if (id !== channelId) return list;
+          channelId = "";
+          reading();
+          await held;
+          return list;
+        };
+      },
+    });
+    const { id } = (await (await w.as.admin("/channels", { json: { name: "humans" } })).json()) as { id: string };
+    channelId = id;
+    await w.as.admin(`/channels/${id}/members`, { json: { userId: w.ids.me } });
+    await live();
+    await click(link("humans"));
+    await read;
+    await w.as.admin(`/channels/${id}/members`, { json: { userId: w.ids.member } });
+    await live();
+    release();
+    await live();
+    expect(memberNames()).toEqual([w.names.admin, w.names.me, w.names.member].sort());
+  });
 });
 
 describe("what changes on a channel elsewhere shows at once", () => {
@@ -325,14 +368,35 @@ describe("other things that appear after my socket connected", () => {
 });
 
 describe("my own presence", () => {
-  test("the column and the account button read the same, and follow my socket", async () => {
-    let open = () => {};
-    const w = await workspace({ socketOpens: new Promise<void>((r) => (open = r)) });
-    // Opened before my socket: the people were read while the server didn't count me yet.
+  test("my socket counted while the people's first read was on its way: online, in the column and the button", async () => {
+    // The server answers the people before it counts my socket (offline), and the answer reaches the app only after
+    // the server announced my arrival (`member.status`) on that socket.
+    let answered = () => {};
+    let announced = () => {};
+    const heard = new Promise<void>((r) => (announced = r));
+    let me = "";
+    const w = await workspace({
+      socketOpens: new Promise<void>((r) => (answered = r)),
+      api: (http) => {
+        const people = http.orgs.people;
+        let first = true;
+        http.orgs.people = async (orgId) => {
+          const list = await people(orgId);
+          if (!first) return list;
+          first = false;
+          me = list.find((p) => p.availability !== undefined)?.presence ?? "";
+          answered();
+          await heard;
+          return list;
+        };
+      },
+      onFrame: (f) => {
+        if (f.event?.type === "member.status") setTimeout(announced, 50);
+      },
+    });
+    expect(me).toBe("offline");
     await click(link("general"));
-    expect(rowPresence(w.names.me)).toBe(footerPresence() ?? "");
-    open();
-    await real();
+    await live();
     expect(rowPresence(w.names.me)).toBe("online");
     expect(footerPresence()).toBe("online");
   });

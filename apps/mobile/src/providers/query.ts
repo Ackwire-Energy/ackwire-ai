@@ -1,9 +1,10 @@
-import { focusManager, QueryClient } from "@tanstack/react-query";
+import { LiveQueryClient } from "@agenteschat/client/lib/live-query-client";
+import { focusManager } from "@tanstack/react-query";
 import { AppState, type AppStateStatus } from "react-native";
 
 /** One query client for the app; refetches when the app comes back to the foreground. */
 export function createQueryClient() {
-  return new QueryClient({
+  return new LiveQueryClient({
     defaultOptions: {
       queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: true },
       mutations: { retry: 0 },

@@ -19,7 +19,7 @@ import {
 } from "@agenteschat/client/lib/presence";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useMeId, useOrgId, useSocketOpen, useWhen } from "../shared/hooks";
+import { useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentWhyKey, lineText, personLine } from "./logic";
 
 /**
@@ -45,7 +45,7 @@ export interface AgentShown {
 export function usePresenceOf(): PresenceOf {
   const orgId = useOrgId();
   const { t, i18n } = useTranslation();
-  const people = usePeople(orgId, useSocketOpen());
+  const people = usePeople(orgId);
   const agents = useAgentStatuses(orgId);
   const ai = useAiStatus(orgId);
   return useMemo(() => {
@@ -73,7 +73,7 @@ export function usePresenceOf(): PresenceOf {
 export function useMyPerson(): Person | undefined {
   const orgId = useOrgId();
   const meId = useMeId();
-  const people = usePeople(orgId, useSocketOpen());
+  const people = usePeople(orgId);
   return meId ? people.data?.find((p) => p.userId === meId) : undefined;
 }
 

@@ -79,7 +79,6 @@ import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { TOAST_MS, useToast } from "@/lib/toast";
-import { useConnectionStatus } from "@/realtime/context";
 import "./members.css";
 
 /**
@@ -131,7 +130,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const manage = can(org, "manage_members");
   const invites = can(org, "invite_people");
   const setRolesOf = useSetMemberRoles(org.id);
-  const peopleQuery = usePeople(org.id, useConnectionStatus() === "open");
+  const peopleQuery = usePeople(org.id);
   const orgRoles = useRoles(org.id).data?.roles ?? [];
   const month = formatMonth(i18n.language, new Date());
   const [roles, setRoles] = useState<string[]>([]);

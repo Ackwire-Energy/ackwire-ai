@@ -7,7 +7,6 @@ import type {
   Availability,
   MemberPresence,
   MemberStatus,
-  Person,
 } from "../api/types";
 import { clockHour } from "./format";
 import { workStatusText } from "./long-work";
@@ -24,23 +23,6 @@ export const AVAILABILITIES: readonly Availability[] = ["auto", "away", "busy", 
 
 /** How you appear for what you picked (to yourself: hidden stays hidden). */
 export const presenceOfAvailability = (a: Availability): MemberPresence => (a === "auto" ? "online" : a);
-
-/**
- * The people as this app shows them: my own row (the only one with `availability`) counts this app's open socket as
- * connected. The server reads connections when it answers, and the app's first read of the people goes out before its
- * socket is counted: without this, the members column showed me offline while I was there. Hidden and out of office
- * don't depend on being connected, so they read as the server said.
- */
-export function withMyConnection(people: Person[], connected: boolean): Person[] {
-  if (!connected) return people;
-  const at = people.findIndex((p) => p.availability !== undefined && p.presence === "offline");
-  const me = people[at];
-  if (!me?.availability) return people;
-  const presence = presenceOfAvailability(me.availability);
-  const out = [...people];
-  out[at] = { ...me, presence, online: presence === "online" || presence === "away" || presence === "busy" };
-  return out;
-}
 
 /** Any presence a badge draws: people's and agents'. */
 export type AnyPresence = MemberPresence | AgentPresence;
