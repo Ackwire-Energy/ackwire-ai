@@ -28,6 +28,7 @@ import {
   stepPermissions,
   upcomingRoutines,
 } from "@agenteschat/client/lib/home";
+import { latestText } from "@agenteschat/client/lib/message-body";
 import { waitingParts, waitingText } from "@agenteschat/client/lib/missions";
 import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib/notifications";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
@@ -406,7 +407,7 @@ function InboxRow({ n, dir, now }: { n: AppNotification; dir: Dir; now: number }
   const sub = card
     ? card.title
     : n.kind === "agent_reply" || n.kind === "mention"
-      ? n.latest.text
+      ? latestText(t, n.latest)
       : (n.source.label ?? n.latest.title ?? n.latest.text);
   const meta = [
     left ? t("approvals.left", { time: left }) : "",

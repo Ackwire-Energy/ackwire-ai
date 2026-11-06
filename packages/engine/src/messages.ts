@@ -942,11 +942,11 @@ export async function insertMessageWithRuns(
             or m.hop < ${AGENT_CHIME_IN_MAX_HOP})
         union all
         -- In-app notifications: people mentioned, a reply in a thread, a person's DM, an agent's answer to whoever
-        -- is behind its run (ADR 0071).
+        -- is behind its run (ADR 0071), a routine's report (it may have no mention and no run).
         select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),
           'notifications.message:' || m.id, 4 from m
           where not ${silent}::boolean and (cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null
-            or m.agent_run_id is not null
+            or m.agent_run_id is not null or m.meta -> 'routine' is not null
             or (m.author_type = 'person' and exists (
               select 1 from ${channels} dc where dc.id = ${input.channelId}::uuid and dc.kind = 'dm')))
         on conflict do nothing

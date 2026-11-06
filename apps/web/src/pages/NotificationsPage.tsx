@@ -22,6 +22,7 @@ import { errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import { mediaKindOf, mediaWord, messageMediaOf, textOrMedia } from "@agenteschat/client/lib/media";
+import { latestText } from "@agenteschat/client/lib/message-body";
 import {
   allItems,
   askersOf,
@@ -674,7 +675,7 @@ function Row({
           ? sayWords(t, why, l.text ?? "")
           : media === "voice"
             ? mediaWord(t, media)
-            : l.text || (media ? mediaWord(t, media) : l.text);
+            : latestText(t, l) || (media ? mediaWord(t, media) : l.text);
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed

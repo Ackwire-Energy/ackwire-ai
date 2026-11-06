@@ -11,7 +11,7 @@ import type {
   MachineAccount,
 } from "../src/api/types";
 import { setupView } from "../src/lib/computer";
-import { serverBody } from "../src/lib/message-body";
+import { latestText, serverBody } from "../src/lib/message-body";
 import {
   type AgentAi,
   type AiChoice,
@@ -972,5 +972,19 @@ describe("a card says the real cause, not that the agent has no AI", () => {
     expect(serverBody(pt, "…", wait("machine_offline"))).toBe(
       "O Codex não está disponível agora. Respondo quando ele voltar.",
     );
+  });
+});
+
+describe("a notification of a body the server wrote", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+
+  test("reads in the person's language; a person's own words stay as they came", () => {
+    const text = "I can't answer yet: I have no AI connected.";
+    expect(latestText(instance.t, { text, meta: { bodyCode: "no_ai", noAi: { reason: "none" } } })).toBe(
+      "Ainda não consigo responder: não tenho uma IA conectada.",
+    );
+    expect(latestText(instance.t, { text: "olha isso" })).toBe("olha isso");
+    expect(latestText(instance.t, {})).toBeUndefined();
   });
 });
