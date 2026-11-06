@@ -1095,6 +1095,12 @@ html:not([data-pointer]) .thread-line:focus-visible {
     display: none;
   }
 }
+/* A page's entrance (`page-in`) holds its last frame, and a transform held there makes the page, not the window, what
+   `position: fixed` fills, and a layer under the sidebar's: the sidebar would stay out of the scrim. Only the holding
+   stops: `animation: none` would play the entrance again when the panel closes. */
+main.shell__main:has(.thread-panel__scrim) {
+  animation-fill-mode: backwards;
+}
 /* The pinned bar: one slim line under the conversation's header, the latest pin; a click lists them all. */
 .pinbar {
   display: flex;

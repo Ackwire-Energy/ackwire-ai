@@ -3,6 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { keys, messagesQuery } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -269,6 +270,84 @@ describe("the header search (Discord's)", () => {
     // The trash forgets them.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Limpar buscas recentes" })));
     expect(screen().queryByRole("option", { name: "zebra" })).toBeNull();
+  });
+
+  test("a hit newer than another conversation's cached page: found once the page refreshes, no false alarm", async () => {
+    const state = seeded();
+    const api = createFakeApi(state);
+    const { services, router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    await services.queryClient.prefetchQuery(messagesQuery(api, ORG_ID, GENERAL_ID));
+    await services.queryClient.invalidateQueries({ queryKey: keys.messages(ORG_ID, GENERAL_ID), refetchType: "none" });
+    state.messages.push({
+      id: "m-new",
+      channelId: GENERAL_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "uma zebra recente",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: new Date().toISOString(),
+    });
+    const load = api.chat.messages.bind(api.chat);
+    spyOn(api.chat, "messages").mockImplementation(async (...args) => {
+      if (!args[2]?.before && !args[2]?.threadId) await new Promise((r) => setTimeout(r, 60));
+      return load(...args);
+    });
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
+    await typeIn("recente");
+    await enter();
+    await act(async () =>
+      fireEvent.click(within(results() as HTMLElement).getByRole("button", { name: "Ir para a mensagem de Ada" })),
+    );
+    await act(() => new Promise((r) => setTimeout(r, 200)));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(row("m-new").classList.contains("ac-msg--focus")).toBe(true);
+    expect(document.body.textContent).not.toContain("Não deu para chegar a essa mensagem aqui.");
+  });
+
+  test("back from a hit's thread: the focus returns to its Ir para", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
+    await typeIn("zebra");
+    await enter();
+    const group = within(results() as HTMLElement).getByRole("region", { name: /^@ada o login está devolvendo 401/ });
+    const jump = within(group).getByRole("button", { name: "Ir para a mensagem de Ada" });
+    jump.focus();
+    await act(async () => fireEvent.click(jump));
+    await settle(6);
+    const back = screen().getByRole("button", { name: "Voltar aos resultados" });
+    back.focus();
+    await act(async () => fireEvent.click(back));
+    await settle(2);
+    expect(document.activeElement).toBe(jump);
+  });
+
+  test("where the pane covers the conversation, Ver em #canal in a hit's thread closes the results too", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
+    await typeIn("zebra");
+    await enter();
+    const group = within(results() as HTMLElement).getByRole("region", { name: /^@ada o login está devolvendo 401/ });
+    await act(async () => fireEvent.click(within(group).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    await settle(6);
+    const pane = screen().getByRole("complementary", { name: "Thread" });
+    pane.style.position = "fixed";
+    const more = within(pane).getByRole("button", { name: "Mais ações da thread" });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await settle(1);
+    await act(async () => fireEvent.click(screen().getByRole("menuitem", { name: "Ver em #eng" })));
+    await settle(4);
+    expect(screen().queryByRole("complementary", { name: "Thread" })).toBeNull();
+    expect(results()).toBeNull();
+    expect(row("m-1").classList.contains("ac-msg--focus")).toBe(true);
   });
 
   test("a DM's hit: the search keeps its scope there, so the other hits stay; closed, the DM holds to itself again", async () => {

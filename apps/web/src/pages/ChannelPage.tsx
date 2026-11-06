@@ -364,6 +364,7 @@ import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { holdOnScreen } from "@/lib/island";
 import { reportPainted } from "@/lib/perf";
+import { coversConversation } from "@/lib/side-pane";
 import { useToast } from "@/lib/toast";
 import {
   reconcileChannelRuns,
@@ -815,6 +816,7 @@ function ChannelView({
   );
   // The header search's results, in the same panel (one panel at a time; a thread a hit opened goes over them).
   const [searchOpen, setSearchOpen] = useState(Boolean(carried));
+  const sidePane = useRef<HTMLElement>(null);
   const carry = headerSearch?.carry;
   useEffect(() => {
     if (!searchOpen || !carry) return;
@@ -1724,7 +1726,8 @@ function ChannelView({
       return;
     }
     if (thread || olderState === "done" || focusPages.current >= FOCUS_MAX_PAGES) {
-      // Not here (or too far back): said, and at the bottom as usual.
+      // A cached page refreshing may still bring it. Else not here (or too far back): said, and at the bottom as usual.
+      if (messages.isFetching) return;
       setFocusDone(true);
       stick.current = true;
       toBottom();
@@ -1735,7 +1738,7 @@ function ChannelView({
       focusPages.current += 1;
       loadOlder(FOCUS_PAGE);
     }
-  }, [found, focusDone, focusTarget, serverRead, olderState, older.length]);
+  }, [found, focusDone, focusTarget, serverRead, olderState, older.length, messages.isFetching]);
   /** A quote was clicked: the original on screen, or paged in like `?m=`. */
   const jumpTo = (messageId: string) => {
     if (highlightMessage(scroller.current, messageId)) {
@@ -2642,6 +2645,7 @@ function ChannelView({
                   />
                 ) : panel || searchOpen ? (
                   <aside
+                    ref={sidePane}
                     className="thread-panel thread-panel--docked"
                     aria-label={t(panel ? "threads.side.label" : "searchPage.panel.label")}
                   >
@@ -2670,6 +2674,8 @@ function ChannelView({
                         onSeeInChannel={(messageId, channelId) => {
                           if (channelId !== channel.id) return false;
                           setPanel(null);
+                          // Results under the thread would come back over the message.
+                          if (coversConversation(sidePane.current)) setSearchOpen(false);
                           jumpTo(messageId);
                           return true;
                         }}

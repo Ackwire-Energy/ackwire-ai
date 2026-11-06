@@ -98,6 +98,17 @@ describe("the tools on top", () => {
     expect(section.getAttribute("title")).toBe("Arraste para mover a seção Ferramentas ou clique para ver as opções");
   });
 
+  test("a row says its name on hover only in the rail, which hides it: beside the words it would just repeat them", async () => {
+    await go();
+    const row = (name: string) => within(nav()).getByRole("link", { name });
+    expect(row("Tarefas").getAttribute("title")).toBeNull();
+    expect(row("Início").getAttribute("title")).toBeNull();
+    await click(within(nav()).getByRole("button", { name: "Minimizar barra lateral" }));
+    expect(row("Tarefas").getAttribute("title")).toBe("Tarefas");
+    expect(row("Início").getAttribute("title")).toBe("Início");
+    await click(within(nav()).getByRole("button", { name: "Expandir barra lateral" }));
+  });
+
   test("by default Threads, Tarefas, Drive and Equipe, Aprovações while some wait; the rest in More, then Personalizar", async () => {
     await go();
     expect(rows()[0]).toBe("Início");

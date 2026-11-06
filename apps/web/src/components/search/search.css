@@ -337,6 +337,10 @@ html:not([data-pointer]) .search-box__x:focus-visible {
     .search-panel__head > :nth-last-child(2) {
       order: 2;
     }
+    /* Its line is what was searched, not the channel a thread's narrow head drops. */
+    .search-panel__head .thread-head__meta > .thread-head__where {
+      display: block;
+    }
   }
 }
 @media (max-width: 760px) {

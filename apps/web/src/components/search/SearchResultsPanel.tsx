@@ -64,7 +64,12 @@ export function SearchResultsPanel({
   const categories = useChannelCategories(org.id);
   const phone = useMatchMedia(COMPACT_QUERY);
   const pane = useRef<HTMLElement>(null);
+  const jumpedFrom = useRef<HTMLElement | null>(null);
   useEscClose(onClose);
+  // Back from the thread a hit opened: where the person was, its back button gone.
+  useEffect(() => {
+    if (!hidden && document.activeElement === document.body) jumpedFrom.current?.focus({ preventScroll: true });
+  }, [hidden]);
   const setShown = ws?.setShown;
   useEffect(() => {
     if (!setShown) return;
@@ -140,7 +145,8 @@ export function SearchResultsPanel({
             aria-label={t("searchPage.panel.jumpLabel", { name })}
             disabled={Boolean(jumping)}
             loading={Boolean(jumping) && jumping === hit.messageId}
-            onClick={() => {
+            onClick={(e) => {
+              jumpedFrom.current = e.currentTarget;
               ws.remember();
               jump(hit);
             }}

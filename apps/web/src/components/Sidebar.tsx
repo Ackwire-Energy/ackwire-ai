@@ -260,15 +260,15 @@ export function Sidebar() {
         {missionsWaiting}
       </CountChip>
     ) : null;
+  // The name is on the row: only the rail, which hides it, says it on hover.
+  const railTip = (id: SidebarItem | "home") => (rail ? t(`shell.${id}`) : undefined);
   const toolRow = (id: SidebarItem) => (
     <Link
       key={id}
       to={SIDEBAR_TOOLS[id].to}
       params={{ orgId }}
       className="sidebar__item"
-      title={
-        id === "threads" && unreadThreads > 0 ? t("shell.unreadThreads", { count: unreadThreads }) : t(`shell.${id}`)
-      }
+      title={id === "threads" && unreadThreads > 0 ? t("shell.unreadThreads", { count: unreadThreads }) : railTip(id)}
       data-unread={id === "threads" && unreadThreads > 0}
     >
       <Icon name={SIDEBAR_TOOLS[id].icon} />
@@ -495,7 +495,7 @@ export function Sidebar() {
     tools: (
       // The tools each person keeps in sight; the rest open beside the sidebar from More.
       <div className="sidebar__group sidebar__tools">
-        <Link to="/org/$orgId/home" params={{ orgId }} className="sidebar__item" title={t("shell.home")}>
+        <Link to="/org/$orgId/home" params={{ orgId }} className="sidebar__item" title={railTip("home")}>
           <Icon name="home" />
           <span className="sidebar__item-label">{t("shell.home")}</span>
         </Link>
