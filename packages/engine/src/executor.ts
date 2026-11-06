@@ -35,7 +35,7 @@ import { withTimeout } from "./agent-media";
 import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
 import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
-import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
+import { type AgentAi, agentAiState, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { deciderName, publishApproval } from "./approvals";
 import { accountablePerson, fedByRoutine, personOfMessage, runAuthority } from "./authority";
 import {
@@ -202,7 +202,7 @@ import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
-import { postNoAiCard } from "./no-ai";
+import { type NoAiCardReason, postNoAiCard } from "./no-ai";
 import {
   notifyCatchUpClosed,
   notifyCatchUpClosedAsker,
@@ -278,7 +278,7 @@ import {
 import { truncateOutput } from "./sandbox";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
-import { standingErrorDetail, standingRefusal } from "./standing";
+import { billingHold, standingErrorDetail, standingRefusal } from "./standing";
 import { personAskedLately, rerootRun, runStretchOf } from "./stretch";
 import { isStuck, noteStep, STUCK_END_NOTE, STUCK_END_REPLY_NOTE, STUCK_NOTE, type StuckState } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
@@ -1383,7 +1383,7 @@ async function executeRunInner(
    * Nothing to think with (ADR 0061): the run fails with `no_ai`, and the conversation gets its agent's
    * card with Connect. Background work only fails (its routine says why).
    */
-  const failNoAi = async (why: NoAiReason, own?: AgentAi["own"], model?: string) => {
+  const failNoAi = async (why: NoAiCardReason, own?: AgentAi["own"], model?: string) => {
     if (!run.background) {
       const cardDeps = { db, pubsub: deps.pubsub, gateway: deps.gateway, machines: deps.machines };
       await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why, own, model)
@@ -1430,8 +1430,16 @@ async function executeRunInner(
 
   // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
   // before it starts anything.
+  // A billing hold keeps a person's message for after the plan: the agent's card says so, and it can be answered then.
+  // Background work and an agent's call have nobody's message to keep: they end saying why.
   const refusal = await standingRefusal(db, run.orgId, run.agentId);
-  if (refusal) return fail(refusal.message);
+  if (refusal) {
+    const kept =
+      !run.background &&
+      (await billingHold(db, run.orgId)) !== null &&
+      (await getMessage(db, run.orgId, run.triggerMessageId))?.authorType === "person";
+    return kept ? failNoAi("plan_hold") : fail(refusal.message);
+  }
 
   const ctx: ToolContext = {
     db,

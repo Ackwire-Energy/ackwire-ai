@@ -150,7 +150,7 @@ import {
   pickerValue,
 } from "@/components/AgentFields";
 import { AddAccount, OpenPage } from "@/components/ai/AddAccountFlow";
-import { accountOption, PlanHold } from "@/components/ai/ConnectAiSteps";
+import { accountOption, PlanHold, usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { LoadingLine } from "@/components/Loading";
@@ -267,6 +267,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const aiStatus = useAiStatus(org.id);
   // With no AI it thinks with nothing, whatever it is set to: the cell says so, as the badge by its name does.
   const noAi = aiStateOf(aiStatus.data, agent.id) === "no_ai";
+  const held = usePlanHold() !== null;
   const view = work.brain.data;
   const kind: BrainKind = view?.brain ?? agent.brain?.kind ?? "model";
   // What pays: the API key, or the plan of the account it thinks with (the agent list's until its view loads).
@@ -348,7 +349,8 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
               onOpen={can("machine") ? () => onOpen("computer") : undefined}
             />
           )}
-          {noAi ? (
+          {/* On a billing hold an AI comes after the plan: no "Sem IA" or Connect here, as on its chip. */}
+          {noAi && held ? null : noAi ? (
             <Cell
               icon={<Icon name="plug" size={16} />}
               label={t("agentPage.work.cell.brain")}
@@ -811,7 +813,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // The API key, Claude's and ChatGPT's plans, then each coding plan with an account there that is the viewer's or
   // that the agent thinks with.
   const cards: AiChoice[] = [
-    "key",
+    // On a billing hold a key is no way forward; one it already thinks with stays on show.
+    ...(hold && savedCard !== "key" ? [] : (["key"] as const)),
     "claude",
     "chatgpt",
     // Cursor (ADR 0114), OpenCode (ADR 0132), Grok (ADR 0142) and Gemini (ADR 0143) only where a computer here runs them, or the agent
@@ -1475,8 +1478,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               disabled: c !== "key" && !homeOf(c),
             }))}
           />
-          {hold && <PlanHold hold={hold} onKey={card !== "key" && can("brain") ? () => choose("key") : undefined} />}
-          {hold && card === "key" && can("brain") && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
+          {hold && <PlanHold hold={hold} />}
+          {hold && card === "key" && can("brain") && (
+            <SettingNote icon="clock">{t("connectAi.key.closed")}</SettingNote>
+          )}
           {chosenSide && <SettingNote icon={chosenSide.icon}>{chosenSide.text}</SettingNote>}
           <Card as="section" className="ai-panel" aria-label={t("brain.title")}>
             {card === "key" ? (
@@ -1526,7 +1531,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             </SettingNote>
           )}
           {/* Another plan, as the "Sem IA" cell offers it: Connect an AI, for this agent (its owner's choice). */}
-          {view.canUsePlans && connect && (
+          {view.canUsePlans && connect && !hold && (
             <span>
               <Button
                 size="sm"

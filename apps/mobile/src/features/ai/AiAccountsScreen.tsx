@@ -22,7 +22,7 @@ import {
 import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { agentAi, aiStateOf, uncheckedKeyLine } from "@agenteschat/client/lib/no-ai";
+import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import { providerLabel } from "@agenteschat/client/lib/providers";
@@ -323,7 +323,7 @@ export function AiAccountsScreen() {
             )}
           </View>
         ) : null}
-        {none ? null : (
+        {none || hold ? null : (
           <View style={styles.start}>
             <Button
               size="sm"
@@ -379,7 +379,7 @@ function KeysSection({ locale }: { locale: string }) {
               toast({
                 title:
                   saved.check === "unchecked"
-                    ? uncheckedKeyLine(t, providerLabel(k.provider), held)
+                    ? t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) })
                     : t("settings.rotated"),
                 icon: "check",
               });
@@ -413,7 +413,7 @@ function KeysSection({ locale }: { locale: string }) {
         ...(isDefault
           ? []
           : [{ label: t("settings.makeDefault"), onPress: () => update.mutate({ defaultCredentialId: k.id }) }]),
-        ...(Platform.OS === "ios" ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
+        ...(Platform.OS === "ios" && !held ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
         { label: t("settings.remove"), destructive: true, onPress: () => remove(k) },
       ],
       t("common.cancel"),
@@ -457,15 +457,19 @@ function KeysSection({ locale }: { locale: string }) {
           })}
         </GroupedList>
       ) : null}
-      <View style={styles.start}>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="plus"
-          label={t("settings.addKey")}
-          onPress={() => openConnectAi({ intent: "api_key" })}
-        />
-      </View>
+      {held ? (
+        <PlanHoldNote org={org} keys />
+      ) : (
+        <View style={styles.start}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="plus"
+            label={t("settings.addKey")}
+            onPress={() => openConnectAi({ intent: "api_key" })}
+          />
+        </View>
+      )}
     </>
   );
 }

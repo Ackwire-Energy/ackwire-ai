@@ -1982,6 +1982,7 @@
     "intro": {
       "greeting": "Bonjour, je suis {{name}}. Je monte l’équipe avec vous.",
       "lead": "Je crée les agents, je connecte les applications et j’invite les personnes. Rien ne change sans votre clic, et je ne fais que ce que vous pouvez faire.",
+      "heldLead": "Choisissez ce que fait votre entreprise et l'équipe apparaît ici. Les agents se mettent au travail dès que le workspace a un abonnement agentes.chat.",
       "connect": {
         "title": "Connecter une IA pour l’équipe",
         "text": "Les agents réfléchissent avec l’IA du workspace. Connectez-vous avec votre abonnement Claude ou ChatGPT, sans clé API.",
@@ -2309,6 +2310,14 @@
       "commands_off": "{{name}} ne peut pas répondre maintenant : les commandes sont désactivées sur l'ordinateur de l'abonnement, et la personne qui s'en occupe doit les activer.",
       "useKey": "Utiliser une clé API"
     },
+    "kept": {
+      "title": "J'ai gardé votre message.",
+      "line": "Je répondrai ici dès que le workspace aura un abonnement agentes.chat et une IA connectée.",
+      "plan": "L'abonnement apporte l'ordinateur des agents, toujours allumé. L'IA est celle que vous payez déjà : Claude, ChatGPT et d'autres, ou une clé API.",
+      "active": "Abonnement actif. Connectez une IA et {{name}} répond ici.",
+      "receipt": "Gardé",
+      "channel": "Gardé. Les agents répondent dès que le workspace a un abonnement agentes.chat."
+    },
     "receipt": "Personne ne répondra : aucune IA connectée",
     "chip": "Sans IA"
   },
@@ -2396,8 +2405,7 @@
       "forAll": "Tous les agents sans abonnement réfléchissent avec elle.",
       "saved": "Enregistrée. Tous les agents sans abonnement réfléchissent avec elle.",
       "savedUnchecked": "Enregistrée, mais {{provider}} n'a pas répondu et la clé n'a pas pu être vérifiée. Si elle échoue, la conversation dit pourquoi.",
-      "held": "Les agents l'utilisent dès que le forfait agentes.chat du workspace est actif.",
-      "savedHeld": "Enregistrée. Les agents l'utilisent dès que le forfait agentes.chat du workspace est actif.",
+      "closed": "Les clés API s'ouvrent avec l'abonnement agentes.chat du workspace.",
       "notPlan": "La clé d'un abonnement de code va dans sa propre option ci-dessus.",
       "billing": "Activez la facturation pour le projet de la clé. Sans facturation, Google peut utiliser ce que vos agents envoient.",
       "privacy": "Vos paramètres de confidentialité OpenRouter décident quels fournisseurs peuvent conserver ce que vos agents envoient."
@@ -3764,6 +3772,11 @@
         "title": "Créez votre premier agent",
         "text": "Dites ce qu'il fait et il rejoint l'équipe.",
         "action": "Créer un agent"
+      },
+      "plan": {
+        "title": "Choisir un abonnement agentes.chat",
+        "text": "Les agents se mettent au travail dès que le workspace en a un.",
+        "action": "Voir les abonnements"
       },
       "ai": {
         "title": "Connectez une IA",
@@ -13627,6 +13640,7 @@
       "no_ai_model_region": "Je ne peux pas répondre : {{model}} a besoin de la région Global activée dans OpenCode (Settings › Privacy).",
       "no_ai_commands_off": "Je ne peux pas répondre maintenant : les commandes sont désactivées sur l'ordinateur de mon abonnement.",
       "no_ai_cli_missing": "Je ne peux pas encore répondre : le programme de mon IA n'est pas installé sur mon ordinateur.",
+      "no_ai_plan_hold": "J'ai gardé votre message. Je répondrai ici dès que le workspace aura un abonnement agentes.chat et une IA connectée.",
       "no_ai_no_computer": "Je ne peux pas encore répondre : mon IA a besoin d'un ordinateur et je n'en ai aucun.",
       "redacted": "[supprimé : cela ressemblait à une connexion ou à une clé]",
       "action_connect_ai": "Connecter une IA",
@@ -14398,7 +14412,9 @@
         "ended": "Se réabonner"
       },
       "askAdmin": "La personne qui gère cet espace de travail peut régler cela.",
-      "paid": "Paiement reçu. L'abonnement agentes.chat démarre dans un instant."
+      "paid": "Paiement reçu. L'abonnement agentes.chat démarre dans un instant.",
+      "teamReady": "Votre équipe est prête. Il lui manque un abonnement agentes.chat pour démarrer.",
+      "invites": "Les invitations s'ouvrent avec l'abonnement agentes.chat."
     },
     "cloud": {
       "review": "En pause pour une vérification de sécurité, jusqu'à ce que notre équipe l'examine. Nos contrôles automatiques ont détecté une activité qui pourrait enfreindre nos Conditions (section 5). Pour contester, écrivez à {{email}}.",
@@ -15607,6 +15623,8 @@
     "firstTask": {
       "suggestion": "suggestion",
       "lead": "Une tâche courte par agent, pour voir chacun au travail aujourd'hui.",
+      "heldLead": "Une tâche courte par agent. Complétez la phrase et envoyez-la. Ils démarrent dès que le workspace a un abonnement agentes.chat.",
+      "example": "Exemple de ce que {{name}} livre",
       "open": "Ouvrir avec la tâche",
       "invite": "Inviter {{names}}",
       "later": "Plus tard"
@@ -15629,6 +15647,7 @@
     "templates": {
       "title": "Modèles d'équipe",
       "lead": "Une équipe prête pour ton type d'activité. Ensuite {{name}} l'ajuste avec toi.",
+      "heldLead": "Choisissez le plus proche de votre activité. Vous pouvez ajuster chaque agent avant de le créer.",
       "use": "Utiliser ce modèle",
       "none": "Aucun de ceux-ci",
       "noneSub": "Dis ce que tu fais et {{name}} la monte",
@@ -15696,50 +15715,55 @@
         "role": "Service client",
         "line": "Répond aux clients sur WhatsApp et par e-mail. T'appelle quand elle ne sait pas.",
         "routine": "Résumer ce qui est resté sans réponse",
-        "task": "Répondre au dernier message client en attente"
+        "task": "Écris une réponse à ce message client :"
       },
       "caio": {
         "role": "Facturation",
         "line": "Relance les retards de paiement et envoie la relance après ton accord.",
         "routine": "Lister qui a un paiement en retard",
-        "task": "Lister qui est en retard ce mois-ci"
+        "task": "Écris un rappel de paiement aimable pour :"
       },
       "ada": {
         "role": "Dev",
         "line": "Corrige les bugs signalés par les clients et ouvre la PR.",
         "routine": "Lister les nouveaux bugs",
-        "task": "Regarder le dernier bug signalé par un client"
+        "task": "Dis-moi par où commencer pour enquêter sur ce bug :"
       },
       "lia": {
         "role": "Contenu",
         "line": "Écrit posts et scripts dans le ton de l'entreprise et les programme après ton accord.",
         "routine": "Proposer les posts de la semaine",
-        "task": "Proposer trois posts pour cette semaine"
+        "task": "Propose trois posts pour cette semaine sur :"
       },
       "theo": {
         "role": "Ventes",
         "line": "Relance toutes les personnes qui ont demandé un devis et rédige les propositions.",
         "routine": "Lister qui a demandé un devis sans réponse",
-        "task": "Lister qui a demandé un devis cette semaine"
+        "task": "Écris un devis court pour cette demande :"
       },
       "nina": {
         "role": "Agenda",
         "line": "Prend, confirme et déplace les rendez-vous, et rappelle les clients la veille.",
         "routine": "Confirmer les rendez-vous de demain",
-        "task": "Me montrer les rendez-vous de demain"
+        "task": "Organise ces horaires de demain :"
       },
       "otto": {
         "role": "Commandes",
         "line": "Suit les commandes et le stock et prévient de ce qui manque bientôt.",
         "routine": "Prévenir de ce qui manque bientôt en stock",
-        "task": "Lister les commandes qui attendent encore l'envoi"
+        "task": "Liste ce qu'il reste à faire sur ces commandes :"
       },
       "bia": {
         "role": "Base de réponses",
         "line": "Tient la base de réponses à jour avec ce que l'équipe répond.",
         "routine": "Mettre à jour la base avec les réponses de la semaine",
-        "task": "Lister les 5 questions que les clients posent le plus"
+        "task": "Écris les réponses à ces questions de clients :"
       }
+    },
+    "example": {
+      "iara": "Bonjour Marina ! Votre commande est partie hier et arrive d'ici vendredi. Le numéro de suivi est juste en dessous. Si vendredi ne convient pas, je trouve une autre date.",
+      "lia": "1. Trois erreurs fréquentes en choisissant une agence. 2. Les coulisses d'un projet qui a failli mal tourner. 3. Une question pour vos abonnés : que voulez-vous voir ici ?",
+      "nina": "Demain : 9h Carla, 10h30 Pedro, 14h libre. Pedro n'a pas encore confirmé. Je lui écris ?"
     },
     "channels": {
       "iara": "support",

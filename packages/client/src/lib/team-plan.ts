@@ -11,6 +11,8 @@ import { errorText } from "./errors";
 /** The start card's first question: what the business does. `other` writes in the composer instead of sending. */
 export const BUSINESS_TYPES = ["agency", "store", "clinic", "software", "support", "services", "other"] as const;
 export type BusinessType = (typeof BUSINESS_TYPES)[number];
+/** Every business type but `other` is a team template's id too (the server's `TEAM_TEMPLATES`). */
+export const isTemplateBusiness = (b: BusinessType): b is Exclude<BusinessType, "other"> => b !== "other";
 
 /** Several answers tapped together go as one message, in this order. */
 export const ANSWER_JOINER = " · ";

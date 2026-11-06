@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { type AiStatusDeps, orgHasAi } from "./ai-status";
 import { caches } from "./cache";
@@ -15,7 +15,17 @@ import { OrgCursor, orgCreatedAtMs } from "./operator";
 import { requirePermission, USER_LOCALES } from "./organizations";
 import { openOrg, orgStanding, STANDING_COLUMNS, workRefusal } from "./standing";
 
-const { organizations, organizationMembers, users, machines, machineProvisioning, machineDeviceCodes, agents } = schema;
+const {
+  organizations,
+  organizationMembers,
+  users,
+  machines,
+  machineProvisioning,
+  machineDeviceCodes,
+  agents,
+  messages,
+  channels,
+} = schema;
 
 /**
  * The workspace's own computer, from a provisioner the operator runs (ADR 0056 §10), with
@@ -523,7 +533,27 @@ async function readyEmailDraft(db: Database, email: ReadyEmailDeps, orgId: strin
   const crew = await emailCrew(db, orgId);
   // Not known now: the step that connects an AI stays in, rather than the computer's ready going unsaid.
   const hasAi = await orgHasAi({ db, gateway: email.gateway, machines: email.machines }, orgId).catch(() => false);
-  return { org, owners, crew, needsAi: !hasAi, publicUrl: email.publicUrl };
+  const kept = await keptConversation(db, orgId);
+  return { org, owners, crew, needsAi: !hasAi, kept, publicUrl: email.publicUrl };
+}
+
+/** The app path of the newest message kept on a billing hold: signing in there, it is answered right there. */
+async function keptConversation(db: Database, orgId: string) {
+  const [card] = await db
+    .select({ channelId: messages.channelId, agentId: messages.authorAgentId, kind: channels.kind })
+    .from(messages)
+    .innerJoin(channels, eq(channels.id, messages.channelId))
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        isNull(messages.deletedAt),
+        sql`${messages.meta}->'noAi'->>'reason' = 'plan_hold'`,
+      ),
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  if (!card) return null;
+  return card.kind === "dm" ? `/org/${orgId}/dm/agent/${card.agentId}` : `/org/${orgId}/c/${card.channelId}`;
 }
 
 /**
@@ -558,6 +588,7 @@ async function queueReadyEmail(
         hasAgents: draft.crew.length > 0,
         crew: draft.crew,
         url: `${draft.publicUrl.replace(/\/$/, "")}/org/${row.orgId}`,
+        ...(draft.kept ? { keptUrl: `${draft.publicUrl.replace(/\/$/, "")}${draft.kept}` } : {}),
       },
     });
   }

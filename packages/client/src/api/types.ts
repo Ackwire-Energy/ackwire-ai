@@ -883,6 +883,8 @@ export interface TeamPlan {
   /** People named as working there, invited after. */
   invite: string[];
   template?: string;
+  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
+  example?: string;
 }
 
 /** The right hand's team card (`meta.actionCard`): several agents created in one click ("Criar o time"). */
@@ -1193,6 +1195,8 @@ export interface MessageReceipts {
   referenced?: string[];
   /** Nobody was asked: the organization has no AI connected. */
   noAi?: boolean;
+  /** With `noAi`: it came in on a billing hold, to be answered after the plan. */
+  kept?: boolean;
   /** Nobody was asked: the workspace used up its platform AI for the month, so only @mentions start agents. */
   platformCap?: boolean;
   /** Who picked the agents for it (ADR 0074); absent on a decision from before. */

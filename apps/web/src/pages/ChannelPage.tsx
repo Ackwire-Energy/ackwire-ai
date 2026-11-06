@@ -954,7 +954,14 @@ function ChannelView({
   const [missionDraft, setMissionDraft] = useState<string | null>(null);
   draftRef.current = draft;
   useEffect(() => {
-    if (draftKey) clearDraft(draftKey);
+    if (!draftKey) return;
+    // Text left here is for the person to finish: the caret waits at its end.
+    const box = composer.current;
+    if (peekDraft(draftKey) && box) {
+      box.focus();
+      box.setSelectionRange(box.value.length, box.value.length);
+    }
+    clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const membersColumn = useMembersColumn();

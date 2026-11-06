@@ -48,7 +48,6 @@ import {
   planOfAccount,
   planPickText,
   planTitle,
-  uncheckedKeyLine,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
@@ -90,18 +89,20 @@ import { PickList } from "../shared/PickList";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { EndpointForm } from "./EndpointForm";
-import {
-  existingRows,
-  type FlowView,
-  flowBack,
-  keyNowLabel,
-  offersKeyNow,
-  PLAN_POLL_MS,
-  pollsPlan,
-  takenFrom,
-} from "./logic";
+import { existingRows, type FlowView, flowBack, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
 import { useAiOrg } from "./org";
-import { AiRow, alertKeyRefused, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard, usePlanHold } from "./parts";
+import {
+  AiRow,
+  alertKeyRefused,
+  Note,
+  OpenPage,
+  PasteField,
+  PlanHoldNote,
+  PlanReplies,
+  Step,
+  StepsCard,
+  usePlanHold,
+} from "./parts";
 
 /*
  * "Conectar uma IA" on the phone: the web's content and rules
@@ -261,7 +262,6 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const { orgId, org } = useAiOrg();
-  const held = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -348,7 +348,7 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
         async () => {
           const { check } = await api.agents.checkCredential(orgId, k.id);
           if (check === "unchecked")
-            toast({ title: uncheckedKeyLine(t, providerLabel(k.provider), held), icon: "check" });
+            toast({ title: t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) }), icon: "check" });
           // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
           if (rightHand) return rightHandOnKey(api, orgId, rightHand, k, models.data?.models ?? []);
           if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });
@@ -773,7 +773,6 @@ function PlanPage(
             agentId={agent.id}
             agentName={agent.name}
             justReady={props.justReady}
-            mayAddKey={props.mayAddKey}
             onComputer={props.onComputer}
             onKey={() => onView({ page: "key" })}
             move={replies.move}
@@ -856,9 +855,8 @@ function PlanWithoutAgent({
       {elsewhere ? (
         <Button variant="primary" wide label={t("aiAccounts.connect.addComputer")} onPress={onComputer} />
       ) : null}
-      {(offersKeyNow(gate, holdText(t, org?.standing) !== null, mayAddKey) || (elsewhere && mayAddKey)) &&
-      !signingIn ? (
-        <Button variant="ghost" wide label={t(keyNowLabel(gate))} onPress={onKey} />
+      {(offersKeyNow(gate, holdText(t, org?.standing) !== null) || (elsewhere && mayAddKey)) && !signingIn ? (
+        <Button variant="ghost" wide label={t("connectAi.wait.useKey")} onPress={onKey} />
       ) : null}
       {steps ? (
         <AddAccount
@@ -890,7 +888,6 @@ function PlanSteps({
   repliesRow,
   email,
   login,
-  mayAddKey,
   onKey,
   onComputer,
   onDone,
@@ -908,8 +905,6 @@ function PlanSteps({
   email?: string;
   /** A row of what the person already has: one more login of that account, or a free login of it signed back in. */
   login?: ExistingSignIn;
-  /** Only an admin adds an API key. */
-  mayAddKey: boolean;
   onKey: () => void;
   onComputer: () => void;
   onDone: (account: MachineAccount | null) => void;
@@ -999,7 +994,7 @@ function PlanSteps({
   }
 
   const ready = gate.state === "ready";
-  const useKey = <Button variant="ghost" wide label={t(keyNowLabel(gate))} onPress={onKey} />;
+  const useKey = <Button variant="ghost" wide label={t("connectAi.wait.useKey")} onPress={onKey} />;
   const hold = holdText(t, org?.standing);
   const wait = (
     <GateWait
@@ -1046,7 +1041,7 @@ function PlanSteps({
   return (
     <View style={styles.gap}>
       {wait}
-      {offersKeyNow(gate, hold !== null, mayAddKey) && !signingIn ? useKey : null}
+      {offersKeyNow(gate, hold !== null) && !signingIn ? useKey : null}
       {ready && waited ? (
         // A card of its own, where the wait's was: never read as the head of the account choice under it.
         <InfoCard icon="check" live>
@@ -1151,7 +1146,7 @@ function GateWait({
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
   else if (gate.state === "billing") {
-    // A hold stops the Model Gateway too, so the key's page says it starts with the plan. Paying happens on the web.
+    // A hold stops the Model Gateway for keys too, and paying happens on the web.
     wait = <InfoCard icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false)}</InfoCard>;
   } else if (gate.state === "preparing") {
     const setup = gate.view;
@@ -1220,13 +1215,14 @@ function KeyPage({
   const valid = keyLooksValid(form.provider, clean);
   const wrong = touched && clean.length > 0 && !valid;
   const others = wrong ? providersForKey(clean) : [];
+  if (hold) return <PlanHoldNote org={org} keys />;
   if (!mayAddKey) return <InfoCard icon="lock">{t("connectAi.keyLocked")}</InfoCard>;
   if (keySaved || endpointSaved) {
     return (
       <View style={styles.done}>
         <ProviderLogo id={endpointSaved ? CUSTOM_PROVIDER : form.provider} size="hero" />
         <Text variant="title2" tone="ink" style={styles.center}>
-          {hold ? t("connectAi.key.savedHeld") : (!endpointSaved && form.savedNote) || t("connectAi.key.saved")}
+          {(!endpointSaved && form.savedNote) || t("connectAi.key.saved")}
         </Text>
       </View>
     );
@@ -1249,7 +1245,6 @@ function KeyPage({
       {custom ? (
         <View style={styles.keySteps}>
           <EndpointForm orgId={orgId} onDone={() => setEndpointSaved(true)} />
-          {hold ? <Note icon="clock">{t("connectAi.key.held")}</Note> : null}
         </View>
       ) : maker && site ? (
         <View style={styles.keySteps}>
@@ -1323,7 +1318,7 @@ function KeyPage({
               {t("mobile.ai.failed")}
             </Note>
           ) : (
-            <Note icon={hold ? "clock" : "info"}>{t(hold ? "connectAi.key.held" : "connectAi.key.forAll")}</Note>
+            <Note icon="info">{t("connectAi.key.forAll")}</Note>
           )}
           {keyButton ? (
             <View style={styles.save}>

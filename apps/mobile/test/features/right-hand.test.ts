@@ -100,6 +100,18 @@ test("its greeting's cards: Connect AI, then how to start, then what next, then 
   expect(introCards({ ...base, teamHandles: ["iara"], alone: false })).toEqual([]);
   // People here already: nothing left to offer, ready-made agents or not.
   expect(introCards({ ...base, teamHandles: ["ada"], alone: false })).toEqual([]);
+  // On a billing hold an AI comes after the plan: how to start and what next, even with no AI or a saved key.
+  const held = { ...base, held: true, askStyle: true };
+  expect(introCards({ ...held, noAi: true })).toEqual(["start"]);
+  expect(introCards(held)).toEqual(["start"]);
+  expect(introCards({ ...held, teamHandles: ["iara"] })).toEqual(["next"]);
+  expect(introCards({ ...base, askStyle: true })).toEqual(["start", "style"]);
+});
+
+test("on a billing hold its greeting offers no line to build the team: that message would be refused", () => {
+  const s = { noAi: false, aiKnown: true, createsAgents: true, hasTeam: true, cardPassed: false };
+  expect(offersTeamSetup(s)).toBe(true);
+  expect(offersTeamSetup({ ...s, held: true })).toBe(false);
 });
 
 test("it asks once how the person wants agents to talk to them, last, while they never picked (ADR 0147)", () => {

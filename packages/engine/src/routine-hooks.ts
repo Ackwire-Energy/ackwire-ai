@@ -22,7 +22,7 @@ import { publishRoutineRuns } from "./events";
 import { cutText } from "./format";
 import { oneLine } from "./mail/text";
 import { type EventMerge, queueEventRun, type RoutineEventPayload } from "./routine-events";
-import { closedOrg } from "./standing";
+import { assertCanWork, closedOrg } from "./standing";
 import { untrustedBlock } from "./untrusted";
 
 /**
@@ -298,6 +298,8 @@ const SAMPLE = { test: true, text: "A sample call sent with Testar on the routin
  */
 export async function sendRoutineHookTest(deps: RoutineHookDeps, routine: RoutineRef & { active: boolean }) {
   if (!routine.active) throw new ConflictError("Turn the routine on to test it.", "routine.webhook_paused");
+  // "Teste enviado" would be false: a slot on hold passes without running.
+  await assertCanWork(deps.db, routine.orgId);
   const hook = await hookRow(deps, routine);
   if (!(await underLimit(deps, hook))) {
     throw new TooManyError("Too many calls to this routine. Try again in a minute.", "routine.webhook_rate_limited");

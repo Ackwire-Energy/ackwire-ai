@@ -64,6 +64,7 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { usePersonMenu } from "@/components/entity-menus";
 import { useFilterCopy } from "@/components/filters";
 import { useCopied } from "@/components/invite/copied";
@@ -369,6 +370,8 @@ function InviteActions() {
   const links = useInviteLinks(org.id);
   const make = useMakeInviteLink(org.id);
   const [copied, copy] = useCopied();
+  // Nobody joins on a billing hold: the invite dialog says so, and a link would open on a refusal.
+  const held = usePlanHold() !== null;
   const copyLink = async () => {
     const shown = links.data?.find((l) => l.url !== null)?.url;
     const url = shown ?? (await make.mutateAsync().catch(() => null))?.url;
@@ -376,9 +379,11 @@ function InviteActions() {
   };
   return (
     <div className="row members-acts">
-      <Button icon={copied ? "check" : "link"} loading={make.isPending} onClick={() => void copyLink()}>
-        {copied ? t("common.copied") : t("members.copyInviteLink")}
-      </Button>
+      {!held && (
+        <Button icon={copied ? "check" : "link"} loading={make.isPending} onClick={() => void copyLink()}>
+          {copied ? t("common.copied") : t("members.copyInviteLink")}
+        </Button>
+      )}
       {invite && (
         <Button variant="primary" icon="plus" onClick={() => invite.open()}>
           {t("members.inviteTitle")}

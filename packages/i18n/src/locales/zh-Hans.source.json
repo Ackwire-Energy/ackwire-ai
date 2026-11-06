@@ -4694,6 +4694,9 @@
   "rightHand.intro.lead": {
     "value": "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do."
   },
+  "rightHand.intro.heldLead": {
+    "value": "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan."
+  },
   "rightHand.intro.connect.title": {
     "value": "Connect an AI for the team"
   },
@@ -5419,6 +5422,24 @@
   "noAi.rightHand.useKey": {
     "value": "Use an API key"
   },
+  "noAi.kept.title": {
+    "value": "I kept your message."
+  },
+  "noAi.kept.line": {
+    "value": "I'll answer here once the workspace has an agentes.chat plan and an AI connected."
+  },
+  "noAi.kept.plan": {
+    "value": "The plan brings the agents' computer, always on. The AI is the one you already pay for: Claude, ChatGPT and more, or an API key."
+  },
+  "noAi.kept.active": {
+    "value": "Plan active. Connect an AI and {{name}} answers here."
+  },
+  "noAi.kept.receipt": {
+    "value": "Kept"
+  },
+  "noAi.kept.channel": {
+    "value": "Kept. The agents answer once the workspace has an agentes.chat plan."
+  },
   "noAi.receipt": {
     "value": "Nobody will answer: no AI connected"
   },
@@ -5575,11 +5596,8 @@
   "connectAi.key.savedUnchecked": {
     "value": "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why."
   },
-  "connectAi.key.held": {
-    "value": "Agents use it once the workspace's agentes.chat plan is active."
-  },
-  "connectAi.key.savedHeld": {
-    "value": "Saved. Agents use it once the workspace's agentes.chat plan is active."
+  "connectAi.key.closed": {
+    "value": "API keys open with the workspace's agentes.chat plan."
   },
   "connectAi.key.notPlan": {
     "value": "A coding plan's key goes in its own option above."
@@ -8852,6 +8870,15 @@
   },
   "home.steps.agent.action": {
     "value": "Create agent"
+  },
+  "home.steps.plan.title": {
+    "value": "Choose an agentes.chat plan"
+  },
+  "home.steps.plan.text": {
+    "value": "The agents start working once the workspace has one."
+  },
+  "home.steps.plan.action": {
+    "value": "See plans"
   },
   "home.steps.ai.title": {
     "value": "Connect an AI"
@@ -32090,6 +32117,9 @@
   "chat.body.no_ai_cli_missing": {
     "value": "I can't answer yet: my AI's program isn't installed on my computer."
   },
+  "chat.body.no_ai_plan_hold": {
+    "value": "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected."
+  },
   "chat.body.no_ai_no_computer": {
     "value": "I can't answer yet: my AI needs a computer and I have none."
   },
@@ -33635,6 +33665,12 @@
   },
   "standing.billing.paid": {
     "value": "Payment received. The agentes.chat plan starts in a moment."
+  },
+  "standing.billing.teamReady": {
+    "value": "Your team is ready. It needs an agentes.chat plan to start."
+  },
+  "standing.billing.invites": {
+    "value": "Invitations open with the agentes.chat plan."
   },
   "standing.cloud.review": {
     "value": "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 5). To contest it, write to {{email}}."
@@ -36268,6 +36304,12 @@
   "teamPlan.firstTask.lead": {
     "value": "One short task per agent, so you see each one working today."
   },
+  "teamPlan.firstTask.heldLead": {
+    "value": "One short task per agent. Finish the sentence and send it. They start once the workspace has an agentes.chat plan."
+  },
+  "teamPlan.firstTask.example": {
+    "value": "Example of what {{name}} delivers"
+  },
   "teamPlan.firstTask.open": {
     "value": "Open with the task"
   },
@@ -36315,6 +36357,9 @@
   },
   "teamPlan.templates.lead": {
     "value": "A ready team for your kind of business. Then {{name}} fits it with you."
+  },
+  "teamPlan.templates.heldLead": {
+    "value": "Pick the closest to your business. You can change every agent before creating them."
   },
   "teamPlan.templates.use": {
     "value": "Use this template"
@@ -36452,7 +36497,7 @@
     "value": "Sum up what was left unanswered"
   },
   "teamTemplates.agents.iara.task": {
-    "value": "Answer the last customer message waiting for us"
+    "value": "Write a reply to this customer message:"
   },
   "teamTemplates.agents.caio.role": {
     "value": "Billing"
@@ -36464,7 +36509,7 @@
     "value": "List who is late on payment"
   },
   "teamTemplates.agents.caio.task": {
-    "value": "List who is late this month"
+    "value": "Write a friendly payment reminder for:"
   },
   "teamTemplates.agents.ada.role": {
     "value": "Dev"
@@ -36476,7 +36521,7 @@
     "value": "List the new bugs"
   },
   "teamTemplates.agents.ada.task": {
-    "value": "Look at the latest bug a customer reported"
+    "value": "Tell me where to start looking at this bug:"
   },
   "teamTemplates.agents.lia.role": {
     "value": "Content"
@@ -36488,7 +36533,7 @@
     "value": "Propose the week's posts"
   },
   "teamTemplates.agents.lia.task": {
-    "value": "Propose three posts for this week"
+    "value": "Suggest three posts for this week about:"
   },
   "teamTemplates.agents.theo.role": {
     "value": "Sales"
@@ -36500,7 +36545,7 @@
     "value": "List who asked for a quote and got no answer"
   },
   "teamTemplates.agents.theo.task": {
-    "value": "List who asked for a quote this week"
+    "value": "Write a short quote for this request:"
   },
   "teamTemplates.agents.nina.role": {
     "value": "Scheduling"
@@ -36512,7 +36557,7 @@
     "value": "Confirm tomorrow's appointments"
   },
   "teamTemplates.agents.nina.task": {
-    "value": "Show me tomorrow's appointments"
+    "value": "Organize tomorrow's schedule:"
   },
   "teamTemplates.agents.otto.role": {
     "value": "Orders"
@@ -36524,7 +36569,7 @@
     "value": "Warn what is running out in stock"
   },
   "teamTemplates.agents.otto.task": {
-    "value": "List the orders still waiting to ship"
+    "value": "List what's left to do on these orders:"
   },
   "teamTemplates.agents.bia.role": {
     "value": "Answer base"
@@ -36536,7 +36581,16 @@
     "value": "Update the base with the week's answers"
   },
   "teamTemplates.agents.bia.task": {
-    "value": "List the 5 questions customers ask the most"
+    "value": "Write answers to these customer questions:"
+  },
+  "teamTemplates.example.iara": {
+    "value": "Hi Marina! Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date."
+  },
+  "teamTemplates.example.lia": {
+    "value": "1. Three common mistakes when hiring an agency. 2. Behind the scenes of a project that almost went wrong. 3. A question for your followers: what do you want to see here?"
+  },
+  "teamTemplates.example.nina": {
+    "value": "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?"
   },
   "teamTemplates.channels.iara": {
     "value": "support"

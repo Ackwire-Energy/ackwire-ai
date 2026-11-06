@@ -624,6 +624,10 @@ const MessageBase = z.object({
         .literal(true)
         .optional()
         .openapi({ description: "Routed to nobody: the organization had no AI connected." }),
+      kept: z
+        .literal(true)
+        .optional()
+        .openapi({ description: "With `noAi`: it came in on a billing hold, to be answered after the plan." }),
       platformCap: z.literal(true).optional().openapi({
         description: "Routed to nobody: the workspace used up its platform AI for the month; @mentions still answer.",
       }),

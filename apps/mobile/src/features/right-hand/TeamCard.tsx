@@ -27,16 +27,20 @@ import {
   teamStatus,
   teamUndoable,
 } from "@agenteschat/client/lib/team-plan";
+import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, fieldText, Icon, LineIcon, Locked, Sheet, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
+import { usePlanHold } from "../ai/parts";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
+import { MESSAGE_STICKER } from "../chat/media";
 import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
@@ -268,7 +272,10 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
   const meId = useMeId();
   const dir = useDirectory();
   const failed = useFailed();
+  const held = usePlanHold(orgId, org) !== null;
   const team = useTeamCard(orgId, { channelId: m.channelId, messageId: m.id });
+  // Made here and now, on a hold: when the new agents' wave started.
+  const [waveFrom, setWaveFrom] = useState<number>();
   const [adjusting, setAdjusting] = useState<TeamAgentDraft | null>(null);
   const [map, setMap] = useState(false);
   const plan = card.params;
@@ -314,7 +321,8 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
                   onPress={() =>
                     team.create.mutate(undefined, {
                       onSuccess: ({ noAi }) => {
-                        if (noAi?.[0]) openConnectAi({ agentId: noAi[0] });
+                        if (held) setWaveFrom(Date.now());
+                        else if (noAi?.[0]) openConnectAi({ agentId: noAi[0] });
                       },
                       onError: failed,
                     })
@@ -393,7 +401,23 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
             {t("teamPlan.card.skillsWait")}
           </Text>
         ) : null}
-        {card.decidedByUserId === meId ? <FirstTasks message={m} card={card} /> : null}
+        {waveFrom !== undefined ? (
+          <View style={styles.wave} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {plan.agents.map((a) => (
+              <StickerCanvas
+                key={a.handle}
+                look={fullLook(a.appearance)}
+                mood="wave"
+                size={MESSAGE_STICKER}
+                seed={a.handle}
+                live
+                playFor={WAVE_SECONDS}
+                from={waveFrom}
+              />
+            ))}
+          </View>
+        ) : null}
+        {card.decidedByUserId === meId ? <FirstTasks message={m} card={card} held={held} /> : null}
       </>
     );
   }
@@ -413,8 +437,11 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
   );
 }
 
-/** A first task per agent (its DM opens with it typed, never sent) and inviting the people. */
-function FirstTasks({ message: m, card }: { message: Message; card: TeamProposalCard }) {
+/**
+ * A first task per agent (its DM opens with it typed, never sent, for the person to finish) and inviting the people. On
+ * a billing hold, a labelled example of what the first agent delivers, and where the plan is, in words only.
+ */
+function FirstTasks({ message: m, card, held }: { message: Message; card: TeamProposalCard; held: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory();
@@ -422,7 +449,8 @@ function FirstTasks({ message: m, card }: { message: Message; card: TeamProposal
   const openDm = useOpenDm();
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
-  const people = card.params.invite;
+  const people = held ? [] : card.params.invite;
+  const example = held && tasks[0] ? card.params.example : undefined;
   if (later || (tasks.length === 0 && people.length === 0)) return null;
   return (
     <AskCard
@@ -430,7 +458,7 @@ function FirstTasks({ message: m, card }: { message: Message; card: TeamProposal
       kind="firstTask"
       agentId={m.author.id ?? ""}
       waitsFor={t("teamPlan.firstTask.suggestion")}
-      lead={t("teamPlan.firstTask.lead")}
+      lead={t(held ? "teamPlan.firstTask.heldLead" : "teamPlan.firstTask.lead")}
       body={
         <View style={styles.rows}>
           {tasks.map((f, i) => (
@@ -448,12 +476,25 @@ function FirstTasks({ message: m, card }: { message: Message; card: TeamProposal
                     variant="secondary"
                     size="sm"
                     label={t("teamPlan.firstTask.open")}
-                    onPress={() => void openDm({ agentId: f.agentId }, { compose: true, text: f.task })}
+                    onPress={() => void openDm({ agentId: f.agentId }, { compose: true, text: `${f.task} ` })}
                   />
                 </View>
               </View>
             </View>
           ))}
+          {example && tasks[0] ? (
+            <View style={[styles.example, { backgroundColor: c.sunken }]}>
+              <Text variant="footnote" tone="muted">
+                {t("teamPlan.firstTask.example", { name: tasks[0].name })}
+              </Text>
+              <Text variant="small">{example}</Text>
+            </View>
+          ) : null}
+          {held ? (
+            <Text variant="footnote" tone="muted">
+              {t(can(org, "manage_billing") ? "connectAi.billingWeb" : "standing.billing.askAdmin")}
+            </Text>
+          ) : null}
         </View>
       }
       foot={
@@ -664,10 +705,11 @@ export function TeamTemplatesSheet({
   onNone: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
   const c = useColors();
   const failed = useFailed();
   const dir = useDirectory();
+  const held = usePlanHold(orgId, org) !== null;
   const name = dir.agents.find(isRightHand)?.name ?? "Lodi";
   const list = useTeamTemplates(orgId, i18n.language, open);
   const use = useApplyTeamTemplate(orgId);
@@ -678,14 +720,20 @@ export function TeamTemplatesSheet({
       <ScrollView contentContainerStyle={styles.form}>
         <Text variant="title2">{chosen ? chosen.name : t("teamPlan.templates.title")}</Text>
         <Text variant="small" tone="muted">
-          {chosen ? chosen.description : t("teamPlan.templates.lead", { name })}
+          {chosen
+            ? chosen.description
+            : held
+              ? t("teamPlan.templates.heldLead")
+              : t("teamPlan.templates.lead", { name })}
         </Text>
         {chosen ? (
           <>
             <TeamRows plan={chosen.team} />
-            <Text variant="footnote" tone="muted">
-              {t("teamPlan.templates.tailor")}
-            </Text>
+            {held ? null : (
+              <Text variant="footnote" tone="muted">
+                {t("teamPlan.templates.tailor")}
+              </Text>
+            )}
             <Text variant="caption" tone="muted">
               {countsText(t, chosen.team)}
             </Text>
@@ -733,26 +781,28 @@ export function TeamTemplatesSheet({
                 </View>
               </Pressable>
             ))}
-            <Pressable
-              accessibilityRole="button"
-              onPress={onNone}
-              style={({ pressed }) => [
-                styles.template,
-                { borderColor: c.line2, backgroundColor: pressed ? c.sunken : c.raised },
-              ]}
-            >
-              <View style={styles.faces}>
-                <Icon name="pen" size={16} color={c.muted} />
-              </View>
-              <View style={styles.fill}>
-                <Text variant="body" style={styles.bold}>
-                  {t("teamPlan.templates.none")}
-                </Text>
-                <Text variant="small" tone="muted">
-                  {t("teamPlan.templates.noneSub", { name })}
-                </Text>
-              </View>
-            </Pressable>
+            {held ? null : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={onNone}
+                style={({ pressed }) => [
+                  styles.template,
+                  { borderColor: c.line2, backgroundColor: pressed ? c.sunken : c.raised },
+                ]}
+              >
+                <View style={styles.faces}>
+                  <Icon name="pen" size={16} color={c.muted} />
+                </View>
+                <View style={styles.fill}>
+                  <Text variant="body" style={styles.bold}>
+                    {t("teamPlan.templates.none")}
+                  </Text>
+                  <Text variant="small" tone="muted">
+                    {t("teamPlan.templates.noneSub", { name })}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
           </>
         )}
       </ScrollView>
@@ -761,6 +811,8 @@ export function TeamTemplatesSheet({
 }
 
 const styles = StyleSheet.create({
+  wave: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  example: { gap: 6, padding: 12, borderRadius: 12, marginTop: 8 },
   chips: { gap: 8, marginTop: 6 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chipFoot: { flexDirection: "row", alignItems: "center", gap: 12 },

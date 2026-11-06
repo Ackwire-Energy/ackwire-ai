@@ -166,7 +166,7 @@ describe("the team card", () => {
     await click(within(first).getAllByRole("button", { name: "Abrir com a tarefa" })[0] as HTMLElement, 12);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${iara?.id}`);
     const box = screen().getByRole("combobox", { name: "Mensagem para Iara" }) as HTMLTextAreaElement;
-    expect(box.value).toBe("Responder a última mensagem que espera");
+    expect(box.value).toBe("Responder a última mensagem que espera ");
     // Typed, never sent.
     expect(calls(state, "chat.post")).toEqual([]);
   });

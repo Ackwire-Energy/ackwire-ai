@@ -91,6 +91,8 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 
 /** A run's error (and a routing decision's) when nobody could think: no AI connected. */
 export const NO_AI = "no_ai" as const;
+/** The `strategy` of a `no_ai` decision made on a billing hold: its receipt says `kept`, and it is answered after the plan. */
+export const KEPT_ON_HOLD = "plan_hold";
 /** A run's error when the person behind it is at their monthly AI limit (ADR 0141): its card says so. */
 export const PERSON_LIMIT = "person_limit" as const;
 /** An older run's error from when a run waited at most 30 minutes for room on its computer (still worded). */

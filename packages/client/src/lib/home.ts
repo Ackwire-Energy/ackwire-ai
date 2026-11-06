@@ -77,7 +77,7 @@ export function upcomingRoutines<T extends Pick<Routine, "active" | "nextRunAt">
     .slice(0, max);
 }
 
-export type FirstStepId = "agent" | "ai" | "ask" | "team" | "routine";
+export type FirstStepId = "plan" | "agent" | "ai" | "ask" | "team" | "routine";
 
 export interface FirstStep {
   id: FirstStepId;
@@ -95,11 +95,13 @@ export const stepPermissions = (
   talk: can(org, "talk_to_agents"),
   invite: can(org, "invite_people"),
   routines: can(org, "manage_routines"),
+  pay: can(org, "manage_billing"),
 });
 
 /**
  * A new workspace's first steps, in order, each checked from what the apps already load and offered only to who may
- * take it: an AI, a request and a routine need an agent first. None once every step offered is done.
+ * take it: an AI, a request and a routine need an agent first. None once every step offered is done. On a billing
+ * hold the plan comes first for who pays, and an AI and invitations wait for it.
  */
 export function firstSteps(input: {
   agents: number;
@@ -115,20 +117,23 @@ export function firstSteps(input: {
   people: number;
   routines: number;
   /** `connectAi`: may add the workspace's key, or owns an agent (a plan thinks only for its owner's agents). */
-  may: { createAgents: boolean; connectAi: boolean; talk: boolean; invite: boolean; routines: boolean };
+  may: { createAgents: boolean; connectAi: boolean; talk: boolean; invite: boolean; routines: boolean; pay?: boolean };
+  /** A billing hold (`planHoldOf`). */
+  held?: boolean;
 }): FirstStep[] {
-  const { agents, may } = input;
+  const { agents, may, held } = input;
   const steps: FirstStep[] = [
+    ...(held && may.pay ? [{ id: "plan" as const, done: false }] : []),
     ...(may.createAgents ? [{ id: "agent" as const, done: (input.made ?? agents) > 0 }] : []),
-    ...(agents > 0 && may.connectAi ? [{ id: "ai" as const, done: input.hasAi }] : []),
+    ...(agents > 0 && may.connectAi && !held ? [{ id: "ai" as const, done: input.hasAi }] : []),
     ...(agents > 0 && may.talk ? [{ id: "ask" as const, done: input.asked }] : []),
-    ...(may.invite ? [{ id: "team" as const, done: input.people > 1 }] : []),
+    ...(may.invite && !held ? [{ id: "team" as const, done: input.people > 1 }] : []),
     ...(agents > 0 && may.routines ? [{ id: "routine" as const, done: input.routines > 0 }] : []),
   ];
   return steps.some((s) => !s.done) ? steps : [];
 }
 
-const CORE_STEPS: ReadonlySet<FirstStepId> = new Set(["agent", "ai", "ask"]);
+const CORE_STEPS: ReadonlySet<FirstStepId> = new Set(["plan", "agent", "ai", "ask"]);
 
 /**
  * Whether the workspace is still starting out ("Comece por aqui"): an agent, its AI or a first request is still to

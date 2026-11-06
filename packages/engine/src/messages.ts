@@ -44,7 +44,7 @@ import { maySql } from "./permissions";
 import { afterReplyAnswered } from "./questions";
 import { rightHandReaches } from "./right-hand";
 import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
-import { computerWaitSql, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
+import { computerWaitSql, KEPT_ON_HOLD, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { admitTaskAgents } from "./task-access";
@@ -325,6 +325,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
           : [],
       ...(referenced.length > 0 ? { referenced } : {}),
       ...(noAi.has(m.id) ? { noAi: true as const } : {}),
+      ...(strategyOf.get(m.id) === KEPT_ON_HOLD ? { kept: true as const } : {}),
       ...(capped.has(m.id) ? { platformCap: true as const } : {}),
       ...decisionOf(strategyOf.get(m.id), m.authorUserId),
     });

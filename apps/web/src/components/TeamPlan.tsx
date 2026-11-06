@@ -19,6 +19,7 @@ import {
   teamUndoable,
 } from "@agenteschat/client/lib/team-plan";
 import {
+  AgentSticker,
   Button,
   Dialog,
   DialogBody,
@@ -29,12 +30,16 @@ import {
   Locked,
   Spinner,
   Textarea,
+  WAVE_SECONDS,
 } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { MESSAGE_STICKER } from "@/chat/ChatMedia";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
@@ -248,7 +253,10 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
   const dir = useDirectory(org.id);
   const toast = useToast();
   const connect = useConnectAi();
+  const held = usePlanHold() !== null;
   const team = useTeamCard(org.id, { channelId: message.channelId, messageId: message.id });
+  // Made here and now, on a hold: the new agents wave, once.
+  const [wave, setWave] = useState(false);
   const [adjusting, setAdjusting] = useState<TeamAgentDraft | null>(null);
   const [map, setMap] = useState(false);
   const agent = message.author.id ? dir.anyAgent(message.author.id) : undefined;
@@ -309,7 +317,8 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
                   onClick={() =>
                     team.create.mutate(undefined, {
                       onSuccess: ({ noAi }) => {
-                        if (noAi?.length) connect?.open({ agentId: noAi[0], agentIds: noAi });
+                        if (held) setWave(true);
+                        else if (noAi?.length) connect?.open({ agentId: noAi[0], agentIds: noAi });
                       },
                       onError: failed,
                     })
@@ -387,7 +396,20 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
         </RequestDone>
         {card.created?.skipped.includes("skills") && <p className="small muted">{t("teamPlan.card.skillsWait")}</p>}
         {card.created?.skipped.includes("weekly") && <p className="small muted">{t("teamPlan.card.weeklyWait")}</p>}
-        {card.decidedByUserId === me.user.id && <FirstTaskCard message={message} card={card} />}
+        {wave && (
+          <div className="tp-wave" aria-hidden="true">
+            {plan.agents.map((a) => (
+              <AgentSticker
+                key={a.handle}
+                appearance={lookOf(a)}
+                mood="wave"
+                playFor={WAVE_SECONDS}
+                size={MESSAGE_STICKER}
+              />
+            ))}
+          </div>
+        )}
+        {card.decidedByUserId === me.user.id && <FirstTaskCard message={message} card={card} held={held} />}
       </>
     );
   }
@@ -405,8 +427,12 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
   );
 }
 
-/** After the team: a short first task per agent (its DM opens with it typed, never sent) and inviting the people. */
-function FirstTaskCard({ message, card }: { message: Message; card: TeamProposalCard }) {
+/**
+ * After the team: a short first task per agent (its DM opens with it typed, never sent, for the person to finish) and
+ * inviting the people. On a billing hold, the way to the plans in their place, and a labelled example of what the
+ * first agent delivers, since nobody can answer yet.
+ */
+function FirstTaskCard({ message, card, held }: { message: Message; card: TeamProposalCard; held: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -414,7 +440,8 @@ function FirstTaskCard({ message, card }: { message: Message; card: TeamProposal
   const invite = useInviteDialog();
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
-  const people = card.params.invite;
+  const people = held ? [] : card.params.invite;
+  const example = held && tasks[0] ? card.params.example : undefined;
   if (later || (tasks.length === 0 && people.length === 0)) return null;
   const agent = message.author.id ? dir.anyAgent(message.author.id) : undefined;
   const label = t("ask.kind.firstTask");
@@ -426,39 +453,58 @@ function FirstTaskCard({ message, card }: { message: Message; card: TeamProposal
       label={label}
       mine={false}
       waitingFor={t("teamPlan.firstTask.suggestion")}
-      lead={t("teamPlan.firstTask.lead")}
+      lead={t(held ? "teamPlan.firstTask.heldLead" : "teamPlan.firstTask.lead")}
       body={
         tasks.length > 0 ? (
-          <ul className="tp-agents">
-            {tasks.map((f) => (
-              <li key={f.agentId} className="tp-agent">
-                <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
-                <span className="tp-agent__text ac-captop">
-                  <b>{f.name}</b>
-                  <span className="tp-agent__line">{f.task}</span>
+          <>
+            <ul className="tp-agents">
+              {tasks.map((f) => (
+                <li key={f.agentId} className="tp-agent">
+                  <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
+                  <span className="tp-agent__text ac-captop">
+                    <b>{f.name}</b>
+                    <span className="tp-agent__line">{f.task}</span>
+                  </span>
+                  {/* On the name's line, as on the team card's rows, however long the task runs. */}
+                  <span className="tp-agent__tail ac-captop">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        // The task ends in a blank for them to finish.
+                        setDraftFor(`agent:${f.agentId}`, `${f.task} `);
+                        void navigate({
+                          to: "/org/$orgId/dm/agent/$agentId",
+                          params: { orgId: org.id, agentId: f.agentId },
+                        });
+                      }}
+                    >
+                      {t("teamPlan.firstTask.open")}
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {example && tasks[0] && (
+              <figure className="tp-example">
+                <figcaption className="small muted">
+                  {t("teamPlan.firstTask.example", { name: tasks[0].name })}
+                </figcaption>
+                <span className="tp-example__message">
+                  <AgentAvatar agentId={tasks[0].agentId} name={tasks[0].name} size="sm" />
+                  <span>{example}</span>
                 </span>
-                {/* On the name's line, as on the team card's rows, however long the task runs. */}
-                <span className="tp-agent__tail ac-captop">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setDraftFor(`agent:${f.agentId}`, f.task);
-                      void navigate({
-                        to: "/org/$orgId/dm/agent/$agentId",
-                        params: { orgId: org.id, agentId: f.agentId },
-                      });
-                    }}
-                  >
-                    {t("teamPlan.firstTask.open")}
-                  </Button>
-                </span>
-              </li>
-            ))}
-          </ul>
+              </figure>
+            )}
+          </>
         ) : undefined
       }
       actions={
         <>
+          {held && can(org, "manage_billing") && (
+            <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+              {t("standing.billing.cta.payment")}
+            </BillingLinkButton>
+          )}
           {people.length > 0 && invite && can(org, "invite_people") && (
             <Button
               size="sm"
@@ -642,6 +688,7 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
   const navigate = useNavigate();
   const toast = useToast();
   const actions = useChannelActions();
+  const held = usePlanHold() !== null;
   const lodi = dir.agents.find(isRightHand);
   const name = lodi?.name ?? "Lodi";
   const list = useTeamTemplates(org.id, i18n.language, open);
@@ -656,10 +703,12 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
         <h3 className="tp-gallery__title">{chosen.name}</h3>
         <p className="muted">{chosen.description}</p>
         <TeamPlanBody plan={chosen.team} />
-        <p className={lodi ? "small muted ac-iconline" : "small muted"}>
-          {lodi && <AgentAvatar agentId={lodi.id} name={name} size="xs" />}
-          <span>{t("teamPlan.templates.tailor")}</span>
-        </p>
+        {!held && (
+          <p className={lodi ? "small muted ac-iconline" : "small muted"}>
+            {lodi && <AgentAvatar agentId={lodi.id} name={name} size="xs" />}
+            <span>{t("teamPlan.templates.tailor")}</span>
+          </p>
+        )}
       </>
     );
   }
@@ -668,7 +717,7 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title={t("teamPlan.templates.title")}
-      description={t("teamPlan.templates.lead", { name })}
+      description={held ? t("teamPlan.templates.heldLead") : t("teamPlan.templates.lead", { name })}
       closeLabel={t("common.close")}
       width={1040}
     >
@@ -696,24 +745,26 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
                   </button>
                 </li>
               ))}
-              <li>
-                <button
-                  type="button"
-                  className="tp-gallery__item ac-iconline"
-                  onClick={() => {
-                    onClose();
-                    actions?.focusComposer();
-                  }}
-                >
-                  <span className="tp-gallery__faces" aria-hidden="true">
-                    <Icon name="edit" size={16} />
-                  </span>
-                  <span className="tp-gallery__text">
-                    <b>{t("teamPlan.templates.none")}</b>
-                    <small>{t("teamPlan.templates.noneSub", { name })}</small>
-                  </span>
-                </button>
-              </li>
+              {!held && (
+                <li>
+                  <button
+                    type="button"
+                    className="tp-gallery__item ac-iconline"
+                    onClick={() => {
+                      onClose();
+                      actions?.focusComposer();
+                    }}
+                  >
+                    <span className="tp-gallery__faces" aria-hidden="true">
+                      <Icon name="edit" size={16} />
+                    </span>
+                    <span className="tp-gallery__text">
+                      <b>{t("teamPlan.templates.none")}</b>
+                      <small>{t("teamPlan.templates.noneSub", { name })}</small>
+                    </span>
+                  </button>
+                </li>
+              )}
             </ul>
             <div className="tp-gallery__preview">{preview}</div>
           </div>

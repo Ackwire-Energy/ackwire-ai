@@ -99,7 +99,7 @@ export function PlanUsageCards() {
         />
         {data.accounts.length === 0 && hold ? (
           // What comes first, as in Contas de IA: an invitation to connect a plan would contradict it.
-          <PlanHold hold={hold} onKey={connectAi ? () => connectAi.open({ intent: "api_key" }) : undefined} />
+          <PlanHold hold={hold} />
         ) : data.accounts.length === 0 ? (
           <EmptyState
             size="panel"

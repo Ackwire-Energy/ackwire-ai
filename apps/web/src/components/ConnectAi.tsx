@@ -46,6 +46,7 @@ import {
   type ExistingUsed,
   type KeyDraft,
   KeyPanel,
+  PlanHold,
   PlanPanel,
   PlanWithoutAgent,
   useGatesWithoutAgent,
@@ -367,7 +368,10 @@ function ConnectAiDialog({
     >
       <DialogBody>
         {/* A link opens this before the agents and their AI load, and what it opens on follows them. */}
-        {dir.loading || status.isPending ? (
+        {hold ? (
+          // Every way in lands here, a card's or a key pasted in the composer: nothing connects before the plan.
+          <PlanHold hold={hold} />
+        ) : dir.loading || status.isPending ? (
           <Spinner />
         ) : used && forAgent ? (
           <ExistingThinks agent={forAgent} used={used} />
@@ -437,7 +441,6 @@ function ConnectAiDialog({
                   savedNote={keyNote}
                   refused={refused}
                   saving={add.isPending}
-                  held={hold !== null}
                   onSave={saveKey}
                   endpoint={
                     <EndpointForm

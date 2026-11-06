@@ -448,7 +448,7 @@ function NewAgentFlow({
   // it is mine (a plan signs in for the agents I create), else the workspace's key (admins). A plan account that
   // wasn't in "Quem pensa" when it opened is what the agent thinks with; closing it with nothing new keeps the pick.
   const [optionsBefore, setOptionsBefore] = useState<ReadonlySet<string> | null>(null);
-  const connectsHere = connect && (ownerId === me.user.id || can(org, "manage_credentials"));
+  const connectsHere = connect && !held && (ownerId === me.user.id || can(org, "manage_credentials"));
   const connectHere = () => {
     if (!connect) return;
     setOptionsBefore(ownerId === me.user.id ? new Set(brainOptions.map((o) => o.value)) : null);
@@ -690,6 +690,8 @@ function NewAgentFlow({
     }
     // Reviewed over the conversation: it closes on it, as it was.
     onClose?.();
+    // On a billing hold nothing connects before the plan.
+    if (held) return;
     if (plan && signIn) connect?.open({ agentId: agent.id, plan: planOfKind(plan.kind) });
     if (connectPlan) connect?.open({ agentId: agent.id, plan: connectPlan });
     if (connectAfter) connect?.open({ agentId: agent.id, agentIds: [agent.id] });
@@ -1405,7 +1407,7 @@ function NewAgentFlow({
               })}
             </span>
           )}
-          {connectAfter && <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>}
+          {connectAfter && !held && <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>}
           {connectsHere && (
             <span className="newag__connect">
               <Button size="sm" variant={connectAfter ? "primary" : "default"} icon="plus" onClick={connectHere}>

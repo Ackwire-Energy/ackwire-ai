@@ -1906,6 +1906,7 @@
     "intro": {
       "greeting": "Hallo, ich bin {{name}}. Ich stelle das Team mit dir zusammen.",
       "lead": "Ich erstelle die Agenten, verbinde die Apps und lade die Leute ein. Nichts ändert sich ohne deinen Klick, und ich tue nur, was du tun darfst.",
+      "heldLead": "Wähle, was dein Unternehmen macht, und das Team erscheint hier. Die Agenten beginnen zu arbeiten, sobald der Workspace einen agentes.chat-Tarif hat.",
       "connect": {
         "title": "Eine KI für das Team verbinden",
         "text": "Die Agenten denken mit der KI des Workspace. Melde dich mit deinem Claude- oder ChatGPT-Abo an, ohne API-Schlüssel.",
@@ -2226,6 +2227,14 @@
       "commands_off": "{{name}} kann gerade nicht antworten: Auf dem Computer des Abos sind Befehle ausgeschaltet, und wer ihn betreut, muss sie einschalten.",
       "useKey": "API-Schlüssel verwenden"
     },
+    "kept": {
+      "title": "Ich habe deine Nachricht aufgehoben.",
+      "line": "Ich antworte hier, sobald der Workspace einen agentes.chat-Tarif und eine verbundene KI hat.",
+      "plan": "Der Tarif bringt den Computer der Agenten, immer eingeschaltet. Die KI ist die, für die du schon zahlst: Claude, ChatGPT und andere oder ein API-Schlüssel.",
+      "active": "Tarif aktiv. Verbinde eine KI und {{name}} antwortet hier.",
+      "receipt": "Aufgehoben",
+      "channel": "Aufgehoben. Die Agenten antworten, sobald der Workspace einen agentes.chat-Tarif hat."
+    },
     "receipt": "Niemand wird antworten: keine KI verbunden",
     "chip": "Keine KI"
   },
@@ -2311,8 +2320,7 @@
       "forAll": "Jeder Agent ohne Abo denkt damit.",
       "saved": "Gespeichert. Jeder Agent ohne Abo denkt damit.",
       "savedUnchecked": "Gespeichert, aber {{provider}} hat nicht geantwortet, der Schlüssel konnte also nicht geprüft werden. Wenn er fehlschlägt, steht der Grund im Chat.",
-      "held": "Agenten nutzen ihn, sobald das agentes.chat-Abo des Workspace aktiv ist.",
-      "savedHeld": "Gespeichert. Agenten nutzen ihn, sobald das agentes.chat-Abo des Workspace aktiv ist.",
+      "closed": "API-Schlüssel gibt es mit dem agentes.chat-Tarif des Workspace.",
       "notPlan": "Der Schlüssel eines Coding-Abos gehört in seine eigene Option oben.",
       "billing": "Aktiviere die Abrechnung für das Projekt des Schlüssels. Ohne Abrechnung darf Google nutzen, was deine Agenten senden.",
       "privacy": "Deine Datenschutzeinstellungen bei OpenRouter entscheiden, welche Anbieter behalten dürfen, was deine Agenten senden."
@@ -3654,6 +3662,11 @@
         "title": "Erstell deinen ersten Agent",
         "text": "Sag, was er macht, und er wird Teil des Teams.",
         "action": "Agent erstellen"
+      },
+      "plan": {
+        "title": "agentes.chat-Tarif wählen",
+        "text": "Die Agenten beginnen zu arbeiten, sobald der Workspace einen hat.",
+        "action": "Tarife ansehen"
       },
       "ai": {
         "title": "Eine KI verbinden",
@@ -13150,6 +13163,7 @@
       "no_ai_model_region": "Ich kann nicht antworten: {{model}} braucht die Region Global, eingeschaltet in OpenCode (Settings › Privacy).",
       "no_ai_commands_off": "Ich kann gerade nicht antworten: Auf dem Computer meines Abos sind Befehle ausgeschaltet.",
       "no_ai_cli_missing": "Ich kann noch nicht antworten: Das Programm meiner KI ist auf meinem Computer nicht installiert.",
+      "no_ai_plan_hold": "Ich habe deine Nachricht aufgehoben. Ich antworte hier, sobald der Workspace einen agentes.chat-Tarif und eine verbundene KI hat.",
       "no_ai_no_computer": "Ich kann noch nicht antworten: Meine KI braucht einen Computer, und ich habe keinen.",
       "redacted": "[entfernt: sah aus wie eine Anmeldung oder ein Schlüssel]",
       "action_connect_ai": "KI verbinden",
@@ -13869,7 +13883,9 @@
         "ended": "Erneut abonnieren"
       },
       "askAdmin": "Wer diesen Workspace leitet, kann das klären.",
-      "paid": "Zahlung erhalten. Der agentes.chat-Tarif startet gleich."
+      "paid": "Zahlung erhalten. Der agentes.chat-Tarif startet gleich.",
+      "teamReady": "Dein Team ist bereit. Zum Start fehlt ein agentes.chat-Tarif.",
+      "invites": "Einladungen gibt es mit dem agentes.chat-Tarif."
     },
     "cloud": {
       "review": "Für eine Sicherheitsprüfung pausiert, bis unser Team es sich ansieht. Unsere automatischen Prüfungen haben Aktivität erkannt, die gegen unsere Bedingungen verstoßen könnte (Abschnitt 5). Um Einspruch einzulegen, schreib an {{email}}.",
@@ -14992,6 +15008,8 @@
     "firstTask": {
       "suggestion": "Vorschlag",
       "lead": "Eine kurze Aufgabe pro Agent, damit du heute jeden bei der Arbeit siehst.",
+      "heldLead": "Eine kurze Aufgabe pro Agent. Ergänze den Satz und sende ihn. Sie beginnen, sobald der Workspace einen agentes.chat-Tarif hat.",
+      "example": "Beispiel dafür, was {{name}} liefert",
       "open": "Mit der Aufgabe öffnen",
       "invite": "{{names}} einladen",
       "later": "Später"
@@ -15014,6 +15032,7 @@
     "templates": {
       "title": "Team-Vorlagen",
       "lead": "Ein fertiges Team für deine Art von Geschäft. Danach passt {{name}} es mit dir an.",
+      "heldLead": "Wähle das, was deinem Geschäft am nächsten kommt. Du kannst jeden Agenten vor dem Erstellen anpassen.",
       "use": "Diese Vorlage nutzen",
       "none": "Keine davon",
       "noneSub": "Erzähl, was du machst, und {{name}} baut es",
@@ -15080,50 +15099,55 @@
         "role": "Kundenservice",
         "line": "Antwortet Kunden auf WhatsApp und per E-Mail. Ruft dich, wenn sie etwas nicht weiß.",
         "routine": "Zusammenfassen, was unbeantwortet blieb",
-        "task": "Die letzte wartende Kundennachricht beantworten"
+        "task": "Schreib eine Antwort auf diese Kundennachricht:"
       },
       "caio": {
         "role": "Abrechnung",
         "line": "Erinnert alle, die mit der Zahlung im Rückstand sind, und schickt die Mahnung nach deinem Ok.",
         "routine": "Auflisten, wer mit der Zahlung im Rückstand ist",
-        "task": "Auflisten, wer diesen Monat im Rückstand ist"
+        "task": "Schreib eine freundliche Zahlungserinnerung für:"
       },
       "ada": {
         "role": "Dev",
         "line": "Behebt die Bugs, die Kunden melden, und öffnet den PR.",
         "routine": "Die neuen Bugs auflisten",
-        "task": "Den letzten Bug ansehen, den ein Kunde gemeldet hat"
+        "task": "Sag mir, wo ich bei diesem Bug anfangen soll:"
       },
       "lia": {
         "role": "Inhalte",
         "line": "Schreibt Posts und Skripte im Ton der Firma und plant sie nach deinem Ok.",
         "routine": "Die Posts der Woche vorschlagen",
-        "task": "Drei Posts für diese Woche vorschlagen"
+        "task": "Schlag drei Posts für diese Woche vor zum Thema:"
       },
       "theo": {
         "role": "Vertrieb",
         "line": "Hakt bei allen nach, die ein Angebot angefragt haben, und schreibt die Angebote.",
         "routine": "Auflisten, wer ein Angebot angefragt und keine Antwort bekommen hat",
-        "task": "Auflisten, wer diese Woche ein Angebot angefragt hat"
+        "task": "Schreib ein kurzes Angebot für diese Anfrage:"
       },
       "nina": {
         "role": "Termine",
         "line": "Vereinbart, bestätigt und verschiebt Termine und erinnert Kunden am Vortag.",
         "routine": "Die Termine von morgen bestätigen",
-        "task": "Mir die Termine von morgen zeigen"
+        "task": "Ordne diese Termine für morgen:"
       },
       "otto": {
         "role": "Bestellungen",
         "line": "Verfolgt Bestellungen und Lager und warnt, was ausgeht.",
         "routine": "Warnen, was im Lager ausgeht",
-        "task": "Die Bestellungen auflisten, die noch auf den Versand warten"
+        "task": "Liste auf, was bei diesen Bestellungen noch offen ist:"
       },
       "bia": {
         "role": "Antwortbasis",
         "line": "Hält die Antwortbasis mit dem aktuell, was das Team antwortet.",
         "routine": "Die Basis mit den Antworten der Woche aktualisieren",
-        "task": "Die 5 Fragen auflisten, die Kunden am häufigsten stellen"
+        "task": "Schreib die Antworten auf diese Kundenfragen:"
       }
+    },
+    "example": {
+      "iara": "Hallo Marina! Deine Bestellung ging gestern raus und kommt bis Freitag an. Die Sendungsnummer steht direkt unten. Wenn Freitag nicht passt, suche ich einen anderen Termin.",
+      "lia": "1. Drei häufige Fehler bei der Wahl einer Agentur. 2. Hinter den Kulissen eines Projekts, das fast schiefging. 3. Eine Frage an eure Follower: Was wollt ihr hier sehen?",
+      "nina": "Morgen: 9:00 Carla, 10:30 Pedro, 14:00 frei. Pedro hat noch nicht bestätigt. Soll ich ihm schreiben?"
     },
     "channels": {
       "iara": "support",

@@ -723,9 +723,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             ...(locale ? { query: { locale } } : {}),
           })
         ).templates,
-      applyTeamTemplate: (orgId, templateId, locale) =>
+      applyTeamTemplate: (orgId, templateId, locale, tap) =>
         request<{ channelId: string; messageId: string }>(`${org(orgId)}/team-templates/${enc(templateId)}/use`, {
-          json: locale ? { locale } : {},
+          json: { ...(locale ? { locale } : {}), ...(tap ? { tap } : {}) },
         }),
       decideCostly: (orgId, signalId, decision) =>
         request<{ state: CostlyDecision }>(`${org(orgId)}/autonomy-proposals/${enc(signalId)}`, {

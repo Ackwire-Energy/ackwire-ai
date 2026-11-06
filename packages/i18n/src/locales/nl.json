@@ -1905,6 +1905,7 @@
     "intro": {
       "greeting": "Hoi, ik ben {{name}}. Ik bouw het team samen met jou.",
       "lead": "Ik maak de agents, koppel de apps en nodig de mensen uit. Niets verandert zonder jouw klik, en ik doe alleen wat jij mag doen.",
+      "heldLead": "Kies wat je bedrijf doet en het team verschijnt hier. De agents gaan aan het werk zodra de workspace een agentes.chat-abonnement heeft.",
       "connect": {
         "title": "Een AI voor het team koppelen",
         "text": "De agents denken met de AI van de workspace. Log in met je Claude- of ChatGPT-abonnement, zonder API-sleutel.",
@@ -2225,6 +2226,14 @@
       "commands_off": "{{name}} kan nu niet antwoorden: opdrachten staan uit op de computer van het abonnement, en wie die beheert moet ze aanzetten.",
       "useKey": "API-sleutel gebruiken"
     },
+    "kept": {
+      "title": "Ik heb je bericht bewaard.",
+      "line": "Ik antwoord hier zodra de workspace een agentes.chat-abonnement en een gekoppelde AI heeft.",
+      "plan": "Het abonnement brengt de computer van de agents, altijd aan. De AI is die waarvoor je al betaalt: Claude, ChatGPT en andere, of een API-sleutel.",
+      "active": "Abonnement actief. Koppel een AI en {{name}} antwoordt hier.",
+      "receipt": "Bewaard",
+      "channel": "Bewaard. De agents antwoorden zodra de workspace een agentes.chat-abonnement heeft."
+    },
     "receipt": "Niemand antwoordt: geen AI gekoppeld",
     "chip": "Geen AI"
   },
@@ -2312,8 +2321,7 @@
       "forAll": "Elke agent zonder abonnement denkt ermee.",
       "saved": "Opgeslagen. Elke agent zonder abonnement denkt ermee.",
       "savedUnchecked": "Opgeslagen, maar {{provider}} gaf geen antwoord, dus de sleutel kon niet worden gecontroleerd. Als hij faalt, staat de reden in het gesprek.",
-      "held": "Agents gebruiken hem zodra het agentes.chat-abonnement van de workspace actief is.",
-      "savedHeld": "Opgeslagen. Agents gebruiken hem zodra het agentes.chat-abonnement van de workspace actief is.",
+      "closed": "API-sleutels gaan open met het agentes.chat-abonnement van de workspace.",
       "notPlan": "De sleutel van een codeerabonnement hoort bij die eigen optie hierboven.",
       "billing": "Zet facturering aan voor het project van de sleutel. Zonder facturering mag Google gebruiken wat je agents versturen.",
       "privacy": "Je privacyinstellingen in OpenRouter bepalen welke aanbieders mogen bewaren wat je agents versturen."
@@ -3657,6 +3665,11 @@
         "title": "Maak je eerste agent",
         "text": "Zeg wat hij doet en hij hoort bij het team.",
         "action": "Agent maken"
+      },
+      "plan": {
+        "title": "Kies een agentes.chat-abonnement",
+        "text": "De agents gaan aan het werk zodra de workspace er een heeft.",
+        "action": "Abonnementen bekijken"
       },
       "ai": {
         "title": "Een AI koppelen",
@@ -13217,6 +13230,7 @@
       "no_ai_model_region": "Ik kan niet antwoorden: {{model}} heeft de regio Global nodig, aangezet in OpenCode (Settings › Privacy).",
       "no_ai_commands_off": "Ik kan nu niet antwoorden: opdrachten staan uit op de computer van mijn abonnement.",
       "no_ai_cli_missing": "Ik kan nog niet antwoorden: het programma van mijn AI is niet geïnstalleerd op mijn computer.",
+      "no_ai_plan_hold": "Ik heb je bericht bewaard. Ik antwoord hier zodra de workspace een agentes.chat-abonnement en een gekoppelde AI heeft.",
       "no_ai_no_computer": "Ik kan nog niet antwoorden: mijn AI heeft een computer nodig en ik heb er geen.",
       "redacted": "[verwijderd: leek op inloggegevens of een sleutel]",
       "action_connect_ai": "AI koppelen",
@@ -13982,7 +13996,9 @@
         "ended": "Opnieuw abonneren"
       },
       "askAdmin": "Wie deze werkruimte beheert, kan dit oplossen.",
-      "paid": "Betaling ontvangen. Het agentes.chat-abonnement begint zo."
+      "paid": "Betaling ontvangen. Het agentes.chat-abonnement begint zo.",
+      "teamReady": "Je team is klaar. Er ontbreekt een agentes.chat-abonnement om te beginnen.",
+      "invites": "Uitnodigingen gaan open met het agentes.chat-abonnement."
     },
     "cloud": {
       "review": "Gepauzeerd voor een veiligheidscontrole, tot ons team ernaar kijkt. Onze automatische controles zagen activiteit die mogelijk in strijd is met onze Voorwaarden (artikel 5). Bezwaar maken? Schrijf naar {{email}}.",
@@ -15167,6 +15183,8 @@
     "firstTask": {
       "suggestion": "suggestie",
       "lead": "Eén korte taak per agent, zodat je ze vandaag allemaal aan het werk ziet.",
+      "heldLead": "Eén korte taak per agent. Maak de zin af en verstuur hem. Ze beginnen zodra de workspace een agentes.chat-abonnement heeft.",
+      "example": "Voorbeeld van wat {{name}} oplevert",
       "open": "Openen met de taak",
       "invite": "{{names}} uitnodigen",
       "later": "Later"
@@ -15189,6 +15207,7 @@
     "templates": {
       "title": "Teamsjablonen",
       "lead": "Een kant-en-klaar team voor jouw soort bedrijf. Daarna past {{name}} het met je aan.",
+      "heldLead": "Kies wat het dichtst bij je bedrijf ligt. Je kunt elke agent aanpassen voordat je hem maakt.",
       "use": "Dit sjabloon gebruiken",
       "none": "Geen van deze",
       "noneSub": "Vertel wat je doet en {{name}} stelt het samen",
@@ -15255,50 +15274,55 @@
         "role": "Klantenservice",
         "line": "Beantwoordt klanten via WhatsApp en e-mail. Roept je als ze het niet weet.",
         "routine": "Samenvatten wat onbeantwoord bleef",
-        "task": "Het laatste wachtende klantbericht beantwoorden"
+        "task": "Schrijf een antwoord op dit klantbericht:"
       },
       "caio": {
         "role": "Facturen",
         "line": "Herinnert wie te laat betaalt en stuurt de herinnering na jouw ok.",
         "routine": "Opsommen wie te laat betaalt",
-        "task": "Opsommen wie deze maand te laat is"
+        "task": "Schrijf een vriendelijke betalingsherinnering voor:"
       },
       "ada": {
         "role": "Dev",
         "line": "Lost de bugs op die klanten melden en opent de PR.",
         "routine": "De nieuwe bugs opsommen",
-        "task": "Kijken naar de laatste bug die een klant meldde"
+        "task": "Vertel me waar ik moet beginnen met deze bug:"
       },
       "lia": {
         "role": "Content",
         "line": "Schrijft posts en scripts in de toon van het bedrijf en plant ze na jouw ok.",
         "routine": "De posts van de week voorstellen",
-        "task": "Drie posts voor deze week voorstellen"
+        "task": "Stel drie posts voor deze week voor over:"
       },
       "theo": {
         "role": "Verkoop",
         "line": "Volgt iedereen op die een offerte vroeg en schrijft de voorstellen.",
         "routine": "Opsommen wie een offerte vroeg en geen antwoord kreeg",
-        "task": "Opsommen wie deze week een offerte vroeg"
+        "task": "Schrijf een korte offerte voor deze aanvraag:"
       },
       "nina": {
         "role": "Agenda",
         "line": "Plant, bevestigt en verzet afspraken en herinnert klanten de dag ervoor.",
         "routine": "De afspraken van morgen bevestigen",
-        "task": "Mij de afspraken van morgen laten zien"
+        "task": "Orden deze tijden van morgen:"
       },
       "otto": {
         "role": "Bestellingen",
         "line": "Volgt bestellingen en voorraad en waarschuwt wat opraakt.",
         "routine": "Waarschuwen wat opraakt in de voorraad",
-        "task": "De bestellingen opsommen die nog op verzending wachten"
+        "task": "Noem wat er nog moet gebeuren bij deze bestellingen:"
       },
       "bia": {
         "role": "Antwoordenbank",
         "line": "Houdt de antwoordenbank bij met wat het team antwoordt.",
         "routine": "De bank bijwerken met de antwoorden van de week",
-        "task": "De 5 vragen opsommen die klanten het vaakst stellen"
+        "task": "Schrijf de antwoorden op deze klantvragen:"
       }
+    },
+    "example": {
+      "iara": "Hoi Marina! Je bestelling is gisteren verstuurd en komt uiterlijk vrijdag aan. De trackingcode staat hieronder. Komt vrijdag niet uit, dan zoek ik een andere datum.",
+      "lia": "1. Drie veelgemaakte fouten bij het kiezen van een bureau. 2. Achter de schermen van een project dat bijna misging. 3. Een vraag aan je volgers: wat willen jullie hier zien?",
+      "nina": "Morgen: 9:00 Carla, 10:30 Pedro, 14:00 vrij. Pedro heeft nog niet bevestigd. Zal ik hem schrijven?"
     },
     "channels": {
       "iara": "support",

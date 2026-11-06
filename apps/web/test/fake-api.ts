@@ -2197,8 +2197,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.teamTemplates", orgId, locale);
         return state.teamTemplates ?? [];
       },
-      applyTeamTemplate: async (orgId, templateId, locale) => {
-        log("agents.applyTeamTemplate", orgId, templateId, locale);
+      applyTeamTemplate: async (orgId, templateId, locale, tap) => {
+        log("agents.applyTeamTemplate", orgId, templateId, locale, tap);
         return { channelId: `dm-${LODI_ID}`, messageId: id("message") };
       },
       decideCostly: async (orgId, signalId, decision) => {

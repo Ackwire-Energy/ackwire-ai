@@ -92,7 +92,7 @@ import {
 } from "./rrule";
 import { providerFailure } from "./runs";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
-import { deletionPending, standingRefusal } from "./standing";
+import { assertCanWork, deletionPending, standingRefusal } from "./standing";
 import { alwaysAsks } from "./tools/gateway";
 import {
   assertMayContinuePause,
@@ -1928,6 +1928,8 @@ export async function queueRoutineRun(
 export async function runRoutineNow(deps: RoutineDeps, actorId: string, orgId: string, id: string) {
   const routine = await loadRoutine(deps.db, orgId, id);
   await requireRoutineManager(deps.db, actorId, orgId, routine.agentId);
+  // A person is waiting on this one: told now, where a scheduled slot just passes.
+  await assertCanWork(deps.db, orgId, routine.agentId);
   await queueRoutineRun(deps, routine, new Date(), "manual");
   await publishRoutineRuns(deps.pubsub, orgId, routine.id);
   const [view] = await views(deps.db, [routine], actorId, deps.hooks);

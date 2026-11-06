@@ -618,6 +618,8 @@ export interface ApiClient {
       orgId: string,
       templateId: string,
       locale?: string,
+      /** On a billing hold: what the person tapped, kept as their message with no run. */
+      tap?: string,
     ): Promise<{ channelId: string; messageId: string }>;
     /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
     decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;

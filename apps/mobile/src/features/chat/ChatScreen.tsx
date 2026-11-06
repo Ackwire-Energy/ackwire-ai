@@ -111,6 +111,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { usePlanHold } from "../ai/parts";
 import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";
 import { threadTitle } from "../chats/logic";
@@ -1637,9 +1638,10 @@ function Chat({
   const receipts: ReceiptsState = useMemo(() => Object.fromEntries(fanNow.filter(([, r]) => r)), [fanKey]);
   // Above the box: an agent here without an AI, or the whole workspace without one (as on the web).
   const aiStatus = useAiStatus(orgId);
+  const planHeld = usePlanHold(orgId, org) !== null;
   // The right hand's greeting says it itself (its Connect AI card).
   const banner =
-    member && !rightHand
+    member && !rightHand && !planHeld
       ? noAiBanner(aiStatus.data, {
           agentIds: dmAgentId ? [dmAgentId] : channelAgents,
           dmAgentId,

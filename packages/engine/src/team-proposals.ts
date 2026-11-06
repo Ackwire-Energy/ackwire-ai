@@ -29,6 +29,7 @@ import {
 import type { ContextDeps } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { openPersonAgentDm } from "./dms";
+import { queuePlanWaiting } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishAgentsChanged, publishChannelEvent, publishMessageCreated } from "./events";
 import { setAgentComputerTarget } from "./machines";
@@ -42,6 +43,7 @@ import { deliverNoticeToRun } from "./run-resume";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
 import { SKILL_NAME } from "./skills";
+import { billingHold } from "./standing";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
@@ -109,6 +111,8 @@ export interface TeamParams {
   invite: string[];
   /** From "Usar este modelo": the template's id. */
   template?: string;
+  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
+  example?: string;
 }
 
 /** `failed` is never stored: a failure leaves it `pending` with `error`. */
@@ -330,6 +334,7 @@ export async function checkTeam(
     approvals: str(input.approvals).slice(0, 300),
     invite: [...new Set(list(input.invite).map(str).filter(Boolean))].slice(0, 10),
     ...(str(input.template) ? { template: str(input.template) } : {}),
+    ...(str(input.example) ? { example: str(input.example) } : {}),
   };
 }
 
@@ -352,6 +357,7 @@ export async function postTeamCard(
   },
   params: TeamParams,
   forUserId: string | null,
+  ttlMs = APPROVAL_TTL_MS,
 ): Promise<Message> {
   const card: TeamProposalCard = {
     kind: "team_proposal",
@@ -360,7 +366,7 @@ export async function postTeamCard(
     state: "pending",
     decidedByUserId: null,
     decidedAt: null,
-    expiresAt: new Date(Date.now() + APPROVAL_TTL_MS).toISOString(),
+    expiresAt: new Date(Date.now() + ttlMs).toISOString(),
   };
   const message = await insertMessage(deps.db, {
     orgId: place.orgId,
@@ -673,6 +679,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
     created: { ...ids, skipped, noAi },
   };
   await writeCard(deps, message, done, "creating");
+  if ((await billingHold(deps.db, orgId)) === "payment") await queuePlanWaiting(deps.db, orgId);
   const [person] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId));
   const who = made.agents.map((a, i) => `@${a.handle} (${a.name}) in #${p.agents[i]?.channel}`).join(", ");
   await tellProposer(

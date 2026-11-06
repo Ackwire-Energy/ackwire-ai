@@ -1831,6 +1831,7 @@
     "intro": {
       "greeting": "Halo, saya {{name}}. Saya menyusun tim bersama Anda.",
       "lead": "Saya membuat agen, menghubungkan aplikasi, dan mengundang orang. Tidak ada yang berubah tanpa klik Anda, dan saya hanya melakukan apa yang bisa Anda lakukan.",
+      "heldLead": "Pilih bidang usahamu dan timnya muncul di sini. Agen mulai bekerja setelah workspace punya paket agentes.chat.",
       "connect": {
         "title": "Hubungkan AI untuk tim",
         "text": "Agen berpikir dengan AI workspace. Masuk dengan paket Claude atau ChatGPT Anda, tanpa kunci API.",
@@ -2138,6 +2139,14 @@
       "commands_off": "{{name}} tidak bisa menjawab sekarang: perintah dimatikan di komputer paketnya, dan orang yang mengurusnya perlu menyalakannya.",
       "useKey": "Pakai kunci API"
     },
+    "kept": {
+      "title": "Saya menyimpan pesanmu.",
+      "line": "Saya akan menjawab di sini setelah workspace punya paket agentes.chat dan AI yang terhubung.",
+      "plan": "Paket ini membawa komputer agen, selalu menyala. AI-nya yang sudah kamu bayar: Claude, ChatGPT dan lainnya, atau kunci API.",
+      "active": "Paket aktif. Hubungkan AI dan {{name}} menjawab di sini.",
+      "receipt": "Disimpan",
+      "channel": "Disimpan. Agen menjawab setelah workspace punya paket agentes.chat."
+    },
     "receipt": "Tidak ada yang akan menjawab: belum ada AI yang terhubung",
     "chip": "Tanpa AI"
   },
@@ -2225,8 +2234,7 @@
       "forAll": "Semua agen tanpa paket berpikir dengan kunci ini.",
       "saved": "Tersimpan. Semua agen tanpa paket berpikir dengan kunci ini.",
       "savedUnchecked": "Tersimpan, tetapi {{provider}} tidak menjawab, jadi kunci tidak bisa diperiksa. Jika gagal, percakapan memberi tahu alasannya.",
-      "held": "Agen memakainya setelah paket agentes.chat workspace aktif.",
-      "savedHeld": "Tersimpan. Agen memakainya setelah paket agentes.chat workspace aktif.",
+      "closed": "Kunci API terbuka bersama paket agentes.chat workspace.",
       "notPlan": "Kunci paket coding dimasukkan di opsinya sendiri di atas.",
       "billing": "Aktifkan penagihan untuk proyek kunci ini. Tanpa penagihan, Google bisa memakai apa yang dikirim agenmu.",
       "privacy": "Pengaturan privasi OpenRouter-mu menentukan penyedia mana yang boleh menyimpan apa yang dikirim agenmu."
@@ -3533,6 +3541,11 @@
         "title": "Buat agen pertamamu",
         "text": "Sebutkan tugasnya dan agen itu bergabung ke tim.",
         "action": "Buat agen"
+      },
+      "plan": {
+        "title": "Pilih paket agentes.chat",
+        "text": "Agen mulai bekerja setelah workspace punya paket.",
+        "action": "Lihat paket"
       },
       "ai": {
         "title": "Hubungkan AI",
@@ -12724,6 +12737,7 @@
       "no_ai_model_region": "Aku tidak bisa menjawab: {{model}} butuh wilayah Global dinyalakan di OpenCode (Settings › Privacy).",
       "no_ai_commands_off": "Aku tidak bisa menjawab sekarang: perintah dimatikan di komputer paketku.",
       "no_ai_cli_missing": "Aku belum bisa menjawab: program AI-ku tidak terpasang di komputerku.",
+      "no_ai_plan_hold": "Saya menyimpan pesanmu. Saya akan menjawab di sini setelah workspace punya paket agentes.chat dan AI yang terhubung.",
       "no_ai_no_computer": "Aku belum bisa menjawab: AI-ku butuh komputer dan aku tidak punya.",
       "redacted": "[dihapus: tampak seperti data masuk atau kunci]",
       "action_connect_ai": "Hubungkan AI",
@@ -13437,7 +13451,9 @@
         "ended": "Berlangganan lagi"
       },
       "askAdmin": "Pengelola ruang kerja ini bisa menyelesaikannya.",
-      "paid": "Pembayaran diterima. Paket agentes.chat akan dimulai sebentar lagi."
+      "paid": "Pembayaran diterima. Paket agentes.chat akan dimulai sebentar lagi.",
+      "teamReady": "Timmu sudah siap. Perlu paket agentes.chat untuk mulai.",
+      "invites": "Undangan terbuka bersama paket agentes.chat."
     },
     "cloud": {
       "review": "Dijeda untuk tinjauan keamanan, sampai tim kami memeriksanya. Pemeriksaan otomatis kami menandai aktivitas yang mungkin melanggar Ketentuan kami (bagian 5). Untuk mengajukan keberatan, tulis ke {{email}}.",
@@ -14581,6 +14597,8 @@
     "firstTask": {
       "suggestion": "saran",
       "lead": "Satu tugas singkat per agen, supaya kamu melihat masing-masing bekerja hari ini.",
+      "heldLead": "Satu tugas singkat per agen. Lengkapi kalimatnya lalu kirim. Mereka mulai setelah workspace punya paket agentes.chat.",
+      "example": "Contoh hasil kerja {{name}}",
       "open": "Buka dengan tugasnya",
       "invite": "Undang {{names}}",
       "later": "Nanti"
@@ -14603,6 +14621,7 @@
     "templates": {
       "title": "Template tim",
       "lead": "Tim siap untuk jenis usahamu. Lalu {{name}} menyesuaikannya bersamamu.",
+      "heldLead": "Pilih yang paling dekat dengan usahamu. Kamu bisa menyesuaikan setiap agen sebelum membuatnya.",
       "use": "Pakai template ini",
       "none": "Tidak ada yang cocok",
       "noneSub": "Ceritakan apa yang kamu kerjakan dan {{name}} menyusunnya",
@@ -14668,50 +14687,55 @@
         "role": "Layanan pelanggan",
         "line": "Menjawab pelanggan di WhatsApp dan email. Memanggilmu saat tidak tahu.",
         "routine": "Merangkum yang belum dijawab",
-        "task": "Menjawab pesan pelanggan terakhir yang menunggu"
+        "task": "Tulis balasan untuk pesan pelanggan ini:"
       },
       "caio": {
         "role": "Penagihan",
         "line": "Mengingatkan yang terlambat bayar dan mengirim tagihan setelah kamu setuju.",
         "routine": "Mendaftar siapa yang terlambat bayar",
-        "task": "Mendaftar siapa yang terlambat bulan ini"
+        "task": "Tulis pengingat pembayaran yang ramah untuk:"
       },
       "ada": {
         "role": "Dev",
         "line": "Memperbaiki bug yang dilaporkan pelanggan dan membuka PR.",
         "routine": "Mendaftar bug baru",
-        "task": "Melihat bug terakhir yang dilaporkan pelanggan"
+        "task": "Beri tahu saya harus mulai dari mana menyelidiki bug ini:"
       },
       "lia": {
         "role": "Konten",
         "line": "Menulis posting dan naskah dengan gaya perusahaan dan menjadwalkannya setelah kamu setuju.",
         "routine": "Mengusulkan posting minggu ini",
-        "task": "Mengusulkan tiga posting untuk minggu ini"
+        "task": "Usulkan tiga posting minggu ini tentang:"
       },
       "theo": {
         "role": "Penjualan",
         "line": "Menindaklanjuti semua yang meminta penawaran dan menulis proposalnya.",
         "routine": "Mendaftar siapa yang meminta penawaran dan belum dijawab",
-        "task": "Mendaftar siapa yang meminta penawaran minggu ini"
+        "task": "Tulis penawaran singkat untuk permintaan ini:"
       },
       "nina": {
         "role": "Jadwal",
         "line": "Membuat, mengonfirmasi, dan memindahkan janji, dan mengingatkan klien sehari sebelumnya.",
         "routine": "Mengonfirmasi janji besok",
-        "task": "Tunjukkan janji besok"
+        "task": "Atur jadwal besok ini:"
       },
       "otto": {
         "role": "Pesanan",
         "line": "Memantau pesanan dan stok dan memberi tahu yang hampir habis.",
         "routine": "Memberi tahu stok yang hampir habis",
-        "task": "Mendaftar pesanan yang masih menunggu dikirim"
+        "task": "Daftar yang masih harus dikerjakan pada pesanan ini:"
       },
       "bia": {
         "role": "Basis jawaban",
         "line": "Menjaga basis jawaban tetap sesuai dengan jawaban tim.",
         "routine": "Memperbarui basis dengan jawaban minggu ini",
-        "task": "Mendaftar 5 pertanyaan yang paling sering ditanyakan pelanggan"
+        "task": "Tulis jawaban untuk pertanyaan pelanggan ini:"
       }
+    },
+    "example": {
+      "iara": "Hai Marina! Pesananmu dikirim kemarin dan tiba paling lambat Jumat. Kode pelacakan ada di bawah ini. Kalau Jumat tidak cocok, saya carikan tanggal lain.",
+      "lia": "1. Tiga kesalahan umum saat memilih agensi. 2. Di balik layar proyek yang nyaris gagal. 3. Pertanyaan untuk pengikut kalian: apa yang ingin kalian lihat di sini?",
+      "nina": "Besok: 9.00 Carla, 10.30 Pedro, 14.00 kosong. Pedro belum konfirmasi. Mau saya kirim pesan ke dia?"
     },
     "channels": {
       "iara": "layanan",

@@ -346,4 +346,19 @@ export const words: EmailWords = {
     button: "打开通知",
     why: (org) => `你收到这封邮件，是因为 ${org} 里有人把你的套餐连接到了一个智能体。`,
   },
+  planWaiting: {
+    subject: "你的团队正在等待",
+    preheader: "你的工作区已就绪。还需要一个 agentes.chat 套餐才能开始。",
+    headline: "你的团队正在等待",
+    body: (agents, channels, routines) => {
+      const a = `${agents} 个智能体`;
+      const c = `${channels} 个频道`;
+      const r = `${routines} 个例行任务`;
+      return routines > 0
+        ? `${a}、${c}和${r}已就绪。还需要一个 agentes.chat 套餐才能开始。`
+        : `${a}和${c}已就绪。还需要一个 agentes.chat 套餐才能开始。`;
+    },
+    button: "查看 agentes.chat 套餐",
+    why: (org) => `你收到这封邮件，是因为你在 agentes.chat 上管理 ${org}。此类提醒只发送两次。`,
+  },
 };
