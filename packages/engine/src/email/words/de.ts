@@ -245,7 +245,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Gib diesen Code ein, um das ganze Konto ",
       { b: email },
-      " zu löschen, nicht nur einen Workspace. Es wird sofort gelöscht, und Workspaces, in denen nur du bist, werden mit ihm geschlossen.",
+      " zu löschen, nicht nur einen Workspace. Es wird sofort überall abgemeldet und 7 Tage später endgültig gelöscht, und Workspaces, in denen nur du bist, werden mit ihm geschlossen.",
     ],
     support: (address) => [
       "Er gilt 10 Minuten lang, und ohne ihn wird nichts gelöscht. Wenn du das nicht warst, gib ihn nicht weiter und schreib an ",

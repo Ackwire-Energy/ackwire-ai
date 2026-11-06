@@ -266,7 +266,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Wpisz ten kod, żeby usunąć całe konto ",
       { b: email },
-      ", a nie tylko jedną przestrzeń roboczą. Zniknie od razu, a razem z nim zamkną się przestrzenie robocze, w których jesteś tylko ty.",
+      ", a nie tylko jedną przestrzeń roboczą. Od razu zostanie wylogowane wszędzie i po 7 dniach usunięte na dobre, a razem z nim zamkną się przestrzenie robocze, w których jesteś tylko ty.",
     ],
     support: (address) => [
       "Działa przez 10 minut i bez niego nic nie zostanie usunięte. Jeśli to nie ty, nikomu go nie podawaj i napisz na ",

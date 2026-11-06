@@ -247,7 +247,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Typ deze code om het hele account ",
       { b: email },
-      " te verwijderen, niet alleen één werkruimte. Het verdwijnt meteen, en de werkruimtes waar alleen jij in zit gaan mee dicht.",
+      " te verwijderen, niet alleen één werkruimte. Het wordt meteen overal uitgelogd en 7 dagen later definitief verwijderd, en de werkruimtes waar alleen jij in zit gaan mee dicht.",
     ],
     support: (address) => [
       "Hij werkt 10 minuten, en zonder deze code wordt er niets verwijderd. Was jij het niet? Deel hem dan niet en schrijf naar ",

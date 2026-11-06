@@ -254,7 +254,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Saisissez ce code pour supprimer tout le compte ",
       { b: email },
-      ", pas seulement un espace de travail. Il disparaît aussitôt, et les espaces de travail dont vous êtes le seul membre se ferment avec lui.",
+      ", pas seulement un espace de travail. Il est déconnecté partout aussitôt et sera supprimé définitivement 7 jours plus tard, et les espaces de travail dont vous êtes le seul membre se ferment avec lui.",
     ],
     support: (address) => [
       "Il est valable 10 minutes, et rien n’est supprimé sans lui. Si ce n’était pas vous, ne le partagez pas et écrivez à ",
