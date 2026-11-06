@@ -9731,15 +9731,14 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   position: relative;
   display: grid;
   grid-template-columns: 30px minmax(96px, 140px) minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
+  /* The value's track takes the room the key and the min height leave; the sub's is only as tall as a sub. With two
+     auto tracks the 30px key, spanning both, gave the empty second one 10px and the value sat above the label. */
+  grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
     "key label value tail"
     "key label sub tail";
   gap: 0 12px;
   align-items: center;
-  /* The tracks keep their content's height: stretched to the row's min height, the value would sit in the top half
-     while the label, spanning both, stays centered. */
-  align-content: center;
   width: calc(100% - 8px);
   min-height: 50px;
   margin: 0 4px;
