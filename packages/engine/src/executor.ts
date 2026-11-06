@@ -2779,7 +2779,12 @@ async function executeRunInner(
     const stillBusy = busy && t.roomWaitSince !== undefined;
     if (busy) {
       t.roomWaitSince ??= Date.now();
-      if (!run.background && run.hop <= 1 && viaRoutine === null) t.roomPeople = true;
+      if (!run.background && run.hop <= 1 && viaRoutine === null) {
+        t.roomPeople = true;
+        // Only the head asks again, and a person's slot can leave too little for the right hand's first ask: behind
+        // people's turns it would wait for each, though its floor is the lowest and they can't pass it.
+        if (isRightHand(agent)) t.roomOrderSince = 0;
+      }
     }
     // Just gone (our own deploy, a runner dialing again): it waits without a word until the outage grace is over.
     let quietUntil: number | null = null;
