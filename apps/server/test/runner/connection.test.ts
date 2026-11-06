@@ -543,6 +543,15 @@ describe("the slot held for a person's turn", () => {
     runner.close();
   });
 
+  test("a burst of people's turns, all closing idle CLIs at once, gets one slot", async () => {
+    const { runner, person, refused } = room({ reclaimBrains: async () => false });
+    for (const id of ["a", "b", "c", "d"]) void person(id);
+    await waitFor(() => refused().length === 3);
+    expect(refused()).toEqual(["b", "c", "d"]);
+    expect(runner.size).toBe(1);
+    runner.close();
+  });
+
   test("not where memory isn't known: there is no floor to keep", async () => {
     const { runner, turn, person, refused } = room({ free: null });
     for (let i = 0; i < TURNS_WITHOUT_MEMORY; i++) void turn(`t${i}`);
