@@ -87,6 +87,20 @@ describe("Aguardando sua resposta, in the chat", () => {
     expect(rendered.router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
   });
 
+  test("on the task's page, Abrir thread lands on the question", async () => {
+    const api = createFakeApi(seedState());
+    const get = api.issues.get;
+    api.issues.get = async (...args) => ({ ...(await get(...args)), backgroundWork: work() });
+    rendered = await renderApp(`/org/${ORG_ID}/issues/131`, { api });
+    await settle(8);
+    const line = document.querySelector(".ac-workline") as HTMLElement;
+    expect(line.querySelector(".ac-workline__question")?.textContent).toBe(QUESTION);
+    await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Abrir thread" })));
+    await settle(2);
+    expect(rendered.router.state.location.pathname).toBe(`/org/${ORG_ID}/threads/anchor`);
+    expect(rendered.router.state.location.search).toMatchObject({ m: "ask" });
+  });
+
   test("waiting on an approval it opens the thread too; once working, the thread's own line is the one way in", async () => {
     const approval = await open(work({ state: "waiting_approval", question: null }));
     expect(within(approval).getByRole("button", { name: "Abrir thread" })).toBeTruthy();

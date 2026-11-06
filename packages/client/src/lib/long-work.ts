@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import type { AgentStatusLine, WorkView } from "../api/types";
 import { runErrorText } from "./errors";
 import { formatTime, lowerFirst } from "./format";
+import { plainLines } from "./markdown";
 
 /**
  * Long work (ADR 0121), the same on every app: the line under the agent's "Vou cuidar disso" (WorkLine on web, its
@@ -64,7 +65,9 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
   const task = w.issue ? { ...w.issue, label: say("work.task", { number: w.issue.number }) } : null;
   const over = workIsOver(w);
   const stop = !over && c.canStop && w.runId ? { runId: w.runId } : null;
-  const question = (w.state === "waiting_input" && w.question) || null;
+  const asked = w.state === "waiting_input" ? w.question : null;
+  // Its card draws the Markdown; a line of plain text can't.
+  const question = asked ? { ...asked, text: plainLines(asked.text).join(" ") || asked.text } : null;
   // The last update is news only while it works: once over, the report says where it ended.
   const update = over || question ? null : (w.lastUpdate?.text ?? null);
   const base = { task, stop, threadId: w.threadId, update, question };

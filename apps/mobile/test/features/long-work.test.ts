@@ -87,6 +87,11 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
     const back = workLine(t, work({ state: "working", question }), ctx);
     expect(back.question).toBeNull();
     expect(back.update).toBe("Esquema lido; migrando as tabelas.");
+    // Its card draws the Markdown; the line says the same words without the marks.
+    const marked = { text: "Envio **agora** ou [espero](https://a.co)?", messageId: "q1" };
+    expect(workLine(t, work({ state: "waiting_input", question: marked }), ctx).question?.text).toBe(
+      "Envio agora ou espero?",
+    );
     // Nothing to quote (a secret, a hand-off): the line alone, with its last update.
     expect(workLine(t, work({ state: "waiting_input" }), ctx).question).toBeNull();
   });

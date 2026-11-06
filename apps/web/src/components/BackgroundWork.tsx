@@ -135,7 +135,11 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
     can(org, "manage_agents");
   const openConversation = () =>
     view.threadId
-      ? void navigate({ to: "/org/$orgId/threads/$threadId", params: { orgId: org.id, threadId: view.threadId } })
+      ? void navigate({
+          to: "/org/$orgId/threads/$threadId",
+          params: { orgId: org.id, threadId: view.threadId },
+          search: view.question?.messageId ? { m: view.question.messageId } : {},
+        })
       : void navigate({
           to: "/org/$orgId/c/$channelId",
           params: { orgId: org.id, channelId: work.channelId },
