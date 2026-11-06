@@ -367,7 +367,7 @@ function Chat({
   const wave = useRightHandWave(orgId, rightHand && dmAgent ? dmAgent.id : "");
   const waveFrom = useMemo(() => (wave ? frameClock.time() : undefined), [wave]);
   const member = dm ? true : (channel?.isMember ?? true);
-  // An administrator reads every channel without joining it (ADR 0150): only what needs being in it waits for Entrar.
+  // An administrator reads every channel without joining it (ADR 0151): only what needs being in it waits for Entrar.
   const admin = can(useOrg().org, "administrator");
   const readable = member || admin;
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);

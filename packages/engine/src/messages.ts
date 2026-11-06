@@ -743,7 +743,7 @@ export async function insertMessageWithRuns(
         left join ${channelMembers} pcm on pcm.user_id = om.user_id and pcm.channel_id = ${input.channelId}::uuid
         where om.org_id = ${input.orgId}::uuid and om.user_id is distinct from ${userId}
           and ((pcm.id is not null and (om.handle = any(${handles}::text[]) or exists (select 1 from everyone)))
-            -- Named, an administrator hears it from a channel they read without being in it (ADR 0150).
+            -- Named, an administrator hears it from a channel they read without being in it (ADR 0151).
             or (om.handle = any(${handles}::text[])
               and exists (select 1 from ${channels} mc where mc.id = ${input.channelId}::uuid and mc.kind = 'channel')
               and ${maySql(sql`om.org_id`, sql`om.user_id`, "administrator")}))

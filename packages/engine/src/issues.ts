@@ -88,7 +88,7 @@ export interface IssueView {
   createdBy: WorkActor;
   source: IssueSource;
   channelId: string | null;
-  /** Who sees it besides administrators (ADR 0150). */
+  /** Who sees it besides administrators (ADR 0151). */
   audience: IssueAudience;
   /** The issue this one is a sub-issue of. */
   parentIssueId: string | null;
@@ -109,7 +109,7 @@ export interface IssueView {
 }
 
 /**
- * Who sees a task (ADR 0150): the workspace, or some people. `channelId`: those people are whoever is in that
+ * Who sees a task (ADR 0151): the workspace, or some people. `channelId`: those people are whoever is in that
  * conversation now, DM or private channel, so someone who joins it sees the task and someone who leaves it doesn't.
  */
 export interface IssueAudience {
@@ -330,7 +330,7 @@ async function inConversation(db: Database, userId: string, orgId: string, chann
   return !!row && (row.memberId !== null || (row.visibility === "public" && row.kind === "channel"));
 }
 
-/** Whether a person sees a task (ADR 0150). Mirrors `taskSeenSql`. */
+/** Whether a person sees a task (ADR 0151). Mirrors `taskSeenSql`. */
 async function personSees(db: Database, userId: string, orgId: string, t: TaskScope) {
   if (t.restricted ? t.audienceUserIds.includes(userId) : !t.channelId) return true;
   const membership = await getMembership(db, userId, orgId);
@@ -370,7 +370,7 @@ async function agentReaches(db: Database, actor: AgentActor, orgId: string, t: T
   return row?.yes === true || row?.yes === "t";
 }
 
-/** By id, an agent working for a person also reaches what that person reaches (ADR 0150). */
+/** By id, an agent working for a person also reaches what that person reaches (ADR 0151). */
 export async function canSee(db: Database, actor: IssueActor, orgId: string, t: TaskRef) {
   if (actor.type === "person") return personSees(db, actor.userId, orgId, t);
   if (await agentReaches(db, actor, orgId, t)) return true;
@@ -789,7 +789,7 @@ export async function createIssue(
     parentIssueId?: string | null;
     /** Drive files uploaded from the new-issue box: linked to the issue and kept on its "created" event. */
     attachmentIds?: string[];
-    /** Who sees it (ADR 0150); left out, where it's made decides. A step always follows its parent. */
+    /** Who sees it (ADR 0151); left out, where it's made decides. A step always follows its parent. */
     audience?: Audience;
   },
 ): Promise<IssueView> {
@@ -1302,7 +1302,7 @@ async function ownFiles(db: Database, actor: IssueActor, orgId: string, attachme
 
 /**
  * A limited task's files stay with it: a file its author brings that isn't in any conversation would be the whole
- * workspace's in the Drive, so it moves to the task's conversation, read by who sees the task (ADR 0150).
+ * workspace's in the Drive, so it moves to the task's conversation, read by who sees the task (ADR 0151).
  */
 async function keepFilesWithTask(
   db: Database,
@@ -1865,7 +1865,7 @@ async function conversationReaders(db: Database, orgId: string, ids: string[]) {
 }
 
 /**
- * Changes who sees a task (ADR 0150), by anyone who can edit it. Limited, its steps go with it at every depth: a step
+ * Changes who sees a task (ADR 0151), by anyone who can edit it. Limited, its steps go with it at every depth: a step
  * left open would show what the task keeps. A step with a list of its own keeps it, so nobody new reads it, and a
  * person assigned to a step stays on it. To everyone, steps stay as they are, so a step someone kept back isn't shown.
  * Who loses it loses its notifications and, at once, the conversation they have open; everyone's boards read again from

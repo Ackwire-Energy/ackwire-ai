@@ -64,6 +64,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AboutSection } from "@/components/AboutSettings";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AccountSection } from "@/components/AccountSettings";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -249,6 +250,7 @@ export function SettingsPage({
         {current === "usage" && <UsageTabs person={person} summary={<UsageSection />} />}
         {current === "import" && <ImportExportSection />}
         {current === "billing" && <BillingSection />}
+        {current === "about" && <AboutSection />}
       </div>
     </div>
   );

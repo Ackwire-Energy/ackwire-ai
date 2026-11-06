@@ -231,7 +231,7 @@ function subjectOf(r: AuditLogRow): ToolCallSubject | null {
 }
 
 /**
- * The rows that keep their title from this reader (ADR 0150). Administrators see everything; `view_audit` given to
+ * The rows that keep their title from this reader (ADR 0151). Administrators see everything; `view_audit` given to
  * anyone else shows a task's or a page's title only to who sees it. A tool call that doesn't say what it wrote (from
  * before it did, or one that failed) goes by its conversation: who doesn't read it doesn't get what was typed there.
  */

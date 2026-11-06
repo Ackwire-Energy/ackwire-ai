@@ -1,6 +1,7 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
-import { accountTitle, reusableAccount } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, reusableAccount, signInOf } from "@agenteschat/client/lib/ai-accounts";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   beginLogin,
   freeDuplicate,
@@ -120,7 +121,7 @@ export function AddAccount(props: AddAccountProps) {
     setReuse(found ?? null);
   }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
   if (reuse === undefined) return <Icon name="spinner" size={14} />;
-  const chosen = reuse ? (pick ?? (reuse.status === "signed_out" ? "again" : undefined)) : "new";
+  const chosen = reuse ? (pick ?? (signInOf(reuse) === "signed_out" ? "again" : undefined)) : "new";
   const label = reuse ? accountTitle(reuse) : "";
   const another = (
     <Button size="sm" onClick={() => setPick("new")}>
@@ -270,7 +271,8 @@ function AddAccountFlow({
   const signInProvider = keyProvider ?? (kind === "antigravity" && enterprise ? GEMINI_ENTERPRISE_PROVIDER : undefined);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
-  const [startFailed, setStartFailed] = useState(false);
+  // Why the sign-in didn't start, in the person's language.
+  const [startFailed, setStartFailed] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
@@ -309,7 +311,7 @@ function AddAccountFlow({
 
   const begin = async (popup?: Window | null): Promise<AccountLoginStart | null> => {
     setStarting(true);
-    setStartFailed(false);
+    setStartFailed(null);
     try {
       const l = await beginLogin((input) => api.machines.beginAccountLogin(org.id, machineId, kind, input), kind, {
         again,
@@ -325,9 +327,10 @@ function AddAccountFlow({
       setLogin(l);
       if (popup) sendPopup(popup, l.url);
       return l;
-    } catch {
+    } catch (error) {
       popup?.close();
-      if (!gone.current) setStartFailed(true);
+      if (!gone.current)
+        setStartFailed(knownErrorText(t, error) ?? t("agentPage.work.brain.add.startFailed", { computer }));
       return null;
     } finally {
       if (!gone.current) setStarting(false);
@@ -384,7 +387,7 @@ function AddAccountFlow({
 
   const reads = [read, ...Object.values(fanReads)];
   const shown = fanFailed ?? result;
-  const noAnswer = startFailed || reads.includes("noAnswer");
+  const noAnswer = startFailed !== null || reads.includes("noAnswer");
   const ended = noAnswer || reads.includes("failed") || shown?.state === "failed" || shown?.state === "expired";
   // The code or the key on its way to the computer, then the computer signing in with it: a line stands in for the
   // field and its buttons until the sign-in ends.
@@ -590,7 +593,7 @@ function AddAccountFlow({
   const why = otherEmail
     ? t(`connectAi.otherAccount.${kind}`, { email: otherEmail, account: hint })
     : noAnswer
-      ? t("agentPage.work.brain.add.startFailed", { computer })
+      ? (startFailed ?? t("agentPage.work.brain.add.startFailed", { computer }))
       : shown?.state === "expired"
         ? t("agentPage.work.brain.add.expired")
         : shown?.duplicate

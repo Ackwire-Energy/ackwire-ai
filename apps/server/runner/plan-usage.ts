@@ -307,7 +307,7 @@ export interface UsageProbe {
  * ends, or the timeout): the answer, else null. Its process tree is killed at
  * the end either way.
  */
-function jsonLines<T>(
+export function jsonLines<T>(
   p: UsageProbe,
   args: string[],
   start: (send: (msg: unknown) => void) => void,

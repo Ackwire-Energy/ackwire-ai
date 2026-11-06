@@ -4268,6 +4268,7 @@
         "account": "Account",
         "accountWho": "Alleen accounts van {{owner}}, verantwoordelijk voor {{name}}: een abonnement denkt alleen voor de agents van de eigenaar.",
         "accountSignedOut": "Uitgelogd, log opnieuw in",
+        "accountUnknown": "Login niet bevestigd, wordt binnenkort opnieuw gecontroleerd",
         "thisComputer": "Account van {{computer}}",
         "accountMove": "In gebruik door {{agents}} · Hierheen verplaatsen",
         "accountAlso": "Ook gebruikt door {{agents}}",
@@ -8186,6 +8187,8 @@
       "signedOutFor_one": "{{agents}} is uitgelogd.",
       "signedOutFor_other": "{{agents}} zijn uitgelogd.",
       "keyRefused": "De sleutel is geweigerd: vervang hem door een nieuwe.",
+      "statusUnknown": "De computer kon de login deze keer niet bevestigen. Hij controleert het vanzelf opnieuw.",
+      "identityUnknown": "account niet herkend",
       "rename": "Hernoemen",
       "signInAgain": "Opnieuw inloggen",
       "newKey": "Sleutel vervangen",
@@ -8232,6 +8235,8 @@
       "limited": "Limiet bereikt",
       "limitedUntil": "Limiet bereikt tot {{when}}",
       "updated": "{{ago}} bijgewerkt",
+      "ago": "{{ago}} bijgewerkt",
+      "stale": "oude cijfers, {{ago}} bijgewerkt",
       "notShared": "{{maker}} deelt het gebruik hier niet.",
       "offer": {
         "use": "{{label}} gebruiken ({{pct}}%)",
@@ -11396,6 +11401,7 @@
       "targetNotFound": "Die computer bestaat niet meer. Kies een andere.",
       "targetSame": "De agents staan al op die computer.",
       "targetPaused": "Die computer is gepauzeerd. Kies een andere.",
+      "accountMethodUnsupported": "Deze computer kan Claude nog niet op deze manier koppelen. Werk het agentes.chat-programma erop bij, of gebruik een API-sleutel.",
       "offline": "{{name}} is nu offline. Probeer het opnieuw zodra hij terug is.",
       "paused": "{{name}} is gepauzeerd: er start niets nieuws op tot hij wordt hervat.",
       "timeout": "De computer antwoordde niet op tijd. Probeer het opnieuw."
@@ -12271,7 +12277,8 @@
       "media": "GIF's en stickers",
       "voice": "Spraak",
       "apps": "AI-apps",
-      "approvals": "Goedkeuringen"
+      "approvals": "Goedkeuringen",
+      "about": "Over agentes.chat"
     },
     "sectionText": {
       "account": "Je profiel en hoe de app er voor jou uitziet.",
@@ -12293,7 +12300,15 @@
       "media": "Wat je in een gesprek kunt sturen, en de gifs en stickers van de agents.",
       "voice": "Spraakberichten in gesprekken, en wie spraak omzet in tekst.",
       "apps": "Geef de agents taken vanuit Claude, Cursor en andere apps.",
-      "approvals": "Wie voor je beslist als een agent om je goedkeuring vraagt."
+      "approvals": "Wie voor je beslist als een agent om je goedkeuring vraagt.",
+      "about": "Wie het maakt, de licentie en waar de broncode staat."
+    },
+    "about": {
+      "basedOn": "Gebaseerd op <site>agentes.chat</site> van Codari Global, LLC",
+      "version": "Versie",
+      "license": "Vrije software onder de <license>GNU Affero General Public License v3</license>, zonder garantie.",
+      "source": "Broncode",
+      "copyright": "Copyright © 2026 Codari Global, LLC en bijdragers"
     },
     "title": "Instellingen",
     "account": {

@@ -57,7 +57,7 @@ export function useWhoSeesDraft(
   return { kind, setKind, picked, toggle, choice, ready: kind !== "people" || picked.size > 0 };
 }
 
-/** "Quem vê" (ADR 0150), the web's three options as rows, the people under them when it's some of them. */
+/** "Quem vê" (ADR 0151), the web's three options as rows, the people under them when it's some of them. */
 export function WhoSeesRows({ draft }: { draft: ReturnType<typeof useWhoSeesDraft> }) {
   const { t } = useTranslation();
   const dir = useDirectory();

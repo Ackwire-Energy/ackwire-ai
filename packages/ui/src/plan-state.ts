@@ -46,6 +46,10 @@ export interface PlanMeterText {
   limited(until: string | null): string;
   /** "Atualizado há 3 min". */
   updated(iso: string): string;
+  /** The compact line's age of the numbers, mid-line: "atualizado há 51 min". */
+  ago(iso: string): string;
+  /** The same past `PLAN_STALE_MS`: "desatualizado, de há 7 h". */
+  stale(iso: string): string;
 }
 
 export type PlanState = "ok" | "almost" | "limited";
@@ -103,12 +107,17 @@ export function planState(
 
 /** How many windows the compact line names; every window is in its title and in the full meter. */
 const LINE_WINDOWS = 2;
+/** From this age the compact line says how old its numbers are. */
+export const PLAN_AGE_SHOWN_MS = 10 * 60_000;
+/** Numbers older than this read as out of date. */
+export const PLAN_STALE_MS = 6 * 3_600_000;
 
 /**
  * The compact meter's words: the tightest windows by their short names ("semana 40% · 5h 12%"), every window
  * with its reset for the title, the tightest (`top`) for its one bar, and only near or at the limit what matters then
  * ("Quase no limite · renova às 14:00", "No limite até 14:00"). Null while no window is known: nothing, never 0%.
  * A plan that refused a request before any window was known is still at the limit: no windows, no bar, only the alert.
+ * `age`: how old the numbers are, from `PLAN_AGE_SHOWN_MS` (out of date past `PLAN_STALE_MS`, `stale`); null before.
  */
 export function planLine(usage: PlanMeterUsage, text: PlanMeterText, now = Date.now()) {
   const rows = planWindows(usage, now);
@@ -117,9 +126,13 @@ export function planLine(usage: PlanMeterUsage, text: PlanMeterText, now = Date.
   if (!top && state !== "limited") return null;
   const reset = (w?: PlanMeterWindow) => (w?.resetsAt && !passed(w.resetsAt, now) ? text.resets(w.resetsAt) : null);
   const join = (parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
+  const old = now - Date.parse(usage.at);
+  const stale = old > PLAN_STALE_MS;
   return {
     state,
     top,
+    stale,
+    age: stale ? text.stale(usage.at) : old >= PLAN_AGE_SHOWN_MS ? text.ago(usage.at) : null,
     line: rows
       .slice(0, LINE_WINDOWS)
       .map((w) => `${text.short(w)} ${w.used}%`)

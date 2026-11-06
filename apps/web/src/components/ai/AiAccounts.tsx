@@ -5,6 +5,8 @@ import {
   agentsToGive,
   endsOnClaude,
   groupPlans,
+  identityUnknown,
+  offersSignInAgain,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
@@ -195,7 +197,7 @@ export function AiAccountsSection() {
       {accounts.length > 0 && (
         <List>
           {accounts.map((account) => {
-            const { logins, usedBy, usage, signedOut } = account;
+            const { logins, usedBy, usage, signedOut, unknown } = account;
             const a = logins.find((l) => l.shared === true) ?? logins[0];
             if (!a) return null;
             const give = toGive(a);
@@ -204,8 +206,14 @@ export function AiAccountsSection() {
             const allOut = signedOut.length === logins.length;
             // Of an account with a login per agent, the agents whose login is out.
             const outFor = allOut ? [] : signedOut.flatMap((l) => l.usedBy);
+            const machine = machines.data?.find((m) => m.id === a.machineId);
             const facts = [
-              a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
+              a.email ??
+                (a.keyHint
+                  ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
+                  : identityUnknown(a, machine)
+                    ? t("aiAccounts.page.identityUnknown")
+                    : null),
               several ? t("aiAccounts.page.on", { computer: computerNameOf(t, org.name, a.computer) }) : null,
               usedBy.length > 0
                 ? t("aiAccounts.page.usedBy", { count: usedBy.length, agents: names(usedBy) })
@@ -225,6 +233,9 @@ export function AiAccountsSection() {
                           ? t("aiAccounts.page.keyRefused")
                           : t("aiAccounts.page.signedOut")}
                     </SettingNote>
+                  )}
+                  {signedOut.length === 0 && unknown.length > 0 && (
+                    <SettingNote icon="info">{t("aiAccounts.page.statusUnknown")}</SettingNote>
                   )}
                   {copies.length > 0 && (
                     <span className="ai-panel__row">
@@ -275,7 +286,7 @@ export function AiAccountsSection() {
                   <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "rename", account })}>
                     {t("aiAccounts.page.rename")}
                   </Button>
-                  {(signedOut.length > 0 || plan) && (
+                  {(logins.some(offersSignInAgain) || plan) && (
                     <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "again", account })}>
                       {plan ? t("aiAccounts.page.newKey") : t("aiAccounts.page.signInAgain")}
                     </Button>
@@ -358,7 +369,7 @@ export function AiAccountsSection() {
 
 /**
  * Signing in again: a coding plan's new key goes to every login of the account, a sign-in to its first login out
- * (else its first). Closes once each login took it.
+ * (else one unchecked, else its first). Closes once each login took it.
  */
 function AgainDialog({
   account,
@@ -374,7 +385,7 @@ function AgainDialog({
   const { t } = useTranslation();
   const hold = usePlanHold();
   const added = useRef(new Set<string>());
-  const a = account.signedOut[0] ?? account.logins[0];
+  const a = account.signedOut[0] ?? account.unknown[0] ?? account.logins[0];
   if (!a) return null;
   const key = isPlanId(a.provider);
   const fanOut = key ? account.logins.map((l) => ({ id: l.id, again: l.id })) : undefined;

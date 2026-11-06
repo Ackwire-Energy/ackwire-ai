@@ -466,7 +466,7 @@ describe("browser_ask_person", () => {
     await start();
     const ana = await addMember(f.db, f.org.id, "member", "ana");
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
-    // A plain member: an administrator reads every channel (ADR 0150), so the link would open for them.
+    // A plain member: an administrator reads every channel (ADR 0151), so the link would open for them.
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     await f.db.update(schema.agents).set({ ownerUserId: bob.id }).where(eq(schema.agents.id, f.agent.id));
     const run = await runFor(ana.id);

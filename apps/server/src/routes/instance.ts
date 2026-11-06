@@ -20,6 +20,10 @@ const InstanceResponse = z
     url: z
       .string()
       .openapi({ description: "This server's own address (`PUBLIC_URL`).", example: "https://chat.example.com" }),
+    sourceUrl: z.string().openapi({
+      description: "Where to get this server's source code (`SOURCE_URL`, AGPL-3.0 section 13).",
+      example: "https://github.com/agentes-chat/agentes-chat",
+    }),
     signIn: z.object({ email: z.boolean(), google: z.boolean(), github: z.boolean(), apple: z.boolean() }),
     signup: z.enum(["open", "invite"]).openapi({ description: "`invite`: only people with an invitation sign up." }),
     ownerClaim: z.boolean().openapi({
@@ -60,6 +64,7 @@ export function registerInstance(api: OpenAPIHono, deps: AppDeps, version: strin
         api: API,
         minApi: MIN_API,
         url: new URL(config.PUBLIC_URL).origin,
+        sourceUrl: config.SOURCE_URL,
         signIn: { email: true, ...authUiConfig(config).socialProviders },
         signup: open ? ("open" as const) : ("invite" as const),
         ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),

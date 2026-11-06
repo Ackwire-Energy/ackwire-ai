@@ -88,6 +88,14 @@ export const envVars = {
     section: "Server",
     example: "2026.10.31.4",
   },
+  // Mirror: PUBLIC_SOURCE_URL in packages/client/src/lib/about.ts.
+  SOURCE_URL: {
+    schema: z.url().default("https://github.com/agentes-chat/agentes-chat"),
+    description:
+      "Where people get this server's source code, shown as \"Source code\" on the About screen of every app (AGPL-3.0 section 13). Running a modified version: point it at your modified source. Default: agentes.chat's public repository.",
+    section: "Server",
+    example: "https://github.com/your-org/your-fork",
+  },
   WEB_DIR: {
     schema: z.string().default("./public"),
     description:

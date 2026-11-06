@@ -4229,6 +4229,7 @@
         "account": "Hesap",
         "accountWho": "Yalnızca {{name}} sorumlusu {{owner}} hesapları: bir plan yalnızca sahibinin ajanları için düşünür.",
         "accountSignedOut": "Oturum kapandı, yeniden giriş yapın",
+        "accountUnknown": "Giriş doğrulanmadı, yakında yeniden kontrol edilecek",
         "thisComputer": "{{computer}} hesabı",
         "accountMove": "{{agents}} kullanıyor · Buraya taşı",
         "accountAlso": "{{agents}} da kullanıyor",
@@ -8077,6 +8078,8 @@
       "signedOutFor_one": "{{agents}} oturumu kapalı.",
       "signedOutFor_other": "{{agents}} oturumu kapalı.",
       "keyRefused": "Anahtar reddedildi: yenisiyle değiştirin.",
+      "statusUnknown": "Bilgisayar bu sefer girişi doğrulayamadı. Kendiliğinden yeniden kontrol edecek.",
+      "identityUnknown": "hesap belirlenemedi",
       "rename": "Yeniden adlandır",
       "signInAgain": "Yeniden giriş yap",
       "newKey": "Anahtarı değiştir",
@@ -8122,6 +8125,8 @@
       "limited": "Sınırda",
       "limitedUntil": "Sınırda · bitiş: {{when}}",
       "updated": "Güncellendi: {{ago}}",
+      "ago": "güncellendi: {{ago}}",
+      "stale": "eski veriler, güncellendi: {{ago}}",
       "notShared": "{{maker}} kullanımı burada paylaşmıyor.",
       "offer": {
         "use": "{{label}} kullan (%{{pct}})",
@@ -11271,6 +11276,7 @@
       "targetNotFound": "O bilgisayar artık yok. Başka birini seçin.",
       "targetSame": "Ajanlar zaten o bilgisayarda.",
       "targetPaused": "O bilgisayar duraklatıldı. Başka birini seçin.",
+      "accountMethodUnsupported": "Bu bilgisayar Claude'u henüz bu şekilde bağlayamıyor. Üzerindeki agentes.chat programını güncelleyin ya da bir API anahtarı kullanın.",
       "offline": "{{name}} şu an çevrimdışı. Geri geldiğinde tekrar deneyin.",
       "paused": "{{name}} duraklatıldı: devam ettirilene kadar üzerinde yeni bir şey başlamaz.",
       "timeout": "Bilgisayar zamanında yanıt vermedi. Tekrar deneyin."
@@ -12146,7 +12152,8 @@
       "media": "GIF'ler ve çıkartmalar",
       "voice": "Ses",
       "apps": "Yapay zeka uygulamaları",
-      "approvals": "Onaylar"
+      "approvals": "Onaylar",
+      "about": "agentes.chat hakkında"
     },
     "sectionText": {
       "account": "Profiliniz ve uygulamanın size nasıl göründüğü.",
@@ -12168,7 +12175,15 @@
       "media": "Konuşmada neler gönderilebildiği ve ajanların GIF'leri ile çıkartmaları.",
       "voice": "Konuşmalardaki sesli mesajlar ve sesi metne kimin dönüştürdüğü.",
       "apps": "Claude, Cursor ve diğer uygulamalardan ajanlara görev verin.",
-      "approvals": "Bir ajan onayınızı istediğinde sizin yerinize kimin karar verdiği."
+      "approvals": "Bir ajan onayınızı istediğinde sizin yerinize kimin karar verdiği.",
+      "about": "Kimin yaptığı, lisansı ve kaynak kodunun yeri."
+    },
+    "about": {
+      "basedOn": "Codari Global, LLC tarafından geliştirilen <site>agentes.chat</site> tabanlı",
+      "version": "Sürüm",
+      "license": "<license>GNU Affero General Public License v3</license> kapsamında özgür yazılım, garantisi yoktur.",
+      "source": "Kaynak kodu",
+      "copyright": "Copyright © 2026 Codari Global, LLC ve katkıda bulunanlar"
     },
     "title": "Ayarlar",
     "account": {

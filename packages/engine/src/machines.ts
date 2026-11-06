@@ -8,7 +8,19 @@ import {
   MIN_RUNNER_PROTOCOL,
   type PubSub,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { type AuditEntry, recordAudit } from "./audit";
 import { caches } from "./cache";
@@ -494,6 +506,20 @@ export async function publishMachineUpdated(
     orgId,
     event: { type: "machine.updated", machineId, ...change },
   });
+}
+
+/** How many `deletedAgentIds` lists: a computer that misses one only keeps that agent's transcripts. */
+const DELETED_AGENTS_LISTED = 500;
+
+/** The org's agents gone for good, the latest first. A computer clears what it holds for those it knew. */
+export async function deletedAgentIds(db: Database, orgId: string): Promise<string[]> {
+  const rows = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNotNull(agents.deletedAt)))
+    .orderBy(desc(agents.deletedAt))
+    .limit(DELETED_AGENTS_LISTED);
+  return rows.map((a) => a.id);
 }
 
 /** The agents of the org pointed at this machine, as its `agents` frame lists them (protocol 9). */

@@ -249,7 +249,7 @@ export interface ChannelListItem {
   /** Order inside its category. */
   position: number;
   isMember: boolean;
-  /** Listed only because I'm an administrator (ADR 0150): the apps keep it off the sidebar until opened or joined. */
+  /** Listed only because I'm an administrator (ADR 0151): the apps keep it off the sidebar until opened or joined. */
   seenAsAdmin: boolean;
   /**
    * Messages since I last read it (from when I joined, if never), not mine;
@@ -312,7 +312,7 @@ const uuidArray = (v: string[] | string | null) =>
 
 /**
  * Channels the user can see: every public channel, private ones they
- * belong to and those limited to a role they hold (ADR 0125), and for an administrator all of them (ADR 0150), in sidebar order (then by name), with their unread count and last message, in one
+ * belong to and those limited to a role they hold (ADR 0125), and for an administrator all of them (ADR 0151), in sidebar order (then by name), with their unread count and last message, in one
  * query (a lateral read per channel on `(channel_id, created_at)`).
  */
 export async function listChannels(db: Database, userId: string, orgId: string): Promise<ChannelListItem[]> {
@@ -539,7 +539,7 @@ export async function readableChannelIds(
  * the user belongs to the organization (a blocked account belongs nowhere,
  * as in `getMembership`), the channel belongs to that organization, and the
  * user is a member of the channel or an administrator, who reads every channel
- * without joining it but never someone else's DM (ADR 0150).
+ * without joining it but never someone else's DM (ADR 0151).
  */
 export async function requireChannelAccess(db: Database, userId: string, orgId: string, channelId: string) {
   // One round trip: membership of the org, the channel, and membership of the channel.
@@ -600,7 +600,7 @@ export const postRefusal = (workspace: Membership) =>
 
 /**
  * Joins a public channel, or a private one limited to a role the person holds (ADR 0125), or any channel for an
- * administrator (ADR 0150). Other private channels need an invitation from a member.
+ * administrator (ADR 0151). Other private channels need an invitation from a member.
  */
 export async function joinChannel(
   db: Database,

@@ -756,7 +756,7 @@ function ChannelView({
   const dir = useDirectory(org.id);
   const rightHandLook = useRightHandLook();
   const isMember = channel.isMember;
-  // An administrator reads every channel without joining it (ADR 0150): only what needs being in it waits for Entrar.
+  // An administrator reads every channel without joining it (ADR 0151): only what needs being in it waits for Entrar.
   const readable = isMember || (!chrome && can(org, "administrator"));
   const members = useChannelMembers(org.id, channel.id, readable);
   const channelMessages = useMessages(org.id, channel.id, readable);

@@ -518,7 +518,7 @@ describe("routine limits", () => {
       target: { type: "channel" as const, channelId: secret.id },
       trigger: daily(),
     };
-    // A plain member who owns the agent: an administrator may post in every channel (ADR 0150).
+    // A plain member who owns the agent: an administrator may post in every channel (ADR 0151).
     const dani = await addMember(f.db, f.org.id, "member", "dani");
     await f.db.update(schema.agents).set({ ownerUserId: dani.id }).where(eq(schema.agents.id, f.agent.id));
     await expect(createRoutine(routineDeps(), dani.id, f.org.id, input)).rejects.toMatchObject({

@@ -998,7 +998,7 @@ export interface WikiPageInput {
   /** Change note for the first version. */
   note?: string;
   source?: { type: string; id: string; channelId?: string } | null;
-  /** Who sees it (ADR 0150), inside its folder's audience; left out, its folder's or everyone. */
+  /** Who sees it (ADR 0151), inside its folder's audience; left out, its folder's or everyone. */
   audience?: Audience;
 }
 
@@ -1778,7 +1778,7 @@ async function requireInsideFolder(db: Executor, orgId: string, a: AudienceCols,
 /**
  * Limits a page to an audience (or opens it again with `null`): besides administrators, only the people holding one of
  * `roleIds` and the people in `userIds` see it, with `agents` only those agents read it (`null` = every agent), and
- * `edit` says who edits among them. Who may: anyone who edits the page (ADR 0150), for who sees it; choosing agents or
+ * `edit` says who edits among them. Who may: anyone who edits the page (ADR 0151), for who sees it; choosing agents or
  * editors takes managing roles too. Only an audience they stay in, so nobody hides a page from themselves. Inside a
  * limited folder it can only be narrower.
  */

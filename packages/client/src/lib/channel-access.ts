@@ -27,7 +27,7 @@ export const accessInput = (a: ChannelAccess): Pick<ChannelInput, "visibility" |
 
 /**
  * Whether I may join a channel I see and am not in: public, limited to roles, which the server shows only to their
- * people, or any for an administrator (ADR 0150).
+ * people, or any for an administrator (ADR 0151).
  */
 export const joinable = (c: Visible & { isMember: boolean }) =>
   !c.isMember && (c.visibility === "public" || limited(c) || c.seenAsAdmin === true);

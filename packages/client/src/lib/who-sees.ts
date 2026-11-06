@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import { joinNames } from "./format";
 
-/** Who something is for (ADR 0150): "only me" is a list of one, and administrators always see it. */
+/** Who something is for (ADR 0151): "only me" is a list of one, and administrators always see it. */
 export type AudienceChoice = { mode: "everyone" } | { mode: "people"; userIds: string[] };
 export type AudienceKind = "everyone" | "me" | "people";
 

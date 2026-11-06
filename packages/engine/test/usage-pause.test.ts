@@ -1545,7 +1545,7 @@ test("two skips on one line make one owner notice counting both; one in a conver
   await postPersonMessage(deps, nina.id, f.org.id, ops.id, { body: "Relatório no Drive." });
   await postPersonMessage(deps, nina.id, f.org.id, theirs.id, { body: "Fatura paga." });
   await drainOutbox(f.db, handlers);
-  // A plain member owns it by the time it counts: an administrator reads every channel (ADR 0150).
+  // A plain member owns it by the time it counts: an administrator reads every channel (ADR 0151).
   await f.db.update(schema.agents).set({ ownerUserId: dono.id }).where(eq(schema.agents.id, f.agent.id));
   await pausedLongAgo(f);
   clearPlanLimits();

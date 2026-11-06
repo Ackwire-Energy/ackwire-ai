@@ -4394,6 +4394,7 @@
         "account": "Compte",
         "accountWho": "Seulement les comptes de {{owner}}, responsable de {{name}} : un plan ne pense que pour les agents de son propriétaire.",
         "accountSignedOut": "Déconnecté, reconnectez-vous",
+        "accountUnknown": "Connexion non confirmée, vérifiée de nouveau bientôt",
         "thisComputer": "Compte de {{computer}}",
         "accountMove": "Utilisé par {{agents}} · Le déplacer ici",
         "accountAlso": "Aussi utilisé par {{agents}}",
@@ -8453,6 +8454,8 @@
       "signedOutFor_many": "{{agents}} sont déconnectés.",
       "signedOutFor_other": "{{agents}} sont déconnectés.",
       "keyRefused": "La clé a été refusée : remplacez-la par une nouvelle.",
+      "statusUnknown": "L'ordinateur n'a pas pu confirmer la connexion cette fois. Il vérifie de nouveau tout seul.",
+      "identityUnknown": "compte non identifié",
       "rename": "Renommer",
       "signInAgain": "Se reconnecter",
       "newKey": "Remplacer la clé",
@@ -8502,6 +8505,8 @@
       "limited": "Limite atteinte",
       "limitedUntil": "Limite atteinte jusqu'à {{when}}",
       "updated": "Mis à jour {{ago}}",
+      "ago": "mis à jour {{ago}}",
+      "stale": "chiffres anciens, mis à jour {{ago}}",
       "notShared": "{{maker}} ne partage pas l'utilisation ici.",
       "offer": {
         "use": "Utiliser {{label}} ({{pct}} %)",
@@ -11761,6 +11766,7 @@
       "targetNotFound": "Cet ordinateur n'existe plus. Choisissez-en un autre.",
       "targetSame": "Les agents sont déjà sur cet ordinateur.",
       "targetPaused": "Cet ordinateur est en pause. Choisissez-en un autre.",
+      "accountMethodUnsupported": "Cet ordinateur ne peut pas encore connecter Claude de cette façon. Mettez à jour le programme agentes.chat dessus ou utilisez une clé API.",
       "offline": "{{name}} est hors ligne pour le moment. Réessayez quand il sera de retour.",
       "paused": "{{name}} est en pause : rien de nouveau n'y démarre tant qu'il n'a pas repris.",
       "timeout": "L'ordinateur n'a pas répondu à temps. Réessayez."
@@ -12651,7 +12657,8 @@
       "media": "GIF et stickers",
       "voice": "Voix",
       "apps": "Applications d'IA",
-      "approvals": "Approbations"
+      "approvals": "Approbations",
+      "about": "À propos d’agentes.chat"
     },
     "sectionText": {
       "account": "Votre profil et l'apparence de l'app pour vous.",
@@ -12673,7 +12680,15 @@
       "media": "Ce qu'on peut envoyer dans une conversation, et les GIF et stickers des agents.",
       "voice": "Les messages vocaux dans les conversations, et qui transforme la voix en texte.",
       "apps": "Confiez des tâches aux agents depuis Claude, Cursor et d'autres apps.",
-      "approvals": "Qui décide pour vous quand un agent demande votre approbation."
+      "approvals": "Qui décide pour vous quand un agent demande votre approbation.",
+      "about": "Qui le fait, sa licence et où trouver son code source."
+    },
+    "about": {
+      "basedOn": "Basé sur <site>agentes.chat</site> de Codari Global, LLC",
+      "version": "Version",
+      "license": "Logiciel libre sous la <license>GNU Affero General Public License v3</license>, sans garantie.",
+      "source": "Code source",
+      "copyright": "Copyright © 2026 Codari Global, LLC et contributeurs"
     },
     "title": "Paramètres",
     "account": {

@@ -569,6 +569,8 @@ describe("Configurações do workspace", () => {
       "Aprovações",
       // Each person connects their own AI apps (ADR 0119).
       "Apps de IA",
+      // AGPL's legal notices and the attribution, for everyone (the section 7(b) term in LICENSE).
+      "Sobre o agentes.chat",
       // The people, where a member who may not invite suggests someone (ADR 0090).
       "Membros e convites",
       // Their own logins, keys and contacts (ADR 0144).

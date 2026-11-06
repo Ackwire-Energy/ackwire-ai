@@ -30,6 +30,8 @@ const text: PlanMeterText = {
   almost: "Quase no limite",
   limited: (until) => (until ? `No limite até ${until.slice(11, 16)}` : "No limite"),
   updated: (iso) => `Atualizado ${iso.slice(11, 16)}`,
+  ago: (iso) => `atualizado ${iso.slice(11, 16)}`,
+  stale: (iso) => `números antigos, de ${iso.slice(11, 16)}`,
 };
 
 const rows = (el: HTMLElement) =>
@@ -223,6 +225,31 @@ test("compact near the limit says when it renews, and at the limit until when", 
   ).container;
   expect(full.querySelector(".ac-planmeter")?.getAttribute("data-state")).toBe("limited");
   expect(full.querySelector(".ac-planmeter__state")?.textContent).toBe("No limite até 13:00");
+});
+
+test("compact says how old its numbers are from 10 minutes, and out of date past 6 hours", () => {
+  const read = (ago: number) =>
+    render(
+      <PlanMeter
+        usage={{ windows: [{ kind: "five_hour", usedPercent: 30 }], at: at(-ago) }}
+        text={text}
+        now={NOW}
+        compact
+      />,
+    ).container.querySelector(".ac-planmeter--compact") as HTMLElement;
+  expect(read(9 * 60_000).querySelector(".ac-planmeter__line")?.textContent).toBe("5h 30%");
+  cleanup();
+  const old = read(51 * 60_000);
+  expect(old.querySelector(".ac-planmeter__line")?.textContent).toBe("5h 30% · atualizado 11:09");
+  expect(old.dataset.stale).toBeUndefined();
+  cleanup();
+  const stale = read(7 * HOUR);
+  expect(stale.querySelector(".ac-planmeter__line")?.textContent).toBe("5h 30% · números antigos, de 05:00");
+  expect(stale.dataset.stale).toBe("true");
+  expect(planLine({ windows: [{ kind: "five_hour", usedPercent: 30 }], at: at(-6 * HOUR) }, text, NOW)).toMatchObject({
+    stale: false,
+    age: "atualizado 06:00",
+  });
 });
 
 test("compact with no window known yet shows nothing, never 0%", () => {

@@ -307,7 +307,7 @@ function Receipt({
   );
 }
 
-/** Who sees the task the agent just made, and the way to change it in place (ADR 0150). */
+/** Who sees the task the agent just made, and the way to change it in place (ADR 0151). */
 function ReceiptWhoSees({ action: a }: { action: AgentAction }) {
   const { t } = useTranslation();
   const { org } = useOrg();

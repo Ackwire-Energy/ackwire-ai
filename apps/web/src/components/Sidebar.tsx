@@ -1039,7 +1039,7 @@ function SidebarChannels({
   const removeCategory = useDeleteChannelCategory(orgId);
   const recreate = useCreateChannelCategory(orgId);
   const manages = can(org, "manage_channels");
-  // An administrator reads every channel (ADR 0150): the ones they aren't in wait under one row, not in the list.
+  // An administrator reads every channel (ADR 0151): the ones they aren't in wait under one row, not in the list.
   const path = useRouterState({ select: (s) => s.location.pathname });
   const channels = all.filter((c) => !c.seenAsAdmin || path.endsWith(`/c/${c.id}`));
   const others = all.filter((c) => !channels.includes(c));

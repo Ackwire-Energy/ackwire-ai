@@ -167,6 +167,8 @@ export interface Instance {
   minApi: number;
   /** The server's own address (`PUBLIC_URL`), the only one its realtime accepts. */
   url: string;
+  /** Where to get the server's source code (AGPL-3.0 section 13; absent: an older server). */
+  sourceUrl?: string;
   signIn: { email: boolean; google: boolean; github: boolean; apple: boolean };
   signup: "open" | "invite";
   /** No account yet, and the first one only through the owner link the setup printed (absent: false). */
@@ -1003,7 +1005,7 @@ export interface Channel {
   /** Private and limited to these roles (departments, ADR 0125): their people see it and may join. Empty or absent: public or invite only. */
   audienceRoleIds?: string[];
   isMember: boolean;
-  /** Listed only because I'm an administrator (ADR 0150): off the sidebar until I open or join it. */
+  /** Listed only because I'm an administrator (ADR 0151): off the sidebar until I open or join it. */
   seenAsAdmin?: boolean;
   createdAt: string;
   /** Who created it: may change it and its members, like admins. */
@@ -3252,7 +3254,7 @@ export interface Issue {
   /** The channel it lives in (from a message, or chosen). */
   channelId: string | null;
   /**
-   * Who sees it besides administrators (ADR 0150). `channelId`: those people are whoever is in that conversation now.
+   * Who sees it besides administrators (ADR 0151). `channelId`: those people are whoever is in that conversation now.
    * Absent on an older server: as `everyone`.
    */
   audience?: { mode: "everyone" | "people"; userIds: string[]; channelId: string | null };
@@ -3319,7 +3321,7 @@ export interface IssueInput {
   githubUrl?: string | null;
   /** Drive files uploaded from the new-issue box (only on create): linked to the issue. */
   attachmentIds?: string[];
-  /** Who sees it (ADR 0150). Left out: the whole workspace. */
+  /** Who sees it (ADR 0151). Left out: the whole workspace. */
   audience?: AudienceChoice;
 }
 
@@ -4720,7 +4722,7 @@ export interface WikiPageInput {
   folder?: string;
   tags?: string[];
   body: string;
-  /** Who sees it (ADR 0150), inside its folder's audience. */
+  /** Who sees it (ADR 0151), inside its folder's audience. */
   audience?: AudienceChoice;
 }
 
@@ -5229,6 +5231,8 @@ export interface MachineAccount {
   /** `pro`, `max`, `ultra`, `team`… from what the CLI says (`planWordOf` names it). */
   plan: string | null;
   status: "active" | "signed_out";
+  /** False: the computer's last look at its sign-in said nothing for sure; `status` is the last known (older servers leave it out). */
+  statusKnown?: boolean;
   /** Whose it is (the person who signed it in); null: nobody's. */
   ownerId: string | null;
   ownerName: string | null;
@@ -5246,6 +5250,8 @@ export interface MachineAccount {
   keyHint: string | null;
   /** It thinks for every agent its owner gives it on that computer, with no new sign-in (absent: an older server). */
   shared?: boolean;
+  /** Claude's organization it is signed in to (opaque), its owner's eyes only; null or absent: not known. */
+  providerOrgId?: string | null;
 }
 
 /** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */

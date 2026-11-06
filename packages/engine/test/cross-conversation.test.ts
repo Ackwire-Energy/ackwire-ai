@@ -274,7 +274,7 @@ describe("memories from a DM", () => {
       content: "Pode enviar sem perguntar.",
       sourceIds: [inDm.id],
     });
-    await f.db.execute(sql.raw(readFileSync(join(migrationsFolder, "0235_dm_memory_stays_personal.sql"), "utf8")));
+    await f.db.execute(sql.raw(readFileSync(join(migrationsFolder, "0236_dm_memory_stays_personal.sql"), "utf8")));
     const scope = async (id: string) =>
       (await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, id)))[0]?.scopeType;
     expect(await scope(fromDm.item.id)).toBe("person");

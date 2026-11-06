@@ -37,7 +37,8 @@ export type OperatorEventType =
   | "task.finished"
   | "desktop_control.ended"
   | "content.viewed"
-  | "platform_ai.threshold";
+  | "platform_ai.threshold"
+  | "account.failure";
 
 export interface OperatorEvent {
   type: OperatorEventType;
@@ -100,21 +101,77 @@ export const recordSession = (
     data: { ip: session.ipAddress ?? null, userAgent: session.userAgent?.slice(0, USER_AGENT_CHARS) ?? null },
   });
 
-/** `run.finished`, in the transaction that ended the run (`transitionRun`). */
+/**
+ * `run.finished`, in the transaction that ended the run (`transitionRun`). `failure`, only on a failed one: a stable
+ * code (never the error's text) and the provider's cause, if any.
+ */
 export async function recordRunFinished(
   db: Executor,
   run: Pick<typeof schema.agentRuns.$inferSelect, "id" | "orgId" | "agentId" | "brain" | "status">,
+  failure?: { code: string | null; cause: string | null },
 ) {
   if (!enabled) return;
   const toolCalls = sql`(select count(*)::int from ${agentRunSteps}
     where ${agentRunSteps.runId} = ${run.id} and ${agentRunSteps.kind} = 'tool_call')`;
+  const failed = failure
+    ? sql` || jsonb_build_object('failure', jsonb_build_object('code', ${failure.code}::text, 'cause', ${failure.cause}::text))`
+    : sql``;
   await recordOperatorEvent(db, {
     type: "run.finished",
     orgId: run.orgId,
     data: sql`jsonb_build_object('runId', ${run.id}::text, 'agentId', ${run.agentId}::text,
-      'brain', ${run.brain}::text, 'status', ${run.status}::text, 'toolCalls', ${toolCalls})`,
+      'brain', ${run.brain}::text, 'status', ${run.status}::text, 'toolCalls', ${toolCalls})${failed}`,
   });
 }
+
+/** One `account.failure` per account and cause in this long. */
+export const ACCOUNT_FAILURE_EVERY_MS = 10 * 60_000;
+// ponytail: per process; each replica writes its own at most every 10 minutes. A shared table if that ever matters.
+const accountFailureAt = new Map<string, number>();
+
+/**
+ * `account.failure`: a turn on a computer's AI account failed for a provider's reason (a refused sign-in, a limit,
+ * a disabled account…). Metadata only, at most one per account and cause every `ACCOUNT_FAILURE_EVERY_MS`.
+ */
+export async function recordAccountFailure(
+  db: Executor,
+  failure: {
+    orgId: string;
+    accountId: string;
+    machineId: string;
+    kind: string;
+    authMethod: string | null;
+    cause: string;
+    code: string;
+    httpStatus?: number;
+  },
+  now = Date.now(),
+) {
+  if (!enabled) return;
+  const key = `${failure.accountId}:${failure.cause}`;
+  const last = accountFailureAt.get(key);
+  if (last !== undefined && now - last < ACCOUNT_FAILURE_EVERY_MS) return;
+  if (accountFailureAt.size >= 10_000) accountFailureAt.clear();
+  accountFailureAt.set(key, now);
+  const [machine] = await db
+    .select({ runnerVersion: schema.machines.runnerVersion, protocol: schema.machines.protocol })
+    .from(schema.machines)
+    .where(eq(schema.machines.id, failure.machineId));
+  const { orgId, httpStatus, ...data } = failure;
+  await recordOperatorEvent(db, {
+    type: "account.failure",
+    orgId,
+    data: {
+      ...data,
+      ...(httpStatus ? { httpStatus } : {}),
+      ...(machine?.runnerVersion ? { runnerVersion: machine.runnerVersion } : {}),
+      ...(machine ? { protocol: machine.protocol } : {}),
+    },
+  });
+}
+
+/** Tests: forgets which account failures were already told. */
+export const resetAccountFailures = () => accountFailureAt.clear();
 
 /** `task.finished`: a task on a computer ended (done, failed, canceled, or interrupted for good). */
 export const recordTaskFinished = (

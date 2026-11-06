@@ -406,7 +406,7 @@ export async function releaseQuestionsOf(
 
 /**
  * The questions waiting on a person who can no longer read where they were asked, though they never left it: an
- * administrator demoted reads a channel only as a member (ADR 0150). Each goes back to the room.
+ * administrator demoted reads a channel only as a member (ADR 0151). Each goes back to the room.
  */
 export async function releaseQuestionsOutOfReach(
   deps: { db: Database; pubsub?: PubSub },

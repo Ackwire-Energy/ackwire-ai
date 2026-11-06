@@ -4,18 +4,18 @@ import { maySql } from "./permissions";
 
 const { issues, channels, channelMembers, agents } = schema;
 
-/** Who a task or a wiki page is for (ADR 0150): "only me" is a list of one. Administrators always see it. */
+/** Who a task or a wiki page is for (ADR 0151): "only me" is a list of one. Administrators always see it. */
 export type Audience = { mode: "everyone" } | { mode: "people"; userIds: string[] };
 
 /** The most people a task's audience names. */
 export const AUDIENCE_MAX = 200;
 
-/** A row of `channels` an administrator reads without being in it (ADR 0150): every channel, never a DM. */
+/** A row of `channels` an administrator reads without being in it (ADR 0151): every channel, never a DM. */
 export const adminChannelSql = (orgId: unknown, userId: unknown) =>
   and(eq(channels.kind, "channel"), maySql(orgId, userId, "administrator"));
 
 /**
- * Whether `userId` sees the `issues` row `alias` (ADR 0150): an administrator always; a limited task, who it names; else
+ * Whether `userId` sees the `issues` row `alias` (ADR 0151): an administrator always; a limited task, who it names; else
  * the whole workspace, or who reads the conversation it's tied to (`channel_id`: its members, anyone for a public
  * channel). The workspace membership is the caller's check. Mirrors `personSees` in `issues.ts`.
  */
@@ -37,7 +37,7 @@ export const taskReaderSql = (channelId: SQL, userId: SQL) => sql`exists (
   select 1 from ${issues} ti where ti.conversation_channel_id = ${channelId} and ${taskSeenSql("ti", userId)})`;
 
 /**
- * The audience an agent picks for what it makes in a conversation (ADR 0150): the workspace from a public channel, and
+ * The audience an agent picks for what it makes in a conversation (ADR 0151): the workspace from a public channel, and
  * from a room no person reads (a routine's); the people there from a DM or a private channel; from a task's own
  * conversation, who sees that task.
  */

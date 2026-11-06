@@ -280,7 +280,7 @@ const HandyLines = ({ action }: { action: AgentAction }) => (
   </>
 );
 
-/** Under a task the agent made: who sees it, and the way to change it (ADR 0150). */
+/** Under a task the agent made: who sees it, and the way to change it (ADR 0151). */
 function WhoSeesLine({ action: a }: { action: AgentAction }) {
   const { t } = useTranslation();
   const mode = a.params.audience;

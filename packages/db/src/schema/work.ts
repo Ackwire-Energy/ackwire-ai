@@ -93,7 +93,7 @@ export const issues = pgTable(
     source: jsonb().$type<Record<string, unknown>>().notNull().default({ type: "manual" }),
     channelId: uuid(),
     /**
-     * Limited to `audienceUserIds` (ADR 0150), with no `channelId`: who sees it is that list, and administrators always.
+     * Limited to `audienceUserIds` (ADR 0151), with no `channelId`: who sees it is that list, and administrators always.
      * Not limited: the workspace, or the people of the conversation in `channelId`.
      */
     restricted: boolean().notNull().default(false),

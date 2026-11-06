@@ -177,7 +177,7 @@ describe("issue.created", () => {
 
   test("only routines whose creator can see the issue fire", async () => {
     f = await setup();
-    // A plain member: an administrator sees every task (ADR 0150).
+    // A plain member: an administrator sees every task (ADR 0151).
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     // Whoever creates a routine must be able to post where it reports.
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });

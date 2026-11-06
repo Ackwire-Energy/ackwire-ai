@@ -51,7 +51,7 @@ const open = (href: string) => router.push(href as never);
  * computers' own sign-ins, each with its usage in pixels);
  * "Do workspace" (the workspace itself first, opening its settings: `app/(app)/settings/*`) and the preferences
  * as loose rows; Sair and the version. Each row pushes its screen (Conta, Workspaces, Membros, Notificações, Sons,
- * Aparência, Idioma: `app/(app)/me/*`) or one of the app's.
+ * Aparência, Idioma, Sobre: `app/(app)/me/*`) or one of the app's.
  */
 export function MeScreen() {
   const { t, i18n } = useTranslation();
@@ -194,6 +194,7 @@ export function MeScreen() {
       value: isAppLocale(i18n.language) ? localeInfo(i18n.language).native : i18n.language,
       href: "/me/language",
     },
+    { icon: "info", label: t("settings.section.about"), href: "/me/about" },
   ];
   return (
     // The page is white like Conversas; its screens sit on the grouped gray, as settings do.

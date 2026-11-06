@@ -49,6 +49,7 @@ import {
   checkFolder,
   parseAgents,
   readAgents,
+  realFoldersFor,
   reduceAccess,
   removeFolder,
   setFolderAgents,
@@ -56,12 +57,16 @@ import {
   TOOL_NAMES,
   writeAgents,
 } from "./access";
+import { AccountBrains } from "./account-brains";
+import { accountSelfCheck, SELF_CHECK_EVERY_MS } from "./account-check";
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
 import {
+  AccountUsers,
   type AgentUser,
   AgentUsers,
   agentGid,
+  authEgressPrefix,
   denySchedulers,
   ensureGitCacheUser,
   GIT_CACHE_DIR,
@@ -221,6 +226,8 @@ export function configFromGrant(
     ...(prev?.networkMark ? { networkMark: prev.networkMark } : {}),
     ...(prev?.networkDrainSeconds ? { networkDrainSeconds: prev.networkDrainSeconds } : {}),
     ...(prev?.networkRevision !== undefined ? { networkRevision: prev.networkRevision } : {}),
+    ...(prev?.networkAuthRoute ? { networkAuthRoute: prev.networkAuthRoute } : {}),
+    ...(prev?.claudeSharedLogin ? { claudeSharedLogin: prev.claudeSharedLogin } : {}),
     ...(prev?.maxConcurrentTasks ? { maxConcurrentTasks: prev.maxConcurrentTasks } : {}),
     ...(prev?.taskMaxSeconds ? { taskMaxSeconds: prev.taskMaxSeconds } : {}),
     ...(prev?.brainIdleMinutes ? { brainIdleMinutes: prev.brainIdleMinutes } : {}),
@@ -286,6 +293,8 @@ interface Session {
   workspaceReal: string;
   tasks: TaskManager;
   brains: BrainManager;
+  /** System mode: the CLIs of Claude sign-ins several agents share, run by root. */
+  accountBrains: AccountBrains | null;
   codexApp: CodexAppServers;
   mcp: McpBridge;
   browser: BrowserManager;
@@ -330,8 +339,21 @@ export interface DaemonOptions {
   pairSleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** Tests (system mode): how agents' users are found and their workers started. */
   workers?: Pick<SupervisorOptions, "user" | "start">;
-  /** Tests (system mode): where the account folders are, and how one is handed to an agent's user. */
-  systemAccounts?: { root: string; chown: (file: string, uid: number, gid: number) => Promise<void> };
+  /**
+   * Tests (system mode): where the account folders are, how one is handed to an agent's user, and what goes before
+   * root's Claude CLIs (none when left out).
+   */
+  systemAccounts?: {
+    root: string;
+    chown: (file: string, uid: number, gid: number) => Promise<void>;
+    authEgress?: () => string[] | null;
+  };
+  /** Tests (system mode): the sign-ins' users, and the self-check that opens Claude's own login for all agents. */
+  accountUsers?: Pick<
+    AccountUsers,
+    "sweep" | "stopScopes" | "sweepAgent" | "launcher" | "remove" | "ensure" | "room" | "bridge" | "carry"
+  >;
+  selfCheck?: () => Promise<string | null>;
 }
 
 export class RunnerDaemon implements RequestObserver {
@@ -399,6 +421,12 @@ export class RunnerDaemon implements RequestObserver {
   private readonly now: () => number;
   /** The computer brains' accounts (ADR 0041): machine-wide, kept across pairings and sessions. */
   readonly accounts: AccountManager;
+  /** System mode: each Claude login for all agents has its own OS user. */
+  private readonly accountUsers: NonNullable<DaemonOptions["accountUsers"]> | null;
+  /** The self-check's last answer: null passed, a string why not. Undefined until it ran; only with the switch on. */
+  private sharedLoginBlocked: string | null | undefined;
+  /** Deleted agents cleared from the sign-ins by this process: each frame lists them all again. */
+  private readonly swept = new Set<string>();
   /** The agents' desktops (ADR 0058): they outlive sessions and this process. */
   readonly desktops: DesktopSessions;
   /** Terminals people open as an agent (ADR 0058 §6). */
@@ -430,10 +458,24 @@ export class RunnerDaemon implements RequestObserver {
     } catch {
       // an unreadable config starts unpaired
     }
-    const lent = system ? (opts.systemAccounts ?? { root: SYSTEM_ACCOUNTS_ROOT, chown: lchownTree }) : null;
+    const lent = system
+      ? (opts.systemAccounts ?? { root: SYSTEM_ACCOUNTS_ROOT, chown: lchownTree, authEgress: () => authEgressPrefix() })
+      : null;
+    const accountUsers = system ? (opts.accountUsers ?? new AccountUsers({ home: opts.home, log: opts.log })) : null;
+    this.accountUsers = accountUsers;
     this.accounts = new AccountManager({
       root: lent?.root ?? path.join(opts.home, "accounts"),
       ...(lent ? { lending: { chown: lent.chown } } : {}),
+      ...(lent?.authEgress ? { authEgress: lent.authEgress } : {}),
+      ...(accountUsers
+        ? {
+            sharedLogin: {
+              ready: () => this.sharedLoginReady,
+              launcher: (id: string) => accountUsers.launcher(id),
+              remove: (id: string) => accountUsers.remove(id),
+            },
+          }
+        : {}),
       orgId: () => this.config?.orgId,
       log: opts.log,
       ...(opts.accountCommands ? { commands: opts.accountCommands } : {}),
@@ -476,6 +518,38 @@ export class RunnerDaemon implements RequestObserver {
     if (!agentUser) return runnerUser(this.opts.home, await this.agentFolder(agent), agent);
     const u = agentUser(agent);
     return systemDesktopUser(systemLauncher(u), { uid: u.uid, gid: agentGid(u.user) });
+  }
+
+  /** Its switch is on, and the last check made under that switch passed. */
+  private get sharedLoginReady() {
+    return this.sharedLoginBlocked === null && this.stored?.claudeSharedLogin !== undefined;
+  }
+
+  /** Who stays on which sign-in: nobody while that login may not run, so no idle CLI is left on its store. */
+  private keepHosted(agents: readonly MachineAgent[]) {
+    const ready = this.sharedLoginReady;
+    const hosted = this.session?.accountBrains?.brains;
+    for (const a of agents) hosted?.keepAccount(ready ? (a.account ?? null) : null, ready ? a.accounts : [], a.id);
+  }
+
+  /**
+   * Claude's own login for all agents is offered only while this says so. `hello` carries the answer, so a new one
+   * reaches the server with a new connection; with the switch on it changes rarely, and turns resume from there.
+   */
+  private async checkSharedLogin() {
+    const users = this.accountUsers;
+    const config = this.stored;
+    if (!users || !config?.claudeSharedLogin) return;
+    const verdict = await (
+      this.opts.selfCheck?.() ?? accountSelfCheck({ config, users, home: this.opts.home, relay: this.self.command })
+    ).catch((err: unknown) => (err instanceof Error ? err.message : String(err)));
+    // A pass holds for what it checked; the config that replaced this one asked again (`applyStored`).
+    if (JSON.stringify(this.stored?.claudeSharedLogin) !== JSON.stringify(config.claudeSharedLogin)) return;
+    const before = this.sharedLoginBlocked;
+    this.sharedLoginBlocked = verdict;
+    if (verdict) this.opts.log(`Claude's own login for all agents: ${verdict}`);
+    this.keepHosted(this.agents);
+    if (verdict !== before) this.session?.connection.reconnect();
   }
 
   /**
@@ -560,6 +634,13 @@ export class RunnerDaemon implements RequestObserver {
       this.opts.log(`config.json can't be read: ${err instanceof Error ? err.message : String(err)}`);
     }
     this.applyStored(stored, null, true);
+    if (this.accountUsers) {
+      this.accountUsers.sweep();
+      void this.checkSharedLogin();
+      const check = setInterval(() => void this.checkSharedLogin(), SELF_CHECK_EVERY_MS);
+      check.unref?.();
+      this.timers.push(check);
+    }
     if (this.opts.watch !== false) {
       this.stopWatch = watchConfig(this.opts.home, (text) => this.onConfigFile(text));
       const expiry = setInterval(() => this.expireRequests(), 60_000);
@@ -702,6 +783,7 @@ export class RunnerDaemon implements RequestObserver {
 
   private applyStored(next: StoredConfig | null, text: string | null, initial: boolean) {
     const prev = this.stored;
+    const loginMethods = this.accounts.claudeLoginMethods();
     this.stored = next;
     this.lastText = text;
     let paired: RunnerConfig | null = null;
@@ -718,6 +800,7 @@ export class RunnerDaemon implements RequestObserver {
     const nextPause = pauseOf(next, this.now());
     if (!initial && JSON.stringify(prev?.paused ?? null) !== JSON.stringify(next?.paused ?? null)) {
       this.send({ type: "runner.state", paused: nextPause });
+      if (nextPause.paused) this.stopHosted("This computer was paused.");
       this.record({
         kind: "pause",
         summary: nextPause.paused
@@ -729,6 +812,17 @@ export class RunnerDaemon implements RequestObserver {
       });
     }
     this.armResume();
+    // The switch goes with its route, so a CLI left running would go out directly.
+    if (!initial && prev?.claudeSharedLogin && !next?.claudeSharedLogin) {
+      this.stopHosted("This computer's Claude login for all agents was turned off.");
+    }
+    if (!initial && JSON.stringify(prev?.claudeSharedLogin) !== JSON.stringify(next?.claudeSharedLogin)) {
+      this.sharedLoginBlocked = undefined;
+      this.keepHosted(this.agents);
+      const methods = this.accounts.claudeLoginMethods();
+      if (JSON.stringify(methods) !== JSON.stringify(loginMethods)) this.session?.connection.reconnect();
+      void this.checkSharedLogin();
+    }
 
     const prevAccess = withShared(effectiveAccess(prev), this.shared);
     const nextAccess = withShared(effectiveAccess(next), this.shared);
@@ -764,11 +858,18 @@ export class RunnerDaemon implements RequestObserver {
         maxProcesses: paired.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
       };
       this.session.brains.setLimits(brainLimits);
+      this.session.accountBrains?.brains.setLimits(brainLimits);
       this.session.codexApp.setLimits(brainLimits);
       this.session.supervisor?.stateChanged();
     }
     this.queueStatus();
     void this.reconcile();
+  }
+
+  /** Every CLI root hosts stops, its turn first. */
+  private stopHosted(why: string) {
+    this.session?.accountBrains?.dropTurns(new RunnerError("dropped", why));
+    for (const u of readAgentUsers(this.opts.home)) this.accountUsers?.stopScopes(u.uid);
   }
 
   /** System mode: what each agent's worker must know about this computer. */
@@ -1014,6 +1115,7 @@ export class RunnerDaemon implements RequestObserver {
     });
     let supervisor: Supervisor | null = null;
     let agentUser: Session["agentUser"] = null;
+    let accountBrains: AccountBrains | null = null;
     if (config.mode === "system") {
       const range = config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE;
       const users = new AgentUsers({ home, range, ...(sharedSpec && this.shared ? { shared: sharedSpec, log } : {}) });
@@ -1125,6 +1227,9 @@ export class RunnerDaemon implements RequestObserver {
           : {
               prepareExisting: (existing: AgentUser[]) => prepareAgents(existing, prepare, policy, log),
             }),
+        stopAccountScopes: (uid) => this.accountUsers?.stopScopes(uid),
+        toolNotice: (agentId, notice) => accountBrains?.toolNotice(agentId, notice),
+        taskStop: (agentId, taskId) => accountBrains?.stopTask(agentId, taskId),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         grant: (kind, accountId) => this.accounts.grant(kind, accountId),
         usage: (kind, accountId, info) =>
@@ -1146,6 +1251,20 @@ export class RunnerDaemon implements RequestObserver {
         relayed: this.relayed,
         log,
       });
+      if (this.accountUsers) {
+        accountBrains = new AccountBrains({
+          root: path.join(home, "account-brains"),
+          accounts: this.accounts,
+          users: this.accountUsers,
+          workers: supervisor,
+          grants: (agentId) => realFoldersFor(this.access(), agentId),
+          relay: this.self.command,
+          shared: () => this.stored?.claudeSharedLogin,
+          idleMs: (config.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
+          maxProcesses: config.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
+          log,
+        });
+      }
     }
     // A view with room again, or ended: the agent's stream sends its next frame, here or from its worker.
     views.onRoom = (agentId) => {
@@ -1168,8 +1287,11 @@ export class RunnerDaemon implements RequestObserver {
       gitCache: path.join(home, "git-cache"),
       tasks,
       brains,
-      // System mode: root runs no turns; its agents' CLIs are their workers'.
-      reclaimBrains: supervisor ? (spare) => supervisor.reclaimBrains(spare) : (spare) => brains.reclaimIdle(spare),
+      ...(accountBrains ? { accountBrains } : {}),
+      // System mode: root runs only the CLIs of sign-ins several agents share; the others are their workers'.
+      reclaimBrains: supervisor
+        ? (spare) => accountBrains?.reclaim(spare) ?? supervisor.reclaimBrains(spare)
+        : (spare) => brains.reclaimIdle(spare),
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
       // A config written later without the mode never turns a system session back into one that does agents' work.
@@ -1229,7 +1351,7 @@ export class RunnerDaemon implements RequestObserver {
       ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),
       log,
       observer: this,
-      onAgents: (raw) => this.setAgents(raw),
+      onAgents: (raw, deleted) => this.setAgents(raw, deleted),
       onBrowserHandoff: (frame) =>
         supervisor ? supervisor.handoff(frame) : browser.setHandoff(frame.agentId, frame.handoff),
       onState: (state) => {
@@ -1282,6 +1404,7 @@ export class RunnerDaemon implements RequestObserver {
       workspaceReal,
       tasks,
       brains,
+      accountBrains,
       codexApp,
       mcp,
       browser,
@@ -1486,6 +1609,7 @@ export class RunnerDaemon implements RequestObserver {
     await s.supervisor?.close();
     s.tasks.close();
     s.brains.close();
+    s.accountBrains?.brains.close();
     s.codexApp.close();
     await s.browser.close().catch(() => undefined);
     await s.mcp.close().catch(() => undefined);
@@ -1551,6 +1675,11 @@ export class RunnerDaemon implements RequestObserver {
       paused: this.pauseState(),
       access,
       size: machineSize(workspaceReal),
+      claudeLoginMethods: this.accounts.claudeLoginMethods(),
+      ...(this.sharedLoginBlocked && this.stored?.claudeSharedLogin
+        ? { claudeLoginBlocked: this.sharedLoginBlocked }
+        : {}),
+      ...(this.accounts.authEgressGroup() ? { authEgressGroup: true as const } : {}),
     };
   }
 
@@ -1657,11 +1786,12 @@ export class RunnerDaemon implements RequestObserver {
     return { logo: this.config ? logoDataUrl(this.logo) : null };
   }
 
-  private setAgents(raw: unknown) {
+  private setAgents(raw: unknown, deletedIds?: unknown) {
     const list = parseAgents(raw);
     // System mode: an account folder stays with an agent's user only while that agent thinks with it.
     if (this.stored?.mode === "system") {
-      const uids = new Map(readAgentUsers(this.opts.home).map((u) => [u.id, u.uid]));
+      const users = readAgentUsers(this.opts.home);
+      const uids = new Map(users.map((u) => [u.id, u.uid]));
       const lent = new Map<string, number>();
       for (const a of list) {
         const uid = uids.get(a.id);
@@ -1669,6 +1799,28 @@ export class RunnerDaemon implements RequestObserver {
         for (const id of [a.account, ...(a.accounts ?? [])]) if (id) lent.set(id, uid);
       }
       void this.accounts.keepLent(lent).catch(() => undefined);
+      const here = new Set(list.map((a) => a.id));
+      const gone = this.agents.filter((a) => !here.has(a.id)).map((a) => a.id);
+      const deleted = new Set(Array.isArray(deletedIds) ? deletedIds : []);
+      const hosted = this.session?.accountBrains;
+      this.keepHosted(list);
+      for (const id of gone) hosted?.brains.keepAccount(null, [], id);
+      for (const u of users) {
+        const clear = deleted.has(u.id) && !here.has(u.id) && !this.swept.has(u.id);
+        if (!clear && !gone.includes(u.id)) continue;
+        hosted?.dropTurns(new RunnerError("dropped", "The agent left this computer."), u.id);
+        // Archived or moved, it may come back: what the sign-ins hold for it stays until it is deleted.
+        if (!clear) {
+          this.accountUsers?.stopScopes(u.uid);
+          continue;
+        }
+        this.swept.add(u.id);
+        try {
+          this.accountUsers?.sweepAgent(u);
+        } catch (err) {
+          this.opts.log(`${u.user}: couldn't clear it from its sign-ins (${err instanceof Error ? err.message : err})`);
+        }
+      }
     }
     // Desktops stay on, so one whose agent left (archived, moved) would hold its display and memory for good; the
     // others take their agent's current name and handle.

@@ -1,6 +1,6 @@
 import { type ChildProcess, type SpawnOptions, spawn } from "node:child_process";
-import { accessSync, constants } from "node:fs";
 import type { Writable } from "node:stream";
+import { isExecutable } from "./executors";
 
 /**
  * System mode under systemd: an agent's Chrome and its AI CLIs run in slices
@@ -34,12 +34,7 @@ export function spawnGated(
   waitMs = ENTER_MS,
 ): ChildProcess {
   const io = options.stdio ?? "pipe";
-  let runnable = true;
-  try {
-    accessSync(file, constants.X_OK);
-  } catch {
-    runnable = false;
-  }
+  const runnable = isExecutable(file);
   // The caller's descriptors stay where they are (a token on fd 3, `accounts.ts`); the gate's comes after them.
   const stdio = typeof io === "string" ? [io, io, io] : [...[0, 1, 2].map((fd) => io[fd] ?? "pipe"), ...io.slice(3)];
   // A program that can't run fails exactly as it did, and past fd 9 `sh` can't name the gate's.

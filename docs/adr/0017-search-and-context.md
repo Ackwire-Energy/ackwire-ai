@@ -69,7 +69,7 @@ An agent's reply in a channel is read by everyone there, so a DM reaches a conve
 - `meta.agentDm` and `meta.postedFrom` carry no requester: they reach every reader, and nothing read it.
 - `send_dm` no longer tells the agent to say who asked and why when the asking was in a DM, and one line in the prompt
   states the rule.
-- Migration 0235 gives memories already saved "everywhere" from a DM back to the person who said them.
+- Migration 0236 gives memories already saved "everywhere" from a DM back to the person who said them.
 
 Not enforced by code: what the model itself writes in a `send_dm` or `post_message` from a DM, a person's `rule` (it
 holds for all the agent's work when its giver decides the agent's approvals, so its text reads in others' runs), and

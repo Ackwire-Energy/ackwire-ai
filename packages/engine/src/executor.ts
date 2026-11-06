@@ -1,4 +1,10 @@
-import { CODEX_FOLDER_PROTOCOL, PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
+import {
+  CODEX_FOLDER_PROTOCOL,
+  PERMISSION_TOOL,
+  type PlanUsage,
+  type ProviderFailureCause,
+  type PubSub,
+} from "@agenteschat/adapters";
 import {
   and,
   count,
@@ -197,7 +203,12 @@ import {
   rateLimited,
 } from "./key-line";
 import { answerNoTurn, deliverLive, listenLiveSteering, renderSteered } from "./live-steer";
-import { publishAccountsChanged, touchMachineAccount } from "./machine-accounts";
+import {
+  accountFailureCause,
+  noteAccountFailure,
+  publishAccountsChanged,
+  touchMachineAccount,
+} from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
@@ -693,6 +704,8 @@ export class BrainFailure extends Error {
     readonly serverStop = false,
     /** A plan limit: whether the turn used a tool before it was cut (undefined: unknown, counted as worked). */
     readonly worked?: boolean,
+    /** Why the provider refused or failed it, as the computer said (runner protocol 50). */
+    readonly provider: { cause?: ProviderFailureCause; httpStatus?: number } = {},
   ) {
     super(message);
     this.name = "BrainFailure";
@@ -1173,6 +1186,8 @@ async function executeRunInner(
   let turnEnd: TurnEndDecision | null = null;
   /** A failure's own code when the run error's prefix is too broad (`brain_unavailable: …`), and the plan it names. */
   let failCause: { code?: string; plan?: string } | undefined;
+  /** The last turn's brain failure, for `run.finished` when the run fails after it. */
+  let brainFailure: { code: string; cause: ProviderFailureCause | null } | undefined;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
   /** Messages that got receipts (`message.actions` goes out once they are published). */
   const withReceipts: string[] = [];
@@ -1375,7 +1390,10 @@ async function executeRunInner(
     const plan = brainPlan && isComputerBrain(brainPlan.kind) ? BRAIN_PLAN_NAMES[brainPlan.kind] : undefined;
     failCause = { ...(ledger ? { code: ledger.code } : {}), ...(plan ? { plan } : {}) };
     await addRunStep(db, run, "error", { reason });
-    const failed = await transitionRun(db, run.id, "running", "failed", { error: reason });
+    const failed = await transitionRun(db, run.id, "running", "failed", {
+      error: reason,
+      ...(brainFailure ? { failure: brainFailure } : {}),
+    });
     if (failed) await closeRoutine({ status: "failed", ...(ledger ?? routineFailureEnd(reason)) });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
@@ -3895,6 +3913,7 @@ async function executeRunInner(
         }
       }
       let result: BrainStep;
+      brainFailure = undefined;
       /** The computer turned the turn away for want of room: nothing ended there that frees room. */
       let refused = false;
       // Whose month this turn counts for (ADR 0141): the person behind the run, else a routine's creator. The
@@ -3999,7 +4018,10 @@ async function executeRunInner(
           carried = null;
           // The account it ran with (ADR 0041): when it was last used, after the turn.
           const account = turnPlan.account;
-          if (account && computerTurns === 1) later(() => touchMachineAccount(db, run.orgId, account.id));
+          if (account && computerTurns === 1) {
+            const succeeded = turnPlan.kind === "claude_code";
+            later(() => touchMachineAccount(db, run.orgId, account.id, { succeeded }));
+          }
           // A turn cut off by its computer is finished now, and one that found room ends that wait.
           delete transcript.interruptedTurn;
           delete transcript.roomWaitSince;
@@ -4033,6 +4055,16 @@ async function executeRunInner(
         if (await isCanceled()) return stopCanceled(deltas.text(), deltas.answer());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
+        if (error instanceof BrainFailure) {
+          const cause = accountFailureCause(error.code, error.provider.cause);
+          brainFailure = { code: error.code, cause };
+          const account = turnPlan.kind === "claude_code" ? turnPlan.account : undefined;
+          if (account && cause) {
+            const { httpStatus } = error.provider;
+            const failure = { orgId: run.orgId, accountId: account.id, code: error.code, cause };
+            later(() => noteAccountFailure(db, httpStatus ? { ...failure, httpStatus } : failure));
+          }
+        }
         // Anything but "no room" means the computer took the turn: that wait for room is over.
         refused = error instanceof BrainFailure && error.code === "busy";
         // Dropped before the computer said or did anything (a deploy as the turn went out): still in line.
@@ -5067,6 +5099,10 @@ async function thinkOnce(
         undefined,
         event.serverStop === true,
         event.worked,
+        {
+          ...(event.cause ? { cause: event.cause } : {}),
+          ...(event.httpStatus ? { httpStatus: event.httpStatus } : {}),
+        },
       );
     } else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
     else if (event.type === "speed_fallback") hooks.onSpeedFallback?.(event.message);

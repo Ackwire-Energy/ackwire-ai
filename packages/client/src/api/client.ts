@@ -1134,7 +1134,7 @@ export interface ApiClient {
     setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
     /** "Mostrar para todos" (ADR 0121): a card from a conversation, shared with the whole workspace. */
     share(orgId: string, id: string): Promise<Issue>;
-    /** Who sees it (ADR 0150): anyone who can edit it changes it. */
+    /** Who sees it (ADR 0151): anyone who can edit it changes it. */
     setAudience(orgId: string, id: string, audience: AudienceChoice): Promise<Issue>;
     activity(orgId: string, id: string): Promise<IssueActivity[]>;
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;

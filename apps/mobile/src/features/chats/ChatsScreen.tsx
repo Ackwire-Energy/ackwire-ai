@@ -89,7 +89,7 @@ function Home() {
   const waiting = useWaitingItems();
   const { collapsed, toggle } = useHomeCollapsed();
   const categories = useChannelCategories(orgId);
-  // An administrator reads every channel (ADR 0150): the ones they aren't in wait at the end of the home.
+  // An administrator reads every channel (ADR 0151): the ones they aren't in wait at the end of the home.
   const others = (useChannels(orgId).data ?? []).filter((c) => c.seenAsAdmin);
   const menus = useCategoryMenus();
   const [waitOpen, setWaitOpen] = useState(false);

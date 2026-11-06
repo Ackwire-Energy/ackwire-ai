@@ -283,8 +283,8 @@ describe("what waits on a person", () => {
   });
 });
 
-describe("migration 0232", () => {
-  const statements = readFileSync(join(migrationsFolder, "0232_refusal_proposals.sql"), "utf8").split(
+describe("migration 0233", () => {
+  const statements = readFileSync(join(migrationsFolder, "0233_refusal_proposals.sql"), "utf8").split(
     "--> statement-breakpoint",
   );
 

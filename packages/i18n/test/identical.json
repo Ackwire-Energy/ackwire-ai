@@ -426,6 +426,7 @@
       "linkPills.issue"
     ],
     "fr": [
+      "settings.about.version",
       "deleteAccount.agentCount",
       "deleteAccount.messageCount",
       "queue.fill.routine",
@@ -781,6 +782,7 @@
       "linkPills.issue"
     ],
     "de": [
+      "settings.about.version",
       "access.agentCol",
       "access.area.browser",
       "access.area.desktop",

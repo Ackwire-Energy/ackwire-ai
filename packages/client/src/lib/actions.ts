@@ -109,7 +109,7 @@ export function actionTextValues(
     case "issue.created":
     case "issue.updated":
     case "issue.assigned": {
-      // No title: a limited task, named where not everyone sees it (ADR 0150).
+      // No title: a limited task, named where not everyone sees it (ADR 0151).
       const v: Record<string, string> = {
         number: str(p.number) || str(a.target.number),
         title: title || t("whoSees.limited"),

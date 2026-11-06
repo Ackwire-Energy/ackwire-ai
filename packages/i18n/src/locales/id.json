@@ -4103,6 +4103,7 @@
         "account": "Akun",
         "accountWho": "Hanya akun {{owner}}, penanggung jawab {{name}}: paket hanya berpikir untuk agen milik pemiliknya.",
         "accountSignedOut": "Keluar, masuk lagi",
+        "accountUnknown": "Login belum dipastikan, segera dicek lagi",
         "thisComputer": "Akun {{computer}}",
         "accountMove": "Dipakai oleh {{agents}} · Pindahkan ke sini",
         "accountAlso": "Juga dipakai oleh {{agents}}",
@@ -7838,6 +7839,8 @@
       "signedOut": "Sudah keluar. Masuk lagi agar agenmu bisa memakainya.",
       "signedOutFor_other": "{{agents}} sudah keluar.",
       "keyRefused": "Kunci ditolak: ganti dengan yang baru.",
+      "statusUnknown": "Komputer tidak bisa memastikan login kali ini. Komputer akan mengeceknya lagi sendiri.",
+      "identityUnknown": "akun tidak dikenali",
       "rename": "Ganti nama",
       "signInAgain": "Masuk lagi",
       "newKey": "Ganti kunci",
@@ -7880,6 +7883,8 @@
       "limited": "Mencapai batas",
       "limitedUntil": "Mencapai batas sampai {{when}}",
       "updated": "Diperbarui {{ago}}",
+      "ago": "diperbarui {{ago}}",
+      "stale": "angka lama, diperbarui {{ago}}",
       "notShared": "{{maker}} tidak membagikan pemakaian di sini.",
       "offer": {
         "use": "Pakai {{label}} ({{pct}}%)",
@@ -10948,6 +10953,7 @@
       "targetNotFound": "Komputer itu sudah tidak ada. Pilih yang lain.",
       "targetSame": "Agen sudah ada di komputer itu.",
       "targetPaused": "Komputer itu sedang dijeda. Pilih yang lain.",
+      "accountMethodUnsupported": "Komputer ini belum bisa menghubungkan Claude dengan cara ini. Perbarui program agentes.chat di komputer ini, atau pakai kunci API.",
       "offline": "{{name}} sedang offline. Coba lagi setelah ia kembali.",
       "paused": "{{name}} dijeda: tidak ada yang baru dimulai di sana sampai dilanjutkan.",
       "timeout": "Komputer tidak menjawab tepat waktu. Coba lagi."
@@ -11808,7 +11814,8 @@
       "media": "GIF dan stiker",
       "voice": "Suara",
       "apps": "Aplikasi AI",
-      "approvals": "Persetujuan"
+      "approvals": "Persetujuan",
+      "about": "Tentang agentes.chat"
     },
     "sectionText": {
       "account": "Profilmu dan tampilan aplikasi untukmu.",
@@ -11830,7 +11837,15 @@
       "media": "Apa yang bisa dikirim di percakapan, serta GIF dan stiker agen.",
       "voice": "Pesan suara di percakapan, dan siapa yang mengubah suara menjadi teks.",
       "apps": "Minta tugas ke agen dari Claude, Cursor, dan aplikasi lain.",
-      "approvals": "Siapa yang memutuskan untukmu saat agen meminta persetujuanmu."
+      "approvals": "Siapa yang memutuskan untukmu saat agen meminta persetujuanmu.",
+      "about": "Siapa pembuatnya, lisensinya, dan letak kode sumbernya."
+    },
+    "about": {
+      "basedOn": "Berdasarkan <site>agentes.chat</site> oleh Codari Global, LLC",
+      "version": "Versi",
+      "license": "Perangkat lunak bebas di bawah <license>GNU Affero General Public License v3</license>, tanpa jaminan.",
+      "source": "Kode sumber",
+      "copyright": "Copyright © 2026 Codari Global, LLC dan para kontributor"
     },
     "title": "Pengaturan",
     "account": {

@@ -1,9 +1,10 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -30,6 +31,9 @@ import {
   OWN_USAGE_ID,
   PERMISSION_PROMPT_TOOL,
   PERMISSION_WAIT_MS,
+  type ProviderFailureCause,
+  type ToolNotice,
+  type TurnContext,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
 import { claudeCodeModel, type PlanId, planOf } from "@agenteschat/providers/plans";
@@ -47,13 +51,17 @@ import {
   yieldRoute,
 } from "./accounts";
 import { ownBranches } from "./command-gate";
+import { DELEGATED_RESULT_TOKENS, type DelegatedBridge } from "./delegated-tools";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
+import { HARDENED_GIT_ARGS } from "./git-guard";
+import { readJson, writeJson } from "./json-file";
 import {
   CHAT_DENIED_TOOLS,
   chatToolsBreach,
   claudeMcpConfig,
   claudePermissionSettings,
+  delegatedToolsBreach,
   type McpTaskInfo,
   missionBranchPrefix,
   newMcpToken,
@@ -127,6 +135,9 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   (`STRAY_TURN_WAIT_MS`) and then uses the same process, so the agent's
  *   other background jobs (a dev server, a watcher) live on. Only a turn stuck
  *   past that wait has its process killed (the next one resumes the session).
+ * - A sign-in several agents share (`BrainTurnContext.delegated`, `account-brains.ts`): this manager runs in root and
+ *   the CLI as the sign-in's own user. Its tools are the agent's worker's (`delegated-tools.ts`), root alone writes its
+ *   stdin, and nothing of the agent's is opened here: the worker says what the turn's folder holds.
  */
 
 /** A session's process, by agent and session id: the key `reclaimIdle` spares last. */
@@ -193,6 +204,9 @@ export const STRAY_TURN_WAIT_MS = 60_000;
  * never ends (a dev server an urgent message moved aside), and killing the process would kill it.
  */
 export const OWN_TURN_DUE_WAIT_MS = 5_000;
+/** A worker sends these: what waits for a session's next turn stays bounded. */
+const NOTICES_KEPT = 20;
+const NOTICE_SESSIONS_KEPT = 1000;
 
 /** The `capabilities` of a `system/init` line (none: an older CLI). */
 export const claudeCapabilities = (ev: Record<string, unknown>): string[] =>
@@ -218,7 +232,49 @@ export const LIMIT_TEXT =
 /** The server throttling everyone, which it says is no plan limit. */
 export const NOT_LIMIT_TEXT = /not your usage limit/i;
 /** Claude Code can't authenticate (not logged in, a revoked token, a bad key). */
-export const AUTH_TEXT = /not logged in|\/login|invalid api key|authentication[_ ]failed|oauth token|credentials/i;
+export const AUTH_TEXT =
+  /not logged in|\/login|invalid api key|authentication[_ ]failed|oauth token|(?:invalid|expired|revoked|missing) credentials|credentials (?:are |were |have )?(?:invalid|expired|revoked|missing)/i;
+
+/** The provider's own words that the account or its organization is shut off: never read in the model's prose. */
+const DISABLED_TEXT = /\b(?:organization|account) (?:has been|is|was) (?:disabled|suspended|banned)\b/i;
+const BILLING_TEXT = /credit balance/i;
+const NETWORK_TEXT =
+  /\bE(?:CONNRESET|CONNREFUSED|CONNABORTED|TIMEDOUT|NOTFOUND|AI_AGAIN|HOSTUNREACH|NETUNREACH|PIPE)\b|socket hang up|proxy|connection error|fetch failed/i;
+/** How Claude Code words a provider's answer in an error text: "API Error: 403 {…}". */
+const API_ERROR_STATUS = /\bAPI Error: (\d{3})\b/;
+
+/** Why the provider refused or failed a call (protocol 50), and its HTTP status when the CLI said one. */
+export interface ProviderFailure {
+  cause?: ProviderFailureCause;
+  httpStatus?: number;
+}
+
+/**
+ * A provider failure from what Claude Code said of it: its `error` word (`api_retry`, an `assistant` error frame),
+ * the HTTP status, and the error's own text (never the model's prose). A 403 alone is a refused sign-in: only the
+ * provider's words say an account is disabled. `noResponse`: no HTTP answer came at all.
+ */
+export function providerFailure(f: {
+  error?: unknown;
+  status?: unknown;
+  text?: string;
+  noResponse?: boolean;
+}): ProviderFailure {
+  const text = f.text ?? "";
+  const status = typeof f.status === "number" ? f.status : Number(API_ERROR_STATUS.exec(text)?.[1]);
+  const httpStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined;
+  const http = httpStatus ? { httpStatus } : {};
+  const error = typeof f.error === "string" ? f.error : "";
+  if (DISABLED_TEXT.test(text)) return { cause: "account_disabled", ...http };
+  if (error === "authentication_failed" || error === "oauth_org_not_allowed" || status === 401 || status === 403)
+    return { cause: "auth_rejected", ...http };
+  if (error === "billing_error" || BILLING_TEXT.test(text)) return { cause: "billing", ...http };
+  if (error === "rate_limit" || status === 429) return { cause: "quota", ...http };
+  if (error === "server_error" || error === "overloaded" || (httpStatus ?? 0) >= 500)
+    return { cause: "provider_transient", ...http };
+  if (NETWORK_TEXT.test(text) || (f.noResponse && !httpStatus)) return { cause: "network", ...http };
+  return http;
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -317,6 +373,8 @@ export class ClaudeStreamParser {
   private worked = false;
   private resetsAt?: string;
   private authFailed = false;
+  /** What the turn's provider errors said last (`api_retry`, an error frame, a refused plan): `cause` on its error. */
+  failure: ProviderFailure = {};
   /** Uncached input of each API call of the turn, by message id (Claude Code repeats a message per content block). */
   private uncached = new Map<string, number>();
 
@@ -331,6 +389,7 @@ export class ClaudeStreamParser {
     this.worked = false;
     this.resetsAt = undefined;
     this.authFailed = false;
+    this.failure = {};
   }
 
   push(raw: string): ParsedBrainLine {
@@ -346,6 +405,14 @@ export class ClaudeStreamParser {
     const main = ev.parent_tool_use_id === null || ev.parent_tool_use_id === undefined;
     switch (ev.type) {
       case "system": {
+        if (ev.subtype === "api_retry") {
+          const failure = providerFailure({
+            error: ev.error,
+            status: ev.error_status,
+            noResponse: ev.error_status === null || isObj(ev.no_response),
+          });
+          if (failure.cause || failure.httpStatus) this.failure = failure;
+        }
         if (ev.subtype === "api_retry" && (ev.error === "authentication_failed" || ev.error_status === 401)) {
           this.authFailed = true;
           return { events: [], authRetry: true };
@@ -381,6 +448,15 @@ export class ClaudeStreamParser {
         if (ev.error === "authentication_failed") this.authFailed = true;
         if (ev.error === "rate_limit") this.limited = true;
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
+        // Claude Code's own frame for a provider's error (its `error` word set): its text is the provider's answer.
+        if (typeof ev.error === "string") {
+          const said = content.map((b) => (isObj(b) && b.type === "text" ? str(b.text) : "")).join("\n");
+          const failure = providerFailure({ error: ev.error, text: said });
+          if (failure.cause || failure.httpStatus) this.failure = failure;
+        } else {
+          // A reply came through: an earlier retry's cause is not why the turn may fail later.
+          this.failure = {};
+        }
         const messageId = isObj(ev.message) ? str(ev.message.id) : "";
         if (messageId && isObj(ev.message) && isObj(ev.message.usage))
           this.uncached.set(messageId, num(ev.message.usage.input_tokens));
@@ -433,6 +509,7 @@ export class ClaudeStreamParser {
         if (info.status !== "rejected") return { events: [], rateLimit: info };
         this.limited = true;
         this.rejected = true;
+        this.failure = { cause: "quota" };
         this.resetsAt = resetIso(info.resetsAt);
         if (this.limitSent) return { events: [], rateLimit: info };
         this.limitSent = true;
@@ -482,6 +559,9 @@ export class ClaudeStreamParser {
     const session = str(ev.session_id) || this.session;
     const text = str(ev.result) || (Array.isArray(ev.errors) ? ev.errors.map(str).join("\n") : "");
     if (ev.is_error === true || (typeof ev.subtype === "string" && ev.subtype !== "success")) {
+      const said = providerFailure({ status: ev.api_error_status, text });
+      const httpStatus = said.httpStatus ?? this.failure.httpStatus;
+      const http = httpStatus ? { httpStatus } : {};
       if (this.rejected || ((this.limited || LIMIT_TEXT.test(text)) && !NOT_LIMIT_TEXT.test(text))) {
         const legacy = /\|(\d{10})\b/.exec(text)?.[1];
         const resetsAt = this.resetsAt ?? (legacy ? resetIso(Number(legacy)) : undefined);
@@ -495,6 +575,8 @@ export class ClaudeStreamParser {
             message: (text || "The plan's usage limit was reached.").slice(0, BRAIN_LIMITS.message),
             retryable: true,
             worked: this.worked,
+            cause: "quota",
+            ...http,
           },
           // Known only from its words (no `rate_limit_event` said so): the stored usage says limited too.
           ...(this.rejected ? {} : { rateLimit: { status: "rejected" } }),
@@ -508,6 +590,8 @@ export class ClaudeStreamParser {
             code: "not_logged_in",
             message: (text || "Claude Code is not logged in on this computer.").slice(0, BRAIN_LIMITS.message),
             retryable: true,
+            cause: (said.cause ?? this.failure.cause) === "account_disabled" ? "account_disabled" : "auth_rejected",
+            ...http,
           },
         };
       }
@@ -518,6 +602,8 @@ export class ClaudeStreamParser {
           code: "claude_failed",
           message: (text || `Claude Code ended with ${str(ev.subtype) || "an error"}`).slice(0, BRAIN_LIMITS.message),
           retryable: false,
+          cause: said.cause ?? this.failure.cause ?? "unknown",
+          ...http,
         },
       };
     }
@@ -547,6 +633,109 @@ export function turnPrompt(
   live.proc.parser.compacted = false;
   const head = [req.conversation.trim(), live.repoInFirst ? repoInstructions(live.cwd).trim() : ""].filter(Boolean);
   return head.length ? `${head.join("\n\n")}\n\n${req.prompt}` : req.prompt;
+}
+
+// ── A CLI that holds a sign-in several agents share ──────────────────────────
+
+/** Invisible to whoever reads the text; enough for the CLI not to take what follows as its own syntax. */
+const ZERO_WIDTH = "\u200b";
+
+/**
+ * `@/path`, `@~/path`, `@a/../b`, `@"path"`: a file the CLI itself would read, as the sign-in's user, also right after
+ * the punctuation it takes as a word's end. The mark goes before the `@`: after it, a `..` would just cancel it as one
+ * more folder. `@lia` is a person, and alone it could only name a file in the CLI's empty folder.
+ */
+export const neutralizeFileMentions = (text: string) =>
+  text.replace(/(^|[\s。、？！])@(?=["'~./\\]|\S*[/\\])/g, `$1${ZERO_WIDTH}@`);
+
+/** Whatever the CLI would act on in a user message itself rather than hand to the model (`!`, `#`, `/` up front). */
+export const neutralizeCliInput = (text: string) =>
+  neutralizeFileMentions(text).replace(/^(\s*)([!#/])/, `$1${ZERO_WIDTH}$2`);
+
+const TOKEN_SHAPE = /sk-ant-o[ar]t01-[A-Za-z0-9_-]+/g;
+/** By shape, without knowing any value: root never holds this sign-in's token, and the model must not show one. */
+export const redactTokenShapes = (text: string) => text.replace(TOKEN_SHAPE, "[REDACTED]");
+/** Where a token may be starting at the end of streamed text: what is kept back from there on. */
+export const tokenShapeTail = (text: string) => /s(?:k(?:-[A-Za-z0-9_-]*)?)?$/.exec(text)?.index ?? text.length;
+
+/** An agent's own `TasksMax`: no honest worker has more shells, so a notice past it is forged and root keeps nothing. */
+export const SHELLS_KEPT = 4096;
+
+const REFUSED_CONTROL = "Not allowed with this sign-in.";
+export const PERSONAL_MCP_REFUSED =
+  "Your own MCP servers don't work with this Claude sign-in. Turn them off for this agent or use another sign-in.";
+
+/** `run/<agent uid>/sessions.json`: root's own record of whose each session is, never what a folder happens to hold. */
+const SESSIONS_FILE = "sessions.json";
+type SessionOwners = Record<string, { agent: string; account: string }>;
+
+const sessionOwner = (room: string, session: string) =>
+  readJson<SessionOwners>(path.join(room, SESSIONS_FILE))?.[session];
+
+function claimSession(room: string, session: string, agent: string, account: string) {
+  const file = path.join(room, SESSIONS_FILE);
+  writeJson(file, { ...readJson<SessionOwners>(file), [session]: { agent, account } });
+}
+
+/** What the model reads when a background shell ended: Claude Code's own notice. */
+function noticeText(n: ToolNotice) {
+  const plain = (text: string) => text.replaceAll("<", "&lt;");
+  const how = n.status === "killed" ? "was stopped" : n.status === "completed" ? "completed" : "failed";
+  const code = n.exitCode === undefined ? "" : ` (exit code ${n.exitCode})`;
+  return [
+    "<task-notification>",
+    `<task-id>${n.shellId}</task-id>`,
+    `<output-file>${plain(n.outputFile)}</output-file>`,
+    `<status>${n.status}</status>`,
+    `<summary>Background command "${plain(n.summary)}" ${how}${code}</summary>`,
+    "</task-notification>",
+  ].join("\n");
+}
+
+const GIT_CONTEXT_MS = 5000;
+const GIT_STATUS_MAX = 2000;
+
+/**
+ * What Claude Code would say of the folder's git itself, were it in that folder. Run as the agent, with the runner's
+ * hardened git: the folder's config is the agent's to write.
+ */
+async function gitContext(cwd: string): Promise<string> {
+  const git = (...args: string[]) =>
+    new Promise<string | null>((resolve) => {
+      const argv = [...HARDENED_GIT_ARGS, "--no-optional-locks", ...args];
+      execFile("git", argv, { cwd, timeout: GIT_CONTEXT_MS }, (err, stdout) => resolve(err ? null : stdout.trim()));
+    });
+  const branch = await git("rev-parse", "--abbrev-ref", "HEAD");
+  if (branch === null) return "";
+  const [status, log] = await Promise.all([git("status", "--short"), git("log", "--oneline", "-n", "5")]);
+  return [
+    "\n\n# Git status at the start of this conversation",
+    "The working directory is a git repository, whatever the environment section above says.",
+    `Current branch: ${branch}`,
+    `Status:\n${(status ?? "").slice(0, GIT_STATUS_MAX) || "(clean)"}`,
+    `Recent commits:\n${log ?? ""}`,
+  ].join("\n");
+}
+
+/**
+ * The worker's side of `turn.context`: the turn's folder as the agent resolves it (`cwd` empty: its own), and with
+ * `text` the instructions and git state root would otherwise have to read.
+ */
+export async function turnContext(ask: {
+  folder: string;
+  grants: string[];
+  cwd?: string;
+  text?: boolean;
+}): Promise<TurnContext> {
+  let cwd = ask.folder;
+  if (ask.cwd?.trim()) {
+    // Root asks again with the absolute path it was told, which may lie in the agent's own folder.
+    const resolved = await resolveForAgent(ask.folder, [ask.folder, ...ask.grants], ask.cwd);
+    if (!resolved.exists) throw new RunnerError("not_found", `The folder ${ask.cwd} doesn't exist`);
+    if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${ask.cwd} is not a folder`);
+    cwd = resolved.abs;
+  }
+  return { folder: ask.folder, cwd, ...(ask.text ? { text: repoInstructions(cwd) + (await gitContext(cwd)) } : {}) };
 }
 
 // ── Command line ─────────────────────────────────────────────────────────────
@@ -601,6 +790,11 @@ export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Gr
 export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep", "ToolSearch"] as const;
 /** Claude Code's web tools, which ours replace on a brain turn. */
 export const WEB_BUILTIN_TOOLS = ["WebFetch", "WebSearch"] as const;
+/**
+ * A CLI on a sign-in several agents share: `--tools` is an allowlist, so what a later version adds stays off. Whatever
+ * touches files or runs code comes from the agent's worker, as the agent's user.
+ */
+export const DELEGATED_BUILTIN_TOOLS = ["ToolSearch"] as const;
 
 /** Most of a checkout's CLAUDE.md and AGENTS.md a turn reads: room for real instructions, not for a dump. */
 export const REPO_INSTRUCTIONS_MAX = 20_000;
@@ -636,10 +830,12 @@ export function repoInstructions(cwd: string): string {
  * `chat` (protocol 41, the team's right hand on a person's plan, ADR 0137 §4): our MCP tools and nothing else. None
  * of Claude Code's own tools (`--tools ""`, each one denied too), no settings files, skills or slash commands, no
  * permission prompt (`dontAsk`: whatever isn't allowed is refused), whatever `personalMcp` says.
+ * `delegated`: the same `plan` and `work` for a CLI whose tools the agent's worker serves.
  */
 export function brainProfileLaunch(
   mode: "plan" | "work" | "chat",
   personalMcp: boolean,
+  delegated = false,
 ): Pick<
   ClaudeLaunch,
   | "strictMcp"
@@ -658,6 +854,16 @@ export function brainProfileLaunch(
       settingSources: "",
       builtinTools: [],
       disallowedTools: CHAT_DENIED_TOOLS,
+      noSlashCommands: true,
+    };
+  }
+  if (delegated) {
+    return {
+      strictMcp: true,
+      promptTool: true,
+      permissionMode: mode === "plan" ? "default" : "acceptEdits",
+      settingSources: "",
+      builtinTools: DELEGATED_BUILTIN_TOOLS,
       noSlashCommands: true,
     };
   }
@@ -775,7 +981,12 @@ export class ClaudeProcess {
   private readonly backgroundTasks = new Set<string>();
   private ownTurnWaiters = new Set<() => void>();
   /** The turn in progress on this process (set by `runTurnOnProcess`): messages for it mid-turn. */
-  turn: { steer(messages: SteerMessage[]): BrainSteerReply } | null = null;
+  turn: { steer(messages: SteerMessage[]): BrainSteerReply; task(t: ParsedTask): void } | null = null;
+  /**
+   * Delegated: every `control_request` of the CLI's is refused (elicitation, sampling, `can_use_tool`, a change of MCP
+   * servers), and this hears which. Anything the agent's side sends the CLI may lead to one.
+   */
+  onControl: ((subtype: string) => void) | null = null;
   private lineHandler: ((line: string) => void) | null = null;
   private exitHandlers = new Set<() => void>();
 
@@ -818,6 +1029,7 @@ export class ClaudeProcess {
         }
         // Nothing after a breach reaches the turn, not even what was already on its way.
         if (this.breach) return;
+        if (this.onControl && line.includes('"control_request"') && this.refuseControl(line)) return;
         if (line.includes('"task_')) this.noteTask(line);
         if (this.lineHandler) this.lineHandler(line);
         else this.noteIdle(line);
@@ -853,6 +1065,21 @@ export class ClaudeProcess {
     } catch {}
   }
 
+  private refuseControl(line: string) {
+    try {
+      const ev = JSON.parse(line) as Record<string, unknown>;
+      if (ev.type !== "control_request") return false;
+      const request_id = str(ev.request_id);
+      this.write(
+        `${JSON.stringify({ type: "control_response", response: { subtype: "error", request_id, error: REFUSED_CONTROL } })}\n`,
+      );
+      this.onControl?.(isObj(ev.request) ? str(ev.request.subtype) : "");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private noteTask(line: string) {
     try {
       const ev = JSON.parse(line) as Record<string, unknown>;
@@ -862,6 +1089,21 @@ export class ClaudeProcess {
     } catch {
       // not a JSON line
     }
+  }
+
+  /**
+   * A background shell of the session, the second source of `task_*`: the worker's, so the CLI says nothing of it. Its
+   * end is told to the model as Claude Code tells its own: read in the turn in progress, or starting one of its own.
+   */
+  toolNotice(n: ToolNotice) {
+    const over = n.status !== "running";
+    if (!over && this.backgroundTasks.size >= SHELLS_KEPT && !this.backgroundTasks.has(n.shellId)) return;
+    if (over) this.backgroundTasks.delete(n.shellId);
+    else this.backgroundTasks.add(n.shellId);
+    this.turn?.task(over ? { id: n.shellId, ended: true } : { id: n.shellId, started: !n.moved, backgrounded: true });
+    if (!over) return;
+    this.write(userMessageLine(neutralizeCliInput(noticeText(n)), { uuid: crypto.randomUUID(), priority: "next" }));
+    if (!this.turn) this.ownTurnDue = true;
   }
 
   /** Holds work of the agent's that closing it would kill: a task in the background, or a turn of its own. */
@@ -1004,6 +1246,16 @@ export function runTurnOnProcess(
     redact?: (text: string) => string;
     /** Streamed text holds back this many characters (the longest secret − 1): a value split between batches never leaves in pieces. */
     redactHold?: number;
+    /** Streamed text also holds back from this index on (what a pattern may still match, `tokenShapeTail`). */
+    redactTail?: (text: string) => number;
+    /** Every line the CLI prints during the turn, as it printed it. */
+    onRawLine?: (line: string) => void;
+    /** What every user message goes through before the CLI reads it (`neutralizeCliInput`). */
+    input?: (text: string) => string;
+    /** The turn is canceled: what the CLI's tools run elsewhere stops too. */
+    onCancel?: () => void;
+    /** An urgent message came: a delegated tool's call answers now, so the CLI reaches its boundary. */
+    onUrgent?: () => void;
     /** One-shot: stdin closes after the prompt. */
     endInput?: boolean;
     /** How long the CLI's next turn may take to start when it still has steered messages (`STEER_FOLLOW_UP_MS`). */
@@ -1020,6 +1272,7 @@ export function runTurnOnProcess(
   },
 ): Promise<TurnOutcome> {
   const redact = opts.redact ?? ((s: string) => s);
+  const input = opts.input ?? ((s: string) => s);
   const deltaMs = opts.deltaMs ?? DELTA_FLUSH_MS;
   const followUpMs = opts.followUpMs ?? STEER_FOLLOW_UP_MS;
   proc.parser.beginTurn();
@@ -1064,6 +1317,14 @@ export function runTurnOnProcess(
         background.set(t.id, foreground.delete(t.id) || !t.started);
       } else if (t.started) foreground.add(t.id);
     };
+    /** Past a result, the work moved aside is over: Claude Code answers it in a turn of its own, about to start. */
+    const movedOver = () => {
+      if (!backgroundWait || movedRunning()) return;
+      clearTimeout(backgroundWait);
+      backgroundWait = null;
+      const end = heldFinal;
+      if (end) followUp = setTimeout(() => finish({ final: heldEnd(end) }), followUpMs);
+    };
     const version = () => proc.cliVersion ?? "(version unknown)";
     proc.turn = {
       steer: (messages) => {
@@ -1076,16 +1337,23 @@ export function runTurnOnProcess(
         if (!support.next) {
           return { status: "unsupported", reason: `Claude Code ${version()} reads messages only between turns` };
         }
-        // Urgent where the CLI can't move work aside: the engine stops the turn and starts it again instead.
-        if (messages.some((m) => m.urgent) && !support.now) {
+        const urgent = messages.some((m) => m.urgent);
+        // Urgent where the CLI can't move work aside: the engine stops the turn and starts it again instead. A
+        // delegated call moves aside in its worker, whatever the CLI can do.
+        if (urgent && !support.now && !opts.onUrgent) {
           return { status: "unsupported", reason: `Claude Code ${version()} can't take an urgent message mid-turn` };
         }
         for (const m of messages) {
-          const priority = m.urgent ? "now" : "next";
-          proc.write(userMessageLine(m.text, { uuid: m.uuid, priority, origin: { kind: "human" } }));
+          const priority = m.urgent && support.now ? "now" : "next";
+          proc.write(userMessageLine(input(m.text), { uuid: m.uuid, priority, origin: { kind: "human" } }));
           outstanding.add(m.uuid);
         }
+        if (urgent) opts.onUrgent?.();
         return { status: "accepted", accepted: messages.map((m) => m.uuid) };
+      },
+      task: (t) => {
+        noteTask(t);
+        movedOver();
       },
     };
     /** Sends the text so far; a batch (`whole` false) keeps back its last `hold` characters for the next one. */
@@ -1093,9 +1361,17 @@ export function runTurnOnProcess(
       if (timer) clearTimeout(timer);
       timer = null;
       if (!buf && !(whole && tail)) return;
-      // Redacted before cutting: the tail kept for next time can't split a value that was caught.
-      const out = redact(tail + buf);
+      const text = tail + buf;
       buf = "";
+      // A shape is cut on the text as it came: once masked it looks finished, and the rest of it would go out plain.
+      if (opts.redactTail) {
+        const cut = whole ? text.length : opts.redactTail(text);
+        tail = text.slice(cut);
+        if (cut > 0) opts.emit({ type: "text_delta", text: redact(text.slice(0, cut)) });
+        return;
+      }
+      // Redacted before cutting: the tail kept for next time can't split a value that was caught.
+      const out = redact(text);
       const cut = whole ? out.length : Math.max(0, out.length - hold);
       tail = out.slice(cut);
       if (cut > 0) opts.emit({ type: "text_delta", text: out.slice(0, cut) });
@@ -1127,12 +1403,22 @@ export function runTurnOnProcess(
     };
     proc.onLine((line) => {
       if (settled) return;
+      opts.onRawLine?.(line);
       if (followUp) clearTimeout(followUp);
       followUp = null;
       const parsed = proc.parser.push(line);
       if (parsed.authRetry && opts.refused) {
         proc.kill();
-        finish({ final: { type: "error", code: "not_logged_in", message: opts.refused, retryable: true } });
+        finish({
+          final: {
+            type: "error",
+            code: "not_logged_in",
+            message: opts.refused,
+            retryable: true,
+            cause: "auth_rejected",
+            ...proc.parser.failure,
+          },
+        });
         return;
       }
       // The next turn began: it reads the notices that came before it.
@@ -1143,13 +1429,7 @@ export function runTurnOnProcess(
       if (parsed.boundary) unheard = 0;
       if (parsed.task) noteTask(parsed.task);
       if (parsed.rateLimit) opts.onRateLimit?.(parsed.rateLimit);
-      // Past a result, the work moved aside is over: Claude Code answers it in a turn of its own, about to start.
-      if (backgroundWait && !movedRunning()) {
-        clearTimeout(backgroundWait);
-        backgroundWait = null;
-        const end = heldFinal;
-        if (end) followUp = setTimeout(() => finish({ final: heldEnd(end) }), followUpMs);
-      }
+      movedOver();
       for (const e of parsed.events) {
         if (e.type === "steer_read") {
           // Only ours (the list may name messages this turn never sent).
@@ -1199,11 +1479,12 @@ export function runTurnOnProcess(
     const offExit = proc.onExit(() => finish(heldFinal ? { final: heldEnd(heldFinal) } : { died: true }));
     function onAbort() {
       proc.kill();
+      opts.onCancel?.();
       finish({ final: { type: "error", code: "canceled", message: "The turn was canceled.", retryable: false } });
     }
     if (opts.signal?.aborted) return onAbort();
     opts.signal?.addEventListener("abort", onAbort, { once: true });
-    proc.write(userMessageLine(prompt));
+    proc.write(userMessageLine(input(prompt)));
     if (opts.endInput) proc.endInput();
   });
 }
@@ -1260,6 +1541,10 @@ interface Live {
   ranKey: string;
   /** Where its session's first system text is kept (`sessionSystem`). */
   keptSystem: string;
+  /** Its per-process files. */
+  dir: string;
+  /** Delegated: its bridge at the agent's worker, as root told it last. */
+  bridged?: { frame: DelegatedFrame; to: DelegatedTurn };
   cwd: string;
   /**
    * The checkout's CLAUDE.md and AGENTS.md go with the conversation in the first message, not in the system text: a
@@ -1284,6 +1569,33 @@ interface BridgeEntry {
   redact?: (text: string) => string;
 }
 
+/** What root tells the agent's worker of one process, but who it is for (`DelegatedBridge`). */
+export type DelegatedFrame = Omit<DelegatedBridge, "agent" | "socketPath">;
+
+/** A turn on a sign-in several agents share: what this manager needs of root (`account-brains.ts`), nothing else. */
+export interface DelegatedTurn {
+  /** The sign-in's `CLAUDE_CONFIG_DIR`: only a transcript's name is ever looked at there. */
+  configDir: string;
+  /** `run/<agent uid>`: this agent's per-process files and `sessions.json`. */
+  room: string;
+  /** How the CLI reaches the worker's tools: the relay's command and the socket it dials. */
+  relay: { socketPath: string; command: string[] };
+  /** The turn's folder, as the agent's worker resolved it. */
+  where(cwd?: string): Promise<TurnContext>;
+  /** What the folder says for the system text, read by the worker. */
+  text(cwd: string): Promise<string>;
+  /** How the CLI starts at `cwd`: command, the whole environment and spawn's own folder. */
+  launch(cwd: string): Promise<{ command: string[]; env: NodeJS.ProcessEnv; cwd: string }>;
+  /** A transcript into another folder's project (`carryClaudeSession`), by the sign-in's user: root opens none. */
+  carry(from: string, to: string): void;
+  /** Opens or updates the process's bridge; resolves once the worker has it. A null `token` closes it. */
+  bridge(frame: DelegatedFrame): Promise<void>;
+  cancel(session: string): void;
+  detach(session: string): void;
+  /** A background task's CLI: what its tools are told, and each line it prints, for the task's logs. */
+  task?: { kind: "mission" | "local"; line(line: string): void };
+}
+
 export interface BrainTurnContext {
   agent: AgentScope;
   /** The agent's folder (real path). */
@@ -1301,6 +1613,8 @@ export interface BrainTurnContext {
   grant?: AccountGrant;
   /** Set by the manager from `grant`: the account's Claude token, in the CLI's env only. */
   oauthToken?: string;
+  /** Root, a sign-in several agents share: the CLI runs as its user and the agent's worker does the rest. */
+  delegated?: DelegatedTurn;
 }
 
 /** A session is remembered per account: the same id in another account's folder is another session. */
@@ -1314,25 +1628,31 @@ const ranKeyOf = (req: BrainTurnRequest, session: string) =>
  * of the session is copied there first. Best effort.
  */
 export function carryClaudeSession(claudeHome: string, cwd: string, session: string) {
-  const projects = path.join(claudeHome, "projects");
   const target = claudeSessionFile(claudeHome, cwd, session);
+  const newest = newestClaudeSession(claudeHome, session, statSync);
+  if (!newest || newest === target) return;
+  try {
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(newest, target);
+  } catch {
+    // unreadable: Claude Code decides as before
+  }
+}
+
+/** The session's most recently written transcript in any of the home's projects. */
+function newestClaudeSession(claudeHome: string, session: string, look: typeof lstatSync) {
+  const projects = path.join(claudeHome, "projects");
   let newest: { file: string; mtime: number } | null = null;
   try {
     for (const dir of readdirSync(projects)) {
       const file = path.join(projects, dir, `${session}.jsonl`);
-      try {
-        const mtime = statSync(file).mtimeMs;
-        if (!newest || mtime > newest.mtime) newest = { file, mtime };
-      } catch {
-        // not in this project
-      }
+      const st = look(file, { throwIfNoEntry: false });
+      if (st?.isFile() && (!newest || st.mtimeMs > newest.mtime)) newest = { file, mtime: st.mtimeMs };
     }
-    if (!newest || newest.file === target) return;
-    mkdirSync(path.dirname(target), { recursive: true });
-    copyFileSync(newest.file, target);
   } catch {
-    // no projects folder, or unreadable: Claude Code decides as before
+    // no projects folder, or unreadable
   }
+  return newest?.file ?? null;
 }
 
 /** What a turn says when its account's token is refused. */
@@ -1356,6 +1676,10 @@ export class BrainManager {
   private closed = false;
   /** The accounts its agent thinks with, as root last said (`keepAccount`); undefined: not said. */
   private keep: ReadonlySet<string> | undefined;
+  /** The same per agent, where one manager runs several agents' CLIs (root's). */
+  private readonly keeps = new Map<string, ReadonlySet<string>>();
+  /** Ended background shells of sessions with no process to tell, by `brainKey`: their next turn hears of them. */
+  private readonly notices = new Map<string, ToolNotice[]>();
   private readonly log: (line: string) => void;
 
   constructor(private readonly opts: BrainManagerOptions) {
@@ -1367,14 +1691,17 @@ export class BrainManager {
    * A process on any other account closes, a busy one once its turn ends, so no process of this agent's user
    * keeps a sign-in the agent left or one that was removed.
    */
-  keepAccount(account: string | null, also: readonly string[] = []) {
-    this.keep = new Set([...(account ? [account] : []), ...also]);
+  keepAccount(account: string | null, also: readonly string[] = [], agentId?: string) {
+    const keep = new Set([...(account ? [account] : []), ...also]);
+    if (agentId === undefined) this.keep = keep;
+    else this.keeps.set(agentId, keep);
     for (const l of [...this.live.values()]) if (!l.busy && this.left(l)) this.drop(l);
   }
 
   /** On an account its agent no longer thinks with (the computer's own sign-in is none). */
   private left(l: Live) {
-    return this.keep !== undefined && l.account !== null && !this.keep.has(l.account);
+    const keep = this.keeps.get(l.agentId) ?? this.keep;
+    return keep !== undefined && l.account !== null && !keep.has(l.account);
   }
 
   /** New limits from the config: idle time for processes started from now on, the process cap at once. */
@@ -1438,6 +1765,22 @@ export class BrainManager {
     return live.proc.turn?.steer(req.messages) ?? { status: "no_turn" };
   }
 
+  /** Whether this manager runs that turn now (root: a `brain.steer` goes here, not to the worker). */
+  hosts(runId: string) {
+    return this.running.has(runId);
+  }
+
+  /** A worker's word on a background shell of one of its agent's sessions. */
+  toolNotice(agentId: string, n: ToolNotice) {
+    const key = brainKey(agentId, n.session);
+    const live = this.live.get(key);
+    if (live && !live.proc.exited) return live.proc.toolNotice(n);
+    if (n.status === "running") return;
+    const held = this.notices.get(key) ?? [];
+    if (held.length >= NOTICES_KEPT || (!held.length && this.notices.size >= NOTICE_SESSIONS_KEPT)) return;
+    this.notices.set(key, [...held, n]);
+  }
+
   /** One turn; resolves with its final event (also emitted). Turns of one session queue. */
   async turn(req: BrainTurnRequest, ctx: BrainTurnContext): Promise<WireBrainEvent> {
     const final = await this.turnInner(req, ctx).catch((err: unknown) =>
@@ -1459,9 +1802,20 @@ export class BrainManager {
     const session = typeof req.session?.id === "string" ? req.session.id : "";
     if (!SESSION_ID.test(session)) throw new RunnerError("bad_request", "The session must be a UUID");
     if (typeof req.prompt !== "string" || !req.prompt.trim()) throw new RunnerError("bad_request", "Empty prompt");
+    const chat = req.permissions?.mode === "chat";
+    if (ctx.delegated) {
+      if (req.personalMcp === true && !chat) return errorEvent("unsupported", PERSONAL_MCP_REFUSED, false);
+      const at = await ctx.delegated.where(chat || typeof req.cwd !== "string" ? undefined : req.cwd);
+      return this.queueTurn(session, at.cwd, req, {
+        ...ctx,
+        folder: at.folder,
+        accountHome: ctx.delegated.configDir,
+        secrets: { env: {}, redact: redactTokenShapes },
+      });
+    }
     let cwd = ctx.folder;
     // A `chat` turn starts in the agent's own folder, whatever the request names.
-    if (req.permissions?.mode !== "chat" && typeof req.cwd === "string" && req.cwd.trim() !== "") {
+    if (!chat && typeof req.cwd === "string" && req.cwd.trim() !== "") {
       const resolved = await resolveForAgent(ctx.folder, ctx.grants, req.cwd);
       if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
       if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
@@ -1483,6 +1837,10 @@ export class BrainManager {
         secrets: withSignIn(ctx.secrets, signIn),
       };
     }
+    return this.queueTurn(session, cwd, req, ctx);
+  }
+
+  private async queueTurn(session: string, cwd: string, req: BrainTurnRequest, ctx: BrainTurnContext) {
     const key = brainKey(ctx.agent.id, session);
     const prev = this.chains.get(key) ?? Promise.resolve();
     const run = prev.catch(() => undefined).then(() => this.runTurn(key, session, cwd, req, ctx));
@@ -1537,7 +1895,7 @@ export class BrainManager {
       if (this.alive(ctx.agent.id) >= this.max) this.closeIdle(this.lruIdle(ctx.agent.id));
       // Over the cap when every process is busy or holds work: the turn still gets its own (the agent works on
       // several conversations at once); `trim` closes the extra as turns end.
-      live = this.spawn(key, session, cwd, req, ctx, sig, true, this.resumeFor(cwd, session, req, ctx));
+      live = await this.spawn(key, session, cwd, req, ctx, sig, true, this.resumeFor(cwd, session, req, ctx));
     }
     if (live) {
       const out = await this.onLive(live, req, ctx);
@@ -1592,6 +1950,21 @@ export class BrainManager {
   }
 
   private resumeFor(cwd: string, session: string, req: BrainTurnRequest, ctx: BrainTurnContext, ranBefore = false) {
+    // Ours by root's record, and its transcript a plain file: not whatever several agents' shared path may hold.
+    if (ctx.delegated && ctx.accountHome) {
+      const owner = sessionOwner(ctx.delegated.room, session);
+      if (owner?.agent !== ctx.agent.id || owner.account !== req.account) return false;
+      const file = claudeSessionFile(ctx.accountHome, cwd, session);
+      const newest = newestClaudeSession(ctx.accountHome, session, lstatSync);
+      if (newest && newest !== file) {
+        try {
+          ctx.delegated.carry(newest, file);
+        } catch (err) {
+          this.log(`[${ctx.agent.handle}] session ${session.slice(0, 8)} stayed in its folder: ${String(err)}`);
+        }
+      }
+      return lstatSync(file, { throwIfNoEntry: false })?.isFile() === true;
+    }
     const home =
       ctx.accountHome ?? this.opts.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
     carryClaudeSession(home, cwd, session);
@@ -1618,13 +1991,35 @@ export class BrainManager {
     this.running.set(req.runId, live);
     // Usage goes to the account the turn thinks with, or to the computer's own sign-in.
     const usageKey = ctx.accountHome && typeof req.account === "string" ? req.account : OWN_USAGE_ID.claude_code;
+    const { delegated } = ctx;
+    const session = live.key.slice(live.agentId.length + 1);
+    const told = this.notices.get(live.key)?.map(noticeText).join("\n");
+    this.notices.delete(live.key);
     try {
-      const out = await runTurnOnProcess(live.proc, turnPrompt(live, req), {
+      if (live.bridged) {
+        const runToken = bridge?.runToken;
+        await live.bridged.to.bridge({
+          ...live.bridged.frame,
+          runId: req.runId,
+          ...(runToken && isRunToolToken(runToken) ? { serverToken: runToken } : {}),
+        });
+      }
+      const prompt = turnPrompt(live, req);
+      const out = await runTurnOnProcess(live.proc, told ? `${told}\n\n${prompt}` : prompt, {
         emit: ctx.emit,
         signal: ctx.signal,
         deltaMs: this.opts.deltaMs,
         redact: ctx.secrets?.redact,
         redactHold: ctx.secrets?.hold,
+        ...(delegated
+          ? {
+              redactTail: tokenShapeTail,
+              input: neutralizeCliInput,
+              onCancel: () => delegated.cancel(session),
+              onUrgent: () => delegated.detach(session),
+              ...(delegated.task ? { onRawLine: delegated.task.line } : {}),
+            }
+          : {}),
         endInput: !live.persistent,
         onRateLimit: (info) => this.opts.accounts?.noteRateLimit?.(usageKey, info),
         ...(ctx.planKey
@@ -1636,7 +2031,7 @@ export class BrainManager {
         ...(this.opts.steerBackgroundWaitMs !== undefined ? { backgroundWaitMs: this.opts.steerBackgroundWaitMs } : {}),
       });
       if (live.proc.breach) {
-        this.log(`[${ctx.agent.handle}] chat turn stopped: ${live.proc.breach}`);
+        this.log(`[${ctx.agent.handle}] turn stopped: ${live.proc.breach}`);
         this.drop(live);
         return { final: errorEvent("tools_not_locked", live.proc.breach, false) };
       }
@@ -1665,6 +2060,8 @@ export class BrainManager {
         bridge.runId = null;
         bridge.runToken = null;
       }
+      // Between turns nothing goes to the server for it, as with ours: no run to relay for.
+      if (live.bridged && !live.proc.exited) void live.bridged.to.bridge(live.bridged.frame).catch(() => undefined);
       this.keepCompacted(live);
       if (live.persistent && this.live.get(live.key) === live) {
         if (this.left(live)) this.drop(live);
@@ -1684,27 +2081,29 @@ export class BrainManager {
     resume: boolean,
     mayRetryFlag: boolean,
   ): Promise<WireBrainEvent> {
-    const live = this.spawn(key, session, cwd, req, ctx, sig, false, resume);
+    const live = await this.spawn(key, session, cwd, req, ctx, sig, false, resume);
     const out = await this.onLive(live, req, ctx);
     this.drop(live);
     if (out.final) return out.final;
     if (live.proc.stderr.startsWith("ENOENT")) return this.cliMissing();
     const fast = Date.now() - live.proc.startedAt <= FAST_FAIL_MS;
-    if (mayRetryFlag && fast && WRONG_SESSION_FLAG.test(live.proc.stderr)) {
+    // Never into `--resume` on a delegated CLI: a transcript it doesn't own is what that answer may mean.
+    if (mayRetryFlag && fast && WRONG_SESSION_FLAG.test(live.proc.stderr) && (resume || !ctx.delegated)) {
       return this.oneShot(key, session, cwd, req, ctx, sig, !resume, false);
     }
-    const tail = live.proc.stderr.trim().split("\n").slice(-3).join(" ").trim();
-    if (/not logged in|\/login/i.test(tail)) {
+    const said = live.proc.stderr.trim().split("\n").slice(-3).join(" ").trim();
+    const tail = ctx.secrets?.redact ? ctx.secrets.redact(said) : said;
+    if (/not logged in|\/login/i.test(said)) {
       return errorEvent("not_logged_in", tail || "Claude Code is not logged in on this computer.", true);
     }
     return errorEvent(
       "claude_failed",
-      `Claude Code ended without an answer (exit ${live.proc.exitCode ?? "?"})${tail ? `: ${ctx.secrets?.redact ? ctx.secrets.redact(tail) : tail}` : ""}`,
+      `Claude Code ended without an answer (exit ${live.proc.exitCode ?? "?"})${tail ? `: ${tail}` : ""}`,
       false,
     );
   }
 
-  private spawn(
+  private async spawn(
     key: string,
     session: string,
     cwd: string,
@@ -1713,13 +2112,38 @@ export class BrainManager {
     sig: string,
     persistent: boolean,
     resume: boolean,
-  ): Live {
+  ): Promise<Live> {
     const id = crypto.randomUUID();
-    const dir = path.join(this.opts.root, id);
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const dir = path.join(ctx.delegated?.room ?? this.opts.root, id);
+    mkdirSync(dir, { recursive: true, mode: ctx.delegated ? 0o750 : 0o700 });
+    try {
+      return await this.start(id, dir, key, session, cwd, req, ctx, sig, persistent, resume);
+    } catch (err) {
+      // Refused on the way (the worker went, a folder root won't build): no process will clean up after it.
+      this.bridge.delete(id);
+      rmSync(dir, { recursive: true, force: true });
+      throw err;
+    }
+  }
+
+  private async start(
+    id: string,
+    dir: string,
+    key: string,
+    session: string,
+    cwd: string,
+    req: BrainTurnRequest,
+    ctx: BrainTurnContext,
+    sig: string,
+    persistent: boolean,
+    resume: boolean,
+  ): Promise<Live> {
+    const { delegated } = ctx;
+    // Delegated: root's, read by the sign-in's user through the default ACL on its room, which these modes unmask.
+    const fileMode = delegated ? 0o640 : 0o600;
     const systemFile = path.join(dir, "system.txt");
     const mode = req.permissions?.mode === "plan" || req.permissions?.mode === "chat" ? req.permissions.mode : "work";
-    const launch = brainProfileLaunch(mode, req.personalMcp === true);
+    const launch = brainProfileLaunch(mode, req.personalMcp === true, delegated !== undefined);
     const system = typeof req.system === "string" ? req.system : "";
     const ranKey = ranKeyOf(req, session);
     // A `chat` turn reads nothing of the folder, its CLAUDE.md included.
@@ -1728,8 +2152,11 @@ export class BrainManager {
     // Protocol 40: what holds for the conversation opens the session's first message instead (`turnPrompt`). The
     // checkout's instructions stay at the end of this text, under Claude Code's last cache breakpoint that sessions
     // share: everything after it (the first message) is written again for each new session.
-    const started = this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system));
-    writeFileSync(systemFile, started.text, { mode: 0o600 });
+    const told = withRepo && delegated ? neutralizeFileMentions(await delegated.text(cwd)) : null;
+    const started = this.sessionSystem(keptSystem, resume, () =>
+      withRepo ? system + (told ?? repoInstructions(cwd)) : system,
+    );
+    writeFileSync(systemFile, started.text, { mode: fileMode });
     let mcpConfigFile: string | undefined;
     // A `chat` turn never holds the agent's secrets, nor reads the auto memory Claude Code keeps in the account's
     // folder (whoever else that folder is lent to can write there), nor loads the plan's claude.ai connectors.
@@ -1739,14 +2166,64 @@ export class BrainManager {
         ? { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1", ENABLE_CLAUDEAI_MCP_SERVERS: "false" }
         : (ctx.secrets?.env ?? {})),
     };
-    // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
-    const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
+    const launched = delegated ? await delegated.launch(cwd) : null;
+    // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in. Delegated: all
+    // of it is root's, none of the agent's secrets (its shell is in its worker, which has them).
+    const env: NodeJS.ProcessEnv = launched
+      ? {
+          ...launched.env,
+          ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+          // Above what a delegated tool answers: past this limit the CLI spills to a file no tool here can read.
+          MAX_MCP_OUTPUT_TOKENS: String(DELEGATED_RESULT_TOKENS * 2),
+        }
+      : ctx.accountHome
+        ? accountEnv("claude_code", ctx.accountHome, base)
+        : base;
     const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
     if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
     // Protocol 28: the agent's context limit; Claude Code compacts the conversation there instead of at its window.
     if (isContextTokens(req.contextTokens)) env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(req.contextTokens);
     const model = plan ? claudeCodeModel(plan, req.model) : typeof req.model === "string" ? req.model : undefined;
-    if (this.opts.mcp) {
+    const branches = ownBranches(ctx.agent, missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix));
+    const allow = Array.isArray(req.permissions?.allow)
+      ? req.permissions.allow.filter((r): r is string => typeof r === "string")
+      : [];
+    let bridged: Live["bridged"];
+    if (delegated) {
+      const token = newMcpToken();
+      mcpConfigFile = path.join(dir, "mcp.json");
+      writeFileSync(
+        mcpConfigFile,
+        JSON.stringify(
+          claudeMcpConfig({
+            command: delegated.relay.command,
+            taskId: id,
+            socketPath: delegated.relay.socketPath,
+            token,
+            alwaysLoad: false,
+            relay: true,
+          }),
+        ),
+        { mode: fileMode },
+      );
+      const frame: DelegatedFrame = {
+        process: id,
+        token,
+        session,
+        cwd,
+        profile: mode === "work" ? "work" : "plan",
+        branches: [...branches],
+        allow,
+        ...(mode === "chat" ? { chat: true } : {}),
+        ...(delegated.task ? { task: delegated.task.kind } : {}),
+        ...(persistent ? {} : { oneShot: true as const }),
+      };
+      this.bridge.set(id, { token, cwd, folder: ctx.folder, runId: null, runToken: null });
+      bridged = { frame, to: delegated };
+      // The worker has it before the CLI's relay can dial.
+      await delegated.bridge(frame);
+      env.MCP_TOOL_TIMEOUT = String(PERMISSION_WAIT_MS + 5 * 60_000);
+    } else if (this.opts.mcp) {
       const token = newMcpToken();
       mcpConfigFile = path.join(dir, "mcp.json");
       writeFileSync(
@@ -1765,7 +2242,7 @@ export class BrainManager {
             profile: mode === "work" ? "work" : "plan",
             ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}),
             // Its own branches: a push there needs nobody (ADR 0053 §3).
-            branches: ownBranches(ctx.agent, missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix)),
+            branches,
           }),
         ),
         { mode: 0o600 },
@@ -1782,31 +2259,33 @@ export class BrainManager {
       env.MCP_TOOL_TIMEOUT = String(PERMISSION_WAIT_MS + 5 * 60_000);
     }
     const settingsFile = path.join(dir, "settings.json");
-    const allow = Array.isArray(req.permissions?.allow)
-      ? req.permissions.allow.filter((r): r is string => typeof r === "string")
-      : [];
     writeFileSync(
       settingsFile,
-      JSON.stringify({
-        ...claudePermissionSettings(
-          mode,
-          allow,
-          undefined,
-          // Every command reaches our prompt tool: plain reads pass there at once, secrets never.
-          { promptReads: true, ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}) },
-        ),
-        // With the owner's own settings loaded (`personalMcp`), theirs decide the computer's own sign-in.
-        ...(ctx.accountHome
-          ? { env: accountSettingsEnv(plan, model) }
-          : req.personalMcp === true && mode !== "chat"
-            ? {}
-            : { env: accountSettingsEnv(undefined, model, process.env, true) }),
-      }),
-      { mode: 0o600 },
+      JSON.stringify(
+        delegated
+          ? // The turn's rules are the worker's to apply: none of the CLI's own tools is left for them.
+            { disableAllHooks: true, env: accountSettingsEnv(undefined, model) }
+          : {
+              ...claudePermissionSettings(
+                mode,
+                allow,
+                undefined,
+                // Every command reaches our prompt tool: plain reads pass there at once, secrets never.
+                { promptReads: true, ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}) },
+              ),
+              // With the owner's own settings loaded (`personalMcp`), theirs decide the computer's own sign-in.
+              ...(ctx.accountHome
+                ? { env: accountSettingsEnv(plan, model) }
+                : req.personalMcp === true && mode !== "chat"
+                  ? {}
+                  : { env: accountSettingsEnv(undefined, model, process.env, true) }),
+            },
+      ),
+      { mode: fileMode },
     );
     // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
     const addDirs =
-      mode === "chat"
+      mode === "chat" || delegated
         ? []
         : [...(cwd !== ctx.folder ? [ctx.folder] : []), ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd))];
     const args = claudeBrainArgs({
@@ -1821,15 +2300,21 @@ export class BrainManager {
       ...(addDirs.length ? { addDirs } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
     });
+    // Claimed before it starts: a CLI that dies in its first turn still left a transcript that is this agent's.
+    if (delegated && !resume) claimSession(delegated.room, session, ctx.agent.id, String(req.account));
     const proc = new ClaudeProcess(
-      this.opts.claudeCommand ?? ["claude"],
+      launched?.command ?? this.opts.claudeCommand ?? ["claude"],
       args,
-      cwd,
+      launched?.cwd ?? cwd,
       env,
       this.opts.spawn,
       ctx.oauthToken,
     );
     if (mode === "chat") proc.lock = chatToolsBreach;
+    else if (delegated) proc.lock = delegatedToolsBreach;
+    if (delegated) {
+      proc.onControl = (subtype) => this.log(`[${ctx.agent.handle}] refused the CLI's control_request ${subtype}`);
+    }
     const live: Live = {
       key,
       agentId: ctx.agent.id,
@@ -1839,12 +2324,19 @@ export class BrainManager {
       sig,
       ranKey,
       keptSystem,
+      dir,
+      ...(bridged ? { bridged } : {}),
       cwd,
       repoInFirst:
-        withRepo && started.kept && typeof req.conversation === "string" && !started.text.includes(REPO_HEADING),
+        !delegated &&
+        withRepo &&
+        started.kept &&
+        typeof req.conversation === "string" &&
+        !started.text.includes(REPO_HEADING),
       // A resume whose first text is gone may have begun with the conversation in it (an older server): read it again.
       opening: !resume || !started.kept,
-      busy: false,
+      // Its turn comes next (`onLive`): a turn starting meanwhile must not take it for an idle one to close.
+      busy: true,
       lastUsed: Date.now(),
       idleTimer: null,
       persistent,
@@ -1998,6 +2490,7 @@ export class BrainManager {
     if (this.live.get(live.key) === live) this.live.delete(live.key);
     if (!live.proc.exited) live.proc.close();
     this.bridge.delete(live.id);
+    if (live.bridged) void live.bridged.to.bridge({ ...live.bridged.frame, token: null }).catch(() => undefined);
     this.keepCompacted(live);
     // Its last turn just used the cache: kept for an hour from now.
     try {
@@ -2006,9 +2499,8 @@ export class BrainManager {
     } catch {
       // nothing kept
     }
-    const dir = path.join(this.opts.root, live.id);
     // The process may still read its files while it exits.
-    const cleanup = () => rmSync(dir, { recursive: true, force: true });
+    const cleanup = () => rmSync(live.dir, { recursive: true, force: true });
     if (live.proc.exited) cleanup();
     else live.proc.onExit(cleanup);
   }

@@ -30,7 +30,7 @@ export interface ResolvedWikiLink {
 }
 
 /**
- * Whether the person `userId` sees a wiki page, as a condition over `wiki_pages` (ADR 0023 addendum, ADR 0150): an open
+ * Whether the person `userId` sees a wiki page, as a condition over `wiki_pages` (ADR 0023 addendum, ADR 0151): an open
  * page, or a restricted one they administer the workspace of, hold one of its audience roles or are named in. `userId`
  * may be a column, to ask it for every row of another table.
  */

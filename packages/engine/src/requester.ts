@@ -31,7 +31,7 @@ export async function personBehindCall(
   return ctx.triggerMessageId ? personOfMessage(ctx.db, ctx.orgId, ctx.triggerMessageId) : null;
 }
 
-/** `visible_to` of the tools that make something people read (ADR 0150). */
+/** `visible_to` of the tools that make something people read (ADR 0151). */
 export const visibleToField = {
   enum: ["conversation", "requester", "everyone"],
   description:

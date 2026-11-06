@@ -97,6 +97,45 @@ test("config: the mode and the agents' uid range are read and checked", () => {
   expect(DEFAULT_AGENT_UID_RANGE).toEqual([20000, 29999]);
 });
 
+test("config: Claude's own login for all agents is off unless its switch is whole, and a new pairing keeps it", () => {
+  const on = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "B" };
+  expect(normalizeStored({ claudeSharedLogin: on }).claudeSharedLogin).toEqual(on as never);
+  const locked = { ...on, refreshLock: ".refresh.lock" };
+  expect(normalizeStored({ claudeSharedLogin: locked }).claudeSharedLogin).toEqual(locked as never);
+  const stray = { ...on, refreshLock: "../.credentials.json" };
+  expect(normalizeStored({ claudeSharedLogin: stray }).claudeSharedLogin).toEqual(on as never);
+  for (const bad of [true, {}, { ...on, refresh: "C" }, { ...on, minVersion: "2.1" }, { ...on, maxVersion: 3 }]) {
+    expect(normalizeStored({ claudeSharedLogin: bad })).toEqual({});
+  }
+  const paired = configFromGrant(
+    { mode: "system", claudeSharedLogin: on as never },
+    {
+      server: "https://app.example.com",
+      grant: { machineId: "m", token: "t", name: "n", org: { id: "o", name: "O" } } as never,
+      workspace: "/w",
+      tools: { commands: true } as never,
+      desktop: false,
+    },
+  );
+  expect(paired.claudeSharedLogin).toEqual(on as never);
+});
+
+test("config: the auth route is only ever the guard's true, and a new pairing keeps it", () => {
+  expect(normalizeStored({ networkAuthRoute: true }).networkAuthRoute).toBe(true);
+  expect(normalizeStored({ networkAuthRoute: "true" })).toEqual({});
+  const paired = configFromGrant(
+    { mode: "system", networkAuthRoute: true },
+    {
+      server: "https://app.example.com",
+      grant: { machineId: "m", token: "t", name: "n", org: { id: "o", name: "O" } } as never,
+      workspace: "/w",
+      tools: { commands: true } as never,
+      desktop: false,
+    },
+  );
+  expect(paired.networkAuthRoute).toBe(true);
+});
+
 test("a system home paired again stays a system home", () => {
   const grant = { token: "agm_new", machineId: "m2", name: "box", org: { id: "o1", name: "Acme" } };
   const input = {

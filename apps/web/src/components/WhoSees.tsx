@@ -71,7 +71,7 @@ export function WhoSeesButton({
 }
 
 /**
- * "Quem vê" (ADR 0150), for a task and a wiki page alike: everyone, only me, or specific people. Administrators always
+ * "Quem vê" (ADR 0151), for a task and a wiki page alike: everyone, only me, or specific people. Administrators always
  * see, so one may leave themselves out of a list; anyone else stays in it.
  */
 export function WhoSeesDialog({

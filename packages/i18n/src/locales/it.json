@@ -4396,6 +4396,7 @@
         "account": "Account",
         "accountWho": "Solo account di {{owner}}, responsabile di {{name}}: un piano pensa solo per gli agenti del suo proprietario.",
         "accountSignedOut": "Disconnesso, accedi di nuovo",
+        "accountUnknown": "Accesso non confermato, ricontrollato a breve",
         "thisComputer": "Account di {{computer}}",
         "accountMove": "In uso da {{agents}} · Spostalo qui",
         "accountAlso": "Usato anche da {{agents}}",
@@ -8470,6 +8471,8 @@
       "signedOutFor_many": "{{agents}} sono disconnessi.",
       "signedOutFor_other": "{{agents}} sono disconnessi.",
       "keyRefused": "La chiave è stata rifiutata: sostituiscila con una nuova.",
+      "statusUnknown": "Il computer non è riuscito a confermare l'accesso questa volta. Lo ricontrolla da solo.",
+      "identityUnknown": "account non identificato",
       "rename": "Rinomina",
       "signInAgain": "Accedi di nuovo",
       "newKey": "Sostituisci la chiave",
@@ -8519,6 +8522,8 @@
       "limited": "Al limite",
       "limitedUntil": "Al limite fino a {{when}}",
       "updated": "Aggiornato {{ago}}",
+      "ago": "aggiornato {{ago}}",
+      "stale": "dati vecchi, aggiornati {{ago}}",
       "notShared": "{{maker}} non condivide qui l'utilizzo.",
       "offer": {
         "use": "Usa {{label}} ({{pct}}%)",
@@ -11771,6 +11776,7 @@
       "targetNotFound": "Quel computer non esiste più. Scegline un altro.",
       "targetSame": "Gli agenti sono già su quel computer.",
       "targetPaused": "Quel computer è in pausa. Scegline un altro.",
+      "accountMethodUnsupported": "Questo computer non può ancora collegare Claude in questo modo. Aggiorna il programma agentes.chat che ha installato, oppure usa una chiave API.",
       "offline": "{{name}} è offline in questo momento. Riprova quando torna disponibile.",
       "paused": "{{name}} è in pausa: non parte nulla di nuovo finché non riprende.",
       "timeout": "Il computer non ha risposto in tempo. Riprova."
@@ -12661,7 +12667,8 @@
       "media": "GIF e sticker",
       "voice": "Voce",
       "apps": "App IA",
-      "approvals": "Approvazioni"
+      "approvals": "Approvazioni",
+      "about": "Informazioni su agentes.chat"
     },
     "sectionText": {
       "account": "Il tuo profilo e come appare l'app per te.",
@@ -12683,7 +12690,15 @@
       "media": "Cosa si può inviare in conversazione, e le GIF e gli sticker degli agenti.",
       "voice": "Messaggi vocali nelle conversazioni, e chi trasforma la voce in testo.",
       "apps": "Chiedi compiti agli agenti da Claude, Cursor e altre app.",
-      "approvals": "Chi decide per te quando un agente chiede la tua approvazione."
+      "approvals": "Chi decide per te quando un agente chiede la tua approvazione.",
+      "about": "Chi lo fa, la sua licenza e dove si trova il codice sorgente."
+    },
+    "about": {
+      "basedOn": "Basato su <site>agentes.chat</site> di Codari Global, LLC",
+      "version": "Versione",
+      "license": "Software libero sotto la <license>GNU Affero General Public License v3</license>, senza garanzia.",
+      "source": "Codice sorgente",
+      "copyright": "Copyright © 2026 Codari Global, LLC e collaboratori"
     },
     "title": "Impostazioni",
     "account": {

@@ -83,7 +83,7 @@ const Issue = z
           description: "Those people are whoever is in this conversation now, a DM or a private channel.",
         }),
       })
-      .openapi({ description: "Who sees it besides administrators (ADR 0150)." }),
+      .openapi({ description: "Who sees it besides administrators (ADR 0151)." }),
     parentIssueId: z.uuid().nullable().openapi({ description: "The issue this one is a sub-issue of." }),
     pullRequests: z.array(z.object({ number: z.number(), url: z.string(), openedBy: Actor.nullable() })),
     githubUrl: z.string().nullable(),

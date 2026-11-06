@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
@@ -60,6 +61,12 @@ export interface MachineExecutors {
   desktopUse?: { available: boolean; reason?: string };
   /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
   mode?: "system";
+  /** `hello.claudeLoginMethods` (protocol 50): what a new Claude sign-in for all agents can use there; absent: older. */
+  claudeLoginMethods?: ("cli_login" | "setup_token" | "api_key")[];
+  /** `hello.claudeLoginBlocked`: why the computer's self-check keeps `cli_login` for all agents off. */
+  claudeLoginBlocked?: string;
+  /** `hello.authEgressGroup` (protocol 50): root's Claude sign-in CLIs there run in the `agentes-auth` group. */
+  authEgressGroup?: true;
   /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */
   ownUsage?: {
     claude_code?: MachinePlanUsage;
@@ -299,6 +306,19 @@ export const machineAccounts = pgTable(
      * login thinks for one agent.
      */
     shared: boolean().notNull().default(false),
+    /**
+     * How it signs in (protocol 50): `cli_login`, `setup_token` or `api_key`. Set when its sign-in starts and from
+     * what the runner reports, never cleared by a report that doesn't say; null: unknown.
+     */
+    authMethod: text(),
+    /** The runner's last look at its status was inconclusive: `status` is the last conclusive one. */
+    statusUnknown: boolean().notNull().default(false),
+    /** The Claude organization it signed in to, as the CLI reports it (no secret). */
+    providerOrgId: text(),
+    /** Why its last turn failed (a `ProviderFailureCause`), and when; and when a turn last succeeded. */
+    lastFailureCause: text(),
+    lastFailureAt: timestamp({ withTimezone: true }),
+    lastSuccessAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp({ withTimezone: true }),
@@ -307,6 +327,35 @@ export const machineAccounts = pgTable(
     primaryKey({ columns: [t.orgId, t.id] }),
     foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }).onDelete("cascade"),
     index().on(t.orgId, t.machineId),
+    check("machine_accounts_auth_method", sql`${t.authMethod} in ('cli_login', 'setup_token', 'api_key')`),
+  ],
+);
+
+/**
+ * How NEW Claude sign-ins for all agents are made on computers where each agent is its own OS user, set through
+ * the operator API: `setup_token` everywhere, or `cli_login` for the listed workspaces (`selected`) or for all.
+ * Elsewhere such a sign-in is always the CLI's own. A connection keeps the method it started with. One row for the
+ * whole installation, so no `org_id`; a missing row reads as `setup_token`, `selected`, no workspaces.
+ */
+export const claudeAuthSettings = pgTable(
+  "claude_auth_settings",
+  {
+    id: integer().primaryKey().default(1),
+    method: text({ enum: ["cli_login", "setup_token"] })
+      .notNull()
+      .default("setup_token"),
+    rollout: text({ enum: ["selected", "all"] })
+      .notNull()
+      .default("selected"),
+    orgIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** When it last changed; null: never. */
+    changedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    check("claude_auth_settings_one_row", sql`${t.id} = 1`),
+    check("claude_auth_settings_method", sql`${t.method} in ('cli_login', 'setup_token')`),
+    check("claude_auth_settings_rollout", sql`${t.rollout} in ('selected', 'all')`),
+    check("claude_auth_settings_org_ids", sql`coalesce(cardinality(${t.orgIds}), 0) <= 500`),
   ],
 );
 

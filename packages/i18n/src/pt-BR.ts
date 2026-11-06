@@ -4323,6 +4323,7 @@ export const ptBR = {
         accountWho_female:
           "Só contas de {{owner}}, responsável pela {{name}}: um plano só pensa pelos agentes do seu dono.",
         accountSignedOut: "Saiu da conta, entre de novo",
+        accountUnknown: "Login não confirmado, confere de novo em breve",
         thisComputer: "Conta deste {{computer}}",
         accountMove: "Em uso por {{agents}} · Mover para cá",
         accountAlso: "Também usada por {{agents}}",
@@ -8122,6 +8123,8 @@ export const ptBR = {
       signedOutFor_one: "{{agents}} ficou sem login.",
       signedOutFor_other: "{{agents}} ficaram sem login.",
       keyRefused: "A chave foi recusada: troque por uma nova.",
+      statusUnknown: "O computador não conseguiu confirmar o login desta vez. Ele confere de novo sozinho.",
+      identityUnknown: "conta não identificada",
       rename: "Renomear",
       signInAgain: "Entrar de novo",
       newKey: "Trocar a chave",
@@ -8170,6 +8173,8 @@ export const ptBR = {
       limited: "No limite",
       limitedUntil: "No limite até {{when}}",
       updated: "Atualizado {{ago}}",
+      ago: "atualizado {{ago}}",
+      stale: "números antigos, atualizados {{ago}}",
       notShared: "{{maker}} não mostra o uso por aqui.",
       offer: {
         use: "Usar {{label}} ({{pct}}%)",
@@ -11073,6 +11078,8 @@ export const ptBR = {
       targetNotFound: "Esse computador não existe mais. Escolha outro.",
       targetSame: "Os agentes já estão nesse computador.",
       targetPaused: "Esse computador está pausado. Escolha outro.",
+      accountMethodUnsupported:
+        "Este computador ainda não conecta o Claude desse jeito. Atualize o programa do agentes.chat nele, ou use uma chave de API.",
       offline: "{{name}} está fora do ar agora. Tente de novo quando ele voltar.",
       paused: "{{name}} está pausado: nada novo começa nele até ele ser retomado.",
       timeout: "O computador não respondeu a tempo. Tente de novo.",
@@ -11957,6 +11964,7 @@ export const ptBR = {
       voice: "Voz",
       apps: "Apps de IA",
       approvals: "Aprovações",
+      about: "Sobre o agentes.chat",
     },
     sectionText: {
       account: "Seu perfil e como o app fica para você.",
@@ -11979,6 +11987,14 @@ export const ptBR = {
       voice: "Mensagens de voz nas conversas, e quem transforma a voz em texto.",
       apps: "Peça tarefas aos agentes pelo Claude, Cursor e outros apps.",
       approvals: "Quem decide por você quando um agente pede a sua aprovação.",
+      about: "Quem faz, a licença e onde está o código-fonte.",
+    },
+    about: {
+      basedOn: "Baseado no <site>agentes.chat</site> da Codari Global, LLC",
+      version: "Versão",
+      license: "Software livre sob a <license>GNU Affero General Public License v3</license>, sem garantia.",
+      source: "Código-fonte",
+      copyright: "Copyright © 2026 Codari Global, LLC e colaboradores",
     },
     title: "Configurações",
     account: {

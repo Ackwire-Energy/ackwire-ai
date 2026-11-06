@@ -65,4 +65,4 @@ Migration `0215_task_conversations.sql` adds `task` to `channel_kind` and the tw
 
 ## Addendum (2026-11-06): who sees a task
 
-ADR 0150 replaces §2's "the workspace's, or of a channel they are in": a task may be limited to a list of people, and administrators always see it, so `taskReaderSql` reads `taskSeenSql`. A task tied to a DM or a private channel stays tied. "Mostrar para todos" is `setIssueAudience` with `everyone`, for anyone who sees the task.
+ADR 0151 replaces §2's "the workspace's, or of a channel they are in": a task may be limited to a list of people, and administrators always see it, so `taskReaderSql` reads `taskSeenSql`. A task tied to a DM or a private channel stays tied. "Mostrar para todos" is `setIssueAudience` with `everyone`, for anyone who sees the task.
