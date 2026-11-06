@@ -5,13 +5,15 @@ import { closeSync, createReadStream, existsSync, openSync, rmSync, statSync } f
 import { mkdir, mkdtemp, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createInterface } from "node:readline";
 import {
+  ASK_AFTER_TASK,
+  ASK_IN_CHAT,
   type CommandProfile,
   type CommandScope,
   inBrowserProfile,
   insideFolders,
   localVerdict,
+  PLAN_MESSAGE,
   SECRET_READ_DENY_RULES,
   simpleCommands,
 } from "@agenteschat/adapters/command-policy";
@@ -25,6 +27,7 @@ import {
 import { exitCodeOf, formatBytes, killTree, runCommand } from "./exec";
 import { resolveCommand } from "./executors";
 import { touchesGitInternals } from "./git-guard";
+import { fileLines } from "./lines";
 import {
   claudePermissionSettings,
   type DelegatedSurface,
@@ -35,7 +38,7 @@ import {
   shellArg,
   type ToolCaller,
 } from "./mcp";
-import { realOrNearest } from "./paths";
+import { isInside, realOrNearest } from "./paths";
 import type { Spawn } from "./scope-gate";
 import { holdsSecretFile } from "./secrets";
 
@@ -295,6 +298,8 @@ export interface DelegatedScope {
   chat?: boolean;
   /** A background task's CLI: a mission's, or one outside a mission (`local`), as `claudeMcpConfig`'s `task`. */
   task?: "mission" | "local";
+  /** The CLI's stdin closes after its prompt, so no notice can reach it. */
+  oneShot?: boolean;
 }
 
 /** `agentSecrets`' answer: what commands get, and what no result may show. */
@@ -329,6 +334,8 @@ interface Shell {
   summary: string;
   file: string;
   child: ChildProcess;
+  /** Started by a plan turn: all a plan turn may stop. */
+  plan: boolean;
   status: ShellStatus;
   exitCode?: number;
   background: boolean;
@@ -468,6 +475,9 @@ const relativeTo = (cwd: string, file: string) => {
   return rel && !rel.startsWith("..") && !path.isAbsolute(rel) ? rel : file;
 };
 const bareDot = (line: string) => line.replace(/^\.\//, "");
+/** rg exits 2 on any path it couldn't read, whatever it found elsewhere: only with nothing found is that a failure. */
+const rgFailed = (out: { exitCode: number; stdout: string }) =>
+  out.exitCode > 1 && !(out.exitCode === 2 && out.stdout.trim());
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 const taskContext = (task: DelegatedScope["task"]) => ({
@@ -521,6 +531,19 @@ export class DelegatedTools {
   /** `turn.detach`: the session's running commands answer now and go on in the background. */
   detach(session: string) {
     for (const call of this.sessions.get(session)?.calls.values() ?? []) call.detach?.();
+  }
+
+  /** A task's CLI ended: nothing is left to stop its session's shells or to hear of them, so they end with it. */
+  endSession(session: string) {
+    const s = this.sessions.get(session);
+    if (!s) return;
+    this.sessions.delete(session);
+    this.stopCalls(s);
+    for (const shell of s.shells.values()) {
+      shell.background = false;
+      this.stop(shell);
+    }
+    rmSync(s.dir, { recursive: true, force: true });
   }
 
   /** The worker stops: what runs here stops with it. */
@@ -646,10 +669,14 @@ export class DelegatedTools {
     const { s } = r;
     const scope = this.commandScope(s);
     const { profile } = s.scope;
-    const verdict = localVerdict(tool, input, scope, profile);
-    if (verdict?.behavior === "deny") return verdict.message;
+    const verdict = localVerdict(tool, input, scope, profile, s.scope.task ? ASK_AFTER_TASK : ASK_IN_CHAT);
+    const refuse = (message: string) => {
+      if (s.scope.task) this.opts.onDenied?.(s.scope.session, tool, input);
+      return message;
+    };
+    if (verdict?.behavior === "deny") return refuse(verdict.message);
     if (s.rules.deny.some((rule) => ruleMatches(rule, tool, input))) {
-      return `Permission to use ${tool} has been denied.`;
+      return refuse(`Permission to use ${tool} has been denied.`);
     }
     const held = s.rules.ask.some((rule) => ruleMatches(rule, tool, input));
     if (verdict?.behavior === "allow" || (!held && this.allowedHere(s, scope, tool, input))) return null;
@@ -665,9 +692,7 @@ export class DelegatedTools {
         ...taskContext(s.scope.task),
       }),
     );
-    if (answer.behavior === "allow") return null;
-    if (s.scope.task) this.opts.onDenied?.(s.scope.session, tool, input);
-    return answer.message;
+    return answer.behavior === "allow" ? null : refuse(answer.message);
   }
 
   /** An allow rule for each part of a command it can follow, or an edit inside the turn's folders. */
@@ -703,8 +728,9 @@ export class DelegatedTools {
       if (timeout) {
         setTimeout(() => this.stop(shell), Math.min(Math.max(timeout, 1), BACKGROUND_MAX_MS)).unref();
       }
+      const after = r.s.scope.oneShot ? "Check on it with TaskOutput." : "You will be notified when it completes.";
       return result(
-        `Command running in background with ID: ${shell.id}. Output is being written to: ${shell.file}. You will be notified when it completes.`,
+        `Command running in background with ID: ${shell.id}. Output is being written to: ${shell.file}. ${after}`,
       );
     }
     const limit = Math.min(Math.max(timeout ?? BASH_DEFAULT_TIMEOUT_MS, 1), BASH_MAX_TIMEOUT_MS);
@@ -777,6 +803,7 @@ export class DelegatedTools {
       summary: (description ?? command).slice(0, 200),
       file,
       child,
+      plan: s.scope.profile === "plan",
       status: "running",
       background: false,
       stopped: false,
@@ -924,6 +951,7 @@ export class DelegatedTools {
     const shell = r.s.shells.get(id);
     if (!shell) return fail(`No task found with ID: ${id}`);
     if (shell.status !== "running") return fail(`Task ${id} is not running (status: ${shell.status})`);
+    if (r.s.scope.profile === "plan" && !shell.plan) return fail(PLAN_MESSAGE);
     this.stop(shell);
     await shell.done;
     return result(
@@ -997,13 +1025,11 @@ export class DelegatedTools {
     }
     const first = Math.max(Math.floor(offset ?? 1), 1);
     const count = Math.max(Math.floor(limit ?? READ_DEFAULT_LINES), 1);
-    const stream = createReadStream(real, { encoding: "utf8" });
-    const lines = createInterface({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
     const shown: string[] = [];
     let seen = 0;
     let chars = 0;
     let more = false;
-    for await (const line of lines) {
+    for await (const line of fileLines(createReadStream(real, { encoding: "utf8" }))) {
       seen++;
       if (seen < first) continue;
       if (seen >= first + count) {
@@ -1014,8 +1040,6 @@ export class DelegatedTools {
       chars += line.length + 8;
       if (chars > DELEGATED_RESULT_TOKENS * CHARS_PER_TOKEN) break;
     }
-    lines.close();
-    stream.destroy();
     if (chars > DELEGATED_RESULT_TOKENS * CHARS_PER_TOKEN) {
       return fail(
         `File content (over ${DELEGATED_RESULT_TOKENS} tokens) exceeds maximum allowed tokens (${DELEGATED_RESULT_TOKENS}). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.`,
@@ -1088,10 +1112,10 @@ export class DelegatedTools {
     }
   }
 
-  private async store(s: Session, real: string, content: string) {
+  private async store(s: Session, real: string, content: string, partial = false) {
     await mkdir(path.dirname(real), { recursive: true });
     await writeFile(real, content);
-    this.noteRead(s, real, (await stat(real)).mtimeMs, false);
+    this.noteRead(s, real, (await stat(real)).mtimeMs, partial);
   }
 
   private async edit(r: Run): Promise<McpToolResult> {
@@ -1118,9 +1142,12 @@ export class DelegatedTools {
       return result(`The file ${abs} has been updated successfully.`);
     }
     if (st.isDirectory()) return fail(`EISDIR: illegal operation on a directory, read '${abs}'`);
-    const raw = await readFile(real, "utf8");
+    // Before any read: a pipe would never answer, and a read takes no cancel.
+    if (!st.isFile()) return fail(`${abs} is not a regular file.`);
     if (old === "") {
-      if (raw.trim() !== "") return fail("Cannot create new file - file already exists.");
+      if (st.size > READ_MAX_BYTES || (await readFile(real, "utf8")).trim() !== "") {
+        return fail("Cannot create new file - file already exists.");
+      }
       await this.store(s, real, next);
       return result(`The file ${abs} has been updated successfully.`);
     }
@@ -1128,6 +1155,7 @@ export class DelegatedTools {
     const seen = s.reads.get(real);
     if (!seen) return fail(NOT_READ);
     if (st.mtimeMs > seen.mtimeMs) return fail(MODIFIED);
+    const raw = await readFile(real, "utf8");
     // Read shows lines without their `\r`: what the model quotes matches once the file's line ends are set aside.
     const crlf = raw.includes("\r\n");
     const content = crlf ? raw.replaceAll("\r\n", "\n") : raw;
@@ -1141,7 +1169,7 @@ export class DelegatedTools {
     }
     const replacement = sameQuotes(old, actual, next);
     const changed = all ? content.split(actual).join(replacement) : content.replace(actual, () => replacement);
-    await this.store(s, real, crlf ? changed.replaceAll("\n", "\r\n") : changed);
+    await this.store(s, real, crlf ? changed.replaceAll("\n", "\r\n") : changed, seen.partial);
     return result(
       all
         ? `The file ${abs} has been updated. All occurrences were successfully replaced.`
@@ -1222,7 +1250,7 @@ export class DelegatedTools {
       ".",
     ]);
     if (out.exitCode === 127) return fail(NO_RIPGREP);
-    if (out.exitCode > 1) return fail(out.stderr.trim() || `Exit code ${out.exitCode}`);
+    if (rgFailed(out)) return fail(out.stderr.trim() || `Exit code ${out.exitCode}`);
     const files = out.stdout
       .split("\n")
       .filter(Boolean)
@@ -1244,14 +1272,28 @@ export class DelegatedTools {
     const pattern = needString(args, "pattern");
     const given = optionalString(args, "path");
     const glob = optionalString(args, "glob");
+    // The target of a link, as for Read: rg searches a path it is given by name whatever its globs exclude.
+    const target = await realOrNearest(given ? this.absolute(s, given) : s.cwd);
     const refused = await this.gate(r, "Grep", {
       pattern,
-      ...(given ? { path: given } : {}),
+      ...(given ? { path: target } : {}),
       ...(glob ? { glob } : {}),
     });
     if (refused) return fail(refused);
-    const target = given ? this.absolute(s, given) : s.cwd;
-    if (!(await statOrNull(target))) return fail(`Path does not exist: ${target}`);
+    if (inBrowserProfile(target)) return fail(`${target} holds your browser's logins. It stays on this computer.`);
+    const st = await statOrNull(target);
+    if (!st) return fail(`Path does not exist: ${target}`);
+    if (st.isFile() && (await holdsSecretFile(s.scope.folder, r.secrets?.files ?? [], target))) {
+      return fail(`${target} holds a secret. It stays on this computer.`);
+    }
+    // A glob with a slash is rooted where rg runs, so it runs above all it searches. Out of the shell's folder that is
+    // the target itself, and what it prints comes back as whole paths.
+    const cwd = await realOrNearest(s.cwd);
+    const within = isInside(cwd, target);
+    const from = within ? cwd : st.isDirectory() ? target : path.dirname(target);
+    const searched = !within ? (st.isDirectory() ? "." : path.basename(target)) : path.relative(cwd, target) || ".";
+    const folder = await realOrNearest(s.scope.folder);
+    const secretFiles = (r.secrets?.files ?? []).map((f) => path.resolve(folder, f)).filter((f) => isInside(from, f));
     const wanted = optionalString(args, "output_mode");
     const mode = wanted === "content" || wanted === "count" ? wanted : "files_with_matches";
     const content = mode === "content";
@@ -1275,15 +1317,15 @@ export class DelegatedTools {
       // After the caller's: rg's last matching glob wins.
       ...VCS_FOLDERS.flatMap((f) => ["--glob", `!${f}/`]),
       ...GREP_SECRET_GLOBS.flatMap((g) => ["--glob", `!${g}`]),
-      ...(r.secrets?.files ?? []).flatMap((f) => ["--glob", `!${f}`]),
+      ...secretFiles.flatMap((f) => ["--glob", `!${path.relative(from, f)}`]),
       "-e",
       pattern,
       "--",
-      target === s.cwd ? "." : relativeTo(s.cwd, target),
+      searched,
     ];
-    const out = await this.runRg(r, s.cwd, rgArgs);
+    const out = await this.runRg(r, from, rgArgs);
     if (out.exitCode === 127) return fail(NO_RIPGREP);
-    if (out.exitCode > 1) return fail(out.stderr.trim() || `Exit code ${out.exitCode}`);
+    if (rgFailed(out)) return fail(out.stderr.trim() || `Exit code ${out.exitCode}`);
     const skip = Math.max(Math.floor(optionalNumber(args, "offset") ?? 0), 0);
     const asked = optionalNumber(args, "head_limit");
     const limit = asked === 0 ? Number.POSITIVE_INFINITY : Math.floor(asked ?? GREP_DEFAULT_LIMIT);
@@ -1293,7 +1335,11 @@ export class DelegatedTools {
       const parts = [...(cut ? [`limit: ${limit}`] : []), ...(skip ? [`offset: ${skip}`] : [])];
       return { kept, pagination: parts.join(", ") };
     };
-    const lines = out.stdout.split("\n").filter(Boolean).map(bareDot);
+    const lines = out.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map(bareDot)
+      .map((line) => (within || line === "--" ? line : `${from}/${line}`));
     if (content) {
       const { kept, pagination } = page(lines);
       if (kept.length === 0) return result(skip && lines.length ? "No entries at this offset" : "No matches found");
@@ -1338,6 +1384,8 @@ export interface DelegatedBridge {
   chat?: true;
   /** `DelegatedScope.task`. */
   task?: "mission" | "local";
+  /** `DelegatedScope.oneShot`. */
+  oneShot?: true;
 }
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined);
@@ -1365,6 +1413,7 @@ export function parseBridge(f: Record<string, unknown>): DelegatedBridge | null 
     ...(typeof f.socketPath === "string" && path.isAbsolute(f.socketPath) ? { socketPath: f.socketPath } : {}),
     ...(f.chat === true ? { chat: true as const } : {}),
     ...(f.task === "mission" || f.task === "local" ? { task: f.task } : {}),
+    ...(f.oneShot === true ? { oneShot: true as const } : {}),
   };
 }
 
@@ -1395,6 +1444,7 @@ export function delegatedTask(
       ...(runnerHome ? { runnerHome } : {}),
       ...(bridge.chat ? { chat: true } : {}),
       ...(bridge.task ? { task: bridge.task } : {}),
+      ...(bridge.oneShot ? { oneShot: true } : {}),
     }),
   };
 }

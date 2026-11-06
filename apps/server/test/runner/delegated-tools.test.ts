@@ -1,7 +1,18 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
+import { ASK_AFTER_TASK, PLAN_MESSAGE } from "@agenteschat/adapters/command-policy";
 import { PERMISSION_TOOL } from "@agenteschat/adapters/machine-protocol";
 import {
   BASH_MAX_TIMEOUT_MS,
@@ -265,6 +276,41 @@ test("TaskStop ends a background command and all it started", async () => {
   expect(textOf(await call("TaskStop", {}))).toBe("Missing required parameter: task_id");
 });
 
+test("a plan turn stops the shells it started, never one a work turn left running", async () => {
+  const { tools, scope, call, state, ask } = setup();
+  state.answer = allow;
+  const server = idIn(textOf(await call("Bash", { command: "sleep 30", run_in_background: true })));
+  const plan = tools.surface({ ...scope, profile: "plan" });
+  const inPlan = (name: string, args: Record<string, unknown>, id: number) => plan.call(name, args, { id, ask });
+  const refused = await inPlan("TaskStop", { task_id: server }, 100);
+  expect(refused).toMatchObject({ isError: true });
+  expect(textOf(refused)).toBe(PLAN_MESSAGE);
+  expect(textOf(await inPlan("TaskOutput", { task_id: server, block: false }, 101))).toContain(
+    "<status>running</status>",
+  );
+  const own = idIn(textOf(await inPlan("Bash", { command: "tail -f /dev/null", run_in_background: true }, 102)));
+  expect(textOf(await inPlan("TaskStop", { task_id: own }, 103))).toContain("Successfully stopped");
+});
+
+test("a CLI no notice can reach is told to look, and its task's end takes its shells", async () => {
+  const { call, tools, folder, notices, state } = setup({ oneShot: true });
+  state.answer = allow;
+  const pidFile = path.join(folder, "pid");
+  const started = textOf(
+    await call("Bash", { command: `echo $$ > ${pidFile}; exec sleep 30`, run_in_background: true }),
+  );
+  expect(started).toContain("Check on it with TaskOutput.");
+  expect(started).not.toContain("notified");
+  await waitFor(() => existsSync(pidFile) && readFileSync(pidFile, "utf8").trim() !== "");
+  const pid = Number(readFileSync(pidFile, "utf8"));
+  tools.endSession("s1");
+  await waitFor(() => !alive(pid));
+  // Started, and nothing after: nobody is left to hear of its end.
+  expect(notices).toHaveLength(1);
+  expect(textOf(await call("TaskOutput", { task_id: "b00000000" }))).toContain("No task found");
+  tools.endSession("no-such-session");
+});
+
 test("a background command's timeout is how long it may run there", async () => {
   const { call, notices, state } = setup();
   state.answer = allow;
@@ -462,6 +508,15 @@ test("Read numbers lines from one, takes offset and limit, and warns about an em
   );
 });
 
+test("Read counts lines as grep does: only a newline ends one", async () => {
+  const { call, folder } = setup();
+  const file = path.join(folder, "a.txt");
+  writeFileSync(file, "one\ntwo\rthree\nfour\n");
+  expect(textOf(await call("Read", { file_path: file, offset: 3 }))).toBe("3\tfour");
+  writeFileSync(file, "a\u2028b\u2029c\nlast");
+  expect(textOf(await call("Read", { file_path: file }))).toBe("1\ta\u2028b\u2029c\n2\tlast");
+});
+
 test("Read stops at 2000 lines and at the size limits, and offset and limit get past the size", async () => {
   const { call, folder } = setup();
   const long = path.join(folder, "long.txt");
@@ -612,6 +667,18 @@ test("Edit wants the file read, and read since it last changed", async () => {
   expect(again.isError).toBe(false);
 });
 
+test.if(process.platform !== "win32")("Edit on a named pipe answers at once, and never opens it", async () => {
+  const { call, folder, state } = setup();
+  state.answer = allow;
+  const pipe = path.join(folder, "pipe");
+  execFileSync("mkfifo", [pipe]);
+  for (const old of ["a", ""]) {
+    const out = await call("Edit", { file_path: pipe, old_string: old, new_string: "b" });
+    expect(out).toMatchObject({ isError: true });
+    expect(textOf(out)).toBe(`${pipe} is not a regular file.`);
+  }
+});
+
 test("Edit needs one match unless told otherwise, and takes the new text as it is", async () => {
   const { call, folder } = setup();
   const file = path.join(folder, "a.txt");
@@ -696,6 +763,18 @@ test("Write makes a file, and replaces one only after reading all of it", async 
   expect(textOf(await call("Write", { file_path: folder, content: "x" }))).toStartWith("EISDIR");
 });
 
+test("an Edit keeps a file marked as partly read, so a Write can't wipe what was never seen", async () => {
+  const { call, folder } = setup();
+  const file = path.join(folder, "a.txt");
+  writeFileSync(file, `${Array.from({ length: 50 }, (_, i) => `line ${i}`).join("\n")}\n`);
+  await call("Read", { file_path: file, offset: 10, limit: 2 });
+  await call("Edit", { file_path: file, old_string: "line 9\n", new_string: "line nine\n" });
+  expect(textOf(await call("Write", { file_path: file, content: "only this" }))).toStartWith("You read only part");
+  expect(readFileSync(file, "utf8")).toContain("line 49");
+  await call("Read", { file_path: file });
+  expect((await call("Write", { file_path: file, content: "only this" })).isError).toBe(false);
+});
+
 test("edits inside the turn's folders need nobody; outside them a person decides; a repository's git dir is never written", async () => {
   const granted = temp("granted-");
   const { call, asked, state, folder } = setup({ grants: [granted] });
@@ -728,6 +807,38 @@ test("a link out of the folders is judged by where it leads", async () => {
   expect(readFileSync(path.join(out, "a.txt"), "utf8")).toBe("x\n");
 });
 
+test("a link to nothing is judged by where it leads too: writing would create that", async () => {
+  const { call, asked, folder } = setup();
+  mkdirSync(path.join(folder, ".git", "hooks"), { recursive: true });
+  const hook = path.join(folder, ".git", "hooks", "post-commit");
+  symlinkSync(".git/hooks/post-commit", path.join(folder, "notes.md"));
+  const write = await call("Write", { file_path: path.join(folder, "notes.md"), content: "x" });
+  expect(textOf(write)).toContain("inside a .git folder");
+  const edit = await call("Edit", { file_path: path.join(folder, "notes.md"), old_string: "", new_string: "x" });
+  expect(textOf(edit)).toContain("inside a .git folder");
+  expect(existsSync(hook)).toBe(false);
+
+  const missing = path.join(temp("elsewhere-"), "a.txt");
+  symlinkSync(missing, path.join(folder, "out.md"));
+  expect(textOf(await call("Write", { file_path: path.join(folder, "out.md"), content: "x" }))).toBe("Lia said no.");
+  expect(asked).toHaveLength(1);
+  expect(existsSync(missing)).toBe(false);
+
+  // Through a folder link, `..` leaves from where the link leads.
+  const out = temp("elsewhere-");
+  mkdirSync(path.join(out, "in"));
+  symlinkSync(path.join(out, "in"), path.join(folder, "there"));
+  symlinkSync("there/../gone.txt", path.join(folder, "up.md"));
+  expect(textOf(await call("Write", { file_path: path.join(folder, "up.md"), content: "x" }))).toBe("Lia said no.");
+  expect(asked).toHaveLength(2);
+  expect(existsSync(path.join(out, "gone.txt"))).toBe(false);
+
+  symlinkSync("loop-b", path.join(folder, "loop-a"));
+  symlinkSync("loop-a", path.join(folder, "loop-b"));
+  const loop = await call("Write", { file_path: path.join(folder, "loop-a"), content: "x" });
+  expect(textOf(loop)).toContain("Too many links");
+});
+
 // ── Glob and Grep ────────────────────────────────────────────────────────────
 
 /** A ripgrep that notes its arguments and prints `out` (exit `code`). */
@@ -737,10 +848,14 @@ function fakeRg(out: string, code = 0) {
   writeFileSync(path.join(dir, "out"), out);
   writeFileSync(
     file,
-    `#!/bin/sh\nfor a in "$@"; do echo "$a"; done > "${dir}/args"\ncat "${dir}/out"\n[ ${code} = 2 ] && echo boom >&2\nexit ${code}\n`,
+    `#!/bin/sh\npwd -P > "${dir}/cwd"\nfor a in "$@"; do echo "$a"; done > "${dir}/args"\ncat "${dir}/out"\n[ ${code} = 2 ] && echo boom >&2\nexit ${code}\n`,
   );
   chmodSync(file, 0o755);
-  return { rg: [file], args: () => readFileSync(path.join(dir, "args"), "utf8").trim().split("\n") };
+  return {
+    rg: [file],
+    args: () => readFileSync(path.join(dir, "args"), "utf8").trim().split("\n"),
+    cwd: () => readFileSync(path.join(dir, "cwd"), "utf8").trim(),
+  };
 }
 
 test("Glob lists files by the path from the shell's folder, and says when it stops", async () => {
@@ -837,6 +952,68 @@ test("Grep counts, and reads no match and a failure apart", async () => {
   const out = await broken.call("Grep", { pattern: "(" });
   expect(out).toEqual({ content: [{ type: "text", text: "boom" }], isError: true });
   expect(textOf(await none.call("Grep", { pattern: "x", path: "no" }))).toStartWith("Path does not exist");
+});
+
+test("a path rg couldn't read costs the search only that path; alone it is still a failure", async () => {
+  const some = fakeRg("./a.txt:1:needle\n", 2);
+  const { call } = setup({}, { rg: some.rg });
+  const out = await call("Grep", { pattern: "needle", output_mode: "content" });
+  expect(out).toMatchObject({ isError: false });
+  expect(textOf(out)).toBe("a.txt:1:needle");
+  const files = setup({}, { rg: fakeRg("./a.txt\n", 2).rg });
+  expect(textOf(await files.call("Glob", { pattern: "*" }))).toBe("a.txt");
+  const none = setup({}, { rg: fakeRg("", 2).rg });
+  expect(await none.call("Glob", { pattern: "*" })).toMatchObject({ isError: true });
+  const late = setup({}, { rg: fakeRg("./a.txt\n", 124).rg });
+  expect(await late.call("Grep", { pattern: "x" })).toMatchObject({ isError: true });
+});
+
+test("Grep refuses what Read refuses: a file named outright or through a link", async () => {
+  const fake = fakeRg("");
+  const secrets = async () => ({ ...SECRETS, files: ["repos/x/conf/sa.json"] });
+  const { call, folder } = setup({}, { rg: fake.rg, secrets });
+  mkdirSync(path.join(folder, "repos", "x", "conf"), { recursive: true });
+  writeFileSync(path.join(folder, "repos", "x", "conf", "sa.json"), "{}");
+  writeFileSync(path.join(folder, "server.pem"), "x");
+  symlinkSync("server.pem", path.join(folder, "notes.txt"));
+  symlinkSync("repos/x/conf/sa.json", path.join(folder, "sa-link"));
+  mkdirSync(path.join(folder, ".agentes", "browser"), { recursive: true });
+  writeFileSync(path.join(folder, ".agentes", "browser", "Cookies"), "x");
+  for (const given of ["repos/x/conf/sa.json", "notes.txt", "sa-link", ".agentes/browser/Cookies"]) {
+    expect(await call("Grep", { pattern: "x", path: given })).toMatchObject({ isError: true });
+  }
+  expect(() => fake.args()).toThrow();
+});
+
+test("Grep leaves an agent's secret files out wherever the shell's folder is", async () => {
+  const fake = fakeRg("");
+  const secrets = async () => ({ ...SECRETS, files: ["repos/x/conf/sa.json", "keys/ada.pem"] });
+  const parts = temp("delegated-");
+  const inner = path.join(parts, "repos", "x");
+  mkdirSync(path.join(inner, "conf"), { recursive: true });
+  const { call } = setup({ folder: parts, cwd: inner }, { rg: fake.rg, secrets });
+  await call("Grep", { pattern: "x" });
+  expect(fake.args()).toContain("!conf/sa.json");
+  expect(fake.args().join(" ")).not.toContain("ada.pem");
+
+  // Above the shell's folder rg runs from the target, and the paths it prints come back whole.
+  const up = fakeRg("./keys/a.txt:1:x\n--\n./repos/b.txt:2:x\n");
+  const above = setup({ folder: parts, cwd: inner }, { rg: up.rg, secrets });
+  const out = await above.call("Grep", { pattern: "x", path: parts, output_mode: "content" });
+  expect(up.cwd()).toBe(realpathSync(parts));
+  expect(up.args().slice(-2)).toEqual(["--", "."]);
+  expect(up.args()).toContain("!repos/x/conf/sa.json");
+  expect(up.args()).toContain("!keys/ada.pem");
+  const root = realpathSync(parts);
+  expect(textOf(out)).toBe(`${root}/keys/a.txt:1:x\n--\n${root}/repos/b.txt:2:x`);
+
+  // A folder reached through a link is searched at its real path, where the same globs hold.
+  const linked = fakeRg("");
+  const link = setup({ folder: parts, cwd: parts }, { rg: linked.rg, secrets });
+  symlinkSync("repos/x/conf", path.join(parts, "linkdir"));
+  await link.call("Grep", { pattern: "x", path: "linkdir" });
+  expect(linked.args().slice(-2)).toEqual(["--", "repos/x/conf"]);
+  expect(linked.args()).toContain("!repos/x/conf/sa.json");
 });
 
 test("a head_limit of zero means no limit, and a computer without ripgrep says what to use", async () => {
@@ -1246,5 +1423,20 @@ test("in a background task, a refused call says so and is listed; a turn's isn't
   expect(mission.surface.local).toBeUndefined();
   const turn = setup({}, { onDenied });
   await turn.call("Bash", { command: "curl -X POST https://example.com/deploy" });
+  expect(denied).toEqual([]);
+});
+
+test("in a background task, what the computer refuses itself says who can't approve it, and is listed", async () => {
+  const denied: unknown[][] = [];
+  const onDenied = (session: string, tool: string, input: Record<string, unknown>) =>
+    void denied.push([session, tool, input.command]);
+  const task = setup({ task: "mission" }, { onDenied });
+  const merge = textOf(await task.call("Bash", { command: "git merge feature" }));
+  expect(merge).toContain(ASK_AFTER_TASK);
+  expect(merge).not.toContain("run_code");
+  expect(denied).toEqual([["s1", "Bash", "git merge feature"]]);
+  denied.length = 0;
+  const turn = setup({}, { onDenied });
+  expect(textOf(await turn.call("Bash", { command: "git merge feature" }))).toContain("run_code");
   expect(denied).toEqual([]);
 });
