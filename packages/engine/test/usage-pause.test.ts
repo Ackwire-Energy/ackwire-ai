@@ -1527,9 +1527,10 @@ test("two skips on one line make one owner notice counting both; one in a conver
   const deps = { db: f.db, pubsub: f.pubsub };
   const bia = await addMember(f.db, f.org.id, "member", "bia");
   const nina = await addMember(f.db, f.org.id, "member", "nina");
-  for (const u of [bia, nina]) await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: u.id });
+  const dono = await addMember(f.db, f.org.id, "member", "dono");
+  for (const u of [bia, nina, dono]) await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: u.id });
   const ops = await createChannel(f.db, f.owner.id, f.org.id, { name: "ops" });
-  for (const u of [bia, nina]) await addChannelMember(f.db, f.owner.id, f.org.id, ops.id, { userId: u.id });
+  for (const u of [bia, nina, dono]) await addChannelMember(f.db, f.owner.id, f.org.id, ops.id, { userId: u.id });
   await addChannelMember(f.db, f.owner.id, f.org.id, ops.id, { agentId: f.agent.id });
   const theirs = await createChannel(f.db, bia.id, f.org.id, { name: "bia-nina", visibility: "private" });
   await addChannelMember(f.db, bia.id, f.org.id, theirs.id, { userId: nina.id });
@@ -1544,6 +1545,8 @@ test("two skips on one line make one owner notice counting both; one in a conver
   await postPersonMessage(deps, nina.id, f.org.id, ops.id, { body: "Relatório no Drive." });
   await postPersonMessage(deps, nina.id, f.org.id, theirs.id, { body: "Fatura paga." });
   await drainOutbox(f.db, handlers);
+  // A plain member owns it by the time it counts: an administrator reads every channel (ADR 0150).
+  await f.db.update(schema.agents).set({ ownerUserId: dono.id }).where(eq(schema.agents.id, f.agent.id));
   await pausedLongAgo(f);
   clearPlanLimits();
   await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 5 * RESUME_GAP_MS) });
@@ -1551,7 +1554,7 @@ test("two skips on one line make one owner notice counting both; one in a conver
   expect(seen).toHaveLength(1);
   expect((await runs(f)).map((r) => r.status)).toEqual(["done", "done", "done"]);
   const owner = await noticesOf(f, "catch_up_closed");
-  expect(owner.map((n) => [n.userId, n.count])).toEqual([[f.owner.id, 2]]);
+  expect(owner.map((n) => [n.userId, n.count])).toEqual([[dono.id, 2]]);
   expect(await noticesOf(f, "catch_up_closed_asker")).toHaveLength(3);
 });
 
