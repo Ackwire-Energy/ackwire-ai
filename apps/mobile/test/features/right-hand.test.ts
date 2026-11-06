@@ -99,6 +99,26 @@ test("the start card's answer: one of its choices, or a message the interview fo
   expect(startCardAnswer([team] as never, choices)).toBe("");
 });
 
+test("on a billing hold a sentence the wall kept answers nothing: the start card stays, as the way to a team", () => {
+  const said = {
+    id: "1",
+    createdAt: "2026-11-05T10:00:01.000Z",
+    author: { type: "person", id: "u" },
+    body: "Vendo pão",
+  };
+  const kept = {
+    id: "2",
+    createdAt: "2026-11-05T10:00:02.000Z",
+    author: { type: "agent", id: "lodi" },
+    body: "Guardei sua mensagem.",
+    meta: { noAi: { agentId: "lodi", forUserId: "u", reason: "plan_hold", intent: "task" } },
+  };
+  expect(startCardAnswer([said, kept] as never, ["Agência", "Loja online"])).toBeNull();
+  const held = { noAi: true, aiKnown: true, teamHandles: [], createsAgents: true, alone: true, held: true };
+  // The kept message's card is no Connect to press first: on a hold an AI comes after the plan.
+  expect(introCards({ ...held, noAiCard: true })).toEqual(["start"]);
+});
+
 test("its greeting's cards: Connect AI, then how to start, then what next, then none", () => {
   const base = { noAi: false, aiKnown: true, teamHandles: [] as string[], createsAgents: true, alone: true };
   expect(introCards({ ...base, noAi: true })).toEqual(["connect"]);
