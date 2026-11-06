@@ -134,7 +134,7 @@ export function AccessDialog<L extends string = string>({
       closeLabel={labels.close}
       width={560}
     >
-      <Locked when={saving}>
+      <Locked when={Boolean(saving)}>
         <DialogBody className="ac-access">
           {note && <p className="ac-access__note">{note}</p>}
           <SearchSelect
