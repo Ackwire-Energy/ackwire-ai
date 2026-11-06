@@ -397,7 +397,7 @@ describe("Quem pensa (its dialog)", () => {
     const api = createFakeApi(state);
     const machines = fakeMachinesOf.get(api);
     machines?.pair({ id: "machine_1", name: "MacBook", os: "linux", mode: "system" });
-    machines?.setSetup({ state: "ready", machineId: "machine_1" });
+    machines?.setSetup({ state: "ready", machineId: "machine_1", since: new Date().toISOString() });
     const base = fakeAgentBrain(ADA_ID);
     const options = base.options.map((o) =>
       o.kind === "codex"

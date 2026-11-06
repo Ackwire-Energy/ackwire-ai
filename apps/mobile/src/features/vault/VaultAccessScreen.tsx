@@ -124,6 +124,7 @@ function AccessForm({
   return (
     <SettingsPage
       title={connectionId ? t("mobile.vault.access.defaultTitle") : t("mobile.vault.access.title")}
+      locked={busy}
       action={{ label: t("common.save"), onPress: save, disabled: !changed || busy }}
     >
       <GroupedFooter>

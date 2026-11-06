@@ -222,6 +222,20 @@ export class ProviderError extends Error {
   }
 }
 
+/** A provider's words on one line, short enough to show. */
+export const shortSaid = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 300);
+
+/**
+ * A 403, with the provider's words when it gave any: a key with no rights and a project that doesn't offer one model
+ * are both 403s, and only the words tell them apart (`keyRefusalOf`).
+ */
+export const deniedError = (code?: string | null, said = "") =>
+  new ProviderError(
+    `provider denied access${said ? ` (${["403", code].filter(Boolean).join(" ")}): ${said}` : ""}`,
+    false,
+    403,
+  );
+
 /** Rough token estimate (≈ 4 characters per token), used only when the provider gave no count. */
 export const estimateTokens = (chars: number) => Math.ceil(chars / 4);
 

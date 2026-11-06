@@ -10,9 +10,11 @@ import type {
   Machine,
   MachineAccount,
   MachineAccountKind,
+  OrgStanding,
 } from "../api/types";
 import { ownSignInReady } from "./ai-accounts";
 import { answersOthers, audienceOf } from "./audience";
+import { type BillingHold, billingHoldOf } from "./billing";
 import { type SetupView, setupPending } from "./computer";
 import { toolOffReason } from "./machines";
 import { can } from "./permissions";
@@ -280,10 +282,38 @@ export type PlanGate =
   | { state: "offline" }
   /** No computer for the agent: none connected (self-host), or the Cloud's said ready and still gave it none. */
   | { state: "missing" }
-  | { state: "unsupported"; reason: BrainUnavailable | "keys" }
+  /** `overdue`: on the Cloud, it should have passed by itself by now and didn't. */
+  | { state: "unsupported"; reason: BrainUnavailable | "keys"; overdue?: boolean }
   /** `owner`: the viewer doesn't own the agent; `computer`: only whoever connected it adds a sign-in there. */
   | { state: "locked"; who: "owner" | "computer" }
+  /** The Cloud's workspace is on a billing hold: it has no computer to sign in on until its agentes.chat plan is active. */
+  | { state: "billing"; hold: BillingHold }
   | { state: "ready" };
+
+/**
+ * How long past its computer being ready a CLI that isn't there may still be on its way. Nothing tells the apps an
+ * install is running: past this, "it changes by itself" would be a guess.
+ */
+export const CLOUD_INSTALL_WAIT_MS = 20 * 60_000;
+
+/** The same for the Cloud's computer offline: a restart takes minutes, so past this it isn't one. */
+export const CLOUD_AWAY_MS = 20 * 60_000;
+
+/** The computer has been ready for longer than an install takes, or nobody knows since when. */
+const installOverdue = (setup: SetupView | null, now: number) =>
+  !setup?.since || now - setup.since >= CLOUD_INSTALL_WAIT_MS;
+
+/** A plan that can't sign in on the Cloud's computer, and whether that is past waiting for (`CLOUD_INSTALL_WAIT_MS`). */
+export const unsupportedGate = (
+  reason: BrainUnavailable | "keys",
+  edition: Edition | null,
+  setup: SetupView | null,
+  now = Date.now(),
+): PlanGate => ({
+  state: "unsupported",
+  reason,
+  ...(edition === "cloud" && reason !== "tool_off" && installOverdue(setup, now) ? { overdue: true } : {}),
+});
 
 /**
  * The gate, first match wins. `brain` is the chosen agent's view (undefined while it loads); `computer` is that
@@ -298,6 +328,8 @@ export function planGate({
   brain,
   computer,
   caughtUp = false,
+  standing,
+  now = Date.now(),
 }: {
   choice: PlanChoice;
   edition: Edition | null;
@@ -305,7 +337,11 @@ export function planGate({
   brain: AgentBrain | undefined;
   computer: AiComputer | undefined;
   caughtUp?: boolean;
+  standing?: Pick<OrgStanding, "state" | "reason"> | null;
+  now?: number;
 }): PlanGate {
+  const hold = edition === "cloud" ? billingHoldOf(standing) : null;
+  if (hold) return { state: "billing", hold };
   if (edition === "cloud" && setupPending(setup)) return { state: "preparing", view: setup };
   if (!brain || !edition) return { state: "loading" };
   if (!brain.canUsePlans) return { state: "locked", who: "owner" };
@@ -313,9 +349,9 @@ export function planGate({
     return edition === "cloud" && !caughtUp ? { state: "preparing", view: null } : { state: "missing" };
   if (!brain.computer.online) return { state: "offline" };
   const option = brain.options.find((o) => o.kind === kindOf(choice));
-  if (!option?.available) return { state: "unsupported", reason: option?.reason ?? "not_installed" };
-  if (!brain.accountsSupported) return { state: "unsupported", reason: "runner_old" };
-  if (isPlanId(choice) && !computer?.keys) return { state: "unsupported", reason: "keys" };
+  if (!option?.available) return unsupportedGate(option?.reason ?? "not_installed", edition, setup, now);
+  if (!brain.accountsSupported) return unsupportedGate("runner_old", edition, setup, now);
+  if (isPlanId(choice) && !computer?.keys) return unsupportedGate("keys", edition, setup, now);
   if (!brain.canManageAccounts) return { state: "locked", who: "computer" };
   return { state: "ready" };
 }
@@ -332,13 +368,19 @@ export function planGateWithoutAgent({
   setup,
   computers,
   machines,
+  standing,
+  now = Date.now(),
 }: {
   choice: PlanChoice;
   edition: Edition | null;
   setup: SetupView | null;
   computers: readonly AiComputer[] | undefined;
   machines?: readonly Pick<Machine, "id" | "pairedBy" | "execAllowed" | "access">[] | undefined;
+  standing?: Pick<OrgStanding, "state" | "reason"> | null;
+  now?: number;
 }): { gate: PlanGate; computer?: AiComputer } {
+  const hold = edition === "cloud" ? billingHoldOf(standing) : null;
+  if (hold) return { gate: { state: "billing", hold } };
   if (edition === "cloud" && setupPending(setup)) return { gate: { state: "preparing", view: setup } };
   if (!computers || !edition) return { gate: { state: "loading" } };
   const kind = kindOf(choice);
@@ -349,15 +391,15 @@ export function planGateWithoutAgent({
   if (!computer) {
     // `canAdd` is also false on a runner too old for accounts: one they connected, or nobody did, is that.
     const old = computers.find((c) => c.mine || machineOf(c)?.pairedBy === null);
-    if (old) return { gate: { state: "unsupported", reason: "runner_old" }, computer: old };
+    if (old) return { gate: unsupportedGate("runner_old", edition, setup, now), computer: old };
     const first = computers[0];
     if (!first) return { gate: edition === "cloud" ? { state: "preparing", view: null } : { state: "missing" } };
     return { gate: { state: "locked", who: "computer" }, computer: first };
   }
   if (!computer.online) return { gate: { state: "offline" }, computer };
   if (computer.brains[kind] !== true)
-    return { gate: { state: "unsupported", reason: brainOffReason(machineOf(computer), kind) }, computer };
-  if (isPlanId(choice) && !computer.keys) return { gate: { state: "unsupported", reason: "keys" }, computer };
+    return { gate: unsupportedGate(brainOffReason(machineOf(computer), kind), edition, setup, now), computer };
+  if (isPlanId(choice) && !computer.keys) return { gate: unsupportedGate("keys", edition, setup, now), computer };
   return { gate: { state: "ready" }, computer };
 }
 
@@ -399,7 +441,8 @@ export const ownSignInFor = (choice: PlanChoice, brain: AgentBrain | undefined, 
   !isPlanId(choice) && ownSignInReady(brain, computer, kindOf(choice));
 
 /** A plan tile reads dimmed when its plan can't sign in there at all (it still opens its panel, which says why). */
-export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.state === "unsupported";
+export const gateDims = (gate: PlanGate) =>
+  gate.state === "missing" || gate.state === "unsupported" || gate.state === "billing";
 
 /**
  * The gate passes by itself, with nothing for the person to do: the computer reconnecting, or (the Cloud's, which is
@@ -407,7 +450,8 @@ export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.sta
  * A program not allowed there is ours to allow, and all of self-host's wait for someone (their computers are people's own).
  */
 export const gateRechecks = (gate: PlanGate, edition: Edition | null) =>
-  gate.state === "offline" || (edition === "cloud" && gate.state === "unsupported" && gate.reason !== "tool_off");
+  gate.state === "offline" ||
+  (edition === "cloud" && gate.state === "unsupported" && gate.reason !== "tool_off" && !gate.overdue);
 
 /** The Cloud's line per reason a plan can't sign in on the workspace's computer (`aiAccounts.connect.needsCloud.*`). */
 const CLOUD_REASON = {
@@ -436,17 +480,22 @@ export function gateLine(
     kind,
     computer,
     machine,
+    now = Date.now(),
   }: {
     gate: PlanGate;
     edition: Edition | null;
     kind: MachineAccountKind;
     computer: string;
-    machine?: Pick<Machine, "os" | "mode"> | null;
+    machine?: (Pick<Machine, "os" | "mode"> & Partial<Pick<Machine, "lastSeenAt">>) | null;
+    now?: number;
   },
 ): { text: string; rechecks: boolean } | null {
   const rechecks = gateRechecks(gate, edition);
   const program = t(`brain.card.${kind}`);
-  if (gate.state === "offline")
+  if (gate.state === "offline") {
+    const seen = machine?.lastSeenAt ? Date.parse(machine.lastSeenAt) : null;
+    if (edition === "cloud" && seen !== null && now - seen >= CLOUD_AWAY_MS)
+      return { text: t("aiAccounts.connect.needsCloud.away", { computer }), rechecks };
     return {
       text:
         edition === "cloud"
@@ -454,9 +503,16 @@ export function gateLine(
           : t("brain.offline", { computer }),
       rechecks,
     };
+  }
   if (gate.state !== "unsupported") return null;
   if (edition === "cloud")
-    return { text: t(`aiAccounts.connect.needsCloud.${CLOUD_REASON[gate.reason]}`, { computer, program }), rechecks };
+    return {
+      text: t(`aiAccounts.connect.needsCloud.${gate.overdue ? "stuck" : CLOUD_REASON[gate.reason]}`, {
+        computer,
+        program,
+      }),
+      rechecks,
+    };
   if (gate.reason === "keys") return { text: t("aiAccounts.connect.needs.keys"), rechecks };
   if (gate.reason === "tool_off") {
     const off = toolOffReason(machine, kind);

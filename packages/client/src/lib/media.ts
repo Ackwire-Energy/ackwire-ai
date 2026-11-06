@@ -16,6 +16,7 @@ import type {
   StickerMood,
 } from "../api/types";
 import { agentGrammar } from "./grammar";
+import { plainInline } from "./markdown";
 import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
 /**
@@ -213,12 +214,16 @@ export function textOrMedia(t: TFunction, body: string, meta: Meta): string {
 export const hitText = (t: TFunction, hit: { snippet: string; mediaKind?: MediaKind }) =>
   hit.snippet || (hit.mediaKind ? mediaWord(t, hit.mediaKind) : "");
 
-/** A quote's line: its excerpt, or the word for what it quotes when that was a GIF or a sticker. */
+/**
+ * A quote's line: its excerpt without Markdown's marks (the excerpt is one line, so a heading's or a list's opens it),
+ * else the word for what it quotes.
+ */
 export function quoteText(t: TFunction, reply: Pick<ReplyRef, "excerpt" | "media">): string {
   const kind = mediaKindOf(reply.media);
   if (kind === "voice") return mediaWord(t, kind);
-  if (reply.excerpt.trim()) return reply.excerpt;
-  return kind ? mediaWord(t, kind) : reply.excerpt;
+  const words = plainInline(reply.excerpt.trim().replace(/^(#{1,6}|[-*+>]|\d+\.)\s+/, ""));
+  if (words) return words;
+  return kind ? mediaWord(t, kind) : t("channel.quoteNoWords");
 }
 
 /** A mood's name, as the picker and a sticker's name say it ("comemorando"). */

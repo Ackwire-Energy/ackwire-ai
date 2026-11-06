@@ -286,7 +286,7 @@ export function wikiLinksIn(text: string): string[] {
 const INLINE_ALL = new RegExp(INLINE.source, "g");
 
 /** A line's words without its inline marks: links and wiki links as their labels, an image as its alt text. */
-const plainInline = (text: string): string =>
+export const plainInline = (text: string): string =>
   text
     .replace(/!(?=\[)/g, "")
     .replace(INLINE_ALL, (tok, code, bold, em, link, _url, wiki, strike) =>

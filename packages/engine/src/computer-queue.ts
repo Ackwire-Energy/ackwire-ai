@@ -16,11 +16,11 @@ import { TtlCache } from "./cache";
 import { NotFoundError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { getMachine } from "./machines";
-import { requirePermission } from "./organizations";
+import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { replyThreadOf } from "./runs";
 
-const { agentRuns, agents, messages } = schema;
+const { agentRuns, agents, channelMembers, channels, messages } = schema;
 
 /**
  * The line for a shared computer's room (ADR 0032, "Calm waits" and "Calm wakes"). The runner admits a turn only
@@ -198,9 +198,19 @@ export type QueuePurpose =
 export interface QueueWhere {
   channelId: string;
   threadId: string | null;
+  /** Two agents' private conversation, said only to who may see that work. */
+  agents: boolean;
 }
 
-export interface QueueWorking {
+/** What the caller may do with a row of the line: everyone reads the line, these depend on who reads it. */
+export interface QueueAccess {
+  /** It sees this run in the task manager (`seesRunSql`): the row opens it. */
+  canOpen: boolean;
+  /** It may stop it (who asked, the agent's owner, an admin; the server checks again). */
+  canStop: boolean;
+}
+
+export interface QueueWorking extends QueueAccess {
   runId: string;
   agentId: string;
   purpose: QueuePurpose;
@@ -209,9 +219,11 @@ export interface QueueWorking {
   startedAt: string;
   /** Its start plus the agent's typical computer turn, never sooner than 30 s from now; null with no basis. */
   estimatedEndAt: string | null;
+  /** Past its agent's typical turn: there is no honest end to give (`estimatedEndAt` is null). */
+  overdue: boolean;
 }
 
-export interface QueueWaiting {
+export interface QueueWaiting extends QueueAccess {
   runId: string;
   agentId: string;
   purpose: QueuePurpose;
@@ -232,6 +244,28 @@ export interface ComputerQueue {
   waiting: QueueWaiting[];
 }
 
+/**
+ * Two agents' private conversation (or a routine's room): `isAgentOnlyDm` for a select. No person is a member, so
+ * membership can't say who sees the work there.
+ */
+const agentsOnlySql = (kind: SQL, dmKey: SQL) =>
+  sql<boolean>`(${kind} = 'dm' and ${dmKey} is not null and ${dmKey} not like '%u:%')`;
+
+/**
+ * Who sees a run's work, for a select naming its columns: the members of its conversation and, for work no person is
+ * a member of (a routine's background run, two agents' private conversation), admins (`manage_agents`) and the agent's
+ * owner. Other people's DMs stay theirs. The task manager, a task's steps and the rows of the line read it. Never
+ * NULL: an agent with no owner would make it so, and `not` of that drops the run from the hidden counts too.
+ */
+export const seesRunSql = (
+  run: { channelId: SQL; kind: SQL; dmKey: SQL; background: SQL; ownerUserId: SQL },
+  userId: string,
+  orgId: string,
+  manages: boolean,
+) => sql<boolean>`coalesce(exists (select 1 from ${channelMembers} cm
+    where cm.org_id = ${orgId}::uuid and cm.channel_id = ${run.channelId} and cm.user_id = ${userId})
+  or ((${run.background} or ${agentsOnlySql(run.kind, run.dmKey)}) and (${manages} or ${run.ownerUserId} = ${userId})), false)`;
+
 /** A running turn's estimated end is never sooner than this from now: an estimate never reads as "any second". */
 export const QUEUE_END_FLOOR_MS = 30_000;
 /** How many of an agent's latest finished computer turns its typical duration is read from. */
@@ -246,20 +280,23 @@ export interface TypicalTurns {
 /**
  * When each running turn should end and each waiting one start, by simulating the computer's slots: each running
  * turn frees one at its expected end, the line takes them in order (the soonest free slot first), and an agent's turn
- * starts at least `ROOM_ASK_SPACING_MS` after the previous ask. A slot with no basis (an agent with no history in an
- * org with none) frees at an unknown time, and so does every turn after it. Pure, for a fixed clock.
+ * starts at least `ROOM_ASK_SPACING_MS` after the previous ask. A turn past its typical length (`overdue`) has no end
+ * to give, and neither has one with no basis (an agent with no history in an org with none): its slot frees at an
+ * unknown time, and so does every turn after it. Pure, for a fixed clock.
  */
 export function estimateQueue(
   now: number,
   working: readonly { agentId: string; startedAt: number }[],
   waiting: readonly { agentId: string; people: boolean }[],
   typical: TypicalTurns,
-): { ends: (number | null)[]; starts: (number | null)[]; after: string[][] } {
+): { ends: (number | null)[]; overdue: boolean[]; starts: (number | null)[]; after: string[][] } {
   const typicalOf = (agentId: string) => typical.byAgent[agentId] ?? typical.org;
-  const ends = working.map((w) => {
+  const expected = working.map((w) => {
     const d = typicalOf(w.agentId);
-    return d === null ? null : Math.max(w.startedAt + d, now + QUEUE_END_FLOOR_MS);
+    return d === null ? null : w.startedAt + d;
   });
+  const overdue = expected.map((end) => end !== null && end <= now);
+  const ends = expected.map((end, i) => (end === null || overdue[i] ? null : Math.max(end, now + QUEUE_END_FLOOR_MS)));
   // Unknown ends go last, the longest running of them first.
   const slots = working.map((w, i) => ({
     agentId: w.agentId,
@@ -290,7 +327,7 @@ export function estimateQueue(
     const d = typicalOf(w.agentId);
     slots[0] = { agentId: w.agentId, end: d === null ? Number.POSITIVE_INFINITY : start + d, since: start };
   });
-  return { ends, starts, after };
+  return { ends, overdue, starts, after };
 }
 
 // ponytail: per-process cache, a minute stale at most; the read touches at most 300 finished runs' transcripts.
@@ -358,7 +395,7 @@ export async function computerQueue(
   machineId: string,
   now = Date.now(),
 ): Promise<ComputerQueue> {
-  await requirePermission(db, actorId, orgId, "read");
+  const manages = can(await requirePermission(db, actorId, orgId, "read"), "manage_agents");
   const machine = await getMachine(db, orgId, machineId);
   if (!machine) throw new NotFoundError("Computer not found", "machine.not_found");
   const cols = {
@@ -373,14 +410,32 @@ export async function computerQueue(
     authorUserId: messages.authorUserId,
     authorAgentId: messages.authorAgentId,
     viaRoutine: sql<unknown>`${messages.meta}->'routine'`,
+    ownerUserId: agents.ownerUserId,
+    sees: seesRunSql(
+      {
+        channelId: sql`${agentRuns.channelId}`,
+        kind: sql`${channels.kind}`,
+        dmKey: sql`${channels.dmKey}`,
+        background: sql`${agentRuns.background}`,
+        ownerUserId: sql`${agents.ownerUserId}`,
+      },
+      actorId,
+      orgId,
+      manages,
+    ),
+    agentsOnly: agentsOnlySql(sql`${channels.kind}`, sql`${channels.dmKey}`),
   };
   const trigger = and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.triggerMessageId));
+  const lineRows = <T extends object>(fields: T) =>
+    db
+      .select({ ...cols, ...fields })
+      .from(agentRuns)
+      .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+      .leftJoin(channels, eq(channels.id, agentRuns.channelId))
+      .leftJoin(messages, trigger);
   const askAt = sql<string>`(${agentRuns.transcript}->'roomAsk'->>'at')::bigint`;
   const [workingRows, waitingRows, typical] = await Promise.all([
-    db
-      .select({ ...cols, askAt })
-      .from(agentRuns)
-      .leftJoin(messages, trigger)
+    lineRows({ askAt })
       .where(
         and(
           eq(agentRuns.orgId, orgId),
@@ -390,10 +445,7 @@ export async function computerQueue(
         ),
       )
       .orderBy(askAt),
-    db
-      .select({ ...cols, people: sql<boolean>`${peopleSql}` })
-      .from(agentRuns)
-      .leftJoin(messages, trigger)
+    lineRows({ people: sql<boolean>`${peopleSql}` })
       .where(and(eq(agentRuns.orgId, orgId), shownInLine(machineId)))
       .orderBy(rankSql(now), sinceSql, agentRuns.id),
     typicalTurns(db, orgId),
@@ -401,9 +453,20 @@ export async function computerQueue(
   const working = workingRows.map((r) => ({ ...r, startedAt: Number(r.askAt) }));
   const est = estimateQueue(now, working, waitingRows, typical);
   const iso = (ms: number | null | undefined) => (ms == null ? null : new Date(ms).toISOString());
-  const where = (r: { channelId: string; threadRootId: string; triggerMessageId: string }) => ({
+  const where = (r: {
+    channelId: string;
+    threadRootId: string;
+    triggerMessageId: string;
+    sees: boolean;
+    agentsOnly: boolean;
+  }) => ({
     channelId: r.channelId,
     threadId: replyThreadOf(r),
+    agents: r.sees && r.agentsOnly,
+  });
+  const access = (r: { sees: boolean; ownerUserId: string | null; authorUserId: string | null }) => ({
+    canOpen: r.sees,
+    canStop: manages || r.ownerUserId === actorId || r.authorUserId === actorId,
   });
   return {
     machineId,
@@ -415,6 +478,8 @@ export async function computerQueue(
       where: where(r),
       startedAt: new Date(r.startedAt).toISOString(),
       estimatedEndAt: iso(est.ends[i]),
+      overdue: est.overdue[i] ?? false,
+      ...access(r),
     })),
     waiting: waitingRows.map((r, i) => ({
       runId: r.runId,
@@ -425,6 +490,7 @@ export async function computerQueue(
       position: i + 1,
       estimatedStartAt: iso(est.starts[i]),
       after: est.after[i] ?? [],
+      ...access(r),
     })),
   };
 }

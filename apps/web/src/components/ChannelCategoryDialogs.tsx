@@ -19,6 +19,7 @@ import {
   Field,
   Icon,
   Input,
+  Locked,
   OptionList,
   Select,
 } from "@agenteschat/ui";
@@ -125,59 +126,61 @@ export function NewCategoryDialog({
           submit();
         }}
       >
-        <DialogBody className="channel-category__fields">
-          <Field
-            label={t("channelCategories.name")}
-            id="category-name"
-            help={t("channelCategories.newCategoryHelp")}
-            error={
-              showError && error === "empty"
-                ? t("channelCategories.nameEmpty")
-                : showError && error === "taken"
-                  ? t("channelCategories.nameTaken", { name: name.trim() })
-                  : undefined
-            }
-          >
-            <Input
-              ref={nameField}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("channelCategories.namePlaceholder")}
-              maxLength={NAME_MAX}
-              autoComplete="off"
-            />
-          </Field>
-          {!nameOnly && <span className="ac-field__label">{t("channelCategories.channels")}</span>}
-        </DialogBody>
-        {!nameOnly && (
-          <DialogSearchList
-            query={q}
-            onQueryChange={setQ}
-            searchLabel={t("channelCategories.channelsSearch")}
-            searchPlaceholder={t("channelCategories.channelsSearch")}
-            isEmpty={list.length === 0}
-            emptyText={t("channelCategories.channelsEmpty", { q })}
-          >
-            {list.map((c) => {
-              const id = `category-pick-${c.id}`;
-              const where = c.categoryId ? categoryName.get(c.categoryId) : undefined;
-              return (
-                <label key={c.id} htmlFor={id} className="scope-row">
-                  <Checkbox id={id} checked={picked.has(c.id)} onCheckedChange={(on) => toggle(c.id, on)} />
-                  <span className="scope-row__text">
-                    <span className="channel-category__channel">
-                      <Icon name="channel" size={16} />
-                      {c.name}
+        <Locked when={create.isPending}>
+          <DialogBody className="channel-category__fields">
+            <Field
+              label={t("channelCategories.name")}
+              id="category-name"
+              help={t("channelCategories.newCategoryHelp")}
+              error={
+                showError && error === "empty"
+                  ? t("channelCategories.nameEmpty")
+                  : showError && error === "taken"
+                    ? t("channelCategories.nameTaken", { name: name.trim() })
+                    : undefined
+              }
+            >
+              <Input
+                ref={nameField}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t("channelCategories.namePlaceholder")}
+                maxLength={NAME_MAX}
+                autoComplete="off"
+              />
+            </Field>
+            {!nameOnly && <span className="ac-field__label">{t("channelCategories.channels")}</span>}
+          </DialogBody>
+          {!nameOnly && (
+            <DialogSearchList
+              query={q}
+              onQueryChange={setQ}
+              searchLabel={t("channelCategories.channelsSearch")}
+              searchPlaceholder={t("channelCategories.channelsSearch")}
+              isEmpty={list.length === 0}
+              emptyText={t("channelCategories.channelsEmpty", { q })}
+            >
+              {list.map((c) => {
+                const id = `category-pick-${c.id}`;
+                const where = c.categoryId ? categoryName.get(c.categoryId) : undefined;
+                return (
+                  <label key={c.id} htmlFor={id} className="scope-row">
+                    <Checkbox id={id} checked={picked.has(c.id)} onCheckedChange={(on) => toggle(c.id, on)} />
+                    <span className="scope-row__text">
+                      <span className="channel-category__channel">
+                        <Icon name="channel" size={16} />
+                        {c.name}
+                      </span>
+                      <span className="small muted">
+                        {where ? t("channelCategories.inCategory", { name: where }) : t("channelCategories.noCategory")}
+                      </span>
                     </span>
-                    <span className="small muted">
-                      {where ? t("channelCategories.inCategory", { name: where }) : t("channelCategories.noCategory")}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-          </DialogSearchList>
-        )}
+                  </label>
+                );
+              })}
+            </DialogSearchList>
+          )}
+        </Locked>
         <DialogFooter bar>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" loading={create.isPending}>
@@ -237,17 +240,19 @@ export function RenameCategoryDialog({
           );
         }}
       >
-        <DialogBody>
-          <Field label={t("channelCategories.name")} id="category-rename" error={error}>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={NAME_MAX}
-              autoComplete="off"
-              autoFocus
-            />
-          </Field>
-        </DialogBody>
+        <Locked when={rename.isPending}>
+          <DialogBody>
+            <Field label={t("channelCategories.name")} id="category-rename" error={error}>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={NAME_MAX}
+                autoComplete="off"
+                autoFocus
+              />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" disabled={Boolean(error)} loading={rename.isPending}>
@@ -396,51 +401,53 @@ export function MoveChannelDialog({
             submit();
           }}
         >
-          <DialogSearchList
-            query={q}
-            onQueryChange={(v) => {
-              setQ(v);
-              // Typing picks the first match, so Enter moves there.
-              const first = all.find((c) => v.trim() && c.name.toLowerCase().includes(v.trim().toLowerCase()));
-              if (first) setDest(first.id);
-            }}
-            searchLabel={t("channelCategories.moveSearch")}
-            searchPlaceholder={t("channelCategories.moveSearch")}
-            isEmpty={false}
-            emptyText=""
-          >
-            {shown.length > 0 ? (
-              <OptionList
-                aria-label={t("channelCategories.moveSearch")}
-                value={dest}
-                onValueChange={setDest}
-                options={shown.map((c) => ({
-                  value: c.id,
-                  title: c.name,
-                  tag: c.id === current ? t("channelCategories.moveNow") : undefined,
-                  description: lineOf(c.id),
-                }))}
-              />
-            ) : (
-              <p className="ac-dialog__empty">{t("channelCategories.moveEmpty", { q })}</p>
-            )}
-            {canCreate && (
-              <button
-                type="button"
-                className="member-row member-row--add channel-category__add"
-                onClick={() => setCreating(true)}
-              >
-                <span className="member-row__plus" aria-hidden="true">
-                  <Icon name="plus" />
-                </span>
-                <span>
-                  {needle && shown.length === 0
-                    ? t("channelCategories.moveCreate", { name: q.trim() })
-                    : t("channelCategories.newCategory")}
-                </span>
-              </button>
-            )}
-          </DialogSearchList>
+          <Locked when={place.isPending}>
+            <DialogSearchList
+              query={q}
+              onQueryChange={(v) => {
+                setQ(v);
+                // Typing picks the first match, so Enter moves there.
+                const first = all.find((c) => v.trim() && c.name.toLowerCase().includes(v.trim().toLowerCase()));
+                if (first) setDest(first.id);
+              }}
+              searchLabel={t("channelCategories.moveSearch")}
+              searchPlaceholder={t("channelCategories.moveSearch")}
+              isEmpty={false}
+              emptyText=""
+            >
+              {shown.length > 0 ? (
+                <OptionList
+                  aria-label={t("channelCategories.moveSearch")}
+                  value={dest}
+                  onValueChange={setDest}
+                  options={shown.map((c) => ({
+                    value: c.id,
+                    title: c.name,
+                    tag: c.id === current ? t("channelCategories.moveNow") : undefined,
+                    description: lineOf(c.id),
+                  }))}
+                />
+              ) : (
+                <p className="ac-dialog__empty">{t("channelCategories.moveEmpty", { q })}</p>
+              )}
+              {canCreate && (
+                <button
+                  type="button"
+                  className="member-row member-row--add channel-category__add"
+                  onClick={() => setCreating(true)}
+                >
+                  <span className="member-row__plus" aria-hidden="true">
+                    <Icon name="plus" />
+                  </span>
+                  <span>
+                    {needle && shown.length === 0
+                      ? t("channelCategories.moveCreate", { name: q.trim() })
+                      : t("channelCategories.newCategory")}
+                  </span>
+                </button>
+              )}
+            </DialogSearchList>
+          </Locked>
           <DialogFooter bar>
             <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
             <Button type="submit" variant="primary" disabled={same} loading={place.isPending}>

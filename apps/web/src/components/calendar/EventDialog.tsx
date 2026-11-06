@@ -9,6 +9,7 @@ import {
   DialogFooter,
   Field,
   Input,
+  Locked,
   RecurrencePicker,
   type RecurrenceRule,
   Switch,
@@ -174,90 +175,92 @@ export function EventDialog({
           submit();
         }}
       >
-        <DialogBody>
-          <Field label={t("calendar.form.title")} id="ev-title">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t("calendar.form.titlePlaceholder")}
-            />
-          </Field>
-          <label className="cal-form__switch" htmlFor="ev-allday">
-            <Switch id="ev-allday" checked={allDay} onCheckedChange={setAllDay} />
-            <span>{t("calendar.form.allDay")}</span>
-          </label>
-          <div className="cal-form__when">
-            <Field label={t("calendar.form.startDate")} id="ev-sd">
-              <DatePicker
-                value={startDay}
-                onChange={(v) => {
-                  // The end keeps the same length.
-                  const shift = at(v, "00:00").getTime() - at(startDay, "00:00").getTime();
-                  setStartDay(v);
-                  setEndDay(toYmd(new Date(at(endDay, "00:00").getTime() + shift)));
-                }}
-                locale={i18n.language}
-                labels={dateLabels}
+        <Locked when={saving}>
+          <DialogBody>
+            <Field label={t("calendar.form.title")} id="ev-title">
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={t("calendar.form.titlePlaceholder")}
               />
             </Field>
-            {!allDay && (
-              <Field label={t("calendar.form.startTime")} id="ev-st">
-                <TimeSelect value={startTime} onChange={setStartTime} />
+            <label className="cal-form__switch" htmlFor="ev-allday">
+              <Switch id="ev-allday" checked={allDay} onCheckedChange={setAllDay} />
+              <span>{t("calendar.form.allDay")}</span>
+            </label>
+            <div className="cal-form__when">
+              <Field label={t("calendar.form.startDate")} id="ev-sd">
+                <DatePicker
+                  value={startDay}
+                  onChange={(v) => {
+                    // The end keeps the same length.
+                    const shift = at(v, "00:00").getTime() - at(startDay, "00:00").getTime();
+                    setStartDay(v);
+                    setEndDay(toYmd(new Date(at(endDay, "00:00").getTime() + shift)));
+                  }}
+                  locale={i18n.language}
+                  labels={dateLabels}
+                />
               </Field>
-            )}
-            <Field label={t("calendar.form.endDate")} id="ev-ed">
-              <DatePicker
-                value={endDay}
-                onChange={setEndDay}
-                locale={i18n.language}
-                labels={dateLabels}
-                min={startDay}
-              />
-            </Field>
-            {!allDay && (
-              <Field
-                label={t("calendar.form.endTime")}
-                id="ev-et"
-                error={timeOk ? undefined : t("calendar.form.timeInvalid")}
-              >
-                <TimeSelect value={endTime} onChange={setEndTime} />
-              </Field>
-            )}
-          </div>
-          <div className="cal-form__repeat">
-            <span className="ac-field__label">{t("calendar.form.repeat")}</span>
-            <RecurrencePicker
-              value={syncedRule}
-              onChange={setRule}
-              labels={recurrenceLabels(t, i18n.language, syncedRule)}
-              locale={i18n.language}
-              renderTimezone={(value, change) => (
-                <ZoneSelect value={value} onChange={change} aria-label={t("recurrence.timezone")} />
+              {!allDay && (
+                <Field label={t("calendar.form.startTime")} id="ev-st">
+                  <TimeSelect value={startTime} onChange={setStartTime} />
+                </Field>
               )}
-              summary={syncedRule.freq === "once" ? undefined : ruleSentence(t, i18n.language, syncedRule)}
-              upcoming={syncedRule.freq === "once" ? undefined : upcomingLabels(i18n.language, syncedRule)}
-              hideTimes
+              <Field label={t("calendar.form.endDate")} id="ev-ed">
+                <DatePicker
+                  value={endDay}
+                  onChange={setEndDay}
+                  locale={i18n.language}
+                  labels={dateLabels}
+                  min={startDay}
+                />
+              </Field>
+              {!allDay && (
+                <Field
+                  label={t("calendar.form.endTime")}
+                  id="ev-et"
+                  error={timeOk ? undefined : t("calendar.form.timeInvalid")}
+                >
+                  <TimeSelect value={endTime} onChange={setEndTime} />
+                </Field>
+              )}
+            </div>
+            <div className="cal-form__repeat">
+              <span className="ac-field__label">{t("calendar.form.repeat")}</span>
+              <RecurrencePicker
+                value={syncedRule}
+                onChange={setRule}
+                labels={recurrenceLabels(t, i18n.language, syncedRule)}
+                locale={i18n.language}
+                renderTimezone={(value, change) => (
+                  <ZoneSelect value={value} onChange={change} aria-label={t("recurrence.timezone")} />
+                )}
+                summary={syncedRule.freq === "once" ? undefined : ruleSentence(t, i18n.language, syncedRule)}
+                upcoming={syncedRule.freq === "once" ? undefined : upcomingLabels(i18n.language, syncedRule)}
+                hideTimes
+              />
+            </div>
+            <PeoplePicker
+              label={t("calendar.form.participants")}
+              searchLabel={t("calendar.form.participantsSearch")}
+              hint={t("calendar.form.participantsHelp")}
+              emptyText={() => t("calendar.form.participantsEmpty")}
+              selected={picked}
+              onChange={setPicked}
             />
-          </div>
-          <PeoplePicker
-            label={t("calendar.form.participants")}
-            searchLabel={t("calendar.form.participantsSearch")}
-            hint={t("calendar.form.participantsHelp")}
-            emptyText={() => t("calendar.form.participantsEmpty")}
-            selected={picked}
-            onChange={setPicked}
-          />
-          <Field label={t("calendar.form.location")} id="ev-loc">
-            <Input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder={t("calendar.form.locationPlaceholder")}
-            />
-          </Field>
-          <Field label={t("calendar.form.description")} id="ev-desc">
-            <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </Field>
-        </DialogBody>
+            <Field label={t("calendar.form.location")} id="ev-loc">
+              <Input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder={t("calendar.form.locationPlaceholder")}
+              />
+            </Field>
+            <Field label={t("calendar.form.description")} id="ev-desc">
+              <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("calendar.form.cancel")}

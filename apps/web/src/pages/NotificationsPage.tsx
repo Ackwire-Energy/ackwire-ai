@@ -6,6 +6,7 @@ import {
   useApi,
   useApproval,
   useApprovals,
+  useApprovalsDeciding,
   useChannels,
   useNotificationAction,
   useNotificationCount,
@@ -52,6 +53,7 @@ import {
   Icon,
   type IconName,
   Kbd,
+  Locked,
   Mention,
   Menu,
   MenuHeading,
@@ -291,45 +293,47 @@ function Composer({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: clicks inside the composer stay out of the row
     <div className="nt-cmp" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-      <textarea
-        id={`nt-ta-${id}`}
-        ref={ref}
-        rows={2}
-        value={draft}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        onChange={(e) => onDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            onSend();
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            onCancel();
-          }
-        }}
-      />
-      <div className="nt-cmp__row">
-        <span className="nt-cmp__hint">
-          <Kbd>{modKey()}</Kbd>
-          <Kbd>↵</Kbd> {t("notifications.composer.sends")} · <Kbd>{t("notifications.composer.escKey")}</Kbd>{" "}
-          {t("notifications.composer.closes")}
-        </span>
-        <span className="nt-grow" />
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          {t("notifications.composer.cancel")}
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          icon="arrowUp"
-          loading={sending}
-          disabled={sending || !draft.trim()}
-          onClick={onSend}
-        >
-          {t("notifications.composer.send")}
-        </Button>
-      </div>
+      <Locked when={sending}>
+        <textarea
+          id={`nt-ta-${id}`}
+          ref={ref}
+          rows={2}
+          value={draft}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          onChange={(e) => onDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              onSend();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              onCancel();
+            }
+          }}
+        />
+        <div className="nt-cmp__row">
+          <span className="nt-cmp__hint">
+            <Kbd>{modKey()}</Kbd>
+            <Kbd>↵</Kbd> {t("notifications.composer.sends")} · <Kbd>{t("notifications.composer.escKey")}</Kbd>{" "}
+            {t("notifications.composer.closes")}
+          </span>
+          <span className="nt-grow" />
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            {t("notifications.composer.cancel")}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            icon="arrowUp"
+            loading={sending}
+            disabled={!draft.trim()}
+            onClick={onSend}
+          >
+            {t("notifications.composer.send")}
+          </Button>
+        </div>
+      </Locked>
     </div>
   );
 }
@@ -924,51 +928,56 @@ function ApprovalActs({
   const [refusing, setRefusing] = useState(false);
   const a = approval.data;
   const items = a?.messageId ? approvalCardItems(approvals.data, a.messageId, a) : [];
+  const deciding = useApprovalsDeciding(org.id, [approvalId, ...items.map((i) => i.id)]);
   // Several on its card: decided together here, one by one in the conversation or Aprovações.
   if (approveAllScope(items).ids.length > 1) {
     return (
-      <div className="nt-wacts ac-acts">
-        <ApproveAll items={items} />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen();
-          }}
-        >
-          {t("notifications.wait.openApprovals")}
-        </Button>
-        {tail}
-      </div>
+      <Locked when={deciding}>
+        <div className="nt-wacts ac-acts">
+          <ApproveAll items={items} />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen();
+            }}
+          >
+            {t("notifications.wait.openApprovals")}
+          </Button>
+          {tail}
+        </div>
+      </Locked>
     );
   }
   if (a?.canDecide && a.status === "pending") {
     if (refusing) return <RefuseBox approval={a} agent={agent} onCancel={() => setRefusing(false)} />;
     return (
-      <div className="nt-wacts ac-acts">
-        <ApproveButton approval={a} />
-        <Button
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            setRefusing(true);
-          }}
-        >
-          {t("approval.refuse")}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen();
-          }}
-        >
-          {t("notifications.wait.openApprovals")}
-        </Button>
-        {tail}
-      </div>
+      <Locked when={deciding}>
+        <div className="nt-wacts ac-acts">
+          <ApproveButton approval={a} />
+          <Button
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              setRefusing(true);
+            }}
+          >
+            {t("approval.refuse")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen();
+            }}
+          >
+            {t("notifications.wait.openApprovals")}
+          </Button>
+          {tail}
+        </div>
+      </Locked>
     );
   }
   return (

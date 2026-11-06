@@ -220,7 +220,7 @@ describe("the pair row before the reply that asked (ConsultPairRow)", () => {
     await open(withTalk(withAsk([c], true), c));
     const r = row() as HTMLElement;
     expect(r.querySelector(".consult-pair__word")).toBeNull();
-    expect(r.querySelector(".consult-pair__time")?.textContent).toBe("35 s");
+    expect(r.querySelector(".consult-pair__time")?.textContent).toBe("levou 35 s");
     // The answer shows nowhere in the channel: the `consult_reply` notice folds away (no second row, no line).
     expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
     expect(document.querySelector("main")?.textContent).not.toContain("subiu 6 pb");
@@ -444,7 +444,7 @@ describe("the pair row before the reply that asked (ConsultPairRow)", () => {
     const r = row() as HTMLElement;
     expect(r.querySelector(".consult-pair__word")).toBeNull();
     expect(r.querySelector(".consult-pair__row--live")).toBeNull();
-    expect(r.querySelector(".consult-pair__time")?.textContent).toMatch(/^\d+ s$/);
+    expect(r.querySelector(".consult-pair__time")?.textContent).toMatch(/^levou \d+ s$/);
     expect(r.textContent).not.toContain("subiu 6 pb");
   });
 });

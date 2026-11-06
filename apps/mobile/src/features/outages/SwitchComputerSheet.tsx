@@ -14,6 +14,7 @@ import {
   GroupedList,
   GroupedRow,
   LineIcon,
+  Locked,
   ProviderLogo,
   SheetScreen,
   Text,
@@ -129,7 +130,7 @@ function SwitchForm({
       </Text>
 
       {/* Settings' groups: each header on its group and each note under it, at the groups' own spacing. */}
-      <View>
+      <Locked when={move.isPending}>
         <GroupedHeader>{t("mobile.outage.sheet.where")}</GroupedHeader>
         <GroupedList>
           {options.map((x) => {
@@ -172,14 +173,15 @@ function SwitchForm({
           ))}
         </GroupedList>
         <GroupedFooter>{t("mobile.outage.sheet.hint", { computer: o.name })}</GroupedFooter>
-      </View>
+      </Locked>
 
       <View style={styles.acts}>
         <Button
           variant="primary"
           wide
           label={t("mobile.outage.sheet.submit", { count })}
-          disabled={!target || count === 0 || move.isPending}
+          loading={move.isPending}
+          disabled={!target || count === 0}
           onPress={submit}
         />
         <Button variant="ghost" wide label={t("mobile.outage.sheet.later")} onPress={onClose} />

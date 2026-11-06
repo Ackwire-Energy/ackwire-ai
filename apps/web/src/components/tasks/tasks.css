@@ -265,7 +265,7 @@
   gap: 6px;
   min-width: 0;
 }
-.tm-saywhy > .tm-why {
+.tm-saywhy .tm-why {
   flex: 1;
   min-width: 0;
 }
@@ -370,6 +370,7 @@
 .tm-panel__foot {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 12px 18px;
@@ -377,6 +378,13 @@
 }
 .tm-panel__foot > .tm-panel__stop {
   margin-left: auto;
+}
+.tm-panel__note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
 }
 
 /* An agent's tasks beside its DM (the thread's panel): three wells, then a card per task. */

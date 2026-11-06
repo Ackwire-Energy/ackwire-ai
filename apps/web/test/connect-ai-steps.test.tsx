@@ -864,7 +864,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const where = { machineId: "managed_1", name: "Computador da Acme", online: true };
     const { api, dialog, tile, services } = await connect({
       computers: [workspace],
-      setup: { state: "ready", machineId: "managed_1" },
+      setup: { state: "ready", machineId: "managed_1", since: new Date().toISOString() },
       brain: { computer: where, options: options(false) },
     });
     await click(tile("ChatGPT"));
@@ -887,6 +887,22 @@ describe("Conectar uma IA: one picker, plans first", () => {
     await settle(6);
     expect(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })).toBeTruthy();
     expect(panel.textContent).not.toContain("sendo instalado");
+  });
+
+  test("on the Cloud, a program that never arrived: no promise of an install, and a key is the way on", async () => {
+    const options = fakeAgentBrain(ADA_ID).options.map((o) =>
+      o.kind === "codex" ? { ...o, available: false, reason: "not_installed" as const } : o,
+    );
+    const { dialog, tile } = await connect({
+      computers: [{ ...MAC, machineId: "managed_1", name: "Computador da Acme" }],
+      setup: { state: "ready", machineId: "managed_1", since: "2026-01-01T00:00:00.000Z" },
+      brain: { computer: { machineId: "managed_1", name: "Computador da Acme", online: true }, options },
+    });
+    await click(tile("ChatGPT"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(panel.textContent).toContain("não vai mudar sozinho");
+    expect(panel.textContent).not.toContain("sendo instalado");
+    expect(within(panel).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
   });
 
   test("on the Cloud, the program not allowed there: it's on our side, never a wait", async () => {

@@ -196,12 +196,17 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
           instructions: args.instructions,
         },
         NEW_AGENT_DEFAULTS,
+        { pubsub: deps.pubsub },
       );
       if (args.avatar_color)
-        agent = await setAgentAppearance(deps.db, p.userId, p.orgId, agent.id, {
-          color: args.avatar_color,
-          eyes: AGENT_LOOK.eyes[0],
-        });
+        agent = await setAgentAppearance(
+          deps.db,
+          p.userId,
+          p.orgId,
+          agent.id,
+          { color: args.avatar_color, eyes: AGENT_LOOK.eyes[0] },
+          { pubsub: deps.pubsub },
+        );
       // Born on the workspace's own computer: it lists its agents again.
       if (agent.machineId) await publishMachineAgentsChanged(deps.pubsub, p.orgId);
       await made("agent", agent.id, agent.name, args.idempotency_key);
@@ -233,7 +238,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
         p.orgId,
         agent.id,
         { instructions: args.instructions },
-        { remember: false },
+        { remember: false, pubsub: deps.pubsub },
       );
       await recordAudit(deps.db, {
         orgId: p.orgId,
@@ -440,11 +445,13 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
       const same = channels.find((c) => c.id === keyed) ?? channels.find((c) => c.name === name);
       if (same) return { id: same.id, name: same.name, existing: true, url: `${base}/c/${same.id}` };
       await allow();
-      const channel = await createChannel(deps.db, p.userId, p.orgId, {
-        name,
-        topic: args.topic,
-        visibility: args.private ? "private" : "public",
-      }).catch((error) => {
+      const channel = await createChannel(
+        deps.db,
+        p.userId,
+        p.orgId,
+        { name, topic: args.topic, visibility: args.private ? "private" : "public" },
+        { pubsub: deps.pubsub },
+      ).catch((error) => {
         if (error instanceof ConflictError)
           throw new ValidationError(
             `A channel named ${name} exists that ${p.personName} can't see. Pick another name.`,

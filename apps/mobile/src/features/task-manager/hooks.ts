@@ -71,13 +71,13 @@ export function useStopper() {
     });
   }, []);
   const stop = useCallback(
-    (runIds: readonly string[], reason?: string) => {
+    (runIds: readonly string[], reason?: string, chain?: boolean) => {
       if (runIds.length === 0) return;
       haptics.firm();
       setStopping((was) => new Set([...was, ...runIds]));
       const why = reason?.trim();
       mutate(
-        { runIds: [...runIds], ...(why ? { reason: why } : {}) },
+        { runIds: [...runIds], ...(why ? { reason: why } : {}), ...(chain ? { chain } : {}) },
         {
           onSuccess: (result) => {
             if (result.failed > 0) toast({ title: t("taskManager.failed"), icon: "x" });

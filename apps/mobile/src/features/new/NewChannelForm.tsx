@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, View } from "react-native";
-import { Button, fieldText, Icon, SheetScreen, Text, useToast } from "@/ui";
+import { Button, fieldText, Icon, Locked, SheetScreen, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
@@ -36,22 +36,24 @@ export function NewChannelForm() {
   return (
     <SheetScreen>
       <SheetHeader title={t("mobile.chats.newChannel")} />
-      <View style={[styles.field, surface]}>
-        <Icon name="hash" size={20} color={c.faint} />
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder={t("mobile.chats.channelPlaceholder")}
-          placeholderTextColor={c.faint}
-          accessibilityLabel={t("mobile.chats.newChannel")}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoFocus
-          returnKeyType="done"
-          onSubmitEditing={submit}
-          style={[styles.input, { color: c.ink }]}
-        />
-      </View>
+      <Locked when={busy}>
+        <View style={[styles.field, surface]}>
+          <Icon name="hash" size={20} color={c.faint} />
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder={t("mobile.chats.channelPlaceholder")}
+            placeholderTextColor={c.faint}
+            accessibilityLabel={t("mobile.chats.newChannel")}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={submit}
+            style={[styles.input, { color: c.ink }]}
+          />
+        </View>
+      </Locked>
       <Text variant="footnote" tone="faint" style={styles.fine}>
         {t("mobile.new.channelFine")}
       </Text>
@@ -59,7 +61,8 @@ export function NewChannelForm() {
         variant="primary"
         wide
         label={t("mobile.chats.createChannel")}
-        disabled={!clean || busy}
+        loading={busy}
+        disabled={!clean}
         onPress={submit}
       />
     </SheetScreen>

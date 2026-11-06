@@ -569,6 +569,7 @@ export function AgentProposalCardView({
           }
           end={<RequestFuse left={Math.max(0, end - Date.now()) / span} agent={agent} text={expiryText(t, card)} />}
           what={draft.name}
+          locked={busy || ask.isPending}
         />
         {reviewing && (
           // Over the conversation: creating, saying no or leaving closes it, and the person is where they were.

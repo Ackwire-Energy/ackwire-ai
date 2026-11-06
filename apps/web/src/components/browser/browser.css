@@ -1448,6 +1448,12 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
   line-height: normal;
   color: var(--ink);
 }
+.brw-go__field input:disabled {
+  color: var(--muted);
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+  cursor: not-allowed;
+}
 .brw-go__field input::placeholder {
   color: var(--faint);
 }
@@ -1635,7 +1641,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible {
     visibility 0s 0.18s;
 }
 .brw-mf__now:hover .brw-mf__hist,
-.brw-mf__now:focus-visible .brw-mf__hist {
+html:not([data-pointer]) .brw-mf__now:focus-visible .brw-mf__hist {
   opacity: 1;
   visibility: visible;
   transform: none;

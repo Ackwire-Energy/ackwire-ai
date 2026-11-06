@@ -1166,7 +1166,8 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 /* Too narrow for the fields beside the task (the conversation open beside it, a small window): they go under it,
    as wide as it, instead of a 320px card left alone on the left. */
 @container issue-layout (max-width: 803px) {
-  .issue-layout > .issue-aside {
+  .issue-layout > .issue-aside,
+  .issue-layout > .ac-locked > .issue-aside {
     flex-basis: 100%;
     max-width: none;
     position: static;

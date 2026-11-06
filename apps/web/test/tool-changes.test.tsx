@@ -96,6 +96,21 @@ test("many changed tools: grouped by connection, the first few shown, all accept
   expect(within(left).getByRole("article", { name: "Notes" })).toBeTruthy();
 });
 
+test("accepting all of a connection: its rows are off until the answer comes", async () => {
+  const api = createFakeApi(seedState({ connections: [] }));
+  const cc = api.customConnectors as typeof api.customConnectors & { addToolChange(o: string, c: ToolChange): void };
+  for (const name of ["search_articles", "get_article"]) cc.addToolChange(ORG_ID, change(name));
+  api.customConnectors.acceptConnectionToolChanges = () => new Promise(() => {});
+  await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+  await settle(8);
+  const panel = screen().getByRole("region", { name: "Ferramentas que mudaram" });
+  const one = within(panel).getByRole("button", { name: "Aceitar get_article" });
+  expect(one.closest("fieldset[disabled]")).toBeNull();
+  await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Aceitar todas" })));
+  await settle(2);
+  expect(one.closest("fieldset[disabled]")).toBeTruthy();
+});
+
 test("the diff: added, removed and changed fields, and input changes outside the fields", () => {
   const change = {
     before: {

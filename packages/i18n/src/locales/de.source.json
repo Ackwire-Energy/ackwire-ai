@@ -4160,6 +4160,21 @@
   "channel.quoteOf": {
     "value": "Reply to {{name}}: {{excerpt}}. See the message"
   },
+  "channel.quoteGone": {
+    "value": "Original message deleted"
+  },
+  "channel.jumpTooFar": {
+    "value": "That message is too far back to open from here."
+  },
+  "channel.quoteNoWords": {
+    "value": "Message with no text"
+  },
+  "channel.replyingTo": {
+    "value": "Replying to {{name}}"
+  },
+  "channel.cancelReply": {
+    "value": "Cancel reply"
+  },
   "channel.emoji": {
     "value": "Emoji"
   },
@@ -4718,6 +4733,12 @@
   "rightHand.profile.nameStory": {
     "value": "The name comes from lodestar, the star sailors steer by."
   },
+  "rightHand.saved.workspace": {
+    "value": "{{name}} now thinks with {{label}} for everyone without a plan of their own."
+  },
+  "rightHand.saved.mine": {
+    "value": "Your conversation with {{name}} now thinks with {{label}}. Only yours does."
+  },
   "rightHand.settings.name": {
     "value": "Name and look"
   },
@@ -4774,6 +4795,12 @@
   },
   "rightHand.settings.fallbackKey": {
     "value": "Without your own plan, it uses the workspace's API key."
+  },
+  "rightHand.settings.fallbackKeyOf": {
+    "value": "Without your own plan, it uses the workspace's key: {{label}}."
+  },
+  "rightHand.settings.fallbackNoKey": {
+    "value": "The workspace has no API key yet, so without your own plan nothing answers you here."
   },
   "rightHand.settings.fallbackPlan": {
     "value": "Without your own plan, it uses {{owner}}'s plan, which serves everyone."
@@ -5380,6 +5407,15 @@
   "connectAi.have.other": {
     "value": "Or connect another"
   },
+  "connectAi.have.manageKeys": {
+    "value": "Manage or delete keys"
+  },
+  "connectAi.billing": {
+    "value": "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan."
+  },
+  "connectAi.billingWeb": {
+    "value": "Choose one on the web, at agentes.chat."
+  },
   "connectAi.orPayGo": {
     "value": "Or pay as you go"
   },
@@ -5454,6 +5490,9 @@
   },
   "connectAi.key.saved": {
     "value": "Saved. Every agent without a plan thinks with it."
+  },
+  "connectAi.key.savedUnchecked": {
+    "value": "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why."
   },
   "connectAi.key.notPlan": {
     "value": "A coding plan's key goes in its own option above."
@@ -7171,7 +7210,7 @@
     "value": "Waiting"
   },
   "secret.targetEnv": {
-    "value": "Goes in as the variable {{name}} on {{agent}}'s computer."
+    "value": "Goes to {{agent}}'s computer, for its commands."
   },
   "secret.targetFile": {
     "value": "Goes to the file {{path}} on {{agent}}'s computer."
@@ -7181,9 +7220,6 @@
   },
   "secret.replaces": {
     "value": "Replaces the key {{agent}} already has under this name."
-  },
-  "secret.label": {
-    "value": "Value of {{name}}"
   },
   "secret.private": {
     "value": "Sent encrypted straight to the computer. It stays out of the chat and away from the agent."
@@ -7207,10 +7243,7 @@
     "value": "Delivered by you"
   },
   "secret.outcomeWithdrawn": {
-    "value": "No longer needed"
-  },
-  "secret.alreadyAnswered": {
-    "value": "This request was already answered or expired."
+    "value": "{{agent}} no longer needs this."
   },
   "secret.failed": {
     "value": "Couldn't deliver it. Is the agent's computer on?"
@@ -13549,7 +13582,7 @@
     "value": "Edit Vault contacts"
   },
   "scopes.vault_write.description": {
-    "value": "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved."
+    "value": "Save and update contact details in the Vault, change a saved login's username or a description, make passwords for accounts it creates, and delete what it saved."
   },
   "scopes.github_git_read.label": {
     "value": "Clone repositories (git)"
@@ -19278,6 +19311,12 @@
   "aiAccounts.connect.needsCloud.preparing": {
     "value": "{{computer}} is getting ready. This changes by itself when it's done."
   },
+  "aiAccounts.connect.needsCloud.stuck": {
+    "value": "{{program}} still isn't ready on {{computer}}, and this won't change by itself. Use an API key for now, and try this plan again later."
+  },
+  "aiAccounts.connect.needsCloud.away": {
+    "value": "{{computer}} has been away longer than a restart takes. Use an API key for now, and try this plan again later."
+  },
   "aiAccounts.done.name": {
     "value": "What do you want to call it? Others see this name."
   },
@@ -21868,6 +21907,36 @@
   "queue.left": {
     "value": "~{{n}} min left"
   },
+  "queue.overdue": {
+    "value": "past its usual time"
+  },
+  "queue.openTask": {
+    "value": "Open task"
+  },
+  "queue.fill.agent": {
+    "value": {
+      "one": "{{count}} asked by an agent",
+      "other": "{{count}} asked by agents"
+    }
+  },
+  "queue.fill.person": {
+    "value": {
+      "one": "{{count}} for a person",
+      "other": "{{count}} for people"
+    }
+  },
+  "queue.fill.routine": {
+    "value": {
+      "one": "{{count}} routine",
+      "other": "{{count}} routines"
+    }
+  },
+  "queue.fill.work": {
+    "value": {
+      "one": "{{count}} long job",
+      "other": "{{count}} long jobs"
+    }
+  },
   "queue.who": {
     "value": "{{name}}"
   },
@@ -21904,14 +21973,14 @@
   "queue.where.thread": {
     "value": "a thread in #{{name}}"
   },
+  "queue.where.agents": {
+    "value": "a conversation between agents"
+  },
   "queue.where.private": {
     "value": "a private conversation"
   },
   "queue.live.nextEta": {
     "value": "Waiting for the computer. Next up, in about {{n}} min"
-  },
-  "queue.live.nextAfter": {
-    "value": "Waiting for the computer. Next up, once {{after}} finishes"
   },
   "queue.live.next": {
     "value": "Waiting for the computer. Next up"
@@ -26594,6 +26663,9 @@
   "errors.wiki.lockAdminsOnly": {
     "value": "Only admins lock pages."
   },
+  "errors.replyGone": {
+    "value": "The message you were replying to isn't here anymore."
+  },
   "errors.media.off": {
     "value": "GIFs and stickers are off in this workspace."
   },
@@ -29503,6 +29575,18 @@
   "settings.keyRefused": {
     "value": "The provider didn't accept this key."
   },
+  "settings.keyNoCredit": {
+    "value": "{{provider}} says this key has no credit. Add credit there and save it again. Nothing was saved."
+  },
+  "settings.keyDenied": {
+    "value": "{{provider}} didn't let this key make a call. Check its permissions there and save it again. Nothing was saved."
+  },
+  "settings.keySaid": {
+    "value": "{{provider}} said: {{said}}"
+  },
+  "settings.keyInUse": {
+    "value": "{{agents}} still think with this key."
+  },
   "settings.keyManagement": {
     "value": "This is a management key. Create a regular API key."
   },
@@ -29556,6 +29640,21 @@
   },
   "settings.removeText": {
     "value": "The key is gone for good. If an agent still uses it, the server refuses: change those agents' key first."
+  },
+  "settings.removeUnused": {
+    "value": "The key is gone for good. No agent thinks with it."
+  },
+  "settings.removeUsedOther": {
+    "value": {
+      "one": "{{agents}} thinks with this key. Once it's gone, it moves to another key, or asks for an AI if none fits its model.",
+      "other": "{{agents}} think with this key. Once it's gone, they move to another key, or ask for an AI if none fits their model."
+    }
+  },
+  "settings.removeUsedNone": {
+    "value": {
+      "one": "{{agents}} thinks with this key and has nothing else. Once it's gone, it stops answering until you connect another AI.",
+      "other": "{{agents}} think with this key and have nothing else. Once it's gone, they stop answering until you connect another AI."
+    }
   },
   "settings.noKeys": {
     "value": "No keys yet."
@@ -30519,6 +30618,9 @@
   },
   "chat.consultGroup.waitingAgents": {
     "value": "{{name}} handed part of it on and is waiting to hear back"
+  },
+  "chat.consultPair.took": {
+    "value": "took {{time}}"
   },
   "chat.consultPair.asking": {
     "value": "asking"
@@ -31514,6 +31616,9 @@
   },
   "chat.body.work_auto_movedOver": {
     "value": "This will take a while, so I'll keep going in the background. I'll post updates here."
+  },
+  "chat.body.moved_on": {
+    "value": "Continues in {{link}}"
   },
   "chat.body.work_end_done": {
     "value": "Done ({{minutes}} min)."
@@ -34142,6 +34247,36 @@
   "taskManager.free": {
     "value": "Free"
   },
+  "taskManager.hiddenTasks": {
+    "value": {
+      "one": "{{count}} task you can't see",
+      "other": "{{count}} tasks you can't see"
+    }
+  },
+  "taskManager.hiddenLine": {
+    "value": {
+      "one": "{{count}} more task in conversations you don't see.",
+      "other": "{{count}} more tasks in conversations you don't see."
+    }
+  },
+  "taskManager.helpers": {
+    "value": {
+      "one": "{{count}} helper",
+      "other": "{{count}} helpers"
+    }
+  },
+  "taskManager.delegated.fromPerson": {
+    "value": "started by {{name}}"
+  },
+  "taskManager.delegated.fromYou": {
+    "value": "started by you"
+  },
+  "taskManager.delegated.fromRoutine": {
+    "value": "started by the routine {{name}}"
+  },
+  "taskManager.delegated.stopNote": {
+    "value": "If you stop it, {{name}} is told you did and won't ask again on its own."
+  },
   "taskManager.columns.task": {
     "value": "Task"
   },
@@ -34159,6 +34294,9 @@
   },
   "taskManager.sections.asked": {
     "value": "Asked by people"
+  },
+  "taskManager.sections.delegated": {
+    "value": "Asked by agents"
   },
   "taskManager.sections.background": {
     "value": "Routines in the background"
@@ -34330,6 +34468,15 @@
   },
   "taskManager.actions.openManager": {
     "value": "Open in the task manager"
+  },
+  "taskManager.confirm.chainTitle": {
+    "value": {
+      "one": "Stop {{name}} and {{count}} helper?",
+      "other": "Stop {{name}} and {{count}} helpers?"
+    }
+  },
+  "taskManager.confirm.chainBody": {
+    "value": "What's done stays, and they are all told."
   },
   "taskManager.confirm.title": {
     "value": {
@@ -35953,5 +36100,68 @@
   },
   "teamTemplates.ask": {
     "value": "I used the {{name}} template. To fit it to your business: **what makes {{org}} different?**"
+  },
+  "secret.labelPassword": {
+    "value": "Password for {{host}}"
+  },
+  "secret.labelCode": {
+    "value": "Code for {{host}}"
+  },
+  "secret.labelKey": {
+    "value": "A key for {{agent}}'s computer"
+  },
+  "secret.labelFile": {
+    "value": "The file {{path}}"
+  },
+  "secret.placeholder": {
+    "value": "Type it here"
+  },
+  "secret.account": {
+    "value": "Account: {{username}}."
+  },
+  "secret.endedDeclined": {
+    "value": "Declined. {{agent}} goes on without it."
+  },
+  "secret.endedExpired": {
+    "value": "Nobody answered in time. {{agent}} goes on without it, and can ask again."
+  },
+  "secret.endedRunStopped": {
+    "value": "{{agent}}'s task stopped before this was answered. Ask {{agent}} again if you still need it."
+  },
+  "secret.endedSuperseded": {
+    "value": "{{agent}} asked again in a newer request."
+  },
+  "secret.endedComputer": {
+    "value": "This can't reach {{agent}} anymore: the computer that asked changed. Ask {{agent}} to ask again."
+  },
+  "secret.endedPersonLeft": {
+    "value": "{{person}} left the workspace before answering."
+  },
+  "secret.endedClosed": {
+    "value": "This request closed before anyone answered. Ask {{agent}} again if you still need it."
+  },
+  "secret.seeNewer": {
+    "value": "See the newer request"
+  },
+  "secret.computerAway": {
+    "value": "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment."
+  },
+  "secret.computerPaused": {
+    "value": "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}."
+  },
+  "builtinTools.vault_make_password.label": {
+    "value": "Make a password"
+  },
+  "builtinTools.vault_make_password.description": {
+    "value": "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it."
+  },
+  "builtinTools.browser_make_password.label": {
+    "value": "Make a password"
+  },
+  "builtinTools.browser_make_password.description": {
+    "value": "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it."
+  },
+  "browser.watch.step.browser_make_password": {
+    "value": "Made a password"
   }
 }

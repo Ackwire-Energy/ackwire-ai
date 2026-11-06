@@ -1,6 +1,6 @@
 import { authErrorText } from "@agenteschat/client/lib/errors";
 import { isEmail, nameIsPassword, passwordState } from "@agenteschat/client/lib/text";
-import { Button, Icon, Input } from "@agenteschat/ui";
+import { Button, Icon, Input, Locked } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useRef, useState } from "react";
@@ -71,73 +71,75 @@ export function OwnerPage({ claim }: { claim: string | null }) {
           </div>
         </header>
         <div className="auth__step">
-          {problem === "taken" && (
-            <Button asChild variant="primary" size="lg" block>
-              <Link to="/login">{t("auth.signIn")}</Link>
-            </Button>
-          )}
-          {!problem && (
-            <>
-              <div className="auth__field">
-                <Input
-                  className="auth__big"
-                  aria-label={t("auth.yourName")}
-                  autoComplete="name"
-                  spellCheck={false}
-                  placeholder={t("auth.flow.namePlaceholder")}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoFocus
-                />
-                <NameHint name={name} />
-              </div>
-              <Input
-                className="auth__big"
-                type="email"
-                inputMode="email"
-                aria-label={t("auth.email")}
-                autoComplete="email"
-                placeholder={t("auth.flow.emailPlaceholder")}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <div className="auth__field">
-                <div className="auth__pass">
+          <Locked when={pending}>
+            {problem === "taken" && (
+              <Button asChild variant="primary" size="lg" block>
+                <Link to="/login">{t("auth.signIn")}</Link>
+              </Button>
+            )}
+            {!problem && (
+              <>
+                <div className="auth__field">
                   <Input
                     className="auth__big"
-                    type={show ? "text" : "password"}
-                    aria-label={t("invite.createPassword")}
-                    autoComplete="new-password"
-                    placeholder={t("invite.createPassword")}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    aria-label={t("auth.yourName")}
+                    autoComplete="name"
+                    spellCheck={false}
+                    placeholder={t("auth.flow.namePlaceholder")}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    autoFocus
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    icon={show ? "eyeOff" : "eye"}
-                    aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}
-                    aria-pressed={show}
-                    className="auth__eye"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setShow((s) => !s)}
-                  />
+                  <NameHint name={name} />
                 </div>
-                <PasswordHelp password={password} />
-              </div>
-              {error && (
-                <p className="auth__error ac-iconline" role="alert">
-                  <Icon name="alert" size={14} />
-                  {error}
-                </p>
-              )}
-              <Button type="submit" variant="primary" size="lg" block kbd={["↵"]} loading={pending} disabled={!ready}>
-                {t("auth.owner.create")}
-              </Button>
-            </>
-          )}
+                <Input
+                  className="auth__big"
+                  type="email"
+                  inputMode="email"
+                  aria-label={t("auth.email")}
+                  autoComplete="email"
+                  placeholder={t("auth.flow.emailPlaceholder")}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <div className="auth__field">
+                  <div className="auth__pass">
+                    <Input
+                      className="auth__big"
+                      type={show ? "text" : "password"}
+                      aria-label={t("invite.createPassword")}
+                      autoComplete="new-password"
+                      placeholder={t("invite.createPassword")}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon={show ? "eyeOff" : "eye"}
+                      aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}
+                      aria-pressed={show}
+                      className="auth__eye"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setShow((s) => !s)}
+                    />
+                  </div>
+                  <PasswordHelp password={password} />
+                </div>
+                {error && (
+                  <p className="auth__error ac-iconline" role="alert">
+                    <Icon name="alert" size={14} />
+                    {error}
+                  </p>
+                )}
+                <Button type="submit" variant="primary" size="lg" block kbd={["↵"]} loading={pending} disabled={!ready}>
+                  {t("auth.owner.create")}
+                </Button>
+              </>
+            )}
+          </Locked>
         </div>
       </form>
     </AuthShell>

@@ -1713,6 +1713,11 @@
     "linkCopied": "Link gekopieerd.",
     "reply": "Beantwoorden",
     "quoteOf": "Antwoord op {{name}}: {{excerpt}}. Bekijk het bericht",
+    "quoteGone": "Oorspronkelijk bericht verwijderd",
+    "jumpTooFar": "Dit bericht ligt te ver terug om hier te openen.",
+    "quoteNoWords": "Bericht zonder tekst",
+    "replyingTo": "Antwoord aan {{name}}",
+    "cancelReply": "Antwoord annuleren",
     "emoji": "Emoji",
     "uploading": "uploaden…",
     "uploadFailed": "is niet geüpload",
@@ -1928,6 +1933,10 @@
       "configure": "Instellen",
       "nameStory": "De naam komt van lodestar, de ster waarop zeelieden koers houden."
     },
+    "saved": {
+      "workspace": "{{name}} denkt nu met {{label}} voor iedereen zonder eigen abonnement.",
+      "mine": "Je gesprek met {{name}} denkt nu met {{label}}. Alleen dat van jou."
+    },
     "settings": {
       "name": "Naam en uiterlijk",
       "nameHelp": "In de zijbalk staat er altijd “{{label}}” bij.",
@@ -1948,6 +1957,8 @@
       "connectMine": "Mijn abonnement koppelen",
       "useWorkspace": "Die van de workspace gebruiken",
       "fallbackKey": "Zonder eigen abonnement gebruikt het de API-sleutel van de workspace.",
+      "fallbackKeyOf": "Zonder eigen abonnement gebruikt het de sleutel van de workspace: {{label}}.",
+      "fallbackNoKey": "De workspace heeft nog geen API-sleutel, dus zonder eigen abonnement antwoordt hier niemand je.",
       "fallbackPlan": "Zonder eigen abonnement gebruikt het het abonnement van {{owner}}, dat iedereen antwoordt.",
       "fallbackYours": "Zonder ander abonnement gebruikt het dat van de workspace, dat van jou is.",
       "fallbackNone": "Zonder eigen abonnement kan {{name}} je niet antwoorden: het abonnement van de workspace antwoordt alleen {{owner}}.",
@@ -2216,8 +2227,11 @@
       "title": "Al gekoppeld",
       "titleFor": "Al gekoppeld, voor {{name}}",
       "titleFor_female": "Al gekoppeld, voor {{name}}",
-      "other": "Of koppel een ander"
+      "other": "Of koppel een ander",
+      "manageKeys": "Sleutels beheren of verwijderen"
     },
+    "billing": "Een abonnement meldt zich aan op de computer van de workspace, en die computer hoort bij een actief agentes.chat-abonnement.",
+    "billingWeb": "Kies er een op het web, op agentes.chat.",
     "orPayGo": "Of betaal per gebruik",
     "plan": {
       "claude": {
@@ -2266,6 +2280,7 @@
       "paste": "Plak hem hier",
       "forAll": "Elke agent zonder abonnement denkt ermee.",
       "saved": "Opgeslagen. Elke agent zonder abonnement denkt ermee.",
+      "savedUnchecked": "Opgeslagen, maar {{provider}} gaf geen antwoord, dus de sleutel kon niet worden gecontroleerd. Als hij faalt, staat de reden in het gesprek.",
       "notPlan": "De sleutel van een codeerabonnement hoort bij die eigen optie hierboven.",
       "billing": "Zet facturering aan voor het project van de sleutel. Zonder facturering mag Google gebruiken wat je agents versturen.",
       "privacy": "Je privacyinstellingen in OpenRouter bepalen welke aanbieders mogen bewaren wat je agents versturen.",
@@ -2963,11 +2978,16 @@
   "secret": {
     "group": "Geheim verzoek van {{agent}}",
     "chip": "Wacht",
-    "targetEnv": "Komt als de variabele {{name}} op de computer van {{agent}}.",
+    "targetEnv": "Gaat naar de computer van {{agent}}, voor zijn opdrachten.",
     "targetFile": "Komt in het bestand {{path}} op de computer van {{agent}}.",
     "targetSite": "Alleen de browser van {{agent}} typt het, op {{host}}. Het blijft buiten de opdrachten van {{agent}}.",
     "replaces": "Vervangt de sleutel die {{agent}} al onder deze naam heeft.",
-    "label": "Waarde van {{name}}",
+    "labelPassword": "Wachtwoord voor {{host}}",
+    "labelCode": "Code voor {{host}}",
+    "labelKey": "Een sleutel voor de computer van {{agent}}",
+    "labelFile": "Het bestand {{path}}",
+    "placeholder": "Typ het hier",
+    "account": "Gebruiker: {{username}}.",
     "private": "Versleuteld rechtstreeks naar de computer gestuurd. Het blijft buiten de chat en uit handen van de agent.",
     "send": "Sturen",
     "decline": "Weigeren",
@@ -2975,8 +2995,17 @@
     "waitingFor": "Alleen {{person}} kan antwoorden.",
     "outcomeBy": "Geleverd door {{person}}",
     "outcomeByYou": "Geleverd door jou",
-    "outcomeWithdrawn": "Niet meer nodig",
-    "alreadyAnswered": "Dit verzoek is al beantwoord of verlopen.",
+    "outcomeWithdrawn": "{{agent}} heeft dit niet meer nodig.",
+    "endedDeclined": "Geweigerd. {{agent}} gaat zonder dit verder.",
+    "endedExpired": "Niemand antwoordde op tijd. {{agent}} gaat zonder dit verder en kan het opnieuw vragen.",
+    "endedRunStopped": "De taak van {{agent}} stopte vóór het antwoord. Vraag het {{agent}} opnieuw als je het nog nodig hebt.",
+    "endedSuperseded": "{{agent}} vroeg het opnieuw in een nieuwer verzoek.",
+    "endedComputer": "Dit bereikt {{agent}} niet meer: de computer die het vroeg is veranderd. Vraag {{agent}} om het opnieuw te vragen.",
+    "endedPersonLeft": "{{person}} heeft de workspace verlaten voor het antwoord.",
+    "endedClosed": "Dit verzoek is gesloten voordat iemand antwoordde. Vraag het {{agent}} opnieuw als je het nog nodig hebt.",
+    "seeNewer": "Nieuwer verzoek bekijken",
+    "computerAway": "De computer van {{agent}} antwoordt nu niet. Dit verzoek blijft open tot {{time}}. Probeer het zo opnieuw.",
+    "computerPaused": "De computer van {{agent}} is door de eigenaar gepauzeerd. Dit verzoek blijft open tot {{time}}.",
     "failed": "Kon het niet leveren. Staat de computer van de agent aan?",
     "empty": "Typ de waarde.",
     "tooLarge": "Te groot (maximaal 16 KB)."
@@ -5658,7 +5687,7 @@
     },
     "vault_write": {
       "label": "Contacten in de Vault bewerken",
-      "description": "Contactgegevens in de Vault opslaan en bijwerken, de gebruikersnaam van een opgeslagen login of een beschrijving wijzigen, en verwijderen wat hij heeft opgeslagen."
+      "description": "Contactgegevens in de Vault opslaan en bijwerken, de gebruikersnaam van een opgeslagen login of een beschrijving wijzigen, wachtwoorden maken voor accounts die hij aanmaakt, en verwijderen wat hij heeft opgeslagen."
     },
     "github_git_read": {
       "label": "Repositories klonen (git)",
@@ -7995,7 +8024,9 @@
         "runnerOld": "Het agentes.chat-programma op {{computer}} is verouderd en een update is onderweg. Dit verandert vanzelf als het klaar is.",
         "execOff": "{{computer}} kan {{program}} nog niet uitvoeren. We zijn ermee bezig, en dit verandert vanzelf.",
         "toolOff": "{{program}} is nog niet toegestaan op {{computer}}. Dat ligt aan ons: probeer het later opnieuw.",
-        "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is."
+        "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is.",
+        "stuck": "{{program}} is nog niet klaar op {{computer}}, en dit verandert niet vanzelf. Gebruik voorlopig een API-sleutel en probeer dit abonnement later opnieuw.",
+        "away": "{{computer}} is langer weg dan een herstart duurt. Gebruik voorlopig een API-sleutel en probeer dit abonnement later opnieuw."
       }
     },
     "done": {
@@ -9028,6 +9059,18 @@
     "startsIn": "start over ~{{n}} min",
     "startsAfter": "start zodra {{after}} klaar is",
     "left": "nog ~{{n}} min",
+    "overdue": "duurt langer dan normaal",
+    "openTask": "Taak openen",
+    "fill": {
+      "agent_one": "{{count}} gevraagd door een agent",
+      "agent_other": "{{count}} gevraagd door agents",
+      "person_one": "{{count}} voor een persoon",
+      "person_other": "{{count}} voor mensen",
+      "routine_one": "{{count}} routine",
+      "routine_other": "{{count}} routines",
+      "work_one": "{{count}} lange taak",
+      "work_other": "{{count}} lange taken"
+    },
     "who": "{{name}}",
     "away": "Weg sinds {{time}}",
     "purpose": {
@@ -9043,11 +9086,11 @@
       "yourDm": "je DM",
       "dm": "DM met {{name}}",
       "thread": "een thread in #{{name}}",
+      "agents": "een gesprek tussen agents",
       "private": "een privégesprek"
     },
     "live": {
       "nextEta": "Wacht op de computer. Is de volgende, over ongeveer {{n}} min",
-      "nextAfter": "Wacht op de computer. Is de volgende zodra {{after}} klaar is",
       "next": "Wacht op de computer. Is de volgende",
       "waiting": "Wacht op de computer",
       "behind": "In de wachtrij, {{nth}}. Na {{names}}",
@@ -11032,6 +11075,7 @@
       "titleNoLetters": "Een titel heeft letters of cijfers nodig.",
       "lockAdminsOnly": "Alleen beheerders vergrendelen pagina's."
     },
+    "replyGone": "Het bericht waarop je reageerde is er niet meer.",
     "media": {
       "off": "GIF's en stickers staan uit in deze werkruimte.",
       "notFound": "Die GIF is niet meer beschikbaar. Kies een andere.",
@@ -12207,6 +12251,10 @@
     "keyValue": "API-sleutel",
     "keyInvalid": "Plak de API-sleutel (minstens 8 tekens).",
     "keyRefused": "De provider accepteerde deze sleutel niet.",
+    "keyNoCredit": "{{provider}} zegt dat deze sleutel geen tegoed heeft. Voeg daar tegoed toe en sla hem opnieuw op. Er is niets opgeslagen.",
+    "keyDenied": "{{provider}} liet deze sleutel geen aanroep doen. Controleer daar zijn rechten en sla hem opnieuw op. Er is niets opgeslagen.",
+    "keySaid": "{{provider}} zei: {{said}}",
+    "keyInUse": "{{agents}} denken nog met deze sleutel.",
     "keyManagement": "Dit is een beheersleutel. Maak een gewone API-sleutel.",
     "autoModels": {
       "title": "Modellen voor Automatisch",
@@ -12227,6 +12275,11 @@
     "remove": "Verwijderen",
     "removeTitle": "De sleutel {{label}} verwijderen",
     "removeText": "De sleutel is voorgoed weg. Als een agent hem nog gebruikt, weigert de server: wijzig eerst de sleutel van die agents.",
+    "removeUnused": "De sleutel is voorgoed weg. Geen enkele agent denkt ermee.",
+    "removeUsedOther_one": "{{agents}} denkt met deze sleutel. Zonder hem gaat de agent naar een andere sleutel, of vraagt om een AI als er geen bij zijn model past.",
+    "removeUsedOther_other": "{{agents}} denken met deze sleutel. Zonder hem gaan ze naar een andere sleutel, of vragen om een AI als er geen bij hun model past.",
+    "removeUsedNone_one": "{{agents}} denkt met deze sleutel en heeft niets anders. Zonder hem antwoordt de agent niet meer tot je een andere AI verbindt.",
+    "removeUsedNone_other": "{{agents}} denken met deze sleutel en hebben niets anders. Zonder hem antwoorden ze niet meer tot je een andere AI verbindt.",
     "noKeys": "Nog geen sleutels.",
     "platformAvailable": "De Claude-sleutel van deze server is ook beschikbaar.",
     "usageTitle": "API-uitgaven per soort",
@@ -12647,6 +12700,7 @@
       "waitingAgents_female": "{{name}} heeft een deel doorgegeven en wacht op antwoord"
     },
     "consultPair": {
+      "took": "duurde {{time}}",
       "asking": "vraagt",
       "working": "bezig",
       "waitingApproval": "wacht op goedkeuring",
@@ -13008,6 +13062,7 @@
       "usage_paused_budget": "{{agent}} heeft dit werk gepauzeerd · maandbudget op {{percent}}%",
       "work_auto_moved": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates, de volgende over ongeveer {{minutes}} min.",
       "work_auto_movedOver": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates.",
+      "moved_on": "Gaat verder in {{link}}",
       "work_end_done": "Klaar ({{minutes}} min).",
       "work_end_failed": "Dit werk op de achtergrond is niet afgerond ({{minutes}} min).",
       "work_end_failedWhy": "Dit werk op de achtergrond is niet afgerond ({{minutes}} min): {{why}}.",
@@ -13288,6 +13343,10 @@
       "label": "Skillscript uitvoeren",
       "description": "Voert het script van een skill uit in de omgeving."
     },
+    "vault_make_password": {
+      "label": "Wachtwoord maken",
+      "description": "Maakt een sterk wachtwoord op zijn computer en bewaart het als sleutel in de Vault, zonder het te zien."
+    },
     "computer_status": {
       "label": "Computer controleren",
       "description": "Zegt welke computer het is en of hij reageert."
@@ -13343,6 +13402,10 @@
     "browser_type_secret": {
       "label": "Wachtwoord typen",
       "description": "Typt een wachtwoord dat je gaf in een wachtwoord- of codeveld, zonder het te zien."
+    },
+    "browser_make_password": {
+      "label": "Wachtwoord maken",
+      "description": "Maakt een sterk wachtwoord voor een site op zijn computer, bewaart het in de Vault en typt het, zonder het te zien."
     },
     "browser_wait": {
       "label": "Wachten op de pagina",
@@ -13733,6 +13796,7 @@
         "browser_scroll": "Door de pagina gescrold",
         "browser_upload": "Een bestand geüpload",
         "browser_type_secret": "Een wachtwoord getypt",
+        "browser_make_password": "Een wachtwoord gemaakt",
         "browser_wait": "Op de pagina gewacht",
         "browser_screenshot": "Een screenshot gemaakt",
         "browser_ask_person": "Om hulp gevraagd",
@@ -14310,6 +14374,18 @@
     "tasks_one": "{{count}} taak",
     "tasks_other": "{{count}} taken",
     "free": "Vrij",
+    "hiddenTasks_one": "{{count}} taak die je niet ziet",
+    "hiddenTasks_other": "{{count}} taken die je niet ziet",
+    "hiddenLine_one": "Nog {{count}} taak in gesprekken die je niet ziet.",
+    "hiddenLine_other": "Nog {{count}} taken in gesprekken die je niet ziet.",
+    "helpers_one": "{{count}} hulp",
+    "helpers_other": "{{count}} hulpen",
+    "delegated": {
+      "fromPerson": "gestart door {{name}}",
+      "fromYou": "gestart door jou",
+      "fromRoutine": "gestart door de routine {{name}}",
+      "stopNote": "Als je hem stopt, hoort {{name}} dat en vraagt die het niet uit zichzelf opnieuw."
+    },
     "columns": {
       "task": "Taak",
       "state": "Status",
@@ -14319,6 +14395,7 @@
     },
     "sections": {
       "asked": "Gevraagd door mensen",
+      "delegated": "Gevraagd door agents",
       "background": "Routines op de achtergrond"
     },
     "state": {
@@ -14390,6 +14467,9 @@
       "openManager": "Openen in Taakbeheer"
     },
     "confirm": {
+      "chainTitle_one": "{{name}} en {{count}} hulp stoppen?",
+      "chainTitle_other": "{{name}} en {{count}} hulpen stoppen?",
+      "chainBody": "Wat al gedaan is blijft bewaard, en iedereen hoort het.",
       "title_one": "De taak van {{name}} stoppen?",
       "title_other": "De {{count}} taken van {{name}} stoppen?",
       "body": "Wat al gedaan is, blijft bewaard, en {{name}} hoort dat jij het hebt gestopt.",

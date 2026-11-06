@@ -1829,6 +1829,11 @@
     "linkCopied": "Skopiowano link.",
     "reply": "Odpowiedz",
     "quoteOf": "Odpowiedź do {{name}}: {{excerpt}}. Zobacz wiadomość",
+    "quoteGone": "Pierwotna wiadomość została usunięta",
+    "jumpTooFar": "Ta wiadomość jest zbyt daleko wstecz, żeby otworzyć ją stąd.",
+    "quoteNoWords": "Wiadomość bez tekstu",
+    "replyingTo": "Odpowiadasz: {{name}}",
+    "cancelReply": "Anuluj odpowiedź",
     "emoji": "Emoji",
     "uploading": "przesyłanie…",
     "uploadFailed": "nie został przesłany",
@@ -2076,6 +2081,10 @@
       "configure": "Skonfiguruj",
       "nameStory": "Nazwa pochodzi od lodestar, gwiazdy, według której żeglarze wyznaczają kurs."
     },
+    "saved": {
+      "workspace": "{{name}} myśli teraz z {{label}} dla wszystkich bez własnego planu.",
+      "mine": "Twoja rozmowa z {{name}} myśli teraz z {{label}}. Tylko twoja."
+    },
     "settings": {
       "name": "Nazwa i wygląd",
       "nameHelp": "Na pasku bocznym zawsze widnieje jako „{{label}}”.",
@@ -2096,6 +2105,8 @@
       "connectMine": "Połącz mój plan",
       "useWorkspace": "Użyj AI workspace'u",
       "fallbackKey": "Bez własnego planu korzysta z klucza API workspace'u.",
+      "fallbackKeyOf": "Bez własnego planu korzysta z klucza workspace'u: {{label}}.",
+      "fallbackNoKey": "Workspace nie ma jeszcze klucza API, więc bez własnego planu nikt ci tu nie odpowie.",
       "fallbackPlan": "Bez własnego planu korzysta z planu użytkownika {{owner}}, który odpowiada wszystkim.",
       "fallbackYours": "Bez innego planu korzysta z planu workspace'u, który jest Twój.",
       "fallbackNone": "Bez własnego planu {{name}} nie może Ci odpowiedzieć: plan workspace'u odpowiada tylko użytkownikowi {{owner}}.",
@@ -2382,8 +2393,11 @@
     "have": {
       "title": "Już połączone",
       "titleFor": "Już połączone dla: {{name}}",
-      "other": "Albo połącz inne"
+      "other": "Albo połącz inne",
+      "manageKeys": "Zarządzaj kluczami lub je usuń"
     },
+    "billing": "Plan loguje się na komputerze workspace'u, a komputer jest dostępny z aktywnym planem agentes.chat.",
+    "billingWeb": "Wybierz plan w przeglądarce, na agentes.chat.",
     "orPayGo": "Albo płać za użycie",
     "plan": {
       "claude": {
@@ -2432,6 +2446,7 @@
       "paste": "Wklej go tutaj",
       "forAll": "Myślą z nim wszyscy agenci bez planu.",
       "saved": "Zapisano. Myślą z nim wszyscy agenci bez planu.",
+      "savedUnchecked": "Zapisano, ale {{provider}} nie odpowiedział, więc nie udało się sprawdzić klucza. Jeśli zawiedzie, rozmowa powie dlaczego.",
       "notPlan": "Klucz planu do kodowania wpisz w jego własnej opcji powyżej.",
       "billing": "Włącz rozliczenia dla projektu tego klucza. Bez rozliczeń Google może wykorzystywać to, co wysyłają twoi agenci.",
       "privacy": "Ustawienia prywatności OpenRouter decydują, którzy dostawcy mogą przechowywać to, co wysyłają twoi agenci.",
@@ -3158,11 +3173,16 @@
   "secret": {
     "group": "Prośba o sekret od {{agent}}",
     "chip": "Czeka",
-    "targetEnv": "Trafi jako zmienna {{name}} na komputer: {{agent}}.",
+    "targetEnv": "Trafi na komputer: {{agent}}, do poleceń.",
     "targetFile": "Trafi do pliku {{path}} na komputerze: {{agent}}.",
     "targetSite": "Wpisuje go tylko przeglądarka agenta {{agent}}, na {{host}}. Nie trafia do poleceń agenta {{agent}}.",
     "replaces": "Zastępuje klucz, który {{agent}} ma już pod tą nazwą.",
-    "label": "Wartość {{name}}",
+    "labelPassword": "Hasło do {{host}}",
+    "labelCode": "Kod do {{host}}",
+    "labelKey": "Klucz do komputera: {{agent}}",
+    "labelFile": "Plik {{path}}",
+    "placeholder": "Wpisz tutaj",
+    "account": "Konto: {{username}}.",
     "private": "Wysyłane szyfrowane prosto na komputer. Nie trafia do czatu ani do agenta.",
     "send": "Wyślij",
     "decline": "Odmów",
@@ -3170,8 +3190,17 @@
     "waitingFor": "Odpowiedzieć może tylko {{person}}.",
     "outcomeBy": "Dostarczone przez: {{person}}",
     "outcomeByYou": "Dostarczone przez ciebie",
-    "outcomeWithdrawn": "Już niepotrzebne",
-    "alreadyAnswered": "Ta prośba ma już odpowiedź albo wygasła.",
+    "outcomeWithdrawn": "{{agent}}: to już niepotrzebne.",
+    "endedDeclined": "Odrzucono. {{agent}}: dalsza praca bez tego.",
+    "endedExpired": "Nikt nie odpowiedział na czas. {{agent}}: dalsza praca bez tego, można poprosić ponownie.",
+    "endedRunStopped": "Zadanie zatrzymało się przed odpowiedzią ({{agent}}). Poproś ponownie: {{agent}}, jeśli nadal tego potrzebujesz.",
+    "endedSuperseded": "{{agent}}: ponowna prośba w nowszym żądaniu.",
+    "endedComputer": "To już nie dotrze ({{agent}}): komputer, który prosił, się zmienił. Poproś o ponowną prośbę: {{agent}}.",
+    "endedPersonLeft": "{{person}}: opuszczono workspace przed odpowiedzią.",
+    "endedClosed": "To żądanie zamknięto przed odpowiedzią. Poproś ponownie: {{agent}}, jeśli nadal tego potrzebujesz.",
+    "seeNewer": "Zobacz nowsze żądanie",
+    "computerAway": "Komputer nie odpowiada teraz ({{agent}}). To żądanie pozostaje otwarte do {{time}}. Spróbuj ponownie za chwilę.",
+    "computerPaused": "Właściciel wstrzymał komputer ({{agent}}). To żądanie pozostaje otwarte do {{time}}.",
     "failed": "Nie udało się dostarczyć. Czy komputer agenta jest włączony?",
     "empty": "Wpisz wartość.",
     "tooLarge": "Za duże (maksymalnie 16 KB)."
@@ -6014,7 +6043,7 @@
     },
     "vault_write": {
       "label": "Edycja kontaktów w Vault",
-      "description": "Zapisywanie i aktualizowanie danych kontaktowych w Vault, zmiana nazwy użytkownika zapisanego loginu lub opisu oraz usuwanie tego, co sam zapisał."
+      "description": "Zapisywanie i aktualizowanie danych kontaktowych w Vault, zmiana nazwy użytkownika zapisanego loginu lub opisu, tworzenie haseł do zakładanych przez siebie kont oraz usuwanie tego, co sam zapisał."
     },
     "github_git_read": {
       "label": "Klonowanie repozytoriów (git)",
@@ -8546,7 +8575,9 @@
         "runnerOld": "Program agentes.chat na komputerze {{computer}} jest nieaktualny, a aktualizacja jest w drodze. To zmieni się samo, gdy się skończy.",
         "execOff": "{{computer}} nie może jeszcze uruchomić programu {{program}}. Zajmujemy się tym, a to zmieni się samo.",
         "toolOff": "{{program}} nie jest jeszcze dozwolony na {{computer}}. To po naszej stronie: spróbuj ponownie później.",
-        "preparing": "{{computer}} się przygotowuje. To zmieni się samo, gdy skończy."
+        "preparing": "{{computer}} się przygotowuje. To zmieni się samo, gdy skończy.",
+        "stuck": "{{program}} wciąż nie jest gotowy na {{computer}} i to nie zmieni się samo. Na razie użyj klucza API, a ten plan spróbuj ponownie później.",
+        "away": "{{computer}} jest niedostępny dłużej, niż trwa restart. Na razie użyj klucza API, a ten plan spróbuj ponownie później."
       }
     },
     "done": {
@@ -9643,6 +9674,26 @@
     "startsIn": "zacznie za ~{{n}} min",
     "startsAfter": "zacznie, gdy {{after}} skończy",
     "left": "zostało ~{{n}} min",
+    "overdue": "trwa dłużej niż zwykle",
+    "openTask": "Otwórz zadanie",
+    "fill": {
+      "agent_one": "{{count}} od agenta",
+      "agent_few": "{{count}} od agentów",
+      "agent_many": "{{count}} od agentów",
+      "agent_other": "{{count}} od agentów",
+      "person_one": "{{count}} dla osoby",
+      "person_few": "{{count}} dla osób",
+      "person_many": "{{count}} dla osób",
+      "person_other": "{{count}} dla osób",
+      "routine_one": "{{count}} rutyna",
+      "routine_few": "{{count}} rutyny",
+      "routine_many": "{{count}} rutyn",
+      "routine_other": "{{count}} rutyny",
+      "work_one": "{{count}} długa praca",
+      "work_few": "{{count}} długie prace",
+      "work_many": "{{count}} długich prac",
+      "work_other": "{{count}} długie prace"
+    },
     "who": "{{name}}",
     "away": "Nieobecny od {{time}}",
     "purpose": {
@@ -9658,11 +9709,11 @@
       "yourDm": "twój DM",
       "dm": "DM z: {{name}}",
       "thread": "wątek w #{{name}}",
+      "agents": "rozmowa między agentami",
       "private": "prywatna rozmowa"
     },
     "live": {
       "nextEta": "Czeka na komputer. Następny w kolejce, za około {{n}} min",
-      "nextAfter": "Czeka na komputer. Następny w kolejce, gdy {{after}} skończy",
       "next": "Czeka na komputer. Następny w kolejce",
       "waiting": "Czeka na komputer",
       "behind": "W kolejce, {{nth}}. Po: {{names}}",
@@ -11769,6 +11820,7 @@
       "titleNoLetters": "Tytuł musi zawierać litery lub cyfry.",
       "lockAdminsOnly": "Tylko administratorzy blokują strony."
     },
+    "replyGone": "Wiadomości, na którą odpowiadasz, już tu nie ma.",
     "media": {
       "off": "GIF-y i naklejki są wyłączone w tej przestrzeni roboczej.",
       "notFound": "Ten GIF nie jest już dostępny. Wybierz inny.",
@@ -12991,6 +13043,10 @@
     "keyValue": "Klucz API",
     "keyInvalid": "Wklej klucz API (co najmniej 8 znaków).",
     "keyRefused": "Dostawca nie zaakceptował tego klucza.",
+    "keyNoCredit": "{{provider}} informuje, że ten klucz nie ma środków. Doładuj je tam i zapisz klucz ponownie. Nic nie zapisano.",
+    "keyDenied": "{{provider}} nie pozwolił temu kluczowi wykonać wywołania. Sprawdź tam jego uprawnienia i zapisz go ponownie. Nic nie zapisano.",
+    "keySaid": "{{provider}} odpowiedział: {{said}}",
+    "keyInUse": "{{agents}} nadal myślą z tym kluczem.",
     "keyManagement": "To klucz do zarządzania. Utwórz zwykły klucz API.",
     "autoModels": {
       "title": "Modele dla trybu Automatycznie",
@@ -13011,6 +13067,15 @@
     "remove": "Usuń",
     "removeTitle": "Usuń klucz {{label}}",
     "removeText": "Klucz zniknie na zawsze. Jeśli jakiś agent wciąż go używa, serwer odmówi: najpierw zmień klucz tych agentów.",
+    "removeUnused": "Klucz zniknie na dobre. Żaden agent z nim nie myśli.",
+    "removeUsedOther_one": "{{agents}} myśli z tym kluczem. Bez niego przejdzie na inny klucz albo poprosi o AI, jeśli żaden nie pasuje do modelu.",
+    "removeUsedOther_few": "{{agents}} myślą z tym kluczem. Bez niego przejdą na inny klucz albo poproszą o AI, jeśli żaden nie pasuje do modelu.",
+    "removeUsedOther_many": "{{agents}} myślą z tym kluczem. Bez niego przejdą na inny klucz albo poproszą o AI, jeśli żaden nie pasuje do modelu.",
+    "removeUsedOther_other": "{{agents}} myślą z tym kluczem. Bez niego przejdą na inny klucz albo poproszą o AI, jeśli żaden nie pasuje do modelu.",
+    "removeUsedNone_one": "{{agents}} myśli z tym kluczem i nie ma nic innego. Bez niego przestanie odpowiadać, dopóki nie połączysz innej AI.",
+    "removeUsedNone_few": "{{agents}} myślą z tym kluczem i nie mają nic innego. Bez niego przestaną odpowiadać, dopóki nie połączysz innej AI.",
+    "removeUsedNone_many": "{{agents}} myślą z tym kluczem i nie mają nic innego. Bez niego przestaną odpowiadać, dopóki nie połączysz innej AI.",
+    "removeUsedNone_other": "{{agents}} myślą z tym kluczem i nie mają nic innego. Bez niego przestaną odpowiadać, dopóki nie połączysz innej AI.",
     "noKeys": "Brak kluczy.",
     "platformAvailable": "Dostępny jest też klucz Claude tego serwera.",
     "usageTitle": "Wydatki na API według rodzaju",
@@ -13449,6 +13514,7 @@
       "waitingAgents_female": "{{name}} przekazała część dalej i czeka na odpowiedź"
     },
     "consultPair": {
+      "took": "zajęło {{time}}",
       "asking": "pyta",
       "working": "pracuje nad tym",
       "waitingApproval": "czeka na zgodę",
@@ -13820,6 +13886,7 @@
       "usage_paused_budget": "{{agent}}: praca wstrzymana · budżet miesięczny na {{percent}}%",
       "work_auto_moved": "To trochę potrwa, więc będę kontynuować w tle. Będę tu wrzucać aktualizacje, następną za około {{minutes}} min.",
       "work_auto_movedOver": "To trochę potrwa, więc będę kontynuować w tle. Będę tu wrzucać aktualizacje.",
+      "moved_on": "Ciąg dalszy w {{link}}",
       "work_end_done": "Gotowe ({{minutes}} min).",
       "work_end_failed": "Ta praca w tle się nie zakończyła ({{minutes}} min).",
       "work_end_failedWhy": "Ta praca w tle się nie zakończyła ({{minutes}} min): {{why}}.",
@@ -14106,6 +14173,10 @@
       "label": "Uruchom skrypt umiejętności",
       "description": "Uruchamia skrypt umiejętności w środowisku."
     },
+    "vault_make_password": {
+      "label": "Utwórz hasło",
+      "description": "Tworzy silne hasło na swoim komputerze i trzyma je w Vault jako klucz, nie widząc go."
+    },
     "computer_status": {
       "label": "Sprawdź komputer",
       "description": "Mówi, który to komputer i czy odpowiada."
@@ -14161,6 +14232,10 @@
     "browser_type_secret": {
       "label": "Wpisz hasło",
       "description": "Wpisuje podane przez ciebie hasło w pole hasła lub kodu, nie widząc go."
+    },
+    "browser_make_password": {
+      "label": "Utwórz hasło",
+      "description": "Tworzy silne hasło do strony na swoim komputerze, trzyma je w Vault i wpisuje, nie widząc go."
     },
     "browser_wait": {
       "label": "Poczekaj na stronę",
@@ -14557,6 +14632,7 @@
         "browser_scroll": "Przewinięto stronę",
         "browser_upload": "Przesłano plik",
         "browser_type_secret": "Wpisano hasło",
+        "browser_make_password": "Utworzono hasło",
         "browser_wait": "Czekano na stronę",
         "browser_screenshot": "Zrobiono zrzut ekranu",
         "browser_ask_person": "Poproszono o pomoc",
@@ -15109,6 +15185,24 @@
     "tasks_many": "{{count}} zadań",
     "tasks_other": "{{count}} zadania",
     "free": "Bez zadań",
+    "hiddenTasks_one": "{{count}} zadanie, którego nie widzisz",
+    "hiddenTasks_few": "{{count}} zadania, których nie widzisz",
+    "hiddenTasks_many": "{{count}} zadań, których nie widzisz",
+    "hiddenTasks_other": "{{count}} zadania, których nie widzisz",
+    "hiddenLine_one": "Jeszcze {{count}} zadanie w rozmowach, których nie widzisz.",
+    "hiddenLine_few": "Jeszcze {{count}} zadania w rozmowach, których nie widzisz.",
+    "hiddenLine_many": "Jeszcze {{count}} zadań w rozmowach, których nie widzisz.",
+    "hiddenLine_other": "Jeszcze {{count}} zadania w rozmowach, których nie widzisz.",
+    "helpers_one": "{{count}} pomocnik",
+    "helpers_few": "{{count}} pomocników",
+    "helpers_many": "{{count}} pomocników",
+    "helpers_other": "{{count}} pomocników",
+    "delegated": {
+      "fromPerson": "zaczęło się od: {{name}}",
+      "fromYou": "zaczęło się od ciebie",
+      "fromRoutine": "zaczęło się od rutyny {{name}}",
+      "stopNote": "Jeśli to zatrzymasz, {{name}} się o tym dowie i nie poprosi ponownie sam z siebie."
+    },
     "columns": {
       "task": "Zadanie",
       "state": "Stan",
@@ -15118,6 +15212,7 @@
     },
     "sections": {
       "asked": "Zlecone przez osoby",
+      "delegated": "Zlecone przez agentów",
       "background": "Rutyny w tle"
     },
     "state": {
@@ -15191,6 +15286,11 @@
       "openManager": "Otwórz w menedżerze zadań"
     },
     "confirm": {
+      "chainTitle_one": "Zatrzymać {{name}} i {{count}} pomocnika?",
+      "chainTitle_few": "Zatrzymać {{name}} i {{count}} pomocników?",
+      "chainTitle_many": "Zatrzymać {{name}} i {{count}} pomocników?",
+      "chainTitle_other": "Zatrzymać {{name}} i {{count}} pomocników?",
+      "chainBody": "To, co już zrobiono, zostaje, a wszyscy się o tym dowiedzą.",
       "title_one": "Zatrzymać zadanie agenta {{name}}?",
       "title_few": "Zatrzymać {{count}} zadania agenta {{name}}?",
       "title_many": "Zatrzymać {{count}} zadań agenta {{name}}?",

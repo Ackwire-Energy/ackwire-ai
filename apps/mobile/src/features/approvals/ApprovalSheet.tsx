@@ -10,7 +10,7 @@ import { nextLabel } from "@agenteschat/client/lib/format";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Button, HoldButton, SheetScreen, Text, useToast } from "@/ui";
+import { Button, HoldButton, Locked, SheetScreen, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
@@ -132,22 +132,30 @@ export function ApprovalSheet({
         {refusing ? null : <ApprovalAheadLine approval={a} />}
         {refusing ? (
           <>
-            <TextArea
-              value={reason}
-              onChangeText={setReason}
-              placeholder={t(`mobile.approval.whyPlaceholder${g}`, { name })}
-              accessibilityLabel={t(`mobile.approval.whyPlaceholder${g}`, { name })}
-              autoFocus
-            />
+            <Locked when={decide.isPending}>
+              <TextArea
+                value={reason}
+                onChangeText={setReason}
+                placeholder={t(`mobile.approval.whyPlaceholder${g}`, { name })}
+                accessibilityLabel={t(`mobile.approval.whyPlaceholder${g}`, { name })}
+                autoFocus
+              />
+            </Locked>
             <View style={styles.acts}>
               <Button
                 variant="primary"
                 wide
                 label={t("mobile.approval.refuse")}
-                disabled={decide.isPending}
+                loading={decide.isPending}
                 onPress={() => done("refuse")}
               />
-              <Button variant="ghost" wide label={t("mobile.common.back")} onPress={() => setRefusing(false)} />
+              <Button
+                variant="ghost"
+                wide
+                label={t("mobile.common.back")}
+                disabled={decide.isPending}
+                onPress={() => setRefusing(false)}
+              />
             </View>
           </>
         ) : (
@@ -182,6 +190,7 @@ export function ApprovalSheet({
                         <HoldButton
                           label={t("mobile.approval.hold")}
                           holdLabel={t("mobile.approval.holding")}
+                          disabled={decide.isPending}
                           onConfirm={() => done("approve")}
                         />
                       ) : (
@@ -192,7 +201,7 @@ export function ApprovalSheet({
                           label={
                             approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")
                           }
-                          disabled={decide.isPending}
+                          loading={decide.isPending}
                           onPress={() => done("approve")}
                         />
                       )}
@@ -200,6 +209,7 @@ export function ApprovalSheet({
                         variant="secondary"
                         wide
                         label={t("mobile.approval.refuse")}
+                        disabled={decide.isPending}
                         onPress={() => setRefusing(true)}
                       />
                       <ApproveAlways

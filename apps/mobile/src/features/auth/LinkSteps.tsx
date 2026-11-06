@@ -8,11 +8,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ComponentRef, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AccessibilityInfo, Linking, type TextInput, View } from "react-native";
+import { AccessibilityInfo, Linking, type TextInput } from "react-native";
 import { useNow } from "@/features/shared/hooks";
 import { firstName } from "@/features/shared/logic";
 import { serverUrl } from "@/lib/server";
-import { Button, haptics, Text } from "@/ui";
+import { Button, haptics, Locked, Text } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
@@ -256,63 +256,70 @@ export function LinkSteps({
     />
   );
 
+  const locked = sending || asking;
   let body: ReactNode = null;
   switch (step) {
     case "email":
       body = (
         <>
-          <AuthField
-            value={email}
-            onChangeText={(value) => {
-              setEmail(value);
-              setError(null);
-            }}
-            placeholder={t("auth.flow.emailPlaceholder")}
-            accessibilityLabel={t("invite.ask.email")}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="next"
-            onSubmitEditing={submit}
-            autoFocus
-          />
-          {fix ? <DidYouMean fix={fix} onFix={setEmail} /> : null}
+          <Locked when={locked} style={{ gap: 10 }}>
+            <AuthField
+              value={email}
+              onChangeText={(value) => {
+                setEmail(value);
+                setError(null);
+              }}
+              placeholder={t("auth.flow.emailPlaceholder")}
+              accessibilityLabel={t("invite.ask.email")}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              onSubmitEditing={submit}
+              autoFocus
+            />
+            {fix ? <DidYouMean fix={fix} onFix={setEmail} /> : null}
+          </Locked>
           <OrgLine agent={preview.agents?.[0]} strong={org} text={sharedBy} />
           <ErrorLine error={error ?? (capped === key ? t("errors.code.limit") : null)} />
           {continueButton}
-          <Quiet
-            label={t("invite.ask.haveAccountSignIn")}
-            onPress={() => {
-              rememberInvite(token, "link");
-              // The address typed here goes along, so the sign-in starts at the password.
-              router.push({ pathname: "/sign-in", params: isEmail(email) ? { email: typed } : {} });
-            }}
-          />
+          <Locked when={locked}>
+            <Quiet
+              label={t("invite.ask.haveAccountSignIn")}
+              onPress={() => {
+                rememberInvite(token, "link");
+                // The address typed here goes along, so the sign-in starts at the password.
+                router.push({ pathname: "/sign-in", params: isEmail(email) ? { email: typed } : {} });
+              }}
+            />
+          </Locked>
         </>
       );
       break;
     case "code":
       body = (
         <>
-          <AuthField
-            ref={codeField}
-            code
-            value={code}
-            onChangeText={typedIn}
-            placeholder={t("invite.ask.code")}
-            accessibilityLabel={t("invite.ask.code")}
-            accessibilityState={{ busy: checking }}
-            keyboardType="number-pad"
-            textContentType="oneTimeCode"
-            autoComplete="one-time-code"
-            returnKeyType="done"
-            onSubmitEditing={() => {
-              if (code.length === CODE_LENGTH && !checking) void checkCode(code);
-            }}
-            autoFocus
-          />
+          <Locked when={checking}>
+            <AuthField
+              ref={codeField}
+              code
+              value={code}
+              onChangeText={typedIn}
+              placeholder={t("invite.ask.code")}
+              accessibilityLabel={t("invite.ask.code")}
+              accessibilityState={{ busy: checking }}
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              autoComplete="one-time-code"
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (code.length === CODE_LENGTH && !checking) void checkCode(code);
+              }}
+              autoFocus
+            />
+          </Locked>
           <ErrorLine error={error} />
           {mail ? (
             <Button
@@ -341,19 +348,21 @@ export function LinkSteps({
     case "name":
       body = (
         <>
-          <AuthField
-            value={name}
-            onChangeText={setName}
-            placeholder={t("auth.flow.namePlaceholder")}
-            accessibilityLabel={t("invite.ask.name")}
-            maxLength={JOIN_NAME_MAX}
-            autoCapitalize="words"
-            autoComplete="name"
-            textContentType="name"
-            returnKeyType="next"
-            onSubmitEditing={submit}
-            autoFocus
-          />
+          <Locked when={locked}>
+            <AuthField
+              value={name}
+              onChangeText={setName}
+              placeholder={t("auth.flow.namePlaceholder")}
+              accessibilityLabel={t("invite.ask.name")}
+              maxLength={JOIN_NAME_MAX}
+              autoCapitalize="words"
+              autoComplete="name"
+              textContentType="name"
+              returnKeyType="next"
+              onSubmitEditing={submit}
+              autoFocus
+            />
+          </Locked>
           {error ? <ErrorLine error={error} /> : <NameHint name={name} />}
           {continueButton}
         </>
@@ -362,18 +371,20 @@ export function LinkSteps({
     case "password":
       body = (
         <>
-          <PasswordField
-            value={password}
-            onChangeText={setPassword}
-            fresh
-            onSecretChange={setSecret}
-            onShow={() => {
-              setWink(true);
-              setTimeout(() => setWink(false), 900);
-            }}
-            onSubmitEditing={submit}
-            label={t("invite.createPassword")}
-          />
+          <Locked when={locked}>
+            <PasswordField
+              value={password}
+              onChangeText={setPassword}
+              fresh
+              onSecretChange={setSecret}
+              onShow={() => {
+                setWink(true);
+                setTimeout(() => setWink(false), 900);
+              }}
+              onSubmitEditing={submit}
+              label={t("invite.createPassword")}
+            />
+          </Locked>
           {continueButton}
         </>
       );
@@ -381,7 +392,7 @@ export function LinkSteps({
     case "note":
       body = (
         <>
-          <View style={{ gap: 6 }}>
+          <Locked when={locked} style={{ gap: 6 }}>
             <Text variant="subhead" tone="muted">
               {t("invite.ask.noteField")}
             </Text>
@@ -396,10 +407,12 @@ export function LinkSteps({
               minHeight={96}
               autoFocus
             />
-          </View>
+          </Locked>
           <ErrorLine error={error} />
           <Button variant="primary" wide label={t("invite.ask.send")} loading={asking} onPress={submit} />
-          <Quiet label={t("mobile.invite.join.skip")} onPress={() => void ask("")} />
+          <Locked when={locked}>
+            <Quiet label={t("mobile.invite.join.skip")} onPress={() => void ask("")} />
+          </Locked>
         </>
       );
       break;

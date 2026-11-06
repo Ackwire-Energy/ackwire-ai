@@ -138,6 +138,7 @@ function ConnectForm({
         onPress: submit,
         disabled: missing.length > 0 || busy,
       }}
+      locked={busy}
     >
       <GroupedFooter>{t("mobile.vault.connect.text", { name: source.name })}</GroupedFooter>
       {source.warning ? (

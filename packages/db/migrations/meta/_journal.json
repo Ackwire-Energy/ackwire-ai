@@ -1569,6 +1569,20 @@
       "when": 1793990000000,
       "tag": "0225_agent_speed",
       "breakpoints": true
+    },
+    {
+      "idx": 226,
+      "version": "7",
+      "when": 1794000000000,
+      "tag": "0226_machine_file_pulls",
+      "breakpoints": true
+    },
+    {
+      "idx": 227,
+      "version": "7",
+      "when": 1794000100000,
+      "tag": "0227_agent_passwords",
+      "breakpoints": true
     }
   ]
 }

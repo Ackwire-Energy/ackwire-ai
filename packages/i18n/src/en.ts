@@ -1702,6 +1702,11 @@ export const en = {
     linkCopied: "Link copied.",
     reply: "Reply",
     quoteOf: "Reply to {{name}}: {{excerpt}}. See the message",
+    quoteGone: "Original message deleted",
+    jumpTooFar: "That message is too far back to open from here.",
+    quoteNoWords: "Message with no text",
+    replyingTo: "Replying to {{name}}",
+    cancelReply: "Cancel reply",
     emoji: "Emoji",
     uploading: "uploading…",
     uploadFailed: "was not uploaded",
@@ -1936,6 +1941,11 @@ export const en = {
       configure: "Configure",
       nameStory: "The name comes from lodestar, the star sailors steer by.",
     },
+    /** What a connect flow says: the right hand has two AIs, and the words say which moved. */
+    saved: {
+      workspace: "{{name}} now thinks with {{label}} for everyone without a plan of their own.",
+      mine: "Your conversation with {{name}} now thinks with {{label}}. Only yours does.",
+    },
     settings: {
       name: "Name and look",
       nameHelp: "In the sidebar it always shows as “{{label}}”.",
@@ -1960,6 +1970,8 @@ export const en = {
       useWorkspace: "Use the workspace's",
       /** Without a plan of their own: what their conversation thinks with. */
       fallbackKey: "Without your own plan, it uses the workspace's API key.",
+      fallbackKeyOf: "Without your own plan, it uses the workspace's key: {{label}}.",
+      fallbackNoKey: "The workspace has no API key yet, so without your own plan nothing answers you here.",
       fallbackPlan: "Without your own plan, it uses {{owner}}'s plan, which serves everyone.",
       fallbackYours: "Without another plan, it uses the workspace's, which is yours.",
       fallbackNone: "Without your own plan, {{name}} can't answer you: the workspace's plan serves only {{owner}}.",
@@ -2240,7 +2252,12 @@ export const en = {
       title: "Already connected",
       titleFor: "Already connected, for {{name}}",
       other: "Or connect another",
+      manageKeys: "Manage or delete keys",
     },
+    /** The Cloud's workspace on a billing hold: a key won't run there either, so only the plan is offered. */
+    billing: "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan.",
+    /** After `billing`, on the phone, where paying isn't offered. */
+    billingWeb: "Choose one on the web, at agentes.chat.",
     orPayGo: "Or pay as you go",
     plan: {
       claude: { title: "Your Claude plan", tiers: "Pro, Max, Ultra, Team or Enterprise" },
@@ -2270,6 +2287,9 @@ export const en = {
       paste: "Paste it here",
       forAll: "Every agent without a plan thinks with it.",
       saved: "Saved. Every agent without a plan thinks with it.",
+      /** Saved, though the provider gave no answer about the key: it may still fail. */
+      savedUnchecked:
+        "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why.",
       notPlan: "A coding plan's key goes in its own option above.",
       billing: "Turn on billing for the key's project. Without billing, Google may use what your agents send.",
       privacy: "Your OpenRouter privacy settings decide which providers may keep what your agents send.",
@@ -2992,11 +3012,17 @@ export const en = {
   secret: {
     group: "Secret request from {{agent}}",
     chip: "Waiting",
-    targetEnv: "Goes in as the variable {{name}} on {{agent}}'s computer.",
+    targetEnv: "Goes to {{agent}}'s computer, for its commands.",
     targetFile: "Goes to the file {{path}} on {{agent}}'s computer.",
     targetSite: "Only {{agent}}'s browser types it, on {{host}}. It stays out of {{agent}}'s commands.",
     replaces: "Replaces the key {{agent}} already has under this name.",
-    label: "Value of {{name}}",
+    /** What a request is called when the agent gave no label of its own. */
+    labelPassword: "Password for {{host}}",
+    labelCode: "Code for {{host}}",
+    labelKey: "A key for {{agent}}'s computer",
+    labelFile: "The file {{path}}",
+    placeholder: "Type it here",
+    account: "Account: {{username}}.",
     private: "Sent encrypted straight to the computer. It stays out of the chat and away from the agent.",
     send: "Send",
     decline: "Decline",
@@ -3004,8 +3030,20 @@ export const en = {
     waitingFor: "Only {{person}} can answer.",
     outcomeBy: "Delivered by {{person}}",
     outcomeByYou: "Delivered by you",
-    outcomeWithdrawn: "No longer needed",
-    alreadyAnswered: "This request was already answered or expired.",
+    outcomeWithdrawn: "{{agent}} no longer needs this.",
+    /** How a request ended with nobody delivering it: what happened and what's next, in the line that replaces its card. */
+    endedDeclined: "Declined. {{agent}} goes on without it.",
+    endedExpired: "Nobody answered in time. {{agent}} goes on without it, and can ask again.",
+    endedRunStopped: "{{agent}}'s task stopped before this was answered. Ask {{agent}} again if you still need it.",
+    endedSuperseded: "{{agent}} asked again in a newer request.",
+    endedComputer: "This can't reach {{agent}} anymore: the computer that asked changed. Ask {{agent}} to ask again.",
+    endedPersonLeft: "{{person}} left the workspace before answering.",
+    endedClosed: "This request closed before anyone answered. Ask {{agent}} again if you still need it.",
+    seeNewer: "See the newer request",
+    /** Sending failed, but the request is still open: only its computer can't take it now. */
+    computerAway:
+      "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment.",
+    computerPaused: "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}.",
     failed: "Couldn't deliver it. Is the agent's computer on?",
     empty: "Type the value.",
     tooLarge: "Too large (16 KB at most).",
@@ -5601,7 +5639,7 @@ export const en = {
     vault_write: {
       label: "Edit Vault contacts",
       description:
-        "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved.",
+        "Save and update contact details in the Vault, change a saved login's username or a description, make passwords for accounts it creates, and delete what it saved.",
     },
     github_git_read: {
       label: "Clone repositories (git)",
@@ -7803,6 +7841,10 @@ export const en = {
         execOff: "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself.",
         toolOff: "{{program}} isn't allowed on {{computer}} yet. That's on our side: try again later.",
         preparing: "{{computer}} is getting ready. This changes by itself when it's done.",
+        /** Past the time any of the above takes: nothing says it's still coming. */
+        stuck:
+          "{{program}} still isn't ready on {{computer}}, and this won't change by itself. Use an API key for now, and try this plan again later.",
+        away: "{{computer}} has been away longer than a restart takes. Use an API key for now, and try this plan again later.",
       },
     },
     done: {
@@ -8815,6 +8857,21 @@ export const en = {
     /** {{after}} is `queue.who`: the agent's name, with an article where the language needs one. */
     startsAfter: "starts once {{after}} finishes",
     left: "~{{n}} min left",
+    /** A turn past its typical length: no estimate is honest. */
+    overdue: "past its usual time",
+    /** A row of the line, for who sees that work. */
+    openTask: "Open task",
+    /** What fills the computer now, joined into one line. */
+    fill: {
+      agent_one: "{{count}} asked by an agent",
+      agent_other: "{{count}} asked by agents",
+      person_one: "{{count}} for a person",
+      person_other: "{{count}} for people",
+      routine_one: "{{count}} routine",
+      routine_other: "{{count}} routines",
+      work_one: "{{count}} long job",
+      work_other: "{{count}} long jobs",
+    },
     /** An agent's name inside a sentence ("once Ada finishes"). Keep {{name}}; add an article only if your language needs one. */
     who: "{{name}}",
     /** The outage card's pill beside the time, {{time}} like "3 min". */
@@ -8833,12 +8890,12 @@ export const en = {
       yourDm: "your DM",
       dm: "DM with {{name}}",
       thread: "a thread in #{{name}}",
+      agents: "a conversation between agents",
       private: "a private conversation",
     },
     /** The waiting agent's live row, where "thinking" shows otherwise. */
     live: {
       nextEta: "Waiting for the computer. Next up, in about {{n}} min",
-      nextAfter: "Waiting for the computer. Next up, once {{after}} finishes",
       next: "Waiting for the computer. Next up",
       /** Before the line knows its turn, or while it can't say where it is. */
       waiting: "Waiting for the computer",
@@ -10561,6 +10618,7 @@ export const en = {
       titleNoLetters: "A title needs letters or numbers.",
       lockAdminsOnly: "Only admins lock pages.",
     },
+    replyGone: "The message you were replying to isn't here anymore.",
     media: {
       off: "GIFs and stickers are off in this workspace.",
       notFound: "That GIF isn't available anymore. Pick another one.",
@@ -11758,6 +11816,11 @@ export const en = {
     keyValue: "API key",
     keyInvalid: "Paste the API key (at least 8 characters).",
     keyRefused: "The provider didn't accept this key.",
+    keyNoCredit: "{{provider}} says this key has no credit. Add credit there and save it again. Nothing was saved.",
+    keyDenied:
+      "{{provider}} didn't let this key make a call. Check its permissions there and save it again. Nothing was saved.",
+    keySaid: "{{provider}} said: {{said}}",
+    keyInUse: "{{agents}} still think with this key.",
     keyManagement: "This is a management key. Create a regular API key.",
     autoModels: {
       title: "Models for Automatic",
@@ -11779,6 +11842,16 @@ export const en = {
     removeTitle: "Delete the key {{label}}",
     removeText:
       "The key is gone for good. If an agent still uses it, the server refuses: change those agents' key first.",
+    removeUnused: "The key is gone for good. No agent thinks with it.",
+    /** Before deleting a key agents use: another key takes over, or nothing does. */
+    removeUsedOther_one:
+      "{{agents}} thinks with this key. Once it's gone, it moves to another key, or asks for an AI if none fits its model.",
+    removeUsedOther_other:
+      "{{agents}} think with this key. Once it's gone, they move to another key, or ask for an AI if none fits their model.",
+    removeUsedNone_one:
+      "{{agents}} thinks with this key and has nothing else. Once it's gone, it stops answering until you connect another AI.",
+    removeUsedNone_other:
+      "{{agents}} think with this key and have nothing else. Once it's gone, they stop answering until you connect another AI.",
     noKeys: "No keys yet.",
     platformAvailable: "This server's Claude key is also available.",
     usageTitle: "API spend by kind",
@@ -12163,6 +12236,8 @@ export const en = {
      * names while a question is out or once it went unanswered, lowercase, then the time.
      */
     consultPair: {
+      /** The row of a closed ask: from the ask to what came back, waits included. */
+      took: "took {{time}}",
       asking: "asking",
       /** Work handed off (`tell_agent`), still on it. */
       working: "working on it",
@@ -12552,6 +12627,7 @@ export const en = {
         "This will take a while, so I'll keep going in the background. I'll post updates here, the next one in about {{minutes}} min.",
       /** The same once the work is over: its line says how it ended, so no promise is left (ADR 0121). */
       work_auto_movedOver: "This will take a while, so I'll keep going in the background. I'll post updates here.",
+      moved_on: "Continues in {{link}}",
       work_end_done: "Done ({{minutes}} min).",
       work_end_failed: "This background work didn't finish ({{minutes}} min).",
       work_end_failedWhy: "This background work didn't finish ({{minutes}} min): {{why}}.",
@@ -12840,6 +12916,10 @@ export const en = {
       label: "Run skill script",
       description: "Runs a skill's script in the environment.",
     },
+    vault_make_password: {
+      label: "Make a password",
+      description: "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it.",
+    },
     computer_status: {
       label: "Check the computer",
       description: "Says which computer it is and whether it's answering.",
@@ -12895,6 +12975,11 @@ export const en = {
     browser_type_secret: {
       label: "Type a password",
       description: "Types a password you gave it into a password or code field, without seeing it.",
+    },
+    browser_make_password: {
+      label: "Make a password",
+      description:
+        "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it.",
     },
     browser_wait: {
       label: "Wait for the page",
@@ -13240,6 +13325,7 @@ export const en = {
         browser_scroll: "Scrolled the page",
         browser_upload: "Uploaded a file",
         browser_type_secret: "Typed a password",
+        browser_make_password: "Made a password",
         browser_wait: "Waited for the page",
         browser_screenshot: "Took a screenshot",
         browser_ask_person: "Asked for help",
@@ -13823,8 +13909,28 @@ export const en = {
     tasks_one: "{{count}} task",
     tasks_other: "{{count}} tasks",
     free: "Free",
+    /** An agent's card: its tasks the viewer may not see, counted. */
+    hiddenTasks_one: "{{count}} task you can't see",
+    hiddenTasks_other: "{{count}} tasks you can't see",
+    /** Under the title: what the viewer may not see, counted. */
+    hiddenLine_one: "{{count}} more task in conversations you don't see.",
+    hiddenLine_other: "{{count}} more tasks in conversations you don't see.",
+    /** A task that asked other agents, on its row. */
+    helpers_one: "{{count}} helper",
+    helpers_other: "{{count}} helpers",
+    /** Work one agent asked of another: what started the chain. */
+    delegated: {
+      fromPerson: "started by {{name}}",
+      fromYou: "started by you",
+      fromRoutine: "started by the routine {{name}}",
+      stopNote: "If you stop it, {{name}} is told you did and won't ask again on its own.",
+    },
     columns: { task: "Task", state: "State", using: "Using now", time: "Time", computer: "Runs on" },
-    sections: { asked: "Asked by people", background: "Routines in the background" },
+    sections: {
+      asked: "Asked by people",
+      delegated: "Asked by agents",
+      background: "Routines in the background",
+    },
     state: {
       working: "Working",
       ok: "Waits for your ok",
@@ -13895,6 +14001,10 @@ export const en = {
       openManager: "Open in the task manager",
     },
     confirm: {
+      /** One task and the agents it asked, stopped together. */
+      chainTitle_one: "Stop {{name}} and {{count}} helper?",
+      chainTitle_other: "Stop {{name}} and {{count}} helpers?",
+      chainBody: "What's done stays, and they are all told.",
       title_one: "Stop the task of {{name}}?",
       title_other: "Stop the {{count}} tasks of {{name}}?",
       body: "What was already done stays, and {{name}} is told that you stopped it.",

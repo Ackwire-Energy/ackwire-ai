@@ -114,6 +114,26 @@ test("a fake brain's text deltas become the agent's message; usage lands on the 
   ).toEqual([]);
 });
 
+test("a computer brain's text before its own tool call never shows live, only the text that ends the turn", async () => {
+  f = await setup();
+  const { brain } = scriptedBrain(() => [
+    { type: "text_delta", text: "I need the inbox id first." },
+    { type: "tool_call", id: "t1", name: "Bash", input: { command: "ls" }, executed: { content: "ok" } },
+    { type: "text_delta", text: "Caixa " },
+    { type: "text_delta", text: "conferida." },
+    { type: "done", text: "Caixa conferida." },
+  ]);
+  const events = f.listen(f.general.id);
+  await post(f, "@dev confere a caixa");
+  await drainOutbox(f.db, handlersWith(f, brain));
+
+  expect(JSON.stringify(events)).not.toContain("inbox id");
+  const deltas = events.flatMap((e) => (e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : []));
+  expect(deltas.join("")).toBe("Caixa conferida.");
+  const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(timeline.map((m) => m.body)).toEqual(["@dev confere a caixa", "Caixa conferida."]);
+});
+
 test("a tool_call runs through the Tool Gateway and its result is fed back on the next turn", async () => {
   const env = envTool();
   f = await setup({ toolSources: [env.source] });

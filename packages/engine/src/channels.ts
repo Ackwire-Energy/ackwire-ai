@@ -16,7 +16,7 @@ import {
 import { caches } from "./cache";
 import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
+import { publishChannelEvent, publishChannelsChanged, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql, threadReadAtSql } from "./follows";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { quietNoticeSql } from "./notices";
@@ -156,6 +156,7 @@ export async function announceChannelLeavers(
     await publishUserEvent(pubsub, orgId, userId, removed);
     await publishChannelEvent(pubsub, removed);
   }
+  if (leavers.length > 0) await publishChannelsChanged(pubsub, orgId);
 }
 
 export async function createChannel(
@@ -170,6 +171,7 @@ export async function createChannel(
     audienceRoleIds?: string[];
     categoryId?: string | null;
   },
+  options: { pubsub?: PubSub } = {},
 ): Promise<Channel> {
   await requirePermission(db, actorId, orgId, "create_channels");
   // Whoever may create a channel may put it in an existing category (arranging categories is for admins).
@@ -183,7 +185,7 @@ export async function createChannel(
   const visibility = input.visibility ?? "public";
   const audienceRoleIds = await channelRoleIds(db, orgId, visibility, input.audienceRoleIds);
   try {
-    return await db.transaction(async (tx) => {
+    const made = await db.transaction(async (tx) => {
       const [channel] = await tx
         .insert(channels)
         .values({
@@ -201,6 +203,8 @@ export async function createChannel(
       await tx.insert(channelMembers).values({ orgId, channelId: channel.id, userId: actorId });
       return channel;
     });
+    await publishChannelsChanged(options.pubsub, orgId);
+    return made;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`#${name} already exists`);
     throw error;
@@ -609,6 +613,7 @@ export async function joinChannel(
       channelId,
       member: { type: "person", id: userId },
     });
+    await publishChannelsChanged(options.pubsub, orgId);
   };
   if (channel.visibility === "public") {
     await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
@@ -738,6 +743,7 @@ export async function addChannelMember(
     };
     await publishChannelEvent(options.pubsub, event);
     await publishUserEvent(options.pubsub, orgId, member.userId, event);
+    await publishChannelsChanged(options.pubsub, orgId);
     return;
   }
   // In no channel: an @mention reaches it anywhere (ADR 0137).
@@ -755,6 +761,7 @@ export async function addChannelMember(
     channelId,
     member: { type: "agent", id: member.agentId, autoReply },
   });
+  await publishChannelsChanged(options.pubsub, orgId);
 }
 
 /**
@@ -800,6 +807,7 @@ export async function setChannelAgentAutoReply(
     channelId,
     member: { type: "agent", id: agentId, autoReply },
   });
+  await publishChannelsChanged(options.pubsub, orgId);
 }
 
 export async function listChannelMembers(db: Database, actorId: string, orgId: string, channelId: string) {
@@ -807,7 +815,8 @@ export async function listChannelMembers(db: Database, actorId: string, orgId: s
   const rows = await db
     .select({ userId: channelMembers.userId, agentId: channelMembers.agentId })
     .from(channelMembers)
-    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId)));
+    .leftJoin(agents, eq(agents.id, channelMembers.agentId))
+    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), isNull(agents.archivedAt)));
   return rows.map((r) =>
     r.userId ? { type: "person" as const, id: r.userId } : { type: "agent" as const, id: r.agentId ?? "" },
   );
@@ -862,6 +871,7 @@ export async function removeChannelMember(
     channelId,
     member: { type: "agent", id: member.agentId },
   });
+  await publishChannelsChanged(options.pubsub, orgId);
 }
 
 /** The channel, when `actorId` may archive it or bring it back: its creator or an admin. */
@@ -891,13 +901,21 @@ export async function archiveChannel(
   await db.update(channels).set({ archivedAt: new Date() }).where(eq(channels.id, channelId));
   caches.channels.delete(`${orgId}:${channelId}`);
   await publishOrgEvent(options.pubsub, { type: "channel.archived", orgId, channelId });
+  await publishChannelsChanged(options.pubsub, orgId);
 }
 
 /** Brings an archived channel back as it was (creator or admin): "Refazer" after an agent's channel was undone. */
-export async function unarchiveChannel(db: Database, actorId: string, orgId: string, channelId: string) {
+export async function unarchiveChannel(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  options: { pubsub?: PubSub } = {},
+) {
   const channel = await archivableChannel(db, actorId, orgId, channelId);
   // A deleted channel is archived for good: its contents are being purged.
   if (channel.deletedAt) throw new NotFoundError("Channel not found");
   await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, channelId));
   caches.channels.delete(`${orgId}:${channelId}`);
+  await publishChannelsChanged(options.pubsub, orgId);
 }

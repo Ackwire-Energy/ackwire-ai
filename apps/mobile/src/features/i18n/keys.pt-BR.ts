@@ -1976,7 +1976,6 @@ export const featureKeysPtBR = {
       as: "Entra como {{username}}.",
       saved: "Salvo no Cofre",
       notSaved: "Enviado, mas não salvo no Cofre",
-      codeLabel: "Código para {{name}}",
       codeIncomplete: "Digite todos os dígitos do código.",
       codeNote: "Vai criptografado direto para o computador. Códigos nunca são salvos.",
     },

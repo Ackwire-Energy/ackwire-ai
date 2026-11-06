@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, count, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { isKnownProvider, PROVIDERS } from "@agenteschat/providers";
 import { actWithUndo } from "./agent-actions";
@@ -453,20 +453,24 @@ export function createSetupToolSource(deps: {
             const [person] = matches;
             if (person && person.userId !== requester) people.set(person.userId, person.name);
           }
+          const events = holdEvents(deps.pubsub);
           const channel = await actWithUndo(
             ctx,
             async (db) => {
-              const created = await createChannel(db, requester, ctx.orgId, {
-                name: str(input.name).trim().replace(/^#/, ""),
-                topic: str(input.topic).trim(),
-              });
+              const created = await createChannel(
+                db,
+                requester,
+                ctx.orgId,
+                { name: str(input.name).trim().replace(/^#/, ""), topic: str(input.topic).trim() },
+                events,
+              );
               // Agents first: only they can be refused (their owner or an admin adds them), and a refusal
               // undoes the whole channel before anyone was told they're in it.
               for (const a of agents.rows) {
-                await addChannelMember(db, requester, ctx.orgId, created.id, { agentId: a.id }, deps);
+                await addChannelMember(db, requester, ctx.orgId, created.id, { agentId: a.id }, events);
               }
               for (const userId of people.keys()) {
-                await addChannelMember(db, requester, ctx.orgId, created.id, { userId }, deps);
+                await addChannelMember(db, requester, ctx.orgId, created.id, { userId }, events);
               }
               return created;
             },
@@ -478,6 +482,7 @@ export function createSetupToolSource(deps: {
               after: { name: created.name },
             }),
           );
+          await events.flush();
           const members = [...people.values(), ...agents.rows.map((a) => `@${a.handle}`)];
           return {
             content: `Created #${channel.name}${members.length ? ` with ${members.join(", ")}` : ""}.`,

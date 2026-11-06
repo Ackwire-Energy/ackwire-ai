@@ -101,7 +101,8 @@ describe("what agents did under each reply (a person's own setting, off by defau
     // Where it browsed and what it did on its desktop are step summaries (no picture): activity too.
     expect(document.querySelectorAll(".brw-trail").length).toBe(0);
     const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    expect(card.textContent).toContain("BILLING_API_KEY");
+    expect(card.textContent).toContain("ler o uso da conta");
+    expect(card.textContent).not.toContain("BILLING_API_KEY");
     // The card alone speaks: its fallback sentence is for previews and notifications.
     expect(document.body.textContent).not.toContain("pediu uma chave");
     expect(document.body.textContent).not.toContain("asked for a key");

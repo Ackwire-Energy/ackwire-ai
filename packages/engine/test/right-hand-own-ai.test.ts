@@ -7,6 +7,7 @@ import {
   MACHINE_CONTROL_TOPIC,
   type MachineStatus,
   machineAgents,
+  makeDefaultCredential,
   openPersonAgentDm,
   PLAN_LENT_JOB,
   postPersonMessage,
@@ -234,3 +235,46 @@ test("a login made for one agent moves to a person's Lodi only when they say so,
   await setAgentBrain(deps, bia.id, fx.org.id, fx.agent.id, { brain: "claude_code", account: BIAS });
   expect((await getAgentBrain(deps, bia.id, fx.org.id, lodi.id, "mine")).account).toBeNull();
 });
+
+test("chosen, reloaded, read: a workspace key shows as the workspace's AI, and each person's own stays theirs", async () => {
+  const { fx, deps, lodi } = await world();
+  // What the dialogs do for a key (`rightHandOnKey`): no own plan, the workspace on its model, the key pinned.
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, lodi.id, { brain: "model", scope: "mine" });
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, lodi.id, { brain: "model", scope: "workspace" });
+  await fx.db.update(schema.agents).set({ credentialId: fx.credential.id }).where(eq(schema.agents.id, lodi.id));
+  const mine = await getAgentBrain(deps, fx.owner.id, fx.org.id, lodi.id, "mine");
+  const workspace = await getAgentBrain(deps, fx.owner.id, fx.org.id, lodi.id, "workspace");
+  const key = { provider: "anthropic", label: fx.credential.label };
+  expect(mine).toMatchObject({ brain: "model", scope: "mine", workspaceAi: { brain: "model", key } });
+  expect(workspace).toMatchObject({ brain: "model", scope: "workspace", workspaceAi: { brain: "model", key } });
+});
+
+test("with no key pinned, the page names the key its calls take: the default, not the newest", async () => {
+  const { fx, deps, lodi } = await world();
+  await fx.db.update(schema.agents).set({ credentialId: null }).where(eq(schema.agents.id, lodi.id));
+  await fx.db.insert(schema.providerCredentials).values({
+    ...(await keyRow(fx)),
+    label: "Newer",
+    createdAt: new Date(Date.now() + 60_000),
+  });
+  await makeDefaultCredential(fx.db, fx.owner.id, fx.org.id, fx.credential.id);
+  const mine = await getAgentBrain(deps, fx.owner.id, fx.org.id, lodi.id, "mine");
+  expect(mine.workspaceAi?.key?.label).toBe(fx.credential.label);
+});
+
+test("with no key anywhere, the workspace's AI says so instead of naming one", async () => {
+  const { fx, deps, lodi } = await world();
+  await fx.db.delete(schema.providerCredentials).where(eq(schema.providerCredentials.orgId, fx.org.id));
+  const mine = await getAgentBrain(deps, fx.owner.id, fx.org.id, lodi.id, "mine");
+  expect(mine.workspaceAi?.key).toBeNull();
+});
+
+/** Another key of the same provider, copied from the fixture's. */
+async function keyRow(fx: Awaited<ReturnType<typeof world>>["fx"]) {
+  const [row] = await fx.db
+    .select()
+    .from(schema.providerCredentials)
+    .where(eq(schema.providerCredentials.id, fx.credential.id));
+  if (!row) throw new Error("fixture key");
+  return { ...row, id: crypto.randomUUID() };
+}

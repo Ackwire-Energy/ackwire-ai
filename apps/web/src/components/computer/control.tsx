@@ -1,4 +1,4 @@
-import { Button, isApple, onScreenKeyboard, Textarea } from "@agenteschat/ui";
+import { Button, isApple, Locked, onScreenKeyboard, Textarea } from "@agenteschat/ui";
 import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { aimsAtScreen } from "@/lib/keys";
@@ -141,6 +141,7 @@ export function HandBackFoot({
   onNote,
   noteFirst,
   pending,
+  locked = false,
   onBack,
   other,
 }: {
@@ -153,6 +154,8 @@ export function HandBackFoot({
   /** The note open from the start. */
   noteFirst: boolean;
   pending: boolean;
+  /** The other way out is on its way: the whole bar waits, its button with no spinner of its own. */
+  locked?: boolean;
   onBack: () => void;
   /** The other way out (a request's Desistir), before the main one. */
   other?: ReactNode;
@@ -173,52 +176,54 @@ export function HandBackFoot({
         if (!(e.target instanceof HTMLTextAreaElement)) e.preventDefault();
       }}
     >
-      <div className="brw-ac__row">
-        {noted ? (
-          <Textarea
-            rows={1}
-            autoGrow
-            className="brw-ac__note"
-            autoFocus={keysWere.current !== null}
-            value={note}
-            onChange={(e) => onNote?.(e.target.value)}
-            placeholder={t("browser.inCard.backPlaceholder", grammar)}
-            aria-label={t("browser.inCard.backLabel", grammar)}
-            maxLength={1000}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && !noteFirst && !note.trim()) {
-                setWriting(false);
-                keysWere.current?.focus({ preventScroll: true });
-              }
-              if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
-              e.preventDefault();
-              back();
-            }}
-          />
-        ) : (
-          <>
-            <b>{title}</b>
-            {note !== undefined && (
-              <button
-                type="button"
-                className="ac-link ac-link--muted brw-ac__add"
-                onClick={() => {
-                  keysWere.current = document.activeElement as HTMLElement | null;
-                  setWriting(true);
-                }}
-              >
-                {t("browser.inCard.addNote")}
-              </button>
-            )}
-          </>
-        )}
-        <span className="brw-ac__ways">
-          {other}
-          <Button size="sm" variant="primary" icon="check" loading={pending} onClick={back}>
-            {label}
-          </Button>
-        </span>
-      </div>
+      <Locked when={pending || locked}>
+        <div className="brw-ac__row">
+          {noted ? (
+            <Textarea
+              rows={1}
+              autoGrow
+              className="brw-ac__note"
+              autoFocus={keysWere.current !== null}
+              value={note}
+              onChange={(e) => onNote?.(e.target.value)}
+              placeholder={t("browser.inCard.backPlaceholder", grammar)}
+              aria-label={t("browser.inCard.backLabel", grammar)}
+              maxLength={1000}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && !noteFirst && !note.trim()) {
+                  setWriting(false);
+                  keysWere.current?.focus({ preventScroll: true });
+                }
+                if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
+                e.preventDefault();
+                back();
+              }}
+            />
+          ) : (
+            <>
+              <b>{title}</b>
+              {note !== undefined && (
+                <button
+                  type="button"
+                  className="ac-link ac-link--muted brw-ac__add"
+                  onClick={() => {
+                    keysWere.current = document.activeElement as HTMLElement | null;
+                    setWriting(true);
+                  }}
+                >
+                  {t("browser.inCard.addNote")}
+                </button>
+              )}
+            </>
+          )}
+          <span className="brw-ac__ways">
+            {other}
+            <Button size="sm" variant="primary" icon="check" loading={pending} onClick={back}>
+              {label}
+            </Button>
+          </span>
+        </div>
+      </Locked>
     </div>
   );
 }

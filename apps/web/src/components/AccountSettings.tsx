@@ -14,6 +14,7 @@ import {
   DialogFooter,
   Field,
   Input,
+  Locked,
   PlanMeter,
   ProviderLogo,
   Segmented,
@@ -344,39 +345,41 @@ export function ProfileDialog({ focus, onClose }: { focus: "name" | "timezone" |
           if (zoneOk && nameOk && !save.isPending) save.mutate();
         }}
       >
-        <DialogBody>
-          <div className="row" style={{ gap: 12, alignItems: "center" }}>
-            <Avatar name={me.user.name} size="lg" imageUrl={mine?.image ?? me.user.image} />
-            <span style={{ fontWeight: 600, flex: 1 }}>{t("photo.label")}</span>
-            <Button size="sm" type="button" onClick={() => setPhoto(true)}>
-              {t("photo.change")}
-            </Button>
-          </div>
-          <Field label={t("auth.yourName")} id="me-name" error={nameOk ? undefined : t("shell.nameEmpty")}>
-            <Input
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus={focus === "name"}
-            />
-          </Field>
-          <Field label={t("shell.handle")} id="me-handle">
-            <AffixInput prefix="@" value={handle} onChange={(e) => setHandle(e.target.value)} />
-          </Field>
-          <Field
-            label={t("shell.timezone")}
-            id="me-zone"
-            hint={{ name: t("common.about", { label: t("shell.timezone") }), text: t("shell.timezoneHelp") }}
-            error={!zoneOk ? t("shell.timezoneInvalid") : undefined}
-          >
-            <ZoneSelect value={zone || "UTC"} disabled={useOrgZone} onChange={setZone} />
-          </Field>
-          <span className="row" style={{ gap: 8, alignItems: "center" }}>
-            <Checkbox id="me-zone-org" checked={useOrgZone} onCheckedChange={setUseOrgZone} />
-            <label htmlFor="me-zone-org">{t("shell.useOrgZone")}</label>
-          </span>
-          {error && <Alert>{error}</Alert>}
-        </DialogBody>
+        <Locked when={save.isPending}>
+          <DialogBody>
+            <div className="row" style={{ gap: 12, alignItems: "center" }}>
+              <Avatar name={me.user.name} size="lg" imageUrl={mine?.image ?? me.user.image} />
+              <span style={{ fontWeight: 600, flex: 1 }}>{t("photo.label")}</span>
+              <Button size="sm" type="button" onClick={() => setPhoto(true)}>
+                {t("photo.change")}
+              </Button>
+            </div>
+            <Field label={t("auth.yourName")} id="me-name" error={nameOk ? undefined : t("shell.nameEmpty")}>
+              <Input
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus={focus === "name"}
+              />
+            </Field>
+            <Field label={t("shell.handle")} id="me-handle">
+              <AffixInput prefix="@" value={handle} onChange={(e) => setHandle(e.target.value)} />
+            </Field>
+            <Field
+              label={t("shell.timezone")}
+              id="me-zone"
+              hint={{ name: t("common.about", { label: t("shell.timezone") }), text: t("shell.timezoneHelp") }}
+              error={!zoneOk ? t("shell.timezoneInvalid") : undefined}
+            >
+              <ZoneSelect value={zone || "UTC"} disabled={useOrgZone} onChange={setZone} />
+            </Field>
+            <span className="row" style={{ gap: 8, alignItems: "center" }}>
+              <Checkbox id="me-zone-org" checked={useOrgZone} onCheckedChange={setUseOrgZone} />
+              <label htmlFor="me-zone-org">{t("shell.useOrgZone")}</label>
+            </span>
+            {error && <Alert>{error}</Alert>}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}

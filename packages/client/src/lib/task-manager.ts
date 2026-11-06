@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { EndedTask, ManagedTask, TaskNow, TaskWait } from "../api/types";
+import type { EndedTask, HiddenTasks, ManagedTask, TaskNow, TaskWait } from "../api/types";
 import { type Activity, toolActivity } from "./activity";
 import { etaMinutes } from "./computer-queue";
 import { usageWhenShort } from "./plan-usage";
@@ -272,22 +272,26 @@ export function programKey(p: TaskProgram): string | null {
 }
 
 /** What a task is about, for its row: its label, else where it is ("Conversa com Ana", "#produto"). */
-export function taskTitle(t: TFunction, task: Pick<ManagedTask, "label" | "routine" | "channelKind" | "channelName">) {
+export function taskTitle(
+  t: TFunction,
+  task: Pick<ManagedTask, "label" | "routine" | "channelKind" | "channelName" | "betweenAgents">,
+) {
   if (task.label?.trim()) return task.label.trim();
   if (task.routine?.name) return task.routine.name;
   return taskWhere(t, task);
 }
 
-/** Where it is: "#produto", "Conversa direta", "Rotina «Backups»". */
+/** Where it is: "#produto", "Conversa direta", "Conversa entre agentes", "Rotina «Backups»". */
 export function taskWhere(
   t: TFunction,
-  task: Pick<ManagedTask, "routine" | "channelKind" | "channelName"> & { background?: boolean },
+  task: Pick<ManagedTask, "routine" | "channelKind" | "channelName" | "betweenAgents"> & { background?: boolean },
 ) {
   if (task.background) {
     return task.routine?.name
       ? t("taskManager.where.routine", { name: task.routine.name })
       : t("taskManager.where.background");
   }
+  if (task.betweenAgents) return t("chat.consultPanel.whereDm");
   if (task.channelKind === "dm") return t("taskManager.where.dm");
   return `#${task.channelName ?? ""}`;
 }
@@ -299,29 +303,82 @@ export interface AgentTasks {
   waiting: number;
   /** Tasks it can stop now (not already stopping on this screen). */
   stoppable: string[];
+  /** What those asked of other agents, still on: it stops with them. */
+  helpers: number;
 }
 
-/**
- * The task manager's sections: tasks people asked for, grouped by agent (agents with someone waiting on them or
- * working first, then by their oldest task), and the routines' background runs.
- */
-export function groupTasks(tasks: ManagedTask[], stopping: ReadonlySet<string> = new Set()) {
-  const asked = tasks.filter((t) => !t.background);
-  const background = tasks.filter((t) => t.background);
+/** How many runs these tasks asked of other agents, still on. */
+export const helpersOf = (tasks: readonly Pick<ManagedTask, "helpers">[]) =>
+  tasks.reduce((n, t) => n + (t.helpers ?? 0), 0);
+
+/** Tasks in groups by `keyOf`, oldest group first, each group oldest first. */
+function tasksBy(tasks: ManagedTask[], keyOf: (task: ManagedTask) => string, stopping: ReadonlySet<string>) {
   const byAgent = new Map<string, ManagedTask[]>();
-  for (const task of asked) byAgent.set(task.agentId, [...(byAgent.get(task.agentId) ?? []), task]);
+  for (const task of tasks) byAgent.set(keyOf(task), [...(byAgent.get(keyOf(task)) ?? []), task]);
   const groups: AgentTasks[] = [...byAgent].map(([agentId, list]) => {
     const sorted = [...list].sort((a, b) => taskSince(a) - taskSince(b));
+    const stoppable = sorted.filter((t) => t.canStop && !stopping.has(t.runId));
     return {
       agentId,
       tasks: sorted,
       working: sorted.filter((t) => taskState(t) === "working").length,
       waiting: sorted.filter((t) => waitsOnPerson(t)).length,
-      stoppable: sorted.filter((t) => t.canStop && !stopping.has(t.runId)).map((t) => t.runId),
+      stoppable: stoppable.map((t) => t.runId),
+      helpers: helpersOf(stoppable),
     };
   });
-  groups.sort((a, b) => taskSince(a.tasks[0] as ManagedTask) - taskSince(b.tasks[0] as ManagedTask));
-  return { groups, background: [...background].sort((a, b) => taskSince(a) - taskSince(b)) };
+  return groups.sort((a, b) => taskSince(a.tasks[0] as ManagedTask) - taskSince(b.tasks[0] as ManagedTask));
+}
+
+/**
+ * The task manager's sections: tasks people asked for, grouped by agent (agents with someone waiting on them or
+ * working first, then by their oldest task), what agents asked of each other in private, grouped by the agent that
+ * asked (`delegated`: a group's `agentId` is that agent), and the routines' background runs.
+ */
+export function groupTasks(tasks: ManagedTask[], stopping: ReadonlySet<string> = new Set()) {
+  const delegatedTo = (t: ManagedTask) => !t.background && Boolean(t.delegation);
+  return {
+    groups: tasksBy(
+      tasks.filter((t) => !t.background && !delegatedTo(t)),
+      (t) => t.agentId,
+      stopping,
+    ),
+    delegated: tasksBy(tasks.filter(delegatedTo), (t) => t.delegation?.agentId ?? "", stopping),
+    background: tasks.filter((t) => t.background).sort((a, b) => taskSince(a) - taskSince(b)),
+  };
+}
+
+/** Who asked it and what started the chain: "a pedido de Theo · começou com Ana", "… · começou na rotina Bugs". */
+export function delegationText(
+  t: TFunction,
+  task: Pick<ManagedTask, "delegation">,
+  agentName: (id: string) => string | undefined,
+  meId: string | null,
+) {
+  const d = task.delegation;
+  if (!d) return null;
+  const name = agentName(d.agentId);
+  const by = name ? t("queue.purpose.agent", { name }) : t("queue.purpose.someAgent");
+  const { origin } = d;
+  const from =
+    origin.kind === "person"
+      ? origin.userId === meId
+        ? t("taskManager.delegated.fromYou")
+        : t("taskManager.delegated.fromPerson", { name: origin.name })
+      : origin.kind === "routine"
+        ? t("taskManager.delegated.fromRoutine", { name: origin.name })
+        : null;
+  return from ? `${by} · ${from}` : by;
+}
+
+/** Its tasks the viewer may not see (`agentId` null: everyone's). */
+export const hiddenCount = (hidden: HiddenTasks | undefined, agentId: string | null) =>
+  (agentId ? hidden?.byAgent[agentId] : hidden?.total) ?? 0;
+
+/** An agent's card line: its tasks, how many it has out of the viewer's sight, or free. */
+export function agentCardLine(t: TFunction, shown: number, hidden: number) {
+  if (shown > 0) return t("taskManager.tasks", { count: shown + hidden });
+  return hidden > 0 ? t("taskManager.hiddenTasks", { count: hidden }) : t("taskManager.free");
 }
 
 /** An agent's tasks (its card, the chat's strip): people's first, then its routines', oldest first. */

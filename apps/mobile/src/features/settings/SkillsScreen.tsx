@@ -779,6 +779,7 @@ function InstallSkill({ initialUrl }: { initialUrl?: string }) {
     <SettingsPage
       title={t("skills.install")}
       action={{ label: t("skills.installSubmit"), disabled: busy, onPress: () => void submit() }}
+      locked={busy}
     >
       <View style={styles.tabs}>
         <Segmented
@@ -988,6 +989,7 @@ export function EditSkillScreen({ id }: { id: string }) {
       title={t("skills.edit")}
       subtitle={s?.name}
       action={{ label: t("skills.save"), disabled: !ready, onPress: save }}
+      locked={action.isPending}
     >
       {!form ? (
         skill.isError ? (

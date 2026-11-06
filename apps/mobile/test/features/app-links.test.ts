@@ -36,6 +36,13 @@ describe("web addresses → the app's screens", () => {
     expect(linkOf(`${W}/org/${O}/threads?open=t2`)).toEqual({ org: O, thread: "t2" });
   });
 
+  test("a conversation with a thread in its panel opens that thread's screen, at its message", () => {
+    expect(linkOf(`${W}/org/${O}/c/c1?thread=t1&reply=true`)).toEqual({ org: O, thread: "t1" });
+    expect(linkOf(`${W}/org/${O}/c/c1?thread=t1&tm=m1`)).toEqual({ org: O, thread: "t1", m: "m1" });
+    expect(linkOf(`${W}/org/${O}/dm/agent/a1?thread=t1`)).toEqual({ org: O, thread: "t1" });
+    expect(linkOf(`${W}/org/${O}/dm/person/u1?thread=t1`)).toEqual({ org: O, thread: "t1" });
+  });
+
   test("the workspace's other pages the app has", () => {
     const to = (path: string) => (linkOf(`${W}/org/${O}${path}`) as { to?: string }).to;
     expect(to("")).toBe("/");

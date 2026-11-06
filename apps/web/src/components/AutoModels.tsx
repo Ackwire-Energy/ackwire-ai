@@ -1,7 +1,7 @@
 import { type ModelTier, useModels, useSettings, useUpdateSettings } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import { MODEL_TIERS, nearestTier } from "@agenteschat/client/lib/providers";
-import { Button, Dialog, DialogBody, DialogFooter, Field, ProviderLogo, SettingRow } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Locked, ProviderLogo, SettingRow } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ModelSelect, modelOptions } from "@/components/AgentFields";
@@ -64,29 +64,31 @@ export function AutoModelsRow() {
         closeLabel={t("common.close")}
         width={520}
       >
-        <DialogBody>
-          {MODEL_TIERS.map((tier) => {
-            const fallback = nearestTier(own, tier, (m) => m.tier);
-            return (
-              <Field key={tier} label={t(`settings.autoModels.${tier}`)} id={`auto-model-${tier}`}>
-                <ModelSelect
-                  value={chosen?.[tier] ?? DEFAULT}
-                  onChange={(model) => setChosen((c) => c && { ...c, [tier]: model })}
-                  options={[
-                    {
-                      value: DEFAULT,
-                      label: fallback
-                        ? t("settings.autoModels.default", { model: fallback.label })
-                        : t("brain.auto.label"),
-                      leading: <ProviderLogo id={PROVIDER} size="sm" />,
-                    },
-                    ...options,
-                  ]}
-                />
-              </Field>
-            );
-          })}
-        </DialogBody>
+        <Locked when={update.isPending}>
+          <DialogBody>
+            {MODEL_TIERS.map((tier) => {
+              const fallback = nearestTier(own, tier, (m) => m.tier);
+              return (
+                <Field key={tier} label={t(`settings.autoModels.${tier}`)} id={`auto-model-${tier}`}>
+                  <ModelSelect
+                    value={chosen?.[tier] ?? DEFAULT}
+                    onChange={(model) => setChosen((c) => c && { ...c, [tier]: model })}
+                    options={[
+                      {
+                        value: DEFAULT,
+                        label: fallback
+                          ? t("settings.autoModels.default", { model: fallback.label })
+                          : t("brain.auto.label"),
+                        leading: <ProviderLogo id={PROVIDER} size="sm" />,
+                      },
+                      ...options,
+                    ]}
+                  />
+                </Field>
+              );
+            })}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={() => setChosen(null)}>{t("common.cancel")}</Button>
           <Button variant="primary" loading={update.isPending} onClick={save}>

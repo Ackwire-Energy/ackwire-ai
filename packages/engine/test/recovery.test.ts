@@ -10,6 +10,7 @@ import {
   drainOutbox,
   enqueue,
   INTERRUPTED_BY_RESTART,
+  insertMessage,
   type JobHandler,
   listMessages,
   postPersonMessage,
@@ -157,6 +158,49 @@ describe("server restarts", () => {
     expect(await activeRunsIn(f.db, f.org.id, f.general.id)).toEqual([
       expect.objectContaining({ runId: run.id, status: "running", agentId: f.agent.id }),
     ]);
+  });
+
+  test("an interrupted run's secret card that is up closes with it and says why, with no click", async () => {
+    const { run } = await interruptedRun();
+    await orphan(run.id);
+    await addRunStep(f.db, run, "tool_call", { toolUseId: "toolu_cut", name: "long_task", input: {} });
+    const card = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: run.channelId,
+      threadId: null,
+      author: { type: "agent", agentId: f.agent.id, runId: run.id, hop: 0 },
+      body: "card",
+    });
+    const [asked] = await f.db
+      .insert(schema.secretRequests)
+      .values({
+        orgId: f.org.id,
+        runId: run.id,
+        agentId: f.agent.id,
+        channelId: run.channelId,
+        messageId: card.id,
+        toolUseId: "toolu_asked",
+        requestedForUserId: f.owner.id,
+        name: "SHOP_PASSWORD",
+        purpose: "To sign in.",
+        targetKind: "env",
+        publicKey: "key",
+        expiresAt: new Date(Date.now() + 600_000),
+      })
+      .returning();
+    const events = f.listen(f.general.id);
+
+    expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).failed).toEqual([run.id]);
+    const [row] = await f.db
+      .select()
+      .from(schema.secretRequests)
+      .where(eq(schema.secretRequests.id, asked?.id ?? ""));
+    expect(row).toMatchObject({ status: "canceled", endReason: "run_stopped" });
+    expect(events.find((e) => e.type === "secret.updated")).toMatchObject({
+      secretRequest: { status: "canceled", endReason: "run_stopped" },
+    });
+    const [message] = await f.db.select().from(schema.messages).where(eq(schema.messages.id, card.id));
+    expect(message?.meta).toMatchObject({ secretRequest: { status: "canceled", endReason: "run_stopped" } });
   });
 
   test("the next instance goes on with what the tool returned: the tool ran once", async () => {

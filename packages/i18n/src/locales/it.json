@@ -1771,6 +1771,11 @@
     "linkCopied": "Link copiato.",
     "reply": "Rispondi",
     "quoteOf": "Risposta a {{name}}: {{excerpt}}. Vedi il messaggio",
+    "quoteGone": "Messaggio originale eliminato",
+    "jumpTooFar": "Questo messaggio è troppo indietro per aprirlo da qui.",
+    "quoteNoWords": "Messaggio senza testo",
+    "replyingTo": "Risposta a {{name}}",
+    "cancelReply": "Annulla risposta",
     "emoji": "Emoji",
     "uploading": "caricamento…",
     "uploadFailed": "non è stato caricato",
@@ -2000,6 +2005,10 @@
       "configure": "Configura",
       "nameStory": "Il nome viene da lodestar, la stella che guida i naviganti."
     },
+    "saved": {
+      "workspace": "{{name}} ora ragiona con {{label}} per tutti quelli senza un piano proprio.",
+      "mine": "La tua conversazione con {{name}} ora ragiona con {{label}}. Solo la tua."
+    },
     "settings": {
       "name": "Nome e aspetto",
       "nameHelp": "Nella barra laterale appare sempre come “{{label}}”.",
@@ -2020,6 +2029,8 @@
       "connectMine": "Collega il mio piano",
       "useWorkspace": "Usa quella del workspace",
       "fallbackKey": "Senza un piano tuo, usa la chiave API del workspace.",
+      "fallbackKeyOf": "Senza un piano tuo, usa la chiave del workspace: {{label}}.",
+      "fallbackNoKey": "Il workspace non ha ancora una chiave API, quindi senza un piano tuo qui non ti risponde nessuno.",
       "fallbackPlan": "Senza un piano tuo, usa il piano di {{owner}}, che risponde a tutti.",
       "fallbackYours": "Senza un altro piano, usa quello del workspace, che è tuo.",
       "fallbackNone": "Senza un piano tuo, {{name}} non può risponderti: il piano del workspace risponde solo a {{owner}}.",
@@ -2301,8 +2312,11 @@
       "title": "Già collegati",
       "titleFor": "Già collegati, per {{name}}",
       "titleFor_female": "Già collegati, per {{name}}",
-      "other": "Oppure collegane un altro"
+      "other": "Oppure collegane un altro",
+      "manageKeys": "Gestisci o elimina le chiavi"
     },
+    "billing": "Un piano accede sul computer del workspace, e il computer arriva con un piano agentes.chat attivo.",
+    "billingWeb": "Scegline uno sul web, su agentes.chat.",
     "orPayGo": "Oppure paga a consumo",
     "plan": {
       "claude": {
@@ -2351,6 +2365,7 @@
       "paste": "Incollala qui",
       "forAll": "Ogni agente senza un piano ragiona con questa.",
       "saved": "Salvata. Ogni agente senza un piano ragiona con questa.",
+      "savedUnchecked": "Salvata, ma {{provider}} non ha risposto e la chiave non è stata verificata. Se fallisce, la conversazione dice perché.",
       "notPlan": "La chiave di un piano di coding va nella sua opzione qui sopra.",
       "billing": "Attiva la fatturazione per il progetto della chiave. Senza fatturazione, Google può usare quello che inviano i tuoi agenti.",
       "privacy": "Le impostazioni privacy di OpenRouter decidono quali fornitori possono conservare quello che inviano i tuoi agenti.",
@@ -3064,11 +3079,16 @@
   "secret": {
     "group": "Richiesta di un segreto da {{agent}}",
     "chip": "In attesa",
-    "targetEnv": "Entra come variabile {{name}} sul computer di {{agent}}.",
+    "targetEnv": "Va sul computer di {{agent}}, per i suoi comandi.",
     "targetFile": "Va nel file {{path}} sul computer di {{agent}}.",
     "targetSite": "Lo digita solo il browser di {{agent}}, su {{host}}. Resta fuori dai comandi di {{agent}}.",
     "replaces": "Sostituisce la chiave che {{agent}} ha già con questo nome.",
-    "label": "Valore di {{name}}",
+    "labelPassword": "Password di {{host}}",
+    "labelCode": "Codice di {{host}}",
+    "labelKey": "Una chiave per il computer di {{agent}}",
+    "labelFile": "Il file {{path}}",
+    "placeholder": "Scrivilo qui",
+    "account": "Utente: {{username}}.",
     "private": "Inviato cifrato direttamente al computer. Resta fuori dalla chat e lontano dall'agente.",
     "send": "Invia",
     "decline": "Rifiuta",
@@ -3076,8 +3096,17 @@
     "waitingFor": "Solo {{person}} può rispondere.",
     "outcomeBy": "Consegnato da {{person}}",
     "outcomeByYou": "Consegnato da te",
-    "outcomeWithdrawn": "Non serve più",
-    "alreadyAnswered": "Questa richiesta ha già avuto risposta o è scaduta.",
+    "outcomeWithdrawn": "{{agent}} non ne ha più bisogno.",
+    "endedDeclined": "Rifiutato. {{agent}} va avanti senza.",
+    "endedExpired": "Nessuno ha risposto in tempo. {{agent}} va avanti senza e può chiederlo di nuovo.",
+    "endedRunStopped": "L'attività di {{agent}} si è fermata prima della risposta. Chiedi di nuovo a {{agent}} se ti serve ancora.",
+    "endedSuperseded": "{{agent}} ha chiesto di nuovo in una richiesta più recente.",
+    "endedComputer": "Questo non arriva più a {{agent}}: il computer che l'ha chiesto è cambiato. Chiedi a {{agent}} di chiederlo di nuovo.",
+    "endedPersonLeft": "{{person}} ha lasciato il workspace prima di rispondere.",
+    "endedClosed": "Questa richiesta si è chiusa prima di una risposta. Chiedi di nuovo a {{agent}} se ti serve ancora.",
+    "seeNewer": "Vedi la richiesta più recente",
+    "computerAway": "Il computer di {{agent}} non risponde in questo momento. Questa richiesta resta aperta fino alle {{time}}. Riprova tra un attimo.",
+    "computerPaused": "Il computer di {{agent}} è in pausa per scelta del proprietario. Questa richiesta resta aperta fino alle {{time}}.",
     "failed": "Non è stato possibile consegnarlo. Il computer dell'agente è acceso?",
     "empty": "Scrivi il valore.",
     "tooLarge": "Troppo grande (massimo 16 KB)."
@@ -5831,7 +5860,7 @@
     },
     "vault_write": {
       "label": "Modificare i contatti del Vault",
-      "description": "Salvare e aggiornare i contatti nel Vault, cambiare il nome utente di un login salvato o una descrizione, ed eliminare ciò che ha salvato."
+      "description": "Salvare e aggiornare i contatti nel Vault, cambiare il nome utente di un login salvato o una descrizione, creare password per gli account che apre, ed eliminare ciò che ha salvato."
     },
     "github_git_read": {
       "label": "Clonare repository (git)",
@@ -8275,7 +8304,9 @@
         "runnerOld": "Il programma agentes.chat su {{computer}} non è aggiornato e l'aggiornamento è in arrivo. Questo cambia da solo quando ha finito.",
         "execOff": "{{computer}} non può ancora eseguire {{program}}. Ci stiamo lavorando, e questo cambia da solo.",
         "toolOff": "{{program}} non è ancora consentito su {{computer}}. Dipende da noi: riprova più tardi.",
-        "preparing": "{{computer}} si sta preparando. Questo cambia da solo quando ha finito."
+        "preparing": "{{computer}} si sta preparando. Questo cambia da solo quando ha finito.",
+        "stuck": "{{program}} non è ancora pronto su {{computer}}, e questo non cambierà da solo. Usa una chiave API per ora e riprova questo piano più tardi.",
+        "away": "{{computer}} è assente da più tempo di un riavvio. Usa una chiave API per ora e riprova questo piano più tardi."
       }
     },
     "done": {
@@ -9341,6 +9372,22 @@
     "startsIn": "inizia tra ~{{n}} min",
     "startsAfter": "inizia quando {{after}} finisce",
     "left": "mancano ~{{n}} min",
+    "overdue": "oltre il solito",
+    "openTask": "Apri attività",
+    "fill": {
+      "agent_one": "{{count}} chiesta da un agente",
+      "agent_many": "{{count}} chieste da agenti",
+      "agent_other": "{{count}} chieste da agenti",
+      "person_one": "{{count}} per una persona",
+      "person_many": "{{count}} per persone",
+      "person_other": "{{count}} per persone",
+      "routine_one": "{{count}} routine",
+      "routine_many": "{{count}} routine",
+      "routine_other": "{{count}} routine",
+      "work_one": "{{count}} lavoro lungo",
+      "work_many": "{{count}} lavori lunghi",
+      "work_other": "{{count}} lavori lunghi"
+    },
     "who": "{{name}}",
     "away": "Via da {{time}}",
     "purpose": {
@@ -9356,11 +9403,11 @@
       "yourDm": "il tuo DM",
       "dm": "DM con {{name}}",
       "thread": "un thread in #{{name}}",
+      "agents": "una conversazione tra agenti",
       "private": "una conversazione privata"
     },
     "live": {
       "nextEta": "In attesa del computer. È il prossimo, tra circa {{n}} min",
-      "nextAfter": "In attesa del computer. È il prossimo quando {{after}} finisce",
       "next": "In attesa del computer. È il prossimo",
       "waiting": "In attesa del computer",
       "behind": "In coda, {{nth}}. Dopo {{names}}",
@@ -11401,6 +11448,7 @@
       "titleNoLetters": "Un titolo deve contenere lettere o numeri.",
       "lockAdminsOnly": "Solo gli admin bloccano le pagine."
     },
+    "replyGone": "Il messaggio a cui stavi rispondendo non c'è più.",
     "media": {
       "off": "GIF e sticker sono disattivati in questo spazio di lavoro.",
       "notFound": "Quella GIF non è più disponibile. Scegline un'altra.",
@@ -12599,6 +12647,10 @@
     "keyValue": "Chiave API",
     "keyInvalid": "Incolla la chiave API (almeno 8 caratteri).",
     "keyRefused": "Il provider non ha accettato questa chiave.",
+    "keyNoCredit": "{{provider}} dice che questa chiave non ha credito. Aggiungi credito lì e salvala di nuovo. Non è stato salvato nulla.",
+    "keyDenied": "{{provider}} non ha lasciato fare una chiamata a questa chiave. Controlla lì i suoi permessi e salvala di nuovo. Non è stato salvato nulla.",
+    "keySaid": "{{provider}} ha detto: {{said}}",
+    "keyInUse": "{{agents}} ragionano ancora con questa chiave.",
     "keyManagement": "Questa è una chiave di gestione. Crea una normale chiave API.",
     "autoModels": {
       "title": "Modelli per Automatico",
@@ -12619,6 +12671,13 @@
     "remove": "Elimina",
     "removeTitle": "Elimina la chiave {{label}}",
     "removeText": "La chiave sparisce per sempre. Se un agente la usa ancora, il server rifiuta: prima cambia la chiave di quegli agenti.",
+    "removeUnused": "La chiave sparisce per sempre. Nessun agente ragiona con essa.",
+    "removeUsedOther_one": "{{agents}} ragiona con questa chiave. Senza, passa a un'altra chiave, o chiede un'IA se nessuna va bene per il suo modello.",
+    "removeUsedOther_many": "{{agents}} ragionano con questa chiave. Senza, passano a un'altra chiave, o chiedono un'IA se nessuna va bene per il loro modello.",
+    "removeUsedOther_other": "{{agents}} ragionano con questa chiave. Senza, passano a un'altra chiave, o chiedono un'IA se nessuna va bene per il loro modello.",
+    "removeUsedNone_one": "{{agents}} ragiona con questa chiave e non ha altro. Senza, smette di rispondere finché non colleghi un'altra IA.",
+    "removeUsedNone_many": "{{agents}} ragionano con questa chiave e non hanno altro. Senza, smettono di rispondere finché non colleghi un'altra IA.",
+    "removeUsedNone_other": "{{agents}} ragionano con questa chiave e non hanno altro. Senza, smettono di rispondere finché non colleghi un'altra IA.",
     "noKeys": "Ancora nessuna chiave.",
     "platformAvailable": "È disponibile anche la chiave Claude di questo server.",
     "usageTitle": "Spesa API per tipo",
@@ -13048,6 +13107,7 @@
       "waitingAgents_female": "{{name}} ha passato una parte ad altri e aspetta notizie"
     },
     "consultPair": {
+      "took": "ha richiesto {{time}}",
       "asking": "sta chiedendo",
       "working": "al lavoro",
       "waitingApproval": "in attesa di approvazione",
@@ -13414,6 +13474,7 @@
       "usage_paused_budget": "{{agent}} ha messo in pausa questo lavoro · budget mensile al {{percent}}%",
       "work_auto_moved": "Ci vorrà un po', quindi continuo in background. Pubblicherò aggiornamenti qui, il prossimo tra circa {{minutes}} min.",
       "work_auto_movedOver": "Ci vorrà un po', quindi continuo in background. Pubblicherò aggiornamenti qui.",
+      "moved_on": "Continua in {{link}}",
       "work_end_done": "Fatto ({{minutes}} min).",
       "work_end_failed": "Questo lavoro in background non è terminato ({{minutes}} min).",
       "work_end_failedWhy": "Questo lavoro in background non è terminato ({{minutes}} min): {{why}}.",
@@ -13697,6 +13758,10 @@
       "label": "Esegui script della skill",
       "description": "Esegue lo script di una skill nell'ambiente."
     },
+    "vault_make_password": {
+      "label": "Crea una password",
+      "description": "Crea una password forte sul suo computer e la conserva nel Vault come chiave, senza vederla."
+    },
     "computer_status": {
       "label": "Controlla il computer",
       "description": "Dice qual è il computer e se risponde."
@@ -13752,6 +13817,10 @@
     "browser_type_secret": {
       "label": "Inserisci una password",
       "description": "Inserisce una password che gli hai dato in un campo password o codice, senza vederla."
+    },
+    "browser_make_password": {
+      "label": "Crea una password",
+      "description": "Crea una password forte per un sito sul suo computer, la conserva nel Vault e la inserisce, senza vederla."
     },
     "browser_wait": {
       "label": "Aspetta la pagina",
@@ -14145,6 +14214,7 @@
         "browser_scroll": "Ha scorso la pagina",
         "browser_upload": "Ha caricato un file",
         "browser_type_secret": "Ha inserito una password",
+        "browser_make_password": "Ha creato una password",
         "browser_wait": "Ha aspettato la pagina",
         "browser_screenshot": "Ha fatto uno screenshot",
         "browser_ask_person": "Ha chiesto aiuto",
@@ -14730,6 +14800,21 @@
     "tasks_many": "{{count}} attività",
     "tasks_other": "{{count}} attività",
     "free": "Disponibile",
+    "hiddenTasks_one": "{{count}} attività che non vedi",
+    "hiddenTasks_many": "{{count}} attività che non vedi",
+    "hiddenTasks_other": "{{count}} attività che non vedi",
+    "hiddenLine_one": "{{count}} attività in più in conversazioni che non vedi.",
+    "hiddenLine_many": "{{count}} attività in più in conversazioni che non vedi.",
+    "hiddenLine_other": "{{count}} attività in più in conversazioni che non vedi.",
+    "helpers_one": "{{count}} aiutante",
+    "helpers_many": "{{count}} aiutanti",
+    "helpers_other": "{{count}} aiutanti",
+    "delegated": {
+      "fromPerson": "iniziata da {{name}}",
+      "fromYou": "iniziata da te",
+      "fromRoutine": "iniziata dalla routine {{name}}",
+      "stopNote": "Se la fermi, {{name}} lo saprà e non la chiederà di nuovo da solo."
+    },
     "columns": {
       "task": "Attività",
       "state": "Stato",
@@ -14739,6 +14824,7 @@
     },
     "sections": {
       "asked": "Chieste da persone",
+      "delegated": "Chieste da agenti",
       "background": "Routine in background"
     },
     "state": {
@@ -14811,6 +14897,10 @@
       "openManager": "Apri in Gestione attività"
     },
     "confirm": {
+      "chainTitle_one": "Fermare {{name}} e {{count}} aiutante?",
+      "chainTitle_many": "Fermare {{name}} e {{count}} aiutanti?",
+      "chainTitle_other": "Fermare {{name}} e {{count}} aiutanti?",
+      "chainBody": "Ciò che è già fatto resta, e tutti lo sapranno.",
       "title_one": "Fermare l'attività di {{name}}?",
       "title_many": "Fermare le {{count}} attività di {{name}}?",
       "title_other": "Fermare le {{count}} attività di {{name}}?",

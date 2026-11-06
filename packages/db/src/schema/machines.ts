@@ -407,3 +407,26 @@ export const machineMcpCalls = pgTable(
   },
   (t) => [primaryKey({ columns: [t.machineId, t.callId] }), index().on(t.createdAt)],
 );
+
+/**
+ * A stored file one computer may fetch, once (`GET /api/machines/pulls/{id}`): the row is deleted by that fetch. Made
+ * after the read check of whoever asked; the id is all the computer holds, so what it gets is what the row names.
+ */
+export const machineFilePulls = pgTable(
+  "machine_file_pulls",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    machineId: uuid()
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    storageConfigId: uuid(),
+    blobKey: text().notNull(),
+    size: integer().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.machineId, t.expiresAt), index().on(t.orgId)],
+);

@@ -560,7 +560,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   white-space: pre-wrap;
 }
 /* Under the request card's well, on its 4px grid. */
-.rq > .waitcard__lines {
+.rq > .ac-locked > .waitcard__lines {
   margin-top: 12px;
 }
 
@@ -1240,8 +1240,14 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .member-row--add:hover {
   color: var(--ink);
 }
+/* What a form brings of its own to a `Locked`, outside the kit's disabled looks. */
+.ac-locked:disabled :is(button, input, textarea):not([class^="ac-"], [class*=" ac-"], .ac-input-affix input),
+.ac-locked:disabled :is(.ac-recur__day, .ac-token__remove, .ac-searchfield__clear, .ac-setmore__toggle) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 /* Above a footer's line, the add row keeps its air (last in the dialog, the list's own edge does). */
-.ac-dialog__list:not(:last-child):has(> .member-row--add:last-child) {
+.ac-dialog__list:is(:not(:last-child), .ac-locked:not(:last-child) > *):has(> .member-row--add:last-child) {
   padding-bottom: 16px;
 }
 html:not([data-pointer]) .member-row--add:focus-visible {
@@ -1966,16 +1972,18 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   overscroll-behavior-x: contain;
 }
 .md__table[data-more="end"] > .md__table-scroll {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent), var(--scroll-strip-x);
+  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent), var(--scroll-strip-x);
 }
 .md__table[data-more="start"] > .md__table-scroll {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px);
-  mask-image: linear-gradient(to right, transparent, #000 48px);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px), var(--scroll-strip-x);
+  mask-image: linear-gradient(to right, transparent, #000 48px), var(--scroll-strip-x);
 }
 .md__table[data-more="both"] > .md__table-scroll {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
-  mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent), var(--scroll-strip-x);
+  mask-image:
+    linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent), var(--scroll-strip-x);
 }
 .md__table table {
   border-collapse: collapse;
@@ -3293,7 +3301,7 @@ html:not([data-pointer]) .level-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.level-pill[disabled] {
+.level-pill:disabled {
   cursor: progress;
   opacity: 0.6;
 }
@@ -6086,47 +6094,37 @@ html:not([data-pointer]) .composer-reply__close:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* "Respondendo a Ana" (quote reply) at the top of the composer card: who and the quoted line. */
+/* "Respondendo a Ana" at the top of the composer card; its × or Esc drops it. */
 .composer-quote {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 6px 6px 10px;
+  gap: 6px;
+  padding: 4px 4px 4px 10px;
   border-radius: var(--radius-item);
   background: var(--sunken);
+  font-size: 12.5px;
+  line-height: 18px;
   color: var(--muted);
 }
 .composer-quote > .ac-icon {
   flex: none;
 }
-.composer-quote__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-  font-size: 12.5px;
-  line-height: 17px;
-}
 .composer-quote__who {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
   color: var(--ink2);
 }
-.composer-quote__excerpt {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* The quote above a reply: a neutral strip; opens the original. */
+/* The line above a reply (`.ac-msg__reply`): face, @name and one line of what it answers; opens the original. */
 .msg-quote {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
   max-width: 100%;
-  margin: 4px 0 2px;
-  padding: 3px 10px;
+  min-height: 20px;
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-item);
-  background: var(--sunken);
+  background: none;
   font: inherit;
   font-size: 13px;
   line-height: 18px;
@@ -6141,16 +6139,34 @@ html:not([data-pointer]) .msg-quote:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+.msg-quote .ac-avatar {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  font-size: 8px;
+}
 .msg-quote__who {
   flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
   color: var(--ink2);
+}
+.ac-msg__text .msg-quote__who {
+  color: inherit;
 }
 .msg-quote__excerpt {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.msg-quote--gone {
+  width: fit-content;
+  font-style: italic;
+  cursor: default;
 }
 /* A picker or menu open from the hover bar keeps the bar on screen. */
 .ac-msg__actions:has([aria-expanded="true"]) {
@@ -7271,7 +7287,7 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
   align-items: center;
 }
 /* The ghost's own off state is only a lighter ink: here it fades, so − and Ajustar read as off at a glance. */
-.izoom__tools .ac-btn[disabled] {
+.izoom__tools .ac-btn:disabled {
   opacity: 0.35;
 }
 .izoom__level {
@@ -12986,7 +13002,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   flex: none;
   margin-top: 2px;
 }
-.rh-check .ac-check[data-disabled] + .settings-row__text .settings-row__label {
+.rh-check .ac-check:disabled + .settings-row__text .settings-row__label {
   color: var(--muted);
 }
 .rh-money {

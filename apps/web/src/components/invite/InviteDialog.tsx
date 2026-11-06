@@ -26,6 +26,7 @@ import {
   DialogBody,
   DialogFooter,
   Icon,
+  Locked,
   LogoMark,
   OptionCard,
   pixelConfetti,
@@ -700,18 +701,20 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
           ))}
         </div>
       )}
-      <DialogBody className="invite-dialog">
-        <div
-          className="invite-screen"
-          key={screen}
-          data-sent={screen === "sent" || undefined}
-          data-party={party || undefined}
-        >
-          <HostAsk host={host} title={ask.title} lead={ask.lead} happy={party} face={hostFace} />
-          <div className="auth__step invite-answer">{answer}</div>
-        </div>
-      </DialogBody>
-      <DialogFooter>{footer}</DialogFooter>
+      <Locked when={inviteMany.isPending}>
+        <DialogBody className="invite-dialog">
+          <div
+            className="invite-screen"
+            key={screen}
+            data-sent={screen === "sent" || undefined}
+            data-party={party || undefined}
+          >
+            <HostAsk host={host} title={ask.title} lead={ask.lead} happy={party} face={hostFace} />
+            <div className="auth__step invite-answer">{answer}</div>
+          </div>
+        </DialogBody>
+        <DialogFooter>{footer}</DialogFooter>
+      </Locked>
     </Dialog>
   );
 }

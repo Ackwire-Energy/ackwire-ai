@@ -342,6 +342,29 @@ describe("Configurações do workspace", () => {
     expect(document.body.textContent).toContain("O provedor não aceitou esta chave.");
   });
 
+  test("a key with no credit: nothing saved, the provider's words in the dialog, and the page that fixes it", async () => {
+    const said = "You exceeded your current quota.";
+    const { state } = await go(
+      seedState({ keyRefusal: "provider_key_no_credit", keyRefusalParams: { provider: "OpenAI", said } }),
+      "settings/keys",
+    );
+    const before = state.credentials.length;
+    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
+    await click(within(keys).getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    await type(within(add).getByLabelText("Chave da API"), "sk-proj-abcdefghijklmnop1234");
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await click(within(add).getByRole("button", { name: "OpenAI" }));
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await settle(4);
+    expect(add.textContent).toContain("OpenAI diz que esta chave está sem crédito");
+    expect(add.textContent).toContain(said);
+    expect(within(add).getByRole("link", { name: "platform.openai.com" }).getAttribute("href")).toBe(
+      "https://platform.openai.com/settings/organization/billing/overview",
+    );
+    expect(state.credentials.length).toBe(before);
+  });
+
   test("Modelos do Automático: with an OpenRouter key, each size of task gets a model of its own or the default", async () => {
     // A model OpenRouter stopped listing: the tier runs on the default, so it reads as the default.
     const seeded = seedState({
@@ -383,9 +406,8 @@ describe("Configurações do workspace", () => {
     expect(keys().textContent).toContain("Padrão do workspace");
     // Platform key not offered by this server: not mentioned.
     expect(keys().textContent).not.toContain("chave do Claude deste servidor");
-    const del = within(keys()).getByRole("button", { name: "Apagar" });
-    expect(del.hasAttribute("disabled")).toBe(true);
-    expect(keys().textContent).toContain("Escolha outra chave padrão antes de apagar esta.");
+    // The default key can go too: its dialog says what happens.
+    expect(within(keys()).getByRole("button", { name: "Apagar" }).hasAttribute("disabled")).toBe(false);
     await click(within(keys()).getByRole("button", { name: "Trocar a chave" }));
     const rotate = screen().getByRole("dialog", { name: "Trocar a chave Claude da Acme" });
     expect(rotate.textContent).toContain("Os agentes que usam esta chave passam para a nova na hora.");
@@ -427,7 +449,12 @@ describe("Configurações do workspace", () => {
       within(screen().getByRole("dialog", { name: /Apagar a chave/ })).getByRole("button", { name: "Apagar" }),
     );
     await settle(4);
-    expect(state.calls.find((c) => c.method === "agents.removeCredential")?.args).toEqual([ORG_ID, "cred-1", true]);
+    expect(state.calls.find((c) => c.method === "agents.removeCredential")?.args).toEqual([
+      ORG_ID,
+      "cred-1",
+      true,
+      true,
+    ]);
     await act(() =>
       router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "usage" } }),
     );

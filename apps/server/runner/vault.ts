@@ -1,6 +1,10 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import {
   type ExecVault,
+  PASSWORD_CLASSES,
+  PASSWORD_LENGTH,
+  type PasswordClass,
+  type PasswordRules,
   SITE_SECRET_TTL_MS,
   VAULT_EXEC_KEYS,
   type VaultTypeRefusal,
@@ -8,11 +12,13 @@ import {
 import {
   generateSecretKeyPair,
   isReservedSecretName,
+  madePasswordAad,
   openSecret,
   parseSecretBox,
   redactSecrets,
   SECRET_NAME,
   type SecretBox,
+  sealSecret,
   type VaultUse,
   vaultAad,
 } from "@agenteschat/adapters/secret-box";
@@ -256,6 +262,60 @@ export class VaultOpening {
     this.keys.clear();
     this.values.clear();
   }
+}
+
+// ── Passwords the agent makes ──────────────────────────────────────────────
+
+/** No look-alikes (l, 1, O, 0), and only symbols sites commonly take. */
+const PASSWORD_CHARS: Record<PasswordClass, string> = {
+  lower: "abcdefghijkmnopqrstuvwxyz",
+  upper: "ABCDEFGHJKLMNPQRSTUVWXYZ",
+  digits: "23456789",
+  symbols: "!@#$%*-_=+?",
+};
+
+const pick = (chars: string) => chars[randomInt(chars.length)] as string;
+
+/** `length` characters from the OS's random source: at least one of each class, in no order of class. */
+export function makePassword({ length, classes }: PasswordRules): string {
+  const sets = classes.map((c) => PASSWORD_CHARS[c]);
+  const all = sets.join("");
+  const chars = sets.map(pick);
+  while (chars.length < length) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j] as string, chars[i] as string];
+  }
+  return chars.join("");
+}
+
+/** The request's rules, checked whole: the server's are the agent's own words. */
+function passwordRulesOf(raw: unknown): PasswordRules {
+  const bad = (why: string) => new RunnerError("bad_request", `A password's rules: ${why}`);
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<PasswordRules>;
+  const { length, classes } = r;
+  if (
+    !Number.isInteger(length) ||
+    (length as number) < PASSWORD_LENGTH.min ||
+    (length as number) > PASSWORD_LENGTH.max
+  ) {
+    throw bad(`length goes from ${PASSWORD_LENGTH.min} to ${PASSWORD_LENGTH.max}`);
+  }
+  if (!Array.isArray(classes) || classes.length === 0 || !classes.every((c) => PASSWORD_CLASSES.includes(c))) {
+    throw bad(`classes are some of ${PASSWORD_CLASSES.join(", ")}`);
+  }
+  return { length: length as number, classes: [...new Set(classes)] };
+}
+
+/** `vault.password`: a new password, out of this process only as a box for the key the request brought. */
+export async function sealMadePassword(
+  req: { requestId: string; publicKey: string; rules: unknown },
+  agentId: unknown,
+): Promise<SecretBox> {
+  if (typeof agentId !== "string" || !agentId) throw new RunnerError("bad_request", "A password belongs to an agent");
+  if (!KEY_ID.test(req.requestId)) throw new RunnerError("bad_request", "A password needs its request's id");
+  const value = makePassword(passwordRulesOf(req.rules));
+  return sealSecret(req.publicKey, value, madePasswordAad({ requestId: req.requestId, agentId }));
 }
 
 // ── Commands: keys for one `exec` ──────────────────────────────────────────

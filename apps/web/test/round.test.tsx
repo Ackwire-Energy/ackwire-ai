@@ -615,8 +615,10 @@ describe("agent questions (ask_user)", () => {
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     await click(within(card).getByRole("button", { name: "staging" }));
     await settle(4);
+    // The card ends where it stands: no choice left to press.
     const after = screen().getByRole("group", { name: "Pergunta de Ada" });
-    expect(within(after).getByRole("alert").textContent).toBe("Esta pergunta já foi respondida ou encerrada.");
+    expect(after.textContent).toContain("Esta pergunta já foi respondida ou encerrada.");
+    expect(within(after).queryByRole("button", { name: "staging" })).toBeNull();
   });
 
   test("a question closed without an answer (its run stopped) says so, not who answered", async () => {

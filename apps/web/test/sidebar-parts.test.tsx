@@ -31,7 +31,7 @@ const withCategory = (state: State = seedState()) => {
   for (const c of state.channels) if (c.id === ENG_ID) c.categoryId = ENGINEERING;
   return state;
 };
-/** DMs with Ada (an hour ago), João (now, 2 unread) and Atlas (none yet: no message, so not listed). */
+/** DMs with Ada (an hour ago), João (now, 2 unread) and Atlas (no message yet). */
 const withDms = (state: State = seedState()) => {
   seedDm(state, { type: "agent", id: ADA_ID }, { ago: 60 });
   seedDm(state, { type: "person", id: "u-joao" }, { ago: 1, unread: 2 });
@@ -117,6 +117,18 @@ describe("the parts' headers", () => {
     // Closed, the part keeps its unread total on its header.
     await click(within(nav()).getByRole("button", { name: "Mensagens diretas" }));
     expect(within(head("Mensagens diretas")).getByRole("img", { name: "2 mensagens não lidas" })).toBeTruthy();
+  });
+
+  test("a DM opened with a person is listed before any message", async () => {
+    const state = seedState();
+    state.dms.push({
+      channelId: "dm-joao",
+      with: { type: "person", id: "u-joao", name: "João", handle: null },
+      openedAt: new Date().toISOString(),
+    });
+    await go(state);
+    const dms = head("Mensagens diretas").closest(".sidebar__section") as HTMLElement;
+    expect(within(dms).getByRole("link", { name: /João/ })).toBeTruthy();
   });
 
   test("no conversation with a person yet: a line says where they go; the agents' groups are under Agentes", async () => {
