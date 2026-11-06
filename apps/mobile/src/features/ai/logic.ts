@@ -18,6 +18,7 @@ import {
   existingAi,
   lendable,
   ownSignInLower,
+  signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts } from "@agenteschat/client/lib/brain-advanced";
@@ -245,7 +246,7 @@ export const accountRow = (t: TFunction, choice: AccountChoice<MachineAccount>, 
   label: accountTitle(choice.login),
   sub: accountAbout(t, choice, agentName),
   mark: choice.login.provider ?? choice.login.kind,
-  off: choice.login.status === "signed_out",
+  off: signInOf(choice.login) === "signed_out",
 });
 
 /**

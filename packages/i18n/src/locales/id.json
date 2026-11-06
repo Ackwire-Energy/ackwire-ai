@@ -4054,6 +4054,7 @@
         "account": "Akun",
         "accountWho": "Hanya akun {{owner}}, penanggung jawab {{name}}: paket hanya berpikir untuk agen milik pemiliknya.",
         "accountSignedOut": "Keluar, masuk lagi",
+        "accountUnknown": "Login belum dipastikan, segera dicek lagi",
         "thisComputer": "Akun {{computer}}",
         "accountMove": "Dipakai oleh {{agents}} · Pindahkan ke sini",
         "accountAlso": "Juga dipakai oleh {{agents}}",
@@ -7760,6 +7761,8 @@
       "signedOut": "Sudah keluar. Masuk lagi agar agenmu bisa memakainya.",
       "signedOutFor_other": "{{agents}} sudah keluar.",
       "keyRefused": "Kunci ditolak: ganti dengan yang baru.",
+      "statusUnknown": "Komputer tidak bisa memastikan login kali ini. Komputer akan mengeceknya lagi sendiri.",
+      "identityUnknown": "akun tidak dikenali",
       "rename": "Ganti nama",
       "signInAgain": "Masuk lagi",
       "newKey": "Ganti kunci",
@@ -7802,6 +7805,8 @@
       "limited": "Mencapai batas",
       "limitedUntil": "Mencapai batas sampai {{when}}",
       "updated": "Diperbarui {{ago}}",
+      "ago": "diperbarui {{ago}}",
+      "stale": "angka lama, diperbarui {{ago}}",
       "notShared": "{{maker}} tidak membagikan pemakaian di sini.",
       "offer": {
         "use": "Pakai {{label}} ({{pct}}%)",
@@ -10858,6 +10863,7 @@
       "targetNotFound": "Komputer itu sudah tidak ada. Pilih yang lain.",
       "targetSame": "Agen sudah ada di komputer itu.",
       "targetPaused": "Komputer itu sedang dijeda. Pilih yang lain.",
+      "accountMethodUnsupported": "Komputer ini belum bisa menghubungkan Claude dengan cara ini. Perbarui program agentes.chat di komputer ini, atau pakai kunci API.",
       "offline": "{{name}} sedang offline. Coba lagi setelah ia kembali.",
       "paused": "{{name}} dijeda: tidak ada yang baru dimulai di sana sampai dilanjutkan.",
       "timeout": "Komputer tidak menjawab tepat waktu. Coba lagi."

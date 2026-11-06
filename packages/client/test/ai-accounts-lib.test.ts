@@ -9,8 +9,10 @@ import {
   endsOnClaude,
   existingAi,
   groupPlans,
+  identityUnknown,
   lendable,
   listsExisting,
+  offersSignInAgain,
   ownSignInListed,
   ownSignInLower,
   ownSignInName,
@@ -18,6 +20,7 @@ import {
   ownSignIns,
   planWordOf,
   reusableAccount,
+  signInOf,
   signInPlan,
   unusedCopies,
 } from "../src/lib/ai-accounts";
@@ -94,6 +97,35 @@ describe("groupPlans: one row per account, its logins together", () => {
       ["e", ["e"]],
       ["f", ["f"]],
     ]);
+  });
+
+  test("one email in two of Claude's organizations is two accounts", () => {
+    const claude = (id: string, providerOrgId: string | null) =>
+      login(id, { provider: null, keyHint: null, email: "ana@example.com", providerOrgId });
+    expect(rows([claude("a", "org-personal"), claude("b", "org-team"), claude("c", "org-team")])).toEqual([
+      ["a", ["a"]],
+      ["b", ["b", "c"]],
+    ]);
+    // A login that doesn't say its organization is a login of either, as the server reads it.
+    expect(rows([claude("a", null), claude("b", "org-team"), claude("c", null)])).toEqual([["a", ["a", "b", "c"]]]);
+    expect(rows([claude("a", "org-personal"), claude("b", null), claude("c", "org-team")])).toEqual([
+      ["a", ["a", "b"]],
+      ["c", ["c"]],
+    ]);
+  });
+
+  test("a login the computer couldn't check is neither signed in nor signed out", () => {
+    const [plan] = groupPlans([
+      login("a"),
+      login("b", { status: "signed_out" }),
+      login("c", { status: "signed_out", statusKnown: false }),
+      login("d", { statusKnown: false }),
+    ]);
+    expect(plan?.signedOut.map((l) => l.id)).toEqual(["b"]);
+    expect(plan?.unknown.map((l) => l.id)).toEqual(["c"]);
+    expect(plan?.logins.map(signInOf)).toEqual(["active", "signed_out", "unknown", "active"]);
+    // Still refused by the server, so signing in again stays offered; only the words change.
+    expect(plan?.logins.map(offersSignInAgain)).toEqual([false, true, true, false]);
   });
 
   test("logins whose email or key the viewer can't see stay apart", () => {
@@ -396,6 +428,14 @@ describe("an account for all of its owner's agents", () => {
     expect(endsOnClaude({ ...token, shared: false }, { mode: "system" })).toBe(false);
     expect(endsOnClaude({ ...token, kind: "codex" }, { mode: "system" })).toBe(false);
   });
+
+  test("such a token names no account: its owner reads that it isn't known, never where an email says it", () => {
+    const token = login("t", { shared: true, provider: null, keyHint: null });
+    expect(identityUnknown(token, { mode: "system" })).toBe(true);
+    expect(identityUnknown({ ...token, email: "ana@example.com" }, { mode: "system" })).toBe(false);
+    expect(identityUnknown({ ...token, mine: false }, { mode: "system" })).toBe(false);
+    expect(identityUnknown(token, { mode: "single" })).toBe(false);
+  });
 });
 
 describe("an account's line in an agent's account choice", () => {
@@ -409,6 +449,12 @@ describe("an account's line in an agent's account choice", () => {
       "agentPage.work.brain.accountSignedOut",
     );
     expect(about({})).toBe("aiAccounts.page.keyEnds");
+  });
+
+  test("one the computer couldn't check says so, never signed out", () => {
+    expect(about({ status: "signed_out", statusKnown: false, provider: null, keyHint: null })).toBe(
+      "agentPage.work.brain.accountUnknown",
+    );
   });
 });
 

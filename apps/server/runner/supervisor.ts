@@ -30,17 +30,22 @@ import {
   type MachineReplies,
   type MachineRequest,
   parseRunnerFrame,
+  parseToolNotice,
+  parseTurnContext,
   type RunnerAccess,
   type RunnerFrame,
   type RunnerPause,
   type RunnerTask,
   type ServerFrame,
+  type ToolNotice,
+  type TurnContext,
 } from "@agenteschat/adapters/machine-protocol";
 import type { AccountGrant } from "./accounts";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
 import { type BindPolicyOptions, ensureBrowserBindPolicy } from "./browser-bind-policy";
 import type { BrowserViews } from "./browser-views";
 import { backoffDelay } from "./connection";
+import type { DelegatedBridge } from "./delegated-tools";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
 import { errnoCode, NetworkChangingError, RunnerError, toMachineError } from "./errors";
@@ -62,6 +67,7 @@ import {
 } from "./secrets";
 import { agentCategorySlice, agentSlice, scopeOomPolicy } from "./service";
 import type { RelayCount } from "./streams";
+import type { HostedExit } from "./tasks";
 
 /**
  * System mode (`install.sh --system`): this root process keeps the server's
@@ -119,6 +125,8 @@ const SCOPE_POLL_MS = 20;
 const SECRET_INSTALL_MS = 20_000;
 const NETWORK_SWITCH_MARGIN_S = 30;
 const NETWORK_SWITCH_POLL_MS = 500;
+/** How long root waits for a worker's word on a turn it hosts. */
+const WORKER_ASK_MS = 20_000;
 /** Clone slots one worker may hold or wait for at once. */
 const MAX_WORKER_SLOTS = 64;
 /** How long `reclaimBrains` waits for a worker's answer (a close waits up to `RECLAIM_EXIT_MS` for the CLI to exit). */
@@ -171,7 +179,7 @@ export type WorkerDesktopUse = "desktop" | "browser";
 const BROWSER_SETUP_OPS: ReadonlySet<string> = new Set(["browser.act", "browser.batch", "browser.warm"]);
 
 /** The account a request's CLI signs in with: a turn's or route's, or a Claude Code or Codex task's (protocol 31). */
-function accountOf(req: MachineRequest): { kind: AccountKind; account: string } | null {
+export function accountOf(req: MachineRequest): { kind: AccountKind; account: string } | null {
   const cli =
     req.op === "brain.turn" || req.op === "brain.route"
       ? req.kind
@@ -257,6 +265,30 @@ export type WorkerLinkFrame =
   | { type: "usage"; kind: AccountKind; account: string; info: unknown }
   /** From the worker: its Codex refreshed the ChatGPT sign-in root keeps for all agents (`watchCodexAuth`). */
   | { type: "codex.auth"; account: string; auth: string }
+  /** To the worker: a delegated CLI's bridge, again for each turn; a null `token` closes it (`delegated-tools.ts`). */
+  | ({ type: "bridge.token" } & DelegatedBridge)
+  /** From the worker: that bridge is open and the CLI's relay may dial, or why not. */
+  | { type: "bridge.ready"; process: string; error?: string }
+  /** To the worker: where a turn root hosts runs (`cwd` absent: the agent's folder), and with `text` what it says. */
+  | { type: "turn.prepare"; prepareId: string; agent: AgentScope; cwd?: string; text?: boolean }
+  /** From the worker: that, read as the agent, or why not. */
+  | ({
+      type: "turn.context";
+      prepareId: string;
+      error?: { code: MachineErrorCode; message: string };
+    } & Partial<TurnContext>)
+  /** To the worker: the calls in progress in a delegated session end, their process groups with them. */
+  | { type: "turn.cancel"; session: string }
+  /** To the worker: a line of the CLI of a task root hosts, for that task's logs. */
+  | { type: "task.out"; taskId: string; stream: "stdout" | "stderr"; line: string }
+  /** To the worker: how that CLI ended. */
+  | ({ type: "task.exit"; taskId: string; session: string } & HostedExit)
+  /** From the worker: that CLI stops. */
+  | { type: "task.stop"; taskId: string }
+  /** To the worker: the commands in progress in a delegated session answer now and go on in the background. */
+  | { type: "turn.detach"; session: string }
+  /** From the worker: a delegated session's background shell started or ended. */
+  | ({ type: "tool.notice" } & ToolNotice)
   /** From the worker: its process `pid`, held until the answer, into the agent's slice for `kind` (`scope-gate.ts`). */
   | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
   /** To the worker: it is there, or why not (it starts where it is either way). */
@@ -332,10 +364,16 @@ export interface SupervisorOptions {
    * one whose folder is lent instead.
    */
   grant?: (kind: AccountKind, accountId: string) => Promise<AccountGrant | null>;
+  /** What root launched for this agent on a sign-in with its own user: no stop by uid reaches it. */
+  stopAccountScopes?: (uid: number) => void;
   /** A turn's plan usage, for its account (`AccountManager.noteRateLimit`, `noteCodexRateLimits`). */
   usage?: (kind: AccountKind, accountId: string, info: unknown) => void;
   /** A refreshed ChatGPT sign-in root keeps for all agents (`AccountManager.keepCodexAuth`). */
   codexAuth?: (accountId: string, auth: unknown) => void;
+  /** A background shell of a session root hosts (`AccountBrains.toolNotice`). */
+  toolNotice?: (agentId: string, notice: ToolNotice) => void;
+  /** The worker asked to stop the CLI of its task root hosts (`AccountBrains.stopTask`). */
+  taskStop?: (agentId: string, taskId: string) => void;
   /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
   desktop?: (agent: AgentScope, use: WorkerDesktopUse) => Promise<WorkerDesktop>;
   /** How many people watch or control the agent's desktop (`DesktopSessions.status`). */
@@ -410,6 +448,17 @@ interface Worker {
   slots: Map<string, { release?: () => void }>;
   /** `brain.reclaim`s it hasn't answered, by this side's id. */
   reclaims: Map<string, (reply: BrainReclaimed) => void>;
+  /** Turns root hosts for its agent: its network waits for them, and the end of its session fails them. */
+  hosted: Set<(err: RunnerError) => void>;
+  /** Tasks root hosts for it: only the worker's own end fails them, as its session's end leaves any other task running. */
+  hostedTasks: Set<(err: RunnerError) => void>;
+  /** What root asked it for such a turn, in order, by what the answer names. */
+  asks: Map<string, Ask[]>;
+}
+
+interface Ask {
+  answer(frame: Record<string, unknown>): void;
+  fail(err: RunnerError): void;
 }
 
 interface Show {
@@ -545,6 +594,88 @@ export class Supervisor {
       w.inflight.set(id, entry);
       scope.signal.addEventListener("abort", onAbort, { once: true });
       this.send(w, { ...req, type: "request", id, ...(grant ? { grant } : {}) } as ServerFrame);
+    });
+  }
+
+  /** Its OS user with the network it has now, its worker up (`AgentWorkers`). */
+  async agentReady(agent: AgentScope, signal: AbortSignal): Promise<AgentUser> {
+    if (this.closed) throw new RunnerError("dropped", STOPPING);
+    const w = this.entryNow(agent) ?? (await this.entryAfterNetworkSwitch(agent, "dropped", signal));
+    await this.ready(w, signal);
+    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
+    return w.user;
+  }
+
+  /** Where a turn root hosts runs, read by the agent's worker as the agent. */
+  async turnContext(agent: AgentScope, ask: { cwd?: string; text?: boolean }, signal: AbortSignal) {
+    const prepareId = String(++this.seq);
+    const f = await this.ask(agent.id, prepareId, { type: "turn.prepare", prepareId, agent, ...ask }, signal);
+    const error = f.error as { code?: unknown; message?: unknown } | undefined;
+    if (error) {
+      const code = typeof error.code === "string" ? (error.code as MachineErrorCode) : "internal";
+      throw new RunnerError(code, typeof error.message === "string" ? error.message.slice(0, 500) : "Refused");
+    }
+    const context = parseTurnContext(f);
+    if (!context) throw new RunnerError("internal", "The agent's worker said nothing usable about this turn");
+    return context;
+  }
+
+  /** Opens or updates a delegated CLI's bridge; resolves once the worker has it. A null `token` closes it. */
+  async bridge(bridge: DelegatedBridge) {
+    const frame = { type: "bridge.token" as const, ...bridge };
+    if (bridge.token === null) return this.tell(bridge.agent.id, frame);
+    const f = await this.ask(bridge.agent.id, `bridge:${bridge.process}`, frame);
+    if (typeof f.error === "string") throw new RunnerError("internal", f.error.slice(0, 500));
+  }
+
+  /** Between two of its sessions too: what a hosted task prints and how it ends can't wait for the server. */
+  tell(agentId: string, frame: WorkerLinkFrame) {
+    const w = this.workers.get(agentId);
+    if (w) this.write(w, frame);
+  }
+
+  /** While the returned call isn't made, a turn root hosts for this agent runs (`Worker.hosted`, `task`: `hostedTasks`). */
+  hold(agentId: string, dropped: (err: RunnerError) => void, task = false): () => void {
+    const w = this.workers.get(agentId);
+    const held = task ? w?.hostedTasks : w?.hosted;
+    held?.add(dropped);
+    return () => held?.delete(dropped);
+  }
+
+  private ask(
+    agentId: string,
+    key: string,
+    frame: WorkerLinkFrame,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>> {
+    const w = this.workers.get(agentId);
+    if (!w?.ready) return Promise.reject(new RunnerError("dropped", "The agent's worker isn't connected right now."));
+    return new Promise((resolve, reject) => {
+      const done = () => {
+        clearTimeout(late);
+        signal?.removeEventListener("abort", abort);
+        const left = w.asks.get(key)?.filter((a) => a !== ask) ?? [];
+        if (left.length) w.asks.set(key, left);
+        else w.asks.delete(key);
+      };
+      const ask: Ask = {
+        answer: (f) => {
+          done();
+          resolve(f);
+        },
+        fail: (err) => {
+          done();
+          reject(err);
+        },
+      };
+      const abort = () => ask.fail(new RunnerError("internal", "Canceled"));
+      const late = setTimeout(
+        () => ask.fail(new RunnerError("internal", "The agent's worker didn't answer in time")),
+        WORKER_ASK_MS,
+      );
+      signal?.addEventListener("abort", abort, { once: true });
+      w.asks.set(key, [...(w.asks.get(key) ?? []), ask]);
+      this.send(w, frame);
     });
   }
 
@@ -761,6 +892,7 @@ export class Supervisor {
         w.installs.size ||
         w.shows.size ||
         w.waiters.size ||
+        w.hosted.size ||
         this.handoffs.has(w.user.id) ||
         this.opts.networkBusy?.(w.user.id) ||
         this.onDesktopInUse(w.user.id) ||
@@ -790,7 +922,8 @@ export class Supervisor {
     const proc = w.proc;
     w.networkRetiring = true;
     w.ready = false;
-    this.endSession(w, why);
+    this.opts.stopAccountScopes?.(w.user.uid);
+    this.endSession(w, why, true);
     this.endShows(w, why);
     for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", why));
     proc.stdin.end();
@@ -865,7 +998,7 @@ export class Supervisor {
       w.timer = null;
       for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", STOPPING));
       w.ready = false;
-      this.endSession(w, STOPPING);
+      this.endSession(w, STOPPING, true);
       this.endShows(w, STOPPING);
       if (!w.proc) continue;
       w.proc.stdin.end();
@@ -939,6 +1072,9 @@ export class Supervisor {
         enters: [],
         slots: new Map(),
         reclaims: new Map(),
+        hosted: new Set(),
+        hostedTasks: new Set(),
+        asks: new Map(),
       };
       this.workers.set(user.id, w);
     }
@@ -1047,10 +1183,12 @@ export class Supervisor {
     w.ready = false;
     w.browserLeaseAt = 0;
     w.browserStreaming = false;
+    this.opts.stopAccountScopes?.(w.user.uid);
     w.browserPaced = false;
     this.endSession(
       w,
       "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
+      true,
     );
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
     for (const slot of w.slots.values()) slot.release?.();
@@ -1067,12 +1205,16 @@ export class Supervisor {
 
   /**
    * Whatever the worker's last session ran is gone: its requests fail, its calls go nowhere. `dropped`: the
-   * server waits for the computer and resumes an agent's turn instead of failing it.
+   * server waits for the computer and resumes an agent's turn instead of failing it. `workerGone`: the worker itself
+   * goes, with what its hosted tasks stand on.
    */
-  private endSession(w: Worker, message: string) {
+  private endSession(w: Worker, message: string, workerGone = false) {
     for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("dropped", message) });
     for (const install of [...w.installs.values()]) install.settle(new RunnerError("internal", message));
     for (const [callId, caller] of this.calls) if (caller === w) this.calls.delete(callId);
+    const gone = new RunnerError("dropped", message);
+    for (const ask of [...w.asks.values()].flat()) ask.fail(gone);
+    for (const dropped of [...w.hosted, ...(workerGone ? w.hostedTasks : [])]) dropped(gone);
   }
 
   /** The worker is gone: the clicks it was answering fail. Not with its session, which follows the server's. */
@@ -1368,6 +1510,20 @@ export class Supervisor {
     if (f?.type === "codex.auth") {
       const account = typeof f.account === "string" ? f.account : "";
       if (w.codexAuths.has(account)) this.opts.codexAuth?.(account, f.auth);
+      return;
+    }
+    if (f?.type === "turn.context" || f?.type === "bridge.ready") {
+      const key = f.type === "turn.context" ? String(f.prepareId) : `bridge:${String(f.process)}`;
+      w.asks.get(key)?.[0]?.answer(f);
+      return;
+    }
+    if (f?.type === "tool.notice") {
+      const notice = parseToolNotice(f);
+      if (notice) this.opts.toolNotice?.(w.user.id, notice);
+      return;
+    }
+    if (f?.type === "task.stop") {
+      if (typeof f.taskId === "string") this.opts.taskStop?.(w.user.id, f.taskId);
       return;
     }
     if (f?.type === "pull.start") {

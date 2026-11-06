@@ -4,6 +4,19 @@ import path from "node:path";
 import { parseAccess, type RunnerAccess, type RunnerPause } from "@agenteschat/adapters/machine-protocol";
 import { validateNetworkMark } from "./network-mark";
 
+/**
+ * Claude's own login for all agents of a system-mode computer, on when present. The versions and the refresh mode are
+ * what real-Linux validation recorded (`A`: the CLIs share a refresh safely; `B`: only with root holding new CLIs
+ * while the refresh lock is there).
+ */
+export interface ClaudeSharedLogin {
+  minVersion: string;
+  maxVersion: string;
+  refresh: "A" | "B";
+  /** `B`: the name in the CLI's config folder that says a refresh is under way, as validation found it. */
+  refreshLock?: string;
+}
+
 /** What `pair` writes and `start` reads (`~/.agentes-runner/config.json`, mode 600). */
 export interface RunnerConfig {
   /** Our server, e.g. `https://app.agentes.chat` (no trailing slash). */
@@ -53,6 +66,10 @@ export interface RunnerConfig {
   networkDrainSeconds?: number;
   /** Root-controlled context revision: bump when an unchanged helper path changes isolation behavior. */
   networkRevision?: number;
+  /** The agents' networks route the sign-in users' group now. Not part of the revision: nothing restarts for it. */
+  networkAuthRoute?: true;
+  /** System mode: absent, a Claude sign-in for all agents is `claude setup-token`'s, as ever. */
+  claudeSharedLogin?: ClaudeSharedLogin;
   /**
    * System mode: what of this computer's own listeners agents may reach besides DNS, as `tcp/11434` or
    * `udp/8125` (`agentes-runner services allow`). Each agent reaches its own local ports anyway, never another's.
@@ -143,6 +160,16 @@ function parsePaused(v: unknown): RunnerConfig["paused"] {
   return { until: null };
 }
 
+function parseClaudeSharedLogin(v: unknown): ClaudeSharedLogin | undefined {
+  const { minVersion, maxVersion, refresh, refreshLock } = (v ?? {}) as Partial<
+    Record<keyof ClaudeSharedLogin, unknown>
+  >;
+  const version = (s: unknown): s is string => typeof s === "string" && /^\d+\.\d+\.\d+$/.test(s);
+  if (!version(minVersion) || !version(maxVersion) || (refresh !== "A" && refresh !== "B")) return undefined;
+  const lock = typeof refreshLock === "string" && /^[\w.-]{1,64}$/.test(refreshLock) ? { refreshLock } : {};
+  return { minVersion, maxVersion, refresh, ...lock };
+}
+
 /** The file's fields, checked one by one (unknown or malformed ones are dropped). Null when there is no file. */
 export function readStoredConfig(home = runnerHome()): StoredConfig | null {
   const file = configPath(home);
@@ -167,6 +194,7 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
   const paused = parsePaused(raw.paused);
   const range = raw.agentUidRange;
   const uids = Array.isArray(range) && range.length === 2 ? agentUidRange(range[0], range[1]) : null;
+  const claudeSharedLogin = parseClaudeSharedLogin(raw.claudeSharedLogin);
   const services = Array.isArray(raw.services)
     ? [...new Set(raw.services.flatMap((s) => (typeof s === "string" ? (parseService(s) ?? []) : [])))]
     : [];
@@ -198,11 +226,13 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
     ...(Number.isSafeInteger(raw.networkRevision) && (raw.networkRevision as number) >= 0
       ? { networkRevision: raw.networkRevision as number }
       : {}),
+    ...(raw.networkAuthRoute === true ? { networkAuthRoute: true as const } : {}),
     ...(Number.isInteger(raw.networkDrainSeconds) &&
     (raw.networkDrainSeconds as number) >= 30 &&
     (raw.networkDrainSeconds as number) <= 3600
       ? { networkDrainSeconds: raw.networkDrainSeconds as number }
       : {}),
+    ...(claudeSharedLogin ? { claudeSharedLogin } : {}),
     ...(services.length ? { services } : {}),
     ...(text(raw.previousToken, 4000) ? { previousToken: text(raw.previousToken, 4000) } : {}),
   };

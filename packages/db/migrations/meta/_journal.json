@@ -1604,6 +1604,13 @@
       "when": 1794030000000,
       "tag": "0230_account_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 231,
+      "version": "7",
+      "when": 1794040000000,
+      "tag": "0231_claude_auth",
+      "breakpoints": true
     }
   ]
 }

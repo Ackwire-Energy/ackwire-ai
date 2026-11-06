@@ -4062,6 +4062,7 @@
         "account": "账号",
         "accountWho": "只有 {{name}} 的负责人 {{owner}} 的账号：套餐只为其所有者的智能体思考。",
         "accountSignedOut": "已退出登录，请重新登录",
+        "accountUnknown": "登录未确认，稍后会再次检查",
         "thisComputer": "{{computer}} 的账号",
         "accountMove": "{{agents}} 正在使用 · 移到这里",
         "accountAlso": "{{agents}} 也在使用",
@@ -7765,6 +7766,8 @@
       "signedOut": "已退出登录。请重新登录，让你的智能体可以使用它。",
       "signedOutFor_other": "{{agents}} 已退出登录。",
       "keyRefused": "密钥被拒绝：请换一个新的。",
+      "statusUnknown": "这次电脑没能确认登录状态。它会自动再检查一次。",
+      "identityUnknown": "未识别的账号",
       "rename": "重命名",
       "signInAgain": "重新登录",
       "newKey": "更换密钥",
@@ -7808,6 +7811,8 @@
       "limited": "已达限额",
       "limitedUntil": "已达限额，直到 {{when}}",
       "updated": "{{ago}}更新",
+      "ago": "{{ago}}更新",
+      "stale": "数据较旧，{{ago}}更新",
       "notShared": "{{maker}} 不在这里提供用量数据。",
       "offer": {
         "use": "使用 {{label}}（{{pct}}%）",
@@ -10865,6 +10870,7 @@
       "targetNotFound": "那台电脑已不存在，请选择另一台。",
       "targetSame": "智能体已经在那台电脑上了。",
       "targetPaused": "那台电脑已暂停，请选择另一台。",
+      "accountMethodUnsupported": "这台电脑暂时无法用这种方式连接 Claude。请更新电脑上的 agentes.chat 程序，或使用 API 密钥。",
       "offline": "{{name}} 现在离线，等它恢复后再试。",
       "paused": "{{name}} 已暂停：恢复之前不会在上面开始新的工作。",
       "timeout": "电脑没有及时响应，请重试。"

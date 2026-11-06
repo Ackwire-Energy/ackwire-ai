@@ -4319,6 +4319,7 @@
         "account": "Cuenta",
         "accountWho": "Solo cuentas de {{owner}}, responsable de {{name}}: un plan solo piensa para los agentes de su dueño.",
         "accountSignedOut": "Sesión cerrada, vuelve a iniciar sesión",
+        "accountUnknown": "Inicio de sesión sin confirmar, se vuelve a comprobar pronto",
         "thisComputer": "Cuenta de {{computer}}",
         "accountMove": "En uso por {{agents}} · Moverla aquí",
         "accountAlso": "También la usa {{agents}}",
@@ -8314,6 +8315,8 @@
       "signedOutFor_many": "{{agents}} quedaron sin sesión.",
       "signedOutFor_other": "{{agents}} quedaron sin sesión.",
       "keyRefused": "La clave fue rechazada: reemplázala por una nueva.",
+      "statusUnknown": "El ordenador no pudo confirmar el inicio de sesión esta vez. Lo vuelve a comprobar solo.",
+      "identityUnknown": "cuenta no identificada",
       "rename": "Cambiar nombre",
       "signInAgain": "Volver a iniciar sesión",
       "newKey": "Reemplazar la clave",
@@ -8362,6 +8365,8 @@
       "limited": "En el límite",
       "limitedUntil": "En el límite hasta {{when}}",
       "updated": "Actualizado {{ago}}",
+      "ago": "actualizado {{ago}}",
+      "stale": "datos antiguos, actualizados {{ago}}",
       "notShared": "{{maker}} no comparte el uso aquí.",
       "offer": {
         "use": "Usar {{label}} ({{pct}}%)",
@@ -11599,6 +11604,7 @@
       "targetNotFound": "Esa computadora ya no existe. Elige otra.",
       "targetSame": "Los agentes ya están en esa computadora.",
       "targetPaused": "Esa computadora está en pausa. Elige otra.",
+      "accountMethodUnsupported": "Esta computadora todavía no puede conectar Claude de esta forma. Actualiza el programa de agentes.chat en ella o usa una clave de API.",
       "offline": "{{name}} está desconectada ahora. Intenta de nuevo cuando vuelva.",
       "paused": "{{name}} está en pausa: nada nuevo empieza en ella hasta que se reanude.",
       "timeout": "La computadora no respondió a tiempo. Intenta de nuevo."

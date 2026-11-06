@@ -827,6 +827,10 @@ export const MachineAccount = z
       .nullable()
       .openapi({ description: "`pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says." }),
     status: z.enum(["active", "signed_out"]),
+    statusKnown: z.boolean().openapi({
+      description:
+        "False: the computer's last look at its sign-in said nothing for sure (runner protocol 50); `status` is the last known.",
+    }),
     ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
     ownerName: z.string().nullable(),
     mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),
@@ -842,6 +846,10 @@ export const MachineAccount = z
     shared: z.boolean().openapi({
       description:
         "It thinks for every agent its owner gives it on that computer, with no new sign-in (runner protocol 29); else for one.",
+    }),
+    providerOrgId: z.string().nullable().openapi({
+      description:
+        "Claude's organization it is signed in to (opaque, runner protocol 50); only for its owner. Logins of one email in two organizations are two accounts.",
     }),
   })
   .openapi("MachineAccount", {

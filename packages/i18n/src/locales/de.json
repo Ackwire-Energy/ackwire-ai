@@ -4195,6 +4195,7 @@
         "account": "Konto",
         "accountWho": "Nur Konten von {{owner}}, verantwortlich für {{name}}: Ein Plan denkt nur für die Agenten seines Inhabers.",
         "accountSignedOut": "Abgemeldet, melde dich erneut an",
+        "accountUnknown": "Anmeldung nicht bestätigt, wird bald erneut geprüft",
         "thisComputer": "Konto von {{computer}}",
         "accountMove": "Genutzt von {{agents}} · Hierher verschieben",
         "accountAlso": "Auch genutzt von {{agents}}",
@@ -8052,6 +8053,8 @@
       "signedOutFor_one": "{{agents}} ist abgemeldet.",
       "signedOutFor_other": "{{agents}} sind abgemeldet.",
       "keyRefused": "Der Schlüssel wurde abgelehnt: Ersetze ihn durch einen neuen.",
+      "statusUnknown": "Der Computer konnte die Anmeldung diesmal nicht bestätigen. Er prüft sie von selbst erneut.",
+      "identityUnknown": "Konto nicht erkannt",
       "rename": "Umbenennen",
       "signInAgain": "Erneut anmelden",
       "newKey": "Schlüssel ersetzen",
@@ -8097,6 +8100,8 @@
       "limited": "Am Limit",
       "limitedUntil": "Am Limit bis {{when}}",
       "updated": "Aktualisiert {{ago}}",
+      "ago": "aktualisiert {{ago}}",
+      "stale": "alte Zahlen, aktualisiert {{ago}}",
       "notShared": "{{maker}} teilt die Nutzung hier nicht.",
       "offer": {
         "use": "{{label}} verwenden ({{pct}} %)",
@@ -11243,6 +11248,7 @@
       "targetNotFound": "Diesen Computer gibt es nicht mehr. Wähl einen anderen.",
       "targetSame": "Die Agenten sind schon auf diesem Computer.",
       "targetPaused": "Dieser Computer ist pausiert. Wähl einen anderen.",
+      "accountMethodUnsupported": "Dieser Computer kann Claude noch nicht auf diese Weise verbinden. Aktualisiere das agentes.chat-Programm darauf oder verwende einen API-Schlüssel.",
       "offline": "{{name}} ist gerade offline. Versuch es noch einmal, sobald er wieder da ist.",
       "paused": "{{name}} ist pausiert: Darauf startet nichts Neues, bis er fortgesetzt wird.",
       "timeout": "Der Computer hat nicht rechtzeitig geantwortet. Versuch es noch einmal."

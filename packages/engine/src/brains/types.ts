@@ -1,4 +1,4 @@
-import type { BrainEffort, BrainSpeed } from "@agenteschat/adapters";
+import type { BrainEffort, BrainSpeed, ProviderFailureCause } from "@agenteschat/adapters";
 import { planOf } from "@agenteschat/providers/plans";
 import type { CodeSetup } from "../git/machine";
 
@@ -179,6 +179,9 @@ export type BrainEvent =
       serverStop?: boolean;
       /** A `plan_limit`: whether the turn used a tool before it was cut (absent: an older runner, counted as worked). */
       worked?: boolean;
+      /** Claude Code (runner protocol 50): why the provider refused or failed it, and its HTTP status. */
+      cause?: ProviderFailureCause;
+      httpStatus?: number;
     }
   /** Messages handed mid-turn (`BrainIO.steerable`) that the turn read, by their `uuid`. */
   | { type: "steer_read"; uuids: string[] }

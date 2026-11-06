@@ -24,8 +24,25 @@ export interface PlanAccount<A extends MachineAccount> {
   usedBy: string[];
   /** The newest usage any of them reported: they share the plan's limits. */
   usage: PlanUsage | null;
+  /** Signed out for sure (`signInOf`). */
   signedOut: A[];
+  /** The computer's last look at them said nothing for sure, and the last it knew was signed out (`signInOf`). */
+  unknown: A[];
 }
+
+/**
+ * Where a login's sign-in stands: signed out only when the computer said so for sure. `unknown`: its last look
+ * said nothing for sure (`statusKnown` false) and the last it knew was signed out, which never reads as signed out
+ * nor asks for a new sign-in: the computer looks again by itself.
+ */
+export const signInOf = (a: Pick<MachineAccount, "status" | "statusKnown">): "active" | "signed_out" | "unknown" =>
+  a.status === "active" ? "active" : a.statusKnown === false ? "unknown" : "signed_out";
+
+/**
+ * Whether a login offers signing in to it again: whenever the server keeps it signed out, also while its last look
+ * was unclear (`signInOf` unknown only changes the words), since its turns are refused until then.
+ */
+export const offersSignInAgain = (a: Pick<MachineAccount, "status">) => a.status === "signed_out";
 
 const newest = (usages: (PlanUsage | null)[]) =>
   usages.reduce<PlanUsage | null>(
@@ -35,24 +52,33 @@ const newest = (usages: (PlanUsage | null)[]) =>
 
 /**
  * The logins of one account together, as the server tells them apart: the same computer, owner, CLI and plan, and
- * the same email (any case) or key's last 4. Never the label, which any rename can repeat. A login whose email or
- * key the viewer can't see (another person's) is a row of its own.
+ * the same email (any case) and Claude organization (one not said is any), or key's last 4. Never the label, which any rename can repeat.
+ * A login whose email or key the viewer can't see (another person's) is a row of its own.
  */
 export function groupPlans<A extends MachineAccount & { machineId?: string }>(
   accounts: readonly A[],
 ): PlanAccount<A>[] {
-  const groups = new Map<string, A[]>();
+  const groups: { key: string; org: string | null; logins: A[] }[] = [];
   for (const a of accounts) {
     const identity = a.provider ? a.keyHint : a.email?.toLowerCase();
     const key = identity ? JSON.stringify([a.machineId ?? null, a.ownerId, a.kind, a.provider, identity]) : a.id;
-    groups.set(key, [...(groups.get(key) ?? []), a]);
+    const org = a.providerOrgId ?? null;
+    // Like the server's, an organization not said matches any: only two known ones tell logins apart.
+    const same = groups.filter((g) => g.key === key);
+    const group = org === null ? same[0] : (same.find((g) => g.org === org) ?? same.find((g) => g.org === null));
+    if (!group) groups.push({ key, org, logins: [a] });
+    else {
+      group.logins.push(a);
+      group.org ??= org;
+    }
   }
-  return [...groups.values()].map((logins) => ({
+  return groups.map(({ logins }) => ({
     key: logins[0]?.id ?? "",
     logins,
     usedBy: logins.flatMap((l) => l.usedBy),
     usage: newest(logins.map((l) => l.usage)),
-    signedOut: logins.filter((l) => l.status === "signed_out"),
+    signedOut: logins.filter((l) => signInOf(l) === "signed_out"),
+    unknown: logins.filter((l) => signInOf(l) === "unknown"),
   }));
 }
 
@@ -161,6 +187,15 @@ export const endsOnClaude = (
 ) => account.shared === true && account.kind === "claude_code" && !account.provider && machine?.mode === "system";
 
 /**
+ * The viewer's own account that can't say which Claude account it is: a token made for all agents (`endsOnClaude`)
+ * comes with no email, so where its email would show, the apps say it isn't known.
+ */
+export const identityUnknown = (
+  account: Pick<MachineAccount, "shared" | "kind" | "provider" | "mine" | "email">,
+  machine: Pick<Machine, "mode"> | undefined,
+) => account.mine && !account.email && endsOnClaude(account, machine);
+
+/**
  * An account by its name with its plan once ("Claude · Max", "Trabalho · Ultra"); a key account by its name. A name
  * that already says the plan stays as it is: servers before ADR 0059's 2026-10-30 amendment name accounts after it
  * ("Claude Max 2"), and the phone talks to those too.
@@ -178,7 +213,7 @@ export const onSeveralComputers = (accounts: readonly { machineId: string }[]) =
  * The line under an account in an agent's account choice (Quem pensa and Connect an AI, web and phone): whose it is
  * when it isn't the viewer's, the agents on it where choosing it signs this agent in to it too, signed out, the
  * agents it would be taken from (or those it thinks for too, made for all of its owner's agents), else its key's end
- * or its email.
+ * or its email. One the computer couldn't check says so, never signed out.
  */
 export function accountAbout(
   t: TFunction,
@@ -187,6 +222,7 @@ export function accountAbout(
 ): string | undefined {
   if (!a.mine) return t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" });
   if (also) return t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t) });
+  if (signInOf(a) === "unknown") return t("agentPage.work.brain.accountUnknown");
   // A coding plan's key never signs out: it reads signed out once its endpoint refused it.
   if (a.status === "signed_out") {
     return t(isPlanId(a.provider) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut");

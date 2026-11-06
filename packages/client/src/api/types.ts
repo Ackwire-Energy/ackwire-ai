@@ -5193,6 +5193,8 @@ export interface MachineAccount {
   /** `pro`, `max`, `ultra`, `team`… from what the CLI says (`planWordOf` names it). */
   plan: string | null;
   status: "active" | "signed_out";
+  /** False: the computer's last look at its sign-in said nothing for sure; `status` is the last known (older servers leave it out). */
+  statusKnown?: boolean;
   /** Whose it is (the person who signed it in); null: nobody's. */
   ownerId: string | null;
   ownerName: string | null;
@@ -5210,6 +5212,8 @@ export interface MachineAccount {
   keyHint: string | null;
   /** It thinks for every agent its owner gives it on that computer, with no new sign-in (absent: an older server). */
   shared?: boolean;
+  /** Claude's organization it is signed in to (opaque), its owner's eyes only; null or absent: not known. */
+  providerOrgId?: string | null;
 }
 
 /** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */

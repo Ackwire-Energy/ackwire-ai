@@ -10188,6 +10188,9 @@
   "agentPage.work.brain.accountSignedOut": {
     "value": "Signed out, sign in again"
   },
+  "agentPage.work.brain.accountUnknown": {
+    "value": "Sign-in not confirmed, checked again soon"
+  },
   "agentPage.work.brain.thisComputer": {
     "value": "{{computer}}'s account"
   },
@@ -19529,6 +19532,12 @@
   "aiAccounts.page.keyRefused": {
     "value": "The key was refused: replace it with a new one."
   },
+  "aiAccounts.page.statusUnknown": {
+    "value": "The computer couldn't confirm the sign-in this time. It checks again on its own."
+  },
+  "aiAccounts.page.identityUnknown": {
+    "value": "account not identified"
+  },
   "aiAccounts.page.rename": {
     "value": "Rename"
   },
@@ -19645,6 +19654,12 @@
   },
   "aiAccounts.usage.updated": {
     "value": "Updated {{ago}}"
+  },
+  "aiAccounts.usage.ago": {
+    "value": "updated {{ago}}"
+  },
+  "aiAccounts.usage.stale": {
+    "value": "old numbers, updated {{ago}}"
   },
   "aiAccounts.usage.notShared": {
     "value": "{{maker}} doesn't share usage here."
@@ -27234,6 +27249,9 @@
   },
   "errors.machine.targetPaused": {
     "value": "That computer is paused. Choose another one."
+  },
+  "errors.machine.accountMethodUnsupported": {
+    "value": "This computer can't connect Claude this way yet. Update the agentes.chat program on it, or use an API key."
   },
   "errors.machine.offline": {
     "value": "{{name}} is offline right now. Try again once it's back."

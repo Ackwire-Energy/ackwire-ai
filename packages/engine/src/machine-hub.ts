@@ -4,6 +4,7 @@ import {
   BROWSER_PROTOCOL,
   type BrowserHandoffInfo,
   brainTopic,
+  CLAUDE_SHARED_PROTOCOL,
   type ErrorReporter,
   HEARTBEAT_MS,
   HELLO_TIMEOUT_MS,
@@ -51,6 +52,7 @@ import {
 import {
   assertNotPaused,
   authenticateMachine,
+  deletedAgentIds,
   getMachineById,
   MACHINE_CONTROL_TOPIC,
   MachineDroppedError,
@@ -584,8 +586,14 @@ export function createMachineHub(deps: MachineHubDeps) {
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
         // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found; protocol 18:
         // the same for the agents' desktops and the terminal, and whether each agent is its own OS user (ADR 0058);
-        // protocol 21: whether agents can use their desktops (ADR 0062).
-        ...(frame.executors || frame.browser || frame.desktop || frame.terminal || frame.desktopUse
+        // protocol 21: whether agents can use their desktops (ADR 0062); protocol 50: which Claude sign-ins for all
+        // agents it can make (an older runner says nothing: `claudeLoginMethodsOf` reads that).
+        ...(frame.executors ||
+        frame.browser ||
+        frame.desktop ||
+        frame.terminal ||
+        frame.desktopUse ||
+        frame.claudeLoginMethods
           ? {
               executors: {
                 // A runner that hasn't looked yet leaves the CLIs out: the last ones stored stand.
@@ -597,6 +605,9 @@ export function createMachineHub(deps: MachineHubDeps) {
                 ...(frame.terminal ? { terminal: frame.terminal } : {}),
                 ...(frame.desktopUse ? { desktopUse: frame.desktopUse } : {}),
                 ...(system ? { mode: "system" as const } : {}),
+                ...(frame.claudeLoginMethods ? { claudeLoginMethods: frame.claudeLoginMethods } : {}),
+                ...(frame.claudeLoginBlocked ? { claudeLoginBlocked: frame.claudeLoginBlocked } : {}),
+                ...(frame.authEgressGroup ? { authEgressGroup: true as const } : {}),
                 ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
               },
             }
@@ -707,7 +718,10 @@ export function createMachineHub(deps: MachineHubDeps) {
   async function sendAgents(conn: MachineConnection) {
     if (!conn.machineId || !conn.orgId || conn.protocol < PAUSE_PROTOCOL) return;
     const agents = await machineAgents(db, conn.orgId, conn.machineId).catch(() => null);
-    if (agents) send(conn, { type: "agents", agents });
+    if (!agents) return;
+    const deleted =
+      conn.protocol >= CLAUDE_SHARED_PROTOCOL ? await deletedAgentIds(db, conn.orgId).catch(() => []) : [];
+    send(conn, { type: "agents", agents, ...(deleted.length ? { deleted } : {}) });
   }
 
   /** `runner.state` (protocol 9): paused, resumed or a new `until`; stored and told to the org. */

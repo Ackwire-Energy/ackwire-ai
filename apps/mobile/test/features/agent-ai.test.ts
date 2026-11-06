@@ -789,8 +789,10 @@ describe("the agent's AI", () => {
     expect(flow).not.toContain("status.isError");
     expect(flow).toMatch(/read === "reconnecting" \? t\("agentPage\.work\.brain\.add\.reconnecting"\)/);
     // Past the wait, the computer that didn't answer; what the computer says still shows at once.
-    expect(flow).toContain('const noAnswer = startFailed || read === "noAnswer";');
-    expect(flow).toMatch(/: noAnswer\s*\?\s*t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)/);
+    expect(flow).toContain('const noAnswer = startFailed !== null || read === "noAnswer";');
+    expect(flow).toMatch(
+      /: noAnswer\s*\?\s*\(startFailed \?\? t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)\)/,
+    );
     expect(flow).toContain('result?.state === "failed" || result?.state === "expired"');
     // Its computer offline mid-sign-in: the steps stay, with no offline card or key over them, and nothing restarts.
     expect(connect).toContain(

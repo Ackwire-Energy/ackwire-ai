@@ -4345,6 +4345,7 @@
         "account": "Account",
         "accountWho": "Solo account di {{owner}}, responsabile di {{name}}: un piano pensa solo per gli agenti del suo proprietario.",
         "accountSignedOut": "Disconnesso, accedi di nuovo",
+        "accountUnknown": "Accesso non confermato, ricontrollato a breve",
         "thisComputer": "Account di {{computer}}",
         "accountMove": "In uso da {{agents}} · Spostalo qui",
         "accountAlso": "Usato anche da {{agents}}",
@@ -8388,6 +8389,8 @@
       "signedOutFor_many": "{{agents}} sono disconnessi.",
       "signedOutFor_other": "{{agents}} sono disconnessi.",
       "keyRefused": "La chiave è stata rifiutata: sostituiscila con una nuova.",
+      "statusUnknown": "Il computer non è riuscito a confermare l'accesso questa volta. Lo ricontrolla da solo.",
+      "identityUnknown": "account non identificato",
       "rename": "Rinomina",
       "signInAgain": "Accedi di nuovo",
       "newKey": "Sostituisci la chiave",
@@ -8437,6 +8440,8 @@
       "limited": "Al limite",
       "limitedUntil": "Al limite fino a {{when}}",
       "updated": "Aggiornato {{ago}}",
+      "ago": "aggiornato {{ago}}",
+      "stale": "dati vecchi, aggiornati {{ago}}",
       "notShared": "{{maker}} non condivide qui l'utilizzo.",
       "offer": {
         "use": "Usa {{label}} ({{pct}}%)",
@@ -11677,6 +11682,7 @@
       "targetNotFound": "Quel computer non esiste più. Scegline un altro.",
       "targetSame": "Gli agenti sono già su quel computer.",
       "targetPaused": "Quel computer è in pausa. Scegline un altro.",
+      "accountMethodUnsupported": "Questo computer non può ancora collegare Claude in questo modo. Aggiorna il programma agentes.chat che ha installato, oppure usa una chiave API.",
       "offline": "{{name}} è offline in questo momento. Riprova quando torna disponibile.",
       "paused": "{{name}} è in pausa: non parte nulla di nuovo finché non riprende.",
       "timeout": "Il computer non ha risposto in tempo. Riprova."

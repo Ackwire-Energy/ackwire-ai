@@ -53,6 +53,7 @@ const KNOWN = {
   "machine.forbidden": "errors.machine.forbidden",
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
+  "account.method_unsupported": "errors.machine.accountMethodUnsupported",
   "machine.pairing_invalid": "errors.machine.pairingInvalid",
   "machine.pairing_off": "errors.machine.pairingOff",
   "machine.target_offline": "errors.machine.targetOffline",

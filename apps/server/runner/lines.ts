@@ -33,3 +33,16 @@ export function readLines(stream: Readable, max: number, onLine: (line: string) 
     size += chunk.length;
   });
 }
+
+/** A text stream's lines as `cat -n`, `grep -n` and rg count them: only `\n` ends one, and one `\r` before it goes. */
+export async function* fileLines(stream: AsyncIterable<string>): AsyncGenerator<string> {
+  const line = (text: string) => (text.endsWith("\r") ? text.slice(0, -1) : text);
+  let rest = "";
+  for await (const chunk of stream) {
+    const parts = chunk.split("\n");
+    parts[0] = rest + parts[0];
+    rest = parts.pop() ?? "";
+    yield* parts.map(line);
+  }
+  if (rest) yield line(rest);
+}

@@ -4218,6 +4218,7 @@
         "account": "Account",
         "accountWho": "Alleen accounts van {{owner}}, verantwoordelijk voor {{name}}: een abonnement denkt alleen voor de agents van de eigenaar.",
         "accountSignedOut": "Uitgelogd, log opnieuw in",
+        "accountUnknown": "Login niet bevestigd, wordt binnenkort opnieuw gecontroleerd",
         "thisComputer": "Account van {{computer}}",
         "accountMove": "In gebruik door {{agents}} · Hierheen verplaatsen",
         "accountAlso": "Ook gebruikt door {{agents}}",
@@ -8106,6 +8107,8 @@
       "signedOutFor_one": "{{agents}} is uitgelogd.",
       "signedOutFor_other": "{{agents}} zijn uitgelogd.",
       "keyRefused": "De sleutel is geweigerd: vervang hem door een nieuwe.",
+      "statusUnknown": "De computer kon de login deze keer niet bevestigen. Hij controleert het vanzelf opnieuw.",
+      "identityUnknown": "account niet herkend",
       "rename": "Hernoemen",
       "signInAgain": "Opnieuw inloggen",
       "newKey": "Sleutel vervangen",
@@ -8152,6 +8155,8 @@
       "limited": "Limiet bereikt",
       "limitedUntil": "Limiet bereikt tot {{when}}",
       "updated": "{{ago}} bijgewerkt",
+      "ago": "{{ago}} bijgewerkt",
+      "stale": "oude cijfers, {{ago}} bijgewerkt",
       "notShared": "{{maker}} deelt het gebruik hier niet.",
       "offer": {
         "use": "{{label}} gebruiken ({{pct}}%)",
@@ -11304,6 +11309,7 @@
       "targetNotFound": "Die computer bestaat niet meer. Kies een andere.",
       "targetSame": "De agents staan al op die computer.",
       "targetPaused": "Die computer is gepauzeerd. Kies een andere.",
+      "accountMethodUnsupported": "Deze computer kan Claude nog niet op deze manier koppelen. Werk het agentes.chat-programma erop bij, of gebruik een API-sleutel.",
       "offline": "{{name}} is nu offline. Probeer het opnieuw zodra hij terug is.",
       "paused": "{{name}} is gepauzeerd: er start niets nieuws op tot hij wordt hervat.",
       "timeout": "De computer antwoordde niet op tijd. Probeer het opnieuw."

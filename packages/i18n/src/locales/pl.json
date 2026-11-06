@@ -4497,6 +4497,7 @@
         "account": "Konto",
         "accountWho": "Tylko konta {{owner}}, osoby odpowiedzialnej za {{name}}: plan myśli tylko dla agentów swojego właściciela.",
         "accountSignedOut": "Wylogowano, zaloguj się ponownie",
+        "accountUnknown": "Logowanie niepotwierdzone, wkrótce sprawdzimy ponownie",
         "thisComputer": "Konto komputera {{computer}}",
         "accountMove": "Używane przez: {{agents}} · Przenieś tutaj",
         "accountAlso": "Używane też przez: {{agents}}",
@@ -8661,6 +8662,8 @@
       "signedOutFor_many": "{{agents}} są wylogowani.",
       "signedOutFor_other": "{{agents}} są wylogowani.",
       "keyRefused": "Klucz został odrzucony: zastąp go nowym.",
+      "statusUnknown": "Komputer nie zdołał tym razem potwierdzić logowania. Sprawdzi je ponownie sam.",
+      "identityUnknown": "konto nierozpoznane",
       "rename": "Zmień nazwę",
       "signInAgain": "Zaloguj się ponownie",
       "newKey": "Zastąp klucz",
@@ -8713,6 +8716,8 @@
       "limited": "Limit osiągnięty",
       "limitedUntil": "Limit osiągnięty do {{when}}",
       "updated": "Zaktualizowano {{ago}}",
+      "ago": "zaktualizowano {{ago}}",
+      "stale": "stare dane, zaktualizowano {{ago}}",
       "notShared": "{{maker}} nie udostępnia tutaj danych o użyciu.",
       "offer": {
         "use": "Użyj {{label}} ({{pct}}%)",
@@ -12049,6 +12054,7 @@
       "targetNotFound": "Ten komputer już nie istnieje. Wybierz inny.",
       "targetSame": "Agenci są już na tym komputerze.",
       "targetPaused": "Ten komputer jest wstrzymany. Wybierz inny.",
+      "accountMethodUnsupported": "Ten komputer nie może jeszcze połączyć Claude w ten sposób. Zaktualizuj na nim program agentes.chat albo użyj klucza API.",
       "offline": "{{name}} jest teraz offline. Spróbuj ponownie, gdy wróci.",
       "paused": "{{name}} jest wstrzymany: nic nowego na nim nie ruszy, dopóki nie zostanie wznowiony.",
       "timeout": "Komputer nie odpowiedział na czas. Spróbuj ponownie."

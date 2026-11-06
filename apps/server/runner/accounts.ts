@@ -10,10 +10,13 @@ import {
   ACCOUNT_LOGIN_TTL_MS,
   type AccountKind,
   type AccountLoginState,
+  type AuthMethod,
   accountCodeAad,
   CURSOR_KEY_PROVIDER,
   isAccountId,
   isAccountKind,
+  isAuthMethod,
+  isClaudeLoginMethod,
   isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
@@ -21,6 +24,8 @@ import {
   OWN_USAGE_ID,
   type OwnPlanUsage,
   type PlanUsage,
+  providerOrgIdOf,
+  providerOrgNameOf,
   type RunnerAccountInfo,
   type WireSecretBox,
 } from "@agenteschat/adapters/machine-protocol";
@@ -35,6 +40,7 @@ import {
   planModel,
   planOf,
 } from "@agenteschat/providers/plans";
+import type { Launcher } from "./agent-users";
 import { agyAuthOf, agyRuntimeDir, writeAgySettings } from "./agy-home";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
@@ -45,6 +51,7 @@ import {
   claudePlan,
   claudeTier,
   GROK_BIN,
+  isExecutable,
   OPENCODE_BIN,
   resolveCommand,
 } from "./executors";
@@ -101,6 +108,11 @@ import type { TaskSecrets } from "./tasks";
  *   Claude one is `claude setup-token`'s token (`token.json`, 600), signed in
  *   in a terminal of its own (`spawnToken`), a coding plan's is its key, and
  *   `grant` hands what a turn needs to the agent's worker.
+ * - Claude's own login for all agents (`sharedLogin`; `<id>.method` says
+ *   `cli_shared`, read as `cli_login` by everything outside this file): the
+ *   folder here stays root's and empty; the CLI's store is the sign-in's OS
+ *   user's (`AccountUsers`), and sign-in, status, usage and sign-out run as
+ *   that user. Root never opens anything in that store.
  */
 
 /** A fresh look at every account's status happens at most this often (each one runs the CLI). */
@@ -380,12 +392,15 @@ export type AccountGrant =
   | { kind: "key"; provider: PlanId; key: string }
   /** A ChatGPT sign-in for all agents: root's newest `auth.json`, refreshed copies coming back (`watchCodexAuth`). */
   | { kind: "codex_auth"; auth: string }
+  /** A Claude sign-in several agents share: its CLI is root's, so a task only prepares here (`tasks.ts`). */
+  | { kind: "hosted" }
   | { kind: "none" };
 
 /** A grant as the worker reads it off root's request frame; null when there is none or it isn't one. */
 export function grantOf(v: unknown): AccountGrant | null {
   const g = v as Record<string, unknown> | null | undefined;
   if (g?.kind === "none") return { kind: "none" };
+  if (g?.kind === "hosted") return { kind: "hosted" };
   if (g?.kind === "token" && typeof g.token === "string" && WHOLE_OAUTH_TOKEN.test(g.token)) {
     return { kind: "token", token: g.token };
   }
@@ -897,6 +912,8 @@ function urlsIn(text: string, host: (h: string) => boolean, final: boolean) {
 const toUrl = (url: string | null) => (url ? { url } : null);
 /** In an account folder while its sign-in runs (removed when it signs in). */
 const SIGNING_IN = ".signing-in";
+/** `<id>.method` of Claude's own login for all agents (`sharedLogin`). Protocol 50 says `cli_login`. */
+const CLI_SHARED = "cli_shared";
 
 const hostIs = (h: string, domain: string) => h === domain || h.endsWith(`.${domain}`);
 
@@ -927,9 +944,9 @@ export function parseCodexLogin(output: string, final = false): { url: string; u
 }
 
 /**
- * `claude auth status --json` → signed in, email and plan (short words only, named by `claudePlan` with the
- * folder's `tier`). Signed in means through claude.ai: a folder that reports an API key isn't the account's own
- * sign-in.
+ * `claude auth status --json` → signed in, email, plan (short words only, named by `claudePlan` with the
+ * folder's `tier`) and Claude organization. Signed in means through claude.ai: a folder that reports an API key isn't
+ * the account's own sign-in. An answer without a `loggedIn` says nothing for sure (`statusUnknown`).
  */
 export function parseClaudeStatus(
   status: number | null,
@@ -940,16 +957,22 @@ export function parseClaudeStatus(
   try {
     json = JSON.parse(stdout.trim() || "null");
   } catch {
-    return { loggedIn: false };
+    return { loggedIn: false, statusUnknown: true };
   }
-  if (!json || typeof json !== "object") return { loggedIn: false };
+  if (!json || typeof json !== "object" || typeof (json as { loggedIn?: unknown }).loggedIn !== "boolean") {
+    return { loggedIn: false, statusUnknown: true };
+  }
   const o = json as Record<string, unknown>;
   const email = typeof o.email === "string" && o.email.length <= 254 && EMAIL.test(o.email) ? o.email : undefined;
   const plan = claudePlan(o.subscriptionType, tier);
+  const providerOrgId = providerOrgIdOf(o.orgId);
+  const orgName = providerOrgNameOf(o.orgName);
   return {
     loggedIn: o.loggedIn === true && status === 0 && o.authMethod === "claude.ai",
     ...(email ? { email } : {}),
     ...(plan ? { plan } : {}),
+    ...(providerOrgId ? { providerOrgId } : {}),
+    ...(orgName ? { orgName } : {}),
   };
 }
 
@@ -1112,6 +1135,23 @@ export interface AccountManagerOptions {
   lending?: { chown: Chown };
   /** Tests: the platform (the Antigravity CLI signs in only on Linux here). */
   platform?: NodeJS.Platform;
+  /**
+   * System mode: what goes before each Claude CLI root runs on an account folder (`authEgressPrefix`), asked once;
+   * null: they run as before.
+   */
+  authEgress?: () => string[] | null;
+  /** System mode: Claude's own login for all agents. Absent, nothing here ever uses it. */
+  sharedLogin?: SharedLogin;
+}
+
+/** Claude's own login for all agents of a system-mode computer: what `AccountManager` needs of `AccountUsers`. */
+export interface SharedLogin {
+  /** The feature's switch is on and the self-check passed. */
+  ready(): boolean;
+  /** How root runs the CLI as the sign-in's user, made the first time. Throws when it can't be. */
+  launcher(id: string): Launcher;
+  /** The sign-in's processes, store and user go. */
+  remove(id: string): void;
 }
 
 /** The real `lending.chown`. */
@@ -1136,6 +1176,8 @@ interface Login {
   token?: string;
   /** System mode: made for all agents (`<id>.shared` once it signs in). */
   shared: boolean;
+  /** Claude's own login for all agents: its CLI runs as the sign-in's user (`sharedCli`). */
+  cliShared?: boolean;
   /** A key account's plan, `cursor` for a Cursor API key, or `zen` for an OpenCode key. */
   provider?: PlanId | CliKeyProvider;
   state: AccountLoginState;
@@ -1182,8 +1224,32 @@ export class AccountManager {
     this.log = opts.log ?? (() => {});
   }
 
-  private command(kind: AccountKind): string[] {
-    return this.opts.commands?.[kind] ?? [COMMAND[kind]];
+  /** `own`: the computer's own sign-in, which never goes through the auth egress group. */
+  private command(kind: AccountKind, own = false): string[] {
+    const command = this.opts.commands?.[kind] ?? [COMMAND[kind]];
+    const prefix = kind === "claude_code" && !own ? this.authPrefix() : null;
+    if (!prefix) return command;
+    // Resolved here: `setpriv` would look the CLI up on the PATH again, shared `bin/` included.
+    const [file, ...pre] = command;
+    const cli = resolveCommand(file ?? "", process.env.PATH);
+    // A missing CLI under setpriv exits 127 instead of failing to start, which says "not installed".
+    return isExecutable(cli) ? [...prefix, cli, ...pre] : [cli, ...pre];
+  }
+
+  private authEgressSaid: string[] | null | undefined;
+  private authPrefix(): string[] | null {
+    if (this.authEgressSaid === undefined) {
+      this.authEgressSaid = this.opts.authEgress?.() ?? null;
+      if (this.opts.authEgress && !this.authEgressSaid) {
+        this.log("no agentes-auth group or setpriv here: Claude sign-ins leave by the computer's own route");
+      }
+    }
+    return this.authEgressSaid;
+  }
+
+  /** Protocol 50 (`hello.authEgressGroup`): root's Claude CLIs on account folders run in the auth egress group. */
+  authEgressGroup(): boolean {
+    return this.authPrefix() !== null;
   }
 
   private dirOf(kind: AccountKind, id: string) {
@@ -1195,10 +1261,10 @@ export class AccountManager {
   }
 
   /**
-   * A file root keeps beside a folder (`<id>.invalid`, `<id>.lent`, `<id>.shared`), out of reach of whoever the
-   * folder is lent to.
+   * A file root keeps beside a folder (`<id>.invalid`, `<id>.lent`, `<id>.shared`, `<id>.method`), out of reach of
+   * whoever the folder is lent to.
    */
-  private marker(kind: AccountKind, id: string, name: "invalid" | "lent" | "shared") {
+  private marker(kind: AccountKind, id: string, name: "invalid" | "lent" | "shared" | "method") {
     return path.join(this.opts.root, kind, `${id}.${name}`);
   }
 
@@ -1215,6 +1281,74 @@ export class AccountManager {
     } catch {
       return null;
     }
+  }
+
+  /** What root wrote beside the folder when its sign-in began (protocol 50); null for an older folder. */
+  private rawMethod(kind: AccountKind, id: string): string | null {
+    try {
+      return readFileSync(this.marker(kind, id, "method"), "utf8").trim();
+    } catch {
+      return null;
+    }
+  }
+
+  /** The method its sign-in began with. */
+  private keptMethod(kind: AccountKind, id: string): AuthMethod | null {
+    const method = this.rawMethod(kind, id);
+    if (method === CLI_SHARED) return "cli_login";
+    return isAuthMethod(method) ? method : null;
+  }
+
+  /** Claude's own login for all agents: the CLI's store is its own user's. */
+  isCliShared(kind: AccountKind, id: string) {
+    return this.opts.lending !== undefined && isAccountId(id) && this.rawMethod(kind, id) === CLI_SHARED;
+  }
+
+  /**
+   * Whether a turn may run on such a sign-in now. `off`: the switch went off or the self-check failed, and no CLI runs
+   * on its store. `signed_out`: the provider refused it, until it signs in again.
+   */
+  cliSharedState(id: string): "ready" | "off" | "signed_out" {
+    if (!this.opts.sharedLogin?.ready()) return "off";
+    return existsSync(this.marker("claude_code", id, "invalid")) ? "signed_out" : "ready";
+  }
+
+  /** The argv of the Claude CLI behind `prefix`. A missing CLI must fail to start, not exit 127 behind the launcher. */
+  sharedCommand(prefix: readonly string[]): string[] {
+    const [file, ...pre] = this.opts.commands?.claude_code ?? [COMMAND.claude_code];
+    const cli = resolveCommand(file ?? "", process.env.PATH);
+    return isExecutable(cli) ? [...prefix, cli, ...pre] : [cli, ...pre];
+  }
+
+  /** The Claude CLI as the sign-in's own user, with the runner's proxies as root's own CLIs have them. */
+  private sharedCli(id: string): { command: string[]; env: NodeJS.ProcessEnv; cwd: string } {
+    const l = this.opts.sharedLogin?.launcher(id);
+    if (!l) throw new RunnerError("unsupported", "This computer can't run this Claude sign-in");
+    const env: NodeJS.ProcessEnv = { ...l.env };
+    for (const k of NETWORK_ENV) if (process.env[k]) env[k] = process.env[k];
+    return { command: this.sharedCommand(l.prefix), env, cwd: l.home };
+  }
+
+  /**
+   * How an account signs in: what root wrote when its sign-in began, else what its look found for sure (a key, a
+   * token root keeps, a CLI's sign-in that finished). Nothing when neither says it.
+   */
+  private authMethodOf(kind: AccountKind, id: string, info: RunnerAccountInfo): { authMethod?: AuthMethod } {
+    const kept = this.keptMethod(kind, id);
+    if (kept) return { authMethod: kept };
+    if (info.keyHint) return { authMethod: "api_key" };
+    const has = (file: string) => existsSync(path.join(this.dirOf(kind, id), file));
+    if (kind === "claude_code" && this.isShared(kind, id)) return has(TOKEN_FILE) ? { authMethod: "setup_token" } : {};
+    return kind === "opencode" || has(SIGNING_IN) ? {} : { authMethod: "cli_login" };
+  }
+
+  /**
+   * Protocol 50 (`hello`): what a new Claude sign-in for all agents uses here. In system mode the CLI's own sign-in
+   * needs its own user and mount view, offered only once the computer's self-check says they hold.
+   */
+  claudeLoginMethods(): AuthMethod[] {
+    if (!this.opts.lending) return ["cli_login"];
+    return this.opts.sharedLogin?.ready() ? ["setup_token", "cli_login"] : ["setup_token"];
   }
 
   /** Whether an account's folder is here (signing in again included). */
@@ -1244,6 +1378,8 @@ export class AccountManager {
    * system mode): a sign-in for every agent of its owner here, which root
    * keeps: Claude's through `claude setup-token` (no login hint there), a
    * plan's key as it is, ChatGPT's through `codex login` as root (`grant` hands its `auth.json` to each turn).
+   * `method` (protocol 50, a Claude subscription sign-in): the one to use, or a refusal; never another one. The method
+   * a sign-in uses is kept beside its folder (`<id>.method`), and signing in again another way is refused.
    */
   async begin(
     kind: AccountKind,
@@ -1252,12 +1388,38 @@ export class AccountManager {
     email?: string,
     provider?: string,
     shared = false,
+    method?: string,
   ): Promise<MachineReplies["account"]> {
     if (this.closed) throw new RunnerError("internal", "The runner is stopping");
     if (!isAccountKind(kind)) throw new RunnerError("bad_request", "Unknown account kind");
     if (!isAccountId(loginId)) throw new RunnerError("bad_request", "Invalid sign-in id");
     if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
       throw new RunnerError("bad_request", "That email can't name the account to sign in to");
+    }
+    if (method !== undefined) {
+      if (!isClaudeLoginMethod(method) || kind !== "claude_code" || provider !== undefined) {
+        throw new RunnerError("bad_request", "That sign-in method isn't one for this account");
+      }
+      if (method === "setup_token" && (!this.opts.lending || !shared)) {
+        throw new RunnerError("bad_request", "A Claude token signs in here only for all agents of a shared computer");
+      }
+    }
+    const canCliShare = this.opts.sharedLogin?.ready() === true;
+    // An older server names no method: what the folder keeps stands.
+    const keepsCliShare = method === undefined && again && this.isCliShared(kind, loginId);
+    // Signing in again a one-agent folder for all agents starts over below, the setup-token way.
+    if (
+      !canCliShare &&
+      this.opts.lending &&
+      shared &&
+      (keepsCliShare ||
+        (method === "cli_login" &&
+          (!again || (this.keptMethod(kind, loginId) === "cli_login" && this.isShared(kind, loginId)))))
+    ) {
+      throw new RunnerError(
+        "unsupported",
+        "This computer can't make a Claude sign-in for all agents with Claude's own login yet.",
+      );
     }
     const cliKey: CliKeyProvider | null =
       kind === "cursor" && provider === CURSOR_KEY_PROVIDER
@@ -1290,10 +1452,16 @@ export class AccountManager {
     }
     // Elsewhere every folder thinks for all of its owner's agents anyway.
     const forAll = this.opts.lending !== undefined && shared && (kind === "claude_code" || kind === "codex");
+    const cliShared = forAll && canCliShare && (method === "cli_login" || keepsCliShare);
     const dir = this.dirOf(kind, loginId);
     if (again) {
       if (!existsSync(dir) || existsSync(path.join(dir, SIGNING_IN))) {
         throw new RunnerError("not_found", "That account is no longer on this computer");
+      }
+      const kept = this.keptMethod(kind, loginId);
+      if (method && kept && kept !== method) throw new RunnerError("bad_request", "This account signs in another way");
+      if (cliShared && existsSync(path.join(dir, TOKEN_FILE))) {
+        throw new RunnerError("bad_request", "This account signs in another way");
       }
       // What an agent's user could write is never run or written by root, and a sign-in for all agents never
       // keeps one agent's login (nor the other way round): it starts over, as root's.
@@ -1327,6 +1495,15 @@ export class AccountManager {
       // Until it signs in: a runner that dies mid sign-in leaves this behind, and the list skips (then clears) it.
       await writeFile(path.join(dir, SIGNING_IN), "", { mode: 0o600 });
     }
+    // The method this sign-in uses; signing in again keeps it, unless an older server's sign-in changes it.
+    const signsIn: AuthMethod | typeof CLI_SHARED = cliShared
+      ? CLI_SHARED
+      : cliKey || (provider && !enterprise)
+        ? "api_key"
+        : forAll && kind === "claude_code"
+          ? "setup_token"
+          : "cli_login";
+    await writeFile(this.marker(kind, loginId, "method"), signsIn, { mode: 0o600 });
     if (cliKey && pair) return this.beginKey(kind, loginId, dir, cliKey, pair, again, false);
     if (provider && pair && !enterprise)
       return this.beginKey(kind, loginId, dir, provider as PlanId, pair, again, forAll);
@@ -1338,6 +1515,7 @@ export class AccountManager {
       kind,
       dir,
       shared: forAll,
+      ...(cliShared ? { cliShared } : {}),
       state: "waiting",
       output: "",
       ...(pair ? { privateKey: pair.privateKey } : {}),
@@ -1347,10 +1525,10 @@ export class AccountManager {
       again,
     };
     try {
-      if (forAll && kind === "claude_code") this.spawnToken(login);
+      if (forAll && kind === "claude_code" && !cliShared) this.spawnToken(login);
       else this.spawnLogin(login, email);
     } catch (err) {
-      if (!again) await rm(dir, { recursive: true, force: true });
+      if (!again) await this.discard(kind, loginId);
       const why = err instanceof Error ? err.message : String(err);
       throw new RunnerError(
         "internal",
@@ -1419,14 +1597,15 @@ export class AccountManager {
 
   /** The CLI's own sign-in with plain pipes (`claude auth login`, `codex login --device-auth`). */
   private spawnLogin(login: Login, email?: string) {
-    const command = this.command(login.kind);
+    const { command, env, cwd } = login.cliShared
+      ? this.sharedCli(login.id)
+      : { command: this.command(login.kind), env: this.env(login.kind, login.dir), cwd: login.dir };
     const [file, ...pre] = command;
-    const env = this.env(login.kind, login.dir);
     const child = spawn(
       resolveCommand(file ?? "", env.PATH),
       [...pre, ...LOGIN_ARGS[login.kind], ...(email ? ["--email", email] : [])],
       {
-        cwd: login.dir,
+        cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
@@ -1541,11 +1720,13 @@ export class AccountManager {
 
   /**
    * System mode, signing in again where an agent's user had the folder, or for all agents where it was one
-   * agent's (or the other way round): root takes it back and empties it.
+   * agent's (or the other way round): root takes it back and empties it. A sign-in with its own user loses that user
+   * and its store with it.
    */
   private async startOver(kind: AccountKind, id: string) {
     const dir = this.dirOf(kind, id);
     await this.serial(id, async () => {
+      if (this.isCliShared(kind, id)) this.opts.sharedLogin?.remove(id);
       if (this.lentTo(kind, id)) await this.reclaimNow(kind, id);
       for (const name of await readdir(dir)) await rm(path.join(dir, name), { recursive: true, force: true });
       await rm(this.marker(kind, id, "lent"), { force: true });
@@ -1617,6 +1798,7 @@ export class AccountManager {
       loggedIn: true,
       provider,
       keyHint: key.slice(-4),
+      authMethod: "api_key",
       ...this.sharedFlag(login.kind, login.id),
     };
     this.settle(login, "done");
@@ -1644,6 +1826,7 @@ export class AccountManager {
       loggedIn: true,
       provider,
       keyHint: key.slice(-4),
+      authMethod: "api_key",
       ...this.sharedFlag(login.kind, login.id),
     };
     this.settle(login, "done");
@@ -1716,7 +1899,7 @@ export class AccountManager {
         await rm(this.marker(login.kind, login.id, "invalid"), { force: true }).catch(() => undefined);
         const info = await this.lookUp(login.kind, login.id);
         if (login.state !== "waiting") return;
-        if (info.loggedIn) {
+        if (info.loggedIn && !info.statusUnknown) {
           await rm(path.join(login.dir, SIGNING_IN), { force: true }).catch(() => undefined);
           // A ChatGPT sign-in for all agents: root's alone from now on (`grant`).
           if (login.shared) {
@@ -1729,7 +1912,13 @@ export class AccountManager {
           this.log(`account ${login.id.slice(0, 8)} (${login.kind}) signed in`);
           return;
         }
-        this.settle(login, "failed", `${LABEL[login.kind]} finished, but the account isn't signed in. Try again.`);
+        this.settle(
+          login,
+          "failed",
+          info.statusUnknown
+            ? `${LABEL[login.kind]} finished, but didn't say whether the account is signed in. Try again.`
+            : `${LABEL[login.kind]} finished, but the account isn't signed in. Try again.`,
+        );
       }
       if (login.state === "waiting") {
         const tail = withoutTokens(stripAnsi(this.shown(login)))
@@ -1747,7 +1936,7 @@ export class AccountManager {
             : `${LABEL[login.kind]} couldn't sign in${login.code ? " with that code" : ""}${safe ? `: ${safe}` : ""}`,
         );
       }
-      if (!login.again && login.started) await rm(login.dir, { recursive: true, force: true }).catch(() => undefined);
+      if (!login.again && login.started) await this.discard(login.kind, login.id).catch(() => undefined);
     })();
   }
 
@@ -1773,7 +1962,13 @@ export class AccountManager {
     // Signed in anew: a turn refused before (`refused`) says nothing about this token.
     await rm(this.marker(login.kind, login.id, "invalid"), { force: true }).catch(() => undefined);
     if (login.state !== "waiting") return true;
-    const info: RunnerAccountInfo = { id: login.id, kind: login.kind, loggedIn: true, shared: true };
+    const info: RunnerAccountInfo = {
+      id: login.id,
+      kind: login.kind,
+      loggedIn: true,
+      shared: true,
+      authMethod: "setup_token",
+    };
     this.settle(login, "done");
     login.account = info;
     this.added(info);
@@ -1805,18 +2000,44 @@ export class AccountManager {
       }, 3000);
       t.unref?.();
     }
-    if (!login.again) await rm(login.dir, { recursive: true, force: true }).catch(() => undefined);
+    if (!login.again) await this.discard(login.kind, login.id).catch(() => undefined);
+  }
+
+  /** A new sign-in that didn't finish: its folder goes, with what root wrote beside it. */
+  private async discard(kind: AccountKind, id: string) {
+    if (this.isCliShared(kind, id)) this.opts.sharedLogin?.remove(id);
+    await rm(this.dirOf(kind, id), { recursive: true, force: true });
+    await rm(this.marker(kind, id, "method"), { force: true });
   }
 
   // ── Accounts ───────────────────────────────────────────────────────────────
 
+  /** Each account's last conclusive `loggedIn`, for a look that says nothing for sure (`statusUnknown`). */
+  private readonly knownLoggedIn = new Map<string, boolean>();
+
   /**
-   * One account's status (never throws: unknown is signed out). Refused in a turn since it last signed in
+   * One account's status and how it signs in (never throws). A look that says nothing for sure keeps the last
+   * conclusive answer, else signed in when a sign-in finished in its folder: only the CLI saying so, or a refusal,
+   * signs it out.
+   */
+  private async lookUp(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
+    const looked = await this.look(kind, id);
+    const info = { ...looked, ...this.authMethodOf(kind, id, looked) };
+    if (!info.statusUnknown) {
+      this.knownLoggedIn.set(id, info.loggedIn);
+      return info;
+    }
+    const known = this.knownLoggedIn.get(id) ?? !existsSync(path.join(this.dirOf(kind, id), SIGNING_IN));
+    return { ...info, loggedIn: known };
+  }
+
+  /**
+   * One account's status as it looks now. Refused in a turn since it last signed in
    * (`refused`), it is signed out whatever its CLI says. Otherwise a key account is signed in; a token root keeps,
    * while it has one; a folder an agent's user had, as its turns last said, with the plan Claude Code keeps there
    * (that user could write it, so it is only ever one of the plans' words); any other, as its CLI says.
    */
-  private async lookUp(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
+  private async look(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
     const dir = this.dirOf(kind, id);
     const refused = existsSync(this.marker(kind, id, "invalid"));
     const shared = this.sharedFlag(kind, id);
@@ -1833,16 +2054,28 @@ export class AccountManager {
         ? { id, kind, loggedIn: !refused, provider: OPENCODE_KEY_PROVIDER, keyHint: key.slice(-4), ...shared }
         : { id, kind, loggedIn: false, ...shared };
     }
+    const cliShared = this.isCliShared(kind, id);
     // A ChatGPT one for all agents holds only what root wrote there (`keepCodexAuth`): its CLI says, below.
-    if (this.isShared(kind, id) && kind !== "codex") {
+    if (this.isShared(kind, id) && kind !== "codex" && !cliShared) {
       return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
     }
     if (refused || this.lentTo(kind, id) !== null) {
       const kept = refused || kind !== "claude_code" ? undefined : claudeKeptPlan(dir);
       return { id, kind, loggedIn: !refused, ...(kept ? { plan: kept } : {}), ...shared };
     }
-    const env = this.env(kind, dir);
-    const r = await runCli(this.command(kind), STATUS_ARGS[kind], env, STATUS_TIMEOUT_MS);
+    // With the switch off or the self-check failing, no CLI runs on its store: it stays as last known.
+    if (cliShared && !this.opts.sharedLogin?.ready())
+      return { id, kind, loggedIn: false, statusUnknown: true, ...shared };
+    const r = await this.serial(
+      id,
+      async () => {
+        const { command, env } = cliShared
+          ? this.sharedCli(id)
+          : { command: this.command(kind), env: this.env(kind, dir) };
+        return runCli(command, STATUS_ARGS[kind], env, STATUS_TIMEOUT_MS);
+      },
+      this.cliOps,
+    ).catch((err: unknown): CliResult => ({ status: null, stdout: "", stderr: String(err) }));
     // Codex says it on stderr.
     const status =
       kind === "claude_code"
@@ -1854,7 +2087,9 @@ export class AccountManager {
             : kind === "antigravity"
               ? parseAgyStatus(r.status, `${r.stdout}\n${r.stderr}`, agyAuthOf(dir))
               : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
-    return { id, kind, ...status, ...shared };
+    // Timed out, or didn't start.
+    const unknown = r.status === null ? { statusUnknown: true as const } : {};
+    return { id, kind, ...status, ...unknown, ...shared };
   }
 
   private async lookAll(): Promise<RunnerAccountInfo[]> {
@@ -1876,7 +2111,7 @@ export class AccountManager {
         const started = this.lentTo(kind, e.name) === null ? await lstat(marker).catch(() => null) : null;
         if (started) {
           if (Date.now() - started.mtimeMs > ACCOUNT_LOGIN_TTL_MS) {
-            await rm(path.join(this.opts.root, kind, e.name), { recursive: true, force: true }).catch(() => undefined);
+            await this.discard(kind, e.name).catch(() => undefined);
           }
           continue;
         }
@@ -1946,6 +2181,7 @@ export class AccountManager {
         rm(this.marker(kind, id, "invalid"), { force: true }),
         rm(this.marker(kind, id, "lent"), { force: true }),
         rm(this.marker(kind, id, "shared"), { force: true }),
+        rm(this.marker(kind, id, "method"), { force: true }),
       ]);
     if (!existsSync(dir)) {
       await markers();
@@ -1954,7 +2190,8 @@ export class AccountManager {
     const lent = this.lentTo(kind, id) !== null;
     // A key has no sign-in to end, nor has a token on this computer (only Claude's settings revoke it); a folder an
     // agent's user had is never run as root (deleting it is the sign-out).
-    if (lent) await this.serial(id, () => this.reclaimNow(kind, id));
+    if (this.isCliShared(kind, id)) await this.removeCliShared(id);
+    else if (lent) await this.serial(id, () => this.reclaimNow(kind, id));
     else if (
       !this.isShared(kind, id) &&
       !(kind === "claude_code" && (await planKeyOf(dir))) &&
@@ -1968,10 +2205,26 @@ export class AccountManager {
     await markers();
     if (this.cache) this.cache = { ...this.cache, value: this.cache.value.filter((a) => a.id !== id) };
     this.usage.delete(id);
+    this.knownLoggedIn.delete(id);
     this.listing = null;
     this.log(`account ${id.slice(0, 8)} (${kind}) removed`);
     this.changed();
     return true;
+  }
+
+  /** Signs out as the sign-in's user when its CLI may run here; its store and user go either way. */
+  private async removeCliShared(id: string) {
+    if (this.opts.sharedLogin?.ready()) {
+      const r = await Promise.resolve()
+        .then(() => {
+          const { command, env } = this.sharedCli(id);
+          return runCli(command, LOGOUT_ARGS.claude_code, env, STATUS_TIMEOUT_MS);
+        })
+        .catch(() => null);
+      if (r?.status !== 0)
+        this.log(`account ${id.slice(0, 8)} (claude_code): sign-out didn't finish; removing it anyway`);
+    }
+    this.opts.sharedLogin?.remove(id);
   }
 
   private changed() {
@@ -1996,14 +2249,19 @@ export class AccountManager {
   // ── System mode: folders lent to agents' users ────────────────────────────
 
   private readonly folderOps = new Map<string, Promise<unknown>>();
+  /**
+   * An account's status look and usage probe, one at a time: two CLI processes on one sign-in race on refreshing
+   * its credentials.
+   */
+  private readonly cliOps = new Map<string, Promise<unknown>>();
 
-  /** One change of a folder's owner at a time. */
-  private serial<T>(id: string, fn: () => Promise<T>): Promise<T> {
-    const run = (this.folderOps.get(id) ?? Promise.resolve()).catch(() => undefined).then(fn);
-    this.folderOps.set(id, run);
+  /** One change of a folder's owner at a time (`ops`: another chain of one-at-a-time work). */
+  private serial<T>(id: string, fn: () => Promise<T>, ops = this.folderOps): Promise<T> {
+    const run = (ops.get(id) ?? Promise.resolve()).catch(() => undefined).then(fn);
+    ops.set(id, run);
     void run
       .finally(() => {
-        if (this.folderOps.get(id) === run) this.folderOps.delete(id);
+        if (ops.get(id) === run) ops.delete(id);
       })
       .catch(() => undefined);
     return run;
@@ -2018,6 +2276,7 @@ export class AccountManager {
     if (!isAccountKind(kind) || !isAccountId(id) || !this.isShared(kind, id)) return null;
     // Signing in again keeps what it has until the new one is kept: only a refusal, or nothing kept, is signed out.
     if (existsSync(this.marker(kind, id, "invalid"))) return { kind: "none" };
+    if (this.isCliShared(kind, id)) return { kind: "hosted" };
     const dir = this.dirOf(kind, id);
     if (kind === "codex") return this.codexGrant(id, dir);
     const plan = await planKeyOf(dir);
@@ -2198,7 +2457,7 @@ export class AccountManager {
       const id = this.probeQueue.shift() as string;
       this.probing.add(id);
       this.probed.set(id, Date.now());
-      void this.probeOne(id)
+      void this.serial(id, () => this.probeOne(id), this.cliOps)
         .catch(() => null)
         .then((found) => {
           if (found === "backoff") this.backoff.set(id, Date.now() + USAGE_BACKOFF_MS);
@@ -2226,6 +2485,9 @@ export class AccountManager {
         })[0];
     if (!target) return null;
     const limits = timeoutMs ? { timeoutMs } : {};
+    if (!own && this.isCliShared(target.kind, id)) {
+      return this.opts.sharedLogin?.ready() ? probeClaudeUsage({ ...this.sharedCli(id), ...limits }) : null;
+    }
     const plan = own || target.kind !== "claude_code" ? null : await planKeyOf(target.cwd);
     if (plan) {
       return fetchPlanKeyUsage(plan.provider, plan.key, {
@@ -2235,7 +2497,7 @@ export class AccountManager {
     }
     // A token makes model requests only: its usage comes from its turns.
     if (!own && (this.lentTo(target.kind, id) !== null || this.isShared(target.kind, id))) return null;
-    const probe = { command: this.command(target.kind), cwd: target.cwd, env: target.env, ...limits };
+    const probe = { command: this.command(target.kind, Boolean(own)), cwd: target.cwd, env: target.env, ...limits };
     // Cursor's CLI reports no plan usage: its turns' `usage` is all there is.
     // Nor does OpenCode's: its key's usage is on OpenCode's console. Grok Build shows its plan's only in its TUI.
     if (target.kind === "cursor" || target.kind === "opencode" || target.kind === "grok") return null;

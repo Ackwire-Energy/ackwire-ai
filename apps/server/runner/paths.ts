@@ -1,5 +1,5 @@
 import { lstatSync } from "node:fs";
-import { lstat, mkdir, readdir, realpath, rename } from "node:fs/promises";
+import { lstat, mkdir, readdir, readlink, realpath, rename } from "node:fs/promises";
 import path from "node:path";
 import { isSecretRead } from "@agenteschat/adapters/command-policy";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
@@ -144,6 +144,43 @@ async function resolveWithin(
       if (up === parent) throw outside();
       parent = up;
     }
+  }
+}
+
+/** As the kernel's limit: a loop of links ends here. */
+const MAX_LINK_HOPS = 40;
+
+/**
+ * `abs` through its symlinks, as far as it exists; what doesn't exist yet stays as it is. A link to something missing
+ * is followed too, since writing to it would create its target: walked part by part, as the kernel does, because a
+ * `..` in a target undoes the link before it, which lexical resolving would not.
+ */
+export async function realOrNearest(abs: string): Promise<string> {
+  try {
+    return await realpath(abs);
+  } catch {
+    const { root } = path.parse(abs);
+    const rest = abs.slice(root.length).split(path.sep);
+    let at = root;
+    let hops = 0;
+    while (rest.length > 0) {
+      const part = rest.shift() as string;
+      if (part === "" || part === ".") continue;
+      if (part === "..") {
+        at = path.dirname(at);
+        continue;
+      }
+      const next = path.join(at, part);
+      const target = await readlink(next).catch(() => null);
+      if (target === null) {
+        at = next;
+        continue;
+      }
+      if (++hops > MAX_LINK_HOPS) throw new RunnerError("bad_request", `Too many links in ${abs}`);
+      if (path.isAbsolute(target)) at = path.parse(target).root;
+      rest.unshift(...target.split(path.sep));
+    }
+    return at;
   }
 }
 

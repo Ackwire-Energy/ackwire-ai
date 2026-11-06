@@ -39,6 +39,9 @@ import { resolveCommand } from "./executors";
  * none while that sign-in has a process open (a turn, or the one kept after it): concurrent processes on one
  * sign-in race on its refresh token, so the answer is `busy` at once and the server tries another. For the
  * same reason a turn or a task starting on a sign-in stops the route running there first.
+ *
+ * On a Claude sign-in several agents share, root runs it as that sign-in's user (`RouteDeps.shared`): no worker holds
+ * the sign-in, and with no tools the CLI has nothing to delegate.
  */
 
 /** Claude Code's argv for a route; the prompt goes on standard input. */
@@ -191,6 +194,12 @@ export interface RouteDeps {
   codexApp?: { holds(account: string | null): boolean };
   /** Background tasks, each with its CLI on its sign-in: its agent's account, or the computer's own (none). */
   tasks?: { runningTasks(): { executor: string; account?: string }[] };
+  /** Root, a sign-in several agents share: its CLI's config folder, a folder its user can read, and how it starts. */
+  shared?: {
+    home: string;
+    dir: string;
+    launch(): Promise<{ command: string[]; env: NodeJS.ProcessEnv; cwd: string }>;
+  };
   signal?: AbortSignal;
   /** Tests: the CLIs, the time limit and where temporary folders go. */
   claudeCommand?: string[];
@@ -226,7 +235,11 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
   }
   const account = req.account ?? null;
   if (account !== null && !isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
-  const signIn = account ? await accountSignIn(deps.accounts, req.kind, account, deps.grant) : null;
+  const signIn = deps.shared
+    ? { home: deps.shared.home, release: undefined }
+    : account
+      ? await accountSignIn(deps.accounts, req.kind, account, deps.grant)
+      : null;
   if (signIn === "signed_out") throw new RunnerError("not_found", "That account is signed out here");
   if (signIn === "missing") throw new RunnerError("not_found", "That account isn't on this computer anymore");
   const home = signIn?.home ?? null;
@@ -251,6 +264,7 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
 }
 
 async function route(req: BrainRouteRequest, deps: RouteDeps, home: string | null, key: string) {
+  if (deps.shared) return claudeRoute(req, { ...deps, dir: deps.shared.dir, home });
   if (home && (deps.grant?.kind === "key" || (!deps.grant && (await planKeyOf(home))))) {
     throw new RunnerError("not_allowed", "A sign-in made with a key doesn't pick who answers");
   }
@@ -266,19 +280,23 @@ async function route(req: BrainRouteRequest, deps: RouteDeps, home: string | nul
 
 async function claudeRoute(req: BrainRouteRequest, o: RouteDeps & { dir: string; home: string | null }) {
   const systemFile = path.join(o.dir, "system.txt");
-  writeFileSync(systemFile, req.system, { mode: 0o600 });
+  writeFileSync(systemFile, req.system, { mode: o.shared ? 0o640 : 0o600 });
+  const launched = await o.shared?.launch();
   // An account's folder is the CLI's home, and requests go only to Claude's own endpoint.
   const token = o.grant?.kind === "token" ? o.grant.token : undefined;
-  const env = o.home
-    ? {
-        ...accountEnv("claude_code", o.home),
-        ...accountSettingsEnv(undefined, "haiku"),
-        ...(token ? TOKEN_FD_ENV : {}),
-      }
-    : process.env;
+  const env = launched
+    ? { ...launched.env, ...accountSettingsEnv(undefined, "haiku") }
+    : o.home
+      ? {
+          ...accountEnv("claude_code", o.home),
+          ...accountSettingsEnv(undefined, "haiku"),
+          ...(token ? TOKEN_FD_ENV : {}),
+        }
+      : process.env;
   const started = Date.now();
-  const run = await runCli(o.claudeCommand ?? ["claude"], claudeRouteArgs({ systemFile, schema: req.schema }), {
-    cwd: o.dir,
+  const command = launched?.command ?? o.claudeCommand ?? ["claude"];
+  const run = await runCli(command, claudeRouteArgs({ systemFile, schema: req.schema }), {
+    cwd: launched?.cwd ?? o.dir,
     env,
     input: req.prompt,
     timeoutMs: o.timeoutMs ?? ROUTE_TIMEOUT_MS,

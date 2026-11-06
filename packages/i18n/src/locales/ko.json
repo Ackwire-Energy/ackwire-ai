@@ -4037,6 +4037,7 @@
         "account": "계정",
         "accountWho": "{{name}} 담당자인 {{owner}}님의 계정만 있어요. 플랜은 주인의 에이전트를 위해서만 생각해요.",
         "accountSignedOut": "로그아웃됨, 다시 로그인하세요",
+        "accountUnknown": "로그인 확인 안 됨, 곧 다시 확인해요",
         "thisComputer": "{{computer}}의 계정",
         "accountMove": "{{agents}}이(가) 사용 중 · 여기로 옮기기",
         "accountAlso": "{{agents}}도 사용 중",
@@ -7705,6 +7706,8 @@
       "signedOut": "로그아웃됐어요. 에이전트가 쓸 수 있도록 다시 로그인하세요.",
       "signedOutFor_other": "{{agents}}이(가) 로그아웃됐어요.",
       "keyRefused": "키가 거부됐어요. 새 키로 바꾸세요.",
+      "statusUnknown": "이번에는 컴퓨터가 로그인을 확인하지 못했어요. 알아서 다시 확인해요.",
+      "identityUnknown": "어떤 계정인지 알 수 없음",
       "rename": "이름 바꾸기",
       "signInAgain": "다시 로그인",
       "newKey": "키 바꾸기",
@@ -7747,6 +7750,8 @@
       "limited": "한도 도달",
       "limitedUntil": "{{when}}까지 한도 도달",
       "updated": "{{ago}} 업데이트됨",
+      "ago": "{{ago}} 업데이트됨",
+      "stale": "오래된 수치, {{ago}} 업데이트됨",
       "notShared": "{{maker}}은(는) 여기에 사용량을 공유하지 않아요.",
       "offer": {
         "use": "{{label}} 사용({{pct}}%)",
@@ -10798,6 +10803,7 @@
       "targetNotFound": "그 컴퓨터는 더 이상 없어요. 다른 컴퓨터를 고르세요.",
       "targetSame": "에이전트가 이미 그 컴퓨터에 있어요.",
       "targetPaused": "그 컴퓨터는 일시 중지됐어요. 다른 컴퓨터를 고르세요.",
+      "accountMethodUnsupported": "이 컴퓨터에서는 아직 이 방식으로 Claude를 연결할 수 없어요. 컴퓨터의 agentes.chat 프로그램을 업데이트하거나 API 키를 쓰세요.",
       "offline": "{{name}}은(는) 지금 오프라인이에요. 돌아오면 다시 시도해 주세요.",
       "paused": "{{name}}이(가) 일시 중지됐어요: 다시 시작될 때까지 새 작업이 시작되지 않아요.",
       "timeout": "컴퓨터가 제때 응답하지 않았어요. 다시 시도해 주세요."

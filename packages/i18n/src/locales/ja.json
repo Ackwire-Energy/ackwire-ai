@@ -4039,6 +4039,7 @@
         "account": "アカウント",
         "accountWho": "{{name}}の担当者である{{owner}}さんのアカウントだけです。プランはその持ち主のエージェントのためにだけ考えます。",
         "accountSignedOut": "ログアウトされています。もう一度ログインしてください",
+        "accountUnknown": "ログインを確認できていません。まもなくもう一度確認します",
         "thisComputer": "{{computer}}のアカウント",
         "accountMove": "{{agents}}が使用中 · ここに移動",
         "accountAlso": "{{agents}}も使用中",
@@ -7711,6 +7712,8 @@
       "signedOut": "ログアウトされています。エージェントが使えるよう、もう一度ログインしてください。",
       "signedOutFor_other": "{{agents}}はログアウトされています。",
       "keyRefused": "キーが拒否されました。新しいキーに置き換えてください。",
+      "statusUnknown": "今回はコンピューターがログインを確認できませんでした。自動でもう一度確認します。",
+      "identityUnknown": "アカウント不明",
       "rename": "名前を変更",
       "signInAgain": "もう一度ログイン",
       "newKey": "キーを置き換える",
@@ -7753,6 +7756,8 @@
       "limited": "上限に達しました",
       "limitedUntil": "{{when}}まで上限に達しています",
       "updated": "{{ago}}に更新",
+      "ago": "{{ago}}に更新",
+      "stale": "古い数値・{{ago}}に更新",
       "notShared": "{{maker}}はここで使用量を共有していません。",
       "offer": {
         "use": "{{label}}を使う（{{pct}}%）",
@@ -10804,6 +10809,7 @@
       "targetNotFound": "そのコンピューターはもう存在しません。別のものを選んでください。",
       "targetSame": "エージェントはすでにそのコンピューターにいます。",
       "targetPaused": "そのコンピューターは一時停止中です。別のものを選んでください。",
+      "accountMethodUnsupported": "このコンピューターでは、まだこの方法でClaudeを接続できません。コンピューターのagentes.chatプログラムを更新するか、APIキーを使ってください。",
       "offline": "{{name}}は現在オフラインです。戻ったらもう一度お試しください。",
       "paused": "{{name}}は一時停止中です。再開されるまで新しいものは始まりません。",
       "timeout": "コンピューターが時間内に応答しませんでした。もう一度お試しください。"

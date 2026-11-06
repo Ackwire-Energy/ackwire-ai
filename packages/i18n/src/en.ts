@@ -4252,6 +4252,8 @@ export const en = {
         accountWho:
           "Only accounts of {{owner}}, who is responsible for {{name}}: a plan thinks only for its owner's agents.",
         accountSignedOut: "Signed out, sign in again",
+        /** The computer's last look at the sign-in said nothing for sure, and the last it knew was signed out. */
+        accountUnknown: "Sign-in not confirmed, checked again soon",
         thisComputer: "{{computer}}'s account",
         accountMove: "In use by {{agents}} · Move it here",
         accountAlso: "Also used by {{agents}}",
@@ -7929,6 +7931,9 @@ export const en = {
       signedOutFor_one: "{{agents}} is signed out.",
       signedOutFor_other: "{{agents}} are signed out.",
       keyRefused: "The key was refused: replace it with a new one.",
+      statusUnknown: "The computer couldn't confirm the sign-in this time. It checks again on its own.",
+      /** Where an account's email would be: a Claude token made for all agents doesn't say which account it is. */
+      identityUnknown: "account not identified",
       rename: "Rename",
       signInAgain: "Sign in again",
       newKey: "Replace the key",
@@ -7975,6 +7980,10 @@ export const en = {
       limited: "At the limit",
       limitedUntil: "At the limit until {{when}}",
       updated: "Updated {{ago}}",
+      /** Mid-line, after the windows: "week 40% · 5h 12% · updated 51 min ago". */
+      ago: "updated {{ago}}",
+      /** The same once the numbers are over 6 hours old. */
+      stale: "old numbers, updated {{ago}}",
       notShared: "{{maker}} doesn't share usage here.",
       offer: {
         use: "Use {{label}} ({{pct}}%)",
@@ -10859,6 +10868,8 @@ export const en = {
       targetNotFound: "That computer no longer exists. Choose another one.",
       targetSame: "The agents are already on that computer.",
       targetPaused: "That computer is paused. Choose another one.",
+      accountMethodUnsupported:
+        "This computer can't connect Claude this way yet. Update the agentes.chat program on it, or use an API key.",
       offline: "{{name}} is offline right now. Try again once it's back.",
       paused: "{{name}} is paused: nothing new starts on it until it's resumed.",
       timeout: "The computer didn't answer in time. Try again.",
