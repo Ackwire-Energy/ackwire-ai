@@ -17,6 +17,7 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useTheme } from "@/ui";
 import { openAgentEdit } from "../agents/AgentEditScreen";
+import { useCardTop } from "../chat/look";
 import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
@@ -176,6 +177,7 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   const meId = useMeId();
   const failed = useFailed();
   const [pending, setPending] = useState(false);
@@ -199,7 +201,7 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
   };
   const done = card.state !== "paused";
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
       <View style={styles.row}>
         <LineIcon name={done ? "check" : "pause"} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
@@ -243,10 +245,10 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
-  acts: { marginTop: 4, gap: 2, alignItems: "flex-start" },
+  acts: { gap: 2, alignItems: "flex-start" },
   // Words-only actions: the ghost buttons' own side padding hangs outside, so their words line up with the text.
   textActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginLeft: -14 },
 });

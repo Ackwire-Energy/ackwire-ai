@@ -260,7 +260,6 @@ const styles = StyleSheet.create({
   line: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 14,

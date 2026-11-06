@@ -405,7 +405,7 @@ function ReceiptsSheet({
 
 const styles = StyleSheet.create({
   // Right under the message, on its side: mine at the right edge (as "Visto"), anyone else's under the text.
-  line: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: -4, marginBottom: 4, minHeight: 20 },
+  line: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, minHeight: 20 },
   end: { alignSelf: "flex-end", paddingRight: 16, paddingLeft: 64 },
   start: { alignSelf: "flex-start", paddingLeft: MSG_TEXT, paddingRight: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },

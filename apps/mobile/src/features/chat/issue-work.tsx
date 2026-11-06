@@ -8,6 +8,7 @@ import { StateChip } from "../issues/parts";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
+import { useCardTop } from "./look";
 
 /**
  * "Ask Ada to implement" (as on the web): the root of the work thread in the
@@ -17,6 +18,7 @@ import { LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
 export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId: string | null }) {
   const { t } = useTranslation();
   const c = useColors();
+  const cardTop = useCardTop();
   const surface = useSurface();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -30,7 +32,7 @@ export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId
       accessibilityRole="button"
       accessibilityLabel={`${t("chat.issueWork.label")}: #${work.number} ${current?.title ?? work.title}`}
       accessibilityHint={t("chat.issueWork.view")}
-      style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, surface, cardTop, pressed && styles.pressed]}
     >
       <View style={styles.head}>
         {/* The icon alone: no tile inside the card. */}
@@ -54,7 +56,7 @@ export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId
 }
 
 /** Where the issue came from: one quiet line, "Ada pegou a issue #24 · título" (opens the issue). */
-export function IssueTakenLine({ message }: { message: Message }) {
+export function IssueTakenLine({ message, gap }: { message: Message; gap: number }) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -66,7 +68,7 @@ export function IssueTakenLine({ message }: { message: Message }) {
     <Pressable
       onPress={() => router.push(`/issues/${taken.number}`)}
       accessibilityRole="link"
-      style={({ pressed }) => [styles.line, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.line, { marginTop: gap }, pressed && styles.pressed]}
     >
       <LineIcon name="issue" size={LINE_MARK} color={c.faint} variant="small" />
       <Text variant="small" tone="faint" style={styles.grow}>
@@ -81,7 +83,7 @@ export function IssueTakenLine({ message }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 8, padding: 14, borderRadius: 20, gap: 8 },
+  card: { padding: 14, borderRadius: 20, gap: 8 },
   head: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1, flexShrink: 1 },
   title: { fontWeight: "600" },
@@ -93,7 +95,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: LINE_GAP,
-    marginVertical: 4,
     paddingLeft: MSG_TEXT,
     paddingRight: 16,
   },

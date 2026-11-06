@@ -425,7 +425,6 @@ const styles = StyleSheet.create({
   // The icon (as the conversation's event lines), the sentence's first line and the action share one middle; the
   // sentence wraps under it.
   one: {
-    marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
@@ -440,7 +439,7 @@ const styles = StyleSheet.create({
   undoneBy: { marginTop: 2 },
   copyHook: { alignSelf: "flex-start", marginTop: 6, paddingVertical: 2 },
   room: { opacity: 0 },
-  group: { marginTop: 12, overflow: "hidden" },
+  group: { overflow: "hidden" },
   hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 12 },
   it: {
     flexDirection: "row",

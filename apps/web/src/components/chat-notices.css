@@ -3,14 +3,14 @@
 .cn-line {
   flex-wrap: wrap;
   gap: 4px 8px;
-  margin: 4px 12px 4px var(--thread-indent, 64px);
+  margin-inline: var(--thread-indent, 64px) 12px;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--faint);
 }
 /* Inside a message, in place of one of its parts: already in the text's column. */
 .cn-line--part {
-  margin: 2px 0;
+  margin-inline: 0;
 }
 /* Never wider than the room beside the icon (14px + the 8px gap): long text wraps here. */
 .cn-line__text {
@@ -56,7 +56,6 @@ html:not([data-pointer]) .cn-line__toggle:focus-visible {
   font-weight: 500;
 }
 .cn-report {
-  margin: 2px 0 6px;
   padding-left: 10px;
   border-left: 2px solid var(--line);
   font-size: 13.5px;

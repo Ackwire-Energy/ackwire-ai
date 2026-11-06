@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useTheme } from "@/ui";
+import { useCardTop } from "../chat/look";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
 
@@ -20,6 +21,7 @@ export function CostlyProposalCard({ message: m }: { message: Message }) {
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   const meId = useMeId();
   const failed = useFailed();
   const [pending, setPending] = useState(false);
@@ -42,7 +44,7 @@ export function CostlyProposalCard({ message: m }: { message: Message }) {
   const by = card.decidedByUserId;
   const who = by === meId ? t("costlyCard.you") : (dir.memberById.get(by ?? "")?.name ?? t("channel.unknownPerson"));
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
       <View style={styles.row}>
         <LineIcon name={decided ? "check" : "shield"} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
@@ -103,7 +105,7 @@ export function CostlyProposalCard({ message: m }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useTheme } from "@/ui";
+import { useCardTop } from "../chat/look";
 import { TeamTemplatesSheet } from "../right-hand/TeamCard";
 import { useDirectory, useMeId } from "../shared/hooks";
 import { usePlanHold } from "./parts";
@@ -62,6 +63,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   const status = useAiStatus(orgId);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const meId = useMeId();
@@ -110,7 +112,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
     }
   };
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
       <View style={styles.top}>
         <LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
@@ -176,6 +178,7 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   const status = useAiStatus(orgId);
   const meId = useMeId();
   // A card in a thread is answered there.
@@ -220,7 +223,7 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
         ? t("noAi.kept.active", { name })
         : t(answering ? "noAi.card.answering" : "noAi.card.connected", { name });
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
       <View style={styles.top}>
         <LineIcon name={state === "answer" ? "check" : "clock"} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
@@ -273,7 +276,7 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
 });

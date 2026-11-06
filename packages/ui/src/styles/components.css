@@ -1002,6 +1002,22 @@ textarea.ac-input {
   margin-left: 0;
 }
 
+/*
+ * A conversation's one vertical rhythm: `--msg-part-gap` between what stacks inside one group (a message's parts, the
+ * next row of the same turn), `--msg-turn-gap` between groups. Measured from what shows to what shows, whatever the two
+ * are, so no part sets a vertical margin of its own. A look sets its pair (`chat/looks.css`), the list and the body
+ * below spend them. `--msg-card-gap` is a card under a message, in its row or in one of its own, in every look. The
+ * numbers are `CHAT_RHYTHM` (packages/client/src/lib/chat-look.ts), which the phone reads.
+ * `--msg-block` is the row's plate past its content. It takes no room between rows: the list pays it back.
+ */
+:root {
+  --msg-part-gap: 8px;
+  --msg-turn-gap: 20px;
+  --msg-card-gap: 12px;
+  --msg-block: 4px;
+  /* The avatar column and its gap: how far a body stands in from its row. */
+  --msg-lead: calc(36px + var(--space-3));
+}
 /* Message: a fixed avatar column at the top, the text column beside it. Its side padding is set through
    `--msg-inline`, which the action bar also reads to stand left of the receipt's check. */
 .ac-msg {
@@ -1009,10 +1025,7 @@ textarea.ac-input {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: 6px var(--msg-inline);
-}
-.ac-msg--grouped {
-  padding-top: 2px;
+  padding: var(--msg-block) var(--msg-inline);
 }
 /*
  * The row's chrome never selects: a double or triple click on a message's text, copied, gives that text and nothing
@@ -1101,6 +1114,10 @@ textarea.ac-input {
   display: flex;
   justify-content: center;
 }
+/* No height of its own: the time's 26px line would stand under a shorter row's one line and open its gap. */
+.ac-msg__gutter {
+  height: 0;
+}
 .ac-msg__avatar {
   /* Top of the avatar on the author line, never centered on a long message. */
   align-self: flex-start;
@@ -1127,6 +1144,28 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
 .ac-msg__body {
   min-width: 0;
   flex: 1;
+}
+/* Doubled to outrank a card's own margin where it also stands outside a message (`.rq`, `.brw-ac`, `.mi-card`, `.ag-rcs`). */
+.ac-msg .ac-msg__body > * {
+  margin-block: 0;
+}
+/* Out of the flow or unseen: they neither take the gap nor make the next part take it. */
+.ac-msg
+  .ac-msg__body
+  > :not(.ac-visually-hidden, .ac-msg__actions, .ac-msg__aside--floating)
+  ~ :not(.ac-visually-hidden, .ac-msg__actions, .ac-msg__aside--floating) {
+  margin-top: var(--msg-part-gap);
+}
+/* A card stands apart from the words above it. */
+.ac-msg.ac-msg .ac-msg__body > :is(.ac-msg__text, .ac-msg-media) ~ :is(.rq, .waitcard, .mi-card, .iw-card, .brw-ac) {
+  margin-top: var(--msg-card-gap);
+}
+/* The name stays on its words, and a line's caption on its bubble. */
+.ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .rq-done) {
+  margin-top: 2px;
+}
+.ac-msg.ac-msg .ac-msg__body > :is(.ac-msg__own-foot, .ac-msg__foot) {
+  margin-top: calc(var(--msg-part-gap) / 2);
 }
 /*
  * Name and time on a 20px line whose box starts at the face's top: capitals flush with the face's edge read as a face
@@ -1244,7 +1283,6 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   }
 }
 .ac-msg__text {
-  margin: 2px 0 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -1274,7 +1312,6 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
    as the 8px between text and the other lines' icons. */
 .ac-msg__error {
   gap: 6px;
-  margin: 2px 0 0;
   color: var(--danger);
   font-size: 14px;
   line-height: 20px;
@@ -1288,7 +1325,6 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin: 2px 0 0;
 }
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
@@ -3267,7 +3303,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin-top: var(--space-1);
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
@@ -3569,7 +3604,6 @@ html:not([data-pointer]) .ac-color__hue:focus-visible {
 }
 /* Under a reply being written: what the agent is doing now ("consultando o GitHub…") */
 .ac-msg__activity {
-  margin: var(--space-1) 0 0;
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
@@ -3634,13 +3668,13 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
 }
 /*
  * A grouped message's check ends its first line, its middle on the line's capitals as an `.ac-iconline` lead's, so
- * it takes the text's type (`.ac-msg__text`) and top margin. The line wraps before it, never under it.
+ * it takes the text's type (`.ac-msg__text`). The line wraps before it, never under it.
  */
 .ac-msg__aside--floating {
   float: right;
   /* A body stacked as a column (cards) has no floats: there it keeps the right end. */
   align-self: flex-end;
-  margin: 2px 0 0 8px;
+  margin-left: 8px;
   font-size: 15.5px;
   line-height: 1.7;
   /* Browsers without the lh unit: the text's 26.35px line. */
@@ -3650,14 +3684,6 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
   .ac-msg__aside--floating {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
-}
-.ac-msg__aside .ac-receipt {
-  margin-top: 0;
-}
-/* A receipt with words: a line of its own under the message, from the text's start, the same on a first and a
-   grouped message, so the text still follows the name and the words come and go without moving it. */
-.ac-msg__foot > .ac-receipt {
-  margin-top: 2px;
 }
 /* A receipt part with nothing to show (a message no agent was asked about) takes no room, in a stacked body too. */
 .ac-msg__aside:empty,
@@ -5450,7 +5476,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 }
 .ac-msg--own .ac-msg__text {
   max-width: 100%;
-  margin-top: 0;
   padding: 7px 14px;
   border-radius: 18px;
   background: var(--own-bubble);
@@ -5504,16 +5529,8 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg--own.ac-msg--failed .ac-msg__text {
   box-shadow: inset 0 0 0 1px var(--danger);
 }
-/* A run's rows sit 2px apart; a new turn keeps the usual gap. */
-.ac-msg--own:is([data-run="start"], [data-run="mid"]) {
-  padding-bottom: 1px;
-}
-.ac-msg--own:is([data-run="mid"], [data-run="end"]) {
-  padding-top: 1px;
-}
 .ac-msg--own .ac-reacts {
   justify-content: flex-end;
-  margin-top: 4px;
 }
 /* The "+" that shows on hover goes first, so the pills at rest end on the bubble's edge. */
 .ac-msg--own .ac-react--add {
@@ -5528,7 +5545,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__own-time {
   position: relative;
   min-height: 16px;
-  margin-top: 4px;
   font-size: 11px;
   line-height: 16px;
   color: var(--faint);
@@ -5618,16 +5634,10 @@ html:not([data-pointer]) .ac-msg--own:has(:focus-visible) .ac-msg__own-time > .a
 }
 /*
  * Something under a bubble (reactions, a file, the thread line, an error, receipt words) ends the run's look there:
- * the usual gap under it, its corner round, and the next bubble's top corner round too.
+ * its corner round, and the next bubble's top corner round too.
  */
-.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) {
-  padding-bottom: 6px;
-}
 .ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) .ac-msg__text {
   border-bottom-right-radius: var(--own-cut);
-}
-.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) + .ac-msg--own {
-  padding-top: 6px;
 }
 .ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))
   + .ac-msg--own
@@ -5890,7 +5900,6 @@ html:not([data-pointer]) .ac-workline__action:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
 }
 .ac-react {
   height: 32px;
@@ -7347,10 +7356,6 @@ html:not([data-pointer]) .ac-stickers__cell:focus-visible {
   flex: none;
   image-rendering: pixelated;
 }
-/* In a message: under the name, as a picture is, a little apart from any words above it. */
-.ac-sticker.ac-msg-media {
-  margin-top: 4px;
-}
 /*
  * A GIF in a message: the picture in the cut-corner frame, as wide as it is up to 300px (`--gif-w`), its shape
  * held before it loads (`--gif-ar`); a small "GIF" mark on its corner and where it comes from on hover.
@@ -7587,7 +7592,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-react--add,
  * does now, the steps, the orbit), opening into every call. Flat like every card: the hairline and the cut corner.
  */
 .ac-tools {
-  margin: 10px 0 12px;
   max-width: var(--msg-card-w);
   border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: var(--surface-raised);

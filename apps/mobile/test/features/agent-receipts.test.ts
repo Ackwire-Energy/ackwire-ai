@@ -552,7 +552,7 @@ describe("a receipt never adds a line to its row", () => {
     const marks = src("features/chat/AgentReceipts.tsx");
     // The time's line holds the tallest mark, and the mark sits in it, after the time.
     expect(num(marks, /mark: \{[^}]*height: (\d+)/)).toBe(num(row, /meTime: \{[^}]*height: (\d+)/));
-    const line = row.slice(row.indexOf("<View style={styles.meTime}>"));
+    const line = row.slice(row.indexOf("<View style={[styles.meTime, "));
     expect(line.indexOf("when.time(m.createdAt)")).toBeLessThan(line.indexOf("<ReceiptMark message={m} mine"));
     expect(line).toContain("<ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />");
     // The turn's last bubble ends on the cut corner, on the side it stands.

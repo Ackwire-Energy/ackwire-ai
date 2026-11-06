@@ -30,6 +30,7 @@ import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { Button, type IconName, LineIcon, Text, useTheme } from "@/ui";
 import { AskDone } from "../chat/asks";
+import { useCardTop } from "../chat/look";
 import { PersonLimitNote } from "../usage/people";
 import { openPage } from "./parts";
 
@@ -246,15 +247,16 @@ function Shell({
   blocked: string;
 }) {
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   if (done) {
     return (
-      <View style={styles.done}>
+      <View>
         <AskDone done words={done} />
       </View>
     );
   }
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
       <View style={styles.row}>
         <LineIcon name={icon} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
@@ -279,8 +281,7 @@ function Shell({
 }
 
 const styles = StyleSheet.create({
-  done: { marginTop: 6 },
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
 });

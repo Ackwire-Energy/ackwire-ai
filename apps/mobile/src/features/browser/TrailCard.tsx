@@ -19,6 +19,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { Icon, Text } from "@/ui";
+import { useCardTop } from "../chat/look";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic, useSurface } from "../shared/parts";
@@ -71,6 +72,7 @@ export function TrailCard({
   const meId = useMeId();
   const dir = useDirectory();
   const c = useColors();
+  const cardTop = useCardTop();
   const when = useWhen();
   const surface = useSurface("e2");
   const [open, setOpen] = useState(false);
@@ -108,7 +110,10 @@ export function TrailCard({
   };
 
   return (
-    <View style={[styles.card, surface]} accessibilityLabel={tt("inCard.group", agentGrammar(agent?.name ?? ""))}>
+    <View
+      style={[styles.card, surface, cardTop]}
+      accessibilityLabel={tt("inCard.group", agentGrammar(agent?.name ?? ""))}
+    >
       <TrailSky color={color} />
       <Pressable
         onPress={toggle}
@@ -229,7 +234,7 @@ export function TrailCard({
 const SITE_ICON = 13;
 
 const styles = StyleSheet.create({
-  card: { marginTop: 12, borderRadius: 20, overflow: "hidden" },
+  card: { borderRadius: 20, overflow: "hidden" },
   head: { flexDirection: "row", alignItems: "center", gap: 12, padding: 10 },
   pressed: { opacity: 0.7 },
   thumb: {

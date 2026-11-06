@@ -8,6 +8,7 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useTheme } from "@/ui";
 import { AskDone } from "../chat/asks";
+import { useCardTop } from "../chat/look";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
 
@@ -22,6 +23,7 @@ export function StretchCard({ message: m }: { message: Message }) {
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   const meId = useMeId();
   const failed = useFailed();
   const [pending, setPending] = useState(false);
@@ -44,7 +46,7 @@ export function StretchCard({ message: m }: { message: Message }) {
   };
   if (continued) {
     return (
-      <View style={styles.done}>
+      <View>
         <AskDone
           done
           words={
@@ -60,7 +62,7 @@ export function StretchCard({ message: m }: { message: Message }) {
     );
   }
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
       <View style={styles.row}>
         <LineIcon name="pause" variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
@@ -75,8 +77,7 @@ export function StretchCard({ message: m }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  done: { marginTop: 6 },
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
 });

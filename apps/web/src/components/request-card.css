@@ -15,11 +15,6 @@
   box-shadow: 0 0 0 1px var(--line2);
   border-radius: 16px 16px 16px 4px;
 }
-/* Under a message's words: the card stands apart from them. */
-.ac-msg__text ~ .rq,
-.ac-msg-media ~ .rq {
-  margin-top: 14px;
-}
 /* Nothing left to decide, so no footer: the card closes on its own padding. */
 .rq:not(:has(.rq__foot)) {
   padding-bottom: 14px;
@@ -281,12 +276,6 @@ html:not([data-pointer]) .rq__more:focus-visible {
  */
 .rq-done {
   max-width: var(--msg-card-w);
-  margin-top: 2px;
-}
-/* Right under the name it is the message's words, not a card: a message with a request stacks its body with the
-   cards' 8px gap (`stacked`), which pulled the line away from the name; it sits 2px under it, as a text does. */
-.ac-msg__head + .rq-done {
-  margin-top: -6px;
 }
 .rq-done__line {
   display: flex;

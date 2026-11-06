@@ -23,6 +23,7 @@ import { Button, Chip, DiffView, haptics, Icon, LineIcon, Text, ToggleSwitch, us
 import { boldRuns } from "../chat/actions";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
 import { markName } from "../chat/logic";
+import { useCardTop } from "../chat/look";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
@@ -49,6 +50,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   const toast = useToast();
   const failed = useFailed();
   const rows = useCardProposals(orgId, ids);
@@ -211,7 +213,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
       />
     );
   const card = (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
       <View style={styles.head}>
         <LineIcon variant="subhead" name="doc" size={16} color={colors.ink2} />
         <Text variant="subhead" tone="ink2" style={styles.fill}>
@@ -286,7 +288,7 @@ function SettingChange({ p }: { p: Proposal }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 10, alignItems: "stretch" },
+  card: { borderRadius: 14, padding: 12, gap: 10, alignItems: "stretch" },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   section: { gap: 8 },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 10 },

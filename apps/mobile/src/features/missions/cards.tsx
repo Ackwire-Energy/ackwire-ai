@@ -29,6 +29,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { useCardTop } from "../chat/look";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -65,6 +66,7 @@ export function MissionCard({
 }
 
 export function MissionCardView({ mission: m, pinned = false }: { mission: Mission; pinned?: boolean }) {
+  const ownTop = useCardTop(8);
   const { t } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
@@ -79,7 +81,7 @@ export function MissionCardView({ mission: m, pinned = false }: { mission: Missi
       onPress={() => router.push(`/mission/${m.id}`)}
       accessibilityRole="button"
       accessibilityLabel={t("mobile.mission.cardLabel", { title: m.title, done, total })}
-      style={({ pressed }) => [styles.mcard, surface, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.mcard, surface, ownTop, pressed && styles.pressed]}
     >
       <View style={styles.row}>
         <Icon name="target" size={15} color={c.muted} />
@@ -141,6 +143,7 @@ export function SetupFailedCard({
   /** The mission's branch is gone (`branch_missing`): trying again starts over from the base. */
   lostBranch?: string | null;
 }) {
+  const ownTop = useCardTop(8);
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
@@ -157,7 +160,7 @@ export function SetupFailedCard({
   const state = m?.worktreeState;
   const open = m ? m.status !== "done" && m.status !== "canceled" : false;
   return (
-    <View style={[styles.askcard, surface]}>
+    <View style={[styles.askcard, surface, ownTop]}>
       <View style={styles.row}>
         <Icon name="code" size={15} color={c.muted} />
         <Text variant="caption" tone="muted" style={styles.bold}>
@@ -238,6 +241,7 @@ export function ReviewCard({ missionId, reviewId }: { missionId: string; reviewI
 }
 
 export function ReviewCardView({ review: r, mission }: { review: MissionReview; mission: Mission | null }) {
+  const ownTop = useCardTop(8);
   const { t } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
@@ -271,7 +275,7 @@ export function ReviewCardView({ review: r, mission }: { review: MissionReview; 
   }
   const canAct = mission?.canAct ?? false;
   return (
-    <View style={[styles.askcard, surface]}>
+    <View style={[styles.askcard, surface, ownTop]}>
       <View style={styles.row}>
         <Icon name="sparkle" size={15} color={c.muted} />
         <Text variant="caption" tone="muted" style={styles.bold}>
@@ -362,6 +366,7 @@ export function DecisionCard({ missionId, decisionId }: { missionId: string; dec
 }
 
 export function DecisionCardView({ decision: d, mission }: { decision: MissionDecision; mission: Mission | null }) {
+  const ownTop = useCardTop(8);
   const { t } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
@@ -394,7 +399,7 @@ export function DecisionCardView({ decision: d, mission }: { decision: MissionDe
     });
   };
   return (
-    <View style={[styles.askcard, surface]}>
+    <View style={[styles.askcard, surface, ownTop]}>
       <View style={styles.row}>
         <Icon name="flag" size={15} color={c.muted} />
         <Text variant="caption" tone="muted" style={styles.bold}>
@@ -458,6 +463,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
   const dir = useDirectory();
   const mission = useMission(orgId, missionId);
   const control = useMissionControl(orgId);
+  const ownTop = useCardTop(8);
   const m = mission.data;
   if (!m) return null;
   const name = dir.agentById.get(m.agentId)?.name ?? "";
@@ -481,7 +487,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
   const findings = m.findings ?? [];
   const investigated = findings.length > 0;
   return (
-    <View style={[investigated ? styles.inv : styles.askcard, surface]}>
+    <View style={[investigated ? styles.inv : styles.askcard, surface, ownTop]}>
       <View style={styles.row}>
         <Icon name="target" size={15} color={c.muted} />
         <Text variant="caption" tone="muted" style={[styles.bold, styles.shrink]}>
@@ -649,7 +655,7 @@ const STEP_N = 16;
 
 const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
-  mcard: { marginTop: 8, padding: 14, borderRadius: 20, gap: 0 },
+  mcard: { padding: 14, borderRadius: 20, gap: 0 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1, minWidth: 0 },
@@ -657,7 +663,7 @@ const styles = StyleSheet.create({
   title: { marginTop: 6, marginBottom: 10 },
   titlePinned: { marginTop: 4, marginBottom: 8 },
   ft: { marginTop: 8, gap: 6 },
-  askcard: { marginTop: 8, padding: 12, borderRadius: 20 },
+  askcard: { padding: 12, borderRadius: 20 },
   summary: { marginBottom: 10 },
   log: { fontSize: 12, lineHeight: 17, marginBottom: 10 },
   acts: { flexDirection: "row", gap: 8, marginTop: 4 },
@@ -680,7 +686,7 @@ const styles = StyleSheet.create({
   n: { width: STEP_N, alignItems: "flex-end" },
   // Under the steps' words: past the number's column and the row's gap.
   more: { paddingLeft: STEP_N + 10, paddingBottom: 8 },
-  inv: { marginTop: 8, padding: 14, borderRadius: 20 },
+  inv: { padding: 14, borderRadius: 20 },
   fd: { gap: 8, marginBottom: 12 },
   fdRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
   refs: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
