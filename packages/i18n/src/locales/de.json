@@ -4525,7 +4525,6 @@
       "builtinHelp": "Drive, Aufgaben, Gedächtnis und mehr",
       "noMatch": "Nichts zu „{{q}}“",
       "noneHere": "Nichts in diesem Filter",
-      "clear": "Lösche die Suche oder den Filter.",
       "library": "Skill-Bibliothek",
       "fineTune": "Die Feinabstimmung pro Tool gibt es im Konnektor. Hier ist es eine Stufe pro App.",
       "always": {
@@ -4610,7 +4609,6 @@
         "routines": "Routinen"
       },
       "noneFilter": "Nichts mit diesem Filter.",
-      "clear": "Versuch ein anderes Wort oder lösche den Filter.",
       "emptyTitle": "Jede Arbeit wird hier festgehalten",
       "emptyText": "Die Schritte und Kosten jeder Arbeit von {{name}} erscheinen hier.",
       "showing": "{{shown}} von {{total}} angezeigt.",
@@ -4788,8 +4786,6 @@
     "emptySearch": "Nichts gefunden für „{{q}}“.",
     "emptyTitle": "Das Gedächtnis von {{name}} beginnt hier",
     "emptyText": "Jede Unterhaltung zeigt etwas Neues darüber, wie das Team arbeitet.",
-    "empty": "Noch nichts hier. {{name}} lernt, während das Team mit ihm spricht.",
-    "empty_female": "Noch nichts hier. {{name}} lernt, während das Team mit ihr spricht.",
     "how": "So funktioniert das Gedächtnis",
     "editTitle": "{{kind}} bearbeiten",
     "text": "Text",

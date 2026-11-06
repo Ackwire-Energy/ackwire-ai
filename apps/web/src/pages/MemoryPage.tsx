@@ -23,10 +23,12 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { lookOf } from "@/lib/look";
 
 export type MemoryTab = "known" | "lessons" | "archived";
 
@@ -97,6 +99,34 @@ export function MemoryPage({ agentId }: { agentId: string }) {
     );
   }
   return <MemoryView agent={agent} />;
+}
+
+/** Nothing in an agent's memory: its own face and a way to teach it, or a way out of the search. */
+export function NoMemories({ agent, q, onClear }: { agent: Agent; q: string; onClear: () => void }) {
+  const { t } = useTranslation();
+  if (q.trim())
+    return (
+      <EmptyState
+        size="inline"
+        actions={
+          <Button size="sm" onClick={onClear}>
+            {t("filters.clearSearch")}
+          </Button>
+        }
+      >
+        {t("memory.emptySearch", { q })}
+      </EmptyState>
+    );
+  return (
+    <EmptyState
+      size="panel"
+      agent={lookOf(agent) ?? true}
+      title={t("memory.emptyTitle", { name: agent.name })}
+      actions={<AskAgentButton agent={agent} variant="primary" />}
+    >
+      {t("memory.emptyText")}
+    </EmptyState>
+  );
 }
 
 function MemoryView({ agent }: { agent: Agent }) {
@@ -219,11 +249,7 @@ function MemoryView({ agent }: { agent: Agent }) {
             </div>
           </article>
         ))}
-        {memory.isSuccess && items.length === 0 && (
-          <p className="muted" style={{ margin: 0, padding: "32px 16px", textAlign: "center" }}>
-            {q.trim() ? t("memory.emptySearch", { q }) : t("memory.empty", g)}
-          </p>
-        )}
+        {memory.isSuccess && items.length === 0 && <NoMemories agent={agent} q={q} onClear={() => setQ("")} />}
       </List>
       <p className="page__note">
         <HelpLink slug="memory">{t("memory.how")}</HelpLink>

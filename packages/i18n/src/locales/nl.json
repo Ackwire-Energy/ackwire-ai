@@ -4559,7 +4559,6 @@
       "builtinHelp": "Drive, taken, geheugen en meer",
       "noMatch": "Niets gevonden voor “{{q}}”",
       "noneHere": "Niets in dit filter",
-      "clear": "Wis de zoekopdracht of het filter.",
       "library": "Skillbibliotheek",
       "fineTune": "Fijnafstemming per tool doe je in de connector. Hier is het één niveau per app.",
       "always": {
@@ -4646,7 +4645,6 @@
         "routines": "Routines"
       },
       "noneFilter": "Niets met dit filter.",
-      "clear": "Probeer een ander woord of wis het filter.",
       "emptyTitle": "Elke klus wordt hier vastgelegd",
       "emptyText": "De stappen en kosten van elke klus van {{name}} verschijnen hier.",
       "showing": "{{shown}} van {{total}} getoond.",
@@ -4837,8 +4835,6 @@
     "emptySearch": "Niets gevonden voor „{{q}}”.",
     "emptyTitle": "Het geheugen van {{name}} begint hier",
     "emptyText": "Elk gesprek leert iets nieuws over hoe het team werkt.",
-    "empty": "Hier staat nog niets. {{name}} leert terwijl het team met hem praat.",
-    "empty_female": "Hier staat nog niets. {{name}} leert terwijl het team met haar praat.",
     "how": "Hoe het geheugen werkt",
     "editTitle": "{{kind}} bewerken",
     "text": "Tekst",

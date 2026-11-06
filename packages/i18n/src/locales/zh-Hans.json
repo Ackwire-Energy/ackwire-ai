@@ -4387,7 +4387,6 @@
       "builtinHelp": "Drive、任务、记忆等",
       "noMatch": "没有与“{{q}}”匹配的内容",
       "noneHere": "此筛选下没有内容",
-      "clear": "清除搜索或筛选。",
       "library": "技能库",
       "fineTune": "逐个工具的精细设置在连接器中进行。这里是每个应用一个级别。",
       "always": {
@@ -4468,7 +4467,6 @@
         "routines": "例行工作"
       },
       "noneFilter": "此筛选下没有内容。",
-      "clear": "换个词试试，或清除筛选。",
       "emptyTitle": "每项工作都记录在这里",
       "emptyText": "{{name}} 每项工作的步骤和费用都会显示在这里。",
       "showing": "显示 {{shown}} / {{total}}。",
@@ -4651,8 +4649,6 @@
     "emptySearch": "没有找到与“{{q}}”相关的内容。",
     "emptyTitle": "{{name}} 的记忆从这里开始",
     "emptyText": "每次对话都能学到团队工作方式的新内容。",
-    "empty": "这里还什么都没有。{{name}} 会在团队和他交流时学习。",
-    "empty_female": "这里还什么都没有。{{name}} 会在团队和她交流时学习。",
     "how": "记忆如何运作",
     "editTitle": "编辑{{kind}}",
     "text": "内容",

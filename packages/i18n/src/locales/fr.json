@@ -4700,7 +4700,6 @@
       "builtinHelp": "Drive, tâches, mémoire et plus",
       "noMatch": "Aucun résultat pour « {{q}} »",
       "noneHere": "Rien dans ce filtre",
-      "clear": "Effacez la recherche ou le filtre.",
       "library": "Bibliothèque de compétences",
       "fineTune": "Le réglage fin, outil par outil, se fait dans le connecteur. Ici, c'est un niveau par app.",
       "always": {
@@ -4793,7 +4792,6 @@
         "routines": "Routines"
       },
       "noneFilter": "Rien avec ce filtre.",
-      "clear": "Essayez un autre mot ou effacez le filtre.",
       "emptyTitle": "Chaque travail est enregistré ici",
       "emptyText": "Les étapes et le coût de chaque travail de {{name}} apparaissent ici.",
       "showing": "{{shown}} sur {{total}} affichées.",
@@ -4984,8 +4982,6 @@
     "emptySearch": "Rien trouvé pour « {{q}} ».",
     "emptyTitle": "La mémoire de {{name}} commence ici",
     "emptyText": "Chaque conversation apprend quelque chose de nouveau sur la façon de travailler de l'équipe.",
-    "empty": "Rien ici pour l'instant. {{name}} apprend à mesure que l'équipe lui parle.",
-    "empty_female": "Rien ici pour l'instant. {{name}} apprend à mesure que l'équipe lui parle.",
     "how": "Comment fonctionne la mémoire",
     "editTitle": "Modifier : {{kind}}",
     "text": "Texte",

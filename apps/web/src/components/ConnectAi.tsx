@@ -12,6 +12,7 @@ import { listsExisting } from "@agenteschat/client/lib/ai-accounts";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { stepPermissions } from "@agenteschat/client/lib/home";
 import {
   type AgentAi,
   type AiChoice,
@@ -105,6 +106,13 @@ const ConnectAiContext = createContext<ConnectAi | null>(null);
 
 /** Null outside the workspace shell (an isolated page in a test): no Connect there. */
 export const useConnectAi = () => useContext(ConnectAiContext);
+
+/** Whether this person has an AI to connect: the workspace's key, or a plan for an agent they have or may make. */
+export function useMayConnectAi() {
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  return stepPermissions(org, me.user.id, dir.agents).connectAi || can(org, "create_agents");
+}
 
 export function ConnectAiProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();

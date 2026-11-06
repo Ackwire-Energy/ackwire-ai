@@ -138,13 +138,12 @@ describe("Configurações → Computadores on self-host", () => {
     const host = region("Computador deste servidor") as HTMLElement;
     expect(host.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
     expect(host.textContent).toContain("Online");
-    // It's this server's: not among the other computers. Their card is its title and ⓘ, and its empty state the
-    // title alone.
+    // It's this server's: not among the other computers. Their card is its title and ⓘ, and its empty state.
     const others = region("Outros computadores") as HTMLElement;
     expect(hintOf("Outros computadores", others).text).toBe(
       "Conectados com um código, como um Mac mini em casa ou outro servidor. O que cada um libera se ajusta nele mesmo.",
     );
-    expect(shownText(others)).toBe("Outros computadoresNenhum outro computador ainda");
+    expect(shownText(others)).toContain("Rode agentes em qualquer computador");
     expect((region("Qual computador cada agente usa") as HTMLElement).textContent).not.toContain("Um por agente");
     expect(body()).not.toMatch(/na nuvem|computador na nuvem|in the cloud/i);
     // What it all means (pausing, folders, the other ways to connect) is one help page, linked once at the end.

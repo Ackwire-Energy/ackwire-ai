@@ -4870,7 +4870,6 @@
       "builtinHelp": "Drive, zadania, pamięć i więcej",
       "noMatch": "Nic nie pasuje do „{{q}}”",
       "noneHere": "Nic w tym filtrze",
-      "clear": "Wyczyść wyszukiwanie lub filtr.",
       "library": "Biblioteka umiejętności",
       "fineTune": "Dokładne ustawienia, narzędzie po narzędziu, są w konektorze. Tutaj jest jeden poziom na aplikację.",
       "always": {
@@ -4969,7 +4968,6 @@
         "routines": "Rutyny"
       },
       "noneFilter": "Nic dla tego filtra.",
-      "clear": "Spróbuj innego słowa albo wyczyść filtr.",
       "emptyTitle": "Każda praca jest tu zapisana",
       "emptyText": "Tu pojawią się kroki i koszt każdej pracy: {{name}}.",
       "showing": "Pokazano {{shown}} z {{total}}.",
@@ -5160,8 +5158,6 @@
     "emptySearch": "Nic nie znaleziono dla „{{q}}”.",
     "emptyTitle": "Tu zaczyna się pamięć: {{name}}",
     "emptyText": "Każda rozmowa uczy czegoś nowego o tym, jak pracuje zespół.",
-    "empty": "Na razie nic tu nie ma. {{name}} uczy się w miarę rozmów z zespołem.",
-    "empty_female": "Na razie nic tu nie ma. {{name}} uczy się w miarę rozmów z zespołem.",
     "how": "Jak działa pamięć",
     "editTitle": "Edytuj: {{kind}}",
     "text": "Treść",

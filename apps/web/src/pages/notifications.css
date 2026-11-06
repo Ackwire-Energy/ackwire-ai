@@ -926,58 +926,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   }
 }
 
-/* ── Empty: everything done ─────────────────────────────────────────────── */
-.nt-calm {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 6px;
-  padding: 0 18px 26px;
-  border-radius: 20px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  overflow: hidden;
-  margin-bottom: 22px;
-  animation: nt-fi 0.4s var(--out);
-}
-.nt-calm__glow {
-  position: relative;
-  width: calc(100% + 36px);
-  margin: 0 -18px -4px;
-  height: 160px;
-}
-.nt-calm__glow .ac-sky-glow {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.nt-calm > b {
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: 28px;
-  letter-spacing: -0.03em;
-}
-.nt-calm > p {
-  margin: 0;
-  color: var(--muted);
-  max-width: 46ch;
-  font-size: 14px;
-}
-.nt-nores {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 36px 16px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 14px;
-  border-radius: 20px;
-  box-shadow: inset 0 0 0 1px var(--line);
-  margin-bottom: 22px;
-}
 .nt-more-pages {
   display: flex;
   justify-content: center;
@@ -1120,7 +1068,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   .nt-cmp,
   .nt-reps,
   .nt-resolved,
-  .nt-calm,
   .nt-more .ac-icon,
   .nt-faces > *,
   .nt-sug button {

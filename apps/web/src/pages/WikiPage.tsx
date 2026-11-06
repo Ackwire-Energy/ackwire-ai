@@ -20,6 +20,7 @@ import { WikiAudienceDialog } from "@/components/wiki/WikiAudience";
 import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
 import { AuthorAvatar, PageOutline, typingIn, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import type { VaultFile } from "@/lib/obsidian";
@@ -426,7 +427,18 @@ function WikiNav({
   );
 }
 
-function HomeHead({ onNew, onImport, onNav }: { onNew: () => void; onImport: () => void; onNav: () => void }) {
+function HomeHead({
+  onNew,
+  onImport,
+  onNav,
+  empty,
+}: {
+  onNew: () => void;
+  onImport: () => void;
+  onNav: () => void;
+  /** The empty state below takes over its buttons: one way in, in the middle of the page. */
+  empty?: boolean;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   return (
@@ -442,7 +454,7 @@ function HomeHead({ onNew, onImport, onNav }: { onNew: () => void; onImport: () 
           <Button variant="ghost" icon="menu" className="wiki__navbtn" onClick={onNav}>
             {t("wiki.tree")}
           </Button>
-          {can(org, "edit_wiki") && (
+          {can(org, "edit_wiki") && !empty && (
             <>
               <Button onClick={onImport}>
                 <ObsidianMark size={16} />
@@ -619,22 +631,20 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const look = useRightHandLook();
+  const edits = can(org, "edit_wiki");
   return (
     <div className="wiki-home">
-      <HomeHead onNew={onNew} onImport={onImport} onNav={onNav} />
+      <HomeHead onNew={onNew} onImport={onImport} onNav={onNav} empty />
       <EmptyState
-        sky
-        icon="book"
+        size="panel"
+        agent={look}
         title={t("wiki.emptyTitle")}
         actions={
-          can(org, "edit_wiki") && (
+          edits && (
             <div className="wiki-empty__acts">
-              {/* The page head has the one primary ("New page"): the empty state's ways in are secondary. */}
-              <Button onClick={onImport}>
-                <ObsidianMark size={16} />
-                {t("wiki.import.cta")}
-              </Button>
               <Button
+                variant="primary"
                 loading={busy}
                 disabled={busy}
                 onClick={async () => {
@@ -657,6 +667,10 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
               >
                 {t("wiki.useStarter")}
               </Button>
+              <Button onClick={onImport}>
+                <ObsidianMark size={16} />
+                {t("wiki.import.cta")}
+              </Button>
               <Button variant="ghost" icon="plus" onClick={onNew}>
                 {t("wiki.blankPage")}
               </Button>
@@ -664,16 +678,18 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
           )
         }
       >
-        {t("wiki.emptyText")}
+        {t(edits ? "wiki.emptyText" : "wiki.emptyViewer")}
       </EmptyState>
-      <ul className="wiki-starter" aria-label={t("wiki.starter")}>
-        {starterPages(t).map((p) => (
-          <li key={p.title}>
-            <Icon name="document" size={14} />
-            {p.folder ? `${p.folder} / ${p.title}` : p.title}
-          </li>
-        ))}
-      </ul>
+      {edits && (
+        <ul className="wiki-starter" aria-label={t("wiki.starter")}>
+          {starterPages(t).map((p) => (
+            <li key={p.title}>
+              <Icon name="document" size={14} />
+              {p.folder ? `${p.folder} / ${p.title}` : p.title}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

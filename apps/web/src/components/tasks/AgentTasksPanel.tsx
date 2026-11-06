@@ -10,7 +10,7 @@ import {
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
-import { Button, Chip, Icon, PixelStop } from "@agenteschat/ui";
+import { Button, Chip, EmptyState, Icon, PixelStop } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,6 +25,7 @@ import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEscClose } from "@/hooks/useEscClose";
 import { useNow } from "@/hooks/useNow";
+import { lookOf } from "@/lib/look";
 import { useAgentTasks } from "./agent-tasks-context";
 import { StopAllInline, StopTaskButton, TaskMark, TaskWaitLines, taskAge, useTaskStop } from "./TaskBits";
 import "@/components/threads/threads.css";
@@ -137,7 +138,9 @@ export function AgentTasksPanel({
             ))}
           </dl>
           {tasks.length === 0 ? (
-            <p className="tm-panel__none">{t("taskManager.agentPanel.none", { name })}</p>
+            <EmptyState size="panel" agent={lookOf(dir.agentById.get(agentId)) ?? true} mood="deal">
+              {t("taskManager.agentPanel.none", { name })}
+            </EmptyState>
           ) : (
             <>
               <TaskWaitLines tasks={tasks} />

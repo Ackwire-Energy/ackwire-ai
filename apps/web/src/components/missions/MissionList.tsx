@@ -2,6 +2,7 @@ import type { Mission } from "@agenteschat/client";
 import { useChannels, useMissionList } from "@agenteschat/client";
 import { formatShortDate, relativeTime } from "@agenteschat/client/lib/format";
 import { isOpenMission, missionCells, missionCellTitles, waitingText } from "@agenteschat/client/lib/missions";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState, Icon, Menu } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -11,6 +12,7 @@ import { MenuEntries } from "@/components/DesktopMenus";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import type { MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { ExecutorChip, MachineChip, MissionHead, MissionStatusChip, MissionStrip } from "./MissionBits";
@@ -25,12 +27,15 @@ import { CloseMissionDialog } from "./MissionDialogs";
 export function MissionsTab({
   filters,
   onNew,
+  onClear,
 }: {
   filters: { q: string; agentId?: string; channelId?: string };
   onNew: () => void;
+  onClear: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const look = useRightHandLook();
   const q = filters.q.trim();
   // The server filters (conversation, agent, words) and counts with the same filters.
   const where = {
@@ -46,21 +51,31 @@ export function MissionsTab({
   if (open.isPending) return <LoadingList count={3} />;
   if (open.isError && !open.data) return <ErrorState error={open.error} onRetry={() => void open.refetch()} />;
   if (active.length === 0 && ended.length === 0) {
-    const filtered = Boolean(q || filters.agentId || filters.channelId);
+    if (q || filters.agentId || filters.channelId)
+      return (
+        <EmptyState
+          size="panel"
+          title={t("threads.empty.noResults")}
+          actions={<Button onClick={onClear}>{t("threads.empty.clear")}</Button>}
+        >
+          {t("threads.empty.noResultsText")}
+        </EmptyState>
+      );
+    const opens = can(org, "post") && can(org, "assign_work");
     return (
       <EmptyState
-        sky={!filtered}
-        icon={filtered ? "search" : "flag"}
-        title={filtered ? t("threads.empty.noResults") : t("missions.empty.title")}
+        size="page"
+        agent={look}
+        title={t("missions.empty.title")}
         actions={
-          filtered ? undefined : (
-            <Button size="sm" variant="primary" icon="plus" onClick={onNew}>
+          opens && (
+            <Button variant="primary" icon="plus" onClick={onNew}>
               {t("missions.new.open")}
             </Button>
           )
         }
       >
-        {filtered ? t("threads.empty.noResultsText") : null}
+        {t(opens ? "threads.empty.missions" : "missions.empty.viewer")}
       </EmptyState>
     );
   }

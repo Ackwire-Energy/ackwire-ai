@@ -22,8 +22,6 @@ import {
   MenuSeparator,
   PageHeader,
   Textarea,
-  useDarkTheme,
-  widgetTileVars,
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -34,12 +32,12 @@ import { OwnerLine, VisibilityChip } from "@/components/dashboards/parts";
 import { ShareDashboardDialog } from "@/components/dashboards/ShareDialog";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { colorOf } from "@/components/Sky";
 import { BoardActionsPill } from "@/components/widgets/parts";
 import { WidgetBoard } from "@/components/widgets/WidgetBoard";
 import { WidgetPanel } from "@/components/widgets/WidgetPanel";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
+import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import "./dashboards.css";
@@ -118,7 +116,6 @@ function Board({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const dark = useDarkTheme();
   const now = useNow(60_000);
   const [arranging, setArranging] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -129,7 +126,7 @@ function Board({
   const toast = useToast();
   const count = board.widgets.length;
   const empty = count === 0;
-  // The empty state's art is in the tones of the board's owner when an agent made it, else of the first agent.
+  // The empty state's agent: who made the board when an agent did, else the first one.
   const artAgent = dir.anyAgent(board.owner?.kind === "agent" ? board.owner.id : (dir.agents[0]?.id ?? ""));
   const setPinned = (pinned: boolean) =>
     update.mutate({ dashboardId: board.id, pinned }, { onError: (error) => toast.show(errorText(t, error), "error") });
@@ -221,16 +218,20 @@ function Board({
       </div>
       <ProposalBanner board={board} />
       {empty ? (
-        <div className="db-empty" style={widgetTileVars(colorOf(artAgent), dark)}>
-          <span className="db-empty__art" aria-hidden="true" />
-          <b>{t("dashboards.empty.title")}</b>
-          <span>{t("dashboards.empty.text")}</span>
-          {board.canEdit && (
-            <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>
-              {t("widgets.add.label")}
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          size="page"
+          agent={lookOf(artAgent) ?? true}
+          title={t("dashboards.empty.title")}
+          actions={
+            board.canEdit && (
+              <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>
+                {t("widgets.add.label")}
+              </Button>
+            )
+          }
+        >
+          {t(board.canEdit ? "dashboards.empty.text" : "dashboards.empty.viewer")}
+        </EmptyState>
       ) : (
         <WidgetBoard
           orgId={org.id}

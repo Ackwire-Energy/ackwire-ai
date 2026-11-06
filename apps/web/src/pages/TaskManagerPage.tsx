@@ -57,6 +57,7 @@ import {
 import { TaskPanel } from "@/components/tasks/TaskPanel";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import "./task-manager.css";
 
 /*
@@ -74,6 +75,7 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
+  const look = useRightHandLook();
   const view = useTaskManager(org.id, { since: todayStart() });
   const now = useNow(1_000);
   const programText = useProgramText();
@@ -316,7 +318,7 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
       )}
 
       {view.data && all.length === 0 && (
-        <EmptyState sky icon="chart" title={t("taskManager.empty.title")}>
+        <EmptyState size="page" agent={look} mood="deal" title={t("taskManager.empty.title")}>
           {t("taskManager.empty.body")}
         </EmptyState>
       )}
@@ -337,7 +339,9 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
             {stopTool}
           </div>
           {shown.length === 0 ? (
-            <EmptyState icon="search" title={t("taskManager.noResults")} />
+            <EmptyState size="panel" actions={<Button onClick={() => setQ("")}>{t("filters.clearSearch")}</Button>}>
+              {t("taskManager.noResults")}
+            </EmptyState>
           ) : card ? (
             <TaskTable>
               {tasksOf(shown, card).length > 0 ? (

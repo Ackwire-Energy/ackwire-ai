@@ -4509,7 +4509,6 @@
       "builtinHelp": "Drive, görevler, bellek ve daha fazlası",
       "noMatch": "“{{q}}” ile eşleşen bir şey yok",
       "noneHere": "Bu filtrede bir şey yok",
-      "clear": "Aramayı veya filtreyi temizleyin.",
       "library": "Beceri kütüphanesi",
       "fineTune": "Araç araç ince ayar bağlayıcının içinde yapılır. Burada uygulama başına tek düzey var.",
       "always": {
@@ -4594,7 +4593,6 @@
         "routines": "Rutinler"
       },
       "noneFilter": "Bu filtreyle bir şey yok.",
-      "clear": "Başka bir kelime deneyin veya filtreyi temizleyin.",
       "emptyTitle": "Her iş burada kayıt altındadır",
       "emptyText": "{{name}} adlı ajanın her işinin adımları ve maliyeti burada görünür.",
       "showing": "{{total}} içinden {{shown}} gösteriliyor.",
@@ -4768,8 +4766,6 @@
     "emptySearch": "“{{q}}” için hiçbir şey bulunamadı.",
     "emptyTitle": "{{name}} belleği burada başlar",
     "emptyText": "Her sohbet, ekibin çalışma şekli hakkında yeni bir şey öğretir.",
-    "empty": "Burada henüz bir şey yok. {{name}}, ekip onunla konuştukça öğrenir.",
-    "empty_female": "Burada henüz bir şey yok. {{name}}, ekip onunla konuştukça öğrenir.",
     "how": "Bellek nasıl çalışır",
     "editTitle": "Düzenle: {{kind}}",
     "text": "Metin",

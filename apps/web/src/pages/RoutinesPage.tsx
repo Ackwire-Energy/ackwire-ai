@@ -117,6 +117,7 @@ import { type CSSProperties, type ReactNode, useDeferredValue, useEffect, useMem
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { CancelAhead } from "@/components/ApprovalItem";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { useActors } from "@/components/actors";
 import {
   type ConnectorTriggerDraft,
@@ -138,6 +139,8 @@ import { useOrg } from "@/components/org-context";
 import { RoutineReachWarnings } from "@/components/RoutineReachWarnings";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { lookOf } from "@/lib/look";
@@ -283,7 +286,8 @@ export function useWhen() {
 /** Rotinas: scheduled and event-driven agent tasks. */
 export function RoutinesPage() {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
   const routines = useRoutines(org.id);
   const now = useNow();
   const [creating, setCreating] = useState(false);
@@ -293,6 +297,10 @@ export function RoutinesPage() {
   const [status, setStatus] = useState<"all" | "active" | "paused" | "event">("all");
   const [q, setQ] = useState("");
   const list = routines.data ?? [];
+  const noRoutines = routines.isSuccess && list.length === 0;
+  const look = useRightHandLook();
+  // The server's rule: who manages routines, or an agent's owner for that agent.
+  const mayCreate = can(org, "manage_routines") || dir.agents.some((a) => a.ownerUserId === me.user.id);
   const [agents, setAgents] = useState<string[]>([]);
   const copy = useFilterCopy();
   const agentOptions = useActorFilterOptions().filter((o) => o.value.startsWith("agent:"));
@@ -360,26 +368,36 @@ export function RoutinesPage() {
           title={t("routines.title")}
           meta={t("routines.subtitle")}
           actions={
-            <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-              {t("routines.new")}
-            </Button>
+            // The empty state takes over this button: one way in, in the middle of the page.
+            !noRoutines && (
+              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+                {t("routines.new")}
+              </Button>
+            )
           }
         />
         {routines.isLoading && <LoadingCards count={3} />}
         {routines.isError && !routines.data && (
           <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
         )}
-        {routines.isSuccess && list.length === 0 && (
+        {noRoutines && (
           <EmptyState
-            sky
-            title={t("routines.emptyTitle")}
+            size="page"
+            agent={look}
+            title={t(mayCreate ? "routines.emptyTitle" : "routines.emptyViewerTitle")}
             actions={
-              // The page head has the one primary "New routine": here it is secondary.
-              <Button icon="plus" onClick={() => setCreating(true)}>
-                {t("routines.new")}
-              </Button>
+              mayCreate && (
+                <>
+                  <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+                    {t("routines.new")}
+                  </Button>
+                  <AskAgentButton draft={t("routines.askText")} />
+                </>
+              )
             }
-          />
+          >
+            {t(mayCreate ? "routines.empty" : "routines.emptyViewer")}
+          </EmptyState>
         )}
         {list.length > 0 && (
           <>
@@ -438,7 +456,22 @@ export function RoutinesPage() {
             {group(status === "paused" ? t("routines.groupPaused") : t("routines.groupLive"), live)}
             {group(t("routines.groupPaused"), paused)}
             {live.length === 0 && paused.length === 0 && filtered && (
-              <EmptyState icon="search" title={t("routines.noResults")} />
+              <EmptyState
+                size="panel"
+                actions={
+                  <Button
+                    onClick={() => {
+                      setAgents([]);
+                      setQ("");
+                      setStatus("all");
+                    }}
+                  >
+                    {copy.clearAll}
+                  </Button>
+                }
+              >
+                {t("routines.noResults")}
+              </EmptyState>
             )}
             {done.length > 0 && status === "all" && (
               <section className="routines-group" aria-label={t("routines.done")}>

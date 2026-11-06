@@ -17,6 +17,7 @@ import { TeamMap } from "@/components/team/TeamMap";
 import { TeamSectors } from "@/components/team/TeamSectors";
 import { TeamUsage } from "@/components/team/TeamUsage";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import "./team.css";
 
@@ -53,6 +54,24 @@ export function TeamPage() {
   const archived = (former.data ?? []).filter((a) => !a.deleted);
   const [deleting, setDeleting] = useState<FormerAgent | null>(null);
   const shown = view !== "usage" && data && agents.length > 0 ? data : null;
+  const noAgents = view !== "usage" && !!data && agents.length === 0;
+  const look = useRightHandLook();
+  const maker = can(org, "create_agents");
+  // The empty state takes over the head's buttons: one way in, in the middle of the page.
+  const makes = maker && (
+    <>
+      <Button asChild icon="archiveBox">
+        <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "import" }}>
+          {t("shell.importAgents")}
+        </Link>
+      </Button>
+      <Button asChild variant="primary" icon="plus">
+        <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
+          {t("shell.createAgent")}
+        </Link>
+      </Button>
+    </>
+  );
   return (
     <div className="page team">
       <PageHeader
@@ -65,22 +84,7 @@ export function TeamPage() {
             t("team.sectorsCount", { count: groups.length }),
           ].join(" · ")
         }
-        actions={
-          can(org, "create_agents") && (
-            <>
-              <Button asChild icon="archiveBox">
-                <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "import" }}>
-                  {t("shell.importAgents")}
-                </Link>
-              </Button>
-              <Button asChild variant="primary" icon="plus">
-                <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
-                  {t("shell.createAgent")}
-                </Link>
-              </Button>
-            </>
-          )
-        }
+        actions={!noAgents && makes}
       >
         <Segmented
           value={view}
@@ -93,9 +97,14 @@ export function TeamPage() {
       {view !== "usage" && team.isError && !data && (
         <ErrorState error={team.error} onRetry={() => void team.refetch()} />
       )}
-      {view !== "usage" && data && agents.length === 0 && (
-        <EmptyState sky title={t("team.emptyTitle")}>
-          {t("team.empty")}
+      {noAgents && (
+        <EmptyState
+          size="page"
+          agent={look}
+          title={t(maker ? "team.emptyTitle" : "team.emptyViewerTitle")}
+          actions={makes}
+        >
+          {t(maker ? "team.empty" : "team.emptyViewer")}
         </EmptyState>
       )}
       {shown && view === "list" && <TeamList team={shown} groups={groups} />}

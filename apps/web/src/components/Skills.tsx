@@ -62,6 +62,7 @@ import {
   DialogSearchList,
   Diff,
   diffLines,
+  EmptyState,
   Field,
   Icon,
   type IconName,
@@ -80,6 +81,7 @@ import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingLine, LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 
@@ -185,8 +187,10 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
   const usage = useSkillUsage(org.id, admin && list.length > 0);
   const settings = useSkillSettings(org.id, admin);
   const action = useSkillAction(org.id);
+  const look = useRightHandLook();
   if (!admin) return null;
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
+  const noSkills = skills.isSuccess && list.length === 0;
   return (
     <Card aria-labelledby="sec-skills">
       <CardHeader
@@ -194,7 +198,8 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
         icon="bulb"
         title={t("skills.title")}
         action={
-          !unavailable && (
+          !unavailable &&
+          !noSkills && (
             <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
               {t("skills.install")}
             </Button>
@@ -217,7 +222,20 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
         </>
       )}
       {skills.isLoading && <LoadingList count={3} avatar={false} />}
-      {skills.isSuccess && list.length === 0 && <p className="small muted">{t("skills.empty")}</p>}
+      {noSkills && (
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t("skills.emptyTitle")}
+          actions={
+            <Button variant="primary" icon="plus" onClick={() => setInstalling(true)}>
+              {t("skills.install")}
+            </Button>
+          }
+        >
+          {t("skills.emptyText")}
+        </EmptyState>
+      )}
       {list.length > 0 && (
         <List aria-label={t("skills.title")}>
           {list.slice(0, INLINE).map((s) => (

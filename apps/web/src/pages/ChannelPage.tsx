@@ -356,12 +356,14 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useDmSidebar, useMembersColumn } from "@/hooks/useMembersColumn";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { TYPED_VALUES } from "@/i18n";
 import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { holdOnScreen } from "@/lib/island";
+import { lookOf } from "@/lib/look";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -720,6 +722,7 @@ function ChannelView({
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
+  const rightHandLook = useRightHandLook();
   const isMember = channel.isMember;
   const members = useChannelMembers(org.id, channel.id, isMember);
   const channelMessages = useMessages(org.id, channel.id, isMember);
@@ -2304,9 +2307,14 @@ function ChannelView({
                             !chrome?.intro && (
                               <div className="channel__empty">
                                 <EmptyState
+                                  size="panel"
                                   icon="message"
-                                  // A DM with an agent: the light sky, like the other empty screens about agents.
-                                  sky={Boolean(chrome?.dmAgentId)}
+                                  // A DM with a person is about them: its agent everywhere else.
+                                  agent={
+                                    chrome?.dmPersonId
+                                      ? undefined
+                                      : (lookOf(dir.agentById.get(chrome?.dmAgentId ?? "")) ?? rightHandLook)
+                                  }
                                   title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
                                   actions={
                                     emptySuggestions.length > 0 ? (
@@ -2328,7 +2336,7 @@ function ChannelView({
                                     ) : undefined
                                   }
                                 >
-                                  {chrome?.emptyText}
+                                  {chrome?.emptyText ?? (chrome?.dmPersonId ? undefined : t("chat.sayHiText"))}
                                 </EmptyState>
                               </div>
                             )}

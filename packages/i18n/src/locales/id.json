@@ -4368,7 +4368,6 @@
       "builtinHelp": "Drive, tugas, memori, dan lainnya",
       "noMatch": "Tidak ada yang cocok dengan “{{q}}”",
       "noneHere": "Tidak ada apa pun di filter ini",
-      "clear": "Hapus pencarian atau filternya.",
       "library": "Pustaka skill",
       "fineTune": "Pengaturan detail, per alat, ada di konektor. Di sini satu level per aplikasi.",
       "always": {
@@ -4447,7 +4446,6 @@
         "routines": "Rutinitas"
       },
       "noneFilter": "Tidak ada apa pun dengan filter ini.",
-      "clear": "Coba kata lain atau hapus filternya.",
       "emptyTitle": "Setiap pekerjaan tercatat di sini",
       "emptyText": "Langkah dan biaya setiap pekerjaan {{name}} muncul di sini.",
       "showing": "Menampilkan {{shown}} dari {{total}}.",
@@ -4621,8 +4619,6 @@
     "emptySearch": "Tidak ada hasil untuk “{{q}}”.",
     "emptyTitle": "Memori {{name}} dimulai di sini",
     "emptyText": "Setiap percakapan mengajarkan hal baru tentang cara kerja tim.",
-    "empty": "Belum ada apa-apa di sini. {{name}} belajar saat tim berbicara dengannya.",
-    "empty_female": "Belum ada apa-apa di sini. {{name}} belajar saat tim berbicara dengannya.",
     "how": "Cara kerja memori",
     "editTitle": "Ubah {{kind}}",
     "text": "Teks",

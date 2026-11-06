@@ -23,7 +23,7 @@ import {
   Segmented,
   Toolbar,
 } from "@agenteschat/ui";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
@@ -36,6 +36,7 @@ import { MissionsTab } from "@/components/missions/MissionList";
 import { useOrg } from "@/components/org-context";
 import { SelectionBar } from "@/components/SelectionBar";
 import { ThreadStatusChip, useThreadControls } from "@/components/threads/ThreadBits";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
 import { THREAD_TABS, type ThreadsTab } from "./thread-tabs";
 import "./threads.css";
@@ -265,6 +266,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
               ...(channel[0] ? { channelId: channel[0] } : {}),
             }}
             onNew={() => setNewMission(true)}
+            onClear={clearFilters}
           />
         )}
         {!missions && list.isPending && <LoadingList count={5} />}
@@ -696,36 +698,48 @@ function ThreadsEmpty({
   onAll: () => void;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const look = useRightHandLook();
+  const channel = useChannels(org.id).data?.[0];
   if (filtered) {
     return (
       <EmptyState
-        icon="search"
+        size="panel"
         title={t("threads.empty.noResults")}
-        actions={
-          <Button size="sm" onClick={onClear}>
-            {t("threads.empty.clear")}
-          </Button>
-        }
+        actions={<Button onClick={onClear}>{t("threads.empty.clear")}</Button>}
       >
         {t("threads.empty.noResultsText")}
       </EmptyState>
     );
   }
+  if (tab === "all") {
+    return (
+      <EmptyState
+        size="page"
+        agent={look}
+        title={t("threads.empty.allTitle")}
+        actions={
+          channel && (
+            <Button asChild variant="primary" icon="channel">
+              <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: channel.id }}>
+                {t("empty.goToChannel", { channel: channel.name })}
+              </Link>
+            </Button>
+          )
+        }
+      >
+        {t("threads.empty.all")}
+      </EmptyState>
+    );
+  }
   return (
     <EmptyState
-      // The light sky only where the subject is an agent: "nobody working" is about agents.
-      sky={tab === "working"}
-      icon={tab === "archived" ? "archiveBox" : tab === "closed" ? "check" : "thread"}
+      size="panel"
+      // Nobody working is a calm moment: the others are only an empty tab.
+      agent={tab === "working" ? look : undefined}
+      mood="deal"
       title={t(`threads.empty.${tab}Title`)}
-      actions={
-        tab === "all" ? undefined : (
-          <Button size="sm" onClick={onAll}>
-            {t("threads.empty.seeAll")}
-          </Button>
-        )
-      }
-    >
-      {tab === "all" ? t("threads.empty.all") : null}
-    </EmptyState>
+      actions={<Button onClick={onAll}>{t("threads.empty.seeAll")}</Button>}
+    />
   );
 }

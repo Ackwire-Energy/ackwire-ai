@@ -20,6 +20,7 @@ import {
 } from "@agenteschat/client/lib/calendar";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { dateOnly, formatTime, joinNames, toYmd } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import { runPixelStatus, runPixels } from "@agenteschat/client/lib/routine-view";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
@@ -422,6 +423,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               openKey={openKey}
               onOpenKey={onOpenKey}
               details={details}
+              onNew={can(org, "post") ? () => newAt(focus) : undefined}
             />
           )}
         </div>

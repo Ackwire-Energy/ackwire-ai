@@ -1186,6 +1186,9 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   .channel__empty .ac-empty {
     padding-inline: 16px;
   }
+  .channel__empty .ac-empty__actions {
+    align-self: stretch;
+  }
   .channel__suggestions {
     width: 100%;
     flex-direction: column;
@@ -7652,19 +7655,6 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 }
 .suspended-page__account {
   margin-top: 32px;
-}
-.computers-empty {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  padding: 6px 0;
-}
-.computers-empty__text {
-  display: flex;
-  flex: 1 1 240px;
-  flex-direction: column;
-  gap: 4px;
 }
 .computers-agent {
   flex-wrap: wrap;

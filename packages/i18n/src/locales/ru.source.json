@@ -11048,9 +11048,6 @@
   "agentPage.access.noneHere": {
     "value": "Nothing in this filter"
   },
-  "agentPage.access.clear": {
-    "value": "Clear the search or the filter."
-  },
   "agentPage.access.library": {
     "value": "Skills library"
   },
@@ -11279,9 +11276,6 @@
   },
   "agentPage.activity.noneFilter": {
     "value": "Nothing with this filter."
-  },
-  "agentPage.activity.clear": {
-    "value": "Try another word or clear the filter."
   },
   "agentPage.activity.emptyTitle": {
     "value": "Every job is on record here"
@@ -11717,10 +11711,6 @@
   },
   "memory.emptyText": {
     "value": "Every conversation teaches something new about how the team works."
-  },
-  "memory.empty": {
-    "value": "Nothing here yet. {{name}} learns as the team talks with him.",
-    "female": "Nothing here yet. {{name}} learns as the team talks with her."
   },
   "memory.how": {
     "value": "How memory works"
