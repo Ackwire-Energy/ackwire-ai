@@ -355,7 +355,7 @@ const NO_NETWORK =
 
 /** On a connected machine the network is that machine's own: we don't block anything there. */
 export const MACHINE_NETWORK_NOTE =
-  "network failure: this is a connected computer, on that machine's own network (we block nothing there), so the problem is the address, the site or that machine's network. Tell the person.";
+  "network failure: this computer is on its own network (we block nothing there), so the problem is the address, the site or that network. Tell the person.";
 
 /**
  * A command killed by SIGKILL (128 + 9) that no person or timeout stopped: on a computer, the kernel stopping the
@@ -637,7 +637,7 @@ export function createSandboxToolSource(
     // An old computer never gets a value: checked before anything is released (`requestVaultKey` checks again).
     const status = await hub.status(computer.machineId);
     if (!status || status.protocol < VAULT_PROTOCOL) {
-      throw new Error(vaultUpdateText(status?.name ?? "computer", "use Vault keys"));
+      throw new Error(vaultUpdateText(status ?? { name: "computer" }, "use Vault keys"));
     }
     const run = { orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId };
     const released = await releaseVaultKeys(vault, run, names);
@@ -1227,7 +1227,7 @@ export function createSandboxToolSource(
   const taskTools = (requireApproval: boolean, info: Extract<ComputerInfo, { kind: "machine" }>): ToolDefinition[] => [
     {
       name: "start_task",
-      description: `Start a detached command or a parallel CLI job on the connected computer "${info.name}" (a build, a dev server, a second Claude Code or Codex on its own task) and return at once with its id. To step out of this conversation while you keep working yourself, use work_in_background instead. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
+      description: `Start a detached command or a parallel CLI job on the computer "${info.name}" (a build, a dev server, a second Claude Code or Codex on its own task) and return at once with its id. To step out of this conversation while you keep working yourself, use work_in_background instead. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       whyAsks: true,

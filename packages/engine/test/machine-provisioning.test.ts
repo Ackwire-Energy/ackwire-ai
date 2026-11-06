@@ -4,6 +4,7 @@ import { and, type Database, eq, schema, sql } from "@agenteschat/db";
 import { runMigration } from "@agenteschat/db/testing";
 import {
   agentComputerInfo,
+  computerPreparing,
   computerSetup,
   createAgent,
   createMachineHub,
@@ -568,6 +569,10 @@ describe("external provisioning", () => {
     const early = await createAgent(f.db, f.owner.id, f.org.id, { name: "Ops", handle: "ops" }, { model: "auto" });
     expect(early.machineId).toBeNull();
     expect(await agentComputerInfo({ db: f.db }, f.org.id, early.id)).toEqual({ kind: "none", preparing: true });
+    // Paid, nothing reported yet: nobody can connect one here, so it is on its way too. People connecting theirs: not.
+    const { organization: paid } = await createOrganization(f.db, f.owner.id, { name: "Paid just now" });
+    expect(await computerPreparing({ db: f.db, workspaceComputer: { billing: true } }, paid.id)).toBe(true);
+    expect(await computerPreparing({ db: f.db }, paid.id)).toBe(false);
 
     const { machineId, token } = await enrolled();
     const runner = await hello(token);

@@ -504,6 +504,8 @@ export async function buildRunContext(
     machines?: Pick<MachineCaller, "status"> | null;
     /** What tells whether an agent has an AI: with it, the agents listed get their state now (`teammatesNowPrompt`). */
     ai?: Omit<AiStatusDeps, "db">;
+    /** Each workspace gets its own computer here; absent: people connect theirs. */
+    workspaceComputer?: WorkspaceComputer;
   },
 ): Promise<RunContext> {
   // Independent lookups go out together (the database may be remote); org,
@@ -881,7 +883,7 @@ export async function buildRunContext(
   const rightHand =
     isRightHand(agent) && requester
       ? await rightHandPrompt(
-          { db, ai: options.ai },
+          { db, ai: options.ai, workspaceComputer: options.workspaceComputer },
           { orgId: run.orgId, agent, personId: requester, inDm: channel.kind === "dm" },
         )
       : null;
@@ -920,7 +922,7 @@ export async function buildRunContext(
             ? `- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request. ${ASK_APPROVALS_TOGETHER} ${REQUEST_APPROVAL_LINE}`
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
           options.askUser
-            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Ask only when you can't go on without their answer, and make it a question to them, never a status note: an optional offer ('I can also email it if you want') or a note that you need nothing goes in your normal reply; like an approval, it posts only the text of that same turn. A way to do what was asked is never an optional offer: do it, handing the person their step. The card shows the question and its choices: don't write them in your text too, and after asking write nothing more. Don't ask about simple requests you can just do (an issue to open, a priority to set, work to assign: do it, they can undo), and never ask more than you need."
+            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait."
             : "",
           options.react
             ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with an empty reply: no text at all, not even the emoji again. Never react and also reply; if something still needs saying, just reply.'
@@ -945,6 +947,7 @@ export async function buildRunContext(
       text: [
         `You work in "${org.name}" on agentes.chat, a workspace where people and AI agents work together.`,
         org.context.trim() ? `# About the organization\n${org.context.trim()}` : "",
+        options.workspaceComputer ? workspaceComputerText(options.workspaceComputer) : "",
       ]
         .filter(Boolean)
         .join("\n\n"),
@@ -1948,6 +1951,28 @@ export function machineAccessText(a: {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/** A server where each workspace gets its own computer (`MACHINE_PROVISIONING=external`); `billing`: it has plans. */
+export interface WorkspaceComputer {
+  billing: boolean;
+}
+
+/**
+ * For every agent where people can't connect a computer (`machine.pairing_off`): the models' own habit is a bigger
+ * server, and nothing else in the prompt says it can't be done here. It speaks of computers for the agents only: a
+ * server of the customer's own stays work an agent may reach. Plans stay on the billing service (ADR 0079), so the
+ * prompt names none.
+ */
+export function workspaceComputerText({ billing }: WorkspaceComputer) {
+  return [
+    "# The computer",
+    `The agents work on one always-on, self-updating computer. No other can join it, nobody SSHes in: never suggest renting or connecting one, nor installing the runner. When full, work slows or queues: finish or stop what can wait (Task manager), one heavy job at a time. ${
+      billing
+        ? "Past that: a bigger plan may bring a bigger one (Settings › Plan and billing); another workspace, on its own plan, has its own."
+        : "Past that: only whoever runs this server can give it a bigger one."
+    } Nothing else exists: say so.`,
+  ].join("\n");
 }
 
 /**

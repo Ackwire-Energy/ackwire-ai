@@ -78,7 +78,7 @@ test("find_tools names a tool the agent isn't allowed yet, with the permission t
   const notYet = text.slice(text.indexOf(NOT_YET));
   expect(notYet).toStartWith(`${NOT_YET}ask a person with request_permission`);
   expect(notYet).toContain(
-    `\n- permission "browser:use" (Use a browser: Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.), for:\n  ${OPEN}\n`,
+    `\n- permission "browser:use" (Use a browser: Browse websites in its own browser on the agent's computer (logins kept per agent). Needs the browser turned on on that computer.), for:\n  ${OPEN}\n`,
   );
   // Its input never: nothing there is a way to call it.
   expect(notYet).not.toContain("Full address");

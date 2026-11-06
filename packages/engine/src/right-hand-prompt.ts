@@ -2,9 +2,10 @@ import { and, type Database, eq, inArray, isNotNull, isNull, schema } from "@age
 import { type AiStatusDeps, agentAiStates, orgHasAi } from "./ai-status";
 import { seesAgentDetails } from "./audience";
 import { listChannels } from "./channels";
+import type { WorkspaceComputer } from "./context";
 import { can, getMembership } from "./organizations";
 import type { RolePermission } from "./permissions";
-import { accountInUse } from "./standing";
+import { accountInUse, isBillingHold, orgStanding } from "./standing";
 import { agentBudgetsThisMonth } from "./usage";
 
 const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
@@ -57,7 +58,7 @@ const usd = (nano: number) => `US$ ${(nano / 1e9).toFixed(2)}`;
  * snapshot is what this person may see), and the rules of its cards.
  */
 export async function rightHandPrompt(
-  deps: { db: Database; ai?: Omit<AiStatusDeps, "db"> },
+  deps: { db: Database; ai?: Omit<AiStatusDeps, "db">; workspaceComputer?: WorkspaceComputer },
   input: { orgId: string; agent: { id: string; name: string; handle: string }; personId: string; inDm: boolean },
 ): Promise<string> {
   const { db } = deps;
@@ -156,6 +157,7 @@ export async function rightHandPrompt(
       .join("; ");
   });
   const hidden = team.length - seen.length;
+  const unpaid = deps.workspaceComputer && computers.length === 0 && isBillingHold(await orgStanding(db, orgId));
 
   const firstThings = [
     anyAi === false
@@ -174,7 +176,9 @@ export async function rightHandPrompt(
       ? "The workspace has no context yet (what the company does, for whom, its house rules), which every agent reads: ask, and say it goes in Settings › Workspace."
       : "",
     computers.length === 0
-      ? "No computer is ready for the agents yet, so they can't browse or run code: say where it is set up (Settings › Computers)."
+      ? deps.workspaceComputer
+        ? `This workspace's computer isn't ready yet, so the agents can't browse or run code. Nobody sets it up: ${unpaid ? "it comes by itself once the plan is paid (Settings › Plan and billing)" : "it is on its way, and Settings › Computers shows how far it is"}.`
+        : "No computer is ready for the agents yet, so they can't browse or run code: say where it is set up (Settings › Computers)."
       : "",
     seen.some((a) => channelsOf(a.id).length === 0)
       ? "An agent is in no channel: offer to add it to one (propose_settings_change, its channels)."
@@ -229,7 +233,7 @@ export async function rightHandPrompt(
       "- A teammate's model, AI account, budget, owner, who talks to it, channels or reply mode: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new team.",
       "- At most 5 agent proposals in a row; ask one short question first when what they need is unclear.",
       "- Approvals waiting for them: offer_approvals (they decide each on the card; you never decide). People's ownership, roles or removal: propose_member_changes.",
-      "- Anything else the app does (billing, deleting the workspace or their account, a password, API keys, roles, routines, Drive, wiki, issues, an agent's page, a channel's settings): offer_open_page, whose screen asks what it always asks.",
+      "- Anything else the app does (billing, deleting the workspace or their account, a password, API keys, roles, routines, the task manager, Drive, wiki, issues, an agent's page, a channel's settings): offer_open_page, whose screen asks what it always asks.",
       "- Never ask for a key, password or token in the chat: offer_connect_ai, offer_connect_app or offer_open_page open our dialog for it.",
       "- Admins get your weekly 'Semana da equipe' card in this DM (Fridays at 17h by default). When they ask you to stop it, send it again or move it, use set_team_week; never say it stopped before the tool did.",
     ].join("\n"),

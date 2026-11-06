@@ -22,12 +22,14 @@ import {
   NotFoundError,
   notAllowedMessage,
   postPersonMessage,
+  REMOVED_COMPUTER_MESSAGE,
   setAgentAccess,
   setAgentMergeRepositories,
   setAgentSkills,
   type ToolContext,
   toolAccess,
   updateSandboxSettings,
+  vaultUpdateText,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 import { connectedComputer } from "./machine-fixtures";
@@ -150,6 +152,9 @@ describe("access", () => {
     expect((await f.tools?.list(ctx))?.map((t) => t.name)).toContain("run_code");
     // Granted, but no computer was chosen for it: computer_status says so.
     expect(await call(ctx, "computer_status", {})).toMatchObject({ isError: true, content: NO_COMPUTER_MESSAGE });
+    // Where people connect their own, that is what to do.
+    expect(NO_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to connect one (Settings → Computers).");
+    expect(REMOVED_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to choose another one.");
   });
 });
 
@@ -283,7 +288,7 @@ describe("network", () => {
       exec: () => ({ exitCode: 6, stdout: "", stderr: "curl: (6) Could not resolve host: example.com" }),
     });
     const out = await call(await runCtx(), "run_code", { language: "bash", code: "curl https://example.com" });
-    expect(out.content).toContain("network failure: this is a connected computer");
+    expect(out.content).toContain("network failure: this computer is on its own network");
     expect(out.content).not.toContain("no internet");
   });
 });
@@ -399,6 +404,9 @@ describe("Drive and skills", () => {
     const left =
       "Not copied to .skills/graficos/: manual.pdf. The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.";
     expect(out.content).toContain(left);
+    expect(vaultUpdateText({ name: "Box", kind: "managed" }, "use Vault keys")).toBe(
+      "The computer Box needs an update to use Vault keys. It updates by itself, so try again later.",
+    );
     expect((await call(ctx, "read_skill_file", { name: "graficos", path: "manual.pdf" })).content).toContain(
       "Not saved on your computer: The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.",
     );

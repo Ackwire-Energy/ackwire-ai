@@ -655,7 +655,12 @@ export async function onManagedMachineHello(
 }
 
 /** Whether the workspace's computer is on its way (reported, not ready): agents say so instead of "no computer". */
-export async function computerPreparing(db: Database, orgId: string) {
+export async function computerPreparing(
+  { db, workspaceComputer }: { db: Database; workspaceComputer?: unknown },
+  orgId: string,
+) {
+  // Nobody can connect one on such a server, and a paid workspace has no row until the provisioner's first report.
+  if (workspaceComputer) return true;
   const [row] = await db
     .select({ state: machineProvisioning.state })
     .from(machineProvisioning)
