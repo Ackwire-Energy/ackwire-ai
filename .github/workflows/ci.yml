@@ -107,7 +107,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # A tag publishes exactly the version /api/health reports; a tag that disagrees with
@@ -145,7 +145,24 @@ jobs:
           bun run check:licenses
       - name: Typecheck
         if: success() || failure()
-        run: bun run typecheck 2>&1 | tee typecheck.log
+        # One package at a time, each within 5 minutes: a package whose check hangs is named here, instead of the whole
+        # job running out of time with no log.
+        run: |
+          set +e
+          status=0
+          for dir in $(git ls-files '*/package.json' | xargs -n1 dirname | sort); do
+            jq -e '.scripts.typecheck' "$dir/package.json" >/dev/null || continue
+            start=$(date +%s)
+            (cd "$dir" && timeout 300 bun run typecheck) > typecheck-one.log 2>&1
+            code=$?
+            cat typecheck-one.log | tee -a typecheck.log
+            echo "$dir: $(( $(date +%s) - start ))s, exit $code" | tee -a typecheck-times.log
+            if [ "$code" -ne 0 ]; then
+              echo "::error::Typecheck failed in $dir (exit $code; 124 = over 5 minutes)"
+              status=1
+            fi
+          done
+          exit $status
       - name: Build web and server
         id: build
         if: success() || failure()
@@ -188,12 +205,15 @@ jobs:
         if: always()
         run: |
           { echo '### Typecheck errors'; echo '```'; grep -E 'error TS' typecheck.log 2>/dev/null | head -80 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '### Typecheck time per package'; echo '```'; cat typecheck-times.log 2>/dev/null || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ci-logs-check
-          path: typecheck.log
+          path: |
+            typecheck.log
+            typecheck-times.log
           if-no-files-found: ignore
           retention-days: 7
 
