@@ -15127,7 +15127,7 @@ export const ptBR = {
       },
     },
     example: {
-      iara: "Oi, Marina! Seu pedido saiu ontem e chega até sexta. O código de rastreio está aqui embaixo. Se sexta não for bom, eu vejo outra data.",
+      iara: "Oi, Marina. Seu pedido saiu ontem e chega até sexta. O código de rastreio está aqui embaixo. Se sexta não for bom, eu vejo outra data.",
       lia: "1. Três erros comuns ao contratar uma agência. 2. Os bastidores de um projeto que quase deu errado. 3. Uma pergunta para quem segue vocês: o que querem ver aqui?",
       nina: "Amanhã: 9h Carla, 10h30 Pedro, 14h livre. O Pedro ainda não confirmou. Quer que eu escreva para ele?",
     },
