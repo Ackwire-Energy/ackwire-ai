@@ -8,8 +8,8 @@ import {
   noAiCardOf,
   OrgPausedError,
   postPersonMessage,
-  renderEmail,
   type RouterStrategy,
+  renderEmail,
   routeMessage,
   runRoutineNow,
   sendPlanWaitingEmail,
@@ -22,7 +22,9 @@ import { channelRoutine, routineDeps } from "./routine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
-  await f?.close();
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
 });
 
 const hold = (code: "payment" | "unpaid" | "ended" | null) => setBillingHold({ db: f.db }, f.org.id, code);
