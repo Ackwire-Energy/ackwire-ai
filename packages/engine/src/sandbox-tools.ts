@@ -338,7 +338,11 @@ function timeoutOf(input: Record<string, unknown>, fallback: number, max: number
  * per conversation (the thread's id, a UUID), resumed on every follow-up.
  * Sessions live per folder, and each agent has its own folder there.
  */
-export function claudeCodeSentence(sessionId: string, tasks = false) {
+export function claudeCodeSentence(sessionId: string, tasks = false, managed = false) {
+  // Each agent is its own OS user there and a sign-in reaches only what the runner starts, never the agent's shell.
+  if (managed) {
+    return `\`claude\` in run_code has no sign-in on this computer, on purpose: "not logged in" there says nothing about any plan, so never ask anyone to sign in because of it.${tasks ? ' For a job for Claude Code, use start_task with executor "claude".' : ""}`;
+  }
   const run = `If Claude Code (\`claude\`) is installed there and the work suits it, run it non-interactively from your workspace with one session per conversation, so it remembers earlier turns: the first time \`claude -p --session-id ${sessionId} "<task>"\`, afterwards \`claude -p --resume ${sessionId} "<follow-up>"\` (if it says there's no such conversation, start it with --session-id). Add \`--permission-mode acceptEdits\` so it can edit files; never add --dangerously-skip-permissions unless the person asks.`;
   return tasks
     ? `${run} For anything that takes more than a couple of minutes (building a feature, a refactor, a long test run), use start_task with executor "claude" instead: it runs in the background in the same session, survives the connection dropping, and you are woken here when it finishes. Keep run_code for short commands and quick questions.`
@@ -773,7 +777,7 @@ export function createSandboxToolSource(
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.${deps.vault ? " With `keys`, saved Vault keys (their variable names, from vault_list) are set as environment variables of this one command only: use them as `$NAME` (bash) or `os.environ` / `process.env`, never print them (output shows them as [secret:NAME]). A routine's run gets no keys." : ""}`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo), computerInfo.managed)}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.${deps.vault ? " With `keys`, saved Vault keys (their variable names, from vault_list) are set as environment variables of this one command only: use them as `$NAME` (bash) or `os.environ` / `process.env`, never print them (output shows them as [secret:NAME]). A routine's run gets no keys." : ""}`,
       scope: SANDBOX_SCOPE,
       readsOutside: true,
       sensitive: requireApproval,
