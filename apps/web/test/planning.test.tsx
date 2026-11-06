@@ -607,6 +607,163 @@ describe("Rotinas", () => {
     expect(card.textContent).toContain("Ainda não rodou");
   });
 
+  test("Nova rotina: a template from one search fills the form, and all of it stays editable", async () => {
+    const { api } = await go("routines");
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    const select = within(dialog).getByRole("combobox", { name: "Começar de um modelo" });
+    expect(select.textContent).toContain("Escolher um modelo");
+    select.focus();
+    await key(select, "Enter");
+    await settle(3);
+    // Sections by area, plain work first; PRs live under Tecnologia, the last one.
+    const groups = within(screen().getByRole("listbox"))
+      .getAllByRole("group")
+      .map((g) => g.getAttribute("aria-label"));
+    expect(groups[0]).toBe("Equipe e rotina do dia");
+    expect(groups.at(-1)).toBe("Tecnologia");
+    const search = screen().getByRole("combobox", { name: "Buscar modelos" });
+    await type(search, "sentry");
+    const found = within(screen().getByRole("listbox")).getAllByRole("option");
+    expect(found.map((o) => o.textContent)).toEqual([expect.stringContaining("Vigiar erros novos")]);
+    expect(found[0]?.textContent).toContain("Precisa deste app: Sentry");
+    await type(search, "fechamento semana");
+    await click(within(screen().getByRole("listbox")).getByRole("option", { name: /Fechamento da semana/ }));
+    await settle(4);
+    expect((within(dialog).getByLabelText("O que fazer") as HTMLTextAreaElement).value).toContain("Resuma a semana");
+    expect((within(dialog).getByLabelText("Nome (opcional)") as HTMLInputElement).value).toBe("Fechamento da semana");
+    expect(dialog.textContent).toContain("Toda semana, sex, às 17:00");
+    expect(within(dialog).getByRole("radio", { name: "Toda vez" }).getAttribute("aria-checked")).toBe("true");
+    expect(select.textContent).toContain("Fechamento da semana");
+    await type(within(dialog).getByLabelText("Nome (opcional)"), "Sexta da equipe");
+    await click(within(dialog).getByRole("button", { name: "Criar rotina" }));
+    await settle(5);
+    const card = screen().getByRole("article", { name: "Sexta da equipe" });
+    expect(card.textContent).toContain("Toda semana, sex, às 17:00");
+    const made = (await api.routines.list(ORG_ID)).find((r) => r.name === "Sexta da equipe");
+    expect(made?.report).toBe("always");
+  });
+
+  test("Nova rotina: a template's app says so once picked, with a way to connect one not connected", async () => {
+    await go("routines");
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    await pick(within(dialog).getByRole("combobox", { name: "Começar de um modelo" }), /Vigiar erros novos/);
+    expect(dialog.textContent).toContain("Precisa deste app: Sentry");
+    expect(dialog.textContent).toContain("A cada hora");
+    // The fake workspace has Sentry on neither list, so its page is one click away.
+    expect(within(dialog).getByRole("link", { name: "Abrir Conectores" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/settings/connectors`,
+    );
+    await pick(within(dialog).getByRole("combobox", { name: "Começar de um modelo" }), /Resumo diário de um canal/);
+    expect(dialog.textContent).not.toContain("Precisa deste app");
+    expect(dialog.textContent).toContain("De segunda a sexta, às 09:00");
+    await pick(within(dialog).getByRole("combobox", { name: "Começar de um modelo" }), /Organizar tarefas novas/);
+    expect(within(dialog).getByRole("radio", { name: "Evento" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(dialog).getByRole("combobox", { name: "Evento" }).textContent).toContain("Tarefa criada no agentes");
+    // A mailbox is the email trigger's own: the workspace has none, so its note and its link say what to do.
+    await pick(within(dialog).getByRole("combobox", { name: "Começar de um modelo" }), /Preparar respostas de email/);
+    expect(within(dialog).getByRole("radio", { name: "Email" }).getAttribute("aria-checked")).toBe("true");
+    expect(dialog.textContent).toContain("Conecte uma caixa de email em Conectores primeiro.");
+    expect(within(dialog).getByRole("button", { name: "Criar rotina" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  test("Nova rotina: a template never writes over the person's words unasked", async () => {
+    await go("routines");
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    const what = within(dialog).getByLabelText("O que fazer") as HTMLTextAreaElement;
+    const select = () => within(dialog).getByRole("combobox", { name: "Começar de um modelo" });
+    await type(what, "Minhas palavras");
+    await pick(select(), /Plano do dia/);
+    const ask = screen().getByRole("dialog", { name: "Trocar o que você escreveu por este modelo?" });
+    await click(within(ask).getByRole("button", { name: "Cancelar" }));
+    await settle(2);
+    expect(what.value).toBe("Minhas palavras");
+    expect(select().textContent).toContain("Escolher um modelo");
+    await pick(select(), /Plano do dia/);
+    await click(
+      within(screen().getByRole("dialog", { name: /Trocar o que você escreveu/ })).getByRole("button", {
+        name: "Trocar",
+      }),
+    );
+    await settle(2);
+    expect(what.value).toContain("Liste as tarefas abertas");
+    // Untouched, it changes for another with nothing to ask.
+    await pick(select(), /Tarefas atrasadas/);
+    expect(screen().queryByRole("dialog", { name: /Trocar o que você escreveu/ })).toBeNull();
+    expect(what.value).toContain("prazo vencido");
+  });
+
+  test("Nova rotina: a template's part in brackets holds the routine back, and says so", async () => {
+    const { api } = await go("routines");
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    await pick(within(dialog).getByRole("combobox", { name: "Começar de um modelo" }), /Vigiar uma página/);
+    const before = (await api.routines.list(ORG_ID)).length;
+    await click(within(dialog).getByRole("button", { name: "Criar rotina" }));
+    await settle(3);
+    expect(dialog.textContent).toContain("Troque o texto entre parênteses primeiro.");
+    expect((await api.routines.list(ORG_ID)).length).toBe(before);
+    await type(within(dialog).getByLabelText("O que fazer"), "Abra exemplo.com e diga se o preço mudou.");
+    await click(within(dialog).getByRole("button", { name: "Criar rotina" }));
+    await settle(5);
+    expect((await api.routines.list(ORG_ID)).length).toBe(before + 1);
+  });
+
+  test("Nova rotina: the search finds templates by words of their instructions, without accents", async () => {
+    await go("routines");
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    const select = within(dialog).getByRole("combobox", { name: "Começar de um modelo" });
+    select.focus();
+    await key(select, "Enter");
+    await settle(3);
+    const search = screen().getByRole("combobox", { name: "Buscar modelos" });
+    const found = () =>
+      within(screen().getByRole("listbox"))
+        .queryAllByRole("option")
+        .map((o) => o.textContent ?? "");
+    await type(search, "reunioes");
+    expect(found()).toEqual([expect.stringContaining("Plano do dia")]);
+    await type(search, "CONCORRENCIA");
+    expect(found()).toEqual([expect.stringContaining("De olho na concorrência")]);
+    await type(search, "sem resultado aqui");
+    expect(found()).toEqual([]);
+    expect(screen().getByRole("listbox").textContent).toContain("Nenhum modelo encontrado");
+  });
+
+  test("Nova rotina: the templates work from the keyboard alone, and Esc leaves the form open", async () => {
+    await go("routines");
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    const select = within(dialog).getByRole("combobox", { name: "Começar de um modelo" });
+    select.focus();
+    await key(select, "Enter");
+    await settle(3);
+    const search = screen().getByRole("combobox", { name: "Buscar modelos" });
+    await key(search, "Escape");
+    await settle(3);
+    expect(screen().queryByRole("listbox")).toBeNull();
+    expect(screen().getByRole("dialog", { name: "Nova rotina" })).toBe(dialog);
+    await key(select, "ArrowDown");
+    await settle(3);
+    const again = screen().getByRole("combobox", { name: "Buscar modelos" });
+    await type(again, "pagamento");
+    await key(again, "ArrowDown");
+    await key(again, "Enter");
+    await settle(4);
+    expect(screen().queryByRole("listbox")).toBeNull();
+    expect((within(dialog).getByLabelText("Nome (opcional)") as HTMLInputElement).value).not.toBe("");
+    expect(select.textContent).not.toContain("Escolher um modelo");
+  });
+
   test("an event-driven routine", async () => {
     await go("routines");
     await click(screen().getByRole("button", { name: "Nova rotina" }));

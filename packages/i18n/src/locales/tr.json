@@ -6217,28 +6217,152 @@
     },
     "presets": {
       "title": "Bir şablondan başlayın",
+      "placeholder": "Şablon seçin",
+      "search": "Şablon arayın",
+      "searchPlaceholder": "Ad, alan veya uygulama",
+      "noResults": "Şablon bulunamadı",
+      "list": "Şablonlar",
+      "needsApp": "Bu uygulama gerekli: {{app}}",
+      "needsApps": "Bu uygulamalardan biri gerekli: {{apps}}",
+      "needsMailbox": "Bağlı bir e-posta kutusu gerekli",
+      "connectFirst": "Rutinin çalışması için bağlayın.",
+      "fillBlank": "Önce parantez içindeki metni değiştirin.",
+      "replaceTitle": "Yazdıklarınızı bu şablonla değiştirmek istiyor musunuz?",
+      "replaceConfirm": "Değiştir",
+      "areas": {
+        "team": "Ekip ve günlük düzen",
+        "sales": "Satış ve müşteriler",
+        "support": "Müşteri hizmetleri",
+        "marketing": "Pazarlama ve içerik",
+        "finance": "Finans",
+        "ops": "Operasyon",
+        "people": "İnsanlar ve İK",
+        "tech": "Teknoloji"
+      },
+      "dayPlan": {
+        "name": "Günün planı",
+        "text": "Hafta içi 08.30'da, bugünün görevleri ve toplantıları.",
+        "prompt": "Bugün teslim edilecek açık görevleri ve günün toplantılarını listeleyin. Önce neyin ilgi beklediğini söyleyin."
+      },
+      "late": {
+        "name": "Geciken görevler",
+        "text": "Hafta içi saat 10'da, süresi geçenler.",
+        "prompt": "Süresi geçmiş açık görevleri bulun. Her biri için sorumlusunu ve kaç gün geciktiğini söyleyin."
+      },
+      "unanswered": {
+        "name": "Yanıtsız sorular",
+        "text": "Hafta içi saat 16'da, bugün kimsenin yanıtlamadıkları.",
+        "prompt": "Kanalda bugün yanıtsız kalan soruları ve istekleri bulun. Her birini soran kişiyle birlikte listeleyin."
+      },
+      "leads": {
+        "name": "Yeni CRM kişileri",
+        "text": "Hafta içi saat 9'da, kim geldi, kimden başlanmalı.",
+        "prompt": "CRM'de son seferden beri eklenen kişilere bakın. En umut verici olanları söyleyin ve her biri için sonraki adımı önerin."
+      },
+      "stalled": {
+        "name": "Duran fırsatlar",
+        "text": "Pazartesi saat 9'da, son zamanlarda hareketsiz fırsatlar.",
+        "prompt": "CRM'de 7 günden uzun süredir hareketsiz olan açık fırsatlara bakın. Her biri için sonraki adımı önerin."
+      },
+      "prospects": {
+        "name": "Yeni müşteri bulun",
+        "text": "Pazartesi saat 8'de, iletişime geçilecek beş şirket.",
+        "prompt": "İnternette ideal müşterimize uyan 5 şirket arayın. Her biri için ne yaptığını ve neden iletişime değer olduğunu söyleyin."
+      },
+      "newEmail": {
+        "name": "E-posta yanıtları hazırlayın",
+        "text": "Bir e-posta gelince ajan yanıtı hazırlar.",
+        "prompt": "Gelen e-postayı okuyun, konusunu ve ne kadar acil olduğunu söyleyin. Bir yanıt önerisi yazın, ama göndermeyin."
+      },
+      "tickets": {
+        "name": "Yanıtsız talepler",
+        "text": "Hafta içi saat 9 ve 14'te, kimler hâlâ bekliyor.",
+        "prompt": "4 saatten uzun süredir yanıtsız olan açık taleplere bakın. En acil olanları önce listeleyin ve her biri için bir yanıt önerin."
+      },
+      "themes": {
+        "name": "En sık istekler",
+        "text": "Cuma saat 16'da, müşterilerin en çok istedikleri.",
+        "prompt": "Haftanın taleplerini okuyun ve konuya göre gruplayın. En sık 5 konuyu ve her birini neyin önleyeceğini söyleyin."
+      },
+      "mentions": {
+        "name": "Şirket bahisleri",
+        "text": "Hafta içi saat 9'da, hakkımızda ne söyleniyor.",
+        "prompt": "İnternette şirketimizle ilgili yeni haberleri ve bahisleri arayın. Nerede çıktığını, olumlu mu olumsuz mu olduğunu ve yanıt gerekip gerekmediğini söyleyin."
+      },
+      "rivals": {
+        "name": "Rakipleri izleyin",
+        "text": "Pazartesi saat 9'da, rakipler neyi değiştirdi.",
+        "prompt": "Rakiplerimizin geçen hafta neyi başlattığını veya değiştirdiğini araştırın: fiyatlar, ürünler ve kampanyalar. Bizim için önemli olanı söyleyin."
+      },
+      "ideas": {
+        "name": "İçerik fikirleri",
+        "text": "Pazartesi saat 10'da, hafta için beş fikir.",
+        "prompt": "Müşterilerin sorduklarına ve pazarımızda olanlara göre bu hafta için 5 içerik fikri önerin. Her birine bir başlık ve bir biçim verin."
+      },
+      "traffic": {
+        "name": "Site rakamları",
+        "text": "Pazartesi 08.30'da, hafta bir öncekiyle karşılaştırmalı.",
+        "prompt": "Geçen haftanın rakamlarına bakın: ziyaretler, kayıtlar ve en çok görülen sayfalar. Önceki haftayla karşılaştırıp neyin değiştiğini söyleyin."
+      },
+      "revenue": {
+        "name": "Dünkü satışlar",
+        "text": "Her gün saat 8'de, satışlar haftalık ortalamayla karşılaştırmalı.",
+        "prompt": "Dün ne kadar sattığımıza bakın ve son 7 günün ortalamasıyla karşılaştırın. Olağan dışı bir şey varsa söyleyin."
+      },
+      "failed": {
+        "name": "Ödeme sorunları",
+        "text": "Hafta içi saat 10'da, retler ve itirazlar.",
+        "prompt": "Son seferden beri reddedilen ödemelere, iadelere ve itirazlara bakın. Her birini tutarı ve müşterisiyle listeleyin."
+      },
+      "monthClose": {
+        "name": "Ay kapanışı",
+        "text": "Ayın 1'inde saat 9'da, geçen ayın parası.",
+        "prompt": "Geçen ayın özetini hazırlayın: gelir, iadeler ve itirazlar. Önceki ayla karşılaştırın."
+      },
+      "sheet": {
+        "name": "Tablo kontrolü",
+        "text": "Hafta içi saat 11'de, boşluklar ve tuhaf rakamlar.",
+        "prompt": "Şu tabloyu kontrol edin: (hangisi olduğunu yazın). Boş alanları, olağan dışı değerleri ve son seferden beri değişenleri belirtin."
+      },
+      "page": {
+        "name": "Bir sayfayı izleyin",
+        "text": "Her gün saat 9'da, yalnızca değişince.",
+        "prompt": "Şu sayfayı açın: (adresi buraya yapıştırın). Son seferden beri önemli bir şey değiştiyse neyin değiştiğini söyleyin."
+      },
+      "newTask": {
+        "name": "Yeni görevleri düzenleyin",
+        "text": "Bir görev oluşturulunca ajan kontrol eder.",
+        "prompt": "Yeni görevi okuyun. Başlamak için neyin eksik olduğunu söyleyin. Bir sorumlu ve bir tarih önerin."
+      },
+      "pulse": {
+        "name": "Haftanın sorusu",
+        "text": "Perşembe saat 16'da, ekibe bir soru.",
+        "prompt": "Geçen haftanın sorusuna gelen yanıtları isim vermeden özetleyin. Sonra kanalda haftanın nasıl geçtiğine dair kısa yeni bir soru paylaşın."
+      },
+      "away": {
+        "name": "Bu hafta kim yok",
+        "text": "Pazartesi 08.30'da, izinler ve seyahatler.",
+        "prompt": "Takvimde bu haftanın izinlerine ve seyahatlerine bakın. Güne göre listeleyin ve neyin karşılanması gerektiğini söyleyin."
+      },
       "digest": {
         "name": "Günlük kanal özeti",
         "text": "Hafta içi saat 9'da, dün olanlar.",
-        "prompt": "Kanalda dün olanları özetle: istekler, çözülenler ve yanıtsız kalanlar.",
-        "phrase": "hafta içi saat 9'da"
+        "prompt": "Kanalda son özetten beri olanları özetle: istekler, çözülenler ve yanıtsız kalanlar."
       },
       "errors": {
         "name": "Yeni hataları izle",
         "text": "Her saat, yalnızca yeni bir hata olduğunda.",
-        "prompt": "Son çalıştırmadan bu yana gelen yeni Sentry hatalarını kontrol et. Varsa özetle ve kodun neresinde oluştuklarını söyle. Yeni bir şey yoksa mesaj gönderme.",
-        "phrase": "her saat"
+        "prompt": "Son çalıştırmadan bu yana gelen yeni Sentry hatalarını kontrol et. Varsa özetle ve kodun neresinde oluştuklarını söyle. Yeni bir şey yoksa mesaj gönderme."
       },
       "prs": {
         "name": "Yeni PR'ları incele",
-        "text": "Bir PR açıldığında ajan onu okur ve yorum yapar.",
-        "prompt": "Yeni PR'ın diff'ini oku, riskleri belirt ve elle neyin test edilmesi gerektiğini söyle."
+        "text": "Hafta içi saat 9 ve 14'te ajan yeni PR'ları okur ve riskleri belirtir.",
+        "prompt": "Son seferden beri açılan PR'lara bakın. Her birinin diff'ini okuyun, riskleri belirtin ve elle neyin test edilmesi gerektiğini söyleyin."
       },
       "week": {
         "name": "Hafta kapanışı",
         "text": "Cuma saat 17'de: kararlar ve açık işler.",
-        "prompt": "Haftayı özetle: kararlar, kapanan görevler ve hâlâ açık olanlar.",
-        "phrase": "her cuma saat 17'de"
+        "prompt": "Haftayı özetle: kararlar, kapanan görevler ve hâlâ açık olanlar."
       }
     },
     "close": "Kapat",

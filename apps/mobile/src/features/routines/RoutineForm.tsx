@@ -12,12 +12,18 @@ import {
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { splitAddresses } from "@agenteschat/client/lib/mail";
 import { routineReachWarnings } from "@agenteschat/client/lib/reach";
+import {
+  blankLeft,
+  ownWords,
+  type RoutineTemplateOption,
+  templateRule,
+} from "@agenteschat/client/lib/routine-templates";
 import { busyOnComputer, runsPerDay } from "@agenteschat/client/lib/routine-view";
 import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { router } from "expo-router";
 import { type ReactNode, useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
@@ -53,7 +59,6 @@ import {
   isDoneOnce,
   isInbox,
   isUtc,
-  PRESETS,
   phraseOf,
   ROUTINE_EVENTS,
   type RoutineDraft,
@@ -69,6 +74,7 @@ import {
   zoneOf,
 } from "./logic";
 import { fromApiRule, nextLabel, ruleSentence, runLabel, toApiRule, upcomingLabels } from "./rule";
+import { TemplatePicker } from "./TemplatePicker";
 import { WebhookCard } from "./WebhookCard";
 import { setRoutineZone, useRoutineZone } from "./zone";
 
@@ -82,7 +88,7 @@ const zoneLabel = (zone: string, locale: string) =>
 
 /**
  * "Nova rotina" and "Editar rotina" (`?edit=<id>`), a screen pushed over Rotinas with the native bar (back, the
- * title, "Criar" or "Salvar"), the web's form for the phone: a starting point (new and empty), the agent, where it
+ * title, "Criar" or "Salvar"), the web's form for the phone: a starting point (new only), the agent, where it
  * delivers (a channel, the DM, a Drive document; a routine made in the chat keeps its conversation), what to do, a name, and when: a phrase the server reads ("toda segunda às 9h")
  * shown back as a sentence with the next runs and its time zone (a screen of its own), an event, or an email.
  * Then when it posts and what it may do on its own. Editing saves only what changed.
@@ -285,19 +291,38 @@ function Form({ routine }: { routine: Routine | undefined }) {
       : d.kind === "email"
         ? Boolean(d.email.accountId) && !fromBad
         : !phraseFailed);
+  const [template, setTemplate] = useState<RoutineTemplateOption>();
+  const unfilled = blankLeft(d.prompt, template);
   const ready =
-    !action.isPending && Boolean(d.agentId) && (promptHidden || d.prompt.trim().length > 0) && scheduleOk && !parsing;
+    !action.isPending &&
+    Boolean(d.agentId) &&
+    (promptHidden || d.prompt.trim().length > 0) &&
+    !unfilled &&
+    scheduleOk &&
+    !parsing;
 
-  /** A starting point: what to do, a name and when (its phrase is read by the server, like a typed one). */
-  const applyPreset = (p: (typeof PRESETS)[number]) => {
+  /** A starting point fills the form; everything in it stays the person's to change. */
+  const applyTemplate = (o: RoutineTemplateOption) => {
+    const picked = o.template;
+    setTemplate(o);
+    setPhrase("");
+    setPhraseTyped(false);
     setD((x) => ({
       ...x,
-      prompt: t(`routines.presets.${p.key}.prompt`),
-      name: t(`routines.presets.${p.key}.name`),
-      kind: p.kind,
-      ...(p.kind === "event" ? { event: p.event } : {}),
+      prompt: o.prompt,
+      name: o.label,
+      report: o.report,
+      kind: picked.kind,
+      ...(picked.kind === "event" ? { event: picked.event } : {}),
+      ...(picked.kind === "schedule" ? { rule: templateRule(picked, x.rule) } : {}),
     }));
-    if (p.kind === "schedule") typePhrase(t(`routines.presets.${p.key}.phrase`));
+  };
+  const pickTemplate = (o: RoutineTemplateOption) => {
+    if (!ownWords(d.prompt, template)) return applyTemplate(o);
+    Alert.alert(t("routines.presets.replaceTitle"), undefined, [
+      { text: t("mobile.common.cancel"), style: "cancel" },
+      { text: t("routines.presets.replaceConfirm"), style: "destructive", onPress: () => applyTemplate(o) },
+    ]);
   };
 
   /**
@@ -379,23 +404,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
       >
         <Locked when={action.isPending}>
           {agents.length === 0 && !dir.loading ? <GroupedFooter>{t("routines.form.noAgents")}</GroupedFooter> : null}
-          {!editing && !d.prompt.trim() ? (
-            <>
-              <GroupedHeader>{t("routines.presets.title")}</GroupedHeader>
-              <GroupedList>
-                {PRESETS.map((p) => (
-                  <GroupedRow
-                    key={p.key}
-                    icon={p.icon}
-                    label={t(`routines.presets.${p.key}.name`)}
-                    sub={t(`routines.presets.${p.key}.text`)}
-                    subLines={2}
-                    onPress={() => applyPreset(p)}
-                  />
-                ))}
-              </GroupedList>
-            </>
-          ) : null}
+          {!editing ? <TemplatePicker value={template?.value} onPick={pickTemplate} /> : null}
 
           <GroupedHeader>{t("routines.form.agent")}</GroupedHeader>
           <GroupedList>
@@ -461,6 +470,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
               minHeight={110}
             />
           )}
+          {unfilled ? <GroupedFooter>{t("routines.presets.fillBlank")}</GroupedFooter> : null}
           <GroupedHeader>{editing ? t("routines.form.title") : t("routines.form.name")}</GroupedHeader>
           <TextArea
             value={d.name}

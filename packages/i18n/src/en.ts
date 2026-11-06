@@ -6231,30 +6231,171 @@ export const en = {
     },
     presets: {
       title: "Start from a template",
+      placeholder: "Choose a template",
+      search: "Search templates",
+      searchPlaceholder: "Name, area or app",
+      noResults: "No template found",
+      list: "Templates",
+      needsApp: "Needs this app: {{app}}",
+      needsApps: "Needs one of these apps: {{apps}}",
+      needsMailbox: "Needs a connected mailbox",
+      connectFirst: "Connect it so the routine can work.",
+      fillBlank: "Replace the text in brackets first.",
+      replaceTitle: "Replace what you wrote with this template?",
+      replaceConfirm: "Replace",
+      /** The select's sections, by work rather than by tool. */
+      areas: {
+        team: "Team and daily routine",
+        sales: "Sales and customers",
+        support: "Customer service",
+        marketing: "Marketing and content",
+        finance: "Finance",
+        ops: "Operations",
+        people: "People and HR",
+        tech: "Technology",
+      },
+      dayPlan: {
+        name: "Plan for the day",
+        text: "Weekdays at 8:30am, today's tasks and meetings.",
+        prompt: "List the open tasks due today and today's meetings. Say what needs attention first.",
+      },
+      late: {
+        name: "Overdue tasks",
+        text: "Weekdays at 10am, what's past its due date.",
+        prompt: "Look for open tasks past their due date. For each one, say who owns it and how many days late it is.",
+      },
+      unanswered: {
+        name: "Unanswered questions",
+        text: "Weekdays at 4pm, what nobody answered today.",
+        prompt:
+          "Look in the channel for today's questions and requests that got no answer. List each one with who asked.",
+      },
+      leads: {
+        name: "New CRM contacts",
+        text: "Weekdays at 9am, who came in and who to call first.",
+        prompt:
+          "Check the CRM for contacts added since last time. Say who looks most promising and suggest the next step for each.",
+      },
+      stalled: {
+        name: "Stalled deals",
+        text: "Mondays at 9am, deals with no recent activity.",
+        prompt: "Check the CRM for open deals with no activity for over 7 days. Suggest the next step for each.",
+      },
+      prospects: {
+        name: "Find new customers",
+        text: "Mondays at 8am, five companies worth contacting.",
+        prompt:
+          "Search the web for 5 companies that fit our ideal customer. For each one, say what it does and why it's worth contacting.",
+      },
+      newEmail: {
+        name: "Draft email replies",
+        text: "When an email arrives, the agent drafts a reply.",
+        prompt:
+          "Read the email that arrived and say what it's about and how urgent it is. Draft a reply, but don't send it.",
+      },
+      tickets: {
+        name: "Unanswered tickets",
+        text: "Weekdays at 9am and 2pm, who's still waiting.",
+        prompt:
+          "Check the open tickets with no reply for over 4 hours. List the most urgent first and suggest a reply for each.",
+      },
+      themes: {
+        name: "Most common requests",
+        text: "Fridays at 4pm, what customers asked for most.",
+        prompt:
+          "Read this week's tickets and group them by subject. Say which 5 came up most and what would prevent each one.",
+      },
+      mentions: {
+        name: "Company mentions",
+        text: "Weekdays at 9am, what's being said about us.",
+        prompt:
+          "Search the web for recent news and mentions of our company. Say where it appeared, whether it's positive or negative, and whether it needs a reply.",
+      },
+      rivals: {
+        name: "Watch competitors",
+        text: "Mondays at 9am, what competitors changed.",
+        prompt:
+          "Research what our competitors launched or changed last week, such as prices, products and campaigns. Say what matters to us.",
+      },
+      ideas: {
+        name: "Content ideas",
+        text: "Mondays at 10am, five ideas for the week.",
+        prompt:
+          "Suggest 5 content ideas for this week, based on what customers ask and what's happening in our market. Give each one a title and a format.",
+      },
+      traffic: {
+        name: "Website numbers",
+        text: "Mondays at 8:30am, the week against the one before.",
+        prompt:
+          "Check last week's numbers: visits, sign-ups and top pages. Compare them with the week before and say what changed.",
+      },
+      revenue: {
+        name: "Yesterday's sales",
+        text: "Every day at 8am, sales against the weekly average.",
+        prompt:
+          "Check how much we sold yesterday and compare it with the average of the last 7 days. Say if anything looks unusual.",
+      },
+      failed: {
+        name: "Payment problems",
+        text: "Weekdays at 10am, declined charges and disputes.",
+        prompt:
+          "Check declined payments, refunds and disputes since last time. List each one with the amount and the customer.",
+      },
+      monthClose: {
+        name: "Month-end summary",
+        text: "On the 1st at 9am, last month's money.",
+        prompt:
+          "Put together a summary of last month: revenue, refunds and disputes. Compare it with the month before.",
+      },
+      sheet: {
+        name: "Check a spreadsheet",
+        text: "Weekdays at 11am, gaps and odd numbers.",
+        prompt:
+          "Check this spreadsheet: (say which one). Point out empty fields, unusual values and what changed since last time.",
+      },
+      page: {
+        name: "Watch a web page",
+        text: "Every day at 9am, only when it changes.",
+        prompt:
+          "Open this page: (paste the address here). If something important changed since last time, say what changed.",
+      },
+      newTask: {
+        name: "Sort new tasks",
+        text: "When a task is created, the agent reviews it.",
+        prompt: "Read the new task. Say what's missing to start it, and suggest who should own it and a due date.",
+      },
+      pulse: {
+        name: "Question of the week",
+        text: "Thursdays at 4pm, one question for the team.",
+        prompt:
+          "Summarize the answers to last week's question without naming anyone. Then post a short new question in the channel about how the week went.",
+      },
+      away: {
+        name: "Who's out this week",
+        text: "Mondays at 8:30am, time off and trips.",
+        prompt: "Check the calendar for time off and trips this week. List them by day and say what needs covering.",
+      },
       digest: {
         name: "Daily channel digest",
         text: "Weekdays at 9am, what happened yesterday.",
         prompt:
-          "Summarize what happened yesterday in the channel: requests, what got solved and what was left unanswered.",
-        phrase: "weekdays at 9am",
+          "Summarize what happened in the channel since the last digest: requests, what got solved and what was left unanswered.",
       },
       errors: {
         name: "Watch for new errors",
         text: "Every hour, only when there's a new error.",
         prompt:
           "Check the new Sentry errors since the last run. If there are any, summarize them and say where in the code they happen. If there's nothing new, don't send a message.",
-        phrase: "every hour",
       },
       prs: {
         name: "Review new PRs",
-        text: "When a PR opens, the agent reads it and comments.",
-        prompt: "Read the new PR's diff, point out risks and say what to test by hand.",
+        text: "Weekdays at 9am and 2pm, the agent reads new PRs and points out risks.",
+        prompt: "Check the PRs opened since last time. Read each diff, point out risks and say what to test by hand.",
       },
       week: {
         name: "Week wrap-up",
         text: "Friday at 5pm: decisions and open items.",
         prompt: "Summarize the week: decisions, closed tasks and what's still open.",
-        phrase: "every friday at 5pm",
       },
     },
     close: "Close",
