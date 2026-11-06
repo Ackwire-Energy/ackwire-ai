@@ -13,6 +13,7 @@ import { messageLink } from "./message-links";
 import { insertMessage, type Message, messageView, replyExcerpt } from "./messages";
 import { missionOfThread } from "./missions";
 import { enqueue } from "./outbox";
+import { ACTIVE_RUN_STATUSES } from "./run-inbox";
 import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, isTerminal, replyThreadOf, runErrorDetail } from "./runs";
 import { ago, stepLine } from "./talker-snapshot";
@@ -1153,7 +1154,7 @@ export async function steerWork(
     .where(eq(agentRuns.workId, work.id))
     .orderBy(desc(agentRuns.createdAt))
     .limit(1);
-  if (!target || isTerminal(target.status)) return { ok: false, reason: "That work already ended." };
+  if (!target) return { ok: false, reason: "That work already ended." };
   const ids = [from.triggerMessageId, ...from.pendingMessageIds];
   const people = await deps.db
     .select({ id: messages.id })
@@ -1161,10 +1162,16 @@ export async function steerWork(
     .where(and(eq(messages.orgId, from.orgId), inArray(messages.id, ids), eq(messages.authorType, "person")));
   if (people.length === 0) return { ok: false, reason: "Only a person's message can be passed on." };
   for (const m of people) {
-    await deps.db
+    // Only into a run still at work: one that ended meanwhile never reads its inbox again.
+    const [taken] = await deps.db
       .update(agentRuns)
-      .set({ pendingMessageIds: sql`array_append(${agentRuns.pendingMessageIds}, ${m.id}::uuid)` })
-      .where(and(eq(agentRuns.id, target.id), sql`not (${m.id}::uuid = any(${agentRuns.pendingMessageIds}))`));
+      .set({
+        pendingMessageIds: sql`case when ${m.id}::uuid = any(${agentRuns.pendingMessageIds})
+          then ${agentRuns.pendingMessageIds} else array_append(${agentRuns.pendingMessageIds}, ${m.id}::uuid) end`,
+      })
+      .where(and(eq(agentRuns.id, target.id), inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES])))
+      .returning({ id: agentRuns.id });
+    if (!taken) return { ok: false, reason: "That work already ended." };
     // Passed on: this run doesn't answer it as its own.
     await deps.db
       .update(agentRuns)

@@ -778,10 +778,12 @@ export async function insertMessageWithRuns(
       ), work_thread as (
         -- A person's reply in the thread where an agent's background work posts (its anchor's, or the thread it was
         -- asked in) is for that agent, as a reply in a thread an agent works in always was: a reply turn of its own
-        -- answers it now (ADR 0121 addendum 2026-11-06). In a DM the agent is addressed anyway.
+        -- answers it now (ADR 0121 addendum 2026-11-06). In a DM the agent is addressed anyway. Naming a person there
+        -- talks to them: the router decides.
         select distinct w.agent_id from ${schema.agentWorks} w
-        join ${agents} wa on wa.id = w.agent_id
+        join ${agents} wa on wa.id = w.agent_id and wa.archived_at is null
         where ${startRuns}::boolean and ${threadId}::uuid is not null and not exists (select 1 from mentioned)
+          and not exists (select 1 from mentioned_people)
           and w.org_id = ${input.orgId}::uuid and w.channel_id = ${input.channelId}::uuid
           and w.status in ('live', 'queued')
           and ((w.own_thread and w.anchor_message_id = ${threadId}::uuid)

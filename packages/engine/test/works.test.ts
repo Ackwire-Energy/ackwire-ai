@@ -260,6 +260,51 @@ test("a work waiting on a person's help still takes their message; one waiting f
   expect(all[1]?.triggerMessageId).toBe(later.id);
 });
 
+test("in the work's thread, a reply that names a person talks to them: no reply turn, the router decides", async () => {
+  f = await setup();
+  const run = await working("@dev faz o QA do site");
+  const { anchor } = await moved(run);
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await f.db
+    .update(schema.organizationMembers)
+    .set({ handle: "bia" })
+    .where(eq(schema.organizationMembers.userId, bia.id));
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const toBia = await ask("@bia dá uma olhada nos links quebrados", anchor.id);
+  expect(toBia.mentionedUserIds).toEqual([bia.id]);
+  expect(toBia.meta.forWork).toBeUndefined();
+  expect(await runs()).toHaveLength(1);
+  expect((await runs())[0]?.pendingMessageIds).toEqual([]);
+});
+
+test("a work left by an archived agent claims no reply in its thread: the router decides", async () => {
+  f = await setup();
+  const run = await working("@dev faz o QA do site");
+  const { anchor } = await moved(run);
+  await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, f.agent.id));
+  const reply = await ask("alguém sabe como ficou o QA?", anchor.id);
+  expect(reply.meta.forWork).toBeUndefined();
+  expect(await runs()).toHaveLength(1);
+});
+
+test("steer_work into a work whose run ended meanwhile: refused, and the message stays with the reply turn", async () => {
+  f = await setup({ workTools: true });
+  const run = await working("@dev faz o QA do site");
+  const { work, anchor } = await moved(run);
+  const reply = await working("testa só a LP", anchor.id);
+  // The work's run ended; its work isn't closed yet (the sweep does that).
+  await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
+  const steer = await invokeToolForRun(
+    { ...deps(), tools: f.tools ?? null },
+    { orgId: f.org.id, agentId: f.agent.id, runId: reply.id, machineId: "" },
+    { id: "s1", name: STEER_WORK_TOOL, input: { work_id: work.id } },
+  );
+  expect(steer.result.isError).toBe(true);
+  expect(steer.result.content).toContain("already ended");
+  const [ended] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
+  expect(ended?.pendingMessageIds).toEqual([]);
+});
+
 test("in a DM too; asked inside a thread, the work keeps the thread and the agent answers there in a new run", async () => {
   f = await setup();
   const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });

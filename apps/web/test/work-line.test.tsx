@@ -133,3 +133,22 @@ describe("the last update, once", () => {
     expect(shown).toHaveLength(1);
   });
 });
+
+test("an anchor in a thread its updates no longer go to keeps the last update on its line", async () => {
+  const UPDATE = "Montei um script para varrer todas as páginas.";
+  const state = seedState();
+  state.messages = state.messages.filter((m) => m.channelId !== ENG_ID);
+  // Moved out of that thread (`move_here`): its updates land at the top of the channel now.
+  const view = work({
+    state: "working",
+    question: null,
+    threadId: null,
+    lastUpdate: { text: UPDATE, at: new Date().toISOString(), seq: 1 },
+  });
+  state.messages.push(message("root", null, "QA do site"));
+  state.messages.push(message("anchor", "root", "Vou cuidar disso.", { longWork: view }));
+  rendered = await renderApp(`/org/${ORG_ID}/threads/root`, { api: createFakeApi(state) });
+  await settle(8);
+  const line = document.querySelector(".ac-workline") as HTMLElement;
+  expect(line.querySelector(".ac-workline__update")?.textContent).toBe(UPDATE);
+});

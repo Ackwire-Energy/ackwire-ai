@@ -4603,7 +4603,11 @@ export const TimelineMessage = memo(function TimelineMessage({
             )}
             {/* Long work (ADR 0121): how it stands, under the agent's "Vou cuidar disso". */}
             {m.longWork && !m.local && (
-              <MessageWorkLine message={m} threaded={Boolean(threadLine)} inThread={!threadsView} />
+              <MessageWorkLine
+                message={m}
+                threaded={Boolean(threadLine)}
+                inThread={!threadsView && (m.threadId ?? m.id) === (m.longWork.threadId ?? m.longWork.anchorMessageId)}
+              />
             )}
             {/* A "Responder" thread went on from here: its line (opens the panel). */}
             {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}

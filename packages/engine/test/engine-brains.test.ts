@@ -3468,6 +3468,48 @@ test("only the head of the computer's line asks it: an agent's run waits behind 
   expect(next).toHaveLength(1);
 });
 
+test("background work in the computer's line ranks as asked work: a person's reply turn goes ahead of it", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const { brain } = scriptedComputerBrain(() => [
+    { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  // Its first turn, before it moved, waited in line as a person's.
+  const workRun = await secondRun(f, (await personMessage(f, "@dev faz o QA do site")).id);
+  await drainOutbox(f.db, handlers);
+  expect((await runById(f, workRun.id))?.transcript).toMatchObject({ roomPeople: true });
+  const [work] = await f.db
+    .insert(schema.agentWorks)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      anchorMessageId: Bun.randomUUIDv7(),
+      ownThread: true,
+      title: "QA do site",
+      status: "live",
+      how: "agent",
+      lastUpdateAt: new Date(),
+    })
+    .returning();
+  await f.db.update(schema.agentRuns).set({ workId: work?.id }).where(eq(schema.agentRuns.id, workRun.id));
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000), maxBatches: 1 });
+  const parked = await runById(f, workRun.id);
+  expect(parked?.transcript).toMatchObject({ waitingForBrain: { code: "busy" }, roomAsked: true });
+  expect(parked?.transcript).not.toHaveProperty("roomPeople");
+
+  const reply = await secondRun(f, (await personMessage(f, "@dev aqui só a LP tá sendo testada?")).id);
+  await drainOutbox(f.db, handlers);
+  expect((await runById(f, reply.id))?.transcript).toMatchObject({ roomPeople: true });
+  expect((await roomHead(f.db, machineId))?.id).toBe(reply.id);
+});
+
 test("the right hand never waits behind the line: its turn goes to the computer past a person's run in it", async () => {
   f = await setup();
   const machineId = await computerAgent(f, { builtin: "right_hand" });

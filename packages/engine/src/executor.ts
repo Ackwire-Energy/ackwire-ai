@@ -2878,7 +2878,7 @@ async function executeRunInner(
     const stillBusy = busy && t.roomWaitSince !== undefined;
     if (busy) {
       t.roomWaitSince ??= Date.now();
-      if (!run.background && run.hop <= 1 && viaRoutine === null) {
+      if (!run.background && run.hop <= 1 && viaRoutine === null && !run.workId) {
         t.roomPeople = true;
         // Only the head asks again, and a person's slot can leave too little for the right hand's first ask: behind
         // people's turns it would wait for each, though its floor is the lowest and they can't pass it.
@@ -3806,7 +3806,12 @@ async function executeRunInner(
        */
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
-        // Background work never holds a person's reserved slot: their reply turn beside it needs it (ADR 0032).
+        // Background work is asked work, never a person's turn: it neither holds their reserved slot nor goes ahead of
+        // their reply turn in the line, whatever its first turn was before it moved (ADR 0032).
+        if (run.workId) {
+          delete transcript.roomPeople;
+          transcript.roomAsked = true;
+        }
         personWaiting =
           !run.workId && (Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null));
         // A routine's run: a person scheduled it.
