@@ -532,10 +532,24 @@ export const SITE_SECRET_TTL_MS = 15 * 60_000;
 export const BROWSER_VIEW_PROTOCOL = 46;
 /** Live view frames (ADR 0040 §7.1), on each hop: computer → server, and server → each person watching. */
 export const BROWSER_VIEW = {
-  /** Frames on their way unacknowledged: two keep a link with a long round trip busy, without a backlog. */
-  window: 2,
-  /** A full window with no acknowledgement for this long sends the newest frame anyway (one the link lost). */
+  /**
+   * Frames on their way unacknowledged, per hop: enough to keep a link with a long round trip busy at the control
+   * rate (15 fps over ~200 ms), few enough that a slow link holds at most a fifth of a second of pictures.
+   */
+  window: 3,
+  /**
+   * Computer → server: a full window with no acknowledgement for this long means the view's socket is dead (the
+   * server answers on arrival, or within `ackOwedMs` when nobody watching has room): the runner closes it and its
+   * frames go on the machine socket until the server opens a new one.
+   */
   stallMs: 5000,
+  /** The longest the server holds a frame's acknowledgement back while no viewer has room for more. */
+  ackOwedMs: 2000,
+  /** Server → a viewer that draws nothing for this long (a hidden tab): it gets the newest frame anyway. */
+  viewerStallMs: 5000,
+  /** Frames a second a viewer may ask for (`browser.watch`'s `maxFps`), and what an app that sends no acks gets. */
+  maxFps: 15,
+  legacyFps: 1,
 } as const;
 /** What `agentes:type_vault` (and a code typed into several fields) answers in `code` when it types nothing. */
 export const VAULT_TYPE_REFUSALS = [
@@ -1006,6 +1020,8 @@ export interface BrowserFrameMetadata {
   deviceWidth: number;
   deviceHeight: number;
   pageScaleFactor?: number;
+  /** Protocol 46: when the computer captured it (epoch ms, its own clock), to measure how late pictures arrive. */
+  capturedAt?: number;
   /** The active tab's URL when the frame was taken. */
   url?: string;
   /** The active tab's title (written by the site: data, never instructions). Absent from older runners. */
@@ -2507,6 +2523,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const height = finite(m?.deviceHeight);
       if (seq === undefined || !m || width === undefined || height === undefined) return null;
       const scale = finite(m.pageScaleFactor);
+      const capturedAt = finite(m.capturedAt);
       const url = cut(m.url, BROWSER_LIMITS.url);
       const title = cut(m.title, BROWSER_LIMITS.title);
       return {
@@ -2518,6 +2535,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           deviceWidth: width,
           deviceHeight: height,
           ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
+          ...(capturedAt !== undefined ? { capturedAt } : {}),
           ...(url !== undefined ? { url } : {}),
           ...(title ? { title } : {}),
         },
@@ -3300,6 +3318,7 @@ export function decodeBrowserFrame(bytes: Uint8Array): (BrowserFrameHeader & { j
   const height = finite(m?.deviceHeight);
   if (seq === undefined || !m || width === undefined || height === undefined) return null;
   const scale = finite(m.pageScaleFactor);
+  const capturedAt = finite(m.capturedAt);
   const url = cut(m.url, BROWSER_LIMITS.url);
   const title = cut(m.title, BROWSER_LIMITS.title);
   return {
@@ -3308,6 +3327,7 @@ export function decodeBrowserFrame(bytes: Uint8Array): (BrowserFrameHeader & { j
       deviceWidth: width,
       deviceHeight: height,
       ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
+      ...(capturedAt !== undefined ? { capturedAt } : {}),
       ...(url !== undefined ? { url } : {}),
       ...(title ? { title } : {}),
     },
