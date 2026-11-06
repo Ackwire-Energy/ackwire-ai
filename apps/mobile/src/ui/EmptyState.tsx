@@ -98,7 +98,7 @@ export function EmptyState({
       {action ? (
         // A row sized to its content: the button keeps its own width and height (in a column it could take
         // the flex space it sits in, and its own `alignSelf` would pin it to the left edge).
-        <View style={styles.action}>{action}</View>
+        <View style={[styles.action, inline && styles.actionInline]}>{action}</View>
       ) : null}
     </View>
   );
@@ -133,4 +133,5 @@ const styles = StyleSheet.create({
   title: { textAlign: "center" },
   subtitle: { textAlign: "center", marginTop: 6, maxWidth: 300 },
   action: { flexDirection: "row", alignSelf: "center", marginTop: 20 },
+  actionInline: { marginTop: 12 },
 });
