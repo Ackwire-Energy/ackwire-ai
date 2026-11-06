@@ -69,6 +69,7 @@ import {
 } from "@/ui";
 import { newAgentAi, pickedAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
+import { usePlanHold } from "../ai/parts";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
 import { useOpenDm } from "../new/useOpenDm";
@@ -218,11 +219,13 @@ function NewAgentForm({
   const [useLast, setUseLast] = useState(true);
   // Or anything else the agent's page offers ("Quem pensa", the web's model step), from its sheet.
   const aiAccounts = useAiAccounts(orgId, !proposed);
+  const held = usePlanHold(orgId, org) !== null;
   const brainOptions = brainPickOptions(t, i18n.language, {
     api: choices,
     machines: brainMachines.data ?? [],
     accounts: aiAccounts.data?.accounts ?? [],
     ownerIsMe: true,
+    held,
   });
   const [picked, setPicked] = useState<BrainPickOption | null>(null);
   const [picking, setPicking] = useState(false);

@@ -1458,6 +1458,7 @@ export function KeyPanel({
             {t("endpoint.optionSub")}
           </p>
           {endpoint}
+          {hold && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
         </>
       ) : keyOf && maker && site ? (
         <>

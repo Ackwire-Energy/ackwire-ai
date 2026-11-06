@@ -1237,6 +1237,7 @@ function KeyPage({
       {custom ? (
         <View style={styles.keySteps}>
           <EndpointForm orgId={orgId} onDone={() => setEndpointSaved(true)} />
+          {hold ? <Note icon="clock">{t("connectAi.key.held")}</Note> : null}
         </View>
       ) : maker && site ? (
         <View style={styles.keySteps}>

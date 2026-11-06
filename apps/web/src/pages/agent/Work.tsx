@@ -627,11 +627,10 @@ function Footer({
 // ── Quem pensa ──────────────────────────────────────────────────────────────
 
 /*
- * The brains as a list; the chosen one opens into one card with its settings
- * full width under a hairline, each with a small label above it: the model one
- * click away, the effort as a pixel ramp, the account on that computer
- * (ADR 0041, only its owner), and at the card's foot a switch for answering
- * through the API while the computer is off.
+ * What pays, in one select with a search, as Connect an AI's; the chosen one's settings in a card right under it,
+ * each with a small label above it: the model one click away, the effort as a pixel ramp, the account on that computer
+ * (ADR 0041, only its owner), and in its advanced settings a switch for answering through the API while the computer
+ * is off.
  */
 
 /**

@@ -130,6 +130,7 @@ export function brainPickOptions(
     machines,
     accounts,
     ownerIsMe,
+    held = false,
   }: {
     /** `modelChoices(…)`. */
     api: [string, ModelChoice[]][];
@@ -139,6 +140,8 @@ export function brainPickOptions(
     accounts: AiAccounts["accounts"];
     /** The new agent is the viewer's: only the owner of both the agent and an account chooses it. */
     ownerIsMe: boolean;
+    /** A billing hold stops the plans (`planHoldOf`): that, not the computers, is why they are off. */
+    held?: boolean;
   },
 ): BrainPickOption[] {
   const auto: BrainPickOption = {
@@ -261,7 +264,11 @@ export function brainPickOptions(
           title: name,
           group: name,
           mark: planMark(choice),
-          description: machines.length === 0 ? t("brain.foot.noComputer") : t("brain.foot.unavailable"),
+          description: held
+            ? t("connectAi.billing")
+            : machines.length === 0
+              ? t("brain.foot.noComputer")
+              : t("brain.foot.unavailable"),
           disabled: true,
           free: false,
           keywords: "",

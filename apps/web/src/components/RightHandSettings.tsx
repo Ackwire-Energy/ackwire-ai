@@ -229,7 +229,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
   return (
     <>
       {hold && (
-        <Card>
+        <Card className="ai-panel">
           <PlanHold
             hold={hold}
             onKey={connect ? () => connect.open({ agentId: agent.id, intent: "api_key" }) : undefined}
