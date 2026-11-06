@@ -110,7 +110,8 @@ describe("where an agent was asked", () => {
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
     const { asked, dm, sent, where, seen } = await theExchange(f.general.id, bia, requests);
     const origin = (sent?.meta as { agentDm?: Record<string, unknown> } | undefined)?.agentDm;
-    expect(origin).toMatchObject({ requesterUserId: bia.id, fromChannelId: f.general.id, fromMessageId: asked.id });
+    expect(origin).toMatchObject({ fromChannelId: f.general.id, fromMessageId: asked.id });
+    expect(origin).not.toHaveProperty("requesterUserId");
     const link = messageLink(f.org.id, asked);
     expect(link).toMatch(LINK);
     expect(seen).toContain(

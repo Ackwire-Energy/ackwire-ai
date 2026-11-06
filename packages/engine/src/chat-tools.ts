@@ -40,11 +40,11 @@ const AGENTS_ONLY =
   "You were consulted by another agent for someone who doesn't talk to you directly: answer that agent with what you found (it passes it on), never them or anyone else from here.";
 
 /**
- * Why a message the agent sends elsewhere was sent: who asked, and the message that asked (`fromMessageId`, in its
- * thread `fromThreadId`), so the agent's later runs there can quote it and link to it (`originNotes` in context.ts).
+ * Why a message the agent sends elsewhere was sent: the message that asked (`fromMessageId`, in its thread
+ * `fromThreadId`), so the agent's later runs there can quote it and link to it (`originNotes` in context.ts). Who
+ * asked isn't on it: everyone there gets the message, and a request from a DM stays in that DM.
  */
-const origin = (ctx: ToolContext, requester: string | null) => ({
-  requesterUserId: requester,
+const origin = (ctx: ToolContext) => ({
   fromChannelId: ctx.channelId,
   fromMessageId: ctx.triggerMessageId,
   fromThreadId: ctx.threadRootId,
@@ -273,7 +273,7 @@ export function createChatToolSource(deps: {
               ...(files.length > 0 ? { artifacts: files } : {}),
               // Kept as `send_gif` keeps it: no URL, and its title never reaches the model (ADR 0091 §6).
               ...(gif ? { media: gif } : {}),
-              postedFrom: origin(ctx, requester),
+              postedFrom: origin(ctx),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
@@ -409,7 +409,7 @@ export function createChatToolSource(deps: {
             // Started by the agent on someone's behalf: the person is notified (an agent's reply isn't).
             meta: {
               ...(files.length > 0 ? { artifacts: files } : {}),
-              agentDm: origin(ctx, requester),
+              agentDm: origin(ctx),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },

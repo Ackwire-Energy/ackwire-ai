@@ -23,6 +23,7 @@ import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-rea
 import { runAuthorityById, UUID } from "../authority";
 import { caches } from "../cache";
 import { isChannelMember, peopleAllIn } from "../channels";
+import { consultationOrigin } from "../consultations";
 import { personAgentDmKey } from "../dms";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -49,6 +50,7 @@ import {
   isHowTo,
   learnedQuietly,
   mayEditItem,
+  personMayRead,
   savedReceiptLine,
   supersede,
 } from "./items";
@@ -895,13 +897,16 @@ async function originReadable(ctx: ToolContext, origin: DescribedMessage) {
  */
 async function dmWithRunPerson(ctx: ToolContext): Promise<string | null> {
   const person = ctx.runId ? (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).personId : null;
-  if (!person) return null;
+  if (!person || !ctx.runId) return null;
   const dms = schema.channels;
   const [row] = await ctx.db
     .select({ id: dms.id })
     .from(dms)
     .where(and(eq(dms.orgId, ctx.orgId), eq(dms.dmKey, personAgentDmKey(person, ctx.agentId)), isNull(dms.archivedAt)));
-  return row?.id ?? null;
+  if (!row) return null;
+  // The asking agent relays the answer where it was asked: it stays out unless everyone there is in this DM.
+  const asked = await consultationOrigin(ctx.db, ctx.orgId, ctx.runId);
+  return !asked || (await peopleAllIn(ctx.db, ctx.orgId, asked.channelId, row.id)) ? row.id : null;
 }
 
 /** Whom the call's run works for in the agents' DM (`readerOf`); the trigger's person without a run. */
@@ -932,13 +937,6 @@ async function triggerAuthor(ctx: ToolContext) {
     .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
   return m?.type === "person" && m.meta.readOutside !== true ? m.userId : null;
 }
-
-/**
- * An item a run may read: not another agent's, and a person's preference only in a run that person is behind
- * (ADR 0120).
- */
-const personMayRead = (item: ContextItem | undefined, person: string | null, agentId: string) =>
-  !item || ((!item.agentId || item.agentId === agentId) && (item.scopeType !== "person" || item.scopeId === person));
 
 /**
  * What a memory is about, apart from its plain title (shown to people, in their language): the same thing saved again,

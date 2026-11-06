@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { eq, migrationsFolder, schema, sql } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  consolidateItem,
+  consolidateOrg,
   createArtifact,
   createChannel,
   drainOutbox,
@@ -191,6 +195,92 @@ test("said in a DM, kept 'everywhere': it reaches that person's runs, never some
     ).text;
   expect(await memoryFor(f.owner.id)).toContain("viagem de outubro");
   expect(await memoryFor(bob.id)).not.toContain("viagem de outubro");
+});
+
+describe("memories from a DM", () => {
+  const memory = {
+    kind: "preference" as const,
+    subject: "viagem",
+    content: "A viagem de outubro não pode chegar à equipe.",
+    trust: "high" as const,
+    confidence: 0.95,
+    evidence: [{ type: "human" as const, ref: "m", at: new Date().toISOString() }],
+    createdByKind: "person" as const,
+  };
+
+  test("a strong one is never proposed: a proposal would show it to who decides, then to every run", async () => {
+    f = await setup({});
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const inDm = { ...memory, orgId: f.org.id, agentId: f.agent.id, createdById: f.owner.id };
+    await consolidateItem(f.db, { ...inDm, scopeType: "agent", scopeId: f.agent.id, channelIds: [dm.id] });
+    await consolidateItem(f.db, { ...inDm, subject: "outra", scopeType: "person", scopeId: f.owner.id });
+    await consolidateItem(f.db, {
+      ...inDm,
+      subject: "canal",
+      content: "O time prefere relatórios às sextas.",
+      scopeType: "agent",
+      scopeId: f.agent.id,
+      channelIds: [f.general.id],
+    });
+    await f.db.update(schema.contextItems).set({ relevance: 1, verified: true });
+    await consolidateOrg(f.context, f.org.id);
+    const proposed = await f.db.select().from(schema.contextProposals);
+    expect(proposed.map((p) => p.proposedText)).toEqual([expect.stringContaining("relatórios às sextas")]);
+  });
+
+  test("two people's preferences on the same subject stay two", async () => {
+    f = await setup({});
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    const of = (userId: string) => ({
+      ...memory,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      scopeType: "person" as const,
+      scopeId: userId,
+      createdById: userId,
+    });
+    await consolidateItem(f.db, of(f.owner.id));
+    await consolidateItem(f.db, of(bob.id));
+    const kept = await f.db.select().from(schema.contextItems);
+    expect(kept.map((i) => i.scopeId).sort()).toEqual([f.owner.id, bob.id].sort());
+  });
+
+  test("the migration gives old 'everywhere' ones from a DM back to who said them, and nothing else", async () => {
+    f = await setup({});
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const inDm = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "entre a gente" });
+    const inChannel = await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "para todos" });
+    const everywhere = {
+      ...memory,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      scopeType: "agent" as const,
+      scopeId: f.agent.id,
+      channelIds: [],
+      createdById: f.owner.id,
+    };
+    const fromDm = await consolidateItem(f.db, { ...everywhere, sourceIds: [inDm.id] });
+    const fromChannel = await consolidateItem(f.db, {
+      ...everywhere,
+      subject: "canal",
+      content: "O time prefere relatórios às sextas.",
+      sourceIds: [inChannel.id],
+    });
+    const rule = await consolidateItem(f.db, {
+      ...everywhere,
+      kind: "rule",
+      subject: "regra",
+      content: "Pode enviar sem perguntar.",
+      sourceIds: [inDm.id],
+    });
+    await f.db.execute(sql.raw(readFileSync(join(migrationsFolder, "0281_dm_memory_stays_personal.sql"), "utf8")));
+    const scope = async (id: string) =>
+      (await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, id)))[0]?.scopeType;
+    expect(await scope(fromDm.item.id)).toBe("person");
+    expect(await scope(fromChannel.item.id)).toBe("agent");
+    expect(await scope(rule.item.id)).toBe("agent");
+  });
 });
 
 describe("list_artifacts for agents", () => {
