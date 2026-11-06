@@ -8,6 +8,7 @@ import {
   browser,
   createTestServer,
   deletionCode,
+  deletionsDue,
   ORIGIN,
   seedOrg,
   signUp,
@@ -267,6 +268,7 @@ describe("account deletion", () => {
     const deleted = await fromApp(bia, "/api/app/account", { method: "DELETE", json: { code } });
     expect(deleted.status).toBe(204);
     expect(deleted.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_token=;"))).toBe(true);
+    await deletionsDue(t);
     expect(await t.db.select().from(schema.users).where(eq(schema.users.email, "bia@example.com"))).toEqual([]);
     expect(await t.db.select().from(schema.pushDevices)).toEqual([]);
     expect((await fromApp(bia, "/api/app/me")).status).toBe(401);
