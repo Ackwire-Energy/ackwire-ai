@@ -42,6 +42,21 @@ test("a list that's down, refusing or unreadable keeps what the plan last said",
   expect(models()).toEqual(before);
 });
 
+test("a list too big to be one, or one that breaks off, keeps what the plan last said", async () => {
+  await refreshPlanModels(answers(NEW_MODEL));
+  const before = models();
+  const huge = { data: [...NEW_MODEL.data, { id: "glm-7", type: "chat", name: "x".repeat(3_000_000) }] };
+  await refreshPlanModels(answers(huge));
+  const cut = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode('{"data":['));
+      c.error(new Error("timed out"));
+    },
+  });
+  await refreshPlanModels((async () => new Response(cut)) as unknown as typeof fetch);
+  expect(models()).toEqual(before);
+});
+
 test("never read: the table", () => {
   expect(models()).toEqual(table.map((m) => m.id));
 });

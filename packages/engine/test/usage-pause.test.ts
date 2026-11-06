@@ -1,4 +1,4 @@
-import { afterEach, expect, setSystemTime, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
@@ -1715,24 +1715,56 @@ test("a model that needs the Global region waits with no reset time and says wha
   expect((await accountUsage(f, accountId))?.models?.["deepseek-v4.1-flash"]).toMatchObject({ region: true });
 });
 
-test("a region refusal the CLI didn't call a limit says what to turn on too", async () => {
-  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
-  const reading: PlanUsage = {
+describe("a refusal the CLI didn't call a limit", () => {
+  const reading = (): PlanUsage => ({
     windows: [{ kind: "five_hour", usedPercent: 0, resetsAt: later(5 * 3600_000).toISOString() }],
     source: "probe",
     at: new Date().toISOString(),
-  };
-  const { accountId } = await goAgent(f, "hy3", reading);
-  const { brain } = scripted(() => [
-    { type: "error", code: "claude_failed", message: "API Error: 403 Model not allowed in this workspace's region" },
-  ]);
-  await post(f, "@dev oi");
-  await drainOutbox(f.db, accountHandlers(f, brain));
-  const [run] = await runs(f);
-  expect(waitOf(run)).toMatchObject({ scope: "region", model: "hy3" });
-  const [note] = await notes(f, "plan_model_region_wait");
-  expect(note?.meta.bodyParams).toMatchObject({ model: "Hy3" });
-  expect((await accountUsage(f, accountId))?.models?.hy3).toMatchObject({ region: true });
+  });
+  const REFUSED = "API Error: 403 Model not allowed in this workspace's region";
+
+  test("on a model that needs the Global region, it says what to turn on", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "deepseek-v4-pro", reading());
+    const { brain } = scripted(() => [{ type: "error", code: "claude_failed", message: REFUSED }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    const [run] = await runs(f);
+    expect(waitOf(run)).toMatchObject({ scope: "region", model: "deepseek-v4-pro" });
+    const [note] = await notes(f, "plan_model_region_wait");
+    expect(note?.meta.bodyParams).toMatchObject({ model: "DeepSeek V4 Pro" });
+    expect((await accountUsage(f, accountId))?.models?.["deepseek-v4-pro"]).toMatchObject({ region: true });
+  });
+
+  test("on a model the setting can't open (Beam: some countries only), it stays the failure it was", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "beam-free", reading());
+    const { brain } = scripted(() => [{ type: "error", code: "claude_failed", message: REFUSED }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(waitOf((await runs(f))[0])).toBeUndefined();
+    expect(await notes(f, "plan_model_region_wait")).toEqual([]);
+    expect((await accountUsage(f, accountId))?.models).toBeUndefined();
+  });
+
+  test("after the turn worked, the word in a command's error parks nothing", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "deepseek-v4-pro", reading());
+    const { brain } = scripted(() => [
+      {
+        type: "tool_call",
+        id: "t1",
+        name: "Bash",
+        input: { command: "aws s3 ls" },
+        executed: { content: "ok" },
+      },
+      { type: "error", code: "claude_failed", message: "Claude Code ended without an answer (exit 1): bad region" },
+    ]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(waitOf((await runs(f))[0])).toBeUndefined();
+    expect((await accountUsage(f, accountId))?.models).toBeUndefined();
+  });
 });
 
 test("a full window of the OpenCode Go account is still the account's limit", async () => {

@@ -5048,8 +5048,10 @@ async function thinkOnce(
         };
       }
     } else if (event.type === "error") {
-      // After a `limit`, whatever ended the turn was the plan's refusal.
-      if (limit || (event.code === "claude_failed" && hooks.refusedByPlan?.(event.message)))
+      // After a `limit`, whatever ended the turn was the plan's refusal. Without one, only before anything ran: the
+      // words of a later failure can be a command's own.
+      const untouched = executedCount === 0 && toolCalls.length === 0;
+      if (limit || (event.code === "claude_failed" && untouched && hooks.refusedByPlan?.(event.message)))
         throw limitFailure(event.message, event.worked);
       throw new BrainFailure(
         event.code,

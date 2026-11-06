@@ -4,9 +4,9 @@
  * a turn goes, which variable holds the key, what each model alias runs), the
  * engine and the apps (names, where the key is made, the model choices): it
  * imports nothing. A plan with a `modelsUrl` goes by that list once the server
- * has read it (`readPlanModels`), this table being its fallback. The key travels sealed to the computer and stays there; our
- * server never holds or routes it, and the endpoint a turn uses comes from the
- * runner's own copy of this file.
+ * has read it (`readPlanModels`), this table being its fallback. The key travels
+ * sealed to the computer and stays there; our server never holds or routes it,
+ * and the endpoint a turn uses comes from the runner's own copy of this file.
  *
  * Settings as each maker documents them for Claude Code (read 2026-10-24):
  * docs.z.ai/devpack/tool/claude, kimi.com/code/docs (third-party tools, Claude
@@ -33,8 +33,7 @@ export type PlanModelTag = "cheap" | "fast" | "smart";
 
 /**
  * What the plan's account must allow before a model answers, all under OpenCode's Settings › Privacy: `globalRegion`
- * its Global region, `paidTraining` paid models that train on what they're sent, `freeTraining` its free models
- * (which all train on it).
+ * its Global region, `paidTraining` paid models that train on what they're sent, `freeTraining` free ones that do.
  */
 export type PlanModelNeed = "globalRegion" | "paidTraining" | "freeTraining";
 
@@ -282,6 +281,15 @@ export const learnedPlanModels = (): Record<string, PlanModel[]> =>
 /** What a model id from a list may look like: it reaches Claude Code's `--model` and its environment. */
 const LISTED_MODEL_ID = /^[A-Za-z0-9][\w.-]{0,79}$/;
 
+/** Ids that already mean something, to the pickers (`auto`) or to Claude Code: never a list's model, whatever it says. */
+const TAKEN_MODEL_ID = /^(?:auto|default|opus|sonnet|haiku|fable)$/i;
+
+const isListedModelId = (v: unknown): v is string =>
+  typeof v === "string" && LISTED_MODEL_ID.test(v) && !TAKEN_MODEL_ID.test(v);
+
+/** Far above any plan's list: past it, the answer isn't one. */
+const MAX_LISTED_MODELS = 300;
+
 /** Makers by the first part of a list's `canonical_id` where they aren't its capitalized form: mostly an API provider's id. */
 const LISTED_MAKERS = new Map([
   ["anthropic", "anthropic"],
@@ -297,7 +305,7 @@ const LISTED_MAKERS = new Map([
 
 function listedMaker(canonicalId: unknown, plan: CodingPlan) {
   const prefix = typeof canonicalId === "string" ? (canonicalId.split("/")[0] ?? "") : "";
-  if (!prefix) return plan.maker;
+  if (!/^[a-z][a-z0-9-]{0,39}$/i.test(prefix)) return plan.maker;
   return LISTED_MAKERS.get(prefix) ?? prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }
 
@@ -310,21 +318,22 @@ function listedMaker(canonicalId: unknown, plan: CodingPlan) {
  */
 export function readPlanModels(plan: CodingPlan, body: unknown): PlanModel[] {
   const data = (body as { data?: unknown } | null)?.data;
-  if (!Array.isArray(data)) return [];
+  if (!Array.isArray(data) || data.length > MAX_LISTED_MODELS) return [];
   const table = plan.claudeCode.models;
   const listed = new Map<string, PlanModel>();
   for (const raw of data as ListedModel[]) {
     const id = raw?.id;
-    if (typeof id !== "string" || !LISTED_MODEL_ID.test(id)) continue;
+    if (!isListedModelId(id)) continue;
     if (raw.type !== "chat" || raw.capabilities?.tools?.supported === false) continue;
     const known = table.find((m) => m.id === id);
     const maker = listedMaker(raw.canonical_id, plan);
     const free = raw.cost?.text?.input?.price === 0 && raw.cost.text.output?.price === 0;
     const trains = /contributor/i.test(id) ? (free ? "freeTraining" : "paidTraining") : undefined;
     const needs = known?.needs ?? (maker === "deepseek" ? "globalRegion" : trains);
+    const name = typeof raw.name === "string" ? raw.name.trim() : "";
     listed.set(id, {
       id,
-      label: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 80) : id,
+      label: name && !/\p{C}/u.test(name) ? name.slice(0, 80) : id,
       maker,
       ...(known?.alias ? { alias: known.alias } : {}),
       ...(known?.tag ? { tag: known.tag } : {}),
@@ -352,13 +361,12 @@ interface ListedModel {
 
 /**
  * The plan for a turn on a computer, whose copy of the table may be older than the plan's list: the id the server
- * chose from that list (`claudeCodeModel` there) counts as one of the plan's. Only a plan with a list, and only an id
- * of a listed model's shape.
+ * chose from that list (`claudeCodeModel` there, which has already turned anything else into `sonnet`) counts as one
+ * of the plan's. Only a plan with a list, and only an id of a listed model's shape.
  */
 export function planForTurn(plan: CodingPlan, value: unknown): CodingPlan {
   const { models } = plan.claudeCode;
-  if (!plan.modelsUrl || typeof value !== "string" || !LISTED_MODEL_ID.test(value)) return plan;
-  if (value === "auto" || isAlias(value) || /^claude-/.test(value) || models.some((m) => m.id === value)) return plan;
+  if (!plan.modelsUrl || !isListedModelId(value) || models.some((m) => m.id === value)) return plan;
   return { ...plan, claudeCode: { ...plan.claudeCode, models: [...models, { id: value, label: value }] } };
 }
 

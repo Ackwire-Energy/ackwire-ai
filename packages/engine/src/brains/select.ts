@@ -174,11 +174,11 @@ const MODEL_WINDOW_WORDS: readonly [RegExp, "seven_day" | "monthly"][] = [
 export type RefusalScope = { scope: "account" } | { scope: "model" | "region"; resetsAt?: string };
 
 /**
- * A plan refused the model for its region (OpenCode's Global setting), whatever the status it came with: models join
- * the plan's list without us knowing which are held back, so the words decide. Any other plan: no.
+ * A plan refused a model that needs its Global region for that, whatever the status it came with. Only those: the
+ * models OpenCode sells in "limited regions" are closed by country, which that setting can't open.
  */
 export const regionRefusal = (provider: string | null | undefined, model: string | null | undefined, message: string) =>
-  ownLimitsModel(provider, model) !== null && /region/i.test(message);
+  ownLimitsModel(provider, model)?.needs === "globalRegion" && /region/i.test(message);
 
 /**
  * Whose limit a plan's refusal (`message`, the CLI's words) is. On a plan whose models have limits of their own, the
