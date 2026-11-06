@@ -194,6 +194,36 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(stale()).toEqual([true, true]);
   });
 
+  test("the agents' screens refetch when the computer changes, so a browser card on one goes back to frames", () => {
+    const qc = new QueryClient();
+    const desk = keys.agentDesktop("o1", "a1");
+    const other = keys.agentDesktop("o1", "a2");
+    const stale = () => [desk, other].map((k) => qc.getQueryState(k)?.isInvalidated ?? false);
+    const fresh = () => {
+      qc.setQueryData(desk, { available: true });
+      qc.setQueryData(other, { available: true });
+    };
+    fresh();
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", name: "Mac" } as { type: string });
+    expect(stale()).toEqual([false, false]);
+    // Offline, its switches, its agents moving: every agent's screen.
+    applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: false } as { type: string });
+    expect(stale()).toEqual([true, true]);
+    fresh();
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", access: true } as { type: string });
+    expect(stale()).toEqual([true, true]);
+    fresh();
+    // An agent's own computer changing: that agent's screen.
+    applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1" } as { type: string });
+    expect(stale()).toEqual([true, false]);
+    // Never its picture: each one asked again is a capture on the computer.
+    const picture = keys.agentDesktopPicture("o1", "a1");
+    qc.setQueryData(picture, { picture: null });
+    applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: false } as { type: string });
+    applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1" } as { type: string });
+    expect(qc.getQueryState(picture)?.isInvalidated).toBe(false);
+  });
+
   test("a plan's usage moving on a computer refetches the agent list, which carries each plan's limits", () => {
     const qc = new QueryClient();
     const agents = keys.agents("o1");

@@ -1,17 +1,31 @@
 import type { OrgPlanUsage, PlanAccountInfo, PlanAccountUsage } from "@agenteschat/client";
 import { useApi, useModels, usePlanUsage } from "@agenteschat/client";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { planName } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf } from "@agenteschat/client/lib/providers";
-import { agentGradient, Card, CardHeader, Icon, Meter, PlanMeter, ProviderLogo } from "@agenteschat/ui";
+import {
+  agentGradient,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Icon,
+  Meter,
+  PlanMeter,
+  ProviderLogo,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { PlanHold, usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { useConnectAi, useMayConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { accountName, accountShares, brandOf, noWindowsText, planMeterText, splitUsage } from "@/lib/plan-usage";
 import "./plan-usage.css";
 
@@ -50,6 +64,10 @@ export function PlanUsageCards() {
   const { org } = useOrg();
   const api = useApi();
   const usage = usePlanUsage(org.id);
+  const look = useRightHandLook();
+  const connectAi = useConnectAi();
+  const mayConnect = useMayConnectAi();
+  const hold = usePlanHold();
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -80,15 +98,32 @@ export function PlanUsageCards() {
           title={t("usageViews.accounts.title")}
           hint={{ name: t("common.about", { label: t("usageViews.accounts.title") }), text: t("usageViews.estimate") }}
         />
-        {data.accounts.length === 0 ? (
-          <p className="plan-empty">{t("usageViews.accounts.empty")}</p>
+        {data.accounts.length === 0 && hold ? (
+          // What comes first, as in Contas de IA: an invitation to connect a plan would contradict it.
+          <PlanHold hold={hold} onKey={connectAi ? () => connectAi.open({ intent: "api_key" }) : undefined} />
+        ) : data.accounts.length === 0 ? (
+          <EmptyState
+            size="panel"
+            agent={look}
+            title={t("aiAccounts.page.emptyTitle")}
+            actions={
+              connectAi &&
+              mayConnect && (
+                <Button variant="primary" icon="plus" onClick={() => connectAi.open({})}>
+                  {t("aiAccounts.page.connect")}
+                </Button>
+              )
+            }
+          >
+            {t(mayConnect ? "usageViews.accounts.empty" : "aiAccounts.page.emptyViewer")}
+          </EmptyState>
         ) : (
           <div className="plan-machines">
             {[...machines].map(([machineId, list]) => (
               <div key={machineId} className="plan-machine">
                 <div className="plan-machine__name">
                   <Icon name="computer" size={14} />
-                  {list[0]?.machineName}
+                  {computerNameOf(t, org.name, list[0]?.machineName ?? "")}
                 </div>
                 {list.map((a) => (
                   <AccountBlock key={a.key} account={a} money={data.money} />

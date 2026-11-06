@@ -197,6 +197,8 @@ export interface User {
    * access allowed them; `org.create_refused` and `org.create_unpaid` can still refuse it).
    */
   canCreateWorkspace?: boolean;
+  /** They deleted this account: the apps show only its waiting screen. `dueAt` is null once the date passed. */
+  deletion?: { dueAt: string | null; requestedAt: string | null };
   /** The app's language for emails, pushes and every device (ADR 0122); null before any app said one. */
   locale?: string | null;
   /** The language follows each device's own (Automático) until the person picks one. */
@@ -2216,6 +2218,8 @@ export interface WorkView {
   finishedAt: string | null;
   nextUpdateAt: string | null;
   lastUpdate: { text: string; at: string; seq: number } | null;
+  /** Waiting on an answer: what its run asked, and the message that holds the card. */
+  question?: { text: string; messageId: string | null } | null;
   plan: { id: string; text: string; state: "todo" | "doing" | "done" }[];
   issue: { id: string; number: number } | null;
   resultMessageId: string | null;
@@ -5064,7 +5068,15 @@ export interface MissionSettings {
 export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
 /** Why a computer brain can't be chosen now. */
-export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
+export type BrainUnavailable =
+  | "no_computer"
+  | "exec_off"
+  | "runner_old"
+  | "tool_off"
+  | "not_installed"
+  | "outdated"
+  /** Its runner hasn't said which CLIs it has yet. */
+  | "not_reported";
 
 export interface BrainModelOption {
   /** What is stored (`opus`, `sonnet`, `haiku`, a Codex model). */
@@ -5230,6 +5242,8 @@ export interface AiComputer {
     antigravity?: boolean;
     key: boolean;
   };
+  /** Why a CLI of `brains` can't think there (absent: an older server). */
+  off?: Partial<Record<MachineAccountKind, BrainUnavailable>>;
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: {
     claude_code: boolean;
@@ -6693,6 +6707,8 @@ export interface DesktopStatus {
   controlRefusal?: "pairer" | "owner_plan" | "role" | "not_allowed" | null;
   /** The agent is held, or the workspace is on hold: people watch, nobody takes control. */
   held: boolean;
+  /** The agent's browser runs on this desktop (ADR 0058 §7). Absent from older servers. */
+  browserOnDesktop?: boolean;
 }
 
 /** `GET …/desktop/picture`: a recent picture of the agent's screen, or why there is none. */

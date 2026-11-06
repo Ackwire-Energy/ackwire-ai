@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EmptyState,
   Field,
   Input,
   Locked,
@@ -19,9 +20,11 @@ import {
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar, AgentWho } from "../AgentAvatar";
 import { AgentSwitches } from "../AgentSwitches";
+import { ErrorState, LoadingList } from "../Loading";
 import { useOrg } from "../org-context";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
@@ -283,6 +286,7 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
+  const look = useRightHandLook();
   const toast = useToast();
   const profiles = useBrowserProfiles(org.id);
   const actions = useBrowserProfileMutations(org.id);
@@ -308,7 +312,8 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
         subtitle={t("browser.profiles.sub")}
         action={
           manage &&
-          !outdated && (
+          !outdated &&
+          !(profiles.isSuccess && mine.length === 0) && (
             <Button size="sm" icon="plus" onClick={() => setOpen({ kind: "new" })}>
               {t("browser.profiles.new")}
             </Button>
@@ -317,8 +322,25 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
       />
       {outdated ? (
         <SettingNote icon="alert">{t("browser.profiles.outdated")}</SettingNote>
+      ) : profiles.isPending ? (
+        <LoadingList count={2} avatar={false} />
+      ) : profiles.isError && !profiles.data ? (
+        <ErrorState error={profiles.error} onRetry={() => void profiles.refetch()} />
       ) : mine.length === 0 ? (
-        <p className="small muted">{t("browser.profiles.empty")}</p>
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t("browser.profiles.emptyTitle")}
+          actions={
+            manage && (
+              <Button variant="primary" icon="plus" onClick={() => setOpen({ kind: "new" })}>
+                {t("browser.profiles.new")}
+              </Button>
+            )
+          }
+        >
+          {t(manage ? "browser.profiles.empty" : "browser.profiles.emptyViewer")}
+        </EmptyState>
       ) : (
         <div className="machine-page__agents pf-list">
           {mine.map((p) => {

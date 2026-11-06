@@ -562,7 +562,7 @@
           },
           "type": {
             "type": "string",
-            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deletion_requested`, `organization.deletion_canceled`, `organization.deleted`, `invitation.created`, `agent.created`, `agent.deleted`, `mail.sent`, `run.finished`, `run.hop_limit`, `task.finished`, `desktop_control.ended`, `content.viewed`, `platform_ai.threshold` or `account.failure` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
+            "description": "`user.signed_up`, `session.created`, `user.deletion_requested`, `user.deletion_canceled`, `user.deleted`, `organization.created`, `organization.deletion_requested`, `organization.deletion_canceled`, `organization.deleted`, `invitation.created`, `agent.created`, `agent.deleted`, `mail.sent`, `run.finished`, `run.hop_limit`, `task.finished`, `desktop_control.ended`, `content.viewed`, `platform_ai.threshold` or `account.failure` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
           },
           "orgId": {
             "type": ["string", "null"],
@@ -2712,7 +2712,7 @@
                   "items": {
                     "$ref": "#/components/schemas/OperatorAuthMethod"
                   },
-                  "description": "What a new Claude sign-in for all agents can use there: what its runner said (protocol 49), else what older runners do."
+                  "description": "What a new Claude sign-in for all agents can use there: what its runner said (protocol 50), else what older runners do."
                 },
                 "supportsSelected": {
                   "type": "boolean",

@@ -247,7 +247,7 @@ export const words: EmailWords = {
     ],
     account: (email) => [
       { b: email },
-      " hesabının tamamını silmek için bu kodu yazın, yalnızca bir çalışma alanını değil. Hesap hemen silinir ve yalnızca sizin bulunduğunuz çalışma alanları da onunla birlikte kapanır.",
+      " hesabının tamamını silmek için bu kodu yazın, yalnızca bir çalışma alanını değil. Hesabın oturumu her yerde hemen kapanır, hesap 7 gün sonra kalıcı olarak silinir ve yalnızca sizin bulunduğunuz çalışma alanları da onunla birlikte kapanır.",
     ],
     support: (address) => [
       "10 dakika geçerli ve bu kod olmadan hiçbir şey silinmez. Bu siz değilseniz kodu kimseyle paylaşmayın ve ",
@@ -292,6 +292,26 @@ export const words: EmailWords = {
     button: "Bağlı uygulamaları gör",
     why: (org) =>
       `Bu e-postayı, agentes.chat'te ${org} çalışma alanındaki hesabınıza bir uygulama bağlandığı için aldınız.`,
+  },
+  accountDeleting: {
+    subject: (day) => `agentes.chat hesabınız ${day} tarihinde silinecek`,
+    preheader: "Fikrinizi değiştirmek için 7 gününüz var.",
+    headline: "Hesabınız siliniyor",
+    body: (email, day, time) => [
+      { b: email },
+      ` hesabını ${day} ${time} tarihinde sileceğiz. Her yerde oturumu kapatıldı ve siz dönene kadar burada kimse size ulaşamaz.`,
+    ],
+    closes: (count, names) => [
+      plural("tr", count, {
+        one: "Yalnızca sizin bulunduğunuz çalışma alanı şimdi kapandı ve aynı tarihte silinecek: ",
+        other: "Yalnızca sizin bulunduğunuz çalışma alanları şimdi kapandı ve aynı tarihte silinecek: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Fikrinizi mi değiştirdiniz? Bu tarihten önce giriş yapın ve Geri yükle düğmesine basın.",
+    button: "Giriş yap ve geri yükle",
+    why: "Bu e-postayı, bu adresin agentes.chat’te bir hesabı olduğu için aldınız.",
   },
   accountDeleted: {
     subject: "agentes.chat hesabınız silindi",

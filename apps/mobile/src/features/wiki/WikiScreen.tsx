@@ -11,9 +11,9 @@ import {
   type WikiPageSummary,
   type WikiVersion,
 } from "@agenteschat/client";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { toggleTask } from "@agenteschat/client/lib/wiki";
+import { titleOfSlug, toggleTask } from "@agenteschat/client/lib/wiki";
 import { type DiffLine, diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -46,6 +46,7 @@ import { aroundStar, wikiMap } from "../constellation/logic";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
+import { FirstUse, useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { ActionList, copyText, goBack, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
@@ -157,12 +158,24 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           </View>
         ) : null}
         {tree.isSuccess && pages.length === 0 ? (
-          <EmptyState icon="file" title={t("wiki.emptyTitle")} subtitle={t("mobile.wiki.empty")} />
+          <FirstUse
+            place="wiki"
+            size="panel"
+            acts={writes}
+            label={t("wiki.newPage")}
+            onPress={() => newWikiPage(folder ? { folder } : {})}
+          />
         ) : null}
         {search ? (
           found.length === 0 ? (
             pages.length > 0 ? (
-              <EmptyState icon="search" title={t("wiki.noMatch")} />
+              <EmptyState
+                size="inline"
+                title={t("wiki.noMatch")}
+                action={
+                  <Button variant="secondary" size="sm" label={t("filters.clearSearch")} onPress={() => setQ("")} />
+                }
+              />
             ) : null
           ) : (
             <Animated.View key="found" {...fade}>
@@ -265,7 +278,7 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           <EmptyState icon="archive" title={t("mobile.wiki.folderGone")} />
         ) : null}
       </PushedLargeTitle>
-      {writes ? (
+      {writes && !(tree.isSuccess && pages.length === 0) ? (
         <PressScale
           accessibilityRole="button"
           accessibilityLabel={t("wiki.newPage")}
@@ -362,6 +375,7 @@ function WikiPage({ slug }: { slug: string }) {
   // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0085).
   const page = useWikiPage(orgId, slug);
   const writes = can(org, "edit_wiki") && page.data?.canEdit !== false;
+  const look = useEmptyLook();
   const admin = can(org, "configure");
   // Who sees a page: people who write the wiki and manage roles (the server checks the same).
   const choosesAudience = writes && can(org, "manage_roles");
@@ -538,8 +552,38 @@ function WikiPage({ slug }: { slug: string }) {
         {page.isError && !p ? (
           (page.error as { code?: string } | null)?.code === "wiki.no_access" ? (
             <EmptyState icon="lock" title={t("wiki.noAccessTitle")} subtitle={t("wiki.noAccessText")} />
+          ) : (page.error as { status?: number } | null)?.status === 404 ? (
+            <EmptyState
+              size="panel"
+              agent={look}
+              title={t("wiki.missingTitle")}
+              subtitle={t(writes ? "wiki.missingText" : "wiki.missingViewer")}
+              {...(writes
+                ? {
+                    action: (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon="plus"
+                        label={t("wiki.createPage")}
+                        onPress={() => newWikiPage({ title: capitalize(titleOfSlug(slug), i18n.language) })}
+                      />
+                    ),
+                  }
+                : {})}
+            />
           ) : (
-            <EmptyState icon="file" title={t("wiki.missingTitle")} subtitle={t("mobile.wiki.missing")} />
+            <View style={styles.center}>
+              <Text tone="muted" style={styles.centerText}>
+                {t("common.loadFailed")}
+              </Text>
+              <Button
+                variant="secondary"
+                size="sm"
+                label={t("mobile.common.retry")}
+                onPress={() => void page.refetch()}
+              />
+            </View>
           )
         ) : null}
         {p ? (

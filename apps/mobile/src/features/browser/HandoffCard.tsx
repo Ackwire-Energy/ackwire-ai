@@ -1,4 +1,5 @@
 import {
+  BROWSER_FPS,
   type BrowserHandoff,
   drivesOnDesktop,
   HANDOFF_OVER,
@@ -196,7 +197,8 @@ function HandoffAsk({
 /** The agent's page as it is now, to look at before taking it (watching only: taps do nothing). */
 function ScreenPeek({ agentId }: { agentId: string }) {
   const c = useColors();
-  const live = useLiveConnection(agentId, true);
+  // A small look before taking it: a frame a second is enough (ADR 0040 §7.1).
+  const live = useLiveConnection(agentId, true, BROWSER_FPS.preview);
   return (
     <View style={[styles.peek, { backgroundColor: c.sunken }]}>
       {live.frame ? (

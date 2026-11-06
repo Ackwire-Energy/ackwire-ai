@@ -93,7 +93,7 @@ describe("the DM's search is the channel's, held to the DM", () => {
     expect(panel.textContent).not.toContain("uma zebra no general");
     // Ir para lands on the message in the DM.
     await click(within(panel).getByRole("button", { name: "Ir para a mensagem de Ada" }));
-    expect(screen().queryByRole("complementary", { name: "Resultados da busca" })).toBeNull();
+    expect(screen().queryByRole("complementary", { name: "Resultados da busca" })).toBeTruthy();
     const row = document.querySelector(`article[data-message-id="m-${dm}"]`);
     expect(row?.classList.contains("ac-msg--focus")).toBe(true);
   });

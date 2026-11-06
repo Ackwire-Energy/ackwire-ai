@@ -6,6 +6,7 @@ setupDom();
 import type { AgentBrain, AiStatus, MachineAccount, MachineAccountKind, Message } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { aiSelect, chooseAi, closeAiSelect, openAiSelect, payWith } from "./ai-picker";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, NOW, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -75,9 +76,6 @@ const cardRow = () =>
     .getAllByRole("article")
     .find((a) => a.querySelector(".waitcard")) as HTMLElement;
 const dialog = (name: string | RegExp) => screen().queryByRole("dialog", { name });
-/** The picker's option of this name, in an open Connect dialog. */
-const option = (box: HTMLElement, name: RegExp) =>
-  within(within(box).getByRole("group", { name: "Qual IA eles vão usar?" })).getByRole("button", { name });
 /** The computer's own sign-in isn't Walter's here: a plan signs in from the page. */
 const noOwnSignIn = (api: ReturnType<typeof createFakeApi>) => {
   const brain = api.agents.brain;
@@ -127,17 +125,12 @@ describe("no AI connected: above the composer", () => {
     );
     await click(within(shown as HTMLElement).getByRole("button", { name: "Conectar uma IA" }), 6);
     const first = dialog("Conectar uma IA") as HTMLElement;
-    for (const name of [
-      /^Claude$/,
-      /^ChatGPT$/,
-      /^GLM Coding$/,
-      /^Kimi Code$/,
-      /^MiniMax$/,
-      /^OpenCode Go$/,
-      /^Chave de API/,
-    ])
-      expect(option(first, name)).toBeTruthy();
-    expect(option(first, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    expect((await openAiSelect(first)).map((o) => o.textContent)).toEqual(
+      expect.arrayContaining(["Claude", "ChatGPT", "GLM Coding", "Kimi Code", "MiniMax", "OpenCode Go"]),
+    );
+    await closeAiSelect();
+    expect(payWith(first, "Com chave de API")).toBeTruthy();
+    expect(aiSelect(first).textContent).toBe("Claude");
     // Ada is Walter's and has no AI: the plan is for her (Atlas isn't his), on the MacBook he connected.
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
@@ -162,7 +155,7 @@ describe("no AI connected: above the composer", () => {
     await settle(8);
     expect(router.state.location.search).toEqual({});
     const first = dialog("Conectar uma IA") as HTMLElement;
-    expect(option(first, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    expect(aiSelect(first).textContent).toBe("Claude");
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
     // Without the computer's name, in a group of its own over a hairline: never read as part of the account.
     expect(panel.querySelector(".ai-panel__ready")?.textContent).toBe("O computador está pronto.");
@@ -184,10 +177,10 @@ describe("no AI connected: above the composer", () => {
     await open(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }));
     await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar uma IA" }));
     const first = dialog("Conectar uma IA") as HTMLElement;
-    expect(option(first, /^Chave de API/).getAttribute("aria-pressed")).toBe("true");
+    expect(payWith(first, "Com chave de API").getAttribute("aria-checked")).toBe("true");
     expect(within(first).getByRole("region", { name: "Chave de API" })).toBeTruthy();
     // Every option stays in view, never locked: with no computer yet, the plan's panel offers connecting one.
-    await click(option(first, /^Claude$/));
+    await chooseAi(first, "Claude");
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("As contas ficam num computador conectado. Conecte um seu primeiro.");
     expect(within(panel).getByRole("button", { name: "Conectar um computador" })).toBeTruthy();
@@ -233,7 +226,7 @@ describe("no AI connected: above the composer", () => {
     await settle(5);
     await click(screen().getByRole("button", { name: "Conectar uma IA" }), 6);
     const box = dialog("Conectar uma IA") as HTMLElement;
-    expect(option(box, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    expect(aiSelect(box).textContent).toBe("Claude");
     const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Os agentes que você criar pensam com ele.");
     const realOpen = window.open;
@@ -311,7 +304,7 @@ describe("no AI connected: above the composer", () => {
       const mac = machines.pair({ name: "MacBook da Ana", pairedBy: { id: "u-ana", name: "Ana Souza" } });
       return { accounts: [], computers: [{ ...SERVER, machineId: mac.id, name: "MacBook da Ana", canAdd: false }] };
     });
-    await click(option(box, /^Claude$/));
+    await chooseAi(box, "Claude");
     await settle(4);
     const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Só Ana conecta um plano no MacBook da Ana.");
@@ -372,13 +365,12 @@ describe("no AI connected: above the composer", () => {
     await open(state, `agents/${ADA_ID}`);
     await click(screen().getByRole("button", { name: "Sem IA" }), 6);
     const chip = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(option(chip, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
-    expect(option(chip, /^Claude$/).getAttribute("aria-pressed")).toBe("false");
+    expect(aiSelect(chip).textContent).toBe("ChatGPT");
     await click(within(chip).getByRole("button", { name: "Fechar" }));
     const work = screen().getByRole("region", { name: "Como trabalha" });
     await click(within(work).getByRole("button", { name: "Conectar uma IA" }), 6);
     const cell = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(option(cell, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
+    expect(aiSelect(cell).textContent).toBe("ChatGPT");
   });
 });
 
@@ -412,10 +404,9 @@ describe("the agent's no-AI card", () => {
     expect(row.textContent).not.toContain("Ainda não consigo responder");
     await click(within(row).getByRole("button", { name: "Conectar" }));
     const add = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    // The key row, on the maker the message named.
-    expect(option(add, /^Chave de API/).getAttribute("aria-pressed")).toBe("true");
-    const makers = within(add).getByRole("group", { name: "Provedor" });
-    expect(within(makers).getByRole("button", { name: "OpenAI" }).getAttribute("aria-pressed")).toBe("true");
+    // The key, on the maker the message named.
+    expect(payWith(add, "Com chave de API").getAttribute("aria-checked")).toBe("true");
+    expect(aiSelect(add, "Provedor").textContent).toBe("OpenAI");
     expect(within(add).getByRole("link", { name: "Abrir platform.openai.com" }).getAttribute("href")).toBe(
       "https://platform.openai.com/api-keys",
     );
@@ -462,7 +453,7 @@ describe("the agent's no-AI card", () => {
     await settle(5);
     await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(option(plan, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    expect(aiSelect(plan).textContent).toBe("Claude");
     // Choosing a plan asks nothing: she then answers only him until he turns on Atende outras pessoas (ADR 0059 §5).
     expect(within(plan).getByRole("switch", { name: "Atende outras pessoas" }).getAttribute("aria-checked")).toBe(
       "false",
@@ -528,7 +519,7 @@ describe("the agent's no-AI card", () => {
     expect(row.textContent).not.toContain("não tem uma IA");
     await click(within(row).getByRole("button", { name: "Entrar de novo" }), 8);
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(option(plan, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    expect(aiSelect(plan).textContent).toBe("Claude");
     const realOpen = window.open;
     window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
     try {
@@ -551,7 +542,7 @@ describe("the agent's no-AI card", () => {
     await settle(5);
     await click(within(cardRow()).getByRole("button", { name: "Entrar de novo" }), 8);
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(option(plan, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
+    expect(aiSelect(plan).textContent).toBe("ChatGPT");
     expect(within(plan).queryByRole("button", { name: "Entrar com Claude" })).toBeNull();
     const realOpen = window.open;
     window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
@@ -590,7 +581,7 @@ describe("the agent's no-AI card", () => {
     expect(within(row).queryByRole("button", { name: "Entrar de novo" })).toBeNull();
     await click(within(row).getByRole("button", { name: "Conectar" }), 8);
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(option(plan, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
+    expect(aiSelect(plan).textContent).toBe("ChatGPT");
     // Nothing of that computer's to share: ChatGPT's own sign-in, from here.
     expect(within(plan).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
     expect(within(plan).getByRole("button", { name: "Entrar com ChatGPT" })).toBeTruthy();
@@ -622,7 +613,7 @@ describe("the agent's no-AI card", () => {
     );
     expect(panel.textContent?.split("pronto")).toHaveLength(2);
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(true);
-    await click(option(plan, /^Chave de API/));
+    await click(payWith(plan, "Com chave de API"));
     expect(within(plan).getByRole("region", { name: "Chave de API" })).toBeTruthy();
   });
 
@@ -638,8 +629,9 @@ describe("the agent's no-AI card", () => {
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     const panel = within(plan).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.querySelector("[aria-busy='true']")).toBeNull();
-    expect(panel.textContent).toContain("As contas ficam num computador conectado.");
-    expect(within(panel).getByRole("button", { name: "Conectar um computador" })).toBeTruthy();
+    expect(panel.textContent).toContain("não vai mudar sozinho");
+    expect(within(panel).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
+    expect(within(panel).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
   });
 
   test("its views don't load: the plan's panel says so with Tentar de novo, which asks again", async () => {
@@ -770,7 +762,6 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
       "Claude Pessoal · MaxTambém usada por Atlas",
       "ChatGPT PlusTambém usada por Atlas",
       "Claude da AcmeClaude · termina em 7f2aPago por uso. Conta no orçamento da Ada.",
-      "Claude",
     ]);
     expect(within(picker).getByText("Ou conecte outra")).toBeTruthy();
     await click(within(picker).getByRole("button", { name: /^Claude Team/ }), 8);
@@ -809,8 +800,8 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     await click(also);
     expect(also.getAttribute("aria-pressed")).toBe("true");
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
-    // Its plan's panel right under it, no tile chosen besides it: nothing comes between a row and its steps.
-    expect(option(box, /^Claude$/).getAttribute("aria-pressed")).toBe("false");
+    // Its plan's panel right under it, nothing chosen in the select: nothing comes between a row and its steps.
+    expect(aiSelect(box).textContent).toBe("Escolha um plano");
     expect(also.nextElementSibling?.getAttribute("aria-label")).toBe("Seu plano do Claude");
     await signInWithClaude(box);
     expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([
@@ -842,8 +833,10 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     await click(also);
     await click(within(box).getByRole("button", { name: "Usar uma chave de API agora" }));
     expect(also.getAttribute("aria-pressed")).toBe("false");
-    expect(option(box, /^Chave de API/).getAttribute("aria-pressed")).toBe("true");
-    expect(picker.nextElementSibling?.getAttribute("aria-label")).toBe("Chave de API");
+    expect(payWith(box, "Com chave de API").getAttribute("aria-checked")).toBe("true");
+    expect(aiSelect(box, "Provedor").closest(".ac-select")?.nextElementSibling?.getAttribute("aria-label")).toBe(
+      "Chave de API",
+    );
   });
 
   test("a free login signed out, signed in again under its row: once she thinks with it, it leaves the list and the panel stays, saying so", async () => {
@@ -927,7 +920,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
     expect(within(picker).getByRole("button", { name: /^Claude da Acme/ })).toBeTruthy();
     // A plan for her is João's to connect, as his account is his to pick.
-    await click(option(box, /^Claude$/));
+    await chooseAi(box, "Claude");
     expect(box.textContent).toContain(
       "Quem conecta a IA de Ada: um admin, com uma chave de API, ou João, com o próprio plano.",
     );
@@ -1124,7 +1117,7 @@ describe("the dialog opens by itself only when Jev is sure, for the author, once
     expect(dialog("Conectar uma IA")).toBeNull();
     await push(socket, routed(mine.id, { intent: "chatgpt", autoOpen: true }));
     const plan = dialog("Conectar uma IA") as HTMLElement;
-    expect(option(plan, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
+    expect(aiSelect(plan).textContent).toBe("ChatGPT");
     expect(within(plan).getByRole("region", { name: "Seu plano do ChatGPT" })).toBeTruthy();
     await click(within(plan).getByRole("button", { name: "Fechar" }));
     expect(dialog("Conectar uma IA")).toBeNull();
@@ -1148,7 +1141,7 @@ describe("the dialog opens by itself only when Jev is sure, for the author, once
     }
     await created("c-mine", { intent: "api_key", autoOpen: true });
     const key = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(option(key, /^Chave de API/).getAttribute("aria-pressed")).toBe("true");
+    expect(payWith(key, "Com chave de API").getAttribute("aria-checked")).toBe("true");
   });
 });
 

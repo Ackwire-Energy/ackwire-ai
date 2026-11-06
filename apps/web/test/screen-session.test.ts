@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -74,14 +74,14 @@ class FakeRfb extends Listeners {
 
 const opened: ScreenSession[] = [];
 
-function setup() {
+function setup(o: { preview?: boolean } = {}) {
   const target = document.createElement("div");
   const sockets: FakeSocket[] = [];
   const rfbs: FakeRfb[] = [];
   const events: ScreenEvent[] = [];
   const session = new ScreenSession(
     target,
-    { orgId: "org", agentId: "ada", base: { protocol: "https:", host: "app.example" } },
+    { orgId: "org", agentId: "ada", base: { protocol: "https:", host: "app.example" }, ...o },
     {
       createRfb: (_el, channel) => {
         const rfb = new FakeRfb(channel);
@@ -214,5 +214,48 @@ describe("the agent's screen on the phone's page", () => {
     session.set({ connect: true, mode: "control" });
     expect(sockets).toHaveLength(2);
     expect(sockets[1]?.url).toContain("mode=control");
+  });
+});
+
+describe("a browser card's view of the screen on the phone (ADR 0058 §7)", () => {
+  test("p=1: a watch-only socket that never switches, whatever mode the app asks for", () => {
+    const { session, sockets, rfbs } = setup({ preview: true });
+    session.set({ connect: true, mode: "control" });
+    expect(sockets[0]?.url).toContain("preview=1&mode=watch");
+    expect(sockets[0]?.url).not.toContain("switch=1");
+    expect(rfbs[0]?.viewOnly).toBe(true);
+    // Asking for control again opens nothing new: it was watching already.
+    session.set({ connect: true, mode: "control" });
+    expect(sockets).toHaveLength(1);
+    rfbs[0]?.connects();
+    session.pointer(10, 10, 1);
+    expect(sockets[0]?.sent).toEqual([]);
+  });
+
+  test("anything but a drop gives up at once; drops are tried again 3 times, then it says offline", () => {
+    const busy = setup({ preview: true });
+    busy.session.set({ connect: true, mode: "watch" });
+    busy.sockets[0]?.serverCloses(4429, "preview_yield");
+    expect(busy.events).toContainEqual({ type: "view", state: "busy" });
+    // A screen that isn't running: the card goes back to frames, nothing starts it.
+    const off = setup({ preview: true });
+    off.session.set({ connect: true, mode: "watch" });
+    off.sockets[0]?.serverCloses(4502, "desktop_off");
+    expect(off.events).toContainEqual({ type: "view", state: "ended" });
+
+    // Each retry at once, so the test needn't wait for them.
+    const timers = spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => {
+      fn();
+      return 0;
+    }) as unknown as typeof setTimeout);
+    try {
+      const { session, sockets, events } = setup({ preview: true });
+      session.set({ connect: true, mode: "watch" });
+      for (let i = 0; i < 4; i++) sockets.at(-1)?.serverCloses(1006);
+      expect(sockets).toHaveLength(4);
+      expect(events.filter((e) => e.type === "view").at(-1)).toEqual({ type: "view", state: "offline" });
+    } finally {
+      timers.mockRestore();
+    }
   });
 });

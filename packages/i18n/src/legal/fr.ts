@@ -8,7 +8,7 @@ export const legalFr: Partial<Record<LegalKind, LegalDocument>> = {
       "Le contrat d'utilisation d'agentes.chat : votre espace de travail, vos agents et les responsabilités de chaque partie.",
     courtesy:
       "Ceci est une traduction de courtoisie. En cas de divergence avec la version anglaise, la version anglaise prévaut.",
-    updated: "2026-11-04",
+    updated: "2026-11-06",
     sections: [
       {
         id: "agreement",
@@ -122,7 +122,7 @@ export const legalFr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Durée et résiliation",
         blocks: [
-          "Vous pouvez cesser d'utiliser le Service et supprimer votre compte à tout moment dans l'application. Nous pouvons suspendre ou mettre fin à votre accès en cas de manquement substantiel aux présentes Conditions, lorsque la loi l'exige, ou moyennant un préavis de 30 jours si nous cessons d'exploiter le Service. Lorsque nous mettons fin au Service pour des raisons autres que votre manquement, nous mettrons votre Contenu de l'Espace de travail à votre disposition pour exportation pendant 30 jours, puis le supprimerons comme décrit dans la Politique de confidentialité. Les sections qui, par leur nature, survivent à la résiliation (notamment les sections 6, 9, 11, 13, 14 et 15) demeurent en vigueur.",
+          "Vous pouvez cesser d'utiliser le Service et supprimer votre compte à tout moment dans l'application. Il est supprimé 7 jours plus tard, et vous pouvez le restaurer d'ici là. Nous pouvons suspendre ou mettre fin à votre accès en cas de manquement substantiel aux présentes Conditions, lorsque la loi l'exige, ou moyennant un préavis de 30 jours si nous cessons d'exploiter le Service. Lorsque nous mettons fin au Service pour des raisons autres que votre manquement, nous mettrons votre Contenu de l'Espace de travail à votre disposition pour exportation pendant 30 jours, puis le supprimerons comme décrit dans la Politique de confidentialité. Les sections qui, par leur nature, survivent à la résiliation (notamment les sections 6, 9, 11, 13, 14 et 15) demeurent en vigueur.",
         ],
       },
       {
@@ -175,7 +175,7 @@ export const legalFr: Partial<Record<LegalKind, LegalDocument>> = {
       "Ce que nous collectons, ce que les agents envoient et à qui, qui peut voir votre espace de travail, et les droits dont vous disposez.",
     courtesy:
       "Ceci est une traduction de courtoisie. En cas de divergence avec la version anglaise, la version anglaise prévaut.",
-    updated: "2026-11-04",
+    updated: "2026-11-06",
     sections: [
       {
         id: "overview",
@@ -265,7 +265,7 @@ export const legalFr: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Données de compte :** pendant toute la durée de vie du compte. Lorsque vous supprimez votre compte dans l'application, il est supprimé immédiatement et disparaît de nos sauvegardes dans un délai de 30 jours, à l'exception des enregistrements que la loi nous impose de conserver. Tout espace de travail dont vous étiez l'unique membre est fermé au même moment, et son contenu est supprimé 7 jours plus tard comme décrit ci-après. Les espaces de travail dont vous faisiez partie conservent votre nom et votre adresse e-mail dans leurs journaux d'audit aussi longtemps que chacun d'eux existe.",
+              "**Données de compte :** pendant toute la durée de vie du compte. Lorsque vous supprimez votre compte dans l'application, il est déconnecté partout immédiatement et supprimé 7 jours plus tard, sauf si vous le restaurez avant, et disparaît de nos sauvegardes dans un délai de 30 jours après cela, à l'exception des enregistrements que la loi nous impose de conserver. Tout espace de travail dont vous étiez l'unique membre est fermé au même moment, et son contenu est supprimé 7 jours plus tard comme décrit ci-après. Les espaces de travail dont vous faisiez partie conservent votre nom et votre adresse e-mail dans leurs journaux d'audit aussi longtemps que chacun d'eux existe.",
               "**Contenu de l'Espace de travail :** pendant toute la durée de vie de l'espace de travail, et moins longtemps lorsque l'espace de travail supprime un contenu déterminé. Lorsque l'abonnement agentes.chat d'un espace de travail prend fin, son contenu reste disponible pendant 90 jours, puis est supprimé. Lorsqu'un propriétaire supprime un espace de travail, celui-ci est fermé pour tous immédiatement et son contenu est supprimé 7 jours plus tard, sauf si un propriétaire le restaure avant cette date, puis disparaît de nos sauvegardes dans les 30 jours qui suivent, à l'exception du contenu que nous devons conserver en vertu de la loi ou à titre de preuve d'abus (voir ci-dessous).",
               "**Journaux :** journaux de requêtes et de sécurité pendant 90 jours au maximum. Les enregistrements d'utilisation des modèles (jetons et coût) pendant toute la durée de vie de l'espace de travail, car les budgets et les rapports d'utilisation en dépendent.",
               "**Données de facturation :** tant que vous payez pour un espace de travail, puis aussi longtemps que l'exige la législation fiscale et comptable.",

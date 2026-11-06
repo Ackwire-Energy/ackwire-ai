@@ -196,7 +196,6 @@
       "active": "Berjalan",
       "proposed": "Diusulkan"
     },
-    "empty": "Belum ada obrolan.",
     "sayHi": "Sapa {{name}}.",
     "channelEmpty": "Belum ada pesan. Mulai percakapannya.",
     "closed": "Ditutup",
@@ -243,7 +242,6 @@
     "channelFine": "Untuk tim atau topik.",
     "chatSearch": "Cari orang atau agen",
     "people": "Orang",
-    "nobody": "Belum ada siapa pun di sini.",
     "search": "Orang atau agen",
     "create": "Buat",
     "agentHint": "Nama dan tugasnya",
@@ -291,7 +289,6 @@
     "switchNone": "Tidak ada percakapan dengan nama itu.",
     "switchWorking": "sedang bekerja",
     "join": "Gabung ke kanal",
-    "empty": "Belum ada yang menulis di sini.",
     "sending": "Mengirim…",
     "failed": "Tidak terkirim · Coba lagi",
     "notSent": "Pesan tidak terkirim.",
@@ -629,9 +626,7 @@
     "section": {
       "missions": "Misi",
       "threads": "Utas"
-    },
-    "empty": "Belum ada utas atau misi",
-    "emptyHint": "Tahan pesan untuk membalas di utas atau menjadikannya misi."
+    }
   },
   "agents": {
     "title": "Agen",
@@ -644,9 +639,6 @@
     "create": "Buat agen",
     "created": "{{name}} bergabung dengan tim",
     "createFailed": "Tidak bisa membuat agen. Mungkin nama itu sudah dipakai.",
-    "empty": "Belum ada agen.",
-    "noneForYou": "Belum ada agen yang bekerja denganmu.",
-    "noneForYouHint": "Minta akses ke admin.",
     "freeSection": "Senggang",
     "noGroupSection": "Tanpa departemen"
   },
@@ -913,6 +905,8 @@
     }
   },
   "delete": {
+    "intro": "Ini tidak bisa dibatalkan.",
+    "introGrace": "Kamu punya 7 hari untuk berubah pikiran.",
     "goes": {
       "account": "Akunmu, aksesmu, dan sesimu akan hilang.",
       "orgs": "Ruang kerja yang anggotanya hanya kamu akan dihapus.",
@@ -991,8 +985,6 @@
       "canceled": "Dibatalkan"
     },
     "until": "tenggat {{date}}",
-    "empty": "Tidak ada tugas di sini",
-    "emptyOpen": "Kamu juga bisa memintanya di obrolan.",
     "loadFailed": "Tidak bisa memuat tugas.",
     "createdBy": "dibuat oleh {{name}}",
     "fromMessage": "dari pesan",
@@ -1066,8 +1058,6 @@
       "file": "File"
     },
     "by": "{{name}} · {{when}}",
-    "empty": "Belum ada apa pun di Drive",
-    "emptySub": "Yang dibuat atau dikirim agen dan orang di obrolan muncul di sini.",
     "noResults": "Tidak ada hasil dengan filter ini.",
     "loadFailed": "Tidak bisa memuat Drive.",
     "more": "Tampilkan lainnya"
@@ -1084,8 +1074,6 @@
     "recent": "Baru dipelajari",
     "mostUsed": "Paling sering dipakai",
     "noMatch": "Tidak ada memori yang cocok.",
-    "emptyTitle": "Belum ada yang dipelajari",
-    "empty": "Selagi bekerja denganmu, agen menyimpan yang mereka pelajari di sini.",
     "gone": "Memori ini sudah tidak ada.",
     "of": "Memori {{name}}",
     "line_other": "{{name}} · dipakai {{count}} kali",
@@ -1104,8 +1092,6 @@
     "mapAgent": "Agen yang membaca halaman minggu ini",
     "usedBy": "Agen yang memakainya",
     "readsWeek_other": "{{count}} kali dibaca minggu ini",
-    "empty": "Ketuk Halaman baru untuk menulis yang pertama.",
-    "missing": "Halaman ini sudah tidak ada atau sudah diganti namanya.",
     "blank": "Halaman kosong.",
     "folderGone": "Folder ini sudah tidak berisi halaman.",
     "reads_other": "{{count}} kali",
@@ -1407,7 +1393,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Hapus",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Panah kiri",
+        "ArrowUp": "Panah atas",
+        "ArrowDown": "Panah bawah",
+        "ArrowRight": "Panah kanan"
       },
       "unavailable": {
         "reconnectingF": "Menghubungkan ulang…",
@@ -1460,8 +1450,6 @@
     "connected": "Terhubung",
     "suggested": "Disarankan untuk {{org}}",
     "all": "Semua",
-    "empty": "Agenmu belum memakai apa pun",
-    "emptySub": "Hubungkan layanan dan mereka mulai membaca dan mengerjakan sesuatu di sana.",
     "noResults": "Tidak ada layanan dengan nama itu. Coba alamatnya.",
     "soon": "Segera",
     "loadFailed": "Tidak bisa memuat konektor.",
@@ -1589,11 +1577,8 @@
   },
   "ai": {
     "yourPlan": "Paket AI-mu",
-    "coding": "Paket coding",
-    "codingSub": "GLM, Kimi, MiniMax, atau OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM, dan lainnya",
     "plansFoot": "Agen berpikir dengan paketmu, tanpa perlu kunci API. Paket masuk di komputer agen.",
-    "whichPlan": "Paket yang mana",
-    "codingFoot": "Paket coding masuk dengan kuncinya sendiri, di komputer agen.",
     "change": "Ganti",
     "how": "Cara menghubungkan",
     "whose": "Kunci milik siapa",
@@ -1677,13 +1662,6 @@
       "login": "Situs web, nama pengguna, dan kata sandi. Agen masuk tanpa melihat kata sandinya.",
       "key": "Kunci API atau token. Agen memakainya dalam perintah tanpa melihatnya.",
       "contact": "Nama, perusahaan, email, telepon, dan alamat yang diisi agen di formulir."
-    },
-    "empty": {
-      "personalTitle": "Belum ada milikmu",
-      "personalText": "Simpan login atau kunci di sini, dan agenmu menggunakannya saat kamu minta.",
-      "teamTitle": "Belum ada yang dibagikan",
-      "teamText": "Simpan login dan kunci yang digunakan agenmu untuk tim.",
-      "teamReadText": "Saat seseorang membagikan login atau kunci kepadamu, item itu muncul di sini."
     },
     "import": {
       "title": "Impor dari komputer",
@@ -1947,5 +1925,127 @@
   "team": {
     "entry": "Daftar, bagan organisasi, dan peta",
     "mapHint": "Untuk memindahkan agen ke kanal lain, pakai peta di web atau bicara dengan {{name}}."
+  },
+  "empty": {
+    "agents": {
+      "title": "Bentuk tim agenmu",
+      "text": "Setiap agen mengambil satu peran dan bekerja bersamamu langsung di obrolan.",
+      "viewerTitle": "Tim agenmu ada di sini",
+      "viewerText": "Orang yang membuat agen di ruang kerja ini menambahkan yang pertama, lalu muncul di sini."
+    },
+    "agentsForYou": {
+      "title": "Agenmu muncul di sini",
+      "text": "Orang yang mengelola agen memilih agen mana yang bekerja denganmu."
+    },
+    "drive": {
+      "title": "Semua yang dibuat tim, di satu tempat",
+      "text": "Laporan, tabel, dan file dari agen dan orang tersimpan di sini, mudah ditemukan.",
+      "viewerTitle": "Temukan yang dibuat tim",
+      "viewerText": "Yang dibuat agen dan orang di obrolan muncul di sini."
+    },
+    "tasks": {
+      "title": "Serahkan pekerjaan ke tim",
+      "text": "Buat tugas untuk agen atau orang dan pantau sampai selesai.",
+      "viewerTitle": "Ikuti pekerjaan tim",
+      "viewerText": "Tugas muncul di sini begitu seseorang membuat yang pertama."
+    },
+    "routines": {
+      "title": "Serahkan pekerjaan berulang ke agenmu",
+      "text": "Rutinitas berjalan sendiri, sesuai jadwal atau saat sesuatu terjadi.",
+      "viewerTitle": "Lihat yang berjalan sendiri",
+      "viewerText": "Orang yang mengelola rutinitas atau punya agen membuatnya, lalu muncul di sini."
+    },
+    "wiki": {
+      "title": "Simpan yang perlu diketahui tim",
+      "text": "Orang dan agen membaca halaman ini, jadi semua bekerja dengan informasi yang sama.",
+      "viewerTitle": "Cari yang diketahui tim",
+      "viewerText": "Orang yang mengedit wiki menulis halaman pertama, lalu muncul di sini."
+    },
+    "memory": {
+      "title": "Agenmu belajar sambil bekerja",
+      "text": "Yang mereka tangkap dari obrolan tersimpan di sini, jadi kamu bisa melihat yang mereka tahu.",
+      "ask": "Aku mau cerita cara kami bekerja di sini.",
+      "noneForAgent": "Tidak ada ingatan dari agen ini."
+    },
+    "threads": {
+      "title": "Setiap topik di percakapannya sendiri",
+      "text": "Tahan pesan untuk membalas di utas atau menjadikannya misi.",
+      "action": "Buka Obrolan"
+    },
+    "chats": {
+      "title": "Mengobrol dengan agenmu",
+      "text": "Minta sesuatu di obrolan dan agen mulai bekerja.",
+      "action": "Obrolan baru"
+    },
+    "channels": {
+      "title": "Kumpulkan orang dan agen di satu kanal",
+      "text": "Setiap kanal mengumpulkan siapa pun yang mengurus satu topik.",
+      "viewerTitle": "Kanal tim ada di sini",
+      "viewerText": "Orang yang membuat kanal membuka yang pertama, lalu muncul di sini.",
+      "action": "Buat kanal"
+    },
+    "people": {
+      "title": "Bekerja bersama timmu di sini",
+      "text": "Undang orang untuk mengobrol dengan mereka dan agenmu di satu tempat.",
+      "viewerTitle": "Timmu muncul di sini",
+      "viewerText": "Orang yang mengundang membawa anggota tim lainnya, lalu mereka muncul di sini."
+    },
+    "chat": {
+      "title": "Semua dimulai dari satu pesan",
+      "text": "Tulis di bawah dan semua orang di sini akan melihatnya.",
+      "viewerTitle": "Pesan muncul di sini",
+      "viewerText": "Saat ada yang menulis, kamu membacanya di sini."
+    },
+    "ai": {
+      "title": "Beri agenmu AI untuk berpikir",
+      "text": "Hubungkan paket yang sudah kamu bayar dan mereka mulai bekerja dengannya."
+    },
+    "vaultPersonal": {
+      "title": "Simpan login-mu dengan aman",
+      "text": "Simpan login atau kunci dan agenmu memakainya saat kamu minta."
+    },
+    "vaultTeam": {
+      "title": "Bagikan login tanpa mengoper kata sandi",
+      "text": "Simpan login dan kunci yang digunakan agenmu untuk tim.",
+      "viewerTitle": "Login tim muncul di sini",
+      "viewerText": "Saat seseorang membagikan login atau kunci denganmu, itu muncul di sini."
+    },
+    "skills": {
+      "title": "Ajari agenmu cara kalian bekerja",
+      "text": "Skill menyimpan langkah suatu tugas, dan agen membukanya saat perlu."
+    },
+    "apps": {
+      "title": "Minta ke agenmu dari aplikasi lain",
+      "text": "Hubungkan Claude atau aplikasi lain dan minta tugas tanpa keluar darinya."
+    },
+    "access": {
+      "title": "Pilih yang boleh dipakai tiap agen",
+      "text": "Hubungkan layanan dan atur akses tiap agen di sini.",
+      "viewerTitle": "Akses tiap agen muncul di sini",
+      "viewerText": "Orang yang mengelola konektor menghubungkan layanan pertama.",
+      "action": "Hubungkan layanan"
+    },
+    "board": {
+      "title": "Lihat yang penting di satu dasbor",
+      "text": "Tambahkan widget, minta ke agen, atau sematkan blok dari obrolan.",
+      "viewerTitle": "Dasbor ini sedang terbentuk",
+      "viewerText": "Orang yang mengedit dasbor ini menambahkan widget, lalu muncul di sini."
+    },
+    "computers": {
+      "title": "Beri agenmu komputer lain",
+      "text": "Hubungkan dengan kode Mac mini di rumah atau server lain.",
+      "viewerTitle": "Komputer lain muncul di sini",
+      "viewerText": "Orang yang menghubungkan komputer menambahkannya, lalu muncul di sini."
+    },
+    "connectors": {
+      "title": "Beri agenmu alat sungguhan",
+      "text": "Hubungkan layanan dan mereka mulai membaca dan bertindak di sana.",
+      "viewerTitle": "Alat agenmu muncul di sini",
+      "viewerText": "Orang yang mengelola konektor menghubungkan layanan di bawah."
+    },
+    "audit": {
+      "title": "Tidak ada yang perlu ditinjau",
+      "text": "Saat agen melakukan sesuatu di luar percakapan, itu muncul di sini."
+    }
   }
 }

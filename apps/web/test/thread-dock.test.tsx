@@ -111,9 +111,12 @@ test("over the agent's page with unsaved edits, opening a thread beside it asks 
   const side = screen().getByRole("complementary", { name: "Perfil da Ada" });
   expect(side.classList.contains("thread-panel--docked")).toBe(true);
   expect(thread()).toBeNull();
-  // Radix tabs activate on mouse down.
-  const tab = within(side).getByRole("tab", { name: /^Configurações/ });
-  await act(async () => fireEvent.mouseDown(tab, { button: 0 }));
+  // Configurações is in the tabs' More menu (Radix opens it on pointer down).
+  await act(async () =>
+    fireEvent.pointerDown(within(side).getByRole("button", { name: /^Mais$/ }), { button: 0, ctrlKey: false }),
+  );
+  await settle(2);
+  await click(within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: /^Configurações/ }));
   await settle(4);
   await click(within(within(side).getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
   await click(screen().getByRole("button", { name: /^Mensagens fixadas \(/ }));

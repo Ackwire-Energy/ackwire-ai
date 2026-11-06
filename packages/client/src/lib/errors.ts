@@ -180,6 +180,8 @@ const KNOWN = {
   "invitation.ask_to_join": "errors.invitation.askToJoin",
   "org.create_invite_only": "errors.org.createInviteOnly",
   "org.not_restorable": "errors.org.notRestorable",
+  "account.not_restorable": "errors.account.notRestorable",
+  "issue.assignee_outside": "errors.issue.assigneeOutside",
   [REAUTH_PASSWORD]: "errors.reauth.password",
   [REAUTH_SIGN_IN]: "errors.reauth.signIn",
   EARLY_ACCESS_OTHER_EMAIL: "auth.earlyAccess.otherEmail",
@@ -649,6 +651,9 @@ const KEY_FAILURES = new Set([
   "run.credential_revoked",
   "run.credential_wrong_provider",
   "run.provider_account",
+  "run.provider_no_credit",
+  "run.provider_invalid_key",
+  "run.provider_no_access",
 ]);
 
 /**
@@ -659,7 +664,8 @@ export function failedRunFix(
   code: string | null | undefined,
   who: { keys: boolean; admin: boolean; owner: boolean },
 ): "useKey" | "changeModel" | null {
-  if (code === "run.model_unlisted") return who.admin || who.owner ? "changeModel" : null;
+  if (code === "run.model_unlisted" || code === "run.provider_model_unavailable")
+    return who.admin || who.owner ? "changeModel" : null;
   return code && KEY_FAILURES.has(code) && who.keys ? "useKey" : null;
 }
 

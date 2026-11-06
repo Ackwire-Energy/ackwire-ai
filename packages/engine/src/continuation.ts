@@ -339,6 +339,8 @@ export interface TurnEnd {
   openRequest?: string;
   /** Something durable brings it back (`wakesLater`), read only when the judgment would run. */
   wakesLater(): Promise<boolean>;
+  /** Whatever run set it, something brings it back to this conversation (`comesBackHere`), read on a repeated promise. */
+  comesBack?(): Promise<boolean>;
   /** The judgment; null when the workspace has no judge. */
   verdict: (() => Promise<ContinuationVerdict>) | null;
   /** What an `untried` turn is reminded of (`untriedNudge`): its means and what it tried, filled by `verdict`. */
@@ -404,8 +406,11 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
         verdict,
         nudge: t.kind === "agents_dm" ? FOLLOW_THROUGH_NUDGE_DM : FOLLOW_THROUGH_NUDGE,
       };
-    // Promising again without acting: a person is asked what it needs instead.
     if (t.kind !== "conversation") return { outcome: "done", rule: "cap", verdict };
+    // Promising again without acting: what an earlier run set brings it back (a follow-up, a reminder, work still
+    // running), and it rests on that. Only now: any wake here, however far off, would otherwise excuse a new promise.
+    if (await t.comesBack?.().catch(() => false)) return { outcome: "waiting", rule: "wakes_later" };
+    // Nothing does: a person is asked what it needs instead.
   }
   // It said it couldn't with ways left: once more with its means, while it still acts between nudges.
   if (verdict === "untried") {

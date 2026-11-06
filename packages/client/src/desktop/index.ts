@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useApi } from "../api/context";
+import { ApiError } from "../api/http";
 import { keys } from "../api/keys";
 import type { BrowserHandoff, DesktopPictureView, DesktopStatus } from "../api/types";
 import { handoffScreen } from "../browser";
@@ -53,8 +55,24 @@ export const DESKTOP_CLOSE = {
   unreachable: 4503,
 } as const;
 
-/** What a viewer socket's close means for the panel; `reason` is the server's (4502: the computer's error code). */
-export function desktopCloseState(code: number, reason = ""): { state: DesktopViewState; retry: DesktopRetry } {
+/**
+ * What a viewer socket's close means for the panel; `reason` is the server's (4502: the computer's error code).
+ * `preview`: a browser card's view (ADR 0058 §7), which never waits on the screen by itself: only a dropped socket
+ * opens it again, anything else puts the card back on its browser's frames.
+ */
+export function desktopCloseState(
+  code: number,
+  reason = "",
+  o: { preview?: boolean } = {},
+): { state: DesktopViewState; retry: DesktopRetry } {
+  const next = closeState(code, reason);
+  if (!o.preview) return next;
+  // The screen isn't running, and a card never starts it.
+  if (code === DESKTOP_CLOSE.refused && reason === "desktop_off") return { state: "ended", retry: "never" };
+  return next.state === "connecting" ? next : { ...next, retry: "never" };
+}
+
+function closeState(code: number, reason: string): { state: DesktopViewState; retry: DesktopRetry } {
   switch (code) {
     // Control isn't this person's (any more): open again, now as a watcher.
     case DESKTOP_CLOSE.controlEnded:
@@ -179,13 +197,18 @@ export const desktopRetryMs = (attempt: number) => RETRY_MS[Math.min(attempt, RE
 
 /**
  * A person's socket to the agent's desktop (raw RFB). `switches`: it takes its mode changing in place (ADR 0058 §17),
- * with `{"type":"mode"}` text frames around each new RFB session (`DesktopLink` in the web app).
+ * with `{"type":"mode"}` text frames around each new RFB session (`DesktopLink` in the web app). `preview`: a browser
+ * card's view (ADR 0058 §7), which only watches and never changes mode.
  */
 export function desktopSocketUrl(
   base: SocketBase,
-  v: { orgId: string; agentId: string; mode: DesktopMode; switches?: boolean },
+  v: { orgId: string; agentId: string; mode: DesktopMode; switches?: boolean; preview?: boolean },
 ) {
-  const params = { orgId: v.orgId, agentId: v.agentId, ...(v.switches ? { switch: 1 } : {}), mode: v.mode };
+  // In this order, one key at a time: an optional key may not be undefined in the address's parameters.
+  const params: Record<string, string | number> = { orgId: v.orgId, agentId: v.agentId };
+  if (v.preview) params.preview = 1;
+  else if (v.switches) params.switch = 1;
+  params.mode = v.preview ? "watch" : v.mode;
   return socketUrl(base, "/api/desktop", params);
 }
 
@@ -252,3 +275,159 @@ export const PASTE_MAX_BYTES = 262_144;
 /** What a text takes on the desktop's clipboard, in the bytes `PASTE_MAX_BYTES` counts. */
 export const pasteBytes = (text: string) =>
   new TextEncoder().encode(text.replace(/\r\n|\r|\n/g, "\r\n")).byteLength + 1;
+
+// ── The browser card on the agent's screen (ADR 0058 §7) ─────────────────────
+
+/** How long a card's screen stays open after it leaves the view (the browser stream's own linger). */
+export const SCREEN_LINGER_MS = 10_000;
+/**
+ * After the card's screen gave up, frames this long at most unless the status changes first; doubled each time it
+ * gives up again on the same status (a cause that lasts: the screen full, the computer failing), up to
+ * `SCREEN_REFUSAL_MAX_MS`.
+ */
+export const SCREEN_REFUSAL_MS = 120_000;
+export const SCREEN_REFUSAL_MAX_MS = 900_000;
+
+/** How long frames win after the card's screen gave up for the `n`-th time in a row on one status (from 0). */
+export const screenRefusalMs = (n: number) => Math.min(SCREEN_REFUSAL_MS * 2 ** n, SCREEN_REFUSAL_MAX_MS);
+
+/**
+ * Whether the browser card shows the agent's whole screen instead of its browser's frames (ADR 0058 §7): its browser
+ * runs on that screen, which runs and this person may watch now, and they hold neither the screen nor the browser
+ * (whoever holds it drives on the frames, whose watch keeps their control alive). A card never starts a screen.
+ */
+export function browserShowsDesktop(
+  status: DesktopStatus | null | undefined,
+  o: { userId: string; holdsBrowser: boolean },
+): boolean {
+  return (
+    !!status &&
+    status.browserOnDesktop === true &&
+    status.running &&
+    !o.holdsBrowser &&
+    status.controllerUserId !== o.userId &&
+    desktopStatusState(status, o.userId) === null
+  );
+}
+
+/** What of the status, once changed, lets a card that gave up try the screen again. */
+export const browserScreenKey = (s: DesktopStatus) =>
+  [s.available, s.running, s.startedAt, s.browserOnDesktop === true, s.controllerUserId, s.reason].join("|");
+
+/** A card's screen in any state but these went back to frames. */
+export const previewGivesUp = (state: DesktopViewState) => state !== "connecting" && state !== "live";
+
+export interface BrowserScreen {
+  /** Show the screen (and watch no frames). */
+  desktop: boolean;
+  /**
+   * The viewer may be open now: `desktop` and on screen, or within `SCREEN_LINGER_MS` of leaving it, and the card of
+   * this agent shown last in this app.
+   */
+  connect: boolean;
+  /** The status answered or failed, or isn't asked: the frames path may start. */
+  settled: boolean;
+  status: ReturnType<typeof useDesktopStatus>;
+  /**
+   * The embedded viewer's state: a `previewGivesUp` one puts the card on frames until the key changes or the refusal
+   * ends.
+   */
+  report: (state: DesktopViewState) => void;
+}
+
+/**
+ * Which of one agent's cards shows its screen: one viewer per agent in this app (ADR 0058 §7), as its frames are one
+ * watch. The card shown last wins; the others keep the screen's place until it leaves.
+ */
+const screenClaims = new Map<string, symbol[]>();
+const claimListeners = new Set<() => void>();
+
+function setScreenClaim(agentId: string, token: symbol, on: boolean) {
+  const list = (screenClaims.get(agentId) ?? []).filter((t) => t !== token);
+  if (on) list.push(token);
+  if (list.length) screenClaims.set(agentId, list);
+  else screenClaims.delete(agentId);
+  for (const listener of claimListeners) listener();
+}
+
+function subscribeClaims(listener: () => void) {
+  claimListeners.add(listener);
+  return () => {
+    claimListeners.delete(listener);
+  };
+}
+
+/** True while `on`, and for `ms` after it turns false. */
+function useLinger(on: boolean, ms: number) {
+  const [kept, setKept] = useState(on);
+  useEffect(() => {
+    if (on) {
+      setKept(true);
+      return;
+    }
+    const timer = setTimeout(() => setKept(false), ms);
+    return () => clearTimeout(timer);
+  }, [on, ms]);
+  return on || kept;
+}
+
+/**
+ * The browser card's choice between the agent's whole screen and its browser's frames (ADR 0058 §7), on the web and
+ * the phone. `shown`: the card is on the person's screen (the viewer opens only then, and lingers a little after);
+ * `poll`: ask the status again every 30 s (by default while shown); `holdsBrowser`: this person holds its browser.
+ */
+export function useBrowserScreen(
+  orgId: string,
+  agentId: string,
+  o: { enabled: boolean; userId: string; shown: boolean; holdsBrowser: boolean; poll?: boolean },
+): BrowserScreen {
+  const status = useDesktopStatus(orgId, agentId, {
+    enabled: o.enabled,
+    poll: o.enabled && (o.poll ?? o.shown) ? PICTURE_IDLE_MS : false,
+  });
+  // A status that now fails for lack of access (or of the agent) shows nothing: React Query keeps the last good one.
+  const lost = status.error instanceof ApiError && (status.error.status === 403 || status.error.status === 404);
+  const data = lost ? undefined : status.data;
+  const key = data ? browserScreenKey(data) : null;
+  const keyRef = useRef(key);
+  keyRef.current = key;
+  const [refusal, setRefusal] = useState<{ key: string; at: number; n: number } | null>(null);
+  const [, setTick] = useState(0);
+  const refusalMs = refusal ? screenRefusalMs(refusal.n) : 0;
+  const refused = refusal !== null && refusal.key === key && Date.now() - refusal.at < refusalMs;
+  useEffect(() => {
+    if (!refused || !refusal) return;
+    // The refusal ends by itself: render again then, so the card tries the screen once more.
+    const timer = setTimeout(() => setTick((n) => n + 1), Math.max(0, refusal.at + refusalMs - Date.now()));
+    return () => clearTimeout(timer);
+  }, [refused, refusal, refusalMs]);
+  const report = useCallback((state: DesktopViewState) => {
+    const current = keyRef.current;
+    // Live again: the next refusal waits the shortest time.
+    if (state === "live") setRefusal(null);
+    else if (current !== null && previewGivesUp(state)) {
+      setRefusal((was) => ({ key: current, at: Date.now(), n: was?.key === current ? was.n + 1 : 0 }));
+    }
+  }, []);
+  const desktop = o.enabled && browserShowsDesktop(data, o) && !refused;
+  const near = useLinger(o.shown, SCREEN_LINGER_MS);
+  const wants = desktop && near;
+  const [token] = useState(() => Symbol("screen"));
+  useEffect(() => {
+    if (!wants) return;
+    setScreenClaim(agentId, token, true);
+    return () => setScreenClaim(agentId, token, false);
+  }, [wants, agentId, token]);
+  const claimant = useSyncExternalStore(
+    subscribeClaims,
+    () => screenClaims.get(agentId)?.at(-1) ?? null,
+    () => null,
+  );
+  return {
+    desktop,
+    connect: wants && claimant === token,
+    settled: !o.enabled || status.isSuccess || status.isError,
+    status,
+    report,
+  };
+}

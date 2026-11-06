@@ -46,8 +46,10 @@ export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onO
     const only = ws.chips.length === 1 ? ws.chips[0] : undefined;
     if (ws.chips.length === 0 || (only?.op === "in" && only.place.id !== place.id)) ws.setChips([{ op: "in", place }]);
   }, [place?.id]);
-  // A DM's search always holds to it, whatever was searched before or picked from the recent ones.
-  const held = dm && ws && place ? inDmOnly(ws.chips, place) : null;
+  // A DM's search always holds to it, whatever was searched before or picked from the recent ones; results brought
+  // here by "Ir para" keep their own scope until they close, or the next hit would be gone.
+  const carried = ws?.carry.current?.channelId === channelId;
+  const held = dm && ws && place && !carried ? inDmOnly(ws.chips, place) : null;
   const heldKey = held?.map(searchChipKey).join(" ");
   useEffect(() => {
     if (ws && held && heldKey !== ws.chips.map(searchChipKey).join(" ")) ws.setChips(held);

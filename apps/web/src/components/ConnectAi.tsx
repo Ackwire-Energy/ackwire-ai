@@ -13,6 +13,7 @@ import { listsExisting } from "@agenteschat/client/lib/ai-accounts";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorCode, errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { stepPermissions } from "@agenteschat/client/lib/home";
 import {
   type AgentAi,
   type AiChoice,
@@ -25,13 +26,14 @@ import {
   type ExistingSignIn,
   freePlanAccount,
   gateDims,
+  mayConnectAi,
   type PlanChoice,
   type PlanGate,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
-import { isRightHand, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, rightHandOf, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { Button, Dialog, DialogBody, DialogFooter, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -48,9 +50,11 @@ import {
   PlanWithoutAgent,
   useGatesWithoutAgent,
   usePlanGates,
+  usePlanHold,
 } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { useOrg } from "@/components/org-context";
+import { ProviderKeySelect } from "@/components/ProviderKey";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
@@ -106,6 +110,21 @@ const ConnectAiContext = createContext<ConnectAi | null>(null);
 
 /** Null outside the workspace shell (an isolated page in a test): no Connect there. */
 export const useConnectAi = () => useContext(ConnectAiContext);
+
+/**
+ * Whether this person has an AI to connect: the workspace's key, a plan for an agent they have or may make, or their
+ * own for the right hand. Yes until the agents are known, so nobody reads "who connects it" for a moment.
+ */
+export function useMayConnectAi() {
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  return (
+    dir.loading ||
+    stepPermissions(org, me.user.id, dir.agents).connectAi ||
+    can(org, "create_agents") ||
+    mayConnectAi(rightHandOf(dir.agents), me.user.id, org)
+  );
+}
 
 export function ConnectAiProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -182,6 +201,7 @@ function ConnectAiDialog({
   const models = useModels();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
+  const hold = usePlanHold();
   // The team's right hand thinks with each person's own AI (ADR 0137 §11): everyone's to connect for their DM.
   const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id || isRightHand(a));
   // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
@@ -274,7 +294,7 @@ function ConnectAiDialog({
     onConnected();
   };
   const saveKey = () => {
-    if (draft.provider === "platform" || draft.provider === CUSTOM_PROVIDER) return;
+    if (draft.provider === CUSTOM_PROVIDER) return;
     setRefused(null);
     const provider = providerLabel(draft.provider);
     add.mutate(
@@ -343,7 +363,6 @@ function ConnectAiDialog({
           : t("connectAi.title.any")
       }
       closeLabel={t("common.close")}
-      // Three plans a row, each name on one line even when chosen, as in the setup's column.
       width={600}
     >
       <DialogBody>
@@ -397,6 +416,17 @@ function ConnectAiDialog({
                 setPickedTarget(defaultTarget({ agents, hasAi, set: setOf(next) }));
             }}
             dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
+            busy={add.isPending}
+            keySelect={
+              mayAddKey &&
+              !keySaved && (
+                <ProviderKeySelect
+                  value={draft.provider}
+                  disabled={add.isPending}
+                  onChange={(provider) => setDraft((d) => ({ ...d, provider }))}
+                />
+              )
+            }
             panel={
               choice === "key" ? (
                 <KeyPanel
@@ -407,6 +437,7 @@ function ConnectAiDialog({
                   savedNote={keyNote}
                   refused={refused}
                   saving={add.isPending}
+                  held={hold !== null}
                   onSave={saveKey}
                   endpoint={
                     <EndpointForm

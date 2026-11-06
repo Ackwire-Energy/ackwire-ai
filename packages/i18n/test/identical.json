@@ -416,7 +416,8 @@
       "teamPlan.card.skills",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
-      "team.list.col.roles"
+      "team.list.col.roles",
+      "connectAi.pick.plan"
     ],
     "fr": [
       "deleteAccount.agentCount",
@@ -786,6 +787,7 @@
       "agentPage.fields.name",
       "agentPage.fields.skills",
       "agentPage.settings.budget",
+      "agentPage.ficha.computer",
       "agentPage.settings.computer",
       "agentPage.work.cell.browser",
       "agentPage.work.computer.browser",
@@ -1143,6 +1145,7 @@
       "agentPage.fields.budget",
       "agentPage.fields.machine",
       "agentPage.settings.budget",
+      "agentPage.ficha.computer",
       "agentPage.settings.computer",
       "agentPage.work.brain.account",
       "agentPage.work.cell.browser",
@@ -1449,6 +1452,7 @@
       "agentPage.numbers.runs",
       "agentPage.overview.routines",
       "agentPage.settings.budget",
+      "agentPage.ficha.computer",
       "agentPage.settings.computer",
       "agentPage.stats.runs",
       "agentPage.work.brain.account",
@@ -2620,7 +2624,8 @@
       "endpoint.styles.openai",
       "endpoint.styles.anthropic",
       "teamTemplates.agents.ada.role",
-      "teamTemplates.channels.ada"
+      "teamTemplates.channels.ada",
+      "connectAi.pick.plan"
     ],
     "pl": [
       "deleteAccount.agentCount",
@@ -2841,7 +2846,8 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.agents",
-      "team.list.col.agent"
+      "team.list.col.agent",
+      "connectAi.pick.plan"
     ],
     "ru": [
       "agent.builtinName",

@@ -3,13 +3,15 @@ import { useAiStatus, useChannels } from "@agenteschat/client";
 import { groupOf } from "@agenteschat/client/lib/agent-groups";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
-import { Icon, PixelSpinner, RoleMark, spriteTone } from "@agenteschat/ui";
+import { noSectorsCopy } from "@agenteschat/client/lib/team-views";
+import { Button, EmptyState, Icon, PixelSpinner, RoleMark, spriteTone } from "@agenteschat/ui";
 import { type CSSProperties, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { lookOf } from "@/lib/look";
 
 /** What every Equipe view looks up: people's names, an agent's setor, the channels I see, the right hand. */
 export function useTeamLookups(groups: readonly AgentGroup[]) {
@@ -35,6 +37,34 @@ export function useTeamLookups(groups: readonly AgentGroup[]) {
 /** A setor's mark: its color and icon. */
 export function SectorMark({ group, size = 16 }: { group: AgentGroup; size?: number }) {
   return <RoleMark color={group.color ?? "graphite"} icon={group.icon ?? "person"} size={size} />;
+}
+
+/** No setor yet, on both views of them: the right hand waving over what they give, and the first one's button. */
+export function NoSectors({
+  lodi,
+  onCreate,
+}: {
+  lodi: ReturnType<typeof useTeamLookups>["lodi"];
+  onCreate?: (() => void) | undefined;
+}) {
+  const { t } = useTranslation();
+  const copy = noSectorsCopy(Boolean(onCreate));
+  return (
+    <EmptyState
+      size="page"
+      agent={lookOf(lodi) ?? true}
+      title={t(copy.title)}
+      actions={
+        onCreate && (
+          <Button variant="primary" icon="plus" onClick={onCreate}>
+            {t("agentGroups.create")}
+          </Button>
+        )
+      }
+    >
+      {t(copy.text)}
+    </EmptyState>
+  );
 }
 
 /** `--sector`: a setor's color, for its frame and card. */

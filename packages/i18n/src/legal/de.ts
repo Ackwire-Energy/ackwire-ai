@@ -8,7 +8,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
       "Die Vereinbarung über die Nutzung von agentes.chat: Ihr Workspace, Ihre Agenten und wofür jede Seite verantwortlich ist.",
     courtesy:
       "Dies ist eine unverbindliche Übersetzung. Weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
-    updated: "2026-11-04",
+    updated: "2026-11-06",
     sections: [
       {
         id: "agreement",
@@ -122,7 +122,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Laufzeit und Beendigung",
         blocks: [
-          "Sie können die Nutzung des Dienstes jederzeit einstellen und Ihr Konto in der App löschen. Wir können Ihren Zugang bei einem wesentlichen Verstoß gegen diese Bedingungen, wenn das Gesetz es verlangt, oder mit einer Frist von 30 Tagen bei Einstellung des Dienstes sperren oder beenden. Beenden wir den Dienst aus anderen Gründen als Ihrem Verstoß, stellen wir Ihre Workspace-Inhalte 30 Tage lang zum Export bereit und löschen sie anschließend wie in der Datenschutzerklärung beschrieben. Abschnitte, die ihrer Natur nach über die Beendigung hinaus fortgelten (darunter 6, 9, 11, 13, 14 und 15), gelten fort.",
+          "Sie können die Nutzung des Dienstes jederzeit einstellen und Ihr Konto in der App löschen. Es wird 7 Tage später entfernt, und Sie können es bis dahin wiederherstellen. Wir können Ihren Zugang bei einem wesentlichen Verstoß gegen diese Bedingungen, wenn das Gesetz es verlangt, oder mit einer Frist von 30 Tagen bei Einstellung des Dienstes sperren oder beenden. Beenden wir den Dienst aus anderen Gründen als Ihrem Verstoß, stellen wir Ihre Workspace-Inhalte 30 Tage lang zum Export bereit und löschen sie anschließend wie in der Datenschutzerklärung beschrieben. Abschnitte, die ihrer Natur nach über die Beendigung hinaus fortgelten (darunter 6, 9, 11, 13, 14 und 15), gelten fort.",
         ],
       },
       {
@@ -175,7 +175,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
       "Welche Daten wir erheben, was Agenten wohin senden, wer Ihren Workspace sehen kann und welche Rechte Sie haben.",
     courtesy:
       "Dies ist eine unverbindliche Übersetzung. Weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
-    updated: "2026-11-04",
+    updated: "2026-11-06",
     sections: [
       {
         id: "overview",
@@ -265,7 +265,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Kontodaten:** für die Dauer des Bestehens des Kontos. Wenn Sie Ihr Konto in der App löschen, wird es sofort entfernt und verschwindet innerhalb von 30 Tagen aus unseren Sicherungen, mit Ausnahme von Aufzeichnungen, die wir gesetzlich aufbewahren müssen. Jeder Workspace, in dem Sie das einzige Mitglied waren, wird zum selben Zeitpunkt geschlossen, und seine Inhalte werden 7 Tage später wie nachstehend beschrieben gelöscht. Die Workspaces, denen Sie angehörten, behalten Ihren Namen und Ihre E-Mail-Adresse in ihren Audit-Protokollen, solange der jeweilige Workspace besteht.",
+              "**Kontodaten:** für die Dauer des Bestehens des Kontos. Wenn Sie Ihr Konto in der App löschen, wird es sofort überall abgemeldet und 7 Tage später entfernt, sofern Sie es nicht vorher wiederherstellen, und verschwindet danach innerhalb von 30 Tagen aus unseren Sicherungen, mit Ausnahme von Aufzeichnungen, die wir gesetzlich aufbewahren müssen. Jeder Workspace, in dem Sie das einzige Mitglied waren, wird zum selben Zeitpunkt geschlossen, und seine Inhalte werden 7 Tage später wie nachstehend beschrieben gelöscht. Die Workspaces, denen Sie angehörten, behalten Ihren Namen und Ihre E-Mail-Adresse in ihren Audit-Protokollen, solange der jeweilige Workspace besteht.",
               "**Workspace-Inhalte:** für die Dauer des Bestehens des Workspace, und früher, wenn der Workspace bestimmte Inhalte löscht. Endet der agentes.chat-Tarif eines Workspace, bleiben seine Inhalte 90 Tage lang verfügbar und werden dann gelöscht. Löscht ein Eigentümer einen Workspace, wird dieser sofort für alle geschlossen, und seine Inhalte werden 7 Tage später gelöscht, sofern ein Eigentümer ihn nicht vorher wiederherstellt, und verschwinden danach innerhalb von 30 Tagen aus unseren Sicherungen, mit Ausnahme von Inhalten, die wir gesetzlich oder als Nachweis von Missbrauch (siehe unten) aufbewahren müssen.",
               "**Protokolle:** Anfrage- und Sicherheitsprotokolle bis zu 90 Tage. Aufzeichnungen über die Modellnutzung (Tokens und Kosten) für die Dauer des Bestehens des Workspace, da Budgets und Nutzungsberichte darauf beruhen.",
               "**Abrechnungsdaten:** solange Sie für einen Workspace bezahlen, und danach so lange, wie es das Steuer- und Handelsrecht verlangt.",

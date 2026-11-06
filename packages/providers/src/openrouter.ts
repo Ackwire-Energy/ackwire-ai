@@ -487,12 +487,21 @@ function routerError(error: unknown, compatible: boolean): ProviderError {
     return openAIError(error);
   if (error instanceof OpenAI.APIError) {
     const status = error.status ?? (Number(error.code) || undefined);
+    const said = saidIn(error);
     // A workspace's own endpoint: its admin reads the server's words to fix it (a model name, a missing feature).
     if (compatible && error.message) {
       const mapped = statusError(status);
-      return new ProviderError(`${mapped.message}: ${error.message.slice(0, 300)}`, mapped.retryable, mapped.status);
+      return new ProviderError(
+        `${mapped.message}: ${error.message.slice(0, 300)}`,
+        mapped.retryable,
+        mapped.status,
+        undefined,
+        said,
+      );
     }
-    return statusError(status, saidIn(error));
+    const mapped = statusError(status, said);
+    mapped.said = said;
+    return mapped;
   }
   return openAIError(error);
 }

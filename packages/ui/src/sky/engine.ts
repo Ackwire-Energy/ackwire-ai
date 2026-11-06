@@ -51,6 +51,8 @@ export interface SkyOptions {
   sprites?: number | { area: number; max: number };
   /** Share of near (double size) sprites (default 0.3). */
   near?: number;
+  /** Share of the far sprites drawn as faint light silhouettes (default 0.5); the rest take `body`. */
+  faint?: number;
   /** Rise speed multiplier (default 1). */
   rise?: number;
   /** Sprites leave above this fraction of the height (default: the top edge). */
@@ -70,6 +72,8 @@ export interface SkyOptions {
   /** Field value inside calm zones (default 6/7) and the fade around them, in sky pixels. */
   calmV?: number;
   calmPad?: number;
+  /** The first tone paints nothing: what's behind shows, whatever the surface (a card's gradient, a tile). */
+  seeThrough?: boolean;
   /** Draws over the field (e.g. one sprite of its own) before the frame is shown. */
   after?: (frame: SkyFrame) => void;
 }
@@ -207,7 +211,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
       vy: near ? 7 : 3.5 + Math.random() * 2,
       ph,
       blink: Math.random() * 6,
-      ghost: !near && Math.random() < 0.5,
+      ghost: !near && Math.random() < (o.faint ?? 0.5),
     };
   };
   const wanted = (o: SkyOptions) => {
@@ -265,7 +269,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     const key = list.join();
     if (key !== toneKey) {
       toneKey = key;
-      tones = list.map(pixelOf);
+      tones = list.map((tone, i) => (o.seeThrough && i === 0 ? 0 : pixelOf(tone)));
     }
     const levels = tones.length - 1;
     const r = host.getBoundingClientRect();

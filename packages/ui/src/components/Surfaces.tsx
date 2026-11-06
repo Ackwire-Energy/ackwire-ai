@@ -6,9 +6,12 @@ import {
   useEffect,
   useState,
 } from "react";
+import { type StickerMood, WAVE_SECONDS } from "../agent/stickers";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 import type { MeterSegment } from "../plan-state";
+import type { AgentAppearance } from "./AgentLook";
+import { AgentSticker } from "./AgentSticker";
 import { InfoHint } from "./InfoHint";
 import { SkyGlow } from "./PixelSky";
 import { ProviderLogo } from "./ProviderLogo";
@@ -125,6 +128,9 @@ export function ListRow({ lead, title, meta, trailing, className, type = "button
   );
 }
 
+/** The agent's side in CSS pixels: whole multiples of the sticker's 64-cell grid stay crisp. */
+const EMPTY_AGENT = { page: 128, panel: 96 } as const;
+
 export interface EmptyStateProps {
   icon?: IconName;
   title?: ReactNode;
@@ -135,19 +141,65 @@ export interface EmptyStateProps {
   sky?: boolean;
   /** A pixel picture instead of the icon (`AgentSearching`), with no dashed box. Decorative: the words say it. */
   art?: ReactNode;
+  /**
+   * The room it has, and with it no dashed box: `page` a page or tab, centered in what's left of it; `panel` a side
+   * panel, column or card; `inline` a list inside a dropdown, sidebar or sheet, compact and never with an agent.
+   * Without it, the dashed box, for an error or a notice in a frame.
+   */
+  size?: "page" | "panel" | "inline";
+  /** The agent standing over the words, in its light: a place's own agent's look, or `true` for the default one. */
+  agent?: AgentAppearance | true;
+  /** What the agent does. A wave plays once and holds, the other moods loop. */
+  mood?: StickerMood;
 }
 
-/** Dashed box with a short explanation (and optional icon, title and actions). */
-export function EmptyState({ icon, title, children, actions, className, sky, art }: EmptyStateProps) {
+/**
+ * What a place is for when nothing is in it. First use: `size` and `agent`, a title that says what the place gives,
+ * one line, and one primary button (none for who can't do it: the line says who can). No results: `size` and a way
+ * to clear, with no agent. All clear: `agent` with a happy mood and no button. Never for loading or an error.
+ */
+export function EmptyState({
+  icon,
+  title,
+  children,
+  actions,
+  className,
+  sky,
+  art,
+  size,
+  agent,
+  mood = "wave",
+}: EmptyStateProps) {
+  const stands = agent && size !== "inline";
+  const look = agent === true ? undefined : agent;
   return (
-    <div className={cx("ac-empty", sky && "ac-empty--sky", !!art && "ac-empty--art", className)}>
+    <div
+      className={cx(
+        "ac-empty",
+        size && `ac-empty--${size}`,
+        sky && "ac-empty--sky",
+        !!art && "ac-empty--art",
+        className,
+      )}
+    >
       {sky && <SkyGlow className="ac-empty__sky" surface="--empty-surface" />}
+      {stands && (
+        <div className="ac-empty__agent" aria-hidden="true">
+          <SkyGlow bare color={look?.color ?? "sky"} surface="--empty-surface" />
+          <AgentSticker
+            appearance={look}
+            mood={mood}
+            size={EMPTY_AGENT[size === "panel" ? "panel" : "page"]}
+            playFor={mood === "wave" ? WAVE_SECONDS : undefined}
+          />
+        </div>
+      )}
       {!!art && (
         <div className="ac-empty__art" aria-hidden="true">
           {art}
         </div>
       )}
-      {icon && !sky && !art && (
+      {icon && !sky && !art && !stands && (
         <span className="ac-empty__icon">
           <Icon name={icon} />
         </span>

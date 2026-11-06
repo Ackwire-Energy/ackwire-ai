@@ -56,7 +56,7 @@ import {
 } from "./organizations";
 import { enqueue } from "./outbox";
 import { givableRoleIds } from "./roles";
-import { closedOrg } from "./standing";
+import { accountInUse, closedOrg } from "./standing";
 
 const {
   accounts,
@@ -180,7 +180,7 @@ async function accountOf(db: Executor, userId: string) {
       name: users.name,
       email: users.email,
       verified: users.emailVerified,
-      blockedAt: users.blockedAt,
+      open: accountInUse,
       locale: users.locale,
     })
     .from(users)
@@ -248,7 +248,7 @@ async function codeAddress(db: Executor, input: JoinCodeInput) {
     return { email, locale: emailLocale(input.locale) };
   }
   const account = await accountOf(db, input.user.id);
-  if (!account || account.blockedAt) throw new ForbiddenError();
+  if (!account?.open) throw new ForbiddenError();
   if (account.verified) throw new ConflictError("This account's email is already confirmed.", "join.verified");
   return { email: account.email.trim().toLowerCase(), locale: emailLocale(account.locale ?? input.locale) };
 }
@@ -423,7 +423,7 @@ export async function askToJoin(
   const orgId = found.link.orgId;
   const account = input.user ? await accountOf(db, input.user.id) : null;
   if (input.user) {
-    if (!account || account.blockedAt) throw new ForbiddenError();
+    if (!account?.open) throw new ForbiddenError();
     if (await isMember(db, orgId, input.user.id))
       throw new ConflictError("You're already in this workspace", "join.member");
   }
@@ -616,7 +616,7 @@ async function file(
       ? await tx
           .select({ email: users.email, locale: users.locale })
           .from(users)
-          .where(and(inArray(users.id, admins), isNull(users.blockedAt)))
+          .where(and(inArray(users.id, admins), accountInUse))
       : [];
     const hour = now.toISOString().slice(0, 13);
     for (const g of emailsByLocale(
@@ -703,7 +703,7 @@ export async function listWaitingJoinRequests(db: Database, actorId: string, org
       email: requests.email,
       note: requests.note,
       verified: sql<boolean>`${requests.verifiedAt} is not null or coalesce(${users.id} = ${requests.userId} and ${users.emailVerified}, false)`,
-      confirmed: sql<boolean>`coalesce(${users.emailVerified} and ${users.blockedAt} is null and (${requests.verifiedAt} is not null or ${users.id} = ${requests.userId}), false)`,
+      confirmed: sql<boolean>`coalesce(${users.emailVerified} and ${accountInUse} and (${requests.verifiedAt} is not null or ${users.id} = ${requests.userId}), false)`,
       suggestedBy: sql<string | null>`(select s.name from ${users} s where s.id = ${requests.suggestedByUserId})`,
       createdAt: requests.createdAt,
       expiresAt: requests.expiresAt,
@@ -742,7 +742,7 @@ async function answerContext(tx: Executor, orgId: string, actorId: string, row: 
   const [org] = await tx.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
   const [approver] = await tx.select({ name: users.name }).from(users).where(eq(users.id, actorId));
   const [account] = await tx
-    .select({ id: users.id, verified: users.emailVerified, blockedAt: users.blockedAt, locale: users.locale })
+    .select({ id: users.id, verified: users.emailVerified, open: accountInUse, locale: users.locale })
     .from(users)
     .where(eq(users.email, row.email));
   const proven = row.verifiedAt !== null || row.userId === account?.id;
@@ -750,7 +750,7 @@ async function answerContext(tx: Executor, orgId: string, actorId: string, row: 
     orgName: org?.name ?? "",
     approverName: approver?.name ?? "",
     locale: emailLocale(account?.locale ?? row.locale),
-    joiner: account?.verified && !account.blockedAt && proven ? account.id : null,
+    joiner: account?.verified && account.open && proven ? account.id : null,
     /** Whether the address has an account at all: an approval makes one only when it has none (ADR 0090). */
     hasAccount: account !== undefined,
   };

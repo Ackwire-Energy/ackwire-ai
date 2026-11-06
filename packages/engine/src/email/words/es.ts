@@ -240,7 +240,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Escribe este código para eliminar toda la cuenta ",
       { b: email },
-      ", no solo un espacio de trabajo. Se elimina al instante, y los espacios de trabajo donde solo estás tú se cierran con ella.",
+      ", no solo un espacio de trabajo. Se cierra la sesión en todas partes al instante y se elimina para siempre 7 días después, y los espacios de trabajo donde solo estás tú se cierran con ella.",
     ],
     support: (address) => [
       "Es válido por 10 minutos, y no se elimina nada sin él. Si no fuiste tú, no lo compartas y escribe a ",
@@ -283,6 +283,27 @@ export const words: EmailWords = {
     note: "¿No la conectaste tú? Desconéctala ahora y cambia tu contraseña.",
     button: "Ver apps conectadas",
     why: (org) => `Recibiste este correo porque se conectó una app a tu cuenta en ${org} en agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Tu cuenta de agentes.chat se eliminará el ${day}`,
+    preheader: "Tienes 7 días para cambiar de opinión.",
+    headline: "Tu cuenta se está eliminando",
+    body: (email, day, time) => [
+      "Eliminaremos la cuenta ",
+      { b: email },
+      ` el ${day} a las ${time}. Se cerró la sesión en todas partes y nadie puede contactarte aquí hasta que vuelvas.`,
+    ],
+    closes: (count, names) => [
+      plural("es", count, {
+        one: "El espacio de trabajo donde solo estabas tú se cerró ahora y se elimina en la misma fecha: ",
+        other: "Los espacios de trabajo donde solo estabas tú se cerraron ahora y se eliminan en la misma fecha: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "¿Cambiaste de opinión? Inicia sesión antes de esa fecha y pulsa Restaurar.",
+    button: "Iniciar sesión para restaurar",
+    why: "Recibiste este correo porque esta dirección tiene una cuenta en agentes.chat.",
   },
   accountDeleted: {
     subject: "Se eliminó tu cuenta de agentes.chat",

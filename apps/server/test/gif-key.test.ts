@@ -1,6 +1,14 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { type Browser, browser, createTestServer, deletionCode, signUp, type TestServer } from "./harness";
+import {
+  type Browser,
+  browser,
+  createTestServer,
+  deletionCode,
+  deletionsDue,
+  signUp,
+  type TestServer,
+} from "./harness";
 
 /**
  * The installation's GIPHY key (ADR 0091, amended 2026-10-31): only its owner has it, never on agentes.chat, and GIFs
@@ -189,6 +197,7 @@ test("once the first account deletes itself, its key goes with it and nobody inh
   expect((await owner("/api/app/gif-key", { method: "PUT", json: { apiKey: GIPHY_KEY } })).status).toBe(200);
   const proof = await deletionCode(server, owner, null);
   expect((await owner("/api/app/account", { method: "DELETE", json: { code: proof } })).status).toBe(204);
+  await deletionsDue(server);
   expect(await server.db.select().from(schema.instanceSecrets)).toEqual([]);
   const gone = await server.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "gif.key_removed"));
   expect(gone).toMatchObject([{ orgId: beta.orgId, actorType: "system", details: { hint: "7a1e" } }]);

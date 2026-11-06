@@ -97,6 +97,7 @@ import {
   type PlanChoice,
   usd,
 } from "@/components/AgentFields";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { ImportFlow, useImportFlow } from "@/components/ImportFlow";
@@ -365,6 +366,7 @@ function NewAgentFlow({
     [models.data, credentials.data, platform.data],
   );
   const usable = useMemo(() => usableModels(choices), [choices]);
+  const held = usePlanHold() !== null;
   // "Quem pensa": what the agent's page offers, every plan on every computer that runs it, in one list.
   const brainOptions = useMemo(
     () =>
@@ -373,8 +375,9 @@ function NewAgentFlow({
         machines: brainMachines.data ?? [],
         accounts: aiAccounts.data?.accounts ?? [],
         ownerIsMe: owner === me.user.id,
+        held,
       }),
-    [t, locale, choices, brainMachines.data, aiAccounts.data, owner, me.user.id],
+    [t, locale, choices, brainMachines.data, aiAccounts.data, owner, me.user.id, held],
   );
   const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
 
@@ -1230,7 +1233,7 @@ function NewAgentFlow({
               </ul>
             </>
           ) : (
-            <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
+            <p className="small muted">{t(managesAgents ? "access.noConnectors" : "access.noConnectorsViewer")}</p>
           )}
           {managesAgents && (
             <Link

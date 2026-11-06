@@ -69,9 +69,9 @@ describe("replyPolicyFor", () => {
     );
   });
 
-  test("a run a note, a late result, its own fast reply or a news-only report woke may pass; an answer may not", () => {
+  test("a run a note, a late result, its own fast reply, its follow-up or a news-only report woke may pass; an answer may not", () => {
     const notice = (kind: string) => ({ authorType: "agent" as const, meta: { notice: { kind, text: "x" } } });
-    for (const kind of ["agent_note", "wait_result", "talker_reply"])
+    for (const kind of ["agent_note", "wait_result", "talker_reply", "follow_up"])
       expect(replyPolicyFor(run({ trigger: "mention" }), notice(kind))).toEqual({ mayPass: true, background: false });
     expect(replyPolicyFor(run({ trigger: "mention" }), notice("consult_reply")).mayPass).toBe(false);
     // A routine's report: quiet allowed when it speaks only on news; one that reports every time always posts.

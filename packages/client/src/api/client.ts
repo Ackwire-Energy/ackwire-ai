@@ -383,10 +383,12 @@ export interface ApiClient {
      */
     deletionCode(): Promise<CodeSent>;
     /**
-     * Deletes my account at once, with the emailed `code`, or `password` on a server that sends no email (`reauth.*`
-     * when refused, 429 after 5 passwords). `sole_owner` (409, `params.orgIds`) while a workspace needs me.
+     * Deletes my account in 7 days, with the emailed `code`, or `password` on a server that sends none (ADR 0088 §10):
+     * every session ends now. `sole_owner` (409) while a workspace needs me.
      */
     delete(input?: DeletionProofInput): Promise<void>;
+    /** Brings it back before its date. `account.not_restorable` (409) after. */
+    restore(): Promise<void>;
   };
   /** Where my pushes go: phones (ADR 0035) and browsers (ADR 0071). Per person, not per organization. */
   push: {

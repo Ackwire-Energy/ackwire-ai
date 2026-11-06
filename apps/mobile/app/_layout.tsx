@@ -1,4 +1,4 @@
-import { keys, useApi } from "@agenteschat/client";
+import { keys, useApi, useMe } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { type Href, ThemeProvider as NavigationThemeProvider, router, Stack, usePathname } from "expo-router";
@@ -22,6 +22,7 @@ import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
+import { DeletingAccount } from "@/ui/auth/DeletingAccount";
 import { DeletingWorkspace } from "@/ui/auth/DeletingWorkspace";
 import { SuspendedWorkspace } from "@/ui/auth/SuspendedWorkspace";
 import { useNavigationTheme } from "@/ui/navigation";
@@ -69,6 +70,9 @@ function Gate() {
   // The server down or out of reach (a self-hosted one, often): the splash stays and says so, never the first run.
   const down = useServerDown(signedIn && !session.pending);
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading) && down === null;
+  // The account was deleted and waits for its date: its own screen, over everything else.
+  const me = useMe();
+  const accountDeletion = ready && signedIn ? me.data?.user.deletion : undefined;
   const suspended = ready && signedIn && org.state ? suspendedOf(org.state.orgs, org.state.orgId) : null;
   // Being deleted: its own screen, after the suspension, the stronger fact.
   const deleting = ready && signedIn && org.state && !suspended ? deletingOf(org.state.orgs, org.state.orgId) : null;
@@ -122,13 +126,13 @@ function Gate() {
   const [firstRunBefore, setFirstRunBefore] = useState(false);
   const firstRun = firstRunMounted(
     firstRunBefore,
-    ready && signedIn && (org.none || freshStart) && !accepting,
+    ready && signedIn && (org.none || freshStart) && !accepting && !accountDeletion,
     onInvite,
   );
   if (firstRun !== firstRunBefore) setFirstRunBefore(firstRun);
   const suspendedShown = suspended !== null && !deletingAccount;
   const deletingShown = deleting !== null && !deletingAccount && !firstRun;
-  const covered = suspendedShown || deletingShown || down !== null || (firstRun && freshStart);
+  const covered = suspendedShown || deletingShown || down !== null || (firstRun && freshStart) || !!accountDeletion;
 
   // The navigator is always mounted (so links and pushes can navigate); the splash covers it until ready.
   return (
@@ -163,6 +167,7 @@ function Gate() {
       {org.state && deleting && deletingShown ? (
         <DeletingWorkspace state={org.state} deleting={deleting} onNewWorkspace={() => setFreshStart(true)} />
       ) : null}
+      {accountDeletion ? <DeletingAccount dueAt={accountDeletion.dueAt} /> : null}
       {launching ? (
         <LaunchSplash
           ready={ready}

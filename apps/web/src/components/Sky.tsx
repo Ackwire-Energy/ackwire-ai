@@ -156,9 +156,10 @@ export function ChannelWelcome({
 type Clear = SkyOptions["clear"];
 
 /**
- * The agent page's cover: a sky in the
- * agent's own color, lighter behind the agent (at `at`, 0..1 across) so its
- * body reads; faster and busier while it works. `clear`: its portrait and the buttons on it.
+ * The agent page's cover: only the light tones of the agent's color, fading into the page at the bottom, with a pool
+ * of light behind its face so the face's own dither never melts into the sky's. Pixels are 2px and the few pixel
+ * agents are all faint, so the cover stays calm next to the page's text; faster while it works. `clear`: its face
+ * (first) and the buttons on it; the pool follows the face, else sits at `at` (0..1 across) near the bottom.
  */
 export function AgentCover({
   color,
@@ -171,24 +172,40 @@ export function AgentCover({
   at?: number;
   clear?: Clear;
 }) {
+  const host = useRef<HTMLDivElement>(null);
+  /** Where the face is, in shares of the cover (its upper quarter, which sits on the sky). */
+  const pool = (): [number, number] => {
+    const face = clear?.()[0];
+    const box = host.current?.getBoundingClientRect();
+    if (!face || !box?.width || !box.height) return [at, 0.83];
+    const f = face.getBoundingClientRect();
+    return [(f.left + f.width / 2 - box.left) / box.width, (f.top + f.height / 4 - box.top) / box.height];
+  };
   return (
-    <div className="agp-cover__sky" data-busy={busy || undefined} aria-hidden="true">
+    <div className="agp-cover__sky" data-busy={busy || undefined} aria-hidden="true" ref={host}>
       <PixelSky
         options={{
-          pixel: 4,
-          palette: agentTones(color),
+          pixel: 2,
+          surface: "--bg",
+          // Mid to near white, then most of the way to the page: no deep tones on the cover.
+          palette: (surface) => {
+            const tones = agentTones(color);
+            const light = tones.slice(3);
+            return [...light, mix(light[light.length - 1] ?? surface, surface, 0.6)];
+          },
           body: spriteTone(color),
           speed: busy ? 2.6 : 1,
           rise: busy ? 2.4 : 1,
-          sprites: busy ? { area: 520, max: 40 } : { area: 1100, max: 20 },
+          near: 0,
+          faint: 1,
+          sprites: busy ? { area: 5300, max: 14 } : { area: 10560, max: 8 },
           clear,
           light: 0,
-          base: (u, v, tt) => {
-            const dx = (u - at) * 2.2;
-            const dy = (v - 0.84) * 1.3;
-            return (
-              0.86 - 0.22 * u - 0.46 * v + 0.42 * Math.exp(-(dx * dx + dy * dy) / 0.14) + 0.06 * S(u * 5 + tt * 0.6)
-            );
+          // Lighter toward the bottom and the right, where the page's text starts.
+          base: (u, v, tt) => 0.28 + 0.3 * u + 0.62 * v * v + 0.05 * S(u * 4 + tt * 0.5),
+          blobs: () => {
+            const [x, y] = pool();
+            return [[x, y, 0.3, 0.75]];
           },
         }}
       />

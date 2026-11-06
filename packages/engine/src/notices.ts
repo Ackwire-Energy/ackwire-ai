@@ -167,7 +167,7 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       if (n.refs?.wake)
         return `[Your follow-up for ${at} is due: you set it earlier in this conversation to come back now]: ${n.text}${
           current
-            ? "\nDo what you came back for now with your tools, then tell the people here what you found, briefly. If it still isn't ready, say so in a line and set another follow_up only if waiting still makes sense."
+            ? "\nDo what you came back for now with your tools, then tell the people here what you found, briefly. Not ready: say so in a line, and set another follow_up only if it makes sense. Nothing left to do or tell: pass."
             : ""
         }`;
       const state = n.refs?.state === "canceled" ? "canceled" : n.refs?.state === "done" ? "came" : "still to come";

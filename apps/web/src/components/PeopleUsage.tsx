@@ -50,6 +50,7 @@ import {
   Checkbox,
   Dialog,
   DialogBody,
+  EmptyState,
   Icon,
   InfoHint,
   Input,
@@ -71,11 +72,13 @@ import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { fileSaver } from "@/components/artifacts/fileSaver";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
 import "./people-usage.css";
 
@@ -184,6 +187,7 @@ function UseMeter({ p, plansOnly }: { p: PersonRow; plansOnly: boolean }) {
 function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; person?: string; onLimits: () => void }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const look = useRightHandLook();
   const api = useApi();
   const dir = useDirectory(org.id);
   const roles = useRoles(org.id);
@@ -331,7 +335,14 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
       )}
       <LiveCard live={data.live} />
       {nobody && period === "month" ? (
-        <p className="plan-empty">{t("peopleUsage.empty")}</p>
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t("peopleUsage.emptyTitle")}
+          actions={<AskAgentButton variant="primary" />}
+        >
+          {t("peopleUsage.empty")}
+        </EmptyState>
       ) : (
         <Card className="pu-table-card">
           <table className="pu-table">

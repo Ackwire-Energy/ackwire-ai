@@ -31,9 +31,11 @@ const VIEW_STATES: ReadonlySet<string> = new Set<DesktopViewState>([
   "ended",
 ]);
 
-/** The page's address for one agent. */
-export const screenPageUrl = (server: string, orgId: string, agentId: string) =>
-  `${server}/screen.html?${new URLSearchParams({ o: orgId, a: agentId }).toString()}`;
+/** The page's address for one agent. `preview`: a browser card's view, which only watches (ADR 0058 §7). */
+export const screenPageUrl = (server: string, orgId: string, agentId: string, o: { preview?: boolean } = {}) => {
+  const query = new URLSearchParams({ o: orgId, a: agentId, ...(o.preview ? { p: "1" } : {}) });
+  return `${server}/screen.html?${query.toString()}`;
+};
 
 /** This WebView holds a session, so only the server's own page ever loads in it: never a link, a redirect or a frame. */
 export function screenPageStays(server: string, url: string): boolean {
@@ -88,13 +90,32 @@ type PageCalls = {
   set: [{ connect: boolean; mode: DesktopMode }];
   retry: [];
   pointer: [x: number, y: number, buttons: number];
-  key: [name: string];
+  key: [name: ScreenKey];
   type: [text: string];
 };
 
 /** A call on the page, for `injectJavaScript`. JSON keeps whatever a person typed a value, never code. */
 export const screenCall = <K extends keyof PageCalls>(method: K, ...args: PageCalls[K]) =>
   `window.agentScreen?.${method}(${args.map((a) => JSON.stringify(a)).join(",")});true;`;
+
+/** The keys a phone keyboard lacks, on the row over it while typing on the screen (`SCREEN_KEYS` on the page). */
+export const SCREEN_ROW_KEYS = ["Escape", "Tab", "ArrowLeft", "ArrowUp", "ArrowDown", "ArrowRight"] as const;
+export type ScreenRowKey = (typeof SCREEN_ROW_KEYS)[number];
+/** Every key the app presses on the screen: the row's, and the keyboard's own Return and Backspace. */
+export type ScreenKey = ScreenRowKey | "Enter" | "Backspace";
+
+/**
+ * What the phone keyboard did to the field nobody sees, from its text before to its text now, as keys on the screen:
+ * Backspaces for what went, then what came. Counted in characters, so an emoji is one Backspace. A change in the middle
+ * (the keyboard's caret moved) takes back to it and types the rest again, which leaves the screen's text the same.
+ */
+export function typedSince(before: string, after: string): { back: number; typed: string } {
+  const was = [...before];
+  const now = [...after];
+  let same = 0;
+  while (same < was.length && same < now.length && was[same] === now[same]) same++;
+  return { back: was.length - same, typed: now.slice(same).join("") };
+}
 
 /** RFB's buttons: the left one, and the wheel's two directions (pressed and let go per notch). */
 export const BUTTON = { none: 0, left: 1, wheelUp: 8, wheelDown: 16 } as const;

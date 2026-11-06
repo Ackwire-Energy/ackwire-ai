@@ -1,7 +1,14 @@
-import { afterEach, expect } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import { ProviderError } from "@agenteschat/providers";
-import { consultationWait, getMessage, loadAgentStatuses, outageParkedSql, receiptsFor } from "../../src";
+import {
+  consultationWait,
+  getMessage,
+  loadAgentStatuses,
+  outageParkedSql,
+  receiptsFor,
+  runErrorDetail,
+} from "../../src";
 import { closeWorlds, world } from "./harness";
 import { assertInvariants } from "./invariants";
 import { scenario } from "./known";
@@ -9,6 +16,20 @@ import { scenario } from "./known";
 // I5 (failures reach someone, and work resumes): no failure ends with only a `run.finished` event.
 
 afterEach(closeWorlds);
+
+test("an error of ours at the last try doesn't read as the provider's, and its raw words aren't shown", async () => {
+  const w = await world({
+    agents: ["otto"],
+    script: { otto: () => ({ error: new Error('relation "usage_records" does not exist') }) },
+  });
+  await w.say("@otto o build passou?");
+  await w.settle();
+  await w.advance(2);
+  const [run] = await w.runs("otto");
+  expect(run?.status).toBe("failed");
+  expect(runErrorDetail(run?.error)).toEqual({ errorCode: "run.our_error" });
+  expect(run?.error).not.toContain("usage_records");
+});
 
 scenario("S29", "a provider outage parks the run, which finishes when the provider is back", async () => {
   let down = true;
@@ -23,8 +44,9 @@ scenario("S29", "a provider outage parks the run, which finishes when the provid
   expect((await w.runs("otto"))[0]?.status).not.toBe("failed");
   // The wait is said once, as the provider's (no question to a person), and stays one note while it lasts.
   await w.advance(2);
-  const notes = (await w.posts("otto")).filter((m) => m.meta.bodyCode === "provider_unavailable");
+  const notes = (await w.posts("otto")).filter((m) => m.meta.bodyCode === "provider_wait_down");
   expect(notes).toHaveLength(1);
+  expect(notes[0]?.meta.bodyParams).toEqual({ provider: "Claude", detail: "overloaded" });
   // Nobody reads the park as a wait on a person: hand-off lines, the agent's status and the message's receipt say the
   // provider is down.
   const [parked] = await w.db
@@ -48,6 +70,10 @@ scenario("S29", "a provider outage parks the run, which finishes when the provid
   await w.advance(60);
   expect((await w.runs("otto")).map((r) => r.status)).toEqual(["done"]);
   expect((await w.posts("otto")).at(-1)?.body).toContain("passou");
+  // Its note no longer says a wait is on, in the same place.
+  const after = (await w.posts("otto")).find((m) => m.id === notes[0]?.id);
+  expect(after?.meta.bodyCode).toBe("provider_back");
+  expect(after?.body).toBe("My AI is back.");
   await assertInvariants(w);
 });
 

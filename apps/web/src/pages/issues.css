@@ -2059,3 +2059,13 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   font-size: 12.5px;
   color: var(--muted);
 }
+
+.issue-private {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}

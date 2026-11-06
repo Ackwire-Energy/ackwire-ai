@@ -1,5 +1,17 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, gt, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  type Executor,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { runAuthority } from "./authority";
 import { askStillOpen, unrequested } from "./brakes";
 import { requireChannelAccess } from "./channels";
@@ -30,7 +42,7 @@ import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tool
  * that conversation (`wakeFollowUp`).
  */
 
-const { agentRuns, messages, routines } = schema;
+const { agentRuns, agentWorks, messages, routines } = schema;
 
 export const FOLLOW_UP_TOOL = "follow_up";
 export const CANCEL_FOLLOW_UP_TOOL = "cancel_follow_up";
@@ -159,6 +171,55 @@ async function pendingFollowUps(
     );
 }
 
+/** Reminders of the agent that run it in this conversation at their time (`schedule_reminder` with `ask_agent`). */
+const wakingReminders = (db: Executor, run: Pick<AgentRun, "orgId" | "agentId" | "channelId">, since?: Date) =>
+  db
+    .select({ id: routines.id })
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, run.orgId),
+        eq(routines.agentId, run.agentId),
+        eq(routines.triggerType, "once"),
+        eq(routines.active, true),
+        isNull(routines.deletedAt),
+        isNotNull(routines.nextRunAt),
+        since ? gte(routines.createdAt, since) : undefined,
+        sql`${routines.target}->>'channelId' = ${run.channelId}`,
+        sql`${routines.target}->>'reminder' = 'false'`,
+      ),
+    )
+    .limit(1);
+
+/**
+ * Whatever run set it, the agent comes back to this conversation by itself: a follow-up still to come (the person's,
+ * in the main timeline), a reminder that runs it here, or long work of its own that reports here. Only for a promise
+ * already made: `wakesLater` alone decides whether a turn is judged at all, or every turn beside a running work would
+ * go unread.
+ */
+export async function comesBackHere(db: Executor, run: AgentRun) {
+  const { personId } = await runAuthority(db, run);
+  const [followUps, reminders, works] = await Promise.all([
+    pendingFollowUps(db, run, personId),
+    wakingReminders(db, run),
+    run.workId
+      ? []
+      : db
+          .select({ id: agentWorks.id })
+          .from(agentWorks)
+          .where(
+            and(
+              eq(agentWorks.orgId, run.orgId),
+              eq(agentWorks.agentId, run.agentId),
+              eq(agentWorks.channelId, run.channelId),
+              inArray(agentWorks.status, ["queued", "live"]),
+            ),
+          )
+          .limit(1),
+  ]);
+  return followUps.length > 0 || reminders.length > 0 || works.length > 0;
+}
+
 /**
  * Whether something brings the agent back here by itself, keeping its promise: a follow-up this run set still to
  * come, a question or work it or an earlier run of it asked or handed off from this conversation that is still out
@@ -192,23 +253,7 @@ export async function wakesLater(
     channel && isAgentOnlyDm(channel)
       ? sentOpen(db, run)
       : handOffsFrom(db, run, { openOnly: true }).then((rows) => rows.length > 0),
-    db
-      .select({ id: routines.id })
-      .from(routines)
-      .where(
-        and(
-          eq(routines.orgId, run.orgId),
-          eq(routines.agentId, run.agentId),
-          eq(routines.triggerType, "once"),
-          eq(routines.active, true),
-          isNull(routines.deletedAt),
-          isNotNull(routines.nextRunAt),
-          gte(routines.createdAt, run.createdAt),
-          sql`${routines.target}->>'channelId' = ${run.channelId}`,
-          sql`${routines.target}->>'reminder' = 'false'`,
-        ),
-      )
-      .limit(1),
+    wakingReminders(db, run, run.createdAt),
   ]);
   if (followUp.length > 0 || handedOff || reminder.length > 0) return true;
   for (const d of detachedWaits)

@@ -8,10 +8,6 @@
 .audit__agent {
   min-width: 180px;
 }
-.audit__empty {
-  margin: 28px 0 0;
-  color: var(--muted);
-}
 .audit__list {
   list-style: none;
   margin: 8px 0 0;

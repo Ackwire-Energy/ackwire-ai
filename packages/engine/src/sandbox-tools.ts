@@ -1088,6 +1088,7 @@ export function createSandboxToolSource(
       description:
         "Copy a Drive file you can see into your computer's workspace (documents as .md, tables as .csv, diffs as .patch, diagrams as .mmd, pages as .html; uploaded files as they are, under their original name).",
       scope: SANDBOX_SCOPE,
+      needs: { name: "read_artifact", scope: "drive:read" },
       inputSchema: {
         type: "object",
         properties: {

@@ -26,6 +26,7 @@ import {
   isAutoModel,
   type ModelMessage,
   type ModelResult,
+  PROVIDERS,
   ProviderError,
   type StopReason,
   type SystemBlock,
@@ -183,12 +184,12 @@ import {
   publishChannelEvent,
   publishMessageCreated,
 } from "./events";
-import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
+import { comesBackHere, FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { type CodeSetup, codeStart } from "./git/machine";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
-import { askVerdict, handOffHolds } from "./hand-off";
+import { askVerdict, handOffHolds, repeatedAsk, saysNeedsNothing } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { type Judge, judgeCallOf } from "./judge";
@@ -277,7 +278,8 @@ import {
   NO_AI,
   OUR_ERROR,
   PERSON_LIMIT,
-  PROVIDER_ACCOUNT,
+  providerFailureOf,
+  providerFailureText,
   type RunStatus,
   replyThreadOf,
   runErrorDetail,
@@ -612,7 +614,7 @@ export interface Transcript {
    * (`waitId`: the job that resumes it) since `since` (ms), `n` times so far. Cleared by the next model call that
    * answers. On a rate limit it also waits in its key's line (`key-line.ts`).
    */
-  outage?: { since: number; n: number; waitId: string } & KeyLinePlace;
+  outage?: { since: number; n: number; waitId: string; noteId?: string } & KeyLinePlace;
   /**
    * When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else.
    * A blip (a deploy dropping the computer for seconds, within the outage grace) keeps its place; a real outage doesn't.
@@ -698,7 +700,7 @@ export class BrainFailure extends Error {
     readonly serverStop = false,
     /** A plan limit: whether the turn used a tool before it was cut (undefined: unknown, counted as worked). */
     readonly worked?: boolean,
-    /** Why the provider refused or failed it, as the computer said (runner protocol 49). */
+    /** Why the provider refused or failed it, as the computer said (runner protocol 50). */
     readonly provider: { cause?: ProviderFailureCause; httpStatus?: number } = {},
   ) {
     super(message);
@@ -813,10 +815,13 @@ const userFacing = (error: unknown): string | null => {
   // The message says what to do ("Add an API key…"); the UI shows it translated by its code (`runErrorDetail`).
   if (error instanceof MissingCredentialError) return error.message;
   if (error instanceof ValidationError || error instanceof NotFoundError) return error.message;
-  if (error instanceof ProviderError && !error.retryable)
-    return `provider_error: ${ACCOUNT_REFUSALS.has(error.status ?? 0) ? PROVIDER_ACCOUNT : ""}${error.message}`;
+  if (error instanceof ProviderError && !error.retryable) return providerFailureText("provider_error", error);
   return null;
 };
+
+/** The run's error when a provider's or a computer's failure outlasted every retry. */
+const gaveUp = (error: ProviderError | BrainFailure) =>
+  error instanceof ProviderError ? providerFailureText("gave_up", error) : `gave_up: ${error.message}`;
 
 /** A provider (or brain) failure that may pass by itself: the run waits it out (`OUTAGE_PARK`), anything else fails. */
 const retryableOutage = (error: unknown) =>
@@ -825,8 +830,20 @@ const retryableOutage = (error: unknown) =>
 /** The card's words when the person behind a run is at their monthly limit (`bodyCode` `person_limit`). */
 const PERSON_LIMIT_TEXT = "The person who asked reached their usage limit for this month.";
 
-/** The note a run parked on a provider outage posts once (`bodyCode` `provider_unavailable`). */
+/** The note a run parked on a provider outage posts once; the apps word it by its cause (`outageNote`). */
 const PROVIDER_UNAVAILABLE_TEXT = "My AI provider isn't answering right now. I'll answer as soon as it's back.";
+/** That note once the provider answers again (`bodyCode` `provider_back`): it no longer says a wait is on. */
+const PROVIDER_BACK_TEXT = "My AI is back.";
+
+/** Causes a run waits out. Any other that still came as retryable reads by the provider's own words. */
+const OUTAGE_CAUSES: ReadonlySet<string> = new Set(["rate_limit", "down", "timeout", "unreachable", "ours"]);
+
+const outageNote = (error: unknown) => {
+  const failure = error instanceof ProviderError ? providerFailureOf(error) : null;
+  if (!failure?.provider) return bodyCode("provider_unavailable");
+  const { cause, provider, detail } = failure;
+  return bodyCode(`provider_wait_${OUTAGE_CAUSES.has(cause) ? cause : "said"}`, { provider, detail });
+};
 
 /** The result of a call in a step cut by a server restart that never started. */
 const NOT_RUN_BY_RESTART =
@@ -1075,7 +1092,11 @@ async function executeRunInner(
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const stored = run.transcript as unknown as Transcript | null;
       // Resumes when the last decision or answer comes in.
-      if (await pauseOpen(db, run.id, stored)) return;
+      if (await pauseOpen(db, run.id, stored)) {
+        // One answer of several: the work's line goes on to what it still asks.
+        await pauseWorkTimer({ db, pubsub: deps.pubsub }, run).catch(() => {});
+        return;
+      }
       // Decided while the computer turn that asked still runs: its job resumes the run when that turn ends
       // (`suspendedByBridge`), so the brain's session never takes two turns at once.
       if (stored?.pending?.calls.some((c) => c.inTurn) && (await runJobElsewhere(db, run.id, options.jobId))) return;
@@ -1593,7 +1614,8 @@ async function executeRunInner(
             message: trigger?.body ?? "",
             recent,
             tools: granted,
-            keep,
+            // The message's words may not mention its file (it may have none), and the agent has to open it.
+            keep: Array.isArray(trigger?.meta.artifacts) ? [...keep, toolGroupKey({ scope: "drive:read" })] : keep,
           });
           toolChoice = choice;
           ctx.loadedGroups = choice.groups;
@@ -2136,13 +2158,29 @@ async function executeRunInner(
   prof.mark("context");
   /** What a resumed computer brain reads first: the results of the calls that waited for a person. */
   let resumeText: string | null = null;
+  /** The provider answered again: its note changes in place, so nobody reads a wait that ended. */
+  const outageOver = async (noteId: string) => {
+    const [row] = await db
+      .update(messages)
+      .set({
+        body: PROVIDER_BACK_TEXT,
+        meta: sql`${messages.meta} || ${JSON.stringify(bodyCode("provider_back"))}::jsonb`,
+      })
+      .where(and(eq(messages.orgId, run.orgId), eq(messages.id, noteId)))
+      .returning();
+    if (!row) return;
+    const [view] = await withWikiLinks(db, run.orgId, [messageView(row)]);
+    if (view) await publishMessageCreated(deps.pubsub, view);
+  };
+
   /**
    * The provider is down past the job's own retries (I5): instead of `gave_up`, the run waits on the ladder and
    * resumes the same turn, nothing repeated. Past `OUTAGE_PARK.maxMs` it fails for good, and the failure is
    * reported (`reportRunFailure`). False when it can't park anymore.
    */
-  const parkOutage = async (message: string, line?: string): Promise<boolean> => {
+  const parkOutage = async (error: unknown, line?: string): Promise<boolean> => {
     const t = transcript as Transcript;
+    const message = error instanceof Error ? error.message : String(error);
     const since = t.outage?.since ?? Date.now();
     const n = t.outage?.n ?? 0;
     if (Date.now() - since >= OUTAGE_PARK.maxMs) return false;
@@ -2151,27 +2189,22 @@ async function executeRunInner(
     const step = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
     const minutes = line && people ? Math.min(step, KEY_LINE_PERSON_MINUTES) : step;
     const at = Date.now() + minutes * 60_000;
-    t.outage = { since, n: n + 1, waitId, ...(line ? { line, at, people } : {}) };
+    const noteId = t.outage?.noteId;
+    t.outage = { since, n: n + 1, waitId, ...(noteId ? { noteId } : {}), ...(line ? { line, at, people } : {}) };
     await deferred;
     await addRunStep(db, run, "error", { reason: "provider_outage", message, parked: n + 1 });
     // Said once where it answers, so the wait reads as the provider's, not as a question to a person.
     const note =
       n === 0 && !run.background && viaRoutine === null
         ? await db.transaction(async (tx) => {
-            const m = await post(
-              tx,
-              replyThreadId,
-              PROVIDER_UNAVAILABLE_TEXT,
-              bodyCode("provider_unavailable"),
-              undefined,
-              true,
-            );
+            const m = await post(tx, replyThreadId, PROVIDER_UNAVAILABLE_TEXT, outageNote(error), undefined, true);
             t.postedCount++;
             t.postedUpTo = t.messages.length;
             return m;
           })
         : null;
     if (note) {
+      t.outage.noteId = note.id;
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
     }
@@ -2516,8 +2549,8 @@ async function executeRunInner(
     // choice kept for the next attempt.
     if (brainPlan.kind === "model" && isAutoModel(agent.model) && !applied.apiModel) {
       const outage = new ProviderError("could not reach provider", true);
-      if (options.finalAttempt)
-        return (await parkOutage(outage.message)) ? undefined : fail(`gave_up: ${outage.message}`);
+      outage.provider = PROVIDERS[provider as keyof typeof PROVIDERS]?.label;
+      if (options.finalAttempt) return (await parkOutage(outage)) ? undefined : fail(gaveUp(outage));
       t.autoModel = choice;
       await saveTranscript(db, t);
       await addRunStep(db, run, "error", { reason: "transient", message: String(outage), willRetry: true });
@@ -4141,16 +4174,19 @@ async function executeRunInner(
         if (paused) return fail(paused.message);
         const reason = userFacing(error);
         if (reason) {
-          if (error instanceof ProviderError && !ACCOUNT_REFUSALS.has(error.status ?? 0)) options.failed?.(error);
+          // Refused on the server's own key, the account is ours: nobody else will tell us.
+          if (error instanceof ProviderError && (error.platformKey || !ACCOUNT_REFUSALS.has(error.status ?? 0)))
+            options.failed?.(error);
           return fail(reason);
         }
         // Back from a park and refused again: one try per wake, or a line's head would hit the limit on every job retry.
         if (options.finalAttempt || (transcript.outage && retryableOutage(error))) {
-          const message = error instanceof Error ? error.message : String(error);
           const line = rateLimited(error) ? keyLineOf(thinker) : undefined;
-          if (retryableOutage(error) && (await parkOutage(message, line))) return;
+          if (retryableOutage(error) && (await parkOutage(error, line))) return;
           options.failed?.(error);
-          return fail(`gave_up: ${message}`);
+          if (error instanceof ProviderError || error instanceof BrainFailure) return fail(gaveUp(error));
+          // Neither the provider's nor the computer's: the run's catch words it as ours.
+          throw error;
         }
         await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });
         throw error;
@@ -4171,6 +4207,7 @@ async function executeRunInner(
       await deltas.flush(
         result.toolCalls.length === 0 && now?.status !== "waiting_approval" && now?.status !== "waiting_input",
       );
+      if (transcript.outage?.noteId) await outageOver(transcript.outage.noteId).catch(() => {});
       const passedLine = transcript.outage?.line;
       delete transcript.outage;
       if (passedLine) {
@@ -4598,6 +4635,7 @@ async function executeRunInner(
         wakesLater: async () =>
           (plan.missionId ? await missionAsksPerson(db, plan.missionId) : false) ||
           wakesLater(db, run, (t as { detachedWaits?: { waitId: string }[] }).detachedWaits),
+        comesBack: () => comesBackHere(db, run),
         verdict: judge
           ? async () =>
               continuationVerdict(judge, {
@@ -4617,17 +4655,20 @@ async function executeRunInner(
           : null,
         evidence: judging.evidence,
       });
-      // Read as needing a person (`ask`) yet asking them for nothing it needs (a status note, an optional offer): it is
-      // its answer, never a nudge to ask nor a question card the run would wait on. On a judge error the rule stands.
-      if (judge && decision.verdict === "ask" && (decision.rule === "ask" || decision.rule === "ask_card")) {
-        const asks = await askVerdict(judge, {
-          orgId: run.orgId,
-          agentId: run.agentId,
-          runId: run.id,
-          question: judged,
-          request: t.request ?? triggerMessage?.body ?? triggerText,
-          ...judging.evidence,
-        }).catch(() => "person" as const);
+      // On its way to asking a person, by the verdict `ask` or by repeating a promise (`continue`), yet asking them for
+      // nothing it needs (a status note, an optional offer, a question it already asked): it is its answer, never a
+      // nudge to ask nor a question card the run would wait on. On a judge error the rule stands.
+      if (judge && (decision.rule === "ask" || decision.rule === "ask_card")) {
+        const asks = (await repeatedAsk(db, run, judged))
+          ? "none"
+          : await askVerdict(judge, {
+              orgId: run.orgId,
+              agentId: run.agentId,
+              runId: run.id,
+              question: judged,
+              request: t.request ?? triggerMessage?.body ?? triggerText,
+              ...judging.evidence,
+            }).catch(() => (saysNeedsNothing(judged) ? ("none" as const) : ("person" as const)));
         if (asks === "none") decision = { outcome: "done", rule: "asks_nothing", verdict: "done" };
       }
       turnEnd = decision;

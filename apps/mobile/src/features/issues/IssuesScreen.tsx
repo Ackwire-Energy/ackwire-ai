@@ -15,9 +15,11 @@ import {
 } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, EmptyState, Filters, IconButton, Text, useReducedMotion } from "@/ui";
-import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
-import { agentLook } from "../shared/logic";
+import { useOrg } from "@/providers/org";
+import { Button, Filters, IconButton, Text, useReducedMotion } from "@/ui";
+import { mayCreate } from "../new/logic";
+import { FirstUse } from "../shared/FirstUse";
+import { useColors, useOrgId, usePullRefresh } from "../shared/hooks";
 import { FocusLive, PushedHeader } from "../shared/parts";
 import { type BoardColumn, issueBoard } from "./logic";
 import { BoardCard, ColumnHeader, useColumnLabel } from "./parts";
@@ -37,7 +39,6 @@ export function IssuesScreen() {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
-  const dir = useDirectory();
   const headerHeight = useHeaderHeight();
   const { width } = useWindowDimensions();
   const issues = useIssues(orgId);
@@ -49,6 +50,7 @@ export function IssuesScreen() {
   const going = useRef<number | null>(null);
   const board = useMemo(() => issueBoard(issues.data ?? [], columns.data ?? []), [issues.data, columns.data]);
   const openNew = () => router.push("/issues/new");
+  const mayNew = mayCreate(useOrg().org, "task");
   const columnWidth = width - PEEK - 16;
   const step = columnWidth + COLUMN_GAP;
   const columnAt = (x: number) => Math.max(0, Math.min(board.length - 1, Math.round(x / step)));
@@ -65,7 +67,10 @@ export function IssuesScreen() {
   const empty = issues.isSuccess && (issues.data ?? []).length === 0;
   return (
     <View style={[styles.screen, { backgroundColor: c.bg, paddingTop: Platform.OS === "ios" ? headerHeight : 0 }]}>
-      <PushedHeader solid={false} right={<IconButton icon="plus" label={t("mobile.issues.new")} onPress={openNew} />} />
+      <PushedHeader
+        solid={false}
+        {...(mayNew ? { right: <IconButton icon="plus" label={t("mobile.issues.new")} onPress={openNew} /> } : {})}
+      />
       <Text variant="display" accessibilityRole="header" numberOfLines={1} style={styles.title}>
         {t("mobile.issues.title")}
       </Text>
@@ -86,13 +91,7 @@ export function IssuesScreen() {
           />
         </View>
       ) : empty ? (
-        <EmptyState
-          sky
-          crew={dir.agents.slice(0, 3).map((a) => ({ ...agentLook(a), id: a.id }))}
-          title={t("mobile.issues.empty")}
-          subtitle={t("mobile.issues.emptyOpen")}
-          action={<Button variant="primary" size="sm" icon="plus" label={t("mobile.issues.new")} onPress={openNew} />}
-        />
+        <FirstUse place="tasks" acts={mayNew} label={t("mobile.issues.new")} onPress={openNew} />
       ) : (
         <>
           <Filters

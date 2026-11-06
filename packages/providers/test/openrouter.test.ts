@@ -491,7 +491,24 @@ describe("OpenRouter adapter (Chat Completions, scripted transport)", () => {
     e = await failure(call({}, scripted(json(408, 408, "Timeout")).fetcher).result);
     expect(e).toMatchObject({ retryable: true, status: 408 });
     e = await failure(call({}, scripted(json(400, 400, "bad")).fetcher).result);
-    expect(e).toMatchObject({ retryable: false, status: 400 });
+    expect(e).toMatchObject({ retryable: false, status: 400, said: "bad" });
+
+    // Behind OpenRouter's generic words: the upstream's own, as text or as its JSON body.
+    const upstream = (raw: string) => ({
+      status: 429,
+      type: "application/json",
+      body: JSON.stringify({ error: { code: 429, message: "Provider returned error", metadata: { raw } } }),
+    });
+    e = await failure(call({}, scripted(upstream("x/y is temporarily rate-limited upstream")).fetcher).result);
+    expect(e).toMatchObject({ said: "x/y is temporarily rate-limited upstream" });
+    e = await failure(call({}, scripted(upstream('{"error":{"message":"busy\\n"}}')).fetcher).result);
+    expect((e as ProviderError).said).toContain("busy");
+    // A body that echoes the request is never shown: only its message is, else OpenRouter's words.
+    const echoed = '{"detail":[{"msg":"Field required","input":{"role":"system","content":"private instructions"}}]}';
+    e = await failure(call({}, scripted(upstream(echoed)).fetcher).result);
+    expect(e).toMatchObject({ said: "Provider returned error" });
+    e = await failure(call({}, scripted(upstream("<html>502 Bad Gateway</html>")).fetcher).result);
+    expect(e).toMatchObject({ said: "Provider returned error" });
 
     // HTTP 200 already sent: the failure arrives as a chunk, its code the status it stands for.
     const broken = (code: unknown) =>

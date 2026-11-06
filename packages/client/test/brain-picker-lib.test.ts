@@ -110,6 +110,16 @@ describe("Quem pensa as one list (the new agent's step)", () => {
       ownerIsMe: true,
     });
     expect(noComputer.find((o) => o.value === "claude-sonnet-5-5")?.disabled).toBe(true);
+    expect(noComputer.find((o) => o.value === "none:claude")?.description).toBe("brain.foot.noComputer");
+    // A billing hold, not the computers, is why a plan is off then.
+    const held = brainPickOptions(t, "pt-BR", {
+      api: modelChoices(MODELS, [], false),
+      machines: [],
+      accounts: [],
+      ownerIsMe: true,
+      held: true,
+    });
+    expect(held.find((o) => o.value === "none:claude")?.description).toBe("connectAi.billing");
   });
 
   test("a plan offers what the agent's page offers there: Automático and the same models", () => {

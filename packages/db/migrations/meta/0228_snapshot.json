@@ -1,5 +1,5 @@
 {
-  "id": "1fd59c4f-0c44-4a0d-9834-9922c8c71a4c",
+  "id": "7b8f1aa5-44d8-4d2a-86ac-2ba05638b675",
   "prevId": "139b2913-00e1-4e00-a4a1-b85a3be16ea5",
   "version": "7",
   "dialect": "postgresql",
@@ -9280,70 +9280,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.claude_auth_settings": {
-      "name": "claude_auth_settings",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "default": 1
-        },
-        "method": {
-          "name": "method",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'setup_token'"
-        },
-        "rollout": {
-          "name": "rollout",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'selected'"
-        },
-        "org_ids": {
-          "name": "org_ids",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::uuid[]"
-        },
-        "changed_at": {
-          "name": "changed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "claude_auth_settings_one_row": {
-          "name": "claude_auth_settings_one_row",
-          "value": "\"claude_auth_settings\".\"id\" = 1"
-        },
-        "claude_auth_settings_method": {
-          "name": "claude_auth_settings_method",
-          "value": "\"claude_auth_settings\".\"method\" in ('cli_login', 'setup_token')"
-        },
-        "claude_auth_settings_rollout": {
-          "name": "claude_auth_settings_rollout",
-          "value": "\"claude_auth_settings\".\"rollout\" in ('selected', 'all')"
-        },
-        "claude_auth_settings_org_ids": {
-          "name": "claude_auth_settings_org_ids",
-          "value": "coalesce(cardinality(\"claude_auth_settings\".\"org_ids\"), 0) <= 500"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.machine_accounts": {
       "name": "machine_accounts",
       "schema": "",
@@ -9433,43 +9369,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "auth_method": {
-          "name": "auth_method",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_unknown": {
-          "name": "status_unknown",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "provider_org_id": {
-          "name": "provider_org_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_failure_cause": {
-          "name": "last_failure_cause",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_failure_at": {
-          "name": "last_failure_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_success_at": {
-          "name": "last_success_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -9569,12 +9468,7 @@
       },
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "machine_accounts_auth_method": {
-          "name": "machine_accounts_auth_method",
-          "value": "\"machine_accounts\".\"auth_method\" in ('cli_login', 'setup_token', 'api_key')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.machine_device_codes": {

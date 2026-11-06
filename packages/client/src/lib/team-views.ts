@@ -113,6 +113,12 @@ export function sectorReach(group: AgentGroup, agents: readonly TeamAgent[]) {
   return { agents: mine, people, channelIds };
 }
 
+/** What an empty Setores says: what they give to who can create one, who does to who can't. */
+export const noSectorsCopy = (arranges: boolean) =>
+  arranges
+    ? ({ title: "team.sectors.emptyTitle", text: "team.sectors.empty" } as const)
+    : ({ title: "team.sectors.emptyViewerTitle", text: "team.sectors.emptyViewer" } as const);
+
 /** What a setor is missing, as a word the apps translate: no lead first, then no substitute; null when covered. */
 export const sectorGap = (group: AgentGroup): "noLead" | "noBackup" | null =>
   !group.leadUserId ? "noLead" : !group.backupUserId ? "noBackup" : null;

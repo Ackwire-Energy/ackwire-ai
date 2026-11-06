@@ -25,6 +25,7 @@ import { cutText, pgSafeJson, pgSafeText } from "../format";
 import { mergeReposOfCall, recordMergeDone, reposOfGithubCall } from "../git/repos";
 import { recordRead } from "../outbound";
 import { routineCreatorOf } from "../requester";
+import { FIXED_GRANTS, RIGHT_HAND_REFUSAL } from "../right-hand";
 import type { RoutineBrief } from "../routine-brief";
 import { addRunStep } from "../runs";
 import { describeWhen } from "../schedule";
@@ -52,6 +53,7 @@ import {
   BUILTIN_SCOPES,
   freshGrantedKeys,
   grantedScopeKeys,
+  grantKey,
   holdsConnection,
   isAllowed,
   NOT_IN_ALL,
@@ -296,8 +298,14 @@ const UNCHECKED: TeamCheck = { proceed: true, reason: null };
  * with less access than the tool needs (`request_permission` only offers what it has none of), or a permission it
  * can ask for. Each says who can change it.
  */
-function refusalOf(tool: ToolDefinition, access: ReturnType<typeof accessWithNeeds>, granted: Set<string>) {
+async function refusalOf(
+  ctx: ToolContext,
+  tool: ToolDefinition,
+  access: ReturnType<typeof accessWithNeeds>,
+  granted: Set<string>,
+) {
   const of = access.of;
+  if (granted.has(grantKey(null, FIXED_GRANTS))) return RIGHT_HAND_REFUSAL;
   if (access.state === "denied") {
     return `${of === tool ? "this tool" : of.name} is turned off for this agent, not for good: an admin can turn it back on, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso). Say so in plain words (the person asking may be that admin), never that it can't be done`;
   }
@@ -305,7 +313,11 @@ function refusalOf(tool: ToolDefinition, access: ReturnType<typeof accessWithNee
     const level = /^custom:[^:]+:(read|write)$/.exec(tool.scope)?.[1];
     return `${tool.name} exists, but this agent's access to ${tool.connectorLabel ?? "its connector"} doesn't cover it (it needs ${level ? `${level} access` : `the scope ${tool.scope}`}). Only an admin can change that, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso): say so (the person asking may be that admin), never that the tool doesn't exist`;
   }
-  return `this agent lacks the scope ${of.scope}. If the request needs it, ask for it with request_permission`;
+  const permission = of === tool && tool.connectionId ? `connector:${tool.connectionId}` : of.scope;
+  if ((await missingPermissions(ctx)).some((m) => m.id === permission)) {
+    return `this agent lacks the scope ${of.scope}. If the request needs it, call ${REQUEST_PERMISSION_TOOL} now with permission "${permission}": a card asks a person and your work goes on once they decide. Never ask the person to try again`;
+  }
+  return `this agent lacks the scope ${of.scope}, which ${REQUEST_PERMISSION_TOOL} can't offer. Only an admin can give it, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso): say so, never ask the person to try again`;
 }
 
 /** `permission_prompt`'s question (Claude Code and Codex commands): a new command, or the state of one asked. */
@@ -1015,7 +1027,8 @@ export function createToolGateway(deps: {
         const granted = await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId);
         const access = accessWithNeeds(granted, tool);
         if (!isAllowed(access.state)) {
-          return finish({ content: `Not allowed: ${refusalOf(tool, access, granted)}`, isError: true }, "refused");
+          const refusal = await refusalOf(ctx, tool, access, granted);
+          return finish({ content: `Not allowed: ${refusal}`, isError: true }, "refused");
         }
       }
       // A call that asks a person says why (shown on its card); the tool itself never sees it. It is
@@ -1056,8 +1069,11 @@ export function createToolGateway(deps: {
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) {
         // Through a directory the model never saw the schema up front: show it, so the next call can be right.
-        const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(tool.inputSchema)}` : "";
-        return finish({ content: `Invalid input: ${problems.join("; ")}${schemaHint}`, isError: true });
+        const listed = asListed(tool, decision);
+        const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(listed.inputSchema)}` : "";
+        // Everything the call lacks in one answer: told one field at a time, a model swaps one for the other.
+        const needsWhy = whyMissing ? `. ${WHY_REFUSAL}` : "";
+        return finish({ content: `Invalid input: ${problems.join("; ")}${needsWhy}${schemaHint}`, isError: true });
       }
       // A run a routine's reading feeds never sends a credential anywhere (ADR 0053 §3): a key it read on its
       // computer (a sandbox that can't keep it from being read) can't leave through any tool, on any brain. Any

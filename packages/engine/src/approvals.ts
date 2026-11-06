@@ -37,6 +37,7 @@ import { notifyApproval, resolveApprovalNotifications } from "./notification-pro
 import { can, type Membership, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { maySql, type RolePermission } from "./permissions";
+import { accountInUse } from "./standing";
 import { taskReaderSql } from "./task-access";
 import { AHEAD_GRACE_MS, type Approval } from "./tools/gateway";
 import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
@@ -47,6 +48,7 @@ const {
   approvals,
   organizationMembers,
   channelMembers,
+  channels,
   agents,
   agentRuns,
   agentRunSteps,
@@ -204,11 +206,19 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
       : Promise.resolve([]),
   ]);
   const issueIds = [...new Set(runs.map((r) => r.issueId).filter((id): id is string => !!id))];
+  // A card reaches approvers outside its conversation, and its realtime event has no one viewer: a task tied to a DM or
+  // a private channel stays off every card.
   const issueRows = issueIds.length
     ? await db
         .select({ id: issues.id, number: issues.number, title: issues.title })
         .from(issues)
-        .where(inArray(issues.id, issueIds))
+        .leftJoin(channels, eq(channels.id, issues.channelId))
+        .where(
+          and(
+            inArray(issues.id, issueIds),
+            or(isNull(issues.channelId), and(eq(channels.kind, "channel"), eq(channels.visibility, "public"))),
+          ),
+        )
     : [];
   const connectionOf = new Map(connections.map((c) => [c.id, c]));
   const mailboxOf = new Map(mailboxes.map((m) => [m.id, m]));
@@ -552,7 +562,8 @@ export async function approverIds(
       )})`,
     })
     .from(organizationMembers)
-    .where(eq(organizationMembers.orgId, approval.orgId));
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(and(eq(organizationMembers.orgId, approval.orgId), accountInUse));
   const admins = members.filter((m) => m.admin).map((m) => m.userId);
   const member = new Set(members.map((m) => m.userId));
   const named = approval.approvers;

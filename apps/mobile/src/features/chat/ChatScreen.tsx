@@ -124,6 +124,7 @@ import { RightHandIntro } from "../right-hand/Intro";
 import { ConversationSearch } from "../search/ConversationSearch";
 import { hitTarget } from "../search/logic";
 import { AgentFace, Face, OpensAgent } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useMyHandle, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, previewOf } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
@@ -1126,6 +1127,7 @@ function Chat({
   const seekPages = useRef(0);
   const seekPressed = useRef(false);
   const seekReady = isThread ? threadMessages.isSuccess && !threadMessages.isPlaceholderData : top.isSuccess;
+  const seekRefreshing = isThread ? threadMessages.isFetching : top.isFetching;
   useEffect(() => {
     if (!seek || !seekReady) return;
     const index = shownRows.findIndex((r) => r.kind === "message" && r.message.id === seek);
@@ -1138,8 +1140,11 @@ function Chat({
       return;
     }
     if (isThread || olderDone || seekPages.current >= SEEK_MAX_PAGES) {
+      // A cached page refreshing may still bring it.
+      if (seekRefreshing) return;
       setSeek(null);
       if (seekPressed.current) toast({ title: t("channel.jumpTooFar") });
+      else toast({ title: t("channel.jumpMissing"), icon: "x" });
       seekPressed.current = false;
       return;
     }
@@ -1147,7 +1152,7 @@ function Chat({
       seekPages.current += 1;
       loadOlder();
     }
-  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo, t, toast]);
+  }, [seek, seekReady, seekRefreshing, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo, t, toast]);
   useEffect(() => {
     if (!flashId) return;
     const timer = setTimeout(() => setFlashId(null), FLASH_MS);
@@ -2072,9 +2077,8 @@ function Chat({
                     />
                   ) : (
                     <View style={[styles.center, { paddingBottom: composerHeight }]}>
-                      <Text tone="faint" style={styles.emptyText}>
-                        {t("mobile.chat.empty")}
-                      </Text>
+                      {/* No button: the composer under it is the next step. */}
+                      <FirstUse place="chat" size="panel" acts={member && channel?.can?.post !== false} />
                     </View>
                   )}
                 </View>
@@ -2326,7 +2330,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  emptyText: { textAlign: "center" },
   pin: { paddingHorizontal: 12, paddingBottom: 10 },
   pinBelowBar: { paddingTop: 10 },
   day: { alignSelf: "center", textAlign: "center", marginTop: 16, marginBottom: 6, fontWeight: "600" },

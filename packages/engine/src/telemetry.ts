@@ -154,7 +154,9 @@ export async function buildTelemetryReport(
         (select count(*) from agent_runs where created_at >= ${day}) as runs,
         (select count(*) from agent_run_steps where kind = 'tool_call' and created_at >= ${day}) as tool_calls,
         (select coalesce(sum((details->>'seconds')::numeric), 0) from audit_log
-          where action in ('desktop.watched', 'desktop.controlled') and created_at >= ${day}) as desktop_seconds,
+          where action in ('desktop.watched', 'desktop.controlled') and created_at >= ${day}
+            -- A browser card's view of the screen (ADR 0058 §7) is no one using the desktop.
+            and coalesce(details->>'preview', 'false') <> 'true') as desktop_seconds,
         (select coalesce(sum((details->>'seconds')::numeric), 0) from audit_log
           where action = 'terminal.session' and created_at >= ${day}) as terminal_seconds`),
   );

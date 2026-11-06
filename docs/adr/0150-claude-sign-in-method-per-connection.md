@@ -4,7 +4,7 @@
 - Date: 2026-11-05
 - Extends: ADR 0041 (accounts per agent), ADR 0056 (operator API), ADR 0059 (AI accounts belong to people)
 - Amends: ADR 0059 §2 (the method a Claude sign-in for all agents uses is per connection and chosen by the operator for new ones; an unchecked status is not signed out), ADR 0056 §4 (the Claude sign-in policy and the AI-accounts reads) and §5 (`account.failure`, a failed `run.finished`'s `failure`)
-- Code: runner protocol 49 (`CLAUDE_AUTH_PROTOCOL`, `AuthMethod`, `ProviderFailureCause`, `claudeLoginMethodsOf` in `packages/adapters/src/machine-protocol.ts`); runner `apps/server/runner/accounts.ts` (the `<id>.method` marker, `authMethod`, `statusUnknown`, `begin`'s `method`), `brain.ts` (`cause`, `httpStatus`), `agent-users.ts` (`authEgressPrefix`); migration `0228_claude_auth` (`machine_accounts.auth_method`, `status_unknown`, `provider_org_id`, `last_failure_cause`, `last_failure_at`, `last_success_at`; `claude_auth_settings`); engine `packages/engine/src/claude-auth-policy.ts`, `machine-accounts.ts`, `operator-events.ts`, `ai-accounts-analytics.ts`; operator routes `apps/server/src/operator/claude-auth.ts`, `analytics.ts`; client `packages/client/src/lib/ai-accounts.ts`
+- Code: runner protocol 50 (`CLAUDE_AUTH_PROTOCOL`, `AuthMethod`, `ProviderFailureCause`, `claudeLoginMethodsOf` in `packages/adapters/src/machine-protocol.ts`); runner `apps/server/runner/accounts.ts` (the `<id>.method` marker, `authMethod`, `statusUnknown`, `begin`'s `method`), `brain.ts` (`cause`, `httpStatus`), `agent-users.ts` (`authEgressPrefix`); migration `0231_claude_auth` (`machine_accounts.auth_method`, `status_unknown`, `provider_org_id`, `last_failure_cause`, `last_failure_at`, `last_success_at`; `claude_auth_settings`); engine `packages/engine/src/claude-auth-policy.ts`, `machine-accounts.ts`, `operator-events.ts`, `ai-accounts-analytics.ts`; operator routes `apps/server/src/operator/claude-auth.ts`, `analytics.ts`; client `packages/client/src/lib/ai-accounts.ts`
 
 ## Context
 
@@ -28,7 +28,7 @@ Signing in again uses the connection's method. A `begin` with `again` that names
 
 ### 3. Capability negotiation, never a fallback
 
-`hello.claudeLoginMethods` says which methods a new Claude sign-in for all agents can use on that computer: `["cli_login"]` where agents are the runner's own user, `["setup_token"]` where each is its own OS user (§Not done). A runner older than 49 says nothing and is read as what it did (`claudeLoginMethodsOf`). When the effective method is one the runner can't use, `beginAccountLogin` refuses with `account.method_unsupported` (409) before any row is made; it never falls back to the other method. A runner that gets `method: "cli_login"` for a shared sign-in in system mode refuses it too (`unsupported`), and `setup_token` outside system mode or without `shared` is `bad_request`. `method` goes only to protocol 49 runners, and only for a Claude subscription (no `provider`).
+`hello.claudeLoginMethods` says which methods a new Claude sign-in for all agents can use on that computer: `["cli_login"]` where agents are the runner's own user, `["setup_token"]` where each is its own OS user (§Not done). A runner older than 50 says nothing and is read as what it did (`claudeLoginMethodsOf`). When the effective method is one the runner can't use, `beginAccountLogin` refuses with `account.method_unsupported` (409) before any row is made; it never falls back to the other method. A runner that gets `method: "cli_login"` for a shared sign-in in system mode refuses it too (`unsupported`), and `setup_token` outside system mode or without `shared` is `bad_request`. `method` goes only to protocol 50 runners, and only for a Claude subscription (no `provider`).
 
 ### 4. An unchecked status is not a signed-out one
 
@@ -50,7 +50,7 @@ Where each agent is its own OS user, root runs Claude's `setup-token`, `auth log
 
 ### 8. Taking it back
 
-The policy is the switch: `setup_token` (or no workspaces listed) makes every new Claude sign-in for all agents a token again, as before. Connections made meanwhile keep their method until they are removed; signing one in again keeps its method, so moving it means removing it and connecting again. Everything here is behind protocol 49: older runners get no `method`, report no new fields, and the server reads their silence as before.
+The policy is the switch: `setup_token` (or no workspaces listed) makes every new Claude sign-in for all agents a token again, as before. Connections made meanwhile keep their method until they are removed; signing one in again keeps its method, so moving it means removing it and connecting again. Everything here is behind protocol 50: older runners get no `method`, report no new fields, and the server reads their silence as before.
 
 ## Not done
 

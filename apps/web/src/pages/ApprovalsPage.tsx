@@ -96,6 +96,7 @@ import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { TaskStepsBlock, useCallLogo } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { TYPED_VALUES } from "@/i18n";
 import { Markdown } from "@/lib/markdown";
 import { useOpenParam } from "@/lib/open-param";
@@ -195,6 +196,7 @@ export function ApprovalsPage() {
   const all = approvals.data ?? [];
   const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
   const query = q.trim().toLowerCase();
+  const look = useRightHandLook();
   const matches = (a: Approval) =>
     !query ||
     [
@@ -356,12 +358,14 @@ export function ApprovalsPage() {
           commands === 0 &&
           !missionWaiting &&
           shownDecided.length === 0 && (
-            <EmptyState sky title={t("approvals.emptyTitle")}>
+            <EmptyState size="page" agent={look} mood="deal" title={t("approvals.emptyTitle")}>
               <HelpLink slug="approvals">{t("approvals.how")}</HelpLink>
             </EmptyState>
           )}
         {approvals.isSuccess && query && shownOpen.length === 0 && shownDecided.length === 0 && (
-          <EmptyState icon="search">{t("approvals.noResults")}</EmptyState>
+          <EmptyState size="panel" actions={<Button onClick={() => setQ("")}>{t("filters.clearSearch")}</Button>}>
+            {t("approvals.noResults")}
+          </EmptyState>
         )}
 
         {(shownOpen.length > 0 || shownDecided.length > 0) && (
@@ -484,7 +488,12 @@ export function ApprovalsPage() {
           </>
         )}
         {approvals.isSuccess && filter !== "pending" && !query && shownOpen.length + shownDecided.length === 0 && (
-          <EmptyState icon="approve">{t("approvals.noResults")}</EmptyState>
+          <EmptyState
+            size="panel"
+            actions={<Button onClick={() => setFilter("pending")}>{t("filters.clearAll")}</Button>}
+          >
+            {t("approvals.noResults")}
+          </EmptyState>
         )}
       </div>
     </div>

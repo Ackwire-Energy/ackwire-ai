@@ -210,7 +210,7 @@ export const words: EmailWords = {
     account: (email) => [
       "输入这个验证码即可删除整个账号 ",
       { b: email },
-      "，而不只是一个工作区。账号会立即删除，只有你一人的工作区也会随之关闭。",
+      "，而不只是一个工作区。账号会立即在所有设备上退出登录，7 天后被永久删除，只有你一人的工作区也会随之关闭。",
     ],
     support: (address) => [
       "验证码 10 分钟内有效，没有它什么都不会被删除。如果不是你本人操作，请不要告诉任何人，并写信至 ",
@@ -253,6 +253,20 @@ export const words: EmailWords = {
     note: "不是你连接的？请立即断开它，并修改密码。",
     button: "查看已连接的应用",
     why: (org) => `你收到这封邮件，是因为有应用连接到了你在 agentes.chat 上 ${org} 的账号。`,
+  },
+  accountDeleting: {
+    subject: (day) => `你的 agentes.chat 账号将于 ${day} 删除`,
+    preheader: "你有 7 天时间改变主意。",
+    headline: "你的账号正在删除",
+    body: (email, day, time) => [
+      "我们将删除账号 ",
+      { b: email },
+      `，时间是 ${day} ${time}。它已在所有设备上退出登录，在你回来之前，这里没有人能联系到你。`,
+    ],
+    closes: (_count, names) => ["只有你一人的工作区现已关闭，并在同一天删除：", ...names, "。"],
+    undo: "改变主意了？在那之前登录并点击“恢复”。",
+    button: "登录并恢复",
+    why: "你收到这封邮件，是因为这个地址在 agentes.chat 上有一个账号。",
   },
   accountDeleted: {
     subject: "你的 agentes.chat 账号已删除",
