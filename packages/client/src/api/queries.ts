@@ -4,6 +4,7 @@ import {
   type QueryClient,
   queryOptions,
   useInfiniteQuery,
+  useIsMutating,
   useMutation,
   useQueries,
   useQuery,
@@ -1743,12 +1744,27 @@ function keepOwnRights(previous: Approval | undefined, approval: Approval): Appr
   return approval;
 }
 
+const decidingKey = (orgId: string) => ["approval-decision", orgId];
+
+/** Whether any of these requests is being decided: each of a card's buttons runs its own mutation. */
+export function useApprovalsDeciding(orgId: string, ids: readonly string[]) {
+  const deciding = useIsMutating({
+    mutationKey: decidingKey(orgId),
+    predicate: (mutation) => {
+      const input = mutation.state.variables as { id?: string; ids?: string[] } | undefined;
+      return (input?.ids ?? [input?.id]).some((id) => id !== undefined && ids.includes(id));
+    },
+  });
+  return deciding > 0;
+}
+
 /** `always` ("Aprovar sempre"): approves this one and the agent's next calls of its kind. */
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const via = useCardVia();
   return useMutation({
+    mutationKey: decidingKey(orgId),
     mutationFn: ({
       id,
       decision,
@@ -1792,6 +1808,7 @@ export function useDecideApprovals(orgId: string) {
   const qc = useQueryClient();
   const via = useCardVia();
   return useMutation({
+    mutationKey: decidingKey(orgId),
     mutationFn: (input: { ids: string[]; decision: "approve" | "refuse"; reason?: string }) =>
       api.approvals.decideMany(orgId, via ? { ...input, via } : input),
     onSuccess: (result, { decision }) => {

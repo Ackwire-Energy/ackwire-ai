@@ -23,6 +23,7 @@ import {
   haptics,
   Icon,
   LineIcon,
+  Locked,
   Segmented,
   Text,
   ToggleSwitch,
@@ -232,7 +233,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       well={{ tile: <IconTile name="lock" size={20} />, title: r.name, detail: where }}
       body={
         mine ? (
-          <>
+          <Locked when={busy !== null} style={styles.body}>
             {code ? (
               <CodeInput
                 length={code}
@@ -370,7 +371,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                 ) : null}
               </View>
             ) : null}
-          </>
+          </Locked>
         ) : null
       }
       expiry={<ExpiryLine expiresAt={r.expiresAt} />}
@@ -414,6 +415,8 @@ export function SecretCard({ request }: { request: SecretRequest }) {
 }
 
 const styles = StyleSheet.create({
+  // The card's body gives its children this gap: the lock takes their place in it.
+  body: { gap: 8 },
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: "600" },
   field: {

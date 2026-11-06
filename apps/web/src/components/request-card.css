@@ -16,7 +16,8 @@
   border-radius: 16px 16px 16px 4px;
 }
 .rq > :not(.ac-approval__sky),
-.rq__form > * {
+.rq > .ac-locked > *,
+.rq__form > .ac-locked > * {
   position: relative;
 }
 .rq__form {

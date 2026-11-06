@@ -9,7 +9,7 @@ import {
   replyTarget,
   waitingCardOf,
 } from "@agenteschat/client/lib/notifications";
-import { Button, CountBadge, cx, Icon, Kbd, prefersReducedMotion } from "@agenteschat/ui";
+import { Button, CountBadge, cx, Icon, Kbd, Locked, prefersReducedMotion } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
@@ -334,20 +334,21 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
           <>
             {typing && target ? (
               <form className="ni__reply" onSubmit={submit}>
-                <input
-                  ref={input}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      e.stopPropagation();
-                      setTyping(false);
-                    }
-                  }}
-                  placeholder={t("island.placeholder")}
-                  aria-label={t("island.reply")}
-                  disabled={reply.isPending}
-                />
+                <Locked when={reply.isPending}>
+                  <input
+                    ref={input}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.stopPropagation();
+                        setTyping(false);
+                      }
+                    }}
+                    placeholder={t("island.placeholder")}
+                    aria-label={t("island.reply")}
+                  />
+                </Locked>
                 <Button
                   type="submit"
                   variant="primary"
@@ -360,34 +361,30 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
                 />
               </form>
             ) : (
-              <div className="ni__acts">
-                {suggestions.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className="ni__choice"
-                    disabled={reply.isPending}
-                    onClick={() => answer(s, true)}
-                  >
-                    {s}
-                  </button>
-                ))}
-                {waiting && waiting.action !== "answer" && canOpen && (
-                  <Button variant="primary" size="sm" onClick={open}>
-                    {waiting.action === "review" ? t("island.review") : t("island.open")}
-                  </Button>
-                )}
-                {target && (
-                  <Button size="sm" icon="reply" onClick={() => setTyping(true)}>
-                    {suggestions.length ? t("island.otherAnswer") : t("island.reply")}
-                  </Button>
-                )}
-                {!(waiting && waiting.action !== "answer") && canOpen && (
-                  <Button size="sm" onClick={open}>
-                    {t("island.open")}
-                  </Button>
-                )}
-              </div>
+              <Locked when={reply.isPending}>
+                <div className="ni__acts">
+                  {suggestions.map((s) => (
+                    <button key={s} type="button" className="ni__choice" onClick={() => answer(s, true)}>
+                      {s}
+                    </button>
+                  ))}
+                  {waiting && waiting.action !== "answer" && canOpen && (
+                    <Button variant="primary" size="sm" onClick={open}>
+                      {waiting.action === "review" ? t("island.review") : t("island.open")}
+                    </Button>
+                  )}
+                  {target && (
+                    <Button size="sm" icon="reply" onClick={() => setTyping(true)}>
+                      {suggestions.length ? t("island.otherAnswer") : t("island.reply")}
+                    </Button>
+                  )}
+                  {!(waiting && waiting.action !== "answer") && canOpen && (
+                    <Button size="sm" onClick={open}>
+                      {t("island.open")}
+                    </Button>
+                  )}
+                </div>
+              </Locked>
             )}
             {failed && <p className="ni__failed">{t("island.failed")}</p>}
           </>

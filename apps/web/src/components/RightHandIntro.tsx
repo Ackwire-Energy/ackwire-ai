@@ -200,6 +200,7 @@ function StartCard({
         waitingFor={answer !== null ? t("teamPlan.answered") : undefined}
         lead={question}
         what={question}
+        locked={create.isPending}
         body={
           <>
             {first && (
@@ -335,6 +336,7 @@ function StyleCard({ agent }: { agent: Agent }) {
       mine={false}
       lead={question}
       what={question}
+      locked={save.isPending}
       body={<p>{t("rightHand.intro.style.text")}</p>}
       actions={
         <>

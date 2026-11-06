@@ -3,7 +3,7 @@ import { textOrMedia } from "@agenteschat/client/lib/media";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, Card, Filters, Icon, IconButton, type IconName, Text, useToast } from "@/ui";
+import { Button, Card, Filters, Icon, IconButton, type IconName, Locked, Text, useToast } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useOrgId, useWhen } from "../shared/hooks";
 import { previewOf } from "../shared/logic";
@@ -128,14 +128,16 @@ export function RemindSheet({
         </View>
       ) : null}
       {needsText ? (
-        <TextArea
-          value={text}
-          onChangeText={setText}
-          placeholder={t("mobile.remind.placeholder")}
-          accessibilityLabel={t("mobile.remind.what")}
-          minHeight={64}
-          autoFocus={!initialText}
-        />
+        <Locked when={action.isPending}>
+          <TextArea
+            value={text}
+            onChangeText={setText}
+            placeholder={t("mobile.remind.placeholder")}
+            accessibilityLabel={t("mobile.remind.what")}
+            minHeight={64}
+            autoFocus={!initialText}
+          />
+        </Locked>
       ) : null}
       {custom === null ? (
         <ActionList
@@ -160,42 +162,46 @@ export function RemindSheet({
         />
       ) : (
         <>
-          <Filters
-            items={days.map((d, i) => ({
-              key: String(i),
-              label:
-                i === 0
-                  ? t("mobile.time.today")
-                  : i === 1
-                    ? t("mobile.remind.tomorrow")
-                    : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" }).format(d).replace(".", ""),
-            }))}
-            value={String(custom.dayOffset)}
-            onChange={(key) => setCustom((cur) => (cur ? { ...cur, dayOffset: Number(key) } : cur))}
-          />
-          <Card>
-            <View style={styles.clock}>
-              <Stepper
-                value={String(custom.time.hour).padStart(2, "0")}
-                label={t("mobile.remind.hour")}
-                lessLabel={t("mobile.remind.hourLess")}
-                moreLabel={t("mobile.remind.hourMore")}
-                onLess={() => moveTime(-60)}
-                onMore={() => moveTime(60)}
-              />
-              <Text variant="display" tone="faint">
-                :
-              </Text>
-              <Stepper
-                value={String(custom.time.minute).padStart(2, "0")}
-                label={t("mobile.remind.minute")}
-                lessLabel={t("mobile.remind.minuteLess", { n: MINUTE_STEP })}
-                moreLabel={t("mobile.remind.minuteMore", { n: MINUTE_STEP })}
-                onLess={() => moveTime(-MINUTE_STEP)}
-                onMore={() => moveTime(MINUTE_STEP)}
-              />
-            </View>
-          </Card>
+          <Locked when={action.isPending} style={styles.custom}>
+            <Filters
+              items={days.map((d, i) => ({
+                key: String(i),
+                label:
+                  i === 0
+                    ? t("mobile.time.today")
+                    : i === 1
+                      ? t("mobile.remind.tomorrow")
+                      : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" })
+                          .format(d)
+                          .replace(".", ""),
+              }))}
+              value={String(custom.dayOffset)}
+              onChange={(key) => setCustom((cur) => (cur ? { ...cur, dayOffset: Number(key) } : cur))}
+            />
+            <Card>
+              <View style={styles.clock}>
+                <Stepper
+                  value={String(custom.time.hour).padStart(2, "0")}
+                  label={t("mobile.remind.hour")}
+                  lessLabel={t("mobile.remind.hourLess")}
+                  moreLabel={t("mobile.remind.hourMore")}
+                  onLess={() => moveTime(-60)}
+                  onMore={() => moveTime(60)}
+                />
+                <Text variant="display" tone="faint">
+                  :
+                </Text>
+                <Stepper
+                  value={String(custom.time.minute).padStart(2, "0")}
+                  label={t("mobile.remind.minute")}
+                  lessLabel={t("mobile.remind.minuteLess", { n: MINUTE_STEP })}
+                  moreLabel={t("mobile.remind.minuteMore", { n: MINUTE_STEP })}
+                  onLess={() => moveTime(-MINUTE_STEP)}
+                  onMore={() => moveTime(MINUTE_STEP)}
+                />
+              </View>
+            </Card>
+          </Locked>
           <Text variant="small" tone={customCheck === "ok" ? "muted" : "danger"} style={styles.center}>
             {customAt
               ? customCheck === "ok"
@@ -208,12 +214,19 @@ export function RemindSheet({
             wide
             icon="clock"
             label={t("mobile.remind.submit")}
-            disabled={!ready || !customAt || customCheck !== "ok" || action.isPending}
+            loading={action.isPending}
+            disabled={!ready || !customAt || customCheck !== "ok"}
             onPress={() => {
               if (customAt) submit(customAt);
             }}
           />
-          <Button variant="ghost" wide label={t("mobile.remind.quick")} onPress={() => setCustom(null)} />
+          <Button
+            variant="ghost"
+            wide
+            label={t("mobile.remind.quick")}
+            disabled={action.isPending}
+            onPress={() => setCustom(null)}
+          />
         </>
       )}
     </>
@@ -253,6 +266,7 @@ function Stepper({
 }
 
 const styles = StyleSheet.create({
+  custom: { gap: 12 },
   grow: { flex: 1 },
   center: { textAlign: "center" },
   preview: { flexDirection: "row", gap: 10, padding: 12, borderRadius: 18 },

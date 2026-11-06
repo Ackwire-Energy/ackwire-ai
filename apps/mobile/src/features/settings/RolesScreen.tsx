@@ -615,6 +615,7 @@ export function AddToRoleScreen({ roleId }: { roleId: string }) {
         disabled: picked.size === 0 || busy,
         onPress: () => void add(),
       }}
+      locked={busy}
     >
       <GroupedFooter>{t("rolesPage.addSub")}</GroupedFooter>
       {candidates.length > PEOPLE_SEARCH_FROM ? (
@@ -692,6 +693,7 @@ export function NewRoleScreen() {
     <SettingsPage
       title={t("rolesPage.newTitle")}
       action={{ label: t("mobile.settings.roles.create"), disabled: !typed || create.isPending, onPress: submit }}
+      locked={create.isPending}
     >
       <GroupedHeader>{t("rolesPage.name")}</GroupedHeader>
       <TextArea
@@ -733,13 +735,17 @@ export function RenameRoleScreen({ roleId }: { roleId: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const value = draft ?? role?.name ?? "";
   const next = value.trim();
-  const ready = Boolean(role?.editable) && next.length > 0 && next !== role?.name;
+  const ready = Boolean(role?.editable) && next.length > 0 && next !== role?.name && !update.isPending;
   const save = () => {
     if (!role || !ready) return;
     update.mutate({ roleId: role.id, patch: { name: next } }, { onSuccess: () => goBack(), onError: fail });
   };
   return (
-    <SettingsPage title={t("rolesPage.name")} action={{ label: t("common.save"), disabled: !ready, onPress: save }}>
+    <SettingsPage
+      title={t("rolesPage.name")}
+      action={{ label: t("common.save"), disabled: !ready, onPress: save }}
+      locked={update.isPending}
+    >
       <GroupedHeader>{t("rolesPage.name")}</GroupedHeader>
       <TextArea
         value={value}

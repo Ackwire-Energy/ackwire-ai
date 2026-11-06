@@ -12,7 +12,7 @@ import { type ReviewTool, reviewDecisions, reviewToolsOf } from "@agenteschat/cl
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Button, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Icon, SearchField, Text } from "@/ui";
+import { Button, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Icon, Locked, SearchField, Text } from "@/ui";
 import { chooseAction } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, successHaptic } from "../shared/parts";
@@ -168,7 +168,9 @@ function ServerReview({
           <GroupedFooter>{t("toolReview.noTools")}</GroupedFooter>
         )
       ) : (
-        <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+        <Locked when={busy}>
+          <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+        </Locked>
       )}
       {/* Asking the server again is the last row: it rarely changes right after connecting. */}
       <View>
@@ -235,7 +237,9 @@ export function MailReview({
       <Text variant="body" tone="muted">
         {t("mail.toolsLead", { name: account.address })}
       </Text>
-      <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+      <Locked when={update.isPending}>
+        <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+      </Locked>
       {failed ? <Problem text={t("mail.actionsError")} /> : null}
       <Button
         variant="primary"

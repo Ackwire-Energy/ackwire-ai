@@ -71,6 +71,7 @@ import {
   Icon,
   InfoHint,
   Input,
+  Locked,
   LogoMark,
   OptionCard,
   ProviderLogo,
@@ -1388,23 +1389,25 @@ export function KeyPanel({
                   <b>{t("connectAi.key.paste")}</b>
                 </label>
                 <span className="agp-addacct__paste">
-                  <Input
-                    id={fieldId}
-                    type="password"
-                    autoComplete="off"
-                    spellCheck={false}
-                    placeholder={maker.placeholder}
-                    value={apiKey}
-                    invalid={wrong}
-                    onChange={(e) => onDraft({ provider, apiKey: e.target.value })}
-                    onBlur={() => setTouched(true)}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter" || !onSave) return;
-                      e.preventDefault();
-                      setTouched(true);
-                      if (valid) onSave();
-                    }}
-                  />
+                  <Locked when={Boolean(saving)}>
+                    <Input
+                      id={fieldId}
+                      type="password"
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder={maker.placeholder}
+                      value={apiKey}
+                      invalid={wrong}
+                      onChange={(e) => onDraft({ provider, apiKey: e.target.value })}
+                      onBlur={() => setTouched(true)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" || !onSave) return;
+                        e.preventDefault();
+                        setTouched(true);
+                        if (valid) onSave();
+                      }}
+                    />
+                  </Locked>
                   {onSave && (
                     <Button variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
                       {t("settings.saveKey")}

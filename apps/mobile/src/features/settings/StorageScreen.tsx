@@ -22,6 +22,7 @@ import {
   GroupedList,
   GroupedRow,
   type IconName,
+  Locked,
   Text,
   useToast,
 } from "@/ui";
@@ -254,63 +255,66 @@ function BucketForm({ config }: { config: StorageConfig }) {
     accessibilityLabel: label,
     style: field,
   });
+  const locked = test.isPending || save.isPending;
   return (
     <>
-      <GroupedHeader>{t("storage.s3")}</GroupedHeader>
-      <GroupedList>
-        <GroupedField label={t("storage.endpoint")}>
-          <TextInput {...text("endpoint", t("storage.endpoint"))} placeholder="https://" keyboardType="url" />
-        </GroupedField>
-        <GroupedField label={t("storage.region")}>
-          <TextInput {...text("region", t("storage.region"))} />
-        </GroupedField>
-        <GroupedField label={t("storage.bucket")}>
-          <TextInput {...text("bucket", t("storage.bucket"))} />
-        </GroupedField>
-        <GroupedField label={t("storage.prefix")}>
-          <TextInput {...text("prefix", t("storage.prefix"))} />
-        </GroupedField>
-      </GroupedList>
-      {touched && missing.fields ? (
-        <Text variant="footnote" tone="danger" style={styles.error}>
-          {t("storage.required")}
-        </Text>
-      ) : (
-        <GroupedFooter>
-          {t("common.joinSentences", { a: t("storage.endpointHelp"), b: t("storage.prefixHelp") })}
-        </GroupedFooter>
-      )}
-      <Gap />
-      <GroupedList>
-        <GroupedField label={t("storage.accessKey")}>
-          <TextInput {...text("accessKeyId", t("storage.accessKey"))} secureTextEntry />
-        </GroupedField>
-        <GroupedField label={t("storage.secret")}>
-          <TextInput {...text("secretAccessKey", t("storage.secret"))} secureTextEntry />
-        </GroupedField>
-      </GroupedList>
-      {touched && missing.keys ? (
-        <Text variant="footnote" tone="danger" style={styles.error}>
-          {t("storage.keysRequired")}
-        </Text>
-      ) : saved ? (
-        <GroupedFooter>
-          {[
-            `${t("storage.accessKey")}: ${t("storage.savedHint", { hint: saved.accessKeyIdHint })}`,
-            `${t("storage.secret")}: ${t("storage.savedHint", { hint: saved.secretHint })}`,
-          ].join("\n")}
-        </GroupedFooter>
-      ) : null}
-      <Gap />
-      <GroupedList>
-        <GroupedRow
-          label={t("storage.pathStyle")}
-          sub={t("storage.pathStyleHelp")}
-          subLines={3}
-          toggle={form.pathStyle}
-          onPress={() => set("pathStyle", !form.pathStyle)}
-        />
-      </GroupedList>
+      <Locked when={locked}>
+        <GroupedHeader>{t("storage.s3")}</GroupedHeader>
+        <GroupedList>
+          <GroupedField label={t("storage.endpoint")}>
+            <TextInput {...text("endpoint", t("storage.endpoint"))} placeholder="https://" keyboardType="url" />
+          </GroupedField>
+          <GroupedField label={t("storage.region")}>
+            <TextInput {...text("region", t("storage.region"))} />
+          </GroupedField>
+          <GroupedField label={t("storage.bucket")}>
+            <TextInput {...text("bucket", t("storage.bucket"))} />
+          </GroupedField>
+          <GroupedField label={t("storage.prefix")}>
+            <TextInput {...text("prefix", t("storage.prefix"))} />
+          </GroupedField>
+        </GroupedList>
+        {touched && missing.fields ? (
+          <Text variant="footnote" tone="danger" style={styles.error}>
+            {t("storage.required")}
+          </Text>
+        ) : (
+          <GroupedFooter>
+            {t("common.joinSentences", { a: t("storage.endpointHelp"), b: t("storage.prefixHelp") })}
+          </GroupedFooter>
+        )}
+        <Gap />
+        <GroupedList>
+          <GroupedField label={t("storage.accessKey")}>
+            <TextInput {...text("accessKeyId", t("storage.accessKey"))} secureTextEntry />
+          </GroupedField>
+          <GroupedField label={t("storage.secret")}>
+            <TextInput {...text("secretAccessKey", t("storage.secret"))} secureTextEntry />
+          </GroupedField>
+        </GroupedList>
+        {touched && missing.keys ? (
+          <Text variant="footnote" tone="danger" style={styles.error}>
+            {t("storage.keysRequired")}
+          </Text>
+        ) : saved ? (
+          <GroupedFooter>
+            {[
+              `${t("storage.accessKey")}: ${t("storage.savedHint", { hint: saved.accessKeyIdHint })}`,
+              `${t("storage.secret")}: ${t("storage.savedHint", { hint: saved.secretHint })}`,
+            ].join("\n")}
+          </GroupedFooter>
+        ) : null}
+        <Gap />
+        <GroupedList>
+          <GroupedRow
+            label={t("storage.pathStyle")}
+            sub={t("storage.pathStyleHelp")}
+            subLines={3}
+            toggle={form.pathStyle}
+            onPress={() => set("pathStyle", !form.pathStyle)}
+          />
+        </GroupedList>
+      </Locked>
       {current ? <TestSteps result={current} /> : null}
       {stale ? <GroupedFooter>{t("storage.retestNeeded")}</GroupedFooter> : null}
       <View style={styles.buttons}>
@@ -318,14 +322,16 @@ function BucketForm({ config }: { config: StorageConfig }) {
           variant="secondary"
           wide
           label={test.isPending ? t("storage.testing") : t("storage.test")}
-          disabled={test.isPending}
+          loading={test.isPending}
+          disabled={save.isPending}
           onPress={runTest}
         />
         <Button
           variant="primary"
           wide
           label={config.kind === "s3" ? t("storage.saveBucket") : t("storage.activate")}
-          disabled={!current?.ok || save.isPending}
+          loading={save.isPending}
+          disabled={!current?.ok || test.isPending}
           onPress={activate}
         />
       </View>

@@ -1,6 +1,7 @@
 import { RadioGroup as RRadioGroup } from "radix-ui";
 import { Fragment, type ReactNode } from "react";
 import { cx } from "../cx";
+import { useLocked } from "./Field";
 
 export interface OptionListItem<V extends string> {
   value: V;
@@ -61,6 +62,7 @@ export function OptionList<V extends string>({
   className,
   ...rest
 }: OptionListProps<V>) {
+  const locked = useLocked();
   const cards = layout === "cards";
   const tiles = layout === "tiles";
   const card = attached && !cards && !tiles;
@@ -92,7 +94,7 @@ export function OptionList<V extends string>({
         "ac-optlist",
         cards && "ac-optlist--cards",
         tiles && "ac-optlist--tiles",
-        disabled && "ac-optlist--locked",
+        (disabled || locked) && "ac-optlist--locked",
         card && "ac-optlist--attached",
         className,
       )}

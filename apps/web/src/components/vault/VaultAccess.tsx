@@ -12,6 +12,7 @@ import {
   DialogFooter,
   Icon,
   type IconName,
+  Locked,
   RoleMark,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -207,18 +208,20 @@ export function AgentsAccessDialog({
       closeLabel={t("common.close")}
       width={480}
     >
-      <DialogBody>
-        <AgentSwitches
-          value={ids}
-          onChange={setIds}
-          all={{
-            checked: all,
-            onChange: setAll,
-            label: t("vault.agents.all"),
-            detail: t("vault.agents.allDetail"),
-          }}
-        />
-      </DialogBody>
+      <Locked when={Boolean(saving)}>
+        <DialogBody>
+          <AgentSwitches
+            value={ids}
+            onChange={setIds}
+            all={{
+              checked: all,
+              onChange: setAll,
+              label: t("vault.agents.all"),
+              detail: t("vault.agents.allDetail"),
+            }}
+          />
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button

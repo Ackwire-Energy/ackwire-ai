@@ -11,7 +11,7 @@ import { workspaceLabel, workspaceNotes } from "@agenteschat/client/lib/deletion
 import { signInPath } from "@agenteschat/client/lib/guards";
 import { visibleText } from "@agenteschat/client/lib/text";
 import { isAppLocale } from "@agenteschat/i18n/locale";
-import { Alert, Button, Card, EmptyState, Field, Icon, OptionList, Select } from "@agenteschat/ui";
+import { Alert, Button, Card, EmptyState, Field, Icon, Locked, OptionList, Select } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -243,167 +243,176 @@ function ConsentForm({
           if (orgId && !busy) onDecide({ decision: "allow", orgId, access }, app);
         }}
       >
-        <div className="consent__app">
-          <AppMark app={{ ...client, name: app }} size="tile" />
-          <span className="list-col">
-            <h1
-              className="consent__title"
-              title={client.displayKind === "verified" ? (name.full ?? undefined) : undefined}
+        <Locked when={busy}>
+          <div className="consent__app">
+            <AppMark app={{ ...client, name: app }} size="tile" />
+            <span className="list-col">
+              <h1
+                className="consent__title"
+                title={client.displayKind === "verified" ? (name.full ?? undefined) : undefined}
+              >
+                <Trans
+                  t={t}
+                  i18nKey={`apps.consent.title.${client.displayKind}`}
+                  values={{ name: bold }}
+                  components={{ b: <b /> }}
+                  {...TYPED_VALUES}
+                />
+              </h1>
+              {secondLine(t, client, name) && (
+                <span className="small muted" title={name.full ?? undefined}>
+                  {secondLine(t, client, name)}
+                </span>
+              )}
+            </span>
+          </div>
+          {client.reservedNameWarning && (
+            // A program on this computer has no address above to check: the title says only "neste computador".
+            <Alert>
+              {t(
+                client.displayKind === "loopback" ? "apps.consent.reservedNameLoopback" : "apps.consent.reservedName",
+                {
+                  name: name.short,
+                },
+              )}
+            </Alert>
+          )}
+          <p className="consent__account small muted">
+            <span>{t("apps.consent.signedInAs", consent.account)}</span>
+            <button
+              type="button"
+              className="ac-link"
+              onClick={async () => {
+                await auth.signOut();
+                qc.clear();
+                window.location.assign(signInPath(window.location.pathname + window.location.search));
+              }}
             >
-              <Trans
-                t={t}
-                i18nKey={`apps.consent.title.${client.displayKind}`}
-                values={{ name: bold }}
-                components={{ b: <b /> }}
-                {...TYPED_VALUES}
+              {t("apps.consent.switchAccount")}
+            </button>
+          </p>
+          {only ? (
+            <div className="apps-field" style={{ gap: 2 }}>
+              <span className="newag__label">{t("apps.consent.workspace")}</span>
+              <span>{named(only)}</span>
+            </div>
+          ) : (
+            <Field label={t("apps.consent.workspace")} id="consent-org">
+              <Select
+                value={orgId}
+                onValueChange={(v) => {
+                  setOrgId(v);
+                  onPick();
+                }}
+                options={consent.workspaces.map((w) => ({
+                  value: w.id,
+                  label: named(w),
+                  disabled: w.paused,
+                }))}
               />
-            </h1>
-            {secondLine(t, client, name) && (
-              <span className="small muted" title={name.full ?? undefined}>
-                {secondLine(t, client, name)}
+            </Field>
+          )}
+          {inlineError && <Alert>{t(`apps.consent.error.${inlineError}`)}</Alert>}
+          {!inlineError && nonePickable && (
+            <Alert>
+              {t(only ? "apps.consent.error.onlyPaused" : "apps.consent.error.allPaused")}{" "}
+              <Link
+                to="/org/$orgId"
+                params={{ orgId: only?.id ?? consent.workspaces[0]?.id ?? "" }}
+                className="ac-link"
+              >
+                {t("apps.consent.error.openWorkspace")}
+              </Link>
+            </Alert>
+          )}
+          <div className="apps-field" style={{ gap: 6 }}>
+            <span className="newag__label" id="consent-access">
+              {t("apps.consent.access")}
+            </span>
+            <OptionList
+              aria-labelledby="consent-access"
+              value={access}
+              onValueChange={setAccess}
+              options={[
+                ...(canManage
+                  ? [
+                      {
+                        value: "manage" as const,
+                        title: t("apps.consent.manage"),
+                        description: t("apps.consent.manageHelp"),
+                      },
+                    ]
+                  : []),
+                ...(canWrite
+                  ? [
+                      {
+                        value: "write" as const,
+                        title: t("apps.consent.write"),
+                        description: t("apps.consent.writeHelp"),
+                      },
+                    ]
+                  : []),
+                { value: "read" as const, title: t("apps.consent.read"), description: t("apps.consent.readHelp") },
+              ]}
+            />
+          </div>
+          <div className="consent__lists">
+            <div className="apps-field" style={{ gap: 8 }}>
+              <span className="newag__label">{t("apps.consent.can")}</span>
+              <ul className="consent__list consent__list--can small">
+                <li className="ac-iconline">
+                  <Icon name="check" size={16} />
+                  <span>{t("apps.consent.canSee")}</span>
+                </li>
+                {access !== "read" && (
+                  <li className="ac-iconline">
+                    <Icon name="check" size={16} />
+                    <span>{t("apps.consent.canSend", { app })}</span>
+                  </li>
+                )}
+                {access === "manage" && (
+                  <li className="ac-iconline">
+                    <Icon name="check" size={16} />
+                    <span>{t("apps.consent.canManage")}</span>
+                  </li>
+                )}
+                <li className="ac-iconline">
+                  <Icon name="check" size={16} />
+                  <span>{t("apps.consent.canRead")}</span>
+                </li>
+              </ul>
+            </div>
+            <div className="apps-field" style={{ gap: 8 }}>
+              <span className="newag__label">{t("apps.consent.never")}</span>
+              <ul className="consent__list consent__list--never small">
+                {(["neverApprove", "neverSettings", "neverHidden"] as const).map((key) => (
+                  <li key={key} className="ac-iconline">
+                    <Icon name="dash" size={16} />
+                    <span>{t(`apps.consent.${key}`)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          {client.displayKind === "loopback" && <Alert tone="neutral">{t("apps.consent.loopbackWarning")}</Alert>}
+          <div className="apps-field" style={{ gap: 4 }}>
+            <span className="small">{t("apps.consent.startedNow")}</span>
+            {/* Cursor's raw scheme: the line under the title already says where in friendly words. */}
+            {client.displayKind !== "app_scheme" && (
+              <span className="consent__returns small muted">
+                {t("apps.consent.returnsTo", { place: visibleText(client.returnsTo) })}
               </span>
             )}
-          </span>
-        </div>
-        {client.reservedNameWarning && (
-          // A program on this computer has no address above to check: the title says only "neste computador".
-          <Alert>
-            {t(client.displayKind === "loopback" ? "apps.consent.reservedNameLoopback" : "apps.consent.reservedName", {
-              name: name.short,
-            })}
-          </Alert>
-        )}
-        <p className="consent__account small muted">
-          <span>{t("apps.consent.signedInAs", consent.account)}</span>
-          <button
-            type="button"
-            className="ac-link"
-            onClick={async () => {
-              await auth.signOut();
-              qc.clear();
-              window.location.assign(signInPath(window.location.pathname + window.location.search));
-            }}
-          >
-            {t("apps.consent.switchAccount")}
-          </button>
-        </p>
-        {only ? (
-          <div className="apps-field" style={{ gap: 2 }}>
-            <span className="newag__label">{t("apps.consent.workspace")}</span>
-            <span>{named(only)}</span>
           </div>
-        ) : (
-          <Field label={t("apps.consent.workspace")} id="consent-org">
-            <Select
-              value={orgId}
-              onValueChange={(v) => {
-                setOrgId(v);
-                onPick();
-              }}
-              options={consent.workspaces.map((w) => ({
-                value: w.id,
-                label: named(w),
-                disabled: w.paused,
-              }))}
-            />
-          </Field>
-        )}
-        {inlineError && <Alert>{t(`apps.consent.error.${inlineError}`)}</Alert>}
-        {!inlineError && nonePickable && (
-          <Alert>
-            {t(only ? "apps.consent.error.onlyPaused" : "apps.consent.error.allPaused")}{" "}
-            <Link to="/org/$orgId" params={{ orgId: only?.id ?? consent.workspaces[0]?.id ?? "" }} className="ac-link">
-              {t("apps.consent.error.openWorkspace")}
-            </Link>
-          </Alert>
-        )}
-        <div className="apps-field" style={{ gap: 6 }}>
-          <span className="newag__label" id="consent-access">
-            {t("apps.consent.access")}
-          </span>
-          <OptionList
-            aria-labelledby="consent-access"
-            value={access}
-            onValueChange={setAccess}
-            options={[
-              ...(canManage
-                ? [
-                    {
-                      value: "manage" as const,
-                      title: t("apps.consent.manage"),
-                      description: t("apps.consent.manageHelp"),
-                    },
-                  ]
-                : []),
-              ...(canWrite
-                ? [
-                    {
-                      value: "write" as const,
-                      title: t("apps.consent.write"),
-                      description: t("apps.consent.writeHelp"),
-                    },
-                  ]
-                : []),
-              { value: "read" as const, title: t("apps.consent.read"), description: t("apps.consent.readHelp") },
-            ]}
-          />
-        </div>
-        <div className="consent__lists">
-          <div className="apps-field" style={{ gap: 8 }}>
-            <span className="newag__label">{t("apps.consent.can")}</span>
-            <ul className="consent__list consent__list--can small">
-              <li className="ac-iconline">
-                <Icon name="check" size={16} />
-                <span>{t("apps.consent.canSee")}</span>
-              </li>
-              {access !== "read" && (
-                <li className="ac-iconline">
-                  <Icon name="check" size={16} />
-                  <span>{t("apps.consent.canSend", { app })}</span>
-                </li>
-              )}
-              {access === "manage" && (
-                <li className="ac-iconline">
-                  <Icon name="check" size={16} />
-                  <span>{t("apps.consent.canManage")}</span>
-                </li>
-              )}
-              <li className="ac-iconline">
-                <Icon name="check" size={16} />
-                <span>{t("apps.consent.canRead")}</span>
-              </li>
-            </ul>
+          <div className="consent__actions">
+            <Button type="button" disabled={busy} onClick={() => onDecide({ decision: "deny" }, app)}>
+              {t("apps.consent.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={busy} disabled={busy || !orgId}>
+              {t("apps.consent.allow")}
+            </Button>
           </div>
-          <div className="apps-field" style={{ gap: 8 }}>
-            <span className="newag__label">{t("apps.consent.never")}</span>
-            <ul className="consent__list consent__list--never small">
-              {(["neverApprove", "neverSettings", "neverHidden"] as const).map((key) => (
-                <li key={key} className="ac-iconline">
-                  <Icon name="dash" size={16} />
-                  <span>{t(`apps.consent.${key}`)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        {client.displayKind === "loopback" && <Alert tone="neutral">{t("apps.consent.loopbackWarning")}</Alert>}
-        <div className="apps-field" style={{ gap: 4 }}>
-          <span className="small">{t("apps.consent.startedNow")}</span>
-          {/* Cursor's raw scheme: the line under the title already says where in friendly words. */}
-          {client.displayKind !== "app_scheme" && (
-            <span className="consent__returns small muted">
-              {t("apps.consent.returnsTo", { place: visibleText(client.returnsTo) })}
-            </span>
-          )}
-        </div>
-        <div className="consent__actions">
-          <Button type="button" disabled={busy} onClick={() => onDecide({ decision: "deny" }, app)}>
-            {t("apps.consent.cancel")}
-          </Button>
-          <Button type="submit" variant="primary" loading={busy} disabled={busy || !orgId}>
-            {t("apps.consent.allow")}
-          </Button>
-        </div>
+        </Locked>
         <p className="small muted" style={{ margin: 0, textAlign: "center" }}>
           {t("apps.consent.footer")}
         </p>

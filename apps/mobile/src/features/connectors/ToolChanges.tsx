@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, DiffView, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { Button, DiffView, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, goBack, PushedHeader, successHaptic } from "../shared/parts";
 
@@ -60,11 +60,13 @@ export function ChangedTools({ connectionId, name }: { connectionId: string; nam
   return (
     <View>
       <GroupedHeader>{`${t("connectors.toolChanges.title")} · ${changes.length}`}</GroupedHeader>
-      <GroupedList>
-        {changes.map((c) => (
-          <ChangeRow key={c.toolName} change={c} />
-        ))}
-      </GroupedList>
+      <Locked when={acceptAll.isPending}>
+        <GroupedList>
+          {changes.map((c) => (
+            <ChangeRow key={c.toolName} change={c} />
+          ))}
+        </GroupedList>
+      </Locked>
       <GroupedFooter>{t("connectors.toolChanges.intro")}</GroupedFooter>
       {changes.length > 1 ? (
         <View style={styles.all}>

@@ -11,6 +11,7 @@ import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
+import { Locked } from "@/ui/Locked";
 import { Text } from "@/ui/Text";
 import { useToast } from "@/ui/Toast";
 
@@ -61,18 +62,20 @@ export default function Server() {
         ) : null
       }
     >
-      <AuthField
-        value={address}
-        onChangeText={setAddress}
-        placeholder={t("mobile.auth.server.placeholder")}
-        keyboardType="url"
-        autoCapitalize="none"
-        autoCorrect={false}
-        textContentType="URL"
-        returnKeyType="go"
-        onSubmitEditing={() => void submit()}
-        accessibilityLabel={t("mobile.auth.server.label")}
-      />
+      <Locked when={busy}>
+        <AuthField
+          value={address}
+          onChangeText={setAddress}
+          placeholder={t("mobile.auth.server.placeholder")}
+          keyboardType="url"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="URL"
+          returnKeyType="go"
+          onSubmitEditing={() => void submit()}
+          accessibilityLabel={t("mobile.auth.server.label")}
+        />
+      </Locked>
       {error ? (
         <Text tone="danger" variant="small" style={CENTER}>
           {error}
@@ -82,7 +85,8 @@ export default function Server() {
         variant="primary"
         wide
         label={busy ? t("mobile.auth.server.checking") : t("mobile.auth.server.use")}
-        disabled={busy || !address.trim()}
+        loading={busy}
+        disabled={!address.trim()}
         onPress={() => void submit()}
       />
       <Button

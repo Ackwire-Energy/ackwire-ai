@@ -21,6 +21,7 @@ import {
   DialogFooter,
   Icon,
   Input,
+  Locked,
   PixelSpinner,
   Popover,
   Select,
@@ -831,19 +832,23 @@ function NewWidgetBody({
         submit();
       }}
     >
-      <div className="ac-dialog__body nw-body">
-        <div className="nw-stage">
-          {card}
-          {below}
+      <Locked when={busy}>
+        <div className="ac-dialog__body nw-body">
+          <div className="nw-stage">
+            {card}
+            {below}
+          </div>
         </div>
-      </div>
+      </Locked>
       <DialogFooter className="nw-foot">
         {/* Only when there is a choice: with My Home alone, nothing to pick. */}
         {destOptions.length > 1 ? (
           <span className="nw-dest">
             <Icon name="grid" size={16} />
             <label htmlFor={`${id}-dest`}>{t("dashboards.newWidget.destination")}</label>
-            <Select id={`${id}-dest`} size="sm" value={dest} onValueChange={setDest} options={destOptions} />
+            <Locked when={busy}>
+              <Select id={`${id}-dest`} size="sm" value={dest} onValueChange={setDest} options={destOptions} />
+            </Locked>
           </span>
         ) : (
           <span className="nw-dest" aria-hidden="true" />

@@ -1,5 +1,5 @@
 import type { Agent } from "@agenteschat/client";
-import { ExpiryFuse } from "@agenteschat/ui";
+import { ExpiryFuse, Locked } from "@agenteschat/ui";
 import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CardSky, colorOf } from "./Sky";
@@ -120,6 +120,7 @@ export function RequestCard({
   what,
   onSubmit,
   muted = false,
+  locked = false,
 }: {
   id: string;
   kind: RequestKind;
@@ -151,6 +152,8 @@ export function RequestCard({
   onSubmit?: () => void;
   /** Overtaken (a newer card took its place): drawn quiet, nothing to do. */
   muted?: boolean;
+  /** Its decision is on its way or can't be made any more: what is filled in and clicked turns off, "Ver …" stays. */
+  locked?: boolean;
 }) {
   const { t } = useTranslation();
   const registry = useContext(AskRegistryContext);
@@ -179,6 +182,12 @@ export function RequestCard({
       {actions}
       {end && <span className="rq__end">{end}</span>}
     </div>
+  );
+  const fill = (
+    <Locked when={locked}>
+      {body}
+      {foot}
+    </Locked>
   );
   const inner = (
     <>
@@ -209,7 +218,11 @@ export function RequestCard({
           )}
         </div>
       )}
-      {open && details && <div className="rq__details">{details}</div>}
+      {open && details && (
+        <div className="rq__details">
+          <Locked when={locked}>{details}</Locked>
+        </div>
+      )}
       {onSubmit ? (
         // Only what is filled in and sent is the form (laid out as if it weren't there).
         <form
@@ -219,14 +232,10 @@ export function RequestCard({
             onSubmit();
           }}
         >
-          {body}
-          {foot}
+          {fill}
         </form>
       ) : (
-        <>
-          {body}
-          {foot}
-        </>
+        fill
       )}
     </>
   );

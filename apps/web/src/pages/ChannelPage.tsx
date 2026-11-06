@@ -175,6 +175,7 @@ import {
   Input,
   isIdHandle,
   Kbd,
+  Locked,
   Mention,
   Menu,
   MenuItem,
@@ -4998,6 +4999,7 @@ function ChannelDetails({
                       variant="ghost"
                       icon="trash"
                       className="channel-details__archive"
+                      disabled={archive.pending}
                       onClick={() => {
                         saveTopic();
                         saveName();
@@ -5178,69 +5180,71 @@ function AddMembersDialog({
       title={t("channelMembers.addTitle", { channel: channel.name })}
       closeLabel={t("common.close")}
     >
-      <DialogSearchList
-        query={q}
-        onQueryChange={setQ}
-        searchLabel={t("channelMembers.addSearch")}
-        searchPlaceholder={t("channelMembers.addSearch")}
-        isEmpty={false}
-        emptyText=""
-      >
-        {rows.length === 0 && !invite && (
-          <p className="ac-dialog__empty">
-            {q.trim()
-              ? t("channelMembers.addEmpty", { q: q.trim() })
-              : t("channelMembers.addEveryone", { org: org.name, channel: channel.name })}
-          </p>
-        )}
-        <MemberPickerRows
-          rows={rows}
-          selected={selected}
-          onToggle={(key, on) =>
-            setSelected((prev) => {
-              const next = new Set(prev);
-              if (on) next.add(key);
-              else next.delete(key);
-              return next;
-            })
-          }
-        />
-        {invite && <InviteOfferRow email={invite} channel={channel} onPick={onInvite} />}
-        {!invite && inviteDialog && can(org, "invite_people") && (
-          <button
-            type="button"
-            className="member-row member-row--add"
-            onClick={() => {
-              onInvite();
-              inviteDialog.open({ channelId: channel.id });
-            }}
-          >
-            <span className="member-row__plus" aria-hidden="true">
-              <Icon name="mail" />
-            </span>
-            {t("shell.invite")}
-          </button>
-        )}
-        {creates && (
-          <button
-            type="button"
-            className="member-row member-row--add"
-            onClick={() => {
-              onInvite();
-              void navigate({
-                to: "/org/$orgId/agents/new",
-                params: { orgId: org.id },
-                search: { channel: channel.id },
-              });
-            }}
-          >
-            <span className="member-row__plus" aria-hidden="true">
-              <Icon name="plus" />
-            </span>
-            {t("shell.createAgent")}
-          </button>
-        )}
-      </DialogSearchList>
+      <Locked when={add.isPending}>
+        <DialogSearchList
+          query={q}
+          onQueryChange={setQ}
+          searchLabel={t("channelMembers.addSearch")}
+          searchPlaceholder={t("channelMembers.addSearch")}
+          isEmpty={false}
+          emptyText=""
+        >
+          {rows.length === 0 && !invite && (
+            <p className="ac-dialog__empty">
+              {q.trim()
+                ? t("channelMembers.addEmpty", { q: q.trim() })
+                : t("channelMembers.addEveryone", { org: org.name, channel: channel.name })}
+            </p>
+          )}
+          <MemberPickerRows
+            rows={rows}
+            selected={selected}
+            onToggle={(key, on) =>
+              setSelected((prev) => {
+                const next = new Set(prev);
+                if (on) next.add(key);
+                else next.delete(key);
+                return next;
+              })
+            }
+          />
+          {invite && <InviteOfferRow email={invite} channel={channel} onPick={onInvite} />}
+          {!invite && inviteDialog && can(org, "invite_people") && (
+            <button
+              type="button"
+              className="member-row member-row--add"
+              onClick={() => {
+                onInvite();
+                inviteDialog.open({ channelId: channel.id });
+              }}
+            >
+              <span className="member-row__plus" aria-hidden="true">
+                <Icon name="mail" />
+              </span>
+              {t("shell.invite")}
+            </button>
+          )}
+          {creates && (
+            <button
+              type="button"
+              className="member-row member-row--add"
+              onClick={() => {
+                onInvite();
+                void navigate({
+                  to: "/org/$orgId/agents/new",
+                  params: { orgId: org.id },
+                  search: { channel: channel.id },
+                });
+              }}
+            >
+              <span className="member-row__plus" aria-hidden="true">
+                <Icon name="plus" />
+              </span>
+              {t("shell.createAgent")}
+            </button>
+          )}
+        </DialogSearchList>
+      </Locked>
       <DialogFooter bar>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button

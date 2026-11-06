@@ -74,6 +74,7 @@ import {
   GroupedRow,
   Icon,
   type IconName,
+  Locked,
   ProviderLogo,
   ProviderQuad,
   Text,
@@ -1125,29 +1126,31 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
   return (
     <View>
       <GroupedHeader>{t("mobile.ai.whose")}</GroupedHeader>
-      <GroupedList>
-        {PROVIDERS.map((p) => (
-          <GroupedRow
-            key={p.id}
-            leading={<ProviderLogo id={p.id} size="sm" />}
-            label={p.label}
-            checked={!custom && form.provider === p.id}
-            onPress={() => {
-              setCustom(false);
-              form.setProvider(p.id);
-            }}
-          />
-        ))}
-        {keyButton ? (
-          <GroupedRow
-            leading={<ProviderLogo id={CUSTOM_PROVIDER} size="sm" />}
-            label={t("endpoint.option")}
-            sub={t("endpoint.optionSub")}
-            checked={custom}
-            onPress={() => setCustom(true)}
-          />
-        ) : null}
-      </GroupedList>
+      <Locked when={form.saving}>
+        <GroupedList>
+          {PROVIDERS.map((p) => (
+            <GroupedRow
+              key={p.id}
+              leading={<ProviderLogo id={p.id} size="sm" />}
+              label={p.label}
+              checked={!custom && form.provider === p.id}
+              onPress={() => {
+                setCustom(false);
+                form.setProvider(p.id);
+              }}
+            />
+          ))}
+          {keyButton ? (
+            <GroupedRow
+              leading={<ProviderLogo id={CUSTOM_PROVIDER} size="sm" />}
+              label={t("endpoint.option")}
+              sub={t("endpoint.optionSub")}
+              checked={custom}
+              onPress={() => setCustom(true)}
+            />
+          ) : null}
+        </GroupedList>
+      </Locked>
       <GroupedFooter>{t("connectAi.key.sub")}</GroupedFooter>
       {custom ? (
         <View style={styles.keySteps}>
@@ -1171,19 +1174,21 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
               }
             />
             <Step n={2} divider title={t("connectAi.key.paste")}>
-              <PasteField
-                value={form.key}
-                onChangeText={form.setKey}
-                onPasted={form.setKey}
-                onBlur={() => setTouched(true)}
-                label={t("connectAi.key.paste")}
-                placeholder={maker.placeholder}
-                secret
-                onSubmit={() => {
-                  setTouched(true);
-                  if (valid && keyButton) onSaveKey?.();
-                }}
-              />
+              <Locked when={form.saving}>
+                <PasteField
+                  value={form.key}
+                  onChangeText={form.setKey}
+                  onPasted={form.setKey}
+                  onBlur={() => setTouched(true)}
+                  label={t("connectAi.key.paste")}
+                  placeholder={maker.placeholder}
+                  secret
+                  onSubmit={() => {
+                    setTouched(true);
+                    if (valid && keyButton) onSaveKey?.();
+                  }}
+                />
+              </Locked>
               {wrong ? (
                 <View style={styles.others}>
                   <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
@@ -1224,7 +1229,8 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
                 variant="primary"
                 wide
                 label={form.saving ? t("mobile.ai.saving") : t("mobile.ai.save")}
-                disabled={!valid || form.saving}
+                loading={form.saving}
+                disabled={!valid}
                 onPress={() => onSaveKey?.()}
               />
             </View>

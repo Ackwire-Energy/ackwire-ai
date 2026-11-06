@@ -560,7 +560,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   white-space: pre-wrap;
 }
 /* Under the request card's well, on its 4px grid. */
-.rq > .waitcard__lines {
+.rq > .ac-locked > .waitcard__lines {
   margin-top: 12px;
 }
 
@@ -1240,8 +1240,14 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .member-row--add:hover {
   color: var(--ink);
 }
+/* What a form brings of its own to a `Locked`, outside the kit's disabled looks. */
+.ac-locked:disabled :is(button, input, textarea):not([class^="ac-"], [class*=" ac-"], .ac-input-affix input),
+.ac-locked:disabled :is(.ac-recur__day, .ac-token__remove, .ac-searchfield__clear, .ac-setmore__toggle) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 /* Above a footer's line, the add row keeps its air (last in the dialog, the list's own edge does). */
-.ac-dialog__list:not(:last-child):has(> .member-row--add:last-child) {
+.ac-dialog__list:is(:not(:last-child), .ac-locked:not(:last-child) > *):has(> .member-row--add:last-child) {
   padding-bottom: 16px;
 }
 html:not([data-pointer]) .member-row--add:focus-visible {
@@ -3270,7 +3276,7 @@ html:not([data-pointer]) .level-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.level-pill[disabled] {
+.level-pill:disabled {
   cursor: progress;
   opacity: 0.6;
 }
@@ -7256,7 +7262,7 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
   align-items: center;
 }
 /* The ghost's own off state is only a lighter ink: here it fades, so − and Ajustar read as off at a glance. */
-.izoom__tools .ac-btn[disabled] {
+.izoom__tools .ac-btn:disabled {
   opacity: 0.35;
 }
 .izoom__level {
@@ -12971,7 +12977,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   flex: none;
   margin-top: 2px;
 }
-.rh-check .ac-check[data-disabled] + .settings-row__text .settings-row__label {
+.rh-check .ac-check:disabled + .settings-row__text .settings-row__label {
   color: var(--muted);
 }
 .rh-money {

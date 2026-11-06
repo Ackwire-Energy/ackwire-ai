@@ -12,6 +12,7 @@ import {
   Icon,
   type IconName,
   Input,
+  Locked,
   Menu,
   MenuItem,
   MenuRadioGroup,
@@ -69,53 +70,55 @@ export function GroupNameDialog({ purpose, onClose }: { purpose: GroupDialogFor;
           save();
         }}
       >
-        <DialogBody>
-          <Field label={t("agentGroups.nameLabel")} id="agent-group-name">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={80}
-              autoComplete="off"
-              autoFocus
-              placeholder={t("agentGroups.namePlaceholder")}
-            />
-          </Field>
-          {looks && (
-            <div className="agent-group-look">
-              <div className="roles-colors" role="radiogroup" aria-label={t("rolesPage.color")}>
-                {looks.colors.map((c) => (
-                  // biome-ignore lint/a11y/useSemanticElements: a swatch button in a radio group
-                  <button
-                    key={c}
-                    type="button"
-                    role="radio"
-                    aria-checked={color === c}
-                    aria-label={t("rolesPage.colorOf", { color: c })}
-                    className="roles-color"
-                    style={{ backgroundImage: `url("${ditherUrl(c as "graphite", 8)}")` }}
-                    onClick={() => setColor(c)}
-                  />
-                ))}
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <Field label={t("agentGroups.nameLabel")} id="agent-group-name">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={80}
+                autoComplete="off"
+                autoFocus
+                placeholder={t("agentGroups.namePlaceholder")}
+              />
+            </Field>
+            {looks && (
+              <div className="agent-group-look">
+                <div className="roles-colors" role="radiogroup" aria-label={t("rolesPage.color")}>
+                  {looks.colors.map((c) => (
+                    // biome-ignore lint/a11y/useSemanticElements: a swatch button in a radio group
+                    <button
+                      key={c}
+                      type="button"
+                      role="radio"
+                      aria-checked={color === c}
+                      aria-label={t("rolesPage.colorOf", { color: c })}
+                      className="roles-color"
+                      style={{ backgroundImage: `url("${ditherUrl(c as "graphite", 8)}")` }}
+                      onClick={() => setColor(c)}
+                    />
+                  ))}
+                </div>
+                <div className="roles-icons" role="radiogroup" aria-label={t("rolesPage.icon")}>
+                  {looks.icons.map((n) => (
+                    // biome-ignore lint/a11y/useSemanticElements: an icon button in a radio group
+                    <button
+                      key={n}
+                      type="button"
+                      role="radio"
+                      aria-checked={icon === n}
+                      aria-label={n}
+                      className="roles-iconpick"
+                      onClick={() => setIcon(n)}
+                    >
+                      <Icon name={n as IconName} size={18} />
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="roles-icons" role="radiogroup" aria-label={t("rolesPage.icon")}>
-                {looks.icons.map((n) => (
-                  // biome-ignore lint/a11y/useSemanticElements: an icon button in a radio group
-                  <button
-                    key={n}
-                    type="button"
-                    role="radio"
-                    aria-checked={icon === n}
-                    aria-label={n}
-                    className="roles-iconpick"
-                    onClick={() => setIcon(n)}
-                  >
-                    <Icon name={n as IconName} size={18} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </DialogBody>
+            )}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}

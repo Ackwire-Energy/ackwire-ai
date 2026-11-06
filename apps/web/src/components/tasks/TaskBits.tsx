@@ -18,7 +18,7 @@ import {
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import { callLogo } from "@agenteschat/client/lib/work";
-import { Button, Chip, cx, Icon, Input, PixelStop, Popover, ProviderLogo, Spinner } from "@agenteschat/ui";
+import { Button, Chip, cx, Icon, Input, Locked, PixelStop, Popover, ProviderLogo, Spinner } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type KeyboardEvent, type ReactNode, useEffect, useState } from "react";
@@ -121,14 +121,16 @@ export function SayWhy({
   };
   return (
     <span className={cx("tm-saywhy", className)}>
-      <ReasonInput
-        value={text}
-        onChange={setText}
-        onEnter={send}
-        onEscape={onCancel}
-        placeholder={t("taskManager.stopped.whyPlaceholder")}
-        autoFocus={autoFocus}
-      />
+      <Locked when={save.isPending}>
+        <ReasonInput
+          value={text}
+          onChange={setText}
+          onEnter={send}
+          onEscape={onCancel}
+          placeholder={t("taskManager.stopped.whyPlaceholder")}
+          autoFocus={autoFocus}
+        />
+      </Locked>
       <Button size="sm" disabled={!text.trim()} loading={save.isPending} onClick={send}>
         {t("taskManager.stopped.send")}
       </Button>
