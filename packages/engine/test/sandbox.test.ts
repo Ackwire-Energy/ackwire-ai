@@ -133,7 +133,7 @@ describe("access", () => {
     expect(await call(ctx, "run_code", { language: "python", code: "print(1)" })).toMatchObject({
       isError: true,
       content:
-        "Not allowed: this agent lacks the scope sandbox:run. If the request needs it, ask for it with request_permission",
+        'Not allowed: this agent lacks the scope sandbox:run. If the request needs it, call request_permission now with permission "sandbox:run": a card asks a person and your work goes on once they decide. Never ask the person to try again',
     });
     // "All tools" doesn't include running code.
     const all = new Set([grantKey(null, "*")]);

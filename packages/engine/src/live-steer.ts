@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import type { SteerMessage, SteerReply } from "./brains/types";
-import { taskNotice } from "./context";
+import { attachedLine, taskNotice } from "./context";
 import { publishChannelEvent } from "./events";
 import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
 import type { AgentRun } from "./runs";
@@ -133,9 +133,11 @@ export async function renderSteered(
     // A background task that ended while it worked: the notice with its result.
     text:
       taskNotice({ body: m.body, meta: m.meta }, true) ??
-      (options.beforeStart
-        ? `[${m.name ?? "someone"}]: ${m.body}`
-        : `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`),
+      `${
+        options.beforeStart
+          ? `[${m.name ?? "someone"}]: ${m.body}`
+          : `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`
+      }${attachedLine(m)}`,
   }));
 }
 
