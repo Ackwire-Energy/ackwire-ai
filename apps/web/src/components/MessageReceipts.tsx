@@ -13,12 +13,15 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { mayConnectAi } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, PixelSpinner, Popover } from "@agenteschat/ui";
 import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { useOpenBilling } from "@/components/BillingLinkButton";
 import { FanOutStrip, QueuedWords } from "@/components/ComputerQueue";
 import { useConnectAi } from "@/components/ConnectAi";
 import { HelpLink } from "@/components/HelpLink";
@@ -57,6 +60,20 @@ function ReceiptAction({ children }: { children: ReactNode }) {
   );
 }
 
+/** The hold's way to the plans, on a kept message's line. */
+function ReceiptPlanAction() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const open = useOpenBilling(org.id, "hold");
+  return (
+    <ReceiptAction>
+      <button type="button" className="ac-receipt__action" disabled={open.isPending} onClick={() => open.mutate()}>
+        {t("standing.billing.cta.payment")}
+      </button>
+    </ReceiptAction>
+  );
+}
+
 /**
  * What became of a message sent into a task at work: the reader's face once it read it, else the spinner while it
  * waits for the next pause, the bolt when it stopped to read, a check once handed over, the clock while an approval
@@ -90,6 +107,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const api = useApi();
   const toast = useToast();
   const connect = useConnectAi();
+  const held = usePlanHold() !== null;
   const steerId = useId();
   const [retrying, setRetrying] = useState(false);
   const receipt = useLive((s) => s.receipts[message.id]);
@@ -139,7 +157,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       : status.kind === "nobody"
         ? t(mentionNeeded ? "receipts.mentionNeeded" : "receipts.nobody")
         : status.kind === "no_ai"
-          ? t("noAi.receipt")
+          ? held
+            ? t("noAi.kept.receipt")
+            : t("noAi.receipt")
           : status.kind === "platform_cap"
             ? t("receipts.platformCap")
             : t(`receipts.${status.kind}`, { count: status.agents.length, names: names(status.agents) });
@@ -154,7 +174,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const reacted = new Set(reactions?.flatMap((r) => r.agentIds ?? []));
   const phaseText = (id: string) => {
     const phase = phases.get(id) ?? "seen";
-    if (phase === "no_ai") return t("noAi.chip");
+    if (phase === "no_ai") return t(held ? "noAi.kept.receipt" : "noAi.chip");
     // A reaction was its answer, whatever its run's state says.
     if (reacted.has(id)) return t("receipts.status.reacted");
     return view.referenced.includes(id) && phase === "seen"
@@ -179,7 +199,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
             // Keyed by the state: each new mark swaps in.
             <SteerMark key={steered.steer.state} steer={steered.steer} name={steered.name} size={16} />
           ) : (
-            <Icon name={receiptIcon(view, receipt)} />
+            <Icon name={held && status?.kind === "no_ai" ? "waiting" : receiptIcon(view, receipt)} />
           )}
         </button>
       }
@@ -292,7 +312,14 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
           <span>{t("receipts.platformCap")}</span>
         </span>
       )}
-      {status?.kind === "no_ai" && (
+      {/* On a billing hold the message is kept: the agent's card says so, or with none, this line does. */}
+      {status?.kind === "no_ai" && held && (
+        <span className="ac-receipt__words">
+          <span>{t(status.agents.length > 0 ? "noAi.kept.receipt" : "noAi.kept.channel")}</span>
+          {status.agents.length === 0 && can(org, "manage_billing") && <ReceiptPlanAction />}
+        </span>
+      )}
+      {status?.kind === "no_ai" && !held && (
         <span className="ac-receipt__words">
           <span>{t("noAi.receipt")}</span>
           {connect && mayConnect && (

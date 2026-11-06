@@ -811,7 +811,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // The API key, Claude's and ChatGPT's plans, then each coding plan with an account there that is the viewer's or
   // that the agent thinks with.
   const cards: AiChoice[] = [
-    "key",
+    // On a billing hold a key is no way forward; one it already thinks with stays on show.
+    ...(hold && savedCard !== "key" ? [] : (["key"] as const)),
     "claude",
     "chatgpt",
     // Cursor (ADR 0114), OpenCode (ADR 0132), Grok (ADR 0142) and Gemini (ADR 0143) only where a computer here runs them, or the agent
@@ -1475,7 +1476,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               disabled: c !== "key" && !homeOf(c),
             }))}
           />
-          {hold && <PlanHold hold={hold} onKey={card !== "key" && can("brain") ? () => choose("key") : undefined} />}
+          {hold && <PlanHold hold={hold} />}
           {hold && card === "key" && can("brain") && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
           {chosenSide && <SettingNote icon={chosenSide.icon}>{chosenSide.text}</SettingNote>}
           <Card as="section" className="ai-panel" aria-label={t("brain.title")}>

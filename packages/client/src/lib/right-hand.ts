@@ -119,13 +119,16 @@ export const offersTeamSetup = (s: {
   hasTeam: boolean;
   /** `startCardPassed`. */
   cardPassed: boolean;
-}) => s.aiKnown && !s.noAi && s.createsAgents && (s.hasTeam || s.cardPassed);
+  /** A billing hold (`planHoldOf`): it can't answer, so its line would send a message that gets refused. */
+  held?: boolean;
+}) => s.aiKnown && !s.noAi && !s.held && s.createsAgents && (s.hasTeam || s.cardPassed);
 
 /**
  * The cards under the right hand's greeting at the top of its DM (ADR 0137): Connect AI while there is none. With one,
  * how to start (for whoever may create agents): with no agent yet, or, still alone, while the team is only ready-made
  * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. Last, once an AI is
- * there, how the person wants agents to talk to them, until they pick (ADR 0147).
+ * there, how the person wants agents to talk to them, until they pick (ADR 0147). On a billing hold, how to start and
+ * what next alone: an AI comes after the plan, and a saved key reading as ready changes nothing.
  */
 export function introCards(s: {
   noAi: boolean;
@@ -138,8 +141,10 @@ export function introCards(s: {
   alone: boolean;
   /** They never picked how agents talk to them (`agentStyle` null; undefined from an older server). */
   askStyle?: boolean;
+  /** A billing hold (`planHoldOf`). */
+  held?: boolean;
 }): ("connect" | "start" | "next" | "style")[] {
-  if (s.noAi) return ["connect"];
+  if (s.noAi && !s.held) return ["connect"];
   const presets = new Set<string>(PRESETS);
   const start =
     s.aiKnown &&
@@ -150,6 +155,6 @@ export function introCards(s: {
   return [
     ...(start ? (["start"] as const) : []),
     ...(next ? (["next"] as const) : []),
-    ...(s.askStyle && s.aiKnown ? (["style"] as const) : []),
+    ...(s.askStyle && s.aiKnown && !s.held ? (["style"] as const) : []),
   ];
 }

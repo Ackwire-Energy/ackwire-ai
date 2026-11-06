@@ -1,8 +1,11 @@
-import { type Message, useAiStatus, useApi } from "@agenteschat/client";
+import { type Message, useAiStatus, useApi, useMessages } from "@agenteschat/client";
+import type { BillingHold } from "@agenteschat/client/lib/billing";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   aiStateOf,
+  keptCardState,
   mayConnectAi,
+  type NoAiCard as NoAiCardMeta,
   noAiCardOf,
   noAiLineKey,
   planLineFix,
@@ -12,12 +15,13 @@ import {
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useTheme } from "@/ui";
 import { useDirectory, useMeId } from "../shared/hooks";
+import { usePlanHold } from "./parts";
 
 type Answer = "pending" | "answering" | "still_missing";
 
@@ -59,8 +63,11 @@ export function NoAiCard({ message: m }: { message: Message }) {
   const status = useAiStatus(orgId);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const meId = useMeId();
+  const hold = usePlanHold(orgId, org);
   const card = noAiCardOf(m.meta);
   if (!card || m.author.type !== "agent") return null;
+  // Any card on a billing hold is the wall: a Connect or a key from before it leads nowhere until the plan.
+  if (card.held || hold) return <KeptCard message={m} card={card} hold={hold} />;
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const again = signInAgainPlan(card, agent);
@@ -153,6 +160,75 @@ export function NoAiCard({ message: m }: { message: Message }) {
           }
         />
       )}
+    </View>
+  );
+}
+
+/**
+ * The web's wall (ADR 0079 §6): the agent kept the message for after the plan, in words only, since paying has no
+ * button or link here (`keptCardState`). Once an AI is there, opening the conversation starts the answer.
+ */
+function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCardMeta; hold: BillingHold | null }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const { orgId, org } = useOrg();
+  const dir = useDirectory();
+  const { colors } = useTheme();
+  const status = useAiStatus(orgId);
+  const meId = useMeId();
+  const messages = useMessages(orgId, m.channelId).data;
+  const started = useRef(false);
+  const [answering, setAnswering] = useState(false);
+  const agent = dir.agentById.get(card.agentId);
+  const name = agent?.name ?? t("channel.unknownAgent");
+  const ai = aiStateOf(status.data, card.agentId);
+  const state = keptCardState({ hold, paid: false, ready: ai !== undefined && ai !== "no_ai" });
+  const mayAnswer =
+    card.forUserId === meId || (meId !== null && agent?.ownerUserId === meId) || can(org, "manage_agents");
+  const replied = messages?.some(
+    (x) => x.author.id === card.agentId && x.createdAt > m.createdAt && !noAiCardOf(x.meta),
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per card here
+  useEffect(() => {
+    if (state !== "answer" || !mayAnswer || replied !== false || started.current) return;
+    started.current = true;
+    void api.chat.answerNow(orgId, m.id).then(
+      () => setAnswering(true),
+      () => undefined,
+    );
+  }, [state, mayAnswer, replied]);
+  const code = hold ?? "payment";
+  const title =
+    state === "held" || state === "paid"
+      ? t("noAi.kept.title")
+      : state === "connect"
+        ? t("noAi.kept.active", { name })
+        : t(replied || !answering ? "noAi.card.connected" : "noAi.card.answering", { name });
+  return (
+    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+      <View style={styles.top}>
+        <LineIcon name={state === "answer" ? "check" : "clock"} variant="subhead" size={16} color={colors.ink2} />
+        <Text variant="subhead" style={styles.title}>
+          {title}
+        </Text>
+      </View>
+      {state === "held" || state === "paid" ? (
+        <>
+          <Text variant="footnote" tone="ink2">
+            {code === "payment" ? t("noAi.kept.line") : t(`standing.billing.${code}`)}
+          </Text>
+          {code === "payment" ? (
+            <Text variant="footnote" tone="ink2">
+              {t("noAi.kept.plan")}
+            </Text>
+          ) : null}
+          <Text variant="footnote" tone="muted">
+            {t(can(org, "manage_billing") ? "connectAi.billingWeb" : "standing.billing.askAdmin")}
+          </Text>
+        </>
+      ) : state === "connect" && mayConnectAi(agent, meId, org) ? (
+        <Button variant="primary" size="sm" label={t("noAi.action")} onPress={() => openConnectAi({ from: m.id })} />
+      ) : null}
     </View>
   );
 }

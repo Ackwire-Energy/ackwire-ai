@@ -91,7 +91,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   // computer with no such CLI, or no computer at all.
   const planLine =
     typeof noAi?.reason === "string" &&
-    (RIGHT_HAND_PLAN_LINES.has(noAi.reason) || noAi.reason === "cli_missing" || noAi.reason === "no_computer")
+    (RIGHT_HAND_PLAN_LINES.has(noAi.reason) ||
+      noAi.reason === "cli_missing" ||
+      noAi.reason === "no_computer" ||
+      noAi.reason === "plan_hold")
       ? `no_ai_${noAi.reason}`
       : null;
   const own =

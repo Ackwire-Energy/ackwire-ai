@@ -398,4 +398,19 @@ export const words: EmailWords = {
     button: "Benachrichtigungen öffnen",
     why: (org) => `Du erhältst diese E-Mail, weil jemand in ${org} dein Abo mit einem Agenten verbunden hat.`,
   },
+  planWaiting: {
+    subject: "Dein Team wartet",
+    preheader: "Dein Workspace ist bereit. Zum Start fehlt ein agentes.chat-Tarif.",
+    headline: "Dein Team wartet",
+    body: (agents, channels, routines) => {
+      const a = plural("de", agents, { one: `1 Agent`, other: `${agents} Agenten` });
+      const c = plural("de", channels, { one: `1 Kanal`, other: `${channels} Kanäle` });
+      const r = plural("de", routines, { one: `1 Routine`, other: `${routines} Routinen` });
+      return routines > 0
+        ? `${a}, ${c} und ${r} sind bereit. Zum Start fehlt ein agentes.chat-Tarif.`
+        : `${a} und ${c} sind bereit. Zum Start fehlt ein agentes.chat-Tarif.`;
+    },
+    button: "agentes.chat-Tarife ansehen",
+    why: (org) => `Du bekommst diese E-Mail, weil du ${org} auf agentes.chat leitest. Wir senden nur zwei solche Hinweise.`,
+  },
 };

@@ -31,7 +31,7 @@ import { Button, SheetScreen, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { ConnectAiFlow, viewOf } from "./ConnectAiSteps";
 import type { FlowView } from "./logic";
-import { openPage } from "./parts";
+import { openPage, PlanHoldNote, usePlanHold } from "./parts";
 
 /**
  * The first run's API key (the web's key panel, saved by the step's button): a pay-as-you-go key for the
@@ -130,6 +130,7 @@ export function ConnectAiSheet() {
   }>();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
+  const hold = usePlanHold(orgId, org);
   // From the create-agent step: for the agent being made, never one I have.
   // The team's right hand thinks with each person's own AI (ADR 0137 §11): everyone's to connect for their DM.
   const mine = params.forNew === "1" ? [] : dir.agents.filter((a) => a.ownerUserId === meId || isRightHand(a));
@@ -171,7 +172,9 @@ export function ConnectAiSheet() {
   };
   return (
     <SheetScreen>
-      {dir.loading || status.isPending ? (
+      {hold ? (
+        <PlanHoldNote org={org} />
+      ) : dir.loading || status.isPending ? (
         <ActivityIndicator color={c.faint} style={styles.loading} />
       ) : (
         <ConnectAiFlow

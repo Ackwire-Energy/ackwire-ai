@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { Icon, ListRow } from "@/ui";
+import { usePlanHold } from "../ai/parts";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { Tile } from "../shared/parts";
 import { CollapsibleSection } from "./HomeSection";
@@ -22,6 +23,7 @@ function useFirstSteps(): FirstStep[] | null {
   const statuses = useAgentStatuses(orgId);
   const overview = useOverview(orgId);
   const routines = useRoutines(orgId);
+  const held = usePlanHold(orgId, org) !== null;
   if (dir.loading || !ai.isFetched || !statuses.isFetched || !overview.isFetched || !routines.isFetched) return null;
   const steps = firstSteps({
     agents: dir.agents.length,
@@ -31,6 +33,7 @@ function useFirstSteps(): FirstStep[] | null {
     people: overview.data?.people ?? 1,
     routines: routines.data?.length ?? 0,
     may: stepPermissions(org, meId, dir.agents),
+    held,
   });
   return startingOut(steps) ? steps : null;
 }
@@ -54,6 +57,22 @@ export function FirstSteps({ collapsed, onToggle }: { collapsed: readonly string
     >
       {steps.map((s, i) => {
         const title = t(`home.steps.${s.id}.title`);
+        // Words only: paying has no button or link here (ADR 0079 §6).
+        if (s.id === "plan") {
+          return (
+            <ListRow
+              key={s.id}
+              divider={i > 0}
+              leading={
+                <Tile size={44}>
+                  <Icon name="clock" size={22} color={c.muted} />
+                </Tile>
+              }
+              title={title}
+              sub={t("connectAi.billingWeb")}
+            />
+          );
+        }
         // The web's "ask" line points at Início's composer, which the phone doesn't have.
         const text = s.done
           ? t("home.steps.done")

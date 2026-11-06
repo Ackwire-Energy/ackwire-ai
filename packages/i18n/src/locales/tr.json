@@ -1893,6 +1893,7 @@
     "intro": {
       "greeting": "Merhaba, ben {{name}}. Ekibi seninle birlikte kuruyorum.",
       "lead": "Ajanları oluşturur, uygulamaları bağlar ve kişileri davet ederim. Sen tıklamadan hiçbir şey değişmez ve yalnızca senin yapabildiklerini yaparım.",
+      "heldLead": "İşletmenin ne yaptığını seç, ekip burada belirsin. Çalışma alanının agentes.chat planı olunca ajanlar çalışmaya başlar.",
       "connect": {
         "title": "Ekip için bir yapay zeka bağla",
         "text": "Ajanlar çalışma alanının yapay zekasıyla düşünür. Claude veya ChatGPT planınla giriş yap, API anahtarı gerekmez.",
@@ -2207,6 +2208,14 @@
       "commands_off": "{{name}} şu an yanıt veremiyor: planın bilgisayarında komutlar kapalı ve bilgisayarla ilgilenen kişinin bunları açması gerekiyor.",
       "useKey": "API anahtarı kullan"
     },
+    "kept": {
+      "title": "Mesajını sakladım.",
+      "line": "Çalışma alanının agentes.chat planı ve bağlı bir yapay zekası olunca burada yanıtlayacağım.",
+      "plan": "Plan, ajanların her zaman açık bilgisayarını getirir. Yapay zeka zaten ödediğindir: Claude, ChatGPT ve diğerleri ya da bir API anahtarı.",
+      "active": "Plan etkin. Bir yapay zeka bağla, {{name}} burada yanıtlasın.",
+      "receipt": "Saklandı",
+      "channel": "Saklandı. Çalışma alanının agentes.chat planı olunca ajanlar yanıtlar."
+    },
     "receipt": "Kimse yanıt vermeyecek: bağlı yapay zeka yok",
     "chip": "Yapay zeka yok"
   },
@@ -2293,7 +2302,7 @@
       "saved": "Kaydedildi. Planı olmayan her ajan bununla düşünür.",
       "savedUnchecked": "Kaydedildi, ama {{provider}} yanıt vermedi, bu yüzden anahtar kontrol edilemedi. Başarısız olursa nedenini sohbet söyler.",
       "held": "Çalışma alanının agentes.chat planı etkin olduğunda ajanlar bunu kullanır.",
-      "savedHeld": "Kaydedildi. Çalışma alanının agentes.chat planı etkin olduğunda ajanlar bunu kullanır.",
+      "closed": "API anahtarları çalışma alanının agentes.chat planıyla açılır.",
       "notPlan": "Bir kodlama planının anahtarı yukarıdaki kendi seçeneğine girilir.",
       "billing": "Anahtarın projesi için faturalandırmayı açın. Faturalandırma olmadan Google, ajanlarınızın gönderdiklerini kullanabilir.",
       "privacy": "Ajanlarınızın gönderdiklerini hangi sağlayıcıların saklayabileceğine OpenRouter gizlilik ayarlarınız karar verir."
@@ -3629,6 +3638,11 @@
         "title": "İlk ajanınızı oluşturun",
         "text": "Ne yaptığını söyleyin, ekibe katılsın.",
         "action": "Ajan oluştur"
+      },
+      "plan": {
+        "title": "Bir agentes.chat planı seç",
+        "text": "Çalışma alanının planı olunca ajanlar çalışmaya başlar.",
+        "action": "Planları gör"
       },
       "ai": {
         "title": "Bir yapay zeka bağlayın",
@@ -13024,6 +13038,7 @@
       "no_ai_model_region": "Yanıt veremiyorum: {{model}} için OpenCode'da Global bölgesinin açık olması gerekiyor (Settings › Privacy).",
       "no_ai_commands_off": "Şu an yanıt veremiyorum: planımın bilgisayarında komutlar kapalı.",
       "no_ai_cli_missing": "Henüz yanıt veremiyorum: yapay zekamın programı bilgisayarımda kurulu değil.",
+      "no_ai_plan_hold": "Mesajını sakladım. Çalışma alanının agentes.chat planı ve bağlı bir yapay zekası olunca burada yanıtlayacağım.",
       "no_ai_no_computer": "Henüz yanıt veremiyorum: yapay zekamın bir bilgisayara ihtiyacı var ve hiç bilgisayarım yok.",
       "redacted": "[kaldırıldı: bir oturum açma bilgisi ya da anahtar gibi görünüyordu]",
       "action_connect_ai": "Yapay zeka bağla",
@@ -13743,7 +13758,9 @@
         "ended": "Yeniden abone ol"
       },
       "askAdmin": "Bu çalışma alanını yöneten kişi bunu çözebilir.",
-      "paid": "Ödeme alındı. agentes.chat planı birazdan başlıyor."
+      "paid": "Ödeme alındı. agentes.chat planı birazdan başlıyor.",
+      "teamReady": "Ekibin hazır. Başlamak için bir agentes.chat planı gerekiyor.",
+      "invites": "Davetler agentes.chat planıyla açılır."
     },
     "cloud": {
       "review": "Ekibimiz inceleyene kadar güvenlik incelemesi için duraklatıldı. Otomatik kontrollerimiz Koşullarımızı (bölüm 5) ihlal edebilecek bir etkinlik saptadı. İtiraz etmek için {{email}} adresine yazın.",
@@ -14870,6 +14887,8 @@
     "firstTask": {
       "suggestion": "öneri",
       "lead": "Her ajan için kısa bir görev, bugün her birini çalışırken gör.",
+      "heldLead": "Her ajan için kısa bir görev. Cümleyi tamamlayıp gönder. Çalışma alanının agentes.chat planı olunca başlarlar.",
+      "example": "{{name}} tarafından sunulanlara örnek",
       "open": "Görevle aç",
       "invite": "{{names}} davet et",
       "later": "Sonra"
@@ -14892,6 +14911,7 @@
     "templates": {
       "title": "Ekip şablonları",
       "lead": "İşletme türüne uygun hazır bir ekip. Sonra {{name}} seninle birlikte uyarlar.",
+      "heldLead": "İşine en yakın olanı seç. Oluşturmadan önce her ajanı ayarlayabilirsin.",
       "use": "Bu şablonu kullan",
       "none": "Hiçbiri",
       "noneSub": "Ne yaptığını anlat, {{name}} kursun",
@@ -14938,50 +14958,55 @@
         "role": "Müşteri hizmetleri",
         "line": "Müşterilere WhatsApp ve e-postadan yanıt verir. Bilmediğinde seni çağırır.",
         "routine": "Yanıtsız kalanları özetle",
-        "task": "Bekleyen son müşteri mesajını yanıtla"
+        "task": "Bu müşteri mesajına bir yanıt yaz:"
       },
       "caio": {
         "role": "Tahsilat",
         "line": "Ödemesi gecikenlere hatırlatır ve onayından sonra ödeme hatırlatmasını gönderir.",
         "routine": "Ödemesi gecikenleri listele",
-        "task": "Bu ay gecikenleri listele"
+        "task": "Şu kişi için nazik bir ödeme hatırlatması yaz:"
       },
       "ada": {
         "role": "Dev",
         "line": "Müşterilerin bildirdiği hataları düzeltir ve PR açar.",
         "routine": "Yeni hataları listele",
-        "task": "Bir müşterinin bildirdiği son hataya bak"
+        "task": "Bu hatayı araştırmaya nereden başlayacağımı söyle:"
       },
       "lia": {
         "role": "İçerik",
         "line": "Şirketin üslubuyla gönderi ve senaryo yazar, onayından sonra planlar.",
         "routine": "Haftanın gönderilerini öner",
-        "task": "Bu hafta için üç gönderi öner"
+        "task": "Şu konuda bu hafta için üç gönderi öner:"
       },
       "theo": {
         "role": "Satış",
         "line": "Teklif isteyen herkesi takip eder ve teklifleri yazar.",
         "routine": "Teklif isteyip yanıt alamayanları listele",
-        "task": "Bu hafta teklif isteyenleri listele"
+        "task": "Bu talep için kısa bir teklif yaz:"
       },
       "nina": {
         "role": "Randevu",
         "line": "Randevu verir, onaylar, değiştirir ve müşterilere bir gün önce hatırlatır.",
         "routine": "Yarının randevularını onayla",
-        "task": "Yarının randevularını göster"
+        "task": "Yarının şu saatlerini düzenle:"
       },
       "otto": {
         "role": "Siparişler",
         "line": "Siparişleri ve stoku takip eder, biten şeyleri haber verir.",
         "routine": "Stokta bitmek üzere olanları haber ver",
-        "task": "Hâlâ gönderim bekleyen siparişleri listele"
+        "task": "Bu siparişlerde yapılacak işleri listele:"
       },
       "bia": {
         "role": "Yanıt tabanı",
         "line": "Yanıt tabanını ekibin verdiği yanıtlarla güncel tutar.",
         "routine": "Tabanı haftanın yanıtlarıyla güncelle",
-        "task": "Müşterilerin en çok sorduğu 5 soruyu listele"
+        "task": "Bu müşteri sorularının yanıtlarını yaz:"
       }
+    },
+    "example": {
+      "iara": "Merhaba Marina! Siparişin dün yola çıktı ve cumaya kadar ulaşacak. Takip kodu hemen aşağıda. Cuma uymazsa başka bir tarih bulurum.",
+      "lia": "1. Ajans seçerken yapılan üç yaygın hata. 2. Neredeyse ters giden bir projenin perde arkası. 3. Takipçilerinize bir soru: burada ne görmek istersiniz?",
+      "nina": "Yarın: 9:00 Carla, 10:30 Pedro, 14:00 boş. Pedro henüz onaylamadı. Ona yazayım mı?"
     },
     "channels": {
       "iara": "destek",

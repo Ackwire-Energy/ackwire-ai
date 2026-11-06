@@ -2,7 +2,9 @@ import type { Agent } from "@agenteschat/client";
 import {
   keys,
   useAiStatus,
+  useApplyTeamTemplate,
   useChannels,
+  useComputerSetup,
   useMembers,
   useMessages,
   useRightHandWave,
@@ -16,7 +18,7 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { answerAfter, BUSINESS_TYPES, startCardPassed } from "@agenteschat/client/lib/team-plan";
+import { answerAfter, BUSINESS_TYPES, isTemplateBusiness, startCardPassed } from "@agenteschat/client/lib/team-plan";
 import { AgentSticker, Button, Icon, Message, MessageText, normalizeAppearance, WAVE_SECONDS } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -25,6 +27,8 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { MESSAGE_STICKER } from "@/chat/ChatMedia";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
@@ -43,8 +47,9 @@ import { useToast } from "@/lib/toast";
  * any AI is connected: its greeting, then the first card the workspace needs. No AI yet: Connect AI. An AI and no
  * agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A team and
  * nobody else here yet: inviting people and the first task. Last, until the person picks, how agents talk to them
- * (ADR 0147). Once the start card has stopped asking, a line to build the team with it, at any time. On the person's
- * first visit, its waving sticker under the greeting, drawn as a sticker message is and decorative (the greeting
+ * (ADR 0147). Once the start card has stopped asking, a line to build the team with it, at any time. On a billing
+ * hold it can't answer, so the start card and what's next alone, with no model call behind them. On the person's first
+ * visit, its waving sticker under the greeting, drawn as a sticker message is and decorative (the greeting
  * already says hello). Its face and name open the profile card, as on any message.
  */
 export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: string }) {
@@ -59,16 +64,20 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
   const wave = useRightHandWave(org.id, agent.id);
   const team = dir.agents.filter((a) => !isRightHand(a));
   const teamHandles = team.map((a) => a.handle);
+  const held = usePlanHold() !== null;
+  const setup = useComputerSetup(org.id);
+  // A hold is known with the edition: until then no card, so Connect doesn't flash before the start card.
   const noAi = aiStateOf(status.data, agent.id) === "no_ai";
-  const aiKnown = Boolean(status.data);
+  const aiKnown = Boolean(status.data) && !setup.isPending;
   const createsAgents = can(org, "create_agents");
   const cards = introCards({
-    noAi,
+    noAi: noAi && aiKnown,
     aiKnown,
     teamHandles,
     createsAgents,
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org.agentStyle === null,
+    held,
   });
   const profile = { actor: { type: "agent", id: agent.id }, label: t("profile.of", { name: agent.name }) } as const;
   return (
@@ -95,7 +104,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
           <p>
             <b>{t("rightHand.intro.greeting", agentGrammar(agent.name))}</b>
           </p>
-          <p>{t("rightHand.intro.lead")}</p>
+          <p>{t(held ? "rightHand.intro.heldLead" : "rightHand.intro.lead")}</p>
         </div>
       </MessageText>
       {wave && (
@@ -122,9 +131,15 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
         </div>
       )}
       {cards.includes("start") && (
-        <StartCard agent={agent} left={presetsLeft(teamHandles)} first={team.length === 0} channelId={channelId} />
+        <StartCard
+          agent={agent}
+          left={presetsLeft(teamHandles)}
+          first={team.length === 0}
+          channelId={channelId}
+          held={held}
+        />
       )}
-      {cards.includes("next") && team[0] && <NextCard agent={agent} first={team[0]} />}
+      {cards.includes("next") && team[0] && <NextCard agent={agent} first={team[0]} held={held} />}
       {cards.includes("style") && <StyleCard agent={agent} />}
       {offersTeamSetup({
         noAi,
@@ -132,6 +147,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
         createsAgents,
         hasTeam: team.length > 0,
         cardPassed: startCardPassed(messages),
+        held,
       }) && (
         <p className="rh-intro__again small muted">
           {t("rightHand.intro.again.question")}{" "}
@@ -148,20 +164,23 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
  * How to start (ADR 0137 §10). With no agent yet: "O que a Acme faz?", business types to tap or a sentence to write
  * (each tap the person's own message, which starts the right hand's interview), and the other ways in under it: the
  * team templates, the ready-made agents, an import or the form. Answered, it reads "respondida" with the pick checked.
- * With ready-made agents already made, the tiles of the ones left, each its own Criar.
+ * With ready-made agents already made, the tiles of the ones left, each its own Criar. On a billing hold a tap posts
+ * that business's template, with no model call, and "Outra coisa" opens the gallery: writing is what won't work yet.
  */
 function StartCard({
   agent,
   left,
   first,
   channelId,
+  held,
 }: {
   agent: Agent;
   left: readonly Preset[];
   first: boolean;
   channelId: string;
+  held: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -186,7 +205,20 @@ function StartCard({
     onError: (e) => toast.show(errorText(t, e), "error"),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.agents(org.id) }),
   });
-  const answer = first ? answerAfter(messages, null) : null;
+  const useTemplate = useApplyTeamTemplate(org.id);
+  const said = first ? answerAfter(messages, null) : null;
+  const choices = BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`));
+  // On a hold a sentence they wrote got the wall: the chips stay, as the way to a team.
+  const answer = held && said !== null && !choices.includes(said) ? null : said;
+  const tap = (text: string) => {
+    const business = BUSINESS_TYPES[choices.indexOf(text)];
+    if (!held) return text === other ? actions?.focusComposer() : actions?.resend(text);
+    if (!business || !isTemplateBusiness(business)) return setTemplates(true);
+    useTemplate.mutate(
+      { templateId: business, locale: i18n.language, tap: text },
+      { onError: (e) => toast.show(errorText(t, e), "error") },
+    );
+  };
   const question = first ? t("teamPlan.start.question", { org: org.name }) : t("rightHand.intro.start.question");
   const other = t("teamPlan.business.other");
   return (
@@ -200,18 +232,13 @@ function StartCard({
         waitingFor={answer !== null ? t("teamPlan.answered") : undefined}
         lead={question}
         what={question}
-        locked={create.isPending}
+        locked={create.isPending || useTemplate.isPending}
         body={
           <>
             {first && (
-              <AnswerChips
-                choices={BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`))}
-                multiple={false}
-                answer={answer}
-                onSend={(text) => (text === other ? actions?.focusComposer() : actions?.resend(text))}
-              />
+              <AnswerChips choices={choices} multiple={false} answer={answer} onSend={tap} />
             )}
-            {first && answer === null && <p className="tp-start__write">{t("teamPlan.start.orWrite")}</p>}
+            {first && answer === null && !held && <p className="tp-start__write">{t("teamPlan.start.orWrite")}</p>}
             {presetsOpen && (
               <div className="rh-intro__presets">
                 {left.map((p) => {
@@ -278,9 +305,10 @@ function StartCard({
 
 /**
  * The team is here, nobody else yet: invite the people, or open the first agent's DM with a first task written. A
- * suggestion, never waiting for the person: alone in a workspace, it stays.
+ * suggestion, never waiting for the person: alone in a workspace, it stays. On a billing hold the plan comes first:
+ * invitations open with it, so offering one would be a second wall.
  */
-function NextCard({ agent, first }: { agent: Agent; first: Agent }) {
+function NextCard({ agent, first, held }: { agent: Agent; first: Agent; held: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const navigate = useNavigate();
@@ -298,11 +326,18 @@ function NextCard({ agent, first }: { agent: Agent; first: Agent }) {
       what={question}
       actions={
         <>
-          {invite && can(org, "invite_people") && (
-            <Button size="sm" variant="primary" onClick={() => invite.open()}>
-              {t("rightHand.intro.next.invite")}
-            </Button>
-          )}
+          {held
+            ? can(org, "manage_billing") && (
+                <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+                  {t("standing.billing.cta.payment")}
+                </BillingLinkButton>
+              )
+            : invite &&
+              can(org, "invite_people") && (
+                <Button size="sm" variant="primary" onClick={() => invite.open()}>
+                  {t("rightHand.intro.next.invite")}
+                </Button>
+              )}
           <Button
             size="sm"
             onClick={() => {

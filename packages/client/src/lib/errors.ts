@@ -154,6 +154,7 @@ const KNOWN = {
   "connector.unavailable": "errors.connector.unavailable",
   // Facts only (the phone shows this one): the web's onboarding says `standing.createUnpaid` beside the way to pay.
   "org.create_unpaid": "standing.createInactive",
+  "credentials.plan_hold": "connectAi.key.closed",
   "machine.managed": "computerSetup.managedNotRemovable",
   "machine.managed_access": "computerSetup.managedAccess",
   "join.link_closed": "errors.join.linkClosed",

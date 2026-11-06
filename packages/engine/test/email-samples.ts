@@ -329,6 +329,16 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     plan: "Claude",
     url: `${APP}/org/${ORG}/notifications`,
   },
+  /** A team waits for the workspace's first plan: what is ready, and the plans. */
+  "plan_waiting.pt-BR": {
+    kind: "plan_waiting",
+    locale: "pt-BR",
+    orgName: "Padaria Souza",
+    agents: 4,
+    channels: 3,
+    routines: 2,
+    url: `${APP}/org/${ORG}/settings/billing`,
+  },
   /** Deleted by the person: the date, the workspace that closed with it, and how to come back. */
   "account_deleting.en": {
     kind: "account_deleting",

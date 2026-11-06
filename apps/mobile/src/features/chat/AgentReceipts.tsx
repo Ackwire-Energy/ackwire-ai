@@ -31,7 +31,7 @@ import {
 } from "@/ui";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
-import { Note, OpenPage } from "../ai/parts";
+import { Note, OpenPage, usePlanHold } from "../ai/parts";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -39,6 +39,7 @@ import { useSheet } from "../shared/SheetHost";
 import {
   markLabel,
   markOf,
+  keptLine,
   phaseKey,
   type ReceiptLine,
   receiptLine,
@@ -75,7 +76,8 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   const reduced = useReducedMotion();
   const sheet = useSheet();
   const steer = useSteerState(orgId, m.channelId, m.id);
-  const line = receiptLine(receipt);
+  const held = usePlanHold(orgId, org) !== null;
+  const line = held ? keptLine(receiptLine(receipt)) : receiptLine(receipt);
   if (!receiptShows(line, Boolean(steer))) return null;
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const say = (w: ReceiptLine["label"]) =>
@@ -89,7 +91,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   const fix =
     failedAgent && failure
       ? failedRunFix(failure.code, {
-          keys: can(org, "manage_credentials"),
+          keys: can(org, "manage_credentials") && !held,
           admin: can(org, "manage_agents"),
           owner: meId !== null && dir.agentById.get(failedAgent)?.ownerUserId === meId,
         })
@@ -300,9 +302,10 @@ function ReceiptsSheet({
   onAction: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const orgId = useOrgId();
+  const { orgId, org } = useOrg();
   const dir = useDirectory();
   const sheet = useSheet();
+  const held = usePlanHold(orgId, org) !== null;
   const reactions = useReactions(orgId, m.id, false).data ?? m.reactions;
   const rows = receiptRows(
     receipt,
@@ -329,7 +332,7 @@ function ReceiptsSheet({
             key={r.agentId}
             leading={<AgentFace agentId={r.agentId} size={30} live={false} />}
             title={name(r.agentId)}
-            subtitle={t(phaseKey(r.phase))}
+            subtitle={t(phaseKey(r.phase, held))}
           />
         ))}
       </Card>

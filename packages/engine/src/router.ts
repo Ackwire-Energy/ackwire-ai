@@ -38,7 +38,7 @@ import type { MachineCaller } from "./machine-hub";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage, type Message, type ReplyRef } from "./messages";
 import { ACTIVE_RUN_STATUSES } from "./run-inbox";
 import { type AgentRun, NO_AI } from "./runs";
-import { OrgDeletingError, standingRefusal } from "./standing";
+import { billingHold, OrgDeletingError, standingRefusal } from "./standing";
 
 const {
   agents,
@@ -704,6 +704,8 @@ export interface RouteResult {
   continuityAgentId?: string | null;
   /** For the receipt: `no_ai`, or `mention_needed` (no step could read it and no rule fit). Never a model's words. */
   reason?: string;
+  /** With `no_ai`: the workspace waits for its first plan, so nothing reads the message. */
+  held?: true;
   /** The step that picked (receipts). */
   decidedBy?: DecidedBy;
   /** A person's social message (a greeting, thanks, an ok) nobody answers: one agent's reaction instead. */
@@ -762,9 +764,16 @@ export async function routeMessage(
   const { db } = deps;
   // A workspace on hold, suspended or being deleted asks no strategy (Jev bills the server): nobody answers there now.
   const refusal = await standingRefusal(db, input.orgId);
-  if (refusal) return { runs: [], skipped: refusal instanceof OrgDeletingError ? "org_deleting" : "org_paused" };
+  const paused = {
+    runs: [],
+    skipped: refusal instanceof OrgDeletingError ? "org_deleting" : "org_paused",
+  } as const satisfies RouteResult;
+  // Waiting for its first plan: a person's message reaches the candidates, to be kept for after it (`no_ai`).
+  const waitsForPlan = (await billingHold(db, input.orgId)) === "payment";
+  if (refusal && !waitsForPlan) return paused;
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message) return { runs: [], skipped: "message_missing" };
+  if (waitsForPlan && message.authorType !== "person") return paused;
   const byAgent = message.authorType === "agent" && message.authorAgentId !== null;
   if (message.authorType !== "person" && !byAgent) return { runs: [], skipped: "not_a_person" };
   if (message.mentionedAgentIds.length > 0) return { runs: [], skipped: "has_mentions" };
@@ -834,7 +843,7 @@ export async function routeMessage(
       .catch(() => new Set<string>());
     candidates = candidates.filter((c) => !out.has(c.agentId));
   }
-  if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
+  if (candidates.length === 0) return waitsForPlan ? paused : { runs: [], skipped: "no_candidates" };
   // Routed to nobody without asking the strategy, and why (the receipts say it).
   const unrouted = async (reason: typeof NO_AI | typeof PLATFORM_CAP): Promise<RouteResult> => {
     const stored = await db
@@ -853,6 +862,7 @@ export async function routeMessage(
   };
   // No AI anywhere in the organization: nobody could answer, whatever the strategy (Jev only scores, so it
   // never misses a key). Stored as `no_ai`, which "Responder agora" routes again once an AI is connected.
+  if (waitsForPlan) return { ...(await unrouted(NO_AI)), held: true };
   if (deps.hasAi && !(await deps.hasAi(message.orgId))) return unrouted(NO_AI);
   if (await deps.platformCapReached?.(message.orgId)) return unrouted(PLATFORM_CAP);
   const quietMs = byAgent ? 0 : (deps.quietMs ?? 0);

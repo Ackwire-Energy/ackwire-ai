@@ -30,10 +30,11 @@ import {
   loadEndpointModels,
   type StoredEndpoint,
 } from "./endpoints";
-import { ConflictError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import type { KeyCheck, ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
 import { orgModelProvider } from "./router";
+import { billingHold } from "./standing";
 
 const { providerCredentials } = schema;
 
@@ -193,6 +194,10 @@ export async function createCredential(
   opts: { fetch?: typeof fetch; net?: EndpointNet; verify?: KeyVerifier } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
+  // A key is no way around a billing hold: it would only sit there reading as ready.
+  if (await billingHold(db, orgId)) {
+    throw new ForbiddenError("API keys open with the workspace's agentes.chat plan", "credentials.plan_hold");
+  }
   if (!isKnownProvider(input.provider)) throw new ValidationError(`Unknown provider ${input.provider}`);
   const custom = input.provider === "custom";
   if (custom !== Boolean(input.endpoint))

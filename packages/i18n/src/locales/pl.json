@@ -2044,6 +2044,7 @@
     "intro": {
       "greeting": "Cześć, tu {{name}}. Zbuduję z tobą zespół.",
       "lead": "Tworzę agentów, podłączam aplikacje i zapraszam ludzi. Nic się nie zmienia bez twojego kliknięcia i robię tylko to, co ty możesz zrobić.",
+      "heldLead": "Wybierz, czym zajmuje się twoja firma, a zespół pojawi się tutaj. Agenci zaczną pracować, gdy workspace będzie mieć plan agentes.chat.",
       "connect": {
         "title": "Podłącz AI dla zespołu",
         "text": "Agenci myślą z AI workspace’u. Zaloguj się swoim planem Claude lub ChatGPT, bez klucza API.",
@@ -2384,6 +2385,14 @@
       "commands_off": "{{name}} nie może teraz odpowiedzieć: polecenia są wyłączone na komputerze planu i osoba, która się nim opiekuje, musi je włączyć.",
       "useKey": "Użyj klucza API"
     },
+    "kept": {
+      "title": "Zachowałem twoją wiadomość.",
+      "line": "Odpowiem tutaj, gdy workspace będzie mieć plan agentes.chat i podłączone AI.",
+      "plan": "Plan daje komputer agentów, zawsze włączony. AI to to, za które już płacisz: Claude, ChatGPT i inne albo klucz API.",
+      "active": "Plan aktywny. Podłącz AI, a {{name}} odpowie tutaj.",
+      "receipt": "Zachowano",
+      "channel": "Zachowano. Agenci odpowiedzą, gdy workspace będzie mieć plan agentes.chat."
+    },
     "receipt": "Nikt nie odpowie: brak podłączonego AI",
     "chip": "Brak AI"
   },
@@ -2470,7 +2479,7 @@
       "saved": "Zapisano. Myślą z nim wszyscy agenci bez planu.",
       "savedUnchecked": "Zapisano, ale {{provider}} nie odpowiedział, więc nie udało się sprawdzić klucza. Jeśli zawiedzie, rozmowa powie dlaczego.",
       "held": "Agenci użyją go, gdy plan agentes.chat workspace'u będzie aktywny.",
-      "savedHeld": "Zapisano. Agenci użyją go, gdy plan agentes.chat workspace'u będzie aktywny.",
+      "closed": "Klucze API otwierają się z planem agentes.chat workspace'u.",
       "notPlan": "Klucz planu do kodowania wpisz w jego własnej opcji powyżej.",
       "billing": "Włącz rozliczenia dla projektu tego klucza. Bez rozliczeń Google może wykorzystywać to, co wysyłają twoi agenci.",
       "privacy": "Ustawienia prywatności OpenRouter decydują, którzy dostawcy mogą przechowywać to, co wysyłają twoi agenci."
@@ -3885,6 +3894,11 @@
         "title": "Utwórz pierwszego agenta",
         "text": "Powiedz, co ma robić, a dołączy do zespołu.",
         "action": "Utwórz agenta"
+      },
+      "plan": {
+        "title": "Wybierz plan agentes.chat",
+        "text": "Agenci zaczną pracować, gdy workspace będzie go mieć.",
+        "action": "Zobacz plany"
       },
       "ai": {
         "title": "Połącz AI",
@@ -13985,6 +13999,7 @@
       "no_ai_model_region": "Nie mogę odpowiedzieć: {{model}} wymaga włączonego regionu Global w OpenCode (Settings › Privacy).",
       "no_ai_commands_off": "Nie mogę teraz odpowiedzieć: polecenia są wyłączone na komputerze mojego planu.",
       "no_ai_cli_missing": "Jeszcze nie mogę odpowiedzieć: program mojego AI nie jest zainstalowany na moim komputerze.",
+      "no_ai_plan_hold": "Zachowałem twoją wiadomość. Odpowiem tutaj, gdy workspace będzie mieć plan agentes.chat i podłączone AI.",
       "no_ai_no_computer": "Jeszcze nie mogę odpowiedzieć: moje AI potrzebuje komputera, a nie mam żadnego.",
       "redacted": "[usunięto: wyglądało na dane logowania lub klucz]",
       "action_connect_ai": "Połącz AI",
@@ -14762,7 +14777,9 @@
         "ended": "Subskrybuj ponownie"
       },
       "askAdmin": "Osoba, która prowadzi tę przestrzeń roboczą, może to załatwić.",
-      "paid": "Płatność otrzymana. Plan agentes.chat zacznie działać za chwilę."
+      "paid": "Płatność otrzymana. Plan agentes.chat zacznie działać za chwilę.",
+      "teamReady": "Twój zespół jest gotowy. Do startu potrzebny jest plan agentes.chat.",
+      "invites": "Zaproszenia otwierają się z planem agentes.chat."
     },
     "cloud": {
       "review": "Wstrzymano do kontroli bezpieczeństwa, dopóki nasz zespół tego nie sprawdzi. Nasze automatyczne kontrole wykryły aktywność, która może naruszać nasz Regulamin (punkt 5). Aby to zakwestionować, napisz na {{email}}.",
@@ -15964,6 +15981,8 @@
     "firstTask": {
       "suggestion": "propozycja",
       "lead": "Jedno krótkie zadanie na agenta, żebyś dziś zobaczył każdego przy pracy.",
+      "heldLead": "Jedno krótkie zadanie na agenta. Dokończ zdanie i wyślij. Zaczną, gdy workspace będzie mieć plan agentes.chat.",
+      "example": "Przykład tego, co dostarcza {{name}}",
       "open": "Otwórz z zadaniem",
       "invite": "Zaproś: {{names}}",
       "later": "Później"
@@ -15986,6 +16005,7 @@
     "templates": {
       "title": "Szablony zespołów",
       "lead": "Gotowy zespół dla twojego rodzaju firmy. Potem {{name}} dopasuje go z tobą.",
+      "heldLead": "Wybierz to, co najbliższe twojej firmie. Każdego agenta możesz dopasować przed utworzeniem.",
       "use": "Użyj tego szablonu",
       "none": "Żaden z nich",
       "noneSub": "Opowiedz, co robisz, a {{name}} go złoży",
@@ -16032,50 +16052,55 @@
         "role": "Obsługa klienta",
         "line": "Odpowiada klientom na WhatsAppie i mailowo. Woła cię, gdy czegoś nie wie.",
         "routine": "Podsumować, co zostało bez odpowiedzi",
-        "task": "Odpowiedzieć na ostatnią czekającą wiadomość klienta"
+        "task": "Napisz odpowiedź na tę wiadomość od klienta:"
       },
       "caio": {
         "role": "Płatności",
         "line": "Przypomina zalegającym z płatnością i wysyła upomnienie po twojej zgodzie.",
         "routine": "Wypisać, kto zalega z płatnością",
-        "task": "Wypisać, kto zalega w tym miesiącu"
+        "task": "Napisz uprzejme przypomnienie o płatności dla:"
       },
       "ada": {
         "role": "Dev",
         "line": "Naprawia błędy zgłaszane przez klientów i otwiera PR.",
         "routine": "Wypisać nowe błędy",
-        "task": "Sprawdzić ostatni błąd zgłoszony przez klienta"
+        "task": "Powiedz, od czego zacząć badanie tego błędu:"
       },
       "lia": {
         "role": "Treści",
         "line": "Pisze posty i scenariusze w tonie firmy i planuje je po twojej zgodzie.",
         "routine": "Zaproponować posty na ten tydzień",
-        "task": "Zaproponować trzy posty na ten tydzień"
+        "task": "Zaproponuj trzy posty na ten tydzień o:"
       },
       "theo": {
         "role": "Sprzedaż",
         "line": "Pilnuje wszystkich, którzy prosili o wycenę, i pisze oferty.",
         "routine": "Wypisać, kto prosił o wycenę i nie dostał odpowiedzi",
-        "task": "Wypisać, kto prosił o wycenę w tym tygodniu"
+        "task": "Napisz krótką wycenę dla tego zlecenia:"
       },
       "nina": {
         "role": "Terminy",
         "line": "Umawia, potwierdza i przesuwa wizyty oraz przypomina klientom dzień wcześniej.",
         "routine": "Potwierdzić jutrzejsze wizyty",
-        "task": "Pokazać mi jutrzejsze wizyty"
+        "task": "Uporządkuj te jutrzejsze godziny:"
       },
       "otto": {
         "role": "Zamówienia",
         "line": "Śledzi zamówienia i magazyn i ostrzega, czego zaczyna brakować.",
         "routine": "Ostrzec, czego brakuje w magazynie",
-        "task": "Wypisać zamówienia, które wciąż czekają na wysyłkę"
+        "task": "Wypisz, co zostało do zrobienia przy tych zamówieniach:"
       },
       "bia": {
         "role": "Baza odpowiedzi",
         "line": "Aktualizuje bazę odpowiedzi według tego, co odpowiada zespół.",
         "routine": "Zaktualizować bazę odpowiedziami z tygodnia",
-        "task": "Wypisać 5 pytań, które klienci zadają najczęściej"
+        "task": "Napisz odpowiedzi na te pytania klientów:"
       }
+    },
+    "example": {
+      "iara": "Cześć, Marina! Twoje zamówienie wyszło wczoraj i dotrze do piątku. Kod śledzenia jest poniżej. Jeśli piątek nie pasuje, znajdę inny termin.",
+      "lia": "1. Trzy częste błędy przy wyborze agencji. 2. Kulisy projektu, który prawie się nie udał. 3. Pytanie do obserwujących: co chcecie tu zobaczyć?",
+      "nina": "Jutro: 9:00 Carla, 10:30 Pedro, 14:00 wolne. Pedro jeszcze nie potwierdził. Mam do niego napisać?"
     },
     "channels": {
       "iara": "wsparcie",

@@ -3,7 +3,9 @@ import {
   keys,
   useAiStatus,
   useApi,
+  useApplyTeamTemplate,
   useChannels,
+  useComputerSetup,
   useMembers,
   useMessages,
   useSetAgentStyle,
@@ -13,7 +15,7 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { answerAfter, BUSINESS_TYPES, startCardPassed } from "@agenteschat/client/lib/team-plan";
+import { answerAfter, BUSINESS_TYPES, isTemplateBusiness, startCardPassed } from "@agenteschat/client/lib/team-plan";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -25,6 +27,7 @@ import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Icon, type IconName, LineIcon, Locked, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
+import { usePlanHold } from "../ai/parts";
 import { requestComposerText } from "../chat/composer-request";
 import { MESSAGE_STICKER } from "../chat/media";
 import { useOpenDm } from "../new/useOpenDm";
@@ -41,7 +44,8 @@ import { AnswerChips, TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
  * An AI and no agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A
  * team and nobody else here yet: inviting people and the first task, written in that agent's composer. Last, until the
  * person picks, how agents talk to them (ADR 0147). Once the start card has stopped asking, a line to build the team
- * with it, at any time. On the person's first visit (`waveFrom`, when its wave started), its waving sticker under the
+ * with it, at any time. On a billing hold it can't answer, so the start card and what's next alone, with no model call
+ * behind them. On the person's first visit (`waveFrom`, when its wave started), its waving sticker under the
  * greeting, drawn as a sticker message is and decorative.
  */
 export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; channelId: string; waveFrom?: number }) {
@@ -53,16 +57,20 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
   const team = dir.agents.filter((a) => !isRightHand(a));
   const first = team[0];
   const teamHandles = team.map((a) => a.handle);
+  const held = usePlanHold(orgId, org) !== null;
+  const setup = useComputerSetup(orgId);
+  // A hold is known with the edition: until then no card, so Connect doesn't flash before the start card.
   const noAi = aiStateOf(status.data, agent.id) === "no_ai";
-  const aiKnown = Boolean(status.data);
+  const aiKnown = Boolean(status.data) && !setup.isPending;
   const createsAgents = can(org, "create_agents");
   const cards = introCards({
-    noAi,
+    noAi: noAi && aiKnown,
     aiKnown,
     teamHandles,
     createsAgents,
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org?.agentStyle === null,
+    held,
   });
   const cardPassed = startCardPassed(useMessages(orgId, channelId).data);
   const send = useSendAnswer(channelId);
@@ -81,7 +89,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
           {t("rightHand.intro.greeting", agentGrammar(agent.name))}
         </Text>
         <Text variant="body" tone="ink2">
-          {t("rightHand.intro.lead")}
+          {t(held ? "rightHand.intro.heldLead" : "rightHand.intro.lead")}
         </Text>
         {waveFrom !== undefined ? (
           <View style={styles.sticker} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -108,11 +116,11 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
           </IntroCard>
         )}
         {cards.includes("start") && (
-          <StartCard channelId={channelId} left={presetsLeft(teamHandles)} first={team.length === 0} />
+          <StartCard channelId={channelId} left={presetsLeft(teamHandles)} first={team.length === 0} held={held} />
         )}
-        {cards.includes("next") && first && <NextCard first={first} />}
+        {cards.includes("next") && first && <NextCard first={first} held={held} />}
         {cards.includes("style") && <StyleCard />}
-        {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cardPassed }) ? (
+        {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cardPassed, held }) ? (
           <View>
             <Text variant="small" tone="muted">
               {t("rightHand.intro.again.question")}
@@ -133,10 +141,21 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
 /**
  * How to start (ADR 0137 §10), as on the web. No agent yet: "O que a Acme faz?" with business types as chips (each tap
  * the person's own message) or a sentence typed, then the other ways in: the templates (a sheet), the ready-made
- * agents, an import or the form. With ready-made agents already made, the tiles of the ones left.
+ * agents, an import or the form. With ready-made agents already made, the tiles of the ones left. On a billing hold a
+ * tap posts that business's template, with no model call, and "Outra coisa" opens the templates.
  */
-function StartCard({ channelId, left, first }: { channelId: string; left: readonly Preset[]; first: boolean }) {
-  const { t } = useTranslation();
+function StartCard({
+  channelId,
+  left,
+  first,
+  held,
+}: {
+  channelId: string;
+  left: readonly Preset[];
+  first: boolean;
+  held: boolean;
+}) {
+  const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -161,21 +180,36 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
     onError: failed,
     onSettled: () => qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
   });
-  const answer = first ? answerAfter(messages, null) : null;
+  const useTemplate = useApplyTeamTemplate(orgId);
+  const said = first ? answerAfter(messages, null) : null;
+  const choices = BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`));
+  // On a hold a sentence they wrote got the wall: the chips stay, as the way to a team.
+  const answer = held && said !== null && !choices.includes(said) ? null : said;
   const other = t("teamPlan.business.other");
+  const tap = (text: string) => {
+    const business = BUSINESS_TYPES[choices.indexOf(text)];
+    if (!held) return text === other ? requestComposerText(channelId, "") : send(text);
+    if (!business || !isTemplateBusiness(business)) return setTemplates(true);
+    useTemplate.mutate({ templateId: business, locale: i18n.language, tap: text }, { onError: failed });
+  };
   return (
     <IntroCard
       icon="agent"
       title={first ? t("teamPlan.start.question", { org: org?.name ?? "" }) : t("rightHand.intro.start.question")}
-      text={first && answer === null ? t("teamPlan.start.orWrite") : first ? t("teamPlan.answered") : undefined}
+      text={
+        first && answer === null
+          ? held
+            ? undefined
+            : t("teamPlan.start.orWrite")
+          : first
+            ? t("teamPlan.answered")
+            : undefined
+      }
     >
       {first ? (
-        <AnswerChips
-          choices={BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`))}
-          multiple={false}
-          answer={answer}
-          onSend={(text) => (text === other ? requestComposerText(channelId, "") : send(text))}
-        />
+        <Locked when={useTemplate.isPending}>
+          <AnswerChips choices={choices} multiple={false} answer={answer} onSend={tap} />
+        </Locked>
       ) : null}
       {presetsOpen ? (
         <>
@@ -269,14 +303,14 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
 }
 
 /** The team is here, nobody else yet: invite the people, or the first agent's DM with a first task written in. */
-function NextCard({ first }: { first: Agent }) {
+function NextCard({ first, held }: { first: Agent; held: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const openDm = useOpenDm();
   const preset = PRESETS.find((p) => p === first.handle);
   return (
     <IntroCard icon="members" title={t("rightHand.intro.next.question")}>
-      {can(org, "invite_people") ? (
+      {can(org, "invite_people") && !held ? (
         <Button
           variant="primary"
           size="card"

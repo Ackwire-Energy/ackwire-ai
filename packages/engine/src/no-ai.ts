@@ -8,6 +8,7 @@ import { BRAIN_NAMES } from "./brains/types";
 import { mayStopRun, runRequester } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { requesterOf, startOrJoinRun } from "./dispatch";
+import { queuePlanWaiting } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishRouted } from "./events";
 import type { Judge } from "./judge";
@@ -16,6 +17,7 @@ import { can, type Membership } from "./organizations";
 import { type RouterDeps, routeMessage } from "./router";
 import { bodyCode } from "./run-tools";
 import { type AgentRun, NO_AI, replyThreadOf } from "./runs";
+import { assertCanWork, billingHold } from "./standing";
 import { continueStretch, stretchCardOf } from "./stretch";
 import { continueUsagePause, usagePauseCardOf } from "./usage-pause";
 import { withWikiLinks } from "./wiki-links";
@@ -34,7 +36,7 @@ const noAiNotSignedInText = (own: NonNullable<AgentAi["own"]>) =>
  * Why it can't think, when that's more than no AI: its computer has no such CLI or no computer at all, and for the
  * team's right hand on a plan (`rightHandNoAiReason`), why that plan can't think for this message.
  */
-const REASON_TEXT: Partial<Record<NoAiReason, string>> = {
+const REASON_TEXT: Partial<Record<NoAiCardReason, string>> = {
   cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
   no_computer: "I can't answer yet: my AI needs a computer and I have none.",
   computer_away: "I can't answer now: the computer my plan is signed in on is away.",
@@ -47,7 +49,11 @@ const REASON_TEXT: Partial<Record<NoAiReason, string>> = {
     "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",
   runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
   plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
+  plan_hold: "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
 };
+
+/** `plan_hold`: no word on its AI: a billing hold stopped the run, and the card keeps the message for after the plan. */
+export type NoAiCardReason = NoAiReason | "plan_hold";
 
 /** A conversation gets the card again only after this long (per agent; once while the organization has no AI). */
 export const NO_AI_CARD_EVERY_MS = 6 * 3600_000;
@@ -56,7 +62,7 @@ export const NO_AI_CARD_EVERY_MS = 6 * 3600_000;
 export interface NoAiCard extends ConnectIntent {
   agentId: string;
   forUserId: string | null;
-  reason: NoAiReason;
+  reason: NoAiCardReason;
   /** With `not_signed_in`: the computer's own sign-in of this CLI isn't there, not an account's (`AgentAi.own`). */
   own?: AgentAi["own"];
   /** With `model_limit` and `model_region`: the model's name the line says ("Kimi K2"). */
@@ -97,7 +103,7 @@ async function cardsPosted(db: Executor, run: Pick<AgentRun, "orgId" | "channelI
 export async function postNoAiCard(
   deps: AiStatusDeps & { db: Database; pubsub: PubSub; judge?: Judge | null },
   run: AgentRun,
-  reason: NoAiReason,
+  reason: NoAiCardReason,
   own?: AgentAi["own"],
   model?: string,
 ): Promise<Message | null> {
@@ -111,8 +117,9 @@ export async function postNoAiCard(
   if (repeated(posted)) return null;
   const trigger = await getMessage(db, run.orgId, run.triggerMessageId);
   const forUserId = trigger ? await requesterOf(db, trigger) : null;
+  // On a billing hold nothing reads the message: no model call before a plan.
   const intent: ConnectIntent =
-    trigger?.authorType === "person"
+    trigger?.authorType === "person" && reason !== "plan_hold"
       ? await aiConnectIntent(deps.judge, { orgId: run.orgId, agentId: run.agentId, runId: run.id, text: trigger.body })
       : { intent: "task" };
   const card = await db.transaction(async (tx) => {
@@ -140,6 +147,7 @@ export async function postNoAiCard(
     });
   });
   if (!card) return null;
+  if (reason === "plan_hold" && (await billingHold(db, run.orgId)) === "payment") await queuePlanWaiting(db, run.orgId);
   const [view] = await withWikiLinks(db, run.orgId, [messageView(card)]);
   if (view) await publishMessageCreated(deps.pubsub, view);
   return card;
@@ -321,6 +329,8 @@ export async function answerNow(
   const message = await getMessage(deps.db, orgId, messageId);
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
   const { membership } = await requireChannelAccess(deps.db, userId, orgId, message.channelId);
+  // Refused here, first: a key saved earlier reads as ready, and the restarted run would only be refused again.
+  await assertCanWork(deps.db, orgId);
   const paused = message.authorType === "agent" ? stretchCardOf(message.meta) : null;
   if (paused) return continueStretch(deps, userId, membership, message, paused);
   const usage = message.authorType === "agent" ? usagePauseCardOf(message.meta) : null;

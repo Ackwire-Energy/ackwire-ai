@@ -42,6 +42,8 @@ import { useConnectAi } from "@/components/ConnectAi";
 import { useMissionsWaitingYou } from "@/components/missions/MissionWaiting";
 import { useNotificationOpener } from "@/components/NotificationOpen";
 import { Face, Headline, SystemFace } from "@/components/NotificationParts";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useOrg } from "@/components/org-context";
 import { HomeMural } from "@/components/widgets/HomeMural";
 import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
@@ -101,6 +103,7 @@ export function HomePage() {
     .filter((a) => listsAgent(org, a) && canTalk(a))
     .sort((a, b) => (lastTalk.get(b.id) ?? "").localeCompare(lastTalk.get(a.id) ?? ""));
 
+  const held = usePlanHold() !== null;
   const steps = stepsHidden
     ? []
     : firstSteps({
@@ -111,6 +114,7 @@ export function HomePage() {
         people: overview.data?.people ?? 1,
         routines: routines.data?.length ?? 0,
         may: stepPermissions(org, me.user.id, dir.agents),
+        held,
       });
   // Each check reads what it needs, so the card doesn't flash its steps open while the lists still come.
   const stepsReady = !dir.loading && ai.isFetched && statuses.isFetched && overview.isFetched && routines.isFetched;
@@ -613,6 +617,12 @@ function StepAction({ id, onAsk }: { id: FirstStep["id"]; onAsk: () => void }) {
   const connect = useConnectAi();
   const label = t(`home.steps.${id}.action`);
   const params = { orgId: org.id };
+  if (id === "plan")
+    return (
+      <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary" className="home-row__act">
+        {label}
+      </BillingLinkButton>
+    );
   if (id === "agent")
     return (
       <Button size="sm" asChild className="home-row__act">

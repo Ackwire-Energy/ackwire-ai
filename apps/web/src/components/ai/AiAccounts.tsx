@@ -157,7 +157,7 @@ export function AiAccountsSection() {
         hint={{ name: t("common.about", { label: t("aiAccounts.page.title") }), text: t("aiAccounts.page.hint") }}
         action={!noPlans && connect}
       />
-      {hold && <PlanHold hold={hold} onKey={connectAi ? () => connectAi.open({ intent: "api_key" }) : undefined} />}
+      {hold && <PlanHold hold={hold} />}
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {ai.isError && <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>}
       {noPlans && (

@@ -265,3 +265,26 @@ html:not([data-pointer]) .tp-gallery__item:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* On a billing hold: the new agents' wave, and what the first agent delivers, drawn as a message and labelled. */
+.tp-wave {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.tp-example {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.tp-example__message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+}

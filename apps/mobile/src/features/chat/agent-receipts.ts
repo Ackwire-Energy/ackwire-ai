@@ -62,7 +62,9 @@ export type ReceiptWords =
   | "receipts.platformCap"
   | "receipts.mentionNeeded"
   | "receipts.picking"
-  | "noAi.receipt";
+  | "noAi.receipt"
+  | "noAi.kept.receipt"
+  | "noAi.kept.channel";
 
 export const FACES = 3;
 
@@ -123,6 +125,16 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
       return { ...faces(status.agents), mark: "none", words, label: words, action: "connect", alert: true };
     }
   }
+}
+
+/**
+ * The same line on a billing hold: the message is kept, with no alert and nothing to connect yet. With a face it has
+ * its agent's card above; with none (a channel message nobody mentioned) the words are all it gets.
+ */
+export function keptLine(line: ReceiptLine | null): ReceiptLine | null {
+  if (line?.words?.key !== "noAi.receipt") return line;
+  const words = { key: line.faces.length > 0 ? ("noAi.kept.receipt" as const) : ("noAi.kept.channel" as const), agents: [] };
+  return { ...line, words, label: words, action: null, alert: false };
 }
 
 /** What keeps its line of words under the message: a receipt with no small mark of its own asks something of you. */
@@ -224,4 +236,5 @@ export function receiptRows(
 }
 
 /** The i18n key of an agent's phase in the sheet. */
-export const phaseKey = (phase: ReceiptRowPhase) => (phase === "no_ai" ? "noAi.chip" : `receipts.status.${phase}`);
+export const phaseKey = (phase: ReceiptRowPhase, held = false) =>
+  phase === "no_ai" ? (held ? "noAi.kept.receipt" : "noAi.chip") : `receipts.status.${phase}`;

@@ -1893,6 +1893,8 @@ export const ptBR = {
       greeting: "Oi, eu sou o {{name}}. Monto o time com você.",
       greeting_female: "Oi, eu sou a {{name}}. Monto o time com você.",
       lead: "Crio os agentes, conecto os apps e convido as pessoas. Nada muda sem o seu clique, e eu faço só o que você pode fazer.",
+      heldLead:
+        "Escolha o que a sua empresa faz e o time aparece aqui. Os agentes começam a trabalhar quando o workspace tiver um plano do agentes.chat.",
       connect: {
         title: "Conectar uma IA para o time",
         text: "Os agentes pensam com a IA do workspace. Entre com o seu plano do Claude ou do ChatGPT, sem chave de API.",
@@ -2257,6 +2259,14 @@ export const ptBR = {
         "{{name}} não consegue responder agora: os comandos estão desligados no computador do plano, e quem cuida dele precisa ligá-los.",
       useKey: "Usar uma chave de API",
     },
+    kept: {
+      title: "Guardei a sua mensagem.",
+      line: "Eu respondo aqui quando o workspace tiver um plano do agentes.chat e uma IA conectada.",
+      plan: "O plano traz o computador dos agentes, sempre ligado. A IA é a que você já paga: Claude, ChatGPT e outras, ou uma chave de API.",
+      active: "Plano ativo. Conecte uma IA e {{name}} responde aqui.",
+      receipt: "Guardada",
+      channel: "Guardada. Os agentes respondem quando o workspace tiver um plano do agentes.chat.",
+    },
     receipt: "Ninguém vai responder: falta uma IA",
     chip: "Sem IA",
   },
@@ -2327,7 +2337,7 @@ export const ptBR = {
       savedUnchecked:
         "Salva, mas {{provider}} não respondeu e a chave não pôde ser testada. Se ela falhar, a conversa diz o motivo.",
       held: "Os agentes usam a chave quando o plano do agentes.chat do workspace estiver ativo.",
-      savedHeld: "Salva. Os agentes usam a chave quando o plano do agentes.chat do workspace estiver ativo.",
+      closed: "As chaves de API abrem com o plano do agentes.chat do workspace.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
       billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
       privacy:
@@ -3713,6 +3723,11 @@ export const ptBR = {
         title: "Crie seu primeiro agente",
         text: "Diga o que ele faz e ele entra na equipe.",
         action: "Criar agente",
+      },
+      plan: {
+        title: "Escolher um plano do agentes.chat",
+        text: "Os agentes começam a trabalhar quando o workspace tiver um.",
+        action: "Ver planos",
       },
       ai: { title: "Conecte uma IA", text: "É com ela que os agentes pensam.", action: "Conectar" },
       ask: { title: "Peça algo a um agente", text: "Escreva aqui embaixo ou numa conversa.", action: "Pedir" },
@@ -12877,6 +12892,7 @@ export const ptBR = {
         "Não consigo responder: o {{model}} precisa da região Global ligada no OpenCode (Settings\u00a0›\u00a0Privacy).",
       no_ai_commands_off: "Agora não consigo responder: os comandos estão desligados no computador do meu plano.",
       no_ai_cli_missing: "Ainda não consigo responder: o programa da minha IA não está instalado no meu computador.",
+      no_ai_plan_hold: "Guardei a sua mensagem. Eu respondo aqui quando o workspace tiver um plano do agentes.chat e uma IA conectada.",
       no_ai_no_computer: "Ainda não consigo responder: minha IA precisa de um computador e não tenho nenhum.",
       redacted: "[removido: parecia um login ou uma chave]",
       action_connect_ai: "Conectar uma IA",
@@ -13664,6 +13680,8 @@ export const ptBR = {
       askAdmin: "Quem administra o workspace pode resolver isso.",
       /** In place of the hold's words, back from paying until the billing service lifts it. */
       paid: "Pagamento recebido. O plano do agentes.chat começa em instantes.",
+      teamReady: "Seu time está pronto. Falta um plano do agentes.chat para ele começar.",
+      invites: "Os convites abrem com o plano do agentes.chat.",
     },
     /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
     cloud: {
@@ -14888,6 +14906,9 @@ export const ptBR = {
     firstTask: {
       suggestion: "sugestão",
       lead: "Uma tarefa curta por agente, para você ver cada um trabalhando hoje.",
+      heldLead:
+        "Uma tarefa curta por agente. Complete a frase e envie. Eles começam quando o workspace tiver um plano do agentes.chat.",
+      example: "Exemplo do que {{name}} entrega",
       open: "Abrir com a tarefa",
       invite: "Convidar {{names}}",
       later: "Depois",
@@ -14910,6 +14931,7 @@ export const ptBR = {
     templates: {
       title: "Modelos de time",
       lead: "Um time pronto para o seu tipo de negócio. Depois o {{name}} ajusta com você.",
+      heldLead: "Escolha o mais perto do seu negócio. Você ajusta cada agente antes de criar.",
       use: "Usar este modelo",
       none: "Nenhum desses",
       noneSub: "Conte o que você faz e o {{name}} monta",
@@ -14956,50 +14978,55 @@ export const ptBR = {
         role: "Atendimento",
         line: "Responde os clientes no WhatsApp e no e-mail. Chama você quando não sabe.",
         routine: "Resumir o que ficou sem resposta",
-        task: "Responder a última mensagem de cliente que está esperando",
+        task: "Escreva uma resposta para esta mensagem de cliente:",
       },
       caio: {
         role: "Cobrança",
         line: "Lembra quem atrasou o pagamento e manda a cobrança depois do seu ok.",
         routine: "Listar quem está com o pagamento atrasado",
-        task: "Listar quem está atrasado neste mês",
+        task: "Escreva um lembrete gentil de pagamento para:",
       },
       ada: {
         role: "Dev",
         line: "Corrige os bugs que os clientes reportam e abre o PR.",
         routine: "Listar os bugs novos",
-        task: "Olhar o último bug que um cliente reportou",
+        task: "Me diga por onde começar a investigar este bug:",
       },
       lia: {
         role: "Conteúdo",
         line: "Escreve posts e roteiros no tom da empresa e agenda depois do seu ok.",
         routine: "Propor os posts da semana",
-        task: "Propor três posts para esta semana",
+        task: "Proponha três posts para esta semana sobre:",
       },
       theo: {
         role: "Vendas",
         line: "Segue quem pediu orçamento e escreve as propostas.",
         routine: "Listar quem pediu orçamento e ficou sem resposta",
-        task: "Listar quem pediu orçamento nesta semana",
+        task: "Escreva um orçamento curto para este pedido:",
       },
       nina: {
         role: "Agenda",
         line: "Marca, confirma e remarca horários, e lembra os clientes na véspera.",
         routine: "Confirmar os horários de amanhã",
-        task: "Mostrar os horários de amanhã",
+        task: "Organize estes horários de amanhã:",
       },
       otto: {
         role: "Pedidos",
         line: "Acompanha pedidos e estoque e avisa o que está acabando.",
         routine: "Avisar o que está acabando no estoque",
-        task: "Listar os pedidos que ainda esperam envio",
+        task: "Liste o que falta fazer nestes pedidos:",
       },
       bia: {
         role: "Base de respostas",
         line: "Mantém a base de respostas em dia com o que o time responde.",
         routine: "Atualizar a base com as respostas da semana",
-        task: "Listar as 5 perguntas que os clientes mais fazem",
+        task: "Escreva as respostas para estas perguntas de clientes:",
       },
+    },
+    example: {
+      iara: "Oi, Marina! Seu pedido saiu ontem e chega até sexta. O código de rastreio está aqui embaixo. Se sexta não for bom, eu vejo outra data.",
+      lia: "1. Três erros comuns ao contratar uma agência. 2. Os bastidores de um projeto que quase deu errado. 3. Uma pergunta para quem segue vocês: o que querem ver aqui?",
+      nina: "Amanhã: 9h Carla, 10h30 Pedro, 14h livre. O Pedro ainda não confirmou. Quer que eu escreva para ele?",
     },
     channels: {
       iara: "atendimento",

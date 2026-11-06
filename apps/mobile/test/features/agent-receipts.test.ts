@@ -14,6 +14,7 @@ import {
   keepsLine,
   markLabel,
   markOf,
+  keptLine,
   phaseKey,
   type ReceiptMarkView,
   receiptLine,
@@ -565,4 +566,21 @@ describe("a receipt never adds a line to its row", () => {
     expect(row).not.toContain("SteerLine");
     expect(src("features/chat/ChatScreen.tsx")).not.toContain('t("mobile.chat.seen")');
   });
+});
+
+test("on a billing hold a no-AI line reads as kept, with no alert and nothing to connect", () => {
+  const line = (faces: string[]) =>
+    keptLine({
+      faces,
+      more: 0,
+      mark: "none",
+      words: { key: "noAi.receipt", agents: [] },
+      label: { key: "noAi.receipt", agents: [] },
+      action: "connect",
+      alert: true,
+    });
+  expect(line(["ada"])).toMatchObject({ words: { key: "noAi.kept.receipt" }, action: null, alert: false });
+  expect(line([])).toMatchObject({ words: { key: "noAi.kept.channel" } });
+  expect(keptLine(null)).toBeNull();
+  expect(phaseKey("no_ai", true)).toBe("noAi.kept.receipt");
 });

@@ -29,7 +29,6 @@ import { computerEdition } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
-import { uncheckedKeyLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   keyLooksValid,
@@ -72,7 +71,7 @@ import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
-import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { KeysClosed, usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { WhoPicksSection } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
@@ -726,6 +725,7 @@ function KeysSection() {
     | { type: "models"; cred: Credential }
   >(null);
   const look = useRightHandLook();
+  const hold = usePlanHold();
   if (!allowed) return null;
   const live = (credentials.data ?? []).filter((c) => !c.revokedAt);
   const noKeys = credentials.isSuccess && live.length === 0;
@@ -737,7 +737,8 @@ function KeysSection() {
         title={t("settings.keysTitle")}
         hint={{ name: t("common.about", { label: t("settings.keysTitle") }), text: t("settings.keysSubtitle") }}
         action={
-          !noKeys && (
+          !noKeys &&
+          !hold && (
             <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
               {t("settings.addKey")}
             </Button>
@@ -746,7 +747,8 @@ function KeysSection() {
       />
       {platform.data && <p className="small muted">{t("settings.platformAvailable")}</p>}
       {credentials.isLoading && <LoadingList count={2} avatar={false} trailing />}
-      {noKeys && (
+      {hold && <KeysClosed hold={hold} />}
+      {noKeys && !hold && (
         <EmptyState
           size="panel"
           agent={look}
@@ -889,14 +891,14 @@ export function KeyDialog({
   const toast = useToast();
   const add = useAddCredential(org.id, true);
   const rotate = useRotateCredential(org.id, true);
-  const held = usePlanHold() !== null;
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const failed = (e: unknown) => {
     setRefused(keyRefusal(t, e));
     if (!keyRefusal(t, e)) toast.show(errorText(t, e), "error");
   };
   const unchecked = (saved: Credential) => {
-    if (saved.check === "unchecked") toast.show(uncheckedKeyLine(t, providerLabel(saved.provider), held), "info");
+    if (saved.check === "unchecked")
+      toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(saved.provider) }), "info");
   };
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");

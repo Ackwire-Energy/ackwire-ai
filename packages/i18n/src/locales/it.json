@@ -1968,6 +1968,7 @@
     "intro": {
       "greeting": "Ciao, sono {{name}}. Costruisco il team con te.",
       "lead": "Creo gli agenti, collego le app e invito le persone. Nulla cambia senza il tuo clic, e faccio solo quello che puoi fare tu.",
+      "heldLead": "Scegli di cosa si occupa la tua azienda e il team appare qui. Gli agenti iniziano a lavorare quando il workspace ha un piano agentes.chat.",
       "connect": {
         "title": "Collega un’IA per il team",
         "text": "Gli agenti pensano con l’IA del workspace. Accedi con il tuo piano di Claude o di ChatGPT, senza chiave API.",
@@ -2301,6 +2302,14 @@
       "commands_off": "{{name}} non può rispondere ora: i comandi sono disattivati sul computer del piano e chi se ne occupa deve attivarli.",
       "useKey": "Usa una chiave API"
     },
+    "kept": {
+      "title": "Ho conservato il tuo messaggio.",
+      "line": "Risponderò qui quando il workspace avrà un piano agentes.chat e un'IA collegata.",
+      "plan": "Il piano porta il computer degli agenti, sempre acceso. L'IA è quella che paghi già: Claude, ChatGPT e altre, o una chiave API.",
+      "active": "Piano attivo. Collega un'IA e {{name}} risponde qui.",
+      "receipt": "Conservato",
+      "channel": "Conservato. Gli agenti rispondono quando il workspace ha un piano agentes.chat."
+    },
     "receipt": "Nessuno risponderà: nessuna IA collegata",
     "chip": "Nessuna IA"
   },
@@ -2389,7 +2398,7 @@
       "saved": "Salvata. Ogni agente senza un piano ragiona con questa.",
       "savedUnchecked": "Salvata, ma {{provider}} non ha risposto e la chiave non è stata verificata. Se fallisce, la conversazione dice perché.",
       "held": "Gli agenti la usano appena il piano agentes.chat del workspace è attivo.",
-      "savedHeld": "Salvata. Gli agenti la usano appena il piano agentes.chat del workspace è attivo.",
+      "closed": "Le chiavi API si aprono con il piano agentes.chat del workspace.",
       "notPlan": "La chiave di un piano di coding va nella sua opzione qui sopra.",
       "billing": "Attiva la fatturazione per il progetto della chiave. Senza fatturazione, Google può usare quello che inviano i tuoi agenti.",
       "privacy": "Le impostazioni privacy di OpenRouter decidono quali fornitori possono conservare quello che inviano i tuoi agenti."
@@ -3752,6 +3761,11 @@
         "title": "Crea il tuo primo agente",
         "text": "Di' cosa fa ed entra nel team.",
         "action": "Crea agente"
+      },
+      "plan": {
+        "title": "Scegli un piano agentes.chat",
+        "text": "Gli agenti iniziano a lavorare quando il workspace ne ha uno.",
+        "action": "Vedi i piani"
       },
       "ai": {
         "title": "Collega un'IA",
@@ -13573,6 +13587,7 @@
       "no_ai_model_region": "Non posso rispondere: {{model}} ha bisogno della regione Global attivata in OpenCode (Settings › Privacy).",
       "no_ai_commands_off": "Ora non posso rispondere: i comandi sono disattivati sul computer del mio piano.",
       "no_ai_cli_missing": "Non posso ancora rispondere: il programma della mia IA non è installato sul mio computer.",
+      "no_ai_plan_hold": "Ho conservato il tuo messaggio. Risponderò qui quando il workspace avrà un piano agentes.chat e un'IA collegata.",
       "no_ai_no_computer": "Non posso ancora rispondere: la mia IA ha bisogno di un computer e non ne ho nessuno.",
       "redacted": "[rimosso: sembrava un accesso o una chiave]",
       "action_connect_ai": "Collega un'IA",
@@ -14344,7 +14359,9 @@
         "ended": "Abbonati di nuovo"
       },
       "askAdmin": "Chi gestisce questo spazio di lavoro può sistemare la cosa.",
-      "paid": "Pagamento ricevuto. Il piano agentes.chat parte tra un attimo."
+      "paid": "Pagamento ricevuto. Il piano agentes.chat parte tra un attimo.",
+      "teamReady": "Il tuo team è pronto. Manca un piano agentes.chat per iniziare.",
+      "invites": "Gli inviti si aprono con il piano agentes.chat."
     },
     "cloud": {
       "review": "In pausa per una verifica di sicurezza, finché il nostro team non la esamina. I nostri controlli automatici hanno segnalato attività che potrebbero violare i nostri Termini (sezione 5). Per contestare, scrivi a {{email}}.",
@@ -15557,6 +15574,8 @@
     "firstTask": {
       "suggestion": "suggerimento",
       "lead": "Un breve compito per agente, per vedere ognuno al lavoro oggi.",
+      "heldLead": "Un compito breve per agente. Completa la frase e inviala. Iniziano quando il workspace ha un piano agentes.chat.",
+      "example": "Esempio di ciò che {{name}} consegna",
       "open": "Apri con il compito",
       "invite": "Invita {{names}}",
       "later": "Più tardi"
@@ -15579,6 +15598,7 @@
     "templates": {
       "title": "Modelli di team",
       "lead": "Un team pronto per il tuo tipo di attività. Poi {{name}} lo adatta con te.",
+      "heldLead": "Scegli il più vicino alla tua attività. Puoi adattare ogni agente prima di crearlo.",
       "use": "Usa questo modello",
       "none": "Nessuno di questi",
       "noneSub": "Racconta cosa fai e {{name}} lo prepara",
@@ -15625,50 +15645,55 @@
         "role": "Assistenza",
         "line": "Risponde ai clienti su WhatsApp e via e-mail. Ti chiama quando non sa.",
         "routine": "Riassumere ciò che è rimasto senza risposta",
-        "task": "Rispondere all'ultimo messaggio di un cliente in attesa"
+        "task": "Scrivi una risposta a questo messaggio del cliente:"
       },
       "caio": {
         "role": "Pagamenti",
         "line": "Ricorda a chi è in ritardo con il pagamento e manda il sollecito dopo il tuo ok.",
         "routine": "Elencare chi è in ritardo con il pagamento",
-        "task": "Elencare chi è in ritardo questo mese"
+        "task": "Scrivi un promemoria di pagamento gentile per:"
       },
       "ada": {
         "role": "Dev",
         "line": "Corregge i bug segnalati dai clienti e apre la PR.",
         "routine": "Elencare i nuovi bug",
-        "task": "Guardare l'ultimo bug segnalato da un cliente"
+        "task": "Dimmi da dove iniziare a indagare su questo bug:"
       },
       "lia": {
         "role": "Contenuti",
         "line": "Scrive post e copioni nel tono dell'azienda e li programma dopo il tuo ok.",
         "routine": "Proporre i post della settimana",
-        "task": "Proporre tre post per questa settimana"
+        "task": "Proponi tre post per questa settimana su:"
       },
       "theo": {
         "role": "Vendite",
         "line": "Ricontatta chi ha chiesto un preventivo e scrive le proposte.",
         "routine": "Elencare chi ha chiesto un preventivo senza risposta",
-        "task": "Elencare chi ha chiesto un preventivo questa settimana"
+        "task": "Scrivi un preventivo breve per questa richiesta:"
       },
       "nina": {
         "role": "Agenda",
         "line": "Fissa, conferma e sposta gli appuntamenti, e ricorda ai clienti il giorno prima.",
         "routine": "Confermare gli appuntamenti di domani",
-        "task": "Mostrarmi gli appuntamenti di domani"
+        "task": "Organizza questi orari di domani:"
       },
       "otto": {
         "role": "Ordini",
         "line": "Segue ordini e magazzino e avvisa cosa sta finendo.",
         "routine": "Avvisare cosa sta finendo in magazzino",
-        "task": "Elencare gli ordini ancora da spedire"
+        "task": "Elenca cosa resta da fare su questi ordini:"
       },
       "bia": {
         "role": "Base di risposte",
         "line": "Tiene aggiornata la base di risposte con ciò che risponde il team.",
         "routine": "Aggiornare la base con le risposte della settimana",
-        "task": "Elencare le 5 domande che i clienti fanno di più"
+        "task": "Scrivi le risposte a queste domande dei clienti:"
       }
+    },
+    "example": {
+      "iara": "Ciao Marina! Il tuo ordine è partito ieri e arriva entro venerdì. Il codice di tracciamento è qui sotto. Se venerdì non va bene, trovo un'altra data.",
+      "lia": "1. Tre errori comuni nello scegliere un'agenzia. 2. Il dietro le quinte di un progetto che stava per andare male. 3. Una domanda per chi vi segue: cosa volete vedere qui?",
+      "nina": "Domani: 9:00 Carla, 10:30 Pedro, 14:00 libero. Pedro non ha ancora confermato. Vuoi che gli scriva?"
     },
     "channels": {
       "iara": "assistenza",

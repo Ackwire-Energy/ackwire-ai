@@ -1899,6 +1899,9 @@ export const en = {
     intro: {
       greeting: "Hi, I'm {{name}}. I'll build the team with you.",
       lead: "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do.",
+      /** In place of `lead` on a billing hold: the team costs no model call, and the plan is said up front. */
+      heldLead:
+        "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan.",
       connect: {
         title: "Connect an AI for the team",
         text: "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed.",
@@ -2241,6 +2244,18 @@ export const en = {
         "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on.",
       useKey: "Use an API key",
     },
+    /** The card an agent posts on a billing hold (`reason: plan_hold`): the message waits for the plan. */
+    kept: {
+      title: "I kept your message.",
+      line: "I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
+      plan: "The plan brings the agents' computer, always on. The AI is the one you already pay for: Claude, ChatGPT and more, or an API key.",
+      /** The hold lifted: the plan is paid, an AI is what's left. */
+      active: "Plan active. Connect an AI and {{name}} answers here.",
+      /** A second message's receipt, where it would say no AI. */
+      receipt: "Kept",
+      /** The receipt of a channel message nobody mentioned. */
+      channel: "Kept. The agents answer once the workspace has an agentes.chat plan.",
+    },
     receipt: "Nobody will answer: no\u00a0AI connected",
     chip: "No AI",
   },
@@ -2315,7 +2330,8 @@ export const en = {
         "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why.",
       /** On a billing hold no model runs, so a key waits for the plan as well (`connectAi.billing`). */
       held: "Agents use it once the workspace's agentes.chat plan is active.",
-      savedHeld: "Saved. Agents use it once the workspace's agentes.chat plan is active.",
+      /** On a billing hold, in place of any way to add a key. */
+      closed: "API keys open with the workspace's agentes.chat plan.",
       notPlan: "A coding plan's key goes in its own option above.",
       billing: "Turn on billing for the key's project. Without billing, Google may use what your agents send.",
       privacy: "Your OpenRouter privacy settings decide which providers may keep what your agents send.",
@@ -3707,6 +3723,12 @@ export const en = {
         title: "Create your first agent",
         text: "Say what it does and it joins the team.",
         action: "Create agent",
+      },
+      /** First for whoever pays, on a billing hold. */
+      plan: {
+        title: "Choose an agentes.chat plan",
+        text: "The agents start working once the workspace has one.",
+        action: "See plans",
       },
       ai: { title: "Connect an AI", text: "It's what your agents think with.", action: "Connect" },
       ask: { title: "Ask an agent for something", text: "Write below or in a conversation.", action: "Ask" },
@@ -12738,6 +12760,7 @@ export const en = {
         "I can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
       no_ai_commands_off: "I can't answer now: commands are turned off on my plan's computer.",
       no_ai_cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
+      no_ai_plan_hold: "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
       no_ai_no_computer: "I can't answer yet: my AI needs a computer and I have none.",
       /** Where the server took a sign-in or a key out of the team's right hand's reply, in place of it. */
       redacted: "[removed: it looked like a sign-in or a key]",
@@ -13472,6 +13495,10 @@ export const en = {
       askAdmin: "Whoever runs this workspace can sort this out.",
       /** In place of the hold's words, back from paying until the billing service lifts it. */
       paid: "Payment received. The agentes.chat plan starts in a moment.",
+      /** The banner's one line on a `payment` hold once there is a team. */
+      teamReady: "Your team is ready. It needs an agentes.chat plan to start.",
+      /** In place of the invite form. */
+      invites: "Invitations open with the agentes.chat plan.",
     },
     /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
     cloud: {
@@ -14647,6 +14674,10 @@ export const en = {
     firstTask: {
       suggestion: "suggestion",
       lead: "One short task per agent, so you see each one working today.",
+      heldLead:
+        "One short task per agent. Finish the sentence and send it. They start once the workspace has an agentes.chat plan.",
+      /** Over the template's sample of its first agent's work: an example, never something it wrote. */
+      example: "Example of what {{name}} delivers",
       open: "Open with the task",
       invite: "Invite {{names}}",
       later: "Later",
@@ -14669,6 +14700,7 @@ export const en = {
     templates: {
       title: "Team templates",
       lead: "A ready team for your kind of business. Then {{name}} fits it with you.",
+      heldLead: "Pick the closest to your business. You can change every agent before creating them.",
       use: "Use this template",
       none: "None of these",
       noneSub: "Tell what you do and {{name}} builds it",
@@ -14715,50 +14747,56 @@ export const en = {
         role: "Customer service",
         line: "Answers customers on WhatsApp and email. Calls you when she doesn't know.",
         routine: "Sum up what was left unanswered",
-        task: "Answer the last customer message waiting for us",
+        task: "Write a reply to this customer message:",
       },
       caio: {
         role: "Billing",
         line: "Reminds whoever is late on payment and sends the reminder after your ok.",
         routine: "List who is late on payment",
-        task: "List who is late this month",
+        task: "Write a friendly payment reminder for:",
       },
       ada: {
         role: "Dev",
         line: "Fixes the bugs customers report and opens the PR.",
         routine: "List the new bugs",
-        task: "Look at the latest bug a customer reported",
+        task: "Tell me where to start looking at this bug:",
       },
       lia: {
         role: "Content",
         line: "Writes posts and scripts in the company's voice and schedules them after your ok.",
         routine: "Propose the week's posts",
-        task: "Propose three posts for this week",
+        task: "Suggest three posts for this week about:",
       },
       theo: {
         role: "Sales",
         line: "Follows up on everyone who asked for a quote and writes the proposals.",
         routine: "List who asked for a quote and got no answer",
-        task: "List who asked for a quote this week",
+        task: "Write a short quote for this request:",
       },
       nina: {
         role: "Scheduling",
         line: "Books, confirms and moves appointments, and reminds clients the day before.",
         routine: "Confirm tomorrow's appointments",
-        task: "Show me tomorrow's appointments",
+        task: "Organize tomorrow's schedule:",
       },
       otto: {
         role: "Orders",
         line: "Follows orders and stock and warns what is running out.",
         routine: "Warn what is running out in stock",
-        task: "List the orders still waiting to ship",
+        task: "List what's left to do on these orders:",
       },
       bia: {
         role: "Answer base",
         line: "Keeps the answer base up to date with what the team answers.",
         routine: "Update the base with the week's answers",
-        task: "List the 5 questions customers ask the most",
+        task: "Write answers to these customer questions:",
       },
+    },
+    /** On a billing hold, under Primeira tarefa: what the template's first agent delivers, labelled and never posted. */
+    example: {
+      iara: "Hi Marina! Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date.",
+      lia: "1. Three common mistakes when hiring an agency. 2. Behind the scenes of a project that almost went wrong. 3. A question for your followers: what do you want to see here?",
+      nina: "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?",
     },
     channels: {
       iara: "support",

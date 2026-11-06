@@ -375,4 +375,19 @@ export const words: EmailWords = {
     button: "Buka notifikasi",
     why: (org) => `Kamu menerima email ini karena seseorang di ${org} menghubungkan paketmu ke sebuah agen.`,
   },
+  planWaiting: {
+    subject: "Timmu sedang menunggu",
+    preheader: "Ruang kerjamu sudah siap. Perlu paket agentes.chat untuk mulai.",
+    headline: "Timmu sedang menunggu",
+    body: (agents, channels, routines) => {
+      const a = `${agents} agen`;
+      const c = `${channels} kanal`;
+      const r = `${routines} rutinitas`;
+      return routines > 0
+        ? `${a}, ${c}, dan ${r} sudah siap. Perlu paket agentes.chat untuk mulai.`
+        : `${a} dan ${c} sudah siap. Perlu paket agentes.chat untuk mulai.`;
+    },
+    button: "Lihat paket agentes.chat",
+    why: (org) => `Kamu menerima email ini karena kamu mengelola ${org} di agentes.chat. Kami hanya mengirim dua pemberitahuan seperti ini.`,
+  },
 };

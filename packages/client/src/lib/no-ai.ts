@@ -55,6 +55,8 @@ export interface NoAiCard {
   model?: string;
   /** Not "no AI": its computer has no such CLI installed, or it has no computer at all. */
   missing?: "cli_missing" | "no_computer";
+  /** A billing hold stopped the run: the message is kept for after the plan (`keptCardState`). */
+  held?: boolean;
 }
 
 /** Why the right hand's plan can't think for this message (`NoAiCard.planLine`). */
@@ -111,7 +113,18 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
       : {}),
     ...(typeof o.model === "string" && o.model ? { model: o.model } : {}),
     ...(o.reason === "cli_missing" || o.reason === "no_computer" ? { missing: o.reason } : {}),
+    ...(o.reason === "plan_hold" ? { held: true } : {}),
   };
+}
+
+/**
+ * Where a kept message stands, from the plan to its answer: the wall (`held`), back from paying with the hold still
+ * on (`paid`, the banner speaks), the plan active with no AI yet (`connect`), and an AI there (`answer`: opening the
+ * conversation starts the answer, with no click). A key saved before reads as ready, so the hold comes first.
+ */
+export function keptCardState(s: { hold: BillingHold | null; paid: boolean; ready: boolean }) {
+  if (s.hold) return s.paid ? ("paid" as const) : ("held" as const);
+  return s.ready ? ("answer" as const) : ("connect" as const);
 }
 
 /** A plan line that passes by itself: once the agent can think again, its card offers "Responder agora". */
@@ -542,17 +555,13 @@ export function dimmedLine(
   return gateLine(t, { gate, ...where })?.text ?? t("aiAccounts.connect.noComputer");
 }
 
-/** A key kept with no word from its maker: a billing hold asked no one, and the key waits for the plan. */
-export const uncheckedKeyLine = (t: TFunction, provider: string, held: boolean) =>
-  held ? t("connectAi.key.savedHeld") : t("connectAi.key.savedUnchecked", { provider });
-
 /**
  * The phone's words for a plan a billing hold stops: paying has no button or link there (ADR 0079 §6, App Store 3.1.1),
  * so whoever pays reads where, and anyone else who can.
  */
-export const planHoldPhoneLine = (t: TFunction, mayPay: boolean) =>
+export const planHoldPhoneLine = (t: TFunction, mayPay: boolean, keys = false) =>
   t("common.joinSentences", {
-    a: t("connectAi.billing"),
+    a: t(keys ? "connectAi.key.closed" : "connectAi.billing"),
     b: t(mayPay ? "connectAi.billingWeb" : "standing.billing.askAdmin"),
   });
 

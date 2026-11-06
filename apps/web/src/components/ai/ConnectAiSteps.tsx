@@ -55,7 +55,6 @@ import {
   planPickText,
   planTitle,
   signsInOnce,
-  uncheckedKeyLine,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
@@ -320,7 +319,6 @@ export function ExistingRows({
   const toast = useToast();
   const dir = useDirectory(org.id);
   const models = useModels();
-  const held = usePlanHold() !== null;
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const view = gates.view;
@@ -370,7 +368,8 @@ export function ExistingRows({
   const pickKey = (key: Credential) =>
     save(async () => {
       const { check } = await api.agents.checkCredential(org.id, key.id);
-      if (check === "unchecked") toast.show(uncheckedKeyLine(t, providerLabel(key.provider), held), "info");
+      if (check === "unchecked")
+        toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(key.provider) }), "info");
       const row = dir.agentById.get(agent.id);
       // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
       if (view.scope === "mine" && row) {
@@ -1229,35 +1228,43 @@ export function usePlanHold() {
   return planHoldOf(computerEdition(useComputerSetup(org.id).data), org.standing);
 }
 
-/**
- * A plan a workspace with no agentes.chat plan in force can't use, in place of its steps: why, the way to that plan for
- * whoever pays (anyone else reads who can), and an API key for whoever may add one. A hold stops the Model Gateway too,
- * so the key's panel says it starts with the plan (`KeyPanel`).
- */
-export function PlanHold({ hold, onKey }: { hold: BillingHold; onKey?: () => void }) {
+/** The way to the plan a billing hold waits for, or who can get it, under the line saying why. */
+function HoldWay({ hold }: { hold: BillingHold }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const billingUrl = useAuthConfig().data?.billingUrl;
-  const canPay = can(org, "manage_billing") && Boolean(billingUrl);
-  const key = can(org, "manage_credentials") ? onKey : undefined;
+  if (!can(org, "manage_billing") || !billingUrl)
+    return <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>;
+  return (
+    <span className="ac-acts">
+      <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+        {t(`standing.billing.cta.${hold}`)}
+      </BillingLinkButton>
+    </span>
+  );
+}
+
+/**
+ * A plan a workspace with no agentes.chat plan in force can't use, in place of its steps: why, and the way to that
+ * plan. A hold stops the Model Gateway for keys too, so no key is offered as a way around it.
+ */
+export function PlanHold({ hold }: { hold: BillingHold }) {
+  const { t } = useTranslation();
   return (
     <>
       <SettingNote icon="alert">{t("connectAi.billing")}</SettingNote>
-      {!canPay && <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>}
-      {(canPay || key) && (
-        <span className="ac-acts">
-          {canPay && (
-            <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
-              {t(`standing.billing.cta.${hold}`)}
-            </BillingLinkButton>
-          )}
-          {key && (
-            <Button size="sm" onClick={key}>
-              {t("noAi.rightHand.useKey")}
-            </Button>
-          )}
-        </span>
-      )}
+      <HoldWay hold={hold} />
+    </>
+  );
+}
+
+/** In place of adding an API key on a billing hold: keys open with the plan, and the server refuses one before it. */
+export function KeysClosed({ hold }: { hold: BillingHold }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <SettingNote icon="alert">{t("connectAi.key.closed")}</SettingNote>
+      <HoldWay hold={hold} />
     </>
   );
 }
@@ -1325,7 +1332,7 @@ function GateWait({
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "billing") {
-    wait = <PlanHold hold={gate.hold} onKey={onKey} />;
+    wait = <PlanHold hold={gate.hold} />;
   } else if (gate.state === "preparing") {
     // The computer's wait in one well: how far it is and the time left, or why it waits (not where the rail beside it
     // already says so), then when the step under it turns on, said once (the owner's email line says it for them). A
@@ -1423,7 +1430,6 @@ export function KeyPanel({
   savedNote,
   refused,
   saving,
-  held,
   onSave,
   endpoint,
 }: {
@@ -1439,8 +1445,6 @@ export function KeyPanel({
   /** The provider refused the key on its test call: nothing was kept. */
   refused?: ReturnType<typeof keyRefusal>;
   saving?: boolean;
-  /** A billing hold stops every model call: the key starts with the plan (`planHoldOf`). */
-  held?: boolean;
   onSave?: () => void;
 }) {
   const { t } = useTranslation();
@@ -1465,7 +1469,7 @@ export function KeyPanel({
         <SettingNote icon="lock">{t("connectAi.keyLocked")}</SettingNote>
       ) : saved ? (
         <SettingNote icon="check" live>
-          {held ? t("connectAi.key.savedHeld") : (savedNote ?? t("connectAi.key.saved"))}
+          {savedNote ?? t("connectAi.key.saved")}
         </SettingNote>
       ) : provider === CUSTOM_PROVIDER ? (
         <>
@@ -1473,7 +1477,6 @@ export function KeyPanel({
             {t("endpoint.optionSub")}
           </p>
           {endpoint}
-          {held && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
         </>
       ) : keyOf && maker && site ? (
         <>
@@ -1524,9 +1527,7 @@ export function KeyPanel({
             )}
             {refused && <KeyRefused refusal={refused} />}
           </Step>
-          <SettingNote icon={held ? "clock" : "agent"}>
-            {t(held ? "connectAi.key.held" : "connectAi.key.forAll")}
-          </SettingNote>
+          <SettingNote icon="agent">{t("connectAi.key.forAll")}</SettingNote>
         </>
       ) : null}
     </Card>

@@ -400,4 +400,19 @@ export const words: EmailWords = {
     button: "Meldingen openen",
     why: (org) => `Je krijgt deze e-mail omdat iemand in ${org} je abonnement aan een agent heeft gekoppeld.`,
   },
+  planWaiting: {
+    subject: "Je team wacht",
+    preheader: "Je werkruimte is klaar. Er is een agentes.chat-abonnement nodig om te beginnen.",
+    headline: "Je team wacht",
+    body: (agents, channels, routines) => {
+      const a = plural("nl", agents, { one: `1 agent`, other: `${agents} agents` });
+      const c = plural("nl", channels, { one: `1 kanaal`, other: `${channels} kanalen` });
+      const r = plural("nl", routines, { one: `1 routine`, other: `${routines} routines` });
+      return routines > 0
+        ? `${a}, ${c} en ${r} staan klaar. Er is een agentes.chat-abonnement nodig om te beginnen.`
+        : `${a} en ${c} staan klaar. Er is een agentes.chat-abonnement nodig om te beginnen.`;
+    },
+    button: "agentes.chat-abonnementen bekijken",
+    why: (org) => `Je krijgt deze e-mail omdat je ${org} beheert op agentes.chat. We sturen maar twee van deze berichten.`,
+  },
 };

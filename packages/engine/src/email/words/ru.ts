@@ -404,4 +404,19 @@ export const words: EmailWords = {
     button: "Открыть уведомления",
     why: (org) => `Вы получили это письмо, потому что кто-то в ${org} подключил ваш план к агенту.`,
   },
+  planWaiting: {
+    subject: "Ваша команда ждёт",
+    preheader: "Рабочее пространство готово. Для старта нужен тариф agentes.chat.",
+    headline: "Ваша команда ждёт",
+    body: (agents, channels, routines) => {
+      const a = plural("ru", agents, { one: `1 агент`, few: `${agents} агента`, many: `${agents} агентов`, other: `${agents} агента` });
+      const c = plural("ru", channels, { one: `1 канал`, few: `${channels} канала`, many: `${channels} каналов`, other: `${channels} канала` });
+      const r = plural("ru", routines, { one: `1 рутина`, few: `${routines} рутины`, many: `${routines} рутин`, other: `${routines} рутины` });
+      return routines > 0
+        ? `Готово: ${a}, ${c} и ${r}. Для старта нужен тариф agentes.chat.`
+        : `Готово: ${a} и ${c}. Для старта нужен тариф agentes.chat.`;
+    },
+    button: "Посмотреть тарифы agentes.chat",
+    why: (org) => `Вы получили это письмо, потому что управляете ${org} в agentes.chat. Мы отправляем только два таких уведомления.`,
+  },
 };

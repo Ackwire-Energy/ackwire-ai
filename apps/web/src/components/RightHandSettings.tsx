@@ -187,7 +187,6 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
   const hold = usePlanHold();
-  const connect = useConnectAi();
   // The workspace's AI (ADR 0137 §11): what every DM thinks with while its person has no plan of their own.
   const kind = planKind(agent.brain?.kind);
   const view = useAgentBrain(org.id, agent.id, true, false, "workspace").data;
@@ -230,10 +229,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
     <>
       {hold && (
         <Card className="ai-panel">
-          <PlanHold
-            hold={hold}
-            onKey={connect ? () => connect.open({ agentId: agent.id, intent: "api_key" }) : undefined}
-          />
+          <PlanHold hold={hold} />
         </Card>
       )}
       <Card>
@@ -287,9 +283,11 @@ function RightHandForm({ agent }: { agent: Agent }) {
             }
             control={
               kind ? (
-                <Button size="sm" onClick={() => setWorkspace({ brain: "model" })}>
-                  {t("noAi.rightHand.useKey")}
-                </Button>
+                !hold && (
+                  <Button size="sm" onClick={() => setWorkspace({ brain: "model" })}>
+                    {t("noAi.rightHand.useKey")}
+                  </Button>
+                )
               ) : (
                 <ModelSelect
                   className="rh-set__model"

@@ -202,7 +202,7 @@ import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
-import { postNoAiCard } from "./no-ai";
+import { type NoAiCardReason, postNoAiCard } from "./no-ai";
 import {
   notifyCatchUpClosed,
   notifyCatchUpClosedAsker,
@@ -278,7 +278,7 @@ import {
 import { truncateOutput } from "./sandbox";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
-import { standingErrorDetail, standingRefusal } from "./standing";
+import { billingHold, standingErrorDetail, standingRefusal } from "./standing";
 import { personAskedLately, rerootRun, runStretchOf } from "./stretch";
 import { isStuck, noteStep, STUCK_END_NOTE, STUCK_END_REPLY_NOTE, STUCK_NOTE, type StuckState } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
@@ -1383,7 +1383,7 @@ async function executeRunInner(
    * Nothing to think with (ADR 0061): the run fails with `no_ai`, and the conversation gets its agent's
    * card with Connect. Background work only fails (its routine says why).
    */
-  const failNoAi = async (why: NoAiReason, own?: AgentAi["own"], model?: string) => {
+  const failNoAi = async (why: NoAiCardReason, own?: AgentAi["own"], model?: string) => {
     if (!run.background) {
       const cardDeps = { db, pubsub: deps.pubsub, gateway: deps.gateway, machines: deps.machines };
       await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why, own, model)
@@ -1430,8 +1430,9 @@ async function executeRunInner(
 
   // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
   // before it starts anything.
+  // A billing hold keeps the message for after the plan: the agent's card says so, and it can be answered then.
   const refusal = await standingRefusal(db, run.orgId, run.agentId);
-  if (refusal) return fail(refusal.message);
+  if (refusal) return (await billingHold(db, run.orgId)) ? failNoAi("plan_hold") : fail(refusal.message);
 
   const ctx: ToolContext = {
     db,
