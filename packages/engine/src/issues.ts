@@ -260,6 +260,17 @@ async function canSee(
   if (actor.type === "agent") {
     if (conversationChannelId && actor.channelId === conversationChannelId) return true;
     if ((await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(channelId)) return true;
+    // In a task's conversation, an agent of the place it's tied to reads what's tied there (a step made here). One
+    // assigned from outside reaches its own task only.
+    const [sibling] = await db
+      .select({ id: issues.id })
+      .from(issues)
+      .innerJoin(
+        channelMembers,
+        and(eq(channelMembers.channelId, channelId), eq(channelMembers.agentId, actor.agentId)),
+      )
+      .where(and(eq(issues.conversationChannelId, actor.channelId), eq(issues.channelId, channelId)));
+    if (sibling) return true;
     if (assignee?.type !== "agent" || assignee.id !== actor.agentId) return false;
     const [row] = rowsOf<{ yes: boolean | string }>(
       await db.execute(sql`select ${seenFromDmSql(orgId, actor.channelId, sql`${channelId}::uuid`)} as yes`),
@@ -1376,8 +1387,9 @@ export async function openTasksBrief(
           isNull(issues.channelId),
           inArray(issues.channelId, visible),
           seenFromDmSql(orgId, channelId, sql`${issues.channelId}`),
-          // From a task's own conversation: that task (ADR 0145).
+          // From a task's own conversation: that task (ADR 0145), and what's tied to the same place.
           eq(issues.conversationChannelId, channelId),
+          sql`${issues.channelId} = (select t.channel_id from ${issues} t where t.conversation_channel_id = ${channelId}::uuid)`,
         ),
       ),
     )

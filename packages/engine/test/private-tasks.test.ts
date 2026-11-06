@@ -3,6 +3,7 @@ import { channelTopic, orgTopic, type RealtimeEvent } from "@agenteschat/adapter
 import { and, eq, inArray, schema, sql } from "@agenteschat/db";
 import {
   addChannelMember,
+  buildTeamWeek,
   calendarRange,
   commentIssue,
   createAgent,
@@ -13,6 +14,7 @@ import {
   getIssueDetail,
   grantScopes,
   issueFromMessage,
+  listApprovals,
   listIssues,
   listNotifications,
   NEW_AGENT_DEFAULTS,
@@ -20,6 +22,8 @@ import {
   openPersonAgentDm,
   openTaskConversation,
   postPersonMessage,
+  removeChannelMember,
+  requireChannelAccess,
   searchVisible,
   shareIssueWithEveryone,
   updateIssue,
@@ -195,6 +199,159 @@ describe("a task made in a private conversation stays there", () => {
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: room.id, agentId: f.agent.id });
     const fromRoutine = await made(await toolsIn(room.id), "Da rotina");
     expect((await listIssues(f.db, person(admin.id), f.org.id)).map((i) => i.id)).toContain(fromRoutine.id);
+  });
+});
+
+describe("what still reads a private task", () => {
+  test("the agent in a task's conversation reaches a step it made there, and an agent elsewhere doesn't", async () => {
+    const { call } = await inDm();
+    const parent = await made(call, "Fechar a folha");
+    const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, parent.id);
+    const inside = await toolsIn(at.channelId);
+    const step = await made(inside, "Passo no tópico");
+    expect(await inside("list_issues", {})).toMatchObject({
+      output: { content: expect.stringContaining("Passo no tópico") },
+    });
+    expect(await inside("update_issue", { issue: step.id, status: "in_progress" })).toMatchObject({
+      output: { content: expect.not.stringContaining("Failed") },
+    });
+    expect(await (await toolsIn(f.general.id))("update_issue", { issue: step.id, status: "done" })).toMatchObject({
+      output: { isError: true },
+    });
+  });
+
+  test("an agent assigned from outside reaches its task from its conversation, not the rest of that DM", async () => {
+    const { call } = await inDm();
+    const outsider = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Fora", handle: "fora" },
+      NEW_AGENT_DEFAULTS,
+    );
+    const task = await made(call, "Folha");
+    await made(call, "Férias");
+    await updateIssue(deps(), person(f.owner.id), f.org.id, task.id, { assignee: { type: "agent", id: outsider.id } });
+    const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, task.id);
+    const seen = await listIssues(f.db, { type: "agent", agentId: outsider.id, channelId: at.channelId }, f.org.id);
+    expect(seen.map((i) => i.id)).toEqual([task.id]);
+  });
+
+  test("someone taken out of a private channel loses its task everywhere, its notifications too", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { agentId: f.agent.id });
+    await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { userId: bia.id });
+    const task = await made(await toolsIn(secret.id), "Fusão", { assignee: "bia" });
+    const at = await openTaskConversation(f.db, person(bia.id), f.org.id, task.id);
+    await drainOutbox(f.db, f.handlers);
+    expect((await listNotifications({ db: f.db }, bia.id, f.org.id)).items).toHaveLength(1);
+
+    await removeChannelMember(f.db, f.owner.id, f.org.id, secret.id, { userId: bia.id }, { pubsub: f.pubsub });
+
+    expect(await listIssues(f.db, person(bia.id), f.org.id)).toEqual([]);
+    await expect(getIssue(f.db, person(bia.id), f.org.id, { id: task.id })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(requireChannelAccess(f.db, bia.id, f.org.id, at.channelId)).rejects.toThrow();
+    expect((await listNotifications({ db: f.db }, bia.id, f.org.id)).items).toEqual([]);
+    expect(await userVisibleChannels(f.db, f.org.id, bia.id)).not.toContain(secret.id);
+  });
+
+  test("an approval card names a private task to nobody: an approver may be outside the conversation", async () => {
+    const { admin, call, dm } = await inDm();
+    const hidden = await made(call, "Reajuste da Bia");
+    const open = await made(await toolsIn(f.general.id), "Onboarding");
+    const cardOf = async (issueId: string, channelId: string) => {
+      const msg = await postPersonMessage(deps(), f.owner.id, f.org.id, channelId, { body: "vai" });
+      const [run] = await f.db
+        .insert(schema.agentRuns)
+        .values({
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          channelId,
+          threadRootId: msg.id,
+          triggerMessageId: msg.id,
+          trigger: "mention",
+          hop: 1,
+          issueId,
+        })
+        .returning();
+      const [card] = await f.db
+        .insert(schema.approvals)
+        .values({
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          channelId,
+          runId: run?.id,
+          threadRootId: msg.id,
+          toolUseId: crypto.randomUUID(),
+          tool: "github_merge",
+          scope: "",
+          params: {},
+          actionHash: crypto.randomUUID(),
+          title: "Merge",
+          expiresAt: new Date(Date.now() + 60_000),
+        })
+        .returning();
+      return card?.id;
+    };
+    const inDmCard = await cardOf(hidden.id, dm.id);
+    const openCard = await cardOf(open.id, f.general.id);
+    const seen = await listApprovals(f.db, admin.id, f.org.id);
+    expect(seen.find((a) => a.id === inDmCard)?.issue).toBeNull();
+    expect(seen.find((a) => a.id === openCard)?.issue).toMatchObject({ title: "Onboarding" });
+  });
+
+  test("the weekly card counts and names nothing it can't show: closed tasks, and steps under a task everyone sees", async () => {
+    const { admin, call, dm } = await inDm();
+    const end = new Date(Date.now() + 60_000);
+    const week = (userId: string) =>
+      buildTeamWeek(f.db, {
+        orgId: f.org.id,
+        userId,
+        rightHandId: f.agent.id,
+        start: new Date(end.getTime() - 7 * 86_400_000),
+        end,
+        timezone: "UTC",
+      });
+    for (const title of ["Folha", "Férias"]) {
+      const task = await made(call, title);
+      await f.db
+        .update(schema.issues)
+        .set({ status: "done", assigneeType: "agent", assigneeId: f.agent.id })
+        .where(eq(schema.issues.id, task.id));
+    }
+    const parent = await createIssue(deps(), person(f.owner.id), f.org.id, { title: "Aberta" });
+    const steps = [];
+    for (const title of ["a", "b", "c"]) {
+      steps.push(await made(call, title));
+    }
+    await f.db
+      .update(schema.issues)
+      .set({
+        parentIssueId: parent.id,
+        status: "todo",
+        channelId: dm.id,
+        updatedAt: new Date(end.getTime() - 3 * 86_400_000),
+      })
+      .where(
+        inArray(
+          schema.issues.id,
+          steps.map((s) => s.id),
+        ),
+      );
+    await f.db
+      .update(schema.issues)
+      .set({ status: "in_progress" })
+      .where(eq(schema.issues.id, steps[0]?.id ?? ""));
+
+    const inside = await week(f.owner.id);
+    const outside = await week(admin.id);
+    expect(inside?.worked.filter((h) => h.kind === "tasks")).toHaveLength(1);
+    expect(inside?.rows.filter((r) => r.kind === "stalled")).toHaveLength(1);
+    expect(outside?.worked.filter((h) => h.kind === "tasks") ?? []).toEqual([]);
+    expect(outside?.rows.filter((r) => r.kind === "stalled") ?? []).toEqual([]);
   });
 });
 

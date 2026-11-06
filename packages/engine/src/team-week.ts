@@ -505,6 +505,7 @@ async function stalledSteps(db: Database, w: Window, visible: ReturnType<typeof 
         (array_agg(s.assignee_id order by s.number) filter (where s.assignee_type = 'agent' and (s.status in ('in_progress', 'in_review') or s.blocked is not null)))[1] as on_agent,
         max(s.updated_at) as moved
       from issues p join issues s on s.parent_issue_id = p.id and s.org_id = p.org_id
+        and (s.channel_id is null or exists (select 1 from channels c where c.id = s.channel_id and ${visible}))
       left join channels c on c.id = p.channel_id
       where p.org_id = ${w.orgId} and p.status not in ('done', 'canceled')
         and (p.channel_id is null or (c.kind = 'channel' and ${visible})
