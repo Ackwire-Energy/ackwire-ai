@@ -107,7 +107,7 @@ test("administrators through the routes: a private channel opens and joins; a DM
   expect((await api(adm, `/channels/${dm}/messages`)).status).toBe(403);
 
   const subscribed = await currentSubscriptions(t.db, admId, orgId, [room.id, dm]);
-  expect([...subscribed]).toEqual([room.id]);
+  expect([...(subscribed ?? [])]).toEqual([room.id]);
 
   expect((await api(adm, `/channels/${dm}/join`, { method: "POST", json: {} })).status).toBe(403);
   expect((await api(bia, `/channels/${room.id}/join`, { method: "POST", json: {} })).status).toBe(403);
@@ -141,5 +141,5 @@ test("an administrator demoted through the route stops reading at once, the sock
   expect((await api(adm, `/channels/${room.id}/messages`)).status).toBe(200);
   expect((await api(owner, `/members/${admId}/roles`, { method: "PUT", json: { roleIds: [] } })).status).toBe(200);
   expect((await api(adm, `/channels/${room.id}/messages`)).status).toBe(403);
-  expect([...(await currentSubscriptions(t.db, admId, orgId, [room.id]))]).toEqual([]);
+  expect([...((await currentSubscriptions(t.db, admId, orgId, [room.id])) ?? [])]).toEqual([]);
 });
