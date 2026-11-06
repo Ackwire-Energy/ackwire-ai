@@ -759,6 +759,8 @@ export const featureKeysPtBR = {
       older: "Mais antigas",
     },
     kind: {
+      proposal_waiting_one: "{{names}} propõe uma melhoria",
+      proposal_waiting_other: "{{names}} propõem melhorias",
       mention_one: "{{names}} mencionou você",
       mention_other: "{{names}} mencionaram você",
       thread_reply_one: "{{names}} respondeu na thread",
@@ -945,6 +947,8 @@ export const featureKeysPtBR = {
     issues: "Tarefas",
     issuesWithMe_one: "{{count}} com você",
     issuesWithMe_other: "{{count}} com você",
+    proposalsWaiting_one: "{{count}} esperando",
+    proposalsWaiting_other: "{{count}} esperando",
     drive: "Drive",
     connectors: "Conectores e MCPs",
     usage: "Uso",

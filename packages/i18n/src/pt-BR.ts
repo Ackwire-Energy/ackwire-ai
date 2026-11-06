@@ -1305,6 +1305,7 @@ export const ptBR = {
     more: "Mais",
     moreWhat: {
       approvals: "O que os agentes pedem para você liberar",
+      proposals: "O que os agentes propõem mudar",
       threads: "Conversas que seguem à parte, e as missões",
       issues: "O trabalho da equipe, de pessoas e agentes",
       wiki: "O que a equipe sabe, escrito para todos",
@@ -1378,6 +1379,7 @@ export const ptBR = {
     summary_one: "{{people}} membro · {{agents}} agentes",
     summary_other: "{{people}} membros · {{agents}} agentes",
     approvals: "Aprovações",
+    proposals: "Propostas de melhoria",
     issues: "Tarefas",
     missionsWaiting_one: "{{count}} missão esperando você",
     missionsWaiting_other: "{{count}} missões esperando você",
@@ -1419,6 +1421,8 @@ export const ptBR = {
     unread_other: "{{count}} mensagens não lidas",
     pendingApprovals_one: "{{count}} aprovação pendente",
     pendingApprovals_other: "{{count}} aprovações pendentes",
+    pendingProposals_one: "{{count}} proposta esperando você",
+    pendingProposals_other: "{{count}} propostas esperando você",
     home: "Início",
     notifications: "Notificações",
     unreadMark: "Não lida",
@@ -3850,6 +3854,7 @@ export const ptBR = {
       joinRequestMany: "<b>{{names}}</b> pedem para entrar",
       joinSuggestion: "<b>{{by}}</b> sugeriu <b>{{name}}</b>",
       changeRequest: "<b>{{name}}</b> pede uma mudança em <b>{{agent}}</b>",
+      proposalWaiting: "Propostas de melhoria de <b>{{names}}</b>",
       changeRequestAgent: "<b>{{name}}</b> pede um novo agente: <b>{{agent}}</b>",
       approvalCover: "<b>{{name}}</b> escolheu você em Quem aprova por mim",
       approvalCoverDeclined: "<b>{{name}}</b> não vai mais aprovar por você",
@@ -3980,6 +3985,7 @@ export const ptBR = {
   },
   approvals: {
     title: "Aprovações",
+    tabs: { requests: "Pedidos" },
     /** Requests sharing one card in the conversation, together here too. */
     groupHead_one: "<b>{{name}}</b> pediu {{count}} coisa de uma vez",
     groupHead_other: "<b>{{name}}</b> pediu {{count}} coisas de uma vez",
@@ -4897,6 +4903,8 @@ export const ptBR = {
     },
   },
   memory: {
+    fromRefusal: "Não propor de novo: {{text}}",
+    fromCorrection: "Uma pessoa corrigiu: {{text}}",
     back: "{{name}}",
     title: "O que o {{name}} sabe",
     title_female: "O que a {{name}} sabe",
@@ -4948,6 +4956,13 @@ export const ptBR = {
   },
   proposals: {
     title: "Propostas de melhoria",
+    whyCode: {
+      refused: "Uma pessoa recusou: {{text}}",
+      corrected: "Uma pessoa corrigiu: {{text}}",
+      seen: "O agente notou isso mais de uma vez.",
+      skill: "Veio do uso desta skill.",
+      asked: "Pedido em uma conversa.",
+    },
     subtitle: "O que os agentes propõem mudar no time. Nada muda sem alguém aceitar.",
     list: "Propostas",
     proposes: "<b>{{agent}}</b> propõe · {{target}}",

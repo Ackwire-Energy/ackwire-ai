@@ -1393,6 +1393,7 @@
     "more": "Ещё",
     "moreWhat": {
       "approvals": "Что агенты просят вас разрешить",
+      "proposals": "Что агенты предлагают изменить",
       "threads": "Ответвления разговоров и миссии",
       "issues": "Работа команды, для людей и агентов",
       "wiki": "Что знает команда, записано для всех",
@@ -1466,6 +1467,7 @@
     "summary_many": "Участники: {{people}} · агенты: {{agents}}",
     "summary_other": "Участники: {{people}} · агенты: {{agents}}",
     "approvals": "Одобрения",
+    "proposals": "Предложения по улучшению",
     "issues": "Задачи",
     "missionsWaiting_one": "{{count}} миссия ждёт вас",
     "missionsWaiting_few": "{{count}} миссии ждут вас",
@@ -1511,6 +1513,10 @@
     "pendingApprovals_few": "{{count}} одобрения ждут",
     "pendingApprovals_many": "{{count}} одобрений ждут",
     "pendingApprovals_other": "{{count}} одобрения ждут",
+    "pendingProposals_one": "{{count}} предложение ждёт вас",
+    "pendingProposals_few": "{{count}} предложения ждут вас",
+    "pendingProposals_many": "{{count}} предложений ждут вас",
+    "pendingProposals_other": "{{count}} предложения ждут вас",
     "home": "Главная",
     "notifications": "Уведомления",
     "unreadMark": "Не прочитано",
@@ -4057,6 +4063,7 @@
       "joinRequestMany": "<b>{{names}}</b> просят вступить",
       "joinSuggestion": "<b>{{by}}</b> предлагает <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> просит изменить <b>{{agent}}</b>",
+      "proposalWaiting": "Предложения по улучшению от <b>{{names}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> просит нового агента: <b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b> выбрал(а) вас в разделе «Кто одобряет за меня»",
       "approvalCoverDeclined": "<b>{{name}}</b> больше не одобряет за вас",
@@ -4198,6 +4205,9 @@
   },
   "approvals": {
     "title": "Одобрения",
+    "tabs": {
+      "requests": "Запросы"
+    },
     "groupHead_one": "<b>{{name}}</b> просит сразу {{count}} действие",
     "groupHead_few": "<b>{{name}}</b> просит сразу {{count}} действия",
     "groupHead_many": "<b>{{name}}</b> просит сразу {{count}} действий",
@@ -5119,6 +5129,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "Больше не предлагать: {{text}}",
+    "fromCorrection": "Человек исправил: {{text}}",
     "back": "{{name}}",
     "title": "Что знает {{name}}",
     "subtitle": "Что {{name}} узнал(а) из разговоров и поправок команды.",
@@ -5186,6 +5198,13 @@
   },
   "proposals": {
     "title": "Предложения по улучшению",
+    "whyCode": {
+      "refused": "Человек отказал: {{text}}",
+      "corrected": "Человек исправил: {{text}}",
+      "seen": "Агент заметил это не один раз.",
+      "skill": "Это появилось при использовании этого навыка.",
+      "asked": "Попросили в разговоре."
+    },
     "subtitle": "Изменения, которые предлагают агенты. Ничего не меняется без согласия.",
     "list": "Предложения",
     "proposes": "<b>{{agent}}</b> предлагает · {{target}}",

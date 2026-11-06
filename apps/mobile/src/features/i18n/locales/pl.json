@@ -711,6 +711,10 @@
     "freeSection": "Wolni",
     "noGroupSection": "Bez działu"
   },
+  "team": {
+    "entry": "Lista, schemat organizacyjny i mapa",
+    "mapHint": "Aby przenieść agenta do innego kanału, użyj mapy w wersji webowej albo porozmawiaj z {{name}}."
+  },
   "agentEdit": {
     "missing": "Ten agent już nie istnieje.",
     "saved": "Zmiany zapisane",
@@ -784,6 +788,10 @@
       "older": "Starsze"
     },
     "kind": {
+      "proposal_waiting_one": "{{names}} proponuje ulepszenie",
+      "proposal_waiting_few": "{{names}} proponują ulepszenia",
+      "proposal_waiting_many": "{{names}} proponują ulepszenia",
+      "proposal_waiting_other": "{{names}} proponują ulepszenia",
       "mention_one": "{{names}} wspomina o tobie",
       "mention_few": "{{names}} wspominają o tobie",
       "mention_many": "{{names}} wspominają o tobie",
@@ -946,6 +954,14 @@
       "desktop_taken_female_few": "Ekran komputera {{agent}} przejęty przez {{names}}",
       "desktop_taken_female_many": "Ekran komputera {{agent}} przejęty przez {{names}}",
       "desktop_taken_female_other": "Ekran komputera {{agent}} przejęty przez {{names}}",
+      "plan_lent_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
       "connector_tool_changed_one": "Podłączony serwer zmienił zatwierdzone przez ciebie narzędzia",
       "connector_tool_changed_few": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
       "connector_tool_changed_many": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
@@ -961,15 +977,7 @@
       "app_created_one": "Aplikacja AI coś dla ciebie utworzyła",
       "app_created_few": "Aplikacje AI coś dla ciebie utworzyły",
       "app_created_many": "Aplikacje AI coś dla ciebie utworzyły",
-      "app_created_other": "Aplikacje AI coś dla ciebie utworzyły",
-      "plan_lent_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}"
+      "app_created_other": "Aplikacje AI coś dla ciebie utworzyły"
     },
     "markRead": "Oznacz jako przeczytane",
     "markUnread": "Oznacz jako nieprzeczytane",
@@ -1063,6 +1071,10 @@
     "issuesWithMe_few": "{{count}} z tobą",
     "issuesWithMe_many": "{{count}} z tobą",
     "issuesWithMe_other": "{{count}} z tobą",
+    "proposalsWaiting_one": "{{count}} czeka",
+    "proposalsWaiting_few": "{{count}} czekają",
+    "proposalsWaiting_many": "{{count}} czeka",
+    "proposalsWaiting_other": "{{count}} czeka",
     "drive": "Drive",
     "connectors": "Konektory i MCP",
     "usage": "Użycie",
@@ -2227,10 +2239,6 @@
         "proposal": "Dashboard"
       }
     }
-  },
-  "team": {
-    "entry": "Lista, schemat organizacyjny i mapa",
-    "mapHint": "Aby przenieść agenta do innego kanału, użyj mapy w wersji webowej albo porozmawiaj z {{name}}."
   },
   "empty": {
     "agents": {

@@ -665,6 +665,10 @@
     "freeSection": "Frei",
     "noGroupSection": "Keine Abteilung"
   },
+  "team": {
+    "entry": "Liste, Organigramm und Karte",
+    "mapHint": "Um einen Agenten in einen anderen Kanal zu verschieben, nutze die Karte im Web oder sprich mit {{name}}."
+  },
   "agentEdit": {
     "missing": "Diesen Agenten gibt es nicht mehr.",
     "saved": "Änderungen gespeichert",
@@ -736,6 +740,8 @@
       "older": "Älter"
     },
     "kind": {
+      "proposal_waiting_one": "{{names}} schlägt eine Verbesserung vor",
+      "proposal_waiting_other": "{{names}} schlagen Verbesserungen vor",
       "mention_one": "{{names}} hat dich erwähnt",
       "mention_other": "{{names}} haben dich erwähnt",
       "thread_reply_one": "{{names}} hat im Thread geantwortet",
@@ -820,6 +826,10 @@
       "desktop_taken_other": "{{names}} haben den Bildschirm des Computers von {{agent}} übernommen",
       "desktop_taken_female_one": "{{names}} hat den Bildschirm des Computers von {{agent}} übernommen",
       "desktop_taken_female_other": "{{names}} haben den Bildschirm des Computers von {{agent}} übernommen",
+      "plan_lent_one": "{{names}} hat dein {{plan}}-Abo mit {{agent}} verbunden",
+      "plan_lent_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden",
+      "plan_lent_female_one": "{{names}} hat dein {{plan}}-Abo mit {{agent}} verbunden",
+      "plan_lent_female_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden",
       "connector_tool_changed_one": "Ein verbundener Server hat Tools geändert, die du freigegeben hast",
       "connector_tool_changed_other": "Verbundene Server haben Tools geändert, die du freigegeben hast",
       "computer_disk_full_one": "Die Festplatte eines Computers ist fast voll",
@@ -827,11 +837,7 @@
       "computer_no_chrome_one": "Ein Computer braucht Google Chrome. Lade es unter google.com/chrome herunter",
       "computer_no_chrome_other": "Computer brauchen Google Chrome. Lade es unter google.com/chrome herunter",
       "app_created_one": "Eine KI-App hat etwas für dich erstellt",
-      "app_created_other": "KI-Apps haben etwas für dich erstellt",
-      "plan_lent_one": "{{names}} hat dein {{plan}}-Abo mit {{agent}} verbunden",
-      "plan_lent_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden",
-      "plan_lent_female_one": "{{names}} hat dein {{plan}}-Abo mit {{agent}} verbunden",
-      "plan_lent_female_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden"
+      "app_created_other": "KI-Apps haben etwas für dich erstellt"
     },
     "markRead": "Als gelesen markieren",
     "markUnread": "Als ungelesen markieren",
@@ -921,6 +927,8 @@
     "issues": "Aufgaben",
     "issuesWithMe_one": "{{count}} bei dir",
     "issuesWithMe_other": "{{count}} bei dir",
+    "proposalsWaiting_one": "{{count}} wartet",
+    "proposalsWaiting_other": "{{count}} warten",
     "drive": "Drive",
     "connectors": "Konnektoren und MCP",
     "usage": "Nutzung",
@@ -2023,10 +2031,6 @@
         "proposal": "Dashboard"
       }
     }
-  },
-  "team": {
-    "entry": "Liste, Organigramm und Karte",
-    "mapHint": "Um einen Agenten in einen anderen Kanal zu verschieben, nutze die Karte im Web oder sprich mit {{name}}."
   },
   "empty": {
     "agents": {

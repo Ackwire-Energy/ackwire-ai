@@ -81,6 +81,7 @@ import {
   CancelAhead,
   decisionLabel,
 } from "@/components/ApprovalItem";
+import { ApprovalsTabs } from "@/components/ApprovalsTabs";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { EmailLetter } from "@/components/EmailLetter";
 import { HelpLink } from "@/components/HelpLink";
@@ -303,6 +304,7 @@ export function ApprovalsPage() {
             )
           }
         />
+        <ApprovalsTabs value="requests" />
         <Toolbar
           label={t("approvals.filters")}
           search={

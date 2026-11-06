@@ -3,6 +3,7 @@ import type { SidebarItem, SidebarItems, SidebarPlace, SidebarSection } from "..
 /** The tools at the top of the sidebar, in their order (mirrors `SIDEBAR_ITEMS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_ITEMS: readonly SidebarItem[] = [
   "approvals",
+  "proposals",
   "threads",
   "issues",
   "wiki",
@@ -15,6 +16,7 @@ export const SIDEBAR_ITEMS: readonly SidebarItem[] = [
 /** Where each tool goes for someone who never moved it. */
 export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   approvals: "auto",
+  proposals: "more",
   threads: "always",
   issues: "always",
   wiki: "more",
@@ -25,7 +27,7 @@ export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
 };
 
 /** The tools with a count in the sidebar: only these can wait in More until there is something (`auto`). */
-export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "threads"];
+export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "proposals", "threads"];
 
 /** The sidebar's sections in their default order (mirrors `SIDEBAR_SECTIONS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "channels", "agents", "people"];

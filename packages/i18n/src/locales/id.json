@@ -1285,6 +1285,7 @@
     "more": "Lainnya",
     "moreWhat": {
       "approvals": "Yang diminta agen untuk kamu izinkan",
+      "proposals": "Yang diusulkan agen untuk diubah",
       "threads": "Percakapan yang bercabang, dan misi",
       "issues": "Pekerjaan tim, untuk orang dan agen",
       "wiki": "Yang diketahui tim, ditulis untuk semua orang",
@@ -1355,6 +1356,7 @@
     "searchWorkspace": "Cari di ruang kerja",
     "summary_other": "{{people}} anggota · {{agents}} agen",
     "approvals": "Persetujuan",
+    "proposals": "Usulan perbaikan",
     "issues": "Tugas",
     "missionsWaiting_other": "{{count}} misi menunggumu",
     "threads": "Utas",
@@ -1391,6 +1393,7 @@
     "gallery": "Galeri komponen",
     "unread_other": "{{count}} pesan belum dibaca",
     "pendingApprovals_other": "{{count}} persetujuan tertunda",
+    "pendingProposals_other": "{{count}} usulan menunggu Anda",
     "home": "Beranda",
     "notifications": "Notifikasi",
     "unreadMark": "Belum dibaca",
@@ -3664,6 +3667,7 @@
       "joinRequestMany": "<b>{{names}}</b> meminta bergabung",
       "joinSuggestion": "<b>{{by}}</b> mengusulkan <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> meminta perubahan pada <b>{{agent}}</b>",
+      "proposalWaiting": "Usulan perbaikan dari <b>{{names}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> meminta agen baru: <b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b> memilihmu di Siapa yang menyetujui untukku",
       "approvalCoverDeclined": "<b>{{name}}</b> tidak lagi menyetujui untukmu",
@@ -3785,6 +3789,9 @@
   },
   "approvals": {
     "title": "Persetujuan",
+    "tabs": {
+      "requests": "Permintaan"
+    },
     "groupHead_other": "<b>{{name}}</b> meminta {{count}} hal sekaligus",
     "readsOnly": "Hanya baca",
     "technical": "Detail teknis",
@@ -4625,6 +4632,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "Jangan usulkan lagi: {{text}}",
+    "fromCorrection": "Seseorang mengoreksi: {{text}}",
     "back": "{{name}}",
     "title": "Yang diketahui {{name}}",
     "title_female": "Yang diketahui {{name}}",
@@ -4689,6 +4698,13 @@
   },
   "proposals": {
     "title": "Usulan perbaikan",
+    "whyCode": {
+      "refused": "Seseorang menolak: {{text}}",
+      "corrected": "Seseorang mengoreksi: {{text}}",
+      "seen": "Agen melihat ini lebih dari sekali.",
+      "skill": "Ini muncul dari penggunaan skill ini.",
+      "asked": "Diminta dalam percakapan."
+    },
     "subtitle": "Perubahan yang diusulkan agen. Tidak ada yang berubah sebelum ada yang menerima.",
     "list": "Usulan",
     "proposes": "<b>{{agent}}</b> mengusulkan · {{target}}",

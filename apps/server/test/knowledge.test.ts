@@ -261,3 +261,58 @@ test("a settings row a member can't decide: only they send it, once, and not onc
   expect((await as(owner)(`/proposals/${id}/accept`, { json: {} })).status).toBe(200);
   expect((await as(member)(`/proposals/${id}/ask`, { json: {} })).status).toBe(409);
 });
+
+test("the server's own lessons reach people without their template, a proposal's reason included", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string) => owner(`/api/app/organizations/${orgId}${path}`);
+  const [item] = await t.db
+    .insert(schema.contextItems)
+    .values({
+      orgId,
+      kind: "lesson",
+      scopeType: "agent",
+      scopeId: agentId,
+      agentId,
+      subjectKey: "refused",
+      title: "",
+      content: "A person refused this change; don't propose it again: ## Learned - Remover o sistema antigo.",
+      evidence: [{ type: "human", ref: "x", at: new Date().toISOString() }],
+    })
+    .returning();
+  const [row] = await t.db
+    .insert(schema.contextProposals)
+    .values({
+      orgId,
+      target: "agent_instructions",
+      agentId,
+      baseHash: "x",
+      proposedText: "",
+      diff: "",
+      rationale: "Seen 2× (confidence 0.90, evidence: human).",
+      itemIds: [item?.id ?? ""],
+    })
+    .returning();
+  const reasons = async () =>
+    (
+      (await (await api("/proposals")).json()) as {
+        proposals: { why: string; whyCode: string | null; evidence: { what: string }[] }[];
+      }
+    ).proposals;
+  expect(await reasons()).toMatchObject([
+    { why: "Remover o sistema antigo.", whyCode: "refused", evidence: [{ what: "Remover o sistema antigo." }] },
+  ]);
+  const memories = (await (await api(`/agents/${agentId}/memories`)).json()) as {
+    memories: { text: string; how: string | null }[];
+  };
+  expect(memories.memories).toMatchObject([{ text: "Remover o sistema antigo.", how: "refused" }]);
+
+  // Its memory gone: the code, never the line written for the logs.
+  await t.db
+    .update(schema.contextProposals)
+    .set({ itemIds: [crypto.randomUUID()] })
+    .where(eq(schema.contextProposals.id, row?.id ?? ""));
+  expect(await reasons()).toMatchObject([{ why: "", whyCode: "seen", evidence: [] }]);
+});

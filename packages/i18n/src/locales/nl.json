@@ -1321,6 +1321,7 @@
     "more": "Meer",
     "moreWhat": {
       "approvals": "Wat agents je vragen toe te staan",
+      "proposals": "Wat agents willen veranderen",
       "threads": "Gesprekken die aftakken, en missies",
       "issues": "Het werk van het team, voor mensen en agents",
       "wiki": "Wat het team weet, voor iedereen opgeschreven",
@@ -1392,6 +1393,7 @@
     "summary_one": "{{people}} lid · {{agents}} agents",
     "summary_other": "{{people}} leden · {{agents}} agents",
     "approvals": "Goedkeuringen",
+    "proposals": "Verbeteringsvoorstellen",
     "issues": "Taken",
     "missionsWaiting_one": "{{count}} missie wacht op jou",
     "missionsWaiting_other": "{{count}} missies wachten op jou",
@@ -1431,6 +1433,8 @@
     "unread_other": "{{count}} ongelezen berichten",
     "pendingApprovals_one": "{{count}} goedkeuring open",
     "pendingApprovals_other": "{{count}} goedkeuringen open",
+    "pendingProposals_one": "{{count}} voorstel wacht op je",
+    "pendingProposals_other": "{{count}} voorstellen wachten op je",
     "home": "Start",
     "notifications": "Meldingen",
     "unreadMark": "Ongelezen",
@@ -3797,6 +3801,7 @@
       "joinRequestMany": "<b>{{names}}</b> vragen om mee te doen",
       "joinSuggestion": "<b>{{by}}</b> stelde <b>{{name}}</b> voor",
       "changeRequest": "<b>{{name}}</b> vraagt een wijziging voor <b>{{agent}}</b>",
+      "proposalWaiting": "Verbetervoorstellen van <b>{{names}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> vraagt een nieuwe agent: <b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b> koos je bij Wie keurt voor mij goed",
       "approvalCoverDeclined": "<b>{{name}}</b> keurt niet meer voor je goed",
@@ -3925,6 +3930,9 @@
   },
   "approvals": {
     "title": "Goedkeuringen",
+    "tabs": {
+      "requests": "Verzoeken"
+    },
     "groupHead_one": "<b>{{name}}</b> vroeg om {{count}} ding in één keer",
     "groupHead_other": "<b>{{name}}</b> vroeg om {{count}} dingen in één keer",
     "readsOnly": "Alleen lezen",
@@ -4838,6 +4846,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "Niet opnieuw voorstellen: {{text}}",
+    "fromCorrection": "Iemand heeft gecorrigeerd: {{text}}",
     "back": "{{name}}",
     "title": "Wat {{name}} weet",
     "title_female": "Wat {{name}} weet",
@@ -4905,6 +4915,13 @@
   },
   "proposals": {
     "title": "Verbeteringsvoorstellen",
+    "whyCode": {
+      "refused": "Iemand heeft geweigerd: {{text}}",
+      "corrected": "Iemand heeft gecorrigeerd: {{text}}",
+      "seen": "De agent zag dit meer dan eens.",
+      "skill": "Dit komt uit het gebruik van deze skill.",
+      "asked": "Gevraagd in een gesprek."
+    },
     "subtitle": "Wijzigingen die de agents voorstellen. Niets verandert zonder akkoord.",
     "list": "Voorstellen",
     "proposes": "<b>{{agent}}</b> stelt voor · {{target}}",

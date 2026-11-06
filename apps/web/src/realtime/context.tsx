@@ -69,6 +69,7 @@ import {
   reconcileConsults,
   reconcileRuns,
   refreshMission,
+  refreshProposals,
   refreshRepliedThread,
   repliedThread,
   retargetProvisional,
@@ -495,9 +496,11 @@ export function RealtimeProvider({
       if (isAgentUnavailable(event)) streams.unavailable(event);
       // A change I asked the right hand for was decided by someone else (ADR 0137): "Aplicado por …" on my card.
       if (event.type === "proposal.decided") {
-        void qc.invalidateQueries({ queryKey: keys.proposals(orgId) });
+        void refreshProposals(qc, orgId);
         void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       }
+      // A proposal I may decide: the sidebar's count and Aprovações' tab.
+      if (event.type === "proposal.created") void refreshProposals(qc, orgId);
       // Unread marks: a message where I am, and my reads and mutes from any device.
       applyUnreadEvent(qc, orgId, event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.

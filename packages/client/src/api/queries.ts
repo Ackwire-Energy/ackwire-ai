@@ -3338,6 +3338,12 @@ function refreshAccepted(qc: QueryClient, orgId: string, decided: Proposal[]) {
     void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
 }
 
+/** The proposals and the sidebar's count of them: after a decision here, or a `proposal.*` event from elsewhere. */
+export function refreshProposals(qc: QueryClient, orgId: string) {
+  void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+  return qc.invalidateQueries({ queryKey: keys.proposals(orgId) });
+}
+
 export function useDecideProposal(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -3349,7 +3355,7 @@ export function useDecideProposal(orgId: string) {
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
     onSuccess: (row) => refreshAccepted(qc, orgId, [row]),
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+    onSettled: () => refreshProposals(qc, orgId),
   });
 }
 
@@ -3387,7 +3393,7 @@ export function useDecideProposals(orgId: string) {
     },
     meta: { silent: true },
     onSuccess: ({ decided }) => refreshAccepted(qc, orgId, decided),
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+    onSettled: () => refreshProposals(qc, orgId),
   });
 }
 

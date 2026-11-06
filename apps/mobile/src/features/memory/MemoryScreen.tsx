@@ -1,6 +1,7 @@
 import { type Memory, useMemoryAction, useOrgMemories } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { memoryLine } from "@agenteschat/client/lib/proposals";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { router } from "expo-router";
 import { useDeferredValue, useMemo, useState } from "react";
@@ -68,7 +69,7 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
       key={m.id}
       divider={i > 0}
       leading={<Face who={{ type: "agent", id: m.agentId }} size={36} live={false} />}
-      title={m.summary ?? m.text}
+      title={m.summary ?? memoryLine(t, m)}
       subtitle={`${dir.nameOf({ type: "agent", id: m.agentId })} · ${when(m.updatedAt)}`}
       chevron
       onPress={() => openMemory(m.id)}
@@ -272,7 +273,7 @@ function MemoryDetail({ id }: { id: string }) {
             </Text>
           </View>
           <Text variant="title2" accessibilityRole="header">
-            {m.summary ?? m.text}
+            {m.summary ?? memoryLine(t, m)}
           </Text>
           {m.summary ? (
             <Pressable
@@ -288,7 +289,7 @@ function MemoryDetail({ id }: { id: string }) {
               {details ? (
                 <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>
                   <Text variant="subhead" tone="muted" selectable>
-                    {m.text}
+                    {memoryLine(t, m)}
                   </Text>
                 </Animated.View>
               ) : null}

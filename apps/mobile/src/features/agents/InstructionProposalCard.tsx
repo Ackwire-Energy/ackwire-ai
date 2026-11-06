@@ -44,7 +44,7 @@ export function InstructionProposals({ message: m }: { message: Message }) {
  * context): each change once, a row per agent and kind of change with its switch when there are several, and
  * Aceitar and Recusar for the rows you may decide. Each row applies on its own. No Editar on the phone.
  */
-function InstructionProposalCard({ ids }: { ids: string[] }) {
+export function InstructionProposalCard({ ids }: { ids: string[] }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const dir = useDirectory();

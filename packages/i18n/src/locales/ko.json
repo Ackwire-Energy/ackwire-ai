@@ -1285,6 +1285,7 @@
     "more": "더 보기",
     "moreWhat": {
       "approvals": "에이전트가 허락을 구하는 일",
+      "proposals": "에이전트가 변경을 제안한 내용",
       "threads": "갈라져 나온 대화와 미션",
       "issues": "사람과 에이전트를 위한 팀의 일",
       "wiki": "모두를 위해 정리한 팀의 지식",
@@ -1355,6 +1356,7 @@
     "searchWorkspace": "워크스페이스 검색",
     "summary_other": "멤버 {{people}}명 · 에이전트 {{agents}}명",
     "approvals": "승인",
+    "proposals": "개선 제안",
     "issues": "작업",
     "missionsWaiting_other": "나를 기다리는 미션 {{count}}개",
     "threads": "스레드",
@@ -1391,6 +1393,7 @@
     "gallery": "컴포넌트 갤러리",
     "unread_other": "읽지 않은 메시지 {{count}}개",
     "pendingApprovals_other": "대기 중인 승인 {{count}}개",
+    "pendingProposals_other": "제안 {{count}}개가 기다리고 있어요",
     "home": "홈",
     "notifications": "알림",
     "unreadMark": "읽지 않음",
@@ -3648,6 +3651,7 @@
       "joinRequestMany": "<b>{{names}}</b> 님이 참여를 요청해요",
       "joinSuggestion": "<b>{{by}}</b> 님이 <b>{{name}}</b> 님을 제안했어요",
       "changeRequest": "<b>{{name}}</b>님이 <b>{{agent}}</b> 변경을 요청해요",
+      "proposalWaiting": "<b>{{names}}</b>의 개선 제안",
       "changeRequestAgent": "<b>{{name}}</b>님이 새 에이전트를 요청해요: <b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b>님이 '나 대신 승인할 사람'으로 나를 골랐어요",
       "approvalCoverDeclined": "<b>{{name}}</b>님이 더 이상 나 대신 승인하지 않아요",
@@ -3768,6 +3772,9 @@
   },
   "approvals": {
     "title": "승인",
+    "tabs": {
+      "requests": "요청"
+    },
     "groupHead_other": "<b>{{name}}</b>이(가) 한 번에 {{count}}개를 요청했어요",
     "readsOnly": "읽기 전용",
     "technical": "기술 세부 정보",
@@ -4608,6 +4615,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "다시 제안하지 않기: {{text}}",
+    "fromCorrection": "사람이 수정함: {{text}}",
     "back": "{{name}}",
     "title": "{{name}}이(가) 아는 것",
     "subtitle": "{{name}}이(가) 대화와 팀의 수정 사항에서 배운 것이에요.",
@@ -4669,6 +4678,13 @@
   },
   "proposals": {
     "title": "개선 제안",
+    "whyCode": {
+      "refused": "사람이 거절함: {{text}}",
+      "corrected": "사람이 수정함: {{text}}",
+      "seen": "에이전트가 이것을 여러 번 확인했어요.",
+      "skill": "이 스킬을 사용하면서 나왔어요.",
+      "asked": "대화에서 요청받았어요."
+    },
     "subtitle": "에이전트가 제안한 변경이에요. 누군가 수락하기 전엔 바뀌지 않아요.",
     "list": "제안",
     "proposes": "<b>{{agent}}</b>의 제안 · {{target}}",

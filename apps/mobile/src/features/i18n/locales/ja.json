@@ -642,6 +642,10 @@
     "freeSection": "空き",
     "noGroupSection": "部署なし"
   },
+  "team": {
+    "entry": "一覧、組織図、マップ",
+    "mapHint": "エージェントを別のチャンネルに移すには、Web のマップを使うか {{name}} に話しかけてください。"
+  },
   "agentEdit": {
     "missing": "このエージェントはもう存在しません。",
     "saved": "変更を保存しました",
@@ -712,6 +716,7 @@
       "older": "それ以前"
     },
     "kind": {
+      "proposal_waiting_other": "{{names}} が改善を提案しています",
       "mention_other": "{{names}}があなたをメンションしました",
       "thread_reply_other": "{{names}}がスレッドで返信しました",
       "agent_reply_other": "{{names}}が返信しました",
@@ -757,12 +762,12 @@
       "browser_profile_request_other": "{{names}}がブラウザプロフィールの追加を求めています",
       "desktop_taken_other": "{{names}}が{{agent}}のコンピューターの画面の操作を引き継ぎました",
       "desktop_taken_female_other": "{{names}}が{{agent}}のコンピューターの画面の操作を引き継ぎました",
+      "plan_lent_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました",
+      "plan_lent_female_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました",
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
       "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
-      "app_created_other": "AIアプリがあなたのために作成しました",
-      "plan_lent_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました",
-      "plan_lent_female_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました"
+      "app_created_other": "AIアプリがあなたのために作成しました"
     },
     "markRead": "既読にする",
     "markUnread": "未読にする",
@@ -850,6 +855,7 @@
     "fromWorkspace": "ワークスペースから",
     "issues": "タスク",
     "issuesWithMe_other": "あなた担当: {{count}}件",
+    "proposalsWaiting_other": "{{count}} 件待ち",
     "drive": "Drive",
     "connectors": "コネクタとMCP",
     "usage": "使用量",
@@ -1921,10 +1927,6 @@
         "proposal": "ダッシュボード"
       }
     }
-  },
-  "team": {
-    "entry": "一覧、組織図、マップ",
-    "mapHint": "エージェントを別のチャンネルに移すには、Web のマップを使うか {{name}} に話しかけてください。"
   },
   "empty": {
     "agents": {

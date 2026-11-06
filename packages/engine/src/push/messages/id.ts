@@ -54,6 +54,7 @@ export const strings: Partial<PushStrings> = {
     failing: "Gagal beberapa kali berturut-turut lalu berhenti.",
   },
   widgetFailedBody: "Ketuk untuk melihat alasannya.",
+  proposalWaitingTitle: (a) => `${a} mengusulkan perbaikan`,
   dashboardProposalTitle: (a) => `${a} ingin memublikasikan dasbor`,
   dashboardProposalBody: (d) => (d ? `“${d}” · Ketuk untuk memutuskan.` : "Ketuk untuk memutuskan."),
   joinRequestTitle: (name, org) => `${name} minta bergabung ke ${org}`,

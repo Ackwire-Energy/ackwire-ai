@@ -1815,6 +1815,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         agents: state.agents.length,
         budgetUsedPercent: workspacePercent(),
         approvalsWaitingForMe: state.approvals.filter((a) => a.status === "pending" && a.canDecide).length,
+        proposalsWaitingForMe: state.proposals.filter((p) => p.status === "pending" && !p.stale && p.canDecide).length,
       }),
       people: async () =>
         state.members.map((m) => ({

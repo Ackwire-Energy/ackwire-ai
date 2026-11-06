@@ -688,6 +688,10 @@
     "freeSection": "Libres",
     "noGroupSection": "Sin departamento"
   },
+  "team": {
+    "entry": "Lista, organigrama y mapa",
+    "mapHint": "Para mover un agente a otro canal, usa el mapa en la web o habla con {{name}}."
+  },
   "agentEdit": {
     "missing": "Este agente ya no existe.",
     "saved": "Cambios guardados",
@@ -760,6 +764,9 @@
       "older": "Anteriores"
     },
     "kind": {
+      "proposal_waiting_one": "{{names}} propone una mejora",
+      "proposal_waiting_many": "{{names}} proponen mejoras",
+      "proposal_waiting_other": "{{names}} proponen mejoras",
       "mention_one": "{{names}} te mencionó",
       "mention_many": "{{names}} te mencionaron",
       "mention_other": "{{names}} te mencionaron",
@@ -883,6 +890,12 @@
       "desktop_taken_female_one": "{{names}} tomó el control de la pantalla del computador de {{agent}}",
       "desktop_taken_female_many": "{{names}} tomaron el control de la pantalla del computador de {{agent}}",
       "desktop_taken_female_other": "{{names}} tomaron el control de la pantalla del computador de {{agent}}",
+      "plan_lent_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
+      "plan_lent_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
+      "plan_lent_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
+      "plan_lent_female_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
+      "plan_lent_female_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
+      "plan_lent_female_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
       "connector_tool_changed_one": "Un servidor conectado cambió herramientas que aprobaste",
       "connector_tool_changed_many": "Un servidor conectado cambió herramientas que aprobaste",
       "connector_tool_changed_other": "Un servidor conectado cambió herramientas que aprobaste",
@@ -894,13 +907,7 @@
       "computer_no_chrome_other": "Computadoras necesitan Google Chrome. Descárgalo en google.com/chrome",
       "app_created_one": "Una app de IA creó cosas para ti",
       "app_created_many": "Una app de IA creó cosas para ti",
-      "app_created_other": "Una app de IA creó cosas para ti",
-      "plan_lent_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
-      "plan_lent_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
-      "plan_lent_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
-      "plan_lent_female_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
-      "plan_lent_female_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
-      "plan_lent_female_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}"
+      "app_created_other": "Una app de IA creó cosas para ti"
     },
     "markRead": "Marcar como leído",
     "markUnread": "Marcar como no leído",
@@ -992,6 +999,9 @@
     "issuesWithMe_one": "{{count}} contigo",
     "issuesWithMe_many": "{{count}} contigo",
     "issuesWithMe_other": "{{count}} contigo",
+    "proposalsWaiting_one": "{{count}} en espera",
+    "proposalsWaiting_many": "{{count}} en espera",
+    "proposalsWaiting_other": "{{count}} en espera",
     "drive": "Drive",
     "connectors": "Conectores y MCP",
     "usage": "Uso",
@@ -2119,10 +2129,6 @@
         "proposal": "Panel"
       }
     }
-  },
-  "team": {
-    "entry": "Lista, organigrama y mapa",
-    "mapHint": "Para mover un agente a otro canal, usa el mapa en la web o habla con {{name}}."
   },
   "empty": {
     "agents": {

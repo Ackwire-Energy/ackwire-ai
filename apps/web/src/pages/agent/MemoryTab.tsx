@@ -11,7 +11,7 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { proposalTitle } from "@agenteschat/client/lib/proposals";
+import { memoryLine, proposalTitle } from "@agenteschat/client/lib/proposals";
 import {
   Alert,
   Button,
@@ -193,11 +193,11 @@ function LearnedRow({ m }: { m: Memory }) {
             <span>{m.summary}</span>
             <details className="agp-mem__details">
               <summary className="small muted">{t("agentPage.memory.details")}</summary>
-              <p className="small">{m.text}</p>
+              <p className="small">{memoryLine(t, m)}</p>
             </details>
           </>
         ) : (
-          <span>{m.text}</span>
+          <span>{memoryLine(t, m)}</span>
         )
       ) : (
         <Locked when={act.isPending}>
@@ -349,7 +349,7 @@ function RulesCard({ rules }: { rules: Memory[] }) {
       <ul className="agp-list agp-mems">
         {rules.map((m) => (
           <li key={m.id} className="agp-mem">
-            <span>{m.text}</span>
+            <span>{memoryLine(t, m)}</span>
             <span className="agp-chips">
               <span className="small muted">
                 {t("agentPage.memory.ruleBy", {
@@ -557,7 +557,7 @@ export function MemoryTab() {
               <ul className="agp-list agp-mems">
                 {shown.map((m) => (
                   <li key={m.id} className="agp-mem">
-                    <span>{m.text}</span>
+                    <span>{memoryLine(t, m)}</span>
                     <span className="agp-chips">
                       <Chip icon={KIND_ICON[m.kind]}>{t(`memory.kinds.${m.kind}`)}</Chip>
                       <TrustChip m={m} />

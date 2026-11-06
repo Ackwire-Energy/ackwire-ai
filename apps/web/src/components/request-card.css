@@ -217,7 +217,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  row-gap: 8px;
   margin: 16px -16px 0;
   padding: 12px 16px;
   min-height: 56px;
@@ -226,6 +226,16 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 .rq__foot > .ac-btn {
   height: 32px;
+}
+/* As `.ac-acts`: a ghost's words stand on the row's edge, on every line when the row wraps. */
+.rq__foot,
+.rq__item-acts {
+  column-gap: calc(2 * var(--ghost-plate));
+}
+.rq__foot > .ac-btn--ghost,
+.rq__item-acts > .ac-btn--ghost {
+  margin-inline: calc(-1 * var(--ghost-plate));
+  padding-inline: var(--ghost-plate);
 }
 /* Choices can be whole sentences: they wrap inside the card instead of running past it. */
 .rq__foot > .ac-btn[data-choice] {
@@ -380,7 +390,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  row-gap: 8px;
   margin-top: 8px;
 }
 .rq__item-acts > .ac-btn {

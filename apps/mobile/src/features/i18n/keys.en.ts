@@ -753,6 +753,8 @@ export const featureKeysEn = {
       older: "Older",
     },
     kind: {
+      proposal_waiting_one: "{{names}} proposes an improvement",
+      proposal_waiting_other: "{{names}} propose improvements",
       mention_one: "{{names}} mentioned you",
       mention_other: "{{names}} mentioned you",
       thread_reply_one: "{{names}} replied in the thread",
@@ -939,6 +941,8 @@ export const featureKeysEn = {
     issues: "Tasks",
     issuesWithMe_one: "{{count}} with you",
     issuesWithMe_other: "{{count}} with you",
+    proposalsWaiting_one: "{{count}} waiting",
+    proposalsWaiting_other: "{{count}} waiting",
     drive: "Drive",
     connectors: "Connectors and MCPs",
     usage: "Usage",

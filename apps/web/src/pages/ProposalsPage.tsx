@@ -3,7 +3,7 @@ import { ApiError, useDecideProposal, useProposals } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { proposalTarget, proposalTitle, proposerOf } from "@agenteschat/client/lib/proposals";
+import { proposalTarget, proposalTitle, proposalWhy, proposerOf } from "@agenteschat/client/lib/proposals";
 import {
   Alert,
   Button,
@@ -22,6 +22,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { ApprovalsTabs } from "@/components/ApprovalsTabs";
 import { isText, SettingChange } from "@/components/ChatCards";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -97,7 +98,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
   };
 
   return (
-    <div className="page page--full page--tight">
+    <div className="page page--full page--tight" style={{ gap: 14 }}>
       {backAgent && (
         <Link
           to="/org/$orgId/agents/$agentId/memory"
@@ -108,7 +109,8 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
           {t("memory.title", agentGrammar(backAgent.name))}
         </Link>
       )}
-      <PageHeader title={t("proposals.title")} meta={t("proposals.subtitle", { org: org.name })} />
+      <PageHeader title={t("approvals.title")} meta={t("proposals.subtitle", { org: org.name })} />
+      <ApprovalsTabs value="proposals" />
 
       {proposals.isSuccess && list.length === 0 && (
         <EmptyState size="page" agent={look} mood="deal" title={t("proposals.emptyTitle")}>
@@ -172,7 +174,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
             <section aria-label={t("proposals.why")} className="section section--tight">
               <span className="ac-eyebrow">{t("proposals.why")}</span>
-              <p style={{ margin: 0 }}>{current.why}</p>
+              <p style={{ margin: 0 }}>{proposalWhy(t, current)}</p>
               <ul className="evidence">
                 {current.evidence.map((e) => (
                   <li key={`${e.where}-${e.what}`} className="ac-iconline">

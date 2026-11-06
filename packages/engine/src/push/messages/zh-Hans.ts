@@ -54,6 +54,7 @@ export const strings: Partial<PushStrings> = {
     failing: "连续失败多次，已停止。",
   },
   widgetFailedBody: "点按查看原因。",
+  proposalWaitingTitle: (a) => `${a} 提议改进`,
   dashboardProposalTitle: (a) => `${a} 想发布一个仪表盘`,
   dashboardProposalBody: (d) => (d ? `“${d}” · 点按做出决定。` : "点按做出决定。"),
   joinRequestTitle: (name, org) => `${name} 请求加入 ${org}`,

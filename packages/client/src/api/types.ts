@@ -1925,6 +1925,8 @@ export interface Memory {
   agentId: string;
   kind: MemoryKind;
   text: string;
+  /** A lesson from something a person refused or corrected: `text` is what it is about (`memoryLine`). */
+  how?: "refused" | "corrected" | null;
   /** "Written by Walter in #eng · Oct 12" (the server's English; `origin` has the parts). */
   source: string;
   origin?: {
@@ -2026,6 +2028,8 @@ export interface Proposal {
   undoActionId?: string | null;
   title: string;
   why: string;
+  /** How it came, said by `proposalWhy` in the person's language; `why` holds the words it is about, if any. */
+  whyCode?: "refused" | "corrected" | "seen" | "skill" | "asked" | null;
   /** `type` names the source for translation; `where` is the server's English text. */
   evidence: {
     where: string;
@@ -2098,6 +2102,8 @@ export interface OrgOverview {
   /** What the workspace's agents spent this month over the sum of their budgets, in %. */
   budgetUsedPercent: number;
   approvalsWaitingForMe: number;
+  /** Open proposals the viewer can see and decide. */
+  proposalsWaitingForMe?: number;
 }
 
 export interface Person {
@@ -5818,6 +5824,7 @@ export type NotificationKind =
    * `latest.text` why. Done once someone decides.
    */
   | "change_request"
+  | "proposal_waiting"
   /**
    * ADR 0141: a person's monthly AI limit, `source.userId` the person, `latest.statusTo`: `warning` (80%, the
    * person), `reached` (who decides; `reached_notify` to the person when the limit only notifies), `request` (who
@@ -6113,7 +6120,16 @@ export interface NoticePrefs {
 }
 
 /** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
-export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "team";
+export type SidebarItem =
+  | "approvals"
+  | "proposals"
+  | "threads"
+  | "issues"
+  | "wiki"
+  | "drive"
+  | "routines"
+  | "calendar"
+  | "team";
 /** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
 export type SidebarPlace = "always" | "more" | "auto";
 /** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */

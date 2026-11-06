@@ -132,6 +132,7 @@ function AppStack() {
       <Stack.Screen name="agent-pick" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget-pin" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="team" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="proposals" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/[runId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }} />

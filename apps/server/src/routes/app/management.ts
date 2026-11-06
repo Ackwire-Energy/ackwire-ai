@@ -115,7 +115,7 @@ const SidebarItems = z
   })
   .openapi("SidebarItems", {
     description:
-      "Where each tool at the top of the sidebar goes: `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero (approvals and threads). A tool left out keeps the app's default.",
+      "Where each tool at the top of the sidebar goes: `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero (approvals, proposals and threads). A tool left out keeps the app's default.",
   });
 
 /** What a card shows besides its number and title (`ISSUE_CARD_FIELDS`). */
@@ -608,6 +608,9 @@ export function managementRoutes(deps: AppDeps) {
               description: "What the workspace's agents spent this month over the sum of their budgets, in %.",
             }),
             approvalsWaitingForMe: z.number(),
+            proposalsWaitingForMe: z.number().openapi({
+              description: "Open proposals the viewer can see and decide (`GET …/proposals`, `canDecide`).",
+            }),
           }),
         ),
         ...errors,

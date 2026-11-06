@@ -8,8 +8,10 @@ import {
   cardProposalIds,
   changedLines,
   chosenRows,
+  memoryLine,
   messageProposalCards,
   proposalSections,
+  proposalWhy,
   proposerOf,
   removalOf,
   rowStatus,
@@ -155,6 +157,19 @@ describe("how a decided card ended", () => {
       accepted: true,
       label: 'proposals.acceptedSome {"done":1,"total":2}',
     });
+  });
+});
+
+describe("the server's reasons", () => {
+  test("a code reads in the person's language, an agent's words as they are", () => {
+    expect(proposalWhy(t, { why: "Fica mais claro.", whyCode: null })).toBe("Fica mais claro.");
+    expect(proposalWhy(t, { why: "Fica mais claro." })).toBe("Fica mais claro.");
+    expect(proposalWhy(t, { why: "Remover", whyCode: "refused" })).toBe('proposals.whyCode.refused {"text":"Remover"}');
+    expect(proposalWhy(t, { why: "", whyCode: "seen" })).toBe("proposals.whyCode.seen");
+  });
+  test("a lesson from a refusal says so", () => {
+    expect(memoryLine(t, { text: "Remover", how: "refused" })).toBe('memory.fromRefusal {"text":"Remover"}');
+    expect(memoryLine(t, { text: "Prefere curto." })).toBe("Prefere curto.");
   });
 });
 
