@@ -2554,7 +2554,7 @@ test("a short line before a bridged approval never shows live: the card says it,
 
 test("stopped between calls: the stopped reply keeps the stretch it was on, never the working text before a call", async () => {
   f = await setup();
-  const machineId = await computerAgent(f);
+  await computerAgent(f);
   const { brain } = scriptedComputerBrain(async function* (_n, turn) {
     yield { type: "text_delta", text: "I need the inbox id first." };
     yield { type: "tool_call", id: "c1", name: "Bash", input: {}, executed: { content: "ok" } };
