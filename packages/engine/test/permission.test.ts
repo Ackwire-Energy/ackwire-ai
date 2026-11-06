@@ -8,14 +8,17 @@ import {
   decideApproval,
   decidingKeys,
   drainOutbox,
+  ensureRightHand,
   ForbiddenError,
   getApproval,
   listApprovals,
   missingPermissions,
   orgOverview,
   postPersonMessage,
+  RIGHT_HAND,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { runContext } from "./mail-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -102,6 +105,16 @@ test("a card asked with the old `reason` field still turns the permission on", a
   await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval.id, { decision: "approve" });
   await drainOutbox(f.db, f.handlers);
   expect(await scopes()).toContain("browser:use");
+});
+
+test("the right hand can't ask: its tools are fixed in code, so an approved card would turn on nothing", async () => {
+  f = await setup({ permissionTools: true, reply });
+  await ensureRightHand(f.db, f.org.id);
+  const [lodi] = await f.db.select().from(schema.agents).where(eq(schema.agents.builtin, RIGHT_HAND));
+  const ctx = await runContext(f);
+  const names = async (agentId: string) => ((await f.tools?.list({ ...ctx, agentId })) ?? []).map((t) => t.name);
+  expect(await names(f.agent.id)).toContain("request_permission");
+  expect(await names(lodi?.id ?? "")).not.toContain("request_permission");
 });
 
 test("refused: nothing is turned on", async () => {

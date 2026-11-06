@@ -713,6 +713,23 @@ describe("issues", () => {
     expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: hidden.id })).status).toBe("todo");
   });
 
+  test("closing someone's task while unassigning it reads as a change on the receipt, never as an assignment", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    const theirs = await createIssue({ db: f.db, pubsub: f.pubsub }, person(f.owner.id), f.org.id, {
+      title: "Da Ana",
+      assignee: { type: "person", id: f.owner.id },
+    });
+    await f.tools?.invoke(await runContext(f), {
+      toolUseId: crypto.randomUUID(),
+      name: "update_issue",
+      input: { issue: theirs.id, status: "canceled", assignee: "none" },
+    });
+    expect(await f.db.select().from(schema.agentActions)).toMatchObject([
+      { kind: "issue.updated", after: { status: "canceled", assignee: null } },
+    ]);
+  });
+
   test("an agent without issues:write can't create issues; one in another channel can't see private ones", async () => {
     f = await setup({
       issueTools: true,

@@ -1,5 +1,7 @@
 import { and, eq, isNull, schema, sql } from "@agenteschat/db";
+import { getAgentCached } from "../agents";
 import { grantBrowserProfile, onSingleModeMachine } from "../browser/profiles";
+import { isRightHand } from "../right-hand";
 import {
   ALL_TOOLS,
   BUILTIN_SCOPES,
@@ -91,6 +93,8 @@ export function createPermissionToolSource(): ToolSource {
   return {
     name: "permissions",
     async tools(ctx) {
+      // The right hand's tools are fixed in code (`RIGHT_HAND_GRANTS`): an approved card would turn on nothing.
+      if (isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId))) return [];
       const missing = await missingPermissions(ctx).catch(() => []);
       const labels = new Map(missing.map((m) => [m.id, m.label]));
       const tool: ToolDefinition = {

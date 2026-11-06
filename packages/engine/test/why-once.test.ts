@@ -5,17 +5,23 @@ import {
   createApiKeyConnection,
   createApprovalRequestToolSource,
   createConnectorToolSource,
+  createDesktopToolSource,
   createGitToolSource,
+  DESKTOP_SCOPE,
+  grantScopes,
   isSensitive,
   type JsonSchema,
+  SANDBOX_SCOPE,
   type ToolContext,
   type ToolDefinition,
   type ToolGateway,
   updateSandboxSettings,
 } from "../src";
 import { WHY_MIN_CHARS, WHY_REFUSAL } from "../src/tools/run-policy";
+import { fakeHub } from "./desktop-fixtures";
 import { fakeGithubMcp } from "./fake-mcp";
 import { type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 import { giveMail, imapAccount, type MailFixture, mailSetup, runContext } from "./mail-fixtures";
 
 /**
@@ -43,6 +49,7 @@ const VALUES: Record<string, unknown> = {
   branch: "feature/x",
   to: ["ana@acme.com"],
   branches: ["feature/x"],
+  steps: [{ do: "press", key: "ctrl+s" }],
 };
 
 /** The smallest value a schema takes, as a model fills in the listed tool. */
@@ -145,6 +152,23 @@ describe("one reason, `why`", () => {
     const account = await imapAccount(m);
     await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"] }, true);
     await everySensitiveToolAsksOnce(m.tools as ToolGateway, await runContext(m.f), ["mail_support_send"]);
+  });
+
+  test("a plan on the desktop too, where every command asks first", async () => {
+    const computer = { machineId: "", orgId: "" };
+    const { hub } = fakeHub(computer);
+    f = await setup({
+      toolSources: [createDesktopToolSource({ machines: { hub }, publicUrl: "https://chat.example.com" })],
+    });
+    const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Box" });
+    Object.assign(computer, { machineId: paired.machineId, orgId: f.org.id });
+    await f.db.update(schema.agents).set({ machineId: paired.machineId }).where(eq(schema.agents.id, f.agent.id));
+    await grantScopes(f.db, f.org.id, f.agent.id, [
+      { connectionId: null, scope: DESKTOP_SCOPE },
+      { connectionId: null, scope: SANDBOX_SCOPE },
+    ]);
+    await updateSandboxSettings(f.db, f.owner.id, f.org.id, { requireApproval: true });
+    await everySensitiveToolAsksOnce(f.tools as ToolGateway, await runContext(f), ["desktop_do"]);
   });
 
   test("request_permission: `why` alone is enough, and the card shows it", async () => {

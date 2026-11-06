@@ -219,7 +219,7 @@ test("without issues:write, find_tools says a task is our board and to ask, besi
     expect(notYet).toStartWith(`${NOT_YET}ask a person with request_permission`);
     expect(notYet).toContain(`- permission "issues:write" (Issues), for:`);
     expect(notYet).toContain(
-      "- create_issue: Create a task on this workspace's board: task, tarefa, backlog or issue mean this board, never GitHub or another tool unless the person names it",
+      "- create_issue: Create a task on this workspace's board: task, tarefa or backlog mean this board, never GitHub or another tool unless the person names it",
     );
   }
   expect(await findTools(ctx, "create issue task backlog")).toContain("- github_issue_write");

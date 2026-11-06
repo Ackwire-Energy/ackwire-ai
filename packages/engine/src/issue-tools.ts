@@ -135,9 +135,11 @@ async function issueChange(
     params.assigneeIsSelf = assignee?.type === "agent" && assignee.id === ctx.agentId;
   }
   return {
-    // Assigning may move it to "in progress" on its own (the agent took it): still an assignment.
+    // Assigning may move it to "in progress" on its own (the agent took it): still an assignment. Any other status
+    // says so: "assigned" must not hide a task closed in the same call.
     kind:
-      diff.fields.includes("assignee") && diff.fields.every((f) => f === "assignee" || f === "status")
+      diff.fields.includes("assignee") &&
+      diff.fields.every((f) => f === "assignee" || (f === "status" && i.status === "in_progress"))
         ? "issue.assigned"
         : "issue.updated",
     target: { type: "issue", id: i.id, number: i.number, title: i.title },
@@ -198,7 +200,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     {
       name: "create_issue",
       description:
-        "Create a task on this workspace's board: task, tarefa, backlog or issue mean this board, never GitHub or another tool unless the person names it (criar tarefa no backlog). It takes a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo.",
+        "Create a task on this workspace's board: task, tarefa or backlog mean this board, never GitHub or another tool unless the person names it (criar tarefa no backlog). It takes a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
