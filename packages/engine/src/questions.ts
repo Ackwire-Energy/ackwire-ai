@@ -404,6 +404,37 @@ export async function releaseQuestionsOf(
   }
 }
 
+/**
+ * The questions waiting on a person who can no longer read where they were asked, though they never left it: an
+ * administrator demoted reads a channel only as a member (ADR 0150). Each goes back to the room.
+ */
+export async function releaseQuestionsOutOfReach(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  userId: string,
+) {
+  const open = await deps.db
+    .selectDistinct({ channelId: agentQuestions.channelId })
+    .from(agentQuestions)
+    .where(
+      and(
+        eq(agentQuestions.orgId, orgId),
+        eq(agentQuestions.requestedForUserId, userId),
+        eq(agentQuestions.status, "open"),
+      ),
+    );
+  if (open.length === 0) return;
+  const readable = await readableChannelIds(
+    deps.db,
+    orgId,
+    userId,
+    open.map((q) => q.channelId),
+  );
+  for (const { channelId } of open) {
+    if (!readable.has(channelId)) await releaseQuestionsOf(deps, orgId, userId, channelId);
+  }
+}
+
 /** Closes questions past their deadline and resumes their runs (worker, every minute). */
 export async function expireQuestions(deps: { db: Database; pubsub?: PubSub }, now = new Date()) {
   const expired = await deps.db.transaction(async (tx) => {

@@ -12,6 +12,7 @@ import {
   postPersonMessage,
   removeChannelMember,
   removeMember,
+  setMemberRoles,
   workViews,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -121,6 +122,20 @@ describe("a question for one person", () => {
       [true, expect.stringContaining("isn't in this conversation")],
       [true, expect.stringContaining('No one called "ninguem"')],
     ]);
+  });
+
+  test("an administrator reads the channel without being in it, so they can be asked; demoted, it goes back to the room", async () => {
+    await setupRoom();
+    const adm = await addMember(f.db, f.org.id, "admin", "carla");
+    await say(f.owner.id, ask({ question: "Qual o orçamento?", person: adm.name }));
+    const [q] = await questions();
+    expect(q).toMatchObject({ requestedForUserId: adm.id, status: "open" });
+
+    await setMemberRoles(f.db, f.owner.id, f.org.id, adm.id, [], { pubsub: f.pubsub });
+    const [after] = await questions();
+    expect(after).toMatchObject({ requestedForUserId: null, status: "open" });
+    await answerQuestion(deps(), f.owner.id, f.org.id, after?.id ?? "", { text: "R$ 10 mil" });
+    expect((await questions())[0]).toMatchObject({ status: "answered", answeredByUserId: f.owner.id });
   });
 
   test("someone else's message doesn't wait behind it: it gets a run of its own, the question stays theirs", async () => {

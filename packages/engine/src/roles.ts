@@ -522,6 +522,9 @@ export async function setMemberRoles(
   });
   if (changed) {
     await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, changed);
+    // Loaded here: questions build on channels, which this module loads.
+    const { releaseQuestionsOutOfReach } = await import("./questions");
+    await releaseQuestionsOutOfReach({ db, pubsub: options.pubsub }, orgId, targetUserId);
     await announceMembers(options.pubsub, orgId);
   }
   return next;
