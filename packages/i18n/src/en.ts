@@ -2240,6 +2240,9 @@ export const en = {
       /** `model`: a model the plan refused for its key (the model or the whole account switched off there). */
       model_off:
         "{{name}} can't answer: OpenCode refused {{model}} with this key. Turn the model or the account on in OpenCode, or choose another model.",
+      /** The key's OpenCode account has no active Go subscription: every model of the plan is refused. */
+      plan_inactive:
+        "{{name}} can't answer: OpenCode Go isn't active on this key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
       commands_off:
         "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on.",
       useKey: "Use an API key",
@@ -8856,6 +8859,9 @@ export const en = {
     /** OpenCode refused the agent's model for the key: the model or the whole account is switched off there. */
     modelOff:
       "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or choose another model.",
+    /** The key's OpenCode account has no active Go subscription: no model of the plan answers. */
+    planInactive:
+      "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion:
@@ -12712,6 +12718,9 @@ export const en = {
       /** OpenCode refused the model for the key (the model or the whole account switched off there): no reset to wait for. */
       plan_model_off_wait:
         "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or change {{agent}}'s model.",
+      /** The key's OpenCode account has no active Go subscription: no reset to wait for. */
+      plan_inactive_wait:
+        "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
       budget_wait: "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it.",
       usage_wait_canceled: "Canceled. It won't run when the limit is back.",
       usage_wait_archived: "It won't run: the agent was archived.",
@@ -12749,6 +12758,8 @@ export const en = {
         "I can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
       no_ai_model_off:
         "I can't answer: OpenCode refused {{model}} with my key. Turn the model or the account on in OpenCode, or change my model.",
+      no_ai_plan_inactive:
+        "I can't answer: OpenCode Go isn't active on my key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
       no_ai_commands_off: "I can't answer now: commands are turned off on my plan's computer.",
       no_ai_cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
       no_ai_no_computer: "I can't answer yet: my AI needs a computer and I have none.",
@@ -14069,6 +14080,8 @@ export const en = {
       modelRegionNext: "Turn it on in OpenCode (Settings\u00a0›\u00a0Privacy)",
       modelOff: "OpenCode refused {{model}}",
       modelOffNext: "Turn it on in OpenCode or choose another model",
+      planInactive: "OpenCode Go isn't active",
+      planInactiveNext: "Check the Go subscription in OpenCode",
       budgetOut: "This month's budget ran out",
       workLine: "In the agent's line of work",
       workLineNext: "Starts when other work ends",

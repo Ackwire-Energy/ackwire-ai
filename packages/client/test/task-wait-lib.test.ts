@@ -61,6 +61,9 @@ test("a limit: the plan's, a model's own, the region it needs, the budget", () =
   const off = words(task("plan", wait({ ...limit, scope: "off", model: "MiniMax M3" })));
   expect(off?.state).toContain("taskManager.wait.modelOff");
   expect(off?.next).toBe("taskManager.wait.modelOffNext");
+  const inactive = words(task("plan", wait({ ...limit, scope: "inactive", model: "MiniMax M3" })));
+  expect(inactive?.state).toBe("taskManager.wait.planInactive");
+  expect(inactive?.next).toBe("taskManager.wait.planInactiveNext");
   const budget = wait({ code: "budget", percent: null, plan: null });
   expect(words(task("budget", budget))?.state).toBe("taskManager.wait.budgetOut");
   const reserved = words(task("budget", { ...budget, resetsAt: null }));

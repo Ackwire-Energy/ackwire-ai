@@ -405,19 +405,22 @@ export const MODEL_LIMIT_HOLD_MS = 30 * 60_000;
 /**
  * The model's own limit in `models` (`PlanUsage.models`, kept by the server) that still holds: until its reset, else
  * `MODEL_LIMIT_HOLD_MS` after it was seen. `region`: it needs the account's Global region; `off`: the plan refused it
- * for this key (the model or the account turned off there).
+ * for this key (the model or the account turned off there); `inactive`: the key's workspace has no active
+ * subscription, which every model of the plan answers the same way.
  */
 export function modelLimitOf(
-  models: Readonly<Record<string, { at: string; until?: string; region?: true; off?: true }>> | undefined,
+  models:
+    | Readonly<Record<string, { at: string; until?: string; region?: true; off?: true; inactive?: true }>>
+    | undefined,
   id: string | null | undefined,
   now = Date.now(),
-): { until: number | null; region: boolean; off: boolean } | null {
+): { until: number | null; region: boolean; off: boolean; inactive: boolean } | null {
   const l = id ? models?.[id] : undefined;
   if (!l) return null;
   const until = l.until ? Date.parse(l.until) : Number.NaN;
-  if (until > now) return { until, region: false, off: false };
+  if (until > now) return { until, region: false, off: false, inactive: false };
   return !l.until && now - Date.parse(l.at) < MODEL_LIMIT_HOLD_MS
-    ? { until: null, region: l.region === true, off: l.off === true }
+    ? { until: null, region: l.region === true, off: l.off === true, inactive: l.inactive === true }
     : null;
 }
 
@@ -426,6 +429,13 @@ export function modelLimitOf(
  * (switched off in its workspace, or the account itself), never the key, which a 401 refuses.
  */
 export const PLAN_FORBIDDEN_TEXT = /\bAPI Error:? 403\b/i;
+
+/**
+ * OpenCode Go's 403 when the key's workspace has no active Go subscription: `Account.Disabled`, "An active OpenCode
+ * Go subscription is required to use Go models." (its words in public reports, github.com/anomalyco/opencode issues
+ * 49768 and 50873, 2026-09). Every model is refused alike, so no setting of one model helps.
+ */
+export const PLAN_INACTIVE_TEXT = /Account\.Disabled|active (?:OpenCode )?Go subscription/i;
 
 /**
  * What "Automático" runs for `value` (an alias, or `auto`) on a plan whose models have limits of their own: the model
@@ -440,9 +450,11 @@ export function autoPlanModel(
 ): string | undefined {
   const own = ownLimitsModel(provider, value);
   const answered = usage?.answered;
-  if (!own || !answered || answered === own.id || !modelLimitOf(usage.models, own.id, now)) return value;
+  const held = own ? modelLimitOf(usage?.models, own.id, now) : null;
+  // No active subscription refuses every model alike: another one would only be refused too.
+  if (!own || !answered || answered === own.id || !held || held.inactive) return value;
   const known = planOf(provider)?.claudeCode.models.some((m) => m.id === answered);
-  return known && !modelLimitOf(usage.models, answered, now) ? answered : value;
+  return known && !modelLimitOf(usage?.models, answered, now) ? answered : value;
 }
 
 /** A coding plan's model by its id, whichever plan has it. */

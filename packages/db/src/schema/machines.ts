@@ -31,7 +31,7 @@ export interface MachinePlanUsage {
   source: "turn" | "probe";
   at: string;
   /** The models at a limit of their own, by model id (`PlanModelLimit` in `@agenteschat/adapters`). */
-  models?: Record<string, { at: string; until?: string; region?: true; off?: true }>;
+  models?: Record<string, { at: string; until?: string; region?: true; off?: true; inactive?: true }>;
   /** The model that last answered with the account's key (`PlanUsage.answered`). */
   answered?: string;
 }

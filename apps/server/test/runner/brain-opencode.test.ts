@@ -316,6 +316,10 @@ test.skipIf(!posix)(
     const second = logOf(log)[1];
     expect(second?.args).toEqual(["run", "--format", "json", "--session", "ses_fake0001"]);
     expect(second?.message).toBe("and now?");
+    // No model named: OpenCode's own choice for the title too. Named: the title is that model's, no other one paid.
+    expect(JSON.parse(first?.config ?? "{}").small_model).toBeUndefined();
+    await handleRequest(ctx, turn({ runId: RUN.replace(/1$/, "3"), model: "opencode/glm-5.3" }), scope as never);
+    expect(JSON.parse(logOf(log)[2]?.config ?? "{}").small_model).toBe("opencode/glm-5.3");
 
     // A model that isn't provider/model is refused before anything runs.
     await expect(

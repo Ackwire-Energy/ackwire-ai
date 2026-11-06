@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
+import { autoPlanModel } from "@agenteschat/providers/plans";
 import {
   addChannelMember,
   archiveAgent,
@@ -1774,7 +1775,11 @@ describe("a model OpenCode refuses for the key (a 403: the model or the account 
     at: new Date().toISOString(),
     ...(answered ? { answered } : {}),
   });
-  const FORBIDDEN = 'API Error: 403 {"type":"error","error":{"type":"permission_error","message":"Account.Disabled"}}';
+  const FORBIDDEN =
+    'API Error: 403 {"type":"error","error":{"type":"permission_error","message":"Model access is disabled"}}';
+  // OpenCode Go's words when the key's account has no active Go subscription (public reports, 2026-09).
+  const INACTIVE =
+    'API Error: 403 {"type":"error","error":{"type":"Account.Disabled","message":"An active OpenCode Go subscription is required to use Go models."}}';
 
   test("a model chosen for the agent: that model waits, says which and what to do, and the key stays signed in", async () => {
     f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
@@ -1841,6 +1846,25 @@ describe("a model OpenCode refuses for the key (a 403: the model or the account 
     expect(waitOf((await runs(f))[0])).toMatchObject({ scope: "off" });
     const [note] = await notes(f, "plan_model_off_wait");
     expect(note?.meta.bodyParams).toMatchObject({ model: "MiniMax M3" });
+  });
+
+  test("no active Go subscription: the account's words, no stand-in that would be refused too, the key signed in", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "auto", reading("deepseek-v4.1-flash"));
+    const { brain, seen } = scripted(() => [{ type: "error", code: "claude_failed", message: INACTIVE }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(seen).toHaveLength(1);
+    const [run] = await runs(f);
+    expect(waitOf(run)).toMatchObject({ scope: "inactive" });
+    expect(waitOf(run)?.resetsAt).toBeUndefined();
+    expect(await notes(f, "plan_model_off_wait")).toEqual([]);
+    expect(await notes(f, "plan_inactive_wait")).toHaveLength(1);
+    const usage = await accountUsage(f, accountId);
+    expect(usage?.models?.["minimax-m3"]).toMatchObject({ inactive: true });
+    expect(autoPlanModel("opencode", "sonnet", usage)).toBe("sonnet");
+    const [row] = await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, accountId));
+    expect(row?.status).toBe("active");
   });
 
   test("a turn that goes through keeps its model as the one that answers with the key", async () => {

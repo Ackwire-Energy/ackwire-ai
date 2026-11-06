@@ -65,6 +65,7 @@ export type RightHandPlanLine =
   | "model_limit"
   | "model_region"
   | "model_off"
+  | "plan_inactive"
   | "commands_off"
   | "plan_not_shared"
   | "runner_outdated"
@@ -76,6 +77,7 @@ export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanL
   "model_limit",
   "model_region",
   "model_off",
+  "plan_inactive",
   "commands_off",
   "plan_not_shared",
   "runner_outdated",

@@ -32,7 +32,14 @@ import {
   PERMISSION_WAIT_MS,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
-import { claudeCodeModel, PLAN_FORBIDDEN_TEXT, type PlanId, planForTurn, planOf } from "@agenteschat/providers/plans";
+import {
+  claudeCodeModel,
+  PLAN_FORBIDDEN_TEXT,
+  PLAN_INACTIVE_TEXT,
+  type PlanId,
+  planForTurn,
+  planOf,
+} from "@agenteschat/providers/plans";
 import {
   ACCOUNT_MISSING_MESSAGE,
   ACCOUNT_SIGNED_OUT,
@@ -510,7 +517,8 @@ export class ClaudeStreamParser {
           ...(this.rejected ? {} : { rateLimit: { status: "rejected" } }),
         };
       }
-      if ((this.authFailed || AUTH_TEXT.test(text)) && !(this.planKey && PLAN_FORBIDDEN_TEXT.test(text))) {
+      const planRefusal = this.planKey && (PLAN_FORBIDDEN_TEXT.test(text) || PLAN_INACTIVE_TEXT.test(text));
+      if ((this.authFailed || AUTH_TEXT.test(text)) && !planRefusal) {
         return {
           events,
           final: {

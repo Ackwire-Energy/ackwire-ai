@@ -710,6 +710,8 @@ export interface PlanModelLimit {
   until?: string;
   region?: true;
   off?: true;
+  /** The key's workspace has no active subscription: every model is refused alike. */
+  inactive?: true;
 }
 
 /** The computer's own sign-ins' usage (protocol 19), by brain. */

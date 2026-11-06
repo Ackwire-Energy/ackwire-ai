@@ -3226,8 +3226,8 @@ async function executeRunInner(
       notePlanLimit(machineId, plan.kind, resetsAt, Date.now(), account.id);
       return resetsAt ? { resetsAt } : {};
     }
-    // The region a model needs, or the model switched off for the key: nothing resets them.
-    const fixed = found.scope === "region" || found.scope === "off";
+    // The region a model needs, the model switched off for the key, or no subscription: nothing resets them.
+    const fixed = found.scope === "region" || found.scope === "off" || found.scope === "inactive";
     await noteModelLimit(
       db,
       run.orgId,
@@ -3237,9 +3237,11 @@ async function executeRunInner(
         ? { region: true }
         : found.scope === "off"
           ? { off: true }
-          : resetsAt
-            ? { until: resetsAt }
-            : {},
+          : found.scope === "inactive"
+            ? { inactive: true }
+            : resetsAt
+              ? { until: resetsAt }
+              : {},
     )
       .then(() => publishAccountsChanged(deps.pubsub, run.orgId, machineId))
       .catch(() => {});
@@ -3299,12 +3301,13 @@ async function executeRunInner(
       at = Math.min(at, brainBack > now ? brainBack : now + ladderDelay(wait.step++));
     }
     const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * line.place);
-    // The region a model needs, or a model switched off, has no reset: its note already says what to turn on.
+    // The region a model needs, a model switched off or no subscription has no reset: its note says what to do.
     const tellOwner =
       !budget &&
       !paused &&
       scope !== "region" &&
       scope !== "off" &&
+      scope !== "inactive" &&
       !known &&
       !wait.noticed &&
       now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
@@ -3352,25 +3355,30 @@ async function executeRunInner(
                   "plan_model_region_wait",
                   `This model (${ownModel.label}) needs the Global region on in OpenCode (Settings › Privacy).`,
                 ]
-              : ownModel && scope === "off"
+              : ownModel && scope === "inactive"
                 ? [
-                    "plan_model_off_wait",
-                    `OpenCode refused ${ownModel.label} with this key: the model or the account is turned off there. Turn it on in OpenCode or change ${agent.name}'s model.`,
+                    "plan_inactive_wait",
+                    "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
                   ]
-                : ownModel
+                : ownModel && scope === "off"
                   ? [
-                      known ? "plan_model_limit_wait" : "plan_model_limit_wait_unknown",
-                      `${ownModel.label} hit its own limit on ${name}. The plan's other models keep working: change ${agent.name}'s model or wait ${known ? "until it resets" : "for it to reset"}.`,
+                      "plan_model_off_wait",
+                      `OpenCode refused ${ownModel.label} with this key: the model or the account is turned off there. Turn it on in OpenCode or change ${agent.name}'s model.`,
                     ]
-                  : cut
+                  : ownModel
                     ? [
-                        known ? "plan_limit_cut" : "plan_limit_cut_unknown",
-                        `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                        known ? "plan_model_limit_wait" : "plan_model_limit_wait_unknown",
+                        `${ownModel.label} hit its own limit on ${name}. The plan's other models keep working: change ${agent.name}'s model or wait ${known ? "until it resets" : "for it to reset"}.`,
                       ]
-                    : [
-                        known ? "plan_limit_wait" : "plan_limit_wait_unknown",
-                        `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
-                      ];
+                    : cut
+                      ? [
+                          known ? "plan_limit_cut" : "plan_limit_cut_unknown",
+                          `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                        ]
+                      : [
+                          known ? "plan_limit_wait" : "plan_limit_wait_unknown",
+                          `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
+                        ];
           const m = await post(
             tx,
             replyThreadId,
@@ -4153,7 +4161,7 @@ async function executeRunInner(
                 ? { resetsAt: error.resetsAt }
                 : {};
           // "Automático" refused on one model: the turn goes again at once on the model that last answered with this key.
-          if (autoBrain && refusal.scope && machineId) {
+          if (autoBrain && refusal.scope && refusal.scope !== "inactive" && machineId) {
             const stored = await storedPlanUsage(db, run.orgId, machineId, turnPlan.kind, turnPlan.account?.id).catch(
               () => null,
             );

@@ -341,11 +341,13 @@ export function rightHandNoAiReason(code: string, scope?: ModelScope): NoAiReaso
   if (code === "plan_limit")
     return scope === "region"
       ? "model_region"
-      : scope === "off"
-        ? "model_off"
-        : scope === "model"
-          ? "model_limit"
-          : "plan_limit";
+      : scope === "inactive"
+        ? "plan_inactive"
+        : scope === "off"
+          ? "model_off"
+          : scope === "model"
+            ? "model_limit"
+            : "plan_limit";
   if (code === "plan_not_shared" || code === "plan_not_owner") return "plan_not_shared";
   if (code === "runner_outdated" || code === "codex_too_old") return "runner_outdated";
   if (code === "exec_disabled" || code === "tool_off") return "commands_off";

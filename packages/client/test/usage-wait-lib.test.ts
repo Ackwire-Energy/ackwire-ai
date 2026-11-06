@@ -108,6 +108,13 @@ test("a model's own limit: the note names the model and the way out, the brain c
   expect(
     serverBody(t, "x", { bodyCode: "plan_model_off_wait", bodyParams: { model: "MiniMax M3", agent: "Lia" } }),
   ).toBe('chat.body.plan_model_off_wait {"model":"MiniMax M3","agent":"Lia","when":""}');
+  // No active Go subscription on the key's account: the account's words, and no other model offered.
+  const inactive = { models: { "minimax-m3": { at, inactive: true as const } } };
+  expect(modelLimitText(t, "en", inactive, "opencode", "sonnet", now)).toBe("brain.planInactive {}");
+  expect(serverBody(t, "x", { bodyCode: "plan_inactive_wait", bodyParams: { model: "MiniMax M3" } })).toBe(
+    'chat.body.plan_inactive_wait {"model":"MiniMax M3","when":""}',
+  );
+  expect(usageWaitFix({ bodyCode: "plan_inactive_wait" }, { admin: true, owner: true })).toBeNull();
 });
 
 test("a wait's way out: another model for its owner or an admin, a higher budget for an admin, none for a plan's limit", () => {

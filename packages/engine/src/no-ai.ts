@@ -43,6 +43,8 @@ const REASON_TEXT: Partial<Record<NoAiReason, string>> = {
   model_limit: "I can't answer now: the model I think with reached its own limit on my plan.",
   model_region: "I can't answer: the model I think with needs the Global region on in OpenCode (Settings › Privacy).",
   model_off: "I can't answer: OpenCode refused the model I think with. Turn it on in OpenCode or change my model.",
+  plan_inactive:
+    "I can't answer: OpenCode Go isn't active on my key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
   commands_off: "I can't answer now: commands are turned off on my plan's computer.",
   plan_not_shared:
     "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",

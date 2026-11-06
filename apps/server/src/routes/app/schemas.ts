@@ -320,12 +320,13 @@ export const PlanUsage = z
           until: z.string().optional(),
           region: z.literal(true).optional(),
           off: z.literal(true).optional(),
+          inactive: z.literal(true).optional(),
         }),
       )
       .optional()
       .openapi({
         description:
-          "Models at a limit of their own, by model id: until `until` (absent: unknown), `region`: the model needs a region the account doesn't allow, or `off`: the plan refused it for the key (the model or the account switched off there).",
+          "Models at a limit of their own, by model id: until `until` (absent: unknown), `region`: the model needs a region the account doesn't allow, `off`: the plan refused it for the key (the model or the account switched off there), or `inactive`: the key's workspace has no active subscription.",
       }),
   })
   .openapi("PlanUsage", {

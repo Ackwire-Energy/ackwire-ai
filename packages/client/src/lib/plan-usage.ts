@@ -93,6 +93,7 @@ export function modelLimitText(
   const limit = model ? modelLimitOf(usage?.models, model.id, now.getTime()) : null;
   if (!model || !limit) return null;
   if (limit.region) return t("brain.modelRegion", { model: model.label });
+  if (limit.inactive) return t("brain.planInactive");
   if (limit.off) return t("brain.modelOff", { model: model.label });
   return limit.until === null
     ? t("brain.modelLimitUnknown", { model: model.label })

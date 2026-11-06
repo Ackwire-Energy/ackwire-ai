@@ -12,6 +12,7 @@ import {
   PLAN_ALIASES,
   PLAN_FORBIDDEN_TEXT,
   PLAN_IDS,
+  PLAN_INACTIVE_TEXT,
   type PlanId,
   type PlanModel,
   planForTurn,
@@ -321,7 +322,7 @@ describe("a model OpenCode refused for the key, and what Automático runs instea
   const off = { "minimax-m3": { at, off: true as const } };
 
   test("off holds like the region does, then a turn asks again", () => {
-    expect(modelLimitOf(off, "minimax-m3", now)).toEqual({ until: null, region: false, off: true });
+    expect(modelLimitOf(off, "minimax-m3", now)).toEqual({ until: null, region: false, off: true, inactive: false });
     expect(modelLimitOf(off, "minimax-m3", now + 31 * 60_000)).toBeNull();
   });
 
@@ -329,6 +330,17 @@ describe("a model OpenCode refused for the key, and what Automático runs instea
     expect(PLAN_FORBIDDEN_TEXT.test('API Error: 403 {"error":{"message":"Account.Disabled"}}')).toBe(true);
     expect(PLAN_FORBIDDEN_TEXT.test('API Error: 401 {"error":{"message":"Invalid credential"}}')).toBe(false);
     expect(PLAN_FORBIDDEN_TEXT.test("exit 1: wrote 403 files")).toBe(false);
+  });
+
+  test("no active Go subscription, in OpenCode's words: no other model stands in, every one is refused alike", () => {
+    expect(PLAN_INACTIVE_TEXT.test("An active OpenCode Go subscription is required to use Go models.")).toBe(true);
+    expect(PLAN_INACTIVE_TEXT.test('{"type":"Account.Disabled"}')).toBe(true);
+    expect(PLAN_INACTIVE_TEXT.test("Model access is disabled")).toBe(false);
+    const inactive = { "minimax-m3": { at, inactive: true as const } };
+    expect(modelLimitOf(inactive, "minimax-m3", now)).toMatchObject({ inactive: true, off: false });
+    expect(autoPlanModel("opencode", "sonnet", { models: inactive, answered: "deepseek-v4.1-flash" }, now)).toBe(
+      "sonnet",
+    );
   });
 
   test("the alias's model while it answers, else the model that last answered with the key while that one does", () => {

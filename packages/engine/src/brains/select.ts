@@ -16,6 +16,7 @@ import {
   modelLimitOf,
   ownLimitsModel,
   PLAN_FORBIDDEN_TEXT,
+  PLAN_INACTIVE_TEXT,
   planOf,
   speedFits,
 } from "@agenteschat/providers/plans";
@@ -181,8 +182,11 @@ const MODEL_WINDOW_WORDS: readonly [RegExp, "seven_day" | "monthly"][] = [
 
 export type RefusalScope = { scope: "account" } | { scope: ModelScope; resetsAt?: string };
 
-/** Whose a plan's refusal is when it's one model's: its own limit, the region it needs, or switched off for the key. */
-export type ModelScope = "model" | "region" | "off";
+/**
+ * Whose a plan's refusal is when it's one model's: its own limit, the region it needs, switched off for the key, or
+ * no active subscription on the key's workspace (`inactive`, kept on the model it refused like the others).
+ */
+export type ModelScope = "model" | "region" | "off" | "inactive";
 
 /**
  * A plan refused a model that needs its Global region for that, whatever the status it came with. Only those: the
@@ -196,7 +200,9 @@ export const regionRefusal = (provider: string | null | undefined, model: string
  * setting may not open): the model is off in its workspace, or the account. Never the key itself.
  */
 export const offRefusal = (provider: string | null | undefined, model: string | null | undefined, message: string) =>
-  ownLimitsModel(provider, model) !== null && PLAN_FORBIDDEN_TEXT.test(message) && !/region/i.test(message);
+  ownLimitsModel(provider, model) !== null &&
+  (PLAN_FORBIDDEN_TEXT.test(message) || PLAN_INACTIVE_TEXT.test(message)) &&
+  !/region/i.test(message);
 
 /**
  * Whose limit a plan's refusal (`message`, the CLI's words) is. On a plan whose models have limits of their own, the
@@ -214,7 +220,7 @@ export function refusalScope(
   const m = ownLimitsModel(provider, model);
   if (!m) return { scope: "account" };
   if (regionRefusal(provider, model, message)) return { scope: "region" };
-  if (offRefusal(provider, model, message)) return { scope: "off" };
+  if (offRefusal(provider, model, message)) return { scope: PLAN_INACTIVE_TEXT.test(message) ? "inactive" : "off" };
   if (usage && planWindows(usage, now).some((w) => w.used >= 100)) return { scope: "account" };
   const kind = MODEL_WINDOW_WORDS.find(([words]) => words.test(message))?.[1];
   const at = kind ? usage?.windows.find((w) => w.kind === kind)?.resetsAt : undefined;
@@ -233,7 +239,7 @@ export async function noteModelLimit(
   orgId: string,
   accountId: string,
   model: string,
-  limit: { until?: string; region?: true; off?: true },
+  limit: { until?: string; region?: true; off?: true; inactive?: true },
   now = Date.now(),
 ) {
   const { machineAccounts } = schema;
@@ -373,12 +379,14 @@ export function computerBrainUnavailable(
   if (own && modelLimit) {
     return {
       code: "plan_limit",
-      scope: modelLimit.region ? "region" : modelLimit.off ? "off" : "model",
+      scope: modelLimit.region ? "region" : modelLimit.inactive ? "inactive" : modelLimit.off ? "off" : "model",
       message: modelLimit.region
         ? `${own.label} needs the Global region on in OpenCode (Settings › Privacy).`
-        : modelLimit.off
-          ? `OpenCode refused ${own.label} with this key: the model or the account is turned off there.`
-          : `${own.label} reached its own limit on the ${name} account "${account?.label ?? ""}".`,
+        : modelLimit.inactive
+          ? `OpenCode Go isn't active on the OpenCode account of the key "${account?.label ?? ""}".`
+          : modelLimit.off
+            ? `OpenCode refused ${own.label} with this key: the model or the account is turned off there.`
+            : `${own.label} reached its own limit on the ${name} account "${account?.label ?? ""}".`,
       ...(modelLimit.until !== null ? { resetsAt: new Date(modelLimit.until).toISOString() } : {}),
     };
   }

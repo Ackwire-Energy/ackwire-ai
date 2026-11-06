@@ -2256,6 +2256,9 @@ export const ptBR = {
       /** `model`: a model the plan refused for its key (the model or the whole account switched off there). */
       model_off:
         "{{name}} não consegue responder: o OpenCode recusou o {{model}} com esta chave. Ligue o modelo ou a conta no OpenCode, ou escolha outro modelo.",
+      /** The key's OpenCode account has no active Go subscription: every model of the plan is refused. */
+      plan_inactive:
+        "{{name}} não consegue responder: o OpenCode Go não está ativo na conta do OpenCode desta chave. Confira a assinatura do Go no OpenCode, ou conecte uma chave da conta que tem o Go.",
       commands_off:
         "{{name}} não consegue responder agora: os comandos estão desligados no computador do plano, e quem cuida dele precisa ligá-los.",
       useKey: "Usar uma chave de API",
@@ -8997,6 +9000,9 @@ export const ptBR = {
     /** OpenCode refused the agent's model for the key: the model or the whole account is switched off there. */
     modelOff:
       "O OpenCode recusou o {{model}} com esta chave: o modelo ou a conta está desligado lá. Ligue no OpenCode ou escolha outro modelo.",
+    /** The key's OpenCode account has no active Go subscription: no model of the plan answers. */
+    planInactive:
+      "O OpenCode Go não está ativo na conta do OpenCode desta chave, então nenhum modelo dele responde. Confira a assinatura do Go no OpenCode, ou conecte uma chave da conta que tem o Go.",
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion: "Ligue a região Global no OpenCode, em Settings › Privacy. Sem ela, este modelo não responde.",
@@ -12849,6 +12855,9 @@ export const ptBR = {
       /** OpenCode refused the model for the key (the model or the whole account switched off there): no reset to wait for. */
       plan_model_off_wait:
         "O OpenCode recusou o {{model}} com esta chave: o modelo ou a conta está desligado lá. Ligue no OpenCode ou troque o modelo de {{agent}}.",
+      /** The key's OpenCode account has no active Go subscription: no reset to wait for. */
+      plan_inactive_wait:
+        "O OpenCode Go não está ativo na conta do OpenCode desta chave, então nenhum modelo dele responde. Confira a assinatura do Go no OpenCode, ou conecte uma chave da conta que tem o Go.",
       budget_wait: "Meu orçamento do mês acabou. Continuo {{when}}, ou antes se um admin aumentar o limite.",
       usage_wait_canceled: "Cancelado. Não vai rodar quando o limite voltar.",
       usage_wait_archived: "Não vai rodar: o agente foi arquivado.",
@@ -12888,6 +12897,8 @@ export const ptBR = {
         "Não consigo responder: o {{model}} precisa da região Global ligada no OpenCode (Settings\u00a0›\u00a0Privacy).",
       no_ai_model_off:
         "Não consigo responder: o OpenCode recusou o {{model}} com a minha chave. Ligue o modelo ou a conta no OpenCode, ou troque o meu modelo.",
+      no_ai_plan_inactive:
+        "Não consigo responder: o OpenCode Go não está ativo na conta do OpenCode da minha chave. Confira a assinatura do Go no OpenCode, ou conecte uma chave da conta que tem o Go.",
       no_ai_commands_off: "Agora não consigo responder: os comandos estão desligados no computador do meu plano.",
       no_ai_cli_missing: "Ainda não consigo responder: o programa da minha IA não está instalado no meu computador.",
       no_ai_no_computer: "Ainda não consigo responder: minha IA precisa de um computador e não tenho nenhum.",
@@ -14326,6 +14337,8 @@ export const ptBR = {
       modelRegionNext: "Ligue no OpenCode (Settings\u00a0›\u00a0Privacy)",
       modelOff: "O OpenCode recusou o {{model}}",
       modelOffNext: "Ligue no OpenCode ou escolha outro modelo",
+      planInactive: "O OpenCode Go não está ativo",
+      planInactiveNext: "Confira a assinatura do Go no OpenCode",
       budgetOut: "Orçamento do mês acabou",
       workLine: "Na fila de trabalhos do agente",
       workLineNext: "Começa quando outro trabalho terminar",
