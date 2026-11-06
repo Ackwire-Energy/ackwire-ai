@@ -134,6 +134,8 @@ describe("#channel links in messages", () => {
     const link = screen().getByRole("link", { name: "Canal #eng" });
     // Focus a script hands back (a panel closing) opens nothing; the keys' does.
     trackInput();
+    // Other test files in the same process may have pressed keys: start from a press, as a page load with the mouse would.
+    fireEvent.pointerDown(document.body, { pointerType: "mouse" });
     await act(async () => link.focus());
     await settle(4);
     expect(screen().queryByRole("dialog", { name: "Sobre #eng" })).toBeNull();

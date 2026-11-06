@@ -7,6 +7,8 @@ import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/
 import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
 import { cutText } from "./format";
+import type { GifMedia } from "./media";
+import type { AgentGifPoster } from "./media-tools";
 import { messageLink } from "./message-links";
 import { insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
@@ -51,6 +53,42 @@ const origin = (ctx: ToolContext, requester: string | null) => ({
 /** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
 
+/** `post_message`'s GIF, listed only when the agent may send one (`AgentGifPoster.offered`), never to background work. */
+const GIF_PROPERTY = {
+  type: "string",
+  maxLength: 100,
+  description: 'What the GIF shows, in English, 1 to 6 words (e.g. "good night moon cat").',
+} as const;
+const GIF_HELP =
+  ' When someone asks for a GIF there, add one with `gif`: what it shows as a short search in English (e.g. "good night moon"), whatever language the conversation is in. It goes in the same message, with the text or alone.';
+
+/**
+ * The GIF `post_message` posts for `search` in `channelId`, or what to tell the model when none goes: only for a
+ * person's request (a routine sends none, as with `send_gif`), with GIFs on for the agent, found the way `send_gif`
+ * finds one. Looked up before anything is posted or copied, so a failed search leaves nothing behind.
+ */
+async function gifToPost(
+  poster: AgentGifPoster | undefined,
+  ctx: ToolContext,
+  input: { search: unknown; requester: string | null; channelId: string },
+): Promise<{ gif: GifMedia } | { error: string }> {
+  if (!input.requester || ctx.background) return { error: "Only a person's request posts a GIF: post the text alone." };
+  const found = poster
+    ? await poster.find(ctx, input.search, `${ctx.runId}:${input.channelId}`)
+    : { none: "off" as const };
+  if ("gif" in found) return found;
+  switch (found.none) {
+    case "off":
+      return { error: "GIFs are off here: post the text alone, without `gif`." };
+    case "empty":
+      return { error: 'Say what the GIF shows in a few English words, e.g. "good night".' };
+    case "down":
+      return { error: "GIF search isn't answering right now: try again, or post without `gif`." };
+    case "not_found":
+      return { error: `No GIF found for "${found.query}". Try other words in English, or post without \`gif\`.` };
+  }
+}
+
 /** For matching what someone typed against names: lower case, no accents, no leading @. */
 export const plainName = (v: string) =>
   v
@@ -92,9 +130,15 @@ export async function findMember(ctx: Pick<ToolContext, "db" | "orgId">, who: st
  * the way `share_artifact` does it (the same file when it's visible there, a
  * copy from a DM or a private channel the person is in). The post is an
  * agent message like any reply (same run and hop, so mentions follow the hop
- * limit). Audited.
+ * limit). Audited. With `gif` (listed when the agent may send GIFs, called for a person), the same message carries
+ * a GIF, drawn under its text by the apps (ADR 0091 addendum 2026-11-05).
  */
-export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: ArtifactDeps }): ToolSource {
+export function createChatToolSource(deps: {
+  pubsub?: PubSub;
+  artifacts: ArtifactDeps;
+  /** `post_message`'s GIF (`createAgentGifPoster`); absent: it has no `gif`. */
+  gif?: AgentGifPoster;
+}): ToolSource {
   const tools: ToolDefinition[] = [
     {
       name: POST_MESSAGE_TOOL,
@@ -184,7 +228,16 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           }
           const text = str(input.text).trim();
           const ids = [...new Set((Array.isArray(input.artifact_ids) ? input.artifact_ids : []).map(String))];
-          if (!text && ids.length === 0) return { content: "Give a text or files to post.", isError: true };
+          const gifAsked = str(input.gif).trim() !== "";
+          if (!text && ids.length === 0 && !gifAsked) {
+            return { content: "Give a text, files or a GIF to post.", isError: true };
+          }
+          let gif: GifMedia | null = null;
+          if (gifAsked) {
+            const found = await gifToPost(deps.gif, ctx, { search: input.gif, requester, channelId: channel.id });
+            if ("error" in found) return { content: found.error, isError: true };
+            gif = found.gif;
+          }
 
           const actor = {
             type: "agent" as const,
@@ -218,6 +271,8 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             body: text,
             meta: {
               ...(files.length > 0 ? { artifacts: files } : {}),
+              // Kept as `send_gif` keeps it: no URL, and its title never reaches the model (ADR 0091 §6).
+              ...(gif ? { media: gif } : {}),
               postedFrom: origin(ctx, requester),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
@@ -233,6 +288,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
               toChannelId: channel.id,
               requesterUserId: requester,
               artifactIds: files.map((f) => f.id),
+              ...(gif ? { gifId: gif.id } : {}),
               ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
             },
           });
@@ -246,7 +302,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             ? `Your replies land there from now on, at its top level, your background work's updates and report too; the people where you were see a line linking to it. Go on with the work.`
             : "Tell the person it's there.";
           return {
-            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. ${next}${note ? ` ${note}` : ""}`,
+            content: `Posted in #${channel.name}${gif ? " with a GIF" : ""}${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. ${next}${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: channel.id } },
           };
         } catch (error) {
@@ -393,7 +449,23 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       },
     },
   ];
-  return { name: "chat", tools: async () => tools };
+  const [postMessage, ...others] = tools as [ToolDefinition, ...ToolDefinition[]];
+  // The same tool with `gif` where the agent may send one for a person; the call checks again.
+  const postWithGif: ToolDefinition = {
+    ...postMessage,
+    description: `${postMessage.description}${GIF_HELP}`,
+    inputSchema: {
+      ...postMessage.inputSchema,
+      properties: { ...(postMessage.inputSchema.properties as Record<string, unknown>), gif: GIF_PROPERTY },
+    },
+  };
+  return {
+    name: "chat",
+    tools: async (ctx) => {
+      const gif = !ctx.background && ctx.runId && deps.gif ? await deps.gif.offered(ctx) : false;
+      return [gif ? postWithGif : postMessage, ...others];
+    },
+  };
 }
 
 /** How many of the conversation's latest messages `to` looks through for its author's. */

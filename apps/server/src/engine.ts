@@ -19,6 +19,7 @@ import {
   CursorBrain,
   composioConnectorsOf,
   connectOverHttp,
+  createAgentGifPoster,
   createAgentStyleToolSource,
   createApprovalRequestToolSource,
   createArtifactToolSource,
@@ -379,7 +380,7 @@ export function buildEngine(o: EngineOptions) {
       createArtifactToolSource(artifacts),
       // Live blocks and votes in the agent's own conversation (ADR 0113).
       createBlockToolSource(artifacts),
-      createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
+      createChatToolSource({ pubsub: adapters.pubsub, artifacts, gif: createAgentGifPoster(adapters.gifs) }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
       // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo, new agents proposed.
       createSetupToolSource({

@@ -37,6 +37,7 @@ import type { WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
 import { teamTools } from "./team-proposals";
 import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
+import { OFFER_CONNECT_APP_TOOL } from "./tools/connector-first";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -46,8 +47,8 @@ const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles }
 export const SETUP_SCOPE = "setup:write";
 export const OFFER_CONNECT_AI_TOOL = "offer_connect_ai";
 export const CREATE_CHANNEL_TOOL = "create_channel";
+export { OFFER_CONNECT_APP_TOOL };
 export const PROPOSE_AGENT_TOOL = "propose_agent";
-export const OFFER_CONNECT_APP_TOOL = "offer_connect_app";
 export const OFFER_INVITES_TOOL = "offer_invites";
 /** Archiving or deleting teammates, one card for them all (ADR 0137 amendment): any agent with setup tools. */
 export const PROPOSE_REMOVE_AGENTS_TOOL = "propose_remove_agents";

@@ -181,7 +181,10 @@ test("its prompt says what the person may do, and shows only the agents they may
   expect(member).toContain("(1 more agent this person can't see.)");
   expect(member).toContain("Never ask for a key, password or token in the chat");
   // Its own tools only, whichever CLI thinks for it (ADR 0137 §4).
-  expect(member).toContain("You use only your agentes tools. Never run commands, read or list files");
+  expect(member).toContain(
+    "You use only your agentes tools, which read files people give you, the Drive and the wiki.",
+  );
+  expect(member).toContain("Never run commands, touch a computer's files");
   expect(member).toContain("never write out tokens, keys, passwords or sign-in data");
   // Money only for who may see usage (ADR 0063).
   expect(owner).toMatch(/@dev \(Dev\)[^\n]*budget US\$/);
@@ -272,7 +275,7 @@ test("with nobody behind its run (another agent's message), it still keeps to it
   const text = systemText(
     (await buildRunContext(f.db, { ...run, triggerMessageId: byAgent.id }, lodi, { maxMessages: 10 })).system,
   );
-  expect(text).toContain("# Your tools\nYou use only your agentes tools.");
+  expect(text).toContain("# Your tools\nYou use only your agentes tools,");
 });
 
 test("in no channel, an @mention in any channel still reaches it, and only that", async () => {
