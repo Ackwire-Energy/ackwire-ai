@@ -865,7 +865,7 @@ async function visibleEvents(db: Database, userId: string, orgId: string, from: 
         eq(calendarAttendees.attendeeId, userId),
       ),
     );
-  const myChannels = await userVisibleChannels(db, orgId, userId);
+  const myChannels = await userVisibleChannels(db, orgId, userId, { archived: true });
   return db
     .select()
     .from(calendarEvents)
@@ -957,7 +957,7 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
         ),
       )
   ).map(proposalView);
-  const mine = new Set(await userVisibleChannels(db, orgId, userId));
+  const mine = new Set(await userVisibleChannels(db, orgId, userId, { archived: true }));
   const reminders = await calendarReminders(db, userId, orgId, from, to, mine, sees);
   return { events, routines: routineRuns, reminders, deadlines, proposals };
 }

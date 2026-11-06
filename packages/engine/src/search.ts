@@ -225,7 +225,12 @@ export async function agentSearchChannels(db: Database, orgId: string, agentId: 
 }
 
 /** Channels a person can read: the ones they belong to and, for an administrator, every channel (never a DM). */
-export async function userVisibleChannels(db: Database, orgId: string, userId: string) {
+export async function userVisibleChannels(
+  db: Database,
+  orgId: string,
+  userId: string,
+  options: { archived?: boolean } = {},
+) {
   const rows = await db
     .select({ id: channels.id })
     .from(channels)
@@ -233,7 +238,7 @@ export async function userVisibleChannels(db: Database, orgId: string, userId: s
     .where(
       and(
         eq(channels.orgId, orgId),
-        isNull(channels.archivedAt),
+        options.archived ? undefined : isNull(channels.archivedAt),
         or(isNotNull(channelMembers.id), adminChannelSql(sql`${orgId}::uuid`, sql`${userId}::text`)),
       ),
     );
@@ -321,6 +326,16 @@ export async function searchForUser(
     visibleChannelIds: visible,
     visibleIssueScopes,
   });
+  // A task's document follows a change of who sees it a moment later: the task itself decides.
+  const tasks = hits.filter((h) => h.kind === "issue").map((h) => h.sourceId);
+  if (tasks.length > 0) {
+    const shown = await deps.db
+      .select({ id: schema.issues.id })
+      .from(schema.issues)
+      .where(and(inArray(schema.issues.id, tasks), taskSeenSql("issues", sql`${userId}::text`)));
+    const seen = new Set(shown.map((t) => t.id));
+    hits = hits.filter((h) => h.kind !== "issue" || seen.has(h.sourceId));
+  }
   // Memory is indexed by channel only: the same rule as `listContextItems` for an agent's and a person's items.
   const items = hits.filter((h) => h.kind === "context_item").map((h) => h.sourceId);
   if (items.length > 0) {

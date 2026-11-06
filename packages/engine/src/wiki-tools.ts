@@ -291,7 +291,10 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             },
             (saved) => wikiEdit(saved, before),
           );
-          return { content: `Linked [[${p.title}]] to ${targets.map((t) => `[[${t}]]`).join(", ")}.` };
+          return {
+            content: `Linked [[${p.title}]] to ${targets.map((t) => `[[${t}]]`).join(", ")}.`,
+            data: { wikiPageId: p.id },
+          };
         } catch (error) {
           return failed(error);
         }

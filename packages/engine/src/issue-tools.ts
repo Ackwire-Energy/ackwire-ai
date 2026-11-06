@@ -362,7 +362,10 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
         try {
           const current = await find(deps, ctx, str(input.issue));
           await commentIssue(deps, actorOf(ctx), ctx.orgId, current.id, str(input.text));
-          return { content: `Commented on #${current.number}.` };
+          return {
+            content: `Commented on #${current.number}.`,
+            data: { issue: { id: current.id, number: current.number } },
+          };
         } catch (error) {
           return failed(error);
         }

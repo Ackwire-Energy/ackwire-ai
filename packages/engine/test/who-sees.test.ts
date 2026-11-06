@@ -3,11 +3,13 @@ import { orgTopic, type RealtimeEvent, userTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
+  archiveChannel,
   buildTeamWeek,
   calendarRange,
   channelCard,
   commentIssue,
   createArtifact,
+  createCalendarEvent,
   createChannel,
   createIssue,
   createRole,
@@ -24,7 +26,9 @@ import {
   listChannels,
   listIssues,
   listMessages,
+  listMissions,
   listNotifications,
+  listThreads,
   listWikiPages,
   NotFoundError,
   openDm,
@@ -57,6 +61,274 @@ const deps = () => ({ db: f.db, pubsub: f.pubsub });
 const everyone = { mode: "everyone" } as const;
 const only = (...userIds: string[]) => ({ mode: "people" as const, userIds });
 const seen = async (userId: string) => (await listIssues(f.db, person(userId), f.org.id)).map((i) => i.title);
+
+describe("what changing who sees a task reaches", () => {
+  const steps = async (who: string) => {
+    const parent = await createIssue(deps(), person(who), f.org.id, { title: "Pai" });
+    const step = await createIssue(deps(), person(who), f.org.id, { title: "Passo", parentIssueId: parent.id });
+    const deep = await createIssue(deps(), person(who), f.org.id, { title: "Fundo", parentIssueId: step.id });
+    return { parent, step, deep };
+  };
+  const audienceOf = async (id: string) => (await getIssue(f.db, person(f.owner.id), f.org.id, { id })).audience;
+
+  test("limiting a task limits its steps at every depth", async () => {
+    const { ana, bia } = await team();
+    const { parent, deep } = await steps(ana.id);
+    await setIssueAudience(deps(), person(ana.id), f.org.id, parent.id, only(ana.id));
+    expect(await seen(bia.id)).toEqual([]);
+    expect((await audienceOf(deep.id)).userIds).toEqual([ana.id]);
+  });
+
+  test("a step kept to someone isn't opened to the people of its task; one that followed the task goes on following", async () => {
+    const { ana, bia } = await team();
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    const { parent, step, deep } = await steps(ana.id);
+    await setIssueAudience(deps(), person(ana.id), f.org.id, step.id, only(ana.id));
+    await setIssueAudience(deps(), person(ana.id), f.org.id, deep.id, only(caio.id));
+    await setIssueAudience(deps(), person(ana.id), f.org.id, parent.id, only(ana.id, bia.id));
+    expect((await audienceOf(step.id)).userIds).toEqual([ana.id]);
+    const follower = await createIssue(deps(), person(ana.id), f.org.id, { title: "B", parentIssueId: parent.id });
+    await setIssueAudience(deps(), person(ana.id), f.org.id, parent.id, only(ana.id));
+    expect((await audienceOf(follower.id)).userIds).toEqual([ana.id]);
+    await setIssueAudience(deps(), person(ana.id), f.org.id, parent.id, only(ana.id, bia.id));
+    expect((await audienceOf(follower.id)).userIds.sort()).toEqual([ana.id, bia.id].sort());
+  });
+
+  test("someone assigned to a step keeps it; someone who lost a step loses its notifications", async () => {
+    const { ana, bia } = await team();
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    const parent = await createIssue(deps(), person(ana.id), f.org.id, { title: "Pai" });
+    const kept = await createIssue(deps(), person(ana.id), f.org.id, {
+      title: "Dele",
+      parentIssueId: parent.id,
+      assignee: { type: "person", id: bia.id },
+    });
+    const gone = await createIssue(deps(), person(caio.id), f.org.id, { title: "Do Caio", parentIssueId: parent.id });
+    await updateIssue(deps(), person(ana.id), f.org.id, gone.id, { status: "in_progress" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await listNotifications({ db: f.db }, caio.id, f.org.id)).items.length).toBeGreaterThan(0);
+    await setIssueAudience(deps(), person(ana.id), f.org.id, parent.id, only(ana.id));
+    expect(await seen(bia.id)).toEqual(["Dele"]);
+    expect((await audienceOf(kept.id)).userIds.sort()).toEqual([ana.id, bia.id].sort());
+    expect((await listNotifications({ db: f.db }, caio.id, f.org.id)).items).toEqual([]);
+  });
+
+  test("who stops seeing it loses its open conversation at once; who still sees it doesn't", async () => {
+    const { ana, bia, adm } = await team();
+    const task = await createIssue(deps(), person(ana.id), f.org.id, { title: "Plano", audience: only(ana.id, bia.id) });
+    const { channelId } = await openTaskConversation(f.db, person(ana.id), f.org.id, task.id);
+    const heard: RealtimeEvent[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => heard.push(e));
+    await setIssueAudience(deps(), person(ana.id), f.org.id, task.id, only(ana.id));
+    const revoked = heard.filter((e) => e.type === "membership.revoked");
+    expect(revoked).toMatchObject([{ userId: bia.id, channelId }]);
+    expect(JSON.stringify(revoked)).not.toContain(adm.id);
+  });
+
+  test("search keeps a task out as soon as it's limited, before its document catches up", async () => {
+    const { ana, bia } = await team();
+    const task = await createIssue(deps(), person(ana.id), f.org.id, { title: "Reajuste geral" });
+    await drainOutbox(f.db, f.handlers);
+    const hits = async (userId: string) =>
+      (await searchForUser(f.context, userId, f.org.id, { text: "Reajuste" })).map((h) => h.sourceId);
+    expect(await hits(bia.id)).toEqual([task.id]);
+    await setIssueAudience(deps(), person(ana.id), f.org.id, task.id, only(ana.id));
+    expect(await hits(bia.id)).toEqual([]);
+    expect(await hits(ana.id)).toEqual([task.id]);
+  });
+
+  test("a file brought to a limited task stays with who sees it, not in the workspace's Drive", async () => {
+    const { ana, bia, adm } = await team();
+    const upload = (title: string) =>
+      createArtifact(f.artifactDeps, person(ana.id), f.org.id, { title, content: { kind: "document", markdown: "x" } });
+    const atCreation = await upload("Na criação");
+    const inComment = await upload("Num comentário");
+    const task = await createIssue(deps(), person(ana.id), f.org.id, {
+      title: "Plano",
+      audience: only(ana.id),
+      attachmentIds: [atCreation.id],
+    });
+    await commentIssue(deps(), person(ana.id), f.org.id, task.id, "", { attachmentIds: [inComment.id] });
+    for (const file of [atCreation, inComment]) {
+      await expect(getArtifact(f.artifactDeps, person(bia.id), f.org.id, file.id)).rejects.toThrow();
+      expect((await getArtifact(f.artifactDeps, person(ana.id), f.org.id, file.id)).id).toBe(file.id);
+      expect((await getArtifact(f.artifactDeps, person(adm.id), f.org.id, file.id)).id).toBe(file.id);
+    }
+    expect((await listArtifacts(f.db, person(bia.id), f.org.id)).map((a) => a.id)).toEqual([]);
+  });
+
+  test("a file brought to an open task stays the workspace's, and someone else's file isn't taken from it", async () => {
+    const { ana, bia } = await team();
+    const mine = await createArtifact(f.artifactDeps, person(ana.id), f.org.id, {
+      title: "Aberto",
+      content: { kind: "document", markdown: "x" },
+    });
+    const theirs = await createArtifact(f.artifactDeps, person(bia.id), f.org.id, {
+      title: "Da Bia",
+      content: { kind: "document", markdown: "x" },
+    });
+    const task = await createIssue(deps(), person(ana.id), f.org.id, { title: "Plano", attachmentIds: [mine.id] });
+    expect((await getArtifact(f.artifactDeps, person(bia.id), f.org.id, mine.id)).id).toBe(mine.id);
+    await updateIssue(deps(), person(ana.id), f.org.id, task.id, { addArtifactId: theirs.id });
+    await setIssueAudience(deps(), person(ana.id), f.org.id, task.id, only(ana.id));
+    expect((await getArtifact(f.artifactDeps, person(bia.id), f.org.id, theirs.id)).id).toBe(theirs.id);
+    await expect(getArtifact(f.artifactDeps, person(bia.id), f.org.id, mine.id)).rejects.toThrow();
+  });
+
+  test("who chooses stays in the list even at its limit", async () => {
+    const { ana } = await team();
+    const crowd = Array.from({ length: 200 }, (_, i) => `someone-${i}`);
+    const task = await createIssue(deps(), person(ana.id), f.org.id, { title: "Cheia", audience: only(...crowd) });
+    expect(task.audience.userIds).toEqual([ana.id]);
+  });
+});
+
+describe("what an administrator reaches, and what stays closed", () => {
+  async function privateRoom() {
+    const people = await team();
+    const secret = await createChannel(f.db, people.ana.id, f.org.id, { name: "secret", visibility: "private" });
+    return { ...people, secret };
+  }
+
+  test("a task's conversation is never joined, not even by an administrator", async () => {
+    const { ana, adm } = await team();
+    const task = await createIssue(deps(), person(ana.id), f.org.id, { title: "Plano", audience: only(ana.id) });
+    const { channelId } = await openTaskConversation(f.db, person(ana.id), f.org.id, task.id);
+    await expect(joinChannel(f.db, adm.id, f.org.id, channelId)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test("a channel's threads open for them; the Threads page stays their own, and a DM's are closed", async () => {
+    const { ana, bia, adm, secret } = await privateRoom();
+    const root = await postPersonMessage(deps(), ana.id, f.org.id, secret.id, { body: "Pergunta" });
+    await postPersonMessage(deps(), ana.id, f.org.id, secret.id, { body: "Resposta", threadId: root.id });
+    const inRoom = (userId: string) => listThreads(f.db, userId, { orgId: f.org.id, channelId: secret.id });
+    expect((await inRoom(adm.id)).threads.map((t) => t.id)).toEqual([root.id]);
+    await expect(inRoom(bia.id)).rejects.toBeInstanceOf(ForbiddenError);
+    expect((await listThreads(f.db, adm.id, { orgId: f.org.id })).threads).toEqual([]);
+    const dm = await openDm(f.db, ana.id, f.org.id, { userId: bia.id });
+    await expect(listThreads(f.db, adm.id, { orgId: f.org.id, channelId: dm.id })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+  });
+
+  test("a private channel's missions are listed for them, a DM's aren't, and a demoted one loses them", async () => {
+    const { ana, bia, adm, secret } = await privateRoom();
+    const mission = async (channelId: string, title: string) => {
+      const root = await postPersonMessage(deps(), ana.id, f.org.id, channelId, { body: title });
+      await f.db.insert(schema.missions).values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId,
+        threadRootId: root.id,
+        ownerId: ana.id,
+        title,
+        goal: "x",
+        status: "active",
+        brain: "model",
+        mainSessionId: crypto.randomUUID(),
+      });
+    };
+    await mission(secret.id, "Na sala");
+    await mission((await openDm(f.db, ana.id, f.org.id, { userId: bia.id })).id, "Na DM");
+    const titles = async (userId: string) =>
+      (await listMissions({ db: f.db } as never, userId, f.org.id)).missions.map((m) => m.title);
+    expect(await titles(adm.id)).toEqual(["Na sala"]);
+    expect(await titles(bia.id)).toEqual(["Na DM"]);
+    await setMemberRoles(f.db, f.owner.id, f.org.id, adm.id, []);
+    expect(await titles(adm.id)).toEqual([]);
+  });
+
+  test("the task of a DM shows to them; what its work asks in the DM doesn't", async () => {
+    const { ana, adm } = await team();
+    const dm = await openDm(f.db, ana.id, f.org.id, { agentId: f.agent.id });
+    const root = await postPersonMessage(deps(), ana.id, f.org.id, dm.id, { body: "monta o relatório" });
+    const task = await createIssue(deps(), person(ana.id), f.org.id, { title: "Relatório", channelId: dm.id });
+    const [run] = await f.db
+      .update(schema.agentRuns)
+      .set({ status: "waiting_input" })
+      .where(eq(schema.agentRuns.triggerMessageId, root.id))
+      .returning();
+    const [work] = await f.db
+      .insert(schema.agentWorks)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: dm.id,
+        title: "Relatório",
+        issueId: task.id,
+        anchorMessageId: root.id,
+        homeThreadId: root.id,
+        ownThread: false,
+        status: "live",
+        how: "agent",
+        lastUpdateAt: new Date(),
+        requestedByUserId: ana.id,
+      })
+      .returning();
+    await f.db
+      .update(schema.agentRuns)
+      .set({ workId: work?.id })
+      .where(eq(schema.agentRuns.id, run?.id ?? ""));
+    await f.db.insert(schema.agentQuestions).values({
+      orgId: f.org.id,
+      runId: run?.id ?? "",
+      agentId: f.agent.id,
+      channelId: dm.id,
+      toolUseId: "tu-1",
+      text: "Mando o salário de quem?",
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+    const card = async (userId: string) =>
+      (await getIssue(f.db, person(userId), f.org.id, { id: task.id })).backgroundWork;
+    expect((await card(ana.id))?.question?.text).toContain("salário");
+    const theirs = await card(adm.id);
+    expect(theirs).not.toBeNull();
+    expect(theirs?.question).toBeNull();
+    const listed = (await listIssues(f.db, person(adm.id), f.org.id)).find((i) => i.id === task.id);
+    expect(JSON.stringify(listed)).not.toContain("salário");
+  });
+
+  test("an event of an archived channel stays on the calendar of who's in it", async () => {
+    const { ana, bia, secret } = await privateRoom();
+    await addChannelMember(f.db, ana.id, f.org.id, secret.id, { userId: bia.id });
+    await createCalendarEvent({ db: f.db }, ana.id, f.org.id, {
+      title: "Reunião",
+      start: "2026-11-20T12:00:00Z",
+      end: "2026-11-20T13:00:00Z",
+      recurrence: "none",
+      participants: [],
+      channelId: secret.id,
+    });
+    await archiveChannel(f.db, ana.id, f.org.id, secret.id);
+    const range = await calendarRange({ db: f.db }, bia.id, f.org.id, "2026-11-01T00:00:00Z", "2026-12-01T00:00:00Z");
+    expect(range.events.map((e) => e.title)).toEqual(["Reunião"]);
+  });
+});
+
+describe("the audit log, for calls that wrote on what the reader doesn't see", () => {
+  test("a comment and a link made from a public channel keep their text from view_audit alone", async () => {
+    const { ana } = await team();
+    const role = await createRole(f.db, f.owner.id, f.org.id, { name: "Auditoria", permissions: ["view_audit"] });
+    const auditor = await addMember(f.db, f.org.id, "member", "auditor");
+    await setMemberRoles(f.db, f.owner.id, f.org.id, auditor.id, [role.id]);
+    const task = await createIssue(deps(), person(f.owner.id), f.org.id, { title: "Sigilo", audience: only(ana.id) });
+    const page = await createWikiPage(deps(), person(f.owner.id), f.org.id, {
+      title: "Página fechada depois",
+      body: "x",
+    });
+    const call = await toolsIn(f.general.id);
+    await call("comment_issue", { issue: `#${task.number}`, text: "Demissão confirmada" });
+    await call("link_to_wiki", { page: page.slug, to: ["Outra página"] });
+    await setWikiPageAudience(deps(), f.owner.id, f.org.id, page.slug, { roleIds: [], userIds: [f.owner.id] });
+    const rows = (userId: string) => listAudit(f.db, userId, f.org.id, { kind: "tool" });
+    const asOwner = JSON.stringify((await rows(f.owner.id)).rows);
+    expect(asOwner).toContain("Demissão confirmada");
+    expect(asOwner).toContain("Outra página");
+    const asAuditor = JSON.stringify((await rows(auditor.id)).rows);
+    expect(asAuditor).not.toContain("Demissão confirmada");
+    expect(asAuditor).not.toContain("Outra página");
+  });
+});
 
 /** A workspace with a plain member (`ana`), another (`bia`) and an administrator who is in nothing (`adm`). */
 async function team() {

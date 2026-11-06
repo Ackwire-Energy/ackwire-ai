@@ -607,7 +607,6 @@ export async function joinChannel(
   options: { pubsub?: PubSub } = {},
 ) {
   const membership = await requirePermission(db, userId, orgId, "read");
-  const admin = can(membership, "administrator");
   const [channel] = await db
     .select({
       kind: channels.kind,
@@ -617,6 +616,7 @@ export async function joinChannel(
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
+  const admin = channel.kind === "channel" && can(membership, "administrator");
   if (channel.kind === "dm" || (channel.visibility !== "public" && channel.byRole !== true && !admin))
     throw new ForbiddenError("This channel is private");
   // The channel's members column shows them at once (a join from a channel's preview or the browser).
