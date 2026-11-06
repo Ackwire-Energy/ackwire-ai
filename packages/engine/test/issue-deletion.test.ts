@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { orgTopic, userTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   askAgentToImplement,
@@ -73,7 +74,8 @@ describe("deleting a task", () => {
 
   test("a step this person can't see stays, as a task of its own; one an agent works on stops with the rest", async () => {
     f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
-    const parent = await createIssue({ db: f.db }, person(f.owner.id), f.org.id, { title: "The plan" });
+    const member = await addMember(f.db, f.org.id, "member", "Member");
+    const parent = await createIssue({ db: f.db }, person(member.id), f.org.id, { title: "The plan" });
     const seen = await createIssue({ db: f.db }, person(f.owner.id), f.org.id, {
       title: "Seen",
       parentIssueId: parent.id,
@@ -93,7 +95,7 @@ describe("deleting a task", () => {
     await askAgentToImplement({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, seen.id, f.agent.id);
     const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.issueId, seen.id));
 
-    await deleteIssue(deps(), f.owner.id, f.org.id, parent.id);
+    await deleteIssue(deps(), member.id, f.org.id, parent.id);
 
     const left = await f.db.select().from(schema.issues).where(eq(schema.issues.orgId, f.org.id));
     expect(left.map((i) => [i.id, i.parentIssueId])).toEqual([[hidden.id, null]]);
@@ -126,6 +128,29 @@ describe("deleting a task", () => {
     expect(await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, at.channelId))).toHaveLength(
       0,
     );
+  });
+
+  test("a limited task's end reaches who sees it, not the workspace", async () => {
+    f = await setup();
+    const named = await addMember(f.db, f.org.id, "member", "Named");
+    const admin = await addMember(f.db, f.org.id, "admin", "Admin");
+    const other = await addMember(f.db, f.org.id, "member", "Other");
+    const issue = await createIssue({ db: f.db }, person(named.id), f.org.id, {
+      title: "Limited",
+      audience: { mode: "people", userIds: [named.id] },
+    });
+    const heard: string[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), () => heard.push("workspace"));
+    for (const [name, id] of [
+      ["named", named.id],
+      ["admin", admin.id],
+      ["other", other.id],
+    ] as const)
+      f.pubsub.subscribe(userTopic(f.org.id, id), () => heard.push(name));
+
+    await deleteIssue(deps(), named.id, f.org.id, issue.id);
+
+    expect(heard.sort()).toEqual(["admin", "named"]);
   });
 
   test("everyone's notifications about it go", async () => {

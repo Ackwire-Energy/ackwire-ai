@@ -753,21 +753,35 @@ export interface IssueDeps {
   pubsub?: PubSub;
 }
 
-/** Tells whoever can see the issue: the whole org, or its conversation, the people it names and administrators. */
-async function announce(deps: IssueDeps, orgId: string, issue: IssueView, type: "issue.created" | "issue.updated") {
-  if (issue.audience.mode === "everyone") {
-    await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: { type, issue } });
+/** Tells whoever can see the task: the whole org, or its conversation, the people it names and administrators. */
+export async function publishToTaskReaders(
+  deps: IssueDeps,
+  orgId: string,
+  task: { channelId: string | null; everyone: boolean; userIds: string[] },
+  event:
+    | { type: "issue.created" | "issue.updated"; issue: IssueView }
+    | { type: "issue.deleted"; issueId: string; number: number },
+) {
+  if (task.everyone) {
+    await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event });
     return;
   }
   if (!deps.pubsub) return;
-  if (issue.channelId) await publishChannelEvent(deps.pubsub, { type, channelId: issue.channelId, issue });
+  if (task.channelId) await publishChannelEvent(deps.pubsub, { ...event, channelId: task.channelId });
   const admins = rowsOf<{ user_id: string }>(
     await deps.db.execute(membersWhoMaySql(sql`${orgId}::uuid`, "administrator")),
   ).map((r) => r.user_id);
-  const named = issue.channelId ? [] : issue.audience.userIds;
-  for (const userId of new Set([...admins, ...named]))
-    await publishUserEvent(deps.pubsub, orgId, userId, { type, issue });
+  const named = task.channelId ? [] : task.userIds;
+  for (const userId of new Set([...admins, ...named])) await publishUserEvent(deps.pubsub, orgId, userId, event);
 }
+
+const announce = (deps: IssueDeps, orgId: string, issue: IssueView, type: "issue.created" | "issue.updated") =>
+  publishToTaskReaders(
+    deps,
+    orgId,
+    { channelId: issue.channelId, everyone: issue.audience.mode === "everyone", userIds: issue.audience.userIds },
+    { type, issue },
+  );
 
 /** Creates an issue with the next number of the org. */
 export async function createIssue(

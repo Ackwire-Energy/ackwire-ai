@@ -40,13 +40,15 @@ export const visibleToField = {
 
 /**
  * `visible_to` as the tool's write takes it; undefined leaves it to the conversation. With nobody behind the run,
- * nobody asked for it to reach further than where it was made.
+ * nobody asked for it to reach further than where it was made. A routine's creator may only narrow it: a run its report
+ * woke sits in a conversation whose private text is no routine's to publish.
  */
 export async function chosenAudience(
   ctx: Pick<ToolContext, "orgId" | "runId" | "triggerMessageId"> & { db: Executor },
   choice: unknown,
 ): Promise<Audience | undefined> {
-  const person = choice === "requester" || choice === "everyone" ? await personBehindCall(ctx) : null;
+  if (choice !== "requester" && choice !== "everyone") return undefined;
+  const person = (await personBehindCall(ctx)) ?? (choice === "requester" ? await routineCreatorOfCall(ctx) : null);
   if (!person) return undefined;
   return choice === "everyone" ? { mode: "everyone" } : { mode: "people", userIds: [person] };
 }

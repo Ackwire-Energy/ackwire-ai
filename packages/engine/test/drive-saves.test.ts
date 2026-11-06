@@ -487,6 +487,15 @@ describe("the wiki in a routine", () => {
     expect(version).toMatchObject({ authorType: "agent", requestedByUserId: f.owner.id });
   });
 
+  test("visible_to requester limits the page to the routine's creator", async () => {
+    await world();
+    const run = ctxOf(await routineRun({ prompt: "Salve o resumo na wiki, só para mim." }));
+    const out = await call(run, "create_wiki_page", { title: "Resumo", body: "# Resumo", visible_to: "requester" });
+    expect(out.content).toContain("only the people chosen");
+    const [page] = await f.db.select().from(schema.wikiPages);
+    expect(page).toMatchObject({ restricted: true, audienceUserIds: [f.owner.id] });
+  });
+
   test("nobody behind it and no routine: refused, without saying a message was missing", async () => {
     await world();
     const bia = await addBia();
