@@ -7,8 +7,9 @@ import { runAuthorityById, UUID } from "./authority";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { textOfBytes } from "./format";
 import { assertStorageRoom } from "./limits";
-import { can, requireActiveMembership } from "./organizations";
+import { can, getMembership, requireActiveMembership } from "./organizations";
 import { markdownToPdf } from "./pdf";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 import { taskReaderSql } from "./task-access";
@@ -535,9 +536,13 @@ async function personReadableChannels(db: Database, userId: string, orgId: strin
   return rows.map((r) => r.id);
 }
 
-/** The person behind an agent's run (`authority.ts`), or null: whose conversations it may also read files of. */
+/**
+ * The person behind an agent's run (`authority.ts`), or null: whose conversations it may also read files of. A run
+ * stays its message's author's for good, so someone who left or was blocked counts as nobody.
+ */
 async function personOfActor(db: Database, orgId: string, actor: Extract<ArtifactActor, { type: "agent" }>) {
-  return actor.runId ? (await runAuthorityById(db, orgId, actor.runId)).personId : null;
+  const person = actor.runId ? (await runAuthorityById(db, orgId, actor.runId)).personId : null;
+  return person && (await getMembership(db, person, orgId)) ? person : null;
 }
 
 /** Whether every version of an artifact in the agents' DM was made by a run for the same person (`agentsDmReads`). */
@@ -551,19 +556,38 @@ async function madeForSamePerson(db: Database, dm: AgentsDmReads, artifactId: st
 }
 
 /**
- * An agent reads org-wide files, whatever the person behind the run may read, and the files of its run's conversation
- * and of public channels it is in (in the agents' DM, only those made for the same person). A file's id reaches an
- * agent in ways `listArtifacts` doesn't list: attached from another conversation, or passed on by the agent asking it.
- * What it lists stays narrower: never the person's other conversations it isn't in.
+ * An agent's own reach, what `listArtifacts` lists and what it may change: org-wide files, its run's conversation and
+ * public channels it is in (in the agents' DM, only those made for the same person), and the conversations it shares
+ * with the person behind the run.
+ */
+async function agentReaches(
+  db: Database,
+  actor: Extract<ArtifactActor, { type: "agent" }>,
+  orgId: string,
+  a: Pick<ArtifactRow, "id" | "channelId">,
+) {
+  if (!a.channelId) return true;
+  if (!(await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(a.channelId)) {
+    const person = await personOfActor(db, orgId, actor);
+    return person !== null && (await requesterSharedChannels(db, orgId, actor.agentId, person)).includes(a.channelId);
+  }
+  const dm = await agentsDmReads(db, orgId, a.channelId, () => readerOfRun(db, orgId, actor.runId));
+  return !dm || madeForSamePerson(db, dm, a.id);
+}
+
+/**
+ * By id an agent also reads whatever the person behind the run may read, and what a teammate made for that person in
+ * the agents' DM, which no person sees: an id reaches it in ways `listArtifacts` doesn't list (attached from another
+ * conversation, passed on by the agent asking it, named in a consulted agent's answer).
  */
 async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pick<ArtifactRow, "id" | "channelId">) {
   if (actor.type === "person") return personCanRead(db, actor.userId, orgId, a);
-  if (!a.channelId) return true;
+  if (await agentReaches(db, actor, orgId, a)) return true;
   const person = await personOfActor(db, orgId, actor);
-  if (person !== null && (await personCanRead(db, person, orgId, a))) return true;
-  if (!(await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(a.channelId)) return false;
-  const dm = await agentsDmReads(db, orgId, a.channelId, () => readerOfRun(db, orgId, actor.runId));
-  return !dm || madeForSamePerson(db, dm, a.id);
+  if (person === null) return false;
+  if (await personCanRead(db, person, orgId, a)) return true;
+  const dm = await agentsDmReads(db, orgId, a.channelId as string, () => Promise.resolve(person));
+  return dm !== null && madeForSamePerson(db, dm, a.id);
 }
 
 async function requireMember(db: Database, actor: ArtifactActor, orgId: string) {
@@ -607,31 +631,26 @@ async function loadArtifact(db: Database, orgId: string, id: string) {
 }
 
 /**
- * An agent's "not found", with what is wrong and what to do: a bare one left agents asking people to send the file
- * again. It may say a file exists and is out of reach, never its title or content: the agent already holds its id.
+ * An agent's "not found", with what to do: a bare one left agents asking people to send the file again. One text for
+ * a wrong id and a file out of reach, deleted or not: which of them it is would say a private conversation holds it.
  */
 async function agentRefusal(db: Database, actor: Extract<ArtifactActor, { type: "agent" }>, orgId: string, id: string) {
-  const [row] = UUID.test(id)
+  const [gone] = UUID.test(id)
     ? await db
-        .select({ id: artifacts.id, channelId: artifacts.channelId, deletedAt: artifacts.deletedAt })
+        .select({ id: artifacts.id, channelId: artifacts.channelId })
         .from(artifacts)
-        .where(and(eq(artifacts.id, id), eq(artifacts.orgId, orgId)))
+        .where(and(eq(artifacts.id, id), eq(artifacts.orgId, orgId), sql`${artifacts.deletedAt} is not null`))
     : [];
-  if (!row) {
-    return new NotFoundError(
-      `File not found: no file has the id ${id}. Copy the whole id from list_artifacts or an "(attached files: …)" line, never from memory. If it isn't there, tell the person you can't find the file and ask them to attach it here; this id won't work again.`,
-    );
-  }
-  if (row.deletedAt && (await canRead(db, actor, orgId, row))) {
+  if (gone && (await canRead(db, actor, orgId, gone))) {
     return new NotFoundError(
       "File not found: it was deleted. Say so: a person can restore it from the Drive's trash (Lixeira).",
     );
   }
-  const reach = (await personOfActor(db, orgId, actor))
-    ? "it is in a conversation the person who asked isn't in, so you can't open it for them"
-    : "nobody is behind this run, so you only reach this conversation, public channels you are in and the Drive";
+  const nobody = (await personOfActor(db, orgId, actor))
+    ? ""
+    : " Nobody is behind this run, so you only reach this conversation, public channels you are in and the Drive.";
   return new NotFoundError(
-    `File not found: ${reach}. Say so, and ask someone who sees the file to attach it here or put it in the Drive; this id won't work again.`,
+    `File not found: ${id} is no file you can open from here. The id may be wrong, or the file is in a conversation out of your reach.${nobody} Copy the whole id from list_artifacts or an "(attached files: …)" line, never from memory. If that isn't it, say so and ask someone who sees the file to attach it here or put it in the Drive; this id won't work again.`,
   );
 }
 
@@ -642,6 +661,17 @@ async function readable(deps: ArtifactDeps, actor: ArtifactActor, orgId: string,
   if (actor.type === "agent") throw await agentRefusal(deps.db, actor, orgId, id);
   // Not visible = not found: don't reveal files of channels you can't see.
   throw new NotFoundError("Artifact not found");
+}
+
+/** `readable` to save a version: reading follows the person behind the run, changing a file only the agent's own reach. */
+async function writable(deps: ArtifactDeps, actor: ArtifactActor, orgId: string, id: string) {
+  const a = await readable(deps, actor, orgId, id);
+  if (actor.type === "agent" && !(await agentReaches(deps.db, actor, orgId, a))) {
+    throw new ForbiddenError(
+      "You can read this file but not change it: it is in a conversation you aren't in. Save your version as a new file with create_artifact.",
+    );
+  }
+  return a;
 }
 
 // ── Writes ───────────────────────────────────────────────────────────────────
@@ -903,7 +933,7 @@ export async function updateArtifact(
   artifactId: string,
   input: { content: unknown; note?: string | null; baseVersion?: number; title?: string },
 ): Promise<ArtifactDetailView> {
-  const current = await readable(deps, actor, orgId, artifactId);
+  const current = await writable(deps, actor, orgId, artifactId);
   if (current.kind === "file") {
     throw new ValidationError("this artifact is an uploaded file: send a new version of the file instead");
   }
@@ -984,7 +1014,7 @@ export async function addFileVersion(
     baseVersion?: number;
   },
 ): Promise<ArtifactDetailView> {
-  const current = await readable(deps, actor, orgId, artifactId);
+  const current = await writable(deps, actor, orgId, artifactId);
   if (current.kind !== "file") {
     throw new ValidationError(`this artifact is a ${current.kind}, not an uploaded file`);
   }
@@ -1054,10 +1084,7 @@ export async function readFileArtifact(
   };
 }
 
-/**
- * All the text of a `file` too long for `content.text`, which `read_artifact` reads in pages; null when it isn't text.
- * Text that isn't UTF-8 is read as Windows-1252, what older tools save HTML and CSV in.
- */
+/** All the text of a `file` too long or not UTF-8 for `content.text`, which `read_artifact` reads in pages; else null. */
 export async function fileFullText(
   deps: ArtifactDeps,
   actor: ArtifactActor,
@@ -1065,13 +1092,9 @@ export async function fileFullText(
   artifactId: string,
   version?: number,
 ): Promise<string | null> {
-  const file = await readFileArtifact(deps, actor, orgId, artifactId, version);
-  if (!isTextFile(file.name, file.contentType)) return null;
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(file.bytes);
-  } catch {
-    return new TextDecoder("windows-1252").decode(file.bytes);
-  }
+  const a = await readable(deps, actor, orgId, artifactId);
+  const v = await versionRow(deps.db, a, version);
+  return isTextFile(v.fileName ?? "", v.contentType) ? textOfBytes((await readVersion(deps, a, v)).body) : null;
 }
 
 /** One artifact at `version` (default: latest), with content. */
@@ -1138,7 +1161,9 @@ export async function listArtifacts(
     if (filters.requesterUserId) {
       const shared = await requesterSharedChannels(db, orgId, actor.agentId, filters.requesterUserId);
       // A run where the agent isn't a member (the right hand, called by name) still lists that conversation.
-      const here = await personCanRead(db, filters.requesterUserId, orgId, { channelId: actor.channelId });
+      const here =
+        (await getMembership(db, filters.requesterUserId, orgId)) &&
+        (await personCanRead(db, filters.requesterUserId, orgId, { channelId: actor.channelId }));
       visible = [...new Set([...visible, ...shared, ...(here ? [actor.channelId] : [])])];
     }
   } else {
@@ -1275,10 +1300,14 @@ export async function shareArtifact(
   const openHere =
     !a.channelId || a.channelId === actor.channelId || (origin?.kind === "channel" && origin.visibility === "public");
   if (!openHere) {
-    // From a DM or a private channel: the requester must be able to see it.
+    // From a DM or a private channel: the requester and the agent must both be in it. Reading for a person is no
+    // reason to carry a file into another audience.
     const allowed =
       (input.alsoFrom != null && a.channelId === input.alsoFrom) ||
-      (input.requesterUserId !== null && (await personCanRead(db, input.requesterUserId, orgId, a)));
+      (input.requesterUserId !== null &&
+        (await requesterSharedChannels(db, orgId, actor.agentId, input.requesterUserId)).includes(
+          a.channelId as string,
+        ));
     if (!allowed) throw await agentRefusal(db, actor, orgId, artifactId);
   }
   let shared: ArtifactView = view(a, editableKind(a.kind));

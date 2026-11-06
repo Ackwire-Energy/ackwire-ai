@@ -113,10 +113,9 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /**
  * Drive tools through the Tool Gateway: `create_artifact`, `update_artifact`
- * (`drive:write`), `read_artifact`, `list_artifacts` (`drive:read`). Agents
- * see the files of their run's channel, of public channels they are in, and
- * org-wide ones. What they create lands in the run's channel and thread; the
- * reply carries `meta.artifacts` for the preview card.
+ * (`drive:write`), `read_artifact`, `list_artifacts` (`drive:read`). Who reads
+ * what is `canRead` in artifacts.ts. What they create lands in the run's
+ * channel and thread; the reply carries `meta.artifacts` for the preview card.
  */
 export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
   const tools: ToolDefinition[] = [
