@@ -15,7 +15,7 @@ import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Button, PixelOrbit, Segmented, Text } from "@/ui";
+import { Button, EmptyState, PixelOrbit, Segmented, Text } from "@/ui";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { AnswerAnywayButton, DontRunButton } from "../ai/UsagePauseCard";
 import { chatHref } from "../links/logic";
@@ -124,9 +124,7 @@ export function UsageQueueSheet({ agentId, tab: initialTab = "queued" }: { agent
         />
       ) : null}
       {waiting === 0 && skipped === 0 ? (
-        <Text variant="small" tone="muted">
-          {t("usageQueue.empty")}
-        </Text>
+        <EmptyState size="inline" title={t("usageQueue.empty")} />
       ) : waiting > 0 && skipped > 0 ? (
         <SameHeight
           shown={tab === "queued" ? queuedList : skippedList}

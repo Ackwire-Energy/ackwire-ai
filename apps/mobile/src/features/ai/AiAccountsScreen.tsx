@@ -30,6 +30,7 @@ import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSh
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
@@ -201,6 +202,7 @@ export function AiAccountsScreen() {
     );
   };
 
+  const none = ai.isSuccess && rows.length === 0 && own.length === 0;
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("mobile.ai.row")} solid={false} grouped />
@@ -221,10 +223,8 @@ export function AiAccountsScreen() {
         </View>
         {ai.isLoading ? <ActivityIndicator color={c.muted} /> : null}
         {ai.isError ? <Note icon="x">{t("common.loadFailed")}</Note> : null}
-        {ai.isSuccess && rows.length === 0 && own.length === 0 ? (
-          <Text variant="small" tone="muted">
-            {t("aiAccounts.page.empty")}
-          </Text>
+        {none ? (
+          <FirstUse place="ai" size="panel" acts label={t("aiAccounts.page.connect")} onPress={() => openConnectAi()} />
         ) : null}
         {/* Settings' own groups on the grouped gray: the mark in the 32 pt column, the hairline from the text on. */}
         {own.length > 0 ? (
@@ -313,15 +313,17 @@ export function AiAccountsScreen() {
             />
           </View>
         ) : null}
-        <View style={styles.start}>
-          <Button
-            size="sm"
-            variant={rows.length || own.length ? "secondary" : "primary"}
-            icon="plus"
-            label={t("aiAccounts.page.connect")}
-            onPress={() => openConnectAi()}
-          />
-        </View>
+        {none ? null : (
+          <View style={styles.start}>
+            <Button
+              size="sm"
+              variant={rows.length || own.length ? "secondary" : "primary"}
+              icon="plus"
+              label={t("aiAccounts.page.connect")}
+              onPress={() => openConnectAi()}
+            />
+          </View>
+        )}
         {can(org, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
       </ScrollView>
     </View>

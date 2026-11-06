@@ -17,7 +17,18 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Share, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, GroupedRow, InfoHint, PersonAvatar, SheetScreen, Text, useReducedMotion, useToast } from "@/ui";
+import {
+  Button,
+  Chip,
+  EmptyState,
+  GroupedRow,
+  InfoHint,
+  PersonAvatar,
+  SheetScreen,
+  Text,
+  useReducedMotion,
+  useToast,
+} from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { errorHaptic, successHaptic, useSurface } from "../shared/parts";
@@ -55,7 +66,7 @@ export function JoinRequestsSheet({ focus, onClose }: { focus?: string | undefin
   else if (list.data.length === 0)
     body = (
       <>
-        <Text tone="muted">{t("members.requests.empty")}</Text>
+        <EmptyState size="inline" title={t("members.requests.empty")} />
         <Button variant="secondary" wide label={t("mobile.common.close")} onPress={onClose} />
       </>
     );

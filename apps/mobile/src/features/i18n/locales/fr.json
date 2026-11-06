@@ -210,7 +210,6 @@
       "active": "En cours",
       "proposed": "Proposée"
     },
-    "empty": "Aucune discussion pour l'instant.",
     "sayHi": "Dites bonjour à {{name}}.",
     "channelEmpty": "Aucun message pour l'instant. Lancez la conversation.",
     "closed": "Fermé",
@@ -261,7 +260,6 @@
     "channelFine": "Pour une équipe ou un sujet.",
     "chatSearch": "Chercher une personne ou un agent",
     "people": "Personnes",
-    "nobody": "Personne ici pour l'instant.",
     "search": "Personne ou agent",
     "create": "Créer",
     "agentHint": "Un nom et ce qu'il fait",
@@ -319,7 +317,6 @@
     "switchNone": "Aucune conversation à ce nom.",
     "switchWorking": "au travail",
     "join": "Rejoindre le canal",
-    "empty": "Personne n'a encore écrit ici.",
     "sending": "Envoi…",
     "failed": "Non envoyé · Réessayer",
     "notSent": "Le message n'a pas été envoyé.",
@@ -673,9 +670,7 @@
     "section": {
       "missions": "Missions",
       "threads": "Fils"
-    },
-    "empty": "Aucun fil ni mission pour l'instant",
-    "emptyHint": "Maintenez un message pour répondre dans un fil ou en faire une mission."
+    }
   },
   "agents": {
     "title": "Agents",
@@ -690,9 +685,6 @@
     "create": "Créer l'agent",
     "created": "{{name}} a rejoint l'équipe",
     "createFailed": "Impossible de créer l'agent. Ce nom est peut-être déjà pris.",
-    "empty": "Aucun agent pour l'instant.",
-    "noneForYou": "Aucun agent ne travaille encore avec vous.",
-    "noneForYouHint": "Demandez l'accès à un admin.",
     "freeSection": "Libres",
     "noGroupSection": "Sans service"
   },
@@ -1133,8 +1125,6 @@
       "canceled": "Annulé"
     },
     "until": "échéance {{date}}",
-    "empty": "Aucune tâche ici",
-    "emptyOpen": "Vous pouvez aussi en demander une dans une discussion.",
     "loadFailed": "Impossible de charger les tâches.",
     "createdBy": "créée par {{name}}",
     "fromMessage": "depuis un message",
@@ -1210,8 +1200,6 @@
       "file": "Fichier"
     },
     "by": "{{name}} · {{when}}",
-    "empty": "Rien dans le Drive pour l'instant",
-    "emptySub": "Ce que les agents et les personnes créent ou envoient dans les discussions apparaît ici.",
     "noResults": "Rien avec ces filtres.",
     "loadFailed": "Impossible de charger le Drive.",
     "more": "Afficher plus"
@@ -1228,8 +1216,6 @@
     "recent": "Tout juste appris",
     "mostUsed": "Les plus utilisés",
     "noMatch": "Aucun souvenir avec ça.",
-    "emptyTitle": "Rien d'appris pour l'instant",
-    "empty": "En travaillant avec vous, les agents gardent ici ce qu'ils apprennent.",
     "gone": "Ce souvenir n'existe plus.",
     "of": "Mémoire de {{name}}",
     "line_one": "{{name}} · utilisé {{count}} fois",
@@ -1256,8 +1242,6 @@
     "readsWeek_one": "{{count}} lecture cette semaine",
     "readsWeek_many": "{{count}} lectures cette semaine",
     "readsWeek_other": "{{count}} lectures cette semaine",
-    "empty": "Touchez Nouvelle page pour écrire la première.",
-    "missing": "Cette page n'existe plus ou a été renommée.",
     "blank": "Page vide.",
     "folderGone": "Ce dossier n'a plus de pages.",
     "reads_one": "{{count}} fois",
@@ -1638,8 +1622,6 @@
     "connected": "Connectés",
     "suggested": "Suggérés pour {{org}}",
     "all": "Tous",
-    "empty": "Vos agents n'utilisent encore rien",
-    "emptySub": "Connectez un service et ils commencent à y lire et à y agir.",
     "noResults": "Aucun service à ce nom. Essayez son adresse.",
     "soon": "Bientôt",
     "loadFailed": "Impossible de charger les connecteurs.",
@@ -1863,13 +1845,6 @@
       "login": "Un site web, un nom d'utilisateur et un mot de passe. Les agents se connectent sans voir le mot de passe.",
       "key": "Une clé API ou un jeton. Les agents l'utilisent dans une commande sans la voir.",
       "contact": "Nom, entreprise, e-mail, téléphone et adresse que les agents remplissent dans les formulaires."
-    },
-    "empty": {
-      "personalTitle": "Rien à vous pour l'instant",
-      "personalText": "Enregistrez ici un identifiant ou une clé, et vos agents l'utilisent quand vous le demandez.",
-      "teamTitle": "Rien de partagé pour l'instant",
-      "teamText": "Enregistrez les identifiants et les clés que vos agents utilisent pour l'équipe.",
-      "teamReadText": "Quand quelqu'un partage un identifiant ou une clé avec vous, il apparaît ici."
     },
     "import": {
       "title": "Importer depuis un ordinateur",
@@ -2146,5 +2121,127 @@
   "team": {
     "entry": "Liste, organigramme et carte",
     "mapHint": "Pour changer un agent de canal, utilisez la carte sur le web ou parlez à {{name}}."
+  },
+  "empty": {
+    "agents": {
+      "title": "Composez votre équipe d'agents",
+      "text": "Chaque agent prend un rôle et travaille avec vous dans la discussion.",
+      "viewerTitle": "Votre équipe d'agents se trouve ici",
+      "viewerText": "La personne qui crée les agents de cet espace ajoute le premier, et il apparaît ici."
+    },
+    "agentsForYou": {
+      "title": "Vos agents apparaissent ici",
+      "text": "La personne qui gère les agents choisit ceux qui travaillent avec vous."
+    },
+    "drive": {
+      "title": "Tout ce que l'équipe crée, au même endroit",
+      "text": "Rapports, tableaux et fichiers des agents et des personnes restent ici, faciles à retrouver.",
+      "viewerTitle": "Retrouvez ce que l'équipe crée",
+      "viewerText": "Ce que les agents et les personnes créent dans les discussions apparaît ici."
+    },
+    "tasks": {
+      "title": "Confiez du travail à l'équipe",
+      "text": "Créez une tâche pour un agent ou une personne et suivez-la jusqu'au bout.",
+      "viewerTitle": "Suivez le travail de l'équipe",
+      "viewerText": "Les tâches apparaissent ici dès que quelqu'un crée la première."
+    },
+    "routines": {
+      "title": "Laissez le travail répétitif à vos agents",
+      "text": "Une routine s'exécute toute seule, à une heure fixée ou quand quelque chose arrive.",
+      "viewerTitle": "Voyez ce qui tourne tout seul",
+      "viewerText": "Les personnes qui gèrent les routines ou possèdent un agent les créent, et elles apparaissent ici."
+    },
+    "wiki": {
+      "title": "Gardez ce que l'équipe doit savoir",
+      "text": "Les personnes et les agents lisent ces pages, et tout le monde travaille avec les mêmes informations.",
+      "viewerTitle": "Consultez ce que l'équipe sait",
+      "viewerText": "La personne qui modifie le wiki écrit la première page, et elle apparaît ici."
+    },
+    "memory": {
+      "title": "Vos agents apprennent en travaillant",
+      "text": "Ce qu'ils retiennent des discussions reste ici, pour que vous voyiez ce qu'ils savent.",
+      "ask": "Je veux te raconter comment on travaille ici.",
+      "noneForAgent": "Aucun souvenir de cet agent."
+    },
+    "threads": {
+      "title": "Chaque sujet dans sa propre discussion",
+      "text": "Maintenez un message pour répondre dans un fil ou en faire une mission.",
+      "action": "Aller aux discussions"
+    },
+    "chats": {
+      "title": "Parlez à vos agents",
+      "text": "Demandez quelque chose dans une discussion et un agent se met au travail.",
+      "action": "Nouvelle discussion"
+    },
+    "channels": {
+      "title": "Réunissez personnes et agents dans un canal",
+      "text": "Chaque canal réunit celles et ceux qui s'occupent d'un sujet.",
+      "viewerTitle": "Les canaux de l'équipe se trouvent ici",
+      "viewerText": "La personne qui crée les canaux ouvre le premier, et il apparaît ici.",
+      "action": "Créer un canal"
+    },
+    "people": {
+      "title": "Travaillez avec votre équipe ici",
+      "text": "Invitez des personnes pour leur parler, ainsi qu'à vos agents, au même endroit.",
+      "viewerTitle": "Votre équipe apparaît ici",
+      "viewerText": "La personne qui invite fait venir le reste de l'équipe, et ces personnes apparaissent ici."
+    },
+    "chat": {
+      "title": "Tout commence par un message",
+      "text": "Écrivez ci-dessous et tout le monde ici le verra.",
+      "viewerTitle": "Les messages apparaissent ici",
+      "viewerText": "Vous pourrez lire cette discussion dès que quelqu'un écrira."
+    },
+    "ai": {
+      "title": "Donnez à vos agents une IA pour réfléchir",
+      "text": "Connectez un forfait que vous payez déjà et ils travaillent avec lui."
+    },
+    "vaultPersonal": {
+      "title": "Gardez vos identifiants en sécurité",
+      "text": "Enregistrez un identifiant ou une clé et vos agents s'en servent quand vous le demandez."
+    },
+    "vaultTeam": {
+      "title": "Partagez des accès sans faire circuler de mots de passe",
+      "text": "Enregistrez les identifiants et les clés que vos agents utilisent pour l'équipe.",
+      "viewerTitle": "Les accès de l'équipe apparaissent ici",
+      "viewerText": "Quand quelqu'un partage un identifiant ou une clé avec vous, ils apparaissent ici."
+    },
+    "skills": {
+      "title": "Apprenez à vos agents comment vous faites",
+      "text": "Une compétence garde les étapes d'une tâche, et les agents l'ouvrent quand ils en ont besoin."
+    },
+    "apps": {
+      "title": "Sollicitez vos agents depuis d'autres applis",
+      "text": "Connectez Claude ou une autre appli et demandez des tâches sans la quitter."
+    },
+    "access": {
+      "title": "Choisissez ce que chaque agent peut utiliser",
+      "text": "Connectez un service et réglez ici l'accès de chaque agent.",
+      "viewerTitle": "L'accès de chaque agent apparaît ici",
+      "viewerText": "La personne qui gère les connecteurs connecte le premier service.",
+      "action": "Connecter un service"
+    },
+    "board": {
+      "title": "Voyez l'essentiel sur un seul tableau",
+      "text": "Ajoutez un widget, demandez-en un à un agent ou épinglez un bloc de la discussion.",
+      "viewerTitle": "Ce tableau prend forme",
+      "viewerText": "La personne qui modifie ce tableau ajoute les widgets, et ils apparaissent ici."
+    },
+    "computers": {
+      "title": "Offrez un autre ordinateur à vos agents",
+      "text": "Connectez avec un code un Mac mini à la maison ou un autre serveur.",
+      "viewerTitle": "Les autres ordinateurs apparaissent ici",
+      "viewerText": "La personne qui connecte les ordinateurs les ajoute, et ils apparaissent ici."
+    },
+    "connectors": {
+      "title": "Donnez à vos agents de vrais outils",
+      "text": "Connectez un service et ils peuvent y lire et y agir.",
+      "viewerTitle": "Les outils de vos agents apparaissent ici",
+      "viewerText": "La personne qui gère les connecteurs connecte les services ci-dessous."
+    },
+    "audit": {
+      "title": "Rien à vérifier",
+      "text": "Quand un agent fait quelque chose hors de la discussion, cela apparaît ici."
+    }
   }
 }

@@ -121,6 +121,7 @@ import { RightHandIntro } from "../right-hand/Intro";
 import { ConversationSearch } from "../search/ConversationSearch";
 import { hitTarget } from "../search/logic";
 import { AgentFace, Face, OpensAgent } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useMyHandle, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, previewOf } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
@@ -2023,9 +2024,8 @@ function Chat({
                     />
                   ) : (
                     <View style={[styles.center, { paddingBottom: composerHeight }]}>
-                      <Text tone="faint" style={styles.emptyText}>
-                        {t("mobile.chat.empty")}
-                      </Text>
+                      {/* No button: the composer under it is the next step. */}
+                      <FirstUse place="chat" size="panel" acts={member && channel?.can?.post !== false} />
                     </View>
                   )}
                 </View>
@@ -2273,7 +2273,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  emptyText: { textAlign: "center" },
   pin: { paddingHorizontal: 12, paddingBottom: 10 },
   pinBelowBar: { paddingTop: 10 },
   day: { alignSelf: "center", textAlign: "center", marginTop: 16, marginBottom: 6, fontWeight: "600" },

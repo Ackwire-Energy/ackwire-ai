@@ -56,6 +56,7 @@ import { useOrg } from "@/providers/org";
 import {
   Button,
   DiffView,
+  EmptyState,
   Filters,
   GroupedFooter,
   GroupedHeader,
@@ -70,6 +71,7 @@ import { SocialMark } from "@/ui/auth/SocialMarks";
 import { Note } from "../ai/parts";
 import { MessageText } from "../chat/MessageText";
 import { ConnectSheet } from "../connectors/ConnectSheet";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors } from "../shared/hooks";
 import { goBack, successHaptic } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
@@ -98,6 +100,8 @@ export function SkillsScreen() {
   const [q, setQ] = useState("");
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   const shown = searchSkills(list, q);
+  const none = skills.isSuccess && list.length === 0;
+  const install = () => router.push("/settings/skills/new");
   return (
     <SettingsPage title={t("skills.title")}>
       <GroupedFooter>{t("settings.sectionText.skills")}</GroupedFooter>
@@ -111,15 +115,14 @@ export function SkillsScreen() {
         </View>
       ) : (
         <>
-          <Gap />
-          <GroupedList>
-            <GroupedRow
-              icon="plus"
-              label={t("skills.install")}
-              chevron
-              onPress={() => router.push("/settings/skills/new")}
-            />
-          </GroupedList>
+          {none ? null : (
+            <>
+              <Gap />
+              <GroupedList>
+                <GroupedRow icon="plus" label={t("skills.install")} chevron onPress={install} />
+              </GroupedList>
+            </>
+          )}
           {settings.data ? (
             <>
               <Gap />
@@ -155,9 +158,15 @@ export function SkillsScreen() {
               <Note icon="x">{t("common.loadFailed")}</Note>
             </View>
           ) : null}
-          {skills.isSuccess && list.length === 0 ? <GroupedFooter>{t("skills.empty")}</GroupedFooter> : null}
+          {none ? <FirstUse place="skills" size="panel" acts label={t("skills.install")} onPress={install} /> : null}
           {list.length > 0 && shown.length === 0 ? (
-            <GroupedFooter>{t("skills.noResults", { q: q.trim() })}</GroupedFooter>
+            <EmptyState
+              size="inline"
+              title={t("skills.noResults", { q: q.trim() })}
+              action={
+                <Button variant="secondary" size="sm" label={t("filters.clearSearch")} onPress={() => setQ("")} />
+              }
+            />
           ) : null}
           {shown.length > 0 ? (
             <GroupedList>

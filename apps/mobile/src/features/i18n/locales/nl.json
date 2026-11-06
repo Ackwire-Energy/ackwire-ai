@@ -203,7 +203,6 @@
       "active": "Bezig",
       "proposed": "Voorgesteld"
     },
-    "empty": "Nog geen gesprekken.",
     "sayHi": "Zeg hallo tegen {{name}}.",
     "channelEmpty": "Nog geen berichten. Begin het gesprek.",
     "closed": "Gesloten",
@@ -252,7 +251,6 @@
     "channelFine": "Voor een team of een onderwerp.",
     "chatSearch": "Zoek een persoon of een agent",
     "people": "Mensen",
-    "nobody": "Nog niemand hier.",
     "search": "Persoon of agent",
     "create": "Maken",
     "agentHint": "Een naam en wat hij doet",
@@ -305,7 +303,6 @@
     "switchNone": "Geen gesprek met die naam.",
     "switchWorking": "aan het werk",
     "join": "Lid worden van het kanaal",
-    "empty": "Hier heeft nog niemand geschreven.",
     "sending": "Versturen…",
     "failed": "Niet verstuurd · Probeer opnieuw",
     "notSent": "Het bericht is niet verstuurd.",
@@ -651,9 +648,7 @@
     "section": {
       "missions": "Missies",
       "threads": "Threads"
-    },
-    "empty": "Nog geen threads of missies",
-    "emptyHint": "Houd een bericht ingedrukt om in een thread te antwoorden of er een missie van te maken."
+    }
   },
   "agents": {
     "title": "Agents",
@@ -667,9 +662,6 @@
     "create": "Agent aanmaken",
     "created": "{{name}} is bij het team gekomen",
     "createFailed": "De agent kon niet worden aangemaakt. Misschien is die naam al bezet.",
-    "empty": "Nog geen agents.",
-    "noneForYou": "Er werkt nog geen agent met jou.",
-    "noneForYouHint": "Vraag een beheerder om toegang.",
     "freeSection": "Vrij",
     "noGroupSection": "Geen afdeling"
   },
@@ -1062,8 +1054,6 @@
       "canceled": "Geannuleerd"
     },
     "until": "uiterlijk {{date}}",
-    "empty": "Hier zijn geen taken",
-    "emptyOpen": "Je kunt er ook een vragen in een gesprek.",
     "loadFailed": "De taken konden niet worden geladen.",
     "createdBy": "aangemaakt door {{name}}",
     "fromMessage": "vanuit een bericht",
@@ -1138,8 +1128,6 @@
       "file": "Bestand"
     },
     "by": "{{name}} · {{when}}",
-    "empty": "Nog niets in de Drive",
-    "emptySub": "Wat agents en mensen in gesprekken maken of sturen, verschijnt hier.",
     "noResults": "Niets met deze filters.",
     "loadFailed": "De Drive kon niet worden geladen.",
     "more": "Meer tonen"
@@ -1156,8 +1144,6 @@
     "recent": "Net geleerd",
     "mostUsed": "Meest gebruikt",
     "noMatch": "Geen herinnering daarmee.",
-    "emptyTitle": "Nog niets geleerd",
-    "empty": "Terwijl ze met je werken, bewaren de agents hier wat ze leren.",
     "gone": "Deze herinnering bestaat niet meer.",
     "of": "Herinnering van {{name}}",
     "line_one": "{{name}} · {{count}} keer gebruikt",
@@ -1180,8 +1166,6 @@
     "usedBy": "Agents die het gebruiken",
     "readsWeek_one": "{{count}} keer gelezen deze week",
     "readsWeek_other": "{{count}} keer gelezen deze week",
-    "empty": "Tik op Nieuwe pagina om de eerste te schrijven.",
-    "missing": "Deze pagina bestaat niet meer of heeft een andere naam gekregen.",
     "blank": "Lege pagina.",
     "folderGone": "Deze map heeft geen pagina's meer.",
     "reads_one": "{{count}} keer",
@@ -1549,8 +1533,6 @@
     "connected": "Verbonden",
     "suggested": "Voorgesteld voor {{org}}",
     "all": "Alle",
-    "empty": "Je agents gebruiken nog niets",
-    "emptySub": "Verbind een dienst en ze gaan erin lezen en dingen doen.",
     "noResults": "Geen dienst met die naam. Probeer het adres.",
     "soon": "Binnenkort",
     "loadFailed": "De connectors konden niet worden geladen.",
@@ -1770,13 +1752,6 @@
       "login": "Een website, gebruikersnaam en wachtwoord. Agenten loggen in zonder het wachtwoord te zien.",
       "key": "Een API-sleutel of token. Agenten gebruiken die in een opdracht zonder hem te zien.",
       "contact": "Naam, bedrijf, e-mail, telefoon en adres die agenten in formulieren invullen."
-    },
-    "empty": {
-      "personalTitle": "Nog niets van jou",
-      "personalText": "Sla hier een login of sleutel op en je agenten gebruiken die als je erom vraagt.",
-      "teamTitle": "Nog niets gedeeld",
-      "teamText": "Sla de logins en sleutels op die je agenten voor het team gebruiken.",
-      "teamReadText": "Als iemand een login of sleutel met je deelt, verschijnt die hier."
     },
     "import": {
       "title": "Importeren vanaf een computer",
@@ -2050,5 +2025,127 @@
   "team": {
     "entry": "Lijst, organogram en kaart",
     "mapHint": "Om een agent naar een ander kanaal te verplaatsen, gebruik je de kaart op het web of praat je met {{name}}."
+  },
+  "empty": {
+    "agents": {
+      "title": "Stel je team van agents samen",
+      "text": "Elke agent krijgt een rol en werkt met je samen in de chat.",
+      "viewerTitle": "Hier staat je team van agents",
+      "viewerText": "Wie in deze werkruimte agents maakt, voegt de eerste toe, en die verschijnt hier."
+    },
+    "agentsForYou": {
+      "title": "Je agents verschijnen hier",
+      "text": "Wie de agents beheert, kiest welke met je werken."
+    },
+    "drive": {
+      "title": "Alles wat het team maakt, op één plek",
+      "text": "Rapporten, tabellen en bestanden van agents en mensen blijven hier, makkelijk te vinden.",
+      "viewerTitle": "Vind wat het team maakt",
+      "viewerText": "Wat agents en mensen in gesprekken maken, verschijnt hier."
+    },
+    "tasks": {
+      "title": "Geef werk aan het team",
+      "text": "Maak een taak voor een agent of een persoon en volg die tot het einde.",
+      "viewerTitle": "Volg het werk van het team",
+      "viewerText": "Taken verschijnen hier zodra iemand de eerste maakt."
+    },
+    "routines": {
+      "title": "Laat herhalend werk over aan je agents",
+      "text": "Een routine draait vanzelf, op een vast moment of als er iets gebeurt.",
+      "viewerTitle": "Zie wat vanzelf draait",
+      "viewerText": "Wie routines beheert of een agent heeft, maakt ze, en ze verschijnen hier."
+    },
+    "wiki": {
+      "title": "Bewaar wat het team moet weten",
+      "text": "Mensen en agents lezen deze pagina's, zodat iedereen met dezelfde informatie werkt.",
+      "viewerTitle": "Zoek op wat het team weet",
+      "viewerText": "Wie de wiki bewerkt, schrijft de eerste pagina, en die verschijnt hier."
+    },
+    "memory": {
+      "title": "Je agents leren terwijl ze werken",
+      "text": "Wat ze uit gesprekken onthouden, blijft hier, zodat je ziet wat ze weten.",
+      "ask": "Ik wil je vertellen hoe we hier werken.",
+      "noneForAgent": "Geen herinneringen van deze agent."
+    },
+    "threads": {
+      "title": "Elk onderwerp in een eigen gesprek",
+      "text": "Houd een bericht ingedrukt om in een thread te antwoorden of er een missie van te maken.",
+      "action": "Naar gesprekken"
+    },
+    "chats": {
+      "title": "Praat met je agents",
+      "text": "Vraag iets in een gesprek en een agent gaat aan de slag.",
+      "action": "Nieuw gesprek"
+    },
+    "channels": {
+      "title": "Breng mensen en agents samen in een kanaal",
+      "text": "Elk kanaal brengt samen wie voor een onderwerp zorgt.",
+      "viewerTitle": "Hier staan de kanalen van het team",
+      "viewerText": "Wie kanalen maakt, opent het eerste, en dat verschijnt hier.",
+      "action": "Kanaal maken"
+    },
+    "people": {
+      "title": "Werk hier samen met je team",
+      "text": "Nodig mensen uit om met hen en je agents op één plek te praten.",
+      "viewerTitle": "Je team verschijnt hier",
+      "viewerText": "Wie mensen uitnodigt, haalt de rest van het team erbij, en die verschijnen hier."
+    },
+    "chat": {
+      "title": "Alles begint met een bericht",
+      "text": "Schrijf hieronder en iedereen hier ziet het.",
+      "viewerTitle": "Berichten verschijnen hier",
+      "viewerText": "Je kunt dit gesprek lezen zodra iemand schrijft."
+    },
+    "ai": {
+      "title": "Geef je agents een AI om mee te denken",
+      "text": "Koppel een abonnement dat je al betaalt en ze gaan ermee aan het werk."
+    },
+    "vaultPersonal": {
+      "title": "Bewaar je logins veilig",
+      "text": "Sla een login of sleutel op en je agents gebruiken die als je erom vraagt."
+    },
+    "vaultTeam": {
+      "title": "Deel logins zonder wachtwoorden door te geven",
+      "text": "Sla de logins en sleutels op die je agents voor het team gebruiken.",
+      "viewerTitle": "De logins van het team verschijnen hier",
+      "viewerText": "Als iemand een login of sleutel met je deelt, verschijnt die hier."
+    },
+    "skills": {
+      "title": "Leer je agents hoe jullie werken",
+      "text": "Een skill bevat de stappen van een taak, en agents openen die wanneer nodig."
+    },
+    "apps": {
+      "title": "Vraag je agents iets vanuit andere apps",
+      "text": "Koppel Claude of een andere app en geef taken zonder die te verlaten."
+    },
+    "access": {
+      "title": "Kies wat elke agent mag gebruiken",
+      "text": "Koppel een dienst en stel hier de toegang van elke agent in.",
+      "viewerTitle": "De toegang van elke agent verschijnt hier",
+      "viewerText": "Wie de connectors beheert, koppelt de eerste dienst.",
+      "action": "Een dienst koppelen"
+    },
+    "board": {
+      "title": "Zie wat telt op één dashboard",
+      "text": "Voeg een widget toe, vraag een agent om er een of pin een blok uit de chat.",
+      "viewerTitle": "Dit dashboard krijgt vorm",
+      "viewerText": "Wie dit dashboard bewerkt, voegt de widgets toe, en die verschijnen hier."
+    },
+    "computers": {
+      "title": "Geef je agents nog een computer",
+      "text": "Koppel met een code een Mac mini thuis of een andere server.",
+      "viewerTitle": "Andere computers verschijnen hier",
+      "viewerText": "Wie computers koppelt, voegt ze toe, en ze verschijnen hier."
+    },
+    "connectors": {
+      "title": "Geef je agents echt gereedschap",
+      "text": "Koppel een dienst en ze kunnen daarin lezen en handelen.",
+      "viewerTitle": "Het gereedschap van je agents verschijnt hier",
+      "viewerText": "Wie de connectors beheert, koppelt de diensten hieronder."
+    },
+    "audit": {
+      "title": "Niets te controleren",
+      "text": "Als een agent iets buiten het gesprek doet, verschijnt het hier."
+    }
   }
 }

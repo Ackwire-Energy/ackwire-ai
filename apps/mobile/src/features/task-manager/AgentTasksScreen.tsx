@@ -6,10 +6,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, Chip, Count, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
+import { Button, Chip, Count, EmptyState, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useAgentTasks, useStopper } from "./hooks";
@@ -98,9 +99,12 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
               </>
             ) : (
               <Animated.View {...fade}>
-                <Text variant="footnote" tone="faint" style={styles.free}>
-                  {t("taskManager.agentPanel.none", { name })}
-                </Text>
+                <EmptyState
+                  size="panel"
+                  agent={agentLook(dir.anyAgent(agentId))}
+                  mood="deal"
+                  title={t("taskManager.agentPanel.none", { name })}
+                />
               </Animated.View>
             )}
             {asking && stoppable.length > 1 ? (

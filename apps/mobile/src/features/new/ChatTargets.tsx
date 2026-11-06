@@ -1,11 +1,14 @@
+import { router } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native";
+import { useOrg } from "@/providers/org";
 import { EmptyState, Icon, Text } from "@/ui";
 import { AgentFace, Face } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { ActionList } from "../shared/parts";
-import { chatMatches } from "./logic";
+import { chatMatches, mayCreate } from "./logic";
 
 /**
  * Who a conversation can start with, for the words typed: "Agents" and "People", each a card of rows (face, name,
@@ -25,6 +28,7 @@ export function ChatTargets({
   const c = useColors();
   const dir = useDirectory();
   const meId = useMeId();
+  const { org } = useOrg();
   const found = useMemo(
     () => chatMatches(q, dir.agents, dir.memberById.values(), meId),
     [q, dir.agents, dir.memberById, meId],
@@ -66,10 +70,17 @@ export function ChatTargets({
         </>
       ) : null}
       {found.agents.length + found.people.length === 0 && !dir.loading ? (
-        <EmptyState
-          icon={q.trim() ? "search" : "members"}
-          title={q.trim() ? t("mobile.find.nothing", { q: q.trim() }) : t("mobile.new.nobody")}
-        />
+        q.trim() ? (
+          <EmptyState size="inline" title={t("mobile.find.nothing", { q: q.trim() })} />
+        ) : (
+          <FirstUse
+            place="people"
+            size="panel"
+            acts={mayCreate(org, "invite")}
+            label={t("members.inviteTitle")}
+            onPress={() => router.push("/invite-people")}
+          />
+        )
       ) : null}
     </>
   );

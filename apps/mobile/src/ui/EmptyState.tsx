@@ -1,4 +1,3 @@
-import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { type StickerLook, type StickerMood, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
@@ -15,10 +14,6 @@ export interface EmptyStateProps {
   subtitle?: string;
   /** A window of pixel sky with a few agents on it (only where the subject is agents). */
   sky?: boolean;
-  /** Who stands on the sky, the first in the middle (the workspace's agents; three of the app's colors without). */
-  crew?: readonly AgentLookInput[];
-  /** The sky's color (the first agent's by default). */
-  color?: AgentColorName;
   /** Without the sky: a quiet icon over the words (a search with nothing found, an empty folder). */
   icon?: IconName;
   /** One way out under the text (a `Button`), centered at its own size. */
@@ -37,10 +32,10 @@ export interface EmptyStateProps {
 /** The agent's side: whole multiples of the sticker's 64-cell grid at the phones' densities. */
 const AGENT_SIDE = { page: 128, panel: 96 } as const;
 
-/** The agents standing on an empty sky when the screen has none of its own to show. */
+/** The agents standing on the sky, the middle one awake. */
 const SOMEONE: readonly AgentLookInput[] = [
-  { color: "indigo", eyes: "round", id: "empty-1" },
   { color: "green", eyes: "round", id: "empty-2" },
+  { color: "indigo", eyes: "round", id: "empty-1" },
   { color: "rose", eyes: "round", id: "empty-3" },
 ];
 
@@ -57,8 +52,6 @@ export function EmptyState({
   title,
   subtitle,
   sky = false,
-  crew,
-  color,
   icon,
   action,
   size,
@@ -66,10 +59,6 @@ export function EmptyState({
   mood = "wave",
 }: EmptyStateProps) {
   const { colors } = useTheme();
-  const cast = (crew && crew.length > 0 ? crew : SOMEONE).slice(0, 3);
-  const lead = cast[0];
-  // The first in the middle, a little bigger and awake; whoever else beside it, resting.
-  const order = cast.length === 3 ? [cast[1], cast[0], cast[2]] : cast;
   const inline = size === "inline";
   return (
     <View style={[styles.wrap, size === "page" && styles.page, inline && styles.inline]}>
@@ -86,18 +75,11 @@ export function EmptyState({
         </View>
       ) : sky ? (
         <View style={styles.window}>
-          <Sky color={color ?? lead?.color ?? "sky"} depth={0.75} style={StyleSheet.absoluteFill} />
+          <Sky color="indigo" depth={0.75} style={StyleSheet.absoluteFill} />
           <View style={styles.crew}>
-            {order.map((look, i) =>
-              look ? (
-                <AgentAvatar
-                  key={look.id ?? `${look.color}-${i}`}
-                  agent={look}
-                  size={look === lead ? 48 : 38}
-                  mode={look === lead ? "idle" : "rest"}
-                />
-              ) : null,
-            )}
+            {SOMEONE.map((look, i) => (
+              <AgentAvatar key={look.id} agent={look} size={i === 1 ? 48 : 38} mode={i === 1 ? "idle" : "rest"} />
+            ))}
           </View>
         </View>
       ) : icon && !inline ? (

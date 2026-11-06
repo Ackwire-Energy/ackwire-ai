@@ -1,13 +1,17 @@
 import { type ArtifactFilters, useArtifacts } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, EmptyState, Filters, SearchField, SectionHeader, Text, useReducedMotion } from "@/ui";
+import { useOrg } from "@/providers/org";
+import { Button, EmptyState, Filters, IconButton, SearchField, SectionHeader, Text, useReducedMotion } from "@/ui";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { DriveCard } from "./DriveCard";
 import { DRIVE_TYPES, type DriveDaySection, type DriveType, driveSections, gridRows, matchesType } from "./logic";
+import { useDriveUpload } from "./useDriveUpload";
 
 /** Cards shown at first and added by "Mostrar mais" (each card loads its own preview). */
 const PAGE = 24;
@@ -15,7 +19,7 @@ const PAGE = 24;
 /**
  * Drive, pushed from Você: the search, the type chips (Tudo,
  * Documentos, Imagens, Tabelas, Diffs), and everything the person can see grouped by day (Hoje, Esta semana,
- * then by month) in a two-column grid of real previews. A card opens the file viewer. `highlightId`: the
+ * then by month) in a two-column grid of real previews, and a file sent from the phone. A card opens the file viewer. `highlightId`: the
  * item "Ver no Drive" came from, outlined.
  */
 export function DriveScreen({ highlightId = null }: { highlightId?: string | null }) {
@@ -47,6 +51,12 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
           .replace(/^./, (x) => x.toLocaleUpperCase())
       : t(`mobile.drive.section.${s.label.kind}`);
   const total = all.length;
+  const mayUpload = can(useOrg().org, "upload_files");
+  const uploader = useDriveUpload(list.refetch);
+  const clear = () => {
+    setQ("");
+    setType("all");
+  };
   const visible = sections.reduce((n, s) => n + s.items.length, 0);
   // The grid fades in over the spinner, and a day that comes or goes with a filter or "Show more" fades while the rest
   // slide into place; what shows when the screen opens doesn't fade card by card.
@@ -56,6 +66,13 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
   return (
     <PushedLargeTitle
       title={t("mobile.drive.title")}
+      {...(mayUpload
+        ? {
+            right: (
+              <IconButton icon="plus" label={t("files.upload")} disabled={uploader.busy} onPress={uploader.pick} />
+            ),
+          }
+        : {})}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <View style={styles.search}>
@@ -88,9 +105,19 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
         </View>
       ) : total === 0 ? (
         search || type !== "all" ? (
-          <EmptyState icon="search" title={t("mobile.drive.noResults")} />
+          <EmptyState
+            size="inline"
+            title={t("mobile.drive.noResults")}
+            action={<Button variant="secondary" size="sm" label={t("filters.clearAll")} onPress={clear} />}
+          />
         ) : (
-          <EmptyState icon="drive" title={t("mobile.drive.empty")} subtitle={t("mobile.drive.emptySub")} />
+          <FirstUse
+            place="drive"
+            acts={mayUpload}
+            label={t("files.upload")}
+            busy={uploader.busy}
+            onPress={uploader.pick}
+          />
         )
       ) : (
         <Animated.View {...fade}>
