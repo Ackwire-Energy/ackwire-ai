@@ -6512,14 +6512,14 @@
         "url": "Payload URL",
         "type": "Content type: application/json",
         "secret": "Secret",
-        "events": "В событиях выберите Pull requests и Deployment statuses, затем Add webhook.",
+        "events": "В Which events выберите Let me select individual events. Отметьте Pull requests и Deployment statuses, затем Add webhook.",
         "another": "Добавить в другой репозиторий"
       },
       "sentry": {
         "open": "В Sentry создайте внутреннюю интеграцию.",
         "openLink": "Открыть в Sentry",
         "url": "Webhook URL",
-        "events": "В разделе Webhooks отметьте issue и сохраните.",
+        "events": "В разделе Permissions поставьте для Issue & Event значение Read. Затем в разделе Webhooks отметьте issue и сохраните.",
         "secret": "Client Secret интеграции",
         "secretPlaceholder": "Вставьте Client Secret",
         "secretSaved": "Сохранено. Вставьте новый, чтобы заменить",

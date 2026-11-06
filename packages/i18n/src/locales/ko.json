@@ -5900,14 +5900,14 @@
         "url": "Payload URL",
         "type": "Content type: application/json",
         "secret": "Secret",
-        "events": "이벤트에서 Pull requests와 Deployment statuses를 고른 뒤 Add webhook을 누르세요.",
+        "events": "Which events에서 Let me select individual events를 고르세요. Pull requests와 Deployment statuses를 체크한 뒤 Add webhook을 누르세요.",
         "another": "다른 저장소에 추가"
       },
       "sentry": {
         "open": "Sentry에서 내부 통합을 만드세요.",
         "openLink": "Sentry에서 열기",
         "url": "Webhook URL",
-        "events": "Webhooks에서 issue를 체크하고 저장하세요.",
+        "events": "Permissions에서 Issue & Event를 Read로 바꾸세요. 그다음 Webhooks에서 issue를 체크하고 저장하세요.",
         "secret": "통합의 Client Secret",
         "secretPlaceholder": "Client Secret 붙여넣기",
         "secretSaved": "저장했어요. 바꾸려면 새 값을 붙여넣으세요",

@@ -5903,14 +5903,14 @@
         "url": "Payload URL",
         "type": "Content type: application/json",
         "secret": "Secret",
-        "events": "イベントでPull requestsとDeployment statusesを選び、Add webhookを押します。",
+        "events": "Which eventsでLet me select individual eventsを選びます。Pull requestsとDeployment statusesにチェックを入れ、Add webhookを押します。",
         "another": "別のリポジトリに追加"
       },
       "sentry": {
         "open": "Sentryで内部インテグレーションを作成します。",
         "openLink": "Sentryで開く",
         "url": "Webhook URL",
-        "events": "Webhooksでissueにチェックを入れて保存します。",
+        "events": "PermissionsでIssue & EventをReadにします。次にWebhooksでissueにチェックを入れて保存します。",
         "secret": "インテグレーションのClient Secret",
         "secretPlaceholder": "Client Secretを貼り付け",
         "secretSaved": "保存済み。置き換えるには新しいものを貼り付け",

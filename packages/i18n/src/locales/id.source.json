@@ -14849,7 +14849,7 @@
     "value": "Secret"
   },
   "routines.setup.github.events": {
-    "value": "Under events, pick Pull requests and Deployment statuses, then Add webhook."
+    "value": "Under Which events, choose Let me select individual events. Tick Pull requests and Deployment statuses, then Add webhook."
   },
   "routines.setup.github.another": {
     "value": "Add to another repository"
@@ -14864,7 +14864,7 @@
     "value": "Webhook URL"
   },
   "routines.setup.sentry.events": {
-    "value": "Under Webhooks, tick issue and save."
+    "value": "Under Permissions, set Issue & Event to Read. Then under Webhooks, tick issue and save."
   },
   "routines.setup.sentry.secret": {
     "value": "The integration's Client Secret"

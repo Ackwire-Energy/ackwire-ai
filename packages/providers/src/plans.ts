@@ -439,11 +439,12 @@ export function claudeCodeModel(plan: CodingPlan | undefined, value: unknown): s
 
 /**
  * The model of a plan (`provider`) a stored value named that the plan's live list (`modelsUrl`) no longer has: its
- * turns run `sonnet` instead (`claudeCodeModel`). Null for an alias, a Claude id, another plan's model or a plan
- * without a list. Its label from the table when the table still knows it.
+ * turns run `sonnet` instead (`claudeCodeModel`). Null for an alias, a Claude id, another plan's model, a plan
+ * without a list, or before this process has read the list (the table alone would call any newer model gone). Its
+ * label from the table when the table still knows it.
  */
 export function droppedPlanModel(provider: unknown, value: unknown): PlanModel | null {
-  const plan = planOf(provider);
+  const plan = isPlanId(provider) ? learned.get(provider) : undefined;
   if (!isPlanId(provider) || !plan?.modelsUrl) return null;
   if (typeof value !== "string" || isAlias(value) || /^claude-/.test(value)) return null;
   if (plan.claudeCode.models.some((m) => m.id === value) || planModelById(value)) return null;

@@ -6180,14 +6180,14 @@
         "url": "Payload URL",
         "type": "Content type: application/json",
         "secret": "Secret",
-        "events": "Kies bij de events Pull requests en Deployment statuses, en dan Add webhook.",
+        "events": "Kies bij Which events Let me select individual events. Vink Pull requests en Deployment statuses aan, en dan Add webhook.",
         "another": "Aan een andere repository toevoegen"
       },
       "sentry": {
         "open": "Maak in Sentry een interne integratie.",
         "openLink": "Openen in Sentry",
         "url": "Webhook URL",
-        "events": "Vink onder Webhooks issue aan en sla op.",
+        "events": "Zet onder Permissions Issue & Event op Read. Vink daarna onder Webhooks issue aan en sla op.",
         "secret": "Client Secret van de integratie",
         "secretPlaceholder": "Plak het Client Secret",
         "secretSaved": "Opgeslagen. Plak een nieuw om het te vervangen",

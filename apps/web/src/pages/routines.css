@@ -916,3 +916,9 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-setup__steps p {
   margin: 0;
 }
+/* The address and secret to paste wrap: all of them in sight, never half hidden behind a sideways scroll. */
+.routine-setup .machine-command__code {
+  overflow-x: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

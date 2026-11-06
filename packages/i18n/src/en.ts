@@ -6123,14 +6123,15 @@ export const en = {
         url: "Payload URL",
         type: "Content type: application/json",
         secret: "Secret",
-        events: "Under events, pick Pull requests and Deployment statuses, then Add webhook.",
+        events:
+          "Under Which events, choose Let me select individual events. Tick Pull requests and Deployment statuses, then Add webhook.",
         another: "Add to another repository",
       },
       sentry: {
         open: "In Sentry, create an internal integration.",
         openLink: "Open in Sentry",
         url: "Webhook URL",
-        events: "Under Webhooks, tick issue and save.",
+        events: "Under Permissions, set Issue & Event to Read. Then under Webhooks, tick issue and save.",
         secret: "The integration's Client Secret",
         secretPlaceholder: "Paste the Client Secret",
         secretSaved: "Saved. Paste a new one to replace it",

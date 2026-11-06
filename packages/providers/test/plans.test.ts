@@ -332,3 +332,11 @@ test("a model the plan's live list dropped: named, with the table's label; nothi
     learnPlanModels({ opencode: table });
   }
 });
+
+test("before this process has read the plan's live list, no model counts as dropped", () => {
+  // A fresh process: this file's other tests have already taught the list to this one.
+  const code = `import { droppedPlanModel } from ${JSON.stringify(`${import.meta.dir}/../src/plans.ts`)};
+console.log(JSON.stringify([droppedPlanModel("opencode", "glm-9"), droppedPlanModel("opencode", "hy3")]));`;
+  const run = Bun.spawnSync([process.execPath, "-e", code]);
+  expect(run.stdout.toString().trim()).toBe("[null,null]");
+});

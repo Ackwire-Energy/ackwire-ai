@@ -3896,9 +3896,18 @@ export function useRoutineHookAction(orgId: string, id: string) {
  */
 export const useWebhookSetup = (orgId: string, provider: WebhookProvider | null, waiting = false) => {
   const api = useApi();
+  const qc = useQueryClient();
   return useQuery({
     queryKey: keys.webhookSetup(orgId, provider ?? ""),
-    queryFn: () => api.routines.webhookSetup(orgId, provider ?? "github"),
+    queryFn: async () => {
+      const before = qc.getQueryData<WebhookSetup>(keys.webhookSetup(orgId, provider ?? ""));
+      const setup = await api.routines.webhookSetup(orgId, provider ?? "github");
+      // Its first good call moves the routines waiting on it out of "needs webhook" on the same screen.
+      if (before && !before.receivedAt && setup.receivedAt) {
+        void qc.invalidateQueries({ queryKey: keys.routines(orgId), exact: true });
+      }
+      return setup;
+    },
     enabled: provider !== null,
     refetchInterval: waiting ? 3000 : false,
     // The person is likely on GitHub's or Sentry's tab saving the webhook while Testar waits.
@@ -3919,7 +3928,10 @@ export function useWebhookSetupAction(orgId: string, provider: WebhookProvider) 
         : action.type === "secret"
           ? api.routines.setWebhookSecret(orgId, provider, action.secret)
           : api.routines.addWebhookToRepo(orgId, action.repo),
-    onSuccess: (setup) => qc.setQueryData(keys.webhookSetup(orgId, provider), setup),
+    onSuccess: (setup) => {
+      qc.setQueryData(keys.webhookSetup(orgId, provider), setup);
+      if (setup.receivedAt) void qc.invalidateQueries({ queryKey: keys.routines(orgId), exact: true });
+    },
   });
 }
 

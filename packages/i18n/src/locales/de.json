@@ -6130,14 +6130,14 @@
         "url": "Payload URL",
         "type": "Content type: application/json",
         "secret": "Secret",
-        "events": "Wähle bei den Ereignissen Pull requests und Deployment statuses, dann Add webhook.",
+        "events": "Wähle bei Which events Let me select individual events. Hake Pull requests und Deployment statuses an, dann Add webhook.",
         "another": "Zu einem weiteren Repo hinzufügen"
       },
       "sentry": {
         "open": "Erstelle in Sentry eine interne Integration.",
         "openLink": "In Sentry öffnen",
         "url": "Webhook URL",
-        "events": "Hake unter Webhooks issue an und speichere.",
+        "events": "Stelle unter Permissions Issue & Event auf Read. Hake dann unter Webhooks issue an und speichere.",
         "secret": "Client Secret der Integration",
         "secretPlaceholder": "Client Secret einfügen",
         "secretSaved": "Gespeichert. Füge ein neues ein, um es zu ersetzen",

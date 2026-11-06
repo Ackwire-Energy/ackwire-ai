@@ -5940,14 +5940,14 @@
         "url": "Payload URL",
         "type": "Content type: application/json",
         "secret": "Secret",
-        "events": "Di bagian event, pilih Pull requests dan Deployment statuses, lalu Add webhook.",
+        "events": "Di Which events, pilih Let me select individual events. Centang Pull requests dan Deployment statuses, lalu Add webhook.",
         "another": "Tambahkan ke repositori lain"
       },
       "sentry": {
         "open": "Di Sentry, buat integrasi internal.",
         "openLink": "Buka di Sentry",
         "url": "Webhook URL",
-        "events": "Di Webhooks, centang issue lalu simpan.",
+        "events": "Di Permissions, setel Issue & Event ke Read. Lalu di Webhooks, centang issue dan simpan.",
         "secret": "Client Secret integrasi",
         "secretPlaceholder": "Tempel Client Secret",
         "secretSaved": "Tersimpan. Tempel yang baru untuk menggantinya",

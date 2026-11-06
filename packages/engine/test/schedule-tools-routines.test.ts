@@ -366,6 +366,10 @@ describe("schedule tools: routines", () => {
     expect((await call("list_routines", {})).content).toContain(
       "can't run yet: no GitHub webhook sends its event here",
     );
+    // Its edit tells the agent where the person sets the webhook up: the routine's own GitHub webhook card.
+    expect((await call("update_routine", { id, prompt: "Revise o PR novo." })).content).toContain(
+      "opens this routine in Rotinas and follows the GitHub webhook steps shown there",
+    );
     // Paused, it says so first.
     const paused = await call("update_routine", { id, active: false });
     expect(paused.content).not.toContain("can't run yet");

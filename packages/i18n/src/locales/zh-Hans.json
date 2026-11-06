@@ -5952,14 +5952,14 @@
         "url": "Payload URL",
         "type": "Content type: application/json",
         "secret": "Secret",
-        "events": "在事件中选择 Pull requests 和 Deployment statuses，然后点 Add webhook。",
+        "events": "在 Which events 中选择 Let me select individual events。勾选 Pull requests 和 Deployment statuses，然后点 Add webhook。",
         "another": "添加到另一个仓库"
       },
       "sentry": {
         "open": "在 Sentry 中创建一个内部集成。",
         "openLink": "在 Sentry 中打开",
         "url": "Webhook URL",
-        "events": "在 Webhooks 下勾选 issue 并保存。",
+        "events": "在 Permissions 下把 Issue & Event 设为 Read。然后在 Webhooks 下勾选 issue 并保存。",
         "secret": "集成的 Client Secret",
         "secretPlaceholder": "粘贴 Client Secret",
         "secretSaved": "已保存。粘贴新的即可替换",

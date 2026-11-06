@@ -278,7 +278,7 @@ async function neverFires(ctx: ToolContext, trigger: RoutineTriggerInput, what: 
 function needsText(r: RoutineView) {
   if (r.state !== "needs_webhook") return "";
   const name = hookName(r);
-  return ` It can't run yet: no ${name} webhook sends this workspace its events, so nothing starts it. Tell the person what it needs: someone who manages connectors opens this routine in Rotinas and follows the ${name} steps under Quando. Until then it never runs; if they'd rather not wait, offer a schedule that checks instead.`;
+  return ` It can't run yet: no ${name} webhook sends this workspace its events, so nothing starts it. Tell the person what it needs: someone who manages connectors opens this routine in Rotinas and follows the ${name} webhook steps shown there. Until then it never runs; if they'd rather not wait, offer a schedule that checks instead.`;
 }
 
 /** One run, coded: "2026-10-20 09:00 failed (provider_error)". */

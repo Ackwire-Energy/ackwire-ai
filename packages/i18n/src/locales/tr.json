@@ -6091,14 +6091,14 @@
         "url": "Payload URL",
         "type": "Content type: application/json",
         "secret": "Secret",
-        "events": "Olaylarda Pull requests ve Deployment statuses'ı seç, sonra Add webhook.",
+        "events": "Which events altında Let me select individual events'i seç. Pull requests ve Deployment statuses'ı işaretle, sonra Add webhook.",
         "another": "Başka bir depoya ekle"
       },
       "sentry": {
         "open": "Sentry'de bir dahili entegrasyon oluştur.",
         "openLink": "Sentry'de aç",
         "url": "Webhook URL",
-        "events": "Webhooks altında issue'yu işaretle ve kaydet.",
+        "events": "Permissions altında Issue & Event'i Read yap. Sonra Webhooks altında issue'yu işaretle ve kaydet.",
         "secret": "Entegrasyonun Client Secret'ı",
         "secretPlaceholder": "Client Secret'ı yapıştır",
         "secretSaved": "Kaydedildi. Değiştirmek için yenisini yapıştır",

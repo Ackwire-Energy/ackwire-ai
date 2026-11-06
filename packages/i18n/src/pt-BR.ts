@@ -6207,14 +6207,15 @@ export const ptBR = {
         url: "Payload URL",
         type: "Content type: application/json",
         secret: "Secret",
-        events: "Em eventos, escolha Pull requests e Deployment statuses e clique em Add webhook.",
+        events:
+          "Em Which events, escolha Let me select individual events. Marque Pull requests e Deployment statuses e clique em Add webhook.",
         another: "Ligar em outro repositório",
       },
       sentry: {
         open: "No Sentry, crie uma integração interna.",
         openLink: "Abrir no Sentry",
         url: "Webhook URL",
-        events: "Em Webhooks, marque issue e salve.",
+        events: "Em Permissions, deixe Issue & Event em Read. Depois, em Webhooks, marque issue e salve.",
         secret: "Client Secret da integração",
         secretPlaceholder: "Cole o Client Secret",
         secretSaved: "Salvo. Cole outro para trocar",
