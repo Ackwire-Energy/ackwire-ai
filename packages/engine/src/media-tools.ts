@@ -92,6 +92,23 @@ export interface MediaToolDeps {
   gifs: GifProvider | null;
 }
 
+/**
+ * The GIF search the calling agent may use: the server's, answering now, with the workspace's GIFs on and the agent's
+ * own switch (`agents.media_replies`). Null: no GIF. Where it goes is the caller's check (`post_message` posts one in
+ * another channel, ADR 0091 addendum 2026-11-05).
+ */
+export async function agentGifSearch(
+  gifs: GifProvider | null | undefined,
+  ctx: Pick<ToolContext, "db" | "orgId" | "agentId">,
+): Promise<GifProvider | null> {
+  if (!gifs?.available()) return null;
+  const [settings, agent] = await Promise.all([
+    mediaSettings(ctx.db, ctx.orgId),
+    getAgentCached(ctx.db, ctx.orgId, ctx.agentId),
+  ]);
+  return settings.gifs && agent && !agent.archivedAt && agent.mediaReplies ? gifs : null;
+}
+
 type RunRow = { hop: number; createdAt: Date };
 
 /** The run's hop (its messages carry it) and start (its own messages are read from there). */
@@ -195,7 +212,7 @@ function gifTool(deps: MediaToolDeps, gifs: GifProvider, options: { sticker: boo
   const instead = options.sticker ? " Send your sticker with `send_sticker` instead, or just reply." : " Just reply.";
   return {
     name: SEND_GIF_TOOL,
-    description: `Send a GIF in this conversation ${WHEN} \`search\` says what the GIF shows, as a short search in English (1 to 6 words, e.g. "good morning coffee cat") whatever language the conversation is in: GIF search matches English best. ${AFTER}`,
+    description: `Send a GIF in this conversation ${WHEN} \`search\` says what the GIF shows, as a short search in English (1 to 6 words, e.g. "good morning coffee cat") whatever language the conversation is in: GIF search matches English best. ${AFTER} To post a GIF in another channel, use post_message with \`gif\`.`,
     scope: "",
     inputSchema: {
       type: "object",
