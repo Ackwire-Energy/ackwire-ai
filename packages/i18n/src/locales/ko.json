@@ -13137,6 +13137,12 @@
       "ended": "{{name}}의 브라우저가 닫혔어요.",
       "starting": "페이지를 여는 중…",
       "page": "{{name}}의 실시간 페이지",
+      "emulated": {
+        "phone": "휴대폰 · {{size}}",
+        "tablet": "태블릿 · {{size}}",
+        "desktop": "데스크톱 · {{size}}"
+      },
+      "normalSize": "기본 크기",
       "tabs_other": "탭 {{count}}개",
       "typeHere": "여기에 입력하세요",
       "typeTo": "{{field}}에 입력돼요",

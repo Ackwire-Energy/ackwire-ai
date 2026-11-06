@@ -3447,3 +3447,100 @@ test.if(posix)(
     expect(state.filled ?? []).toEqual([]);
   },
 );
+
+/** A Chrome whose DevTools socket the runner keeps (its traffic counter), and every such socket opened. */
+function chromeWithDevtools() {
+  const devtools: FakeSocket[] = [];
+  const chromes = fakeChromes();
+  const t = setup({
+    startChrome: async (exe, args, profile) => ({
+      ...(await chromes.start(exe, args, profile)),
+      wsPath: "/devtools/browser/sized",
+    }),
+    connectDevtools: (url) => {
+      const s = new FakeSocket(url);
+      devtools.push(s);
+      queueMicrotask(() => {
+        s.onopen?.();
+        s.push({ id: 1, result: {} });
+      });
+      return s;
+    },
+  });
+  return { t, devtools, chromes: chromes.started };
+}
+
+const emulationOn = (socket: FakeSocket | undefined, sessionId: string) =>
+  (socket?.sent ?? []).filter((m) => m.sessionId === sessionId && String(m.method).startsWith("Emulation."));
+
+test.if(posix)(
+  "agentes:viewport: every tab at a phone's size until changed back, the frames say so, and a closed browser forgets it",
+  async () => {
+    const { t, devtools, chromes } = chromeWithDevtools();
+    // Refused before anything runs: no device, half a size, a size off the bounds.
+    for (const args of [["watch"], ["phone", "375"], ["phone", "100", "667"]]) {
+      expect(await errorCode(() => t.act("agentes:viewport", args))).toBe("bad_request");
+    }
+    expect(chromes).toHaveLength(0);
+    // Chrome starts for it; the size goes to its tabs on the runner's own DevTools socket, never to agent-browser.
+    expect(await t.act("agentes:viewport", ["phone"])).toMatchObject({
+      success: true,
+      data: { device: "phone", width: 390, height: 844 },
+    });
+    expect(t.logged().some((c) => c.args.includes("agentes:viewport"))).toBe(false);
+    const cdp = devtools[0];
+    cdp?.push({
+      method: "Target.attachedToTarget",
+      params: { sessionId: "tab-1", targetInfo: { type: "page", targetId: "t1" } },
+    });
+    expect(emulationOn(cdp, "tab-1").map((m) => m.method)).toEqual([
+      "Emulation.setDeviceMetricsOverride",
+      "Emulation.setTouchEmulationEnabled",
+      "Emulation.setUserAgentOverride",
+    ]);
+    expect(emulationOn(cdp, "tab-1")[0]?.params).toMatchObject({
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 3,
+      mobile: true,
+    });
+    // The user agent is this Chrome's version, as Chrome on Android says it.
+    expect(JSON.stringify(emulationOn(cdp, "tab-1")[2]?.params)).toContain("Chrome/156.0.0.0 Mobile Safari");
+    // The live view's frames carry it.
+    await t.act("open", ["https://shop.example.com/"]);
+    await t.manager.streamStart(dev, "watch");
+    t.sockets[0]?.push({ type: "frame", seq: 1, data: "/9j/A", metadata: { deviceWidth: 390, deviceHeight: 844 } });
+    const frames = () => t.frames.filter((f) => f.type === "browser.frame");
+    expect(frames().at(-1)).toMatchObject({ metadata: { deviceWidth: 390, deviceHeight: 844, emulated: "phone" } });
+    // Chrome quits under it (a crash, an update): the next Chrome's tabs get the same size.
+    chromes[0]?.close();
+    await t.act("open", ["https://shop.example.com/"]);
+    await waitFor(() => devtools.length === 2);
+    devtools[1]?.push({
+      method: "Target.attachedToTarget",
+      params: { sessionId: "tab-2", targetInfo: { type: "page", targetId: "t2" } },
+    });
+    expect(emulationOn(devtools[1], "tab-2")[0]?.params).toMatchObject({ width: 390, mobile: true });
+    // `desktop` alone ends it on every tab.
+    expect(await t.act("agentes:viewport", ["desktop"])).toMatchObject({ success: true, data: { device: "desktop" } });
+    expect(
+      emulationOn(devtools[1], "tab-2")
+        .slice(3)
+        .map((m) => m.method),
+    ).toEqual([
+      "Emulation.clearDeviceMetricsOverride",
+      "Emulation.setTouchEmulationEnabled",
+      "Emulation.setUserAgentOverride",
+    ]);
+    // An exact size, then the agent closes its browser: the next one opens at the window's own size.
+    expect(await t.act("agentes:viewport", ["desktop", "1440", "900"])).toMatchObject({ success: true });
+    await t.act("close");
+    await t.act("open", ["https://shop.example.com/"]);
+    await waitFor(() => devtools.length === 3);
+    devtools[2]?.push({
+      method: "Target.attachedToTarget",
+      params: { sessionId: "tab-3", targetInfo: { type: "page", targetId: "t3" } },
+    });
+    expect(emulationOn(devtools[2], "tab-3")).toEqual([]);
+  },
+);

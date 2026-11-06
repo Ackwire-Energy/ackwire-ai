@@ -14468,6 +14468,12 @@
       "ended": "Браузер {{name}} закрыт.",
       "starting": "Открываем страницу…",
       "page": "Страница {{name}} вживую",
+      "emulated": {
+        "phone": "Телефон · {{size}}",
+        "tablet": "Планшет · {{size}}",
+        "desktop": "Компьютер · {{size}}"
+      },
+      "normalSize": "Обычный размер",
       "tabs_one": "{{count}} вкладка",
       "tabs_few": "{{count}} вкладки",
       "tabs_many": "{{count}} вкладок",

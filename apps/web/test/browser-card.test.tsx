@@ -455,7 +455,7 @@ describe("the card in the message", () => {
     /** The input frames sent since, each as its events. */
     const frames = () =>
       (socket.sent.slice(before) as Sent[]).filter((f) => f.type === "browser.input").map((f) => f.events ?? []);
-    return { card, page, img, socket, sentToPage, flushed, frames };
+    return { card, page, img, socket, sentToPage, flushed, frames, state };
   }
   const pointer = (pointerId: number, x: number, y: number, pointerType = "mouse") => ({
     pointerId,
@@ -472,6 +472,42 @@ describe("the card in the message", () => {
     await act(async () => page.dispatchEvent(e));
     return e;
   };
+
+  test("a page the agent shows as a phone: centred with its size said, and the person in control can end it", async () => {
+    const { card, page, socket, state } = await inControlOfPage();
+    expect(card.querySelector(".brw-emu")).toBeNull();
+    await act(async () =>
+      socket.push({
+        type: "browser.frame",
+        agentId: ADA_ID,
+        seq: 2,
+        data: FRAME_DATA,
+        metadata: { deviceWidth: 390, deviceHeight: 844, emulated: "phone" },
+      }),
+    );
+    const label = card.querySelector(".brw-emu") as HTMLElement;
+    expect(label.textContent).toContain("Celular · 390×844");
+    expect(page.classList.contains("is-emulated")).toBe(true);
+    // Its button is off the page: pressing it sends the page nothing.
+    expect(page.contains(label)).toBe(false);
+    await act(async () => fireEvent.click(within(label).getByRole("button", { name: "Tamanho normal" })));
+    await settle(2);
+    expect(state.calls.filter((c) => c.method === "browser.open").map((c) => c.args)).toEqual([
+      [ORG_ID, ADA_ID, { go: "normalSize" }],
+    ]);
+    // Back at the window's size: no label.
+    await act(async () =>
+      socket.push({
+        type: "browser.frame",
+        agentId: ADA_ID,
+        seq: 3,
+        data: FRAME_DATA,
+        metadata: { deviceWidth: 1280, deviceHeight: 800 },
+      }),
+    );
+    expect(card.querySelector(".brw-emu")).toBeNull();
+    expect(page.classList.contains("is-emulated")).toBe(false);
+  });
 
   test("the wheel scrolls the conversation until the page is pressed; Esc gives it back", async () => {
     const { card, page } = await inControlOfPage();

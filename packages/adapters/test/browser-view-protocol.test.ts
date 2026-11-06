@@ -2,10 +2,13 @@ import { expect, test } from "bun:test";
 import {
   BROWSER_LIMITS,
   BROWSER_VIEW_PROTOCOL,
+  BROWSER_VIEWPORT_PROTOCOL,
+  browserViewportOf,
   decodeBrowserFrame,
   encodeBrowserFrame,
   MACHINE_OPS,
   MACHINE_PROTOCOL_VERSION,
+  parseRunnerFrame,
   parseServerFrame,
   parseStreamControl,
 } from "../src/machine-protocol";
@@ -63,4 +66,53 @@ test("bytes that aren't a frame read as null; the header is checked like a brows
     JPEG,
   );
   expect(decodeBrowserFrame(long)?.metadata.title).toHaveLength(BROWSER_LIMITS.title);
+});
+
+test("protocol 52: agentes:viewport's arguments, checked as the runner reads them", () => {
+  expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(BROWSER_VIEWPORT_PROTOCOL);
+  expect(browserViewportOf(["phone"])).toEqual({ device: "phone", width: 390, height: 844 });
+  expect(browserViewportOf(["tablet"])).toEqual({ device: "tablet", width: 820, height: 1180 });
+  // `desktop` alone: the window's own size, no emulation.
+  expect(browserViewportOf(["desktop"])).toBeNull();
+  expect(browserViewportOf(["phone", "375", "667"])).toEqual({ device: "phone", width: 375, height: 667 });
+  expect(browserViewportOf(["desktop", "1440", "900"])).toEqual({ device: "desktop", width: 1440, height: 900 });
+  for (const bad of [
+    [],
+    ["watch"],
+    ["phone", "375"],
+    ["phone", "199", "667"],
+    ["phone", "375", "3841"],
+    ["phone", "3e2", "667"],
+    ["phone", "375.5", "667"],
+    ["desktop", "1440", "900", "2"],
+  ]) {
+    expect(browserViewportOf(bad)).toBeUndefined();
+  }
+});
+
+test("protocol 52 both ways: the server asks with browser.act, the runner's frames say the emulated device", () => {
+  const act = {
+    type: "request",
+    id: "r1",
+    op: "browser.act",
+    agent: { id: "a1", handle: "dev" },
+    command: "agentes:viewport",
+    args: ["phone", "375", "667"],
+    timeoutSeconds: 30,
+  };
+  expect(parseServerFrame(JSON.stringify(act))).toMatchObject({
+    op: "browser.act",
+    command: "agentes:viewport",
+    args: ["phone", "375", "667"],
+  });
+  const metadata = { ...META, deviceWidth: 375, deviceHeight: 667, emulated: "phone" as const };
+  const frame = { type: "browser.frame", agentId: "a1", seq: 3, data: "/9j/", metadata };
+  expect(parseRunnerFrame(JSON.stringify(frame))).toMatchObject({ metadata: { emulated: "phone" } });
+  expect(decodeBrowserFrame(encodeBrowserFrame({ seq: 3, metadata }, JPEG))?.metadata).toEqual(metadata);
+  // Anything but a device is left out; a frame without it (an older runner) shows the page as it is.
+  const odd = { ...frame, metadata: { ...metadata, emulated: "watch" } };
+  expect(JSON.stringify(parseRunnerFrame(JSON.stringify(odd)))).not.toContain("emulated");
+  expect(JSON.stringify(decodeBrowserFrame(encodeBrowserFrame({ seq: 3, metadata: META }, JPEG)))).not.toContain(
+    "emulated",
+  );
 });

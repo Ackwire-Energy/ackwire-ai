@@ -14551,6 +14551,12 @@
       "starting": "Otwieranie strony…",
       "page": "Strona agenta {{name}} na żywo",
       "page_female": "Strona agentki {{name}} na żywo",
+      "emulated": {
+        "phone": "Telefon · {{size}}",
+        "tablet": "Tablet · {{size}}",
+        "desktop": "Komputer · {{size}}"
+      },
+      "normalSize": "Normalny rozmiar",
       "tabs_one": "{{count}} karta",
       "tabs_few": "{{count}} karty",
       "tabs_many": "{{count}} kart",

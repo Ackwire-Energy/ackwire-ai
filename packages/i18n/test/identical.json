@@ -230,7 +230,8 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.chart.workspace",
-      "files.video.volume"
+      "files.video.volume",
+      "browser.live.emulated.tablet"
     ],
     "es": [
       "agent.builtinName",
@@ -1132,7 +1133,9 @@
       "team.list.col.person",
       "approvals.review.state",
       "agentSide.label",
-      "agentPage.work.brain.speeds.standard"
+      "agentPage.work.brain.speeds.standard",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "it": [
       "queue.fill.routine",
@@ -1423,7 +1426,9 @@
       "teamTemplates.channels.ada",
       "files.video.volume",
       "taskManager.waitGroup.routines",
-      "agentPage.work.brain.speeds.standard"
+      "agentPage.work.brain.speeds.standard",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "nl": [
       "deleteAccount.agentCount",
@@ -1923,7 +1928,9 @@
       "approvals.review.state",
       "files.video.volume",
       "taskManager.waitGroup.routines",
-      "agentSide.label"
+      "agentSide.label",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "ja": [
       "access.area.vault",
@@ -2496,7 +2503,9 @@
       "teamTemplates.channels.ada",
       "agentGroups.rename",
       "approvals.review.state",
-      "files.video.volume"
+      "files.video.volume",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "tr": [
       "agent.builtinName",
@@ -2627,7 +2636,8 @@
       "endpoint.styles.anthropic",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
-      "connectAi.pick.plan"
+      "connectAi.pick.plan",
+      "browser.live.emulated.tablet"
     ],
     "pl": [
       "deleteAccount.agentCount",
@@ -2849,7 +2859,8 @@
       "teamTemplates.channels.ada",
       "team.agents",
       "team.list.col.agent",
-      "connectAi.pick.plan"
+      "connectAi.pick.plan",
+      "browser.live.emulated.tablet"
     ],
     "ru": [
       "agent.builtinName",

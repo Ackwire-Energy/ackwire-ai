@@ -6640,7 +6640,7 @@ export type ScreenKind = "browser" | "desktop";
  * with the run it is bound to, `runId`).
  */
 /** Where the person in control sends the agent's page: an address they typed, or the address bar's arrows and reload. */
-export type PageTarget = string | { go: "back" | "forward" | "reload" };
+export type PageTarget = string | { go: "back" | "forward" | "reload" | "normalSize" };
 
 export interface BrowserHandoff {
   id: string;

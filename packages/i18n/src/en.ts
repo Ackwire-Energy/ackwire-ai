@@ -13292,6 +13292,14 @@ export const en = {
       ended: "{{name}}'s browser closed.",
       starting: "Opening the page…",
       page: "{{name}}'s page, live",
+      /** Over the live page while the agent shows it at another size than its window's (`emulated`): device · size. */
+      emulated: {
+        phone: "Phone · {{size}}",
+        tablet: "Tablet · {{size}}",
+        desktop: "Desktop · {{size}}",
+      },
+      /** Button beside that label, for the person in control: the page at the window's own size again. */
+      normalSize: "Normal size",
       tabs_one: "{{count}} tab",
       tabs_other: "{{count}} tabs",
       typeHere: "Type here",

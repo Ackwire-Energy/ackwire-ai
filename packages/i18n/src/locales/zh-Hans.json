@@ -13234,6 +13234,12 @@
       "starting": "正在打开页面…",
       "page": "{{name}} 的页面，实时",
       "page_female": "{{name}} 的页面，实时",
+      "emulated": {
+        "phone": "手机 · {{size}}",
+        "tablet": "平板 · {{size}}",
+        "desktop": "桌面 · {{size}}"
+      },
+      "normalSize": "正常尺寸",
       "tabs_other": "{{count}} 个标签页",
       "typeHere": "在这里输入",
       "typeTo": "输入到 {{field}}",

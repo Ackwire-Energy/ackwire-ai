@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { StreamSocket } from "../../runner/browser";
-import { type CrashedPage, countChromeTraffic } from "../../runner/browser-traffic";
+import { type CrashedPage, countChromeTraffic, emulationCommands } from "../../runner/browser-traffic";
 
 /** Chrome's end of the counter's DevTools socket: what the counter sent, and events pushed to it. */
 class FakeCdp implements StreamSocket {
@@ -442,4 +442,75 @@ test("a session attached after a guard was ready: the next guard waits for its F
   cdp.reply(enables()[1]?.id ?? 0);
   expect(await second.ready).toBe(true);
   c.close();
+});
+
+test("a page size holds on every tab, new ones too, on the counter's own sessions; null ends it on each", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  const phone = emulationCommands({ device: "phone", width: 390, height: 844 }, "156.0.8078.79");
+  const before = cdp.sent.length;
+  c.emulate(phone);
+  const on = (sessionId: string, from: number) =>
+    cdp.sent
+      .slice(from)
+      .filter((m) => m.sessionId === sessionId && m.method.startsWith("Emulation."))
+      .map((m) => ({ method: m.method, params: m.params }));
+  expect(on("page-1", before)).toEqual(phone);
+  // A frame inside the page takes its page's size: nothing of its own.
+  const frameAt = cdp.sent.length;
+  cdp.event(
+    "Target.attachedToTarget",
+    { sessionId: "frame-1", targetInfo: { type: "iframe" }, waitingForDebugger: false },
+    "page-1",
+  );
+  expect(on("frame-1", frameAt)).toEqual([]);
+  // A tab that opens later gets it as it attaches.
+  const tabAt = cdp.sent.length;
+  cdp.attach("page-2");
+  expect(on("page-2", tabAt)).toEqual(phone);
+  const clearAt = cdp.sent.length;
+  c.emulate(null);
+  const cleared = [
+    { method: "Emulation.clearDeviceMetricsOverride", params: {} },
+    { method: "Emulation.setTouchEmulationEnabled", params: { enabled: false } },
+    { method: "Emulation.setUserAgentOverride", params: { userAgent: "" } },
+  ];
+  expect(on("page-1", clearAt)).toEqual(cleared);
+  expect(on("page-2", clearAt)).toEqual(cleared);
+  const laterAt = cdp.sent.length;
+  cdp.attach("page-3");
+  expect(on("page-3", laterAt)).toEqual([]);
+});
+
+test("a phone is mobile with touch and Chrome on Android of the same version; a desktop size changes the size alone", () => {
+  const [metrics, touch, agent] = emulationCommands({ device: "phone", width: 390, height: 844 }, "156.0.8078.79");
+  expect(metrics).toEqual({
+    method: "Emulation.setDeviceMetricsOverride",
+    params: { width: 390, height: 844, deviceScaleFactor: 3, mobile: true, screenWidth: 390, screenHeight: 844 },
+  });
+  expect(touch).toEqual({ method: "Emulation.setTouchEmulationEnabled", params: { enabled: true, maxTouchPoints: 5 } });
+  expect(agent?.params.userAgent).toBe(
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+  );
+  expect(agent?.params.userAgentMetadata).toMatchObject({ platform: "Android", mobile: true });
+  // A tablet: Android without "Mobile", its own pixel ratio.
+  const tablet = emulationCommands({ device: "tablet", width: 820, height: 1180 }, "156.0.8078.79");
+  expect(tablet[0]?.params).toMatchObject({ deviceScaleFactor: 2, mobile: true });
+  expect(String(tablet[2]?.params.userAgent)).not.toContain("Mobile");
+  expect(tablet[2]?.params.userAgentMetadata).toMatchObject({ mobile: false });
+  // A desktop size: the screen's own pixel ratio, no touch, the user agent Chrome started with.
+  expect(emulationCommands({ device: "desktop", width: 1440, height: 900 }, "156.0.8078.79")).toEqual([
+    {
+      method: "Emulation.setDeviceMetricsOverride",
+      params: { width: 1440, height: 900, deviceScaleFactor: 0, mobile: false, screenWidth: 1440, screenHeight: 900 },
+    },
+    { method: "Emulation.setTouchEmulationEnabled", params: { enabled: false } },
+    { method: "Emulation.setUserAgentOverride", params: { userAgent: "" } },
+  ]);
+  // Chrome's version unknown: the size and touch, never a made-up version.
+  const unknown = emulationCommands({ device: "phone", width: 390, height: 844 }, null);
+  expect(unknown[2]).toEqual({ method: "Emulation.setUserAgentOverride", params: { userAgent: "" } });
 });

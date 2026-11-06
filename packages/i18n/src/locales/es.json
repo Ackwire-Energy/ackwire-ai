@@ -14028,6 +14028,12 @@
       "ended": "Se cerró el navegador de {{name}}.",
       "starting": "Abriendo la página…",
       "page": "Página de {{name}}, en vivo",
+      "emulated": {
+        "phone": "Celular · {{size}}",
+        "tablet": "Tableta · {{size}}",
+        "desktop": "Escritorio · {{size}}"
+      },
+      "normalSize": "Tamaño normal",
       "tabs_one": "{{count}} pestaña",
       "tabs_many": "{{count}} pestañas",
       "tabs_other": "{{count}} pestañas",

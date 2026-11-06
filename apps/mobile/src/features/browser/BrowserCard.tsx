@@ -449,6 +449,30 @@ export function BrowserCard({
                 <Sky color={color} surface="raised" depth={0.95} fade={0} style={StyleSheet.absoluteFill} />
               ) : null}
               {live.frame ? <FrameView frame={live.frame} enabled={mine} onInput={live.sendInput} /> : null}
+              {live.frame?.metadata.emulated ? (
+                <View style={[styles.emu, raised]}>
+                  <Text variant="caption" tone="ink" style={styles.semibold}>
+                    {t(`browser.live.emulated.${live.frame.metadata.emulated}`, {
+                      size: `${live.frame.metadata.deviceWidth}×${live.frame.metadata.deviceHeight}`,
+                    })}
+                  </Text>
+                  {mine ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label={t("browser.live.normalSize")}
+                      disabled={profile ? profileActions.open.isPending : actions.opening}
+                      onPress={() =>
+                        void (
+                          profile
+                            ? profileActions.open.mutateAsync({ profileId: profile.id, url: { go: "normalSize" } })
+                            : actions.open(agentId, { go: "normalSize" })
+                        ).catch(failedToast)
+                      }
+                    />
+                  ) : null}
+                </View>
+              ) : null}
               {!live.frame || live.unavailable ? (
                 <View style={[styles.center, live.frame ? styles.overlay : null]}>
                   <View style={sky ? [styles.onSky, raised] : styles.lines}>
@@ -612,6 +636,18 @@ const styles = StyleSheet.create({
   onSky: { alignItems: "center", gap: 4, maxWidth: 420, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
   centerText: { textAlign: "center" },
   overlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.35)" },
+  emu: {
+    position: "absolute",
+    bottom: 8,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingLeft: 10,
+    paddingRight: 4,
+    minHeight: 28,
+    borderRadius: 999,
+  },
   control: { padding: 10, gap: 8 },
   ways: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 16 },
   way: { paddingVertical: 4 },

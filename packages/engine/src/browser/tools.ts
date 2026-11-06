@@ -1,10 +1,15 @@
 import {
   type AgentScope,
+  BROWSER_DEVICE_SIZES,
+  BROWSER_DEVICES,
   BROWSER_FAST_PROTOCOL,
+  BROWSER_VIEWPORT_PROTOCOL,
+  BROWSER_VIEWPORT_SIDE,
   BROWSER_WARM_PROTOCOL,
   type BrowserBatchCommand,
   type BrowserSetup,
   browserSetupOf,
+  browserViewportOf,
   chromeFailureKind,
   type ErrorReporter,
   formatVaultRule,
@@ -510,6 +515,25 @@ function urlOf(data: unknown): string | null {
   const d = data as Record<string, unknown>;
   const url = typeof d.url === "string" ? d.url : typeof d.origin === "string" ? d.origin : null;
   return url && /^(https?:|about:)/.test(url) ? url.slice(0, 2048) : null;
+}
+
+const VIEWPORT_HELP = `Give \`viewport\` a \`device\` (${BROWSER_DEVICES.join(", ")}), and for an exact size both \`width\` and \`height\` (${BROWSER_VIEWPORT_SIDE.min} to ${BROWSER_VIEWPORT_SIDE.max}).`;
+
+/** `browser_open`'s `viewport` as `agentes:viewport`'s arguments, or null when it isn't one. */
+function viewportArgs(v: unknown): string[] | null {
+  if (!v || typeof v !== "object") return null;
+  const { device, width, height } = v as Record<string, unknown>;
+  const args =
+    width === undefined && height === undefined ? [String(device)] : [String(device), String(width), String(height)];
+  return browserViewportOf(args) === undefined ? null : args;
+}
+
+/** What the agent is told its page size is now. */
+function viewportText(args: string[]): string {
+  const v = browserViewportOf(args);
+  return v
+    ? `Every tab shows as a ${v.device} (${v.width}×${v.height}) until you open with viewport desktop and no size.`
+    : "The page shows at the window's own size again.";
 }
 
 /** An image a judge can take (Jev: each side 280 to 1568 pixels), or null. */
@@ -1386,18 +1410,44 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         return plan(ctx, valid, { trail: true });
       },
     ),
-    step(
+    tool(
       "browser_open",
-      `${BROWSER_TOOL_INFO.browser_open.description} The browser is yours alone and keeps its logins between runs. It answers with what you can act on there. To open a page and do something on it, use one browser_do that starts with \`open\` instead.`,
+      `${BROWSER_TOOL_INFO.browser_open.description} The browser is yours alone and keeps its logins between runs. It answers with what you can act on there. To open a page and do something on it, use one browser_do that starts with \`open\` instead. To see a site as on a phone or a tablet (a responsive check), open it with \`viewport\`: \`phone\` is ${BROWSER_DEVICE_SIZES.phone.width}×${BROWSER_DEVICE_SIZES.phone.height} with touch and a phone's user agent, \`tablet\` ${BROWSER_DEVICE_SIZES.tablet.width}×${BROWSER_DEVICE_SIZES.tablet.height}; \`width\` and \`height\` set an exact size. Every tab keeps it (browser_read, browser_screenshot and the person watching see it) until you open with \`viewport\` \`desktop\` and no size, the window's own.`,
       {
         type: "object",
-        properties: { url: { type: "string", description: "Full address (https://…).", maxLength: 2048 } },
+        properties: {
+          url: { type: "string", description: "Full address (https://…).", maxLength: 2048 },
+          viewport: {
+            type: "object",
+            properties: {
+              device: { type: "string", enum: [...BROWSER_DEVICES] },
+              width: { type: "integer", minimum: BROWSER_VIEWPORT_SIDE.min, maximum: BROWSER_VIEWPORT_SIDE.max },
+              height: { type: "integer", minimum: BROWSER_VIEWPORT_SIDE.min, maximum: BROWSER_VIEWPORT_SIDE.max },
+            },
+            required: ["device"],
+            additionalProperties: false,
+          },
+        },
         required: ["url"],
         additionalProperties: false,
       },
-      (input) => {
+      async (input, ctx) => {
         const url = str(input.url).trim();
-        return /^https?:\/\//i.test(url) ? { do: "open", url } : "Give a full web address starting with https://.";
+        if (!/^https?:\/\//i.test(url))
+          return { content: "Give a full web address starting with https://.", isError: true };
+        if (input.viewport === undefined) return plan(ctx, [{ do: "open", url }]);
+        const args = viewportArgs(input.viewport);
+        if (!args) return { content: VIEWPORT_HELP, isError: true };
+        const linked = await linkFor(ctx);
+        if (!linked.ok) return { content: linked.text, isError: true };
+        if (linked.status.protocol < BROWSER_VIEWPORT_PROTOCOL) {
+          return { content: vaultUpdateText(linked.status.machineName, "change the page size"), isError: true };
+        }
+        // Before the page loads: its site sees the phone from the first request.
+        const sized = await linked.link.act({ command: "agentes:viewport", args, timeoutSeconds: COMMAND_SECONDS });
+        if (!sized.ok) return { content: neutralizeUntrusted(sized.text), isError: true };
+        const out = await plan(ctx, [{ do: "open", url }]);
+        return { ...out, content: `${viewportText(args)}\n${out.content}` };
       },
     ),
     step(
