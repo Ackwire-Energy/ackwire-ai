@@ -1551,6 +1551,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       remove: async (orgId, slug) => {
         await request<void>(`${org(orgId)}/wiki/pages/${enc(slug)}`, { method: "DELETE" });
       },
+      removeMany: (orgId, target) => request(`${org(orgId)}/wiki/bulk/delete`, { json: target }),
+      trash: async (orgId) =>
+        (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/pages`, { query: { deleted: "true" } })).pages,
+      restoreMany: (orgId, ids) => request(`${org(orgId)}/wiki/trash/restore`, { json: { ids } }),
+      purge: (orgId, ids) => request(`${org(orgId)}/wiki/trash/purge`, { json: ids ? { ids } : {} }),
+      setAgents: (orgId, ids, agentIds) =>
+        request(`${org(orgId)}/wiki/bulk/agents`, { method: "PUT", json: { ids, agentIds } }),
+      context: (orgId, slug, on) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/context`, { json: { on } }),
       reads: (orgId) => request<WikiTopRead[]>(`${org(orgId)}/wiki/reads`),
       import: (orgId, input) => request<WikiImportResult>(`${org(orgId)}/wiki/import`, { json: input }),
       append: (orgId, slug, input) =>

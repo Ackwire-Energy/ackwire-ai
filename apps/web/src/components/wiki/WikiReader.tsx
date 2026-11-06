@@ -46,6 +46,7 @@ import { retitled } from "@/lib/wiki-rich";
 import { ObsidianMark } from "./ObsidianMark";
 import { WikiAskDialog } from "./WikiAsk";
 import { WikiAudienceDialog } from "./WikiAudience";
+import { WikiBulkDeleteDialog } from "./WikiBulk";
 import { WikiFolderPicker, WikiTagsEdit } from "./WikiProps";
 import { WikiRichEditor, type WikiRichEditorHandle } from "./WikiRichEditor";
 
@@ -307,9 +308,11 @@ function PageMeta({
   const reads = page.reads;
   const accessTitle = page.audienceFolder
     ? t("wiki.audienceFollows", { folder: page.audienceFolder })
-    : access.limited
-      ? t("wiki.restrictedHint")
-      : t("wiki.access.everyoneHint");
+    : page.audienceFolder === ""
+      ? t("wiki.audienceFollowsRoot")
+      : access.limited
+        ? t("wiki.restrictedHint")
+        : t("wiki.access.everyoneHint");
   const accessInner = (
     <>
       <Icon name={access.limited ? "eye" : "audienceEveryone"} size={14} />
@@ -368,6 +371,11 @@ function PageMeta({
           <span className="wiki-label">{t("wiki.uses.title")}</span>
           <UsesRows page={page} />
         </Popover>
+      )}
+      {page.agentContext && (
+        <Chip icon="agent" title={t("wiki.context.hint")}>
+          {t("wiki.context.chip")}
+        </Chip>
       )}
       {page.canEdit === false && (
         <Chip icon="eye" title={t("wiki.readOnlyHint")}>
@@ -645,6 +653,8 @@ export function WikiReader({
   const [conflict, setConflict] = useState<WikiPageData | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteImport, setDeleteImport] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
   const [asking, setAsking] = useState<string | null>(null);
   const embed = useEmbedRenderer(page.data?.source?.attachments);
@@ -827,6 +837,13 @@ export function WikiReader({
   }
 
   const crumbs = (editing ? draft.folder : (p?.folder ?? "")).split("/").filter(Boolean);
+  // Everything the page's import brought: by its id, or by vault for imports made before ids.
+  const importPages = (p: WikiPageData) =>
+    pages.filter((x) =>
+      p.importId
+        ? x.importId === p.importId
+        : x.sourceType === p.sourceType && x.sourceName === p.sourceName && !x.importId,
+    );
   // The page's actions: its "…" and the right click on its title.
   const pageEntries = (p: WikiPageData): MenuEntry[] => [
     {
@@ -850,6 +867,20 @@ export function WikiReader({
               action.mutate(
                 { type: "pin", slug: p.slug, pinned: !p.pinned },
                 { onSuccess: (x) => toast.show(x.pinned ? t("wiki.pinned") : t("wiki.unpinned")) },
+              ),
+          },
+          {
+            kind: "item",
+            id: "context",
+            label: p.agentContext ? t("wiki.context.off") : t("wiki.context.on"),
+            icon: "agent",
+            run: () =>
+              action.mutate(
+                { type: "context", slug: p.slug, on: !p.agentContext },
+                {
+                  onSuccess: (x) => toast.show(x.agentContext ? t("wiki.context.added") : t("wiki.context.removed")),
+                  onError: (e) => toast.show(errorText(t, e, i18n.language), "error"),
+                },
               ),
           },
         ] satisfies MenuEntry[])
@@ -885,6 +916,18 @@ export function WikiReader({
             danger: true,
             run: () => setConfirmDelete(true),
           },
+          ...(p.sourceType === "obsidian" && p.sourceName
+            ? ([
+                {
+                  kind: "item",
+                  id: "delete-import",
+                  label: t("wiki.bulk.deleteImport", { name: p.sourceName, count: importPages(p).length }),
+                  icon: "trash",
+                  danger: true,
+                  run: () => setDeleteImport(true),
+                },
+              ] satisfies MenuEntry[])
+            : []),
         ] satisfies MenuEntry[])
       : []),
   ];
@@ -1056,28 +1099,48 @@ export function WikiReader({
       {p && confirmDelete && (
         <Dialog
           open
-          onOpenChange={(o) => !o && setConfirmDelete(false)}
+          onOpenChange={(o) => !o && !deleting && setConfirmDelete(false)}
           title={t("wiki.deleteTitle", { title: p.title })}
           description={t("wiki.deleteText")}
           closeLabel={t("common.close")}
           width={440}
         >
           <DialogFooter>
-            <Button onClick={() => setConfirmDelete(false)}>{t("common.cancel")}</Button>
+            <Button disabled={deleting} onClick={() => setConfirmDelete(false)}>
+              {t("common.cancel")}
+            </Button>
             <Button
               variant="danger"
+              loading={deleting}
+              disabled={deleting}
               onClick={async () => {
-                await api.wiki.remove(org.id, p.slug);
-                setConfirmDelete(false);
-                void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
-                toast.show(t("wiki.deleted", { title: p.title }));
-                void navigate({ to: "/org/$orgId/wiki", params: { orgId: org.id } });
+                setDeleting(true);
+                try {
+                  await api.wiki.remove(org.id, p.slug);
+                  setConfirmDelete(false);
+                  void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
+                  toast.show(t("wiki.deleted", { title: p.title }));
+                  void navigate({ to: "/org/$orgId/wiki", params: { orgId: org.id } });
+                } catch (e) {
+                  toast.show(errorText(t, e, i18n.language), "error");
+                } finally {
+                  setDeleting(false);
+                }
               }}
             >
               {t("wiki.delete")}
             </Button>
           </DialogFooter>
         </Dialog>
+      )}
+      {p && deleteImport && p.sourceName && (
+        <WikiBulkDeleteDialog
+          target={p.importId ? { importId: p.importId } : { source: { type: p.sourceType ?? "", name: p.sourceName } }}
+          count={importPages(p).length}
+          what={{ kind: "import", name: p.sourceName }}
+          onClose={() => setDeleteImport(false)}
+          onDone={() => void navigate({ to: "/org/$orgId/wiki", params: { orgId: org.id } })}
+        />
       )}
     </div>
   );

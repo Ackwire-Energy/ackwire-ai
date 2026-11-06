@@ -37,8 +37,9 @@ export function WikiAudienceDialog({
 }) {
   const { org } = useOrg();
   const [onFolder, setOnFolder] = useState(folder ?? null);
-  const info = useWikiFolderAudience(org.id, onFolder ?? "", Boolean(onFolder));
-  if (onFolder) {
+  // "" is the wiki's root: every page and folder.
+  const info = useWikiFolderAudience(org.id, onFolder ?? "", onFolder !== null);
+  if (onFolder !== null) {
     if (!info.data) return null;
     return (
       <FolderForm key={onFolder} folder={onFolder} own={info.data.own} above={info.data.above} onClose={onClose} />
@@ -112,8 +113,8 @@ function FolderForm({
   const save = useSetWikiFolderAudience(org.id);
   return (
     <AudienceForm
-      title={t("wiki.audienceFolderTitle", { folder })}
-      description={t("wiki.audienceFolderText")}
+      title={folder ? t("wiki.audienceFolderTitle", { folder }) : t("wiki.audienceRootTitle")}
+      description={folder ? t("wiki.audienceFolderText") : t("wiki.audienceRootText")}
       initial={own ?? above ?? OPEN_WIKI_ACCESS}
       above={above}
       saving={save.isPending}
@@ -220,7 +221,13 @@ function AudienceForm({
     <AccessDialog<WikiLevel>
       title={title}
       description={description}
-      note={above ? t("wiki.audienceInFolder", { folder: above.folder }) : undefined}
+      note={
+        above
+          ? above.folder
+            ? t("wiki.audienceInFolder", { folder: above.folder })
+            : t("wiki.audienceInRoot")
+          : undefined
+      }
       base={[
         {
           id: "everyone",

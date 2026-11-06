@@ -163,6 +163,8 @@ import type {
   ThreadPatch,
   ToolDecision,
   UnreadEvent,
+  WikiBulkFailed,
+  WikiBulkTarget,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
@@ -4565,6 +4567,7 @@ export function useWikiAction(orgId: string) {
         | { type: "move"; slug: string; folder: string }
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
+        | { type: "context"; slug: string; on: boolean }
         | { type: "audience"; slug: string; access: WikiAccess }
         | {
             type: "append";
@@ -4586,6 +4589,8 @@ export function useWikiAction(orgId: string) {
           return api.wiki.lock(orgId, action.slug, action.locked);
         case "pin":
           return api.wiki.pin(orgId, action.slug, action.pinned);
+        case "context":
+          return api.wiki.context(orgId, action.slug, action.on);
         case "audience":
           return api.wiki.audience(orgId, action.slug, action.access);
         case "append":
@@ -4594,6 +4599,52 @@ export function useWikiAction(orgId: string) {
     },
     onSuccess: (page) => {
       qc.setQueryData(keys.wikiPage(orgId, page.slug), page);
+      void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
+    },
+  });
+}
+
+/** The wiki's Lixeira: pages deleted in the last 30 days. */
+export const useWikiTrash = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.wikiTrash(orgId), queryFn: () => api.wiki.trash(orgId), enabled });
+};
+
+/** Delete, restore or purge many pages, or set their agents: the whole wiki is read again after. */
+export function useWikiBulk(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: async (
+      action:
+        | { type: "delete"; target: WikiBulkTarget }
+        | { type: "restore"; ids: string[] }
+        | { type: "purge"; ids?: string[] }
+        | { type: "agents"; ids: string[]; agentIds: string[] | null },
+    ) => {
+      // One shape for every action: how many changed, how many this person couldn't reach, and which failed.
+      const none: WikiBulkFailed = [];
+      switch (action.type) {
+        case "delete": {
+          const r = await api.wiki.removeMany(orgId, action.target);
+          return { count: r.deleted, kept: r.kept, failed: none };
+        }
+        case "restore": {
+          const r = await api.wiki.restoreMany(orgId, action.ids);
+          return { count: r.restored, kept: r.kept, failed: r.failed };
+        }
+        case "purge": {
+          const r = await api.wiki.purge(orgId, action.ids);
+          return { count: r.purged, kept: r.kept, failed: none };
+        }
+        case "agents": {
+          const r = await api.wiki.setAgents(orgId, action.ids, action.agentIds);
+          return { count: r.changed, kept: 0, failed: r.failed };
+        }
+      }
+    },
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
     },
   });

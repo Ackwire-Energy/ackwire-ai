@@ -4417,6 +4417,8 @@ export interface WikiPageSummary {
   locked?: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned?: boolean;
+  /** "Sempre no contexto dos agentes": in every run of an agent that reads it (at most 3 per workspace). */
+  agentContext?: boolean;
   /** Limited to these roles and people (owners always read it); null or missing = every member. */
   audience?: WikiAudience | null;
   /** Limited to these agents; null or missing = every agent. */
@@ -4431,8 +4433,14 @@ export interface WikiPageSummary {
   excerpt?: string;
   /** `obsidian` for an imported page. */
   sourceType?: string | null;
+  /** An imported page: the vault's name. */
+  sourceName?: string | null;
+  /** The import that brought it (null for pages imported before imports had ids). */
+  importId?: string | null;
   updatedAt: string;
   updatedBy: WikiAuthor;
+  /** In the trash since then (the trash's list). */
+  deletedAt?: string | null;
 }
 
 /** Agents that used pages (in their context or reading them), last 7 days. */
@@ -4463,7 +4471,19 @@ export interface WikiImportInput {
   notes: WikiImportNote[];
   folder?: string;
   onConflict: "keep_both" | "skip";
+  /** The same for every batch and retry of one import. */
+  importId?: string;
 }
+
+/** What "Apagar" reaches: chosen pages, a folder with its subfolders, or one import (by id, or by vault for older ones). */
+export type WikiBulkTarget =
+  | { ids: string[] }
+  | { folder: string }
+  | { importId: string }
+  | { source: { type: string; name: string } };
+
+/** Pages a bulk change couldn't reach, with the error code. */
+export type WikiBulkFailed = { id: string; title: string; code: string }[];
 
 export interface WikiImportResult {
   created: WikiPageSummary[];

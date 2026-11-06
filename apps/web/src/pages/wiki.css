@@ -185,6 +185,136 @@ button.wiki-folder-row__act:hover {
     opacity: 1;
   }
 }
+.wiki-folder-row__act--del {
+  right: 54px;
+}
+/* The tree's header: "Pages", then who sees the whole wiki and "Select" on the right. */
+.wiki-label--acts {
+  min-height: 22px;
+}
+.wiki-label__act {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  cursor: pointer;
+}
+.wiki-label__act:first-of-type {
+  margin-left: auto;
+}
+.wiki-label__act:hover,
+.wiki-label__act[data-on] {
+  color: var(--ink2);
+}
+.wiki-label__act--text {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.wiki-row--pick {
+  cursor: pointer;
+}
+/* While choosing pages: what's chosen and what to do with it, kept in view at the bottom of the tree. */
+.wiki-pickbar {
+  position: sticky;
+  bottom: -18px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -8px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+}
+.wiki-pickbar__all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink2);
+  cursor: pointer;
+}
+.wiki-pickbar__acts {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.wiki-bulk-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.wiki-bulk-agents__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.wiki-bulk-agents__row[data-off] {
+  color: var(--muted);
+}
+.wiki-trash__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--plate);
+}
+.wiki-trash__acts {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.wiki-trash__list {
+  display: flex;
+  flex-direction: column;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.wiki-trash__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.wiki-trash__row > .ac-icon {
+  color: var(--faint);
+}
+.wiki-trash__t {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.wiki-trash__t b {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.wiki-trash__t small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
 .wiki-row[aria-expanded="false"] .wiki-row__car {
   transform: rotate(-90deg);
 }
