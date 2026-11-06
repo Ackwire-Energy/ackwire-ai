@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { writeAgents } from "../../runner/access";
-import { accountSelfCheck, type SelfCheck } from "../../runner/account-check";
+import { accountSelfCheck, REFUSED, type SelfCheck } from "../../runner/account-check";
 import {
   ACCOUNT_USERS_FILE,
   AccountUsers,
@@ -889,6 +889,21 @@ test.if(process.platform !== "win32")(
     expect(agent).toEndWith(" sh /var/lib/agentes-claude/00000000-0000-4000-8000-000000000000 4242");
   },
 );
+
+test.if(process.platform !== "win32")("what the agent's user tries counts only when the kernel refused it", () => {
+  const denied = "ls: cannot open directory: Permission denied";
+  const hidden = "cat: /proc/1/environ: No such file or directory";
+  const answers = (o: { ls?: string; proc?: string; kill?: string }) => {
+    const said = (text: string | undefined, fallback: string) => `echo "${text ?? fallback}" >&2; return 1`;
+    const stubs = `ls() { ${said(o.ls, denied)}; }; cat() { ${said(o.proc, hidden)}; }; head() { ${said(o.proc, hidden)}; }; kill() { ${said(o.kill, "kill: Operation not permitted")}; }`;
+    return Bun.spawnSync(["/bin/sh", "-c", `${stubs}\n${REFUSED}`, "sh", "/store", "1"]).exitCode;
+  };
+  expect(answers({})).toBe(0);
+  expect(answers({ proc: "cat: /proc/1/environ: Permission denied" })).toBe(0);
+  expect(answers({ kill: "kill: No such process" })).not.toBe(0);
+  expect(answers({ ls: "ls: cannot access: No such file or directory" })).not.toBe(0);
+  expect(answers({ proc: "cat: read error: Input/output error" })).not.toBe(0);
+});
 
 test("the self-check says why: off, no systemd, an untrusted path, a version nobody validated", async () => {
   const off = selfCheck();

@@ -29,12 +29,15 @@ const PROBE_TIMEOUT_MS = 20_000;
 /**
  * Run as the stand-in agent (`$1` the sign-in's folder, `$2` the probe CLI's pid); succeeds only when the kernel
  * refused each. Opening `/proc/<pid>/mem` takes the same check as a ptrace attach, with no tool for it installed.
- * Refused means refused: a path or process that isn't there would otherwise pass.
+ * Refused means refused: a path or process that isn't there would otherwise pass. The one exception is `/proc/<pid>`:
+ * under `hidepid=invisible`, as on the Cloud's machines, the kernel answers another user that it doesn't exist. `kill`
+ * comes last and tells the two apart: only a process that is there, and not this user's, gives "not permitted".
  */
-const REFUSED = [
+export const REFUSED = [
   "export LC_ALL=C",
   'refused() { o=$("$@" 2>&1) && return 1; case "$o" in *"ermission denied"*|*"not permitted"*) ;; *) return 1 ;; esac; }',
-  'refused ls "$1/config" && refused ls "$1/run" && refused cat "/proc/$2/environ" && refused head -c1 "/proc/$2/mem" && refused kill -0 "$2"',
+  'hidden() { o=$("$@" 2>&1) && return 1; case "$o" in *"No such file"*|*"ermission denied"*) ;; *) return 1 ;; esac; }',
+  'refused ls "$1/config" && refused ls "$1/run" && hidden cat "/proc/$2/environ" && hidden head -c1 "/proc/$2/mem" && refused kill -0 "$2"',
 ].join("\n");
 
 type Exec = (argv: string[], env: NodeJS.ProcessEnv) => Promise<boolean>;
