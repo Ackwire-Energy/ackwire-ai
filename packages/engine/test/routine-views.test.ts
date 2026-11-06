@@ -518,7 +518,10 @@ describe("routine limits", () => {
       target: { type: "channel" as const, channelId: secret.id },
       trigger: daily(),
     };
-    await expect(createRoutine(routineDeps(), carla.id, f.org.id, input)).rejects.toMatchObject({
+    // A plain member who owns the agent: an administrator may post in every channel (ADR 0150).
+    const dani = await addMember(f.db, f.org.id, "member", "dani");
+    await f.db.update(schema.agents).set({ ownerUserId: dani.id }).where(eq(schema.agents.id, f.agent.id));
+    await expect(createRoutine(routineDeps(), dani.id, f.org.id, input)).rejects.toMatchObject({
       code: "routine.creator_cannot_post",
     });
     // The owner is in it; an admin who edits keeps the owner as the one who must post there.
