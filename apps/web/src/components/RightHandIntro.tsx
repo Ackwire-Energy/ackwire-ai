@@ -235,9 +235,7 @@ function StartCard({
         locked={create.isPending || useTemplate.isPending}
         body={
           <>
-            {first && (
-              <AnswerChips choices={choices} multiple={false} answer={answer} onSend={tap} />
-            )}
+            {first && <AnswerChips choices={choices} multiple={false} answer={answer} onSend={tap} />}
             {first && answer === null && !held && <p className="tp-start__write">{t("teamPlan.start.orWrite")}</p>}
             {presetsOpen && (
               <div className="rh-intro__presets">

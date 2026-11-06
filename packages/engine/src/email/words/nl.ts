@@ -413,6 +413,7 @@ export const words: EmailWords = {
         : `${a} en ${c} staan klaar. Er is een agentes.chat-abonnement nodig om te beginnen.`;
     },
     button: "agentes.chat-abonnementen bekijken",
-    why: (org) => `Je krijgt deze e-mail omdat je ${org} beheert op agentes.chat. We sturen maar twee van deze berichten.`,
+    why: (org) =>
+      `Je krijgt deze e-mail omdat je ${org} beheert op agentes.chat. We sturen maar twee van deze berichten.`,
   },
 };

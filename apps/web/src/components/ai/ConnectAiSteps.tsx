@@ -1228,43 +1228,28 @@ export function usePlanHold() {
   return planHoldOf(computerEdition(useComputerSetup(org.id).data), org.standing);
 }
 
-/** The way to the plan a billing hold waits for, or who can get it, under the line saying why. */
-function HoldWay({ hold }: { hold: BillingHold }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const billingUrl = useAuthConfig().data?.billingUrl;
-  if (!can(org, "manage_billing") || !billingUrl)
-    return <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>;
-  return (
-    <span className="ac-acts">
-      <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
-        {t(`standing.billing.cta.${hold}`)}
-      </BillingLinkButton>
-    </span>
-  );
-}
-
 /**
  * A plan a workspace with no agentes.chat plan in force can't use, in place of its steps: why, and the way to that
- * plan. A hold stops the Model Gateway for keys too, so no key is offered as a way around it.
+ * plan for whoever pays (anyone else reads who can). A hold stops the Model Gateway for keys too, so no key is offered
+ * as a way around it.
  */
 export function PlanHold({ hold }: { hold: BillingHold }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const billingUrl = useAuthConfig().data?.billingUrl;
+  const canPay = can(org, "manage_billing") && Boolean(billingUrl);
   return (
     <>
       <SettingNote icon="alert">{t("connectAi.billing")}</SettingNote>
-      <HoldWay hold={hold} />
-    </>
-  );
-}
-
-/** In place of adding an API key on a billing hold: keys open with the plan, and the server refuses one before it. */
-export function KeysClosed({ hold }: { hold: BillingHold }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <SettingNote icon="alert">{t("connectAi.key.closed")}</SettingNote>
-      <HoldWay hold={hold} />
+      {canPay ? (
+        <span className="ac-acts">
+          <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+            {t(`standing.billing.cta.${hold}`)}
+          </BillingLinkButton>
+        </span>
+      ) : (
+        <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>
+      )}
     </>
   );
 }

@@ -420,6 +420,7 @@ export const words: EmailWords = {
         : `${a} et ${c} sont prêts. Il leur faut un abonnement agentes.chat pour démarrer.`;
     },
     button: "Voir les abonnements agentes.chat",
-    why: (org) => `Vous recevez cet e-mail parce que vous gérez ${org} sur agentes.chat. Nous n'envoyons que deux rappels comme celui-ci.`,
+    why: (org) =>
+      `Vous recevez cet e-mail parce que vous gérez ${org} sur agentes.chat. Nous n'envoyons que deux rappels comme celui-ci.`,
   },
 };

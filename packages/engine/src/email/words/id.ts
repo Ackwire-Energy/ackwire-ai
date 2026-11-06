@@ -388,6 +388,7 @@ export const words: EmailWords = {
         : `${a} dan ${c} sudah siap. Perlu paket agentes.chat untuk mulai.`;
     },
     button: "Lihat paket agentes.chat",
-    why: (org) => `Kamu menerima email ini karena kamu mengelola ${org} di agentes.chat. Kami hanya mengirim dua pemberitahuan seperti ini.`,
+    why: (org) =>
+      `Kamu menerima email ini karena kamu mengelola ${org} di agentes.chat. Kami hanya mengirim dua pemberitahuan seperti ini.`,
   },
 };

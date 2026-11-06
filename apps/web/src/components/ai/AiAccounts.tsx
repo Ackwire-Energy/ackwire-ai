@@ -155,7 +155,7 @@ export function AiAccountsSection() {
         icon="computer"
         title={t("aiAccounts.page.title")}
         hint={{ name: t("common.about", { label: t("aiAccounts.page.title") }), text: t("aiAccounts.page.hint") }}
-        action={!noPlans && connect}
+        action={!noPlans && !hold && connect}
       />
       {hold && <PlanHold hold={hold} />}
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}

@@ -303,19 +303,17 @@ function PlanLineCard({
             <Button size="sm" variant="primary" onClick={() => connect.answer(message.id)}>
               {t("noAi.card.answerNow")}
             </Button>
+          ) : // The workspace's plan serves only its owner: the person's own plan answers them (ADR 0137 §11).
+          fix === "connectMine" ? (
+            <Button size="sm" onClick={() => connect.open({ agentId, from: message.id })}>
+              {t("rightHand.settings.connectMine")}
+            </Button>
+          ) : fix === "useKey" ? (
+            <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
+              {t("noAi.rightHand.useKey")}
+            </Button>
           ) : (
-            // The workspace's plan serves only its owner: the person's own plan answers them (ADR 0137 §11).
-            fix === "connectMine" ? (
-              <Button size="sm" onClick={() => connect.open({ agentId, from: message.id })}>
-                {t("rightHand.settings.connectMine")}
-              </Button>
-            ) : fix === "useKey" ? (
-              <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
-                {t("noAi.rightHand.useKey")}
-              </Button>
-            ) : (
-              <span className="small muted">{t("noAi.lockedAdmins")}</span>
-            )
+            <span className="small muted">{t("noAi.lockedAdmins")}</span>
           )}
         </span>
       )}

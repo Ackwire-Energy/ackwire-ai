@@ -145,7 +145,9 @@ describe("a billing hold (ADR 0079): its own words, and its fix for whoever runs
     });
     const banner = () => screen().getByRole("region", { name: STATUS });
     // A team, waiting for its first plan: one line, no pause, no second line.
-    expect(banner().textContent).toBe("Seu time está pronto. Falta um plano do agentes.chat para ele começar.Ver planos do agentes.chat");
+    expect(banner().textContent).toBe(
+      "Seu time está pronto. Falta um plano do agentes.chat para ele começar.Ver planos do agentes.chat",
+    );
     expect(banner().querySelector(".outage__icon")).toBeNull();
     // Not back from paying: nothing to wait for, so `/me` isn't asked again.
     expect(meEvery(services.queryClient)).not.toContain(5000);

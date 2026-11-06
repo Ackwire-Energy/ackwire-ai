@@ -412,6 +412,7 @@ export const words: EmailWords = {
         : `${a} ve ${c} hazır. Başlamak için bir agentes.chat planı gerekiyor.`;
     },
     button: "agentes.chat planlarını gör",
-    why: (org) => `Bu e-postayı agentes.chat üzerinde ${org} alanını yönettiğin için aldın. Bu bildirimden yalnızca iki tane gönderiyoruz.`,
+    why: (org) =>
+      `Bu e-postayı agentes.chat üzerinde ${org} alanını yönettiğin için aldın. Bu bildirimden yalnızca iki tane gönderiyoruz.`,
   },
 };

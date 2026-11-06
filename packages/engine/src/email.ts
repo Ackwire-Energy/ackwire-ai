@@ -999,11 +999,7 @@ export async function sendPlanWaitingEmail(db: Database, publicUrl: string, orgI
       .select({ n: count })
       .from(schema.channels)
       .where(
-        and(
-          eq(schema.channels.orgId, orgId),
-          eq(schema.channels.kind, "channel"),
-          isNull(schema.channels.archivedAt),
-        ),
+        and(eq(schema.channels.orgId, orgId), eq(schema.channels.kind, "channel"), isNull(schema.channels.archivedAt)),
       ),
     db
       .select({ n: count })

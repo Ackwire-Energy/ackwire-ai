@@ -404,6 +404,7 @@ export const words: EmailWords = {
         : `${a} y ${c} están listos. Falta un plan de agentes.chat para que empiecen.`;
     },
     button: "Ver planes de agentes.chat",
-    why: (org) => `Recibiste este correo porque administras ${org} en agentes.chat. Solo enviamos dos avisos como este.`,
+    why: (org) =>
+      `Recibiste este correo porque administras ${org} en agentes.chat. Solo enviamos dos avisos como este.`,
   },
 };

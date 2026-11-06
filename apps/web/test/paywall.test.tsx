@@ -5,7 +5,17 @@ setupDom();
 
 import type { AiStatus, Message, OrgStanding, TeamProposalCard } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, LODI_ID, NOW, ORG_ID, seedState, withRightHand } from "./fake-api";
+import {
+  ADA_ID,
+  createFakeApi,
+  ENG_ID,
+  fakeMachinesOf,
+  LODI_ID,
+  NOW,
+  ORG_ID,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -42,7 +52,10 @@ const wall = (agentId = ADA_ID, channelId = ENG_ID): Message => ({
   body: "I kept your message.",
   mentionedAgentIds: [],
   agentRunId: "r-kept",
-  meta: { bodyCode: "no_ai", noAi: { agentId, forUserId: "u-walter", reason: "plan_hold", intent: "task", runId: "r" } },
+  meta: {
+    bodyCode: "no_ai",
+    noAi: { agentId, forUserId: "u-walter", reason: "plan_hold", intent: "task", runId: "r" },
+  },
   createdAt: NOW.toISOString(),
 });
 
@@ -130,7 +143,13 @@ describe("after the plan", () => {
 
   test("already answered: nothing starts again", async () => {
     const state = seedState({ aiStatus: ready(ADA_ID) });
-    const later = { ...wall(), id: "m-reply", meta: {}, body: "Done.", createdAt: new Date(NOW.getTime() + 1000).toISOString() };
+    const later = {
+      ...wall(),
+      id: "m-reply",
+      meta: {},
+      body: "Done.",
+      createdAt: new Date(NOW.getTime() + 1000).toISOString(),
+    };
     state.messages.push(wall(), later);
     await open(state);
     expect(calls(state, "chat.answerNow")).toHaveLength(0);

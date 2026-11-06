@@ -544,7 +544,11 @@ async function keptConversation(db: Database, orgId: string) {
     .from(messages)
     .innerJoin(channels, eq(channels.id, messages.channelId))
     .where(
-      and(eq(messages.orgId, orgId), isNull(messages.deletedAt), sql`${messages.meta}->'noAi'->>'reason' = 'plan_hold'`),
+      and(
+        eq(messages.orgId, orgId),
+        isNull(messages.deletedAt),
+        sql`${messages.meta}->'noAi'->>'reason' = 'plan_hold'`,
+      ),
     )
     .orderBy(desc(messages.createdAt))
     .limit(1);

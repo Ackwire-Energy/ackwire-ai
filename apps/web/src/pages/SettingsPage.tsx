@@ -57,6 +57,7 @@ import {
   Meter,
   PageHeader,
   ProviderLogo,
+  SettingNote,
   Switch,
   Textarea,
 } from "@agenteschat/ui";
@@ -71,7 +72,7 @@ import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
-import { KeysClosed, usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { WhoPicksSection } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
@@ -747,7 +748,7 @@ function KeysSection() {
       />
       {platform.data && <p className="small muted">{t("settings.platformAvailable")}</p>}
       {credentials.isLoading && <LoadingList count={2} avatar={false} trailing />}
-      {hold && <KeysClosed hold={hold} />}
+      {hold && <SettingNote icon="alert">{t("connectAi.key.closed")}</SettingNote>}
       {noKeys && !hold && (
         <EmptyState
           size="panel"

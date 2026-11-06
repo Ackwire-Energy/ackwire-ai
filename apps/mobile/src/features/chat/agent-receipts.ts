@@ -133,7 +133,10 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
  */
 export function keptLine(line: ReceiptLine | null): ReceiptLine | null {
   if (line?.words?.key !== "noAi.receipt") return line;
-  const words = { key: line.faces.length > 0 ? ("noAi.kept.receipt" as const) : ("noAi.kept.channel" as const), agents: [] };
+  const words = {
+    key: line.faces.length > 0 ? ("noAi.kept.receipt" as const) : ("noAi.kept.channel" as const),
+    agents: [],
+  };
   return { ...line, words, label: words, action: null, alert: false };
 }
 

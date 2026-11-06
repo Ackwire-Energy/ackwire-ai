@@ -89,15 +89,7 @@ import { PickList } from "../shared/PickList";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { EndpointForm } from "./EndpointForm";
-import {
-  existingRows,
-  type FlowView,
-  flowBack,
-  offersKeyNow,
-  PLAN_POLL_MS,
-  pollsPlan,
-  takenFrom,
-} from "./logic";
+import { existingRows, type FlowView, flowBack, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
 import { useAiOrg } from "./org";
 import {
   AiRow,
@@ -781,7 +773,6 @@ function PlanPage(
             agentId={agent.id}
             agentName={agent.name}
             justReady={props.justReady}
-            mayAddKey={props.mayAddKey}
             onComputer={props.onComputer}
             onKey={() => onView({ page: "key" })}
             move={replies.move}
@@ -864,8 +855,7 @@ function PlanWithoutAgent({
       {elsewhere ? (
         <Button variant="primary" wide label={t("aiAccounts.connect.addComputer")} onPress={onComputer} />
       ) : null}
-      {(offersKeyNow(gate, holdText(t, org?.standing) !== null) || (elsewhere && mayAddKey)) &&
-      !signingIn ? (
+      {(offersKeyNow(gate, holdText(t, org?.standing) !== null) || (elsewhere && mayAddKey)) && !signingIn ? (
         <Button variant="ghost" wide label={t("connectAi.wait.useKey")} onPress={onKey} />
       ) : null}
       {steps ? (
@@ -898,7 +888,6 @@ function PlanSteps({
   repliesRow,
   email,
   login,
-  mayAddKey,
   onKey,
   onComputer,
   onDone,
@@ -916,8 +905,6 @@ function PlanSteps({
   email?: string;
   /** A row of what the person already has: one more login of that account, or a free login of it signed back in. */
   login?: ExistingSignIn;
-  /** Only an admin adds an API key. */
-  mayAddKey: boolean;
   onKey: () => void;
   onComputer: () => void;
   onDone: (account: MachineAccount | null) => void;

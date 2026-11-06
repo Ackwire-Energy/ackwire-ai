@@ -425,9 +425,24 @@ export const words: EmailWords = {
     preheader: "Twoja przestrzeń robocza jest gotowa. Do startu potrzebny jest plan agentes.chat.",
     headline: "Twój zespół czeka",
     body: (agents, channels, routines) => {
-      const a = plural("pl", agents, { one: `1 agent`, few: `${agents} agenci`, many: `${agents} agentów`, other: `${agents} agenta` });
-      const c = plural("pl", channels, { one: `1 kanał`, few: `${channels} kanały`, many: `${channels} kanałów`, other: `${channels} kanału` });
-      const r = plural("pl", routines, { one: `1 rutyna`, few: `${routines} rutyny`, many: `${routines} rutyn`, other: `${routines} rutyny` });
+      const a = plural("pl", agents, {
+        one: `1 agent`,
+        few: `${agents} agenci`,
+        many: `${agents} agentów`,
+        other: `${agents} agenta`,
+      });
+      const c = plural("pl", channels, {
+        one: `1 kanał`,
+        few: `${channels} kanały`,
+        many: `${channels} kanałów`,
+        other: `${channels} kanału`,
+      });
+      const r = plural("pl", routines, {
+        one: `1 rutyna`,
+        few: `${routines} rutyny`,
+        many: `${routines} rutyn`,
+        other: `${routines} rutyny`,
+      });
       return routines > 0
         ? `Gotowe: ${a}, ${c} i ${r}. Do startu potrzebny jest plan agentes.chat.`
         : `Gotowe: ${a} i ${c}. Do startu potrzebny jest plan agentes.chat.`;

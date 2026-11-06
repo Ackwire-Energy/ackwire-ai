@@ -400,6 +400,7 @@ export const words: EmailWords = {
         : `${a} e ${c} sono pronti. Serve un piano agentes.chat per iniziare.`;
     },
     button: "Vedi i piani agentes.chat",
-    why: (org) => `Hai ricevuto questa email perché gestisci ${org} su agentes.chat. Inviamo solo due avvisi come questo.`,
+    why: (org) =>
+      `Hai ricevuto questa email perché gestisci ${org} su agentes.chat. Inviamo solo due avvisi come questo.`,
   },
 };

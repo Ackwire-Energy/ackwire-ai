@@ -457,44 +457,44 @@ function FirstTaskCard({ message, card, held }: { message: Message; card: TeamPr
       body={
         tasks.length > 0 ? (
           <>
-          <ul className="tp-agents">
-            {tasks.map((f) => (
-              <li key={f.agentId} className="tp-agent">
-                <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
-                <span className="tp-agent__text ac-captop">
-                  <b>{f.name}</b>
-                  <span className="tp-agent__line">{f.task}</span>
+            <ul className="tp-agents">
+              {tasks.map((f) => (
+                <li key={f.agentId} className="tp-agent">
+                  <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
+                  <span className="tp-agent__text ac-captop">
+                    <b>{f.name}</b>
+                    <span className="tp-agent__line">{f.task}</span>
+                  </span>
+                  {/* On the name's line, as on the team card's rows, however long the task runs. */}
+                  <span className="tp-agent__tail ac-captop">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        // The task ends in a blank for them to finish.
+                        setDraftFor(`agent:${f.agentId}`, `${f.task} `);
+                        void navigate({
+                          to: "/org/$orgId/dm/agent/$agentId",
+                          params: { orgId: org.id, agentId: f.agentId },
+                        });
+                      }}
+                    >
+                      {t("teamPlan.firstTask.open")}
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {example && tasks[0] && (
+              <figure className="tp-example">
+                <figcaption className="small muted">
+                  {t("teamPlan.firstTask.example", { name: tasks[0].name })}
+                </figcaption>
+                <span className="tp-example__message">
+                  <AgentAvatar agentId={tasks[0].agentId} name={tasks[0].name} size="sm" />
+                  <span>{example}</span>
                 </span>
-                {/* On the name's line, as on the team card's rows, however long the task runs. */}
-                <span className="tp-agent__tail ac-captop">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      // The task ends in a blank for them to finish.
-                      setDraftFor(`agent:${f.agentId}`, `${f.task} `);
-                      void navigate({
-                        to: "/org/$orgId/dm/agent/$agentId",
-                        params: { orgId: org.id, agentId: f.agentId },
-                      });
-                    }}
-                  >
-                    {t("teamPlan.firstTask.open")}
-                  </Button>
-                </span>
-              </li>
-            ))}
-          </ul>
-          {example && tasks[0] && (
-            <figure className="tp-example">
-              <figcaption className="small muted">
-                {t("teamPlan.firstTask.example", { name: tasks[0].name })}
-              </figcaption>
-              <span className="tp-example__message">
-                <AgentAvatar agentId={tasks[0].agentId} name={tasks[0].name} size="sm" />
-                <span>{example}</span>
-              </span>
-            </figure>
-          )}
+              </figure>
+            )}
           </>
         ) : undefined
       }

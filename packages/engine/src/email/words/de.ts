@@ -411,6 +411,7 @@ export const words: EmailWords = {
         : `${a} und ${c} sind bereit. Zum Start fehlt ein agentes.chat-Tarif.`;
     },
     button: "agentes.chat-Tarife ansehen",
-    why: (org) => `Du bekommst diese E-Mail, weil du ${org} auf agentes.chat leitest. Wir senden nur zwei solche Hinweise.`,
+    why: (org) =>
+      `Du bekommst diese E-Mail, weil du ${org} auf agentes.chat leitest. Wir senden nur zwei solche Hinweise.`,
   },
 };

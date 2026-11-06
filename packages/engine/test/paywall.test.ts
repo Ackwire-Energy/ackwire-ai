@@ -8,6 +8,7 @@ import {
   noAiCardOf,
   OrgPausedError,
   postPersonMessage,
+  renderEmail,
   type RouterStrategy,
   routeMessage,
   runRoutineNow,
@@ -72,7 +73,11 @@ describe("the first send on a hold", () => {
 
   test("a trust hold still ends the run saying why, with no card", async () => {
     f = await setup();
-    await setOrgStanding({ db: f.db, pubsub: f.pubsub }, f.org.id, { state: "hold", reason: "review", notice: "shown" });
+    await setOrgStanding({ db: f.db, pubsub: f.pubsub }, f.org.id, {
+      state: "hold",
+      reason: "review",
+      notice: "shown",
+    });
     await post("@dev hello");
     await drainOutbox(f.db, f.handlers);
     expect(await cards()).toHaveLength(0);
@@ -145,7 +150,9 @@ describe("what a hold closes", () => {
     f = await setup();
     const routine = await channelRoutine(f);
     await hold("payment");
-    await expect(runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id)).rejects.toBeInstanceOf(OrgPausedError);
+    await expect(runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id)).rejects.toBeInstanceOf(
+      OrgPausedError,
+    );
   });
 });
 
@@ -204,7 +211,9 @@ describe("the plan_waiting email", () => {
     f.db
       .select()
       .from(schema.outbox)
-      .where(and(eq(schema.outbox.kind, "email.send"), sql`${schema.outbox.payload}->'template'->>'kind' = 'plan_waiting'`));
+      .where(
+        and(eq(schema.outbox.kind, "email.send"), sql`${schema.outbox.payload}->'template'->>'kind' = 'plan_waiting'`),
+      );
 
   test("goes to who can pay at a confirmed address, with the billing page, while it still waits", async () => {
     f = await setup();
@@ -230,4 +239,18 @@ describe("the plan_waiting email", () => {
     await sendPlanWaitingEmail(f.db, "https://app.example.com", f.org.id, 1);
     expect(await sent()).toHaveLength(0);
   });
+});
+
+test("the computer's ready email sends a kept message's person to that conversation, with Connect open", () => {
+  const ready = {
+    kind: "computer_ready" as const,
+    orgName: "Acme",
+    specs: null,
+    needsAi: true,
+    hasAgents: true,
+    url: "https://app.example.com/org/o1",
+  };
+  const keptUrl = "https://app.example.com/org/o1/dm/agent/a1";
+  expect(renderEmail({ ...ready, keptUrl }).html).toContain(`${keptUrl}?connect=ai`);
+  expect(renderEmail(ready).html).toContain("/org/o1?connect=ai");
 });

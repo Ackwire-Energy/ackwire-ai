@@ -175,7 +175,6 @@ describe("a plan with no agentes.chat plan in force", () => {
       expect(panel.querySelector(".ai-panel__wait")?.textContent).toMatch(/assim que o computador ficar pronto/);
     }
   });
-
 });
 
 describe("the other places a plan is chosen", () => {

@@ -12760,7 +12760,8 @@ export const en = {
         "I can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
       no_ai_commands_off: "I can't answer now: commands are turned off on my plan's computer.",
       no_ai_cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
-      no_ai_plan_hold: "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
+      no_ai_plan_hold:
+        "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
       no_ai_no_computer: "I can't answer yet: my AI needs a computer and I have none.",
       /** Where the server took a sign-in or a key out of the team's right hand's reply, in place of it. */
       redacted: "[removed: it looked like a sign-in or a key]",

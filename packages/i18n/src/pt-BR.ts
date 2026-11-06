@@ -12892,7 +12892,8 @@ export const ptBR = {
         "Não consigo responder: o {{model}} precisa da região Global ligada no OpenCode (Settings\u00a0›\u00a0Privacy).",
       no_ai_commands_off: "Agora não consigo responder: os comandos estão desligados no computador do meu plano.",
       no_ai_cli_missing: "Ainda não consigo responder: o programa da minha IA não está instalado no meu computador.",
-      no_ai_plan_hold: "Guardei a sua mensagem. Eu respondo aqui quando o workspace tiver um plano do agentes.chat e uma IA conectada.",
+      no_ai_plan_hold:
+        "Guardei a sua mensagem. Eu respondo aqui quando o workspace tiver um plano do agentes.chat e uma IA conectada.",
       no_ai_no_computer: "Ainda não consigo responder: minha IA precisa de um computador e não tenho nenhum.",
       redacted: "[removido: parecia um login ou uma chave]",
       action_connect_ai: "Conectar uma IA",

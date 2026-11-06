@@ -1635,10 +1635,10 @@ function Chat({
   const receipts: ReceiptsState = useMemo(() => Object.fromEntries(fanNow.filter(([, r]) => r)), [fanKey]);
   // Above the box: an agent here without an AI, or the whole workspace without one (as on the web).
   const aiStatus = useAiStatus(orgId);
-  const held = usePlanHold(orgId, org) !== null;
+  const planHeld = usePlanHold(orgId, org) !== null;
   // The right hand's greeting says it itself (its Connect AI card).
   const banner =
-    member && !rightHand && !held
+    member && !rightHand && !planHeld
       ? noAiBanner(aiStatus.data, {
           agentIds: dmAgentId ? [dmAgentId] : channelAgents,
           dmAgentId,

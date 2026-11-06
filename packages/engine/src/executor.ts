@@ -35,7 +35,7 @@ import { withTimeout } from "./agent-media";
 import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
 import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
-import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
+import { type AgentAi, agentAiState, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { deciderName, publishApproval } from "./approvals";
 import { accountablePerson, fedByRoutine, personOfMessage, runAuthority } from "./authority";
 import {
