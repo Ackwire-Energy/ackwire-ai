@@ -2230,6 +2230,11 @@
       "one": "{{name}} 전용 계정",
       "each": "각 에이전트 전용 계정"
     },
+    "popup": {
+      "title": "{{name}} 연결 중",
+      "any": "AI 연결 중",
+      "text": "컴퓨터에 로그인 페이지를 요청하고 있어요. 몇 초 안에 여기에서 열립니다."
+    },
     "chatgptCode": {
       "title": "ChatGPT에서 코드 로그인 허용하기",
       "text": "설정 › 보안에서 Codex의 기기 코드 로그인을 켜세요. Business나 Enterprise에서는 관리자가 켜요.",

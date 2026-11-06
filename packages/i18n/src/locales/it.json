@@ -2412,6 +2412,11 @@
       "one_female": "Un account solo per {{name}}",
       "each": "Un account solo per loro"
     },
+    "popup": {
+      "title": "Connessione a {{name}}",
+      "any": "Connessione alla tua IA",
+      "text": "Stiamo chiedendo la pagina di accesso al computer. Si apre qui tra pochi secondi."
+    },
     "chatgptCode": {
       "title": "Consenti l'accesso con un codice in ChatGPT",
       "text": "In Impostazioni › Sicurezza, attiva l'accesso con codice dispositivo per Codex. Su Business o Enterprise, lo fa un admin.",

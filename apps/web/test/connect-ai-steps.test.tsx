@@ -72,7 +72,17 @@ const account = (over: Partial<MachineAccount> = {}): MachineAccount => ({
 async function withPopup(run: () => Promise<void>) {
   const realOpen = window.open;
   const opened: string[] = [];
-  const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
+  const popup = {
+    closed: false,
+    opener: {},
+    location: {
+      href: "",
+      replace(url: string) {
+        this.href = url;
+      },
+    },
+    close: () => {},
+  };
   window.open = ((url: string) => {
     opened.push(url);
     return popup;
@@ -434,7 +444,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })),
     );
     await settle(6);
-    expect(opened).toEqual(["about:blank"]);
+    expect(opened).toEqual(["/conectando?kind=codex"]);
     expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([[ORG_ID, "machine_1", "codex"]]);
     expect(popup.location.href).toBe("https://auth.openai.com/codex/device");
     expect(within(panel).getByLabelText("Código para o ChatGPT").textContent).toBe("ABCD-1234");

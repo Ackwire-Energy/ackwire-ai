@@ -2327,6 +2327,11 @@
       "one_female": "Een account alleen voor {{name}}",
       "each": "Een account alleen voor hen"
     },
+    "popup": {
+      "title": "{{name}} verbinden",
+      "any": "Je AI verbinden",
+      "text": "We vragen de computer om de inlogpagina. Die opent hier over een paar seconden."
+    },
     "chatgptCode": {
       "title": "Sta inloggen met een code toe in ChatGPT",
       "text": "Zet in Instellingen › Beveiliging inloggen met apparaatcode aan voor Codex. Bij Business of Enterprise doet een beheerder dat.",

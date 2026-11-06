@@ -971,7 +971,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   test("Adicionar conta: no address asked, Claude's page opens beside, Colar sends only this sign-in's code; Voltar stops it", async () => {
     const { state, api } = await onMac();
     const opened: string[] = [];
-    const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
+    const popup = {
+      closed: false,
+      opener: {},
+      location: {
+        href: "",
+        replace(url: string) {
+          this.href = url;
+        },
+      },
+      close: () => {},
+    };
     const realOpen = window.open;
     window.open = ((url?: string | URL) => {
       opened.push(String(url));
@@ -1004,7 +1014,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
         "claude_code",
       ]);
       // The window opened on the click itself went to Claude's page, cut off from the app.
-      expect(opened).toEqual(["about:blank"]);
+      expect(opened).toEqual(["/conectando?kind=claude_code"]);
       expect(popup.opener).toBeNull();
       expect(popup.location.href).toBe("https://claude.ai/oauth/authorize?code=true&state=st4te");
       expect(within(block).getByRole("link", { name: "Abrir de novo" }).getAttribute("href")).toBe(

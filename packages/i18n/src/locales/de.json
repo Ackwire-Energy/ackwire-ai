@@ -2325,6 +2325,11 @@
       "one": "Ein Konto nur für {{name}}",
       "each": "Ein eigenes Konto für jeden"
     },
+    "popup": {
+      "title": "{{name}} wird verbunden",
+      "any": "Deine KI wird verbunden",
+      "text": "Wir fragen den Computer nach der Anmeldeseite. Sie öffnet sich hier in wenigen Sekunden."
+    },
     "chatgptCode": {
       "title": "Anmeldung mit Code in ChatGPT erlauben",
       "text": "Aktiviere unter Einstellungen › Sicherheit die Anmeldung per Gerätecode für Codex. Bei Business oder Enterprise macht das ein Admin.",

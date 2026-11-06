@@ -5602,6 +5602,15 @@
   "connectAi.own.each": {
     "value": "An account just for them"
   },
+  "connectAi.popup.title": {
+    "value": "Connecting {{name}}"
+  },
+  "connectAi.popup.any": {
+    "value": "Connecting your AI"
+  },
+  "connectAi.popup.text": {
+    "value": "We're asking the computer for the sign-in page. It opens here in a few seconds."
+  },
   "connectAi.chatgptCode.title": {
     "value": "Allow sign-in with a code in ChatGPT"
   },

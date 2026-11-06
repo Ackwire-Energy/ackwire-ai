@@ -2241,6 +2241,11 @@
       "one_female": "Akun khusus untuk {{name}}",
       "each": "Akun khusus untuk mereka"
     },
+    "popup": {
+      "title": "Menghubungkan {{name}}",
+      "any": "Menghubungkan AI kamu",
+      "text": "Kami sedang meminta halaman masuk ke komputer. Halaman itu terbuka di sini dalam beberapa detik."
+    },
     "chatgptCode": {
       "title": "Izinkan masuk dengan kode di ChatGPT",
       "text": "Di Settings › Security, aktifkan device code sign-in untuk Codex. Di Business atau Enterprise, Admin yang melakukannya.",

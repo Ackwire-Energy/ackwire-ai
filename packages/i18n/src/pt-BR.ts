@@ -2353,6 +2353,11 @@ export const ptBR = {
       /** For "Todos os agentes": one sign-in each, with the same account. */
       each: "Uma conta só para eles",
     },
+    popup: {
+      title: "Conectando {{name}}",
+      any: "Conectando a sua IA",
+      text: "Estamos pedindo a página de entrada ao computador. Ela abre aqui em alguns segundos.",
+    },
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
       text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem\u00a0administra\u00a0liga.",
