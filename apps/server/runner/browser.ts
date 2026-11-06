@@ -16,6 +16,7 @@ import {
   type AgentScope,
   agentBrowserUrl,
   BROWSER_LIMITS,
+  BROWSER_VIEW,
   type BrowserHandoffInfo,
   type BrowserInputEvent,
   type BrowserSetup,
@@ -133,7 +134,11 @@ import {
  *   relayed as `browser.frame` only while the server asked for it, with the
  *   active tab's address and title; a page that isn't repainting gets one
  *   screenshot as its first frame. A stream can't start on a closed browser
- *   (`browser_closed`): a command opens it first.
+ *   (`browser_closed`): a command opens it first. Frames are JPEG at quality
+ *   60, at most 1280 pixels wide or tall (a high-density screen's frame is
+ *   scaled down to that); where they go is the runner's (`BrowserViews`,
+ *   ADR 0040 §7.1). The stream sends one at a time (`pacing=ack`): the next
+ *   once the live view has room for it (`frameRoom`, `room`).
  * - On the agent's desktop (ADR 0058 §7, a request's `desktop`): the same
  *   Chrome runs headed on that display, so people watching the desktop see it;
  *   the desktop starts first. A Chrome in the other mode moves at the next
@@ -172,8 +177,12 @@ const CHROME_KILL_MS = 3000;
 const CHROME_QUIT_MS = 2000;
 /** Memory one live browser takes, roughly (the per-machine cap). */
 const SESSION_BYTES = 300 * 1024 * 1024;
-/** Frames a second per stream mode. */
-export const STREAM_FPS: Record<BrowserStreamMode, number> = { watch: 1, control: 15 };
+/**
+ * Frames a second per stream mode, at most: Chrome sends one only when the page repaints. Watching gets a few, so a
+ * page loading or scrolling reads as moving; the live view's window (`BrowserViews`) keeps a slow link from falling
+ * behind.
+ */
+export const STREAM_FPS: Record<BrowserStreamMode, number> = { watch: 5, control: 15 };
 /** Characters of page output (snapshots, text) one command returns at most. */
 const MAX_OUTPUT_CHARS = 50_000;
 /** Bytes of stdout read from one command (a full-page screenshot as JSON stays well under). */
@@ -195,6 +204,11 @@ const RETRY_FAILURE_MS = 10 * 60_000;
 const STREAM_OPEN_MS = 5000;
 /** A new stream with no frame from Chrome after this sends one screenshot instead (`firstFrame`). */
 const FIRST_FRAME_MS = 1000;
+/**
+ * A frame of `agent-browser`'s not acknowledged for this long is acknowledged anyway (`ackSource`): whatever was to
+ * say the live view has room again got lost, and one frame more only takes the place of the one waiting there.
+ */
+const SOURCE_ACK_MS = BROWSER_VIEW.ackOwedMs;
 /** A session that answered this long before its idle timeout is checked again before a read. */
 const ALIVE_MARGIN_MS = 60_000;
 /** A capture's file older than this is a leftover (its command timed out): removed by the next capture. */
@@ -1286,6 +1300,14 @@ export interface BrowserManagerOptions {
   memoryEvents?: { agent: string; agents: string };
   /** Tests: how long a new stream waits for Chrome's first frame (`FIRST_FRAME_MS`). */
   firstFrameMs?: number;
+  /**
+   * Whether an agent's next frame may come now (ADR 0040 §7.1): its live view has room for it, or it has none. When
+   * it hasn't, the frame `agent-browser` sent is acknowledged only at `room` (its stream sends one at a time, the
+   * newest, `pacing=ack`), so Chrome's pictures nobody would see are never relayed and parsed. Absent: always.
+   */
+  frameRoom?: (agentId: string) => boolean;
+  /** Tests: how long a frame waits for `room` at most (`SOURCE_ACK_MS`). */
+  sourceAckMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
   startChrome?: (exe: string, args: string[], profile: string, env?: Record<string, string>) => Promise<OwnChrome>;
   /** Tests: how long a Chrome started for Browser may take to show its window (`WINDOW_MS`), and to draw it. */
@@ -1316,12 +1338,29 @@ interface Stream {
   framed?: boolean;
   /** Closed by us (stop, mode off): no `ended` frame for an expected close. */
   closing: boolean;
+  /** The `seq` of `agent-browser`'s frame not acknowledged yet: it sends no other until it is (`pacing=ack`). */
+  owed: number | null;
+  /** Acknowledges it anyway after `SOURCE_ACK_MS`, so the stream never stops for a lost word. */
+  owedTimer: ReturnType<typeof setTimeout> | null;
+  /** The last frame's `seq`: a frame without one is acknowledged as that (acknowledgements are cumulative). */
+  lastSeq?: number;
 }
 
 /** What a frame says about the page besides its size: the active tab's address and title. */
 /** The pointer is where the agent's `hover` left it. */
 // ponytail: that stands for "a menu it opened is open"; asking the page (`:hover` up from the target) would tell for sure.
 const stayed = (s: Session) => !!s.hovered && s.hovered === s.pointer;
+
+/**
+ * When Chrome captured a frame, in epoch ms (`BrowserFrameMetadata.capturedAt`), from its metadata's `timestamp`:
+ * epoch seconds as CDP gives it, or milliseconds. Null when it is neither (absent, or a clock that isn't the epoch's).
+ */
+export function captureTime(raw: unknown): number | null {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return null;
+  // Below 1e11 it is seconds (until the year 5138), else milliseconds; either way, before 2001 it isn't a capture's.
+  const ms = raw < 1e11 ? raw * 1000 : raw;
+  return ms >= 1e12 ? Math.round(ms) : null;
+}
 
 const pageMeta = (stream: Stream) => ({
   ...(stream.url ? { url: stream.url } : {}),
@@ -3485,11 +3524,14 @@ export class BrowserManager {
       if (session.stream.mode !== mode) {
         if (mode === "watch") this.letGo(session.stream);
         session.stream.mode = mode;
-        session.stream.socket.send(JSON.stringify({ type: "config", maxFps: STREAM_FPS[mode] }));
+        // Pacing again too: a config that leaves it out may put the stream back on its default.
+        session.stream.socket.send(JSON.stringify({ type: "config", pacing: "ack", maxFps: STREAM_FPS[mode] }));
         this.changed();
       }
       // The server asks again when it lost the page (a new process, a stop that failed): an idle page sends it again.
       session.stream.framed = false;
+      // And a frame still waiting for room comes at once: a new view (or none) is behind this start.
+      this.ackSource(session.stream);
       void this.firstFrame(session, session.stream);
       return { mode };
     }
@@ -3539,7 +3581,9 @@ export class BrowserManager {
       return reported;
     });
     if (port === null) throw new RunnerError("browser_closed", "The agent's browser isn't open");
-    const url = `ws://127.0.0.1:${port}/?maxFps=${STREAM_FPS[mode]}`;
+    // `pacing=ack` (ADR 0040 §7.1): one frame at a time, the newest, each sent once the last one is acknowledged
+    // (`ackSource`); on the URL, so it covers the first frame too.
+    const url = `ws://127.0.0.1:${port}/?pacing=ack&maxFps=${STREAM_FPS[mode]}`;
     const socket = (this.opts.connectStream ?? ((u: string) => new WebSocket(u) as unknown as StreamSocket))(url);
     const stream: Stream = {
       socket,
@@ -3548,6 +3592,8 @@ export class BrowserManager {
       input: { held: new Set() },
       inputQueue: Promise.resolve(),
       closing: false,
+      owed: null,
+      owedTimer: null,
     };
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -3568,6 +3614,7 @@ export class BrowserManager {
     const old = session.stream;
     if (old) {
       old.closing = true;
+      this.settleSource(old);
       try {
         old.socket.close();
       } catch {
@@ -3580,6 +3627,7 @@ export class BrowserManager {
     void this.firstFrame(session, stream);
     socket.onerror = () => undefined;
     socket.onclose = () => {
+      this.settleSource(stream);
       if (session.stream !== stream) return;
       session.stream = undefined;
       this.changed();
@@ -3644,16 +3692,33 @@ export class BrowserManager {
       }
       return;
     }
-    if (msg.type !== "frame" || typeof msg.data !== "string" || msg.data.length > BROWSER_LIMITS.frameBytes) return;
+    if (msg.type !== "frame") return;
+    const seq = Number(msg.seq);
+    if (!Number.isFinite(seq)) {
+      // Unusable, and acknowledged all the same (`pacing=ack`): none comes after it until it is.
+      stream.owed = stream.lastSeq ?? 0;
+      this.ackSource(stream);
+      return;
+    }
+    stream.lastSeq = seq;
     const m = isRecord(msg.metadata) ? msg.metadata : {};
     const width = Number(m.deviceWidth);
     const height = Number(m.deviceHeight);
-    const seq = Number(msg.seq);
-    if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(seq)) return;
+    if (
+      typeof msg.data !== "string" ||
+      msg.data.length > BROWSER_LIMITS.frameBytes ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      // Skipped, and acknowledged all the same: none comes after it until it is.
+      stream.owed = seq;
+      this.ackSource(stream);
+      return;
+    }
     const scale = Number(m.pageScaleFactor);
     session.lastUsed = this.now();
     stream.framed = true;
-    // Newest wins: a frame the connection can't take now is dropped, never queued.
+    // Newest wins: the live view's window (`BrowserViews`) holds only the newest while the link is busy.
     this.opts.send({
       type: "browser.frame",
       agentId: session.agentId,
@@ -3663,9 +3728,47 @@ export class BrowserManager {
         deviceWidth: width,
         deviceHeight: height,
         ...(Number.isFinite(scale) ? { pageScaleFactor: scale } : {}),
+        capturedAt: captureTime(m.timestamp) ?? this.now(),
         ...pageMeta(stream),
       },
     });
+    // The next one once there is room for it (after the send: the view counts this one first).
+    stream.owed = seq;
+    if (this.opts.frameRoom?.(session.agentId) ?? true) return this.ackSource(stream);
+    if (stream.owedTimer) return;
+    stream.owedTimer = setTimeout(() => this.ackSource(stream), this.opts.sourceAckMs ?? SOURCE_ACK_MS);
+    (stream.owedTimer as { unref?: () => void }).unref?.();
+  }
+
+  /**
+   * An agent's live view has room for its next frame again, or it ended (`BrowserViews.onRoom`; in system mode
+   * root's `browser.room`): its stream's frame waiting for that is acknowledged, and `agent-browser` sends the newest.
+   */
+  room(agentId: string) {
+    for (const s of this.sessions.values()) {
+      if (s.agentId === agentId && s.stream) this.ackSource(s.stream);
+    }
+  }
+
+  /** `agent-browser` may send the stream's next frame (`pacing=ack`: it holds only the newest meanwhile). */
+  private ackSource(stream: Stream) {
+    if (stream.owedTimer) clearTimeout(stream.owedTimer);
+    stream.owedTimer = null;
+    const seq = stream.owed;
+    if (seq === null || stream.closing) return;
+    stream.owed = null;
+    try {
+      stream.socket.send(JSON.stringify({ type: "ack", seq }));
+    } catch {
+      // closed: its close says so
+    }
+  }
+
+  /** A stream that ends owes nothing any more. */
+  private settleSource(stream: Stream) {
+    if (stream.owedTimer) clearTimeout(stream.owedTimer);
+    stream.owedTimer = null;
+    stream.owed = null;
   }
 
   /**
@@ -3700,7 +3803,12 @@ export class BrowserManager {
           agentId: session.agentId,
           seq: 0,
           data,
-          metadata: { deviceWidth: size.width, deviceHeight: size.height, ...pageMeta(stream) },
+          metadata: {
+            deviceWidth: size.width,
+            deviceHeight: size.height,
+            capturedAt: this.now(),
+            ...pageMeta(stream),
+          },
         });
       } finally {
         await rm(file, { force: true }).catch(() => undefined);
@@ -3723,6 +3831,7 @@ export class BrowserManager {
     for (const s of this.sessions.values()) {
       if (!s.stream) continue;
       s.stream.closing = true;
+      this.settleSource(s.stream);
       s.stream.socket.close();
       s.stream = undefined;
     }
@@ -3733,6 +3842,7 @@ export class BrowserManager {
     const stream = session.stream;
     if (!stream) return;
     stream.closing = true;
+    this.settleSource(stream);
     session.stream = undefined;
     try {
       stream.socket.close();
@@ -3847,6 +3957,9 @@ export class BrowserManager {
       env[k] = v;
     }
     env.AGENT_BROWSER_STREAM_QUALITY = "60";
+    // A frame larger than the panel that draws it is bytes nobody sees (a high-density screen doubles both sides).
+    env.AGENT_BROWSER_STREAM_MAX_WIDTH = "1280";
+    env.AGENT_BROWSER_STREAM_MAX_HEIGHT = "1280";
     if (this.opts.fixedPorts) env.AGENT_BROWSER_STREAM_PORT = String(this.opts.fixedPorts.stream);
     const [bin, ...pre] = command as [string, ...string[]];
     return new Promise((resolve) => {

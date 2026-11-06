@@ -138,3 +138,16 @@ export function pageNoteOf(gap: PageGap | null, hidden: boolean, mine: boolean, 
 
 /** A browser that is closed, ended or on a computer that's off: the agent's sky in the page's place, the words on it. */
 export const skyBehind = (note: PageNote) => note.say === "closed" || note.say === "ended" || note.say === "offline";
+
+/**
+ * Whether the card watches its browser's frames. Not while it shows the agent's whole screen (ADR 0058 §7), so the
+ * computer's screencast isn't kept running for nobody, nor before the screen's status says which: the person in
+ * control always does, since their watch keeps their control.
+ */
+export const framesWanted = (o: {
+  watching: boolean;
+  profile: boolean;
+  holding: boolean;
+  settled: boolean;
+  desktop: boolean;
+}) => (o.watching || o.profile) && (o.holding || (o.settled && !o.desktop));

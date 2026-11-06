@@ -4,6 +4,8 @@ import { STREAM_CLOSE } from "../../adapters/src/machine-protocol";
 import type { BrowserHandoff, DesktopStatus } from "../src/index";
 import {
   askControlWords,
+  browserScreenKey,
+  browserShowsDesktop,
   DESKTOP_CLOSE,
   desktopCloseState,
   desktopMode,
@@ -13,6 +15,8 @@ import {
   desktopSwitch,
   desktopWithHandoff,
   drivesOnDesktop,
+  previewGivesUp,
+  screenRefusalMs,
 } from "../src/index";
 
 const handoff = (over: Partial<BrowserHandoff> = {}): BrowserHandoff => ({
@@ -144,6 +148,77 @@ describe("the agent's screen", () => {
     expect(desktopSocketUrl(base, { orgId: "o1", agentId: "a1", mode: "watch", switches: true })).toBe(
       "wss://agentes.chat/api/desktop?orgId=o1&agentId=a1&switch=1&mode=watch",
     );
+    // A browser card's view only watches, and never changes mode.
+    const card = { orgId: "o1", agentId: "a1", mode: "control", switches: true, preview: true } as const;
+    expect(desktopSocketUrl(base, card)).toBe(
+      "wss://agentes.chat/api/desktop?orgId=o1&agentId=a1&preview=1&mode=watch",
+    );
+  });
+});
+
+describe("the browser card on the agent's screen (ADR 0058 §7)", () => {
+  const me = { userId: "me", holdsBrowser: false };
+  const onDesk = (over: Partial<DesktopStatus> = {}) => status({ browserOnDesktop: true, ...over });
+
+  test("the screen shows only while every condition holds", () => {
+    expect(browserShowsDesktop(onDesk(), me)).toBe(true);
+    // No status yet, or one from an older server.
+    expect(browserShowsDesktop(null, me)).toBe(false);
+    expect(browserShowsDesktop(undefined, me)).toBe(false);
+    expect(browserShowsDesktop(status(), me)).toBe(false);
+    expect(browserShowsDesktop(onDesk({ browserOnDesktop: false }), me)).toBe(false);
+    // A card never starts a stopped screen.
+    expect(browserShowsDesktop(onDesk({ running: false }), me)).toBe(false);
+    expect(browserShowsDesktop(onDesk({ available: false, reason: "offline" }), me)).toBe(false);
+    // Someone else in control hides it; this person's own control stays on the frames.
+    expect(browserShowsDesktop(onDesk({ controllerUserId: "ana" }), me)).toBe(false);
+    expect(browserShowsDesktop(onDesk({ controllerUserId: "me" }), me)).toBe(false);
+    expect(browserShowsDesktop(onDesk(), { userId: "me", holdsBrowser: true })).toBe(false);
+    // A held agent's running screen may be watched.
+    expect(browserShowsDesktop(onDesk({ held: true }), me)).toBe(true);
+  });
+
+  test("what of the status lets a card that gave up try again", () => {
+    const key = browserScreenKey(onDesk());
+    expect(browserScreenKey(onDesk({ viewers: 3, canControl: false }))).toBe(key);
+    expect(browserScreenKey(onDesk({ running: false }))).not.toBe(key);
+    expect(browserScreenKey(onDesk({ startedAt: "2026-11-05T10:00:00.000Z" }))).not.toBe(key);
+    expect(browserScreenKey(onDesk({ browserOnDesktop: false }))).not.toBe(key);
+    expect(browserScreenKey(onDesk({ controllerUserId: "ana" }))).not.toBe(key);
+    expect(browserScreenKey(onDesk({ available: false, reason: "offline" }))).not.toBe(key);
+    // Absent reads as false.
+    expect(browserScreenKey(status())).toBe(browserScreenKey(onDesk({ browserOnDesktop: false })));
+  });
+
+  test("a card that keeps giving up on one status waits longer each time, up to a quarter of an hour", () => {
+    expect(screenRefusalMs(0)).toBe(120_000);
+    expect(screenRefusalMs(1)).toBe(240_000);
+    expect(screenRefusalMs(3)).toBe(900_000);
+    expect(screenRefusalMs(10)).toBe(900_000);
+  });
+
+  test("a card's screen gives up on anything but opening and live", () => {
+    expect(previewGivesUp("connecting")).toBe(false);
+    expect(previewGivesUp("live")).toBe(false);
+    for (const state of ["hidden", "offline", "busy", "noRoom", "forbidden", "unavailable", "ended", "held"] as const) {
+      expect(previewGivesUp(state)).toBe(true);
+    }
+  });
+
+  test("its closes: only a dropped socket opens it again, a stopped screen ends it", () => {
+    const preview = { preview: true };
+    expect(desktopCloseState(4502, "desktop_off", preview)).toEqual({ state: "ended", retry: "never" });
+    expect(desktopCloseState(4429, "preview_yield", preview)).toEqual({ state: "busy", retry: "never" });
+    expect(desktopCloseState(4409, "", preview)).toEqual({ state: "hidden", retry: "never" });
+    expect(desktopCloseState(4503, "offline", preview)).toEqual({ state: "offline", retry: "never" });
+    expect(desktopCloseState(4502, "machine_paused", preview)).toEqual({ state: "paused", retry: "never" });
+    expect(desktopCloseState(4502, "held", preview)).toEqual({ state: "held", retry: "never" });
+    expect(desktopCloseState(4403, "", preview)).toEqual({ state: "forbidden", retry: "never" });
+    expect(desktopCloseState(1000, "", preview)).toEqual({ state: "ended", retry: "never" });
+    expect(desktopCloseState(4410, "", preview)).toEqual({ state: "connecting", retry: "now" });
+    for (const code of [1001, 1006, 4408]) {
+      expect(desktopCloseState(code, "", preview)).toEqual({ state: "connecting", retry: "later" });
+    }
   });
 });
 
