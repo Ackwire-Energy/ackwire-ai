@@ -2327,6 +2327,8 @@
     "own": {
       "shared": "Ajanlarınızın paylaştığı hesap",
       "sharedLower": "ajanlarınızın paylaştığı hesap",
+      "free": "OpenCode'un ücretsiz modelleri",
+      "freeLower": "OpenCode'un ücretsiz modelleri",
       "one": "Yalnızca {{name}} için bir hesap",
       "each": "Yalnızca onlar için bir hesap"
     },
@@ -4431,7 +4433,12 @@
       "files": "Dosyalar",
       "usage": "Kullanım",
       "activity": "Etkinlik",
-      "settings": "Ayarlar"
+      "settings": "Ayarlar",
+      "more": "Diğer"
+    },
+    "ficha": {
+      "with": "Kimlerle",
+      "computer": "Bilgisayar"
     },
     "changed": "Değiştirildi",
     "undo": "Geri al",

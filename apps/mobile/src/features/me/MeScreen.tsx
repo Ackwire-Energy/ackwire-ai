@@ -6,6 +6,7 @@ import {
   ownSignIns,
   ownSignInTitle,
 } from "@agenteschat/client/lib/ai-accounts";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import Constants from "expo-constants";
@@ -294,7 +295,11 @@ export function MeScreen() {
             key={a.key}
             logo={first.provider ?? first.kind}
             title={accountTitle(first)}
-            sub={several ? t("aiAccounts.page.on", { computer: first.computer }) : null}
+            sub={
+              several
+                ? t("aiAccounts.page.on", { computer: computerNameOf(t, org.org?.name ?? "", first.computer) })
+                : null
+            }
             usage={a.usage}
             divider={own.length + i > 0}
             onPress={() => open("/ai-accounts")}

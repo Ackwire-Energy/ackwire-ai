@@ -2506,6 +2506,8 @@
     "own": {
       "shared": "Konto wspólne dla twoich agentów",
       "sharedLower": "konto wspólne dla twoich agentów",
+      "free": "Darmowe modele OpenCode",
+      "freeLower": "darmowe modele OpenCode",
       "one": "Konto tylko dla: {{name}}",
       "each": "Osobne konto dla każdego"
     },
@@ -4768,7 +4770,12 @@
       "files": "Pliki",
       "usage": "Użycie",
       "activity": "Aktywność",
-      "settings": "Ustawienia"
+      "settings": "Ustawienia",
+      "more": "Więcej"
+    },
+    "ficha": {
+      "with": "Z kim",
+      "computer": "Komputer"
     },
     "changed": "Zmieniono",
     "undo": "Cofnij",

@@ -2364,6 +2364,8 @@ export const ptBR = {
     own: {
       shared: "A conta que os seus agentes dividem",
       sharedLower: "a conta que os seus agentes dividem",
+      free: "Modelos grátis do OpenCode",
+      freeLower: "os modelos grátis do OpenCode",
       one: "Uma conta só para o {{name}}",
       one_female: "Uma conta só para a {{name}}",
       /** For "Todos os agentes": one sign-in each, with the same account. */
@@ -4543,6 +4545,12 @@ export const ptBR = {
       usage: "Uso",
       activity: "Atividade",
       settings: "Configurações",
+      more: "Mais",
+    },
+    /** The overview's two lists of rows: how it works, then who it works with. */
+    ficha: {
+      with: "Com quem",
+      computer: "Computador",
     },
     changed: "Alterado",
     undo: "Desfazer",

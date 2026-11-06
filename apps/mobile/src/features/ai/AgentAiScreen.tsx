@@ -3,6 +3,7 @@ import { keys, useAgentBrain, useAiAccounts, useApi, useMachines, useModels } fr
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedContents, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -143,7 +144,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
       ...(kind && !planOf(a?.provider) ? { intent: planOfKind(kind) } : {}),
       ...(also && a?.email ? { email: a.email } : {}),
     });
-  const computer = view?.computer?.name ?? "";
+  const computer = computerNameOf(t, org?.name ?? "", view?.computer?.name ?? "");
   const mayPick = view !== undefined && !busy;
   const choose = (a: MachineAccount | null) => {
     if (!view || !mayPick || (a?.id ?? null) === view.account) return;
@@ -212,7 +213,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   {ownRow ? (
                     <GroupedRow
                       leading={<ProviderLogo id={kind} size="sm" />}
-                      label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer)}
+                      label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer, kind)}
                       checked={view.account === null}
                       disabled={!mayPick}
                       onPress={() => choose(null)}

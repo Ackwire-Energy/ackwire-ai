@@ -2337,6 +2337,8 @@
     "own": {
       "shared": "Das Konto, das deine Agenten teilen",
       "sharedLower": "das Konto, das deine Agenten teilen",
+      "free": "Die kostenlosen Modelle von OpenCode",
+      "freeLower": "die kostenlosen Modelle von OpenCode",
       "one": "Ein Konto nur für {{name}}",
       "each": "Ein eigenes Konto für jeden"
     },
@@ -4447,7 +4449,12 @@
       "files": "Dateien",
       "usage": "Nutzung",
       "activity": "Aktivität",
-      "settings": "Einstellungen"
+      "settings": "Einstellungen",
+      "more": "Mehr"
+    },
+    "ficha": {
+      "with": "Mit wem",
+      "computer": "Computer"
     },
     "changed": "Geändert",
     "undo": "Rückgängig",

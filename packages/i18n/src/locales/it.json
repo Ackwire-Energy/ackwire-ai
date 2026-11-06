@@ -2424,6 +2424,8 @@
     "own": {
       "shared": "L'account condiviso dai tuoi agenti",
       "sharedLower": "l'account condiviso dai tuoi agenti",
+      "free": "Modelli gratuiti di OpenCode",
+      "freeLower": "i modelli gratuiti di OpenCode",
       "one": "Un account solo per {{name}}",
       "one_female": "Un account solo per {{name}}",
       "each": "Un account solo per loro"
@@ -4610,7 +4612,12 @@
       "files": "File",
       "usage": "Utilizzo",
       "activity": "Attività recenti",
-      "settings": "Impostazioni"
+      "settings": "Impostazioni",
+      "more": "Altro"
+    },
+    "ficha": {
+      "with": "Con chi",
+      "computer": "Computer"
     },
     "changed": "Modificato",
     "undo": "Annulla",

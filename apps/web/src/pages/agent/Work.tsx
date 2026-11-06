@@ -51,6 +51,7 @@ import {
   accountChoices,
   lendable,
   ownSignInListed,
+  ownSignInLower,
   ownSignInName,
   ownSignInReady,
   ownSignInTitle,
@@ -67,7 +68,7 @@ import {
   SPEEDS,
 } from "@agenteschat/client/lib/brain-advanced";
 import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
-import { setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { computerNameOf, setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
@@ -209,7 +210,10 @@ function useWork() {
   return { brain, computer, browser, scopes, machines, granted, machineId, target, browserWord };
 }
 
-/** A cell of "Como trabalha" (and the memory's counts): its icon, what it is, the value; a button for who may change it. */
+/**
+ * A cell of the memory's counts, or (`row`) a row of the overview's fact sheet (Ficha.tsx): its icon, what it is, the value; a button
+ * for who may change it, which opens its dialog (`open`: that dialog is open now).
+ */
 export function Cell({
   icon,
   label,
@@ -219,6 +223,8 @@ export function Cell({
   muted,
   openLabel,
   onOpen,
+  row,
+  open,
 }: {
   icon: ReactNode;
   label: string;
@@ -228,6 +234,8 @@ export function Cell({
   muted?: boolean;
   openLabel?: string;
   onOpen?: () => void;
+  row?: boolean;
+  open?: boolean;
 }) {
   const body = (
     <>
@@ -242,20 +250,38 @@ export function Cell({
       </span>
     </>
   );
-  if (!onOpen) return <div className="agp-cell agp-cell--ro">{body}</div>;
+  if (!onOpen) return <div className={row ? "agp-cell agp-cell--ro agp-frow" : "agp-cell agp-cell--ro"}>{body}</div>;
   return (
-    <button type="button" className="agp-cell" aria-haspopup="dialog" aria-label={openLabel} onClick={onOpen}>
+    <button
+      type="button"
+      className={row ? "agp-cell agp-frow" : "agp-cell"}
+      data-open={open || undefined}
+      aria-haspopup="dialog"
+      aria-label={openLabel}
+      onClick={onOpen}
+    >
       {body}
-      <Icon name="chevronDown" size={14} className="agp-cell__chev" />
+      <Icon name={row ? "chevronRight" : "chevronDown"} size={14} className="agp-cell__chev" />
     </button>
   );
 }
 
 /**
- * Como trabalha: where it works, who thinks (with the effort) and the browser
- * side by side, each opening its dialog; the numbers in the footer. Where comes first: who thinks depends on it.
+ * How it works, the first group of the overview's fact sheet (Ficha.tsx): the computer's entry (`before`), where it works, who thinks
+ * (with the effort) and the browser, one row each opening its dialog, then what it may use and its usage (`after`).
+ * Where comes first: who thinks depends on it. `open`: the row whose dialog is open.
  */
-export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => void; footer?: ReactNode }) {
+export function WorkCard({
+  onOpen,
+  open,
+  before,
+  after,
+}: {
+  onOpen: (dialog: WorkDialog) => void;
+  open?: string | null;
+  before?: ReactNode;
+  after?: ReactNode;
+}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const { agent, viewer, saved, can, g } = useAgentEdit();
@@ -298,7 +324,12 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       ? null
       : view?.account
         ? (planAccounts.find((a) => a.id === view.account)?.label ?? null)
-        : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
+        : ownSignInName(
+            t,
+            view?.ownSignIn === true && view.canUsePlans,
+            view?.computer?.name ?? "",
+            kind === "model" ? undefined : kind,
+          );
   // Near or at its plan's limit: said where the account is.
   const usage =
     !view || kind === "model"
@@ -335,66 +366,75 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   );
   return (
     <div className="agp-work">
-      <section className="agp-workcard" aria-label={t("agentPage.work.cell.label", g)}>
-        <div className="agp-cells">
-          {/* The Cloud's agents all work on the workspace's own computer, whose state the page's computer entry says:
+      <h2 className="agp-ficha__h" id="agp-ficha-work">
+        {t("agentPage.work.cell.label", g)}
+      </h2>
+      <section className="agp-workcard agp-ficha__card" aria-labelledby="agp-ficha-work">
+        {before}
+        {/* The Cloud's agents all work on the workspace's own computer, whose state the page's computer entry says:
               nothing to pick, so no cell. */}
-          {!member && edition === "selfhost" && (
-            <Cell
-              icon={<Icon name={choice === "none" ? "dash" : "computer"} size={16} />}
-              label={choice === "none" ? t("computer.target.label") : t("agentPage.work.cell.computer")}
-              value={machine ? machine.name : choice ? noComputer.label(choice) : null}
-              sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
-              openLabel={t("agentPage.work.open.computer", g)}
-              onOpen={can("machine") ? () => onOpen("computer") : undefined}
-            />
-          )}
-          {/* On a billing hold an AI comes after the plan: no "Sem IA" or Connect here, as on its chip. */}
-          {noAi && held ? null : noAi ? (
-            <Cell
-              icon={<Icon name="plug" size={16} />}
-              label={t("agentPage.work.cell.brain")}
-              value={t("noAi.chip")}
-              sub={t("connectAi.title.any")}
-              muted
-              openLabel={t("connectAi.title.any")}
-              onOpen={connect ? () => connect.open({ agentId: agent.id }) : undefined}
-            />
-          ) : (
-            <Cell
-              icon={
-                ai !== "key" ? (
-                  <ProviderLogo id={planMark(ai)} size="sm" />
-                ) : keyProvider ? (
-                  <ProviderLogo id={keyProvider} size="sm" />
-                ) : (
-                  <Icon name="brainAgent" size={16} />
-                )
-              }
-              label={
-                ai === "key"
-                  ? t("agentPage.work.cell.brain")
-                  : t("agentPage.work.cell.brainWith", { plan: planLabel(t, ai) })
-              }
-              value={ai === "key" ? orgModel : planModel}
-              more={ai === "key" ? null : [effort, speed].filter(Boolean).join(" · ")}
-              sub={sub}
-              openLabel={t("agentPage.work.open.brain")}
-              onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
-            />
-          )}
-          {!member && (
-            <Cell
-              icon={<Icon name={work.browserWord === "off" ? "block" : "globe"} size={16} />}
-              label={t("agentPage.work.cell.browser")}
-              value={t(`agentPage.work.browser.${work.browserWord}`)}
-              muted={work.browserWord === "off"}
-              openLabel={t("agentPage.work.open.browser")}
-              onOpen={() => onOpen("browser")}
-            />
-          )}
-        </div>
-        {footer && <div className="agp-workcard__foot">{footer}</div>}
+        {!member && edition === "selfhost" && (
+          <Cell
+            row
+            icon={<Icon name={choice === "none" ? "dash" : "computer"} size={16} />}
+            label={choice === "none" ? t("computer.target.label") : t("agentPage.work.cell.computer")}
+            value={machine ? machine.name : choice ? noComputer.label(choice) : null}
+            sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
+            open={open === "computer"}
+            openLabel={t("agentPage.work.open.computer", g)}
+            onOpen={can("machine") ? () => onOpen("computer") : undefined}
+          />
+        )}
+        {/* On a billing hold an AI comes after the plan: no "Sem IA" or Connect here, as on its chip. */}
+        {noAi && held ? null : noAi ? (
+          <Cell
+            row
+            icon={<Icon name="plug" size={16} />}
+            label={t("agentPage.work.cell.brain")}
+            value={t("noAi.chip")}
+            sub={t("connectAi.title.any")}
+            muted
+            openLabel={t("connectAi.title.any")}
+            onOpen={connect ? () => connect.open({ agentId: agent.id }) : undefined}
+          />
+        ) : (
+          <Cell
+            row
+            icon={
+              ai !== "key" ? (
+                <ProviderLogo id={planMark(ai)} size="sm" />
+              ) : keyProvider ? (
+                <ProviderLogo id={keyProvider} size="sm" />
+              ) : (
+                <Icon name="brainAgent" size={16} />
+              )
+            }
+            label={
+              ai === "key"
+                ? t("agentPage.work.cell.brain")
+                : t("agentPage.work.cell.brainWith", { plan: planLabel(t, ai) })
+            }
+            value={ai === "key" ? orgModel : planModel}
+            more={ai === "key" ? null : [effort, speed].filter(Boolean).join(" · ")}
+            sub={sub}
+            open={open === "brain"}
+            openLabel={t("agentPage.work.open.brain")}
+            onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
+          />
+        )}
+        {!member && (
+          <Cell
+            row
+            icon={<Icon name={work.browserWord === "off" ? "block" : "globe"} size={16} />}
+            label={t("agentPage.work.cell.browser")}
+            value={t(`agentPage.work.browser.${work.browserWord}`)}
+            muted={work.browserWord === "off"}
+            open={open === "browser"}
+            openLabel={t("agentPage.work.open.browser")}
+            onOpen={() => onOpen("browser")}
+          />
+        )}
+        {after}
       </section>
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
@@ -772,7 +812,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
   const accountKind = kind === "model" ? null : kind;
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
-  const computerName = view.computer?.name ?? "";
+  const computerName = computerNameOf(t, org.name, view.computer?.name ?? "");
   // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
   const allAccounts = [
     ...view.accounts.map((v) => added.find((a) => a.id === v.id) ?? v),
@@ -1032,7 +1072,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ? // Chosen only where it is its owner's: the computer's own sign-in, the account their agents share.
                   t("aiAccounts.done.savedAgent", {
                     agent: agent.name,
-                    label: t("connectAi.own.sharedLower"),
+                    label: ownSignInLower(t, accountKind),
                   })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
@@ -1185,7 +1225,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       ? [
           {
             value: HERE,
-            label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName),
+            label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName, accountKind ?? undefined),
             description: accountKind && ownPlan ? ownSignInTitle(t, { kind: accountKind, plan: ownPlan }) : undefined,
             leading: sharedIcon,
           },

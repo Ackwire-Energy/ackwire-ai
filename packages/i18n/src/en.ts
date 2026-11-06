@@ -2356,6 +2356,8 @@ export const en = {
     own: {
       shared: "The account your agents share",
       sharedLower: "the account your agents share",
+      free: "OpenCode's free models",
+      freeLower: "OpenCode's free models",
       one: "An account just for {{name}}",
       each: "An account just for them",
     },
@@ -4509,6 +4511,12 @@ export const en = {
       usage: "Usage",
       activity: "Activity",
       settings: "Settings",
+      more: "More",
+    },
+    /** The overview's two lists of rows: how it works, then who it works with. */
+    ficha: {
+      with: "Who it works with",
+      computer: "Computer",
     },
     changed: "Changed",
     undo: "Undo",

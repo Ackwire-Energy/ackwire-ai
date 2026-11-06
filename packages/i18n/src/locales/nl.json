@@ -2338,6 +2338,8 @@
     "own": {
       "shared": "Het account dat je agents delen",
       "sharedLower": "het account dat je agents delen",
+      "free": "Gratis modellen van OpenCode",
+      "freeLower": "de gratis modellen van OpenCode",
       "one": "Een account alleen voor {{name}}",
       "one_female": "Een account alleen voor {{name}}",
       "each": "Een account alleen voor hen"
@@ -4477,7 +4479,12 @@
       "files": "Bestanden",
       "usage": "Gebruik",
       "activity": "Activiteit",
-      "settings": "Instellingen"
+      "settings": "Instellingen",
+      "more": "Meer"
+    },
+    "ficha": {
+      "with": "Met wie",
+      "computer": "Computer"
     },
     "changed": "Gewijzigd",
     "undo": "Ongedaan maken",

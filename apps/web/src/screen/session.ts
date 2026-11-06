@@ -38,6 +38,8 @@ const PICTURE_WAIT_MS = 10_000;
 const SWITCH_WAIT_MS = 3_000;
 /** RFB's PointerEvent: its message type, then the buttons held and the position, big-endian. */
 const POINTER_EVENT = 5;
+/** A browser card's screen (`preview`) opens again this many times after drops, then says offline. */
+const PREVIEW_RETRIES = 3;
 
 export interface ScreenDeps {
   createRfb: (target: HTMLElement, channel: RfbChannel) => RFB;
@@ -50,6 +52,9 @@ export interface ScreenDeps {
  * with a socket and noVNC, without its screen around it. The app holds every touch: noVNC here only draws, at the
  * desktop's own size, and the app moves and zooms the whole page. The pointer goes straight onto the session's
  * channel as an RFB message, since noVNC would read it from a mouse over a canvas the app transforms.
+ *
+ * `preview`: the browser card's view of the screen its browser runs on (ADR 0058 §7): watching only, and no wait of
+ * its own on a screen it can't show (the card shows its browser's frames instead).
  */
 export class ScreenSession {
   private want: { connect: boolean; mode: DesktopMode } = { connect: false, mode: "watch" };
@@ -67,12 +72,19 @@ export class ScreenSession {
 
   constructor(
     private readonly target: HTMLElement,
-    private readonly place: { orgId: string; agentId: string; base: Parameters<typeof desktopSocketUrl>[0] },
+    private readonly place: {
+      orgId: string;
+      agentId: string;
+      base: Parameters<typeof desktopSocketUrl>[0];
+      preview?: boolean;
+    },
     private readonly deps: ScreenDeps,
   ) {}
 
   /** What the app wants now: called again for every change, so the same value does nothing. */
-  set(want: { connect: boolean; mode: DesktopMode }) {
+  set(asked: { connect: boolean; mode: DesktopMode }) {
+    // A card's view only watches.
+    const want = this.place.preview ? { ...asked, mode: "watch" as const } : asked;
     const was = this.want;
     this.want = want;
     if (!want.connect) return this.end();
@@ -151,9 +163,14 @@ export class ScreenSession {
     const holding = heldPicture(this.target) !== null || holdPicture(this.target);
     this.end();
     if (!holding) this.say("connecting");
-    const { orgId, agentId, base } = this.place;
+    const { orgId, agentId, base, preview } = this.place;
     const mode = this.want.mode;
-    const socket = this.deps.createSocket(desktopSocketUrl(base, { orgId, agentId, mode, switches: true }));
+    const socket = this.deps.createSocket(
+      desktopSocketUrl(
+        base,
+        preview ? { orgId, agentId, mode: "watch", preview: true } : { orgId, agentId, mode, switches: true },
+      ),
+    );
     const link = new DesktopLink(socket);
     this.link = link;
     socket.addEventListener("close", (e) => this.closed(link, e));
@@ -178,13 +195,16 @@ export class ScreenSession {
     this.session = null;
     clearInterval(this.looking);
     clearTimeout(this.switchTimer);
-    const next = desktopCloseState(e.code, e.reason);
+    const preview = this.place.preview === true;
+    const next = desktopCloseState(e.code, e.reason, { preview });
+    // A card's screen that keeps dropping says so, and the card shows the frames.
+    const spent = preview && next.retry !== "never" && this.attempts >= PREVIEW_RETRIES;
     if (e.code !== DESKTOP_CLOSE.controlEnded || !holdPicture(this.target)) {
       heldPicture(this.target)?.remove();
-      this.say(next.state);
+      this.say(spent ? "offline" : next.state);
     }
     this.deps.post({ type: "changed" });
-    if (next.retry === "never") {
+    if (next.retry === "never" || spent) {
       this.gaveUp = true;
       return;
     }

@@ -2244,6 +2244,8 @@
     "own": {
       "shared": "你的智能体共用的账号",
       "sharedLower": "你的智能体共用的账号",
+      "free": "OpenCode 的免费模型",
+      "freeLower": "OpenCode 的免费模型",
       "one": "{{name}} 专用的账号",
       "one_female": "{{name}} 专用的账号",
       "each": "每个智能体专用的账号"
@@ -4315,7 +4317,12 @@
       "files": "文件",
       "usage": "用量",
       "activity": "动态",
-      "settings": "设置"
+      "settings": "设置",
+      "more": "更多"
+    },
+    "ficha": {
+      "with": "与谁合作",
+      "computer": "电脑"
     },
     "changed": "已更改",
     "undo": "撤销",

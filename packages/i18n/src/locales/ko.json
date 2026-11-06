@@ -2241,6 +2241,8 @@
     "own": {
       "shared": "에이전트가 함께 쓰는 계정",
       "sharedLower": "에이전트가 함께 쓰는 계정",
+      "free": "OpenCode 무료 모델",
+      "freeLower": "OpenCode 무료 모델",
       "one": "{{name}} 전용 계정",
       "each": "각 에이전트 전용 계정"
     },
@@ -4283,7 +4285,12 @@
       "files": "파일",
       "usage": "사용량",
       "activity": "활동",
-      "settings": "설정"
+      "settings": "설정",
+      "more": "더 보기"
+    },
+    "ficha": {
+      "with": "함께 일하는 사람",
+      "computer": "컴퓨터"
     },
     "changed": "변경됨",
     "undo": "실행 취소",

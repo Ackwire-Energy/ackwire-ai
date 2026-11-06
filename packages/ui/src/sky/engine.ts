@@ -51,6 +51,8 @@ export interface SkyOptions {
   sprites?: number | { area: number; max: number };
   /** Share of near (double size) sprites (default 0.3). */
   near?: number;
+  /** Share of the far sprites drawn as faint light silhouettes (default 0.5); the rest take `body`. */
+  faint?: number;
   /** Rise speed multiplier (default 1). */
   rise?: number;
   /** Sprites leave above this fraction of the height (default: the top edge). */
@@ -209,7 +211,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
       vy: near ? 7 : 3.5 + Math.random() * 2,
       ph,
       blink: Math.random() * 6,
-      ghost: !near && Math.random() < 0.5,
+      ghost: !near && Math.random() < (o.faint ?? 0.5),
     };
   };
   const wanted = (o: SkyOptions) => {

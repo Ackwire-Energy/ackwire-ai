@@ -15,6 +15,7 @@ import {
   accountTitle,
   existingAi,
   groupPlans,
+  ownSignInLower,
   planWordOf,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
@@ -1004,7 +1005,7 @@ function PlanSteps({
     );
   }
   if (ownSaved) {
-    const label = t("connectAi.own.sharedLower");
+    const label = ownSignInLower(t, kind);
     return (
       <>
         <SettingNote icon="check" live>
@@ -1156,7 +1157,9 @@ function PlanSteps({
           {ownable && (
             <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
               <span className="ac-option__text">
-                <span className="ac-option__title">{t("connectAi.own.shared")}</span>
+                <span className="ac-option__title">
+                  {kind === "opencode" ? t("connectAi.own.free") : t("connectAi.own.shared")}
+                </span>
                 {ownPlan && <span className="ac-option__desc">{`${brand} ${ownPlan}`}</span>}
               </span>
             </OptionCard>

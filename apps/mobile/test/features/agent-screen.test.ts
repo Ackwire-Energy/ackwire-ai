@@ -46,6 +46,13 @@ describe("the page behind the agent's screen", () => {
     expect(screenPageStays(SERVER, "not a url")).toBe(false);
   });
 
+  test("a browser card's page only watches, and is still the server's own page (ADR 0058 §7)", () => {
+    const url = screenPageUrl(SERVER, "org", "ada", { preview: true });
+    expect(url).toBe("https://app.example/screen.html?o=org&a=ada&p=1");
+    expect(screenPageStays(SERVER, url)).toBe(true);
+    expect(screenPageUrl(SERVER, "org", "ada", { preview: false })).toBe(screenPageUrl(SERVER, "org", "ada"));
+  });
+
   test("a message counts only from the server's page, and only as what it can say", () => {
     const url = screenPageUrl(SERVER, "org", "ada");
     const heard = (data: unknown, from = url) => screenEvent(SERVER, { url: from, data: JSON.stringify(data) });

@@ -456,6 +456,8 @@ describe("the agents' computers by role (ADR 0085 §12): none, the browser, the 
       reason: "browser_only",
       canControl: false,
       controlRefusal: "role",
+      // The browser's frames are what they see: never the screen it runs on.
+      browserOnDesktop: false,
     });
     await expect(requireComputerDriver(f.db, caio.id, f.org.id, f.agent.id)).rejects.toThrow(
       "not their whole computer",
@@ -647,7 +649,7 @@ describe("the browser and the desktop show one window", () => {
       hub: { isLocal: () => true, call: async () => ({}) } as unknown as MachineHub,
     });
     const card: BrowserLiveMessage[] = [];
-    const stopCard = await live.watch({ userId: bia.id, send: (m) => card.push(m) }, f.org.id, f.agent.id);
+    const { stop: stopCard } = await live.watch({ userId: bia.id, send: (m) => card.push(m) }, f.org.id, f.agent.id);
     const desktopView = await open(bia.id, WATCH);
     const message = await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@dev check it" });
     const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, message.id));
@@ -871,11 +873,13 @@ describe("the desktop's REST and keep-alive", () => {
       canControl: true,
       controlRefusal: null,
       held: false,
+      browserOnDesktop: true,
     });
     expect(await desktopStatus(rest, caio.id, f.org.id, f.agent.id)).toMatchObject({
       canControl: false,
       controlRefusal: "pairer",
       held: false,
+      browserOnDesktop: true,
     });
     expect(new Set(requests.map((r) => r.op))).toEqual(new Set(["desktop.session.status"]));
 
@@ -897,7 +901,51 @@ describe("the desktop's REST and keep-alive", () => {
       available: false,
       reason: "not_allowed",
       running: false,
+      browserOnDesktop: false,
     });
+  });
+
+  test("whether the agent's browser runs on this screen, so its browser card shows it (ADR 0058 §7)", async () => {
+    const { hub } = await start();
+    const rest = { db: f.db, hub, streams: broker };
+    expect(await desktopStatus(rest, f.owner.id, f.org.id, f.agent.id)).toMatchObject({ browserOnDesktop: true });
+    // Its browser last ran on another computer: that one's frames, not this screen.
+    const other = await pairMachine(deps(), f.owner.id, f.org.id, { name: "Other" });
+    await f.db.update(schema.agents).set({ browserMachineId: other.machineId }).where(eq(schema.agents.id, f.agent.id));
+    expect(await desktopStatus(rest, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
+      available: true,
+      browserOnDesktop: false,
+    });
+    await f.db.update(schema.agents).set({ browserMachineId: null }).where(eq(schema.agents.id, f.agent.id));
+    // The computer offline: nothing to show, so no screen in the card.
+    const offline = { ...hub, status: async () => null } as unknown as MachineHub;
+    expect(await desktopStatus({ ...rest, hub: offline }, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
+      available: false,
+      reason: "offline",
+      browserOnDesktop: false,
+    });
+  });
+
+  test("a browser card's view of the screen is audited as watching, marked as the card's", async () => {
+    const { machine } = await start();
+    const viewer = fakeSocket();
+    const stream = broker?.open(viewer.socket, {
+      userId: f.owner.id,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      request: WATCH,
+      preview: true,
+    });
+    if (!stream) throw new Error("no broker");
+    await until(() => stream.runner !== null, "the card's stream");
+    broker?.close(stream);
+    const watched = () =>
+      f.db
+        .select()
+        .from(schema.auditLog)
+        .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, "desktop.watched")));
+    await until(async () => (await watched()).length === 1, "the audit");
+    expect((await watched())[0]?.details).toMatchObject({ machineId: machine.machineId, preview: true });
   });
 
   test("an open desktop handoff keeps its desktop running", async () => {

@@ -9061,7 +9061,7 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
 }
 .agp-cover {
   position: relative;
-  height: 176px;
+  height: 112px;
   overflow: hidden;
   isolation: isolate;
   background: var(--sunken);
@@ -9076,14 +9076,22 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   width: 100%;
   height: 100%;
 }
-/* The agent on the cover's left edge, cut out by a ring of the page. */
+/* The face over the cover's bottom edge, who it is beside it: the page's text starts a face-height sooner. */
+.agp-idrow {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 0 var(--agp-gutter);
+}
+/* The agent's face, cut out by a ring of the page. */
 .agp-face {
   position: relative;
   z-index: 1;
   display: grid;
-  width: 112px;
-  height: 112px;
-  margin: -56px 0 0 var(--agp-gutter);
+  flex: none;
+  width: 76px;
+  height: 76px;
+  margin-top: -38px;
   /* The avatar's own tile (radius 30%) is the face: the ring follows it. */
   border-radius: 30%;
   box-shadow: 0 0 0 6px var(--bg);
@@ -9097,31 +9105,28 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   display: flex;
   flex-direction: column;
 }
-/* How it works under the name, where the overview's side column is gone (AgentPage: workInAside). */
-.agp-hero__work {
-  padding: 18px var(--agp-gutter) 0;
-}
 /* The name on its own line; the handle and role, then its chips ("Sem IA"), share the next one. */
 .agp-ident {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px var(--space-2);
-  padding: 12px var(--agp-gutter) 0;
+  gap: 2px var(--space-2);
+  min-width: 0;
+  padding-bottom: 2px;
 }
 .agp-name {
   flex-basis: 100%;
   margin: 0;
   font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: var(--font-display-weight, 300);
-  line-height: 1;
-  letter-spacing: -0.03em;
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 .agp-handle {
   color: var(--muted);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
 }
 /* The right hand's name story, its own line under the handle. */
@@ -9152,7 +9157,7 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   color: var(--sky-ink);
 }
 
-/* Como trabalha: three cells in one card, no shadow, a hairline; the numbers below. */
+/* Cells in one card, no shadow, a hairline (the memory's counts; the overview's rows restyle them below). */
 .agp-work {
   display: flex;
   flex-direction: column;
@@ -9275,67 +9280,6 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 .agp-cell__chev {
   align-self: center;
   color: var(--faint);
-}
-.agp-workcard__foot {
-  margin: 4px 0 0;
-  padding: 8px 0 4px;
-  border-top: 1px solid var(--line);
-}
-.agp-numbers {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 16px;
-  margin: 0;
-}
-/* A fact keeps to one line while the row has room; on a phone a long one (a plan's limits with its account) wraps
-   inside the page instead of running past it, its icon staying on the first line as an `.ac-iconline` lead. */
-.agp-number {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  padding: 2px 4px;
-  margin: 0 -4px;
-  border: 0;
-  border-radius: 7px;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 12.5px;
-  text-align: start;
-  cursor: pointer;
-}
-.agp-number > .ac-icon:first-child {
-  align-self: flex-start;
-  translate: 0 calc(11px - var(--cap-mid) - 50%);
-}
-@supports (top: 1lh) {
-  .agp-number > .ac-icon:first-child {
-    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
-  }
-}
-.agp-number:hover {
-  background: var(--plate, color-mix(in srgb, var(--ink) 6%, transparent));
-  color: var(--ink2);
-}
-.agp-number .ac-icon {
-  color: var(--faint);
-}
-.agp-number .ac-meter {
-  width: 40px;
-  height: 4px;
-}
-/* A plan's limits read like the facts beside them: the line, its small bar, then the state near the limit. */
-.agp-number .ac-planmeter--compact {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 6px;
-  font-size: inherit;
-}
-.agp-number .ac-planmeter__line {
-  color: inherit;
 }
 /* The sentence's dialogs: the link by the buttons ("Conectar outro computador"). */
 .agp-wdlg__link {
@@ -9758,49 +9702,203 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
     var(--card-shadow),
     inset 2px 0 0 var(--ink);
 }
-/* "Como trabalha" isn't a `Card`: the same face as the root card beside it. */
-.agp-aside__work {
-  padding: 12px 20px;
+/*
+ * The overview. Wide: what it does and its recent work on the left, the Ficha as a column on the right (its rows
+ * put the label over the value there). The last row takes what the Ficha needs past the left column, so the
+ * left cards never spread apart. Narrow (the panel, below 1100px): one column in the markup's order.
+ */
+.agp-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  grid-template-rows: auto auto 1fr;
+  align-items: start;
+  gap: 16px 24px;
+  max-width: 1240px;
+}
+.agp-overview > * {
+  grid-column: 1;
+}
+.agp-overview > .agp-overview__side {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+}
+/*
+ * The Ficha (Overview): how it works and who it works with, as two lists of rows on the root card's face. A row is
+ * its key, what it is, the value and a chevron (or its own button); the whole row opens its dialog.
+ */
+.agp-ficha__h {
+  margin: 0 4px 8px;
+  color: var(--faint);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+}
+.agp-ficha__card {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
   border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);
 }
-.agp-aside__h {
-  margin: 0 0 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.agp-aside .agp-work {
+.agp-work:has(> .agp-ficha__h) {
+  gap: 0;
   padding-top: 0;
 }
-.agp-aside .agp-workcard {
-  padding: 0;
-  border-block: 0;
+.agp-work:has(> .agp-ficha__h) > :not(.agp-ficha__h, .agp-ficha__card) {
+  margin-top: 10px;
+}
+.agp-ficha__card .agp-frow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(96px, 140px) minmax(0, 1fr) auto;
+  /* The value's track takes the room the key and the min height leave; the sub's is only as tall as a sub. With two
+     auto tracks the 30px key, spanning both, gave the empty second one 10px and the value sat above the label. */
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "key label value tail"
+    "key label sub tail";
+  gap: 0 12px;
+  align-items: center;
+  width: calc(100% - 8px);
+  min-height: 50px;
+  margin: 0 4px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 13px 13px 13px 4px;
   background: none;
   box-shadow: none;
-}
-.agp-aside .agp-cells {
-  grid-template-columns: minmax(0, 1fr);
-}
-.agp-aside .agp-cell + .agp-cell::before {
-  display: none;
-}
-.agp-aside .agp-workcard__foot {
-  margin: 14px 0 0;
-  padding: 14px 0 0;
-}
-.agp-aside .agp-numbers {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-.agp-aside .agp-number {
-  font-size: 14px;
-  white-space: normal;
+  overflow: visible;
+  color: var(--ink);
+  font: inherit;
   text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.agp-ficha__card .agp-frow.agp-cell--ro {
+  cursor: default;
+}
+/* Hover: a faint plate with room on both sides; the row whose dialog is open, a step darker. */
+.agp-ficha__card .agp-frow:hover:not(.agp-cell--ro) {
+  background: color-mix(in srgb, var(--ink) 3.5%, transparent);
+}
+.agp-ficha__card .agp-frow[data-open],
+.agp-ficha__card .agp-frow[data-open]:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.agp-ficha__card .agp-frow:hover:not(.agp-cell--ro) .agp-cell__chev,
+.agp-ficha__card .agp-frow[data-open] .agp-cell__chev {
+  color: var(--ink2);
+}
+/* Hairlines from the label's column to the row's end (the keys stand free); they fade around a hovered or open row. */
+.agp-ficha__card .agp-frow + .agp-frow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 12px;
+  bottom: auto;
+  left: 54px;
+  width: auto;
+  height: 1px;
+  background: var(--line);
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.agp-ficha__card .agp-frow:hover::before,
+.agp-ficha__card .agp-frow:hover + .agp-frow::before,
+.agp-ficha__card .agp-frow[data-open]::before,
+.agp-ficha__card .agp-frow[data-open] + .agp-frow::before {
+  opacity: 0;
+}
+.agp-ficha__card .agp-frow .agp-cell__key {
+  grid-area: key;
+  translate: none;
+}
+.agp-ficha__card .agp-frow .agp-cell__text {
+  display: contents;
+}
+.agp-ficha__card .agp-frow .agp-cell__text small,
+.agp-ficha__card .agp-frow__label {
+  grid-area: label;
+  color: var(--faint);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.agp-ficha__card .agp-frow .agp-cell__value,
+.agp-ficha__card .agp-frow__value {
+  grid-area: value;
+  min-width: 0;
+  font-size: 14.5px;
+  line-height: 20px;
+}
+.agp-ficha__card .agp-frow .agp-cell__sub {
+  grid-area: sub;
+}
+.agp-ficha__card .agp-frow .agp-cell__chev,
+.agp-ficha__card .agp-frow__tail {
+  grid-area: tail;
+  justify-self: end;
+}
+/* The computer's line reads as a value: in the ink, its icon (a pause, a clock) beside it. */
+.agp-ficha__card .agp-frow__value .cmp-entry__line {
+  color: var(--ink);
+  font-size: inherit;
+  font-weight: 600;
+}
+.agp-ficha__card .cmp-entry.agp-frow[data-tone="warn"] {
+  background: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent);
+}
+/* Usage: the plan's line and its bar, then the budget, on one line while there is room. */
+.agp-frow__usage {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  font-weight: 500;
+}
+.agp-frow__usage .ac-meter {
+  width: 48px;
+  height: 4px;
+}
+.agp-frow__usage .ac-planmeter--compact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: inherit;
+}
+/* Narrow (the panel, a phone): the label over the value, the key and the chevron beside both. */
+@container (max-width: 520px) {
+  .agp-ficha__card .agp-frow {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "key label tail"
+      "key value tail"
+      "key sub tail";
+  }
+}
+/* The routines' dialog: each name a link to its page. */
+.agp-li__link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+.agp-li__link:hover {
+  text-decoration: underline;
+}
+/* "More": the menu of the tabs that aren't in the bar, a tab itself. */
+.agp-tabs .agp-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.agp-tabs .agp-more .ac-icon:last-child {
+  color: var(--faint);
 }
 .agp-changed {
   display: inline-flex;

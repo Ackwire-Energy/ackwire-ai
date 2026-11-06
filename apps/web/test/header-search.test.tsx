@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { keys, messagesQuery } from "@agenteschat/client";
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -117,6 +117,7 @@ describe("the header search (Discord's)", () => {
     expect(box().value).toBe("achei");
   });
 
+  // Many renders/tool calls in one test: over 5 s on a loaded CI runner, well under alone.
   test("a message older than what's loaded: the conversation pages back to it, the buttons waiting meanwhile", async () => {
     const state = seedState();
     const at = Date.now() - 3_600_000;
@@ -150,12 +151,11 @@ describe("the header search (Discord's)", () => {
     await act(async () => fireEvent.click(jump));
     expect((jump as HTMLButtonElement).disabled).toBe(true);
     release();
-    await settle(12);
+    await waitFor(() => expect(row("h-3")?.classList.contains("ac-msg--focus")).toBe(true), { timeout: 10_000 });
     expect(pages.mock.calls.at(-1)?.[2]?.limit).toBe(200);
-    expect(row("h-3").classList.contains("ac-msg--focus")).toBe(true);
     expect((jump as HTMLButtonElement).disabled).toBe(false);
     expect(results()).toBeTruthy();
-  });
+  }, 15_000);
 
   test("a message no longer there says so, and the results stay", async () => {
     const api = createFakeApi(seeded());

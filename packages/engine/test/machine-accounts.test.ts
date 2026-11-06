@@ -6,6 +6,8 @@ import {
   BRAIN_PROTOCOL,
   generateSecretKeyPair,
   type MachineRequest,
+  OPENCODE_KEY_PROVIDER,
+  OPENCODE_PROTOCOL,
   type OwnPlanUsage,
   openSecret,
   orgTopic,
@@ -101,7 +103,7 @@ async function sharedMachine() {
   return paired;
 }
 
-async function addAccount(machineId: string, id: string, kind: "claude_code" | "codex", over = {}) {
+async function addAccount(machineId: string, id: string, kind: "claude_code" | "codex" | "opencode", over = {}) {
   await f.db.insert(schema.machineAccounts).values({
     id,
     orgId: f.org.id,
@@ -114,6 +116,36 @@ async function addAccount(machineId: string, id: string, kind: "claude_code" | "
     ...over,
   });
 }
+
+test("OpenCode's CLI on a computer is no sign-in of anyone's: a real key still lists", async () => {
+  f = await setup();
+  const { machineId } = await sharedMachine();
+  await f.db
+    .update(schema.machines)
+    .set({
+      protocol: OPENCODE_PROTOCOL,
+      execAllowed: true,
+      executors: { opencode: { version: "1.19.5" }, detectedAt: new Date().toISOString() },
+    })
+    .where(eq(schema.machines.id, machineId));
+  const page = await listAiAccounts({ db: f.db }, f.owner.id, f.org.id);
+  const row = page.computers.find((c) => c.machineId === machineId);
+  // Available to choose (the free tier), claimed by nobody.
+  expect(row?.own).toEqual({});
+  expect(row?.brains.opencode).toBe(true);
+  expect(row?.canAdd).toBe(true);
+  expect(page.accounts.filter((a) => a.machineId === machineId)).toEqual([]);
+
+  await f.db.update(schema.machines).set({ pairedByUserId: f.owner.id }).where(eq(schema.machines.id, machineId));
+  expect(
+    (await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers.find((c) => c.machineId === machineId)?.own,
+  ).toEqual({});
+
+  const key = "00000000-0000-4000-8000-0000000000c0";
+  await addAccount(machineId, key, "opencode", { provider: OPENCODE_KEY_PROVIDER, label: "OpenCode" });
+  const keyed = await listAiAccounts({ db: f.db }, f.owner.id, f.org.id);
+  expect(keyed.accounts.filter((a) => a.machineId === machineId).map((a) => a.id)).toEqual([key]);
+});
 
 const agentRow = async (id = f.agent.id) => {
   const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, id));

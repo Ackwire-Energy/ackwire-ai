@@ -6,14 +6,17 @@ import { type BrowserFrameMetadata, type BrowserInputEvent, type BrowserModifier
  * events to send.
  */
 
-/** A JPEG's pixel size from its base64 data (the start of the file is enough), or null. */
-export function jpegSize(base64: string): { width: number; height: number } | null {
+/** A JPEG's pixel size from its bytes or its base64 (the start of the file is enough), or null. */
+export function jpegSize(picture: string | Uint8Array): { width: number; height: number } | null {
   let bytes: Uint8Array;
-  try {
-    const head = atob(base64.slice(0, 65536 - (65536 % 4)));
-    bytes = Uint8Array.from(head, (c) => c.charCodeAt(0));
-  } catch {
-    return null;
+  if (typeof picture !== "string") bytes = picture.subarray(0, 65536);
+  else {
+    try {
+      const head = atob(picture.slice(0, 65536 - (65536 % 4)));
+      bytes = Uint8Array.from(head, (c) => c.charCodeAt(0));
+    } catch {
+      return null;
+    }
   }
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
   let i = 2;
@@ -40,8 +43,13 @@ export function jpegSize(base64: string): { width: number; height: number } | nu
  * window's height while the page area is shorter (1280×720 reported, 1280×577 drawn), which
  * put every click a quarter lower than aimed; the picture's own aspect is the truth.
  */
-export function frameMetadata(frame: { data: string; metadata: BrowserFrameMetadata }): BrowserFrameMetadata {
-  const size = jpegSize(frame.data);
+export function frameMetadata(frame: {
+  data?: string;
+  jpeg?: Uint8Array;
+  metadata: BrowserFrameMetadata;
+}): BrowserFrameMetadata {
+  const picture = frame.jpeg ?? frame.data;
+  const size = picture === undefined ? null : jpegSize(picture);
   if (!size || frame.metadata.deviceWidth <= 0) return frame.metadata;
   return {
     ...frame.metadata,

@@ -314,7 +314,6 @@ describe("the agent page's cards and the chat's", () => {
     );
     // The foot reaches the card's bottom edge (12px), not past it (--card-pad is 20px).
     expect(value(css, ".agp-card>.ac-card__foot", "margin-bottom")).toBe("-12px");
-    expect(value(css, ".agp-aside__work", "padding")).toBe("12px 20px");
   });
 
   test("the cards beside them use the same 12px", async () => {
