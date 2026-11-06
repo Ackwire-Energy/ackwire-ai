@@ -87,6 +87,7 @@ describe("the event pill", () => {
   test("a decided approval: outcome and title, its date in the time slot, Cancel as an action, the values under it", () => {
     const cards = src("features/chat/cards.tsx");
     const done = cards.slice(cards.indexOf("function ApprovalDone("), cards.indexOf("function ApprovalGroupAsk("));
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the component's own template, read as source text
     expect(done).toContain("words={`${outcome}: ${markName(approvalHeadline(t, a, i18n.language))}`}");
     expect(done).toContain("time={a.decidedAt ? when.short(a.decidedAt) : undefined}");
     expect(done).toContain('label={t("approval.ahead.cancel")}');

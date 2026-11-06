@@ -166,9 +166,7 @@ export function NoAiCard({ message }: { message: Message }) {
         ) : undefined
       }
       below={
-        connect && !mine ? (
-          <span>{owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}</span>
-        ) : undefined
+        connect && !mine ? <span>{owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}</span> : undefined
       }
     >
       {title}

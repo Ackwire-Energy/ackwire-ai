@@ -212,17 +212,13 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           words={`${secretOutcome(t, r, mine, person, agentName)}: ${markName(label)}`}
           time={endedAt ? when.short(endedAt) : undefined}
           actions={
-            r.supersededBy ? (
-              <EventPillAction label={t("secret.seeNewer")} onPress={() => void showNewer()} />
-            ) : null
+            r.supersededBy ? <EventPillAction label={t("secret.seeNewer")} onPress={() => void showNewer()} /> : null
           }
           more={{
             label: t("approval.seeDetails"),
             content: (
               <Text variant="small" tone="muted">
-                {[r.purpose, where, kept === "saved" ? t("mobile.vault.card.saved") : null]
-                  .filter(Boolean)
-                  .join("\n")}
+                {[r.purpose, where, kept === "saved" ? t("mobile.vault.card.saved") : null].filter(Boolean).join("\n")}
               </Text>
             ),
           }}

@@ -3012,7 +3012,14 @@ const Timeline = memo(function Timeline({
   );
   const shownMessages = useMemo(() => items.flatMap((i) => (i.kind === "message" ? [i.message] : [])), [items]);
   // One stop, one pill: a stopped task's notice goes into its reply's pill while that reply (or its block) is here.
-  const stops = useMemo(() => stopsOf(shownMessages, slots.map((s) => s.runId)), [shownMessages, slots]);
+  const stops = useMemo(
+    () =>
+      stopsOf(
+        shownMessages,
+        slots.map((s) => s.runId),
+      ),
+    [shownMessages, slots],
+  );
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
   for (const [at, item] of items.entries()) {

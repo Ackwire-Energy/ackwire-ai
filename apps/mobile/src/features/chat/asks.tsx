@@ -75,14 +75,7 @@ import {
   timerDelay,
 } from "./ask-store";
 import { LineStop, useRowsInView } from "./LiveRows";
-import {
-  approvalIdOf,
-  lineStops,
-  markedParts,
-  markName,
-  questionOf,
-  workingEntries,
-} from "./logic";
+import { approvalIdOf, lineStops, markedParts, markName, questionOf, workingEntries } from "./logic";
 import type { RowSight } from "./row-sight";
 
 /**
