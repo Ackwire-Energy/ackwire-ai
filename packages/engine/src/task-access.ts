@@ -37,6 +37,20 @@ export const taskReaderSql = (channelId: SQL, userId: SQL) => sql`exists (
   select 1 from ${issues} ti where ti.conversation_channel_id = ${channelId} and ${taskSeenSql("ti", userId)})`;
 
 /**
+ * Whether `userId` reads the channel `channelId`, by the rule of `requireChannelAccess` and `readableChannelIds`: a
+ * member, an administrator in a channel (public or private, never a DM), or who sees the task of a task's conversation.
+ */
+export const channelReaderSql = (channelId: SQL, userId: SQL) => sql`(exists (
+    select 1 from ${channelMembers} rm where rm.channel_id = ${channelId} and rm.user_id = ${userId})
+  or exists (select 1 from ${channels} rc where rc.id = ${channelId}
+    and ((rc.kind = 'channel' and ${maySql(sql`rc.org_id`, userId, "administrator")})
+      or (rc.kind = 'task' and ${taskReaderSql(channelId, userId)}))))`;
+
+/** The people of `orgId` who read the channel `channelId` (`channelReaderSql`), as a subquery of `user_id`. */
+export const channelReadersSql = (orgId: SQL, channelId: SQL) => sql`(select cr.user_id from organization_members cr
+  where cr.org_id = ${orgId} and ${channelReaderSql(channelId, sql`cr.user_id`)})`;
+
+/**
  * The audience an agent picks for what it makes in a conversation (ADR 0151): the workspace from a public channel, and
  * from a room no person reads (a routine's); the people there from a DM or a private channel; from a task's own
  * conversation, who sees that task.

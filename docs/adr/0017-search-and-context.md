@@ -70,6 +70,9 @@ An agent's reply in a channel is read by everyone there, so a DM reaches a conve
 - `send_dm` no longer tells the agent to say who asked and why when the asking was in a DM, and one line in the prompt
   states the rule.
 - Migration 0236 gives memories already saved "everywhere" from a DM back to the person who said them.
+- "Everyone" there is everyone who reads the conversation (`channelReaderSql`, the rule of `requireChannelAccess`):
+  its members, administrators in any channel they aren't in (ADR 0151), and a task's readers in its conversation.
+  The recent-work block and `peopleAllIn` (origin notes, `originReadable`, a consulted agent's DM) count them all.
 
 Not enforced by code: what the model itself writes in a `send_dm` or `post_message` from a DM, a person's `rule` (it
 holds for all the agent's work when its giver decides the agent's approvals, so its text reads in others' runs), and

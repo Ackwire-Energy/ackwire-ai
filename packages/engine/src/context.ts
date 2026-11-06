@@ -57,6 +57,7 @@ import { heldHere } from "./run-inbox";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { SITE_SECRET_TTL_TEXT, secretStillHeld } from "./secrets";
 import { stretchCardOf } from "./stretch";
+import { channelReaderSql, channelReadersSql } from "./task-access";
 import { taskConversationOf } from "./task-conversation";
 import { loadTeam, rosterScopeNames, TEAM_IN_PROMPT, teammatesFor, teammatesNowPrompt, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
@@ -715,7 +716,8 @@ export async function buildRunContext(
     ? sql`r.thread_root_id = r.trigger_message_id`
     : sql`r.thread_root_id = ${run.threadRootId}::uuid`;
   const actionRows = rowsOf<ActionRow>(
-    await db.execute(sql`(select s.data, s.created_at, a.handle, false as elsewhere, c.kind, c.name, r.id as run_id
+    await db.execute(sql`with here_readers as materialized ${channelReadersSql(sql`${run.orgId}::uuid`, sql`${run.channelId}::uuid`)}
+      (select s.data, s.created_at, a.handle, false as elsewhere, c.kind, c.name, r.id as run_id
         from agent_run_steps s
         join agent_runs r on r.id = s.run_id
         join agents a on a.id = r.agent_id
@@ -749,11 +751,10 @@ export async function buildRunContext(
             ${channel.kind !== "channel" ? sql`` : sql`and ${sameConversation}`})
           and exists (select 1 from channel_members m
             where m.channel_id = r.channel_id and m.user_id = ${workedFor ?? ""})
-          -- Everyone here reads the reply: what stayed in a DM or a private channel shows only if they are all there too.
+          -- Everyone who reads here reads the reply (administrators outside a channel too): what stayed in a DM or a
+          -- private channel shows only if they all read it there too.
           and ((c.kind = 'channel' and c.visibility = 'public') or not exists (
-            select 1 from channel_members here where here.channel_id = ${run.channelId}::uuid and here.user_id is not null
-              and not exists (select 1 from channel_members there
-                where there.channel_id = r.channel_id and there.user_id = here.user_id)))
+            select 1 from here_readers h where not ${channelReaderSql(sql`r.channel_id`, sql`h.user_id`)}))
         order by s.created_at desc limit 30)`),
   );
   // A result read from outside never shows here (ADR 0117): only that the tool read it.

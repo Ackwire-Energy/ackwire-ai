@@ -14,6 +14,7 @@ import {
   listArtifacts,
   listMessages,
   openDm,
+  peopleAllIn,
   postPersonMessage,
   requesterSharedChannels,
   retrieveForRun,
@@ -154,6 +155,54 @@ describe("what stays in a DM", () => {
         })
       ).map((a) => a.id),
     ).toContain(report?.id ?? "");
+  });
+
+  test("an administrator outside a private channel reads it too: a DM between others stays out of it", async () => {
+    const prompts: string[] = [];
+    f = await setup({
+      artifactTools: true,
+      reply: (req: ModelRequest) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        prompts.push(systemText(req.system ?? ""));
+        if (last.includes("tool_result")) return { chunks: ["Pronto."] };
+        if (last.includes("monta um relatorio")) {
+          return {
+            chunks: [],
+            toolUses: [
+              {
+                name: "create_artifact",
+                input: { title: "Relatório de salários", kind: "document", markdown: "# Salários\n120" },
+              },
+            ],
+          };
+        }
+        return { chunks: ["ok"] };
+      },
+    });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    const dm = await openDm(f.db, ana.id, f.org.id, { agentId: f.agent.id });
+    await postPersonMessage(deps, ana.id, f.org.id, dm.id, { body: "monta um relatorio dos salários" });
+    await drainOutbox(f.db, f.handlers);
+
+    // Only ana and the agent are in it; the owner, an administrator, reads it without being a member.
+    const room = await createChannel(f.db, f.owner.id, f.org.id, { name: "folha", visibility: "private" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, room.id, { userId: ana.id });
+    await addChannelMember(f.db, f.owner.id, f.org.id, room.id, { agentId: f.agent.id });
+    await f.db
+      .delete(schema.channelMembers)
+      .where(sql`${schema.channelMembers.channelId} = ${room.id} and ${schema.channelMembers.userId} = ${f.owner.id}`);
+    expect(await peopleAllIn(f.db, f.org.id, room.id, dm.id)).toBe(false);
+
+    const before = prompts.length;
+    await postPersonMessage(deps, ana.id, f.org.id, room.id, { body: "@dev bom dia" });
+    await drainOutbox(f.db, f.handlers);
+    expect(prompts.length).toBeGreaterThan(before);
+    expect(prompts.at(-1)).not.toContain("in other conversations");
+    expect(prompts.at(-1)).not.toContain("Relatório de salários");
+
+    // The other way round, only ana reads her DM and she reads the room: the room's work may show in the DM.
+    expect(await peopleAllIn(f.db, f.org.id, dm.id, room.id)).toBe(true);
   });
 });
 

@@ -43,7 +43,7 @@ import {
 } from "./permissions";
 import { refuseRightHand } from "./right-hand";
 import { accountInUse, closedRefusal, STANDING_COLUMNS } from "./standing";
-import { adminChannelSql, taskReaderSql } from "./task-access";
+import { adminChannelSql, channelReaderSql, channelReadersSql, taskReaderSql } from "./task-access";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
 
@@ -484,13 +484,15 @@ export async function isChannelMember(db: Executor, orgId: string, channelId: st
   return row !== undefined;
 }
 
-/** Every person in `hereId` is also in `thereId`: what `thereId` says may be repeated in `hereId`. */
+/**
+ * Every person who reads `hereId` also reads `thereId` (`channelReaderSql`, so an administrator outside a channel
+ * counts): what `thereId` says may be repeated in `hereId`.
+ */
 export async function peopleAllIn(db: Executor, orgId: string, hereId: string, thereId: string) {
   const [row] = rowsOf<{ ok: boolean }>(
     await db.execute(sql`select not exists (
-        select 1 from ${channelMembers} h
-        where h.org_id = ${orgId}::uuid and h.channel_id = ${hereId}::uuid and h.user_id is not null
-          and not exists (select 1 from ${channelMembers} t where t.channel_id = ${thereId}::uuid and t.user_id = h.user_id)
+        select 1 from ${channelReadersSql(sql`${orgId}::uuid`, sql`${hereId}::uuid`)} h
+        where not ${channelReaderSql(sql`${thereId}::uuid`, sql`h.user_id`)}
       ) as ok`),
   );
   return row?.ok === true;
