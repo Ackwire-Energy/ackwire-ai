@@ -166,12 +166,14 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           }
           const moving = input.move_here === true;
           const [run] = await ctx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, ctx.runId));
+          const here = channel.id === ctx.channelId;
           const inThread = replyThreadOf(ctx) !== null;
-          if (channel.id === ctx.channelId && !(moving && inThread)) {
-            const out = inThread ? " To continue at this channel's top level instead, set `move_here`." : "";
+          const movable = (moving || (here && inThread)) && !!run && (await movableRun(ctx.db, run));
+          if (here && !(moving && inThread && movable)) {
+            const out = inThread && movable ? " To continue at this channel's top level instead, set `move_here`." : "";
             return { content: `${SAME_CONVERSATION}${out}`, isError: true };
           }
-          if (moving && !(run && (await movableRun(ctx.db, run)))) {
+          if (moving && !movable) {
             return { content: "This work stays where it is: post without `move_here`.", isError: true };
           }
           if (channel.visibility !== "public" && !members.some((m) => m.agentId === ctx.agentId)) {

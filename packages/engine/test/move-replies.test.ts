@@ -4,8 +4,11 @@ import { serverText } from "@agenteschat/i18n";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   addChannelMember,
+  type Brain,
   createChannel,
+  createJobHandlers,
   drainOutbox,
+  executeToolForRun,
   insertMessage,
   moveRun,
   moveToBackground,
@@ -222,4 +225,55 @@ test("in a thread without move_here, the result says how to leave it", async () 
   await say("@dev manda no canal", root.id);
   await drainOutbox(f.db, f.handlers);
   expect((await toolContents()).at(-1)?.content).toContain("`move_here`");
+});
+
+test("a brain that moves inside its turn: its first words after the move don't bring the row back to the thread", async () => {
+  f = await setup({ chatTools: true, reply: () => ({ chunks: ["Conferi."] }) });
+  const root = await thread();
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn) {
+      await executeToolForRun(
+        f.jobDeps,
+        { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId: "mac" },
+        { id: "m1", name: "post_message", input: { channel: "general", text: "Sigo aqui.", move_here: true } },
+      );
+      yield { type: "tool_call", id: "m1", name: "post_message", input: {}, executed: { content: "ok" } };
+      await new Promise((r) => setTimeout(r, 50));
+      yield { type: "text_delta", text: "Lojas conferidas." };
+      yield { type: "done", text: "Lojas conferidas." };
+    },
+  };
+  const events = f.listen(f.general.id);
+  await say("@dev continue no canal, fora dessa thread", root.id);
+  await drainOutbox(f.db, createJobHandlers({ ...f.jobDeps, brains: { model: () => brain } }));
+
+  expect((await agentPosts()).at(-1)).toMatchObject({ body: "Lojas conferidas.", threadId: null });
+  const typing = events.filter((e) => e.type === "agent.typing");
+  expect(typing.map((e) => e.threadId)).toEqual([null]);
+});
+
+test("in a mission's thread: told once it stays, never sent back and forth between `move_here` and not", async () => {
+  f = await setup({
+    chatTools: true,
+    reply: (req) => {
+      if (!asked(req, "fora dessa thread")) return { chunks: ["Conferi."] };
+      if (called(req, "post_message")) return { chunks: ["Sigo aqui."] };
+      return { chunks: [], toolUses: [{ name: "post_message", input: { channel: "general", text: "Oi." } }] };
+    },
+  });
+  const root = await thread();
+  await f.db.insert(schema.missions).values({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    channelId: f.general.id,
+    threadRootId: root.id,
+    ownerId: f.owner.id,
+    title: "Lojas",
+    goal: "Conferir as lojas",
+    mainSessionId: crypto.randomUUID(),
+  });
+  await say("@dev continue fora dessa thread", root.id);
+  await drainOutbox(f.db, f.handlers);
+  expect((await toolContents()).at(-1)?.content).not.toContain("`move_here`");
 });

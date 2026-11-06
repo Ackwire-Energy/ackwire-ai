@@ -155,7 +155,7 @@ export async function settleReach(
         (await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, a, undefined, person ?? undefined))
           .state === "no_ai"
       ) {
-        entries.push(blockedOf(a));
+        entries.push({ agentId: a.id, handle: a.handle, reason: blockedReason, noAi: true });
         continue;
       }
       // Already handed to it by this run (its own tell_agent): that note is the delivery.

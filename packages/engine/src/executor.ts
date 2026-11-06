@@ -2194,7 +2194,8 @@ async function executeRunInner(
    * wrote so far, nothing lost, with "Stopped by …", and tell the channel.
    * A background run posts nothing (ADR 0053 §5): its ledger says who stopped it.
    */
-  const stopCanceled = async (partial: string) => {
+  /** `partial` goes on the transcript ("Continuar" reads on from it); `said`, what of it the stopped reply shows. */
+  const stopCanceled = async (partial: string, said = partial) => {
     await deferred;
     const t = transcript as Transcript;
     const [row] = await db.select({ error: agentRuns.error }).from(agentRuns).where(eq(agentRuns.id, run.id));
@@ -2219,23 +2220,24 @@ async function executeRunInner(
     const wrote = [
       ...t.messages
         .slice(t.postedUpTo)
-        .filter((m) => m.role === "assistant")
+        // A step that called a tool wrote working text: it stays on the transcript and the run's activity.
+        .filter((m) => m.role === "assistant" && !hasToolUse(m))
         .map((m) => stripSentinel(textOf(m.content))),
-      stripSentinel(partial),
+      stripSentinel(said),
     ]
       .filter(Boolean)
       .join("\n\n");
     // The apps show `canceled.text`, not the body: the right hand's is scrubbed here, before both (ADR 0137 §4).
-    const said = isRightHand(agent) ? await scrubRightHandReply(db, run, wrote) : wrote;
+    const shown = isRightHand(agent) ? await scrubRightHandReply(db, run, wrote) : wrote;
     // Cut mid-stream: what it was writing stays in the transcript too ("Continuar" picks up from there).
     if (partial.trim() && t.messages.at(-1)?.role !== "assistant")
       t.messages.push({ role: "assistant", content: [{ type: "text", text: partial.trim() }] });
     const note = `_Stopped${person ? ` by ${person.name}` : ""}._`;
     const message = await db.transaction(async (tx) => {
-      const m = await post(tx, replyThreadId, said ? `${said}\n\n${note}` : note, {
+      const m = await post(tx, replyThreadId, shown ? `${shown}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
         // `text`: what the agent wrote; the app adds "Stopped by …" in the person's language.
-        canceled: { byUserId: by, text: said },
+        canceled: { byUserId: by, text: shown },
       });
       t.postedUpTo = t.messages.length;
       t.postedCount++;
@@ -3667,7 +3669,6 @@ async function executeRunInner(
       const turn = run.turns + 1;
       const deltas = createDeltaPublisher(deps.pubsub, run, where, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
         turn,
-        event: { type: "agent.typing", ...where },
         onFirst: () => {
           deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id });
           if (admitted?.fromLine) void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
@@ -3869,7 +3870,7 @@ async function executeRunInner(
         await deltas.flush();
         await deferred;
         // Canceled mid-stream: the gateway recorded the usage so far; keep the text so far.
-        if (await isCanceled()) return stopCanceled(deltas.text());
+        if (await isCanceled()) return stopCanceled(deltas.text(), deltas.answer());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
         // Anything but "no room" means the computer took the turn: that wait for room is over.
@@ -4014,7 +4015,14 @@ async function executeRunInner(
           await publishQueueChanged(deps.pubsub, run.orgId, ranOn);
         }
       }
-      await deltas.flush(result.toolCalls.length === 0);
+      // A bridged call paused the run in this turn: what it wrote leads to a card, or the card says it already.
+      const [now] =
+        turnPlan.kind === "model"
+          ? []
+          : await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
+      await deltas.flush(
+        result.toolCalls.length === 0 && now?.status !== "waiting_approval" && now?.status !== "waiting_input",
+      );
       delete transcript.outage;
       prof.mark(`model#${run.turns + 1}`);
       await deferred;
@@ -5022,6 +5030,9 @@ export async function executeToolForRun(
   return { ...result, isError: result.isError === true };
 }
 
+const hasToolUse = (m: Transcript["messages"][number]) =>
+  typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use");
+
 /**
  * When the final model call wrote nothing: the agent's last narration since
  * the last post ("Installed Go and built it."), else a plain "Done." when it
@@ -5034,7 +5045,7 @@ function closingSummary(t: Transcript, anythingPosted: boolean): string {
     .filter(Boolean)
     .at(-1);
   if (last) return last;
-  const usedTools = turns.some((m) => typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use"));
+  const usedTools = turns.some(hasToolUse);
   return usedTools && !anythingPosted ? DONE_TEXT : "";
 }
 
@@ -5097,13 +5108,12 @@ const WORKING_TEXT_MAX = 280;
 function createDeltaPublisher(
   pubsub: PubSub,
   run: AgentRun,
-  /** Where the run answers: a computer brain's turn can move mid-way. */
-  where: { channelId: string; threadId: string | null },
+  /** Where the run answers, read at each event: a computer brain's turn can move mid-way. */
+  where: { channelId: string; threadId: string | null; agentId: string; runId: string },
   flushMs: number,
   startSeq = 0,
   first: {
     turn: number;
-    event?: ChannelEvent;
     onFirst?: () => void;
     /** Background work (a routine's run): nothing of its text shows live in the conversation. */
     quiet?: boolean;
@@ -5189,8 +5199,7 @@ function createDeltaPublisher(
         started = true;
         first.onFirst?.();
         // Published in order, before the first delta.
-        const typing = first.quiet ? undefined : first.event;
-        if (typing) pending = pending.then(() => publishChannelEvent(pubsub, typing));
+        if (!first.quiet) pending = pending.then(() => publishChannelEvent(pubsub, { type: "agent.typing", ...where }));
       }
       all += text;
       if (text) marks.push([Date.now(), all.length]);
@@ -5215,6 +5224,8 @@ function createDeltaPublisher(
      * calls set apart as paragraphs.
      */
     text: () => stretches().join("\n\n"),
+    /** What a stopped reply shows: the stretches read as the answer and the one it was on, none a call ended. */
+    answer: () => showable(true),
     /**
      * What the brain said after its last call, as its final answer is (the model brain's is its last call's text): the
      * stretches before it were said on the way, or dropped half-written for a call and written again after it.

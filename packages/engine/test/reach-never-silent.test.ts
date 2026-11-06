@@ -182,6 +182,27 @@ describe("a member that takes consultations for the person behind an agent's mes
     );
     expect(skipped).toEqual([]);
   });
+
+  test("with no AI connected, the line under the message says that, not that the person can't talk to it", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
+      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
+    });
+    const gil = await agentOf("Gil", "gil", { inGeneral: true });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: bob.id, audienceMode: "owner", model: "gpt-6-luna", credentialId: null })
+      .where(eq(schema.agents.id, gil.id));
+    const sent = await devWrites("@gil revisa o relatório de hoje.", []);
+    await drainOutbox(f.db, f.handlers);
+
+    expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
+    expect(reachOf((await messageOf(sent.id))?.meta)).toEqual([
+      { agentId: gil.id, handle: "gil", reason: "audience", noAi: true },
+    ]);
+  });
 });
 
 describe("a routine whose creator can't reach the agent it names", () => {
