@@ -102,7 +102,10 @@ describe("work agents asked of each other (ADR 0128)", () => {
     const [machine] = await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "Mac" }).returning();
     const member = await addMember(f.db, f.org.id, "member", "bia");
     const hide = (waitingMachineId: string | null) =>
-      f.db.update(schema.agentRuns).set({ status: "running", waitingMachineId }).where(eq(schema.agentRuns.id, helper.id));
+      f.db
+        .update(schema.agentRuns)
+        .set({ status: "running", waitingMachineId })
+        .where(eq(schema.agentRuns.id, helper.id));
 
     await hide(machine?.id ?? null);
     const asking = (await taskManager(f.db, member.id, f.org.id)).hidden;
