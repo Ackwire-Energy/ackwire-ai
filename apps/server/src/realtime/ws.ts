@@ -14,6 +14,7 @@ import type { Config } from "@agenteschat/config";
 import { and, type Database, eq, inArray, isNotNull, isNull, or, schema, sql } from "@agenteschat/db";
 import {
   activityAudience,
+  adminChannelSql,
   announcePresence,
   type BrowserLive,
   closedRefusal,
@@ -28,7 +29,6 @@ import {
   requireChannelAccess,
   requireProfileWatcher,
   taskReaderSql,
-  adminChannelSql,
   touchLastSeen,
 } from "@agenteschat/engine";
 import type { Auth, SessionUser } from "../auth";

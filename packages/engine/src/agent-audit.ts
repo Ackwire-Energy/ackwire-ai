@@ -261,7 +261,11 @@ async function hiddenFrom(db: Database, orgId: string, userId: string, rows: Aud
   const publicPlaces = new Set(open.map((c) => c.id));
   const hidden = new Set<string>();
   for (const [r, s] of subjects) {
-    if (s ? !seen.has(s.id) : unnamed.includes(r) && !(r.channelId && (read.has(r.channelId) || publicPlaces.has(r.channelId))))
+    if (
+      s
+        ? !seen.has(s.id)
+        : unnamed.includes(r) && !(r.channelId && (read.has(r.channelId) || publicPlaces.has(r.channelId)))
+    )
       hidden.add(r.id);
   }
   return hidden;

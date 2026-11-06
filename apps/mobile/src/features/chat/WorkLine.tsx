@@ -8,7 +8,7 @@ import { createContext, type ReactNode, useContext, useEffect, useState } from "
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { haptics, Icon, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
+import { haptics, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";

@@ -25,7 +25,7 @@ import { useToast } from "@/lib/toast";
 
 /**
  * "Acesso" to a wiki page or folder (ADR 0023 addenda), in the shared `AccessDialog`: a level for everyone and one per
- * role, person and agent. Owners always read and edit; the server refuses a choice that leaves out whoever makes it. A
+ * role, person and agent. Administrators always read and edit; the server refuses a choice that leaves out whoever makes it. A
  * page's dialog can also set the page's folder.
  */
 export function WikiAudienceDialog({

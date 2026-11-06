@@ -575,7 +575,9 @@ async function tiedPeople(db: Database, rows: IssueRow[]) {
     .select({ id: channels.id, userId: channelMembers.userId })
     .from(channels)
     .leftJoin(channelMembers, eq(channelMembers.channelId, channels.id))
-    .where(and(inArray(channels.id, ids), sql`not (${channels.kind} = 'channel' and ${channels.visibility} = 'public')`));
+    .where(
+      and(inArray(channels.id, ids), sql`not (${channels.kind} = 'channel' and ${channels.visibility} = 'public')`),
+    );
   for (const f of found) {
     const people = out.get(f.id) ?? [];
     if (f.userId) people.push(f.userId);

@@ -89,7 +89,9 @@ export function WhoSeesScreen({ number, slug }: { number?: number; slug?: string
   const page = useWikiPage(orgId, slug ?? null);
   if (number !== undefined) {
     const i = issue.data;
-    return i ? <IssueForm key={i.id} id={i.id} audience={i.audience ?? { mode: "everyone", userIds: [], channelId: null }} /> : null;
+    return i ? (
+      <IssueForm key={i.id} id={i.id} audience={i.audience ?? { mode: "everyone", userIds: [], channelId: null }} />
+    ) : null;
   }
   const p = page.data;
   if (!p) return null;

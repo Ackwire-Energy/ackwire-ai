@@ -8,7 +8,18 @@ import {
   audienceOfKind,
   whoSeesLabel,
 } from "@agenteschat/client/lib/who-sees";
-import { Avatar, Button, Checkbox, Dialog, DialogBody, DialogFooter, Icon, Input, Locked, OptionCard } from "@agenteschat/ui";
+import {
+  Avatar,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Icon,
+  Input,
+  Locked,
+  OptionCard,
+} from "@agenteschat/ui";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -46,6 +57,7 @@ export function WhoSeesButton({
   return (
     <Button
       size="sm"
+      className="who-sees__button"
       icon={value.mode === "everyone" ? "audienceEveryone" : "lock"}
       aria-label={`${t("whoSees.label")}: ${label}`}
       disabled={disabled}
@@ -134,7 +146,11 @@ export function WhoSeesDialog({
                   return (
                     <li key={m.userId}>
                       <label htmlFor={id} className="who-sees__person">
-                        <Checkbox id={id} checked={picked.has(m.userId)} onCheckedChange={(on) => toggle(m.userId, on)} />
+                        <Checkbox
+                          id={id}
+                          checked={picked.has(m.userId)}
+                          onCheckedChange={(on) => toggle(m.userId, on)}
+                        />
                         <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />
                         <span className="who-sees__name">{m.name}</span>
                       </label>

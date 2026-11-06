@@ -1,10 +1,10 @@
-import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees";
 import type { WikiAuthor, WikiPage as WikiPageData, WikiPageSummary, WikiVersion } from "@agenteschat/client";
 import { ApiError, keys, useRoles, useWikiAction, useWikiHistory, useWikiPage } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon } from "@agenteschat/client/lib/files";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
+import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees";
 import { leafTitle } from "@agenteschat/client/lib/wiki";
 import {
   Avatar,
@@ -47,7 +47,7 @@ import { useToast } from "@/lib/toast";
 import { retitled } from "@/lib/wiki-rich";
 import { ObsidianMark } from "./ObsidianMark";
 import { WikiAskDialog } from "./WikiAsk";
-import { WikiWhoSeesDialog } from "./WikiAudience";
+import { WikiAudienceDialog, WikiWhoSeesDialog } from "./WikiAudience";
 import { WikiFolderPicker, WikiTagsEdit } from "./WikiProps";
 import { WikiRichEditor, type WikiRichEditorHandle } from "./WikiRichEditor";
 
@@ -648,6 +648,7 @@ export function WikiReader({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
   const [asking, setAsking] = useState<string | null>(null);
   const embed = useEmbedRenderer(page.data?.source?.attachments);
   const folders = [...new Set(pages.map((x) => x.folder).filter(Boolean))].sort();
@@ -858,9 +859,9 @@ export function WikiReader({
           },
         ] satisfies MenuEntry[])
       : []),
-    ...(choosesAudience
+    ...(choosesAudience && can(org, "manage_roles")
       ? ([
-          { kind: "item", id: "audience", label: t("wiki.audience"), icon: "eye", run: () => setAudienceOpen(true) },
+          { kind: "item", id: "audience", label: t("wiki.audience"), icon: "eye", run: () => setAccessOpen(true) },
         ] satisfies MenuEntry[])
       : []),
     ...(admin
@@ -1058,6 +1059,7 @@ export function WikiReader({
       )}
       {p && <HistoryDialog page={p} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
       {p && audienceOpen && <WikiWhoSeesDialog page={p} onClose={() => setAudienceOpen(false)} />}
+      {p && accessOpen && <WikiAudienceDialog page={p} onClose={() => setAccessOpen(false)} />}
       {choosingNew && (
         <WhoSeesDialog
           title={t("whoSees.pageTitle")}

@@ -21004,7 +21004,7 @@
     "value": "Restricted"
   },
   "wiki.restrictedHint": {
-    "value": "Only owners and the people chosen see this page."
+    "value": "Only administrators and the people chosen see this page."
   },
   "wiki.audience": {
     "value": "Access"
@@ -21013,7 +21013,7 @@
     "value": "Access to {{title}}"
   },
   "wiki.audienceText": {
-    "value": "Owners always have access. Anyone without it won't find the page in lists, search or links."
+    "value": "Administrators always have access. Anyone without it won't find the page in lists, search or links."
   },
   "wiki.audienceEveryone": {
     "value": "Everyone in the workspace"
@@ -21025,7 +21025,7 @@
     "value": "Access to the folder {{folder}}"
   },
   "wiki.audienceFolderText": {
-    "value": "It reaches the pages in this folder and its subfolders, and the ones added later. Owners always have access."
+    "value": "It reaches the pages in this folder and its subfolders, and the ones added later. Administrators always have access."
   },
   "wiki.audienceAgents": {
     "value": "Agents"
@@ -21184,7 +21184,7 @@
     "value": "Everyone, no agents"
   },
   "wiki.access.ownersOnly": {
-    "value": "Owners only"
+    "value": "Administrators only"
   },
   "wiki.access.withAllAgents": {
     "value": "{{names}} and every agent"

@@ -98,6 +98,7 @@ export function chatRoutes(deps: AppDeps) {
             visibility: r.visibility,
             audienceRoleIds: r.audienceRoleIds,
             isMember: r.isMember,
+            seenAsAdmin: r.seenAsAdmin,
             createdByUserId: r.createdByUserId,
             createdAt: r.createdAt.toISOString(),
             categoryId: r.categoryId,

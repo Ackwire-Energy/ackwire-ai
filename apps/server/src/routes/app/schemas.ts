@@ -433,6 +433,9 @@ export const Channel = z
       description: "Private and limited to these roles (departments, ADR 0125); empty: public or invite only.",
     }),
     isMember: z.boolean(),
+    seenAsAdmin: z.boolean().optional().openapi({
+      description: "Listed only because you're an administrator (ADR 0150): off the sidebar until opened or joined.",
+    }),
     createdByUserId: z
       .string()
       .nullable()

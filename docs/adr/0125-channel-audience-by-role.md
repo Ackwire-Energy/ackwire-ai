@@ -47,7 +47,7 @@ was a private channel kept by hand.
 
 - No new permission, no change to messages, search, routing or the WebSocket.
 - A member who wasn't in a role keeps a channel they joined by name; an admin removes them by hand if needed.
-- Admins see a role channel only as anyone does: when they hold one of its roles or are in it, as with private
+- (Replaced by ADR 0150: administrators see every channel.) Admins saw a role channel only as anyone does: when they hold one of its roles or are in it, as with private
   channels. There is no listing of every channel for `manage_channels`.
 - Joining a role channel, taking a role away (from a person or by deleting it) and changing a channel's roles take the
   workspace's `org-members` lock, so a join at the same moment as a removal never leaves someone without the role in.

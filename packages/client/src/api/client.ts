@@ -1359,7 +1359,11 @@ export interface ApiClient {
     pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
     /** Who sees it (null = every member); for people who edit the wiki and manage roles. */
     /** `audience` alone is for anyone who edits the page; the rest takes managing roles. */
-    audience(orgId: string, slug: string, access: Partial<WikiAccess> & Pick<WikiAccess, "audience">): Promise<WikiPage>;
+    audience(
+      orgId: string,
+      slug: string,
+      access: Partial<WikiAccess> & Pick<WikiAccess, "audience">,
+    ): Promise<WikiPage>;
     /** A folder's audience, and the closest limited folder above it. */
     folderAudience(
       orgId: string,

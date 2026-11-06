@@ -700,11 +700,7 @@ async function backlinksOf(db: Database, actor: WikiActor, page: PageRow): Promi
       .select({ number: issues.number, title: issues.title })
       .from(issues)
       .where(
-        and(
-          eq(issues.orgId, page.orgId),
-          inArray(issues.id, issueIds),
-          taskSeenSql("issues", sql`${viewer}::text`),
-        ),
+        and(eq(issues.orgId, page.orgId), inArray(issues.id, issueIds), taskSeenSql("issues", sql`${viewer}::text`)),
       )
       .orderBy(desc(issues.number));
     for (const i of found) {

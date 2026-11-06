@@ -62,3 +62,7 @@ Migration `0215_task_conversations.sql` adds `task` to `channel_kind` and the tw
 - People are never members of a task's conversation: lists, unread counts and search that read membership don't show it, by design. It is read from the task. A task conversation's messages are not in the person's search results yet (search reads joined channels); the task itself is.
 - `requireChannelAccess` adds one `exists` to its single query, evaluated only for a `task` channel.
 - Older work threads in DMs keep working: their root (`meta.issueWork`) still gives the brief, and their replies reach the task's conversation.
+
+## Addendum (2026-11-06): who sees a task
+
+ADR 0150 replaces §2's "the workspace's, or of a channel they are in": a task may be limited to a list of people, and administrators always see it, so `taskReaderSql` reads `taskSeenSql`. A task tied to a DM or a private channel stays tied. "Mostrar para todos" is `setIssueAudience` with `everyone`, for anyone who sees the task.

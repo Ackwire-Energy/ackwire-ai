@@ -165,6 +165,13 @@ describe("what a person hands an agent, it reads", () => {
   });
 });
 
+/** Someone in #general who is no administrator: an administrator reads every channel. */
+async function plainPerson() {
+  const plain = await addMember(f.db, f.org.id, "member", "plain");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: plain.id });
+  return plain.id;
+}
+
 describe("reading stays bound by who asked", () => {
   test("a private file of someone else stays refused, its content and title never shown", async () => {
     f = await world();
@@ -172,7 +179,7 @@ describe("reading stays bound by who asked", () => {
     const secret = await createChannel(f.db, bob.id, f.org.id, { name: "secreto", visibility: "private" });
     const file = await upload(secret.id, bob.id);
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bob.id }).catch(() => {});
-    const run = await runOf(f.agent.id, f.general.id, "@dev lê o arquivo do bob");
+    const run = await runOf(f.agent.id, f.general.id, "@dev lê o arquivo do bob", await plainPerson());
     const read = await bridged(run, "read_artifact", { artifact_id: file.id });
     expect(read.isError).toBe(true);
     expect(read.content).not.toContain("Plano Ouro");
@@ -186,7 +193,7 @@ describe("reading stays bound by who asked", () => {
     const secret = await createChannel(f.db, bob.id, f.org.id, { name: "secreto", visibility: "private" });
     await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { agentId: f.agent.id });
     const file = await upload(secret.id, bob.id);
-    const run = await runOf(f.agent.id, f.general.id, "@dev lê o arquivo do bob");
+    const run = await runOf(f.agent.id, f.general.id, "@dev lê o arquivo do bob", await plainPerson());
     const read = await bridged(run, "read_artifact", { artifact_id: file.id });
     expect(read.isError).toBe(true);
     expect(read.content).not.toContain("Plano Ouro");
@@ -240,7 +247,7 @@ describe("a refusal says what is wrong and what to do", () => {
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     const secret = await createChannel(f.db, bob.id, f.org.id, { name: "secreto", visibility: "private" });
     const file = await upload(secret.id, bob.id);
-    const run = await runOf(f.agent.id, f.general.id, "@dev lê");
+    const run = await runOf(f.agent.id, f.general.id, "@dev lê", await plainPerson());
     const read = await bridged(run, "read_artifact", { artifact_id: file.id });
     expect(read.content).toContain("attach");
   });
@@ -478,21 +485,20 @@ describe("what reading by id must not open", () => {
     expect((await bridged(run, "list_artifacts", {})).content).not.toContain(file.id);
   });
 
-  test("an admin behind the run: a private channel and a DM between others stay closed, on any agent", async () => {
+  test("an admin behind the run reaches a private channel's file; a DM between others stays closed, on any agent", async () => {
     f = await world();
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     const carol = await addMember(f.db, f.org.id, "member", "carol");
     const secret = await createChannel(f.db, bob.id, f.org.id, { name: "secreto", visibility: "private" });
     const between = await openDm(f.db, bob.id, f.org.id, { userId: carol.id });
-    const files = [await upload(secret.id, bob.id), await upload(between.id, bob.id)];
+    const [inChannel, inDm] = [await upload(secret.id, bob.id), await upload(between.id, bob.id)];
     const lodi = await lodiOf();
     const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, lodi.id);
     const run = await runOf(lodi.id, dm.id, "lê os arquivos do bob");
-    for (const file of files) {
-      const read = await bridged(run, "read_artifact", { artifact_id: file.id });
-      expect(read.isError).toBe(true);
-      expect(read.content).not.toContain("Plano Ouro");
-    }
+    expect((await bridged(run, "read_artifact", { artifact_id: inChannel.id })).content).toContain("Plano Ouro");
+    const read = await bridged(run, "read_artifact", { artifact_id: inDm.id });
+    expect(read.isError).toBe(true);
+    expect(read.content).not.toContain("Plano Ouro");
   });
 
   test("a routine's run reads as nobody, not as its creator", async () => {
@@ -519,7 +525,8 @@ describe("what reading by id must not open", () => {
       return { chunks: [], toolUses: [{ name: "read_artifact", input: { artifact_id: fileId } }] };
     });
     const bob = await addMember(f.db, f.org.id, "member", "bob");
-    const secret = await createChannel(f.db, bob.id, f.org.id, { name: "secreto", visibility: "private" });
+    const carol = await addMember(f.db, f.org.id, "member", "carol");
+    const secret = await openDm(f.db, bob.id, f.org.id, { userId: carol.id });
     bobsId = (await upload(secret.id, bob.id, "<p>SEGREDO DO BOB</p>")).id;
     const lodi = await lodiOf();
     const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, lodi.id);
@@ -541,7 +548,7 @@ describe("what reading by id must not open", () => {
     const live = await upload(secret.id, bob.id);
     const trashed = await upload(secret.id, bob.id);
     await deleteArtifact(f.artifactDeps, bob.id, f.org.id, trashed.id);
-    const run = await runOf(f.agent.id, f.general.id, "@dev lê");
+    const run = await runOf(f.agent.id, f.general.id, "@dev lê", await plainPerson());
     const words = async (id: string) =>
       (await bridged(run, "read_artifact", { artifact_id: id })).content.replaceAll(id, "ID");
     const nothing = await words("0195f3a0-0000-7000-8000-000000000000");

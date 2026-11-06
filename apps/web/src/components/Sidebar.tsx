@@ -1350,9 +1350,7 @@ function SidebarChannels({
               <MenuItem
                 key={c.id}
                 icon="lock"
-                onSelect={() =>
-                  void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } })
-                }
+                onSelect={() => void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } })}
               >
                 {c.name}
               </MenuItem>

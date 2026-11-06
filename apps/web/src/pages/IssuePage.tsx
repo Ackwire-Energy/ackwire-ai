@@ -38,8 +38,8 @@ import { IssueWorkBlock } from "@/components/BackgroundWork";
 import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
-import { IssueWhoSeesDialog, WhoSeesButton } from "@/components/WhoSees";
 import { TaskConversationButton, TaskConversationPanel, TaskConversationSummary } from "@/components/TaskConversation";
+import { IssueWhoSeesDialog, WhoSeesButton } from "@/components/WhoSees";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import {
   columnIdOf,

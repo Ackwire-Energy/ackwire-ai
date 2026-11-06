@@ -480,8 +480,8 @@ export function NewIssueDialog({
                     </MenuItem>
                   ))}
                 </Menu>
-                <DueDate value={due} onChange={setDue} />
                 <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />
+                <DueDate value={due} onChange={setDue} />
                 {todoColumns.length > 1 && chosenColumn && (
                   <Menu
                     label={t("issues.column")}

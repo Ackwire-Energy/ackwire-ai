@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { channelTopic, orgTopic, type RealtimeEvent, userTopic } from "@agenteschat/adapters";
+import { orgTopic, type RealtimeEvent, userTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
@@ -102,9 +102,9 @@ describe("a task's audience", () => {
     await expect(getIssue(f.db, person(bia.id), f.org.id, { number: mine.number })).rejects.toBeInstanceOf(
       NotFoundError,
     );
-    await expect(
-      updateIssue(deps(), person(bia.id), f.org.id, mine.id, { status: "done" }),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(updateIssue(deps(), person(bia.id), f.org.id, mine.id, { status: "done" })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
     await expect(commentIssue(deps(), person(bia.id), f.org.id, mine.id, "oi")).rejects.toBeInstanceOf(NotFoundError);
     await expect(openTaskConversation(f.db, person(bia.id), f.org.id, mine.id)).rejects.toBeInstanceOf(NotFoundError);
   });
@@ -127,9 +127,15 @@ describe("a task's audience", () => {
     });
     const limited = await setIssueAudience(deps(), person(ana.id), f.org.id, task.id, only());
     expect(limited.audience.userIds.sort()).toEqual([ana.id, bia.id].sort());
-    expect((await seen(bia.id))).toEqual(["Plano"]);
+    expect(await seen(bia.id)).toEqual(["Plano"]);
     await expect(
-      setIssueAudience(deps(), person(adm.id), f.org.id, (await createIssue(deps(), person(adm.id), f.org.id, { title: "x" })).id, only()),
+      setIssueAudience(
+        deps(),
+        person(adm.id),
+        f.org.id,
+        (await createIssue(deps(), person(adm.id), f.org.id, { title: "x" })).id,
+        only(),
+      ),
     ).rejects.toBeInstanceOf(ValidationError);
     const byAdmin = await setIssueAudience(deps(), person(adm.id), f.org.id, task.id, only(ana.id));
     expect(byAdmin.audience.userIds.sort()).toEqual([ana.id, bia.id].sort());
@@ -402,8 +408,14 @@ describe("administrators and channels", () => {
 
   test("a mention reaches an administrator outside the channel, and nobody else outside it", async () => {
     const { ana, bia, adm, secret } = await privateRoom();
-    await f.db.update(schema.organizationMembers).set({ handle: "adm" }).where(eq(schema.organizationMembers.userId, adm.id));
-    await f.db.update(schema.organizationMembers).set({ handle: "bia" }).where(eq(schema.organizationMembers.userId, bia.id));
+    await f.db
+      .update(schema.organizationMembers)
+      .set({ handle: "adm" })
+      .where(eq(schema.organizationMembers.userId, adm.id));
+    await f.db
+      .update(schema.organizationMembers)
+      .set({ handle: "bia" })
+      .where(eq(schema.organizationMembers.userId, bia.id));
     await postPersonMessage(deps(), ana.id, f.org.id, secret.id, { body: "@adm e @bia olhem isso" });
     await drainOutbox(f.db, f.handlers);
     expect((await listNotifications({ db: f.db }, adm.id, f.org.id)).items.length).toBeGreaterThan(0);

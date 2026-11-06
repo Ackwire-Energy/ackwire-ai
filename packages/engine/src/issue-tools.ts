@@ -161,8 +161,16 @@ const STATUSES = ["todo", "in_progress", "in_review", "done", "canceled"];
 const PRIORITIES = ["low", "normal", "high"];
 
 /** What the agent tells the person after making a task: they change it on the task, in one click. */
-const whoSees = (i: IssueView) =>
-  `Who sees it: ${i.audience.mode === "everyone" ? "everyone in the workspace" : i.audience.channelId ? "the people in this conversation" : `${i.audience.userIds.length} chosen ${i.audience.userIds.length === 1 ? "person" : "people"}`}, and administrators. Say so in your reply; they can change it on the task.`;
+function whoSees(i: IssueView) {
+  const { mode, channelId, userIds } = i.audience;
+  const who =
+    mode === "everyone"
+      ? "everyone in the workspace"
+      : channelId
+        ? "the people in this conversation"
+        : `${userIds.length} chosen ${userIds.length === 1 ? "person" : "people"}`;
+  return `Who sees it: ${who}, and administrators. Say so in your reply; they can change it on the task.`;
+}
 
 /**
  * Issue tools through the Tool Gateway: `list_issues` (`issues:read`),
