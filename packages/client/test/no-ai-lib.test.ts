@@ -26,6 +26,7 @@ import {
   catchUp,
   defaultChoice,
   defaultTarget,
+  dimmedLine,
   firstAgent,
   freePlanAccount,
   gateDims,
@@ -44,6 +45,8 @@ import {
   type PlanGate,
   planGate,
   planGateWithoutAgent,
+  planHoldOf,
+  planHoldPhoneLine,
   planLineFix,
   planMark,
   planOfAccount,
@@ -264,6 +267,24 @@ describe("the Cloud's plan gate tells the truth", () => {
     // A review hold isn't about money, and a self-hosted server has no plan to pay.
     expect(gate({ edition: "cloud", standing: { state: "hold", reason: "review" } }).state).not.toBe("billing");
     expect(gate({ standing: { state: "hold", reason: "payment" } }).state).toBe("ready");
+    expect(planHoldOf("selfhost", { state: "hold", reason: "payment" })).toBeNull();
+    expect(planHoldOf("cloud", { state: "hold", reason: "ended" })).toBe("ended");
+    expect(planHoldOf("cloud", { state: "active", reason: null })).toBeNull();
+  });
+
+  test("the phone's words for a hold: where to pay for whoever pays, who can for anyone else, never a link", () => {
+    const t = ((key: string, o?: { a: string; b: string }) => (o ? `${o.a} ${o.b}` : key)) as unknown as TFunction;
+    expect(planHoldPhoneLine(t, true)).toBe("connectAi.billing connectAi.billingWeb");
+    expect(planHoldPhoneLine(t, false)).toBe("connectAi.billing standing.billing.askAdmin");
+  });
+
+  test("a dimmed plan's rows always have words: the hold's, the computer's, or that it has none", () => {
+    const where = { edition: "cloud", kind: "codex", computer: "Acme" } as const;
+    expect(dimmedLine(enT, { state: "billing", hold: "payment" }, where)).toBe(enT("connectAi.billing"));
+    expect(dimmedLine(enT, { state: "missing" }, where)).toBe(enT("aiAccounts.connect.noComputer"));
+    expect(dimmedLine(enT, { state: "unsupported", reason: "not_installed" }, where)).toBe(
+      gateLine(enT, { gate: { state: "unsupported", reason: "not_installed" }, ...where })?.text,
+    );
   });
 
   test("a CLI missing from a computer ready just now may still be coming; past that it never reads as installing", () => {

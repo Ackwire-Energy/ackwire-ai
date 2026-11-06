@@ -42,6 +42,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { planMeterText } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { AddAccount } from "./AddAccountFlow";
+import { PlanHold, usePlanHold } from "./ConnectAiSteps";
 
 /*
  * Configurações › Contas de IA, "Seus planos" (ADR 0059): the viewer's own
@@ -68,6 +69,7 @@ export function AiAccountsSection() {
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connectAi = useConnectAi();
+  const hold = usePlanHold();
   const [open, setOpen] = useState<Open | null>(null);
   const [busy, setBusy] = useState(false);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
@@ -149,6 +151,7 @@ export function AiAccountsSection() {
         hint={{ name: t("common.about", { label: t("aiAccounts.page.title") }), text: t("aiAccounts.page.hint") }}
         action={connect}
       />
+      {hold && <PlanHold hold={hold} onKey={connectAi ? () => connectAi.open({ intent: "api_key" }) : undefined} />}
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {ai.isError && <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>}
       {ai.isSuccess && rows.length === 0 && own.length === 0 && (
@@ -346,6 +349,7 @@ function AgainDialog({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
+  const hold = usePlanHold();
   const added = useRef(new Set<string>());
   const a = account.signedOut[0] ?? account.logins[0];
   if (!a) return null;
@@ -354,21 +358,25 @@ function AgainDialog({
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={a.label} closeLabel={t("common.close")} width={520}>
       <DialogBody>
-        <AddAccount
-          machineId={a.machineId}
-          kind={a.kind}
-          computer={a.computer}
-          again={a.id}
-          email={a.email}
-          local={local}
-          {...(signInProviderOf(a.provider) ? { provider: signInProviderOf(a.provider) } : {})}
-          {...(fanOut ? { fanOut } : {})}
-          onBack={onClose}
-          onAdded={(_, login) => {
-            added.current.add(login ?? a.id);
-            if (added.current.size >= (fanOut?.length ?? 1)) onDone();
-          }}
-        />
+        {hold ? (
+          <PlanHold hold={hold} />
+        ) : (
+          <AddAccount
+            machineId={a.machineId}
+            kind={a.kind}
+            computer={a.computer}
+            again={a.id}
+            email={a.email}
+            local={local}
+            {...(signInProviderOf(a.provider) ? { provider: signInProviderOf(a.provider) } : {})}
+            {...(fanOut ? { fanOut } : {})}
+            onBack={onClose}
+            onAdded={(_, login) => {
+              added.current.add(login ?? a.id);
+              if (added.current.size >= (fanOut?.length ?? 1)) onDone();
+            }}
+          />
+        )}
       </DialogBody>
     </Dialog>
   );

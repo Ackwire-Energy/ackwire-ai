@@ -5,6 +5,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { chooseBrain } from "./ai-picker";
 import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -223,9 +224,7 @@ describe("Atende outras pessoas (Quem pensa)", () => {
   test("onto a plan it starts off, and Usar asks nothing", async () => {
     const state = await ada({ brain: "model", effectiveModel: null, onlyOwner: false }, { ownPlan: "max" });
     const d = await brainDialog();
-    await click(
-      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name: /^Claude/ }),
-    );
+    await chooseBrain(d, /^Claude/);
     const a = await advanced(d);
     expect(replies(a).getAttribute("aria-checked")).toBe("false");
     await done(a);
@@ -240,9 +239,7 @@ describe("Atende outras pessoas (Quem pensa)", () => {
       { mine: false, ownPlan: "max" },
     );
     const d = await brainDialog();
-    await click(
-      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name: /^Claude/ }),
-    );
+    await chooseBrain(d, /^Claude/);
     const a = await advanced(d);
     await click(replies(a));
     await done(a);
@@ -275,11 +272,7 @@ describe("Atende outras pessoas (Quem pensa)", () => {
   test("back on the API it still answers only its owner: the notice lets everyone in with one click", async () => {
     const state = await ada({});
     const d = await brainDialog();
-    await click(
-      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", {
-        name: /^Chave de API/,
-      }),
-    );
+    await chooseBrain(d, /^Chave de API/);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(document.body.textContent).toContain("A Ada voltou a pensar pela API e ainda só atende você.");
@@ -309,11 +302,7 @@ describe("Só algumas pessoas with nobody picked yet", () => {
   test("back on the API: no button that would let everyone in", async () => {
     await ada({}, { people: true });
     const d = await brainDialog();
-    await click(
-      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", {
-        name: /^Chave de API/,
-      }),
-    );
+    await chooseBrain(d, /^Chave de API/);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(document.body.textContent).toContain("A Ada voltou a pensar pela API e ainda só atende você.");

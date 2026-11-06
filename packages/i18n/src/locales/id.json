@@ -981,7 +981,6 @@
     "keyFromOther": "Dari penyedia lain?",
     "anthropicWorkspace": "ID ruang kerja Claude Console",
     "anthropicWorkspaceHelp": "Hanya untuk kunci yang berfungsi di lebih dari satu ruang kerja. ID-nya diawali wrkspc_.",
-    "platformKeyDesc": "Tanpa kunci sendiri: agen memakai kunci Claude milik server ini. Kamu bisa melihat biaya tiap agen.",
     "computer": {
       "title": "Di mana kita akan bekerja?",
       "lead": "Agen bekerja di komputer, dan tindakan sensitif tetap meminta persetujuanmu.",
@@ -2208,10 +2207,11 @@
       "forAll": "Semua agen tanpa paket berpikir dengan kunci ini.",
       "saved": "Tersimpan. Semua agen tanpa paket berpikir dengan kunci ini.",
       "savedUnchecked": "Tersimpan, tetapi {{provider}} tidak menjawab, jadi kunci tidak bisa diperiksa. Jika gagal, percakapan memberi tahu alasannya.",
+      "held": "Agen memakainya setelah paket agentes.chat workspace aktif.",
+      "savedHeld": "Tersimpan. Agen memakainya setelah paket agentes.chat workspace aktif.",
       "notPlan": "Kunci paket coding dimasukkan di opsinya sendiri di atas.",
       "billing": "Aktifkan penagihan untuk proyek kunci ini. Tanpa penagihan, Google bisa memakai apa yang dikirim agenmu.",
-      "privacy": "Pengaturan privasi OpenRouter-mu menentukan penyedia mana yang boleh menyimpan apa yang dikirim agenmu.",
-      "platform": "Server ini"
+      "privacy": "Pengaturan privasi OpenRouter-mu menentukan penyedia mana yang boleh menyimpan apa yang dikirim agenmu."
     },
     "wait": {
       "signIn": "Kamu bisa masuk di sini begitu komputernya siap.",

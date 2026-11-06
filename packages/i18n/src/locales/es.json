@@ -1045,7 +1045,6 @@
     "keyFromOther": "¿Es de otro proveedor?",
     "anthropicWorkspace": "ID del espacio de trabajo de Claude Console",
     "anthropicWorkspaceHelp": "Solo para una clave que funciona en más de un espacio de trabajo. El ID empieza con wrkspc_.",
-    "platformKeyDesc": "Sin clave propia: los agentes usan la clave de Claude de este servidor. Ves el costo de cada agente.",
     "computer": {
       "title": "¿Dónde vamos a trabajar?",
       "lead": "Los agentes trabajan en una computadora, y las acciones sensibles igual piden tu aprobación.",
@@ -2374,10 +2373,11 @@
       "forAll": "Todos los agentes sin plan piensan con ella.",
       "saved": "Guardada. Todos los agentes sin plan piensan con ella.",
       "savedUnchecked": "Guardada, pero {{provider}} no respondió y la clave no se pudo comprobar. Si falla, la conversación dice por qué.",
+      "held": "Los agentes la usan en cuanto el plan de agentes.chat del workspace esté activo.",
+      "savedHeld": "Guardada. Los agentes la usan en cuanto el plan de agentes.chat del workspace esté activo.",
       "notPlan": "La clave de un plan de programación va en su propia opción, arriba.",
       "billing": "Activa la facturación del proyecto de la clave. Sin facturación, Google puede usar lo que envían tus agentes.",
-      "privacy": "Tu configuración de privacidad de OpenRouter decide qué proveedores pueden guardar lo que envían tus agentes.",
-      "platform": "Este servidor"
+      "privacy": "Tu configuración de privacidad de OpenRouter decide qué proveedores pueden guardar lo que envían tus agentes."
     },
     "wait": {
       "signIn": "Inicias sesión aquí en cuanto la computadora esté lista.",

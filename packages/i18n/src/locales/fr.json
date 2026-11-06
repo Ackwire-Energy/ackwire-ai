@@ -1045,7 +1045,6 @@
     "keyFromOther": "Elle vient d'un autre fournisseur ?",
     "anthropicWorkspace": "ID d'espace de travail de la Claude Console",
     "anthropicWorkspaceHelp": "Uniquement pour une clé qui fonctionne dans plusieurs espaces de travail. L'ID commence par wrkspc_.",
-    "platformKeyDesc": "Pas de clé à vous : les agents utilisent la clé Claude de ce serveur. Vous voyez le coût de chaque agent.",
     "computer": {
       "title": "Où allons-nous travailler ?",
       "lead": "Les agents travaillent sur un ordinateur, et les actions sensibles demandent toujours votre approbation.",
@@ -2377,10 +2376,11 @@
       "forAll": "Tous les agents sans abonnement réfléchissent avec elle.",
       "saved": "Enregistrée. Tous les agents sans abonnement réfléchissent avec elle.",
       "savedUnchecked": "Enregistrée, mais {{provider}} n'a pas répondu et la clé n'a pas pu être vérifiée. Si elle échoue, la conversation dit pourquoi.",
+      "held": "Les agents l'utilisent dès que le forfait agentes.chat du workspace est actif.",
+      "savedHeld": "Enregistrée. Les agents l'utilisent dès que le forfait agentes.chat du workspace est actif.",
       "notPlan": "La clé d'un abonnement de code va dans sa propre option ci-dessus.",
       "billing": "Activez la facturation pour le projet de la clé. Sans facturation, Google peut utiliser ce que vos agents envoient.",
-      "privacy": "Vos paramètres de confidentialité OpenRouter décident quels fournisseurs peuvent conserver ce que vos agents envoient.",
-      "platform": "Ce serveur"
+      "privacy": "Vos paramètres de confidentialité OpenRouter décident quels fournisseurs peuvent conserver ce que vos agents envoient."
     },
     "wait": {
       "signIn": "Vous vous connectez ici dès que l'ordinateur est prêt.",

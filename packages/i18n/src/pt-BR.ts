@@ -1016,7 +1016,6 @@ export const ptBR = {
     keyFromOther: "É de outro provedor?",
     anthropicWorkspace: "ID do workspace no Claude Console",
     anthropicWorkspaceHelp: "Só para uma chave que vale em mais de um workspace. O ID começa com wrkspc_.",
-    platformKeyDesc: "Sem chave sua: os agentes usam a chave do Claude deste servidor. Você vê o custo de cada agente.",
     computer: {
       title: "Onde a gente vai trabalhar?",
       lead: "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
@@ -2317,11 +2316,12 @@ export const ptBR = {
       saved: "Salva. Todo agente sem plano pensa com ela.",
       savedUnchecked:
         "Salva, mas {{provider}} não respondeu e a chave não pôde ser testada. Se ela falhar, a conversa diz o motivo.",
+      held: "Os agentes usam a chave quando o plano do agentes.chat do workspace estiver ativo.",
+      savedHeld: "Salva. Os agentes usam a chave quando o plano do agentes.chat do workspace estiver ativo.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
       billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
       privacy:
         "As configurações de privacidade da OpenRouter decidem quais provedores podem guardar o que seus agentes enviam.",
-      platform: "Este servidor",
     },
     wait: {
       signIn: "Você entra aqui assim que o computador ficar pronto.",

@@ -277,6 +277,12 @@ export const planPickText = (t: TFunction, choice: PlanChoice) =>
 export const PLAN_MARKS = ["claude", "openai", "zai", "kimi"] as const;
 export const KEY_MARKS = ["claude", "openai", "gemini", "openrouter"] as const;
 
+/** The billing hold that stops a plan: only the Cloud has an agentes.chat plan, so a self-hosted server never has one. */
+export const planHoldOf = (
+  edition: Edition | null,
+  standing: Pick<OrgStanding, "state" | "reason"> | null | undefined,
+) => (edition === "cloud" ? billingHoldOf(standing) : null);
+
 /** What a plan's panel can do now for one agent: sign in, or why not yet. */
 export type PlanGate =
   | { state: "loading" }
@@ -343,7 +349,7 @@ export function planGate({
   standing?: Pick<OrgStanding, "state" | "reason"> | null;
   now?: number;
 }): PlanGate {
-  const hold = edition === "cloud" ? billingHoldOf(standing) : null;
+  const hold = planHoldOf(edition, standing);
   if (hold) return { state: "billing", hold };
   if (edition === "cloud" && setupPending(setup)) return { state: "preparing", view: setup };
   if (!brain || !edition) return { state: "loading" };
@@ -382,7 +388,7 @@ export function planGateWithoutAgent({
   standing?: Pick<OrgStanding, "state" | "reason"> | null;
   now?: number;
 }): { gate: PlanGate; computer?: AiComputer } {
-  const hold = edition === "cloud" ? billingHoldOf(standing) : null;
+  const hold = planHoldOf(edition, standing);
   if (hold) return { gate: { state: "billing", hold } };
   if (edition === "cloud" && setupPending(setup)) return { gate: { state: "preparing", view: setup } };
   if (!computers || !edition) return { gate: { state: "loading" } };
@@ -523,6 +529,26 @@ export function gateLine(
   }
   return { text: t(`brain.reasons.${gate.reason}`, { computer, program }), rechecks };
 }
+
+/** Why a plan's rows are dimmed (`gateDims`), in one line under them. */
+export function dimmedLine(
+  t: TFunction,
+  gate: PlanGate,
+  where: { edition: Edition | null; kind: MachineAccountKind; computer: string },
+) {
+  if (gate.state === "billing") return t("connectAi.billing");
+  return gateLine(t, { gate, ...where })?.text ?? t("aiAccounts.connect.noComputer");
+}
+
+/**
+ * The phone's words for a plan a billing hold stops: paying has no button or link there (ADR 0079 §6, App Store 3.1.1),
+ * so whoever pays reads where, and anyone else who can.
+ */
+export const planHoldPhoneLine = (t: TFunction, mayPay: boolean) =>
+  t("common.joinSentences", {
+    a: t("connectAi.billing"),
+    b: t(mayPay ? "connectAi.billingWeb" : "standing.billing.askAdmin"),
+  });
 
 /** The longest a plan's panel shows its sign-in loading while the agent's view is asked again (`catchUp`). */
 export const CATCH_UP_MS = 8000;

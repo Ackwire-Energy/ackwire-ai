@@ -1020,7 +1020,6 @@ export const en = {
     keyFromOther: "Is it from another provider?",
     anthropicWorkspace: "Claude Console workspace ID",
     anthropicWorkspaceHelp: "Only for a key that works in more than one workspace. The ID starts with wrkspc_.",
-    platformKeyDesc: "No key of your own: agents use this server's Claude key. You see each agent's cost.",
     computer: {
       title: "Where will we work?",
       lead: "Agents work on a computer, and sensitive actions still ask for your approval.",
@@ -2254,7 +2253,7 @@ export const en = {
       other: "Or connect another",
       manageKeys: "Manage or delete keys",
     },
-    /** The Cloud's workspace on a billing hold: a key won't run there either, so only the plan is offered. */
+    /** The Cloud's workspace on a billing hold, where a plan would sign in. */
     billing: "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan.",
     /** After `billing`, on the phone, where paying isn't offered. */
     billingWeb: "Choose one on the web, at agentes.chat.",
@@ -2304,10 +2303,12 @@ export const en = {
       /** Saved, though the provider gave no answer about the key: it may still fail. */
       savedUnchecked:
         "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why.",
+      /** On a billing hold no model runs, so a key waits for the plan as well (`connectAi.billing`). */
+      held: "Agents use it once the workspace's agentes.chat plan is active.",
+      savedHeld: "Saved. Agents use it once the workspace's agentes.chat plan is active.",
       notPlan: "A coding plan's key goes in its own option above.",
       billing: "Turn on billing for the key's project. Without billing, Google may use what your agents send.",
       privacy: "Your OpenRouter privacy settings decide which providers may keep what your agents send.",
-      platform: "This server",
     },
     wait: {
       signIn: "You sign in here as soon as the computer is ready.",

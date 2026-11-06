@@ -981,7 +981,6 @@
     "keyFromOther": "是其他服务商的密钥？",
     "anthropicWorkspace": "Claude Console 工作区 ID",
     "anthropicWorkspaceHelp": "仅适用于在多个工作区中都有效的密钥。ID 以 wrkspc_ 开头。",
-    "platformKeyDesc": "无需自己的密钥：智能体使用此服务器的 Claude 密钥。你可以看到每个智能体的费用。",
     "computer": {
       "title": "我们在哪里工作？",
       "lead": "智能体在电脑上工作，敏感操作仍会请你审批。",
@@ -2201,10 +2200,11 @@
       "forAll": "所有没有套餐的智能体都用它来思考。",
       "saved": "已保存。所有没有套餐的智能体都用它来思考。",
       "savedUnchecked": "已保存，但 {{provider}} 没有回应，因此无法检查这个密钥。如果它失败，对话里会说明原因。",
+      "held": "工作区的 agentes.chat 套餐生效后，智能体就会使用它。",
+      "savedHeld": "已保存。工作区的 agentes.chat 套餐生效后，智能体就会使用它。",
       "notPlan": "编程套餐的密钥请填在上方它自己的选项里。",
       "billing": "请为密钥所属的项目开通结算。不开通结算的话，Google 可能会使用你的智能体发送的内容。",
-      "privacy": "你的 OpenRouter 隐私设置决定哪些服务商可以保留你的智能体发送的内容。",
-      "platform": "这台服务器"
+      "privacy": "你的 OpenRouter 隐私设置决定哪些服务商可以保留你的智能体发送的内容。"
     },
     "wait": {
       "signIn": "电脑一就绪，你就可以在这里登录。",

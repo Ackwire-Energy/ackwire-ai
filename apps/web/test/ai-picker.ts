@@ -2,11 +2,11 @@ import { act, fireEvent, within } from "@testing-library/react";
 import { screen, settle } from "./render";
 
 /** Whose plan or whose key, in an open Connect an AI: the picker's select. */
-export const aiSelect = (box: HTMLElement, name: "Plano" | "Provedor" = "Plano") =>
+export const aiSelect = (box: HTMLElement, name: "Plano" | "Provedor" | "Quem pensa" = "Plano") =>
   within(box).getByRole("combobox", { name });
 
 /** That select opened: its rows. */
-export async function openAiSelect(box: HTMLElement, name: "Plano" | "Provedor" = "Plano") {
+export async function openAiSelect(box: HTMLElement, name: "Plano" | "Provedor" | "Quem pensa" = "Plano") {
   const select = aiSelect(box, name);
   select.focus();
   await act(async () => fireEvent.keyDown(select, { key: "Enter" }));
@@ -35,4 +35,14 @@ export async function chooseAi(box: HTMLElement, name: string, maker = false) {
   const rows = await openAiSelect(box, maker ? "Provedor" : "Plano");
   const row = rows.find((o) => o.textContent === name || o.textContent?.startsWith(`${name}`)) as Element;
   await clicked(row);
+}
+
+/** A row of "Quem pensa"'s select by the title it shows. */
+export const brainTitle = (option: Element) =>
+  option.querySelector(".ac-menu__label > span:first-child")?.textContent ?? "";
+
+/** Picks what thinks in "Quem pensa". */
+export async function chooseBrain(box: HTMLElement, name: RegExp) {
+  const rows = await openAiSelect(box, "Quem pensa");
+  await clicked(rows.find((o) => name.test(brainTitle(o))) as Element);
 }

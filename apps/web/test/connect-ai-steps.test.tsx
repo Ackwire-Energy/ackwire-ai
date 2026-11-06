@@ -213,6 +213,22 @@ const chatgptPlus = account({
 });
 
 describe("Conectar uma IA: one picker, plans first", () => {
+  test("one gap sets a plan's steps apart: each part of the flow takes it, with no margin of its own", async () => {
+    const layout = await stylesheet("../src/layout.css");
+    for (const box of [".agp-addacct", ".ai-panel"]) expect(ruleOf(layout, box)).toContain("gap: var(--ai-steps-gap)");
+    expect(ruleOf(layout, ".agp-addacct > .ac-setnote")).toContain("margin-block: 0");
+    const parts = [...layout.matchAll(/\.agp-addacct > [^\s{,]+ \{[^}]*\}/g)].map((m) => m[0]);
+    expect(parts.length).toBeGreaterThan(0);
+    for (const part of parts) expect(part).not.toMatch(/margin(-block|-top|-bottom)?: (?!0)/);
+    // So every part a flow draws has to be one of these: a new kind brings its own margin past the check above.
+    const { dialog, choose } = await connect();
+    for (const name of ["Claude", "ChatGPT", "Cursor", "OpenCode Go", "Grok", "Gemini", "GLM Coding"]) {
+      await choose(name);
+      for (const part of Array.from(dialog.querySelector(".agp-addacct")?.children ?? []))
+        expect(part.className).toMatch(/agp-addacct__step|ac-setnote|ac-btn|agp-addacct__head|ai-panel__row/);
+    }
+  });
+
   test("Settings › AI accounts opens the same picker: a plan or a key, then one select with Claude chosen and its sign-in", async () => {
     const { dialog } = await connect();
     const group = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
@@ -611,7 +627,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // As far under the words as a field is under its title (the words' 4px gap and the field's 4px margin), and
     // nearer them than the next step, as far as a panel's groups.
     expect(ruleOf(layout, ".agp-addacct__step")).toContain("gap: 8px 12px");
-    expect(ruleOf(layout, ".agp-addacct")).toContain("gap: 16px");
+    expect(layout).toContain("--ai-steps-gap: 16px");
     expect(ruleOf(layout, ".agp-addacct__text")).toContain("gap: 4px");
     expect(ruleOf(layout, ".agp-addacct__paste,\n.agp-addacct__code")).toContain("margin: 4px 0");
     expect(ruleOf(layout, ".agp-addacct__step:not(.ac-iconline) > .agp-addacct__text")).toContain("flex-basis: 100%");

@@ -788,7 +788,7 @@ describe("the agent's AI", () => {
       'const steps = ready || gate.state === "preparing" || (gate.state === "offline" && signingIn);',
     );
     expect(connect).toContain('} else if (why && !(gate.state === "offline" && signingIn)) {');
-    expect(connect).toContain("offersKeyNow(gate, hold !== null) && !signingIn");
+    expect(connect).toContain("offersKeyNow(gate, hold !== null, mayAddKey) && !signingIn");
     expect(connect).toContain("onSigningIn={setSigningIn}");
     expect(flow).toMatch(
       /useEffect\(\(\) => \{\s*onSigningIn\?\.\(begun\);\s*return \(\) => onSigningIn\?\.\(false\);/,

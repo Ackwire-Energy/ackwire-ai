@@ -1013,7 +1013,6 @@
     "keyFromOther": "Ist er von einem anderen Anbieter?",
     "anthropicWorkspace": "Workspace-ID der Claude Console",
     "anthropicWorkspaceHelp": "Nur für einen Schlüssel, der in mehr als einem Workspace funktioniert. Die ID beginnt mit wrkspc_.",
-    "platformKeyDesc": "Kein eigener Schlüssel: Agenten nutzen den Claude-Schlüssel dieses Servers. Du siehst die Kosten jedes Agenten.",
     "computer": {
       "title": "Wo arbeiten wir?",
       "lead": "Agenten arbeiten auf einem Computer, und heikle Aktionen fragen trotzdem nach deiner Freigabe.",
@@ -2293,10 +2292,11 @@
       "forAll": "Jeder Agent ohne Abo denkt damit.",
       "saved": "Gespeichert. Jeder Agent ohne Abo denkt damit.",
       "savedUnchecked": "Gespeichert, aber {{provider}} hat nicht geantwortet, der Schlüssel konnte also nicht geprüft werden. Wenn er fehlschlägt, steht der Grund im Chat.",
+      "held": "Agenten nutzen ihn, sobald das agentes.chat-Abo des Workspace aktiv ist.",
+      "savedHeld": "Gespeichert. Agenten nutzen ihn, sobald das agentes.chat-Abo des Workspace aktiv ist.",
       "notPlan": "Der Schlüssel eines Coding-Abos gehört in seine eigene Option oben.",
       "billing": "Aktiviere die Abrechnung für das Projekt des Schlüssels. Ohne Abrechnung darf Google nutzen, was deine Agenten senden.",
-      "privacy": "Deine Datenschutzeinstellungen bei OpenRouter entscheiden, welche Anbieter behalten dürfen, was deine Agenten senden.",
-      "platform": "Dieser Server"
+      "privacy": "Deine Datenschutzeinstellungen bei OpenRouter entscheiden, welche Anbieter behalten dürfen, was deine Agenten senden."
     },
     "wait": {
       "signIn": "Du meldest dich hier an, sobald der Computer bereit ist.",

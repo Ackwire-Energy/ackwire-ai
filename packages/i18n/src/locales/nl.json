@@ -1013,7 +1013,6 @@
     "keyFromOther": "Is hij van een andere aanbieder?",
     "anthropicWorkspace": "Workspace-ID van Claude Console",
     "anthropicWorkspaceHelp": "Alleen voor een sleutel die in meer dan één workspace werkt. De ID begint met wrkspc_.",
-    "platformKeyDesc": "Geen eigen sleutel: agents gebruiken de Claude-sleutel van deze server. Je ziet de kosten van elke agent.",
     "computer": {
       "title": "Waar gaan we werken?",
       "lead": "Agents werken op een computer, en gevoelige acties vragen nog steeds om je goedkeuring.",
@@ -2294,10 +2293,11 @@
       "forAll": "Elke agent zonder abonnement denkt ermee.",
       "saved": "Opgeslagen. Elke agent zonder abonnement denkt ermee.",
       "savedUnchecked": "Opgeslagen, maar {{provider}} gaf geen antwoord, dus de sleutel kon niet worden gecontroleerd. Als hij faalt, staat de reden in het gesprek.",
+      "held": "Agents gebruiken hem zodra het agentes.chat-abonnement van de workspace actief is.",
+      "savedHeld": "Opgeslagen. Agents gebruiken hem zodra het agentes.chat-abonnement van de workspace actief is.",
       "notPlan": "De sleutel van een codeerabonnement hoort bij die eigen optie hierboven.",
       "billing": "Zet facturering aan voor het project van de sleutel. Zonder facturering mag Google gebruiken wat je agents versturen.",
-      "privacy": "Je privacyinstellingen in OpenRouter bepalen welke aanbieders mogen bewaren wat je agents versturen.",
-      "platform": "Deze server"
+      "privacy": "Je privacyinstellingen in OpenRouter bepalen welke aanbieders mogen bewaren wat je agents versturen."
     },
     "wait": {
       "signIn": "Je logt hier in zodra de computer klaar is.",

@@ -2456,9 +2456,6 @@
   "onboarding.anthropicWorkspaceHelp": {
     "value": "Only for a key that works in more than one workspace. The ID starts with wrkspc_."
   },
-  "onboarding.platformKeyDesc": {
-    "value": "No key of your own: agents use this server's Claude key. You see each agent's cost."
-  },
   "onboarding.computer.title": {
     "value": "Where will we work?"
   },
@@ -5521,6 +5518,12 @@
   "connectAi.key.savedUnchecked": {
     "value": "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why."
   },
+  "connectAi.key.held": {
+    "value": "Agents use it once the workspace's agentes.chat plan is active."
+  },
+  "connectAi.key.savedHeld": {
+    "value": "Saved. Agents use it once the workspace's agentes.chat plan is active."
+  },
   "connectAi.key.notPlan": {
     "value": "A coding plan's key goes in its own option above."
   },
@@ -5529,9 +5532,6 @@
   },
   "connectAi.key.privacy": {
     "value": "Your OpenRouter privacy settings decide which providers may keep what your agents send."
-  },
-  "connectAi.key.platform": {
-    "value": "This server"
   },
   "connectAi.wait.signIn": {
     "value": "You sign in here as soon as the computer is ready."

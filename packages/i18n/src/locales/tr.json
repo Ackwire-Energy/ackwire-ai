@@ -1013,7 +1013,6 @@
     "keyFromOther": "Başka bir sağlayıcıdan mı?",
     "anthropicWorkspace": "Claude Console çalışma alanı kimliği",
     "anthropicWorkspaceHelp": "Yalnızca birden fazla çalışma alanında çalışan bir anahtar için. Kimlik wrkspc_ ile başlar.",
-    "platformKeyDesc": "Kendi anahtarınız yok: ajanlar bu sunucunun Claude anahtarını kullanır. Her ajanın maliyetini görürsünüz.",
     "computer": {
       "title": "Nerede çalışacağız?",
       "lead": "Ajanlar bir bilgisayarda çalışır, hassas işlemler yine de onayınızı ister.",
@@ -2283,10 +2282,11 @@
       "forAll": "Planı olmayan her ajan bununla düşünür.",
       "saved": "Kaydedildi. Planı olmayan her ajan bununla düşünür.",
       "savedUnchecked": "Kaydedildi, ama {{provider}} yanıt vermedi, bu yüzden anahtar kontrol edilemedi. Başarısız olursa nedenini sohbet söyler.",
+      "held": "Çalışma alanının agentes.chat planı etkin olduğunda ajanlar bunu kullanır.",
+      "savedHeld": "Kaydedildi. Çalışma alanının agentes.chat planı etkin olduğunda ajanlar bunu kullanır.",
       "notPlan": "Bir kodlama planının anahtarı yukarıdaki kendi seçeneğine girilir.",
       "billing": "Anahtarın projesi için faturalandırmayı açın. Faturalandırma olmadan Google, ajanlarınızın gönderdiklerini kullanabilir.",
-      "privacy": "Ajanlarınızın gönderdiklerini hangi sağlayıcıların saklayabileceğine OpenRouter gizlilik ayarlarınız karar verir.",
-      "platform": "Bu sunucu"
+      "privacy": "Ajanlarınızın gönderdiklerini hangi sağlayıcıların saklayabileceğine OpenRouter gizlilik ayarlarınız karar verir."
     },
     "wait": {
       "signIn": "Bilgisayar hazır olur olmaz burada giriş yaparsınız.",

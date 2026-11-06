@@ -38,7 +38,7 @@ import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
 import { openConnectAi } from "./NoAiCard";
-import { alertKeyRefused, Note } from "./parts";
+import { alertKeyRefused, Note, PlanHoldNote, usePlanHold } from "./parts";
 
 /*
  * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", first the sign-ins of the
@@ -94,6 +94,7 @@ export function AiAccountsScreen() {
   const meId = useMeId();
   const status = useAiStatus(orgId);
   const [again, setAgain] = useState<Account | null>(null);
+  const hold = usePlanHold(orgId, org);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
@@ -222,6 +223,7 @@ export function AiAccountsScreen() {
             </Text>
           </InfoHint>
         </View>
+        {hold && !again ? <PlanHoldNote org={org} /> : null}
         {ai.isLoading ? <ActivityIndicator color={c.muted} /> : null}
         {ai.isError ? <Note icon="x">{t("common.loadFailed")}</Note> : null}
         {ai.isSuccess && rows.length === 0 && own.length === 0 ? (
@@ -301,19 +303,23 @@ export function AiAccountsScreen() {
               </Text>
               <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
             </View>
-            <AddAccount
-              machineId={again.machineId}
-              kind={again.kind}
-              computer={again.computer}
-              again={again.id}
-              email={again.email}
-              local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
-              {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
-              onAdded={() => {
-                setAgain(null);
-                refetch();
-              }}
-            />
+            {hold ? (
+              <PlanHoldNote org={org} />
+            ) : (
+              <AddAccount
+                machineId={again.machineId}
+                kind={again.kind}
+                computer={again.computer}
+                again={again.id}
+                email={again.email}
+                local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
+                {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
+                onAdded={() => {
+                  setAgain(null);
+                  refetch();
+                }}
+              />
+            )}
           </View>
         ) : null}
         <View style={styles.start}>

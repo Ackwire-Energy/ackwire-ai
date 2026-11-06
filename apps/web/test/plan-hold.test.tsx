@@ -1,0 +1,263 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import type { AiAccounts, AiComputer } from "@agenteschat/client";
+import { PLAN_CHOICES, type PlanChoice, planTitle } from "@agenteschat/client/lib/no-ai";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import i18next from "i18next";
+import { brainTitle, openAiSelect, payWith } from "./ai-picker";
+import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState, withRightHand } from "./fake-api";
+import { shownText } from "./hint";
+import { renderApp, screen, settle } from "./render";
+
+afterEach(() => cleanup());
+
+/*
+ * The four people a plan's screens answer: a workspace with its agentes.chat plan, one without it for whoever pays and
+ * for a member, and a self-hosted server, which has no such plan.
+ */
+type Who = "paid" | "owner" | "member" | "selfhost";
+
+const WHY = "Um plano entra no computador do workspace, e o computador vem com um plano ativo do agentes.chat.";
+const ASK = "Quem administra o workspace pode resolver isso.";
+const PAY = "Ver planos do agentes.chat";
+const KEY = "Usar uma chave de API";
+const HELD = "Os agentes usam a chave quando o plano do agentes.chat do workspace estiver ativo.";
+
+const COMPUTER: AiComputer = {
+  machineId: "machine_1",
+  name: "MacBook",
+  online: true,
+  mine: true,
+  canAdd: true,
+  keys: true,
+  brains: { claude_code: true, codex: true, cursor: true, opencode: true, grok: true, antigravity: true },
+};
+
+const EVERY_PROGRAM = (["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"] as const).map((kind) => ({
+  kind,
+  available: true,
+  models: [],
+  defaultModel: null,
+}));
+const NO_COMPUTER = { computer: null, machines: [] };
+
+const click = async (el: Element) => {
+  await act(async () => fireEvent.click(el));
+  await settle(4);
+};
+
+async function open(who: Who, path: string, accounts: AiAccounts["accounts"] = []) {
+  const state = seedState({ authConfig: who === "selfhost" ? {} : { billingUrl: "https://billing.example.com" } });
+  if (path.endsWith("right_hand")) withRightHand(state);
+  const held = who === "owner" || who === "member" || who === "selfhost";
+  const me = state.me;
+  if (me)
+    me.organizations = me.organizations.map((o) => ({
+      ...o,
+      ...(who === "member" ? { role: "member" as const } : {}),
+      ...(held ? { standing: { state: "hold" as const, reason: "payment" } } : {}),
+    }));
+  for (const a of state.agents) if (a.id === ADA_ID) a.ownerUserId = state.me?.user.id ?? null;
+  if (path.includes("connect=ai"))
+    state.aiStatus = { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] };
+  const api = createFakeApi(state);
+  const machines = fakeMachinesOf.get(api);
+  const paired = who === "paid" || who === "selfhost";
+  if (paired)
+    machines?.pair({
+      id: "machine_1",
+      name: "MacBook",
+      agents: state.agents.filter((a) => a.id === ADA_ID).map((a) => ({ id: a.id, name: a.name, handle: a.handle })),
+    });
+  if (who !== "selfhost") machines?.setSetup({ state: paired ? "ready" : null });
+  machines?.setAiAccounts({ accounts, computers: paired ? [COMPUTER] : [] });
+  const viewOf = api.agents.brain;
+  api.agents.brain = async (orgId, agentId) => ({
+    ...(await viewOf(orgId, agentId)),
+    ownSignIn: false,
+    accounts,
+    ...(paired ? { options: EVERY_PROGRAM, accountsSupported: true, canManageAccounts: true } : NO_COMPUTER),
+  });
+  await renderApp(path, { api });
+  await settle(8);
+  return { state, api };
+}
+
+async function connect(who: Who, accounts: AiAccounts["accounts"] = []) {
+  const opened = await open(who, `/org/${ORG_ID}?connect=ai`, accounts);
+  return { ...opened, dialog: screen().getByRole("dialog", { name: /Conectar uma IA/ }) };
+}
+
+async function planPanel(dialog: HTMLElement, choice: PlanChoice) {
+  const rows = await openAiSelect(dialog);
+  await click(rows[PLAN_CHOICES.indexOf(choice)] as Element);
+  await settle(2);
+  return within(dialog).getAllByRole("region", { name: planTitle(i18next.t, choice) })[0] as HTMLElement;
+}
+
+const disabledButtons = (box: HTMLElement) => Array.from(box.querySelectorAll("button:disabled"));
+const buttonNamed = (box: HTMLElement, name: string) => within(box).queryByRole("button", { name });
+
+describe("a plan with no agentes.chat plan in force", () => {
+  test("whoever pays: every plan says why where its button was, with the plans page and a key, and nothing off", async () => {
+    const { dialog } = await connect("owner");
+    for (const choice of PLAN_CHOICES) {
+      const panel = await planPanel(dialog, choice);
+      expect(shownText(panel)).toContain(WHY);
+      expect(buttonNamed(panel, PAY)).not.toBeNull();
+      expect(buttonNamed(panel, KEY)).not.toBeNull();
+      expect(disabledButtons(panel)).toEqual([]);
+      expect(panel.querySelector(".agp-addacct")).toBeNull();
+    }
+  });
+
+  test("a member: every plan says why and who can sort it out, with nothing to press", async () => {
+    const { dialog } = await connect("member");
+    for (const choice of PLAN_CHOICES) {
+      const panel = await planPanel(dialog, choice);
+      expect(shownText(panel)).toContain(WHY);
+      expect(shownText(panel)).toContain(ASK);
+      expect(buttonNamed(panel, PAY)).toBeNull();
+      expect(buttonNamed(panel, KEY)).toBeNull();
+      expect(disabledButtons(panel)).toEqual([]);
+    }
+  });
+
+  test("with the plan in force: every plan signs in, no word of billing", async () => {
+    const { dialog } = await connect("paid");
+    for (const choice of PLAN_CHOICES) {
+      const panel = await planPanel(dialog, choice);
+      expect(shownText(panel)).not.toContain(WHY);
+      expect(buttonNamed(panel, PAY)).toBeNull();
+      expect(panel.querySelector(".agp-addacct")).not.toBeNull();
+      expect(disabledButtons(panel).filter((b) => !b.textContent?.includes("Enviar"))).toEqual([]);
+    }
+  });
+
+  test("self-hosted: no word of billing, though a hold there carries a billing code", async () => {
+    const { dialog } = await connect("selfhost");
+    for (const choice of PLAN_CHOICES) {
+      const panel = await planPanel(dialog, choice);
+      expect(shownText(panel)).not.toContain("agentes.chat");
+      expect(buttonNamed(panel, PAY)).toBeNull();
+    }
+    await click(payWith(dialog, "Com chave de API"));
+    expect(shownText(dialog)).not.toContain(HELD);
+    expect(shownText(dialog)).toContain("Todo agente sem plano pensa com ela.");
+  });
+
+  test("Ver planos goes to the real billing page, minted on the click", async () => {
+    const { dialog, state } = await connect("owner");
+    const panel = await planPanel(dialog, "chatgpt");
+    await click(buttonNamed(panel, PAY) as HTMLElement);
+    expect(state.calls.filter((c) => c.method === "orgs.billingLink")).toHaveLength(1);
+  });
+
+  test("the key: reached from the plan, it says it waits for the plan, and saved it never blames the provider", async () => {
+    const { dialog } = await connect("owner");
+    const panel = await planPanel(dialog, "gemini");
+    await click(buttonNamed(panel, KEY) as HTMLElement);
+    expect(shownText(dialog)).toContain(HELD);
+    expect(shownText(dialog)).not.toContain("Todo agente sem plano pensa com ela.");
+    await act(async () =>
+      fireEvent.change(within(dialog).getByLabelText("Cole aqui"), { target: { value: `sk-ant-${"a".repeat(40)}` } }),
+    );
+    await click(within(dialog).getByRole("button", { name: "Salvar chave" }));
+    await settle(4);
+    expect(shownText(dialog)).toContain(`Salva. ${HELD}`);
+    expect(shownText(dialog)).not.toContain("não respondeu");
+  });
+
+  test("no view of the computer and no hold: the steps it turns off say what they wait for, on every plan", async () => {
+    const state = seedState();
+    for (const a of state.agents) if (a.id === ADA_ID) a.ownerUserId = state.me?.user.id ?? null;
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ state: null });
+    fakeMachinesOf.get(api)?.setAiAccounts({ accounts: [], computers: [] });
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({
+      ...(await viewOf(orgId, agentId)),
+      ownSignIn: false,
+      computer: null,
+      machines: [],
+    });
+    await renderApp(`/org/${ORG_ID}?connect=ai`, { api });
+    await settle(8);
+    const dialog = screen().getByRole("dialog", { name: /Conectar uma IA/ });
+    for (const choice of PLAN_CHOICES) {
+      const panel = await planPanel(dialog, choice);
+      expect(disabledButtons(panel).length).toBeGreaterThan(0);
+      expect(panel.querySelector(".ai-panel__wait")?.textContent).toMatch(/assim que o computador ficar pronto/);
+    }
+  });
+
+  test("a row of what the person has, off for the same reason, says it under the rows", async () => {
+    const account = {
+      id: "acct_max",
+      kind: "claude_code",
+      label: "Claude Max",
+      email: null,
+      plan: null,
+      status: "active",
+      ownerId: "u-owner",
+      ownerName: "Ana",
+      mine: true,
+      usedBy: [],
+      usage: null,
+      provider: null,
+      keyHint: null,
+    } as unknown as AiAccounts["accounts"][number];
+    const { dialog } = await connect("owner", [account]);
+    const row = within(dialog).getByRole("button", { name: /Claude Max/ }) as HTMLButtonElement;
+    expect(row.disabled).toBe(true);
+    expect(row.parentElement?.querySelector(":scope > .ac-setnote")?.textContent).toContain(WHY);
+  });
+});
+
+describe("the other places a plan is chosen", () => {
+  test("Contas de IA: why, the plans page and a key, at the head of the section", async () => {
+    await open("owner", `/org/${ORG_ID}/settings/keys`);
+    const card = screen().getByRole("region", { name: "Seus planos" });
+    expect(shownText(card)).toContain(WHY);
+    expect(buttonNamed(card, PAY)).not.toBeNull();
+    await click(buttonNamed(card, KEY) as HTMLElement);
+    expect(shownText(screen().getByRole("dialog", { name: /Conectar uma IA/ }))).toContain(HELD);
+  });
+
+  test("Contas de IA, with the plan in force or self-hosted: nothing of it", async () => {
+    await open("paid", `/org/${ORG_ID}/settings/keys`);
+    expect(shownText(screen().getByRole("region", { name: "Seus planos" }))).not.toContain(WHY);
+    cleanup();
+    await open("selfhost", `/org/${ORG_ID}/settings/keys`);
+    expect(shownText(screen().getByRole("region", { name: "Seus planos" }))).not.toContain(WHY);
+  });
+
+  test("Quem pensa: the plans in its select say why, and the dialog offers the way on; the key is one choice away", async () => {
+    await open("owner", `/org/${ORG_ID}/agents/${ADA_ID}`);
+    await click(screen().getByRole("button", { name: "Mudar quem pensa" }));
+    const d = screen().getByRole("dialog", { name: "Quem pensa" });
+    const rows = await openAiSelect(d, "Quem pensa");
+    const plans = rows.filter((o) => brainTitle(o) !== "Chave de API");
+    expect(plans.length).toBeGreaterThan(0);
+    for (const o of plans) {
+      expect(o.getAttribute("aria-disabled")).toBe("true");
+      expect(o.querySelector(".ac-menu__desc")?.textContent).toBe(WHY);
+    }
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
+    expect(shownText(d)).toContain(WHY);
+    expect(buttonNamed(d, PAY)).not.toBeNull();
+  });
+
+  test("Lodi's settings: why and the way on in place of the plan row", async () => {
+    await open("owner", `/org/${ORG_ID}/settings/right_hand`);
+    const body = document.querySelector(".settings__body") as HTMLElement;
+    expect(shownText(body)).toContain(WHY);
+    expect(buttonNamed(body, PAY)).not.toBeNull();
+    expect(buttonNamed(body, KEY)).not.toBeNull();
+    expect(shownText(body)).not.toContain("Conecte um plano em Sua IA para usar aqui.");
+  });
+});

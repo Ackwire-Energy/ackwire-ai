@@ -27,6 +27,7 @@ import {
   type AiChoice,
   behindComputer,
   catchUp,
+  dimmedLine,
   type ExistingSignIn,
   firstAgent,
   freePlanAccount,
@@ -41,12 +42,14 @@ import {
   type PlanGate,
   planGate,
   planGateWithoutAgent,
+  planHoldPhoneLine,
   planLabel,
   planMark,
   planOfAccount,
   planPickText,
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
@@ -86,9 +89,18 @@ import { PickList } from "../shared/PickList";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { EndpointForm } from "./EndpointForm";
-import { existingRows, type FlowView, flowBack, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
+import {
+  existingRows,
+  type FlowView,
+  flowBack,
+  keyNowLabel,
+  offersKeyNow,
+  PLAN_POLL_MS,
+  pollsPlan,
+  takenFrom,
+} from "./logic";
 import { useAiOrg } from "./org";
-import { AiRow, alertKeyRefused, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
+import { AiRow, alertKeyRefused, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard, usePlanHold } from "./parts";
 
 /*
  * "Conectar uma IA" on the phone: the web's content and rules
@@ -410,6 +422,13 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
             go(next);
           }}
           dims={dims}
+          dimmedWhy={(choice) =>
+            dimmedLine(t, agentId !== undefined ? gates.gateOf(choice) : bareGates.at(choice).gate, {
+              edition: gates.edition ?? bareGates.edition,
+              kind: kindOf(choice),
+              computer: gates.view?.computer?.name ?? "",
+            })
+          }
           have={have}
           haveFor={startAgentId || theirs ? undefined : forAgent?.name}
           busy={busy}
@@ -445,6 +464,7 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
 function Home({
   onView,
   dims,
+  dimmedWhy,
   have,
   haveFor,
   busy,
@@ -452,6 +472,8 @@ function Home({
 }: {
   onView: (v: FlowView) => void;
   dims: (choice: PlanChoice) => boolean;
+  /** Why a plan is dimmed, said once under the rows it dims. */
+  dimmedWhy: (choice: PlanChoice) => string;
   have: ReturnType<typeof existingRows>;
   /** The agent they are for, where the sheet's title doesn't say it. */
   haveFor?: string;
@@ -459,6 +481,9 @@ function Home({
   onHave: (row: ExistingAi) => void;
 }) {
   const { t } = useTranslation();
+  const dimmed = have.flatMap((r) =>
+    r.row.kind === "account" && dims(planOfAccount(r.row.choice.login)) ? [planOfAccount(r.row.choice.login)] : [],
+  )[0];
   return (
     <View>
       {have.length > 0 ? (
@@ -487,6 +512,7 @@ function Home({
               />
             ) : null}
           </GroupedList>
+          {dimmed ? <GroupedFooter>{dimmedWhy(dimmed)}</GroupedFooter> : null}
         </>
       ) : null}
       <GroupedHeader>{t("mobile.ai.yourPlan")}</GroupedHeader>
@@ -742,6 +768,7 @@ function PlanPage(
             agentId={agent.id}
             agentName={agent.name}
             justReady={props.justReady}
+            mayAddKey={props.mayAddKey}
             onComputer={props.onComputer}
             onKey={() => onView({ page: "key" })}
             move={replies.move}
@@ -824,8 +851,9 @@ function PlanWithoutAgent({
       {elsewhere ? (
         <Button variant="primary" wide label={t("aiAccounts.connect.addComputer")} onPress={onComputer} />
       ) : null}
-      {(offersKeyNow(gate, holdText(t, org?.standing) !== null) || (elsewhere && mayAddKey)) && !signingIn ? (
-        <Button variant="ghost" wide label={t("connectAi.wait.useKey")} onPress={onKey} />
+      {(offersKeyNow(gate, holdText(t, org?.standing) !== null, mayAddKey) || (elsewhere && mayAddKey)) &&
+      !signingIn ? (
+        <Button variant="ghost" wide label={t(keyNowLabel(gate))} onPress={onKey} />
       ) : null}
       {steps ? (
         <AddAccount
@@ -857,6 +885,7 @@ function PlanSteps({
   repliesRow,
   email,
   login,
+  mayAddKey,
   onKey,
   onComputer,
   onDone,
@@ -874,6 +903,8 @@ function PlanSteps({
   email?: string;
   /** A row of what the person already has: one more login of that account, or a free login of it signed back in. */
   login?: ExistingSignIn;
+  /** Only an admin adds an API key. */
+  mayAddKey: boolean;
   onKey: () => void;
   onComputer: () => void;
   onDone: (account: MachineAccount | null) => void;
@@ -963,7 +994,7 @@ function PlanSteps({
   }
 
   const ready = gate.state === "ready";
-  const useKey = <Button variant="ghost" wide label={t("connectAi.wait.useKey")} onPress={onKey} />;
+  const useKey = <Button variant="ghost" wide label={t(keyNowLabel(gate))} onPress={onKey} />;
   const hold = holdText(t, org?.standing);
   const wait = (
     <GateWait
@@ -1010,7 +1041,7 @@ function PlanSteps({
   return (
     <View style={styles.gap}>
       {wait}
-      {offersKeyNow(gate, hold !== null) && !signingIn ? useKey : null}
+      {offersKeyNow(gate, hold !== null, mayAddKey) && !signingIn ? useKey : null}
       {ready && waited ? (
         // A card of its own, where the wait's was: never read as the head of the account choice under it.
         <InfoCard icon="check" live>
@@ -1108,12 +1139,8 @@ function GateWait({
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
   else if (gate.state === "billing") {
-    // A hold stops the Model Gateway too, so a key is no way out here. Paying happens on the web.
-    wait = (
-      <InfoCard icon="pause">
-        {t("common.joinSentences", { a: t("connectAi.billing"), b: t("connectAi.billingWeb") })}
-      </InfoCard>
-    );
+    // A hold stops the Model Gateway too, so the key's page says it starts with the plan. Paying happens on the web.
+    wait = <InfoCard icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false)}</InfoCard>;
   } else if (gate.state === "preparing") {
     const setup = gate.view;
     // A hold decides when anything runs there: it speaks alone. The wait is the app's own (its steps, the time left,
@@ -1169,7 +1196,8 @@ function KeyPage({
   onMakers,
 }: ConnectAiFlowProps & { onMakers: () => void }) {
   const { t } = useTranslation();
-  const { orgId } = useAiOrg();
+  const { orgId, org } = useAiOrg();
+  const hold = usePlanHold(orgId, org);
   const [touched, setTouched] = useState(false);
   const [opened, setOpened] = useState(false);
   const { custom } = form;
@@ -1186,7 +1214,7 @@ function KeyPage({
       <View style={styles.done}>
         <ProviderLogo id={endpointSaved ? CUSTOM_PROVIDER : form.provider} size="hero" />
         <Text variant="title2" tone="ink" style={styles.center}>
-          {(!endpointSaved && form.savedNote) || t("connectAi.key.saved")}
+          {hold ? t("connectAi.key.savedHeld") : (!endpointSaved && form.savedNote) || t("connectAi.key.saved")}
         </Text>
       </View>
     );
@@ -1282,7 +1310,7 @@ function KeyPage({
               {t("mobile.ai.failed")}
             </Note>
           ) : (
-            <Note icon="info">{t("connectAi.key.forAll")}</Note>
+            <Note icon={hold ? "clock" : "info"}>{t(hold ? "connectAi.key.held" : "connectAi.key.forAll")}</Note>
           )}
           {keyButton ? (
             <View style={styles.save}>
