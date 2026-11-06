@@ -84,6 +84,7 @@ export const APP_PAGES = {
   audit: "The audit log",
   usage: "Usage and costs",
   computers: "Computers for the agents",
+  task_manager: "Task manager: what each agent is doing now, what waits for room on the computer, stopping a task",
   connectors: "Apps, MCP servers, mailboxes and databases",
   skills: "Skills",
   storage: "File storage",

@@ -258,6 +258,50 @@ test("in its DM its run reads its own block, not an agent's instructions", async
   expect(text).not.toContain("# Your instructions");
 });
 
+test("what it and the agents advise about computers follows where the server gets them", async () => {
+  f = await setup({ rightHand: true });
+  const [lodi] = await rightHandOf(f.org.id);
+  if (!lodi) throw new Error("no right hand");
+  const runOf = async (dmId: string) => {
+    const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dmId, {
+      body: "a CPU saturou com 2 tarefas, o que eu faço?",
+    });
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+    if (!run) throw new Error("no run");
+    return run;
+  };
+  const lodiRun = await runOf((await openPersonAgentDm(f.db, f.org.id, f.owner.id, lodi.id)).id);
+  const agentRun = await runOf((await openPersonAgentDm(f.db, f.org.id, f.owner.id, f.agent.id)).id);
+  const text = async (agent: typeof lodi, run: typeof lodiRun, workspaceComputer?: { billing: boolean }) =>
+    systemText((await buildRunContext(f.db, run, agent, { maxMessages: 10, workspaceComputer })).system);
+
+  for (const [agent, run] of [
+    [lodi, lodiRun],
+    [f.agent, agentRun],
+  ] as const) {
+    const cloud = await text(agent, run, { billing: true });
+    expect(cloud).toContain("Nobody connects, rents or reaches another here (no pairing, install command, SSH)");
+    expect(cloud).toContain("Settings › Plan and billing shows if a bigger plan brings a bigger one");
+    expect(cloud).toContain("another workspace has its own");
+    expect(cloud).toContain("Task manager");
+    // Its own provisioner, no plans: no page to send anyone to.
+    const provisioned = await text(agent, run, { billing: false });
+    expect(provisioned).toContain("only whoever runs this server can give it a bigger one");
+    expect(provisioned).not.toContain("Plan and billing");
+    // People connect their own: today's words, none of the block.
+    expect(await text(agent, run)).not.toContain("# This workspace's computer");
+  }
+
+  const cloud = await text(lodi, lodiRun, { billing: true });
+  expect(cloud).toContain("Nobody sets it up: it comes by itself once the plan is paid");
+  expect(cloud).not.toContain("say where it is set up");
+  expect(await text(lodi, lodiRun, { billing: false })).toContain("it comes by itself, and Settings › Computers");
+  const own = await text(lodi, lodiRun);
+  expect(own).toContain("No computer is ready for the agents yet");
+  expect(own).toContain("say where it is set up (Settings › Computers)");
+  expect(own).not.toContain("Nobody sets it up");
+});
+
 test("with nobody behind its run (another agent's message), it still keeps to its own tools", async () => {
   f = await setup({ rightHand: true });
   const [lodi] = await rightHandOf(f.org.id);

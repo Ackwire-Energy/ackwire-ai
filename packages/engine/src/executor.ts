@@ -138,6 +138,7 @@ import {
   stableFirst,
   teammatesNowAgain,
   thisTurnParts,
+  type WorkspaceComputer,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
@@ -438,6 +439,8 @@ export interface EngineDeps {
   prepareCode?(turn: BrainTurn, signal: AbortSignal): Promise<CodeSetup | null>;
   /** Computers' status (machine hub): a computer brain's availability is checked before its turn. */
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
+  /** Each workspace gets its own computer here (`workspaceComputerText`); absent: people connect theirs. */
+  workspaceComputer?: WorkspaceComputer;
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
   /** How long a run waits, still working, for a computer just gone (default `COMPUTER_BLIP_WAIT_MS`). */
@@ -1978,6 +1981,7 @@ async function executeRunInner(
         mayPass: policy.mayPass,
         machines: deps.machines,
         ai: { gateway: deps.gateway, machines: deps.machines },
+        workspaceComputer: deps.workspaceComputer,
       }),
       contextDeps
         ? // A person's own message already names who is behind the run: no read for it.

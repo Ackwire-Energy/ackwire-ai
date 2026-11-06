@@ -981,7 +981,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   async function loginRefusal(
     ctx: ToolContext,
     id: string,
-    status: { machineName: string; protocol: number },
+    status: { machineName: string; protocol: number; kind?: string },
     profile: { id: string; name: string } | null,
     made: boolean,
   ): Promise<string | null> {
@@ -991,7 +991,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     if (!made && !isAllowed(toolAccess(granted, { name: VAULT_LIST_TOOL, scope: VAULT_READ_SCOPE }))) {
       return 'You may not use the Vault ("See the Vault" is off for you). Ask for it with request_permission, or ask the person for the password with request_secret.';
     }
-    if (status.protocol < VAULT_PROTOCOL) return vaultUpdateText(status.machineName, "type Vault logins");
+    if (status.protocol < VAULT_PROTOCOL)
+      return vaultUpdateText({ name: status.machineName, kind: status.kind }, "type Vault logins");
     try {
       await checkVaultLogin(vault, ids(ctx), id, await vaultProfile(ctx, profile));
       return null;
@@ -1078,7 +1079,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       const boxes = (s.targets ?? []).filter((t) => t.trim()).length;
       if (boxes > 1 && linked.status.protocol < VAULT_PROTOCOL) {
         return {
-          content: vaultUpdateText(linked.status.machineName, "type a code into several boxes"),
+          content: vaultUpdateText(
+            { name: linked.status.machineName, kind: linked.status.kind },
+            "type a code into several boxes",
+          ),
           isError: true,
         };
       }

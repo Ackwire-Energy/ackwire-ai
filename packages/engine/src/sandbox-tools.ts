@@ -636,7 +636,7 @@ export function createSandboxToolSource(
     // An old computer never gets a value: checked before anything is released (`requestVaultKey` checks again).
     const status = await hub.status(computer.machineId);
     if (!status || status.protocol < VAULT_PROTOCOL) {
-      throw new Error(vaultUpdateText(status?.name ?? "computer", "use Vault keys"));
+      throw new Error(vaultUpdateText(status ?? { name: "computer" }, "use Vault keys"));
     }
     const run = { orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId };
     const released = await releaseVaultKeys(vault, run, names);

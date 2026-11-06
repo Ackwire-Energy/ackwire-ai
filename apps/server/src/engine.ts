@@ -686,6 +686,8 @@ export function buildEngine(o: EngineOptions) {
     brains,
     prepareCode,
     machines: machineHub,
+    workspaceComputer:
+      config.MACHINE_PROVISIONING === "external" ? { billing: Boolean(config.BILLING_URL) } : undefined,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     maxHops: config.AGENT_MAX_HOPS,

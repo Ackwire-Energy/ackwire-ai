@@ -39,6 +39,7 @@ export const APP_PAGES = {
     may: null,
     label: "settings.section.computers",
   },
+  task_manager: { web: "/task-manager", phone: "/task-manager", may: null, label: "taskManager.title" },
   connectors: { web: "/settings/connectors", phone: "/connectors", may: null, label: "settings.section.connectors" },
   skills: {
     web: "/settings/skills",

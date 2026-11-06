@@ -28,6 +28,7 @@ import {
   type ToolContext,
   toolAccess,
   updateSandboxSettings,
+  vaultUpdateText,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 import { connectedComputer } from "./machine-fixtures";
@@ -399,6 +400,9 @@ describe("Drive and skills", () => {
     const left =
       "Not copied to .skills/graficos/: manual.pdf. The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.";
     expect(out.content).toContain(left);
+    expect(vaultUpdateText({ name: "Box", kind: "managed" }, "use Vault keys")).toBe(
+      "The computer Box needs an update to use Vault keys. It updates by itself, so try again later.",
+    );
     expect((await call(ctx, "read_skill_file", { name: "graficos", path: "manual.pdf" })).content).toContain(
       "Not saved on your computer: The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.",
     );
