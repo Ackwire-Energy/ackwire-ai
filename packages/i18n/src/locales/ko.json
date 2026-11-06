@@ -1655,6 +1655,11 @@
     "linkCopied": "링크를 복사했어요.",
     "reply": "답장",
     "quoteOf": "{{name}}에게 답장: {{excerpt}}. 메시지 보기",
+    "quoteGone": "원본 메시지가 삭제되었습니다",
+    "jumpTooFar": "이 메시지는 너무 오래되어 여기서 열 수 없어요.",
+    "quoteNoWords": "텍스트 없는 메시지",
+    "replyingTo": "{{name}}님에게 답장 중",
+    "cancelReply": "답장 취소",
     "emoji": "이모지",
     "uploading": "업로드 중…",
     "uploadFailed": "업로드되지 않았어요",
@@ -1855,6 +1860,10 @@
       "configure": "설정",
       "nameStory": "이름은 뱃사람의 길잡이 별, lodestar에서 왔어요."
     },
+    "saved": {
+      "workspace": "이제 {{name}}은(는) 자기 플랜이 없는 모두를 위해 {{label}}(으)로 생각해요.",
+      "mine": "{{name}}와(과) 나누는 내 대화는 이제 {{label}}(으)로 생각해요. 내 대화만요."
+    },
     "settings": {
       "name": "이름과 모습",
       "nameHelp": "사이드바에서는 항상 “{{label}}”(으)로 보여요.",
@@ -1875,6 +1884,8 @@
       "connectMine": "내 플랜 연결",
       "useWorkspace": "워크스페이스 것 사용",
       "fallbackKey": "내 플랜이 없으면 워크스페이스의 API 키를 사용해요.",
+      "fallbackKeyOf": "내 플랜이 없으면 워크스페이스의 키를 사용해요: {{label}}.",
+      "fallbackNoKey": "워크스페이스에 아직 API 키가 없어서, 내 플랜이 없으면 여기서는 아무도 답하지 않아요.",
       "fallbackPlan": "내 플랜이 없으면 모두에게 답하는 {{owner}}의 플랜을 사용해요.",
       "fallbackYours": "다른 플랜이 없으면 내 것인 워크스페이스 플랜을 사용해요.",
       "fallbackNone": "내 플랜이 없으면 {{name}}이(가) 답할 수 없어요. 워크스페이스 플랜은 {{owner}}에게만 답해요.",
@@ -2120,8 +2131,11 @@
     "have": {
       "title": "이미 연결됨",
       "titleFor": "{{name}}에 이미 연결됨",
-      "other": "또는 다른 것 연결"
+      "other": "또는 다른 것 연결",
+      "manageKeys": "키 관리 또는 삭제"
     },
+    "billing": "플랜은 워크스페이스의 컴퓨터에 로그인하고, 그 컴퓨터는 활성 agentes.chat 요금제와 함께 제공돼요.",
+    "billingWeb": "웹의 agentes.chat에서 하나를 선택하세요.",
     "orPayGo": "또는 사용한 만큼 결제",
     "plan": {
       "claude": {
@@ -2170,6 +2184,7 @@
       "paste": "여기에 붙여넣기",
       "forAll": "요금제가 없는 모든 에이전트가 이 키로 생각해요.",
       "saved": "저장했어요. 요금제가 없는 모든 에이전트가 이 키로 생각해요.",
+      "savedUnchecked": "저장했지만 {{provider}}에서 응답이 없어 키를 확인하지 못했어요. 실패하면 대화에서 이유를 알려드려요.",
       "notPlan": "코딩 요금제 키는 위에 있는 전용 옵션에 넣으세요.",
       "billing": "키 프로젝트의 결제를 켜세요. 결제가 꺼져 있으면 Google이 에이전트가 보낸 내용을 사용할 수 있어요.",
       "privacy": "에이전트가 보낸 내용을 어떤 제공업체가 보관할 수 있는지는 OpenRouter 개인정보 설정에서 정해져요.",
@@ -2850,11 +2865,16 @@
   "secret": {
     "group": "{{agent}}의 비밀 정보 요청",
     "chip": "대기 중",
-    "targetEnv": "{{agent}}의 컴퓨터에 {{name}} 변수로 들어가요.",
+    "targetEnv": "{{agent}}의 컴퓨터로 가서 명령에 쓰여요.",
     "targetFile": "{{agent}}의 컴퓨터에 있는 {{path}} 파일로 들어가요.",
     "targetSite": "{{host}}에서 {{agent}}의 브라우저만 이 값을 입력해요. {{agent}}의 명령어에는 들어가지 않아요.",
     "replaces": "{{agent}}이(가) 이 이름으로 이미 가진 키를 대체해요.",
-    "label": "{{name}} 값",
+    "labelPassword": "{{host}} 비밀번호",
+    "labelCode": "{{host}} 코드",
+    "labelKey": "{{agent}}의 컴퓨터용 키",
+    "labelFile": "파일 {{path}}",
+    "placeholder": "여기에 입력",
+    "account": "계정: {{username}}.",
     "private": "암호화되어 컴퓨터로 바로 전송돼요. 채팅에 남지 않고 에이전트도 볼 수 없어요.",
     "send": "보내기",
     "decline": "거절",
@@ -2862,8 +2882,17 @@
     "waitingFor": "{{person}}만 답할 수 있어요.",
     "outcomeBy": "{{person}}이(가) 전달함",
     "outcomeByYou": "내가 전달함",
-    "outcomeWithdrawn": "더 이상 필요 없음",
-    "alreadyAnswered": "이미 답했거나 만료된 요청이에요.",
+    "outcomeWithdrawn": "{{agent}}에게 더 이상 필요하지 않아요.",
+    "endedDeclined": "거절했어요. {{agent}}은(는) 이것 없이 계속해요.",
+    "endedExpired": "제시간에 아무도 답하지 않았어요. {{agent}}은(는) 이것 없이 계속하고 다시 요청할 수 있어요.",
+    "endedRunStopped": "답변 전에 {{agent}}의 작업이 멈췄어요. 아직 필요하면 {{agent}}에게 다시 요청하세요.",
+    "endedSuperseded": "{{agent}}이(가) 더 새로운 요청으로 다시 물었어요.",
+    "endedComputer": "이제 {{agent}}에게 전달할 수 없어요. 요청한 컴퓨터가 바뀌었어요. {{agent}}에게 다시 요청해 달라고 하세요.",
+    "endedPersonLeft": "{{person}}이(가) 답하기 전에 워크스페이스를 떠났어요.",
+    "endedClosed": "이 요청은 답변 전에 닫혔어요. 아직 필요하면 {{agent}}에게 다시 요청하세요.",
+    "seeNewer": "새 요청 보기",
+    "computerAway": "{{agent}}의 컴퓨터가 지금 응답하지 않아요. 이 요청은 {{time}}까지 열려 있어요. 잠시 후 다시 시도하세요.",
+    "computerPaused": "소유자가 {{agent}}의 컴퓨터를 일시 중지했어요. 이 요청은 {{time}}까지 열려 있어요.",
     "failed": "전달하지 못했어요. 에이전트의 컴퓨터가 켜져 있나요?",
     "empty": "값을 입력하세요.",
     "tooLarge": "너무 커요(최대 16KB)."
@@ -5394,7 +5423,7 @@
     },
     "vault_write": {
       "label": "Vault 연락처 편집",
-      "description": "Vault에 연락처를 저장하고 업데이트하며, 저장된 로그인의 사용자 이름이나 설명을 바꾸고, 자신이 저장한 것을 삭제해요."
+      "description": "Vault에 연락처를 저장하고 업데이트하며, 저장된 로그인의 사용자 이름이나 설명을 바꾸고, 직접 만드는 계정의 비밀번호를 만들고, 자신이 저장한 것을 삭제해요."
     },
     "github_git_read": {
       "label": "저장소 클론(git)",
@@ -7594,7 +7623,9 @@
         "runnerOld": "{{computer}}의 agentes.chat 프로그램이 오래되어 업데이트가 오고 있어요. 끝나면 저절로 바뀌어요.",
         "execOff": "{{computer}}이(가) 아직 {{program}}을(를) 실행할 수 없어요. 해결 중이고, 저절로 바뀌어요.",
         "toolOff": "{{computer}}에서 {{program}}이(가) 아직 허용되지 않았어요. 저희 쪽 문제예요. 나중에 다시 시도하세요.",
-        "preparing": "{{computer}}을(를) 준비하는 중이에요. 끝나면 저절로 바뀌어요."
+        "preparing": "{{computer}}을(를) 준비하는 중이에요. 끝나면 저절로 바뀌어요.",
+        "stuck": "{{computer}}에서 {{program}}이(가) 아직 준비되지 않았고, 저절로 바뀌지 않아요. 지금은 API 키를 쓰고 나중에 이 플랜을 다시 시도하세요.",
+        "away": "{{computer}}이(가) 재시작에 걸리는 시간보다 오래 자리를 비웠어요. 지금은 API 키를 쓰고 나중에 이 플랜을 다시 시도하세요."
       }
     },
     "done": {
@@ -8585,6 +8616,14 @@
     "startsIn": "약 {{n}}분 후 시작",
     "startsAfter": "{{after}} 작업이 끝나면 시작",
     "left": "약 {{n}}분 남음",
+    "overdue": "평소보다 오래 걸려요",
+    "openTask": "작업 열기",
+    "fill": {
+      "agent_other": "에이전트 요청 {{count}}건",
+      "person_other": "사람의 요청 {{count}}건",
+      "routine_other": "루틴 {{count}}개",
+      "work_other": "긴 작업 {{count}}건"
+    },
     "who": "{{name}}",
     "away": "{{time}}째 연결 끊김",
     "purpose": {
@@ -8600,11 +8639,11 @@
       "yourDm": "내 DM",
       "dm": "{{name}}과의 DM",
       "thread": "#{{name}}의 스레드",
+      "agents": "에이전트끼리의 대화",
       "private": "비공개 대화"
     },
     "live": {
       "nextEta": "컴퓨터를 기다리는 중. 다음 차례, 약 {{n}}분 후",
-      "nextAfter": "컴퓨터를 기다리는 중. {{after}} 작업이 끝나면 다음 차례",
       "next": "컴퓨터를 기다리는 중. 다음 차례",
       "waiting": "컴퓨터를 기다리는 중",
       "behind": "대기열 {{nth}}. {{names}} 다음",
@@ -10532,6 +10571,7 @@
       "titleNoLetters": "제목에는 글자나 숫자가 있어야 해요.",
       "lockAdminsOnly": "관리자만 페이지를 잠글 수 있어요."
     },
+    "replyGone": "답장하려던 메시지가 더 이상 없습니다.",
     "media": {
       "off": "이 워크스페이스에서는 GIF와 스티커가 꺼져 있어요.",
       "notFound": "그 GIF는 더 이상 사용할 수 없어요. 다른 걸 고르세요.",
@@ -11683,6 +11723,10 @@
     "keyValue": "API 키",
     "keyInvalid": "API 키를 붙여넣으세요(최소 8자).",
     "keyRefused": "제공업체가 이 키를 받아들이지 않았어요.",
+    "keyNoCredit": "{{provider}}에서 이 키에 크레딧이 없다고 해요. 그곳에서 크레딧을 추가하고 다시 저장하세요. 아무것도 저장되지 않았어요.",
+    "keyDenied": "{{provider}}에서 이 키의 호출을 허용하지 않았어요. 그곳에서 권한을 확인하고 다시 저장하세요. 아무것도 저장되지 않았어요.",
+    "keySaid": "{{provider}}의 답변: {{said}}",
+    "keyInUse": "{{agents}}은(는) 아직 이 키로 생각해요.",
     "keyManagement": "관리용 키예요. 일반 API 키를 만드세요.",
     "autoModels": {
       "title": "자동 모드에 쓸 모델",
@@ -11703,6 +11747,9 @@
     "remove": "삭제",
     "removeTitle": "{{label}} 키 삭제",
     "removeText": "키가 영구적으로 삭제돼요. 아직 이 키를 쓰는 에이전트가 있으면 서버가 거부하니, 먼저 해당 에이전트의 키를 바꾸세요.",
+    "removeUnused": "키가 완전히 사라져요. 이 키로 생각하는 에이전트는 없어요.",
+    "removeUsedOther_other": "{{agents}}은(는) 이 키로 생각해요. 키가 사라지면 다른 키로 옮기거나, 모델에 맞는 키가 없으면 AI를 요청해요.",
+    "removeUsedNone_other": "{{agents}}은(는) 이 키로 생각하고 다른 것이 없어요. 키가 사라지면 다른 AI를 연결할 때까지 답하지 않아요.",
     "noKeys": "아직 키가 없어요.",
     "platformAvailable": "이 서버의 Claude 키도 사용할 수 있어요.",
     "usageTitle": "유형별 API 지출",
@@ -12112,6 +12159,7 @@
       "waitingAgents": "{{name}}이(가) 일부를 넘기고 결과를 기다리는 중"
     },
     "consultPair": {
+      "took": "{{time}} 걸렸어요",
       "asking": "질문 중",
       "working": "작업 중",
       "waitingApproval": "승인 대기 중",
@@ -12464,6 +12512,7 @@
       "usage_paused_budget": "{{agent}}이(가) 이 작업을 일시 중지했어요 · 월 예산 {{percent}}%",
       "work_auto_moved": "시간이 좀 걸릴 것 같아 백그라운드에서 계속할게요. 여기에 진행 상황을 올릴게요. 다음 소식은 약 {{minutes}}분 후예요.",
       "work_auto_movedOver": "시간이 좀 걸릴 것 같아 백그라운드에서 계속할게요. 여기에 진행 상황을 올릴게요.",
+      "moved_on": "{{link}} 에서 계속됩니다",
       "work_end_done": "완료했어요({{minutes}}분).",
       "work_end_failed": "이 백그라운드 작업을 끝내지 못했어요({{minutes}}분).",
       "work_end_failedWhy": "이 백그라운드 작업을 끝내지 못했어요({{minutes}}분): {{why}}.",
@@ -12741,6 +12790,10 @@
       "label": "스킬 스크립트 실행",
       "description": "환경에서 스킬의 스크립트를 실행해요."
     },
+    "vault_make_password": {
+      "label": "비밀번호 만들기",
+      "description": "자기 컴퓨터에서 강력한 비밀번호를 만들어, 보지 않고 Vault에 키로 보관해요."
+    },
     "computer_status": {
       "label": "컴퓨터 확인",
       "description": "어떤 컴퓨터인지, 응답하고 있는지 알려 줘요."
@@ -12796,6 +12849,10 @@
     "browser_type_secret": {
       "label": "비밀번호 입력",
       "description": "받은 비밀번호를 보지 않고 비밀번호나 코드 필드에 입력해요."
+    },
+    "browser_make_password": {
+      "label": "비밀번호 만들기",
+      "description": "자기 컴퓨터에서 사이트용 강력한 비밀번호를 만들어, 보지 않고 Vault에 보관하고 입력해요."
     },
     "browser_wait": {
       "label": "페이지 기다리기",
@@ -13137,6 +13194,7 @@
         "browser_scroll": "페이지를 스크롤했어요",
         "browser_upload": "파일을 업로드했어요",
         "browser_type_secret": "비밀번호를 입력했어요",
+        "browser_make_password": "비밀번호를 만들었어요",
         "browser_wait": "페이지를 기다렸어요",
         "browser_screenshot": "스크린샷을 찍었어요",
         "browser_ask_person": "도움을 요청했어요",
@@ -13644,6 +13702,15 @@
     "agentTasks": "{{name}}의 작업",
     "tasks_other": "작업 {{count}}개",
     "free": "작업 없음",
+    "hiddenTasks_other": "볼 수 없는 작업 {{count}}개",
+    "hiddenLine_other": "볼 수 없는 대화에 작업이 {{count}}개 더 있어요.",
+    "helpers_other": "도우미 {{count}}명",
+    "delegated": {
+      "fromPerson": "{{name}} 님이 시작했어요",
+      "fromYou": "내가 시작했어요",
+      "fromRoutine": "루틴 {{name}}에서 시작했어요",
+      "stopNote": "멈추면 {{name}}에게 알려지고, 스스로 다시 요청하지 않아요."
+    },
     "columns": {
       "task": "작업",
       "state": "상태",
@@ -13653,6 +13720,7 @@
     },
     "sections": {
       "asked": "사람이 요청한 작업",
+      "delegated": "에이전트가 요청한 작업",
       "background": "백그라운드 루틴"
     },
     "state": {
@@ -13723,6 +13791,8 @@
       "openManager": "작업 관리자에서 열기"
     },
     "confirm": {
+      "chainTitle_other": "{{name}}와(과) 도우미 {{count}}명을 멈출까요?",
+      "chainBody": "이미 한 일은 남고, 모두에게 알려져요.",
       "title_other": "{{name}}의 작업 {{count}}개를 중지할까요?",
       "body": "이미 한 일은 그대로 남고, {{name}}에게 내가 중지했다고 알려요.",
       "short": "{{name}}에게 내가 중지했다고 알려요.",

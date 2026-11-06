@@ -248,8 +248,8 @@ describe("Gemini adapter (Interactions API, scripted transport)", () => {
   });
 
   test("HTTP errors: a bad key, no credit and no access aren't retried; limits and outages are, a daily quota isn't", async () => {
-    const errorFor = async (status: number, code: string) => {
-      const { provider } = gemini(JSON.stringify({ error: { code, message: "m" } }), status);
+    const errorFor = async (status: number, code: string, message?: string) => {
+      const { provider } = gemini(JSON.stringify({ error: { code, message } }), status);
       return (await failure(provider.stream(request(), quiet))) as ProviderError;
     };
     const shape = (e: ProviderError) => ({ message: e.message, retryable: e.retryable, partial: e.partial });
@@ -281,6 +281,10 @@ describe("Gemini adapter (Interactions API, scripted transport)", () => {
     // Another 4xx keeps Google's code, so a disabled billing reads as itself.
     expect(shape(await errorFor(400, "failed_precondition"))).toMatchObject({
       message: "provider rejected the request (400 failed_precondition)",
+      retryable: false,
+    });
+    expect(shape(await errorFor(400, "invalid_argument", "API key not valid."))).toMatchObject({
+      message: "provider rejected the request (400 invalid_argument): API key not valid.",
       retryable: false,
     });
   });

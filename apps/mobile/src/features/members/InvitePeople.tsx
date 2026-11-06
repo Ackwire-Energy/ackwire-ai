@@ -187,6 +187,7 @@ function InvitePeople() {
               />
             ),
           })}
+      locked={inviteMany.isPending}
     >
       <MembersFullNote />
       <OnlyYouNote />

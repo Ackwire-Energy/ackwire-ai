@@ -28,6 +28,7 @@ import {
   DialogSearchList,
   Icon,
   type IconName,
+  Locked,
   Menu,
   MenuItem,
 } from "@agenteschat/ui";
@@ -228,29 +229,31 @@ function MergeRepoDialog({ chosen, onClose }: { chosen: string[]; onClose: () =>
       ) : listing.isError ? (
         <p className="ac-dialog__empty">{t("repos.unavailable")}</p>
       ) : (
-        <DialogSearchList
-          query={q}
-          onQueryChange={setQ}
-          searchLabel={t("repos.search")}
-          searchPlaceholder={t("repos.search")}
-          listLabel={t("repos.merge.label")}
-          isEmpty={shown.length === 0}
-          emptyText={query ? t("repos.noMatch", { q }) : t("repos.none")}
-        >
-          {shown.map((name) => (
-            <label key={name} htmlFor={id(name)} className="scope-row">
-              <Checkbox
-                id={id(name)}
-                checked={pick.includes(name)}
-                onCheckedChange={(on) => setPick((p) => (on ? [...p, name] : p.filter((r) => r !== name)))}
-              />
-              <Icon name="repo" size={16} />
-              <span className="scope-row__text">
-                <b>{name}</b>
-              </span>
-            </label>
-          ))}
-        </DialogSearchList>
+        <Locked when={save.isPending}>
+          <DialogSearchList
+            query={q}
+            onQueryChange={setQ}
+            searchLabel={t("repos.search")}
+            searchPlaceholder={t("repos.search")}
+            listLabel={t("repos.merge.label")}
+            isEmpty={shown.length === 0}
+            emptyText={query ? t("repos.noMatch", { q }) : t("repos.none")}
+          >
+            {shown.map((name) => (
+              <label key={name} htmlFor={id(name)} className="scope-row">
+                <Checkbox
+                  id={id(name)}
+                  checked={pick.includes(name)}
+                  onCheckedChange={(on) => setPick((p) => (on ? [...p, name] : p.filter((r) => r !== name)))}
+                />
+                <Icon name="repo" size={16} />
+                <span className="scope-row__text">
+                  <b>{name}</b>
+                </span>
+              </label>
+            ))}
+          </DialogSearchList>
+        </Locked>
       )}
       <DialogFooter bar>
         <Button variant="ghost" onClick={onClose}>

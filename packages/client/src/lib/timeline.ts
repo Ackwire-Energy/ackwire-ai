@@ -2,7 +2,7 @@ import type { Approval, Message, ReplyRef } from "../api/types";
 import type { LiveRun } from "../realtime/streams";
 import { messageMediaOf } from "./media";
 import { answeredNotices, isAgentOnlyNotice, isAnsweredNotice, isEventLine, isTalkerReply } from "./notices";
-import { quoteExcerpt } from "./reply";
+import { quoteExcerpt, replyOf } from "./reply";
 import { isRoutineCall, routineReplyOf } from "./routines";
 import { voiceOf } from "./voice";
 
@@ -164,10 +164,15 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
         : undefined;
       out.push({
         ...entry.item,
-        // A reply that quotes its root starts its own block; a fast reply while it works shows its header
-        // ("enquanto trabalha").
+        // A reply that quotes a message starts its own block, its face under the quote; a fast reply while it works
+        // shows its header ("enquanto trabalha").
         grouped:
-          !context && !routine && !prevRoutine && !isTalkerReply(m.meta) && groupsWith(prev, m.author, m.createdAt),
+          !context &&
+          !replyOf(m.meta) &&
+          !routine &&
+          !prevRoutine &&
+          !isTalkerReply(m.meta) &&
+          groupsWith(prev, m.author, m.createdAt),
         ...(context ? { context } : {}),
       });
       prev = m;

@@ -19,6 +19,7 @@ import {
   GroupedHeader,
   GroupedList,
   GroupedRow,
+  Locked,
   Text,
   useToast,
 } from "@/ui";
@@ -152,144 +153,146 @@ export function AgentEditScreen({ id }: { id: string }) {
         bottomOffset={24}
         contentContainerStyle={styles.form}
       >
-        <View style={styles.hero}>
-          <AgentAvatar agent={{ ...draft.look, id }} size={96} name={draft.name} />
-          <Text variant="footnote" tone="muted">
-            @{draft.handle}
-          </Text>
-        </View>
+        <Locked when={update.isPending}>
+          <View style={styles.hero}>
+            <AgentAvatar agent={{ ...draft.look, id }} size={96} name={draft.name} />
+            <Text variant="footnote" tone="muted">
+              @{draft.handle}
+            </Text>
+          </View>
 
-        {fields.has("name") ? (
-          <>
-            <GroupedHeader>{t("agent.nameLabel")}</GroupedHeader>
-            <GroupedList>
-              <TextInput
-                value={draft.name}
-                onChangeText={(v) => set("name", v)}
-                maxLength={32}
-                autoCorrect={false}
-                placeholder={t("newAgent.namePlaceholder")}
-                placeholderTextColor={c.faint}
-                accessibilityLabel={t("agent.nameLabel")}
-                style={field}
-              />
-            </GroupedList>
-            {nameMissing ? (
-              <View style={styles.foot}>
-                <ErrorLine text={t("newAgent.errors.nameRequired")} />
-              </View>
-            ) : (
-              <GroupedFooter>
-                {moved && !handleIssue
-                  ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
-                  : t("agent.identityHelp")}
-              </GroupedFooter>
-            )}
-            <GroupedHeader>{t("agent.handleLabel")}</GroupedHeader>
-            <GroupedList>
-              <HandleInput
-                value={draft.handle}
-                onChangeText={(v) => set("handle", cleanHandle(v))}
-                label={t("agent.handleLabel")}
-                grouped
-              />
-            </GroupedList>
-            {handleIssue ? (
-              <View style={styles.foot}>
-                <ErrorLine text={handleIssue} />
-              </View>
-            ) : null}
-          </>
-        ) : (
-          readOnly(t("agent.nameLabel"), agent.name)
-        )}
-
-        {rightHand ? null : fields.has("role") ? (
-          <RoleInput
-            value={draft.role}
-            onChangeText={(v) => set("role", v)}
-            placeholder={t("agent.roleHelp")}
-            grouped
-          />
-        ) : (
-          readOnly(t("agent.roleLabel"), agent.role)
-        )}
-
-        {fields.has("look") ? <LookList look={draft.look} onChange={(look) => set("look", look)} /> : null}
-
-        {/* Only an audience that leaves someone out has anyone to be consulted for. */}
-        {!rightHand && offersConsultable(draft.audience, onPlan) ? (
-          <>
-            <View style={styles.gap} />
-            <GroupedList>
-              <GroupedRow
-                icon="agent"
-                label={t("audience.consultable", agentGrammar(agent.name))}
-                labelLines={2}
-                sub={t("audience.consultableHint", agentGrammar(agent.name))}
-                subLines={4}
-                toggle={draft.audience.consultable !== false}
-                disabled={
-                  !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))
-                }
-                onPress={() =>
-                  set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
-                }
-              />
-            </GroupedList>
-          </>
-        ) : null}
-
-        {rightHand ? (
-          <>
-            <View style={styles.gap} />
-            <GroupedFooter>{t("rightHand.settings.lock", agentGrammar(agent.name))}</GroupedFooter>
-          </>
-        ) : (
-          <>
-            {admin ? <BudgetSection agent={agent} /> : null}
-            <BrakesSection agent={agent} />
-
-            <GroupedHeader>{t("agent.instructions")}</GroupedHeader>
-            {/* The list draws the field's surface (radius 14, raised), as on "Create agent". */}
-            <GroupedList>
-              {fields.has("instructions") ? (
-                <TextArea
-                  value={draft.instructions}
-                  onChangeText={(v) => set("instructions", v)}
-                  placeholder={t("newAgent.instructionsPlaceholder")}
-                  accessibilityLabel={t("agent.instructions")}
-                  minHeight={180}
-                  scrollEnabled={false}
-                  style={styles.bare}
+          {fields.has("name") ? (
+            <>
+              <GroupedHeader>{t("agent.nameLabel")}</GroupedHeader>
+              <GroupedList>
+                <TextInput
+                  value={draft.name}
+                  onChangeText={(v) => set("name", v)}
+                  maxLength={32}
+                  autoCorrect={false}
+                  placeholder={t("newAgent.namePlaceholder")}
+                  placeholderTextColor={c.faint}
+                  accessibilityLabel={t("agent.nameLabel")}
+                  style={field}
                 />
+              </GroupedList>
+              {nameMissing ? (
+                <View style={styles.foot}>
+                  <ErrorLine text={t("newAgent.errors.nameRequired")} />
+                </View>
               ) : (
-                <Text variant="body" tone="ink2" selectable style={styles.field}>
-                  {agent.instructions || t("agentPage.none")}
-                </Text>
+                <GroupedFooter>
+                  {moved && !handleIssue
+                    ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
+                    : t("agent.identityHelp")}
+                </GroupedFooter>
               )}
-            </GroupedList>
-            {!fields.has("name") ? <GroupedFooter>{t("mobile.agentEdit.adminsOnly")}</GroupedFooter> : null}
-          </>
-        )}
+              <GroupedHeader>{t("agent.handleLabel")}</GroupedHeader>
+              <GroupedList>
+                <HandleInput
+                  value={draft.handle}
+                  onChangeText={(v) => set("handle", cleanHandle(v))}
+                  label={t("agent.handleLabel")}
+                  grouped
+                />
+              </GroupedList>
+              {handleIssue ? (
+                <View style={styles.foot}>
+                  <ErrorLine text={handleIssue} />
+                </View>
+              ) : null}
+            </>
+          ) : (
+            readOnly(t("agent.nameLabel"), agent.name)
+          )}
 
-        {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
-        {admin && !rightHand ? (
-          <>
-            <View style={styles.gap} />
-            <GroupedList>
-              <GroupedRow
-                icon="x"
-                label={t("agentPage.delete.action", agentGrammar(agent.name))}
-                sub={t("agentPage.delete.help")}
-                subLines={2}
-                danger
-                chevron
-                onPress={() => openAgentDelete(id)}
-              />
-            </GroupedList>
-          </>
-        ) : null}
+          {rightHand ? null : fields.has("role") ? (
+            <RoleInput
+              value={draft.role}
+              onChangeText={(v) => set("role", v)}
+              placeholder={t("agent.roleHelp")}
+              grouped
+            />
+          ) : (
+            readOnly(t("agent.roleLabel"), agent.role)
+          )}
+
+          {fields.has("look") ? <LookList look={draft.look} onChange={(look) => set("look", look)} /> : null}
+
+          {/* Only an audience that leaves someone out has anyone to be consulted for. */}
+          {!rightHand && offersConsultable(draft.audience, onPlan) ? (
+            <>
+              <View style={styles.gap} />
+              <GroupedList>
+                <GroupedRow
+                  icon="agent"
+                  label={t("audience.consultable", agentGrammar(agent.name))}
+                  labelLines={2}
+                  sub={t("audience.consultableHint", agentGrammar(agent.name))}
+                  subLines={4}
+                  toggle={draft.audience.consultable !== false}
+                  disabled={
+                    !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))
+                  }
+                  onPress={() =>
+                    set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
+                  }
+                />
+              </GroupedList>
+            </>
+          ) : null}
+
+          {rightHand ? (
+            <>
+              <View style={styles.gap} />
+              <GroupedFooter>{t("rightHand.settings.lock", agentGrammar(agent.name))}</GroupedFooter>
+            </>
+          ) : (
+            <>
+              {admin ? <BudgetSection agent={agent} /> : null}
+              <BrakesSection agent={agent} />
+
+              <GroupedHeader>{t("agent.instructions")}</GroupedHeader>
+              {/* The list draws the field's surface (radius 14, raised), as on "Create agent". */}
+              <GroupedList>
+                {fields.has("instructions") ? (
+                  <TextArea
+                    value={draft.instructions}
+                    onChangeText={(v) => set("instructions", v)}
+                    placeholder={t("newAgent.instructionsPlaceholder")}
+                    accessibilityLabel={t("agent.instructions")}
+                    minHeight={180}
+                    scrollEnabled={false}
+                    style={styles.bare}
+                  />
+                ) : (
+                  <Text variant="body" tone="ink2" selectable style={styles.field}>
+                    {agent.instructions || t("agentPage.none")}
+                  </Text>
+                )}
+              </GroupedList>
+              {!fields.has("name") ? <GroupedFooter>{t("mobile.agentEdit.adminsOnly")}</GroupedFooter> : null}
+            </>
+          )}
+
+          {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
+          {admin && !rightHand ? (
+            <>
+              <View style={styles.gap} />
+              <GroupedList>
+                <GroupedRow
+                  icon="x"
+                  label={t("agentPage.delete.action", agentGrammar(agent.name))}
+                  sub={t("agentPage.delete.help")}
+                  subLines={2}
+                  danger
+                  chevron
+                  onPress={() => openAgentDelete(id)}
+                />
+              </GroupedList>
+            </>
+          ) : null}
+        </Locked>
       </KeyboardAwareScrollView>
     </View>
   );

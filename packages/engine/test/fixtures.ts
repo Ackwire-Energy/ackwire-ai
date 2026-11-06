@@ -20,6 +20,7 @@ import {
   addChannelMember,
   type ContextDeps,
   createAgent,
+  createAgentGifPoster,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
@@ -177,7 +178,10 @@ export async function setup(
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
-    /** Add the built-in `send_gif` and `send_sticker` tools (ADR 0091), with `gifs` as the server's GIF search. */
+    /**
+     * Add the built-in `send_gif` and `send_sticker` tools (ADR 0091), with `gifs` as the server's GIF search (also
+     * `post_message`'s `gif`).
+     */
     mediaTools?: boolean;
     /** Add the built-in `follow_up` and `cancel_follow_up` tools. */
     followUps?: boolean;
@@ -342,7 +346,9 @@ export async function setup(
       : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.blockTools ? [createBlockToolSource(artifactDeps)] : []),
-    ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
+    ...(options.chatTools
+      ? [createChatToolSource({ pubsub, artifacts: artifactDeps, gif: createAgentGifPoster(options.gifs) })]
+      : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
     ...(options.skillTools

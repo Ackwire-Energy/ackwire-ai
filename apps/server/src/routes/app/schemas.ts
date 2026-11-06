@@ -214,6 +214,14 @@ export const Credential = z
       .boolean()
       .optional()
       .openapi({ description: "The workspace's default key (agents without their own key, router, summaries)." }),
+    usedBy: z
+      .array(z.object({ id: z.uuid(), name: z.string() }))
+      .optional()
+      .openapi({ description: "The agents that think with it, in a list of keys: what removing it would change." }),
+    check: z
+      .enum(["ok", "unchecked"])
+      .optional()
+      .openapi({ description: "On a key just saved: `ok` a real call passed, `unchecked` the provider didn't say." }),
     createdAt: z.string(),
     revokedAt: z.string().nullable(),
   })
@@ -810,7 +818,7 @@ export const MachineAccount = z
     status: z.enum(["active", "signed_out"]),
     statusKnown: z.boolean().openapi({
       description:
-        "False: the computer's last look at its sign-in said nothing for sure (runner protocol 47); `status` is the last known.",
+        "False: the computer's last look at its sign-in said nothing for sure (runner protocol 49); `status` is the last known.",
     }),
     ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
     ownerName: z.string().nullable(),
@@ -830,7 +838,7 @@ export const MachineAccount = z
     }),
     providerOrgId: z.string().nullable().openapi({
       description:
-        "Claude's organization it is signed in to (opaque, runner protocol 47); only for its owner. Logins of one email in two organizations are two accounts.",
+        "Claude's organization it is signed in to (opaque, runner protocol 49); only for its owner. Logins of one email in two organizations are two accounts.",
     }),
   })
   .openapi("MachineAccount", {
@@ -855,11 +863,12 @@ export const AgentBrain = z
         brain: BrainKind,
         ownerId: z.string().nullable(),
         servesYou: z.boolean(),
+        key: z.object({ provider: z.string(), label: z.string() }).nullable().optional(),
       })
       .optional()
       .openapi({
         description:
-          "With `mine`: the workspace's AI, `model` for an API key, else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
+          "The team's right hand: the workspace's AI, `model` for an API key (`key`, by its provider and name; null with none), else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
       }),
     brain: BrainKind,
     model: z.string().nullable().openapi({ description: "As stored; null = the brain's default." }),

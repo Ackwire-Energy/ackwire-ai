@@ -12,8 +12,9 @@ afterEach(async () => {
 
 test("the agent sets a follow-up; its line lists with the messages; a person cancels it once", async () => {
   t = await createTestServer({
+    // Call 1 is the key's test when `seedOrg` saves it.
     reply: (_request, call) =>
-      call === 1
+      call === 2
         ? {
             chunks: [""],
             toolUses: [

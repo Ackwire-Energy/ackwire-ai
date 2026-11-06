@@ -31,8 +31,8 @@ beforeAll(async () => {
   const m = await t.db
     .insert(schema.machines)
     .values([
-      { orgId: ada, name: "Box", protocol: 47, runnerVersion: "1.2.3", executors: { mode: "system", ...signedIn } },
-      { orgId: ada, name: "Mac", protocol: 47, executors: { claude: { version: "2.1.0", loggedIn: false } } },
+      { orgId: ada, name: "Box", protocol: 49, runnerVersion: "1.2.3", executors: { mode: "system", ...signedIn } },
+      { orgId: ada, name: "Mac", protocol: 49, executors: { claude: { version: "2.1.0", loggedIn: false } } },
       { orgId: lia, name: "Lia box", protocol: 45, executors: signedIn },
       { orgId: lia, name: "Gone", executors: signedIn, deletedAt: new Date() },
     ])
@@ -288,7 +288,7 @@ test("the list: keyset pages newest first, agents counted once each, no email or
     usageAt: "2026-10-05T10:00:00.000Z",
     usageSource: "probe",
     runnerVersion: "1.2.3",
-    protocol: 47,
+    protocol: 49,
   });
   expect(seen.find((a) => a.id === id(2))?.runnerVersion).toBeNull();
 });

@@ -74,9 +74,11 @@ html[data-pointer] :focus-visible {
   --scroll-thumb-hover: color-mix(in srgb, var(--ink) 36%, transparent);
 }
 /* A scroller that fades its content at an end with a mask adds this layer to it: the fade then spares the strip our
-   scrollbar is drawn in, and the thumb ends round. Nothing where we draw no scrollbar. */
+   scrollbar is drawn in, and the thumb ends round. Nothing where we draw no scrollbar. `-x`: for a sideways scroller,
+   whose scrollbar runs along the bottom. */
 :root {
   --scroll-strip: linear-gradient(transparent 0 0);
+  --scroll-strip-x: linear-gradient(transparent 0 0);
 }
 @media (hover: hover) and (pointer: fine) {
   ::-webkit-scrollbar {
@@ -86,6 +88,7 @@ html[data-pointer] :focus-visible {
   @supports selector(::-webkit-scrollbar) {
     :root {
       --scroll-strip: linear-gradient(to left, #000 8px, transparent 0);
+      --scroll-strip-x: linear-gradient(to top, #000 8px, transparent 0);
     }
   }
   ::-webkit-scrollbar-track,
@@ -350,7 +353,7 @@ html:not([data-pointer]) .ac-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.ac-btn[disabled],
+.ac-btn:disabled,
 .ac-btn[aria-disabled="true"] {
   cursor: not-allowed;
   color: var(--ink-muted);
@@ -427,6 +430,10 @@ html:not([data-pointer]) .ac-btn:focus-visible {
   font: inherit;
   text-align: start;
 }
+/* `Locked`: a fieldset for what it turns off, with no box of its own, so a row or a grid around it lays out as before. */
+.ac-locked {
+  display: contents;
+}
 /* Text link: an action in a sentence; `--muted` for a help line's link. */
 .ac-link {
   color: var(--ink);
@@ -445,6 +452,11 @@ html:not([data-pointer]) .ac-btn:focus-visible {
 }
 .ac-link--muted:hover {
   color: var(--ink);
+}
+.ac-link:disabled {
+  cursor: not-allowed;
+  color: var(--faint);
+  text-decoration-color: transparent;
 }
 html:not([data-pointer]) .ac-link:focus-visible {
   outline: none;
@@ -550,6 +562,19 @@ html:not([data-pointer]) .ac-link:focus-visible {
 .ac-input[readonly] {
   background: var(--sunken);
   color: var(--muted);
+}
+.ac-input:disabled,
+.ac-input-affix:has(input:disabled),
+.ac-searchfield:has(input:disabled) {
+  border-color: var(--line);
+  background: var(--sunken);
+}
+/* Off, the words stay readable: Safari fades a disabled field on its own, by text fill and by opacity. */
+:is(.ac-input, .ac-input-affix input, .ac-searchfield__input, .ac-composer textarea):disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
 }
 /* An emailed code's digits, spaced and centered (asking to join, deleting): the letter spacing trails the last one,
    so the left padding takes the same. */
@@ -995,6 +1020,7 @@ textarea.ac-input {
  */
 .ac-msg__avatar,
 .ac-msg__gutter,
+.ac-msg__reply,
 .ac-msg__head,
 .ac-msg__aside,
 .ac-msg__foot,
@@ -1024,6 +1050,49 @@ textarea.ac-input {
   --surface-sunken: var(--msg-well);
   --card-well: var(--msg-well);
 }
+/* A reply's line above its row: the curve leaves over the face and ends at the quote, in line with the name. */
+.ac-msg:has(> .ac-msg__reply) {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.ac-msg > .ac-msg__reply {
+  --reply-face: 36px;
+  --reply-gap: var(--space-3);
+  position: relative;
+  flex: 0 0 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding-left: calc(var(--reply-face) + var(--reply-gap));
+}
+.ac-msg > .ac-msg__reply::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: -1px;
+  left: calc(var(--reply-face) / 2 - 1px);
+  width: calc(var(--reply-face) / 2 + var(--reply-gap) - 5px);
+  border-top: 2px solid var(--line2);
+  border-left: 2px solid var(--line2);
+  border-top-left-radius: 7px;
+}
+.ac-msg--own > .ac-msg__reply {
+  display: flex;
+  justify-content: flex-end;
+  padding-left: 0;
+}
+.ac-msg--own > .ac-msg__reply::before {
+  display: none;
+}
+/* Inside a bubble, on top of its words: a plate of its ink, so it reads on any bubble's color. */
+.ac-msg__text > .ac-msg__reply {
+  margin-bottom: 4px;
+}
+.ac-msg__text > .ac-msg__reply .msg-quote {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+}
 /* The face is 36px in the feed, the sidebar's size. */
 .ac-msg__avatar,
 .ac-msg__gutter {
@@ -1052,7 +1121,7 @@ textarea.ac-input {
   visibility: hidden;
 }
 .ac-msg--grouped:hover .ac-msg__gutter-time,
-.ac-msg--grouped:focus-within .ac-msg__gutter-time {
+html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   visibility: visible;
 }
 .ac-msg__body {
@@ -1089,7 +1158,11 @@ textarea.ac-input {
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
-/* Details behind the time (date, model, tokens, cost): a tooltip on hover or focus, never in the header */
+/*
+ * Details behind the time (date, model, tokens, cost): a tooltip on hover or focus, never in the header. Focus counts
+ * for the keys only (`data-pointer`): a panel or a dialog closing with Esc hands the focus back by script, which a
+ * browser calls :focus-visible after any key.
+ */
 .ac-msg__time--details,
 .ac-msg__gutter-time {
   position: relative;
@@ -1123,7 +1196,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   pointer-events: none;
 }
 .ac-msg__time--details:hover .ac-msg__tip,
-.ac-msg__time--details:focus-visible .ac-msg__tip,
+html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
 .ac-msg__gutter-time:hover .ac-msg__tip,
 .ac-msg__own-time:hover .ac-msg__tip {
   visibility: visible;
@@ -1138,7 +1211,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
       visibility 0s linear 120ms;
   }
   .ac-msg__time--details:hover .ac-msg__tip,
-  .ac-msg__time--details:focus-visible .ac-msg__tip,
+  html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   .ac-msg__gutter-time:hover .ac-msg__tip,
   .ac-msg__own-time:hover .ac-msg__tip {
     transform: none;
@@ -1628,7 +1701,7 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 .ac-select__trigger[aria-invalid="true"] {
   border-color: var(--danger);
 }
-.ac-select__trigger[data-disabled] {
+.ac-select__trigger:disabled {
   cursor: not-allowed;
   color: var(--muted);
   border-color: var(--line);
@@ -2006,8 +2079,8 @@ html:not([data-pointer]) .ac-radio:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.ac-check[data-disabled],
-.ac-radio[data-disabled] {
+.ac-check:disabled,
+.ac-radio:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -2130,11 +2203,11 @@ html:not([data-pointer]) .ac-option[aria-pressed="true"]:focus-visible {
   display: flex;
   flex: none;
 }
-.ac-option[data-disabled] {
+.ac-option:is([data-disabled], :disabled, :has(> .ac-radio:disabled)) {
   cursor: not-allowed;
 }
 /* The option dims, not the chip that says why ("Em breve"). */
-.ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc) {
+.ac-option:is([data-disabled], :disabled, :has(> .ac-radio:disabled)) :is(.ac-option__title, .ac-option__desc) {
   opacity: 0.55;
 }
 .ac-pill {
@@ -2156,6 +2229,10 @@ html:not([data-pointer]) .ac-option[aria-pressed="true"]:focus-visible {
   background: var(--chosen-bg);
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
+}
+.ac-pill:has(.ac-check:disabled) {
+  cursor: not-allowed;
+  color: var(--muted);
 }
 .ac-pill .ac-check {
   margin: 0;
@@ -2327,8 +2404,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   flex: none;
 }
 /* With no footer under it, the body or the list keeps the dialog's own edge below its last item. */
-.ac-dialog__body:last-child,
-.ac-dialog__list:last-child {
+:is(.ac-dialog__body, .ac-dialog__list):last-child:not(.ac-locked:not(:last-child) > *) {
   padding-bottom: var(--dialog-pad);
 }
 .ac-dialog__list {
@@ -2357,7 +2433,8 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 }
 /* Over that line, the body ends as far above it as the buttons start under it (it kept only its 4px of room for focus
    rings). */
-.ac-dialog__body:has(+ .ac-dialog__foot--bar) {
+.ac-dialog__body:has(+ .ac-dialog__foot--bar),
+.ac-locked:has(+ .ac-dialog__foot--bar) > .ac-dialog__body {
   padding-bottom: 12px;
 }
 .ac-dialog__foot-note {
@@ -3152,7 +3229,7 @@ html:not([data-pointer]) .ac-navcard:focus-visible {
   pointer-events: none;
 }
 .ac-msg:hover .ac-msg__actions,
-.ac-msg:focus-within .ac-msg__actions,
+html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__actions[data-open="true"] {
   opacity: 1;
   pointer-events: auto;
@@ -3799,17 +3876,17 @@ html:not([data-pointer]) .ac-token__remove:focus-visible {
 html:not([data-pointer]) .ac-switch:focus-visible {
   box-shadow: var(--focus-ring);
 }
-.ac-switch[data-disabled] {
+.ac-switch:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 /* Off and unavailable: an outline, not a filled track, so it never reads as a switch that is just off (in dark
    mode dimming alone barely shows). */
-.ac-switch[data-disabled]:not([data-state="checked"]) {
+.ac-switch:disabled:not([data-state="checked"]) {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--line-strong);
 }
-.ac-switch[data-disabled]:not([data-state="checked"]) .ac-switch__thumb {
+.ac-switch:disabled:not([data-state="checked"]) .ac-switch__thumb {
   background: var(--line-strong);
 }
 .ac-switch__thumb {
@@ -4068,16 +4145,16 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 .ac-btn--primary.ac-btn--loading .ac-btn__spinner {
   color: var(--on-action);
 }
-.ac-btn--loading[disabled] {
+.ac-btn--loading:disabled {
   cursor: progress;
   border-color: var(--line-strong);
   background: var(--surface-raised);
 }
-.ac-btn--primary.ac-btn--loading[disabled] {
+.ac-btn--primary.ac-btn--loading:disabled {
   background: var(--action);
   border-color: var(--action);
 }
-.ac-btn--ghost.ac-btn--loading[disabled] {
+.ac-btn--ghost.ac-btn--loading:disabled {
   border-color: transparent;
   background: transparent;
 }
@@ -4263,7 +4340,7 @@ html:not([data-pointer]) .ac-switch:focus-visible {
   background: var(--raised);
   box-shadow: var(--e2), var(--top);
 }
-.ac-btn:active:not([disabled]) {
+.ac-btn:active:not(:disabled) {
   transform: scale(0.97) translateY(0.5px);
 }
 /*
@@ -4332,14 +4409,14 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 }
 /* Off: a faint plate over whatever it sits on, so its shape shows on a page, a card or a well, in both themes (a
    sunken fill is nearly the dark page's own color). */
-.ac-btn[disabled],
+.ac-btn:disabled,
 .ac-btn[aria-disabled="true"] {
   color: var(--faint);
   background: var(--plate);
   box-shadow: none;
   filter: none;
 }
-.ac-btn--ghost[disabled] {
+.ac-btn--ghost:disabled {
   background: transparent;
 }
 /*
@@ -4357,11 +4434,11 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   color: var(--on-dark);
   background: var(--on-dark-plate);
 }
-.ac-on-dark .ac-btn--ghost:active:not([disabled]) {
+.ac-on-dark .ac-btn--ghost:active:not(:disabled) {
   color: var(--on-dark);
   background: var(--on-dark-plate-strong);
 }
-.ac-on-dark .ac-btn--ghost[disabled] {
+.ac-on-dark .ac-btn--ghost:disabled {
   color: var(--on-dark-faint);
   background: transparent;
 }
@@ -4429,7 +4506,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
  * The spinner is a canvas that reads `color`, so it keeps its own.
  */
 .ac-btn.ac-btn--loading,
-.ac-btn.ac-btn--loading[disabled],
+.ac-btn.ac-btn--loading:disabled,
 .ac-btn.ac-btn--loading[aria-disabled="true"] {
   color: transparent;
   -webkit-text-fill-color: transparent;
@@ -4437,11 +4514,11 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-btn.ac-btn--loading .ac-btn__spinner {
   -webkit-text-fill-color: currentColor;
 }
-.ac-btn--loading[disabled] {
+.ac-btn--loading:disabled {
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
 }
-.ac-btn--primary.ac-btn--loading[disabled] {
+.ac-btn--primary.ac-btn--loading:disabled {
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 82%, var(--bg)) 0%, var(--ink) 100%);
 }
 
@@ -4621,7 +4698,7 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   box-shadow: var(--focus-ring);
 }
 /* Shown, not changed (a member reading an admin's setting): the choice stays readable, faded. */
-.ac-seg[aria-disabled="true"] {
+.ac-seg:has(.ac-seg__item:disabled) {
   opacity: 0.55;
 }
 .ac-seg__item:disabled {
@@ -5274,7 +5351,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
     transform 0.16s var(--out);
 }
 .ac-msg:hover .ac-msg__actions,
-.ac-msg:focus-within .ac-msg__actions,
+html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__actions[data-open="true"],
 .ac-msg__actions:has([aria-expanded="true"]) {
   transform: translateY(-50%);
@@ -5526,7 +5603,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   }
 }
 /* Keyboard focus in my row opens its time's details: its head is hidden, so nothing else would. */
-.ac-msg--own:has(:focus-visible) .ac-msg__own-time > .ac-msg__tip {
+html:not([data-pointer]) .ac-msg--own:has(:focus-visible) .ac-msg__own-time > .ac-msg__tip {
   visibility: visible;
   opacity: 1;
 }
@@ -5850,7 +5927,7 @@ html:not([data-pointer]) .ac-react:focus-visible {
 .ac-composer:focus-within {
   box-shadow: var(--e3), var(--top);
 }
-.ac-composer[data-disabled] {
+.ac-composer:is([data-disabled], :has(textarea:disabled)) {
   background: var(--sunken);
   box-shadow: var(--e1);
 }
@@ -5960,15 +6037,15 @@ html:not([data-pointer]) .ac-react:focus-visible {
   opacity: 1;
   cursor: pointer;
 }
-.ac-composer__send[disabled] {
+.ac-composer__send:disabled {
   cursor: default;
 }
 /* Off, it stays the primary square, only dimmed (not the generic disabled gray). */
-.ac-composer__send.ac-btn[disabled] {
+.ac-composer__send.ac-btn:disabled {
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 82%, var(--bg)) 0%, var(--ink) 100%);
   color: var(--bg);
 }
-.ac-composer__send:active:not([disabled]) {
+.ac-composer__send:active:not(:disabled) {
   transform: scale(0.96);
 }
 html:not([data-pointer]) .ac-composer__send:focus-visible {
@@ -7358,7 +7435,7 @@ html:not([data-pointer]) .ac-gif:focus-visible {
   color: var(--ink);
 }
 .ac-msg:hover .ac-react--add,
-.ac-msg:focus-within .ac-react--add,
+html:not([data-pointer]) .ac-msg:focus-within .ac-react--add,
 .ac-react--add[aria-expanded="true"] {
   opacity: 1;
 }
@@ -7367,7 +7444,7 @@ html:not([data-pointer]) .ac-gif:focus-visible {
     opacity: 1;
   }
 }
-.ac-react[disabled] {
+.ac-react:disabled {
   cursor: default;
   opacity: 0.6;
 }
@@ -8662,10 +8739,13 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-msg__actions {
     right: 8px;
   }
-  /* The time's details: on a tap of the time, not only on hover. */
+  /* The time's details and a note's reason: on a tap, not only on hover. */
   .ac-msg__time--details:focus .ac-msg__tip {
     visibility: visible;
     opacity: 1;
+  }
+  .ac-msg__note:focus .ac-msg__note-tip {
+    display: block;
   }
   .ac-emoji__cell:hover {
     transform: none;
@@ -9047,11 +9127,11 @@ html:not([data-pointer]) .ac-optrow[data-state="checked"]:focus-visible {
 .ac-optrow__more--lead {
   padding-left: 12px;
 }
-.ac-optrow[data-disabled]:not([data-state="checked"]) {
+.ac-optrow:disabled:not([data-state="checked"]) {
   cursor: default;
   opacity: 0.5;
 }
-.ac-optrow[data-disabled]:not([data-state="checked"]):hover {
+.ac-optrow:disabled:not([data-state="checked"]):hover {
   box-shadow: inset 0 0 0 1px var(--line2);
 }
 .ac-optlist--locked .ac-optrow {
@@ -9232,7 +9312,7 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
   top: 14px;
   right: 14px;
 }
-.ac-optlist--cards .ac-optrow[data-disabled]:not([data-state="checked"]) .ac-optrow__dot--corner {
+.ac-optlist--cards .ac-optrow:disabled:not([data-state="checked"]) .ac-optrow__dot--corner {
   display: none;
 }
 .ac-optrow__foot {
@@ -9592,7 +9672,7 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   display: none;
 }
 .ac-msg__note:hover .ac-msg__note-tip,
-.ac-msg__note:focus .ac-msg__note-tip {
+html:not([data-pointer]) .ac-msg__note:focus-visible .ac-msg__note-tip {
   display: block;
 }
 @media (prefers-reduced-motion: no-preference) {

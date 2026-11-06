@@ -9,15 +9,17 @@ import {
   Field,
   Icon,
   Input,
+  Locked,
   Menu,
   MenuHeading,
   MenuItem,
   MenuNote,
   MenuSeparator,
   OptionList,
+  useScrollSides,
 } from "@agenteschat/ui";
 import { type Query, useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { BOARD, columnIdOf, columnsOf, isCustomBoard, STATUS_ICON, useColumnTitle, useStageName } from "@/lib/issues";
@@ -152,35 +154,6 @@ function ColumnCards({
  * customized, each column's menu, and "Nova tarefa" under A fazer. Grouped by assignee or priority: one column each.
  * Cards move between and inside columns (`useIssueDrag`).
  */
-/**
- * Which ends of a sideways scroller have more past them ("start", "end", "both" or none), kept as it scrolls or
- * resizes: the board fades and offers its arrows only there.
- */
-function useMoreSides(ref: RefObject<HTMLElement | null>) {
-  const [more, setMore] = useState<"start" | "end" | "both" | undefined>(undefined);
-  const measure = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const start = el.scrollLeft > 1;
-    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-    setMore(start && end ? "both" : start ? "start" : end ? "end" : undefined);
-  }, [ref]);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    measure();
-    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    resize?.observe(el);
-    if (el.firstElementChild) resize?.observe(el.firstElementChild);
-    el.addEventListener("scroll", measure, { passive: true });
-    return () => {
-      resize?.disconnect();
-      el.removeEventListener("scroll", measure);
-    };
-  }, [ref, measure]);
-  return more;
-}
-
 export function Board({
   groups,
   stages,
@@ -206,7 +179,7 @@ export function Board({
   const grouped = stages !== null && isCustomBoard(columns);
   const byId = new Map(groups.map((g) => [g.id, g]));
   const wrap = useRef<HTMLDivElement>(null);
-  const more = useMoreSides(wrap);
+  const more = useScrollSides(wrap);
   // About two columns at a time, as far as a hand would drag it.
   const slide = (direction: 1 | -1) => wrap.current?.scrollBy({ left: direction * 520, behavior: "smooth" });
   const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus, foot?: ReactNode) => (
@@ -556,38 +529,40 @@ export function AddColumnDialog({
           create();
         }}
       >
-        <DialogBody>
-          <Field label={t("issues.columns.name")} id="ic-name">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={40}
-              autoComplete="off"
-              placeholder={t("issues.columns.namePlaceholder")}
-            />
-          </Field>
-          <div className="issues-stagepick">
-            <span className="ac-field__label" id="ic-stage">
-              {t("issues.columns.stageQuestion")}
-            </span>
-            <OptionList
-              layout="tiles"
-              aria-labelledby="ic-stage"
-              value={stage ?? ("" as IssueStatus)}
-              onValueChange={setStage}
-              options={BOARD.map((s) => ({
-                value: s,
-                leading: <Icon name={STATUS_ICON[s]} size={16} />,
-                title: stageName(s),
-                description: t(`issues.columns.stageHint.${s}`),
-              }))}
-            />
-          </div>
-          <p className="issues-explain ac-iconline">
-            <Icon name="arrowRight" size={16} />
-            <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
-          </p>
-        </DialogBody>
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <Field label={t("issues.columns.name")} id="ic-name">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={40}
+                autoComplete="off"
+                placeholder={t("issues.columns.namePlaceholder")}
+              />
+            </Field>
+            <div className="issues-stagepick">
+              <span className="ac-field__label" id="ic-stage">
+                {t("issues.columns.stageQuestion")}
+              </span>
+              <OptionList
+                layout="tiles"
+                aria-labelledby="ic-stage"
+                value={stage ?? ("" as IssueStatus)}
+                onValueChange={setStage}
+                options={BOARD.map((s) => ({
+                  value: s,
+                  leading: <Icon name={STATUS_ICON[s]} size={16} />,
+                  title: stageName(s),
+                  description: t(`issues.columns.stageHint.${s}`),
+                }))}
+              />
+            </div>
+            <p className="issues-explain ac-iconline">
+              <Icon name="arrowRight" size={16} />
+              <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
+            </p>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>
             {t("issues.columns.cancel")}
@@ -682,49 +657,51 @@ function DeleteColumnDialog({
       width={480}
     >
       {n > 0 && (
-        <DialogBody>
-          <div className="issues-dests" role="radiogroup" aria-label={t("issues.columns.destinations")}>
-            {BOARD.map((s) => {
-              const cs = columnsOf(others, s);
-              if (cs.length === 0) return null;
-              return (
-                <div key={s} className="issues-dests__stage">
-                  <span>
-                    <Icon name={STATUS_ICON[s]} size={14} />
-                    {stageName(s)}
-                  </span>
-                  <div className="issues-dests__row">
-                    {cs.map((c) => (
-                      // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
-                      <button
-                        key={c.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={dest === c.id}
-                        className="issues-dest"
-                        onClick={() => setDest(c.id)}
-                      >
-                        {title(c)}
-                      </button>
-                    ))}
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <div className="issues-dests" role="radiogroup" aria-label={t("issues.columns.destinations")}>
+              {BOARD.map((s) => {
+                const cs = columnsOf(others, s);
+                if (cs.length === 0) return null;
+                return (
+                  <div key={s} className="issues-dests__stage">
+                    <span>
+                      <Icon name={STATUS_ICON[s]} size={14} />
+                      {stageName(s)}
+                    </span>
+                    <div className="issues-dests__row">
+                      {cs.map((c) => (
+                        // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
+                        <button
+                          key={c.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={dest === c.id}
+                          className="issues-dest"
+                          onClick={() => setDest(c.id)}
+                        >
+                          {title(c)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          {to && to.stage !== col.stage && (
-            <p className="issues-explain ac-iconline">
-              <Icon name="arrowRight" size={16} />
-              <span>
-                {t("issues.columns.stageChange", {
-                  count: n,
-                  from: stageName(col.stage),
-                  to: stageName(to.stage),
-                })}
-              </span>
-            </p>
-          )}
-        </DialogBody>
+                );
+              })}
+            </div>
+            {to && to.stage !== col.stage && (
+              <p className="issues-explain ac-iconline">
+                <Icon name="arrowRight" size={16} />
+                <span>
+                  {t("issues.columns.stageChange", {
+                    count: n,
+                    from: stageName(col.stage),
+                    to: stageName(to.stage),
+                  })}
+                </span>
+              </p>
+            )}
+          </DialogBody>
+        </Locked>
       )}
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose}>

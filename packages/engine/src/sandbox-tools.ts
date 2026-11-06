@@ -4,6 +4,8 @@ import {
   type ExecResult,
   isReservedSecretName,
   MAX_INLINE_FILE_BYTES,
+  PASSWORD_CLASSES,
+  PASSWORD_LENGTH,
   type PubSub,
   policyRefusal,
   SECRET_NAME,
@@ -26,7 +28,7 @@ import {
   createArtifact,
   diffToPatch,
   getArtifact,
-  readFileArtifact,
+  storedFileOfArtifact,
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
@@ -34,11 +36,18 @@ import { recordAudit } from "./audit";
 import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
+import { copyToComputer } from "./file-pulls";
 import { cutText, formatBytes, textOfBytes } from "./format";
 import { mergeReposOfCall } from "./git/repos";
 import { fullMachinePath, pathInOwnFolder, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
-import { foldersFixedMessage, notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
+import {
+  foldersFixedMessage,
+  notAllowedMessage,
+  requestMadePassword,
+  requestVaultKey,
+  vaultUpdateText,
+} from "./machine-provider";
 import {
   enqueueWake,
   formatDuration,
@@ -76,9 +85,9 @@ import {
   truncateOutput,
   withSandbox,
 } from "./sandbox";
-import { requestSecretTool } from "./secret-request-tool";
-import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
-import { agentSkillByName, type SkillDeps, skillFilesOf, skillFolderFiles } from "./skills";
+import { friendlyLabel, requestSecretTool } from "./secret-request-tool";
+import { MAKE_KEY_TOOL, REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
+import { agentSkillByName, type SkillDeps, skillFilesOf, skillFilesOver, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { MAX_RESULT_CHARS } from "./tools/gateway";
 import { WHY_MAX_CHARS } from "./tools/run-policy";
@@ -90,16 +99,36 @@ import {
   toolAllowScope,
   VAULT_LIST_TOOL,
   VAULT_READ_SCOPE,
+  VAULT_SAVE_TOOL,
+  VAULT_WRITE_SCOPE,
 } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 import { uploadedFile, uploadFromComputer } from "./uploads";
-import { recordVaultUse, releaseVaultKeys, type VaultDeps, VaultRefusal, vaultRefusalOutput } from "./vault";
+import {
+  recordVaultUse,
+  releaseVaultKeys,
+  restoreMadePassword,
+  saveMadePassword,
+  undoneText,
+  type VaultDeps,
+  VaultRefusal,
+  vaultItemName,
+  vaultRefusalOutput,
+} from "./vault";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /** Tools that change the computer (or start work on it); the rest only read. */
-const WRITE_TOOLS = new Set(["run_code", "write_file", "start_task", "run_skill_script", "import_file", "cancel_task"]);
+const WRITE_TOOLS = new Set([
+  "run_code",
+  "write_file",
+  "start_task",
+  "run_skill_script",
+  "import_file",
+  "cancel_task",
+  MAKE_KEY_TOOL,
+]);
 
 const READ_ONLY_COMMANDS = new Set([
   "ls",
@@ -644,6 +673,69 @@ export function createSandboxToolSource(
     };
   };
 
+  /**
+   * The computer's side of a made password (ADR 0144 §8): the same box from the agent's own process to the Vault, kept
+   * as a key, since a command takes it by name. For what the agent sets up itself, as a database's user.
+   */
+  const makeKeyTool = (vault: VaultDeps): ToolDefinition => ({
+    name: MAKE_KEY_TOOL,
+    description:
+      "For something you are setting up yourself on your computer (a database user, a service's admin): makes a strong password there and keeps it in the Vault as a key. You never see it: commands get it as $NAME through run_code's `keys`. Never ask a person to invent one.",
+    scope: SANDBOX_SCOPE,
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
+        label: { type: "string", maxLength: 80, description: "What people read in the Vault (`Postgres admin`)." },
+        length: { type: "integer", minimum: PASSWORD_LENGTH.min, maximum: PASSWORD_LENGTH.max },
+        classes: { type: "array", items: { enum: [...PASSWORD_CLASSES] } },
+        undo: { type: "string", maxLength: 64, description: "A key's id: back to the value it had before." },
+      },
+      additionalProperties: false,
+    },
+    describe: () => ({ title: "Make a password" }),
+    async execute(input, ctx) {
+      const hub = deps.machines?.hub;
+      if (!hub) return { content: "Connected computers are not available on this server.", isError: true };
+      const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+      if (!isAllowed(toolAccess(granted, { name: VAULT_SAVE_TOOL, scope: VAULT_WRITE_SCOPE }))) {
+        return {
+          content:
+            'You may not keep passwords in the Vault ("Edit Vault contacts" is off for you). Ask for it with request_permission.',
+          isError: true,
+        };
+      }
+      const runIds = { orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId };
+      try {
+        const undo = str(input.undo).trim();
+        if (undo) {
+          const { item, kept } = await restoreMadePassword(vault, runIds, undo);
+          return { content: undoneText(vaultItemName(item), kept) };
+        }
+        const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+        const scope = {
+          id: ctx.agentId,
+          handle: agent?.handle ?? "agent",
+          ...(agent?.name ? { name: agent.name } : {}),
+        };
+        const value = await run(ctx, (computer) =>
+          requestMadePassword(hub, computer.machineId, scope, input, ctx.signal),
+        );
+        const saved = await saveMadePassword(
+          vault,
+          runIds,
+          { keyName: str(input.name), title: friendlyLabel(input.label) ?? "" },
+          value,
+        );
+        return {
+          content: `Made it: ${vaultItemName(saved.item)} is in the Vault${saved.outcome === "updated" ? ", in place of the value it had (`undo` with its id brings that back)" : ""}. Give its name to run_code's \`keys\`.`,
+        };
+      } catch (error) {
+        return vaultRefusalOutput(error) ?? failed(error);
+      }
+    },
+  });
+
   /** `machine.exec` in the audit log: what ran on a connected machine (command head and exit code). */
   const auditMachineExec = async (
     ctx: ToolContext,
@@ -755,10 +847,12 @@ export function createSandboxToolSource(
         }
       },
     },
+    ...(deps.vault ? [makeKeyTool(deps.vault)] : []),
     requestSecretTool({
       scope: SANDBOX_SCOPE,
       browserOnly: false,
       toolPath: (raw) => toolPath(raw, computerInfo),
+      ...(deps.pubsub ? { pubsub: deps.pubsub } : {}),
       onComputer: (ctx, fn) => run(ctx, fn),
     }),
     {
@@ -1009,11 +1103,11 @@ export function createSandboxToolSource(
           const file = fileOfArtifact(a);
           if (!file) {
             // An uploaded file: its bytes as they are, under its original name.
-            const raw = await readFileArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
+            const raw = await storedFileOfArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
             const path = toolPath(str(input.path), computerInfo) || `imports/${cleanFileName(raw.name)}`;
-            await run(ctx, (c) => c.provider.writeFile(c.id, path, raw.bytes));
+            await run(ctx, (c) => copyToComputer({ ...deps.artifacts, publicUrl: deps.publicUrl }, ctx, c, path, raw));
             return {
-              content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.bytes.byteLength)}).`,
+              content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.size)}).`,
             };
           }
           const path = toolPath(str(input.path), computerInfo) || `imports/${slug(a.title)}.${file.ext}`;
@@ -1064,23 +1158,38 @@ export function createSandboxToolSource(
           const timeout = timeoutOf(input, execTimeout, maxTimeout);
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
-          // A file past what one write to a computer carries (a big PDF) stays behind instead of failing every run.
-          const left = listed
-            .filter((f) => f.status !== "ignored" && f.size > MAX_INLINE_FILE_BYTES)
-            .map((f) => f.path);
+          // What an older runner can't receive (a big PDF) stays behind instead of failing every run.
+          let left = "";
           // A skill can hold thousands of files: copied once a version. Its scripts go on every run, so what runs (and
           // what a person approved) is the skill's, whatever was written over them on the computer since.
           const copiedMark = `${base}/.copied-v${skill.version}`;
+          // Files past a `write` have their own mark: a runner brought up to date gets them without the rest again.
+          const largeMark = `${base}/.copied-large-v${skill.version}`;
           const scripts = listed.filter((f) => f.status === "script").map((f) => f.path);
           const started = Date.now();
+          const mark = (path: string, c: ComputerHandle) =>
+            c.provider.writeFile(c.id, path, new TextEncoder().encode(skill.name));
           const result = await run(ctx, async (computer) => {
             const copied = await computer.provider.readFile(computer.id, copiedMark);
-            for (const f of await skillFolderFiles(skillDeps(ctx), skill, copied ? scripts : undefined)) {
-              if (f.data.byteLength > MAX_INLINE_FILE_BYTES) continue;
+            const wanted = copied ? scripts : undefined;
+            for (const f of await skillFolderFiles(skillDeps(ctx), skill, wanted, MAX_INLINE_FILE_BYTES)) {
               await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
             }
-            if (!copied)
-              await computer.provider.writeFile(computer.id, copiedMark, new TextEncoder().encode(skill.name));
+            if (!copied) await mark(copiedMark, computer);
+            const large = await skillFilesOver(ctx.db, skill, MAX_INLINE_FILE_BYTES);
+            const refusal = large.length > 0 ? await computer.provider.pullRefusal(computer.id) : null;
+            if (refusal) {
+              left = `Not copied to ${base}/: ${large.map((f) => f.path).join(", ")}. ${refusal}`;
+            } else if (large.length > 0) {
+              const pull = { ...skillDeps(ctx), publicUrl: deps.publicUrl };
+              const whole = await computer.provider.readFile(computer.id, largeMark);
+              for (const f of large) {
+                if (!whole || scripts.includes(f.path)) {
+                  await copyToComputer(pull, ctx, computer, `${base}/${f.path}`, f);
+                }
+              }
+              if (!whole) await mark(largeMark, computer);
+            }
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
               timeoutSeconds: timeout,
@@ -1091,9 +1200,8 @@ export function createSandboxToolSource(
           });
           const seconds = Math.round((Date.now() - started) / 1000);
           const output = execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
-          if (left.length === 0) return output;
-          const note = `Not copied to ${base}/ (over ${formatBytes(MAX_INLINE_FILE_BYTES)} each): ${left.join(", ")}.`;
-          return { ...output, content: `${output.content}\n${note}` };
+          if (!left) return output;
+          return { ...output, content: `${output.content}\n${left}` };
         } catch (error) {
           return heldForApproval(error, "Not run") ?? failed(error);
         }
@@ -1453,6 +1561,7 @@ export function createSandboxToolSource(
           "upload_file",
           "import_file",
           "computer_status",
+          MAKE_KEY_TOOL,
           REQUEST_SECRET_TOOL,
           "start_task",
           "list_tasks",

@@ -95,6 +95,28 @@ describe("message Markdown", () => {
     expect(el.querySelector("strong")?.textContent).toBe("<iframe src=//evil.example>");
   });
 
+  test("a table scrolls inside its box, which says which side has more columns (that side fades)", () => {
+    const el = body(["| Destino | Hoje | 7 dias |", "| --- | ---: | ---: |", "| Paris | 14 | 129 |"].join("\n"));
+    const box = el.querySelector(".md--message > .md__table") as HTMLElement;
+    const scroller = box.querySelector(":scope > .md__table-scroll") as HTMLElement;
+    expect(scroller.querySelector(":scope > table th")?.textContent).toBe("Destino");
+    // Fits: no side fades.
+    expect(box.dataset.more).toBeUndefined();
+    // Wider than the message: more at the end, then at both sides, then only at the start.
+    const size = (scrollLeft: number) => {
+      for (const [k, v] of Object.entries({ clientWidth: 300, scrollWidth: 500, scrollLeft })) {
+        Object.defineProperty(scroller, k, { configurable: true, value: v });
+      }
+      fireEvent.scroll(scroller);
+    };
+    size(0);
+    expect(box.dataset.more).toBe("end");
+    size(100);
+    expect(box.dataset.more).toBe("both");
+    size(200);
+    expect(box.dataset.more).toBe("start");
+  });
+
   test("renderInline without a mention renderer keeps @ as text", () => {
     const { container } = render(<p>{renderInline("oi @ada")}</p>);
     expect(container.textContent).toBe("oi @ada");

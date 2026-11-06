@@ -21,10 +21,9 @@ import {
   openableConsultation,
   pairItemOf,
 } from "@agenteschat/client/lib/consult-group";
-import { withoutRelayLine } from "@agenteschat/client/lib/consultations";
+import { consultTimeText, withoutRelayLine } from "@agenteschat/client/lib/consultations";
 import { joinNames, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { formatLineTime } from "@agenteschat/client/lib/work";
 import { cx, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -213,7 +212,7 @@ export function ConsultPairRow({ askerId, items }: { askerId: string; items: rea
         )}
         {pair.word && <span className="consult-pair__word">{t(pair.word.key, pair.word.values)}</span>}
         {pair.seconds !== null && (
-          <span className="consult-pair__time">{formatLineTime(i18n.language, pair.seconds * 1000)}</span>
+          <span className="consult-pair__time">{consultTimeText(t, i18n.language, live, pair.seconds)}</span>
         )}
         <Icon name={openConsultation ? "chevronRight" : "chevronDown"} size={14} className="consult-pair__chev" />
       </button>

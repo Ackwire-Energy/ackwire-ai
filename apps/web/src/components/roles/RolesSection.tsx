@@ -53,6 +53,7 @@ import {
   Icon,
   type IconName,
   Input,
+  Locked,
   Menu,
   MenuItem,
   PageHeader,
@@ -867,56 +868,58 @@ function AddPeopleDialog({
       closeLabel={t("common.close")}
       width={440}
     >
-      <DialogBody>
-        {candidates.length > PEOPLE_SEARCH_FROM && (
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("rolesPage.searchPeople")}
-            aria-label={t("rolesPage.searchPeople")}
-          />
-        )}
-        {shown.length === 0 ? (
-          <p className="roles-empty">{emptyText}</p>
-        ) : (
-          <ul className="roles-pick">
-            {shown.map((p) => {
-              const on = picked.has(p.userId);
-              return (
-                <li key={p.userId}>
-                  <button
-                    type="button"
-                    className="roles-pick__row"
-                    aria-pressed={on}
-                    onClick={() =>
-                      setPicked((s) => {
-                        const next = new Set(s);
-                        if (next.has(p.userId)) next.delete(p.userId);
-                        else next.add(p.userId);
-                        return next;
-                      })
-                    }
-                  >
-                    <span className="ac-check" data-state={on ? "checked" : "unchecked"} aria-hidden="true">
-                      {on && <Icon name="check" size={14} />}
-                    </span>
-                    <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
-                    <span className="roles-person__text">
-                      <b>{p.name}</b>
-                      <span>{p.email}</span>
-                    </span>
-                    <span className="roles-chips">
-                      {sortRoles(roles.filter((r) => !isEveryone(r) && (p.roleIds ?? []).includes(r.id))).map((r) => (
-                        <RoleChip key={r.id} role={r} />
-                      ))}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </DialogBody>
+      <Locked when={busy}>
+        <DialogBody>
+          {candidates.length > PEOPLE_SEARCH_FROM && (
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("rolesPage.searchPeople")}
+              aria-label={t("rolesPage.searchPeople")}
+            />
+          )}
+          {shown.length === 0 ? (
+            <p className="roles-empty">{emptyText}</p>
+          ) : (
+            <ul className="roles-pick">
+              {shown.map((p) => {
+                const on = picked.has(p.userId);
+                return (
+                  <li key={p.userId}>
+                    <button
+                      type="button"
+                      className="roles-pick__row"
+                      aria-pressed={on}
+                      onClick={() =>
+                        setPicked((s) => {
+                          const next = new Set(s);
+                          if (next.has(p.userId)) next.delete(p.userId);
+                          else next.add(p.userId);
+                          return next;
+                        })
+                      }
+                    >
+                      <span className="ac-check" data-state={on ? "checked" : "unchecked"} aria-hidden="true">
+                        {on && <Icon name="check" size={14} />}
+                      </span>
+                      <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
+                      <span className="roles-person__text">
+                        <b>{p.name}</b>
+                        <span>{p.email}</span>
+                      </span>
+                      <span className="roles-chips">
+                        {sortRoles(roles.filter((r) => !isEveryone(r) && (p.roleIds ?? []).includes(r.id))).map((r) => (
+                          <RoleChip key={r.id} role={r} />
+                        ))}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar>
         <Button variant="ghost" onClick={() => close(false)}>
           {t("common.cancel")}
@@ -992,49 +995,51 @@ function NewRoleDialog({
       closeLabel={t("common.close")}
       width={440}
     >
-      <DialogBody>
-        <label className="roles-field" htmlFor="new-role-name">
-          {t("rolesPage.name")}
-          <Input
-            id="new-role-name"
-            value={name}
-            maxLength={40}
-            autoFocus
-            placeholder={t("rolesPage.namePlaceholder")}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                submit();
-              }
-            }}
-          />
-        </label>
-        <div className="roles-field">
-          {t("rolesPage.startFrom")}
-          <div className="roles-templates" role="radiogroup" aria-label={t("rolesPage.startFrom")}>
-            {choices.map((c) => (
-              // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
-              <button
-                key={c.id}
-                type="button"
-                role="radio"
-                aria-checked={from === c.id}
-                className="roles-template"
-                onClick={() => setFrom(c.id)}
-              >
-                <span className="ac-radio" data-state={from === c.id ? "checked" : "unchecked"} aria-hidden="true">
-                  {from === c.id && <span className="ac-radio__dot" />}
-                </span>
-                <span>
-                  <b>{c.title}</b>
-                  {c.desc && <span>{c.desc}</span>}
-                </span>
-              </button>
-            ))}
+      <Locked when={create.isPending}>
+        <DialogBody>
+          <label className="roles-field" htmlFor="new-role-name">
+            {t("rolesPage.name")}
+            <Input
+              id="new-role-name"
+              value={name}
+              maxLength={40}
+              autoFocus
+              placeholder={t("rolesPage.namePlaceholder")}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+            />
+          </label>
+          <div className="roles-field">
+            {t("rolesPage.startFrom")}
+            <div className="roles-templates" role="radiogroup" aria-label={t("rolesPage.startFrom")}>
+              {choices.map((c) => (
+                // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
+                <button
+                  key={c.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={from === c.id}
+                  className="roles-template"
+                  onClick={() => setFrom(c.id)}
+                >
+                  <span className="ac-radio" data-state={from === c.id ? "checked" : "unchecked"} aria-hidden="true">
+                    {from === c.id && <span className="ac-radio__dot" />}
+                  </span>
+                  <span>
+                    <b>{c.title}</b>
+                    {c.desc && <span>{c.desc}</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </DialogBody>
+        </DialogBody>
+      </Locked>
       <DialogFooter bar>
         <Button variant="ghost" onClick={() => onOpenChange(false)}>
           {t("common.cancel")}

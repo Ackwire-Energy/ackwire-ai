@@ -1,7 +1,7 @@
 import type { ReactionCount } from "@agenteschat/client";
 import { useCorrectMessage } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Textarea } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Locked, Textarea } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
@@ -131,17 +131,19 @@ export function CorrectionDialog({
           );
         }}
       >
-        <DialogBody>
-          <Field label={t("channel.correctLabel")} id={`correct-${messageId}`} help={t("channel.correctHelp", g)}>
-            <Textarea
-              rows={4}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={t("channel.correctPlaceholder")}
-              autoFocus
-            />
-          </Field>
-        </DialogBody>
+        <Locked when={correct.isPending}>
+          <DialogBody>
+            <Field label={t("channel.correctLabel")} id={`correct-${messageId}`} help={t("channel.correctHelp", g)}>
+              <Textarea
+                rows={4}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={t("channel.correctPlaceholder")}
+                autoFocus
+              />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button

@@ -6,7 +6,7 @@ import { publishMessageCreated } from "./events";
 import { messageView, replyExcerpt } from "./messages";
 import type { Notice } from "./notices";
 import { requireActiveMembership } from "./organizations";
-import { type AgentRun, type RunStatus, replyThreadOf } from "./runs";
+import { type AgentRun, computerWaitOf, type RunStatus, replyThreadOf } from "./runs";
 
 /**
  * A person stopped an agent's task (ADR 0128): the agent is told, in the conversation the task belonged to (a
@@ -28,6 +28,8 @@ export interface StoppedRefs {
   /** What it was doing when stopped: `working`, `waiting` (an ok or an answer), `queued`. */
   was: "working" | "waiting" | "queued";
   reason?: string;
+  /** The agents it had asked, stopped with it ("@ada, @rio"). */
+  helpers?: string;
 }
 
 const refsOf = (r: StoppedRefs): Record<string, string> => ({ ...r }) as unknown as Record<string, string>;
@@ -41,6 +43,7 @@ export function stoppedText(r: StoppedRefs): string {
     r.was === "working" ? "while you worked on it" : r.was === "queued" ? "before it started" : "while it waited";
   return [
     `${r.byName || "A person"} stopped your task${r.label ? ` «${r.label}»` : ""} ${doing}.`,
+    ...(r.helpers ? [`What you asked of ${r.helpers} stopped with it: nothing more comes from them.`] : []),
     "What you already did or posted stays as it is.",
     r.reason ? `Their reason, in their words: «${r.reason}».` : "They gave no reason.",
     "Don't pick it up again on your own: only when someone asks you to.",
@@ -78,6 +81,7 @@ export async function tellAgentStopped(
   previous: RunStatus,
   byUserId: string,
   reason?: string,
+  helpers: string[] = [],
 ): Promise<void> {
   const { db } = deps;
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, byUserId));
@@ -86,8 +90,9 @@ export async function tellAgentStopped(
     byUserId,
     byName: person?.name ?? "",
     label: await labelOfRun(db, run),
-    was: wasOf(previous),
+    was: computerWaitOf(run) ? "waiting" : wasOf(previous),
     ...(cleanReason(reason) ? { reason: cleanReason(reason) } : {}),
+    ...(helpers.length ? { helpers: helpers.join(", ") } : {}),
   };
   const notice: Notice = { kind: "run_stopped", text: stoppedText(refs), refs: refsOf(refs) };
   const delivered = await db.transaction((tx) =>

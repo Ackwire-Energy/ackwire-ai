@@ -53,6 +53,7 @@ import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
 import { type NetworkConfig, networkConfig, networkKey } from "./network-state";
+import { PULL_TIMEOUT_MS } from "./pull";
 import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
 import type { ScopeKind } from "./scope-gate";
 import {
@@ -102,7 +103,7 @@ const WORKER_STABLE_MS = 60_000;
 const WORKER_PING_MS = 10_000;
 /** A worker that leaves this much of what was sent to it unread is stopped. */
 const WORKER_BACKLOG_MAX = 64 * 1024 * 1024;
-/** A `push`'s bytes cross the link in pieces of this size. */
+/** A `push`'s or `pull`'s bytes cross the link in pieces of this size. */
 export const UPLOAD_CHUNK_BYTES = 1024 * 1024;
 /** A task the server never acknowledged is forgotten after this long. */
 const TASK_OWNER_KEEP_MS = 8 * 24 * 3600_000;
@@ -220,6 +221,14 @@ export type WorkerLinkFrame =
   | { type: "upload.chunk"; uploadId: string; data: string }
   /** From the worker: every piece was sent; upload them. */
   | { type: "upload.end"; uploadId: string; contentType: string; name: string; sha256: string }
+  /** From the worker: fetch the file of its `pull` request of this id, whose URL root takes from the request itself. */
+  | { type: "pull.start"; pullId: string }
+  /** To the worker: the server's status for its `pull`; the body's pieces follow. */
+  | { type: "pull.head"; pullId: string; status: number }
+  /** To the worker: a piece of a `pull`'s bytes (base64). */
+  | { type: "pull.chunk"; pullId: string; data: string }
+  /** To the worker: nothing more comes, and why when it was cut short. */
+  | { type: "pull.end"; pullId: string; error?: string }
   /** From the worker: its agent's desktop, started when it isn't running (root's, ADR 0058 §10). */
   | { type: "desktop.ensure"; ensureId: string; use: WorkerDesktopUse }
   /** To the worker: where its agent's desktop runs, or why it can't. */
@@ -384,6 +393,7 @@ export interface SupervisorOptions {
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
 type Push = Extract<MachineRequest, { op: "push" }>;
+type Pull = Extract<MachineRequest, { op: "pull" }>;
 type ByCall = Extract<ServerFrame, { type: "mcp.result" | "mcp.tools" }>;
 type Handoff = Extract<ServerFrame, { type: "browser.handoff" }>;
 
@@ -393,6 +403,8 @@ interface Inflight {
   settle(outcome: Outcome): void;
   /** `push`: the bytes the worker sent for it; uploaded once. */
   upload?: { parts: Buffer[]; size: number; sent: boolean };
+  /** `pull`: the file was asked for; fetched once. */
+  pulling?: boolean;
 }
 
 interface Worker {
@@ -1183,12 +1195,12 @@ export class Supervisor {
     for (const s of [...w.shows.values()]) s.settle(new RunnerError("internal", message));
   }
 
-  private send(w: Worker, frame: ServerFrame | WorkerLinkFrame) {
-    if (w.ready) this.write(w, frame);
+  private send(w: Worker, frame: ServerFrame | WorkerLinkFrame, flushed?: () => void) {
+    if (w.ready) this.write(w, frame, flushed);
   }
 
   /** To the worker's process, also between two of its sessions. */
-  private write(w: Worker, frame: ServerFrame | WorkerLinkFrame) {
+  private write(w: Worker, frame: ServerFrame | WorkerLinkFrame, flushed?: () => void) {
     if (!w.proc) return;
     if (w.proc.stdin.writableLength > WORKER_BACKLOG_MAX) {
       this.opts.log(`[${w.user.user}] isn't reading what it is sent; stopping it`);
@@ -1199,7 +1211,7 @@ export class Supervisor {
     if (frame.type === "request" && frame.op === "browser.input" && this.opts.relayed) {
       this.opts.relayed.browserView.down += Buffer.byteLength(line);
     }
-    w.proc.stdin.write(line);
+    w.proc.stdin.write(line, flushed);
   }
 
   private welcome(w: Worker) {
@@ -1473,6 +1485,10 @@ export class Supervisor {
       if (typeof f.taskId === "string") this.opts.taskStop?.(w.user.id, f.taskId);
       return;
     }
+    if (f?.type === "pull.start") {
+      void this.pull(w, typeof f.pullId === "string" ? f.pullId : "");
+      return;
+    }
     if (f?.type !== "upload.chunk" && f?.type !== "upload.end") return;
     const uploadId = typeof f.uploadId === "string" ? f.uploadId : "";
     const e = [...w.inflight.values()].find((x) => x.req.op === "push" && x.req.uploadId === uploadId);
@@ -1621,6 +1637,54 @@ export class Supervisor {
       await new Promise((r) => setTimeout(r, SCOPE_POLL_MS));
     }
     return "It didn't show in its slice in time";
+  }
+
+  /**
+   * To the worker's `pull`, the file from the server this computer is paired with, with the machine token. As root,
+   * this request takes the host's own route: an agent's goes through whatever its workspace routes agents through.
+   * Each piece waits for the one before it to leave for the worker's pipe: under Bun a child's stdin always reports a
+   * `writableLength` of 0, and only a write's callback tells, so the file never piles up here.
+   */
+  private async pull(w: Worker, pullId: string) {
+    const e = [...w.inflight.values()].find((x) => x.req.op === "pull" && x.req.pullId === pullId);
+    if (!e || e.pulling) {
+      this.send(w, { type: "pull.end", pullId, error: "No pull is waiting for this file" });
+      return;
+    }
+    e.pulling = true;
+    const req = e.req as Pull;
+    const target = uploadUrl(this.opts.server, req.url);
+    if (!target) {
+      this.send(w, { type: "pull.end", pullId, error: "The file URL must be http(s)" });
+      return;
+    }
+    const doFetch: FetchLike = this.opts.fetch ?? ((url, init) => fetch(url, init));
+    const live = () => [...w.inflight.values()].includes(e);
+    try {
+      const res = await doFetch(target, {
+        method: "GET",
+        headers: { authorization: `Bearer ${this.opts.token}` },
+        signal: AbortSignal.any([AbortSignal.timeout(PULL_TIMEOUT_MS), e.scope.signal]),
+      });
+      this.send(w, { type: "pull.head", pullId, status: res.status });
+      if (res.body) {
+        for await (const piece of res.body) {
+          for (let at = 0; at < piece.byteLength; at += UPLOAD_CHUNK_BYTES) {
+            const data = Buffer.from(piece.subarray(at, at + UPLOAD_CHUNK_BYTES)).toString("base64");
+            let flushed = false;
+            this.send(w, { type: "pull.chunk", pullId, data }, () => {
+              flushed = true;
+            });
+            while (!flushed && live() && w.ready) await Bun.sleep(5);
+            // It stopped first (the disk filled, the bytes went past the size): leaving the loop closes the fetch.
+            if (!live()) return;
+          }
+        }
+      }
+      this.send(w, { type: "pull.end", pullId });
+    } catch (err) {
+      this.send(w, { type: "pull.end", pullId, error: err instanceof Error ? err.message : String(err) });
+    }
   }
 
   /** To the request's upload on the server this computer is paired with, with the machine token; from the worker only the file's name, type and hash. */

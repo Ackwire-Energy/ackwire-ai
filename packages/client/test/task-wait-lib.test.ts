@@ -1,7 +1,16 @@
 import { expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { ManagedTask, TaskWait } from "../src/api/types";
-import { taskWaitGroups, taskWaitGroupText, taskWaitWords } from "../src/lib/task-manager";
+import {
+  agentCardLine,
+  delegationText,
+  groupTasks,
+  hiddenCount,
+  taskWaitGroups,
+  taskWaitGroupText,
+  taskWaitWords,
+  taskWhere,
+} from "../src/lib/task-manager";
 
 /** Says the key and its values, so a test reads which words were picked. */
 const t = ((key: string, values: Record<string, unknown> = {}) => {
@@ -106,4 +115,52 @@ test("the group's words: routines or tasks, by what holds them", () => {
   const own = wait({ code: "plan_limit", percent: null, scope: "model", model: "GLM-5.3" });
   expect(group(task("plan", own))).toContain("taskManager.waitGroup.modelLimit");
   expect(group(task("budget", wait({ code: "budget", percent: null })))).toContain("taskManager.waitGroup.budgetOut");
+});
+
+test("a task agents asked of each other: its own section, by who asked, saying what started it", () => {
+  const delegated = (runId: string, by: string): ManagedTask =>
+    ({
+      runId,
+      agentId: "rio",
+      status: "running",
+      background: false,
+      startedAt: new Date(now).toISOString(),
+      createdAt: new Date(now).toISOString(),
+      canStop: true,
+      delegation: { agentId: by, origin: { kind: "person", userId: "me", name: "Ana" } },
+    }) as ManagedTask;
+  const asked = { ...delegated("r0", ""), delegation: null, agentId: "theo" };
+  const out = groupTasks([asked, delegated("r1", "theo"), delegated("r2", "theo"), delegated("r3", "bia")]);
+  expect(out.groups.map((g) => g.agentId)).toEqual(["theo"]);
+  expect(out.delegated.map((g) => [g.agentId, g.tasks.length])).toEqual([
+    ["theo", 2],
+    ["bia", 1],
+  ]);
+
+  const name = (id: string) => (id === "theo" ? "Theo" : undefined);
+  const by = delegated("r1", "theo");
+  expect(delegationText(t, by, name, "me")).toBe('queue.purpose.agent {"name":"Theo"} · taskManager.delegated.fromYou');
+  expect(delegationText(t, by, name, "other")).toContain('taskManager.delegated.fromPerson {"name":"Ana"}');
+  const routine = { delegation: { agentId: "bia", origin: { kind: "routine" as const, name: "Bugs" } } };
+  expect(delegationText(t, routine, name, "me")).toBe(
+    'queue.purpose.someAgent · taskManager.delegated.fromRoutine {"name":"Bugs"}',
+  );
+  expect(delegationText(t, { delegation: { agentId: "theo", origin: { kind: "agent" } } }, name, "me")).toBe(
+    'queue.purpose.agent {"name":"Theo"}',
+  );
+  expect(delegationText(t, { delegation: null }, name, "me")).toBeNull();
+  expect(taskWhere(t, { routine: null, channelKind: "dm", channelName: null, betweenAgents: true })).toBe(
+    "chat.consultPanel.whereDm",
+  );
+});
+
+test("an agent busy out of the viewer's sight is never free: its card counts it, without saying what", () => {
+  const hidden = { total: 3, working: 2, byAgent: { rio: 3 } };
+  expect(hiddenCount(hidden, "rio")).toBe(3);
+  expect(hiddenCount(hidden, "bia")).toBe(0);
+  expect(hiddenCount(hidden, null)).toBe(3);
+  expect(hiddenCount(undefined, null)).toBe(0);
+  expect(agentCardLine(t, 0, 3)).toBe('taskManager.hiddenTasks {"count":3}');
+  expect(agentCardLine(t, 1, 3)).toBe('taskManager.tasks {"count":4}');
+  expect(agentCardLine(t, 0, 0)).toBe("taskManager.free");
 });

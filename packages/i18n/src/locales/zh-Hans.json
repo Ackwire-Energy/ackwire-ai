@@ -1655,6 +1655,11 @@
     "linkCopied": "链接已复制。",
     "reply": "回复",
     "quoteOf": "回复 {{name}}：{{excerpt}}。查看消息",
+    "quoteGone": "原消息已删除",
+    "jumpTooFar": "这条消息太久远,无法从这里打开。",
+    "quoteNoWords": "无文字消息",
+    "replyingTo": "正在回复 {{name}}",
+    "cancelReply": "取消回复",
     "emoji": "表情",
     "uploading": "上传中…",
     "uploadFailed": "未上传",
@@ -1854,6 +1859,10 @@
       "configure": "设置",
       "nameStory": "名字来自 lodestar，指引水手航向的那颗星。"
     },
+    "saved": {
+      "workspace": "{{name}} 现在用 {{label}} 为所有没有自己套餐的人思考。",
+      "mine": "你与 {{name}} 的对话现在用 {{label}} 思考。仅你的对话。"
+    },
     "settings": {
       "name": "名称和外观",
       "nameHelp": "在侧边栏里它总是显示为“{{label}}”。",
@@ -1874,6 +1883,8 @@
       "connectMine": "连接我的套餐",
       "useWorkspace": "使用工作区的",
       "fallbackKey": "没有自己的套餐时，使用工作区的 API 密钥。",
+      "fallbackKeyOf": "没有自己的套餐时，使用工作区的密钥：{{label}}。",
+      "fallbackNoKey": "工作区还没有 API 密钥，所以没有自己的套餐时这里不会有人回复你。",
       "fallbackPlan": "没有自己的套餐时，使用{{owner}}的套餐，它回复所有人。",
       "fallbackYours": "没有其他套餐时，使用工作区的套餐，它是你的。",
       "fallbackNone": "没有自己的套餐时，{{name}}无法回复你：工作区的套餐只回复{{owner}}。",
@@ -2123,8 +2134,11 @@
       "title": "已连接",
       "titleFor": "已为 {{name}} 连接",
       "titleFor_female": "已为 {{name}} 连接",
-      "other": "或连接其他"
+      "other": "或连接其他",
+      "manageKeys": "管理或删除密钥"
     },
+    "billing": "套餐登录在工作区的电脑上，而这台电脑需要有效的 agentes.chat 套餐才会提供。",
+    "billingWeb": "请在网页上的 agentes.chat 选择一个。",
     "orPayGo": "或按量付费",
     "plan": {
       "claude": {
@@ -2173,6 +2187,7 @@
       "paste": "粘贴到这里",
       "forAll": "所有没有套餐的智能体都用它来思考。",
       "saved": "已保存。所有没有套餐的智能体都用它来思考。",
+      "savedUnchecked": "已保存，但 {{provider}} 没有回应，因此无法检查这个密钥。如果它失败，对话里会说明原因。",
       "notPlan": "编程套餐的密钥请填在上方它自己的选项里。",
       "billing": "请为密钥所属的项目开通结算。不开通结算的话，Google 可能会使用你的智能体发送的内容。",
       "privacy": "你的 OpenRouter 隐私设置决定哪些服务商可以保留你的智能体发送的内容。",
@@ -2853,11 +2868,16 @@
   "secret": {
     "group": "来自 {{agent}} 的密钥请求",
     "chip": "等待中",
-    "targetEnv": "将作为 {{agent}} 电脑上的变量 {{name}} 使用。",
+    "targetEnv": "发送到 {{agent}} 的电脑，供其命令使用。",
     "targetFile": "将写入 {{agent}} 电脑上的文件 {{path}}。",
     "targetSite": "只有 {{agent}} 的浏览器会在 {{host}} 上输入它。它不会出现在 {{agent}} 的命令中。",
     "replaces": "替换 {{agent}} 在此名称下已有的密钥。",
-    "label": "{{name}} 的值",
+    "labelPassword": "{{host}} 的密码",
+    "labelCode": "{{host}} 的验证码",
+    "labelKey": "{{agent}} 电脑的密钥",
+    "labelFile": "文件 {{path}}",
+    "placeholder": "在此输入",
+    "account": "账号：{{username}}。",
     "private": "加密后直接发送到电脑。不会出现在聊天中，智能体也看不到。",
     "send": "发送",
     "decline": "拒绝",
@@ -2865,8 +2885,17 @@
     "waitingFor": "只有 {{person}} 可以回答。",
     "outcomeBy": "由 {{person}} 提供",
     "outcomeByYou": "由你提供",
-    "outcomeWithdrawn": "已不再需要",
-    "alreadyAnswered": "这个请求已被回答或已过期。",
+    "outcomeWithdrawn": "{{agent}} 不再需要这个了。",
+    "endedDeclined": "已拒绝。{{agent}} 会在没有它的情况下继续。",
+    "endedExpired": "没有人及时回复。{{agent}} 会在没有它的情况下继续，也可以再次请求。",
+    "endedRunStopped": "{{agent}} 的任务在回复前已停止。如果仍然需要，请再次让 {{agent}} 请求。",
+    "endedSuperseded": "{{agent}} 在一个更新的请求中再次提出了请求。",
+    "endedComputer": "这已无法送达 {{agent}}：发出请求的电脑已更换。请让 {{agent}} 重新请求。",
+    "endedPersonLeft": "{{person}} 在回复前离开了工作区。",
+    "endedClosed": "此请求在有人回复前已关闭。如果仍然需要，请再次让 {{agent}} 请求。",
+    "seeNewer": "查看更新的请求",
+    "computerAway": "{{agent}} 的电脑目前没有响应。此请求在 {{time}} 前保持开放。请稍后重试。",
+    "computerPaused": "{{agent}} 的电脑已被所有者暂停。此请求在 {{time}} 前保持开放。",
     "failed": "无法送达。智能体的电脑开着吗？",
     "empty": "请输入值。",
     "tooLarge": "太大了（最多 16 KB）。"
@@ -5440,7 +5469,7 @@
     },
     "vault_write": {
       "label": "编辑 Vault 联系信息",
-      "description": "在 Vault 中保存和更新联系信息，修改已保存登录信息的用户名或描述，并删除它自己保存的内容。"
+      "description": "在 Vault 中保存和更新联系信息，修改已保存登录信息的用户名或描述，为它创建的账号生成密码，并删除它自己保存的内容。"
     },
     "github_git_read": {
       "label": "克隆仓库（git）",
@@ -7657,7 +7686,9 @@
         "runnerOld": "{{computer}} 上的 agentes.chat 程序版本较旧，更新正在路上。完成后这里会自动更新。",
         "execOff": "{{computer}} 暂时还不能运行 {{program}}。我们正在处理，这里会自动更新。",
         "toolOff": "{{computer}} 上还未允许 {{program}}。这是我们这边的问题：请稍后再试。",
-        "preparing": "{{computer}} 正在准备中。完成后这里会自动更新。"
+        "preparing": "{{computer}} 正在准备中。完成后这里会自动更新。",
+        "stuck": "{{program}} 在 {{computer}} 上仍未就绪，而且不会自动改变。请先使用 API 密钥，稍后再试这个套餐。",
+        "away": "{{computer}} 离线的时间已超过一次重启所需。请先使用 API 密钥，稍后再试这个套餐。"
       }
     },
     "done": {
@@ -8659,6 +8690,14 @@
     "startsIn": "约 {{n}} 分钟后开始",
     "startsAfter": "{{after}} 完成后开始",
     "left": "还剩约 {{n}} 分钟",
+    "overdue": "比平时久",
+    "openTask": "打开任务",
+    "fill": {
+      "agent_other": "{{count}} 个由智能体发起",
+      "person_other": "{{count}} 个为人处理",
+      "routine_other": "{{count}} 项例行工作",
+      "work_other": "{{count}} 项长时间工作"
+    },
     "who": "{{name}}",
     "away": "离开 {{time}}",
     "purpose": {
@@ -8674,11 +8713,11 @@
       "yourDm": "你的私信",
       "dm": "与 {{name}} 的私信",
       "thread": "#{{name}} 中的一个话题",
+      "agents": "智能体之间的对话",
       "private": "私密对话"
     },
     "live": {
       "nextEta": "正在等待电脑。下一个就是它，约 {{n}} 分钟后",
-      "nextAfter": "正在等待电脑。{{after}} 完成后就轮到它",
       "next": "正在等待电脑。下一个就是它",
       "waiting": "正在等待电脑",
       "behind": "排队中，第 {{nth}}。在 {{names}} 之后",
@@ -10602,6 +10641,7 @@
       "titleNoLetters": "标题需要包含字母或数字。",
       "lockAdminsOnly": "只有管理员可以锁定页面。"
     },
+    "replyGone": "你正在回复的消息已不存在。",
     "media": {
       "off": "此工作区已关闭 GIF 和贴纸。",
       "notFound": "那个 GIF 已不可用，请换一个。",
@@ -11755,6 +11795,10 @@
     "keyValue": "API 密钥",
     "keyInvalid": "请粘贴 API 密钥（至少 8 个字符）。",
     "keyRefused": "服务商不接受这个密钥。",
+    "keyNoCredit": "{{provider}} 表示这个密钥没有额度。请在那里充值后重新保存。没有保存任何内容。",
+    "keyDenied": "{{provider}} 不允许这个密钥发起调用。请在那里检查权限后重新保存。没有保存任何内容。",
+    "keySaid": "{{provider}} 回复：{{said}}",
+    "keyInUse": "{{agents}} 仍在用这个密钥思考。",
     "keyManagement": "这是一个管理密钥。请创建普通的 API 密钥。",
     "autoModels": {
       "title": "“自动”使用的模型",
@@ -11775,6 +11819,9 @@
     "remove": "删除",
     "removeTitle": "删除密钥 {{label}}",
     "removeText": "密钥将被永久删除。如果仍有智能体在使用它，服务器会拒绝：请先更换这些智能体的密钥。",
+    "removeUnused": "密钥将被永久删除。没有智能体在用它思考。",
+    "removeUsedOther_other": "{{agents}} 正在用这个密钥思考。删除后会改用其他密钥。如果没有适合其模型的密钥，则会请求连接 AI。",
+    "removeUsedNone_other": "{{agents}} 正在用这个密钥思考，且没有其他方式。删除后将停止回复，直到你连接其他 AI。",
     "noKeys": "还没有密钥。",
     "platformAvailable": "也可以使用此服务器的 Claude 密钥。",
     "usageTitle": "按类型划分的 API 花费",
@@ -12186,6 +12233,7 @@
       "waitingAgents_female": "{{name}} 把部分工作交了出去，正在等待回复"
     },
     "consultPair": {
+      "took": "用了 {{time}}",
       "asking": "提问中",
       "working": "处理中",
       "waitingApproval": "等待批准",
@@ -12542,6 +12590,7 @@
       "usage_paused_budget": "{{agent}} 暂停了这项工作 · 每月预算已用 {{percent}}%",
       "work_auto_moved": "这需要一些时间，所以我会在后台继续。我会在这里发布进展，下一次大约在 {{minutes}} 分钟后。",
       "work_auto_movedOver": "这需要一些时间，所以我会在后台继续。我会在这里发布进展。",
+      "moved_on": "继续在 {{link}}",
       "work_end_done": "完成（{{minutes}} 分钟）。",
       "work_end_failed": "这项后台工作没有完成（{{minutes}} 分钟）。",
       "work_end_failedWhy": "这项后台工作没有完成（{{minutes}} 分钟）：{{why}}。",
@@ -12819,6 +12868,10 @@
       "label": "运行技能脚本",
       "description": "在环境中运行技能的脚本。"
     },
+    "vault_make_password": {
+      "label": "生成密码",
+      "description": "在它的电脑上生成强密码，并在不查看的情况下作为密钥保存到 Vault。"
+    },
     "computer_status": {
       "label": "检查电脑",
       "description": "说明是哪台电脑，以及它是否有响应。"
@@ -12874,6 +12927,10 @@
     "browser_type_secret": {
       "label": "输入密码",
       "description": "在不查看的情况下，把你提供的密码输入到密码或验证码字段中。"
+    },
+    "browser_make_password": {
+      "label": "生成密码",
+      "description": "在它的电脑上为网站生成强密码，在不查看的情况下保存到 Vault 并输入。"
     },
     "browser_wait": {
       "label": "等待页面",
@@ -13261,6 +13318,7 @@
         "browser_scroll": "滚动了页面",
         "browser_upload": "上传了一个文件",
         "browser_type_secret": "输入了密码",
+        "browser_make_password": "生成了密码",
         "browser_wait": "等待页面加载",
         "browser_screenshot": "截取了屏幕",
         "browser_ask_person": "请求了帮助",
@@ -13830,6 +13888,15 @@
     "agentTasks": "{{name}} 的任务",
     "tasks_other": "{{count}} 个任务",
     "free": "空闲",
+    "hiddenTasks_other": "{{count}} 个你看不到的任务",
+    "hiddenLine_other": "你看不到的对话里还有 {{count}} 个任务。",
+    "helpers_other": "{{count}} 个协助者",
+    "delegated": {
+      "fromPerson": "由 {{name}} 发起",
+      "fromYou": "由你发起",
+      "fromRoutine": "由例行工作 {{name}} 发起",
+      "stopNote": "停止后，{{name}} 会收到通知，不会自行再次请求。"
+    },
     "columns": {
       "task": "任务",
       "state": "状态",
@@ -13839,6 +13906,7 @@
     },
     "sections": {
       "asked": "成员的请求",
+      "delegated": "智能体发起",
       "background": "后台例行工作"
     },
     "state": {
@@ -13909,6 +13977,8 @@
       "openManager": "在任务管理器中打开"
     },
     "confirm": {
+      "chainTitle_other": "停止 {{name}} 和 {{count}} 个协助者？",
+      "chainBody": "已完成的内容会保留，大家都会收到通知。",
       "title_other": "要停止 {{name}} 的 {{count}} 个任务吗？",
       "body": "已完成的部分会保留，{{name}} 也会知道是你停止的。",
       "short": "{{name}} 会知道是你停止的。",

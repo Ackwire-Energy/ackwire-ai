@@ -87,6 +87,25 @@ test("a member's Lodi page has Sua IA: what their DM thinks with without a plan,
   expect(screen().getByRole("dialog", { name: /Lodi/ })).toBeTruthy();
 });
 
+test("after a key is chosen and the page reloads, Lodi's settings name it: Sua IA says it's the workspace's, the workspace's AI shows it", async () => {
+  const state = withRightHand(seedState());
+  const api = createFakeApi(state);
+  const key = { provider: "openai", label: "OpenAI da Acme" };
+  api.agents.brain = async (_org, id, scope) =>
+    fakeAgentBrain(id, {
+      scope: scope ?? "mine",
+      brain: "model",
+      accounts: [],
+      canUsePlans: true,
+      workspaceAi: { brain: "model", ownerId: null, servesYou: true, key },
+    });
+  await renderApp(`/org/${ORG_ID}/settings/right_hand`, { api });
+  await settle(8);
+  const rows = [...document.querySelectorAll(".settings-row")].map((r) => r.textContent ?? "");
+  expect(rows.find((r) => r.includes("Sua IA"))).toContain("a chave do workspace: OpenAI da Acme");
+  expect(rows.find((r) => r.includes("IA do workspace"))).toContain("OpenAI da Acme");
+});
+
 describe("the agent's page beside its conversation", () => {
   const openPanel = async () => {
     const state = withRightHand(seedState());

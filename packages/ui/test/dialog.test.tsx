@@ -294,7 +294,7 @@ describe("Dialog without a footer", () => {
     expect(dialog.lastElementChild?.classList.contains("ac-dialog__body")).toBe(true);
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     expect(css).toMatch(
-      /\n\.ac-dialog__body:last-child,\n\.ac-dialog__list:last-child \{\s*padding-bottom: var\(--dialog-pad\);/,
+      /\n:is\(\.ac-dialog__body, \.ac-dialog__list\):last-child:not\(\.ac-locked:not\(:last-child\) > \*\) \{\s*padding-bottom: var\(--dialog-pad\);/,
     );
   });
 

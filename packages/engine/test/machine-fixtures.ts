@@ -15,6 +15,7 @@ import {
   grantScopes,
   type MachineHub,
   MachineRequestError,
+  openFilePull,
   pollDeviceToken,
   receiveMachineUpload,
   setAgentComputerTarget,
@@ -107,6 +108,10 @@ export interface FakeRunnerOptions {
     /** The runner refuses it (`approval_needed`: its command policy held it). */
     | { fail: { code: string; message: string } };
   push?: (req: Extract<Request, { op: "push" }>, bytes: Uint8Array, name: string) => Promise<void>;
+  /** What this computer fetches for a `pull`; `connectedComputer`'s default goes to `openFilePull` as its machine. */
+  pull?: (req: Extract<Request, { op: "pull" }>) => Promise<Uint8Array>;
+  /** Says hello at this protocol (`connectedComputer`). */
+  protocol?: number;
   execAllowed?: boolean;
   /** A socket whose close never reaches the hub (a runner killed behind a proxy: half-open). */
   dead?: boolean;
@@ -244,6 +249,15 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
           contentType: "",
         });
       }
+      case "pull": {
+        try {
+          const data = (await options.pull?.(req)) ?? new Uint8Array();
+          files.set(req.path, data);
+          return ok({ size: data.byteLength, sha256: createHash("sha256").update(data).digest("hex") });
+        } catch (error) {
+          return fail("pull_failed", error instanceof Error ? error.message : String(error));
+        }
+      }
     }
   };
   const socket = {
@@ -299,7 +313,13 @@ export async function connectedComputer(f: Fixture, options: FakeRunnerOptions =
   });
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "sandbox:run" }]);
   await setAgentComputerTarget(deps, f.owner.id, f.org.id, f.agent.id, paired.machineId);
-  const runner = fakeRunner(f.machineHub as MachineHub, options);
-  await runner.hello(paired.token);
+  const runner = fakeRunner(f.machineHub as MachineHub, {
+    pull: async (req) => {
+      const { body } = await openFilePull(f.artifactDeps, req.pullId, paired.machineId);
+      return new Uint8Array(await new Response(body).arrayBuffer());
+    },
+    ...options,
+  });
+  await runner.hello(paired.token, options.protocol ? { protocol: options.protocol } : {});
   return { paired, runner };
 }

@@ -17,6 +17,7 @@ import { entriesOffScreen } from "@agenteschat/client/lib/activity";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOpen, messageProposalCards, proposalTarget, proposerOf } from "@agenteschat/client/lib/proposals";
+import { secretLabel } from "@agenteschat/client/lib/secret-requests";
 import {
   type ComponentRef,
   createContext,
@@ -194,10 +195,14 @@ function ApprovalProbe({ id, messageId, order }: { id: string; messageId: string
 }
 
 function SecretProbe({ request: s, messageId, order }: { request: SecretRequest; messageId: string; order: number }) {
+  const { t } = useTranslation();
   const meId = useMeId();
+  const dir = useDirectory();
   const expired = useExpired(s.expiresAt);
   const waits = s.status === "pending" && !expired && s.requestedForUserId === meId;
-  const ask = waits ? { id: s.id, kind: "secret" as const, agentId: s.agentId, what: s.name, messageId, order } : null;
+  const agent = dir.anyAgent(s.agentId)?.name ?? t("channel.unknownAgent");
+  const what = secretLabel(t, s, agent);
+  const ask = waits ? { id: s.id, kind: "secret" as const, agentId: s.agentId, what, messageId, order } : null;
   return <Report id={s.id} ask={ask} />;
 }
 
@@ -456,7 +461,12 @@ export function AskCard({
     well && (well.detail || well.more) ? (
       <>
         <View style={styles.sourceMark}>{well.tile}</View>
-        <Text variant="footnote" tone="faint" numberOfLines={open ? 3 : 1} style={styles.grow}>
+        <Text
+          variant="footnote"
+          tone="faint"
+          numberOfLines={well.more ? (open ? 3 : 1) : undefined}
+          style={styles.grow}
+        >
           {well.detail || well.more?.label}
         </Text>
         {well.more ? (
@@ -487,7 +497,7 @@ export function AskCard({
             ) : null}
           </View>
           {title ? (
-            <Text variant="title" tone="ink" numberOfLines={4}>
+            <Text variant="title" tone="ink" numberOfLines={well && !well.more ? undefined : 4}>
               {title}
             </Text>
           ) : null}

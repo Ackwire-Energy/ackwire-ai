@@ -1976,7 +1976,6 @@ export const featureKeysEn = {
       as: "Signs in as {{username}}.",
       saved: "Saved to the Vault",
       notSaved: "Sent, but not saved to the Vault",
-      codeLabel: "Code for {{name}}",
       codeIncomplete: "Type every digit of the code.",
       codeNote: "Sent encrypted straight to the computer. Codes are never saved.",
     },

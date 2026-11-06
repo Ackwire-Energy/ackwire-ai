@@ -131,7 +131,7 @@ test("a routine set to act wakes the agent its message mentions, once, for the r
   // It works within the routine's bounds, with its creator's reach.
   expect(routineCreatorOf(await runAuthorityById(f.db, f.org.id, opsRuns[0]?.id as string))).toBe(f.owner.id);
   expect(systemText(f.provider.calls[0]?.request.system ?? "")).toContain(
-    "An @mention in your hand_off message also wakes that agent",
+    "An @mention in your hand_off message also wakes an agent of",
   );
 });
 
@@ -165,7 +165,7 @@ test("a routine set to act that already told the agent wakes it no second time b
   expect(opsRuns[0]?.triggerMessageId).not.toBe(posted?.id);
 });
 
-test("a routine set to act hands its mention to an agent outside as a note, and one its creator can't reach shows why", async () => {
+test("a routine's @ of an agent outside reaches nobody and its result says so; a member its creator can't reach shows why", async () => {
   const order = "@ops e @gil, o checkout caiu esta noite: investiguem.";
   f = await setup({
     handOff: true,
@@ -195,13 +195,12 @@ test("a routine set to act hands its mention to an agent outside as a note, and 
   await drainOutbox(f.db, f.handlers);
 
   const [posted] = await messagesIn(f, f.general.id);
-  const [note] = await f.db.select().from(schema.agentConsultations);
-  expect(note?.targetAgentId).toBe(ops.id);
+  expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
+  expect((await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === ops.id)).toEqual([]);
   const reach = reachOf(posted?.meta);
-  expect(reach.map((e) => [e.handle, e.reason, !!e.consultationId]).sort()).toEqual([
-    ["gil", "routine_creator_reach", false],
-    ["ops", "not_in_channel", true],
-  ]);
+  expect(reach.map((e) => [e.handle, e.reason, !!e.consultationId])).toEqual([["gil", "routine_creator_reach", false]]);
+  const results = (await f.db.select().from(schema.agentRunSteps)).filter((s) => s.kind === "tool_result");
+  expect(JSON.stringify(results.map((s) => s.data))).toContain("@ops wasn't in that conversation");
   expect((await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === gil.id)).toEqual([]);
   const [told] = await notificationsOf(f, "agent_unreached");
   expect(told?.userId).toBe(bob.id);

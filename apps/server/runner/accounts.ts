@@ -912,7 +912,7 @@ function urlsIn(text: string, host: (h: string) => boolean, final: boolean) {
 const toUrl = (url: string | null) => (url ? { url } : null);
 /** In an account folder while its sign-in runs (removed when it signs in). */
 const SIGNING_IN = ".signing-in";
-/** `<id>.method` of Claude's own login for all agents (`sharedLogin`). Protocol 47 says `cli_login`. */
+/** `<id>.method` of Claude's own login for all agents (`sharedLogin`). Protocol 49 says `cli_login`. */
 const CLI_SHARED = "cli_shared";
 
 const hostIs = (h: string, domain: string) => h === domain || h.endsWith(`.${domain}`);
@@ -1247,7 +1247,7 @@ export class AccountManager {
     return this.authEgressSaid;
   }
 
-  /** Protocol 47 (`hello.authEgressGroup`): root's Claude CLIs on account folders run in the auth egress group. */
+  /** Protocol 49 (`hello.authEgressGroup`): root's Claude CLIs on account folders run in the auth egress group. */
   authEgressGroup(): boolean {
     return this.authPrefix() !== null;
   }
@@ -1283,7 +1283,7 @@ export class AccountManager {
     }
   }
 
-  /** What root wrote beside the folder when its sign-in began (protocol 47); null for an older folder. */
+  /** What root wrote beside the folder when its sign-in began (protocol 49); null for an older folder. */
   private rawMethod(kind: AccountKind, id: string): string | null {
     try {
       return readFileSync(this.marker(kind, id, "method"), "utf8").trim();
@@ -1343,7 +1343,7 @@ export class AccountManager {
   }
 
   /**
-   * Protocol 47 (`hello`): what a new Claude sign-in for all agents uses here. In system mode the CLI's own sign-in
+   * Protocol 49 (`hello`): what a new Claude sign-in for all agents uses here. In system mode the CLI's own sign-in
    * needs its own user and mount view, offered only once the computer's self-check says they hold.
    */
   claudeLoginMethods(): AuthMethod[] {
@@ -1378,7 +1378,7 @@ export class AccountManager {
    * system mode): a sign-in for every agent of its owner here, which root
    * keeps: Claude's through `claude setup-token` (no login hint there), a
    * plan's key as it is, ChatGPT's through `codex login` as root (`grant` hands its `auth.json` to each turn).
-   * `method` (protocol 47, a Claude subscription sign-in): the one to use, or a refusal; never another one. The method
+   * `method` (protocol 49, a Claude subscription sign-in): the one to use, or a refusal; never another one. The method
    * a sign-in uses is kept beside its folder (`<id>.method`), and signing in again another way is refused.
    */
   async begin(

@@ -96,7 +96,7 @@ describe("buttons and kbd", () => {
 
   test("off, a button is a faint plate over what it sits on, so its shape shows on the dark page too", async () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
-    const off = css.split('\n.ac-btn[disabled],\n.ac-btn[aria-disabled="true"] {').at(-1)?.split("}")[0] ?? "";
+    const off = css.split('\n.ac-btn:disabled,\n.ac-btn[aria-disabled="true"] {').at(-1)?.split("}")[0] ?? "";
     expect(off).toContain("background: var(--plate)");
     expect(off).not.toContain("var(--sunken)");
   });

@@ -15,7 +15,19 @@ import {
   type PlanUsage,
   type PubSub,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  type Executor,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import {
   AUTO_MODEL,
   type ContextLimit,
@@ -24,6 +36,8 @@ import {
   isAutoModel,
   isContextLimit,
   MODEL_CATALOG,
+  modelProvider,
+  parseCustomModel,
 } from "@agenteschat/providers";
 import {
   ANTIGRAVITY_MODELS,
@@ -49,6 +63,7 @@ import {
 import { recordAudit } from "./audit";
 import { BRAIN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
+import { defaultCredentials, providerKeyOf } from "./credentials";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
   defaultAccountLabel,
@@ -79,6 +94,7 @@ import { resolveNotifications } from "./notifications";
 import { can, getMembership, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRightHand, personalBrain } from "./right-hand";
+import { orgModelProvider } from "./router";
 import { closedRefusal } from "./standing";
 import { wakeAgentUsageWaits } from "./usage-pause";
 
@@ -388,6 +404,8 @@ export interface RightHandWorkspaceAi {
   ownerId: string | null;
   /** It thinks for the caller: a key, a plan its owner lets serve everyone ("Atende outras pessoas"), or theirs. */
   servesYou: boolean;
+  /** On a key: the workspace's key it thinks with, by its provider and name; null with none (the server's may serve). */
+  key?: { provider: string; label: string } | null;
 }
 
 export interface AgentBrainView {
@@ -641,10 +659,32 @@ async function personalAgent(db: Database, agent: Agent, userId: string, account
   return { ...(await settingsAgent(db, mine, userId, account ?? first?.id)), ownerUserId: userId };
 }
 
+/** The workspace's key the right hand's model thinks with, in the order its calls take: null where they'd find none. */
+async function workspaceKey(db: Database, agent: Agent) {
+  const pinned = parseCustomModel(agent.model)?.credentialId ?? agent.credentialId;
+  const [provider, defaults, rows] = await Promise.all([
+    isAutoModel(agent.model) ? orgModelProvider(db, agent.orgId) : modelProvider(agent.model),
+    defaultCredentials(db, agent.orgId),
+    db
+      .select({
+        id: schema.providerCredentials.id,
+        provider: schema.providerCredentials.provider,
+        label: schema.providerCredentials.label,
+        revokedAt: schema.providerCredentials.revokedAt,
+      })
+      .from(schema.providerCredentials)
+      .where(eq(schema.providerCredentials.orgId, agent.orgId))
+      .orderBy(asc(schema.providerCredentials.createdAt)),
+  ]);
+  const key = pinned ? rows.find((r) => r.id === pinned && !r.revokedAt) : providerKeyOf(rows, defaults, provider);
+  return key ? { provider: key.provider, label: key.label } : null;
+}
+
 /** What everyone's DM with the right hand thinks with while they have no AI of their own (its `agents` row). */
 async function workspaceAi(db: Database, agent: Agent, userId: string): Promise<RightHandWorkspaceAi> {
   const brain = brainOf(agent.brain);
-  if (brain === "model" || !agent.brainAccountId) return { brain: "model", ownerId: null, servesYou: true };
+  if (brain === "model" || !agent.brainAccountId)
+    return { brain: "model", ownerId: null, servesYou: true, key: await workspaceKey(db, agent) };
   const ownerId = await accountOwnerOf(db, agent.orgId, agent.brainAccountId);
   return { brain, ownerId, servesYou: agent.planForOthers || ownerId === userId };
 }
@@ -850,7 +890,10 @@ export async function getAgentBrain(
     candidateMachines(deps.db, userId, orgId, admin, agent.machineId),
     machineLook.then((m) => brainAccounts(deps.db, userId, orgId, agent, m, others)),
   ]);
-  return view(agent, machine, machines, accounts, userId, others);
+  return {
+    ...view(agent, machine, machines, accounts, userId, others),
+    ...(access.scope ? { workspaceAi: await workspaceAi(deps.db, access.agent, userId) } : {}),
+  };
 }
 
 /**

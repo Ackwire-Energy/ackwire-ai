@@ -47,6 +47,8 @@ export interface VoiceTarget {
   orgId: string;
   channelId: string;
   threadId: string | null;
+  /** The message this take answers (`meta.replyTo`). */
+  replyTo?: string | null;
   authorId: string;
   /** Whether this person may record now (`/voice/allowed`); null while unknown. */
   allowed: boolean | null;
@@ -173,7 +175,7 @@ export function useVoiceTake(target: VoiceTarget) {
   }, [finishStretch, joined, path, progress, setPhase]);
 
   const send = useCallback(async () => {
-    const { orgId, channelId, threadId, authorId, afterSend } = targetRef.current;
+    const { orgId, channelId, threadId, replyTo = null, authorId, afterSend } = targetRef.current;
     stopPlayback();
     await finishStretch();
     const total = doneMs.current;
@@ -196,7 +198,7 @@ export function useVoiceTake(target: VoiceTarget) {
           orgId,
           channelId,
           threadId,
-          replyTo: null,
+          replyTo,
           authorId,
           durationMs: Math.round(file.ms),
           peaks: peaksOf(all.slice(from, to)),

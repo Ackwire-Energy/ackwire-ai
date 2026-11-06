@@ -21,7 +21,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { AgentAvatar, Button, Card, Icon, LineIcon, LogoMark, Text, Toggle, useTheme } from "@/ui";
+import { AgentAvatar, Button, Card, Icon, LineIcon, Locked, LogoMark, Text, Toggle, useTheme } from "@/ui";
 import { openPage } from "../ai/parts";
 import { tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
@@ -179,41 +179,43 @@ function Picker({ imp }: { imp: AgentImport }) {
 
   return (
     <>
-      <Card>
-        {IMPORT_CARDS.map((card, i) => {
-          const on = imp.card === card;
-          const name = cardName(t, card);
-          return (
-            <View key={card}>
-              <Pressable
-                onPress={() => {
-                  tapHaptic();
-                  imp.setCard(on ? null : card);
-                }}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={name}
-                style={({ pressed }) => [
-                  styles.source,
-                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-                  pressed && { backgroundColor: c.sunken },
-                ]}
-              >
-                <SourceMark card={card} />
-                <Text variant="body" style={styles.fill}>
-                  {name}
-                </Text>
-                {on ? <Icon name="checkc" size={24} color={c.ink} /> : null}
-              </Pressable>
-              {on && !isRequestCard(card) ? (
-                <View style={styles.where}>
-                  <Note icon="info">{t(`mobile.newAgent.import.where.${card}`)}</Note>
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
-      </Card>
+      <Locked when={busy}>
+        <Card>
+          {IMPORT_CARDS.map((card, i) => {
+            const on = imp.card === card;
+            const name = cardName(t, card);
+            return (
+              <View key={card}>
+                <Pressable
+                  onPress={() => {
+                    tapHaptic();
+                    imp.setCard(on ? null : card);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={name}
+                  style={({ pressed }) => [
+                    styles.source,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                    pressed && { backgroundColor: c.sunken },
+                  ]}
+                >
+                  <SourceMark card={card} />
+                  <Text variant="body" style={styles.fill}>
+                    {name}
+                  </Text>
+                  {on ? <Icon name="checkc" size={24} color={c.ink} /> : null}
+                </Pressable>
+                {on && !isRequestCard(card) ? (
+                  <View style={styles.where}>
+                    <Note icon="info">{t(`mobile.newAgent.import.where.${card}`)}</Note>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </Card>
+      </Locked>
 
       {isRequestCard(imp.card) ? <RequestSteps key={imp.card} card={imp.card} /> : null}
 
@@ -237,18 +239,19 @@ function Picker({ imp }: { imp: AgentImport }) {
       <Text variant="footnote" tone="faint" style={styles.gapTop}>
         {t("mobile.newAgent.import.pasteTitle")}
       </Text>
-      <TextArea
-        value={text}
-        onChangeText={setText}
-        editable={!busy}
-        autoCapitalize="none"
-        autoCorrect={false}
-        spellCheck={false}
-        placeholder={t("onboarding.import.pastePlaceholder")}
-        accessibilityLabel={t("mobile.newAgent.import.pasteTitle")}
-        minHeight={160}
-        style={styles.paste}
-      />
+      <Locked when={busy}>
+        <TextArea
+          value={text}
+          onChangeText={setText}
+          autoCapitalize="none"
+          autoCorrect={false}
+          spellCheck={false}
+          placeholder={t("onboarding.import.pastePlaceholder")}
+          accessibilityLabel={t("mobile.newAgent.import.pasteTitle")}
+          minHeight={160}
+          style={styles.paste}
+        />
+      </Locked>
       <View style={styles.actions}>
         <Button
           variant="secondary"

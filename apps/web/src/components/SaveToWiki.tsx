@@ -1,5 +1,5 @@
 import { useWikiAction, useWikiTree } from "@agenteschat/client";
-import { Button, Dialog, DialogBody, DialogFooter, Icon, SearchField } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Icon, Locked, SearchField } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -67,55 +67,50 @@ export function SaveToWikiDialog({
       closeLabel={t("common.close")}
       width={520}
     >
-      <DialogBody>
-        <SearchField
-          size="sm"
-          aria-label={t("wiki.savePick")}
-          placeholder={t("wiki.search")}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onClear={() => setQ("")}
-          clearLabel={t("filters.clearSearch")}
-        />
-        {/* biome-ignore lint/a11y/useSemanticElements: a scroll region of page choices */}
-        <div className="save-wiki__list" role="region" aria-label={t("wiki.savePick")}>
-          {pages.map((p) => (
-            <button
-              key={p.slug}
-              type="button"
-              className="save-wiki__page"
-              disabled={action.isPending || busy}
-              onClick={() => appendTo(p.slug, p.title)}
-            >
-              <Icon name="book" size={14} />
-              <span>{p.title}</span>
-              {p.folder && <span className="small muted">{p.folder}</span>}
-            </button>
-          ))}
-          {query && !exact && (
-            <button
-              type="button"
-              className="save-wiki__page save-wiki__page--new"
-              disabled={action.isPending || busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  const page = await action.mutateAsync({
-                    type: "create",
-                    input: { title: query, body: `# ${query}\n\n` },
-                  });
-                  appendTo(page.slug, page.title);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <Icon name="plus" size={14} />
-              <span>{t("wiki.saveNew", { title: query })}</span>
-            </button>
-          )}
-        </div>
-      </DialogBody>
+      <Locked when={action.isPending || busy}>
+        <DialogBody>
+          <SearchField
+            size="sm"
+            aria-label={t("wiki.savePick")}
+            placeholder={t("wiki.search")}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onClear={() => setQ("")}
+            clearLabel={t("filters.clearSearch")}
+          />
+          {/* biome-ignore lint/a11y/useSemanticElements: a scroll region of page choices */}
+          <div className="save-wiki__list" role="region" aria-label={t("wiki.savePick")}>
+            {pages.map((p) => (
+              <button key={p.slug} type="button" className="save-wiki__page" onClick={() => appendTo(p.slug, p.title)}>
+                <Icon name="book" size={14} />
+                <span>{p.title}</span>
+                {p.folder && <span className="small muted">{p.folder}</span>}
+              </button>
+            ))}
+            {query && !exact && (
+              <button
+                type="button"
+                className="save-wiki__page save-wiki__page--new"
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const page = await action.mutateAsync({
+                      type: "create",
+                      input: { title: query, body: `# ${query}\n\n` },
+                    });
+                    appendTo(page.slug, page.title);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <Icon name="plus" size={14} />
+                <span>{t("wiki.saveNew", { title: query })}</span>
+              </button>
+            )}
+          </div>
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
       </DialogFooter>

@@ -207,7 +207,8 @@ html:not([data-pointer]) .mcard__emoji:focus-visible {
   padding: var(--menu-pad);
 }
 /* Cancelar and Salvar on the room (`.ac-popover`), everything over them further in. */
-.mcard-audience.ac-popover > :not(.mcard-audience__acts) {
+.mcard-audience.ac-popover > :not(.mcard-audience__acts),
+.mcard-audience.ac-popover > .ac-locked > * {
   margin-inline: var(--popover-in);
 }
 .mcard-audience__title {

@@ -1,5 +1,6 @@
+import type { keyRefusal } from "@agenteschat/client/lib/errors";
 import { type ProviderId, providerOf, providersForKey } from "@agenteschat/client/lib/providers";
-import { Button, ProviderLogo } from "@agenteschat/ui";
+import { Button, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -19,6 +20,20 @@ export function KeySite({ provider }: { provider: ProviderId }) {
       {p.billing && ` ${t("connectAi.key.billing")}`}
       {p.privacy && ` ${t("connectAi.key.privacy")}`}
     </>
+  );
+}
+
+/** A key its provider refused on its test call: why, in the provider's words too, and the page that fixes it. */
+export function KeyRefused({ refusal }: { refusal: NonNullable<ReturnType<typeof keyRefusal>> }) {
+  return (
+    <SettingNote icon="alert" live>
+      {refusal.text}{" "}
+      {refusal.href && (
+        <a className="ac-link" href={refusal.href} target="_blank" rel="noreferrer">
+          {refusal.site}
+        </a>
+      )}
+    </SettingNote>
   );
 }
 

@@ -626,6 +626,19 @@ describe("what waits on a plan's limit: Não rodar", () => {
     await click(within(paused).getByRole("button", { name: "Não rodar" }));
     expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-u-open")).toBe(true);
     expect(cards.some((a) => a.textContent?.includes("Cancelado. Não vai rodar quando o limite voltar."))).toBe(true);
+    cleanup();
+
+    const held = createFakeApi(state);
+    held.agents.cancelRun = () => new Promise(() => {});
+    state.messages.push(usageCard("u-held", {}, 2));
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: held });
+    await settle(5);
+    const waiting = screen()
+      .getAllByRole("article")
+      .find((a) => a.querySelector(".waitcard") && within(a).queryByRole("button", { name: "Continuar agora" }));
+    await click(within(waiting as HTMLElement).getByRole("button", { name: "Não rodar" }));
+    const go = within(waiting as HTMLElement).getByRole("button", { name: "Continuar agora" });
+    expect(go.closest("fieldset[disabled]")).not.toBeNull();
   });
 });
 

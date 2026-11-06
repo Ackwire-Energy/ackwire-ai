@@ -117,6 +117,8 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
     : null;
 }
 
+type PullFrame = Extract<WorkerLinkFrame, { type: "pull.head" | "pull.chunk" | "pull.end" }>;
+
 /**
  * The worker's end of the link. Each dial is one session on the same pipes;
  * `worker.close` ends it (the supervisor's own session with the server
@@ -125,6 +127,7 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
 export class WorkerLink {
   private session: SocketHandlers | null = null;
   private readonly uploads = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "upload.reply" }>) => void>();
+  private readonly pulls = new Map<string, (frame: PullFrame) => void>();
   private readonly desktops = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "desktop.ensured" }>) => void>();
   private nextEnsure = 0;
   private readonly enters = new Map<string, () => void>();
@@ -225,6 +228,11 @@ export class WorkerLink {
         return;
       case "upload.reply":
         if (typeof f.uploadId === "string") this.uploads.get(f.uploadId)?.(f as never);
+        return;
+      case "pull.head":
+      case "pull.chunk":
+      case "pull.end":
+        if (typeof f.pullId === "string") this.pulls.get(f.pullId)?.(f as never);
         return;
       case "desktop.ensured":
         if (typeof f.ensureId === "string") this.desktops.get(f.ensureId)?.(f as never);
@@ -429,11 +437,12 @@ export class WorkerLink {
   }
 
   /**
-   * `push` without the machine token: the bytes go to the supervisor in
-   * pieces, it uploads them to the request's URL and says how that went.
+   * `push` and `pull` without the machine token: the supervisor makes the request to the URL of the server's own
+   * request, which also keeps it off the route the agent's programs take, and the bytes cross the link in pieces.
    */
   readonly fetch: FetchLike = (_url, init) => {
     const headers = new Headers(init.headers as Record<string, string>);
+    if (init.method === "GET") return this.pull(headers.get("x-agentes-pull-id") ?? "", init.signal ?? undefined);
     const uploadId = headers.get("x-agentes-upload-id") ?? "";
     const body = init.body instanceof Uint8Array ? init.body : new Uint8Array();
     const signal = init.signal ?? undefined;
@@ -468,6 +477,38 @@ export class WorkerLink {
       );
     });
   };
+
+  private pull(pullId: string, signal?: AbortSignal) {
+    return new Promise<Response>((resolve, reject) => {
+      let sink: ReadableStreamDefaultController<Uint8Array> | undefined;
+      const done = () => {
+        this.pulls.delete(pullId);
+        signal?.removeEventListener("abort", abort);
+      };
+      const fail = (error: Error) => {
+        done();
+        reject(error);
+        sink?.error(error);
+      };
+      const abort = () => fail(signal?.reason instanceof Error ? signal.reason : new Error("Canceled"));
+      const body = new ReadableStream<Uint8Array>({
+        start: (controller) => {
+          sink = controller;
+        },
+        cancel: done,
+      });
+      this.pulls.set(pullId, (f) => {
+        if (f.type === "pull.head") resolve(new Response(body, { status: f.status }));
+        else if (f.type === "pull.chunk") sink?.enqueue(Buffer.from(f.data, "base64"));
+        else if (f.error === undefined) {
+          done();
+          sink?.close();
+        } else fail(new Error(f.error));
+      });
+      signal?.addEventListener("abort", abort, { once: true });
+      this.write(JSON.stringify({ type: "pull.start", pullId } satisfies WorkerLinkFrame));
+    });
+  }
 }
 
 /** Runs the worker until the supervisor goes away; its background tasks keep running (ADR 0029). */

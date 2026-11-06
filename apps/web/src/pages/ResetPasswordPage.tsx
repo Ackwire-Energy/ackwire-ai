@@ -1,6 +1,6 @@
 import { authErrorText } from "@agenteschat/client/lib/errors";
 import { passwordState } from "@agenteschat/client/lib/text";
-import { Button, Icon, Input } from "@agenteschat/ui";
+import { Button, Icon, Input, Locked } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -52,59 +52,61 @@ export function ResetPasswordPage({ token }: { token?: string }) {
           </div>
         </header>
         <div className="auth__step">
-          {expired || done ? (
-            <Button asChild variant="primary" size="lg" block>
-              <Link to="/login">{expired ? t("auth.reset.askAgain") : t("auth.signIn")}</Link>
-            </Button>
-          ) : (
-            <>
-              <div className="auth__field">
-                <div className="auth__pass">
-                  <Input
-                    className="auth__big"
-                    type={show ? "text" : "password"}
-                    aria-label={t("auth.reset.title")}
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onFocus={() => setFocus(true)}
-                    onBlur={() => setFocus(false)}
-                    autoFocus
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    icon={show ? "eyeOff" : "eye"}
-                    aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}
-                    aria-pressed={show}
-                    className="auth__eye"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setShow((s) => !s)}
-                  />
-                </div>
-                <PasswordHelp password={password} />
-              </div>
-              {error && (
-                <p className="auth__error ac-iconline" role="alert">
-                  <Icon name="alert" size={14} />
-                  {error}
-                </p>
-              )}
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                block
-                kbd={["↵"]}
-                loading={pending}
-                disabled={passwordState(password) !== "ok"}
-              >
-                {t("auth.reset.save")}
+          <Locked when={pending}>
+            {expired || done ? (
+              <Button asChild variant="primary" size="lg" block>
+                <Link to="/login">{expired ? t("auth.reset.askAgain") : t("auth.signIn")}</Link>
               </Button>
-            </>
-          )}
+            ) : (
+              <>
+                <div className="auth__field">
+                  <div className="auth__pass">
+                    <Input
+                      className="auth__big"
+                      type={show ? "text" : "password"}
+                      aria-label={t("auth.reset.title")}
+                      autoComplete="new-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onFocus={() => setFocus(true)}
+                      onBlur={() => setFocus(false)}
+                      autoFocus
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon={show ? "eyeOff" : "eye"}
+                      aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}
+                      aria-pressed={show}
+                      className="auth__eye"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setShow((s) => !s)}
+                    />
+                  </div>
+                  <PasswordHelp password={password} />
+                </div>
+                {error && (
+                  <p className="auth__error ac-iconline" role="alert">
+                    <Icon name="alert" size={14} />
+                    {error}
+                  </p>
+                )}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  block
+                  kbd={["↵"]}
+                  loading={pending}
+                  disabled={passwordState(password) !== "ok"}
+                >
+                  {t("auth.reset.save")}
+                </Button>
+              </>
+            )}
+          </Locked>
         </div>
       </form>
     </AuthShell>

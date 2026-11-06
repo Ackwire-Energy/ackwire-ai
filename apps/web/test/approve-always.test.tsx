@@ -143,7 +143,7 @@ describe("Aprovar sempre on a request", () => {
     const pane = screen().getByRole("region", { name: TITLE });
     expect(pane.textContent).toContain(HINT);
     // Beside Refuse and Approve, first in the bar.
-    const buttons = [...(pane.querySelector(".ap-bar__acts")?.querySelectorAll(":scope > button") ?? [])];
+    const buttons = [...(pane.querySelector(".ap-bar__acts")?.querySelectorAll(".ac-locked > button") ?? [])];
     expect(buttons.map((b) => b.textContent?.replace(/R$/, ""))).toEqual(["Aprovar sempre", "Recusar", "Aprovar"]);
     expect(buttons.at(-1)?.getAttribute("data-approve")).toBe("ap-merge");
     await click(within(pane).getByRole("button", { name: "Aprovar sempre" }));

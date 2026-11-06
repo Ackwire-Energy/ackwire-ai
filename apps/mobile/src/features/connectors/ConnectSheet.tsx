@@ -28,7 +28,19 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, GroupedList, GroupedRow, Icon, InfoHint, LineIcon, Text, useTheme, useToast } from "@/ui";
+import {
+  Button,
+  fieldText,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  InfoHint,
+  LineIcon,
+  Locked,
+  Text,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
@@ -554,7 +566,7 @@ function ConnectStep({
       ) : null}
       {askUrl && phase === "address" ? (
         <>
-          <View style={styles.fieldBox}>
+          <Locked when={busy} style={styles.fieldBox}>
             <Text variant="footnote" tone="faint">
               {t("mobile.connectors.addressLabel")}
             </Text>
@@ -575,8 +587,8 @@ function ConnectStep({
               accessibilityLabel={t("mobile.connectors.addressLabel")}
               style={field}
             />
-          </View>
-          <Button variant="primary" wide label={t("connectFlow.next")} onPress={toEnter} />
+          </Locked>
+          <Button variant="primary" wide label={t("connectFlow.next")} disabled={busy} onPress={toEnter} />
           {error ? <Problem key={error} text={error} /> : null}
         </>
       ) : (
@@ -587,7 +599,13 @@ function ConnectStep({
               <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.grow}>
                 {serverUrl}
               </Text>
-              <Button variant="text" size="sm" label={t("common.back")} onPress={() => setPhase("address")} />
+              <Button
+                variant="text"
+                size="sm"
+                label={t("common.back")}
+                disabled={busy}
+                onPress={() => setPhase("address")}
+              />
             </View>
           ) : null}
           {mode === "signIn" ? (
@@ -606,7 +624,7 @@ function ConnectStep({
             />
           ) : (
             <>
-              <View style={styles.fieldBox}>
+              <Locked when={busy} style={styles.fieldBox}>
                 <InfoHint
                   name={t("common.about", { label: keyLabel })}
                   text={t("mobile.connectors.keyHelp")}
@@ -643,7 +661,7 @@ function ConnectStep({
                     </Text>
                   </Pressable>
                 </View>
-              </View>
+              </Locked>
               <Button
                 variant="primary"
                 wide
@@ -659,6 +677,7 @@ function ConnectStep({
               variant="text"
               size="sm"
               label={mode === "signIn" ? t("mobile.connectors.useKey") : t("mobile.connectors.useSignIn")}
+              disabled={busy}
               onPress={() => setMode(mode === "signIn" ? "key" : "signIn")}
             />
           ) : null}

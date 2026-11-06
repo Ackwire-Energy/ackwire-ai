@@ -9,6 +9,7 @@ import {
   DialogBody,
   Icon,
   Input,
+  Locked,
   Select,
   Spinner,
   Switch,
@@ -367,22 +368,24 @@ function AlertEdit({
   const id = useId();
   return (
     <div className="wd__alert">
-      <div className="wd__alert-on">
-        <Switch id={`${id}-on`} checked={enabled} onCheckedChange={setEnabled} />
-        <label htmlFor={`${id}-on`}>{t("widgets.alert.label")}</label>
-      </div>
-      {enabled && (
-        <div className="wd__cond">
-          <label htmlFor={`${id}-cond`}>{t("widgets.alert.condition")}</label>
-          <Input
-            id={`${id}-cond`}
-            value={condition}
-            maxLength={200}
-            placeholder={t("widgets.alert.placeholder")}
-            onChange={(e) => setCondition(e.target.value)}
-          />
+      <Locked when={saving}>
+        <div className="wd__alert-on">
+          <Switch id={`${id}-on`} checked={enabled} onCheckedChange={setEnabled} />
+          <label htmlFor={`${id}-on`}>{t("widgets.alert.label")}</label>
         </div>
-      )}
+        {enabled && (
+          <div className="wd__cond">
+            <label htmlFor={`${id}-cond`}>{t("widgets.alert.condition")}</label>
+            <Input
+              id={`${id}-cond`}
+              value={condition}
+              maxLength={200}
+              placeholder={t("widgets.alert.placeholder")}
+              onChange={(e) => setCondition(e.target.value)}
+            />
+          </div>
+        )}
+      </Locked>
       <div className="wd__alert-acts">
         <Button size="sm" variant="ghost" onClick={onCancel}>
           {t("common.cancel")}

@@ -114,6 +114,7 @@ test("a thread reply, socket first or POST first: out of the channel, once in th
   for (const socketFirst of [true, false]) {
     const s = setup();
     s.qc.setQueryData(keys.messages("o1", "c1"), []);
+    s.qc.setQueryData(keys.thread("o1", "c1", "root"), []);
     s.send("k1", "root");
     await s.tick();
     const real = server("k1", { threadId: "root" });

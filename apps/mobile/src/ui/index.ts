@@ -56,6 +56,7 @@ export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";
 export { LineIcon, type LineIconProps } from "./LineIcon";
 export { LIST_AVATAR, LIST_INSET, LIST_PREVIEW, LIST_TIME, ListRow, type ListRowProps } from "./ListRow";
+export { Locked } from "./Locked";
 export { LogoMark } from "./LogoMark";
 export {
   CoverTabStack,

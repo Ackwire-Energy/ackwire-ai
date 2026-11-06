@@ -1655,6 +1655,11 @@
     "linkCopied": "Tautan disalin.",
     "reply": "Balas",
     "quoteOf": "Balasan untuk {{name}}: {{excerpt}}. Lihat pesannya",
+    "quoteGone": "Pesan asli dihapus",
+    "jumpTooFar": "Pesan itu terlalu jauh ke belakang untuk dibuka dari sini.",
+    "quoteNoWords": "Pesan tanpa teks",
+    "replyingTo": "Membalas {{name}}",
+    "cancelReply": "Batalkan balasan",
     "emoji": "Emoji",
     "uploading": "mengunggah…",
     "uploadFailed": "tidak terunggah",
@@ -1855,6 +1860,10 @@
       "configure": "Atur",
       "nameStory": "Namanya berasal dari lodestar, bintang penunjuk arah para pelaut."
     },
+    "saved": {
+      "workspace": "{{name}} sekarang berpikir dengan {{label}} untuk semua orang tanpa paket sendiri.",
+      "mine": "Percakapanmu dengan {{name}} sekarang berpikir dengan {{label}}. Hanya percakapanmu."
+    },
     "settings": {
       "name": "Nama dan tampilan",
       "nameHelp": "Di bilah samping selalu tampil sebagai “{{label}}”.",
@@ -1875,6 +1884,8 @@
       "connectMine": "Hubungkan paket saya",
       "useWorkspace": "Pakai milik workspace",
       "fallbackKey": "Tanpa paket sendiri, ia memakai kunci API workspace.",
+      "fallbackKeyOf": "Tanpa paket sendiri, ia memakai kunci workspace: {{label}}.",
+      "fallbackNoKey": "Workspace belum punya kunci API, jadi tanpa paket sendiri tidak ada yang menjawabmu di sini.",
       "fallbackPlan": "Tanpa paket sendiri, ia memakai paket {{owner}}, yang menjawab semua orang.",
       "fallbackYours": "Tanpa paket lain, ia memakai paket workspace, yang milikmu.",
       "fallbackNone": "Tanpa paket sendiri, {{name}} tidak bisa menjawabmu: paket workspace hanya menjawab {{owner}}.",
@@ -2130,8 +2141,11 @@
       "title": "Sudah terhubung",
       "titleFor": "Sudah terhubung, untuk {{name}}",
       "titleFor_female": "Sudah terhubung, untuk {{name}}",
-      "other": "Atau hubungkan yang lain"
+      "other": "Atau hubungkan yang lain",
+      "manageKeys": "Kelola atau hapus kunci"
     },
+    "billing": "Paket masuk di komputer workspace, dan komputer itu datang dengan paket agentes.chat yang aktif.",
+    "billingWeb": "Pilih satu di web, di agentes.chat.",
     "orPayGo": "Atau bayar sesuai pemakaian",
     "plan": {
       "claude": {
@@ -2180,6 +2194,7 @@
       "paste": "Tempel di sini",
       "forAll": "Semua agen tanpa paket berpikir dengan kunci ini.",
       "saved": "Tersimpan. Semua agen tanpa paket berpikir dengan kunci ini.",
+      "savedUnchecked": "Tersimpan, tetapi {{provider}} tidak menjawab, jadi kunci tidak bisa diperiksa. Jika gagal, percakapan memberi tahu alasannya.",
       "notPlan": "Kunci paket coding dimasukkan di opsinya sendiri di atas.",
       "billing": "Aktifkan penagihan untuk proyek kunci ini. Tanpa penagihan, Google bisa memakai apa yang dikirim agenmu.",
       "privacy": "Pengaturan privasi OpenRouter-mu menentukan penyedia mana yang boleh menyimpan apa yang dikirim agenmu.",
@@ -2863,11 +2878,16 @@
   "secret": {
     "group": "Permintaan rahasia dari {{agent}}",
     "chip": "Menunggu",
-    "targetEnv": "Masuk sebagai variabel {{name}} di komputer {{agent}}.",
+    "targetEnv": "Masuk ke komputer {{agent}}, untuk perintahnya.",
     "targetFile": "Masuk ke file {{path}} di komputer {{agent}}.",
     "targetSite": "Hanya browser {{agent}} yang mengetiknya, di {{host}}. Nilainya tidak masuk ke perintah {{agent}}.",
     "replaces": "Menggantikan kunci yang sudah dimiliki {{agent}} dengan nama ini.",
-    "label": "Nilai {{name}}",
+    "labelPassword": "Kata sandi untuk {{host}}",
+    "labelCode": "Kode untuk {{host}}",
+    "labelKey": "Kunci untuk komputer {{agent}}",
+    "labelFile": "File {{path}}",
+    "placeholder": "Ketik di sini",
+    "account": "Akun: {{username}}.",
     "private": "Dikirim terenkripsi langsung ke komputer. Nilainya tidak masuk ke chat dan tidak terlihat oleh agen.",
     "send": "Kirim",
     "decline": "Tolak",
@@ -2875,8 +2895,17 @@
     "waitingFor": "Hanya {{person}} yang bisa menjawab.",
     "outcomeBy": "Dikirim oleh {{person}}",
     "outcomeByYou": "Dikirim olehmu",
-    "outcomeWithdrawn": "Sudah tidak diperlukan",
-    "alreadyAnswered": "Permintaan ini sudah dijawab atau kedaluwarsa.",
+    "outcomeWithdrawn": "{{agent}} tidak membutuhkan ini lagi.",
+    "endedDeclined": "Ditolak. {{agent}} lanjut tanpa ini.",
+    "endedExpired": "Tidak ada yang menjawab tepat waktu. {{agent}} lanjut tanpa ini dan bisa meminta lagi.",
+    "endedRunStopped": "Tugas {{agent}} berhenti sebelum ini dijawab. Minta lagi ke {{agent}} jika masih perlu.",
+    "endedSuperseded": "{{agent}} meminta lagi dalam permintaan yang lebih baru.",
+    "endedComputer": "Ini tidak bisa sampai ke {{agent}} lagi: komputer yang meminta sudah berubah. Minta {{agent}} untuk meminta lagi.",
+    "endedPersonLeft": "{{person}} keluar dari workspace sebelum menjawab.",
+    "endedClosed": "Permintaan ini ditutup sebelum ada yang menjawab. Minta lagi ke {{agent}} jika masih perlu.",
+    "seeNewer": "Lihat permintaan yang lebih baru",
+    "computerAway": "Komputer {{agent}} tidak merespons saat ini. Permintaan ini tetap terbuka sampai {{time}}. Coba lagi sebentar lagi.",
+    "computerPaused": "Komputer {{agent}} dijeda oleh pemiliknya. Permintaan ini tetap terbuka sampai {{time}}.",
     "failed": "Tidak bisa dikirim. Apakah komputer agen menyala?",
     "empty": "Ketik nilainya.",
     "tooLarge": "Terlalu besar (maks. 16 KB)."
@@ -5426,7 +5455,7 @@
     },
     "vault_write": {
       "label": "Mengedit kontak Vault",
-      "description": "Menyimpan dan memperbarui kontak di Vault, mengubah nama pengguna login tersimpan atau deskripsi, dan menghapus yang ia simpan."
+      "description": "Menyimpan dan memperbarui kontak di Vault, mengubah nama pengguna login tersimpan atau deskripsi, membuat kata sandi untuk akun yang ia buat, dan menghapus yang ia simpan."
     },
     "github_git_read": {
       "label": "Kloning repositori (git)",
@@ -7650,7 +7679,9 @@
         "runnerOld": "Program agentes.chat di {{computer}} sudah usang dan pembaruannya sedang dalam perjalanan. Ini berubah sendiri setelah selesai.",
         "execOff": "{{computer}} belum bisa menjalankan {{program}}. Kami sedang menanganinya, dan ini berubah sendiri.",
         "toolOff": "{{program}} belum diizinkan di {{computer}}. Itu urusan kami: coba lagi nanti.",
-        "preparing": "{{computer}} sedang disiapkan. Ini berubah sendiri setelah selesai."
+        "preparing": "{{computer}} sedang disiapkan. Ini berubah sendiri setelah selesai.",
+        "stuck": "{{program}} masih belum siap di {{computer}}, dan ini tidak akan berubah sendiri. Pakai kunci API untuk sementara dan coba paket ini lagi nanti.",
+        "away": "{{computer}} sudah pergi lebih lama dari waktu mulai ulang. Pakai kunci API untuk sementara dan coba paket ini lagi nanti."
       }
     },
     "done": {
@@ -8646,6 +8677,14 @@
     "startsIn": "mulai ~{{n}} mnt lagi",
     "startsAfter": "mulai setelah {{after}} selesai",
     "left": "sisa ~{{n}} mnt",
+    "overdue": "lebih lama dari biasanya",
+    "openTask": "Buka tugas",
+    "fill": {
+      "agent_other": "{{count}} diminta agen",
+      "person_other": "{{count}} untuk orang",
+      "routine_other": "{{count}} rutinitas",
+      "work_other": "{{count}} kerja panjang"
+    },
     "who": "{{name}}",
     "away": "Pergi {{time}}",
     "purpose": {
@@ -8661,11 +8700,11 @@
       "yourDm": "DM kamu",
       "dm": "DM dengan {{name}}",
       "thread": "thread di #{{name}}",
+      "agents": "percakapan antar agen",
       "private": "percakapan pribadi"
     },
     "live": {
       "nextEta": "Menunggu komputer. Giliran berikutnya, sekitar {{n}} mnt lagi",
-      "nextAfter": "Menunggu komputer. Giliran berikutnya setelah {{after}} selesai",
       "next": "Menunggu komputer. Giliran berikutnya",
       "waiting": "Menunggu komputer",
       "behind": "Dalam antrean, ke-{{nth}}. Setelah {{names}}",
@@ -10593,6 +10632,7 @@
       "titleNoLetters": "Judul harus berisi huruf atau angka.",
       "lockAdminsOnly": "Hanya Admin yang bisa mengunci halaman."
     },
+    "replyGone": "Pesan yang kamu balas sudah tidak ada.",
     "media": {
       "off": "GIF dan stiker dinonaktifkan di ruang kerja ini.",
       "notFound": "GIF itu sudah tidak tersedia. Pilih yang lain.",
@@ -11746,6 +11786,10 @@
     "keyValue": "Kunci API",
     "keyInvalid": "Tempel kunci API (minimal 8 karakter).",
     "keyRefused": "Penyedia tidak menerima kunci ini.",
+    "keyNoCredit": "{{provider}} mengatakan kunci ini tidak punya kredit. Tambahkan kredit di sana lalu simpan lagi. Tidak ada yang disimpan.",
+    "keyDenied": "{{provider}} tidak mengizinkan kunci ini melakukan panggilan. Periksa izinnya di sana lalu simpan lagi. Tidak ada yang disimpan.",
+    "keySaid": "{{provider}} berkata: {{said}}",
+    "keyInUse": "{{agents}} masih berpikir dengan kunci ini.",
     "keyManagement": "Ini kunci manajemen. Buat kunci API biasa.",
     "autoModels": {
       "title": "Model untuk Otomatis",
@@ -11766,6 +11810,9 @@
     "remove": "Hapus",
     "removeTitle": "Hapus kunci {{label}}",
     "removeText": "Kunci ini hilang selamanya. Kalau masih ada agen yang memakainya, server akan menolak: ganti dulu kunci agen-agen itu.",
+    "removeUnused": "Kunci hilang untuk selamanya. Tidak ada agen yang berpikir dengannya.",
+    "removeUsedOther_other": "{{agents}} berpikir dengan kunci ini. Setelah kunci hilang, mereka pindah ke kunci lain, atau meminta AI jika tidak ada yang cocok dengan modelnya.",
+    "removeUsedNone_other": "{{agents}} berpikir dengan kunci ini dan tidak punya yang lain. Setelah kunci hilang, mereka berhenti menjawab sampai kamu menghubungkan AI lain.",
     "noKeys": "Belum ada kunci.",
     "platformAvailable": "Kunci Claude server ini juga tersedia.",
     "usageTitle": "Pengeluaran API per jenis",
@@ -12175,6 +12222,7 @@
       "waitingAgents": "{{name}} menyerahkan sebagian dan sedang menunggu kabar"
     },
     "consultPair": {
+      "took": "butuh {{time}}",
       "asking": "bertanya",
       "working": "sedang mengerjakan",
       "waitingApproval": "menunggu persetujuan",
@@ -12527,6 +12575,7 @@
       "usage_paused_budget": "{{agent}} menjeda pekerjaan ini · anggaran bulanan di {{percent}}%",
       "work_auto_moved": "Ini akan makan waktu, jadi aku lanjutkan di latar belakang. Aku akan memposting kabar di sini, berikutnya sekitar {{minutes}} menit lagi.",
       "work_auto_movedOver": "Ini akan makan waktu, jadi aku lanjutkan di latar belakang. Aku akan memposting kabar di sini.",
+      "moved_on": "Berlanjut di {{link}}",
       "work_end_done": "Selesai ({{minutes}} menit).",
       "work_end_failed": "Pekerjaan latar belakang ini tidak selesai ({{minutes}} menit).",
       "work_end_failedWhy": "Pekerjaan latar belakang ini tidak selesai ({{minutes}} menit): {{why}}.",
@@ -12804,6 +12853,10 @@
       "label": "Jalankan skrip skill",
       "description": "Menjalankan skrip sebuah skill di lingkungan."
     },
+    "vault_make_password": {
+      "label": "Buat kata sandi",
+      "description": "Membuat kata sandi kuat di komputernya dan menyimpannya di Vault sebagai kunci, tanpa melihatnya."
+    },
     "computer_status": {
       "label": "Periksa komputer",
       "description": "Memberi tahu komputer mana yang dipakai dan apakah sedang merespons."
@@ -12859,6 +12912,10 @@
     "browser_type_secret": {
       "label": "Ketik kata sandi",
       "description": "Mengetik kata sandi yang kamu berikan ke kolom kata sandi atau kode, tanpa melihatnya."
+    },
+    "browser_make_password": {
+      "label": "Buat kata sandi",
+      "description": "Membuat kata sandi kuat untuk sebuah situs di komputernya, menyimpannya di Vault, dan mengetiknya, tanpa melihatnya."
     },
     "browser_wait": {
       "label": "Tunggu halaman",
@@ -13200,6 +13257,7 @@
         "browser_scroll": "Menggulir halaman",
         "browser_upload": "Mengunggah file",
         "browser_type_secret": "Mengetik kata sandi",
+        "browser_make_password": "Membuat kata sandi",
         "browser_wait": "Menunggu halaman",
         "browser_screenshot": "Mengambil tangkapan layar",
         "browser_ask_person": "Meminta bantuan",
@@ -13755,6 +13813,15 @@
     "agentTasks": "Tugas {{name}}",
     "tasks_other": "{{count}} tugas",
     "free": "Luang",
+    "hiddenTasks_other": "{{count}} tugas yang tidak kamu lihat",
+    "hiddenLine_other": "{{count}} tugas lagi di percakapan yang tidak kamu lihat.",
+    "helpers_other": "{{count}} pembantu",
+    "delegated": {
+      "fromPerson": "dimulai oleh {{name}}",
+      "fromYou": "dimulai olehmu",
+      "fromRoutine": "dimulai oleh rutinitas {{name}}",
+      "stopNote": "Kalau kamu menghentikannya, {{name}} diberi tahu dan tidak akan meminta lagi sendiri."
+    },
     "columns": {
       "task": "Tugas",
       "state": "Status",
@@ -13764,6 +13831,7 @@
     },
     "sections": {
       "asked": "Diminta oleh orang",
+      "delegated": "Diminta agen",
       "background": "Rutinitas di latar belakang"
     },
     "state": {
@@ -13834,6 +13902,8 @@
       "openManager": "Buka di pengelola tugas"
     },
     "confirm": {
+      "chainTitle_other": "Hentikan {{name}} dan {{count}} pembantu?",
+      "chainBody": "Yang sudah selesai tetap tersimpan, dan semuanya diberi tahu.",
       "title_other": "Hentikan {{count}} tugas {{name}}?",
       "body": "Yang sudah dikerjakan tetap tersimpan, dan {{name}} diberi tahu bahwa kamu menghentikannya.",
       "short": "{{name}} diberi tahu bahwa kamu menghentikannya.",

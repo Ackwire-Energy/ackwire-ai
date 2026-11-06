@@ -17,6 +17,7 @@ import {
   EmptyState,
   Icon,
   Kbd,
+  Locked,
   Menu,
   modKey,
   Popover,
@@ -958,7 +959,7 @@ export function WikiReader({
           <div className="wiki-top__acts">{actions}</div>
         </div>
         {editing ? (
-          <>
+          <Locked when={action.isPending}>
             <TitleField
               value={draft.title}
               onChange={(title) => setDraft({ ...draft, title })}
@@ -997,7 +998,7 @@ export function WikiReader({
               />
             )}
             {mode === "visual" && <p className="wiki-hintline small muted">{t("wiki.rich.hint", { key: modKey() })}</p>}
-          </>
+          </Locked>
         ) : (
           p && (
             <>

@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 48;
+export const MACHINE_PROTOCOL_VERSION = 50;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -520,6 +520,26 @@ export const VAULT_PROTOCOL = 45;
  */
 export const SPEED_PROTOCOL = 46;
 /**
+ * From this protocol on: `pull`. A file too big for a `write` is fetched by the computer itself from a one-use URL of
+ * ours and lands whole or not at all. An older runner takes files up to `MAX_INLINE_FILE_BYTES` only.
+ */
+export const FILE_PULL_PROTOCOL = 47;
+/**
+ * From this protocol on (ADR 0144 §8): `vault.password` makes a password in the agent's process (its worker in system
+ * mode) and answers it sealed to the one-use public key the request carries, so it reaches the Vault as a box: no
+ * command line, log or relay on the way reads it. The server sends it to no older runner.
+ */
+export const VAULT_PASSWORD_PROTOCOL = 48;
+/** What a password is made of. */
+export const PASSWORD_CLASSES = ["lower", "upper", "digits", "symbols"] as const;
+export type PasswordClass = (typeof PASSWORD_CLASSES)[number];
+/** The shape of a password `vault.password` makes: a site's own rules, as the agent read them. */
+export interface PasswordRules {
+  length: number;
+  classes: PasswordClass[];
+}
+export const PASSWORD_LENGTH = { min: 8, max: 128, default: 20 } as const;
+/**
  * From this protocol on: how each account signs in. Accounts carry `authMethod` (from what the runner keeps beside
  * and in the folder, never guessed), `statusUnknown` when the last look at their status said nothing for sure, and
  * Claude's `providerOrgId` / `orgName`; `hello` says which methods a new Claude sign-in for all agents can use here
@@ -527,7 +547,7 @@ export const SPEED_PROTOCOL = 46;
  * its `cause` and the provider's `httpStatus`. The server sends `method` to no older runner, and reads an older
  * runner's missing `claudeLoginMethods` as `claudeLoginMethodsOf` says.
  */
-export const CLAUDE_AUTH_PROTOCOL = 47;
+export const CLAUDE_AUTH_PROTOCOL = 49;
 /**
  * From this protocol on: a system-mode runner may list `cli_login` in `claudeLoginMethods`. Its turns on such a sign-in
  * run in root, as the sign-in's own OS user, with no tool of the CLI's that touches files or runs code; each agent's
@@ -537,7 +557,7 @@ export const CLAUDE_AUTH_PROTOCOL = 47;
  * server's side of the wire only the `agents` frame changes: its `deleted` says which agents are gone for good, what an
  * archived or moved agent, which also leaves the list, isn't. An older runner just never lists the method.
  */
-export const CLAUDE_SHARED_PROTOCOL = 48;
+export const CLAUDE_SHARED_PROTOCOL = 50;
 /**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
@@ -618,7 +638,7 @@ export const isContextTokens = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 50_000 && v <= 10_000_000;
 
 /**
- * How an account signs in (protocol 47). `cli_login`: the CLI's own sign-in, kept and refreshed by the CLI in the
+ * How an account signs in (protocol 49). `cli_login`: the CLI's own sign-in, kept and refreshed by the CLI in the
  * folder. `setup_token`: `claude setup-token`'s long-lived token, kept by root and handed to each turn. `api_key`: a
  * pasted key (a coding plan's, Cursor's, OpenCode's).
  */
@@ -629,13 +649,13 @@ export const isAuthMethod = (v: unknown): v is AuthMethod => AUTH_METHODS.some((
 export type ClaudeLoginMethod = Exclude<AuthMethod, "api_key">;
 export const isClaudeLoginMethod = (v: unknown): v is ClaudeLoginMethod => v === "cli_login" || v === "setup_token";
 /**
- * What a new Claude sign-in for all agents can use on a computer: what its runner said (protocol 47), else what
+ * What a new Claude sign-in for all agents can use on a computer: what its runner said (protocol 49), else what
  * runners did before saying it (`claude setup-token` in system mode, the CLI's own sign-in elsewhere).
  */
 export const claudeLoginMethodsOf = (said: readonly AuthMethod[] | undefined, system: boolean): AuthMethod[] =>
   said ? [...said] : [system ? "setup_token" : "cli_login"];
 
-/** Why a provider refused or failed a turn (protocol 47), as far as the runner could tell from the CLI. */
+/** Why a provider refused or failed a turn (protocol 49), as far as the runner could tell from the CLI. */
 export type ProviderFailureCause =
   | "auth_rejected"
   | "account_disabled"
@@ -687,14 +707,14 @@ export interface RunnerAccountInfo {
   keyHint?: string;
   /** Protocol 29: it thinks for several of its owner's agents at once. */
   shared?: boolean;
-  /** Protocol 47: how it signs in, when the runner knows for sure. */
+  /** Protocol 49: how it signs in, when the runner knows for sure. */
   authMethod?: AuthMethod;
   /**
-   * Protocol 47: the last look at its status was inconclusive (the CLI timed out, didn't start or answered nothing
+   * Protocol 49: the last look at its status was inconclusive (the CLI timed out, didn't start or answered nothing
    * readable); `loggedIn` is then the last conclusive answer the runner knew.
    */
   statusUnknown?: true;
-  /** Protocol 47: the Claude organization it signed in to (no secret). */
+  /** Protocol 49: the Claude organization it signed in to (no secret). */
   providerOrgId?: string;
   orgName?: string;
 }
@@ -770,7 +790,7 @@ export type AccountRequest =
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
    * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
    * Protocol 29, `shared`: one sign-in for every agent of its owner there (`SHARED_ACCOUNTS_PROTOCOL`).
-   * Protocol 47, `method` (a Claude subscription sign-in only): `setup_token` in system mode for all agents, or
+   * Protocol 49, `method` (a Claude subscription sign-in only): `setup_token` in system mode for all agents, or
    * `cli_login`; a runner that can't do it refuses (`unsupported`) and never signs in another way, and `again` on an
    * account that signs in another way is refused too. Absent: as before.
    */
@@ -1205,7 +1225,7 @@ export const HELLO_TIMEOUT_MS = 10_000;
 export const HEARTBEAT_MS = 25_000;
 /** Largest text frame either side accepts (a `write` of 5 MB is about 6.7 MB in base64). */
 export const MAX_FRAME_BYTES = 8 * 1024 * 1024;
-/** `read`/`write` bodies (base64 in JSON); larger files go through `push`. */
+/** `read`/`write` bodies (base64 in JSON); larger files go through `push` and `pull`. */
 export const MAX_INLINE_FILE_BYTES = 5 * 1024 * 1024;
 
 export const MACHINE_TOKEN_PREFIX = "agm_";
@@ -1398,7 +1418,7 @@ export type WireBrainEvent =
       message: string;
       retryable?: boolean;
       worked?: boolean;
-      /** Protocol 47: why the provider refused or failed it, and its HTTP status when the CLI said one. */
+      /** Protocol 49: why the provider refused or failed it, and its HTTP status when the CLI said one. */
       cause?: ProviderFailureCause;
       httpStatus?: number;
     }
@@ -1488,6 +1508,11 @@ export interface BrainTurnRequest {
   freeTier?: boolean;
   /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
   contextTokens?: number;
+  /**
+   * A person waits on this turn (first rank of the computer's line): it may take the runner's reserved slot
+   * (`PERSON_TURN_MIN_FREE_BYTES`). No protocol step: a runner that doesn't read it admits the turn like any other.
+   */
+  personWaiting?: boolean;
 }
 
 /** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */
@@ -1742,12 +1767,12 @@ export interface RunnerInfo {
   ownUsage?: OwnPlanUsage;
   /** Protocol 22: how big the computer is. */
   size?: MachineSize;
-  /** Protocol 47: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
+  /** Protocol 49: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
   claudeLoginMethods?: AuthMethod[];
   /** Why this computer doesn't list `cli_login` for all agents though it was switched on (its self-check's answer). */
   claudeLoginBlocked?: string;
   /**
-   * Protocol 47 (system mode): root's Claude sign-in, status, sign-out and usage CLIs run in the `agentes-auth`
+   * Protocol 49 (system mode): root's Claude sign-in, status, sign-out and usage CLIs run in the `agentes-auth`
    * group, which the computer's egress rules may route apart from the rest of root.
    */
   authEgressGroup?: true;
@@ -1832,6 +1857,17 @@ export type MachineRequest = (
       uploadId: string;
       maxBytes: number;
     }
+  /** Protocol 47 (`FILE_PULL_PROTOCOL`): `write`'s path rules, the bytes fetched from `url` instead of sent here. */
+  | {
+      op: "pull";
+      path: string;
+      /** Absolute URL of our file endpoint (`GET`, machine token as bearer), good for one fetch. */
+      url: string;
+      pullId: string;
+      size: number;
+      /** Hex; absent for a stored file with no recorded hash (a skill's), which is then checked by size alone. */
+      sha256?: string;
+    }
   /**
    * Protocol 12: one `agent-browser` command in the request's agent's session
    * (`open`, `snapshot`, `click`…; `args` as on its command line, without
@@ -1898,6 +1934,8 @@ export type MachineRequest = (
   | { op: "desktop.text" }
   /** Protocol 45: a one-use key the request's agent's Vault values are sealed to (ADR 0144). */
   | { op: "vault.key" }
+  /** `requestId` and `publicKey`: what the answer is sealed to (`madePasswordAad`). */
+  | { op: "vault.password"; requestId: string; publicKey: string; rules: PasswordRules }
 ) & {
   agent?: AgentScope;
   /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
@@ -1921,6 +1959,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "write",
   "list",
   "push",
+  "pull",
   "secret",
   "account",
   "task.start",
@@ -1953,6 +1992,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.apps",
   "desktop.text",
   "vault.key",
+  "vault.password",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1972,6 +2012,8 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
+  /** What landed at the path: its bytes and SHA-256 (hex). */
+  pull: { size: number; sha256: string };
   /**
    * `keypair`: public key, and `sites` from a runner that keeps a `site` target out of its commands; `deliver`/
    * `activate`: size; an older activation may be superseded.
@@ -2079,6 +2121,7 @@ export interface MachineReplies {
   "desktop.text": { text: string } | { same: true };
   /** Protocol 45: the key's id, its public key (raw P-256, base64) and when it stops opening anything (ISO). */
   "vault.key": { vaultKey: { keyId: string; publicKey: string; expiresAt: string } };
+  "vault.password": { box: WireSecretBox };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
@@ -2097,6 +2140,8 @@ export type MachineErrorCode =
   | "exec_disabled"
   | "too_large"
   | "upload_failed"
+  /** Protocol 47: a `pull` didn't land; its message says why, for people. */
+  | "pull_failed"
   /**
    * `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`); `brain.turn` while the computer
    * has no room for one more turn (ADR 0025 §5, admission). Try again later.
@@ -2149,7 +2194,7 @@ export type MachineErrorCode =
    */
   | "approval_needed"
   /**
-   * Protocol 47: this runner can't do it the way it was asked (a Claude sign-in `method` it can't use here); the
+   * Protocol 49: this runner can't do it the way it was asked (a Claude sign-in `method` it can't use here); the
    * message says why. Older servers read it like `internal`.
    */
   | "unsupported"

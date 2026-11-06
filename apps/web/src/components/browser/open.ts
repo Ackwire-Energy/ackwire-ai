@@ -37,8 +37,9 @@ export function useBrowserCardRequest(match: { agentId?: string; handoffId?: str
       if (!r || Date.now() - r.at > FRESH_MS) return;
       const ok = (r.handoffId && r.handoffId === handoffId) || (!r.handoffId && r.agentId && r.agentId === agentId);
       if (!ok) return;
-      pending = null;
+      // In this order: React Compiler folds `r` into `pending` here, so clearing first would read `at` off null.
       setHit(r.at);
+      pending = null;
     };
     check();
     listeners.add(check);

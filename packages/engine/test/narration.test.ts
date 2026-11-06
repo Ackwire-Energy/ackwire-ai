@@ -31,7 +31,10 @@ function envTool() {
 
 const turns = (req: ModelRequest) => req.messages.filter((m) => m.role === "assistant").length;
 
-test("a 3-call tool loop: narration goes to steps and live events, the message is the final answer, nothing lost", async () => {
+/** An answer past `WORKING_TEXT_MAX`: read as the answer before its turn ends. */
+const LONG = "Não dá para compilar aqui: faltam Go e gcc no computador. ".repeat(6);
+
+test("a 3-call tool loop: working text goes to the steps, never live; the long answer streams; the message is the final answer", async () => {
   const env = envTool();
   f = await setup({
     toolSources: [env.source],
@@ -44,7 +47,7 @@ test("a 3-call tool loop: narration goes to steps and live events, the message i
           chunks: ["Go não está instalado. ", "Vou tentar o compilador C."],
           toolUses: [{ name: "check_env", input: {} }],
         };
-      return { chunks: ["Não dá para compilar aqui: ", "faltam Go e gcc no computador."] };
+      return { chunks: [LONG, "Instale os dois."] };
     },
   });
   const events = f.listen(f.general.id);
@@ -78,31 +81,19 @@ test("a 3-call tool loop: narration goes to steps and live events, the message i
 
   // The message holds only the final answer, whole.
   const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
-  expect(timeline.map((m) => m.body)).toEqual([
-    "@dev compila o projeto",
-    "Não dá para compilar aqui: faltam Go e gcc no computador.",
-  ]);
+  expect(timeline.map((m) => m.body)).toEqual(["@dev compila o projeto", `${LONG}Instale os dois.`.trim()]);
 
-  // Narration: one event per tool turn, in order, complete.
-  const narration = events.flatMap((e) =>
-    e.type === "agent.narration" ? [e as unknown as { turn: number; text: string }] : [],
-  );
-  expect(narration.map((e) => [e.turn, e.text])).toEqual([
-    [1, "Começo verificando o ambiente."],
-    [2, "Go não está instalado. Vou tentar o compilador C."],
-  ]);
+  // Nothing of the working text reached the conversation live, on any event.
+  expect(JSON.stringify(events)).not.toContain("Vou tentar o compilador");
+  expect(JSON.stringify(events)).not.toContain("Começo verificando");
 
-  // Deltas: every piece streamed, tagged by turn, with increasing seq (never reused).
+  // Deltas: only the answer, tagged by its turn, with increasing seq (never reused).
   const deltas = events.flatMap((e) =>
     e.type === "agent.delta" ? [e as unknown as { turn: number; seq: number; text: string }] : [],
   );
   const byTurn = new Map<number, string>();
   for (const d of deltas) byTurn.set(d.turn, (byTurn.get(d.turn) ?? "") + d.text);
-  expect([...byTurn]).toEqual([
-    [1, "Começo verificando o ambiente."],
-    [2, "Go não está instalado. Vou tentar o compilador C."],
-    [3, "Não dá para compilar aqui: faltam Go e gcc no computador."],
-  ]);
+  expect([...byTurn]).toEqual([[3, `${LONG}Instale os dois.`]]);
   // Only a brain that says when each call ended marks its stretches.
   expect(deltas.some((d) => "from" in d)).toBe(false);
   const seqs = deltas.map((d) => d.seq);
@@ -115,7 +106,7 @@ test("a 3-call tool loop: narration goes to steps and live events, the message i
     told.set(d.turn, (told.get(d.turn) ?? 0) + d.text.length);
   }
 
-  // Steps: the model calls keep the narration.
+  // Steps: the model calls keep the narration, for the run's activity.
   const [run] = await f.db.select().from(schema.agentRuns);
   const steps = await f.db
     .select()
@@ -126,6 +117,15 @@ test("a 3-call tool loop: narration goes to steps and live events, the message i
     .sort((a, b) => a.seq - b.seq)
     .map((s) => (s.data as { narration?: string }).narration ?? null);
   expect(calls).toEqual(["Começo verificando o ambiente.", "Go não está instalado. Vou tentar o compilador C.", null]);
+});
+
+test("a short answer shows whole when its turn ends, with no tool call to wait for", async () => {
+  f = await setup({ reply: () => ({ chunks: ["Tudo ", "certo."] }) });
+  const events = f.listen(f.general.id);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+  await drainOutbox(f.db, f.handlers);
+  const deltas = events.flatMap((e) => (e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : []));
+  expect(deltas.join("")).toBe("Tudo certo.");
 });
 
 test("a final call with no text closes with the last narration instead of an empty reply", async () => {

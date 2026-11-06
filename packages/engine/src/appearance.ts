@@ -1,8 +1,10 @@
+import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, schema } from "@agenteschat/db";
 import { type Agent, getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { publishAgentsChanged } from "./events";
 import { can, requirePermission } from "./organizations";
 
 const { agents } = schema;
@@ -65,6 +67,7 @@ export async function setAgentAppearance(
   orgId: string,
   agentId: string,
   appearance: { color?: unknown; eyes?: unknown; accessory?: unknown } | null,
+  options: { pubsub?: PubSub } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
@@ -87,5 +90,6 @@ export async function setAgentAppearance(
     target: { type: "agent", id: agentId },
     details: { from: agent.appearance, to: look },
   });
+  await publishAgentsChanged(options.pubsub, orgId);
   return updated;
 }

@@ -15,7 +15,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Share } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useToast } from "@/ui";
+import { Button, Icon, Locked, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { type ActionItem, ActionList, copyText, successHaptic } from "../shared/parts";
@@ -263,7 +263,9 @@ function InvitationRolesSheet({ invitation: inv }: { invitation: InvitationWithS
         title={t("members.invitations.roleTitle", { email: inv.email })}
         subtitle={t("members.invitations.roleText")}
       />
-      <ActionList items={rows.map((r) => ({ ...r, checked: value.includes(r.key), onPress: () => flip(r.key) }))} />
+      <Locked when={save.isPending}>
+        <ActionList items={rows.map((r) => ({ ...r, checked: value.includes(r.key), onPress: () => flip(r.key) }))} />
+      </Locked>
       <Text variant="footnote" tone="faint">
         {rows.length > 0 ? t("members.everyoneNote") : t("members.noRolesToGive")}
       </Text>
