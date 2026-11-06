@@ -14,12 +14,16 @@ import {
   getArtifact,
   grantScopes,
   listArtifacts,
+  listRoles,
   openDm,
   postPersonMessage,
   receiveMachineUpload,
   runRoutineNow,
+  shareSavedFile,
   surfaceRoomFiles,
   type ToolContext,
+  updateArtifact,
+  updateRole,
   withPersonFacts,
 } from "../src";
 import { openRoutineRoom } from "../src/routine-room";
@@ -40,6 +44,8 @@ afterEach(async () => {
 const DRIVE = ["drive:read", "drive:write"].map((scope) => ({ connectionId: null, scope }));
 const WIKI = ["wiki:read", "wiki:write"].map((scope) => ({ connectionId: null, scope }));
 const PDF = new TextEncoder().encode("%PDF-1.4 relatório");
+
+let computerFiles: () => Map<string, Uint8Array>;
 
 const lastText = (req: { messages: unknown[] }) => JSON.stringify(req.messages.at(-1));
 
@@ -82,6 +88,7 @@ async function world(reply?: Reply) {
   machineId = computer.paired.machineId;
   await grantScopes(f.db, f.org.id, f.agent.id, [...DRIVE, ...WIKI]);
   computer.runner.files.set("relatorio.pdf", PDF);
+  computerFiles = () => computer.runner.files;
   return { bob: await addMember(f.db, f.org.id, "member", "bob") };
 }
 
@@ -103,8 +110,8 @@ const call = async (ctx: ToolContext, name: string, input: Record<string, unknow
 };
 
 /** The run a person's message started, finished; calls go through it afterwards. */
-async function runAfter(agentId: string, channelId: string, body: string) {
-  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, channelId, { body });
+async function runAfter(agentId: string, channelId: string, body: string, userId = f.owner.id) {
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, userId, f.org.id, channelId, { body });
   await drainOutbox(f.db, f.handlers);
   const runs = await f.db
     .select()
@@ -117,6 +124,12 @@ async function runAfter(agentId: string, channelId: string, body: string) {
 
 const routineRun = async (input: Parameters<typeof channelRoutine>[1] = {}) =>
   agentRunRow(f, (await fire(f, (await channelRoutine(f, input)).id, new Date())).agentRunId);
+
+/** A routine of @dev's own owner, `userId`, reporting in their DM unless said otherwise. */
+async function routineOf(userId: string, input: Parameters<typeof channelRoutine>[1] = {}) {
+  await f.db.update(schema.agents).set({ ownerUserId: userId }).where(eq(schema.agents.id, f.agent.id));
+  return channelRoutine(f, { target: { type: "dm" }, ...input }, userId);
+}
 
 const addBia = async () => {
   const bia = await createAgent(
@@ -316,6 +329,16 @@ describe("shared_drive", () => {
     expect((await driveOf(bob.id)).map((a) => a.audience)).toEqual([{ kind: "workspace" }, { kind: "workspace" }]);
   });
 
+  test("export_file too", async () => {
+    const { bob } = await world();
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const ctx = ctxOf(await runAfter(f.agent.id, dm.id, "salva no drive compartilhado"));
+    computerFiles().set("nota.md", new TextEncoder().encode("# nota"));
+    const out = await call(ctx, "export_file", { path: "nota.md", shared_drive: true });
+    expect(out.content).toContain("the workspace's shared Drive");
+    expect(await titles(bob.id)).toEqual(["nota.md"]);
+  });
+
   test("from a routine: in the workspace's Drive, whoever it reports to", async () => {
     const { bob } = await world();
     const run = await routineRun({ target: { type: "dm" } });
@@ -368,6 +391,9 @@ describe("a routine's own files", () => {
     expect(
       (await call(next, "update_artifact", { artifact_id: id, note: "semana", markdown: "# novo" })).isError,
     ).toBeFalsy();
+    expect((await call(next, "update_artifact", { artifact_id: id, note: "x", shared_drive: true })).content).toContain(
+      "the workspace's shared Drive",
+    );
   });
 
   test("but not the creator's other files in that DM", async () => {
@@ -502,15 +528,26 @@ describe("files already stuck in rooms", () => {
     return id;
   }
 
-  test("a routine's go where it reports, an agents' DM's where the person asked, once", async () => {
+  test("each goes to its person alone, even when the routine reports to a public channel, once", async () => {
     const { bob } = await world();
     const bia = await addBia();
-    await stuckIn(ctxOf(await routineRun({ target: { type: "dm" } })));
+    await stuckIn(ctxOf(await routineRun()));
     await stuckIn(ctxOf(await consultedRun(bia.id)));
     expect(await titles(f.owner.id)).toEqual([]);
     expect(await surfaceRoomFiles(f.db)).toBe(2);
     expect(await titles(f.owner.id)).toEqual(["Relatório", "Relatório"]);
-    expect(await titles(bob.id)).toEqual(["Relatório"]);
+    expect((await driveOf(f.owner.id)).map((a) => a.audience.kind)).toEqual(["dm", "dm"]);
+    expect(await titles(bob.id)).toEqual([]);
+    expect(await surfaceRoomFiles(f.db)).toBe(0);
+    const moves = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "artifact.surfaced"));
+    expect(moves.length).toBe(2);
+  });
+
+  test("a person who left: the file stays in the room", async () => {
+    const { bob } = await world();
+    const routine = await routineOf(bob.id);
+    await stuckIn(ctxOf(await agentRunRow(f, (await fire(f, routine.id, new Date())).agentRunId)));
+    await f.db.delete(schema.organizationMembers).where(eq(schema.organizationMembers.userId, bob.id));
     expect(await surfaceRoomFiles(f.db)).toBe(0);
   });
 
@@ -531,4 +568,232 @@ describe("files already stuck in rooms", () => {
       .where(eq(schema.artifactVersions.artifactId, brought));
     expect(await surfaceRoomFiles(f.db)).toBe(0);
   });
+});
+
+/** A run of `agentId` in `channelId` that another agent's message woke: nobody is behind it. */
+async function unattendedRun(agentId: string, channelId: string) {
+  const [message] = await f.db
+    .insert(schema.messages)
+    .values({ orgId: f.org.id, channelId, authorType: "agent", authorAgentId: agentId, body: "nota" })
+    .returning();
+  if (!message) throw new Error("no message");
+  const [run] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId,
+      channelId,
+      threadRootId: message.id,
+      triggerMessageId: message.id,
+      trigger: "mention",
+      hop: 1,
+      status: "running",
+    })
+    .returning();
+  if (!run) throw new Error("no run");
+  return run;
+}
+
+const idOf = (out: { data?: Record<string, unknown> }) => (out.data as { artifact: { id: string } }).artifact.id;
+
+/** People of the base role can no longer add files. */
+async function noUploads() {
+  const base = (await listRoles(f.db, f.owner.id, f.org.id)).roles.find((r) => r.kind === "everyone");
+  if (!base) throw new Error("no base role");
+  await updateRole(f.db, f.owner.id, f.org.id, base.id, {
+    permissions: base.permissions.filter((k) => k !== "upload_files"),
+  });
+}
+
+const privateRoom = async () => {
+  const room = await createChannel(f.db, f.owner.id, f.org.id, { name: "vendas", visibility: "private" });
+  await addChannelMember(f.db, f.owner.id, f.org.id, room.id, { agentId: f.agent.id });
+  return room;
+};
+
+const madeBy = (userId: string, channelId: string, title = "Meu") =>
+  createArtifact(f.artifactDeps, { type: "person", userId }, f.org.id, {
+    title,
+    content: { kind: "document", markdown: "privado" },
+    channelId,
+  });
+
+describe("who may widen a file to the whole workspace", () => {
+  test("nobody behind the run: a private channel's file stays there, a new one and one that exists", async () => {
+    const { bob } = await world();
+    const room = await privateRoom();
+    const ctx = ctxOf(await unattendedRun(f.agent.id, room.id));
+    const saved = await save(ctx, { shared_drive: true });
+    expect(saved.isError).toBeFalsy();
+    expect(saved.content).toContain("Saved");
+    expect(saved.content).toContain("It isn't in the shared Drive");
+    expect(saved.content).toContain("Only the members of #vendas");
+    expect(saved.content).not.toContain("update_artifact with shared_drive");
+    const theirs = await madeBy(f.owner.id, room.id);
+    const moved = await call(ctx, "update_artifact", { artifact_id: theirs.id, note: "x", shared_drive: true });
+    expect(moved.isError).toBe(true);
+    expect(await titles(bob.id)).toEqual([]);
+  });
+
+  test("a person who can't add files to the Drive doesn't do it through an agent", async () => {
+    const { bob } = await world();
+    await noUploads();
+    const dm = await openDm(f.db, bob.id, f.org.id, { agentId: f.agent.id });
+    const saved = await save(ctxOf(await runAfter(f.agent.id, dm.id, "salva no drive compartilhado", bob.id)), {
+      shared_drive: true,
+    });
+    expect(saved.content).toContain("It isn't in the shared Drive");
+    expect(await titles(f.owner.id)).toEqual([]);
+    expect(await titles(bob.id)).toEqual(["Relatório"]);
+  });
+
+  test("a run that read outside content doesn't publish a file it didn't make: its own, and the next message, do", async () => {
+    const { bob } = await world();
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const theirs = await madeBy(f.owner.id, dm.id);
+    const run = await runAfter(f.agent.id, dm.id, "lê essa página");
+    await f.db
+      .insert(schema.agentRunSteps)
+      .values({ orgId: f.org.id, runId: run.id, seq: 900, kind: "tool_result", data: { data: { outside: true } } });
+    const ctx = ctxOf(run);
+    const held = await call(ctx, "update_artifact", { artifact_id: theirs.id, note: "x", shared_drive: true });
+    expect(held.isError).toBe(true);
+    expect(held.content).toContain("outside");
+    expect(await titles(bob.id)).toEqual([]);
+    await save(ctx, { shared_drive: true });
+    expect(await titles(bob.id)).toEqual(["Relatório"]);
+    const next = ctxOf(await runAfter(f.agent.id, dm.id, "pode publicar o meu"));
+    expect(
+      (await call(next, "update_artifact", { artifact_id: theirs.id, note: "x", shared_drive: true })).isError,
+    ).toBeFalsy();
+    expect(await titles(bob.id)).toEqual(["Meu", "Relatório"]);
+  });
+
+  test("a routine doesn't publish a file of its room a person added to in their DM", async () => {
+    const { bob } = await world();
+    const routine = await channelRoutine(f, { target: { type: "dm" } });
+    const first = ctxOf(await agentRunRow(f, (await fire(f, routine.id, new Date())).agentRunId));
+    const id = idOf(await save(first));
+    await updateArtifact(f.artifactDeps, { type: "person", userId: f.owner.id }, f.org.id, id, {
+      content: { kind: "document", markdown: "anotação privada" },
+      note: "minha",
+    });
+    await f.db.update(schema.routineRuns).set({ status: "reported", finishedAt: new Date() });
+    await f.db.update(schema.agentRuns).set({ status: "done" });
+    const next = ctxOf(await agentRunRow(f, (await fire(f, routine.id, new Date(Date.now() + 86_400_000))).agentRunId));
+    const moved = await call(next, "update_artifact", { artifact_id: id, note: "x", shared_drive: true });
+    expect(moved.isError).toBe(true);
+    expect(await titles(bob.id)).toEqual([]);
+  });
+
+  test("an agent a routine asked, in their DM, does what the routine said", async () => {
+    const { bob } = await world();
+    const bia = await addBia();
+    const routine = await channelRoutine(f, { prompt: "pergunta bia", target: { type: "dm" } });
+    await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, bia.id));
+    if (!run) throw new Error("no consulted run");
+    await save(ctxOf(run), { shared_drive: true });
+    expect(await titles(bob.id)).toEqual(["Relatório"]);
+  });
+
+  test('"Um documento no Drive" of a person who can\'t add files stays with them', async () => {
+    const { bob } = await world();
+    const carla = await addMember(f.db, f.org.id, "member", "carla");
+    await noUploads();
+    const routine = await routineOf(bob.id, { target: { type: "artifact" } });
+    const saved = await save(ctxOf(await agentRunRow(f, (await fire(f, routine.id, new Date())).agentRunId)));
+    expect(saved.content).toContain("Only bob can see it");
+    expect(await titles(bob.id)).toEqual(["Relatório"]);
+    expect(await titles(carla.id)).toEqual([]);
+  });
+});
+
+test("a routine that only says the Drive doesn't publish: that takes the shared Drive", async () => {
+  await world();
+  const routine = await channelRoutine(f, { prompt: "Salve no Drive.", target: { type: "dm" } });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+  const prompt = systemText(f.provider.calls[0]?.request.system ?? "");
+  expect(prompt).toContain('ask for the shared Drive ("drive compartilhado")');
+  expect(prompt).not.toContain("name the Drive");
+});
+
+describe("what a tool's result says", () => {
+  test("share_artifact's copy from the agents' DM: where it really went", async () => {
+    await world();
+    const bia = await addBia();
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: bia.id });
+    const theirs = await madeBy(f.owner.id, dm.id);
+    const out = await call(ctxOf(await consultedRun(bia.id)), "share_artifact", { artifact_id: theirs.id });
+    expect(out.content).toContain("from #general: everyone in the workspace sees it");
+  });
+
+  test("a screenshot shared from a routine's room isn't shown there", async () => {
+    await world();
+    const run = await routineRun({ target: { type: "dm" } });
+    const [machine] = await f.db.select().from(schema.machines);
+    const out = await shareSavedFile(
+      { machines: { hub: f.machineHub as NonNullable<typeof f.machineHub> }, pubsub: f.pubsub },
+      ctxOf(run),
+      machine?.id ?? "",
+      "relatorio.pdf",
+      { content: "Saved relatorio.pdf in your folder." },
+    );
+    expect(out.isError).toBeFalsy();
+    expect(out.content).not.toContain("It is shown in this conversation");
+    expect(out.content).toContain("Only ana can see it");
+  });
+});
+
+test("what an agent outside the person's audience made in the agents' DM doesn't reach them through a colleague", async () => {
+  await world();
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  const bia = await addBia();
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: f.owner.id, audienceMode: "owner" })
+    .where(eq(schema.agents.id, bia.id));
+  await join(lia.id);
+  const asked = await runAfter(f.agent.id, f.general.id, "@dev pergunta bia", lia.id);
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, bia.id));
+  if (!run) throw new Error("no consulted run");
+  const saved = await save(ctxOf(run), { shared_drive: true });
+  expect(saved.content).toContain("it answers the agent that asked");
+  const id = idOf(saved);
+  expect(await titles(lia.id)).toEqual([]);
+  expect((await call(ctxOf(asked), "share_artifact", { artifact_id: id })).isError).toBe(true);
+  expect(await titles(lia.id)).toEqual([]);
+});
+
+test("a routine whose creator left writes nothing to the wiki in their name", async () => {
+  const { bob } = await world();
+  const routine = await routineOf(bob.id, { prompt: "Salve na wiki." });
+  const run = await agentRunRow(f, (await fire(f, routine.id, new Date())).agentRunId);
+  await f.db.delete(schema.organizationMembers).where(eq(schema.organizationMembers.userId, bob.id));
+  const out = await call(ctxOf(run), "create_wiki_page", { title: "Resumo", body: "# Resumo" });
+  expect(out.isError).toBe(true);
+  expect(await f.db.select().from(schema.wikiPageVersions)).toEqual([]);
+});
+
+test("a run a routine's report woke in a private channel publishes none of it", async () => {
+  const { bob } = await world((req) => {
+    const last = lastText(req);
+    if (last.includes("tool_result")) return { chunks: ["ok"] };
+    return last.includes("Veja as avaliações")
+      ? { chunks: [], toolUses: [{ name: "hand_off", input: { message: "Olha isso.", wake_me: true } }] }
+      : { chunks: ["ok"] };
+  });
+  const room = await privateRoom();
+  await grantScopes(f.db, f.org.id, f.agent.id, WIKI);
+  const routine = await channelRoutine(f, { target: { type: "channel", channelId: room.id } });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.channelId, room.id));
+  if (!run) throw new Error("no run woken");
+  expect((await save(ctxOf(run), { shared_drive: true })).content).toContain("It isn't in the shared Drive");
+  expect(await titles(bob.id)).toEqual([]);
+  const wiki = await call(ctxOf(run), "create_wiki_page", { title: "Resumo", body: "# Resumo" });
+  expect(wiki.content).toContain("nobody asked for this");
 });

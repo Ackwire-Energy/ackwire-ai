@@ -1,5 +1,7 @@
 import { type ActionRecord, actWithUndo } from "./agent-actions";
+import { agentRoom } from "./artifacts";
 import { cutText } from "./format";
+import { getMembership } from "./organizations";
 import { personBehindCall, routineCreatorOfCall, wikiActorOfCall } from "./requester";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
@@ -65,9 +67,13 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
   const pageRef = { type: "string", minLength: 1, maxLength: 200, description: "Page title or slug" };
 
   async function writer(ctx: ToolContext): Promise<WikiActor | null> {
-    // A routine's instructions are its creator's request. An agent's own message is nobody's.
-    const userId = (await personBehindCall(ctx)) ?? (await routineCreatorOfCall(ctx));
-    return userId ? { type: "agent", agentId: ctx.agentId, requestedByUserId: userId, channelId: ctx.channelId } : null;
+    // A routine's instructions are its creator's request, in a room no person reads: a run its report woke sits in a
+    // conversation, whose private text is no routine's to publish. An agent's own message is nobody's.
+    const inRoom = await agentRoom(ctx.db, ctx.orgId, ctx.channelId);
+    const userId = (await personBehindCall(ctx)) ?? (inRoom ? await routineCreatorOfCall(ctx) : null);
+    // A run stays its person's for good: someone who left asks for nothing.
+    if (!userId || !(await getMembership(ctx.db, userId, ctx.orgId))) return null;
+    return { type: "agent", agentId: ctx.agentId, requestedByUserId: userId, channelId: ctx.channelId };
   }
 
   const tools: ToolDefinition[] = [

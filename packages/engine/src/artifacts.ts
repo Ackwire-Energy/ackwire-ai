@@ -19,15 +19,17 @@ import { type AgentsDmReads, agentsDmReads, readerOfRun } from "./agents-dm-read
 import { recordAudit } from "./audit";
 import { runAuthorityById, UUID } from "./authority";
 import { routineBriefOfRun } from "./background";
-import { peopleSee } from "./consultations";
-import { isAgentOnlyDm } from "./dms";
+import { answersAgentsOnly, peopleSee } from "./consultations";
+import { isAgentOnlyDm, openDm } from "./dms";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { textOfBytes } from "./format";
 import { assertStorageRoom } from "./limits";
 import { can, getMembership, requireActiveMembership } from "./organizations";
+import { runItselfReadOutside } from "./outside";
 import { markdownToPdf } from "./pdf";
+import { routineCreatorOf } from "./requester";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 import { accountInUse } from "./standing";
 import { taskReaderSql } from "./task-access";
@@ -573,8 +575,13 @@ async function madeForSamePerson(db: Database, dm: AgentsDmReads, artifactId: st
   return rows.length > 0 && results.every(Boolean);
 }
 
+/** Whether a person may add files to the Drive (`placeNew`); someone who left never does. */
+async function addsToDrive(db: Database, orgId: string, userId: string) {
+  return can(await getMembership(db, userId, orgId), "upload_files");
+}
+
 /** A room no person reads (a routine's, an agents' DM), as a channel row, or null for any other conversation. */
-async function agentRoom(db: Executor, orgId: string, channelId: string) {
+export async function agentRoom(db: Executor, orgId: string, channelId: string) {
   const [channel] = await db
     .select({ kind: channels.kind, dmKey: channels.dmKey })
     .from(channels)
@@ -786,7 +793,8 @@ async function placeFile(
     .where(and(eq(schema.agentRuns.orgId, orgId), eq(schema.agentRuns.id, actor.runId)));
   if (!run) return place;
   const brief = run.background ? await routineBriefOfRun(db, run) : null;
-  return { ...place, ...(brief?.toDrive ? { channelId: null, threadId: null } : await peopleSee(db, run, room)) };
+  const toDrive = brief?.toDrive && brief.creatorUserId && (await addsToDrive(db, orgId, brief.creatorUserId));
+  return { ...place, ...(toDrive ? { channelId: null, threadId: null } : await peopleSee(db, run, room)) };
 }
 
 /** Version 1 of a new artifact: blob, rows, index, audit and the channel event. */
@@ -1116,8 +1124,52 @@ export async function addFileVersion(
 }
 
 /**
+ * Why a run can't show a file of a private conversation to the whole workspace, null when it can. Only someone who may
+ * add to the Drive widens an audience: the person behind the run, or the creator of the routine it works for in a room
+ * no person reads (a run a report woke sits in a conversation, whose private text is no routine's to publish). And a
+ * file it didn't make takes more: a routine only moves what its room alone made, and a run that read outside content
+ * moves nothing of anyone's, so an injected page can't publish a person's private file.
+ */
+async function sharedDriveRefusal(
+  db: Database,
+  actor: Extract<ArtifactActor, { type: "agent" }>,
+  orgId: string,
+  a: ArtifactRow,
+) {
+  const [here] = await db
+    .select({ kind: channels.kind, visibility: channels.visibility })
+    .from(channels)
+    .where(eq(channels.id, a.channelId as string));
+  if (here?.kind === "channel" && here.visibility === "public") return null;
+  const runId = actor.runId ?? "";
+  if (runId && (await answersAgentsOnly(db, orgId, runId))) {
+    return "nothing of this run reaches people, it answers the agent that asked";
+  }
+  const authority = await runAuthorityById(db, orgId, runId);
+  const room = await agentRoom(db, orgId, actor.channelId);
+  const asker = authority.personId ?? (room ? routineCreatorOf(authority) : null);
+  if (!asker || !(await addsToDrive(db, orgId, asker))) {
+    return "only a person who may add files to the Drive can ask for that, and nobody who can is behind this run";
+  }
+  const made = await db
+    .select({ runId: artifactVersions.runId, roomId: schema.agentRuns.channelId })
+    .from(artifactVersions)
+    .leftJoin(schema.agentRuns, eq(schema.agentRuns.id, artifactVersions.runId))
+    .where(eq(artifactVersions.artifactId, a.id));
+  if (made.every((m) => m.runId === runId)) return null;
+  if (!authority.personId) {
+    return made.every((m) => m.roomId === actor.channelId)
+      ? null
+      : "a person changed this file where it is, so only a person can ask to move it";
+  }
+  return (await runItselfReadOutside(db, orgId, runId))
+    ? "this run read content from outside and didn't make this file. It moves when the person asks for it in a new message"
+    : null;
+}
+
+/**
  * `shared_drive`: the file leaves its conversation for the workspace's shared Drive (no channel), so everyone there
- * sees it. Who may: whoever may change it. Links and cards keep working, since it is the same file.
+ * sees it (`sharedDriveRefusal`). Links and cards keep working, since it is the same file.
  */
 export async function moveToSharedDrive(
   deps: ArtifactDeps,
@@ -1128,6 +1180,8 @@ export async function moveToSharedDrive(
   const a = await writable(deps, actor, orgId, artifactId);
   if (!a.inDrive) throw new ValidationError(`a ${a.kind} lives in its conversation, not in the Drive`);
   if (!a.channelId) return;
+  const refusal = await sharedDriveRefusal(deps.db, actor, orgId, a);
+  if (refusal) throw new ForbiddenError(refusal);
   const row = await deps.db.transaction(async (tx) => {
     const [moved] = await tx
       .update(artifacts)
@@ -1152,7 +1206,7 @@ export async function moveToSharedDrive(
 const SHARED_DRIVE_HINT = "To put it there: update_artifact with shared_drive: true.";
 
 /** Where a file is and who sees it, for an agent to tell people (what `withPersonFacts` shows them). */
-export async function fileReach(db: Database, orgId: string, artifactId: string) {
+export async function fileReach(db: Database, orgId: string, artifactId: string, hint = SHARED_DRIVE_HINT) {
   const [a] = await db
     .select({ channelId: artifacts.channelId, kind: channels.kind, name: channels.name, open: channels.visibility })
     .from(artifacts)
@@ -1163,7 +1217,7 @@ export async function fileReach(db: Database, orgId: string, artifactId: string)
   if (a.kind === "channel" && a.open === "public") {
     return `It is in the shared Drive, from #${a.name}: everyone in the workspace sees it.`;
   }
-  const notShared = `in the Drive's private section, not in the shared Drive. ${SHARED_DRIVE_HINT}`;
+  const notShared = `in the Drive's private section, not in the shared Drive. ${hint}`.trimEnd();
   if (a.kind === "channel") return `Only the members of #${a.name} see it: it is ${notShared}`;
   const people = await db
     .select({ name: schema.users.name })
@@ -1171,7 +1225,7 @@ export async function fileReach(db: Database, orgId: string, artifactId: string)
     .innerJoin(schema.users, eq(schema.users.id, channelMembers.userId))
     .where(eq(channelMembers.channelId, a.channelId));
   if (people.length > 0) return `Only ${people.map((p) => p.name).join(", ")} can see it: it is ${notShared}`;
-  return `No person sees it: it is in a conversation between agents, not in the shared Drive. Don't say it is saved for people. ${SHARED_DRIVE_HINT}`;
+  return `No person sees it: it is in a conversation between agents, not in the shared Drive. Don't say it is saved for people. ${hint}`.trimEnd();
 }
 
 /** The Drive files a run saved, as a message carries them, of those the people of `channelId` see (or everyone does). */
@@ -1436,6 +1490,16 @@ export async function artifactOrigins(
   };
 }
 
+/** Whether a run that answers agents only made a version: nothing of it reaches a person. */
+async function madeForAgentsOnly(db: Database, orgId: string, artifactId: string) {
+  const rows = await db
+    .select({ runId: artifactVersions.runId })
+    .from(artifactVersions)
+    .where(eq(artifactVersions.artifactId, artifactId));
+  const results = await Promise.all(rows.map((v) => (v.runId ? answersAgentsOnly(db, orgId, v.runId) : false)));
+  return results.some(Boolean);
+}
+
 /**
  * An agent brings an artifact into its run's conversation (`share_artifact`):
  * allowed only when the person who asked can see where it came from (and the
@@ -1473,8 +1537,9 @@ export async function shareArtifact(
       (input.alsoFrom != null && (a.channelId === input.alsoFrom || (await madeInRoom(db, a.id, input.alsoFrom)))) ||
       (requester !== null &&
         (await requesterSharedChannels(db, orgId, actor.agentId, requester)).includes(a.channelId as string)) ||
-      // No person is in the agents' DM: what a teammate made there for the person asking is theirs to have.
-      (dm !== null && (await madeForSamePerson(db, dm, a.id)));
+      // No person is in the agents' DM: what a teammate made there for the person asking is theirs to have, unless
+      // that teammate may only answer agents (`answersAgentsOnly`).
+      (dm !== null && (await madeForSamePerson(db, dm, a.id)) && !(await madeForAgentsOnly(db, orgId, a.id)));
     if (!allowed) throw await agentRefusal(db, actor, orgId, artifactId);
   }
   let shared: ArtifactView = view(a, editableKind(a.kind));
@@ -1510,20 +1575,16 @@ export async function shareArtifact(
 }
 
 /**
- * Files saved before `placeFile` still sit in rooms no person reads. Each goes where people follow the runs that made
- * it, when all of them agree; the rest stay, so nothing reaches anyone its run wouldn't reach now. Once at boot, off
- * its path: the code holds the rule (who a run answers), which a SQL migration couldn't.
+ * Files saved before `placeFile` still sit in rooms no person reads, written by agents told nobody reads them. Each goes
+ * to the one person its runs worked for, in their DM with the agent, however wide the place its routine reports to: a
+ * run's working file was never saved for a channel, and that person can have it put in the shared Drive
+ * (`moveToSharedDrive`). The rest stay. Once at boot, off its path: who a run worked for is a rule in code, which a SQL
+ * migration couldn't read.
  * ponytail: what stays is looked at again on every boot; a mark on the row when that many ever add up.
  */
 export async function surfaceRoomFiles(db: Database) {
   const stuck = await db
-    .select({
-      id: artifacts.id,
-      orgId: artifacts.orgId,
-      roomId: channels.id,
-      kind: channels.kind,
-      dmKey: channels.dmKey,
-    })
+    .select({ id: artifacts.id, orgId: artifacts.orgId, roomId: channels.id })
     .from(artifacts)
     .innerJoin(channels, eq(channels.id, artifacts.channelId))
     .where(
@@ -1544,21 +1605,34 @@ export async function surfaceRoomFiles(db: Database) {
     // "From …": what a connector or an email brought in, which nobody may have meant for people.
     if (made.some((m) => m.note?.startsWith("From "))) continue;
     const runs = made.flatMap((m) => (m.run ? [m.run] : []));
-    if (runs.length === 0 || runs.length !== made.length) continue;
-    const places = await Promise.all(runs.map((run) => peopleSee(db, run, a)));
-    const [place] = places;
-    if (!place || place.channelId === a.roomId || places.some((p) => p.channelId !== place.channelId)) continue;
-    const [open] = await db
-      .select({ id: channels.id })
-      .from(channels)
-      .where(and(eq(channels.id, place.channelId), isNull(channels.archivedAt)));
-    if (!open) continue;
+    const [run] = runs;
+    if (!run || runs.length !== made.length) continue;
+    const people = await Promise.all(
+      runs.map(async (r) => {
+        const authority = await runAuthorityById(db, a.orgId, r.id);
+        return (await answersAgentsOnly(db, a.orgId, r.id))
+          ? null
+          : (authority.personId ?? routineCreatorOf(authority));
+      }),
+    );
+    const person = people[0];
+    if (!person || people.some((p) => p !== person)) continue;
+    // Refused for someone who left or whom the agent no longer answers: the file stays.
+    const dm = await openDm(db, person, a.orgId, { agentId: run.agentId }).catch(() => null);
+    if (!dm) continue;
     await db.transaction(async (tx) => {
       await tx
         .update(artifacts)
-        .set({ channelId: place.channelId, threadId: place.threadId })
+        .set({ channelId: dm.id, threadId: null })
         .where(and(eq(artifacts.id, a.id), eq(artifacts.channelId, a.roomId)));
       await enqueueIndex(tx, { orgId: a.orgId, kind: "file", sourceId: a.id });
+      await recordAudit(tx, {
+        orgId: a.orgId,
+        actor: { type: "system", id: null },
+        action: "artifact.surfaced",
+        target: { type: "artifact", id: a.id },
+        details: { fromChannelId: a.roomId, toChannelId: dm.id, personId: person },
+      });
     });
     moved++;
   }
