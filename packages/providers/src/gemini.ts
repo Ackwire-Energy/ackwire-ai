@@ -2,6 +2,7 @@ import { MODEL_CATALOG } from "./catalog";
 import { sseData } from "./sse";
 import {
   type ContentBlock,
+  deniedError,
   estimateTokens,
   laidOut,
   type ModelMessage,
@@ -336,7 +337,7 @@ function errorOf(status: number | undefined, code: string | undefined, message?:
   if (status === 401 || code === "authentication") return new ProviderError("invalid provider API key", false, 401);
   if (status === 402 || code === "payment_required")
     return new ProviderError("no prepaid credit left at the provider", false, 402);
-  if (status === 403 || code === "permission_denied") return new ProviderError("provider denied access", false, 403);
+  if (status === 403 || code === "permission_denied") return deniedError(code, message ? shortSaid(message) : "");
   if (code === "quota_exceeded") return new ProviderError("daily quota used up at the provider", false, 429);
   if (status === 429 || status === 408 || code === "rate_limit_exceeded" || code === "too_many_requests")
     return new ProviderError("rate limited by provider", true, status ?? 429);

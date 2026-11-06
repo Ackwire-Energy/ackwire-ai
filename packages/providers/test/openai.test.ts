@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cheapModelOf, costNanoUsd, createOpenAIProvider, MODEL_CATALOG, ProviderError } from "../src";
+import { cheapModelOf, costNanoUsd, createOpenAIProvider, keyRefusalOf, MODEL_CATALOG, ProviderError } from "../src";
 
 const sse = (events: Record<string, unknown>[], tail = "") =>
   events.map((e, i) => `event: ${e.type}\ndata: ${JSON.stringify({ ...e, sequence_number: i })}\n\n`).join("") + tail;
@@ -340,6 +340,34 @@ describe("what a failure says", () => {
 
   test("a rate limit inside a stream is still one", async () => {
     expect(await failed(frame("rate_limit_exceeded", "Slow down."))).toMatchObject({ retryable: true, status: 429 });
+  });
+
+  test("a response that failed is a failure, never an empty reply that worked", async () => {
+    const response = (status: string, error: unknown) => ({
+      id: "r1",
+      object: "response",
+      created_at: 1,
+      status,
+      model: "m",
+      output: [],
+      error,
+    });
+    const event = (type: string, n: number, body: unknown) =>
+      `event: ${type}\ndata: ${JSON.stringify({ type, sequence_number: n, response: body })}\n\n`;
+    const body =
+      event("response.created", 0, response("in_progress", null)) +
+      event("response.failed", 1, response("failed", { code: "insufficient_quota", message: "Add credit." }));
+    const e = await failed(body);
+    expect(e).toMatchObject({ retryable: false, status: 429 });
+    expect(e?.message).toContain("no prepaid credit left at the provider (429 insufficient_quota): Add credit.");
+  });
+
+  test("a 403 keeps the words that tell a model out of reach from a key with no rights", async () => {
+    const said = "Project proj_1 does not have access to model gpt-small";
+    const body = JSON.stringify({ error: { code: "model_not_found", message: said } });
+    const e = await failed(body, 403);
+    expect(e?.message).toBe(`provider denied access (403 model_not_found): ${said}`);
+    expect(e && keyRefusalOf(e)).toBeNull();
   });
 
   test("any other refusal keeps the status, the code and the words, cut short", async () => {

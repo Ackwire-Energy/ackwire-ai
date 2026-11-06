@@ -12,6 +12,7 @@ import {
 import { openAIError, saidIn } from "./openai";
 import {
   type ContentBlock,
+  deniedError,
   estimateTokens,
   laidOut,
   type ModelProvider,
@@ -475,7 +476,7 @@ function costOf(u: Usage): number | undefined {
 function statusError(status: number | undefined, said = ""): ProviderError {
   if (status === 401) return new ProviderError("invalid provider API key", false, 401);
   if (status === 402) return new ProviderError("no prepaid credit left at the provider", false, 402);
-  if (status === 403) return new ProviderError("provider denied access", false, 403);
+  if (status === 403) return deniedError(null, said);
   if (status === 429) return new ProviderError("rate limited by provider", true, 429);
   if (status === undefined || status === 408 || status >= 500) return new ProviderError("provider error", true, status);
   return new ProviderError(`provider rejected the request (${status})${said ? `: ${said}` : ""}`, false, status);

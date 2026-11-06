@@ -9,6 +9,7 @@ import type {
 import { MODEL_CATALOG } from "./catalog";
 import {
   type ContentBlock,
+  deniedError,
   laidOut,
   type ModelMessage,
   type ModelProvider,
@@ -440,7 +441,10 @@ function toProviderError(error: unknown): ProviderError {
   // Most specific first: rate limits and server errors are worth retrying, bad requests and auth are not.
   if (error instanceof Anthropic.RateLimitError) return new ProviderError("rate limited by provider", true, 429);
   if (error instanceof Anthropic.AuthenticationError) return new ProviderError("invalid provider API key", false, 401);
-  if (error instanceof Anthropic.PermissionDeniedError) return new ProviderError("provider denied access", false, 403);
+  if (error instanceof Anthropic.PermissionDeniedError) {
+    const body = error.error as { error?: { message?: unknown } } | undefined;
+    return deniedError(error.type, typeof body?.error?.message === "string" ? shortSaid(body.error.message) : "");
+  }
   if (error instanceof Anthropic.InternalServerError) return new ProviderError("provider error", true, error.status);
   if (error instanceof Anthropic.APIConnectionError) return new ProviderError("could not reach provider", true);
   if (error instanceof Anthropic.APIUserAbortError) return new ProviderError("request aborted", false);

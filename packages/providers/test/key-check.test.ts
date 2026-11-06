@@ -13,6 +13,8 @@ test("a test call's failure says what it knows of the key", () => {
   const claude = "provider rejected the request (400 invalid_request_error): Your credit balance is too low";
   expect(keyRefusalOf({ status: 400, message: claude })).toBe("no_credit");
   expect(keyRefusalOf({ status: 403, message: "provider denied access" })).toBe("denied");
+  expect(keyRefusalOf({ status: 403, message: "provider denied access (403): Country not supported" })).toBe("denied");
+  expect(keyRefusalOf({ status: 403, message: "provider denied access (403): no access to model x" })).toBeNull();
 });
 
 test("what says nothing of the key leaves it unchecked", () => {

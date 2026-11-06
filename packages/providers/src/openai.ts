@@ -9,6 +9,7 @@ import type {
 import { MODEL_CATALOG } from "./catalog";
 import {
   type ContentBlock,
+  deniedError,
   laidOut,
   type ModelMessage,
   type ModelProvider,
@@ -100,6 +101,10 @@ export function createOpenAIProvider(
           }
         });
         const response = await stream.finalResponse();
+        // A failed response ends its stream cleanly: read as a reply, it would be an empty one that "worked".
+        if (response.status === "failed") {
+          throw new OpenAI.APIError(undefined, response.error ?? undefined, response.error?.message, undefined);
+        }
         return fromResponse(response as unknown as Response);
       } catch (error) {
         const mapped = openAIError(error);
@@ -234,7 +239,7 @@ export function openAIError(error: unknown): ProviderError {
   }
   if (error instanceof OpenAI.RateLimitError) return new ProviderError("rate limited by provider", true, 429);
   if (error instanceof OpenAI.AuthenticationError) return new ProviderError("invalid provider API key", false, 401);
-  if (error instanceof OpenAI.PermissionDeniedError) return new ProviderError("provider denied access", false, 403);
+  if (error instanceof OpenAI.PermissionDeniedError) return deniedError(error.code, saidIn(error));
   if (error instanceof OpenAI.InternalServerError) return new ProviderError("provider error", true, error.status);
   if (error instanceof OpenAI.APIConnectionError) return new ProviderError("could not reach provider", true);
   if (error instanceof OpenAI.APIUserAbortError) return new ProviderError("request aborted", false);
