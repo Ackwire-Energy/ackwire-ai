@@ -3735,6 +3735,8 @@ export const ptBR = {
       takeBackAll: "Tirar de todos os agentes",
       done: "Seu plano voltou",
     },
+    /** Under `plan_model_dropped`: opens the agent's "Quem pensa". */
+    planModelDropped: { choose: "Escolher outro modelo" },
     docTitleUnread: "({{count}}) Notificações",
     summaryWaiting_one: "{{count}} coisa esperando você",
     summaryWaiting_other: "{{count}} coisas esperando você",
@@ -3835,6 +3837,9 @@ export const ptBR = {
       /** Someone gave an agent the person's plan (`plan_lent`): `plan` its maker ("Claude"). */
       planLent: "<b>{{name}}</b> conectou o seu plano do {{plan}} ao\u00a0<b>{{agent}}</b>",
       planLent_female: "<b>{{name}}</b> conectou o seu plano do {{plan}} à\u00a0<b>{{agent}}</b>",
+      /** The agent's model left its plan's list (`plan_model_dropped`): `runs` the model it uses now. */
+      planModelDropped:
+        "O {{model}} saiu do {{plan}}. <b>{{name}}</b> está usando o {{runs}} até você escolher outro modelo.",
       routineWaitingPlan: "<b>{{name}}</b> espera o plano renovar para rodar uma rotina",
       planResetUnknown: "O {{plan}} não disse quando o limite renova. O trabalho de <b>{{name}}</b> segue esperando.",
       catchUpClosed_one: "<b>{{name}}</b> retomou e pulou {{count}} conversa que não precisava de resposta",

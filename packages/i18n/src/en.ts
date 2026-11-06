@@ -3729,6 +3729,8 @@ export const en = {
       takeBackAll: "Take it back from every agent",
       done: "Your plan is back",
     },
+    /** Under `plan_model_dropped`: opens the agent's "Quem pensa". */
+    planModelDropped: { choose: "Choose another model" },
     docTitleUnread: "({{count}}) Notifications",
     summaryWaiting_one: "{{count}} thing waiting on you",
     summaryWaiting_other: "{{count}} things waiting on you",
@@ -3826,6 +3828,8 @@ export const en = {
       desktopTaken: "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer",
       /** Someone gave an agent the person's plan (`plan_lent`): `plan` its maker ("Claude"). */
       planLent: "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>",
+      /** The agent's model left its plan's list (`plan_model_dropped`): `runs` the model it uses now. */
+      planModelDropped: "{{model}} left {{plan}}. <b>{{name}}</b> is using {{runs}} until you choose another model.",
       routineWaitingPlan: "<b>{{name}}</b> is waiting for its plan to reset to run a routine",
       planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       catchUpClosed_one: "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",

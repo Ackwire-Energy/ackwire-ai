@@ -3,6 +3,7 @@ import { MODEL_CATALOG } from "../src/catalog";
 import {
   CODING_PLANS,
   claudeCodeModel,
+  droppedPlanModel,
   FAST_MODE_MODELS,
   isPlanModelId,
   learnedPlanModels,
@@ -310,4 +311,24 @@ describe("a plan's public list of models", () => {
     // A plan without a list stays with its own models.
     expect(planForTurn(CODING_PLANS.kimi, "glm-6")).toBe(CODING_PLANS.kimi);
   });
+});
+
+test("a model the plan's live list dropped: named, with the table's label; nothing else counts as dropped", () => {
+  const table = models("opencode");
+  const gone = table.find((m) => !m.alias);
+  if (!gone) throw new Error("the table has a model without an alias");
+  try {
+    expect(droppedPlanModel("opencode", gone.id)).toBeNull();
+    learnPlanModels({ opencode: table.filter((m) => m.id !== gone.id) });
+    expect(droppedPlanModel("opencode", gone.id)).toEqual(gone);
+    expect(claudeCodeModel(planOf("opencode"), gone.id)).toBe("sonnet");
+    learnPlanModels({ opencode: [...table.filter((m) => m.id !== gone.id), { id: "glm-9", label: "GLM-9" }] });
+    learnPlanModels({ opencode: table.filter((m) => m.id !== gone.id) });
+    expect(droppedPlanModel("opencode", "glm-9")).toEqual({ id: "glm-9", label: "glm-9" });
+    for (const value of ["sonnet", "claude-opus-4-1", ids("zai")[0], null])
+      expect(droppedPlanModel("opencode", value)).toBeNull();
+    expect(droppedPlanModel("zai", "glm-9")).toBeNull();
+  } finally {
+    learnPlanModels({ opencode: table });
+  }
 });

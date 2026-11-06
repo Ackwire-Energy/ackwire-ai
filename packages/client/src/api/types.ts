@@ -5785,6 +5785,12 @@ export type NotificationKind =
    */
   | "plan_lent"
   /**
+   * A model an agent thinks with left its plan's live list, so its turns run another (the agent's owner, once per agent
+   * and model). `source.agentId`, the model in `latest.title`, the plan in `latest.plan`, what runs now in
+   * `latest.nowModel`. Choosing another model makes it done.
+   */
+  | "plan_model_dropped"
+  /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
@@ -5992,6 +5998,8 @@ export interface NotificationLatest {
   failures?: RunFailure[];
   /** `run_failed` on a computer brain: the plan's name its cause names ("Claude"). */
   plan?: string;
+  /** `plan_model_dropped`: the model the agent's turns run now. */
+  nowModel?: string;
   /** `usage_limit`: the share of the person's limit used. */
   percent?: number;
   /** `usage_limit` to who decides: the limit, the raise offered, where the limit comes from, this month's requests. */

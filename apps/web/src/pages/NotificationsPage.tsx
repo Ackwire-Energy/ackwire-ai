@@ -192,6 +192,7 @@ function SourceChip({
   )
     [icon, label] = ["computer", t("notifications.source.machine")];
   else if (n.kind === "plan_lent") [icon, label] = ["bulb", t("settings.section.keys")];
+  else if (n.kind === "plan_model_dropped") [icon, label] = ["bulb", t("brain.title")];
   else if (n.kind === "browser_handoff") [icon, label] = ["globe", t("notifications.source.browser")];
   else if (s.issueNumber != null)
     [icon, label] = ["issues", t("notifications.source.issue", { number: s.issueNumber })];
@@ -777,6 +778,13 @@ function Row({
               <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
             {n.kind === "plan_lent" && <PlanTakeBack n={n} />}
+            {n.kind === "plan_model_dropped" && n.source.agentId && !n.doneAt && (
+              <div className="nt-steprow">
+                <Button size="sm" onClick={() => h.onOpen(n)}>
+                  {t("notifications.planModelDropped.choose")}
+                </Button>
+              </div>
+            )}
             {widgetNoticeOf(n) && !n.doneAt && (
               <div className="nt-steprow">
                 <WidgetNoticeActions n={n} onOpen={() => h.onOpen(n)} open={false} />

@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
+import type { PlanModel } from "@agenteschat/providers/plans";
 import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { autonomyNoteFor, proposalCardOf } from "./brakes";
@@ -948,6 +949,28 @@ export async function notifyPlanResetUnknown(
       label: input.agentName,
     },
     latest: { title: input.plan },
+  });
+}
+
+/** The inbox note of an agent's model that left its plan's list (`plan_model_dropped`); no model: all of the agent's. */
+export const planModelDroppedGroup = (agentId: string, model = "") => `plan_model_dropped:${agentId}:${model}`;
+
+/**
+ * A model the agent thinks with left its plan's live list and its turns run another one: its owner hears it once per
+ * model, with what it runs now, so the switch is never silent.
+ */
+export async function notifyPlanModelDropped(
+  deps: NotificationDeps,
+  input: { orgId: string; agentId: string; agentName: string; plan: string; model: PlanModel; runs: string },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [await agentOwner(deps, input.agentId)],
+    kind: "plan_model_dropped",
+    groupKey: planModelDroppedGroup(input.agentId, input.model.id),
+    actor: agent(input.agentId),
+    source: { agentId: input.agentId, label: input.agentName },
+    latest: { title: input.model.label, plan: input.plan, nowModel: input.runs },
   });
 }
 

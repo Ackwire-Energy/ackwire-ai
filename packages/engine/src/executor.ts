@@ -27,7 +27,7 @@ import {
   type ToolImage,
   textOf,
 } from "@agenteschat/providers";
-import { ownLimitsModel } from "@agenteschat/providers/plans";
+import { droppedPlanModel, ownLimitsModel, planModel, planOf } from "@agenteschat/providers/plans";
 import { extraUsageLeft, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
@@ -207,6 +207,7 @@ import { postNoAiCard } from "./no-ai";
 import {
   notifyCatchUpClosed,
   notifyCatchUpClosedAsker,
+  notifyPlanModelDropped,
   notifyPlanResetUnknown,
   resolveRunFailed,
 } from "./notification-producers";
@@ -2485,6 +2486,25 @@ async function executeRunInner(
     fresh: Boolean(viaRoutine) || run.background,
     promptKey: transcript.promptKey,
   });
+  // The agent's model left its plan's live list, so this turn runs another: its owner hears it, never silently.
+  const dropped =
+    brainPlan.kind === "claude_code" && !brainPlan.missionId && agent.brain === "claude_code"
+      ? droppedPlanModel(brainPlan.account?.provider, agent.brainModel)
+      : null;
+  const droppedFrom = dropped ? planOf(brainPlan.account?.provider) : undefined;
+  if (dropped && droppedFrom) {
+    await notifyPlanModelDropped(
+      { db, pubsub: deps.pubsub },
+      {
+        orgId: run.orgId,
+        agentId: agent.id,
+        agentName: agent.name,
+        plan: droppedFrom.name,
+        model: dropped,
+        runs: planModel(droppedFrom, brainPlan.model).label,
+      },
+    ).catch(() => {});
+  }
   // A mission's main session can't be replaced mid-mission: its first turn after an edit reads the settings again.
   if (brainPlan.settingsChanged && needsContext) {
     transcript.system = [

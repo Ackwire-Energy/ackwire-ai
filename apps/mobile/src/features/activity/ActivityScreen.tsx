@@ -563,6 +563,12 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
           <ChangeRequestCard n={n} />
         </View>
       ) : null}
+      {/* The agent's model left its plan's list: another one chosen from here. */}
+      {n.kind === "plan_model_dropped" && href && !n.doneAt ? (
+        <View style={styles.change}>
+          <Button variant="secondary" size="sm" label={t("mobile.activity.chooseModel")} onPress={open} />
+        </View>
+      ) : null}
       {/* A person asks for more (ADR 0141): raised or refused right here. */}
       {n.kind === "usage_limit" && n.latest.statusTo === "request" && !n.doneAt ? (
         <View style={styles.change}>

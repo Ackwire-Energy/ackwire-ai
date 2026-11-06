@@ -159,6 +159,13 @@ export const NOTIFICATION_KINDS = [
    */
   "plan_lent",
   /**
+   * A model an agent thinks with left its plan's live list (`droppedPlanModel`), so its turns run another one: the
+   * agent's owner, once per agent and model (`planModelDroppedGroup`), the agent as actor, `source.agentId` and its
+   * name in `source.label`, the model in `latest.title`, the plan's name in `latest.plan` and what it runs now in
+   * `latest.nowModel`. Inbox only, with "Escolher outro modelo"; done once its model changes.
+   */
+  "plan_model_dropped",
+  /**
    * An AI app connected as the person created agents, routines, skills, memories or channels for them (ADR 0119):
    * one row per connection merging while unread, `latest.title` the app's name and `latest.created` how many of each
    * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.
@@ -320,6 +327,8 @@ export interface NotificationLatest {
   failures?: RunFailure[];
   /** `run_failed` on a computer brain: the plan's name its cause may name ("the Claude account was disconnected"). */
   plan?: string;
+  /** `plan_model_dropped`: the model the agent's turns run now. */
+  nowModel?: string;
   /** `usage_limit`: the share of the person's limit used. */
   percent?: number;
   /** `usage_limit` to who decides: the limit, what "Aumentar" raises it to, where it comes from, this month's requests. */
