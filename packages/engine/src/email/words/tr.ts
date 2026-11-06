@@ -247,7 +247,7 @@ export const words: EmailWords = {
     ],
     account: (email) => [
       { b: email },
-      " hesabının tamamını silmek için bu kodu yazın, yalnızca bir çalışma alanını değil. Hesap hemen silinir ve yalnızca sizin bulunduğunuz çalışma alanları da onunla birlikte kapanır.",
+      " hesabının tamamını silmek için bu kodu yazın, yalnızca bir çalışma alanını değil. Hesabın oturumu her yerde hemen kapanır, hesap 7 gün sonra kalıcı olarak silinir ve yalnızca sizin bulunduğunuz çalışma alanları da onunla birlikte kapanır.",
     ],
     support: (address) => [
       "10 dakika geçerli ve bu kod olmadan hiçbir şey silinmez. Bu siz değilseniz kodu kimseyle paylaşmayın ve ",

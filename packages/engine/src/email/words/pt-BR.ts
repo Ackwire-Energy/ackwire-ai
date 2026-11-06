@@ -226,7 +226,7 @@ export const ptBR: Words = {
     account: (email) => [
       "Digite este código para apagar a conta inteira ",
       { b: email },
-      ", não só um workspace. Ela some na hora, e os workspaces em que só você está fecham com ela.",
+      ", não só um workspace. Ela sai de todos os aparelhos na hora e é apagada de vez 7 dias depois, e os workspaces em que só você está fecham com ela.",
     ],
     support: (address) => [
       "Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e escreva para ",

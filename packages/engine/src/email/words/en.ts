@@ -259,7 +259,7 @@ export const en = {
     account: (email: string): Text => [
       "Type this code to delete the whole account ",
       { b: email },
-      ", not just one workspace. It goes at once, and the workspaces only you are in close with it.",
+      ", not just one workspace. It's signed out everywhere at once and deleted for good 7 days later, and the workspaces only you are in close with it.",
     ],
     support: (address: string): Text => [
       "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and write to ",

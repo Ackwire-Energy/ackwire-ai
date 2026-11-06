@@ -230,7 +230,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Ketik kode ini untuk menghapus seluruh akun ",
       { b: email },
-      ", bukan hanya satu ruang kerja. Akun ini langsung hilang, dan ruang kerja yang hanya berisi kamu ikut ditutup.",
+      ", bukan hanya satu ruang kerja. Akun ini langsung keluar di semua perangkat dan dihapus permanen 7 hari kemudian, dan ruang kerja yang hanya berisi kamu ikut ditutup.",
     ],
     support: (address) => [
       "Berlaku 10 menit, dan tidak ada yang dihapus tanpa kode ini. Kalau ini bukan kamu, jangan bagikan kodenya dan kirim email ke ",

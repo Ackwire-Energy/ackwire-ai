@@ -803,9 +803,10 @@ deletes the account at Composio, without revoking it at the service.
 **Deleting workspaces and accounts.** An owner deletes a workspace in **Settings → General**, with a
 code emailed to them (with no email set up, their password instead): it closes for everyone at once,
 its agents stop, and it is deleted for good 7 days later. Until then any owner can restore it. An
-account is deleted at once from the account menu, or the account page on the phone, with the same
-proof, and the workspaces where it was the only member close with it and go 7 days later. With Sign
-in with Apple, register `EMAIL_FROM`'s domain in Apple Developer › Sign in with Apple for Email
+account is deleted from **Settings → Your account**, or the account page on the phone, with the same
+proof: it is signed out everywhere at once and deleted for good 7 days later, and signing in before
+then restores it. The workspaces where it was the only member close at the same time and go on the
+same date. With Sign in with Apple, register `EMAIL_FROM`'s domain in Apple Developer › Sign in with Apple for Email
 Communication (SPF and DKIM passing): someone who hid their address gets mail only from senders
 registered there, so without it they would get no code. What lives outside the server stays:
 the agents' folders on connected computers until the runner is removed, files in a workspace's own

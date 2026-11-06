@@ -240,7 +240,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Escribe este código para eliminar toda la cuenta ",
       { b: email },
-      ", no solo un espacio de trabajo. Se elimina al instante, y los espacios de trabajo donde solo estás tú se cierran con ella.",
+      ", no solo un espacio de trabajo. Se cierra la sesión en todas partes al instante y se elimina para siempre 7 días después, y los espacios de trabajo donde solo estás tú se cierran con ella.",
     ],
     support: (address) => [
       "Es válido por 10 minutos, y no se elimina nada sin él. Si no fuiste tú, no lo compartas y escribe a ",
