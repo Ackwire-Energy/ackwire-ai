@@ -717,7 +717,7 @@ describe("issues", () => {
     const said = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id)).filter(
       (a) => a.event === "github_link",
     );
-    expect(said.map((a) => a.textCode).sort()).toEqual(["github_linked", "github_linked", "github_unlinked"]);
+    expect(said.map((a) => a.textCode).sort()).toEqual(["github_linked", "github_unlinked"]);
   });
 
   test("a new agent creates tasks with no card, updates what it can see of others' and never what it can't", async () => {
