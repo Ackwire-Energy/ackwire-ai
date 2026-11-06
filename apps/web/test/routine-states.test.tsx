@@ -651,7 +651,7 @@ describe("Approval cards: why, and asked while nobody watched", () => {
     await act(async () => fireEvent.click(within(group).getByRole("button", { name: "Ver detalhes" })));
     const text = group.textContent ?? "";
     const why = text.indexOf("O PR #42 corrige o login");
-    const action = text.indexOf("Merge PR #42 into main");
+    const action = text.indexOf("Fazer um merge");
     const origin = text.indexOf("rotina «Revisar PRs»");
     expect(why).toBeGreaterThan(-1);
     expect(action).toBeGreaterThan(why);

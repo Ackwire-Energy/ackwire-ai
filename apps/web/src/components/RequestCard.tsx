@@ -1,4 +1,5 @@
 import type { Agent } from "@agenteschat/client";
+import { askKindWords } from "@agenteschat/client/lib/approval-words";
 import { ExpiryFuse, Locked } from "@agenteschat/ui";
 import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -176,7 +177,6 @@ export function RequestCard({
     if (openProp === undefined) setOpenSelf(next);
     onOpenChange?.(next);
   };
-  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   const foot = (actions || end) && (
     <div className="rq__foot">
       {actions}
@@ -193,7 +193,7 @@ export function RequestCard({
     <>
       <CardSky color={colorOf(agent)} />
       <div className="rq__head">
-        <span className="rq__kind">{tt(`ask.kind.${kind}`)}</span>
+        <span className="rq__kind">{askKindWords(t, kind, Boolean(mine))}</span>
         {mine ? (
           <span className="rq__state">
             <WaitMark />

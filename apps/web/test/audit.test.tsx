@@ -163,7 +163,7 @@ describe("Configurações → Auditoria", () => {
     await click(within(panel).getByRole("link", { name: "Ver o pedido" }));
     await settle(4);
     expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/audit`);
-    expect(document.querySelector(".ap-dialog")?.textContent).toContain("Run deploy workflow");
+    expect(document.querySelector(".ap-dialog")?.textContent).toContain("Fazer um deploy");
     // Escape dismisses the request alone; the row stays open under it.
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     await settle(2);

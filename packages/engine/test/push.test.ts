@@ -138,7 +138,8 @@ describe("push text", () => {
       highRisk: true,
     });
     expect(risky.title).toBe("Dev precisa da sua aprovação");
-    expect(risky.body).toBe("Deploy api to production. Abra o app para revisar com calma.");
+    // The title is the tool's, in English: only the apps word it in other languages.
+    expect(risky.body).toBe("Toque para ver o pedido.");
     // Asked by a routine while nobody watched: the push names it.
     const fromRoutine = renderPush("en", {
       kind: "approval",
@@ -351,7 +352,7 @@ describe("push delivery", () => {
     expect(push.sent[0]).toMatchObject({
       to: TOKEN_BIA,
       title: "Dev precisa da sua aprovação",
-      body: "Rotina «Revisar PRs»: Merge PR #42",
+      body: "Rotina «Revisar PRs»: Toque para ver o pedido.",
     });
   });
 

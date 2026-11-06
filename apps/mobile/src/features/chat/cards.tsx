@@ -24,6 +24,7 @@ import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
   alwaysRoutineName,
+  approvalAskLine,
   approvalGroupWaitsFor,
   approvalSummary,
   approvalWaitsFor,
@@ -304,7 +305,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       kind="approval"
       agentId={first.agentId}
       waitsFor={ids.length > 0 ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
-      lead={approvalWhy(leadItem) ?? t("approval.askMany", { count: waiting.length })}
+      lead={approvalWhy(leadItem) ?? approvalAskLine(t, ids.length > 0, waiting.length)}
       well={
         single
           ? {
@@ -541,7 +542,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       kind="approval"
       agentId={a.agentId}
       waitsFor={a.canDecide ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
-      lead={approvalWhy(a) ?? t("approval.askPlain")}
+      lead={approvalWhy(a) ?? approvalAskLine(t, a.canDecide)}
       well={{
         tile: <ApprovalMark approval={a} size={20} />,
         title: approvalHeadline(t, a, i18n.language),

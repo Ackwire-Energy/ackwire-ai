@@ -11,6 +11,7 @@ import {
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
+  approvalAskLine,
   approvalGroupWaitsFor,
   approvalSummary,
   approvalTitle,
@@ -82,7 +83,7 @@ export function ApprovalAsk({
       label={t("approval.group")}
       mine={approval.canDecide}
       waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
-      lead={why ?? t("approval.askPlain")}
+      lead={why ?? approvalAskLine(t, approval.canDecide)}
       object={{
         logo: <ConnectorMark approval={approval} />,
         title,
@@ -193,7 +194,7 @@ export function ApprovalGroupAsk({
       label={t("approval.group")}
       mine={mine}
       waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
-      lead={why ?? t("approval.askMany", { count: waiting.length })}
+      lead={why ?? approvalAskLine(t, mine, waiting.length)}
       object={
         one
           ? { logo: <ConnectorMark approval={first} />, title: runHead(t, one, agent), more: t("approval.run.show") }
@@ -239,7 +240,7 @@ export function ApprovalGroupAsk({
       end={
         deadline ? <RequestFuse left={left} agent={agent} text={expiryText(t, { expiresAt: deadline })} /> : undefined
       }
-      what={one ? runHead(t, one, agent) : t("approval.askMany", { count: waiting.length })}
+      what={one ? runHead(t, one, agent) : approvalAskLine(t, mine, waiting.length)}
       locked={deciding}
     />
   );
