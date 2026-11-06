@@ -2,13 +2,12 @@ import {
   type ConnectIntent,
   type Credential,
   keys,
-  useAgents,
   useAiAccounts,
   useAiStatus,
   useApi,
   useModels,
 } from "@agenteschat/client";
-import { keyRefusal } from "@agenteschat/client/lib/errors";
+import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, choiceOfIntent, freePlanAccount, PLAN_CHOICES } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -27,7 +26,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
-import { Button, SheetScreen } from "@/ui";
+import { Button, SheetScreen, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { ConnectAiFlow, type FlowView, viewOf } from "./ConnectAiSteps";
 import { openPage } from "./parts";
@@ -139,8 +138,8 @@ export function ConnectAiSheet() {
     viewOf(PLAN_CHOICES.find((c) => c === params.plan) ?? choiceOfIntent(params.intent as ConnectIntent | undefined)),
   );
   const form = useConnectKey(orgId, params.provider);
-  const agentRows = useAgents(orgId);
   const models = useModels();
+  const toast = useToast();
   const [keySaved, setKeySaved] = useState(false);
   const answer = () => {
     void qc.invalidateQueries({ queryKey: keys.aiStatus(orgId) });
@@ -199,11 +198,13 @@ export function ConnectAiSheet() {
               if (!key) return;
               // The right hand asked for a key ("Usar uma chave de API"): the workspace's AI from now on, and the person's
               // own DM goes back to it.
-              const row = agentRows.data?.find((a) => a.id === one?.id);
-              if (one && rightHand && row) {
-                const moved = await rightHandOnKey(api, orgId, row, key, models.data?.models ?? []).then(
+              if (one && rightHand) {
+                const moved = await rightHandOnKey(api, orgId, one, key, models.data?.models ?? []).then(
                   () => true,
-                  () => false,
+                  (error) => {
+                    toast({ title: errorText(t, error), icon: "x" });
+                    return false;
+                  },
                 );
                 if (moved && key.check !== "unchecked")
                   form.setSavedNote(thinksWithLine(t, "workspace", one.name, key.label));

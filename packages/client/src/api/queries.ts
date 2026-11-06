@@ -2682,6 +2682,7 @@ export function useRemoveCredential(orgId: string) {
     // `aiStatus` lives under `credentials`; the agents that used it have no key of their own now.
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agentPages(orgId) });
       return qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
     },
   });

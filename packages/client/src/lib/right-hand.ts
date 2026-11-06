@@ -50,8 +50,9 @@ export const thinksWithLine = (t: TFunction, scope: BrainScope | undefined, agen
     : t("aiAccounts.done.savedAgent", { agent, label });
 
 /**
- * The right hand on a workspace key, web and phone: the person's own DM goes back to the workspace's AI, that AI to its
- * API key, and the key is pinned, with Automático where the model chosen before can't run on it.
+ * The right hand on a workspace key, web and phone: the workspace's AI goes to its API key, the key is pinned, with
+ * Automático where the model chosen before can't run on it, and the person's own DM goes back to that AI. In that
+ * order: someone the workspace's AI refuses keeps their own as it was.
  */
 export async function rightHandOnKey(
   api: ApiClient,
@@ -60,10 +61,10 @@ export async function rightHandOnKey(
   key: Pick<Credential, "id" | "provider">,
   models: readonly Model[],
 ) {
-  await api.agents.setBrain(orgId, agent.id, { brain: "model" });
   await api.agents.setBrain(orgId, agent.id, { scope: "workspace", brain: "model" });
   const fits = keyRuns(key, agent.model, models);
   await api.agents.update(orgId, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
+  await api.agents.setBrain(orgId, agent.id, { brain: "model" });
 }
 
 /** Its one-time "Novo" is per person and workspace (`seenList` entries), gone once its DM opened. */

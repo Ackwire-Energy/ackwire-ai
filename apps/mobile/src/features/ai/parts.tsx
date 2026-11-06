@@ -1,9 +1,11 @@
+import type { keyRefusal } from "@agenteschat/client/lib/errors";
 import { type CodingPlan, planReplies } from "@agenteschat/client/lib/plans";
 import * as Clipboard from "expo-clipboard";
 import { openBrowserAsync } from "expo-web-browser";
+import type { TFunction } from "i18next";
 import type { ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Linking, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Linking, StyleSheet, TextInput, View } from "react-native";
 import {
   Button,
   fieldText,
@@ -215,6 +217,14 @@ export function StepText({ children }: { children: ReactNode }) {
 /** Opens a maker's own page (a sign-in, its settings, where a key is made) in the in-app browser. */
 export function openPage(href: string) {
   void openBrowserAsync(href).catch(() => Linking.openURL(href));
+}
+
+/** A stored key its provider refused: why, in the provider's words too, and the page that fixes it. */
+export function alertKeyRefused(t: TFunction, refusal: NonNullable<ReturnType<typeof keyRefusal>>) {
+  Alert.alert(refusal.text, undefined, [
+    { text: t("common.close"), style: "cancel" },
+    ...(refusal.href ? [{ text: refusal.site, onPress: () => openPage(refusal.href) }] : []),
+  ]);
 }
 
 /**

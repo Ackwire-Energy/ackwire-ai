@@ -80,7 +80,18 @@ import {
 } from "@agenteschat/engine";
 import { contextWindowOf, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
-import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  iso,
+  json,
+  keyTester,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
 import { credentialOut } from "./credential-view";
 import {
   AgentAppearance,
@@ -1208,7 +1219,7 @@ export function managementRoutes(deps: AppDeps) {
         orgId,
         credentialId,
         c.req.valid("json"),
-        { fetch: deps.extras?.http, verify: deps.extras?.context?.gateway?.verifyKey },
+        { fetch: deps.extras?.http, verify: (await keyTester(deps, c.get("user").id))?.verifyKey },
       );
       return c.json(credentialOut(row), 200);
     },

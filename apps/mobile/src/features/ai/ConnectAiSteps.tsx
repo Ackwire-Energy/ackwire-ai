@@ -20,7 +20,7 @@ import {
 } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
-import { errorText, holdText } from "@agenteschat/client/lib/errors";
+import { errorText, holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -90,7 +90,7 @@ import type { ConnectKey } from "./ConnectAi";
 import { EndpointForm } from "./EndpointForm";
 import { existingRows, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
 import { useAiOrg } from "./org";
-import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
+import { AiRow, alertKeyRefused, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
 
 /*
  * "Conectar uma IA" on the phone: the web's content and rules
@@ -318,7 +318,9 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
       toast({ title: thinksWithLine(t, scope, to.name, label), icon: "check" });
       props.onPlanDone(to.id);
     } catch (error) {
-      toast({ title: errorText(t, error), icon: "x" });
+      const refusal = keyRefusal(t, error);
+      if (refusal) alertKeyRefused(t, refusal);
+      else toast({ title: errorText(t, error), icon: "x" });
     } finally {
       setBusy(false);
     }
@@ -337,7 +339,9 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
         forAgent,
         k.label,
         async () => {
-          await api.agents.checkCredential(orgId, k.id);
+          const { check } = await api.agents.checkCredential(orgId, k.id);
+          if (check === "unchecked")
+            toast({ title: t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) }), icon: "check" });
           // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
           if (rightHand) return rightHandOnKey(api, orgId, rightHand, k, models.data?.models ?? []);
           if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });

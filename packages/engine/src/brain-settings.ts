@@ -15,8 +15,8 @@ import {
 } from "@agenteschat/adapters";
 import {
   and,
+  asc,
   type Database,
-  desc,
   type Executor,
   eq,
   inArray,
@@ -35,6 +35,7 @@ import {
   isContextLimit,
   MODEL_CATALOG,
   modelProvider,
+  parseCustomModel,
 } from "@agenteschat/providers";
 import {
   ANTIGRAVITY_MODELS,
@@ -59,7 +60,7 @@ import {
 import { recordAudit } from "./audit";
 import { BRAIN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
-import { usableCredentialRow } from "./credentials";
+import { defaultCredentials, providerKeyOf } from "./credentials";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
   defaultAccountLabel,
@@ -652,27 +653,25 @@ async function personalAgent(db: Database, agent: Agent, userId: string, account
   return { ...(await settingsAgent(db, mine, userId, account ?? first?.id)), ownerUserId: userId };
 }
 
-/** The workspace's key the right hand's model thinks with: the one pinned, else the newest of its model's provider. */
+/** The workspace's key the right hand's model thinks with, in the order its calls take: null where they'd find none. */
 async function workspaceKey(db: Database, agent: Agent) {
-  const pinned = agent.credentialId ? await usableCredentialRow(db, agent.orgId, agent.credentialId) : null;
-  const provider =
-    pinned?.provider ??
-    (isAutoModel(agent.model) ? await orgModelProvider(db, agent.orgId) : modelProvider(agent.model));
-  const [newest] = pinned
-    ? [pinned]
-    : await db
-        .select({ provider: schema.providerCredentials.provider, label: schema.providerCredentials.label })
-        .from(schema.providerCredentials)
-        .where(
-          and(
-            eq(schema.providerCredentials.orgId, agent.orgId),
-            eq(schema.providerCredentials.provider, provider ?? ""),
-            isNull(schema.providerCredentials.revokedAt),
-          ),
-        )
-        .orderBy(desc(schema.providerCredentials.createdAt))
-        .limit(1);
-  return newest ? { provider: newest.provider, label: newest.label } : null;
+  const pinned = parseCustomModel(agent.model)?.credentialId ?? agent.credentialId;
+  const [provider, defaults, rows] = await Promise.all([
+    isAutoModel(agent.model) ? orgModelProvider(db, agent.orgId) : modelProvider(agent.model),
+    defaultCredentials(db, agent.orgId),
+    db
+      .select({
+        id: schema.providerCredentials.id,
+        provider: schema.providerCredentials.provider,
+        label: schema.providerCredentials.label,
+        revokedAt: schema.providerCredentials.revokedAt,
+      })
+      .from(schema.providerCredentials)
+      .where(eq(schema.providerCredentials.orgId, agent.orgId))
+      .orderBy(asc(schema.providerCredentials.createdAt)),
+  ]);
+  const key = pinned ? rows.find((r) => r.id === pinned && !r.revokedAt) : providerKeyOf(rows, defaults, provider);
+  return key ? { provider: key.provider, label: key.label } : null;
 }
 
 /** What everyone's DM with the right hand thinks with while they have no AI of their own (its `agents` row). */

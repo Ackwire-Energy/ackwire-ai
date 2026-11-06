@@ -172,6 +172,16 @@ describe("removing a key", () => {
     });
   });
 
+  test("an agent with no key of its own counts on the key its calls take, a plan's agent doesn't", async () => {
+    const usedByOf = async (id: string) =>
+      (await listCredentials(f.db, f.owner.id, f.org.id)).find((c) => c.id === id)?.usedBy?.map((a) => a.name);
+    const rio = await usingAgent();
+    await f.db.update(schema.agents).set({ credentialId: null }).where(eq(schema.agents.id, rio.id));
+    expect(await usedByOf(f.credential.id)).toContain("Rio");
+    await f.db.update(schema.agents).set({ brain: "claude_code" }).where(eq(schema.agents.id, rio.id));
+    expect(await usedByOf(f.credential.id)).not.toContain("Rio");
+  });
+
   test("with `release` it goes: the agents lose it, its default too, and the row is gone", async () => {
     const agent = await usingAgent();
     const defaults = {

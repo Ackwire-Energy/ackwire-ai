@@ -156,10 +156,13 @@ export type KeyCheck =
 
 const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
+/** The call's own key first: a key of an unusual shape is one no pattern knows. */
+const withoutKey = (text: string, apiKey: string) => redactCredentials(text.replaceAll(apiKey, "••••"));
+
 /** A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked. */
-const masked = (error: unknown) =>
+const masked = (error: unknown, apiKey: string) =>
   error instanceof ProviderError
-    ? new ProviderError(redactCredentials(error.message), error.retryable, error.status, error.partial)
+    ? new ProviderError(withoutKey(error.message, apiKey), error.retryable, error.status, error.partial)
     : error;
 
 /**
@@ -752,7 +755,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         });
         if (personId && usage)
           await addPersonSpend(db, { orgId: agent.orgId, personId, amountNanoUsd: actual, at: now() });
-        throw masked(error);
+        throw masked(error, key.apiKey);
       }
 
       const { record, spent, personSpent } = await settleCall({
@@ -883,8 +886,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       } catch (error) {
         const refusal = error instanceof ProviderError ? keyRefusalOf(error) : null;
         if (!refusal || !(error instanceof ProviderError)) return { state: "unchecked" };
-        const said = keyFailureWords(error.message).replaceAll(input.key.apiKey, "••••");
-        return { state: "refused", refusal, said: redactCredentials(said) };
+        return { state: "refused", refusal, said: withoutKey(keyFailureWords(error.message), input.key.apiKey) };
       }
     },
 
@@ -941,7 +943,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       } catch (error) {
         const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
         if (usage) await recordUsage(db, { ...base, model: call.model, usage, partial: true });
-        throw masked(error);
+        throw masked(error, key.apiKey);
       }
       const record = await recordUsage(db, {
         ...base,

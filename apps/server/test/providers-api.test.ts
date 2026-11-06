@@ -219,3 +219,24 @@ test("a key saved says it passed; it can be tried again; with `release` it goes 
   expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("credential.default");
   expect((await api(`/credentials/${key.id}?purge=true&release=true`, { method: "DELETE" })).status).toBe(204);
 });
+
+test("past a person's hourly key tests a key saves unchecked: no one sorts stolen keys through this server", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const created = await api("/credentials", {
+    json: { provider: "openai", label: "OpenAI", apiKey: "sk-proj-abcdefgh" },
+  });
+  const key = (await created.json()) as { id: string; check: string };
+  expect(key.check).toBe("ok");
+  const checks: string[] = [];
+  for (let i = 0; i < 30; i++) {
+    const res = await api(`/credentials/${key.id}/check`, { json: {} });
+    checks.push(((await res.json()) as { check: string }).check);
+  }
+  expect(checks.at(0)).toBe("ok");
+  expect(checks.at(-1)).toBe("unchecked");
+}, 20_000);

@@ -60,7 +60,7 @@ test("what a person without a plan reads names the key, or that there is none", 
   expect(say({ key: null }, true)).toContain("the workspace's API key");
 });
 
-test("a key for the right hand: the person's own goes, the workspace's moves, and a model it can't run becomes Automatic", async () => {
+test("a key for the right hand: the workspace's moves first, so a refusal leaves the person's own; a model it can't run becomes Automatic", async () => {
   const calls: unknown[] = [];
   const api = {
     agents: {
@@ -70,8 +70,8 @@ test("a key for the right hand: the person's own goes, the workspace's moves, an
   } as never;
   await rightHandOnKey(api, "o", { id: "lodi", model: "claude-opus" }, { id: "k1", provider: "openai" }, []);
   expect(calls).toEqual([
-    { brain: "model" },
     { scope: "workspace", brain: "model" },
     { credentialId: "k1", model: "auto" },
+    { brain: "model" },
   ]);
 });

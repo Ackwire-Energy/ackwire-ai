@@ -83,6 +83,7 @@ import {
   createAppRouter,
   errors,
   json,
+  keyTester,
   noContent,
   OrgParams,
   requireSession,
@@ -473,7 +474,7 @@ export function agentRoutes(deps: AppDeps) {
         userId,
         orgId,
         { ...input, ...(endpoint ? { endpoint: { ...endpoint, models: endpoint.models.map(modelIn) } } : {}) },
-        { fetch: deps.extras?.http, net: endpointNet(deps), verify: deps.extras?.context?.gateway?.verifyKey },
+        { fetch: deps.extras?.http, net: endpointNet(deps), verify: (await keyTester(deps, userId))?.verifyKey },
       );
       const checks = row.endpoint ? await endpointChecks(deps, userId, orgId, row.id) : undefined;
       return c.json({ ...credentialOut(row), ...(checks ? { checks } : {}) }, 201);
@@ -578,9 +579,10 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, credentialId } = c.req.valid("param");
-      const gateway = deps.extras?.context?.gateway;
+      const userId = c.get("user").id;
+      const gateway = await keyTester(deps, userId);
       if (!gateway) return c.json({ check: "unchecked" as const }, 200);
-      return c.json({ check: await checkCredential(db, gateway, c.get("user").id, orgId, credentialId) }, 200);
+      return c.json({ check: await checkCredential(db, gateway, userId, orgId, credentialId) }, 200);
     },
   );
 

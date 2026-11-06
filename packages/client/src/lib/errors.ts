@@ -611,10 +611,6 @@ export const oauthReturnText = (t: TFunction, code: string): string => {
   return t("oauthReturn.failed");
 };
 
-/**
- * A failed request in the person's words: a code the app knows, a file too big, a refusal, no answer (offline or the
- * server out of reach), else `untranslatedText`. Never a raw error's own words ("Failed to fetch", "Bad Gateway").
- */
 /** A key the provider refused on its test call, as a dialog says it: why, its words, and the page that fixes it. */
 export function keyRefusal(t: TFunction, error: unknown): { text: string; href: string; site: string } | null {
   if (!(error instanceof ApiError) || !KEY_REFUSALS.has(error.code ?? "")) return null;
@@ -631,6 +627,10 @@ export function keyRefusal(t: TFunction, error: unknown): { text: string; href: 
 
 const KEY_REFUSALS = new Set(["provider_key_invalid", "provider_key_no_credit", "provider_key_denied"]);
 
+/**
+ * A failed request in the person's words: a code the app knows, a file too big, a refusal, no answer (offline or the
+ * server out of reach), else `untranslatedText`. Never a raw error's own words ("Failed to fetch", "Bad Gateway").
+ */
 export function errorText(t: TFunction, error: unknown, locale?: string): string {
   if (error instanceof ApiError) {
     const known = knownErrorText(t, error, locale);

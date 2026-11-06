@@ -27,7 +27,7 @@ import {
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
-import { errorText, holdText, type keyRefusal } from "@agenteschat/client/lib/errors";
+import { errorText, holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -298,12 +298,14 @@ export function ExistingRows({
   const dir = useDirectory(org.id);
   const models = useModels();
   const [busy, setBusy] = useState(false);
+  const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const view = gates.view;
   if (!view || view.agentId !== agent.id) return null;
   const rows = existingAi(view, credentials);
   if (rows.length === 0 && !panel) return null;
   const save = async (run: () => Promise<ExistingUsed>) => {
     setBusy(true);
+    setRefused(null);
     try {
       const used = await run();
       for (const key of [
@@ -315,7 +317,9 @@ export function ExistingRows({
         void qc.invalidateQueries({ queryKey: key });
       onUsed(agent.id, used);
     } catch (error) {
-      toast.show(errorText(t, error), "error");
+      const refusal = keyRefusal(t, error);
+      setRefused(refusal);
+      if (!refusal) toast.show(errorText(t, error), "error");
     } finally {
       setBusy(false);
     }
@@ -341,7 +345,9 @@ export function ExistingRows({
   // Tried first: a key kept earlier may have run out of credit, and "now thinks with it" has to be true.
   const pickKey = (key: Credential) =>
     save(async () => {
-      await api.agents.checkCredential(org.id, key.id);
+      const { check } = await api.agents.checkCredential(org.id, key.id);
+      if (check === "unchecked")
+        toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(key.provider) }), "info");
       const row = dir.agentById.get(agent.id);
       // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
       if (view.scope === "mine" && row) {
@@ -415,6 +421,7 @@ export function ExistingRows({
     <>
       <p className="ai-picker__or">{named ? t("connectAi.have.titleFor", g) : t("connectAi.have.title")}</p>
       {items}
+      {refused && <KeyRefused refusal={refused} />}
       {lends && <p className="ai-picker__or">{t("agentPage.work.brain.accountOthers")}</p>}
       {onManageKeys && rows.some((r) => r.kind === "key") && (
         <p className="ai-picker__or">

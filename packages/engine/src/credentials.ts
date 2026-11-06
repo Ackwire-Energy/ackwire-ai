@@ -6,14 +6,17 @@ import {
   customModelsOf,
   type EndpointStyle,
   ensureOpenRouterModels,
+  isAutoModel,
   isCustomModel,
   isKnownProvider,
   isOpenRouterModel,
   listedModels,
   type ModelInfo,
   modelInfo,
+  modelProvider,
   PROVIDERS,
   type ProviderId,
+  parseCustomModel,
 } from "@agenteschat/providers";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
@@ -30,6 +33,7 @@ import {
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import type { KeyCheck, ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
+import { orgModelProvider } from "./router";
 
 const { providerCredentials } = schema;
 
@@ -360,9 +364,23 @@ async function dropDefault(tx: Executor, orgId: string, credentialId: string) {
     .where(eq(schema.organizationSettings.orgId, orgId));
 }
 
+/**
+ * The key a provider's calls take with no key of their own, of an org's keys oldest first: its default, the single
+ * default of old when it is of that provider, else its newest (`resolveKey`'s order).
+ */
+export function providerKeyOf<K extends { id: string; provider: string; revokedAt: Date | null }>(
+  rows: readonly K[],
+  defaults: Awaited<ReturnType<typeof defaultCredentials>>,
+  provider: string | undefined,
+) {
+  const live = rows.filter((r) => r.provider === provider && !r.revokedAt);
+  const chosen = provider ? defaults.perProvider[provider] : undefined;
+  return live.find((r) => r.id === chosen) ?? live.find((r) => r.id === defaults.legacy) ?? live.at(-1) ?? null;
+}
+
 export async function listCredentials(db: Database, actorId: string, orgId: string): Promise<CredentialSummary[]> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
-  const [rows, defaults, agents] = await Promise.all([
+  const [rows, defaults, agents, autoProvider] = await Promise.all([
     db
       .select()
       .from(providerCredentials)
@@ -370,13 +388,26 @@ export async function listCredentials(db: Database, actorId: string, orgId: stri
       .orderBy(asc(providerCredentials.createdAt)),
     defaultCredentials(db, orgId),
     db
-      .select({ id: schema.agents.id, name: schema.agents.name, credentialId: schema.agents.credentialId })
+      .select({
+        id: schema.agents.id,
+        name: schema.agents.name,
+        credentialId: schema.agents.credentialId,
+        model: schema.agents.model,
+        brain: schema.agents.brain,
+      })
       .from(schema.agents)
       .where(and(eq(schema.agents.orgId, orgId), isNull(schema.agents.archivedAt))),
+    orgModelProvider(db, orgId),
   ]);
   const isDefault = (r: typeof providerCredentials.$inferSelect) =>
     defaults.perProvider[r.provider] ? defaults.perProvider[r.provider] === r.id : defaults.legacy === r.id;
-  const usedBy = (id: string) => agents.filter((a) => a.credentialId === id).map((a) => ({ id: a.id, name: a.name }));
+  // An agent with no key of its own thinks with its provider's key all the same: removing that one changes it too.
+  const keyOf = (a: (typeof agents)[number]) => {
+    const own = parseCustomModel(a.model)?.credentialId ?? a.credentialId;
+    if (own || a.brain !== "model") return own;
+    return providerKeyOf(rows, defaults, isAutoModel(a.model) ? autoProvider : modelProvider(a.model))?.id;
+  };
+  const usedBy = (id: string) => agents.filter((a) => keyOf(a) === id).map((a) => ({ id: a.id, name: a.name }));
   return rows.map((r) => ({ ...summary(r), isDefault: isDefault(r), usedBy: usedBy(r.id) }));
 }
 

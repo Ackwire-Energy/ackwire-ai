@@ -19,7 +19,7 @@ import {
   ownSignIns,
   ownSignInTitle,
 } from "@agenteschat/client/lib/ai-accounts";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -38,7 +38,7 @@ import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
 import { openConnectAi } from "./NoAiCard";
-import { Note } from "./parts";
+import { alertKeyRefused, Note } from "./parts";
 
 /*
  * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", first the sign-ins of the
@@ -338,7 +338,11 @@ function KeysSection({ locale }: { locale: string }) {
   const update = useUpdateSettings(orgId);
   const live = (credentials.data ?? []).filter((k) => !k.revokedAt);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-  const failed = (error: unknown) => toast({ title: errorText(t, error), icon: "x" });
+  const failed = (error: unknown) => {
+    const refusal = keyRefusal(t, error);
+    if (refusal) alertKeyRefused(t, refusal);
+    else toast({ title: errorText(t, error), icon: "x" });
+  };
   const platform = usePlatformKey(orgId);
 
   const rotate = (k: Credential) => {
@@ -379,6 +383,7 @@ function KeysSection({ locale }: { locale: string }) {
           api.agents.removeCredential(orgId, k.id, true, true).then(() => {
             refetch();
             void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+            void qc.invalidateQueries({ queryKey: keys.agentPages(orgId) });
           }, failed),
       },
     ]);
