@@ -234,6 +234,7 @@ export function createMockPlanning(
       source: { type: "manual" },
       channelId: null,
       pullRequests: [],
+      githubUrl: null,
       artifacts: [],
       createdAt: minutesAgo(now, 3000 - n),
       updatedAt: minutesAgo(now, 600 - n),
@@ -508,6 +509,7 @@ export function createMockPlanning(
           source: { type: "manual" },
           channelId: null,
           pullRequests: [],
+          githubUrl: null,
           // Files from the new-task box: linked, and kept on the "created" event (their Drive titles stand in as ids).
           artifacts: (input.attachmentIds ?? []).map((id) => ({ id, title: id, createdBy: author })),
           createdAt: at,

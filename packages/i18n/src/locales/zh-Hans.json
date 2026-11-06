@@ -2570,6 +2570,7 @@
       "assignee": "负责人",
       "labels": "标签",
       "dueDate": "截止日期",
+      "githubUrl": "GitHub 链接",
       "criteria": "验收标准"
     },
     "routineFields": {
@@ -5808,6 +5809,12 @@
     "prBy": "PR #{{number}} · 由 {{name}} 创建",
     "artifactBy": "{{title}}（{{name}}）",
     "noLinks": "还没有关联内容。",
+    "github": {
+      "label": "GitHub 链接",
+      "placeholder": "粘贴 GitHub issue 或 PR 的链接",
+      "invalid": "这不是 GitHub issue 或 pull request 的链接。",
+      "remove": "移除 GitHub 链接"
+    },
     "openConversation": "查看对话",
     "labels": "标签",
     "tabs": {
@@ -5845,6 +5852,8 @@
       "due_date_set": "将截止日期设为 {{date}}",
       "due_date_removed": "移除了截止日期",
       "pr_linked": "关联了 PR #{{number}}",
+      "github_linked": "已关联到 GitHub",
+      "github_unlinked": "已移除 GitHub 链接",
       "artifact_linked": "附加了一个文件",
       "criterion_checked": "勾选了标准“{{text}}”",
       "criterion_unchecked": "取消勾选了标准“{{text}}”",

@@ -2762,6 +2762,7 @@
       "assignee": "la personne assignée",
       "labels": "les étiquettes",
       "dueDate": "l'échéance",
+      "githubUrl": "le lien GitHub",
       "criteria": "les critères"
     },
     "routineFields": {
@@ -6211,6 +6212,12 @@
     "prBy": "PR #{{number}} · ouverte par {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Rien de lié pour l'instant.",
+    "github": {
+      "label": "Lien GitHub",
+      "placeholder": "Collez le lien d'une issue ou d'une PR GitHub",
+      "invalid": "Ce n'est pas le lien d'une issue ou d'une pull request GitHub.",
+      "remove": "Retirer le lien GitHub"
+    },
     "openConversation": "Voir la conversation",
     "labels": "Étiquettes",
     "tabs": {
@@ -6248,6 +6255,8 @@
       "due_date_set": "a fixé l'échéance au {{date}}",
       "due_date_removed": "a retiré l'échéance",
       "pr_linked": "a lié la PR #{{number}}",
+      "github_linked": "l'a lié à GitHub",
+      "github_unlinked": "a retiré le lien GitHub",
       "artifact_linked": "a joint un fichier",
       "criterion_checked": "a coché le critère « {{text}} »",
       "criterion_unchecked": "a décoché le critère « {{text}} »",

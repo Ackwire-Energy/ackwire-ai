@@ -1211,6 +1211,20 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   text-decoration: underline;
 }
 
+.issue-github {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.issue-github__chip {
+  max-width: 100%;
+  color: var(--ink);
+  text-decoration: none;
+}
+.issue-github__chip:hover {
+  background: var(--sunken);
+}
+
 /* The agent's work: live steps, or stalled. */
 .issue-work {
   position: relative;

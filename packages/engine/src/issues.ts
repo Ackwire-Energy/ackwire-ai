@@ -77,6 +77,8 @@ export interface IssueView {
   /** The issue this one is a sub-issue of. */
   parentIssueId: string | null;
   pullRequests: { number: number; url: string; openedBy: WorkActor | null }[];
+  /** The GitHub issue or pull request it is about: only a link, nothing syncs. */
+  githubUrl: string | null;
   artifacts: { id: string; title: string; createdBy: WorkActor }[];
   /** The assigned agent's work on it, from its runs (null: a person has it, nobody, or it is closed). */
   work: IssueWork | null;
@@ -140,6 +142,7 @@ export interface IssueInput {
   priority?: IssuePriority;
   dueDate?: string | null;
   labels?: string[];
+  githubUrl?: string | null;
 }
 
 export type IssuePatch = Partial<{
@@ -153,6 +156,8 @@ export type IssuePatch = Partial<{
   assignee: WorkActor | null;
   dueDate: string | null;
   labels: string[];
+  /** Null removes it. */
+  githubUrl: string | null;
   /**
    * The whole list of acceptance criteria, in order: an `id` keeps that criterion (and whether it is checked), one
    * without is new, and a criterion left out is removed.
@@ -448,6 +453,7 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
     channelId: r.channelId,
     parentIssueId: r.parentIssueId,
     pullRequests: r.pullRequests as unknown as IssueView["pullRequests"],
+    githubUrl: r.githubUrl,
     artifacts: r.artifactIds.flatMap((id) => {
       const f = byId.get(id);
       return f ? [{ id: f.id, title: f.title, createdBy: { type: f.type as WorkActor["type"], id: f.by } }] : [];
@@ -553,6 +559,8 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
       return s(data.dueDate) ? out("due_date_set", { date: s(data.dueDate) as string }) : out("due_date_removed");
     case "pr_linked":
       return s(data.number) ? out(event, { number: s(data.number) as string }) : {};
+    case "github_link":
+      return out(s(data.url) ? "github_linked" : "github_unlinked");
     case "criterion_checked":
       return s(data.text)
         ? out(data.done ? "criterion_checked" : "criterion_unchecked", { text: s(data.text) as string })
@@ -653,6 +661,7 @@ export async function createIssue(
         assigneeId: input.assignee?.id ?? null,
         labels: cleanLabels(input.labels) ?? [],
         dueDate: checkDate(input.dueDate) ?? null,
+        githubUrl: checkGithubUrl(input.githubUrl),
         criteria,
         source: source as unknown as Record<string, unknown>,
         channelId,
@@ -803,6 +812,18 @@ export async function listIssues(
   return views(db, visible);
 }
 
+/** Mirrors `GITHUB_LINK`, packages/client/src/lib/github-link.ts. */
+const GITHUB_LINK = /^https:\/\/(?:www\.)?github\.com\/[^/\s]+\/[^/\s]+\/(?:issues|pull)\/\d+(?:[/?#]\S*)?$/;
+
+/** A task's GitHub link as stored: people open it from the task, so nothing but that address goes in. */
+function checkGithubUrl(value: string | null | undefined) {
+  const url = value?.trim();
+  if (!url) return null;
+  if (url.length > 500 || !GITHUB_LINK.test(url))
+    throw new ValidationError("That isn't the link of a GitHub issue or pull request");
+  return url;
+}
+
 const isHttpsUrl = (value: string) => {
   try {
     return new URL(value).protocol === "https:";
@@ -872,6 +893,17 @@ export async function updateIssue(
     });
   }
   if (patch.labels !== undefined) set.labels = cleanLabels(patch.labels) ?? [];
+  if (patch.githubUrl !== undefined) {
+    const url = checkGithubUrl(patch.githubUrl);
+    if (url !== current.githubUrl) {
+      set.githubUrl = url;
+      events.push({
+        text: url ? "linked it to GitHub" : "removed the GitHub link",
+        event: "github_link",
+        data: { url },
+      });
+    }
+  }
   if (patch.criteria !== undefined) {
     const criteria = editedCriteria(current.criteria, patch.criteria);
     const same =

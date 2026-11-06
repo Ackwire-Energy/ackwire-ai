@@ -2569,6 +2569,7 @@
       "assignee": "担当者",
       "labels": "ラベル",
       "dueDate": "期日",
+      "githubUrl": "GitHub リンク",
       "criteria": "完了条件"
     },
     "routineFields": {
@@ -5759,6 +5760,12 @@
     "prBy": "PR #{{number}} · 作成者: {{name}}",
     "artifactBy": "{{title}}（{{name}}）",
     "noLinks": "リンクされたものはまだありません。",
+    "github": {
+      "label": "GitHub リンク",
+      "placeholder": "GitHub の Issue または PR のリンクを貼り付け",
+      "invalid": "GitHub の Issue または Pull Request のリンクではありません。",
+      "remove": "GitHub リンクを削除"
+    },
     "openConversation": "会話を見る",
     "labels": "ラベル",
     "tabs": {
@@ -5796,6 +5803,8 @@
       "due_date_set": "期日を{{date}}に設定しました",
       "due_date_removed": "期日を削除しました",
       "pr_linked": "PR #{{number}}をリンクしました",
+      "github_linked": "GitHub にリンクしました",
+      "github_unlinked": "GitHub リンクを削除しました",
       "artifact_linked": "ファイルを添付しました",
       "criterion_checked": "条件「{{text}}」にチェックを入れました",
       "criterion_unchecked": "条件「{{text}}」のチェックを外しました",

@@ -2657,6 +2657,7 @@
       "assignee": "atanan kişiyi",
       "labels": "etiketleri",
       "dueDate": "bitiş tarihini",
+      "githubUrl": "GitHub bağlantısını",
       "criteria": "kriterleri"
     },
     "routineFields": {
@@ -5947,6 +5948,12 @@
     "prBy": "PR #{{number}} · açan: {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Henüz bağlantılı bir şey yok.",
+    "github": {
+      "label": "GitHub bağlantısı",
+      "placeholder": "Bir GitHub issue veya PR bağlantısı yapıştır",
+      "invalid": "Bu bir GitHub issue veya pull request bağlantısı değil.",
+      "remove": "GitHub bağlantısını kaldır"
+    },
     "openConversation": "Konuşmayı gör",
     "labels": "Etiketler",
     "tabs": {
@@ -5984,6 +5991,8 @@
       "due_date_set": "son tarihi {{date}} olarak ayarladı",
       "due_date_removed": "son tarihi kaldırdı",
       "pr_linked": "PR #{{number}} bağladı",
+      "github_linked": "GitHub'a bağladı",
+      "github_unlinked": "GitHub bağlantısını kaldırdı",
       "artifact_linked": "bir dosya ekledi",
       "criterion_checked": "\"{{text}}\" kriterini işaretledi",
       "criterion_unchecked": "\"{{text}}\" kriterinin işaretini kaldırdı",

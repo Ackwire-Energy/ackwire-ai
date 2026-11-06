@@ -6397,6 +6397,9 @@
   "agentActions.issueFields.dueDate": {
     "value": "the due date"
   },
+  "agentActions.issueFields.githubUrl": {
+    "value": "the GitHub link"
+  },
   "agentActions.issueFields.criteria": {
     "value": "the criteria"
   },
@@ -14488,6 +14491,18 @@
   "issues.noLinks": {
     "value": "Nothing linked yet."
   },
+  "issues.github.label": {
+    "value": "GitHub link"
+  },
+  "issues.github.placeholder": {
+    "value": "Paste a GitHub issue or PR link"
+  },
+  "issues.github.invalid": {
+    "value": "That isn't the link of a GitHub issue or pull request."
+  },
+  "issues.github.remove": {
+    "value": "Remove the GitHub link"
+  },
   "issues.openConversation": {
     "value": "View conversation"
   },
@@ -14577,6 +14592,12 @@
   },
   "issues.event.pr_linked": {
     "value": "linked PR #{{number}}"
+  },
+  "issues.event.github_linked": {
+    "value": "linked it to GitHub"
+  },
+  "issues.event.github_unlinked": {
+    "value": "removed the GitHub link"
   },
   "issues.event.artifact_linked": {
     "value": "attached a file"

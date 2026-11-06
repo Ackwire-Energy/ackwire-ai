@@ -2671,6 +2671,7 @@
       "assignee": "de toegewezen persoon",
       "labels": "de labels",
       "dueDate": "de deadline",
+      "githubUrl": "de GitHub-link",
       "criteria": "de criteria"
     },
     "routineFields": {
@@ -6036,6 +6037,12 @@
     "prBy": "PR #{{number}} · geopend door {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Nog niets gekoppeld.",
+    "github": {
+      "label": "GitHub-link",
+      "placeholder": "Plak de link van een GitHub-issue of PR",
+      "invalid": "Dat is geen link van een GitHub-issue of pull request.",
+      "remove": "GitHub-link verwijderen"
+    },
     "openConversation": "Gesprek bekijken",
     "labels": "Labels",
     "tabs": {
@@ -6073,6 +6080,8 @@
       "due_date_set": "heeft de deadline op {{date}} gezet",
       "due_date_removed": "heeft de deadline verwijderd",
       "pr_linked": "heeft PR #{{number}} gekoppeld",
+      "github_linked": "heeft het aan GitHub gekoppeld",
+      "github_unlinked": "heeft de GitHub-link verwijderd",
       "artifact_linked": "heeft een bestand toegevoegd",
       "criterion_checked": "heeft het criterium \"{{text}}\" aangevinkt",
       "criterion_unchecked": "heeft het criterium \"{{text}}\" uitgevinkt",

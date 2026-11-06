@@ -670,6 +670,52 @@ describe("issues", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
+  test("a GitHub link: an agent sets and removes it, and only a GitHub issue or PR address goes in", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      triggerMessageId: crypto.randomUUID(),
+    };
+    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tool = (name: string) => {
+      const found = tools.find((t) => t.name === name);
+      if (!found) throw new Error(name);
+      return found;
+    };
+    const url = "https://github.com/acme/app/issues/12";
+    const made = await tool("create_issue").execute({ title: "Sync", github_url: url }, ctx);
+    expect(made.isError).toBeUndefined();
+    const read = async () => getIssue(f.db, person(f.owner.id), f.org.id, { number: 1 });
+    expect((await read()).githubUrl).toBe(url);
+
+    const refused = await tool("update_issue").execute({ issue: "#1", github_url: "javascript:alert(1)" }, ctx);
+    expect(refused.isError).toBe(true);
+    for (const bad of ["https://evil.example/acme/app/issues/1", "https://github.com/acme/app", "http://github.com/a/b/pull/1"]) {
+      await expect(
+        updateIssue(deps, person(f.owner.id), f.org.id, (await read()).id, { githubUrl: bad }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    }
+
+    const pr = "https://github.com/acme/app/pull/40/files";
+    await tool("update_issue").execute({ issue: "#1", github_url: pr }, ctx);
+    expect((await read()).githubUrl).toBe(pr);
+    await tool("update_issue").execute({ issue: "#1", github_url: "" }, ctx);
+    expect((await read()).githubUrl).toBeNull();
+    // Setting what is already there says nothing in the activity.
+    const issue = await read();
+    await updateIssue(deps, person(f.owner.id), f.org.id, issue.id, { githubUrl: null });
+    const said = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id)).filter(
+      (a) => a.event === "github_link",
+    );
+    expect(said.map((a) => a.textCode).sort()).toEqual(["github_linked", "github_linked", "github_unlinked"]);
+  });
+
   test("a new agent creates tasks with no card, updates what it can see of others' and never what it can't", async () => {
     f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
     const { id: agentId } = await createAgent(

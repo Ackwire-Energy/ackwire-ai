@@ -3,6 +3,7 @@ import { keys, useChannels, useIssue, useIssueAction, useIssueActivity, useIssue
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
 import { webUrl } from "@agenteschat/client/lib/guards";
 import { issueEventText } from "@agenteschat/client/lib/issues";
 import { foldSteps } from "@agenteschat/client/lib/work";
@@ -18,6 +19,7 @@ import {
   DetailsSection,
   Field,
   Icon,
+  Input,
   Locked,
   SavedNote,
   Select,
@@ -36,6 +38,7 @@ import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { IssueWorkBlock, PrivateTaskBlock } from "@/components/BackgroundWork";
 import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
+import { GitHubMark } from "@/components/GitHubMark";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
 import { TaskConversationButton, TaskConversationPanel, TaskConversationSummary } from "@/components/TaskConversation";
@@ -817,6 +820,68 @@ function Details({ issue: i }: { issue: Issue }) {
   );
 }
 
+/** The GitHub issue or pull request the task is about: a field to paste it, then a chip that opens it. */
+function GithubLink({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useIssueAction(org.id);
+  const [text, setText] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const save = (githubUrl: string | null) =>
+    action.mutate({ type: "update", id: i.id, patch: { githubUrl } }, { onSuccess: () => setText("") });
+  const submit = () => {
+    const url = text.trim();
+    if (!url) return setInvalid(false);
+    setInvalid(!isGithubLink(url));
+    if (isGithubLink(url)) save(url);
+  };
+  if (i.githubUrl) {
+    return (
+      <span className="issue-github">
+        <a href={webUrl(i.githubUrl)} target="_blank" rel="noopener noreferrer" className="ac-chip issue-github__chip">
+          <GitHubMark />
+          <span className="ac-chip__text">{githubLinkLabel(i.githubUrl)}</span>
+        </a>
+        <Button
+          size="sm"
+          variant="ghost"
+          iconOnly
+          icon="close"
+          aria-label={t("issues.github.remove")}
+          title={t("issues.github.remove")}
+          disabled={action.isPending}
+          onClick={() => save(null)}
+        />
+      </span>
+    );
+  }
+  return (
+    <Locked when={action.isPending}>
+      <Field
+        label={t("issues.github.label")}
+        id={`is-github-${i.id}`}
+        error={invalid ? t("issues.github.invalid") : undefined}
+      >
+        <Input
+          type="url"
+          inputMode="url"
+          spellCheck={false}
+          value={text}
+          placeholder={t("issues.github.placeholder")}
+          onChange={(e) => {
+            setText(e.target.value);
+            setInvalid(false);
+          }}
+          onBlur={submit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+        />
+      </Field>
+    </Locked>
+  );
+}
+
 /** Pull requests and labels (files are in "Anexos"). */
 function Links({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
@@ -834,6 +899,7 @@ function Links({ issue: i }: { issue: Issue }) {
               : t("issues.pr", { number: pr.number })}
           </a>
         ))}
+        <GithubLink issue={i} />
       </div>
       {i.labels.length > 0 && (
         <div className="issue-aside__item">

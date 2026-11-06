@@ -2567,6 +2567,7 @@
       "assignee": "담당자",
       "labels": "라벨",
       "dueDate": "마감일",
+      "githubUrl": "GitHub 링크",
       "criteria": "기준"
     },
     "routineFields": {
@@ -5756,6 +5757,12 @@
     "prBy": "PR #{{number}} · {{name}}이(가) 엶",
     "artifactBy": "{{title}}({{name}})",
     "noLinks": "아직 연결된 항목이 없어요.",
+    "github": {
+      "label": "GitHub 링크",
+      "placeholder": "GitHub 이슈 또는 PR 링크를 붙여 넣으세요",
+      "invalid": "GitHub 이슈나 풀 리퀘스트 링크가 아니에요.",
+      "remove": "GitHub 링크 삭제"
+    },
     "openConversation": "대화 보기",
     "labels": "라벨",
     "tabs": {
@@ -5793,6 +5800,8 @@
       "due_date_set": "마감일을 {{date}}(으)로 정했어요",
       "due_date_removed": "마감일을 없앴어요",
       "pr_linked": "PR #{{number}}을(를) 연결했어요",
+      "github_linked": "GitHub에 연결했습니다",
+      "github_unlinked": "GitHub 링크를 삭제했습니다",
       "artifact_linked": "파일을 첨부했어요",
       "criterion_checked": "조건 \"{{text}}\"을(를) 체크했어요",
       "criterion_unchecked": "조건 \"{{text}}\"의 체크를 해제했어요",

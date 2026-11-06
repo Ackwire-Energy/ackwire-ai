@@ -2849,6 +2849,7 @@
       "assignee": "исполнитель",
       "labels": "метки",
       "dueDate": "срок",
+      "githubUrl": "ссылку на GitHub",
       "criteria": "критерии"
     },
     "routineFields": {
@@ -6368,6 +6369,12 @@
     "prBy": "PR #{{number}} · открыл(а) {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Пока ничего не связано.",
+    "github": {
+      "label": "Ссылка на GitHub",
+      "placeholder": "Вставьте ссылку на issue или PR в GitHub",
+      "invalid": "Это не ссылка на issue или pull request в GitHub.",
+      "remove": "Убрать ссылку на GitHub"
+    },
     "openConversation": "Открыть переписку",
     "labels": "Метки",
     "tabs": {
@@ -6405,6 +6412,8 @@
       "due_date_set": "установил(а) срок {{date}}",
       "due_date_removed": "убрал(а) срок",
       "pr_linked": "привязал(а) PR #{{number}}",
+      "github_linked": "связал с GitHub",
+      "github_unlinked": "убрал ссылку на GitHub",
       "artifact_linked": "прикрепил(а) файл",
       "criterion_checked": "отметил(а) критерий «{{text}}»",
       "criterion_unchecked": "снял(а) отметку с критерия «{{text}}»",

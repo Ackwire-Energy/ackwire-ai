@@ -2848,6 +2848,7 @@
       "assignee": "osobę przypisaną",
       "labels": "etykiety",
       "dueDate": "termin",
+      "githubUrl": "link do GitHub",
       "criteria": "kryteria"
     },
     "routineFields": {
@@ -6401,6 +6402,12 @@
     "prBy": "PR #{{number}} · otworzył(a): {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Nic jeszcze nie powiązano.",
+    "github": {
+      "label": "Link do GitHub",
+      "placeholder": "Wklej link do issue lub PR na GitHub",
+      "invalid": "To nie jest link do issue ani pull requesta na GitHub.",
+      "remove": "Usuń link do GitHub"
+    },
     "openConversation": "Zobacz rozmowę",
     "labels": "Etykiety",
     "tabs": {
@@ -6438,6 +6445,8 @@
       "due_date_set": "ustawił(a) termin na {{date}}",
       "due_date_removed": "usunął(ęła) termin",
       "pr_linked": "powiązał(a) PR #{{number}}",
+      "github_linked": "połączono z GitHub",
+      "github_unlinked": "usunięto link do GitHub",
       "artifact_linked": "załączył(a) plik",
       "criterion_checked": "zaznaczył(a) kryterium „{{text}}”",
       "criterion_unchecked": "odznaczył(a) kryterium „{{text}}”",

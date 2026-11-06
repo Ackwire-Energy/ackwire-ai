@@ -14,6 +14,7 @@ import {
 } from "@agenteschat/client";
 import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
 import { webUrl } from "@agenteschat/client/lib/guards";
 import { conversationLine, isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -39,11 +40,13 @@ import {
   IconButton,
   type IconName,
   LineIcon,
+  Locked,
   PixelOrbit,
   Text,
   useReducedMotion,
   useToast,
 } from "@/ui";
+import { SocialMark } from "@/ui/auth/SocialMarks";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";
@@ -61,7 +64,9 @@ import {
   tapHaptic,
   useSurface,
 } from "../shared/parts";
+import { SheetTitle } from "../shared/PromptForm";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { TextArea } from "../shared/TextArea";
 import { IssueActivityFeed } from "./IssueActivity";
 import {
   columnChoices,
@@ -73,7 +78,7 @@ import {
   taskConversationHref,
   workLines,
 } from "./logic";
-import { StateChip, useColumnLabel, useStepText } from "./parts";
+import { GithubChip, StateChip, useColumnLabel, useStepText } from "./parts";
 
 /**
  * One task (called "tarefa" in the app): where it came from, the big title, its state, priority
@@ -282,8 +287,85 @@ function Head({ issue: i }: { issue: Issue }) {
         ) : (
           <Chip icon="circle" label={t("issues.noAssignee")} />
         )}
+        {i.githubUrl ? (
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={i.githubUrl}
+            onPress={() => {
+              const url = webUrl(i.githubUrl);
+              if (url) void Linking.openURL(url).catch(() => undefined);
+            }}
+          >
+            <GithubChip url={i.githubUrl} />
+          </Pressable>
+        ) : null}
       </View>
     </View>
+  );
+}
+
+/** Pastes, changes or removes the task's GitHub link. */
+function GithubLinkForm({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const sheet = useSheet();
+  const action = useIssueAction(useOrgId());
+  const toast = useToast();
+  const [text, setText] = useState(i.githubUrl ?? "");
+  const [invalid, setInvalid] = useState(false);
+  const save = (githubUrl: string | null) =>
+    action.mutate(
+      { type: "update", id: i.id, patch: { githubUrl } },
+      {
+        onSuccess: () => {
+          sheet.close();
+          toast({ title: t("mobile.issues.changed") });
+        },
+        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+      },
+    );
+  const submit = () => {
+    const url = text.trim();
+    if (url && !isGithubLink(url)) return setInvalid(true);
+    save(url || null);
+  };
+  return (
+    <>
+      <SheetTitle title={t("issues.github.label")} />
+      <Locked when={action.isPending}>
+        <TextArea
+          multiline={false}
+          minHeight={44}
+          value={text}
+          onChangeText={(v) => {
+            setText(v);
+            setInvalid(false);
+          }}
+          onSubmitEditing={submit}
+          placeholder={t("issues.github.placeholder")}
+          accessibilityLabel={t("issues.github.label")}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          autoFocus
+        />
+      </Locked>
+      {invalid ? (
+        <Text variant="small" style={{ color: c.warn }}>
+          {t("issues.github.invalid")}
+        </Text>
+      ) : null}
+      <Button variant="primary" wide label={t("common.save")} loading={action.isPending} onPress={submit} />
+      {i.githubUrl ? (
+        <Button
+          variant="ghost"
+          wide
+          label={t("issues.github.remove")}
+          disabled={action.isPending}
+          onPress={() => save(null)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -687,6 +769,7 @@ function ColumnPicker({
 /** "…": its column, priority, who does it (an agent is asked and starts), stop the agent, cancel. */
 function IssueMenu({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
+  const c = useColors();
   const sheet = useSheet();
   const orgId = useOrgId();
   const api = useApi();
@@ -808,6 +891,13 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       label: t("mobile.issues.actions.assignee"),
       hint: i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody"),
       onPress: () => pick(assigneeItems()),
+    },
+    {
+      key: "github",
+      leading: <SocialMark provider="github" color={c.ink} size={18} />,
+      label: t("issues.github.label"),
+      ...(i.githubUrl ? { hint: githubLinkLabel(i.githubUrl) } : {}),
+      onPress: () => sheet.open(<GithubLinkForm issue={i} />),
     },
   ];
   if (w?.state === "running" && w.runId) {

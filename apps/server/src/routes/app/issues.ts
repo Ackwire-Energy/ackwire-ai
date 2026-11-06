@@ -24,6 +24,11 @@ const tags = ["Issues"];
 const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string() });
 const Status = z.enum(["todo", "in_progress", "in_review", "done", "canceled"]);
 const Priority = z.enum(["low", "normal", "high"]);
+const GithubUrl = z
+  .string()
+  .max(500)
+  .nullable()
+  .openapi({ description: "The GitHub issue or pull request this task is about (`null` removes it)." });
 const DueDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -61,6 +66,7 @@ const Issue = z
     channelId: z.uuid().nullable(),
     parentIssueId: z.uuid().nullable().openapi({ description: "The issue this one is a sub-issue of." }),
     pullRequests: z.array(z.object({ number: z.number(), url: z.string(), openedBy: Actor.nullable() })),
+    githubUrl: z.string().nullable(),
     artifacts: z.array(z.object({ id: z.uuid(), title: z.string(), createdBy: Actor })),
     work: z
       .object({
@@ -223,6 +229,7 @@ export function issueRoutes(deps: AppDeps) {
             priority: Priority.optional(),
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
+            githubUrl: GithubUrl.optional(),
             parentIssueId: z.uuid().nullable().optional(),
             attachmentIds: z
               .array(z.uuid())
@@ -268,6 +275,7 @@ export function issueRoutes(deps: AppDeps) {
             assignee: Actor.nullable().optional(),
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
+            githubUrl: GithubUrl.optional(),
             criteria: z
               .array(z.object({ id: z.string().optional(), text: z.string().max(500) }))
               .max(50)
