@@ -51,7 +51,7 @@ import {
   yieldRoute,
 } from "./accounts";
 import { ownBranches } from "./command-gate";
-import { DELEGATED_RESULT_TOKENS, type DelegatedBridge } from "./delegated-tools";
+import { DELEGATED_RESULT_CHARS, type DelegatedBridge } from "./delegated-tools";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { HARDENED_GIT_ARGS } from "./git-guard";
@@ -2173,8 +2173,10 @@ export class BrainManager {
       ? {
           ...launched.env,
           ENABLE_CLAUDEAI_MCP_SERVERS: "false",
-          // Above what a delegated tool answers: past this limit the CLI spills to a file no tool here can read.
-          MAX_MCP_OUTPUT_TOKENS: String(DELEGATED_RESULT_TOKENS * 2),
+          // Past this the CLI saves a result to a file no tool here can read. Once its estimate (characters / 4) passes
+          // half of it, the CLI counts real tokens, and dense text runs near one token a character: at twice the cap in
+          // characters, no capped result is ever counted.
+          MAX_MCP_OUTPUT_TOKENS: String(DELEGATED_RESULT_CHARS * 2),
         }
       : ctx.accountHome
         ? accountEnv("claude_code", ctx.accountHome, base)
