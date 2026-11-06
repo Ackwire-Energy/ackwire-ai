@@ -11,7 +11,7 @@ const { messagePins, messages } = schema;
 /**
  * Pinned messages of a channel or DM. Anyone who can post there pins and
  * unpins; everyone who reads it sees the pins (`message.pinned`,
- * `message.unpinned` live). Forum topics have no pins.
+ * `message.unpinned` live).
  */
 
 /** Pins a channel holds at most. */
@@ -35,7 +35,6 @@ export interface PinView {
 
 async function requirePinChannel(db: Database, actorId: string, orgId: string, channelId: string, write: boolean) {
   const { channel, membership } = await requireChannelAccess(db, actorId, orgId, channelId);
-  if (channel.kind === "forum") throw new NotFoundError("Channel not found");
   if (write && !can(membership, "post")) throw new ForbiddenError();
   return channel;
 }

@@ -170,18 +170,6 @@ async function seed() {
       actors: [{ type: "agent", id: agentId }],
     })
     .returning();
-  // A person's turn in a forum topic it opened: the topic goes on without it and still waits for them.
-  const [turn] = await db
-    .insert(schema.notifications)
-    .values({
-      orgId,
-      userId: f.owner.id,
-      kind: "forum_turn",
-      waiting: true,
-      groupKey: `forum_turn:${crypto.randomUUID()}:1`,
-      actors: [{ type: "agent", id: agentId }],
-    })
-    .returning();
   const [mission] = await db
     .insert(schema.missions)
     .values({
@@ -209,7 +197,7 @@ async function seed() {
       operatorHoldReason: "abuse",
     })
     .where(eq(schema.agents.id, agentId));
-  return { skill, routine, approval, dm, inbox, turn, mission };
+  return { skill, routine, approval, dm, inbox, mission };
 }
 
 describe("deleting an agent", () => {
@@ -232,7 +220,7 @@ describe("deleting an agent", () => {
       .from(schema.usageRecords)
       .where(eq(schema.usageRecords.agentId, f.agent.id));
     expect(usageBefore.length).toBeGreaterThan(0);
-    const { skill, routine, approval, dm, inbox, turn, mission } = await seed();
+    const { skill, routine, approval, dm, inbox, mission } = await seed();
 
     await remove();
 
@@ -308,11 +296,6 @@ describe("deleting an agent", () => {
       .from(schema.notifications)
       .where(eq(schema.notifications.id, inbox?.id ?? ""));
     expect(resolved?.doneAt).toBeInstanceOf(Date);
-    const [stillYours] = await f.db
-      .select()
-      .from(schema.notifications)
-      .where(eq(schema.notifications.id, turn?.id ?? ""));
-    expect(stillYours?.doneAt).toBeNull();
     const [conversation] = await f.db.select().from(schema.channels).where(eq(schema.channels.id, dm.id));
     expect(conversation?.archivedAt).toBeInstanceOf(Date);
     expect(await listDms(f.db, f.owner.id, f.org.id)).toEqual([]);

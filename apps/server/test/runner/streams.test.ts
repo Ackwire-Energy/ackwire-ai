@@ -190,9 +190,11 @@ test("stream.open: each kind behind its switch; a desktop that isn't running sta
   closers.push(x.close);
   const desktop = desktopOn(x.socketPath, { running: false });
   const opened: string[] = [];
+  const taken: string[] = [];
   let paused = false;
   let tools: Partial<RunnerAccess["tools"]> = { desktop: true, terminal: true };
   const ctx: HandlerContext = {
+    desktopTaken: (agentId) => taken.push(agentId),
     workspaceReal: "/srv/agentes",
     exec: true,
     token: TOKEN,
@@ -239,6 +241,9 @@ test("stream.open: each kind behind its switch; a desktop that isn't running sta
   paused = true;
   expect(await open(watch)).toBe("ok");
   paused = false;
+  expect(taken).toEqual([]);
+  expect(await open(control)).toBe("ok");
+  expect(taken).toEqual([dev.id]);
 
   tools = { desktop: false, terminal: false };
   expect(await open(watch)).toBe("not_allowed");

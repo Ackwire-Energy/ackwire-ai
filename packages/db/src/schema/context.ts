@@ -27,7 +27,7 @@ const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
 /**
  * The core search index (docs/adr/0017-search-and-context.md):
- * one row per searchable thing (message, context item, issue, forum post,
+ * one row per searchable thing (message, context item, issue,
  * file), fed by the outbox. Hybrid: full-text (`tsv`, `simple` config so
  * Portuguese and English both work) + pgvector (`embedding`, optional).
  * Visibility travels with the document: `channel_ids` are ALL required (the
@@ -72,6 +72,8 @@ export const contextKindEnum = pgEnum("context_kind", [
   "entity_profile",
   "note",
   "lesson",
+  /** A lasting rule a person gave an agent (a permission, a destination): in every run it acts for them (ADR 0120). */
+  "rule",
 ]);
 export const trustEnum = pgEnum("context_trust", ["high", "low"]);
 export const contextStatusEnum = pgEnum("context_status", ["active", "archived"]);

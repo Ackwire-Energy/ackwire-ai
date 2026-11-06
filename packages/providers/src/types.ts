@@ -169,8 +169,19 @@ export interface StreamOptions {
   /** OpenAI organization and project (headers), when the key needs them. */
   organization?: string;
   project?: string;
+  /** A workspace's own endpoint the call goes to (`custom` provider, ADR 0146). */
+  endpoint?: Endpoint;
   /** Called with each text fragment as it is generated. */
   onDelta(text: string): void;
+}
+
+/**
+ * A workspace's own model endpoint (ADR 0146). `baseURL` is what that API's SDK takes: `https://host/v1` for Chat
+ * Completions (`openai`), `https://host/anthropic` (no `/v1`) for Anthropic Messages.
+ */
+export interface Endpoint {
+  style: "openai" | "anthropic";
+  baseURL: string;
 }
 
 export interface ModelProvider {

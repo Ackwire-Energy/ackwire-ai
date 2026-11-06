@@ -1,6 +1,6 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
-import { isKnownModel, isOpenRouterModel } from "@agenteschat/providers";
+import { isCustomModel, isKnownModel, isOpenRouterModel } from "@agenteschat/providers";
 import { driveFolder, isIdHandle, isSecretFile } from "@agenteschat/ui/names";
 import { createAgent, freeHandle, HANDLE_PATTERN, updateAgent } from "./agents";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
@@ -174,7 +174,7 @@ export interface ImportState {
   handles: Set<string>;
   /** Skill names (deleted ones too) → id. */
   skills: Map<string, string>;
-  /** Channel names (archived ones, DMs and forums too) → id; `open`: a live public channel agents can join. */
+  /** Channel names (archived ones and DMs too) → id; `open`: a live public channel agents can join. */
   channels: Map<string, { id: string; open: boolean }>;
   now: Date;
 }
@@ -396,7 +396,8 @@ export function planImport(input: ImportInput, state: ImportState): { items: Pla
       continue;
     }
     // An OpenRouter model would need the workspace's OpenRouter key: an import keeps catalog models only.
-    const model = a.model && !isOpenRouterModel(a.model) && isKnownModel(a.model) ? a.model : null;
+    const model =
+      a.model && !isOpenRouterModel(a.model) && !isCustomModel(a.model) && isKnownModel(a.model) ? a.model : null;
     const step = compare("agent", a.key, hash);
     const handle = step.action === "create" ? newHandles.get(a.key) : (made("agent", a.key)?.handle ?? r.wanted);
     if (!handle) {

@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MAX_INLINE_FILE_BYTES } from "@agenteschat/adapters";
-import { DELETE_BRANCHES_POINTER } from "@agenteschat/adapters/command-policy";
+import {
+  ASK_AGAIN,
+  approvalMessage,
+  DELETE_BRANCHES_POINTER,
+  SECRET_MESSAGE,
+} from "@agenteschat/adapters/command-policy";
 import { eq, schema } from "@agenteschat/db";
 import {
   createAgent,
   createOrganization,
+  decideApprovals,
   drainOutbox,
   ForbiddenError,
   getAgentComputer,
@@ -17,6 +23,7 @@ import {
   notAllowedMessage,
   postPersonMessage,
   setAgentAccess,
+  setAgentMergeRepositories,
   setAgentSkills,
   type ToolContext,
   toolAccess,
@@ -291,7 +298,7 @@ describe("Drive and skills", () => {
     expect(saved.isError).toBeFalsy();
     const [table] = await f.db.select().from(schema.artifacts);
     expect(table).toMatchObject({ kind: "table", title: "Vendas", channelId: f.general.id });
-    expect(saved.data).toEqual({ artifact: { id: table?.id, version: 1 } });
+    expect(saved.data).toEqual({ artifact: { id: table?.id, version: 1, title: "Vendas" } });
     await call(ctx, "write_file", { path: "out/vendas.csv", content: "mês,total\nfev,2\n" });
     const v2 = await call(ctx, "export_file", { path: "out/vendas.csv", artifact_id: table?.id });
     expect(v2.content).toContain("version 2");
@@ -300,6 +307,30 @@ describe("Drive and skills", () => {
     const imported = await call(ctx, "import_file", { artifact_id: table?.id });
     expect(imported.content).toContain("imports/vendas.csv");
     expect(new TextDecoder().decode(runner.files.get("imports/vendas.csv"))).toBe("mês,total\r\nfev,2");
+  });
+
+  test("load_skill names a large skill's shallowest files and folds the rest by folder, which read_skill_file lists", async () => {
+    f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const files: Record<string, string> = {
+      "SKILL.md": "---\nname: kit\ndescription: Kit.\n---\nLeia.",
+      "ref.md": "#",
+    };
+    for (let i = 0; i < 120; i++) files[`assets/icons/i${i}.svg`] = "<svg/>";
+    const skill = await importSkillZip(
+      { db: f.db, blobs: f.artifactDeps.blobs },
+      f.owner.id,
+      f.org.id,
+      await zipOf(files),
+    );
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
+    const ctx = await runCtx();
+    const loaded = (await call(ctx, "load_skill", { name: "kit" })).content;
+    expect(loaded).toContain("- ref.md (text/markdown");
+    expect(loaded).toContain("- assets/icons/ (21 more, read_skill_file on this path lists them)");
+    expect(loaded.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(101);
+    const listed = (await call(ctx, "read_skill_file", { name: "kit", path: "assets/icons/" })).content;
+    expect(listed.split("\n")).toHaveLength(120);
+    expect(listed).toContain("assets/icons/i119.svg");
   });
 
   test("run_skill_script copies the skill and runs the script; read_skill_file still refuses it", async () => {
@@ -329,6 +360,7 @@ describe("Drive and skills", () => {
     expect(out).toMatchObject({ isError: false });
     expect(out.content).toContain("Not copied to .skills/graficos/ (over 5.0 MB each): manual.pdf.");
     expect([...runner.files.keys()].sort()).toEqual([
+      ".skills/graficos/.copied-v1",
       ".skills/graficos/logo.png",
       ".skills/graficos/ref.md",
       ".skills/graficos/scripts/plot.py",
@@ -338,6 +370,15 @@ describe("Drive and skills", () => {
       command: "python3 .skills/graficos/scripts/plot.py '--n' 'it'\\''s'",
     });
     expect((await call(ctx, "run_skill_script", { skill: "graficos", path: "ref.md" })).isError).toBe(true);
+    // The version is on the computer now: the next run writes its scripts alone, so one changed there never runs, and
+    // still says what stayed behind.
+    const writes = () => runner.sent.filter((s) => s.type === "request" && s.op === "write");
+    const before = writes().length;
+    runner.files.set(".skills/graficos/scripts/plot.py", new TextEncoder().encode("changed on the computer"));
+    const again = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(again.content).toContain("Not copied to .skills/graficos/ (over 5.0 MB each): manual.pdf.");
+    expect(writes().slice(before)).toMatchObject([{ path: ".skills/graficos/scripts/plot.py" }]);
+    expect(new TextDecoder().decode(runner.files.get(".skills/graficos/scripts/plot.py"))).not.toContain("changed");
   });
 });
 
@@ -369,7 +410,7 @@ describe("skill files on the computer", () => {
 });
 
 describe("commands the computer holds for a person (ADR 0053 §3)", () => {
-  test("run_code and a skill script: held, they say why and how to ask; with why they ask in the chat, and the approved call runs", async () => {
+  test("run_code and a skill script: held, they ask in the chat by themselves (with why, the agent's reason), and the approved call runs", async () => {
     f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
     const HELD =
       "This push goes to the default branch main: a person approves it first. To ask them, make the same call again with why set to your reason: it waits for their decision in the chat.";
@@ -381,12 +422,24 @@ describe("commands the computer holds for a person (ADR 0053 §3)", () => {
           : { fail: { code: "approval_needed", message: HELD } },
     });
     const ctx = await runCtx();
-    expect(await call(ctx, "run_code", { language: "bash", code: "git push origin main" })).toEqual({
-      content: `Not run: ${HELD}`,
-      isError: true,
-      data: { code: "command.approval_needed" },
+    const execs = () => runner.sent.filter((s) => s.type === "request" && s.op === "exec");
+    // Held without a why: the card goes out at once, with the computer's reason; nothing ran.
+    const held = await f.tools?.invoke(ctx, {
+      toolUseId: crypto.randomUUID(),
+      name: "run_code",
+      input: { language: "bash", code: "git push origin main" },
     });
-    // The same call with why: an approval card in the chat; nothing else reaches the computer.
+    if (held?.type !== "approval") throw new Error(`expected an approval, got ${held?.type}`);
+    expect(held.approval).toMatchObject({
+      tool: "run_code",
+      params: { language: "bash", code: "git push origin main" },
+      why: "This push goes to the default branch main, so the computer waits for a person's approval before running it.",
+      channelId: f.general.id,
+      status: "pending",
+    });
+    expect(execs()).toHaveLength(1);
+    expect(execs()[0]).not.toHaveProperty("approved");
+    // With why: the agent's own reason on the card; nothing else reaches the computer.
     const asked = await f.tools?.invoke(ctx, {
       toolUseId: crypto.randomUUID(),
       name: "run_code",
@@ -394,9 +447,7 @@ describe("commands the computer holds for a person (ADR 0053 §3)", () => {
     });
     if (asked?.type !== "approval") throw new Error(`expected an approval, got ${asked?.type}`);
     expect(asked.approval).toMatchObject({ tool: "run_code", why: WHY, channelId: f.general.id });
-    const execs = () => runner.sent.filter((s) => s.type === "request" && s.op === "exec");
     expect(execs()).toHaveLength(1);
-    expect(execs()[0]).not.toHaveProperty("approved");
     // A person approved it: that exact call runs, and the computer is told a person approved it.
     const ran = await f.tools?.executeApproved(ctx, { ...asked.approval, status: "approved" });
     expect(ran?.content).toContain("pushed");
@@ -407,10 +458,12 @@ describe("commands the computer holds for a person (ADR 0053 §3)", () => {
     const zip = await zipOf({ "SKILL.md": md, "scripts/ship.sh": "git push origin main" });
     const skill = await importSkillZip({ db: f.db, blobs: f.artifactDeps.blobs }, f.owner.id, f.org.id, zip);
     await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
-    expect(await call(ctx, "run_skill_script", { skill: "entrega", path: "scripts/ship.sh" })).toMatchObject({
-      content: `Not run: ${HELD}`,
-      data: { code: "command.approval_needed" },
+    const heldScript = await f.tools?.invoke(ctx, {
+      toolUseId: crypto.randomUUID(),
+      name: "run_skill_script",
+      input: { skill: "entrega", path: "scripts/ship.sh" },
     });
+    expect(heldScript?.type).toBe("approval");
     const script = await f.tools?.invoke(ctx, {
       toolUseId: crypto.randomUUID(),
       name: "run_skill_script",
@@ -420,6 +473,246 @@ describe("commands the computer holds for a person (ADR 0053 §3)", () => {
     // A why too short to tell the person anything is refused, with nothing asked.
     const short = await call(ctx, "run_code", { language: "bash", code: "git push origin main", why: "ship" });
     expect(short).toMatchObject({ isError: true, data: { code: "tool.why_missing" } });
+  });
+
+  test("merges the computer holds in one turn: one card with both, the run waits, and approving them all runs each and resumes it", async () => {
+    const HELD =
+      "This is a merge: a person approves it first. To ask them, make the same call again with why set to your reason: it waits for their decision in the chat.";
+    f = await setup({
+      machines: true,
+      reply: (req) =>
+        JSON.stringify(req.messages).includes("tool_result")
+          ? { chunks: ["Os dois PRs foram mesclados."] }
+          : {
+              chunks: [],
+              toolUses: [12, 13].map((n) => ({
+                name: "run_code",
+                input: { language: "bash", code: `gh pr merge ${n} --squash` },
+              })),
+            },
+    });
+    const { runner } = await connectedComputer(f, {
+      exec: (req) =>
+        req.approved
+          ? { exitCode: 0, stdout: "merged", stderr: "" }
+          : { fail: { code: "approval_needed", message: HELD } },
+    });
+    const execs = () => runner.sent.filter((s) => s.type === "request" && s.op === "exec");
+    const ctx = await runCtx();
+    const runOf = async () => (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, ctx.runId)))[0];
+
+    // No why from the agent: both cards went out by themselves, on one card, and the run waits for the people.
+    expect((await runOf())?.status).toBe("waiting_approval");
+    const asked = await f.db.select().from(schema.approvals).where(eq(schema.approvals.runId, ctx.runId));
+    expect(asked.map((a) => [a.tool, a.status, a.why])).toEqual([
+      ["run_code", "pending", "This is a merge, so the computer waits for a person's approval before running it."],
+      ["run_code", "pending", "This is a merge, so the computer waits for a person's approval before running it."],
+    ]);
+    expect(new Set(asked.map((a) => a.messageId)).size).toBe(1);
+    expect(execs().every((e) => !("approved" in e))).toBe(true);
+
+    // "Aprovar tudo": each held command runs as approved, and the run goes on with what came of them.
+    await decideApprovals({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      ids: asked.map((a) => a.id),
+      decision: "approve",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const approved = execs().filter((e) => (e as { approved?: boolean }).approved);
+    expect(approved).toHaveLength(2);
+    expect((await runOf())?.status).toBe("done");
+    const said = await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, ctx.runId));
+    expect(said.map((m) => m.body)).toContain("Os dois PRs foram mesclados.");
+  });
+
+  test("long work: merges held after it went to the background come on one card, and Aprovar tudo resumes the work", async () => {
+    const HELD =
+      "This is a merge: a person approves it first. To ask them, make the same call again with why set to your reason: it waits for their decision in the chat.";
+    let turn = 0;
+    f = await setup({
+      machines: true,
+      workTools: true,
+      reply: () => {
+        turn += 1;
+        if (turn === 1) {
+          return {
+            chunks: [],
+            toolUses: [{ name: "work_in_background", input: { title: "Merge dos PRs", say: "Vou cuidar disso." } }],
+          };
+        }
+        if (turn === 2) {
+          return {
+            chunks: [],
+            toolUses: [12, 13, 14].map((n) => ({
+              name: "run_code",
+              input: { language: "bash", code: `gh pr merge ${n} --squash` },
+            })),
+          };
+        }
+        return { chunks: ["Os três PRs foram mesclados."] };
+      },
+    });
+    const { runner } = await connectedComputer(f, {
+      exec: (req) =>
+        req.approved
+          ? { exitCode: 0, stdout: "merged", stderr: "" }
+          : { fail: { code: "approval_needed", message: HELD } },
+    });
+    const ctx = await runCtx();
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, ctx.runId));
+    expect(run?.workId).not.toBeNull();
+    expect(run?.status).toBe("waiting_approval");
+    const asked = await f.db.select().from(schema.approvals).where(eq(schema.approvals.runId, ctx.runId));
+    expect(asked).toHaveLength(3);
+    expect(new Set(asked.map((a) => a.messageId)).size).toBe(1);
+    await decideApprovals({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      ids: asked.map((a) => a.id),
+      decision: "approve",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const ran = runner.sent.filter((s) => s.type === "request" && s.op === "exec" && "approved" in s);
+    expect(ran).toHaveLength(3);
+    const [work] = await f.db.select().from(schema.agentWorks);
+    expect(work?.status).toBe("done");
+  });
+
+  describe('"Pode fazer merge sem perguntar" on the computer', () => {
+    const HELD =
+      "This is a merge: a person approves it first. To ask them, make the same call again with why set to your reason: it waits for their decision in the chat.";
+    const MERGE = { repo: "acme/app", pr: 12, ref: null };
+    const receipts = () => f.db.select().from(schema.agentActions);
+    const merged = () =>
+      f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "agent.merged_without_asking"));
+    const asks = (ctx: ToolContext, input: Record<string, unknown>) =>
+      f.tools?.invoke(ctx, { toolUseId: crypto.randomUUID(), name: "run_code", input });
+
+    test("the computer is told the repositories, and a merge it ran has its audit line and receipt, with no card", async () => {
+      f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+      await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+      const { runner } = await connectedComputer(f, {
+        exec: () => ({ exitCode: 0, stdout: "ok", stderr: "", merge: MERGE }),
+      });
+      const ctx = await runCtx();
+      const done = await asks(ctx, { language: "bash", code: "gh pr merge 12 --squash -R acme/app" });
+      expect(done?.type).toBe("result");
+      const [exec] = runner.sent.filter((s) => s.type === "request" && s.op === "exec");
+      expect(exec).toMatchObject({ mergeRepos: ["acme/app"] });
+      expect(exec).not.toHaveProperty("approved");
+      expect(await f.db.select().from(schema.approvals)).toEqual([]);
+      expect((await merged()).map((a) => [a.targetId, a.details])).toEqual([
+        ["acme/app", { pr: 12, ref: null, tool: "run_code" }],
+      ]);
+      expect((await receipts()).map((r) => [r.kind, r.params])).toEqual([
+        ["pr.merged", { repo: "acme/app", number: 12 }],
+      ]);
+    });
+
+    test("a merge that failed on the computer leaves no receipt", async () => {
+      f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+      await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+      await connectedComputer(f, { exec: () => ({ exitCode: 1, stdout: "", stderr: "not mergeable", merge: MERGE }) });
+      const ctx = await runCtx();
+      await asks(ctx, { language: "bash", code: "gh pr merge 12 -R acme/app" });
+      expect(await merged()).toEqual([]);
+      expect(await receipts()).toEqual([]);
+    });
+
+    test("a merge the computer still holds (another repository, a script with more in it) gets its card", async () => {
+      f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+      await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+      await connectedComputer(f, { exec: () => ({ fail: { code: "approval_needed", message: HELD } }) });
+      const ctx = await runCtx();
+      const held = await asks(ctx, { language: "bash", code: "gh pr merge 3 -R beta/app" });
+      expect(held?.type).toBe("approval");
+      expect(await receipts()).toEqual([]);
+    });
+
+    test("a brain told to ask with why: the computer decides first, and runs what the agent may do alone", async () => {
+      f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+      await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+      await connectedComputer(f, { exec: () => ({ exitCode: 0, stdout: "ok", stderr: "", merge: MERGE }) });
+      const ctx = await runCtx();
+      const done = await asks(ctx, { language: "bash", code: "gh pr merge 12 -R acme/app", why: WHY });
+      expect(done?.type).toBe("result");
+      expect(await f.db.select().from(schema.approvals)).toEqual([]);
+      expect(await merged()).toHaveLength(1);
+    });
+
+    test("held with why, the card keeps the agent's reason, even when the computer names another way", async () => {
+      f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+      await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+      const other = approvalMessage(
+        "This push goes to the default branch main",
+        ASK_AGAIN,
+        "Or push to a branch of your own (agentes/dev/…) and open a pull request.",
+      );
+      await connectedComputer(f, { exec: () => ({ fail: { code: "approval_needed", message: other } }) });
+      const ctx = await runCtx();
+      const held = await asks(ctx, { language: "bash", code: "gh pr merge 12 -R acme/api", why: WHY });
+      if (held?.type !== "approval") throw new Error(`expected an approval, got ${held?.type}`);
+      expect(held.approval.why).toBe(WHY);
+    });
+
+    test("with why, anything but one merge asks at once, whatever it says about merging", async () => {
+      f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+      await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+      const { runner } = await connectedComputer(f, { exec: () => ({ exitCode: 0, stdout: "ok", stderr: "" }) });
+      const ctx = await runCtx();
+      const held = await asks(ctx, { language: "bash", code: "./purge.sh --before-merge", why: WHY });
+      expect(held?.type).toBe("approval");
+      expect(runner.sent.filter((s) => s.type === "request" && s.op === "exec")).toEqual([]);
+    });
+
+    test("without the permission, a call with why asks at once and the computer isn't told anything", async () => {
+      f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+      const { runner } = await connectedComputer(f);
+      const ctx = await runCtx();
+      const asked = await asks(ctx, { language: "bash", code: "gh pr merge 12 -R acme/app", why: WHY });
+      expect(asked?.type).toBe("approval");
+      expect(runner.sent.filter((s) => s.type === "request" && s.op === "exec")).toEqual([]);
+    });
+
+    test("a person's approved call goes as approved, with no list: its card is the record", async () => {
+      f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+      await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+      const { runner } = await connectedComputer(f, {
+        exec: (req) =>
+          req.approved
+            ? { exitCode: 0, stdout: "merged", stderr: "" }
+            : { fail: { code: "approval_needed", message: HELD } },
+      });
+      const ctx = await runCtx();
+      const held = await asks(ctx, { language: "bash", code: "gh pr merge 3 -R beta/app" });
+      if (held?.type !== "approval") throw new Error(`expected an approval, got ${held?.type}`);
+      await f.tools?.executeApproved(ctx, { ...held.approval, status: "approved" });
+      const last = runner.sent.filter((s) => s.type === "request" && s.op === "exec").at(-1);
+      expect(last).toMatchObject({ approved: true });
+      expect(last).not.toHaveProperty("mergeRepos");
+      expect(await receipts()).toEqual([]);
+    });
+  });
+
+  test("a hold with a way that needs nobody, a secret read or words it doesn't know: no card, the agent reads it", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const said = [
+      approvalMessage(
+        "This push goes to the default branch main",
+        ASK_AGAIN,
+        "Or push to a branch of your own (agentes/dev/…) and open a pull request.",
+      ),
+      SECRET_MESSAGE,
+      "A person must approve this.",
+    ];
+    let n = 0;
+    await connectedComputer(f, { exec: () => ({ fail: { code: "approval_needed", message: said[n++] ?? "" } }) });
+    const ctx = await runCtx();
+    for (const message of said) {
+      expect(await call(ctx, "run_code", { language: "bash", code: "git push origin main" })).toEqual({
+        content: `Not run: ${message}`,
+        isError: true,
+        data: { code: "command.approval_needed" },
+      });
+    }
+    expect(await f.db.select().from(schema.approvals)).toEqual([]);
   });
 
   test("what our git proxy refuses never runs, approved or not: the computer's refusal reads as it is", async () => {

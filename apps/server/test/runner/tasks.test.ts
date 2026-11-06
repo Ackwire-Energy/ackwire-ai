@@ -756,6 +756,9 @@ test.skipIf(!posix)(
     await tasks.start(AGENT, { taskId: id(49), executor: "shell", command: "sleep 30" });
     tasks.keepAccount(FOLDER_ACCOUNT);
     expect(tasks.list().map((t) => t.status)).toEqual(["running", "running"]);
+    // One of the several accounts the agent thinks with (the team's right hand): it goes on too.
+    tasks.keepAccount(null, [FOLDER_ACCOUNT]);
+    expect(tasks.list().map((t) => t.status)).toEqual(["running", "running"]);
     // Root says the agent thinks with nothing now: the task on its old account stops, the shell task goes on.
     tasks.keepAccount(null);
     await waitFor(() => Boolean(done(id(48))), 8000);
@@ -888,17 +891,20 @@ test.skipIf(!posix)("a hosted task's cancel asks root, and never signals the wor
   expect(s.done(id(2))).toMatchObject({ canceled: true });
 });
 
-test.skipIf(!posix)("a hosted task's CLI doesn't outlive the runner: the next one reads it as interrupted", async () => {
-  const s = setup();
-  await s.tasks.init();
-  await s.tasks.start(AGENT, hostedStart(3), undefined, HOSTED);
-  s.tasks.close();
-  const next = s.make();
-  next.attach(s.send);
-  await next.init();
-  await waitFor(() => s.done(id(3)) !== undefined);
-  expect(s.done(id(3))).toMatchObject({ interrupted: true });
-});
+test.skipIf(!posix)(
+  "a hosted task's CLI doesn't outlive the runner: the next one reads it as interrupted",
+  async () => {
+    const s = setup();
+    await s.tasks.init();
+    await s.tasks.start(AGENT, hostedStart(3), undefined, HOSTED);
+    s.tasks.close();
+    const next = s.make();
+    next.attach(s.send);
+    await next.init();
+    await waitFor(() => s.done(id(3)) !== undefined);
+    expect(s.done(id(3))).toMatchObject({ interrupted: true });
+  },
+);
 
 test.skipIf(!posix)("a hosted task's commands refused with nobody to ask go with its end", async () => {
   const s = setup();
@@ -916,7 +922,10 @@ test.skipIf(!posix)("a hosted task's commands refused with nobody to ask go with
 test("a tool of Claude Code's served by the bridge reads as itself; the server's keep their names", () => {
   const line = (name: string) =>
     parseOutputLine(
-      JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name, input: { command: "ls" } }] } }),
+      JSON.stringify({
+        type: "assistant",
+        message: { content: [{ type: "tool_use", name, input: { command: "ls" } }] },
+      }),
       "claude",
       "/w",
     ).line;

@@ -5,7 +5,17 @@ setupDom();
 
 import { HOVER_CLOSE_MS, mentionQuery } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  ATLAS_ID,
+  createFakeApi,
+  ENG_ID,
+  GENERAL_ID,
+  meWithRole,
+  ORG_ID,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -96,6 +106,54 @@ describe("@mention autocomplete", () => {
       { agentId: ATLAS_ID },
     ]);
     expect(screen().getByText("Atlas entrou no canal.")).toBeTruthy();
+  });
+
+  test("the right hand is in every channel: no note, and picking it offers nothing to add", async () => {
+    const { state } = await go(`c/${GENERAL_ID}`, withRightHand(seedState()));
+    await typeIn(composer(), "@lod");
+    const list = screen().getByRole("listbox", { name: "Pessoas e agentes" });
+    const lodi = within(list).getByRole("option", { name: /Lodi/ });
+    expect(lodi.textContent).not.toContain("não está no canal");
+    await click(lodi);
+    expect(composer().value).toBe("@lodi ");
+    expect(document.querySelector(".mention-offer")).toBeNull();
+    expect(state.calls.some((c) => c.method === "chat.addMember")).toBe(false);
+  });
+
+  test("@todos comes first for who may mention everyone, in their language, and shows as a mention to each reader", async () => {
+    const state = seedState();
+    // Typed in English by someone else: this reader sees their own word.
+    state.messages.push({
+      id: "m-all",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-joao" },
+      body: "@everyone deploy às 15h",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      meta: { mentionsEveryone: true },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    const pill = screen().getByText("@todos");
+    expect(pill.className).toContain("ac-mention--me");
+    expect(screen().queryByText("@everyone")).toBeNull();
+    await typeIn(composer(), "@to");
+    const list = screen().getByRole("listbox", { name: "Pessoas e agentes" });
+    const first = within(list).getAllByRole("option")[0];
+    expect(first?.textContent).toContain("@todos");
+    expect(first?.textContent).toContain("Todo mundo desta conversa, pessoas e agentes");
+    await keyDown(composer(), "Enter");
+    expect(composer().value).toBe("@todos ");
+  });
+
+  test("without `mention_everyone` the list doesn't offer it", async () => {
+    const state = seedState();
+    meWithRole(state, ["post"]);
+    await go(`c/${ENG_ID}`, state);
+    await typeIn(composer(), "@");
+    const list = screen().getByRole("listbox", { name: "Pessoas e agentes" });
+    expect(list.textContent).not.toContain("@todos");
   });
 
   test("works in the task conversation's box too", async () => {

@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../cx";
 import { movesByKeys, trackInput } from "../device";
+import { EDGE_ROOM } from "../floating";
 import { Icon } from "../icons/Icon";
 import { useFieldControl } from "./Field";
 
@@ -186,6 +187,7 @@ export function Select<V extends string = string>({
             className="ac-menu ac-menu--select"
             position="popper"
             sideOffset={4}
+            collisionPadding={EDGE_ROOM}
             align={align}
             aria-label={listLabel ?? rest["aria-label"]}
             onCloseAutoFocus={onCloseAutoFocus}

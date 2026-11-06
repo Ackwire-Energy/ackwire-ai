@@ -1,9 +1,11 @@
+import { EVERYONE_WORDS } from "@agenteschat/i18n/everyone";
+
 /**
  * The parsing half of a small, safe Markdown renderer for chat messages and
  * artifact documents: headings, paragraphs, lists, quotes, rules, GFM tables,
  * fenced code, inline code, bold, italic, ~~strikethrough~~, links and bare
- * URLs. Each platform renders the blocks with its own elements (the web:
- * `apps/web/src/lib/markdown.tsx`); raw HTML is never interpreted. Links
+ * URLs, and with `details`, collapsed blocks (`detailsAt`). Each platform renders the blocks with its own elements
+ * (the web: `apps/web/src/lib/markdown.tsx`); other raw HTML is never interpreted. Links
  * allow http(s) and mailto (`SAFE_URL`); @mentions follow `MENTION`.
  */
 export type MdBlock =
@@ -14,7 +16,9 @@ export type MdBlock =
   | { type: "quote"; text: string; lines: string[] }
   | { type: "embed"; target: string }
   | { type: "rule" }
-  | { type: "table"; header: string[]; rows: string[][]; align: TableAlign[] };
+  | { type: "table"; header: string[]; rows: string[][]; align: TableAlign[] }
+  /** Collapsed until opened (`detailsAt`): `body` is Markdown of its own. */
+  | { type: "details"; summary: string; body: string };
 
 /** A column's alignment: from the separator (`:---`, `:---:`, `---:`), else right when every cell is a number. */
 export type TableAlign = "left" | "center" | "right";
@@ -58,12 +62,71 @@ export function tableAt(
   return { table: { type: "table", header, rows, align }, next: j };
 }
 
+/** `<details>`, an optional `<summary>…</summary>`, then the start of the body, all on the line that opens it. */
+export const DETAILS_OPEN = /^\s*<details>\s*(?:<summary>(.*?)<\/summary>)?(.*)$/i;
+const SUMMARY = /^\s*<summary>(.*?)<\/summary>(.*)$/i;
+/** `</details>` ends the line that closes the block, after the body's last words or on its own. */
+export const DETAILS_CLOSE = /<\/details>\s*$/i;
+const FENCE = /^\s*```/;
+
+/**
+ * A collapsed block starting at `lines[i]`, written as HTML's `<details>` (ADR 0147: agents put what only some want
+ * to read there): `<details>`, a `<summary>…</summary>` (on that line or the next), the body in Markdown, and
+ * `</details>` ending a line, so the whole block may sit on one line. One inside it, or in a fenced block, doesn't
+ * close it; unclosed (still being written), it runs to the end. Null when the line opens none. Shared by the web and
+ * the phone app.
+ */
+export function detailsAt(
+  lines: readonly string[],
+  i: number,
+): { details: Extract<MdBlock, { type: "details" }>; next: number } | null {
+  const open = (lines[i] ?? "").match(DETAILS_OPEN);
+  if (!open) return null;
+  let j = i + 1;
+  let summary = open[1];
+  let first = open[2] ?? "";
+  const own = summary === undefined && !first.trim() ? (lines[j] ?? "").match(SUMMARY) : null;
+  if (own) {
+    summary = own[1];
+    first = own[2] ?? "";
+    j++;
+  }
+  const body: string[] = [];
+  const done = (next: number) => ({
+    details: { type: "details" as const, summary: (summary ?? "").trim(), body: body.join("\n").trim() },
+    next,
+  });
+  const closeAt = (line: string) => line.match(DETAILS_CLOSE)?.index;
+  const end = closeAt(first);
+  body.push(first.slice(0, end));
+  if (end !== undefined) return done(j);
+  let depth = 0;
+  let fence = false;
+  for (; j < lines.length; j++) {
+    const line = lines[j] as string;
+    if (FENCE.test(line)) fence = !fence;
+    else if (!fence) {
+      const opens = DETAILS_OPEN.test(line);
+      const close = closeAt(line);
+      if (opens && close === undefined) depth++;
+      else if (!opens && close !== undefined && depth-- === 0) {
+        body.push(line.slice(0, close));
+        return done(j + 1);
+      }
+    }
+    body.push(line);
+  }
+  return done(lines.length);
+}
+
 /** A block and the source lines it came from (`[first, end)`), for an editor that keeps untouched blocks as written. */
 export type MdRangedBlock = MdBlock & { range: [number, number] };
 
-export function parseMarkdown(source: string, options: { breaks?: boolean; ranges: true }): MdRangedBlock[];
-export function parseMarkdown(source: string, options?: { breaks?: boolean; ranges?: false }): MdBlock[];
-export function parseMarkdown(source: string, options: { breaks?: boolean; ranges?: boolean } = {}): MdBlock[] {
+/** `details`: `<details>` blocks become `details` (`detailsAt`) instead of text; off for editors that keep the source. */
+type ParseOptions = { breaks?: boolean; details?: boolean };
+export function parseMarkdown(source: string, options: ParseOptions & { ranges: true }): MdRangedBlock[];
+export function parseMarkdown(source: string, options?: ParseOptions & { ranges?: false }): MdBlock[];
+export function parseMarkdown(source: string, options: ParseOptions & { ranges?: boolean } = {}): MdBlock[] {
   const join = options.breaks ? "\n" : " ";
   const lines = source.replace(/\r\n?/g, "\n").split("\n");
   const out: MdBlock[] = [];
@@ -107,6 +170,12 @@ export function parseMarkdown(source: string, options: { breaks?: boolean; range
       push(table.table);
       continue;
     }
+    const details = options.details ? detailsAt(lines, i) : null;
+    if (details) {
+      i = details.next;
+      push(details.details);
+      continue;
+    }
     if (/^\s*>/.test(line)) {
       const body: string[] = [];
       while (i < lines.length && /^\s*>/.test(lines[i] as string))
@@ -140,7 +209,14 @@ export function parseMarkdown(source: string, options: { breaks?: boolean; range
     const para: string[] = [];
     while (i < lines.length) {
       const l = lines[i] as string;
-      if (!l.trim() || /^(#{1,6})\s|^\s*```|^\s*>/.test(l) || LIST.test(l) || (para.length && tableAt(lines, i))) break;
+      if (
+        !l.trim() ||
+        /^(#{1,6})\s|^\s*```|^\s*>/.test(l) ||
+        LIST.test(l) ||
+        (para.length && tableAt(lines, i)) ||
+        (options.details && DETAILS_OPEN.test(l))
+      )
+        break;
       para.push(l.trim());
       i++;
     }
@@ -154,8 +230,16 @@ export function parseMarkdown(source: string, options: { breaks?: boolean; range
 export const INLINE =
   /(`[^`]+`)|(\*\*[^*]+?\*\*|__[^_]+?__)|((?<![\w*])\*[^*\s][^*]*?\*(?![\w*])|(?<![\w_])_[^_\s][^_]*?_(?![\w_]))|(\[[^\]]+\]\([^)\s]+\))|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|(\[\[[^[\]\n]+\]\])|(~~[^~\s](?:[^~]*?[^~\s])?~~)/;
 export const SAFE_URL = /^(https?:|mailto:)/i;
-/** Same rule as the backend (`parseMentionHandles`): emails are not mentions. */
-export const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
+/** The words for everyone outside the handles' letters (`@全員`, `@все`); the others are handles to `MENTION` already. */
+const OTHER_SCRIPT_EVERYONE = EVERYONE_WORDS.filter((w) => !/^[a-z0-9_-]+$/.test(w));
+/**
+ * Same rule as the backend (`parseMentionHandles`): emails are not mentions. Also the mention of everyone in any
+ * script (`@全員`), as the backend reads it (`mentionsEveryone`).
+ */
+export const MENTION = new RegExp(
+  `(^|[^\\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31}(?![\\w@-])|(?:${OTHER_SCRIPT_EVERYONE.join("|")})(?![\\p{L}\\p{N}_@-]))`,
+  "giu",
+);
 
 /** The first of `agents` a text @mentions, ignoring case as the backend does; undefined when it names none of them. */
 export function firstMentioned<A extends { handle: string }>(text: string, agents: readonly A[]): A | undefined {
@@ -182,6 +266,12 @@ export function parseWikiToken(token: string) {
   const label = (bar >= 0 ? inner.slice(bar + 1) : inner).trim() || title;
   return { title, label };
 }
+
+/**
+ * Whether a `[[link]]` to no page reads as a page's name. A sentence in brackets (ends like one, or runs long) is an
+ * agent's styling, so it shows as plain text instead of an offer to create a page of that name.
+ */
+export const readsAsPageTitle = (title: string) => title.length <= 80 && !/[.!?…:;]$/.test(title.trim());
 
 /** Every `[[link]]` title in a text, in order, without repeats. */
 export function wikiLinksIn(text: string): string[] {

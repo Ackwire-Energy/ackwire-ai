@@ -33,7 +33,7 @@ describe("back from a provider's sign-in that didn't connect", () => {
         expired: "Esse link expirou. Comece de novo em Conectores.",
         used: "Esse link já foi usado. Se não conectou, comece de novo em Conectores.",
         other_account: "Termine com a conta que começou. Este navegador entrou com outra.",
-        not_allowed: "Você não tem permissão para isso. Peça a um admin do workspace.",
+        not_allowed: "Você não tem permissão para isso.",
         not_visible: "Sua conta do GitHub não vê essa instalação. Instale com uma conta que tenha acesso a ela.",
         failed: "Não deu para conectar. Tente de novo em instantes.",
         "Some words from the server": "Não deu para conectar. Tente de novo em instantes.",
@@ -43,7 +43,7 @@ describe("back from a provider's sign-in that didn't connect", () => {
         expired: "That link expired. Start again from Connectors.",
         used: "That link was already used. If it didn't connect, start again from Connectors.",
         other_account: "Finish with the account that started it. This browser is signed in with another one.",
-        not_allowed: "You don't have permission for this. Ask a workspace admin.",
+        not_allowed: "You don't have permission for this.",
         not_visible:
           "Your GitHub account can't see that installation. Install it with an account that has access to it.",
         failed: "Couldn't connect. Try again in a moment.",

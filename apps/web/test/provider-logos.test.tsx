@@ -52,7 +52,18 @@ describe("provider marks where a provider is named", () => {
       screen()
         .getAllByRole("option")
         .map((o) => o.textContent),
-    ).toEqual(["Claude", "OpenAI", "Gemini", "DeepSeek", "Kimi", "Z.ai", "MiniMax", "OpenRouter"]);
+    ).toEqual([
+      "Claude",
+      "OpenAI",
+      "Gemini",
+      "DeepSeek",
+      "Kimi",
+      "Z.ai",
+      "MiniMax",
+      "OpenRouter",
+      // A workspace's own endpoint (ADR 0146), its line under its name.
+      expect.stringContaining("Outro provedor"),
+    ]);
     const gemini = screen().getByRole("option", { name: "Gemini" });
     expect(marks(gemini)).toEqual(["gemini"]);
     expect(gemini.querySelector(".ac-brand img")?.getAttribute("src")).toBe("/brands/gemini.png");

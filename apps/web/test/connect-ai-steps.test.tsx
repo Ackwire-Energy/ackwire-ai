@@ -888,7 +888,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.textContent).not.toContain("sendo instalado");
   });
 
-  test("on the Cloud, the program not allowed there: who to ask, never a wait", async () => {
+  test("on the Cloud, the program not allowed there: it's on our side, never a wait", async () => {
     const options = fakeAgentBrain(ADA_ID).options.map((o) =>
       o.kind === "codex" ? { ...o, available: false, reason: "tool_off" as const } : o,
     );
@@ -899,7 +899,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     });
     await click(tile("ChatGPT"));
     expect(dialog.textContent).toContain(
-      "O Codex não está liberado no Computador da Acme. Peça ao suporte para liberar.",
+      "O Codex ainda não está liberado no Computador da Acme. Isso é do nosso lado: tente de novo mais tarde.",
     );
     expect(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
   });
@@ -949,7 +949,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.querySelector(".ai-panel__head")).toBeNull();
     expect(shownText(panel).split("Você paga pelo uso, direto ao provedor.")).toHaveLength(2);
     expect(shownText(panel)).toContain("Todo agente sem plano pensa com ela.");
-    // Every maker as a tile, Gemini third.
+    // Every maker as a tile, Gemini third; a workspace's own endpoint last (ADR 0146).
     const makers = within(panel).getByRole("group", { name: "Provedor" });
     expect([...makers.querySelectorAll(".ac-option__title")].map((el) => el.textContent)).toEqual([
       "Claude",
@@ -960,6 +960,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Z.ai",
       "MiniMax",
       "OpenRouter",
+      "Outro provedor",
     ]);
     // OpenRouter passes what is sent on to other providers: its privacy settings say who may keep it, in the ⓘ.
     await click(within(panel).getByRole("button", { name: "OpenRouter" }));

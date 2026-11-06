@@ -693,7 +693,7 @@
     "noneForYou": "Todavía ningún agente trabaja contigo.",
     "noneForYouHint": "Pide acceso a un admin.",
     "freeSection": "Libres",
-    "noGroupSection": "Sin grupo"
+    "noGroupSection": "Sin departamento"
   },
   "agentEdit": {
     "missing": "Este agente ya no existe.",
@@ -791,12 +791,6 @@
       "issue_status_one": "{{names}} cambió una tarea",
       "issue_status_many": "{{names}} cambiaron una tarea",
       "issue_status_other": "{{names}} cambiaron una tarea",
-      "forum_turn_one": "Tu turno en el foro",
-      "forum_turn_many": "Tu turno en el foro",
-      "forum_turn_other": "Tu turno en el foro",
-      "forum_synthesis_one": "Resumen del foro listo",
-      "forum_synthesis_many": "Resumen del foro listo",
-      "forum_synthesis_other": "Resumen del foro listo",
       "approval_one": "{{names}} pide aprobación",
       "approval_many": "{{names}} piden aprobación",
       "approval_other": "{{names}} piden aprobación",
@@ -1145,7 +1139,6 @@
     "loadFailed": "No se pudieron cargar las tareas.",
     "createdBy": "creada por {{name}}",
     "fromMessage": "de un mensaje",
-    "fromForum": "del foro",
     "fromAgent": "de un pedido a un agente",
     "fromWebhook": "de {{provider}}",
     "workingFor_one": "trabajando hace {{count}} min",
@@ -1322,7 +1315,6 @@
     "kind": {
       "approval": "Aprobar",
       "question": "Pregunta",
-      "forum": "Tu turno",
       "browser": "Navegador",
       "secret": "Secreto",
       "join": "Miembros",
@@ -1438,7 +1430,6 @@
         "wiki": "Wiki",
         "skills": "Habilidades",
         "schedule": "Rutinas",
-        "forum": "Foro",
         "sandbox": "Computadora propia",
         "browser": "Navegador",
         "setup": "Configuración del espacio de trabajo",
@@ -2149,5 +2140,9 @@
         "proposal": "Panel"
       }
     }
+  },
+  "team": {
+    "entry": "Lista, organigrama y mapa",
+    "mapHint": "Para mover un agente a otro canal, usa el mapa en la web o habla con {{name}}."
   }
 }

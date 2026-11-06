@@ -1,9 +1,37 @@
+import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
-import type { Agent, DirectMessage } from "../api/types";
+import type { Agent, AgentBrain, DirectMessage } from "../api/types";
 import { PRESETS } from "./onboarding";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
+
+/** Whether a channel's member pickers offer the agent: never the right hand, in no channel (an @mention reaches it). */
+export const joinsChannels = (agent: Pick<Agent, "builtin">) => !isRightHand(agent);
+
+/**
+ * Whether an @mention in a conversation of `kind` reaches the agent though it isn't a member there: the right hand, in
+ * any channel, never a DM (the server's `rightHandReaches`). The "@" pickers count it as in, with nothing to add.
+ */
+export const mentionReaches = (agent: Pick<Agent, "builtin">, kind: "channel" | "dm") =>
+  kind === "channel" && isRightHand(agent);
+
+/**
+ * What the person's DM thinks with while they have no AI of their own (ADR 0137 §11), as one line: the workspace's key,
+ * its plan where that serves them, or that it doesn't. `name`: its grammar (`agentGrammar`); `firstName`: of a member.
+ */
+export function rightHandFallback(
+  t: TFunction,
+  ai: NonNullable<AgentBrain["workspaceAi"]>,
+  meId: string | undefined,
+  name: Record<string, unknown>,
+  firstName: (userId: string) => string | undefined,
+): string {
+  if (ai.brain === "model") return t("rightHand.settings.fallbackKey");
+  const owner = (ai.ownerId && firstName(ai.ownerId)) ?? "";
+  if (!ai.servesYou) return t("rightHand.settings.fallbackNone", { ...name, owner });
+  return ai.ownerId === meId ? t("rightHand.settings.fallbackYours") : t("rightHand.settings.fallbackPlan", { owner });
+}
 
 /** Its one-time "Novo" is per person and workspace (`seenList` entries), gone once its DM opened. */
 export const rightHandSeenKey = (userId: string, orgId: string) => `${userId}.${orgId}`;
@@ -47,9 +75,23 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
 export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p) => !teamHandles.includes(p));
 
 /**
+ * Whether its greeting ends with the way to build the team with it, for whoever may create agents once an AI is there.
+ * Not while the start card still asks, or its interview runs: with no team, those are the way.
+ */
+export const offersTeamSetup = (s: {
+  noAi: boolean;
+  aiKnown: boolean;
+  createsAgents: boolean;
+  hasTeam: boolean;
+  /** `startCardPassed`. */
+  cardPassed: boolean;
+}) => s.aiKnown && !s.noAi && s.createsAgents && (s.hasTeam || s.cardPassed);
+
+/**
  * The cards under the right hand's greeting at the top of its DM (ADR 0137): Connect AI while there is none. With one,
  * how to start (for whoever may create agents): with no agent yet, or, still alone, while the team is only ready-made
- * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. None after.
+ * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. Last, once an AI is
+ * there, how the person wants agents to talk to them, until they pick (ADR 0147).
  */
 export function introCards(s: {
   noAi: boolean;
@@ -60,7 +102,9 @@ export function introCards(s: {
   createsAgents: boolean;
   /** The person is the workspace's only member. */
   alone: boolean;
-}): ("connect" | "start" | "next")[] {
+  /** They never picked how agents talk to them (`agentStyle` null; undefined from an older server). */
+  askStyle?: boolean;
+}): ("connect" | "start" | "next" | "style")[] {
   if (s.noAi) return ["connect"];
   const presets = new Set<string>(PRESETS);
   const start =
@@ -69,5 +113,9 @@ export function introCards(s: {
     (s.teamHandles.length === 0 ||
       (s.alone && presetsLeft(s.teamHandles).length > 0 && s.teamHandles.every((h) => presets.has(h))));
   const next = s.teamHandles.length > 0 && s.alone;
-  return [...(start ? (["start"] as const) : []), ...(next ? (["next"] as const) : [])];
+  return [
+    ...(start ? (["start"] as const) : []),
+    ...(next ? (["next"] as const) : []),
+    ...(s.askStyle && s.aiKnown ? (["style"] as const) : []),
+  ];
 }

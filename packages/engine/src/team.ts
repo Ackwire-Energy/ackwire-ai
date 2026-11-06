@@ -9,6 +9,7 @@ import { agentBrowserStatus } from "./browser/status";
 import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
+import { channelAudienceSql } from "./channels";
 import { agentDesktopUseStatus } from "./desktop/status";
 import { cutText, editDistance } from "./format";
 import type { MachineCaller, MachineStatus } from "./machine-hub";
@@ -18,7 +19,17 @@ import { personBehindCall, routineCreatorOfCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
-const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, organizationMembers, users } = schema;
+const {
+  agentConsultations,
+  agentRuns,
+  agentScopes,
+  agents,
+  channelMembers,
+  channels,
+  connectorConnections,
+  organizationMembers,
+  users,
+} = schema;
 
 /**
  * Each agent's scopes, with a whole-connection grant (`connector:*`) named
@@ -461,7 +472,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
   const ids = list.map((a) => a.id);
   const ownerIds = [...new Set(list.map((a) => a.ownerUserId).filter((id): id is string => !!id))];
   const since = new Date(Date.now() - TEAM_CONSULTATIONS_MS);
-  const [scopes, owners, busy, consultations] = ids.length
+  const [scopes, owners, busy, consultations, seats] = ids.length
     ? await Promise.all([
         agentScopeNames(db, orgId, ids),
         ownerIds.length
@@ -492,8 +503,24 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
           .where(and(eq(agentConsultations.orgId, orgId), gte(agentConsultations.createdAt, since)))
           .orderBy(desc(agentConsultations.createdAt))
           .limit(50),
+        // The channels each agent is in, among those the viewer may see: listChannels' rule.
+        db
+          .select({ agentId: channelMembers.agentId, channelId: channels.id })
+          .from(channelMembers)
+          .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+          .where(
+            and(
+              eq(channels.orgId, orgId),
+              inArray(channelMembers.agentId, ids),
+              eq(channels.kind, "channel"),
+              isNull(channels.archivedAt),
+              isNull(channels.deletedAt),
+              sql`(${channels.visibility} = 'public' or exists (select 1 from ${channelMembers} me where me.channel_id = ${channels.id} and me.user_id = ${actorId}) or ${channelAudienceSql("channels", sql`${actorId}`)})`,
+            ),
+          )
+          .orderBy(asc(channels.position), asc(channels.name)),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], []];
   const busyIds = new Set(busy.map((r) => r.agentId));
   const active = new Set(ids);
   return {
@@ -508,6 +535,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
         ownerUserId: a.ownerUserId,
         capabilities: seesDetails ? capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)) : [],
         busy: busyIds.has(a.id),
+        channelIds: seats.filter((r) => r.agentId === a.id).map((r) => r.channelId),
         canTalk: canTalkTo(a, actorId, talks),
         seesDetails,
       };

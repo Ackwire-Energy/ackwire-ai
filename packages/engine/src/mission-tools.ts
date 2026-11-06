@@ -134,8 +134,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
         const owner = await taskRequester(ctx);
         if (!owner) return { content: "Only a person's request can become a mission.", isError: true };
         const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
-        if (!channel || channel.kind === "forum")
-          return { content: "Missions live in a channel or a DM.", isError: true };
+        if (!channel) return { content: "Missions live in a channel or a DM.", isError: true };
         const flat = replyThreadOf(ctx) === null;
         const trigger = flat ? await getMessage(ctx.db, ctx.orgId, ctx.triggerMessageId) : null;
         // Asked in the main timeline: the mission gets a thread of its own, started from the message that asked.

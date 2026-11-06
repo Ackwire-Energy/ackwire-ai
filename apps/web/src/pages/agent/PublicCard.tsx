@@ -5,6 +5,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { type AgentColor, Avatar, Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -30,7 +31,14 @@ export function AskAccessButton({ agent, size = "sm" }: { agent: Pick<Agent, "ow
  * The agent's page for someone who doesn't see how it works (`seesDetails`): its face, name and role, who answers
  * for it, who it answers, where it works, and a way to ask for access. No tabs.
  */
-export function AgentPublicCard({ agent, onClose }: { agent: Agent; onClose?: () => void }) {
+export function AgentPublicCard({
+  agent,
+  children,
+}: {
+  agent: Agent;
+  /** Cards first in its column (the team's right hand's own AI for the viewer). */
+  children?: ReactNode;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -45,19 +53,6 @@ export function AgentPublicCard({ agent, onClose }: { agent: Agent; onClose?: ()
         <section className="agp-idcard" aria-label={agent.name}>
           <div className="agp-cover">
             <AgentCover color={(look?.color ?? "indigo") as AgentColor} busy={false} />
-            {onClose && (
-              <div className="agp-cover__acts">
-                <Button
-                  size="sm"
-                  iconOnly
-                  icon="close"
-                  className="agp-glass"
-                  aria-label={t("common.close")}
-                  title={t("common.close")}
-                  onClick={onClose}
-                />
-              </div>
-            )}
           </div>
           <span className="agp-face">
             <AgentAvatar agentId={agent.id} size="xl" name={agent.name} />
@@ -75,6 +70,7 @@ export function AgentPublicCard({ agent, onClose }: { agent: Agent; onClose?: ()
       <div className="agp-view">
         <div className="agp-cols">
           <div className="agp-col">
+            {children}
             <Card as="section" className="agp-card" aria-labelledby="pub-who">
               <CardHeader id="pub-who" icon="person" title={t("agentPage.overview.who", g)} />
               <div className="agp-person">

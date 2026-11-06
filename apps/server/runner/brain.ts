@@ -1649,10 +1649,10 @@ export class BrainManager {
   /** Sessions that answered here (`ranKeyOf`): resumed next time even where Claude Code's folder can't be looked at. */
   private readonly ran = new Set<string>();
   private closed = false;
-  /** The account its agent thinks with, as root last said (`keepAccount`); undefined: not said. */
-  private keep: string | null | undefined;
+  /** The accounts its agent thinks with, as root last said (`keepAccount`); undefined: not said. */
+  private keep: ReadonlySet<string> | undefined;
   /** The same per agent, where one manager runs several agents' CLIs (root's). */
-  private readonly keeps = new Map<string, string | null>();
+  private readonly keeps = new Map<string, ReadonlySet<string>>();
   /** Ended background shells of sessions with no process to tell, by `brainKey`: their next turn hears of them. */
   private readonly notices = new Map<string, ToolNotice[]>();
   private readonly log: (line: string) => void;
@@ -1666,16 +1666,17 @@ export class BrainManager {
    * A process on any other account closes, a busy one once its turn ends, so no process of this agent's user
    * keeps a sign-in the agent left or one that was removed.
    */
-  keepAccount(account: string | null, agentId?: string) {
-    if (agentId === undefined) this.keep = account;
-    else this.keeps.set(agentId, account);
+  keepAccount(account: string | null, also: readonly string[] = [], agentId?: string) {
+    const keep = new Set([...(account ? [account] : []), ...also]);
+    if (agentId === undefined) this.keep = keep;
+    else this.keeps.set(agentId, keep);
     for (const l of [...this.live.values()]) if (!l.busy && this.left(l)) this.drop(l);
   }
 
   /** On an account its agent no longer thinks with (the computer's own sign-in is none). */
   private left(l: Live) {
-    const keep = this.keeps.has(l.agentId) ? this.keeps.get(l.agentId) : this.keep;
-    return keep !== undefined && l.account !== null && l.account !== keep;
+    const keep = this.keeps.get(l.agentId) ?? this.keep;
+    return keep !== undefined && l.account !== null && !keep.has(l.account);
   }
 
   /** New limits from the config: idle time for processes started from now on, the process cap at once. */

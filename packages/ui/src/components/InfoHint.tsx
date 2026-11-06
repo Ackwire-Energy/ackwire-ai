@@ -1,6 +1,7 @@
 import { Popover as RPopover } from "radix-ui";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { movesByKeys, trackInput } from "../device";
+import { EDGE_ROOM } from "../floating";
 import { useHoverCard } from "../hooks/useHoverCard";
 import { Icon } from "../icons/Icon";
 
@@ -79,7 +80,7 @@ export function InfoHint({ name, children, id, side = "top", align = "center" }:
           side={side}
           align={align}
           sideOffset={6}
-          collisionPadding={8}
+          collisionPadding={EDGE_ROOM}
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
           onPointerDownOutside={onAnchor}

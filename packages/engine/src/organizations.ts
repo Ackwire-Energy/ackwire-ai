@@ -18,11 +18,13 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type AppLocale, appLocale, isAppLocale, LOCALE_CODES } from "@agenteschat/i18n/locale";
+import { type AgentStyle, isAgentStyle, saveAgentStyle } from "./agent-style";
 import { dropAgentRules } from "./approval-rules";
 import { revokeMemberApps } from "./apps/revoke";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { memberCardVia } from "./card-via";
+import { type ChatPrefs, chatPrefsOf, saveChatPrefs } from "./chat-prefs";
 import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, safeEqual, sha256 } from "./crypto";
 import { restoreDms } from "./dms";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
@@ -95,6 +97,10 @@ export interface Membership {
   start?: StartChoice;
   /** Whether the person sees what agents did under each reply (listMemberships, `setShowActivity`). */
   showActivity?: boolean;
+  /** How agents talk to the person here (listMemberships, `setAgentStyle`); null until they pick (ADR 0147). */
+  agentStyle?: AgentStyle | null;
+  /** How conversations look to the person here (listMemberships, `setChatPrefs`); only what they chose. */
+  chatPrefs?: ChatPrefs;
 }
 
 /** What opens when the app starts in a workspace (ADR 0108), the person's own. */
@@ -148,6 +154,8 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       startPage: organizationMembers.startPage,
       startChannelId: organizationMembers.startChannelId,
       showActivity: organizationMembers.showActivity,
+      agentStyle: organizationMembers.agentStyle,
+      chatPrefs: organizationMembers.chatPrefs,
       ...ROLE_COLUMNS,
     })
     .from(organizationMembers)
@@ -155,8 +163,9 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
     .innerJoin(users, eq(users.id, organizationMembers.userId))
     .where(and(eq(organizationMembers.userId, userId), isNull(users.blockedAt)))
     .orderBy(asc(organizations.createdAt));
-  return rows.map(({ startPage, startChannelId, ...row }) => ({
+  return rows.map(({ startPage, startChannelId, chatPrefs, ...row }) => ({
     ...withPermissions(row),
+    chatPrefs: chatPrefsOf(chatPrefs),
     start: { page: startPage, channelId: startPage === "channel" ? startChannelId : null },
   }));
 }
@@ -783,6 +792,20 @@ export async function setShowActivity(db: Database, userId: string, orgId: strin
     .set({ showActivity: show })
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
   return show;
+}
+
+/** How agents talk to the person in this workspace (ADR 0147). */
+export async function setAgentStyle(db: Database, userId: string, orgId: string, style: AgentStyle) {
+  await requirePermission(db, userId, orgId, "read");
+  if (!isAgentStyle(style)) throw new ValidationError("style must be simple or technical");
+  await saveAgentStyle(db, orgId, userId, style);
+  return style;
+}
+
+/** How conversations look to the person in this workspace, on every device. Only the keys in `patch` change. */
+export async function setChatPrefs(db: Database, userId: string, orgId: string, patch: ChatPrefs) {
+  await requirePermission(db, userId, orgId, "read");
+  return (await saveChatPrefs(db, orgId, userId, chatPrefsOf(patch))) ?? {};
 }
 
 /** The languages of the app (`users.locale`): emails and pushes are written in it. */

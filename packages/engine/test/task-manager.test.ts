@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
 import {
   addRunStep,
   cancelRun,
+  continuePausedRuns,
   drainOutbox,
   ForbiddenError,
   listMessages,
+  type Membership,
+  mayContinuePause,
   NotFoundError,
   postPersonMessage,
   setStopReason,
@@ -72,6 +75,144 @@ describe("stopping a task tells the agent (ADR 0128)", () => {
     await expect(setStopReason(deps(), f.owner.id, f.org.id, run?.id ?? "", "de novo")).rejects.toBeInstanceOf(
       ValidationError,
     );
+  });
+});
+
+describe("why a task waits", () => {
+  /** Parks a run as the executor does: its wait in the transcript, how far a pause got on its step. */
+  const park = async (runId: string, wait: Record<string, unknown>, pause?: Record<string, unknown>) => {
+    await f.db
+      .update(schema.agentRuns)
+      .set({
+        status: "waiting_input",
+        transcript: { waitingForBrain: { kind: "claude_code", machineId: "", ...wait } } as never,
+      })
+      .where(eq(schema.agentRuns.id, runId));
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, runId));
+    if (run)
+      await addRunStep(f.db, run, "error", { reason: "usage_wait", code: wait.code, ...(pause ? { pause } : {}) });
+  };
+  const resetsAt = "2026-11-07T21:00:00.000Z";
+  const pauseWait = {
+    code: "usage_pause",
+    source: "plan",
+    plan: "Claude",
+    resetsAt,
+    waitId: "w1",
+    waitKey: "plan:m:k:a",
+  };
+
+  test("a pause: the plan, its window, how far along and when it resets", async () => {
+    f = await setup();
+    await ask("@dev resume a semana");
+    const [run] = await runs();
+    await park(run?.id ?? "", pauseWait, { source: "plan", used: 95, window: "seven_day" });
+    const { tasks } = await taskManager(f.db, f.owner.id, f.org.id);
+    expect(tasks[0]?.held).toBe("plan");
+    expect(tasks[0]?.wait).toEqual({
+      code: "usage_pause",
+      key: "plan:m:k:a",
+      plan: "Claude",
+      model: null,
+      scope: null,
+      percent: 95,
+      window: "seven_day",
+      resetsAt,
+      canContinue: true,
+    });
+  });
+
+  test("the agent's line of work keeps its own code; a run at work has no wait", async () => {
+    f = await setup();
+    await ask("@dev resume a semana");
+    const [run] = await runs();
+    expect((await taskManager(f.db, f.owner.id, f.org.id)).tasks[0]?.wait).toBeNull();
+    await park(run?.id ?? "", { code: "work_queue", waitId: "w1" });
+    expect((await taskManager(f.db, f.owner.id, f.org.id)).tasks[0]?.wait?.code).toBe("work_queue");
+  });
+
+  test("a model's own limit says the model by name", async () => {
+    f = await setup();
+    await ask("@dev resume a semana");
+    const [run] = await runs();
+    await park(run?.id ?? "", {
+      code: "plan_limit",
+      plan: "OpenCode Go",
+      model: "glm-5.3",
+      scope: "model",
+      waitId: "w1",
+    });
+    const { tasks } = await taskManager(f.db, f.owner.id, f.org.id);
+    expect(tasks[0]?.wait).toMatchObject({ scope: "model", model: "GLM-5.3", canContinue: false });
+  });
+
+  test("Continuar agora on several: who may goes on, once; anyone else is refused and sees no way to", async () => {
+    f = await setup();
+    await ask("@dev resume a semana");
+    const [run] = await runs();
+    const runId = run?.id ?? "";
+    await park(runId, pauseWait, { source: "plan", used: 95, window: "seven_day" });
+    const other = await addMember(f.db, f.org.id, "member", "caio");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: other.id });
+
+    const seen = await taskManager(f.db, other.id, f.org.id);
+    expect(seen.tasks[0]?.wait?.canContinue).toBe(false);
+    await expect(continuePausedRuns({ db: f.db }, other.id, f.org.id, [runId])).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(await continuePausedRuns({ db: f.db }, f.owner.id, f.org.id, [runId])).toEqual({ continued: 1 });
+    const [after] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, runId));
+    const transcript = after?.transcript as unknown as { usagePause?: { override?: unknown } } | undefined;
+    expect(transcript?.usagePause?.override).toEqual({
+      until: resetsAt,
+      by: f.owner.id,
+    });
+    expect(await continuePausedRuns({ db: f.db }, f.owner.id, f.org.id, [runId])).toEqual({ continued: 0 });
+  });
+
+  test("managing routines is no way past the rule for a run that isn't a routine's", async () => {
+    f = await setup();
+    await ask("@dev resume a semana");
+    const [run] = await runs();
+    const membership = { permissions: new Set(["manage_routines"]) } as unknown as Membership;
+    const row = {
+      run: { orgId: f.org.id, triggerMessageId: run?.triggerMessageId ?? "" },
+      requester: null,
+      ownerUserId: null,
+      routineCreatorId: null,
+    };
+    const other = await addMember(f.db, f.org.id, "member", "caio");
+    expect(await mayContinuePause(f.db, other.id, membership, { ...row, routineId: null })).toBe(false);
+    expect(await mayContinuePause(f.db, other.id, membership, { ...row, routineId: "a-routine" })).toBe(true);
+  });
+
+  test("Continuar agora on several says so on a run's card, as pressing the card does", async () => {
+    f = await setup();
+    await ask("@dev resume a semana");
+    const [run] = await runs();
+    const runId = run?.id ?? "";
+    await park(runId, pauseWait, { source: "plan", used: 95, window: "seven_day" });
+    const card = { kind: "usage_paused", state: "paused", runId, waitId: "w1", continuedByUserId: null };
+    const [trigger] = await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, run?.triggerMessageId ?? ""));
+    await f.db
+      .update(schema.messages)
+      .set({ meta: { ...trigger?.meta, actionCard: card } })
+      .where(eq(schema.messages.id, trigger?.id ?? ""));
+    await f.db
+      .update(schema.agentRuns)
+      .set({
+        transcript: sql`${schema.agentRuns.transcript} || jsonb_build_object('usagePause', jsonb_build_object('cardId', ${trigger?.id}::text))`,
+      })
+      .where(eq(schema.agentRuns.id, runId));
+
+    expect(await continuePausedRuns(deps(), f.owner.id, f.org.id, [runId])).toEqual({ continued: 1 });
+    const [after] = await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, trigger?.id ?? ""));
+    expect(after?.meta.actionCard).toMatchObject({ state: "continued", continuedByUserId: f.owner.id, waitId: "w1" });
   });
 });
 

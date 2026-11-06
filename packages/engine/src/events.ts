@@ -12,6 +12,7 @@ import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
 import type { MessageMemory } from "./message-memories";
 import type { MessageView, ReactionCount } from "./messages";
+import type { TeamProposalCard } from "./team-proposals";
 import type { WorkView } from "./works";
 
 /** What a memory tool changed, for the "memory updated" card (persisted in the reply's `meta.memoryUpdates`). */
@@ -465,6 +466,9 @@ export type ChannelEvent =
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
+      /** `failed`: why, for the app to word (`runErrorDetail`). */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
@@ -602,14 +606,6 @@ export type ChannelEvent =
       change: string;
       [key: string]: unknown;
     }
-  /** An agent's forum suggestion card was accepted (a topic opened) or dismissed: its `meta.forumSuggestion` now. */
-  | {
-      type: "forum.suggestion.updated";
-      channelId: string;
-      threadId: string | null;
-      messageId: string;
-      suggestion: Record<string, unknown>;
-    }
   /**
    * An agent's proposal of a new agent was decided (ADR 0081): what changed on its card (`meta.actionCard`). The
    * draft stays on the message: its instructions alone can be past a NOTIFY payload's limit.
@@ -629,6 +625,14 @@ export type ChannelEvent =
       applied?: { channelIds: string[]; connectionIds: string[]; mailAccountIds: string[] };
       /** The routine made with it. */
       routineId?: string | null;
+    }
+  /** The right hand's team card changed (created, failed, adjusted, dismissed, undone, replaced): the whole card. */
+  | {
+      type: "team.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      card: TeamProposalCard;
     }
   /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now (null: nothing to say). */
   | {

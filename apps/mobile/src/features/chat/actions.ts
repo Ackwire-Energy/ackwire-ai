@@ -36,6 +36,7 @@ export const RECEIPT_ICONS: Record<AgentActionKind, IconName> = {
   "skill.created": "brain",
   "skill.updated": "brain",
   "agent.settings_changed": "agent",
+  "pr.merged": "code",
 };
 
 /** A kind a newer server sends that this build doesn't know yet gets the plain check. */

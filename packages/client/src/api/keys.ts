@@ -32,6 +32,7 @@ export const keys = {
   formerAgents: (orgId: string) => ["org", orgId, "agents", "former"] as const,
   /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
   agentProposal: (orgId: string, messageId: string) => ["org", orgId, "agent-proposal", messageId] as const,
+  teamTemplates: (orgId: string, locale: string) => ["org", orgId, "team-templates", locale] as const,
   team: (orgId: string) => ["org", orgId, "team"] as const,
   credentials: (orgId: string) => ["org", orgId, "credentials"] as const,
   /** Under `credentials`: a key added, rotated or removed refreshes it too. */
@@ -56,6 +57,7 @@ export const keys = {
   githubApp: (orgId: string) => ["org", orgId, "github-app"] as const,
   githubRepos: (orgId: string) => ["org", orgId, "github-repositories"] as const,
   agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
+  agentMergeRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "merge-repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   toolChanges: (orgId: string) => ["org", orgId, "tool-changes"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
@@ -99,6 +101,7 @@ export const keys = {
   peopleUsage: (orgId: string, period: object = {}) => ["org", orgId, "people-usage", period] as const,
   personUsage: (orgId: string, userId: string) => ["org", orgId, "people-usage", "person", userId] as const,
   personLimits: (orgId: string) => ["org", orgId, "people-usage", "limits"] as const,
+  teamWeek: (orgId: string) => ["org", orgId, "team-week"] as const,
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
   /** All the agents' memories, for the workspace's map. */
@@ -200,8 +203,6 @@ export const keys = {
   issuesView: (orgId: string) => ["org", orgId, "issues-view"] as const,
   sidebarToolOrder: (orgId: string) => ["org", orgId, "sidebar-tool-order"] as const,
   sidebarView: (orgId: string) => ["org", orgId, "sidebar-view"] as const,
-  forum: (orgId: string) => ["org", orgId, "forum"] as const,
-  forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,
   wikiTree: (orgId: string) => ["org", orgId, "wiki", "tree"] as const,
   wikiPage: (orgId: string, slug: string) => ["org", orgId, "wiki", "page", slug] as const,
@@ -251,6 +252,7 @@ export const keys = {
   browserHandoff: (orgId: string, handoffId: string) => ["org", orgId, "browser", "handoff", handoffId] as const,
   /** The agent's desktop (ADR 0058): its state as this person sees it. */
   agentDesktop: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId] as const,
+  agentDesktopPicture: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId, "picture"] as const,
   /** Every agent's screen (`agentDesktop`'s prefix). */
   agentDesktops: (orgId: string) => ["org", orgId, "desktop"] as const,
   /** Boards and widgets (ADR 0135): everything below (prefix); `dashboard.*` events refresh it. */

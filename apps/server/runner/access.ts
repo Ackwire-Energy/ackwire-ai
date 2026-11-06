@@ -446,6 +446,9 @@ export function parseAgents(v: unknown): MachineAgent[] {
       name: str(o.name, 100) || str(o.handle, 64),
       ...(lookOut && Object.keys(lookOut).length ? { look: lookOut } : {}),
       ...(isAccountId(o.account) ? { account: o.account } : {}),
+      ...(Array.isArray(o.accounts) && o.accounts.some(isAccountId)
+        ? { accounts: o.accounts.filter(isAccountId).slice(0, 500) }
+        : {}),
       ...(str(o.locale, 32) ? { locale: str(o.locale, 32) } : {}),
     });
   }

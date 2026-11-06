@@ -9,7 +9,7 @@ import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./
 import { getOrgSettings } from "./management";
 import { insertMessage, messageView } from "./messages";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
-import { routineSeer, routineSlots } from "./routines";
+import { calendarReminders, routineSeer, routineSlots } from "./routines";
 import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
 import { replyThreadOf } from "./runs";
 
@@ -885,7 +885,7 @@ async function visibleEvents(db: Database, userId: string, orgId: string, from: 
     );
 }
 
-/** The calendar view: events (with recurrences expanded), routine runs, issue deadlines and my pending proposals. */
+/** The calendar view: events (with recurrences expanded), routine runs, reminders, issue deadlines and my pending proposals. */
 export async function calendarRange(deps: CalendarDeps, userId: string, orgId: string, fromIso: string, toIso: string) {
   const { db } = deps;
   await requirePermission(db, userId, orgId, "read");
@@ -968,7 +968,8 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
         ),
       )
   ).map(proposalView);
-  return { events, routines: routineRuns, deadlines, proposals };
+  const reminders = await calendarReminders(db, userId, orgId, from, to, mine, sees);
+  return { events, routines: routineRuns, reminders, deadlines, proposals };
 }
 
 /** Busy blocks (no details) of people and agents between two instants. */

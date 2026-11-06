@@ -10,8 +10,16 @@ import {
   useMachines,
   useModels,
 } from "@agenteschat/client";
-import { accountTitle, type ExistingAi, groupPlans, planWordOf, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import {
+  accountTitle,
+  type ExistingAi,
+  groupPlans,
+  listsExisting,
+  planWordOf,
+  signInPlan,
+} from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -77,6 +85,7 @@ import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
+import { EndpointForm } from "./EndpointForm";
 import { existingRows, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
 import { useAiOrg } from "./org";
 import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
@@ -253,7 +262,12 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
   const [login, setLogin] = useState<ExistingSignIn | null>(null);
   const [busy, setBusy] = useState(false);
   const have =
-    forAgent && gates.view?.agentId === forAgent.id && !hasAi(forAgent.id)
+    forAgent &&
+    gates.view?.agentId === forAgent.id &&
+    listsExisting(
+      agentRows.data?.find((a) => a.id === forAgent.id),
+      !hasAi(forAgent.id),
+    )
       ? existingRows(t, gates.view, credentials.data ?? [], forAgent.name)
       : [];
   const shownGate = gates.gateOf(view.page === "plan" ? view.choice : "claude");
@@ -302,6 +316,10 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
       const fits = keyRuns(k, model, models.data?.models ?? []);
       return void save(forAgent, k.label, async () => {
         if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });
+        // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
+        if (gates.view?.scope === "mine") {
+          await api.agents.setBrain(orgId, forAgent.id, { scope: "workspace", brain: "model" });
+        }
         await api.agents.update(orgId, forAgent.id, { credentialId: k.id, ...(fits ? {} : { model: AUTO }) });
       });
     }
@@ -584,17 +602,19 @@ function PlanPage(
   const [done, setDone] = useState<{ agentId: string; agent: string; label: string } | null>(null);
   const kind = kindOf(choice);
   const replies = useReplies(gates, agentId, kind);
-  const repliesRow = (
-    <PlanReplies
-      agent={done?.agent ?? agent?.name ?? ""}
-      on={replies.on}
-      onChange={(on) => void replies.change(on)}
-      brain={kind}
-      plan={replies.plan}
-      coding={planOf(choice)}
-      disabled={replies.busy}
-    />
-  );
+  // The team's right hand's own AI for the person serves them alone: no switch.
+  const repliesRow =
+    gates.view?.scope === "mine" ? null : (
+      <PlanReplies
+        agent={done?.agent ?? agent?.name ?? ""}
+        on={replies.on}
+        onChange={(on) => void replies.change(on)}
+        brain={kind}
+        plan={replies.plan}
+        coding={planOf(choice)}
+        disabled={replies.busy}
+      />
+    );
   const pick = () => {
     const names = agents.map((a) => a.name);
     const choose = (i: number) => {
@@ -1059,7 +1079,7 @@ function GateWait({
       <InfoCard icon="lock">
         {gate.who === "computer"
           ? t("connectAi.accountsLocked", { name: pairer ?? "", computer })
-          : t("noAi.lockedAdmins")}
+          : t("noAi.lockedOwner")}
       </InfoCard>
     );
   }
@@ -1074,8 +1094,12 @@ function GateWait({
 function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveKey }: ConnectAiFlowProps) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
+  const { orgId } = useAiOrg();
   const [touched, setTouched] = useState(false);
   const [opened, setOpened] = useState(false);
+  // "Outro provedor" (ADR 0146): its own form, saved by its own button (a sheet only: the first run saves a key).
+  const [custom, setCustom] = useState(form.asked === CUSTOM_PROVIDER);
+  const [endpointSaved, setEndpointSaved] = useState(false);
   const maker = providerOf(form.provider);
   const hint = maker && keyStepHint(maker);
   const clean = form.key.trim();
@@ -1083,10 +1107,10 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
   const wrong = touched && clean.length > 0 && !valid;
   const others = wrong ? providersForKey(clean) : [];
   if (!mayAddKey) return <InfoCard icon="lock">{t("connectAi.keyLocked")}</InfoCard>;
-  if (keySaved) {
+  if (keySaved || endpointSaved) {
     return (
       <View style={styles.done}>
-        <ProviderLogo id={form.provider} size="hero" />
+        <ProviderLogo id={endpointSaved ? CUSTOM_PROVIDER : form.provider} size="hero" />
         <Text variant="title2" tone="ink" style={styles.center}>
           {t("connectAi.key.saved")}
         </Text>
@@ -1103,13 +1127,29 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
             key={p.id}
             leading={<ProviderLogo id={p.id} size="sm" />}
             label={p.label}
-            checked={form.provider === p.id}
-            onPress={() => form.setProvider(p.id)}
+            checked={!custom && form.provider === p.id}
+            onPress={() => {
+              setCustom(false);
+              form.setProvider(p.id);
+            }}
           />
         ))}
+        {keyButton ? (
+          <GroupedRow
+            leading={<ProviderLogo id={CUSTOM_PROVIDER} size="sm" />}
+            label={t("endpoint.option")}
+            sub={t("endpoint.optionSub")}
+            checked={custom}
+            onPress={() => setCustom(true)}
+          />
+        ) : null}
       </GroupedList>
       <GroupedFooter>{t("connectAi.key.sub")}</GroupedFooter>
-      {maker && site ? (
+      {custom ? (
+        <View style={styles.keySteps}>
+          <EndpointForm orgId={orgId} onDone={() => setEndpointSaved(true)} />
+        </View>
+      ) : maker && site ? (
         <View style={styles.keySteps}>
           <StepsCard>
             <Step

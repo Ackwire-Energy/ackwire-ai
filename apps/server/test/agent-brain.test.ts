@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type PlanUsage, type PlanWindowKind, type ServerFrame } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import { applyBootSwitches } from "../src/start";
 import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -650,4 +650,20 @@ test("someone else's plan (ADR 0059 §3): the workspace's owner gives Bia's to a
     .from(schema.agents)
     .where(eq(schema.agents.id, agentId));
   expect(row).toEqual({ account: null, lentBy: null });
+});
+
+test("the team's right hand: `mine` is every member's own by default, `workspace` stays the admins'", async () => {
+  const { api, asBia, orgId } = await workspace();
+  const [lodi] = await t.db
+    .select({ id: schema.agents.id })
+    .from(schema.agents)
+    .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.builtin, "right_hand")));
+  const id = lodi?.id;
+  const mine = await asBia(`/agents/${id}/brain`);
+  expect(mine.status).toBe(200);
+  expect(await mine.json()).toMatchObject({ scope: "mine", brain: "model", canUsePlans: true });
+  expect((await asBia(`/agents/${id}/brain?scope=workspace`)).status).toBe(403);
+  const workspaceAi = await api(`/agents/${id}/brain?scope=workspace`);
+  expect(workspaceAi.status).toBe(200);
+  expect(await workspaceAi.json()).toMatchObject({ scope: "workspace" });
 });

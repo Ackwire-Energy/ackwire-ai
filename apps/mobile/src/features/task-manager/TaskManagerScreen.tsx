@@ -6,6 +6,7 @@ import {
   groupTasks,
   taskState,
   taskTitle,
+  taskWaitWords,
   taskWhere,
 } from "@agenteschat/client/lib/task-manager";
 import { router } from "expo-router";
@@ -44,10 +45,10 @@ import {
   groupLine,
   type RowState,
   rowState,
-  taskStateText,
+  taskStateWords,
   taskSubline,
 } from "./logic";
-import { StateLine, StopButton, StopConfirm, TaskMark, UsingLine } from "./parts";
+import { StateLine, StopButton, StopConfirm, TaskMark, UsingLine, WaitLines } from "./parts";
 
 /** Rows whose agent moves (a long list stays light). */
 const LIVE_ROWS = 8;
@@ -148,6 +149,7 @@ function TaskManager() {
           {groups.length > 0 ? (
             <>
               <SectionHeader title={t("taskManager.sections.asked")} count={askedCount} />
+              <WaitLines tasks={groups.flatMap((g) => g.tasks)} now={now} />
               {groups.map((g, i) => (
                 <AgentGroup
                   key={g.agentId}
@@ -174,6 +176,7 @@ function TaskManager() {
           {background.length > 0 ? (
             <>
               <SectionHeader title={t("taskManager.sections.background")} count={background.length} />
+              <WaitLines tasks={background} now={now} />
               {background.map((task, i) => (
                 <TaskRow
                   key={task.runId}
@@ -249,12 +252,13 @@ function AgentGroup({
   now: number;
   meId: string | null;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
   const name = dir.nameOf({ type: "agent", id: group.agentId }) || t("channel.unknownAgent");
   const color = agentLook(dir.anyAgent(group.agentId)).color;
-  const line = groupLine(t, group);
+  const heldTask = group.tasks.find((task) => taskState(task) === "waiting");
+  const line = groupLine(t, group, heldTask ? taskWaitWords(t, i18n.language, heldTask, now)?.state : null);
   const mark: RowState = line.mark === "working" ? "working" : line.mark === "waiting" ? "ok" : "queued";
   const chevron = useAnimatedStyle(() => ({
     transform: [{ rotate: withTiming(open ? "0deg" : "-90deg", { duration: 200 }) }],
@@ -285,7 +289,6 @@ function AgentGroup({
             <TaskMark state={mark} color={color} />
             <Text
               variant="footnote"
-              numberOfLines={1}
               style={[styles.semibold, styles.shrink, { color: line.mark === "waiting" ? c.amber : c.ink2 }]}
             >
               {line.text}
@@ -345,17 +348,18 @@ function TaskRow({
   meId: string | null;
   onStop: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
   const title = taskTitle(t, task);
   const sub = taskSubline(t, task, meId, title);
+  const words = taskStateWords(t, i18n.language, task, state, now);
   const line = flat ? [dir.nameOf({ type: "agent", id: task.agentId }), sub].filter(Boolean).join(" · ") : sub;
   return (
     <Pressable
       onPress={() => router.push(taskHref(task.runId))}
       accessibilityRole="button"
-      accessibilityLabel={[title, line, taskStateText(t, task, state)].filter(Boolean).join(", ")}
+      accessibilityLabel={[title, line, words.state, words.next].filter(Boolean).join(", ")}
       style={({ pressed }) => [
         styles.task,
         flat ? styles.flat : styles.indented,

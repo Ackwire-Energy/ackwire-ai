@@ -52,7 +52,7 @@ import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { CHROME_MAX_SCALE, haptics, Icon, PixelStop, Text, useReducedMotion, useTheme } from "@/ui";
 import { AgentFace, AgentWho, Face } from "../shared/Face";
-import { useDirectory, useNow, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useNow, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import type { Measurable } from "./ask-store";
@@ -66,12 +66,14 @@ import {
   lineStops,
   markedParts,
   markName,
+  nameInk,
   narrowDrawn,
   PHRASE_FADE_MS,
   type PhraseTurn,
   turnPhrase,
   workingEntries,
 } from "./logic";
+import { lookRows, useRowLook } from "./look";
 import { MessageText } from "./MessageText";
 import { type RowSight, rowsShown } from "./row-sight";
 import { TurnTools } from "./ToolCalls";
@@ -187,6 +189,11 @@ export const TurnRow = memo(function TurnRow({
   const { t } = useTranslation();
   const dir = useDirectory();
   const when = useWhen();
+  const look = useRowLook();
+  const c = useColors();
+  const { scheme } = useTheme();
+  const bubbled = look.style === "bubbles";
+  const compact = look.style === "compact";
   const agent = dir.agentById.get(run.agentId);
   const color = agentLook(agent).color;
   const phase = turnPhase(run);
@@ -228,15 +235,31 @@ export const TurnRow = memo(function TurnRow({
   return (
     <>
       {pair}
-      <View ref={seen} collapsable={false} style={styles.msg}>
-        <View style={styles.avslot}>
-          <AgentFace agentId={run.agentId} size={34} mode={live ? (phase === "writing" ? "run" : "think") : "idle"} />
+      <View
+        ref={seen}
+        collapsable={false}
+        style={[styles.msg, bubbled && lookRows.bubblesRow, compact && lookRows.compactRow]}
+      >
+        {compact ? <View style={lookRows.compactClock} /> : null}
+        <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
+          <AgentFace
+            agentId={run.agentId}
+            size={compact ? 18 : bubbled ? 30 : 34}
+            mode={live ? (phase === "writing" ? "run" : "think") : "idle"}
+          />
         </View>
         <View style={styles.body}>
           <View style={styles.who}>
-            <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
-              {agent?.name ?? ""}
-            </Text>
+            {!bubbled || look.names ? (
+              <Text
+                variant="footnote"
+                tone="ink2"
+                style={[styles.name, bubbled ? { color: nameInk(color, scheme === "dark") } : undefined]}
+                numberOfLines={1}
+              >
+                {agent?.name ?? ""}
+              </Text>
+            ) : null}
             {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
               `RunClock`); "parado" once stopped. */}
             <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
@@ -257,14 +280,25 @@ export const TurnRow = memo(function TurnRow({
           </View>
           {/* Nothing said and no steps yet: the words stream where the opener stands, so the line it opens
             with stays put when a tool call turns it into narration. */}
-          {wordsOnTop && run.text ? (
-            <RevealText text={run.text} live={phase === "writing"} accent={color} />
-          ) : said ? (
-            <View style={styles.say}>
-              <MessageText body={said} selectable={false} />
+          {bubbled && (said || run.text) ? (
+            <View style={[lookRows.bubble, { backgroundColor: c.bubble }]}>
+              {said && !wordsOnTop ? <MessageText body={said} selectable={false} /> : null}
+              {run.text ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
             </View>
-          ) : null}
-          {run.text && !wordsOnTop ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
+          ) : (
+            <>
+              {wordsOnTop && run.text ? (
+                <RevealText text={run.text} live={phase === "writing"} accent={color} />
+              ) : said ? (
+                <View style={styles.say}>
+                  <MessageText body={said} selectable={false} />
+                </View>
+              ) : null}
+              {run.text && !wordsOnTop ? (
+                <RevealText text={run.text} live={phase === "writing"} accent={color} />
+              ) : null}
+            </>
+          )}
           {/* Its tools last, where its saved reply keeps them. */}
           <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
         </View>

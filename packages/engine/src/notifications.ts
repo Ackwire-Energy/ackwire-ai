@@ -39,7 +39,7 @@ const { notifications, organizationMembers } = schema;
  * - Realtime goes to the recipient only (`userTopic`, cross-replica):
  *   `notification.upserted`, `notification.removed`, `notification.counts`.
  * - Auto-resolve: the source closed (question answered, approval decided,
- *   forum turn over, issue unassigned) sets `done_at` and emits `removed`.
+ *   issue unassigned) sets `done_at` and emits `removed`.
  * - Push (ADR 0035): the first event of a group of a pushing kind enqueues
  *   `push.send` for the person's phones (`push.ts`).
  */
@@ -57,8 +57,6 @@ export const NOTIFICATION_KINDS = [
   "issue_assigned",
   "issue_comment",
   "issue_status",
-  "forum_turn",
-  "forum_synthesis",
   "approval",
   "mission_finished",
   "mission_stopped",

@@ -13,7 +13,7 @@ What we have doesn't cover it:
 
 - **Shared channels.** Agents in the same channel read each other. Routines don't: each one works in its own routine room, and other runs' searches never reach it, on purpose (`agentSearchChannels`, `search.ts:192`).
 - **Org memory.** The reflect job extracts facts and entity profiles after conversations. It is late (two agents acting minutes apart both miss it) and it keeps facts, not actions.
-- **Search.** `search_context` covers messages, memory items, tasks, forum, files and wiki. The actions themselves are not indexed. An email an agent sent without writing about it in the chat can't be found.
+- **Search.** `search_context` covers messages, memory items, tasks, files and wiki. The actions themselves are not indexed. An email an agent sent without writing about it in the chat can't be found.
 - **Tasks.** The board answers "who is on it" for work that is a task. One email, one reply or one post doesn't become a task, and it shouldn't (hundreds of cards).
 - **`remember`.** It writes to the agent's own memory, and only when a person asks.
 

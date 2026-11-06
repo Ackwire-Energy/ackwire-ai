@@ -278,10 +278,10 @@ test("desktop_screenshot with share: sent to the Drive and attached to the reply
   expect(out.isError).toBeUndefined();
   const [a] = await f.db.select().from(schema.artifacts);
   expect(a).toMatchObject({ kind: "file", title: "a.jpg", channelId: f.general.id });
-  expect(out.data).toEqual({ path: "shots/a.jpg", artifact: { id: a?.id, version: 1 } });
+  expect(out.data).toEqual({ path: "shots/a.jpg", artifact: { id: a?.id, version: 1, title: "a.jpg" } });
   const reply: ToolSideEffects = {};
   absorbToolData(reply, out.data);
-  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1 }]);
+  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1, title: "a.jpg" }]);
   expect(out.content).toContain(
     `It is shown in this conversation: its card goes with your reply ("a.jpg" in the Drive`,
   );

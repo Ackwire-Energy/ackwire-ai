@@ -1,13 +1,21 @@
 import type { GitHubRepositories } from "@agenteschat/client";
-import { useGitHubApp, useGitHubRepos, useInstallGitHubApp } from "@agenteschat/client";
+import {
+  useAgentMergeRepos,
+  useGitHubApp,
+  useGitHubRepos,
+  useInstallGitHubApp,
+  useSetAgentMergeRepos,
+} from "@agenteschat/client";
 import { can as orgCan } from "@agenteschat/client/lib/permissions";
 import {
   applyPick,
   covers,
   isAccount,
   makeFirst,
+  mergeChoices,
   type RepoChoice,
   repoExists,
+  repoListOf,
   repoName,
   toggleRepo,
 } from "@agenteschat/client/lib/repos";
@@ -149,6 +157,110 @@ export function ReposBlock() {
       )}
       <WasLine changeKey="repos" />
     </div>
+  );
+}
+
+/**
+ * "Pode fazer merge sem perguntar", under the repositories: where the agent merges with no approval card, for its
+ * owner or an admin to choose. Saved at once, outside the page's save bar, like "Aprovado sempre": it is a permission
+ * on its own, with its own line in the audit.
+ */
+export function MergeReposBlock() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const { agent, can } = useAgentEdit();
+  const merge = useAgentMergeRepos(org.id, agent.id);
+  const [picking, setPicking] = useState(false);
+  const list = merge.data ?? [];
+  const editable = can("repos");
+  if (!merge.data || (list.length === 0 && !editable)) return null;
+  return (
+    <div className="agp-repos">
+      <span className="agp-repos__label">{t("repos.merge.label")}</span>
+      <span className="agp-chips">
+        {list.length === 0 ? (
+          <span className="small muted">{t("repos.merge.none")}</span>
+        ) : (
+          list.map((repo) => (
+            <Chip key={repo} icon="repo">
+              {repo}
+            </Chip>
+          ))
+        )}
+        {editable && (
+          <Button size="sm" variant="ghost" icon="edit" onClick={() => setPicking(true)}>
+            {list.length === 0 ? t("repos.choose") : t("repos.change")}
+          </Button>
+        )}
+      </span>
+      <span className="small muted">{t("repos.merge.help")}</span>
+      {picking && <MergeRepoDialog chosen={list} onClose={() => setPicking(false)} />}
+    </div>
+  );
+}
+
+function MergeRepoDialog({ chosen, onClose }: { chosen: string[]; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const { agent, g, saved } = useAgentEdit();
+  const listing = useGitHubRepos(org.id);
+  const save = useSetAgentMergeRepos(org.id, agent.id);
+  const [pick, setPick] = useState(chosen);
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const shown = mergeChoices(listing.data, saved.repos ? repoListOf(saved.repos) : []).filter(
+    (name) => !query || name.toLowerCase().includes(query),
+  );
+  const id = (s: string) => `merge-repo-${s.replace(/[^a-zA-Z0-9]/g, "-")}`;
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={t("repos.merge.dialogTitle", g)}
+      description={t("repos.merge.dialogDesc")}
+      closeLabel={t("common.close")}
+      className="agp-repodialog"
+    >
+      {listing.isLoading ? (
+        <div className="ac-dialog__body">
+          <LoadingLine width={220} />
+        </div>
+      ) : listing.isError ? (
+        <p className="ac-dialog__empty">{t("repos.unavailable")}</p>
+      ) : (
+        <DialogSearchList
+          query={q}
+          onQueryChange={setQ}
+          searchLabel={t("repos.search")}
+          searchPlaceholder={t("repos.search")}
+          listLabel={t("repos.merge.label")}
+          isEmpty={shown.length === 0}
+          emptyText={query ? t("repos.noMatch", { q }) : t("repos.none")}
+        >
+          {shown.map((name) => (
+            <label key={name} htmlFor={id(name)} className="scope-row">
+              <Checkbox
+                id={id(name)}
+                checked={pick.includes(name)}
+                onCheckedChange={(on) => setPick((p) => (on ? [...p, name] : p.filter((r) => r !== name)))}
+              />
+              <Icon name="repo" size={16} />
+              <span className="scope-row__text">
+                <b>{name}</b>
+              </span>
+            </label>
+          ))}
+        </DialogSearchList>
+      )}
+      <DialogFooter bar>
+        <Button variant="ghost" onClick={onClose}>
+          {t("common.cancel")}
+        </Button>
+        <Button variant="primary" loading={save.isPending} onClick={() => save.mutate(pick, { onSuccess: onClose })}>
+          {t("common.save")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
 

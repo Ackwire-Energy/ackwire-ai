@@ -63,13 +63,15 @@ test("post_message: from a DM to #general with the file (as a copy); only channe
     .from(schema.messages)
     .where(and(eq(schema.messages.channelId, f.general.id), eq(schema.messages.authorAgentId, f.agent.id)));
   expect(posted?.body).toBe("Carrossel de Miami pronto");
-  const files = (posted?.meta as { artifacts?: string[] } | undefined)?.artifacts ?? [];
-  expect(files).toHaveLength(1);
+  type FileRef = { id: string; version: number; title: string };
+  const files = (posted?.meta as { artifacts?: FileRef[] } | undefined)?.artifacts;
+  // The file card's shape (`{ id, version, title }`), so the apps show it and the agent reads it by name.
+  expect(files).toEqual([{ id: expect.any(String), version: 1, title: "Carrossel Miami" }]);
   // From the DM: a copy in #general, so the people there can open it; the original stays in the DM.
   const [copy] = await f.db
     .select()
     .from(schema.artifacts)
-    .where(eq(schema.artifacts.id, files[0] as string));
+    .where(eq(schema.artifacts.id, files?.[0]?.id ?? ""));
   expect(copy).toMatchObject({ channelId: f.general.id, title: "Carrossel Miami" });
   expect(copy?.id).not.toBe(fileId);
   const [audit] = await f.db
@@ -118,7 +120,7 @@ test("post_message: from a DM to #general with the file (as a copy); only channe
 });
 
 test("send_dm: the agent writes to a person in its DM with them, they're notified; several matches ask which one", async () => {
-  const person = "thay";
+  const person = "joao";
   f = await setup({
     chatTools: true,
     reply: (req: ModelRequest) => {
@@ -127,25 +129,25 @@ test("send_dm: the agent writes to a person in its DM with them, they're notifie
       if (last.includes("avisa")) {
         return {
           chunks: [],
-          toolUses: [{ name: "send_dm", input: { person, text: "Oi Thay! O Walter pediu para te avisar do e-mail." } }],
+          toolUses: [{ name: "send_dm", input: { person, text: "Oi Joao! O Leo pediu para te avisar do e-mail." } }],
         };
       }
       return { chunks: ["ok"] };
     },
   });
-  const thay = await addMember(f.db, f.org.id, "member", "Tháy Lima");
+  const joao = await addMember(f.db, f.org.id, "member", "João Lima");
   const deps = { db: f.db, pubsub: f.pubsub };
-  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev avisa a thay desse email na dm" });
+  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev avisa o joao desse email na dm" });
   await drainOutbox(f.db, f.handlers);
   expect((await toolResults()).find((r) => r.name === "send_dm")).toMatchObject({ isError: false });
 
-  // The DM between Thay and the agent, with the message from the agent, and a notification for her.
+  // The DM between Joao and the agent, with the message from the agent, and a notification for him.
   const dm = (await f.db.select().from(schema.channels)).find((c) => c.kind === "dm");
   const members = await f.db
     .select()
     .from(schema.channelMembers)
     .where(eq(schema.channelMembers.channelId, dm?.id ?? ""));
-  expect(members.map((m) => m.userId ?? m.agentId).sort()).toEqual([thay.id, f.agent.id].sort());
+  expect(members.map((m) => m.userId ?? m.agentId).sort()).toEqual([joao.id, f.agent.id].sort());
   const [sent] = await f.db
     .select()
     .from(schema.messages)
@@ -153,20 +155,99 @@ test("send_dm: the agent writes to a person in its DM with them, they're notifie
   expect(sent).toMatchObject({
     authorType: "agent",
     authorAgentId: f.agent.id,
-    body: "Oi Thay! O Walter pediu para te avisar do e-mail.",
+    body: "Oi Joao! O Leo pediu para te avisar do e-mail.",
   });
   expect(sent?.meta.agentDm).toMatchObject({ requesterUserId: f.owner.id });
   const notes = await f.db
     .select()
     .from(schema.notifications)
-    .where(and(eq(schema.notifications.userId, thay.id), eq(schema.notifications.kind, "dm")));
+    .where(and(eq(schema.notifications.userId, joao.id), eq(schema.notifications.kind, "dm")));
   expect(notes).toHaveLength(1);
 
   // Two people whose first name is the same: the agent is told to ask which one.
-  await addMember(f.db, f.org.id, "member", "Thay Souza");
-  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev avisa a thay de novo" });
+  await addMember(f.db, f.org.id, "member", "Joao Souza");
+  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev avisa o joao de novo" });
   await drainOutbox(f.db, f.handlers);
   const results = (await toolResults()).filter((r) => r.name === "send_dm");
   expect(results.at(-1)).toMatchObject({ isError: true });
   expect(results.at(-1)?.content).toContain("Several people match");
+});
+
+test("send_dm with a file: the person gets the file itself (a copy from the asker's DM), not only its name; a file the asker can't see is refused", async () => {
+  let fileId = "";
+  f = await setup({
+    artifactTools: true,
+    chatTools: true,
+    reply: (req: ModelRequest) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["Feito."] };
+      if (last.includes("monta o roteiro")) {
+        return {
+          chunks: [],
+          toolUses: [
+            { name: "create_artifact", input: { title: "Roteiro do video", kind: "document", markdown: "# Cena 1" } },
+          ],
+        };
+      }
+      if (last.includes("manda pra bia")) {
+        // Files only: the text is optional when there are files.
+        return { chunks: [], toolUses: [{ name: "send_dm", input: { person: "bia", artifact_ids: [fileId] } }] };
+      }
+      return { chunks: ["ok"] };
+    },
+  });
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "monta o roteiro do video" });
+  await drainOutbox(f.db, f.handlers);
+  const [original] = await f.db.select().from(schema.artifacts);
+  fileId = original?.id ?? "";
+  expect(original?.channelId).toBe(dm.id);
+
+  await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "manda pra bia na dm" });
+  await drainOutbox(f.db, f.handlers);
+  expect((await toolResults()).find((r) => r.name === "send_dm")).toMatchObject({
+    isError: false,
+    content: expect.stringContaining("with 1 file(s)"),
+  });
+  const sentDms = async () =>
+    (await f.db.select().from(schema.messages)).filter((m) => (m.meta as { agentDm?: unknown }).agentDm);
+  const [sent] = await sentDms();
+  const biaDm = sent?.channelId ?? "";
+  const members = await f.db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, biaDm));
+  expect(members.map((m) => m.userId ?? m.agentId).sort()).toEqual([bia.id, f.agent.id].sort());
+  expect(sent).toMatchObject({ authorType: "agent", authorAgentId: f.agent.id });
+  // `meta.artifacts` holds ids, or entries with an id: read either.
+  const files = (sent?.meta as { artifacts?: unknown[] } | undefined)?.artifacts ?? [];
+  expect(files).toHaveLength(1);
+  const first = files[0];
+  const copyId = typeof first === "string" ? first : (first as { id: string }).id;
+  // From the asker's DM: a copy in Bia's DM with the agent, so she can open it; the original stays where it was.
+  const [copy] = await f.db.select().from(schema.artifacts).where(eq(schema.artifacts.id, copyId));
+  expect(copy).toMatchObject({ channelId: biaDm, title: "Roteiro do video" });
+  expect(copy?.id).not.toBe(fileId);
+  const [audit] = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "message.sent_dm"));
+  expect(audit?.details).toMatchObject({ toUserId: bia.id, fromChannelId: dm.id, artifactIds: [copyId] });
+  const notes = await f.db
+    .select()
+    .from(schema.notifications)
+    .where(and(eq(schema.notifications.userId, bia.id), eq(schema.notifications.kind, "dm")));
+  expect(notes).toHaveLength(1);
+
+  // A file from a DM the asker isn't in: as if it didn't exist, and nothing is sent.
+  const leo = await addMember(f.db, f.org.id, "member", "leo");
+  const leoDm = await openDm(f.db, leo.id, f.org.id, { agentId: f.agent.id });
+  await postPersonMessage(deps, leo.id, f.org.id, leoDm.id, { body: "monta o roteiro do video" });
+  await drainOutbox(f.db, f.handlers);
+  const [leoFile] = await f.db.select().from(schema.artifacts).where(eq(schema.artifacts.channelId, leoDm.id));
+  fileId = leoFile?.id ?? "";
+  expect(fileId).not.toBe("");
+  await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "manda pra bia na dm esse outro" });
+  await drainOutbox(f.db, f.handlers);
+  expect((await toolResults()).filter((r) => r.name === "send_dm").at(-1)).toMatchObject({
+    isError: true,
+    content: expect.stringContaining("not found"),
+  });
+  expect(await sentDms()).toHaveLength(1);
 });

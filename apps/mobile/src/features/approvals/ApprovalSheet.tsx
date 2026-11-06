@@ -1,6 +1,11 @@
 import { useApproval, useChannels, useDecideApproval } from "@agenteschat/client";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
-import { aheadEndLine, approvalWaitsFor, requesterDecidesLine } from "@agenteschat/client/lib/approval-words";
+import {
+  aheadEndLine,
+  alwaysRoutineName,
+  approvalWaitsFor,
+  requesterDecidesLine,
+} from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -74,7 +79,7 @@ export function ApprovalSheet({
           successHaptic();
           toast({
             ...(always
-              ? approveAlwaysToast(t, name)
+              ? approveAlwaysToast(t, name, alwaysRoutineName(t, a))
               : {
                   title: decision === "approve" ? t("mobile.approval.approved") : t("mobile.approval.refused"),
                   subtitle:

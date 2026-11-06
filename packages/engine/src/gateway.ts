@@ -2,10 +2,13 @@ import type { KeyWrapper, PlatformCredentials, PubSub } from "@agenteschat/adapt
 import { and, type Database, desc, type Executor, eq, gte, isNull, lt, rowsOf, schema, sql } from "@agenteschat/db";
 import {
   costNanoUsd,
+  customModelOf,
   type EmbeddingProvider,
+  type Endpoint,
   embeddingCostNanoUsd,
   ensureOpenRouterModels,
   estimateTokens,
+  isCustomModel,
   isKnownModel,
   isOpenRouterModel,
   type ModelInfo,
@@ -21,6 +24,7 @@ import {
   outputTokensWithin,
   PROVIDERS,
   ProviderError,
+  parseCustomModel,
   promptChars,
   type SystemPrompt,
   type ToolSpec,
@@ -28,6 +32,7 @@ import {
 import { type Agent, getAgent } from "./agents";
 import { caches } from "./cache";
 import { decryptCredential, usableCredentialRow } from "./credentials";
+import { loadEndpointModels } from "./endpoints";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { maySql, type RolePermission } from "./permissions";
@@ -109,6 +114,8 @@ export interface OrgCall {
   messages: ModelMessage[];
   maxTokens: number;
   outputSchema?: Record<string, unknown>;
+  /** Tools the model may call (an endpoint's test call, ADR 0146); none run here. */
+  tools?: ToolSpec[];
   effort?: ModelRequest["effort"];
   /** Agent the call is about, if any (recorded, not billed to its budget). */
   agentId?: string | null;
@@ -139,9 +146,12 @@ const masked = (error: unknown) =>
 /**
  * The only way to call a model (docs/adr/0007, 0012). For every call:
  * 0. refuse it for a workspace on hold or suspended, or a held agent (`standing.ts`);
- * 1. resolve the model from the catalog or OpenRouter's list (agent's model, or the fixed org-call model);
+ * 1. resolve the model from the catalog, OpenRouter's list or the workspace's own endpoint (ADR 0146) (agent's
+ *    model, or the fixed org-call model);
  * 2. agent calls: atomically reserve the worst-case cost against the agent's
- *    monthly counter (row lock), shrinking `maxTokens` to fit the budget;
+ *    monthly counter (row lock), shrinking `maxTokens` to fit the budget. An endpoint model without prices costs 0:
+ *    its calls never use the budget up (tokens are still recorded), and an agent whose budget priced calls used up
+ *    stops on it too;
  * 3. decrypt the org's credential (or ask the platform-credential adapter);
  * 4. stream through the provider interface;
  * 5. record tokens and cost with `org_id`, `agent_id` and `kind`, and settle
@@ -164,6 +174,8 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     workspaceId?: string;
     organization?: string;
     project?: string;
+    /** A workspace endpoint's address and API style (ADR 0146). */
+    endpoint?: Endpoint;
     credentialId: string | null;
   };
   const label = (provider: string) => (PROVIDERS as Record<string, { label: string }>)[provider]?.label ?? provider;
@@ -176,6 +188,9 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           workspaceId: c.workspaceId,
           organization: c.options?.organization,
           project: c.options?.project,
+          ...(c.options?.endpoint
+            ? { endpoint: { style: c.options.endpoint.style, baseURL: c.options.endpoint.baseURL } }
+            : {}),
           credentialId,
         }
       : null;
@@ -246,14 +261,25 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     })) as string | null;
   }
 
-  const agentKey = (agent: Agent, provider: string) => resolveKey(agent.orgId, provider, agent.credentialId);
-  const orgKey = (orgId: string, provider: string) => resolveKey(orgId, provider, null);
+  /** A workspace endpoint's model names its own credential (ADR 0146): that key, whatever the agent's. */
+  const pinnedKey = (model: string) => parseCustomModel(model)?.credentialId ?? null;
+  const agentKey = (agent: Agent, provider: string) =>
+    resolveKey(agent.orgId, provider, pinnedKey(agent.model) ?? agent.credentialId);
+  const orgKey = (orgId: string, provider: string, model: string) => resolveKey(orgId, provider, pinnedKey(model));
 
   /**
    * A model's entry from the catalog or OpenRouter's list (read first when due), or why there is none. Called once
    * its key resolved: no key, no read of OpenRouter's list.
    */
-  async function infoFor(model: string): Promise<ModelInfo> {
+  async function infoFor(orgId: string, model: string): Promise<ModelInfo> {
+    if (isCustomModel(model)) {
+      await loadEndpointModels(db, orgId);
+      const own = customModelOf(orgId, model);
+      if (own) return own;
+      throw new ValidationError(
+        "This model was removed from its endpoint. Pick another model in the agent's settings.",
+      );
+    }
     if (isOpenRouterModel(model)) await ensureOpenRouterModels(model);
     const info = modelInfo(model);
     if (info) return info;
@@ -611,7 +637,8 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       if (!provider || !deps.providers[provider]) return false;
       const usable = async (id: string) => (await usableCredentialRow(db, agent.orgId, id))?.provider === provider;
       try {
-        if (agent.credentialId) return await usable(agent.credentialId);
+        const own = pinnedKey(agent.model) ?? agent.credentialId;
+        if (own) return await usable(own);
         const defaultId = await orgDefaultCredentialId(agent.orgId, provider);
         if (defaultId && (await usable(defaultId))) return true;
         const platform = deps.platformCredentials;
@@ -637,7 +664,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       if (!providerId) throw new ValidationError(`Model ${agent.model} is not in the catalog`);
       const provider = providerFor(providerId);
       const key = await agentKey(agent, providerId);
-      const info = await infoFor(agent.model);
+      const info = await infoFor(agent.orgId, agent.model);
 
       const request: ModelRequest = {
         model: agent.model,
@@ -679,6 +706,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           workspaceId: key.workspaceId,
           organization: key.organization,
           project: key.project,
+          endpoint: key.endpoint,
           onDelta: call.onDelta,
         });
       } catch (error) {
@@ -809,13 +837,14 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       const providerId = modelProvider(call.model);
       if (!providerId) throw new ValidationError(`Model ${call.model} is not in the catalog`);
       const provider = providerFor(providerId);
-      const key = await orgKey(call.orgId, providerId);
-      const info = await infoFor(call.model);
+      const key = await orgKey(call.orgId, providerId, call.model);
+      const info = await infoFor(call.orgId, call.model);
       const request: ModelRequest = {
         model: call.model,
         system: call.system,
         messages: call.messages,
         maxTokens: capOf(call.maxTokens, info),
+        ...(call.tools ? { tools: call.tools } : {}),
         outputSchema: call.outputSchema,
         effort: call.effort,
         signal: call.signal,
@@ -834,6 +863,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         result = await provider.stream(request, {
           apiKey: key.apiKey,
           workspaceId: key.workspaceId,
+          endpoint: key.endpoint,
           onDelta: () => {},
         });
       } catch (error) {

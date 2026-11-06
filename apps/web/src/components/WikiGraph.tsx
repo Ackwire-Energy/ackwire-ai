@@ -1,7 +1,7 @@
 import type { WikiGraph } from "@agenteschat/client";
 import { useWikiGraph } from "@agenteschat/client";
 import { layoutGraph, type Placed } from "@agenteschat/client/lib/wiki";
-import { appearanceStyle, Segmented } from "@agenteschat/ui";
+import { appearanceStyle, PageHeader, Segmented } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -184,12 +184,7 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
   ];
   return (
     <section className="wiki-graph" aria-label={t("wiki.graph")}>
-      <header className="wiki-home__head">
-        <div>
-          <h1 className="wiki-home__title">{t("wiki.graph")}</h1>
-          <p className="muted">{t("wiki.graphText")}</p>
-        </div>
-      </header>
+      <PageHeader title={t("wiki.graph")} meta={t("wiki.graphText")} />
       <div className="wiki-graph__box">
         <Segmented
           size="sm"

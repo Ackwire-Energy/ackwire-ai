@@ -103,20 +103,22 @@ import {
   screenAboveEnd,
   usageLine,
 } from "@agenteschat/client/lib/chat";
+import { firstUnreadId, opensAtLastRead } from "@agenteschat/client/lib/chat-look";
 import { choiceReplyLine } from "@agenteschat/client/lib/choices";
 import { draftKeyOf } from "@agenteschat/client/lib/composer-drafts";
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
-import { errorCode, errorText, restrictionLine, runErrorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, restrictionLine, runErrorText, runFailureLine } from "@agenteschat/client/lib/errors";
+import { everyoneWord, isEveryoneMention, mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { capitalize, dayLabel, formatFullDate, formatTime, lowerFirst } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
-import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
+import { hasWideBlock } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText, textOrMedia } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
@@ -178,6 +180,7 @@ import {
   MenuRadioGroup,
   MenuSeparator,
   Message,
+  MessageLookContext,
   MessageText,
   PixelSpinner,
   PixelStop,
@@ -212,6 +215,7 @@ import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { ChatMedia } from "@/chat/ChatMedia";
 import { ChatVoice } from "@/chat/ChatVoice";
+import { useConversationLook } from "@/chat/look";
 import { MessageBody } from "@/chat/MessageBody";
 import { useBrowserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
@@ -232,7 +236,8 @@ import { ActorAvatar, AgentAvatar, PersonAvatar } from "@/components/AgentAvatar
 import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
-import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
+import { AgentPanelContext, AgentPanelShownContext, useOpenAgentPanel } from "@/components/agent-panel-context";
+import { AgentSidebar } from "@/components/agents/AgentSidebar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { MessageWorkLine } from "@/components/BackgroundWork";
@@ -263,7 +268,6 @@ import { DatePill, type DatePillHandle } from "@/components/DatePill";
 import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useArchiveChannelWithUndo } from "@/components/entity-menus";
-import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
@@ -300,7 +304,7 @@ import { MissionCommandCard } from "@/components/missions/MissionCommandCard";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { CHANNEL_NAME, ChannelAccessChoice, toChannelName } from "@/components/NewChannelDialog";
-import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
+import { FailedRunFix, KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
@@ -320,6 +324,7 @@ import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { SearchResultsPanel } from "@/components/search/SearchResultsPanel";
 import { TeamChecks } from "@/components/TeamChecks";
+import { ReplyChips } from "@/components/TeamPlan";
 import { ToLatest } from "@/components/ToLatest";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { AgentTasksPanel } from "@/components/tasks/AgentTasksPanel";
@@ -340,7 +345,7 @@ import { BarAlsoTyping, BarPhrase, BarStep, ConsultClock, WorkingStack } from "@
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
-import { useMembersColumn } from "@/hooks/useMembersColumn";
+import { useDmSidebar, useMembersColumn } from "@/hooks/useMembersColumn";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
@@ -396,10 +401,18 @@ const useSecond = (active: boolean) => useSyncExternalStore(active ? secondClock
 /** Live statuses of a run still at work on its conversation (a new message steers into it). */
 const WORKING: ReadonlySet<string> = new Set(["thinking", "queued", "running", "waiting_approval"]);
 
+/** The sidebar of a DM with an agent, as its header's toggle reads it. */
+export interface DmSideControl {
+  open: boolean;
+  /** It sits beside the chat (not over it, not given up to a thread or the agent's page). */
+  docked: boolean;
+  toggle: () => void;
+}
+
 /** Header and empty state of a channel, or of a DM (same layout). */
 export interface ChannelChrome {
-  /** A page's own header; a function gets the header search's way into its results (a DM's). */
-  header?: ReactNode | ((h: { onSearch: () => void }) => ReactNode);
+  /** A page's own header; a function gets the header search's way into its results and the sidebar (a DM's). */
+  header?: ReactNode | ((h: { onSearch: () => void; side: DmSideControl | null }) => ReactNode);
   emptyText?: string;
   /** Composer label/placeholder target, e.g. "Ada" instead of "#eng". */
   composerTarget?: string;
@@ -771,7 +784,9 @@ function ChannelView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || draftRef.current.trim()) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
-      if (!stopTarget) return;
+      // An Esc from a panel is that panel's, and one from the conversation beside a thread isn't the thread's.
+      const inPanel = e.target instanceof Element && Boolean(e.target.closest(".thread-panel"));
+      if (!stopTarget || inPanel !== Boolean(chrome?.panel)) return;
       e.preventDefault();
       stopRun(stopTarget);
     };
@@ -783,8 +798,25 @@ function ChannelView({
   // The header search's results, in the same panel (one panel at a time).
   const [searchOpen, setSearchOpen] = useState(false);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
-  // (its memory); one panel at a time.
-  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
+  // (its memory); one panel at a time. Its opener again closes it (`close`, counted, so unsaved edits ask first).
+  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab; close?: number } | null>(null);
+  // What had the focus when the profile opened: it gets it back when the panel closes.
+  const profileOpener = useRef<HTMLElement | null>(null);
+  const closeProfile = useCallback(() => {
+    setProfile(null);
+    const opener = profileOpener.current;
+    profileOpener.current = null;
+    // After the frame: a closing "Descartar e sair" dialog hands focus back when it unmounts, to a page that's gone.
+    requestAnimationFrame(() => {
+      if (opener?.isConnected) opener.focus();
+    });
+  }, []);
+  // The conversation stays in use beside the page: what would take the panel's place asks first over unsaved edits.
+  const profileKeeps = useCallback(() => {
+    if (!document.querySelector(".thread-panel [data-dirty]")) return false;
+    setProfile((open) => open && { ...open, close: (open.close ?? 0) + 1 });
+    return true;
+  }, []);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
   // A DM with an agent: its tasks (ADR 0128), from the pill in the header; one panel too, any other one closes it.
@@ -793,19 +825,29 @@ function ChannelView({
     if (panel || profile || consultId || searchOpen) setTasksOpen(false);
   }, [panel, profile, consultId, searchOpen]);
   const toggleTasks = useCallback(() => {
+    if (profileKeeps()) return;
     setPanel(null);
     setProfile(null);
     setConsultId(null);
     setSearchOpen(false);
     setTasksOpen((open) => !open);
-  }, []);
+  }, [profileKeeps]);
   const outerPanel = useOpenAgentPanel();
-  const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
-    setPanel(null);
-    setSearchOpen(false);
-    setConsultId(null);
-    setProfile({ agentId, tab });
-  }, []);
+  const openAgentPanel = useCallback(
+    (agentId: string, tab?: AgentTab) => {
+      if (profileKeeps()) return;
+      setPanel(null);
+      setSearchOpen(false);
+      setConsultId(null);
+      const from = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setProfile((open) => {
+        if (open?.agentId === agentId && open.tab === tab) return { ...open, close: (open.close ?? 0) + 1 };
+        profileOpener.current = from;
+        return { agentId, tab };
+      });
+    },
+    [profileKeeps],
+  );
   // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
   useEffect(() => {
     if (chrome?.panel) return;
@@ -828,6 +870,7 @@ function ChannelView({
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const membersColumn = useMembersColumn();
+  const dmSidebar = useDmSidebar();
   // Opened from a sidebar row's "Adicionar pessoas ou agentes": straight to adding, and closing that closes it all.
   const [addFirst, setAddFirst] = useState(false);
   // The members column's "Adicionar pessoa ou agente": the details' add flow alone, as from a sidebar row.
@@ -850,7 +893,11 @@ function ChannelView({
   }, [channel.id, chrome?.header]);
   // An agent mentioned from outside the channel: offer to add it.
   const [offer, setOffer] = useState<string | null>(null);
-  const mentionSearch = useMentionSearch(chrome?.task ? undefined : members.data);
+  const mentionSearch = useMentionSearch(
+    chrome?.task ? undefined : members.data,
+    chrome?.dmAgentId || chrome?.dmPersonId ? "dm" : "channel",
+    offersEveryone(org, Boolean(chrome?.dmAgentId || chrome?.dmPersonId)),
+  );
   const channelSearch = useChannelSearch();
   const composer = useRef<HTMLTextAreaElement>(null);
   const emojiPicker = useEmojiLabels();
@@ -1155,9 +1202,18 @@ function ChannelView({
   const measureFar = (el: HTMLElement) =>
     setFar(!stick.current && screenAboveEnd(el.scrollHeight - el.scrollTop - el.clientHeight, el.clientHeight));
   const datePill = useRef<DatePillHandle>(null);
-  // Every conversation opens at its last message (coming back to one included).
+  // "Última mensagem lida" with something unread: it opens at the "Novas" line, kept as it was on opening because
+  // reading moves it. Threads open at their end.
+  const dmRead = useDms(org.id).data?.find((d) => d.channelId === channel.id);
+  const [readFrom] = useState(() => {
+    const unread = channel.unreadCount ?? dmRead?.unread ?? 0;
+    return !thread && !focusMessageId && !adjustThreadId && opensAtLastRead(org.chatPrefs, unread)
+      ? { at: channel.lastReadAt ?? dmRead?.lastReadAt }
+      : null;
+  });
+  // Otherwise every conversation opens at its last message (coming back to one included).
   // Opened at a message: not pinned to the bottom until the person scrolls down.
-  const stick = useRef(!focusMessageId);
+  const stick = useRef(!focusMessageId && !readFrom);
   const lastScrollTop = useRef<number | null>(null);
   // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
   const autoScrollUntil = useRef(0);
@@ -1454,6 +1510,11 @@ function ChannelView({
   const wikiPages = useWikiTree(org.id);
   // Composer context: who it goes to (the DM agent, or the agents @mentioned in the draft).
   const dmAgent = chrome?.dmAgentId ? dir.agentById.get(chrome.dmAgentId) : undefined;
+  const look = useConversationLook(
+    Boolean(chrome?.dmAgentId || chrome?.dmPersonId || thread?.channelKind === "dm"),
+    dmAgent ? colorOf(dmAgent) : undefined,
+  );
+  const namedLook = useMemo(() => ({ ...look, names: true }), [look]);
   const draftAgents = useMemo(
     () =>
       [
@@ -1860,14 +1921,21 @@ function ChannelView({
     pillWriting.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),
     unseenSummary.mentionsMe,
   );
-  /** A catch-up while away: to the "Novas" divider when it is far up, else to the end. */
-  const openUnseen = () => {
+  /** A catch-up while away: to the "Novas" divider when it is far up, else to the end. On opening: no glide. */
+  const openUnseen = (glide = true) => {
     const el = scroller.current;
     const line = el?.querySelector<HTMLElement>(".channel__unread");
     // Without layout (no size) there is nothing to measure: the end.
     if (el && line && line.offsetHeight > 0) {
       const top = line.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
       if (dividerIsFar(top, el.scrollHeight, el.clientHeight)) {
+        if (!glide) {
+          // Rows off screen have an estimated height until drawn (`content-visibility`): as `highlightMessage`.
+          const land = () => line.scrollIntoView?.({ block: "start" });
+          land();
+          requestAnimationFrame(() => setTimeout(land, 0));
+          return;
+        }
         autoScrollUntil.current = Date.now() + 600;
         if (!reducedMotion && typeof el.scrollTo === "function") el.scrollTo({ top: top - 12, behavior: "smooth" });
         else el.scrollTop = top - 12;
@@ -1875,14 +1943,41 @@ function ChannelView({
         return;
       }
     }
-    toBottom(true);
+    toBottom(glide);
   };
+  const landingAtRead = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once the divider a catch-up asked for is drawn
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!catchUp.current || unseenFrom === null) return;
     catchUp.current = false;
-    openUnseen();
+    openUnseen(!landingAtRead.current);
+    landingAtRead.current = false;
   }, [unseenFrom]);
+  // Opening at the last read message: the line goes before the first unread one, once the messages are in.
+  const atReadDone = useRef(!readFrom);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the page with them arrives
+  useLayoutEffect(() => {
+    if (atReadDone.current || !serverRead) return;
+    const items = timeline.flatMap((i) => (i.kind === "message" ? [i] : []));
+    const id = firstUnreadId(
+      items.map((i) => i.message),
+      readFrom?.at,
+      me.user.id,
+    );
+    const key = items.find((i) => i.message.id === id)?.key;
+    if (!key) {
+      // A page kept from an earlier visit has none of them: the end, until the fresh one lands.
+      atReadDone.current = !messages.isFetching;
+      stick.current = true;
+      followRef.current();
+      return;
+    }
+    atReadDone.current = true;
+    stick.current = false;
+    landingAtRead.current = true;
+    catchUp.current = true;
+    markUnseen(key);
+  }, [serverRead, messages.isFetching]);
   const emptySuggestions = useMemo(() => {
     if (chrome?.suggestions) return chrome.suggestions.map((text) => ({ label: text, text }));
     const a = suggestedAgent;
@@ -1959,18 +2054,21 @@ function ChannelView({
     reply: thread
       ? () => composer.current?.focus()
       : (message) => {
+          if (profileKeeps()) return;
           setProfile(null);
           setConsultId(null);
           setSearchOpen(false);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
     openThread: (id, focus) => {
+      if (profileKeeps()) return;
       setProfile(null);
       setConsultId(null);
       setSearchOpen(false);
       setPanel({ id, reply: false, focus });
     },
     openConsultation: (id) => {
+      if (profileKeeps()) return;
       setProfile(null);
       setPanel(null);
       setSearchOpen(false);
@@ -2021,520 +2119,553 @@ function ChannelView({
   const Tag = chrome?.panel ? "section" : "main";
   // Enter in the header search: its results in the panel, in place of any other.
   const openSearch = () => {
+    if (profileKeeps()) return;
     setPanel(null);
     setProfile(null);
     setConsultId(null);
     setSearchOpen(true);
   };
+  // A thread or an agent's page in the column's place: its toggle closes that and shows the column.
+  const toggleColumn = (column: { open: boolean; toggle: () => void }) => {
+    if (!panel && !profile) return column.toggle();
+    if (profileKeeps()) return;
+    setPanel(null);
+    setProfile(null);
+    if (!column.open) column.toggle();
+  };
+  const side: DmSideControl | null =
+    agentDm && dmAgent
+      ? {
+          open: !panel && !profile && dmSidebar.open,
+          docked: !panel && !profile && dmSidebar.column,
+          toggle: () => toggleColumn(dmSidebar),
+        }
+      : null;
   // It takes over from the conversation's skeleton (`ChannelSkeleton`): no second entrance of the whole view.
   const [continues] = useState(skeletonOnScreen);
 
   return (
     // A thread inside the panel opens profiles in its channel's panel, not inside itself.
     <AgentPanelContext.Provider value={chrome?.panel ? outerPanel : openAgentPanel}>
-      <ChannelActionsContext.Provider value={actions}>
-        <ChannelThreadsContext.Provider value={threadsView}>
-          {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
+      <MessageLookContext.Provider value={look}>
+        <ChannelActionsContext.Provider value={actions}>
+          <ChannelThreadsContext.Provider value={threadsView}>
+            {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
             are a left-aligned team chat. */}
-          <Tag
-            className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}
-            data-continues={continues || undefined}
-          >
-            {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
-            {chrome?.header ? (
-              <AgentTasksContext.Provider value={tasksControl}>
-                {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch }) : chrome.header}
-              </AgentTasksContext.Provider>
-            ) : (
-              <ChannelHeader
-                channel={channel}
-                isMember={isMember}
-                queueMachine={queueMachine}
-                people={channelPeople}
-                agents={channelAgents}
-                // A thread in the members' place: the toggle closes it and shows the members.
-                membersOpen={!panel && membersColumn.open}
-                onMembers={
-                  panel
-                    ? () => {
-                        setPanel(null);
-                        if (!membersColumn.open) membersColumn.toggle();
-                      }
-                    : membersColumn.toggle
-                }
-                onDetails={() => setDetailsOpen(true)}
-                onSearch={openSearch}
-              />
-            )}
-            {/* Under the header: the conversation, and the members beside it (the header spans both, as Discord's). */}
-            <div className="channel__body">
-              <div className="channel__col">
-                {isMember && (
-                  <ChannelPinnedBar
-                    channelId={channel.id}
-                    channelName={chrome ? undefined : channel.name}
-                    threadId={thread?.id}
-                  />
-                )}
-                {!chrome && isMember && arriving && (
-                  <ArrivalCard channel={channel} onSayHi={() => composer.current?.focus()} onClose={arrival.close} />
-                )}
-                {!chrome && isMember && !arriving && (
-                  <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
-                )}
+            <Tag
+              className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}
+              data-continues={continues || undefined}
+            >
+              {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
+              {chrome?.header ? (
+                <AgentTasksContext.Provider value={tasksControl}>
+                  <AgentPanelShownContext.Provider value={profile?.agentId ?? null}>
+                    {typeof chrome.header === "function"
+                      ? chrome.header({ onSearch: openSearch, side })
+                      : chrome.header}
+                  </AgentPanelShownContext.Provider>
+                </AgentTasksContext.Provider>
+              ) : (
+                <ChannelHeader
+                  channel={channel}
+                  isMember={isMember}
+                  queueMachine={queueMachine}
+                  people={channelPeople}
+                  agents={channelAgents}
+                  membersOpen={!panel && !profile && membersColumn.open}
+                  onMembers={() => toggleColumn(membersColumn)}
+                  onDetails={() => setDetailsOpen(true)}
+                  onSearch={openSearch}
+                />
+              )}
+              {/* Under the header: the conversation, and the members beside it (the header spans both, as Discord's). */}
+              <div className="channel__body">
+                <div className="channel__col">
+                  {isMember && (
+                    <ChannelPinnedBar
+                      channelId={channel.id}
+                      channelName={chrome ? undefined : channel.name}
+                      threadId={thread?.id}
+                    />
+                  )}
+                  {!chrome && isMember && arriving && (
+                    <ArrivalCard channel={channel} onSayHi={() => composer.current?.focus()} onClose={arrival.close} />
+                  )}
+                  {!chrome && isMember && !arriving && (
+                    <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
+                  )}
 
-                {!isMember ? (
-                  <div className="channel__empty">
-                    <EmptyState
-                      icon="channel"
-                      title={t("channel.notMemberTitle")}
-                      actions={
-                        <Button
-                          variant="primary"
-                          onClick={() => join.mutate()}
-                          disabled={join.isPending}
-                          loading={join.isPending}
-                        >
-                          {t("channel.join", { channel: channel.name })}
-                        </Button>
-                      }
-                    >
-                      {t("channel.notMemberText")}
-                    </EmptyState>
-                  </div>
-                ) : (
-                  <>
-                    {olderState === "loading" && (
-                      <div className="channel__older" role="status">
-                        <span className="channel__older-pill">
-                          <Spinner size={14} />
-                          {t("channel.loadingOlder")}
-                        </span>
-                      </div>
-                    )}
-                    {olderState !== "loading" && <DatePill scroller={scroller} ref={datePill} />}
-                    <RowsProvider asks={askRegistry} stop={stopTarget?.runId} drawn={rowDrawn}>
-                      <section
-                        ref={scroller}
-                        className="channel__messages"
-                        data-fresh={fresh || undefined}
-                        aria-label={t("channel.messages")}
-                        aria-live="polite"
-                        aria-relevant="additions"
-                        onWheel={(e) => {
-                          markScrollGesture();
-                          if (e.deltaY < 0) {
-                            markUpGesture();
-                            letGo();
-                          } else markGesture();
-                        }}
-                        onTouchMove={() => {
-                          markScrollGesture();
-                          markUpGesture();
-                        }}
-                        // On the list itself, not on a row: its scrollbar.
-                        onPointerDown={(e) => (e.target === e.currentTarget ? markUpGesture() : markGesture())}
-                        onKeyDown={(e) => (isScrollUpKey(e) ? markUpGesture() : markGesture())}
-                        onScroll={(e) => {
-                          const previousTop = lastScrollTop.current;
-                          lastScrollTop.current = e.currentTarget.scrollTop;
-                          measureFar(e.currentTarget);
-                          // Only the person scrolling unpins (or loads older pages); layout changes never do.
-                          const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
-                          // A drag selecting text past the top edge scrolls up too: the person is reading.
-                          const upByPerson =
-                            Date.now() - lastUpGesture.current < GESTURE_MS ||
-                            (byPerson && selectingIn(e.currentTarget));
-                          if (byPerson) datePill.current?.poke();
-                          if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
-                          if (upByPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
-                            letGo();
-                            return;
-                          }
-                          const near = nearBottom(e.currentTarget);
-                          if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
-                          // Pinned again only when the person comes back down, not by layout.
-                          const movedDown = previousTop !== null && e.currentTarget.scrollTop > previousTop;
-                          if (near && !stick.current && !(byPerson && movedDown)) return;
-                          stick.current = near;
-                          if (near) clearUnseen();
-                          // The person reached the end by themselves: the answer was read, the hold is over.
-                          if (near && byPerson) {
-                            markRead();
-                            if (holdingRef.current) setHold(false);
-                          }
-                        }}
+                  {!isMember ? (
+                    <div className="channel__empty">
+                      <EmptyState
+                        icon="channel"
+                        title={t("channel.notMemberTitle")}
+                        actions={
+                          <Button
+                            variant="primary"
+                            onClick={() => join.mutate()}
+                            disabled={join.isPending}
+                            loading={join.isPending}
+                          >
+                            {t("channel.join", { channel: channel.name })}
+                          </Button>
+                        }
                       >
-                        {/* Pushes short channels down, next to the composer. */}
-                        <div className="channel__spacer" aria-hidden="true" />
-                        {chrome?.top}
-                        {chrome?.intro}
-                        {messages.isLoading && <LoadingConversation />}
-                        {messages.isError && !messages.data && (
-                          <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
-                        )}
-                        {serverRead &&
-                          timeline.length === 0 &&
-                          slots.length === 0 &&
-                          !thread &&
-                          !adjusting &&
-                          !chrome?.intro && (
-                            <div className="channel__empty">
-                              <EmptyState
-                                icon="message"
-                                // A DM with an agent: the light sky, like the other empty screens about agents.
-                                sky={Boolean(chrome?.dmAgentId)}
-                                title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
-                                actions={
-                                  emptySuggestions.length > 0 ? (
-                                    <fieldset className="channel__suggestions">
-                                      <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
-                                      {emptySuggestions.map((s) => (
-                                        <Button
-                                          key={s.text}
-                                          size="sm"
-                                          onClick={() => {
-                                            setDraft(s.text);
-                                            composer.current?.focus();
-                                          }}
-                                        >
-                                          {s.label}
-                                        </Button>
-                                      ))}
-                                    </fieldset>
-                                  ) : undefined
-                                }
-                              >
-                                {chrome?.emptyText}
-                              </EmptyState>
-                            </div>
+                        {t("channel.notMemberText")}
+                      </EmptyState>
+                    </div>
+                  ) : (
+                    <>
+                      {olderState === "loading" && (
+                        <div className="channel__older" role="status">
+                          <span className="channel__older-pill">
+                            <Spinner size={14} />
+                            {t("channel.loadingOlder")}
+                          </span>
+                        </div>
+                      )}
+                      {olderState !== "loading" && <DatePill scroller={scroller} ref={datePill} />}
+                      <RowsProvider asks={askRegistry} stop={stopTarget?.runId} drawn={rowDrawn}>
+                        <section
+                          ref={scroller}
+                          className="channel__messages"
+                          data-look={look.style}
+                          data-fresh={fresh || undefined}
+                          aria-label={t("channel.messages")}
+                          aria-live="polite"
+                          aria-relevant="additions"
+                          onWheel={(e) => {
+                            markScrollGesture();
+                            if (e.deltaY < 0) {
+                              markUpGesture();
+                              letGo();
+                            } else markGesture();
+                          }}
+                          onTouchMove={() => {
+                            markScrollGesture();
+                            markUpGesture();
+                          }}
+                          // On the list itself, not on a row: its scrollbar.
+                          onPointerDown={(e) => (e.target === e.currentTarget ? markUpGesture() : markGesture())}
+                          onKeyDown={(e) => (isScrollUpKey(e) ? markUpGesture() : markGesture())}
+                          onScroll={(e) => {
+                            const previousTop = lastScrollTop.current;
+                            lastScrollTop.current = e.currentTarget.scrollTop;
+                            measureFar(e.currentTarget);
+                            // Only the person scrolling unpins (or loads older pages); layout changes never do.
+                            const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
+                            // A drag selecting text past the top edge scrolls up too: the person is reading.
+                            const upByPerson =
+                              Date.now() - lastUpGesture.current < GESTURE_MS ||
+                              (byPerson && selectingIn(e.currentTarget));
+                            if (byPerson) datePill.current?.poke();
+                            if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
+                            if (upByPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
+                              letGo();
+                              return;
+                            }
+                            const near = nearBottom(e.currentTarget);
+                            if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
+                            // Pinned again only when the person comes back down, not by layout.
+                            const movedDown = previousTop !== null && e.currentTarget.scrollTop > previousTop;
+                            if (near && !stick.current && !(byPerson && movedDown)) return;
+                            stick.current = near;
+                            if (near) clearUnseen();
+                            // The person reached the end by themselves: the answer was read, the hold is over.
+                            if (near && byPerson) {
+                              markRead();
+                              if (holdingRef.current) setHold(false);
+                            }
+                          }}
+                        >
+                          {/* Pushes short channels down, next to the composer. */}
+                          <div className="channel__spacer" aria-hidden="true" />
+                          {chrome?.top}
+                          {chrome?.intro}
+                          {messages.isLoading && <LoadingConversation />}
+                          {messages.isError && !messages.data && (
+                            <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
                           )}
-                        {adjustThreadId ? (
-                          <RangeRows
-                            adjust={adjust}
-                            scroller={scroller}
-                            renderMessage={(m) => (
-                              <ErrorBoundary resetKey={m} fallback={unshownLine}>
-                                <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
-                              </ErrorBoundary>
+                          {serverRead &&
+                            timeline.length === 0 &&
+                            slots.length === 0 &&
+                            !thread &&
+                            !adjusting &&
+                            !chrome?.intro && (
+                              <div className="channel__empty">
+                                <EmptyState
+                                  icon="message"
+                                  // A DM with an agent: the light sky, like the other empty screens about agents.
+                                  sky={Boolean(chrome?.dmAgentId)}
+                                  title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
+                                  actions={
+                                    emptySuggestions.length > 0 ? (
+                                      <fieldset className="channel__suggestions">
+                                        <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
+                                        {emptySuggestions.map((s) => (
+                                          <Button
+                                            key={s.text}
+                                            size="sm"
+                                            onClick={() => {
+                                              setDraft(s.text);
+                                              composer.current?.focus();
+                                            }}
+                                          >
+                                            {s.label}
+                                          </Button>
+                                        ))}
+                                      </fieldset>
+                                    ) : undefined
+                                  }
+                                >
+                                  {chrome?.emptyText}
+                                </EmptyState>
+                              </div>
                             )}
-                          />
+                          {adjustThreadId ? (
+                            <RangeRows
+                              adjust={adjust}
+                              scroller={scroller}
+                              renderMessage={(m) => (
+                                <ErrorBoundary resetKey={m} fallback={unshownLine}>
+                                  <TimelineMessage
+                                    message={m}
+                                    grouped={false}
+                                    entering={false}
+                                    modelLabels={NO_LABELS}
+                                  />
+                                </ErrorBoundary>
+                              )}
+                            />
+                          ) : (
+                            <>
+                              <Timeline
+                                items={timeline}
+                                ready={serverRead}
+                                slots={slots}
+                                runKeys={runKeys.current}
+                                divider={divider}
+                                channelId={channel.id}
+                                runVisible={runVisible}
+                                dmPersonId={thread ? undefined : chrome?.dmPersonId}
+                                consultGroups={consultGroups}
+                                seenId={thread ? null : seenId}
+                              />
+                              {/* A thread's root is on screen from the channel: only its replies are loading. */}
+                              {thread && messages.isPlaceholderData && thread.replyCount > 0 && (
+                                <LoadingConversation count={Math.min(thread.replyCount, 6)} />
+                              )}
+                              {!thread && (
+                                <ArchivedThreadsNote
+                                  channelId={channel.id}
+                                  count={archivedThreads.data?.threads.length ?? 0}
+                                />
+                              )}
+                            </>
+                          )}
+                          {ephemeral && (
+                            <MissionEphemeral
+                              kind={ephemeral.kind}
+                              missionId={ephemeral.missionId}
+                              onClose={() => setEphemeral(null)}
+                            />
+                          )}
+                          <LiveMemoryCards channelId={channel.id} />
+                          <LiveNotices channelId={channel.id} />
+                        </section>
+                      </RowsProvider>
+                      <ToLatest
+                        shown={!adjustThreadId && (far || pillOn)}
+                        count={unseenSummary.count}
+                        mentionsMe={unseenSummary.mentionsMe}
+                        label={
+                          pillText.length > 0
+                            ? t("channel.newPill.label", { text: pillText.join(" · ") })
+                            : t("channel.toLatest")
+                        }
+                        onClick={() => toBottom(true)}
+                      />
+                      {holding && (
+                        <div className="channel__pill">
+                          <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
+                            <Icon name="chevronDown" size={16} />
+                            {t("channel.endOfReply")}
+                          </Button>
+                        </div>
+                      )}
+                      <div className="channel__composer">
+                        <ConnectionBanner status={status} />
+                        {!chrome?.intro && (
+                          <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
+                        )}
+                        <ActivityBar
+                          channelId={channel.id}
+                          threadId={thread?.id ?? null}
+                          visible={runVisible}
+                          outOfView={outOfView}
+                          onSee={seeRun}
+                          asks={asksOut}
+                          onSeeAsk={seeAsk}
+                          stoppable={stopTarget?.runId}
+                          consultBlocks={consultGroups.nearEnd}
+                        />
+                        {adjustThreadId ? (
+                          <RangeBar adjust={adjust} />
+                        ) : chrome?.composerReplacement ? (
+                          chrome.composerReplacement
+                        ) : channel.can?.post === false ? (
+                          // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
+                          <p className="channel__notice channel__readonly ac-iconline" role="status">
+                            <Icon name="lock" size={16} />
+                            <span>{t("channel.perms.readOnlyComposer")}</span>
+                          </p>
                         ) : (
                           <>
-                            <Timeline
-                              items={timeline}
-                              ready={serverRead}
-                              slots={slots}
-                              runKeys={runKeys.current}
-                              divider={divider}
-                              channelId={channel.id}
-                              runVisible={runVisible}
-                              dmPersonId={thread ? undefined : chrome?.dmPersonId}
-                              consultGroups={consultGroups}
-                              seenId={thread ? null : seenId}
+                            <Composer
+                              attachments={
+                                files.length > 0
+                                  ? files.map((f) => (
+                                      <ComposerFile
+                                        key={f.key}
+                                        name={f.name}
+                                        icon={f.icon}
+                                        preview={f.preview}
+                                        detail={formatBytes(i18n.language, f.size)}
+                                        status={f.status}
+                                        statusLabel={
+                                          f.status === "uploading"
+                                            ? t("channel.uploading")
+                                            : f.status === "failed"
+                                              ? t("channel.uploadFailed")
+                                              : undefined
+                                        }
+                                        removeLabel={t("channel.removeFile", { name: f.name })}
+                                        onRemove={() => dropFiles((x) => x.key !== f.key)}
+                                      />
+                                    ))
+                                  : undefined
+                              }
+                              onFiles={chrome?.locked ? undefined : addFiles}
+                              canSendEmpty={attached.length > 0}
+                              sendBlocked={uploading}
+                              format={formatLabels}
+                              emoji={mediaTabs ? { ...emojiLabels, button: mediaTabs.button } : emojiLabels}
+                              pickerTabs={mediaTabs?.tabs}
+                              pickerLabels={mediaTabs?.labels}
+                              id={`composer-${thread?.id ?? channel.id}`}
+                              textareaRef={composer}
+                              keepsEsc={Boolean(stopTarget) && !chrome?.panel}
+                              value={draft}
+                              onChange={(v) => {
+                                setDraft(v);
+                                if (v.trim()) sendTyping(v);
+                              }}
+                              onSend={onSend}
+                              working={chrome?.locked ? null : working}
+                              choice={choice}
+                              voice={voice}
+                              disabled={Boolean(chrome?.locked)}
+                              label={
+                                chrome?.composerLabel ??
+                                (chrome?.composerTarget
+                                  ? t("channel.composerDm", { name: chrome.composerTarget })
+                                  : t("channel.composerLabel", { channel: channel.name }))
+                              }
+                              placeholder={
+                                // DMs name the person or agent ("Mensagem para Theo"); channels keep "#nome".
+                                chrome?.composerLabel ??
+                                (chrome?.composerTarget
+                                  ? t("channel.composerDm", { name: chrome.composerTarget })
+                                  : t("channel.composerPlaceholder", { channel: channel.name }))
+                              }
+                              sendLabel={t("channel.send")}
+                              sendText={t("channel.send")}
+                              attachLabel={t("channel.attach")}
+                              pills={composerPills}
+                              inlinePills={agentDm}
+                              links={{
+                                listLabel: t("wiki.editor.suggest"),
+                                search: (q) =>
+                                  (wikiPages.data ?? [])
+                                    .filter((p) => p.title.toLowerCase().includes(q.trim().toLowerCase()))
+                                    .slice(0, 8)
+                                    .map((p) => ({
+                                      key: `wiki:${p.slug}`,
+                                      insert: p.title,
+                                      label: p.title,
+                                      description: p.folder || undefined,
+                                      leading: <Icon name="book" size={16} />,
+                                    })),
+                              }}
+                              commands={
+                                commands.length > 0 ? { listLabel: t("composer.commands"), list: commands } : undefined
+                              }
+                              channels={{ search: channelSearch, listLabel: t("channelRefs.list") }}
+                              mentions={{
+                                search: mentionSearch,
+                                listLabel: t("mentions.list"),
+                                onPick: (item) => {
+                                  if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
+                                },
+                              }}
                             />
-                            {/* A thread's root is on screen from the channel: only its replies are loading. */}
-                            {thread && messages.isPlaceholderData && thread.replyCount > 0 && (
-                              <LoadingConversation count={Math.min(thread.replyCount, 6)} />
+                            {offer && (
+                              <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
                             )}
-                            {!thread && (
-                              <ArchivedThreadsNote
-                                channelId={channel.id}
-                                count={archivedThreads.data?.threads.length ?? 0}
-                              />
+                            <KeyGuardDialog
+                              ask={keyAsk}
+                              onClose={() => setKeyAsk(null)}
+                              onSend={() => {
+                                setKeyAsk(null);
+                                if (keyAsk) onSend(keyAsk.text, { interrupt: keyAsk.interrupt, keyChecked: true });
+                              }}
+                              onEdit={(text) => {
+                                setKeyAsk(null);
+                                setDraft(text);
+                                composer.current?.focus();
+                              }}
+                            />
+                            {chrome?.composerNote && !chrome.locked && (
+                              <p className="ac-composer__hint">{chrome.composerNote}</p>
+                            )}
+                            {chrome?.locked && (
+                              <p className="ac-composer__hint">
+                                {chrome.locked} {chrome.lockedAction}
+                              </p>
                             )}
                           </>
                         )}
-                        {ephemeral && (
-                          <MissionEphemeral
-                            kind={ephemeral.kind}
-                            missionId={ephemeral.missionId}
-                            onClose={() => setEphemeral(null)}
-                          />
-                        )}
-                        <LiveMemoryCards channelId={channel.id} />
-                        <LiveNotices channelId={channel.id} />
-                      </section>
-                    </RowsProvider>
-                    <ToLatest
-                      shown={!adjustThreadId && (far || pillOn)}
-                      count={unseenSummary.count}
-                      mentionsMe={unseenSummary.mentionsMe}
-                      label={
-                        pillText.length > 0
-                          ? t("channel.newPill.label", { text: pillText.join(" · ") })
-                          : t("channel.toLatest")
-                      }
-                      onClick={() => toBottom(true)}
-                    />
-                    {holding && (
-                      <div className="channel__pill">
-                        <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
-                          <Icon name="chevronDown" size={16} />
-                          {t("channel.endOfReply")}
-                        </Button>
                       </div>
-                    )}
-                    <div className="channel__composer">
-                      <ConnectionBanner status={status} />
-                      {!chrome?.intro && (
-                        <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
-                      )}
-                      <ActivityBar
-                        channelId={channel.id}
-                        threadId={thread?.id ?? null}
-                        visible={runVisible}
-                        outOfView={outOfView}
-                        onSee={seeRun}
-                        asks={asksOut}
-                        onSeeAsk={seeAsk}
-                        stoppable={stopTarget?.runId}
-                        consultBlocks={consultGroups.nearEnd}
-                      />
-                      {adjustThreadId ? (
-                        <RangeBar adjust={adjust} />
-                      ) : chrome?.composerReplacement ? (
-                        chrome.composerReplacement
-                      ) : channel.can?.post === false ? (
-                        // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
-                        <p className="channel__notice channel__readonly ac-iconline" role="status">
-                          <Icon name="lock" size={16} />
-                          <span>{t("channel.perms.readOnlyComposer")}</span>
-                        </p>
-                      ) : (
-                        <>
-                          <Composer
-                            attachments={
-                              files.length > 0
-                                ? files.map((f) => (
-                                    <ComposerFile
-                                      key={f.key}
-                                      name={f.name}
-                                      icon={f.icon}
-                                      preview={f.preview}
-                                      detail={formatBytes(i18n.language, f.size)}
-                                      status={f.status}
-                                      statusLabel={
-                                        f.status === "uploading"
-                                          ? t("channel.uploading")
-                                          : f.status === "failed"
-                                            ? t("channel.uploadFailed")
-                                            : undefined
-                                      }
-                                      removeLabel={t("channel.removeFile", { name: f.name })}
-                                      onRemove={() => dropFiles((x) => x.key !== f.key)}
-                                    />
-                                  ))
-                                : undefined
-                            }
-                            onFiles={chrome?.locked ? undefined : addFiles}
-                            canSendEmpty={attached.length > 0}
-                            sendBlocked={uploading}
-                            format={formatLabels}
-                            emoji={mediaTabs ? { ...emojiLabels, button: mediaTabs.button } : emojiLabels}
-                            pickerTabs={mediaTabs?.tabs}
-                            pickerLabels={mediaTabs?.labels}
-                            id={`composer-${thread?.id ?? channel.id}`}
-                            textareaRef={composer}
-                            value={draft}
-                            onChange={(v) => {
-                              setDraft(v);
-                              if (v.trim()) sendTyping(v);
-                            }}
-                            onSend={onSend}
-                            working={chrome?.locked ? null : working}
-                            choice={choice}
-                            voice={voice}
-                            disabled={Boolean(chrome?.locked)}
-                            label={
-                              chrome?.composerLabel ??
-                              (chrome?.composerTarget
-                                ? t("channel.composerDm", { name: chrome.composerTarget })
-                                : t("channel.composerLabel", { channel: channel.name }))
-                            }
-                            placeholder={
-                              // DMs name the person or agent ("Mensagem para Theo"); channels keep "#nome".
-                              chrome?.composerLabel ??
-                              (chrome?.composerTarget
-                                ? t("channel.composerDm", { name: chrome.composerTarget })
-                                : t("channel.composerPlaceholder", { channel: channel.name }))
-                            }
-                            sendLabel={t("channel.send")}
-                            sendText={t("channel.send")}
-                            attachLabel={t("channel.attach")}
-                            pills={composerPills}
-                            inlinePills={agentDm}
-                            links={{
-                              listLabel: t("wiki.editor.suggest"),
-                              search: (q) =>
-                                (wikiPages.data ?? [])
-                                  .filter((p) => p.title.toLowerCase().includes(q.trim().toLowerCase()))
-                                  .slice(0, 8)
-                                  .map((p) => ({
-                                    key: `wiki:${p.slug}`,
-                                    insert: p.title,
-                                    label: p.title,
-                                    description: p.folder || undefined,
-                                    leading: <Icon name="book" size={16} />,
-                                  })),
-                            }}
-                            commands={
-                              commands.length > 0 ? { listLabel: t("composer.commands"), list: commands } : undefined
-                            }
-                            channels={{ search: channelSearch, listLabel: t("channelRefs.list") }}
-                            mentions={{
-                              search: mentionSearch,
-                              listLabel: t("mentions.list"),
-                              onPick: (item) => {
-                                if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
-                              },
-                            }}
-                          />
-                          {offer && (
-                            <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
-                          )}
-                          <KeyGuardDialog
-                            ask={keyAsk}
-                            onClose={() => setKeyAsk(null)}
-                            onSend={() => {
-                              setKeyAsk(null);
-                              if (keyAsk) onSend(keyAsk.text, { interrupt: keyAsk.interrupt, keyChecked: true });
-                            }}
-                            onEdit={(text) => {
-                              setKeyAsk(null);
-                              setDraft(text);
-                              composer.current?.focus();
-                            }}
-                          />
-                          {chrome?.composerNote && !chrome.locked && (
-                            <p className="ac-composer__hint">{chrome.composerNote}</p>
-                          )}
-                          {chrome?.locked && (
-                            <p className="ac-composer__hint">
-                              {chrome.locked} {chrome.lockedAction}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
 
-                {!chrome?.header && (
-                  <ChannelDetails
-                    open={detailsOpen}
-                    onOpenChange={(open) => {
-                      setDetailsOpen(open);
-                      if (!open) setAddFirst(false);
-                    }}
-                    channel={channel}
-                    startAdding={addFirst}
+                  {!chrome?.header && (
+                    <ChannelDetails
+                      open={detailsOpen}
+                      onOpenChange={(open) => {
+                        setDetailsOpen(open);
+                        if (!open) setAddFirst(false);
+                      }}
+                      channel={channel}
+                      startAdding={addFirst}
+                    />
+                  )}
+                  {missionDraft !== null && (
+                    <NewMissionDialog
+                      open
+                      onOpenChange={(o) => !o && setMissionDraft(null)}
+                      initialGoal={missionDraft}
+                      initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
+                      initialAgentId={suggestedAgent?.id}
+                    />
+                  )}
+                </div>
+                {/* A thread or an agent's page opens in the members' place, wider, and gives it back when it closes; the
+                  channel stays in use beside it (a phone: a sheet over it). */}
+                {profile ? (
+                  <AgentPanel
+                    key={`${profile.agentId}:${profile.tab ?? ""}`}
+                    agentId={profile.agentId}
+                    tab={profile.tab}
+                    closeRequest={profile.close}
+                    onClose={closeProfile}
                   />
-                )}
-                {missionDraft !== null && (
-                  <NewMissionDialog
-                    open
-                    onOpenChange={(o) => !o && setMissionDraft(null)}
-                    initialGoal={missionDraft}
-                    initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
-                    initialAgentId={suggestedAgent?.id}
-                  />
+                ) : panel ? (
+                  <aside className="thread-panel thread-panel--docked" aria-label={t("threads.side.label")}>
+                    <ThreadPage
+                      key={`${panel.id}:${panel.focus ?? ""}`}
+                      threadId={panel.id}
+                      reply={panel.reply}
+                      focusMessageId={panel.focus}
+                      onClose={() => setPanel(null)}
+                      onSeeInChannel={(messageId, channelId) => {
+                        if (channelId !== channel.id) return false;
+                        setPanel(null);
+                        jumpTo(messageId);
+                        return true;
+                      }}
+                    />
+                  </aside>
+                ) : side && dmAgent && (side.docked || dmSidebar.sheet) ? (
+                  <AgentSidebar agent={dmAgent} onClose={dmSidebar.sheet ? dmSidebar.closeSheet : undefined} />
+                ) : (
+                  !chrome &&
+                  membersColumn.column && (
+                    <MembersColumn
+                      channel={channel}
+                      people={channelPeople}
+                      agents={channelAgents}
+                      {...(addsMembers ? { onAdd: addMembers } : {})}
+                    />
+                  )
                 )}
               </div>
-              {/* A thread opens in the members' place, wider, and gives it back when it closes; the channel stays in use
-                  beside it (a phone: a sheet over it). */}
-              {panel ? (
-                <aside className="thread-panel thread-panel--docked" aria-label={t("threads.side.label")}>
-                  <ThreadPage
-                    key={`${panel.id}:${panel.focus ?? ""}`}
-                    threadId={panel.id}
-                    reply={panel.reply}
-                    focusMessageId={panel.focus}
-                    onClose={() => setPanel(null)}
-                    onSeeInChannel={(messageId, channelId) => {
-                      if (channelId !== channel.id) return false;
-                      setPanel(null);
-                      jumpTo(messageId);
-                      return true;
-                    }}
-                  />
-                </aside>
-              ) : (
-                !chrome &&
-                membersColumn.column && (
-                  <MembersColumn
-                    channel={channel}
-                    people={channelPeople}
-                    agents={channelAgents}
-                    {...(addsMembers ? { onAdd: addMembers } : {})}
-                  />
-                )
+            </Tag>
+            {!chrome && membersColumn.sheet && (
+              <MembersSheet
+                channel={channel}
+                isMember={isMember}
+                people={channelPeople}
+                agents={channelAgents}
+                onDetails={() => {
+                  membersColumn.closeSheet();
+                  setDetailsOpen(true);
+                }}
+                {...(addsMembers
+                  ? {
+                      onAdd: () => {
+                        membersColumn.closeSheet();
+                        addMembers();
+                      },
+                    }
+                  : {})}
+                onClose={membersColumn.closeSheet}
+              />
+            )}
+            {/* Rows from more than the two people of a DM: they keep their names there too. */}
+            <MessageLookContext.Provider value={namedLook}>
+              {searchOpen && <SearchResultsPanel channelId={channel.id} onClose={() => setSearchOpen(false)} />}
+              {consultId && (
+                <ConsultationPanel
+                  key={consultId}
+                  channelId={channel.id}
+                  channelName={chrome?.composerTarget ? null : channel.name}
+                  consultationId={consultId}
+                  onClose={() => setConsultId(null)}
+                  onTalk={(handle) => {
+                    setConsultId(null);
+                    actions.insertMention(handle);
+                  }}
+                  onAnswer={() => {
+                    setConsultId(null);
+                    actions.focusComposer();
+                  }}
+                  renderMessage={(m, grouped) => (
+                    <ErrorBoundary resetKey={m} fallback={unshownLine}>
+                      <TimelineMessage
+                        message={m}
+                        grouped={grouped}
+                        entering={false}
+                        modelLabels={NO_LABELS}
+                        readOnly
+                      />
+                    </ErrorBoundary>
+                  )}
+                />
               )}
-            </div>
-          </Tag>
-          {!chrome && membersColumn.sheet && (
-            <MembersSheet
-              channel={channel}
-              isMember={isMember}
-              people={channelPeople}
-              agents={channelAgents}
-              onDetails={() => {
-                membersColumn.closeSheet();
-                setDetailsOpen(true);
-              }}
-              {...(addsMembers
-                ? {
-                    onAdd: () => {
-                      membersColumn.closeSheet();
-                      addMembers();
-                    },
-                  }
-                : {})}
-              onClose={membersColumn.closeSheet}
-            />
-          )}
-          {searchOpen && <SearchResultsPanel channelId={channel.id} onClose={() => setSearchOpen(false)} />}
-          {profile && (
-            <AgentPanel
-              key={`${profile.agentId}:${profile.tab ?? ""}`}
-              agentId={profile.agentId}
-              tab={profile.tab}
-              onClose={() => setProfile(null)}
-            />
-          )}
-          {consultId && (
-            <ConsultationPanel
-              key={consultId}
-              channelId={channel.id}
-              channelName={chrome?.composerTarget ? null : channel.name}
-              consultationId={consultId}
-              onClose={() => setConsultId(null)}
-              onTalk={(handle) => {
-                setConsultId(null);
-                actions.insertMention(handle);
-              }}
-              onAnswer={() => {
-                setConsultId(null);
-                actions.focusComposer();
-              }}
-              renderMessage={(m, grouped) => (
-                <ErrorBoundary resetKey={m} fallback={unshownLine}>
-                  <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
-                </ErrorBoundary>
-              )}
-            />
-          )}
-          {tasksOpen && tasksAgentId && (
-            <AgentTasksPanel
-              agentId={tasksAgentId}
-              channelId={channel.id}
-              tasks={agentTasks}
-              ended={taskView.data?.ended ?? []}
-              onClose={() => setTasksOpen(false)}
-            />
-          )}
-        </ChannelThreadsContext.Provider>
-      </ChannelActionsContext.Provider>
+            </MessageLookContext.Provider>
+            {tasksOpen && tasksAgentId && (
+              <AgentTasksPanel
+                agentId={tasksAgentId}
+                channelId={channel.id}
+                tasks={agentTasks}
+                ended={taskView.data?.ended ?? []}
+                onClose={() => setTasksOpen(false)}
+              />
+            )}
+          </ChannelThreadsContext.Provider>
+        </ChannelActionsContext.Provider>
+      </MessageLookContext.Provider>
     </AgentPanelContext.Provider>
   );
 }
@@ -2830,6 +2961,7 @@ function HeldBrowserRow({ place }: { place: HeldPlace }) {
     <Message
       agent
       stacked
+      bare
       avatar={<AgentAvatar agentId={place.agentId} name={name} state="idle" />}
       author={name}
       time={t("common.now")}
@@ -2969,6 +3101,7 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
             key={c.key}
             agent
             stacked
+            bare
             avatar={<AgentAvatar agentId={c.agentId} name={name} state="idle" />}
             author={name}
             time={t("common.now")}
@@ -3603,8 +3736,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
   const failedWhy = liveFailed ? runErrorText(t, live?.errorCode, live?.errorParams) : null;
-  // After "couldn't answer:", the sentence goes on: no capital, no final period.
-  const failedReason = failedWhy && lowerFirst(failedWhy.replace(/\.$/, ""), i18n.language);
   // Refused by the workspace's standing: its own words, not the server's English.
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
@@ -3705,8 +3836,15 @@ export const TimelineMessage = memo(function TimelineMessage({
   const via = m.author.type === "person" ? appVia(m.meta) : null;
   const myHandle = dir.memberById.get(me.user.id)?.handle?.toLowerCase();
   const mentionsMe =
-    !!myHandle && !(m.author.type === "person" && m.author.id === me.user.id) && mentionsHandle(body, myHandle);
+    !(m.author.type === "person" && m.author.id === me.user.id) && mentionsReader({ body, meta: m.meta }, myHandle);
   const renderMention = (handle: string, key: string) => {
+    // The mention of everyone: the reader's own word, marked as a mention of them.
+    if (isEveryoneMention(m.meta, handle))
+      return (
+        <Mention key={key} className="ac-mention--me">
+          @{everyoneWord(i18n.language)}
+        </Mention>
+      );
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
     if (!a && !p) return <Mention key={key}>@{handle}</Mention>;
@@ -3720,7 +3858,9 @@ export const TimelineMessage = memo(function TimelineMessage({
         label={t("profile.of", { name: shown })}
         className="profile-trigger--mention"
       >
-        <Mention className={isMe ? "ac-mention--me" : undefined}>@{shown}</Mention>
+        <Mention tone={dir.mentionTone(handle)} className={isMe ? "ac-mention--me" : undefined}>
+          @{shown}
+        </Mention>
       </ProfileTrigger>
     );
   };
@@ -3759,8 +3899,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   const replyRun = mediaAfter ? null : m.agentRunId;
   // "Responder": the message this one quotes.
   const quoted = useMemo(() => replyOf(m.meta) ?? replyContext ?? null, [m.meta, replyContext]);
-  // An agent opened a forum topic from here: the topic card with "Ver discussão".
-  const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
   // A mission's cards (ADR 0029): the plan, a decision, a review; a report says where it ran.
   const missionPlan = m.author.type === "agent" ? missionPlanOf(meta) : null;
   const missionDecision = m.author.type === "agent" && meta.missionDecision ? m : null;
@@ -3780,8 +3918,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   );
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.openThread !== undefined;
-  // An agent suggests a topic ("Vale um fórum?"): only a person opens it.
-  const forumSuggestion = m.author.type === "agent" ? forumSuggestionOf(meta) : null;
   // It asked other agents before answering: one row right before the reply, its run's questions (on the run's last
   // message here, or on its live row while it works) and the ones its `meta.consulted` names.
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
@@ -3820,7 +3956,6 @@ export const TimelineMessage = memo(function TimelineMessage({
     question ||
     secretRequest ||
     missionCard ||
-    forumSuggestion ||
     issueWork;
   const feedback = !readOnly && m.author.type === "agent" && !card && !m.local && !live && !mediaAfter;
   const menu = useMessageMenu(m, channelName ?? "", {
@@ -3842,6 +3977,27 @@ export const TimelineMessage = memo(function TimelineMessage({
   const keptSteps = keptFirst && keptWork ? keptWork.filter((w) => w !== keptFirst) : keptWork;
   // Said before a call and then posted as this message (the lead before a card): the body already shows it.
   const keptSaid = keptFirst?.kind === "say" && !holdsText(body, keptFirst.text) ? keptFirst : undefined;
+  // What's in a `MessageText`, for the bubbles: the name opens the first, the time ends the last (a row with none keeps
+  // them above its cards).
+  const liveWords = !liveFailed && Boolean(revealed);
+  const liveLead = !(wordsOnTop && liveWords) && Boolean(opening.said);
+  const leadShown = live ? liveLead : keptSaid?.kind === "say";
+  const bodyShown = live
+    ? liveWords
+    : !missionCard &&
+      // A request says its action itself ("Pedido de aprovação: …" would repeat it).
+      !approvalId &&
+      // A secret request's card names the key itself: its fallback text ("Theo asked for a key") is for pushes.
+      !secretRequest &&
+      !issueWork &&
+      !waitNotice &&
+      !noAi &&
+      !actionCard &&
+      // A question's card already says it: its own text isn't repeated above.
+      !(question && body.trim() === question.text.trim()) &&
+      !voice &&
+      !choiceReply &&
+      Boolean(body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media));
   // People see name, time and text; the date, model and tokens wait behind the time. An agent's sticker after its
   // reply carries the reply's run: its model and tokens are the reply's, never said twice.
   const usage = m.author.type === "agent" && !mediaAfter ? messageUsage(m) : null;
@@ -3873,6 +4029,8 @@ export const TimelineMessage = memo(function TimelineMessage({
         grouped={grouped && !waiting && !pair}
         own={own}
         run={run}
+        bare={waiting || !(leadShown || bodyShown)}
+        nameColor={dir.nameColorOf(m.author)}
         waiting={waiting}
         entering={entering && !replacesLive}
         streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
@@ -4004,28 +4162,30 @@ export const TimelineMessage = memo(function TimelineMessage({
           <Parts resetKey={m}>
             {/* The first thing it said opens the block, above its tools; with nothing said, its words stream on top. */}
             {/* Keyed like the saved message's parts: its text stays the same element when the message takes its place. */}
-            {wordsOnTop && !liveFailed && revealed ? (
+            {wordsOnTop && liveWords ? (
               <MessageText key="body">
                 <MessageBody
                   body={revealed}
                   resolveMention={dir.mentionName}
+                  mentionTone={dir.mentionTone}
                   live={!liveStopped}
                   accent={colorOf(agent)}
                 />
               </MessageText>
             ) : (
               opening.said && (
-                <MessageText key="said">
-                  <MessageBody body={opening.said} resolveMention={dir.mentionName} />
+                <MessageText key="said" closes={!liveWords}>
+                  <MessageBody body={opening.said} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
                 </MessageText>
               )
             )}
             {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
-            {!liveFailed && revealed && !wordsOnTop && (
-              <MessageText key="body">
+            {liveWords && !wordsOnTop && (
+              <MessageText key="body" opens={!liveLead}>
                 <MessageBody
                   body={revealed}
                   resolveMention={dir.mentionName}
+                  mentionTone={dir.mentionTone}
                   live={!liveStopped}
                   accent={colorOf(agent)}
                 />
@@ -4037,15 +4197,13 @@ export const TimelineMessage = memo(function TimelineMessage({
                   <Icon name="alert" size={16} />
                   {/* A known code is said in words; the stored error (a computer's code) only on hover. */}
                   <span title={!refusal && failedWhy ? live.error : undefined}>
-                    {refusal
-                      ? t("channel.runRefused", { agent: name, reason: refusal })
-                      : live.errorCode === "run.computer_busy"
-                        ? t("channel.runBusy", { agent: name })
-                        : failedWhy || live.error
-                          ? t("channel.runFailed", { agent: name, reason: failedReason || live.error })
-                          : t("channel.runFailedNoReason", { agent: name })}
+                    {runFailureLine(t, name, { code: live.errorCode, params: live.errorParams }, i18n.language) ??
+                      (live.error
+                        ? t("channel.runFailed", { agent: name, reason: live.error })
+                        : t("channel.runFailedNoReason", { agent: name }))}
                   </span>
                 </p>
+                {live.agentId && <FailedRunFix code={live.errorCode} agentId={live.agentId} />}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -4078,55 +4236,42 @@ export const TimelineMessage = memo(function TimelineMessage({
         ) : (
           <Parts resetKey={m}>
             {keptSaid?.kind === "say" && (
-              <MessageText key="said">
-                <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
+              <MessageText key="said" closes={!bodyShown}>
+                <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
               </MessageText>
             )}
             {routine && report && reportOpen && <RoutineReport text={report} />}
             {quoted && <QuotedMessage reply={quoted} />}
-            {!missionCard &&
-              // A request says its action itself ("Pedido de aprovação: …" would repeat it).
-              !approvalId &&
-              // A secret request's card names the key itself: its fallback text ("Theo asked for a key") is for pushes.
-              !secretRequest &&
-              !forumSuggestion &&
-              !issueWork &&
-              !waitNotice &&
-              !noAi &&
-              !actionCard &&
-              // A question's card already says it: its own text isn't repeated above.
-              !(question && body.trim() === question.text.trim()) &&
-              !voice &&
-              !choiceReply &&
-              (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
-                <MessageText key="body" style={workOver ? { opacity: 0.6 } : undefined}>
-                  <MessageBody
-                    body={talk ? talk.lead : body}
-                    resolveMention={dir.mentionName}
-                    renderMention={renderMention}
-                    wikiLink={wikiLink}
-                    channelRefs={channelRefsOf(m.meta)}
-                    accent={colorOf(agent)}
-                    pinFrom={
-                      m.author.type === "agent" && m.author.id && !m.local && !readOnly
-                        ? { messageId: m.id, agentId: m.author.id }
-                        : null
-                    }
-                  />
-                  {talk && openThread && (
-                    <button
-                      type="button"
-                      className="msg-talk__more"
-                      aria-pressed={threadsView?.open === talkThread}
-                      onClick={() => openThread(talkThread)}
-                    >
-                      {t("chat.talk.readAll")}
-                      <span className="msg-talk__count">{t("chat.talk.more", { count: talk.more })}</span>
-                      <Icon name="chevronRight" size={14} />
-                    </button>
-                  )}
-                </MessageText>
-              )}
+            {bodyShown && (
+              <MessageText key="body" opens={!leadShown} style={workOver ? { opacity: 0.6 } : undefined}>
+                <MessageBody
+                  body={talk ? talk.lead : body}
+                  resolveMention={dir.mentionName}
+                  mentionTone={dir.mentionTone}
+                  renderMention={renderMention}
+                  wikiLink={wikiLink}
+                  channelRefs={channelRefsOf(m.meta)}
+                  accent={colorOf(agent)}
+                  pinFrom={
+                    m.author.type === "agent" && m.author.id && !m.local && !readOnly
+                      ? { messageId: m.id, agentId: m.author.id }
+                      : null
+                  }
+                />
+                {talk && openThread && (
+                  <button
+                    type="button"
+                    className="msg-talk__more"
+                    aria-pressed={threadsView?.open === talkThread}
+                    onClick={() => openThread(talkThread)}
+                  >
+                    {t("chat.talk.readAll")}
+                    <span className="msg-talk__count">{t("chat.talk.more", { count: talk.more })}</span>
+                    <Icon name="chevronRight" size={14} />
+                  </button>
+                )}
+              </MessageText>
+            )}
             {choiceReply && (
               <p className="choice-reply">
                 <Icon name="check" size={14} />
@@ -4201,7 +4346,6 @@ export const TimelineMessage = memo(function TimelineMessage({
                 enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
               />
             )}
-            {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
             {missionPlan && <MissionPlanCard plan={missionPlan} />}
             {missionReview && <MissionReviewCard message={missionReview} />}
             {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
@@ -4251,6 +4395,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
             {noAi && <NoAiCard message={m} />}
             {actionCard && <ActionCard message={m} />}
+            {m.author.type === "agent" && !m.local && m.meta?.replyChips ? <ReplyChips message={m} /> : null}
             {usageWait?.closed ? (
               <UsageWaitClosed message={m} wait={{ ...usageWait, closed: usageWait.closed }} />
             ) : (
@@ -4259,7 +4404,6 @@ export const TimelineMessage = memo(function TimelineMessage({
             {question && <QuestionCard question={question} />}
             {secretRequest && <SecretCard request={secretRequest} />}
             {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
-            {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
             {missionDecision && <MissionDecisionCard message={missionDecision} />}
             {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
             {missionCommand && <MissionCommandCard command={missionCommand} />}
@@ -4914,7 +5058,7 @@ function AddMembersDialog({
       setSelected(new Set());
     }
   }, [open]);
-  const rows = useMemberRows(q, exclude);
+  const rows = useMemberRows(q, exclude, undefined, { channel: true });
   // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
   const invite = useInviteOffer(q);
   const inviteDialog = useInviteDialog();

@@ -1,7 +1,7 @@
 import type { DashboardSummary } from "@agenteschat/client";
 import { dashboardGroups, useDashboards, useMembers } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Button, Icon } from "@agenteschat/ui";
+import { Button, Icon, PageHeader } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -46,15 +46,15 @@ export function DashboardsPage() {
   );
   return (
     <div className="page page--list dashboards">
-      <header className="list-head">
-        <div>
-          <h1>{t("dashboards.title")}</h1>
-          <p className="list-head__sub">{t("dashboards.subtitle")}</p>
-        </div>
-        <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-          {t("dashboards.new")}
-        </Button>
-      </header>
+      <PageHeader
+        title={t("dashboards.title")}
+        meta={t("dashboards.subtitle")}
+        actions={
+          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+            {t("dashboards.new")}
+          </Button>
+        }
+      />
       {list.isLoading && <LoadingCards count={3} />}
       {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
       {list.data && (

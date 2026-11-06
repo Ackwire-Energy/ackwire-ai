@@ -35,17 +35,17 @@ describe("an agent seen from outside its audience", () => {
     expect(ask.getAttribute("href")).toBe(`/org/${ORG_ID}/dm/person/u-joao`);
   });
 
-  test("the Team card leaves out what it does and can do, and offers to ask for access", async () => {
+  test("Equipe's map card leaves out what it does and opens its public card, which offers to ask for access", async () => {
     await renderApp(`/org/${ORG_ID}/team`, { api: createFakeApi(outside()) });
     await settle(4);
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    await act(async () => fireEvent.click(within(sky).getByRole("button", { name: "Ada, ver detalhes" })));
+    await act(async () => fireEvent.click(screen().getByRole("radio", { name: "Mapa" })));
     await settle(2);
-    const card = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    expect(card.textContent).not.toContain("tabela 4");
-    expect(card.querySelectorAll(".ac-chip")).toHaveLength(0);
-    expect(within(card).getByRole("link", { name: "Pedir acesso" })).toBeTruthy();
-    expect(within(card).queryByRole("link", { name: "Editar" })).toBeNull();
+    const link = screen().getAllByRole("link", { name: /^Ada/ })[0];
+    const card = link?.closest(".team-map__card");
+    expect(card).toBeTruthy();
+    expect(card?.textContent).not.toContain("tabela 4");
+    expect(card?.querySelector(".team-map__does")).toBeNull();
+    expect(link?.getAttribute("href")).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
   });
 });
 

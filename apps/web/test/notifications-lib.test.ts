@@ -117,13 +117,12 @@ describe("grouping and order", () => {
     ]);
   });
 
-  test("waiting: an agent's question, then my turn at the table, then an approval", () => {
+  test("waiting: an agent's question, then an approval", () => {
     const list = sortWaiting([
       notification({ id: "ap", kind: "approval", waiting: true }),
-      notification({ id: "f", kind: "forum_turn", waiting: true }),
       notification({ id: "q", kind: "agent_question", waiting: true }),
     ]);
-    expect(list.map((n) => n.id)).toEqual(["q", "f", "ap"]);
+    expect(list.map((n) => n.id)).toEqual(["q", "ap"]);
   });
 
   test("a thread with several replies (or an issue with several comments) expands", () => {
@@ -152,10 +151,6 @@ describe("answering and opening", () => {
     expect(replyTarget(notification({ id: "1", kind: "agent_question", source: { questionId: "q" } }))).toEqual({
       kind: "question",
       questionId: "q",
-    });
-    expect(replyTarget(notification({ id: "2", kind: "forum_turn", source: { topicId: "t" } }))).toEqual({
-      kind: "forum",
-      topicId: "t",
     });
     expect(replyTarget(notification({ id: "3", kind: "issue_comment", source: { issueId: "i" } }))).toEqual({
       kind: "issue",
@@ -205,10 +200,6 @@ describe("answering and opening", () => {
     expect(openTarget(notification({ id: "4", kind: "issue_assigned", source: { issueNumber: 131 } }))).toEqual({
       to: "/org/$orgId/issues/$number",
       params: { number: "131" },
-    });
-    expect(openTarget(notification({ id: "5", kind: "forum_turn", source: { topicId: "t" } }))).toEqual({
-      to: "/org/$orgId/forum/$topicId",
-      params: { topicId: "t" },
     });
     expect(openTarget(notification({ id: "6", kind: "approval", source: { approvalId: "a" } }))).toEqual({
       to: "/org/$orgId/approvals",

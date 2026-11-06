@@ -130,12 +130,12 @@ export function ThreadLineBody({
         </span>
       )}
       {at && (
-        <>
+        <span className="thread-line__when">
           <span className="thread-line__dot" aria-hidden="true">
             ·
           </span>
           <time dateTime={at}>{relativeTime(t, i18n.language, at)}</time>
-        </>
+        </span>
       )}
     </>
   );

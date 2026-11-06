@@ -10,6 +10,7 @@
     "./pt-BR": "./src/pt-BR.ts",
     "./en": "./src/en.ts",
     "./locale": "./src/locale.ts",
+    "./everyone": "./src/everyone.ts",
     "./load": "./src/load.ts",
     "./format": "./src/format.ts",
     "./plurals": "./src/plurals.ts",

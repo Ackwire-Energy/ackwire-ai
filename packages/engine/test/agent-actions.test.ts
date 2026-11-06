@@ -349,10 +349,7 @@ describe("act with undo: memory, routines, channels, wiki, threads", () => {
       .returning();
     const produto = await createChannel(f.db, f.owner.id, f.org.id, { name: "produto" });
     const call = await toolsOf(
-      [
-        createWorkspaceToolSource({ pubsub: f.pubsub }),
-        createWikiToolSource({ pubsub: f.pubsub, search: f.context, artifacts: f.artifactDeps }),
-      ],
+      [createWorkspaceToolSource({ pubsub: f.pubsub }), createWikiToolSource({ pubsub: f.pubsub, search: f.context })],
       ctx,
     );
     await call("add_agent_to_channel", { agent: "@lia", channel: "#produto" });

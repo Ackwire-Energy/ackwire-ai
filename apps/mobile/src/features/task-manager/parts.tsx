@@ -1,5 +1,13 @@
-import { type ManagedTask, useCatalog } from "@agenteschat/client";
-import { taskClock, taskProgram, taskSince, taskState } from "@agenteschat/client/lib/task-manager";
+import { type ManagedTask, useCatalog, useContinueTasks } from "@agenteschat/client";
+import {
+  type TaskWaitGroup,
+  taskClock,
+  taskProgram,
+  taskSince,
+  taskState,
+  taskWaitGroups,
+  taskWaitGroupText,
+} from "@agenteschat/client/lib/task-manager";
 import { callLogo } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useState } from "react";
@@ -7,10 +15,11 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
 import { Button, fieldText, Icon, PixelOrbit, PixelStop, PixelStopped, ProviderLogo, Text, weights } from "@/ui";
 import { useCallLogo } from "../chat/ToolCalls";
+import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { isHeld, lineStartText, type RowState, taskStateText, usingNow } from "./logic";
+import { isHeld, type RowState, taskStateWords, usingNow } from "./logic";
 
 /**
  * The pieces the task manager's list, a task's screen and an agent's tasks share (ADR 0128): a task's mark and state,
@@ -44,24 +53,20 @@ export function useAgentColor(agentId: string): AgentColorName {
 }
 
 /**
- * "Trabalhando · 6:12", "Espera seu ok · 18:03" (amber: it waits on a person), "Na fila · 2º" (with when it should
- * start under it, in the computer line's words), "Parando…".
+ * "Trabalhando · 6:12", "Espera seu ok · 18:03" (amber: it waits on a person), "Parando…"; a wait wraps whole, with
+ * what comes next under it ("Volta sáb às 18:00", or when it should start in the computer's line).
  */
 export function StateLine({ task, state, now }: { task: ManagedTask; state: RowState; now: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const color = useAgentColor(task.agentId);
   const waits = state === "ok" || state === "answer";
-  const starts = state === "computerBusy" ? lineStartText(t, task, now) : null;
+  const words = taskStateWords(t, i18n.language, task, state, now);
   const line = (
     <View style={styles.row}>
       <TaskMark state={state} color={color} />
-      <Text
-        variant="footnote"
-        numberOfLines={1}
-        style={[styles.semibold, styles.shrink, { color: waits ? c.amber : c.ink2 }]}
-      >
-        {taskStateText(t, task, state)}
+      <Text variant="footnote" style={[styles.semibold, styles.shrink, { color: waits ? c.amber : c.ink2 }]}>
+        {words.state}
       </Text>
       {state === "stopping" ? null : (
         <Text variant="caption" tone="faint" style={styles.num}>
@@ -70,13 +75,46 @@ export function StateLine({ task, state, now }: { task: ManagedTask; state: RowS
       )}
     </View>
   );
-  if (!starts) return line;
+  if (!words.next) return line;
   return (
     <View style={styles.stack}>
       {line}
-      <Text variant="caption" tone="faint" numberOfLines={1} style={styles.starts}>
-        {starts}
+      <Text variant="caption" tone="faint" style={styles.starts}>
+        {words.next}
       </Text>
+    </View>
+  );
+}
+
+/** The lines over several tasks waiting on the same limit. */
+export function WaitLines({ tasks, now }: { tasks: ManagedTask[]; now: number }) {
+  return taskWaitGroups(tasks).map((group) => <WaitLine key={group.key} group={group} now={now} />);
+}
+
+/**
+ * Why they wait, once, and Continuar agora on a pause for who may press it (the pause card's rule): nobody else sees
+ * the button.
+ */
+function WaitLine({ group, now }: { group: TaskWaitGroup; now: number }) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  const orgId = useOrgId();
+  const failed = useFailed();
+  const go = useContinueTasks(orgId);
+  return (
+    <View style={[styles.waitLine, { backgroundColor: c.sunken }]}>
+      <Text variant="footnote" tone="ink2">
+        {taskWaitGroupText(t, i18n.language, group, now)}
+      </Text>
+      {group.continuable.length > 0 ? (
+        <Button
+          variant="primary"
+          size="sm"
+          label={t("usageCard.continue")}
+          loading={go.isPending}
+          onPress={() => go.mutate(group.continuable, { onError: failed })}
+        />
+      ) : null}
     </View>
   );
 }
@@ -226,6 +264,15 @@ const styles = StyleSheet.create({
   stack: { gap: 1, minWidth: 0 },
   // Under the state's words, past its mark (16 + 6).
   starts: { marginLeft: 22 },
+  waitLine: {
+    gap: 8,
+    alignItems: "flex-start",
+    marginTop: 4,
+    marginBottom: 8,
+    marginHorizontal: 16,
+    padding: 12,
+    borderRadius: 14,
+  },
   // As tall as the button it stands in for, so the row doesn't move.
   stopping: { minWidth: 36, height: 36, alignItems: "center", justifyContent: "center" },
   field: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, minHeight: 36 },

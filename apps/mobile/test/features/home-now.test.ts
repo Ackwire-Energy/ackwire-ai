@@ -194,16 +194,10 @@ describe("Atividade: cards and what comes next", () => {
     expect(card).toEqual({ kind: "approval", title: "Fazer merge do PR #128 em main", expiresAt, action: "review" });
   });
 
-  test("a question and a forum turn: Responder, no deadline", () => {
+  test("a question: Responder, no deadline", () => {
     expect(
       waitingCardOf(notification({ id: "n2", kind: "agent_question", latest: { text: "Devolvo o reembolso?" } })),
     ).toEqual({ kind: "question", title: "Devolvo o reembolso?", expiresAt: null, action: "answer" });
-    expect(waitingCardOf(notification({ id: "n3", kind: "forum_turn", latest: { title: "Preço novo" } }))).toEqual({
-      kind: "forum",
-      title: "Preço novo",
-      expiresAt: null,
-      action: "answer",
-    });
   });
 
   test("a connected server's changed tools: reviewed (Revisar), never a question", () => {

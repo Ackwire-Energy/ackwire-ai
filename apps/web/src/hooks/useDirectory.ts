@@ -1,8 +1,11 @@
 import type { Agent, Member, Message } from "@agenteschat/client";
 import { useAgents, useFormerAgents, useMembers, useRoles } from "@agenteschat/client";
 import { agentsByAnyHandle, formerById } from "@agenteschat/client/lib/directory";
+import { memberRoleColor } from "@agenteschat/client/lib/member-groups";
+import { type AgentColor, agentGradient } from "@agenteschat/ui";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { lookOf } from "@/lib/look";
 
 /** People and agents of the organization, by id and handle, for names and avatars. */
 export function useDirectory(orgId: string) {
@@ -43,6 +46,21 @@ export function useDirectory(orgId: string) {
     /** `@ada` → "Ada", `@joao` → "João"; unknown handles stay as typed. */
     const mentionName = (handle: string) =>
       agentByHandle.get(handle.toLowerCase())?.name ?? memberByHandle.get(handle.toLowerCase())?.name ?? null;
+    /** A mentioned agent's color; none for a person or an unknown handle (their chip stays neutral). */
+    const mentionTone = (handle: string) => {
+      const agent = agentByHandle.get(handle.toLowerCase());
+      return agent ? (lookOf(agent)?.color ?? "sky") : undefined;
+    };
+    /** A name's color in the bubbles, on a light and a dark surface: an agent's own, a person's role's; none: the ink. */
+    const nameColorOf = (author: Message["author"]) => {
+      const color =
+        author.type === "agent"
+          ? (lookOf(anyAgent(author.id ?? ""))?.color ?? "sky")
+          : memberRoleColor(memberById.get(author.id ?? "") ?? { role: "member" }, roles.data?.roles ?? []);
+      if (!color) return undefined;
+      const [top, deep] = agentGradient(color as AgentColor);
+      return [deep, top] as const;
+    };
     return {
       agents: agents.data ?? [],
       members: people,
@@ -53,7 +71,9 @@ export function useDirectory(orgId: string) {
       memberByHandle,
       authorName,
       mentionName,
+      mentionTone,
       agentInitials,
+      nameColorOf,
       roleName,
       loading: agents.isPending || members.isPending,
     };

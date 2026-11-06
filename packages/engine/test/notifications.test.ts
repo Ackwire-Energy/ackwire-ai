@@ -426,23 +426,21 @@ test("realtime goes to the recipient only; auto-resolve removes for everyone", a
   await notify(deps(), {
     orgId: f.org.id,
     userIds: [bia.id, f.owner.id],
-    kind: "forum_turn",
-    groupKey: "forum_turn:topic-1:2",
-    waiting: true,
+    kind: "routine_failed",
+    groupKey: "routine_failed:routine-1:2",
     actor: { type: "user", id: f.owner.id },
-    source: { topicId: "topic-1" },
-    latest: { round: 2, rounds: 3 },
+    source: { routineId: "routine-1" },
   });
   expect(biaEvents.map((e) => e.type)).toEqual(["notification.upserted", "notification.counts"]);
-  expect(biaEvents[1]).toMatchObject({ unread: 1, waiting: 1 });
+  expect(biaEvents[1]).toMatchObject({ unread: 1 });
   expect(caioEvents).toEqual([]);
   expect(ownerEvents).toEqual([]); // the actor
 
-  expect(await resolveNotifications(deps(), f.org.id, { groupKeyPrefix: "forum_turn:topic-1:" })).toBe(1);
+  expect(await resolveNotifications(deps(), f.org.id, { groupKeyPrefix: "routine_failed:routine-1:" })).toBe(1);
   expect(biaEvents.map((e) => e.type).slice(2)).toEqual(["notification.removed", "notification.counts"]);
   expect((await inbox(bia.id)).items).toEqual([]);
   // Another group with the same start is untouched.
-  expect(await resolveNotifications(deps(), f.org.id, { groupKeyPrefix: "forum_turn:topic-12:" })).toBe(0);
+  expect(await resolveNotifications(deps(), f.org.id, { groupKeyPrefix: "routine_failed:routine-12:" })).toBe(0);
 });
 
 test("issues: assigned (resolved when unassigned), status by others, comments merge, mentions in comments", async () => {

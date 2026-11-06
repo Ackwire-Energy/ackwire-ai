@@ -1,6 +1,6 @@
 import type { Message } from "@agenteschat/client";
+import { mentionsReader } from "@agenteschat/client/lib/everyone";
 import { joinNames } from "@agenteschat/client/lib/format";
-import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import type { TFunction } from "i18next";
@@ -25,7 +25,7 @@ export function unseenOf(items: TimelineItem[], fromKey: string | null, meId: st
     const a = item.message.author;
     if (a.type === "person" && a.id === meId) continue;
     count++;
-    if (myHandle && !mentionsMe) mentionsMe = mentionsHandle(item.message.body, myHandle);
+    if (!mentionsMe) mentionsMe = mentionsReader(item.message, myHandle);
     if (!authors.some((x) => x.type === a.type && x.id === a.id)) authors.push(a);
   }
   return { count, authors, mentionsMe };

@@ -1,7 +1,15 @@
-import { type AgentAudience, useAgentDetail, useAgentGroups, useSettings, useUsage } from "@agenteschat/client";
+import {
+  type AgentAudience,
+  useAgentDetail,
+  useAgentGroups,
+  useModels,
+  useSettings,
+  useUsage,
+} from "@agenteschat/client";
 import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
+import { modelUnpriced } from "@agenteschat/client/lib/endpoints";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { addsAgentsTo } from "@agenteschat/client/lib/permissions";
 import {
@@ -18,6 +26,7 @@ import {
   Meter,
   randomAppearance,
   Select,
+  SettingNote,
 } from "@agenteschat/ui";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -204,6 +213,7 @@ export function SettingsTab({
   const settings = useSettings(org.id);
   const detail = useAgentDetail(org.id, agent.id);
   const usage = useUsage(org.id);
+  const models = useModels();
   const groups = useAgentGroups(org.id).data ?? [];
   const inGroup = groupOf(groups, agent.id);
   // "Quem pensa" lives in the sentence under the name now (its dialog saves at once).
@@ -354,6 +364,9 @@ export function SettingsTab({
                 )}
               </div>
               <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} marks={[80]} />
+              {modelUnpriced(models.data?.models, agent.model) && (
+                <SettingNote icon="info">{t("endpoint.budgetUnpriced")}</SettingNote>
+              )}
               <ul className="agp-spent__stats">
                 <li>
                   <Icon name="bolt" size={14} />

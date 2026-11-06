@@ -10,8 +10,6 @@ export const strings: Partial<PushStrings> = {
   approvalFromRoutine: (routine) => `Rutyna „${routine}”`,
   questionTitle: (a) => `${a} ma do ciebie pytanie`,
   questionBody: "Dotknij, żeby odpowiedzieć.",
-  forumTitle: "Twoja kolej, żeby zabrać głos",
-  forumBody: "Dotknij, żeby dołączyć do rozmowy.",
   mentionTitle: (a) => `${a} wspomina o tobie`,
   replyTitle: (a) => `${a} odpowiada`,
   missionStoppedTitle: "Misja się zatrzymała",
@@ -75,4 +73,5 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a} podnosi twój limit w tym miesiącu`,
   usageRaisedBody: "Możesz kontynuować.",
   usageRefusedTitle: (a) => `${a} odmawia prośby o większe użycie`,
+  teamWeekReady: "Tydzień twojego zespołu jest gotowy",
 };

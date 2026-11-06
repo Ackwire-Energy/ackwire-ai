@@ -130,6 +130,7 @@ function AppStack() {
       <Stack.Screen name="widget-new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-pick" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget-pin" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="team" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/[runId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }} />
@@ -160,6 +161,8 @@ function AppStack() {
       <Stack.Screen name="me/approvals" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/start" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/activity" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/agent-style" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/chat-look" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />

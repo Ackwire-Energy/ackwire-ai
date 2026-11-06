@@ -7,12 +7,16 @@ import {
   useSteerState,
 } from "@agenteschat/client";
 import { listNames } from "@agenteschat/client/lib/activity";
+import { failedRunFix, runFailureLine } from "@agenteschat/client/lib/errors";
+import { mayConnectAi } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { helpUrl } from "@agenteschat/client/lib/server";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
 import {
   Button,
   Card,
@@ -25,11 +29,12 @@ import {
   useReducedMotion,
   useToast,
 } from "@/ui";
+import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { Note, OpenPage } from "../ai/parts";
 import { QueueWaitRows } from "../queue/parts";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
 import {
@@ -62,8 +67,9 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   connectInline: boolean;
   onRetry: (m: Message) => void;
 }) {
-  const { t } = useTranslation();
-  const orgId = useOrgId();
+  const { t, i18n } = useTranslation();
+  const { orgId, org } = useOrg();
+  const meId = useMeId();
   const dir = useDirectory();
   const c = useColors();
   const reduced = useReducedMotion();
@@ -75,10 +81,30 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   const say = (w: ReceiptLine["label"]) =>
     t(w.key, { count: w.agents.length, names: listNames(t, w.agents.map(name)) });
   const label = say(line.label);
-  // Retry sends my words again: only under my own message.
-  const action = line.action === "retry" ? (mine ? "retry" : null) : line.action;
+  // One agent failed: why, in place of only saying that it did (the web's line on its failed run).
+  const failedAgent =
+    line.words?.key === "receipts.failed" && line.words.agents.length === 1 ? line.words.agents[0] : null;
+  const failure = failedAgent ? receipt?.failures?.[failedAgent] : undefined;
+  const why = failedAgent && failure ? runFailureLine(t, name(failedAgent), failure, i18n.language) : null;
+  const fix =
+    failedAgent && failure
+      ? failedRunFix(failure.code, {
+          keys: can(org, "manage_credentials"),
+          admin: can(org, "manage_agents"),
+          owner: meId !== null && dir.agentById.get(failedAgent)?.ownerUserId === meId,
+        })
+      : null;
+  const only = line.faces.length === 1 && line.more === 0 ? line.faces[0] : undefined;
+  // Retry sends my words again: only under my own message. Connect: for who can connect one.
+  const action =
+    line.action === "retry"
+      ? mine
+        ? "retry"
+        : null
+      : line.action === "connect" && !mayConnectAi(only ? dir.agentById.get(only) : null, meId, org)
+        ? null
+        : line.action;
   const connect = () => {
-    const only = line.faces.length === 1 && line.more === 0 ? line.faces[0] : undefined;
     openConnectAi({
       from: m.id,
       ...(receipt?.noAi?.intent ? { intent: receipt.noAi.intent } : {}),
@@ -129,8 +155,13 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
         ) : null}
         <Mark mark={line.mark} color={c.muted} />
         {line.words ? (
-          <Text variant="caption" tone={line.alert ? "danger" : "muted"} numberOfLines={2} style={styles.words}>
-            {say(line.words)}
+          <Text
+            variant="caption"
+            tone={line.alert ? "danger" : "muted"}
+            numberOfLines={why ? undefined : 2}
+            style={styles.words}
+          >
+            {why ?? say(line.words)}
           </Text>
         ) : null}
       </Pressable>
@@ -140,6 +171,16 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
           size="sm"
           label={action === "retry" ? t("receipts.retry") : t("noAi.action")}
           onPress={act}
+        />
+      ) : null}
+      {fix && failedAgent ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          label={t(fix === "useKey" ? "noAi.rightHand.useKey" : "usageCard.changeModel")}
+          onPress={() =>
+            fix === "useKey" ? openConnectAi({ agentId: failedAgent, intent: "api_key" }) : openAgentAi(failedAgent)
+          }
         />
       ) : null}
     </Animated.View>
@@ -162,6 +203,7 @@ export const ReceiptMark = memo(function ReceiptMark({
   mine,
   receipt,
   seenBy,
+  ink,
 }: {
   message: Message;
   /** My own message: it also wears what became of it in a task at work. */
@@ -170,11 +212,14 @@ export const ReceiptMark = memo(function ReceiptMark({
   receipt?: MessageReceipt;
   /** A DM between people: who read this message, my latest. */
   seenBy?: string;
+  /** Over a solid bubble: the mark's color in place of the page's. */
+  ink?: string;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
+  const tint = ink ?? c.muted;
   const reduced = useReducedMotion();
   const sheet = useSheet();
   const toast = useToast();
@@ -204,18 +249,18 @@ export const ReceiptMark = memo(function ReceiptMark({
           view.state === "read" || view.state === "resolved" ? (
             <AgentFace agentId={view.agentId} size={16} live={false} framed={false} />
           ) : view.state === "now" ? (
-            <Icon name="bolt" size={14} color={c.muted} />
+            <Icon name="bolt" size={14} color={tint} />
           ) : view.state === "delivered" ? (
-            <Icon name="check" size={14} color={c.muted} />
+            <Icon name="check" size={14} color={tint} />
           ) : view.state === "held" ? (
-            <Icon name="pause" size={14} color={c.muted} />
+            <Icon name="pause" size={14} color={tint} />
           ) : (
-            <InkOrbit size={10} color={c.muted} />
+            <InkOrbit size={10} color={tint} />
           )
         ) : (
           <>
             {view.agentId ? <AgentFace agentId={view.agentId} size={16} live={false} framed={false} /> : null}
-            <Mark mark={view.mark} color={c.muted} />
+            <Mark mark={view.mark} color={tint} />
           </>
         )}
       </Pressable>

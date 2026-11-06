@@ -506,6 +506,24 @@ export async function scheduleDoneCheck(
 export const DONE_CHECK_DELAY_MS = 30_000;
 
 /**
+ * A mission message's files (`meta.artifacts`) with their titles, in the given order: the agent reads its own
+ * message's files by name and id from the meta (context.ts `ownFilesNote`), with no query when it builds a run.
+ */
+export async function missionFileRefs(db: Executor, orgId: string, ids: string[]) {
+  if (ids.length === 0) return [];
+  const a = schema.artifacts;
+  const rows = await db
+    .select({ id: a.id, title: a.title })
+    .from(a)
+    .where(and(eq(a.orgId, orgId), inArray(a.id, ids)));
+  const titles = new Map(rows.map((r) => [r.id, r.title]));
+  return ids.map((id) => {
+    const title = titles.get(id);
+    return title === undefined ? { id } : { id, title };
+  });
+}
+
+/**
  * A line written in the mission's thread by its agent (no run, no routing). Its executor works on a computer with
  * its own internet, so what it writes counts as relaying outside content (`meta.readOutside`, ADR 0117).
  */
@@ -1154,9 +1172,8 @@ export async function createMission(
     if (!theirs && root.authorUserId) rootAuthor = root.authorUserId;
   }
   if (!channelId) throw new ValidationError("Give the conversation (channelId) or the thread (threadId)");
-  const { channel, membership } = await requireChannelAccess(db, userId, orgId, channelId);
+  const { membership } = await requireChannelAccess(db, userId, orgId, channelId);
   if (!can(membership, "post") || !can(membership, "assign_work")) throw new ForbiddenError();
-  if (channel.kind === "forum") throw new ValidationError("Forum topics have no missions", "mission.invalid");
   const allowed = await eligibleChannelAgents(db, orgId, channelId, [input.agentId], { requesterUserId: userId });
   if (allowed.length === 0) {
     throw new ForbiddenError(
@@ -2946,7 +2963,7 @@ export async function requestReview(
       `Ready for you to see: ${title}`,
       {
         missionReview: { id: r.id, missionId: mission.id },
-        ...(r.artifactIds.length ? { artifacts: r.artifactIds.map((id) => ({ id })) } : {}),
+        ...(r.artifactIds.length ? { artifacts: await missionFileRefs(tx, mission.orgId, r.artifactIds) } : {}),
         bodyCode: "mission_review",
         bodyParams: { title },
       },

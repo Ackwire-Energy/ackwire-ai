@@ -10,7 +10,7 @@ describe("the tools' order", () => {
     expect(placeTool(order, "approvals", "issues", "after").slice(0, 3)).toEqual(["threads", "issues", "approvals"]);
     expect(placeTool(order, "drive", "drive", "after")).toEqual(order);
     expect(placeTool(order, "drive", "nope" as SidebarItem, "after")).toEqual(order);
-    expect(new Set(placeTool(order, "forum", "approvals", "before")).size).toBe(order.length);
+    expect(new Set(placeTool(order, "calendar", "approvals", "before")).size).toBe(order.length);
   });
 
   test("up and down step past the next tool shown in the list, over the ones in More between them", () => {

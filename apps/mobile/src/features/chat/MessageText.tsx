@@ -1,12 +1,13 @@
 import { parseChart } from "@agenteschat/client/lib/chart";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Text as RNText, StyleSheet, View } from "react-native";
-import { Text, useReducedMotion } from "@/ui";
+import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import { Icon, Text, useReducedMotion } from "@/ui";
 import { useColors } from "../shared/hooks";
+import { tapHaptic } from "../shared/parts";
 import { ChartCard, ChartPending } from "./ChartCard";
 import { CodeCard } from "./CodeCard";
-import { parseBlocks } from "./logic";
+import { type Inline, parseBlocks } from "./logic";
 import { Spans, Table } from "./MessageSpans";
 
 /**
@@ -22,6 +23,8 @@ export const MessageText = memo(function MessageText({
   selectable = true,
   accent,
   channelRefs,
+  everyone = false,
+  ink,
 }: {
   body: string;
   streaming?: boolean;
@@ -37,9 +40,14 @@ export const MessageText = memo(function MessageText({
   accent?: AgentColorName;
   /** The message's `meta.channelRefs`: the channel each `#name` meant when written. */
   channelRefs?: Record<string, string>;
+  /** The message's `meta.mentionsEveryone`: its `@todos` shows in the reader's language, like a mention of them. */
+  everyone?: boolean;
+  /** Over a solid bubble: the words' color in place of the page's. */
+  ink?: string;
 }) {
   const c = useColors();
   const blocks = useMemo(() => parseBlocks(body), [body]);
+  const inked = ink ? { color: ink } : undefined;
   const tone = muted ? "muted" : "ink";
   const last = blocks.length - 1;
   const caret =
@@ -67,15 +75,17 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i}>
-                <Table header={b.header} rows={b.rows} align={b.align} />
+                <View style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
+                  <Table header={b.header} rows={b.rows} align={b.align} />
+                </View>
                 {end ? <Text variant="body">{end}</Text> : null}
               </View>
             );
           case "heading":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone="ink" style={[styles.line, styles.heading]}>
-                <Spans inline={b.inline} channelRefs={channelRefs} />
+              <Text key={i} variant="body" tone="ink" style={[styles.line, styles.heading, inked]}>
+                <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
                 {end}
               </Text>
             );
@@ -83,21 +93,29 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={styles.bullet}>
-                <Text variant="body" tone="faint" style={[styles.line, styles.mark]}>
+                <Text variant="body" tone="faint" style={[styles.line, styles.mark, inked]}>
                   {b.ordinal ? `${b.ordinal}.` : "•"}
                 </Text>
-                <Text variant="body" tone={tone} style={[styles.line, styles.flex]}>
-                  <Spans inline={b.inline} channelRefs={channelRefs} />
+                <Text variant="body" tone={tone} style={[styles.line, styles.flex, inked]}>
+                  <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
                   {end}
                 </Text>
+              </View>
+            );
+          case "details":
+            return (
+              // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
+              <View key={i} style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
+                <Details summary={b.summary} body={b.body} muted={muted} accent={accent} channelRefs={channelRefs} />
+                {end ? <Text variant="body">{end}</Text> : null}
               </View>
             );
           case "quote":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <View key={i} style={[styles.quote, { borderLeftColor: c.line2 ?? c.line }]}>
-                <Text variant="body" tone="muted" style={styles.line}>
-                  <Spans inline={b.inline} channelRefs={channelRefs} />
+              <View key={i} style={[styles.quote, { borderLeftColor: ink ?? c.line2 ?? c.line }]}>
+                <Text variant="body" tone="muted" style={[styles.line, inked]}>
+                  <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
                   {end}
                 </Text>
               </View>
@@ -105,8 +123,8 @@ export const MessageText = memo(function MessageText({
           default:
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone={tone} style={styles.line} selectable={selectable}>
-                <Spans inline={b.inline} channelRefs={channelRefs} />
+              <Text key={i} variant="body" tone={tone} style={[styles.line, inked]} selectable={selectable}>
+                <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
                 {end}
               </Text>
             );
@@ -127,6 +145,52 @@ function Fenced({ lang, text, accent, open }: { lang: string; text: string; acce
   if (chart) return <ChartCard spec={chart} {...(accent ? { accent } : {})} />;
   if (isChart && open) return <ChartPending {...(accent ? { accent } : {})} />;
   return <CodeCard lang={isChart ? "json" : lang} text={text} />;
+}
+
+/** A collapsed block (`<details>`, ADR 0147): its summary opens what only some want to read. */
+function Details({
+  summary,
+  body,
+  muted,
+  accent,
+  channelRefs,
+}: {
+  summary: Inline[];
+  body: string;
+  muted: boolean;
+  accent?: AgentColorName;
+  channelRefs?: Record<string, string>;
+}) {
+  const c = useColors();
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={[styles.details, { borderColor: c.line }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={() => {
+          tapHaptic();
+          setOpen((v) => !v);
+        }}
+        style={styles.summary}
+      >
+        <Text variant="body" tone="muted" style={[styles.line, styles.flex, styles.heading]}>
+          {summary.length > 0 ? <Spans inline={summary} channelRefs={channelRefs} /> : "…"}
+        </Text>
+        <View style={open ? styles.flip : undefined}>
+          <Icon name="chev" size={13} color={c.muted} />
+        </View>
+      </Pressable>
+      {open ? (
+        <MessageText
+          body={body}
+          muted={muted}
+          {...(accent ? { accent } : {})}
+          {...(channelRefs ? { channelRefs } : {})}
+        />
+      ) : null}
+    </View>
+  );
 }
 
 /** The agent's thin caret while it writes (agent blue: the agent's identity); still with reduce motion. */
@@ -154,4 +218,15 @@ const styles = StyleSheet.create({
   bullet: { flexDirection: "row", gap: 8, paddingLeft: 2 },
   mark: { minWidth: 14 },
   quote: { borderLeftWidth: 3, paddingLeft: 10 },
+  /** On a solid bubble: a table or a collapsed block stays on the page's color, in the page's ink. */
+  cut: { borderRadius: 10, overflow: "hidden" },
+  details: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  summary: { flexDirection: "row", alignItems: "center", gap: 8 },
+  flip: { transform: [{ rotate: "180deg" }] },
 });

@@ -115,6 +115,23 @@ describe("receipts under the agent's reply", () => {
     expect(row.textContent).toContain("Faz sozinha, sem pedir: Enviar mensagem (Slack) e Enviar e-mail (Gmail)");
   });
 
+  test("a changed routine: its tile icon at the 14px text's 16px, a real space before its bold name", async () => {
+    await open(
+      withActions([
+        action({
+          kind: "routine.updated",
+          target: { type: "routine", id: "rt-1", title: "Resumo da semana" },
+          params: { name: "Resumo da semana", fields: ["prompt"] },
+        }),
+      ]),
+    );
+    const row = receipts().querySelector(".ag-rc") as HTMLElement;
+    const sentence = row.querySelector(".ag-rc__sentence") as HTMLElement;
+    expect(sentence.textContent).toBe("Mudei o pedido da rotina Resumo da semana");
+    expect(sentence.querySelector(".ag-rc__target")?.previousSibling?.textContent).toEndWith("rotina ");
+    expect((row.querySelector(".ag-rc__ic svg") as SVGElement).style.width).toBe("16px");
+  });
+
   test("several: 'N mudanças · agora', Desfazer tudo, one row each with its own Desfazer", async () => {
     await open(withActions([action(), priority(), memory()]));
     const group = receipts();

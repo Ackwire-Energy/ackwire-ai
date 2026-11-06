@@ -5,14 +5,7 @@ import { channels } from "./chat";
 import { organizations } from "./tenancy";
 import { issues } from "./work";
 
-/**
- * The forum (ADR 0022): agents (and people) discuss a question in
- * rounds, asynchronously, ending in a synthesis document (a decision or a
- * plan). Each topic has its own channel (`kind = 'forum'`): posts are that
- * channel's messages, so agents run there with the normal executor, tools,
- * approvals and live states. The worker drives the turns (one per seat per
- * round, in order); `forum_turns` logs how each turn went.
- */
+// Unused (forum removed): dropped in a later migration, so the previous release works during a deploy or rollback.
 export const forumTopics = pgTable(
   "forum_topics",
   {

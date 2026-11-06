@@ -103,8 +103,17 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
   const limits = { ...DEFAULT_LIMITS, ...(f.limits as Partial<WorkerState["limits"]>) };
   const viewers = Number.isSafeInteger(f.desktopViewers) ? Math.max(0, f.desktopViewers as number) : 0;
   const account = f.account === null || isAccountId(f.account) ? { account: f.account } : {};
+  const accounts = Array.isArray(f.accounts) ? { accounts: f.accounts.filter(isAccountId) } : {};
   return access && paused
-    ? { access, paused, limits, desktopViewers: viewers, privateNetwork: f.privateNetwork === true, ...account }
+    ? {
+        access,
+        paused,
+        limits,
+        desktopViewers: viewers,
+        privateNetwork: f.privateNetwork === true,
+        ...account,
+        ...accounts,
+      }
     : null;
 }
 
@@ -124,6 +133,7 @@ export class WorkerLink {
   private readonly fills = new Map<string, (dir: string | null) => void>();
   private nextGit = 0;
   onState: (state: WorkerState) => void = () => {};
+  onDesktopTaken: () => void = () => {};
   onSecretInstall: (id: string, agent: AgentScope, secret: ActivatedSecret) => void = () => {};
   /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
   onShow: (showId: string, agent: AgentScope) => void = () => {};
@@ -210,6 +220,9 @@ export class WorkerLink {
         if (state) this.onState(state);
         return;
       }
+      case "desktop.taken":
+        this.onDesktopTaken();
+        return;
       case "upload.reply":
         if (typeof f.uploadId === "string") this.uploads.get(f.uploadId)?.(f as never);
         return;
@@ -640,6 +653,11 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     const idle = brains.idleCandidate(spare);
     return idle ? { closed: false, idle } : { closed: false };
   };
+  link.onDesktopTaken = () => {
+    desktopUse.stopInput(o.agentId);
+    // Its Chrome may be a window on that desktop.
+    browser.stopInput(o.agentId);
+  };
   link.onShow = (showId, agent) => {
     const shown =
       agent.id === o.agentId
@@ -732,8 +750,8 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     brains.setLimits(brainLimits());
     codexApp.setLimits(brainLimits());
     if (next.account !== undefined) {
-      brains.keepAccount(next.account);
-      tasks.keepAccount(next.account);
+      brains.keepAccount(next.account, next.accounts);
+      tasks.keepAccount(next.account, next.accounts);
     }
     // The browser switch went off: the agent's browser closes now, not at its next command.
     if (browserOff) void browser.closeAll();

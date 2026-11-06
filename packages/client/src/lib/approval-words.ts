@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { Approval, ApprovalCoverView, ApprovalRule, CardDelegate } from "../api/types";
 import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./approval-kind";
 import { humanize } from "./custom-tools";
-import { formatShortDate, formatTime, lowerFirst } from "./format";
+import { formatShortDate, formatTime, lowerFirst, relativeDay } from "./format";
 import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
@@ -212,6 +212,7 @@ export const COMMAND_RULE_TOOL = "command";
 export function approveAlwaysWords(t: TFunction, approval: Pick<Approval, "approveAlways">) {
   const kind = approval.approveAlways;
   if (!kind) return "";
+  if (kind.routineId) return kind.actions.map((name) => ownActionName(t, name)).join(", ");
   if (kind.tool === COMMAND_RULE_TOOL) return kind.actions.join(", ");
   if (kind.tool === BRANCH_PUSH) return kind.actions.map((target) => pushWords(t, target)).join(", ");
   const tool = toolName(t, partsOf(kind.tool), kind.tool);
@@ -219,15 +220,37 @@ export function approveAlwaysWords(t: TFunction, approval: Pick<Approval, "appro
   return kind.actions.length > 0 ? kind.actions.map((slug) => actionName(t, slug)).join(", ") : tool;
 }
 
-/** "Aprovar sempre", or "Aprovar sempre leituras" where only the SQL reads of one project would be covered. */
+/**
+ * "Aprovar sempre", "Aprovar sempre leituras" where only the SQL reads of one project would be covered, or "Sempre
+ * nesta rotina" on a routine's card.
+ */
 export const approveAlwaysLabel = (t: TFunction, approval: Pick<Approval, "approveAlways">) =>
-  t(sqlReadsTarget(approval.approveAlways?.actions[0]) === null ? "approval.always.button" : "approval.always.reads");
+  t(
+    approval.approveAlways?.routineId
+      ? "approval.always.routine"
+      : sqlReadsTarget(approval.approveAlways?.actions[0]) === null
+        ? "approval.always.button"
+        : "approval.always.reads",
+  );
+
+/** The name of the routine "Sempre nesta rotina" keeps a kind for; null on any other card. */
+export function alwaysRoutineName(t: TFunction, approval: Pick<Approval, "approveAlways" | "origin">) {
+  if (!approval.approveAlways?.routineId) return null;
+  const origin = approval.origin;
+  return (origin?.kind === "routine" && origin.routineName) || t("approval.always.thisRoutine");
+}
 
 /**
  * The line under "Aprovar sempre", on the card's face: exactly what approving for good covers (with any values, one
  * branch, or only the reads of one project) and where to undo it.
  */
-export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approveAlways">, agentName: string) {
+export function approveAlwaysHint(
+  t: TFunction,
+  approval: Pick<Approval, "approveAlways"> & Partial<Pick<Approval, "origin">>,
+  agentName: string,
+) {
+  const routine = alwaysRoutineName(t, { origin: null, ...approval });
+  if (routine) return t("approval.always.noteRoutine", { routine, actions: approveAlwaysWords(t, approval) });
   const target = sqlReadsTarget(approval.approveAlways?.actions[0]);
   const key =
     target !== null
@@ -384,11 +407,8 @@ export function delegateLine(
 /** "Desfazer arquiva a Triagem. Vale até 09:42.": what Desfazer does, and until when. */
 export function delegateUndoLine(t: TFunction, locale: string, d: CardDelegate, agentName: string | null) {
   const end = d.undoUntil ? new Date(d.undoUntil) : null;
-  // It lasts a day: tomorrow's word (Intl's own, "amanhã", "tomorrow") before the hour when it ends then.
-  const tomorrow =
-    end && end.toDateString() !== new Date().toDateString()
-      ? `${new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(1, "day")}, `
-      : "";
+  // It lasts a day: tomorrow's word ("amanhã", "tomorrow") before the hour when it ends then.
+  const tomorrow = end && end.toDateString() !== new Date().toDateString() ? `${relativeDay(locale, 1)}, ` : "";
   const until = end ? `${tomorrow}${formatTime(locale, end.toISOString())}` : "";
   return agentName
     ? t("rightHandApprovals.card.undoArchives", { name: agentName, until })

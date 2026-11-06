@@ -163,6 +163,8 @@ export interface WorkerState {
   desktopViewers?: number;
   /** The account its agent thinks with now (null: none): its processes on any other close (`keepAccount`). */
   account?: string | null;
+  /** The other accounts it thinks with (the right hand on people's own plans): kept too. */
+  accounts?: string[];
 }
 
 /** The agent's desktop as its worker uses it (desktop use, its Chrome): where it runs, never its VNC passwords. */
@@ -210,6 +212,8 @@ export type WorkerLinkFrame =
   | ({ type: "worker.state" } & WorkerState)
   /** To the worker: its session ends (the server's did); it dials again and says hello. */
   | { type: "worker.close" }
+  /** To the worker: a person takes control of its agent's desktop, which root sees and the worker's input doesn't. */
+  | { type: "desktop.taken" }
   /** To the worker: how its upload went (the server's status and body), or why it didn't go. */
   | { type: "upload.reply"; uploadId: string; status?: number; body?: string; error?: string }
   /** From the worker: a piece of a `push`'s bytes (base64). */
@@ -359,6 +363,8 @@ export interface SupervisorOptions {
   desktopViewers?: (agentId: string) => number;
   /** The account an agent thinks with now, still on this computer (the agents frame); null: none. */
   account?: (agentId: string) => string | null;
+  /** The other accounts it thinks with now (`MachineAgent.accounts`). */
+  accounts?: (agentId: string) => string[];
   /** Root's shared git cache (`systemGitCache`); without it a worker's clones get none. */
   gitCache?: (input: { connection: string; repo: string; github: string; uid: number }) => Promise<string | null>;
   /** Tests: the clock of the browser's lease. */
@@ -757,6 +763,12 @@ export class Supervisor {
     else this.handoffs.delete(frame.agentId);
     const w = this.workers.get(frame.agentId);
     if (w && this.online) this.send(w, frame);
+  }
+
+  /** A person takes control of the agent's desktop: its worker stops what the agent's pointer and keys are doing. */
+  desktopTaken(agentId: string) {
+    const w = this.workers.get(agentId);
+    if (w) this.send(w, { type: "desktop.taken" });
   }
 
   /**
@@ -1209,6 +1221,7 @@ export class Supervisor {
       access: { ...s.access, folders },
       ...(viewers > 0 ? { desktopViewers: viewers } : {}),
       ...(this.opts.account ? { account: this.opts.account(w.user.id) } : {}),
+      ...(this.opts.accounts?.(w.user.id).length ? { accounts: this.opts.accounts(w.user.id) } : {}),
     };
     const line = JSON.stringify(frame);
     if (line === w.state) return;

@@ -92,7 +92,7 @@ export interface ThreadInfo {
   id: string;
   channelId: string;
   channelName: string;
-  channelKind: "channel" | "dm" | "forum" | "task";
+  channelKind: schema.ChannelKind;
   /** Null: no title of its own (show `rootText`). Written by a person, or by a model (`threads.assess`). */
   title: string | null;
   /** The root message's text, on one line (≤ 200 chars). */
@@ -186,7 +186,6 @@ async function requireThread(db: Database, userId: string, orgId: string, rootId
     .where(and(eq(messages.id, rootId), eq(messages.orgId, orgId)));
   if (!found || found.root.deletedAt || found.root.threadId) throw new NotFoundError("Thread not found");
   const { channel, membership } = await requireChannelAccess(db, userId, orgId, found.root.channelId);
-  if (channel.kind === "forum") throw new NotFoundError("Thread not found");
   return { root: found.root, row: found.row, channel, membership };
 }
 
@@ -438,14 +437,10 @@ export async function createThreadFromRange(
   const { orgId } = input;
   const { channel, membership } = await requireChannelAccess(db, actorId, orgId, input.channelId);
   if (!can(membership, "post")) throw new ForbiddenError();
-  if (channel.kind === "forum") {
-    throw new ValidationError("Forum topics have no threads", "thread.forum");
-  }
   const source =
     input.contextChannelId && input.contextChannelId !== channel.id
       ? (await requireChannelAccess(db, actorId, orgId, input.contextChannelId)).channel
       : channel;
-  if (source.kind === "forum") throw new ValidationError("Forum topics have no threads", "thread.forum");
   const range = await resolveRange(db, orgId, source, input);
   await requireRangeVisible(db, orgId, channel.id, source);
   const given = cleanTitle(input.title);
@@ -923,7 +918,7 @@ interface ThreadSqlRow {
   id: string;
   channel_id: string;
   channel_name: string;
-  channel_kind: "channel" | "dm" | "forum" | "task";
+  channel_kind: schema.ChannelKind;
   created_at: Date | string;
   body: string;
   root_meta: Record<string, unknown> | null;
@@ -1270,7 +1265,7 @@ export async function getThread(db: Database, actorId: string, orgId: string, ro
       id: root.id,
       channel_id: root.channelId,
       channel_name: channel.name,
-      channel_kind: channel.kind,
+      channel_kind: channel.kind as schema.ChannelKind,
       created_at: root.createdAt,
       body: root.body,
       root_meta: root.meta,

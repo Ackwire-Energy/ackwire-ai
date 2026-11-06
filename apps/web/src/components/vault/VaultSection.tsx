@@ -1,7 +1,7 @@
 import type { VaultItem, VaultItemKind, VaultScope } from "@agenteschat/client";
 import { useVault } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Button, EmptyState, Icon, List, SearchField, Segmented, Select, Toolbar } from "@agenteschat/ui";
+import { Button, EmptyState, Icon, List, PageHeader, SearchField, Segmented, Select, Toolbar } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -179,22 +179,21 @@ export function VaultSection() {
 
   return (
     <div className="vlt">
-      <header className="page__header page__header--row">
-        <div className="page__header-text">
-          <h2 className="page-title">{t("settings.section.vault")}</h2>
-          <p className="muted" style={{ margin: 0 }}>
-            {t("settings.sectionText.vault")}
-          </p>
-        </div>
-        <span className="vlt-head__acts">
-          <Button icon="upload" onClick={open("import")}>
-            {t("vault.import.open")}
-          </Button>
-          <Button variant="primary" icon="plus" onClick={open("new")}>
-            {t("vault.new.open")}
-          </Button>
-        </span>
-      </header>
+      <PageHeader
+        level={2}
+        title={t("settings.section.vault")}
+        meta={t("settings.sectionText.vault")}
+        actions={
+          <>
+            <Button icon="upload" onClick={open("import")}>
+              {t("vault.import.open")}
+            </Button>
+            <Button variant="primary" icon="plus" onClick={open("new")}>
+              {t("vault.new.open")}
+            </Button>
+          </>
+        }
+      />
       {vault.isPending ? (
         <LoadingList count={4} trailing />
       ) : vault.isError || !data ? (

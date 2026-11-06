@@ -54,7 +54,6 @@ export const ROUTINE_CODE_TEXT: Record<string, string> = {
   deleted: "Routine deleted",
   paused: "Routine paused",
   lost: "Lost: it never started",
-  forum_opened: "Forum opened",
   reminder_sent: "Reminder sent",
 };
 

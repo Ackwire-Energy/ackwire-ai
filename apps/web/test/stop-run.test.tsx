@@ -9,6 +9,7 @@ import type { TFunction } from "i18next";
 import { HOVER_OPEN_MS } from "@/components/ProfileCard";
 import { runContext } from "@/components/StopRun";
 import { createI18n } from "@/i18n";
+import { requestAgentPanel } from "@/lib/agent-panel-ask";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -114,6 +115,20 @@ describe("Parar is immediate", () => {
     await act(async () => fireEvent.keyDown(box, { key: "Escape" }));
     await settle(2);
     expect(cancels(state)).toHaveLength(1);
+  });
+
+  test("Esc in a field of the agent's page in the panel stops nothing under it", async () => {
+    const { state, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await act(async () => requestAgentPanel(ADA_ID, "settings"));
+    await settle(6);
+    const panel = screen().getByRole("complementary", { name: "Perfil da Ada" });
+    const field = panel.querySelector("input, textarea") as HTMLElement;
+    field.focus();
+    await act(async () => fireEvent.keyDown(field, { key: "Escape" }));
+    await settle(2);
+    expect(cancels(state)).toHaveLength(0);
+    expect(screen().getByRole("complementary", { name: "Perfil da Ada" })).toBeTruthy();
   });
 
   test("typing while it works: 'Juntar' (↵) joins; ⌘↵ / Ctrl↵ sends with 'Parar e mandar'", async () => {

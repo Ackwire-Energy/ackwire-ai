@@ -141,3 +141,65 @@ describe("where Lodi's name comes from", () => {
     expect(card.textContent).not.toContain(story);
   });
 });
+
+describe("the profile in the panel closes", () => {
+  const PANEL = { name: "Perfil da Ada" };
+  const openAda = async (state = seedState()) => {
+    const header = await go(state, `dm/agent/${ADA_ID}`);
+    const trigger = within(header).getByRole("button", { name: "Perfil de Ada" });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    trigger.focus();
+    await click(trigger);
+    return { trigger, panel: screen().getByRole("complementary", PANEL) };
+  };
+
+  test("by Esc inside it: it had the focus, the trigger gets it back", async () => {
+    const { trigger, panel } = await openAda();
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(panel);
+    await act(async () => fireEvent.keyDown(panel, { key: "Escape" }));
+    await settle(2);
+    expect(screen().queryByRole("complementary", PANEL)).toBeNull();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  test("by its trigger again, and by its × at the top", async () => {
+    const { trigger } = await openAda();
+    await click(trigger);
+    expect(screen().queryByRole("complementary", PANEL)).toBeNull();
+    await click(trigger);
+    const panel = screen().getByRole("complementary", PANEL);
+    const close = within(panel).getByRole("button", { name: "Fechar" });
+    expect(close.classList.contains("thread-panel__close")).toBe(true);
+    expect(within(panel).getAllByRole("button", { name: "Fechar" })).toHaveLength(1);
+    await click(close);
+    expect(screen().queryByRole("complementary", PANEL)).toBeNull();
+  });
+
+  test("an agent's public card closes too, by its ×, with no overlay over the conversation", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.seesDetails = false;
+    const { panel } = await openAda(state);
+    expect(document.querySelector(".thread-panel__scrim")).toBeNull();
+    await click(within(panel).getByRole("button", { name: "Fechar" }));
+    expect(screen().queryByRole("complementary", PANEL)).toBeNull();
+  });
+
+  test("Lodi's, for an admin (its settings, no tabs): its × and Esc close it", async () => {
+    const state = withRightHand(seedState());
+    seedDm(state, { type: "agent", id: LODI_ID });
+    const header = await go(state, `dm/agent/${LODI_ID}`);
+    const trigger = within(header).getByRole("button", { name: "Perfil de Lodi" });
+    await click(trigger);
+    const panel = () => screen().queryByRole("complementary", { name: /Lodi/ });
+    await click(within(panel() as HTMLElement).getByRole("button", { name: "Fechar" }));
+    expect(panel()).toBeNull();
+    await click(trigger);
+    await act(async () => fireEvent.keyDown(panel() as HTMLElement, { key: "Escape" }));
+    await settle(2);
+    expect(panel()).toBeNull();
+  });
+});

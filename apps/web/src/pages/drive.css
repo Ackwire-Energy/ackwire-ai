@@ -9,37 +9,6 @@
   flex-direction: column;
   gap: 16px;
 }
-.drive-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-.drive-head__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.drive-head__title h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-}
-.drive-head__sub {
-  margin: 6px 0 0;
-  max-width: 60ch;
-  color: var(--muted);
-}
-.drive-head__actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
 
 /* Icon-only items are square inside the track. */
 .drive-view .ac-seg__item {
@@ -333,7 +302,16 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   z-index: var(--z-lifted);
 }
 
-/* Details (in the shared details dialog). */
+/* Details (in the shared details dialog). A video plays in the preview's place: as wide as the dialog, 16:9 (other
+   shapes letterboxed), never taller than most of the window. */
+.drive-details__video.ac-video--viewer {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  max-height: 62vh;
+  border-radius: var(--radius-lg);
+}
 .drive-details__actions {
   display: flex;
   flex-wrap: wrap;
@@ -727,13 +705,6 @@ html:not([data-pointer]) button.drive-where:focus-visible {
   }
 }
 @media (max-width: 720px) {
-  .drive-head {
-    align-items: flex-start;
-  }
-  .drive-head__actions {
-    width: 100%;
-    justify-content: space-between;
-  }
   .drive-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;

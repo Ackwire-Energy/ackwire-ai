@@ -14,13 +14,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { ACCOUNT_SIGNED_OUT, type AccountManager } from "./accounts";
 import { ACCOUNT_STORES, type AccountUsers, type AgentUser, accountLauncher } from "./agent-users";
-import {
-  BrainManager,
-  type DelegatedFrame,
-  type DelegatedTurn,
-  neutralizeCliInput,
-  redactTokenShapes,
-} from "./brain";
+import { BrainManager, type DelegatedFrame, type DelegatedTurn, neutralizeCliInput, redactTokenShapes } from "./brain";
 import { routeWithPlan } from "./brain-route";
 import type { ClaudeSharedLogin } from "./config";
 import type { DelegatedBridge } from "./delegated-tools";
@@ -244,13 +238,10 @@ export class AccountBrains {
     const stop = new AbortController();
     this.tasks.set(taskId, { agentId: agent.id, stop });
     let timedOut = false;
-    const limit = setTimeout(
-      () => {
-        timedOut = true;
-        stop.abort();
-      },
-      Math.min(host.maxSeconds, TASK_MAX_SECONDS_CAP) * 1000,
-    );
+    const limit = setTimeout(() => {
+      timedOut = true;
+      stop.abort();
+    }, Math.min(host.maxSeconds, TASK_MAX_SECONDS_CAP) * 1000);
     const say = (stream: "stdout" | "stderr", line: string) =>
       this.o.workers.tell(agent.id, { type: "task.out", taskId, stream, line });
     const stopped = (): HostedExit | null =>

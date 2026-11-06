@@ -114,7 +114,7 @@ export function calendarRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/calendar",
       tags,
       security,
-      summary: "Events, routine runs, issue deadlines and my pending proposals between from and to",
+      summary: "Events, routine runs, reminders, issue deadlines and my pending proposals between from and to",
       request: { params: OrgParams, query: z.object({ from: z.string(), to: z.string() }) },
       responses: {
         200: json(
@@ -127,6 +127,19 @@ export function calendarRoutes(deps: AppDeps) {
                 agentId: z.uuid(),
                 at: z.string(),
                 target: z.unknown(),
+              }),
+            ),
+            reminders: z.array(
+              z.object({
+                id: z.uuid(),
+                message: z.string(),
+                at: z.string(),
+                forUserId: z.string(),
+                channelId: z.uuid(),
+                threadId: z.uuid().nullable(),
+                agentId: z.uuid(),
+                createdBy: z.string().nullable().openapi({ description: "The person who set it." }),
+                canCancel: z.boolean().openapi({ description: "Only who set it can (`DELETE /reminders/{id}`)." }),
               }),
             ),
             deadlines: z.array(

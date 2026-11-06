@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
+import type { ChatPrefs } from "../lib/chat-look";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
@@ -29,6 +30,7 @@ import {
   upsertInPages,
   withServerCounts,
 } from "../lib/notifications";
+import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { firstVisitOf } from "../lib/right-hand";
@@ -37,6 +39,7 @@ import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
 import { SIDEBAR_VIEW_DEFAULT } from "../lib/sidebar-view";
 import { playSound } from "../lib/sounds";
+import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import { threadStartOf } from "../lib/threads";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import { voiceOf } from "../lib/voice";
@@ -55,11 +58,13 @@ import type {
   AgentDatabase,
   AgentDatabaseInput,
   AgentGroup,
+  AgentGroupPatch,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
   AgentProposalDecision,
   AgentSetup,
+  AgentStyle,
   AiStatus,
   ApiRule,
   AppConsentDecision,
@@ -73,6 +78,7 @@ import type {
   AuditQuery,
   AuditRow,
   BlockState,
+  BrainScope,
   CalendarEventInput,
   CalendarEventPatch,
   CardDelegate,
@@ -86,14 +92,8 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  EndpointModel,
   ForeignMailbox,
-  ForumParticipantsInput,
-  ForumPostInput,
-  ForumSuggestedIssue,
-  ForumSuggestion,
-  ForumSuggestionOverrides,
-  ForumTopicDetail,
-  ForumTopicInput,
   GifCategory,
   GifKey,
   InviteBatch,
@@ -152,6 +152,7 @@ import type {
   StartChoice,
   StatusInput,
   StorageMigration,
+  TeamProposalCard,
   ThreadAction,
   ThreadCreateInput,
   ThreadFilters,
@@ -672,6 +673,65 @@ export function useCreateProposedAgent(orgId: string) {
   });
 }
 
+/** The right hand's team card as it is now (its mutations and `team.proposal.updated`), in every list of its channel. */
+export function cacheTeamCard(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  card: TeamProposalCard,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ actionCard: card }));
+}
+
+/** "Criar o time", "Descartar", "Desfazer" and "Ajustar" on the team card: the card comes back as it is now. */
+export function useTeamCard(orgId: string, where: { channelId: string; messageId: string }) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const settle = ({ card }: { card: TeamProposalCard }) => {
+    cacheTeamCard(qc, orgId, where, card);
+    for (const key of [keys.agents(orgId), keys.channels(orgId), keys.routines(orgId)])
+      void qc.invalidateQueries({ queryKey: key });
+  };
+  const { messageId } = where;
+  return {
+    create: useMutation({ mutationFn: () => api.agents.createTeam(orgId, messageId), onSuccess: settle }),
+    deny: useMutation({ mutationFn: () => api.agents.denyTeam(orgId, messageId), onSuccess: settle }),
+    undo: useMutation({ mutationFn: () => api.agents.undoTeam(orgId, messageId), onSuccess: settle }),
+    adjust: useMutation({
+      mutationFn: ({
+        handle,
+        patch,
+      }: {
+        handle: string;
+        patch: Parameters<ApiClient["agents"]["adjustTeamAgent"]>[3];
+      }) => api.agents.adjustTeamAgent(orgId, messageId, handle, patch),
+      onSuccess: settle,
+    }),
+  };
+}
+
+/** "Ver modelos de time": the six templates in this language. */
+export function useTeamTemplates(orgId: string, locale: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.teamTemplates(orgId, locale),
+    queryFn: () => api.agents.teamTemplates(orgId, locale),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** "Usar este modelo": its card and the right hand's first question land in the person's DM with it. */
+export function useApplyTeamTemplate(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ templateId, locale }: { templateId: string; locale?: string }) =>
+      api.agents.applyTeamTemplate(orgId, templateId, locale),
+    onSuccess: ({ channelId }) => void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) }),
+  });
+}
+
 /** The routine a proposal came with, once its agent is where it reports (the card's "Criar a rotina"). */
 export function useCreateProposedRoutine(orgId: string) {
   const api = useApi();
@@ -778,6 +838,38 @@ export function useAddCredential(orgId: string) {
   });
 }
 
+/** What an endpoint lists before it is saved (ADR 0146). */
+export function useEndpointModels(orgId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (input: Parameters<ApiClient["agents"]["endpointModels"]>[1]) =>
+      api.agents.endpointModels(orgId, input),
+  });
+}
+
+/** Changes an endpoint's models and prices; its models in the pickers follow. */
+export function useSetEndpointModels(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { credentialId: string; models: EndpointModel[] }) =>
+      api.agents.setEndpointModels(orgId, input.credentialId, input.models),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.models });
+      return qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
+    },
+  });
+}
+
+/** The team map's drag (ADR 0148): the right hand posts a settings card in my DM with it; nothing changes yet. */
+export function useProposeChannelMove(orgId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (input: { agentId: string; fromChannelId: string | null; toChannelId: string; reason: string }) =>
+      api.agents.proposeChannelMove(orgId, input),
+  });
+}
+
 // ── Agent groups (ADR 0083) ─────────────────────────────────────────────────
 
 export const useAgentGroups = (orgId: string) => {
@@ -786,8 +878,8 @@ export const useAgentGroups = (orgId: string) => {
 };
 
 export type AgentGroupAction =
-  | { type: "create"; name: string; agentIds?: string[] }
-  | { type: "update"; groupId: string; name?: string; index?: number }
+  | { type: "create"; name: string; agentIds?: string[]; color?: string; icon?: string }
+  | ({ type: "update"; groupId: string } & AgentGroupPatch)
   | { type: "remove"; groupId: string }
   | { type: "move"; agentId: string; groupId: string | null; index?: number };
 
@@ -800,9 +892,16 @@ export function useAgentGroupAction(orgId: string) {
     mutationFn: (action: AgentGroupAction): Promise<AgentGroup[]> => {
       switch (action.type) {
         case "create":
-          return api.agentGroups.create(orgId, { name: action.name, agentIds: action.agentIds });
-        case "update":
-          return api.agentGroups.update(orgId, action.groupId, { name: action.name, index: action.index });
+          return api.agentGroups.create(orgId, {
+            name: action.name,
+            agentIds: action.agentIds,
+            color: action.color,
+            icon: action.icon,
+          });
+        case "update": {
+          const { type: _, groupId, ...patch } = action;
+          return api.agentGroups.update(orgId, groupId, patch);
+        }
         case "remove":
           return api.agentGroups.remove(orgId, action.groupId);
         case "move":
@@ -1159,20 +1258,6 @@ export function cacheMessageMeta(
     if (!list.some((m) => m && m.id === messageId)) return data;
     return list.map((m) => (m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), ...patch(m.meta ?? {}) } } : m));
   });
-}
-
-/**
- * A forum suggestion card changed (accepted, dismissed, or my own "Agora não"):
- * the message's `meta.forumSuggestion` in every loaded list of that channel.
- */
-export function cacheForumSuggestion(
-  qc: ReturnType<typeof useQueryClient>,
-  orgId: string,
-  channelId: string,
-  messageId: string,
-  suggestion: ForumSuggestion,
-) {
-  cacheMessageMeta(qc, orgId, channelId, messageId, () => ({ forumSuggestion: suggestion }));
 }
 
 /**
@@ -1627,6 +1712,7 @@ export function useDecideApproval(orgId: string) {
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
       if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
+      if (always && approval.approveAlways?.routineId) void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
     },
   });
 }
@@ -1876,6 +1962,26 @@ export const useAgentRepos = (orgId: string, agentId: string, enabled = true) =>
   });
 };
 
+/** Where the agent merges with no approval card ("Pode fazer merge sem perguntar"). */
+export const useAgentMergeRepos = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentMergeRepos(orgId, agentId),
+    queryFn: () => api.repositories.merge(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
+export function useSetAgentMergeRepos(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (repositories: string[]) => api.repositories.setMerge(orgId, agentId, repositories),
+    onSuccess: (repositories) => qc.setQueryData(keys.agentMergeRepos(orgId, agentId), repositories),
+  });
+}
+
 export function useRemoveGitHubApp(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2121,6 +2227,59 @@ export function useSetShowActivity(orgId: string) {
       return { before };
     },
     onError: (_e, _show, ctx) => {
+      if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
+    },
+    onSuccess: put,
+  });
+}
+
+/** How agents talk to me in this workspace (ADR 0147): the choice shows at once. */
+export function useSetAgentStyle(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const put = (agentStyle: AgentStyle) =>
+    qc.setQueryData<Me | null>(keys.me, (me) =>
+      me ? { ...me, organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, agentStyle } : o)) } : me,
+    );
+  return useMutation({
+    mutationFn: (style: AgentStyle) => api.orgs.setAgentStyle(orgId, style),
+    onMutate: async (style) => {
+      await qc.cancelQueries({ queryKey: keys.me });
+      const before = qc.getQueryData<Me | null>(keys.me);
+      put(style);
+      return { before };
+    },
+    onError: (_e, _style, ctx) => {
+      if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
+    },
+    onSuccess: put,
+  });
+}
+
+/** How conversations look to me in this workspace, on every device: the choice shows at once. */
+export function useSetChatPrefs(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const put = (patch: ChatPrefs) =>
+    qc.setQueryData<Me | null>(keys.me, (me) =>
+      me
+        ? {
+            ...me,
+            organizations: me.organizations.map((o) =>
+              o.id === orgId ? { ...o, chatPrefs: { ...o.chatPrefs, ...patch } } : o,
+            ),
+          }
+        : me,
+    );
+  return useMutation({
+    mutationFn: (patch: ChatPrefs) => api.orgs.setChatPrefs(orgId, patch),
+    onMutate: async (patch) => {
+      await qc.cancelQueries({ queryKey: keys.me });
+      const before = qc.getQueryData<Me | null>(keys.me);
+      put(patch);
+      return { before };
+    },
+    onError: (_e, _patch, ctx) => {
       if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
     },
     onSuccess: put,
@@ -2437,6 +2596,32 @@ export const useRefuseMoreUsage = (orgId: string) => {
   return usePeopleUsageMutation(orgId, (userId: string) => api.orgs.refuseMoreUsage(orgId, userId));
 };
 
+/** When Lodi's weekly card comes for me (ADR 0137 §9), or that it is off. */
+export const useTeamWeekPrefs = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.teamWeek(orgId), queryFn: () => api.orgs.teamWeek(orgId), enabled });
+};
+
+export const useSetTeamWeekPrefs = (orgId: string) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Partial<Omit<TeamWeekPrefs, "timezone">>) => api.orgs.setTeamWeek(orgId, patch),
+    onSuccess: (prefs) => qc.setQueryData(keys.teamWeek(orgId), prefs),
+  });
+};
+
+/** A row of my weekly card, or "Agora não": the card comes back changed through its message's event. */
+export const useActOnTeamWeek = (orgId: string) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, act }: { messageId: string; act: TeamWeekAct }) =>
+      api.orgs.actOnTeamWeek(orgId, messageId, act),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.routines(orgId) }),
+  });
+};
+
 /** The agent's "Uso" tab: its month by account and day, and the account it thinks with now. */
 export const useAgentPlanUsage = (orgId: string, agentId: string) => {
   const api = useApi();
@@ -2695,10 +2880,28 @@ export function useToggleReaction(orgId: string, messageId: string) {
   const api = useApi();
   const onAgentReaction = useAgentReaction();
   const qc = useQueryClient();
+  const meId = useMe().data?.user.id;
+  const mutationKey = ["reaction", orgId, messageId];
+  const queryKey = keys.reactions(orgId, messageId);
   return useMutation({
+    mutationKey,
     mutationFn: ({ reaction, on }: { reaction: string; on: boolean }) =>
       on ? api.chat.react(orgId, messageId, reaction) : api.chat.unreact(orgId, messageId, reaction),
-    onSuccess: (reactions) => applyReactions(qc, orgId, messageId, reactions, onAgentReaction),
+    // The pill shows at once; a refused reaction goes back to what was there.
+    onMutate: ({ reaction, on }) => {
+      if (!meId) return undefined;
+      void qc.cancelQueries({ queryKey });
+      const before = knownReactions(qc, orgId, messageId);
+      applyReactions(qc, orgId, messageId, setMyReaction(before, reaction, meId, on), onAgentReaction);
+      return { before };
+    },
+    onError: (_error, _input, context) => {
+      if (context) qc.setQueryData(queryKey, context.before);
+    },
+    // An earlier answer mustn't undo a later tap (👍 then 👎 is two calls): only the last one in flight is the truth.
+    onSuccess: (reactions) => {
+      if (qc.isMutating({ mutationKey }) <= 1) applyReactions(qc, orgId, messageId, reactions, onAgentReaction);
+    },
   });
 }
 
@@ -3868,11 +4071,18 @@ export function useSaveSandboxSettings(orgId: string) {
  * "Quem pensa" (its owner or an admin; members don't load it). `pollMs`: asked again this often where no event
  * keeps it current (the onboarding opens no socket).
  */
-export const useAgentBrain = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
+export const useAgentBrain = (
+  orgId: string,
+  agentId: string,
+  enabled = true,
+  pollMs: number | false = false,
+  /** The team's right hand's workspace AI (admins), under the same key so every invalidation reaches it. */
+  scope?: BrainScope,
+) => {
   const api = useApi();
   return useQuery({
-    queryKey: keys.agentBrain(orgId, agentId),
-    queryFn: () => api.agents.brain(orgId, agentId),
+    queryKey: scope ? [...keys.agentBrain(orgId, agentId), scope] : keys.agentBrain(orgId, agentId),
+    queryFn: () => api.agents.brain(orgId, agentId, scope),
     enabled,
     retry: false,
     refetchInterval: pollMs,
@@ -4189,95 +4399,6 @@ export function useHostComputerOn(orgId: string) {
   });
 }
 
-// ── Forum ────────────────────────────────────────────────────────────────────
-
-export const useForumTopics = (orgId: string, enabled = true) => {
-  const api = useApi();
-  return useQuery({
-    queryKey: keys.forum(orgId),
-    queryFn: () => api.forum.list(orgId),
-    enabled,
-    staleTime: 15_000,
-  });
-};
-
-/** A topic with its posts; refreshed every few seconds while the discussion is on (or stalled). */
-export const useForumTopic = (orgId: string, topicId: string | null) => {
-  const api = useApi();
-  return useQuery({
-    queryKey: keys.forumTopic(orgId, topicId ?? ""),
-    queryFn: () => api.forum.get(orgId, topicId ?? ""),
-    enabled: topicId !== null,
-    refetchInterval: (q) => (q.state.data?.status === "open" ? 5000 : false),
-    meta: { quiet: true },
-  });
-};
-
-export type ForumAction =
-  | { type: "create"; input: ForumTopicInput }
-  | { type: "post"; topicId: string; input: ForumPostInput }
-  | { type: "conclude"; topicId: string }
-  | { type: "cancel"; topicId: string }
-  | { type: "pass"; topicId: string }
-  | { type: "resume"; topicId: string }
-  | { type: "participants"; topicId: string; input: ForumParticipantsInput }
-  | { type: "issues"; topicId: string; items: ForumSuggestedIssue[] }
-  | { type: "accept"; messageId: string; overrides?: ForumSuggestionOverrides }
-  | { type: "dismiss"; messageId: string };
-
-export function useForumAction(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (action: ForumAction): Promise<unknown> => {
-      switch (action.type) {
-        case "create":
-          return api.forum.create(orgId, action.input);
-        case "post":
-          return api.forum.post(orgId, action.topicId, action.input);
-        case "conclude":
-          return api.forum.conclude(orgId, action.topicId);
-        case "cancel":
-          return api.forum.cancel(orgId, action.topicId);
-        case "pass":
-          return api.forum.pass(orgId, action.topicId);
-        case "resume":
-          return api.forum.resume(orgId, action.topicId);
-        case "participants":
-          return api.forum.participants(orgId, action.topicId, action.input);
-        case "issues":
-          return api.forum.createIssues(orgId, action.topicId, action.items);
-        case "accept":
-          return api.forum.acceptSuggestion(orgId, action.messageId, action.overrides);
-        case "dismiss":
-          return api.forum.dismissSuggestion(orgId, action.messageId);
-      }
-    },
-    onSuccess: (result, action) => {
-      if (action.type === "accept") {
-        const topic = (result as { topic?: ForumTopicDetail }).topic;
-        if (topic) qc.setQueryData(keys.forumTopic(orgId, topic.id), topic);
-        return;
-      }
-      if (
-        action.type !== "issues" &&
-        action.type !== "post" &&
-        action.type !== "dismiss" &&
-        result &&
-        typeof result === "object" &&
-        "id" in result
-      ) {
-        qc.setQueryData(keys.forumTopic(orgId, (result as ForumTopicDetail).id), result);
-      }
-    },
-    onSettled: (_r, _e, action) => {
-      void qc.invalidateQueries({ queryKey: keys.forum(orgId) });
-      if ("topicId" in action) void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, action.topicId) });
-      if (action.type === "issues") void qc.invalidateQueries({ queryKey: ["org", orgId, "issues"] });
-    },
-  });
-}
-
 // ── Wiki ─────────────────────────────────────────────────────────────────────
 
 /** Every page (titles, folders, tags): the tree, `[[link]]` resolution, ⌘K. */
@@ -4344,7 +4465,7 @@ export function useWikiAction(orgId: string) {
             type: "append";
             slug: string;
             text: string;
-            source: { kind: "message"; channelId: string; messageId: string } | { kind: "forum"; topicId: string };
+            source: { kind: "message"; channelId: string; messageId: string };
           },
     ): Promise<WikiPage> => {
       switch (action.type) {
@@ -5022,8 +5143,8 @@ export function useNotificationAction(orgId: string) {
 
 /**
  * "Responder" in the inbox, through the endpoints that already exist: a
- * message (channel, thread or DM), an issue comment, an answer to an agent's
- * question, or my turn at the forum table.
+ * message (channel, thread or DM), an issue comment, or an answer to an agent's
+ * question.
  */
 export function useNotificationReply(orgId: string) {
   const api = useApi();
@@ -5050,11 +5171,6 @@ export function useNotificationReply(orgId: string) {
             kind: "question" as const,
             question: await api.questions.answer(orgId, target.questionId, choice ? { choice: text } : { text }),
           };
-        case "forum":
-          await api.forum.post(orgId, target.topicId, { body: text });
-          void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, target.topicId) });
-          void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
-          return { kind: "forum" as const };
       }
     },
   });
@@ -5342,6 +5458,22 @@ export function useStopTasks(orgId: string) {
   });
 }
 
+/** Continuar agora on runs paused near a limit (the task manager's line over them). */
+export function useContinueTasks(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runIds: string[]) => {
+      if (!api.working?.continueTasks) throw new Error("This server can't continue tasks yet");
+      return api.working.continueTasks(orgId, runIds);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.taskManager(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.working(orgId) });
+    },
+  });
+}
+
 /** "Dizer por quê" after stopping a task: the agent reads it (only who stopped it, once). */
 export function useStopReason(orgId: string) {
   const api = useApi();
@@ -5379,6 +5511,7 @@ export function useReminderAction(orgId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.reminders(orgId) });
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
     },
   });
 }

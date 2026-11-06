@@ -25,6 +25,7 @@ import {
 } from "@agenteschat/client";
 import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
 import { computerEdition } from "@agenteschat/client/lib/computer";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -51,6 +52,7 @@ import {
   Input,
   List,
   Meter,
+  PageHeader,
   ProviderLogo,
   Select,
   Switch,
@@ -67,6 +69,7 @@ import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
+import { EndpointForm } from "@/components/ai/EndpointForm";
 import { WhoPicksSection } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ComputersSection } from "@/components/Computers";
@@ -197,21 +200,20 @@ export function SettingsPage({
       </nav>
       <div className="settings__body">
         {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
-          <header className="page__header">
-            <h2 className="page-title">{sectionName(current)}</h2>
-            {current !== "computers" ? (
-              <p className="muted" style={{ margin: 0 }}>
-                {t(`settings.sectionText.${current}`)}
-              </p>
-            ) : edition ? (
-              <p className="muted" style={{ margin: 0 }}>
-                {edition === "cloud" ? t("computers.leadCloud") : t("computers.lead")}
-              </p>
-            ) : setup.isError ? null : (
-              // Never one edition's words before the server says which this is (the section says if it couldn't).
-              <LoadingLine width={320} />
-            )}
-          </header>
+          <PageHeader
+            level={2}
+            title={sectionName(current)}
+            meta={
+              current !== "computers" ? (
+                t(`settings.sectionText.${current}`)
+              ) : edition ? (
+                t(edition === "cloud" ? "computers.leadCloud" : "computers.lead")
+              ) : setup.isError ? null : (
+                // Never one edition's words before the server says which this is (the section says if it couldn't).
+                <LoadingLine width={320} />
+              )
+            }
+          />
         )}
         {current === "account" && <AccountSection />}
         {current === "notifications" && <NoticePrefsSection />}
@@ -346,22 +348,21 @@ function GeneralSection() {
 
   return (
     <>
-      <header className="page__header page__header--row">
-        <div className="page__header-text">
-          <h2 className="page-title">{t("settings.section.general")}</h2>
-          <p className="muted" style={{ margin: 0 }}>
-            {t("settings.sectionText.general")}
-          </p>
-        </div>
-        <span className="settings__saved" data-on={saved || undefined} role="status">
-          {saved && (
-            <>
-              <Icon name="check" size={16} />
-              {t("settings.savedShort")}
-            </>
-          )}
-        </span>
-      </header>
+      <PageHeader
+        level={2}
+        title={t("settings.section.general")}
+        meta={t("settings.sectionText.general")}
+        actions={
+          <span className="settings__saved" data-on={saved || undefined} role="status">
+            {saved && (
+              <>
+                <Icon name="check" size={16} />
+                {t("settings.savedShort")}
+              </>
+            )}
+          </span>
+        }
+      />
       {!editable && <p className="page__note">{t("settings.readOnly")}</p>}
 
       <Card aria-label={t("settings.orgTitle")}>
@@ -713,7 +714,11 @@ function KeysSection() {
   const updateSettings = useUpdateSettings(org.id);
   const remove = useRemoveCredential(org.id);
   const [dialog, setDialog] = useState<
-    null | { type: "add" } | { type: "rotate"; cred: Credential } | { type: "remove"; cred: Credential }
+    | null
+    | { type: "add" }
+    | { type: "rotate"; cred: Credential }
+    | { type: "remove"; cred: Credential }
+    | { type: "models"; cred: Credential }
   >(null);
   if (!allowed) return null;
   const live = (credentials.data ?? []).filter((c) => !c.revokedAt);
@@ -745,13 +750,19 @@ function KeysSection() {
                     {c.label}
                   </span>
                   <span className="small muted">
-                    {providerLabel(c.provider)} · {t("settings.keyEndsIn", { hint: c.keyHint })} ·{" "}
+                    {c.endpoint
+                      ? `${c.endpoint.baseURL} · `
+                      : `${providerLabel(c.provider)} · ${t("settings.keyEndsIn", { hint: c.keyHint })} · `}
                     <span style={{ whiteSpace: "nowrap" }}>
                       {t("settings.keyAdded", { when: relativeTime(t, i18n.language, c.createdAt) })}
                     </span>
                   </span>
                 </span>
-                {isDefault ? (
+                {c.endpoint ? (
+                  <Button variant="ghost" size="sm" onClick={() => setDialog({ type: "models", cred: c })}>
+                    {t("endpoint.models")}
+                  </Button>
+                ) : isDefault ? (
                   <Chip icon="check">{t("settings.default")}</Chip>
                 ) : (
                   <Button
@@ -796,6 +807,19 @@ function KeysSection() {
         cred={dialog && dialog.type !== "add" ? dialog.cred : undefined}
         onClose={() => setDialog(null)}
       />
+      <Dialog
+        open={dialog?.type === "models"}
+        onOpenChange={(o) => !o && setDialog(null)}
+        title={t("endpoint.modelsTitle", { name: dialog?.type === "models" ? dialog.cred.label : "" })}
+        closeLabel={t("common.close")}
+        width={520}
+      >
+        {dialog?.type === "models" && (
+          <DialogBody>
+            <EndpointForm orgId={org.id} credential={dialog.cred} onDone={() => setDialog(null)} />
+          </DialogBody>
+        )}
+      </Dialog>
       <Dialog
         open={dialog?.type === "remove"}
         onOpenChange={(o) => !o && setDialog(null)}
@@ -852,6 +876,8 @@ export function KeyDialog({
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState<ProviderId>("anthropic");
+  // "Outro provedor" (ADR 0146): its own form instead of a key's.
+  const [custom, setCustom] = useState(false);
   const [workspaceId, setWorkspaceId] = useState("");
   const [touched, setTouched] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset the form each time it opens
@@ -860,6 +886,7 @@ export function KeyDialog({
     setApiKey(pasted ?? "");
     setWorkspaceId("");
     setProvider(providerGuess(pasted, suggested ?? cred?.provider));
+    setCustom(mode === "add" && suggested === CUSTOM_PROVIDER);
     setTouched(false);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);
@@ -870,6 +897,36 @@ export function KeyDialog({
       t(`onboarding.keyInvalid.${provider}`)
     );
   const pending = add.isPending || rotate.isPending;
+  const providerSelect = (
+    <Field label={t("settings.provider")} id="key-provider">
+      <Select
+        value={custom ? CUSTOM_PROVIDER : provider}
+        onValueChange={(v) => {
+          setCustom(v === CUSTOM_PROVIDER);
+          if (v !== CUSTOM_PROVIDER) setProvider(v as ProviderId);
+        }}
+        options={[
+          ...PROVIDERS.map((p) => ({
+            value: p.id as string,
+            label: p.label,
+            leading: <ProviderLogo id={p.id} size="xs" />,
+          })),
+          {
+            value: CUSTOM_PROVIDER,
+            label: t("endpoint.option"),
+            description: t("endpoint.optionSub"),
+            leading: <ProviderLogo id={CUSTOM_PROVIDER} size="xs" />,
+          },
+        ]}
+        renderValue={(o) => (
+          <span className="row">
+            {o.leading}
+            {o.label}
+          </span>
+        )}
+      />
+    </Field>
+  );
   return (
     <Dialog
       open={mode !== null}
@@ -883,102 +940,102 @@ export function KeyDialog({
       closeLabel={t("common.close")}
       width={440}
     >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setTouched(true);
-          if (!valid) return;
-          if (mode === "rotate" && cred) {
-            rotate.mutate(
-              { id: cred.id, apiKey: apiKey.trim() },
-              {
-                onSuccess: () => {
-                  toast.show(t("settings.rotated"));
-                  onClose();
-                },
-              },
-            );
-          } else {
-            add.mutate(
-              {
-                provider,
-                label: label.trim() || providerLabel(provider),
-                apiKey: apiKey.trim(),
-                ...(provider === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
-              },
-              {
-                onSuccess: (saved) => {
-                  onAdded?.(saved);
-                  onClose();
-                },
-              },
-            );
-          }
-        }}
-      >
+      {custom && mode === "add" ? (
         <DialogBody>
-          {mode === "add" && (
-            <Field label={t("settings.provider")} id="key-provider">
-              <Select
-                value={provider}
-                onValueChange={setProvider}
-                options={PROVIDERS.map((p) => ({
-                  value: p.id,
-                  label: p.label,
-                  leading: <ProviderLogo id={p.id} size="xs" />,
-                }))}
-                renderValue={(o) => (
-                  <span className="row">
-                    {o.leading}
-                    {o.label}
-                  </span>
-                )}
-              />
-            </Field>
-          )}
-          {mode === "add" && (
-            <Field label={t("settings.keyLabel")} id="key-label">
-              <Input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
-              />
-            </Field>
-          )}
-          <Field label={t("settings.keyValue")} id="key-value-set" error={error} help={<KeySite provider={provider} />}>
-            <Input
-              type="password"
-              autoComplete="off"
-              placeholder={providerOf(provider)?.placeholder}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </Field>
-          {mode === "add" && provider === "anthropic" && (
+          {providerSelect}
+          <EndpointForm
+            orgId={org.id}
+            onDone={(saved) => {
+              onAdded?.(saved);
+              onClose();
+            }}
+          />
+        </DialogBody>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setTouched(true);
+            if (!valid) return;
+            if (mode === "rotate" && cred) {
+              rotate.mutate(
+                { id: cred.id, apiKey: apiKey.trim() },
+                {
+                  onSuccess: () => {
+                    toast.show(t("settings.rotated"));
+                    onClose();
+                  },
+                },
+              );
+            } else {
+              add.mutate(
+                {
+                  provider,
+                  label: label.trim() || providerLabel(provider),
+                  apiKey: apiKey.trim(),
+                  ...(provider === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
+                },
+                {
+                  onSuccess: (saved) => {
+                    onAdded?.(saved);
+                    onClose();
+                  },
+                },
+              );
+            }
+          }}
+        >
+          <DialogBody>
+            {mode === "add" && providerSelect}
+            {mode === "add" && (
+              <Field label={t("settings.keyLabel")} id="key-label">
+                <Input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
+                />
+              </Field>
+            )}
             <Field
-              label={t("onboarding.anthropicWorkspace")}
-              id="key-ws-set"
-              hint={{
-                name: t("common.about", { label: t("onboarding.anthropicWorkspace") }),
-                text: t("onboarding.anthropicWorkspaceHelp"),
-              }}
+              label={t("settings.keyValue")}
+              id="key-value-set"
+              error={error}
+              help={<KeySite provider={provider} />}
             >
               <Input
-                value={workspaceId}
-                onChange={(e) => setWorkspaceId(e.target.value)}
-                placeholder={t("settings.workspaceIdPlaceholder")}
+                type="password"
                 autoComplete="off"
+                placeholder={providerOf(provider)?.placeholder}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
               />
             </Field>
-          )}
-        </DialogBody>
-        <DialogFooter>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button type="submit" variant="primary" disabled={pending}>
-            {mode === "rotate" ? t("settings.rotate") : t("settings.saveKey")}
-          </Button>
-        </DialogFooter>
-      </form>
+            {mode === "add" && provider === "anthropic" && (
+              <Field
+                label={t("onboarding.anthropicWorkspace")}
+                id="key-ws-set"
+                hint={{
+                  name: t("common.about", { label: t("onboarding.anthropicWorkspace") }),
+                  text: t("onboarding.anthropicWorkspaceHelp"),
+                }}
+              >
+                <Input
+                  value={workspaceId}
+                  onChange={(e) => setWorkspaceId(e.target.value)}
+                  placeholder={t("settings.workspaceIdPlaceholder")}
+                  autoComplete="off"
+                />
+              </Field>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={onClose}>{t("common.cancel")}</Button>
+            <Button type="submit" variant="primary" disabled={pending}>
+              {mode === "rotate" ? t("settings.rotate") : t("settings.saveKey")}
+            </Button>
+          </DialogFooter>
+        </form>
+      )}
     </Dialog>
   );
 }

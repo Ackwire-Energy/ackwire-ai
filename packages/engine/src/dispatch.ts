@@ -126,9 +126,8 @@ export async function startOrJoinRun(
   trigger: RunTrigger,
   options: StartRunOptions = {},
 ): Promise<{ created: AgentRun } | { joined: string } | null> {
-  // One active run per agent and conversation (forum turns are driven separately; background runs
-  // hold no slot): the message goes to it, read at its next step, instead of a second run.
-  if (trigger !== "forum" && !options.background) {
+  // One active run per agent and conversation (background runs hold no slot): the message goes to it, read at its next step, instead of a second run.
+  if (!options.background) {
     // Several runs may be active (in the agents' DM one per person behind them; elsewhere a person's run
     // next to an unattended one, or one held by a decision): the message joins the newest it may
     // (`mayJoin`). A run waiting on an approval, a secret or a mission's decision takes nothing new
@@ -196,14 +195,7 @@ export async function startOrJoinRun(
       return { joined: run.id };
     }
   }
-  if (
-    options.park &&
-    message.authorAgentId &&
-    message.hop >= 1 &&
-    !options.granted &&
-    !options.background &&
-    trigger !== "forum"
-  ) {
+  if (options.park && message.authorAgentId && message.hop >= 1 && !options.granted && !options.background) {
     const inLine = await agentLineRank(tx, message.orgId, agentId);
     // Work a person asked for lately never waits behind the agent's own chatter.
     if (inLine !== null && (inLine < 2 || !(await personAskedLately(tx, message.orgId, stretchOf(message))))) {
@@ -223,9 +215,9 @@ export async function startOrJoinRun(
       return null;
     }
   }
-  // Agents started it (its trigger is an agent's, hop 1 or more): within its stretch's limits. A forum's turns and a
-  // routine's background run keep their own.
-  if (!options.granted && trigger !== "forum" && !options.background && message.hop >= 1) {
+  // Agents started it (its trigger is an agent's, hop 1 or more): within its stretch's limits. A routine's background
+  // run keeps its own.
+  if (!options.granted && !options.background && message.hop >= 1) {
     const stop = await stretchStop(tx, message.orgId, stretchOf(message), agentId, message.id);
     if (stop) {
       await pauseStretch(tx, message.orgId, await holdOf(tx, message, agentId, trigger, stop));

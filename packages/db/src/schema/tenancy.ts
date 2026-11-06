@@ -158,10 +158,27 @@ export const organizationMembers = pgTable(
      */
     showActivity: boolean().notNull().default(false),
     /**
+     * How agents talk to the person here (ADR 0147): `simple` (plain words, what to do first) or `technical` (paths,
+     * codes and ids welcome). Null until they pick one: agents talk simply, and the right hand asks once.
+     */
+    agentStyle: text().$type<"simple" | "technical">(),
+    /**
+     * How conversations look to the person here: `{ channelStyle?, dmStyle?, channelTone?, dmTone?, openAt? }`. A key
+     * not here keeps the app's default, so a default can change for everyone who never chose (read through
+     * `chatPrefsOf`, packages/engine/src/chat-prefs.ts; the defaults live in packages/client/src/lib/chat-look.ts).
+     */
+    chatPrefs: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    /**
      * The dashboard Início shows instead of the person's own home board (ADR 0135 §18); null = their own. No foreign
      * key: read against the boards they see, so one deleted or no longer shown to them falls back to their own.
      */
     homeDashboardId: uuid(),
+    /**
+     * Lodi's weekly card for this person (ADR 0137 §9): `{ off?, day?, hour? }` (day 0 = Sunday, the hour in the
+     * workspace's time zone); a key not here keeps the default, Friday at 17h. Read through `teamWeekPrefsOf`
+     * (packages/engine/src/team-week.ts).
+     */
+    teamWeek: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

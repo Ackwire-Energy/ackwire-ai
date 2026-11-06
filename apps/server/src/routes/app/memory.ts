@@ -12,6 +12,7 @@ import {
   listAgentMemoryRows,
   listOrgMemoryRows,
   listProposals,
+  mayEditItem,
   NotFoundError,
   ownerDecides,
   type Proposal as ProposalRow,
@@ -30,7 +31,10 @@ const Memory = z
   .object({
     id: z.uuid(),
     agentId: z.uuid(),
-    kind: z.enum(["fact", "decision", "lesson", "preference"]),
+    kind: z.enum(["fact", "decision", "lesson", "preference", "rule"]).openapi({
+      description:
+        "`rule`: a lasting rule a person gave the agent (a permission, where to send things), followed in every run it does for them; `origin` says who and when.",
+    }),
     text: z.string(),
     source: z.string().openapi({ example: "Learned in #eng · Oct 12" }),
     origin: z
@@ -69,6 +73,10 @@ const Memory = z
         'The agent\'s own how-tos, lessons and notes ("How it works"): no receipt in the chat, listed only for its owner and who manages agents.',
     }),
     disputed: z.boolean().optional().openapi({ description: "Another memory says otherwise, until a person decides." }),
+    removable: z
+      .boolean()
+      .optional()
+      .openapi({ description: "A `rule` the viewer may remove: its giver, the agent's owner or an admin." }),
     channelId: z.uuid().nullable().optional().openapi({ description: "Where it was learned." }),
     updatedAt: z.string(),
     from: z
@@ -184,6 +192,7 @@ const KIND: Record<ContextItem["kind"], z.infer<typeof Memory>["kind"]> = {
   decision: "decision",
   lesson: "lesson",
   preference: "preference",
+  rule: "rule",
   note: "fact",
   open_question: "fact",
   entity_profile: "fact",
@@ -264,7 +273,7 @@ async function memoryViews(db: Database, items: ContextItem[], visible: readonly
       verified: i.verified,
       supersedes: previous.get(i.id) ?? null,
       editedByUserId: i.createdByKind === "person" ? i.createdById : null,
-      learned: i.createdByKind !== "person" || i.sourceIds.length > 0 || viaApp,
+      learned: i.kind !== "rule" && (i.createdByKind !== "person" || i.sourceIds.length > 0 || viaApp),
       howTo: isHowTo(i),
       summary: i.title.trim() && i.title.trim() !== i.content.trim() ? i.title.trim() : null,
       playbook: isPlaybook(i),
@@ -494,8 +503,17 @@ export function memoryRoutes(deps: AppDeps) {
       const current = rows
         .filter((r) => !r.supersededBy)
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.getTime() - a.updatedAt.getTime());
-      if (c.req.valid("query").about !== "me")
-        return c.json({ memories: await memoryViews(db, current, visible) }, 200);
+      if (c.req.valid("query").about !== "me") {
+        const views = await memoryViews(db, current, visible);
+        const rules = new Map(current.filter((i) => i.kind === "rule").map((i) => [i.id, i]));
+        const removable = new Map(
+          await Promise.all([...rules].map(async ([id, i]) => [id, await mayEditItem(db, viewerId, i)] as const)),
+        );
+        return c.json(
+          { memories: views.map((v) => (rules.has(v.id) ? { ...v, removable: removable.get(v.id) } : v)) },
+          200,
+        );
+      }
       const mine = await viewerSources(db, orgId, viewerId, current);
       const about = current.filter(
         (i) =>
@@ -512,7 +530,8 @@ export function memoryRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/memories/{memoryId}",
       tags,
       security,
-      summary: "Edit (keeps history), pin or archive a memory (agent owner or admin)",
+      summary:
+        "Edit (keeps history), pin or archive a memory (agent owner or admin; a rule people gave: its giver too)",
       request: {
         params: OrgParams.extend({ memoryId: z.uuid() }),
         body: body(

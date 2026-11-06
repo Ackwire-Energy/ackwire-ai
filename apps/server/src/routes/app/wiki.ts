@@ -107,7 +107,6 @@ const Backlink = z
       excerpt: z.string(),
       at: z.string(),
     }),
-    z.object({ kind: z.literal("forum"), topicId: z.uuid(), title: z.string() }),
     z.object({ kind: z.literal("issue"), number: z.number(), title: z.string() }),
   ])
   .openapi("WikiBacklink");
@@ -162,12 +161,7 @@ const Version = z
     title: z.string(),
   })
   .openapi("WikiVersion");
-const Source = z
-  .union([
-    z.object({ kind: z.literal("message"), channelId: z.uuid(), messageId: z.uuid() }),
-    z.object({ kind: z.literal("forum"), topicId: z.uuid() }),
-  ])
-  .openapi("WikiSource");
+const Source = z.object({ kind: z.literal("message"), channelId: z.uuid(), messageId: z.uuid() }).openapi("WikiSource");
 const Title = z.string().trim().min(1).max(200);
 const Folder = z.string().max(200);
 const Tags = z.array(z.string().max(40)).max(20);
@@ -187,7 +181,6 @@ export function wikiRoutes(deps: AppDeps) {
     db,
     pubsub: adapters.pubsub,
     search: { db, search: adapters.search, gateway: { embed: deps.extras?.embed ?? (async () => null) } },
-    artifacts: deps.extras?.artifacts,
   });
   const person = (userId: string): WikiActor => ({ type: "person", userId });
 
@@ -367,7 +360,7 @@ export function wikiRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/wiki/save",
       tags,
       security,
-      summary: '"Salvar na wiki" on a new page: a message or a forum synthesis, with a link back to it',
+      summary: '"Salvar na wiki" on a new page: a message, with a link back to it',
       request: {
         params: OrgParams,
         body: body(
@@ -432,7 +425,7 @@ export function wikiRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/wiki/pages/{slug}/append",
       tags,
       security,
-      summary: '"Salvar na wiki" on an existing page: appends the message or synthesis, with where it came from',
+      summary: '"Salvar na wiki" on an existing page: appends the message, with where it came from',
       request: {
         params: PageParams,
         body: body(

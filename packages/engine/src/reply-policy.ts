@@ -48,6 +48,19 @@ export const byAnotherAgent = (
   !!trigger.authorAgentId &&
   trigger.authorAgentId !== run.agentId;
 
+/** The prompt block of a run only a person's mention of everyone woke (`byEveryone`): it may pass too. */
+export const WHY_EVERYONE_CALLED =
+  "# Why you were called\nA person mentioned everyone in this conversation (@everyone), not you by name. Answer only if the message asks something of you or in your area that nobody has answered yet; an announcement, a greeting to all or something for the people here asks nothing of you: call pass at once.";
+
+/** A mention of everyone woke the run (`meta.everyoneAgentIds`, written with the message), its name not. */
+export const byEveryone = (
+  run: Pick<AgentRun, "agentId" | "trigger">,
+  trigger: Pick<Message, "meta"> | null | undefined,
+) => {
+  const ids = trigger?.meta?.everyoneAgentIds;
+  return run.trigger === "mention" && Array.isArray(ids) && ids.includes(run.agentId);
+};
+
 export interface ReplyPolicy {
   /** Nobody called it by name: it may end without a message (`pass`, an empty or sentinel-only answer). */
   mayPass: boolean;
@@ -65,9 +78,9 @@ const INFORMING_NOTICES: ReadonlySet<string> = new Set(["agent_note", "wait_resu
  * How a run must answer. Only runs nobody called by name may pass: the router
  * brought them in (a person's message without a mention, or an agent's reply
  * it chimes in on, `meta.joined`), another agent's @mention woke them
- * (`byAnotherAgent`), or a notice that only informs woke them
+ * (`byAnotherAgent`), a person's mention of everyone woke them (`byEveryone`), or a notice that only informs woke them
  * (`INFORMING_NOTICES`). Never a person's mention, a DM, another agent's
- * `ask_agent` consultation (a DM between agents), a forum turn, a routine's
+ * `ask_agent` consultation (a DM between agents), a routine's
  * call or report, a quote reply to this agent, a router follow-up to the agent
  * the person was talking to, nor a run a person answered or wrote into
  * (`answerOwed`). A run catching up after a usage pause (`catchUp`) may pass whoever called it: what it was asked
@@ -92,7 +105,7 @@ export function replyPolicyFor(
   // The end of a task a routine started follows the same report policy (`wakeConversationForTask`).
   const task = trigger?.meta?.machineTask as { routine?: { report?: unknown } } | undefined;
   if (task?.routine && task.routine.report !== "always") return { mayPass: true, background: false };
-  if (byAnotherAgent(run, trigger)) return { mayPass: true, background: false };
+  if (byAnotherAgent(run, trigger) || byEveryone(run, trigger)) return { mayPass: true, background: false };
   if (run.trigger !== "router" || options.followUp) return { mayPass: false, background: false };
   const meta = trigger?.meta ?? {};
   // A routine's call is a person's message written for its creator; an agent's message about a routine's

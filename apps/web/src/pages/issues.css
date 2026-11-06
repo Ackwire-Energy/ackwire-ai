@@ -21,27 +21,6 @@
   gap: 18px;
 }
 
-/* ── Header and toolbar ─────────────────────────────────────────────────── */
-.issues-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-.issues-head h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-}
-.issues-head__sub {
-  margin: 6px 0 0;
-  color: var(--muted);
-}
-
 /* ── Agents working now ─────────────────────────────────────────────────── */
 .issues-now {
   display: flex;
@@ -1294,12 +1273,6 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   }
 }
 @media (max-width: 720px) {
-  .issues-head > .ac-btn {
-    width: 100%;
-  }
-  .issues-head > .ac-btn .ac-btn__kbd {
-    display: none;
-  }
   .issues-board {
     --cw: 78vw;
   }
@@ -1800,7 +1773,10 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
  * A task's conversation (ADR 0145). The card's last line is the chat's thread line, quiet inside the card (the card
  * opens; the line isn't a button of its own).
  */
+/* A narrow card wraps the line between its parts (faces, count, state, time), never inside one. */
 .issue-card__talk {
+  flex-wrap: wrap;
+  row-gap: 2px;
   margin: 2px 0 0 -6px;
   pointer-events: none;
 }
@@ -1858,18 +1834,36 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   justify-content: space-between;
   gap: 8px;
 }
+/* "Tasks" and "Conversation" sit a step above the details, never on the fields card. */
+.issue-page__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* With its conversation the page is as tall as the area it scrolls in: the details scroll in their column and the
+   conversation runs to the bottom, the same margin below as above (the area is shorter than the window under the
+   desktop app's title bar or a banner, so a height taken from the window left a gap or cut the panel short). */
 .issue-page--talk {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(360px, 38%, 520px);
   gap: 24px;
-  align-items: start;
+  align-items: stretch;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+/* Room for the cards' shadows and focus rings at the scrolling column's edges. */
+.issue-page--talk > .issue-page__main {
+  min-height: 0;
+  overflow-y: auto;
+  margin: -4px;
+  padding: 4px;
 }
 .issue-page__talk {
-  position: sticky;
-  top: 0;
-  height: calc(100vh - 96px);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
-  height: calc(100dvh - 96px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1891,4 +1885,45 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   .issue-page--talk > .issue-page__main {
     display: none;
   }
+}
+.issue-subl {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.issue-subl li a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 6px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: inherit;
+  text-decoration: none;
+}
+.issue-subl li a:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.issue-subl__num {
+  width: 38px;
+  font-size: 12.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.issue-subl__tx {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.issue-subl__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
 }

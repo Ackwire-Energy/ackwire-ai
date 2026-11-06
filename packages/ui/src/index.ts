@@ -178,20 +178,6 @@ export {
   type FilterChipProps,
   type FilterOption,
 } from "./components/FilterChip";
-export {
-  Convergence,
-  type ForumTrackItem,
-  type ForumTrackKind,
-  layoutTrack,
-  RoundTrack,
-  roundLabelBoxes,
-  StanceLane,
-  TRACK_SIZES,
-  type TrackLayout,
-  type TrackLayoutItem,
-  type TrackSize,
-  trackItemAt,
-} from "./components/ForumPixels";
 export { InfoHint, type InfoHintProps } from "./components/InfoHint";
 export { isApple, Kbd, modKey, shortcut } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
@@ -225,9 +211,17 @@ export {
   MenuOverlayItem,
   MenuOverlaySeparator,
 } from "./components/MenuOverlay";
-export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
+export {
+  DayDivider,
+  Message,
+  type MessageLook,
+  MessageLookContext,
+  type MessageProps,
+  MessageText,
+} from "./components/Message";
 export { stopPlayback } from "./components/media-playback";
 export { OptionList, type OptionListItem, type OptionListProps } from "./components/OptionList";
+export { PageHeader, type PageHeaderProps } from "./components/PageHeader";
 export {
   PixelDone,
   type PixelDoneProps,

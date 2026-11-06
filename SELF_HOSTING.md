@@ -738,6 +738,14 @@ ones a self-hosted instance usually touches:
 **Model keys.** Each organization adds its own keys (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai,
 MiniMax or OpenRouter) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
 
+**Your own models.** **Other provider** there takes any server that speaks OpenAI's Chat Completions or
+Anthropic's Messages: an Ollama, vLLM, LM Studio or LiteLLM next to this server, or a gateway. Give its base
+address as that API's SDK takes it (`http://localhost:11434/v1` for Ollama), a key if it asks for one, then
+fetch or type its models and, if you like, their prices: each model gets one test call that checks it can use
+tools. A model without prices costs nothing in budgets (its tokens are still counted). Private addresses and
+`http://` are allowed on a self-hosted server, unless `ALLOW_SIGNUP=true` lets anyone in; set
+`MODEL_ENDPOINTS_PRIVATE` to choose (`false` allows only public https ones, what agentes.chat Cloud does).
+
 **Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
 it (below). After it, with `ALLOW_SIGNUP=false` (the default), only invited people get in: invited by
 email from **Settings → Members and invitations**. A workspace's invitation link lets nobody in by
@@ -913,6 +921,7 @@ party only when you turn that service on:
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
 | Claude (Anthropic), OpenAI, Gemini (Google), DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| Another provider (OpenAI- or Anthropic-compatible) | An organization's endpoint (Settings → AI accounts → Other provider) | What the other model providers receive, sent to the address the organization typed. When it is saved, the server also reads that address's model list and makes one small test call per model. |
 | OpenRouter | An organization's key | What the other model providers receive, passed on by OpenRouter to the model's own provider (the organization's OpenRouter privacy settings decide which may keep it). While a workspace has an OpenRouter key, the server also reads OpenRouter's public model list, with no key: about once an hour, and up to once a minute while agents' runs ask for a model the list lacks. |
 | TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI accounts** (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role, description and tools of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |

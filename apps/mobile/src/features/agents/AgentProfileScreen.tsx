@@ -8,9 +8,11 @@ import {
   useAiStatus,
   useApi,
   useApprovalRules,
+  useMemory,
   useMemoryAboutMe,
   useMemoryAction,
   useModelLabel,
+  useModels,
   useRemoveApprovalRule,
   useUsage,
 } from "@agenteschat/client";
@@ -18,6 +20,7 @@ import { approvalRuleServer, approvalRuleWords } from "@agenteschat/client/lib/a
 import { listsAgent, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
+import { modelUnpriced } from "@agenteschat/client/lib/endpoints";
 import { formatPercent, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
@@ -54,12 +57,12 @@ import {
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
-import { LetMeTalkPill } from "../chat/ReachLines";
+import { LetMeTalkButton } from "../chat/ReachLines";
 import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { UsageQueueSheet } from "../queue/UsageQueueSheet";
-import { openRightHandSettings } from "../right-hand/SettingsScreen";
+import { openRightHandSettings, RightHandMine } from "../right-hand/SettingsScreen";
 import { useConnectedById } from "../settings/hooks";
 import { agentBadgeInset } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -76,6 +79,7 @@ import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
 import { AgentMailSection } from "./AgentMailSection";
 import { byPlaybook, canEditMemories, type DidLine, didLines, knownAboutMe, plainRole, spendOf, usesOf } from "./logic";
+import { MergeReposSection } from "./MergeReposSection";
 import { MonthPixels } from "./MonthPixels";
 import { useMemoryOriginText } from "./useMemoryOriginText";
 import { workTitle } from "./work";
@@ -92,7 +96,6 @@ const AREA_ICON: Record<string, IconName> = {
   wiki: "doc",
   skills: "sparkle",
   schedule: "clock",
-  forum: "chat",
   sandbox: "laptop",
   browser: "globe",
   setup: "pen",
@@ -144,6 +147,7 @@ function Profile({ id }: { id: string }) {
   const underBar = AVATAR_TOP - (insets.top + BAR_HEIGHT);
   const avatarFade = useScrollFade(y, underBar - 30, underBar + 70);
   const agent = dir.agentById.get(id);
+  const models = useModels();
   // Someone it doesn't answer (not its owner, not an admin) sees only its public card: no tools, memory or month.
   const details = seesDetails(agent);
   // The team's right hand (ADR 0137): what it is and how it works, its model, Configurar for who manages agents.
@@ -388,9 +392,14 @@ function Profile({ id }: { id: string }) {
               {details ? t("mobile.agent.cantTalk") : t("profile.detailsHidden", agentGrammar(name))}
             </Text>
           ) : null}
-          {agent ? <LetMeTalkPill agent={agent} /> : null}
+          {agent ? <LetMeTalkButton agent={agent} /> : null}
         </View>
 
+        {rightHand && agent ? (
+          <Section title={t("rightHand.settings.mine")}>
+            <RightHandMine agent={agent} />
+          </Section>
+        ) : null}
         {rightHand && agent ? (
           <Section title={t("rightHand.profile.how")}>
             <Card>
@@ -586,6 +595,10 @@ function Profile({ id }: { id: string }) {
 
             <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
 
+            {details ? <GivenRules agentId={id} /> : null}
+
+            <MergeReposSection agentId={id} name={name} mayEdit={mine || can(org, "manage_agents")} />
+
             <Section title={t("mobile.agent.month")}>
               <View style={styles.monthCards}>
                 {shown.plan ? (
@@ -626,6 +639,11 @@ function Profile({ id }: { id: string }) {
                         )}
                       </View>
                       <SpendBar color={look.color} value={spend.fraction} />
+                      {agent && modelUnpriced(models.data?.models, agent.model) ? (
+                        <Text variant="caption" tone="muted">
+                          {t("endpoint.budgetUnpriced")}
+                        </Text>
+                      ) : null}
                       {spend.fraction >= 1 ? (
                         <View style={styles.warn}>
                           <Icon name="clock" size={14} color={c.muted} />
@@ -730,6 +748,59 @@ function AlwaysApproved({ agentId, name, mayRemove }: { agentId: string; name: s
       </Card>
       <Text variant="small" tone="muted" style={styles.foot}>
         {t("agentPage.access.always.help")}
+      </Text>
+    </Section>
+  );
+}
+
+/**
+ * "Regras que as pessoas deram", as on the web's Memória: what people told it to always do, by whom and when. Its
+ * giver, the agent's owner and admins take one back with its ×. Shown only when there is something.
+ */
+function GivenRules({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const toast = useToast();
+  const when = useWhen();
+  const memory = useMemory(orgId, agentId);
+  const remove = useMemoryAction(orgId, agentId);
+  const list = (memory.data ?? []).filter((m) => m.kind === "rule" && !m.archived);
+  if (list.length === 0) return null;
+  return (
+    <Section title={t("agentPage.memory.rules")}>
+      <Card>
+        {list.map((m) => (
+          <Row
+            key={m.id}
+            leading={<Tile icon="flag" />}
+            title={m.text}
+            subtitle={t("agentPage.memory.ruleBy", {
+              name: m.origin?.name ?? t("memory.origin.someone"),
+              date: when.short(m.origin?.at ?? m.updatedAt),
+            })}
+            meta={
+              m.removable ? (
+                <IconButton
+                  icon="x"
+                  label={t("agentPage.memory.removeRule")}
+                  disabled={remove.isPending}
+                  onPress={() =>
+                    remove.mutate(
+                      { type: "archive", id: m.id, archived: true },
+                      {
+                        onSuccess: () => toast({ title: t("agentPage.memory.ruleRemoved"), agentId }),
+                        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+                      },
+                    )
+                  }
+                />
+              ) : undefined
+            }
+          />
+        ))}
+      </Card>
+      <Text variant="small" tone="muted" style={styles.foot}>
+        {t("agentPage.memory.rulesNote")}
       </Text>
     </Section>
   );

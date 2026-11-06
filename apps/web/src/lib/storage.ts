@@ -52,12 +52,16 @@ export const STORAGE_KEYS = {
   imageLens: "agentes.image.lens",
   /** The Drive's view: "grid" (default) or "list". */
   driveView: "agentes.drive.view",
+  /** Equipe's view (ADR 0148): "list" (default), "chart", "map", "sectors" or "usage". */
+  teamView: "agentes.team.view",
   /** "1" when the person shrank the sidebar to its icon rail (desktop). */
   sidebarCollapsed: "agentes.sidebar.collapsed",
   /** Prefix (`.<user id>.<org id>`): the sidebar categories that person closed in that workspace (JSON array of ids). */
   sidebarSections: "agentes.sidebar.sections",
   /** Prefix (`.<user id>.<org id>`): "1" or "0", the person opened or closed a channel's members column there. */
   membersColumn: "agentes.members.column",
+  /** Prefix (`.<user id>.<org id>`): "1" or "0", the person opened or closed the sidebar of a DM with an agent there. */
+  dmSidebar: "agentes.dm.sidebar",
   /** Offline-computer notices the person closed (`machineId@offlineSince`), until that computer comes back. */
   outagesDismissed: "agentes.outages.dismissed",
   /** The workspace computer's notice the person closed (`setupNoticeKey`), until its state changes. */

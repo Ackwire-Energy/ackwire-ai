@@ -81,7 +81,7 @@ const policyJson = (p: ClaudeAuthPolicy) => ({
 });
 
 /**
- * How new Claude sign-ins for all agents are made (ADR 0146): the installation's policy and how the connections
+ * How new Claude sign-ins for all agents are made (ADR 0149): the installation's policy and how the connections
  * people have now sign in. A change reaches only sign-ins started after it; every connection keeps its method.
  */
 export function registerOperatorClaudeAuth(api: OpenAPIHono, { db }: OperatorDeps) {

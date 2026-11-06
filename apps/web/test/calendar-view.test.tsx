@@ -3,10 +3,11 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { CalendarReminder } from "@agenteschat/client";
 import { HOUR_PX } from "@agenteschat/client/lib/calendar";
 import { toYmd } from "@agenteschat/client/lib/format";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -108,7 +109,7 @@ describe("Calendário: views, moves and series", () => {
 
   test("views: Mês and Agenda; T goes back to today; arrows move the day", async () => {
     await go();
-    const range = () => document.querySelector(".cal-page__range")?.textContent ?? "";
+    const range = () => document.querySelector(".ac-pagehead__meta")?.textContent ?? "";
     const thisWeek = range();
     await act(async () => fireEvent.keyDown(document.body, { key: "ArrowRight" }));
     for (let i = 0; i < 7; i++) await act(async () => fireEvent.keyDown(document.body, { key: "ArrowRight" }));
@@ -263,5 +264,67 @@ describe("Calendário: views, moves and series", () => {
     await settle(2);
     expect(document.querySelectorAll(".cal-week__col")).toHaveLength(7);
     expect(screen().getByText("Nada marcado. Arraste para criar ou aperte N")).toBeTruthy();
+  });
+});
+
+describe("Calendário: reminders", () => {
+  const reminder = (over: Partial<CalendarReminder> = {}): CalendarReminder => ({
+    id: "rem-1",
+    message: "Call com o cliente",
+    at: at(9).toISOString(),
+    forUserId: "u-joao",
+    channelId: ENG_ID,
+    threadId: null,
+    agentId: ADA_ID,
+    createdBy: "u-joao",
+    canCancel: true,
+    ...over,
+  });
+  /** The calendar with these reminders, and every cancel asked. */
+  const withReminders = async (seeded: CalendarReminder[]) => {
+    let reminders = seeded;
+    const canceled: string[] = [];
+    await go(async (api) => {
+      const range = api.calendar.range;
+      api.calendar.range = async (...args) => ({ ...(await range(...args)), reminders });
+      api.reminders = {
+        create: async () => ({}) as never,
+        list: async () => [],
+        cancel: async (_org, id) => {
+          canceled.push(id);
+          reminders = [];
+          return {} as never;
+        },
+      };
+    });
+    return canceled;
+  };
+  const chip = () => screen().queryByRole("button", { name: /^Call com o cliente, / });
+
+  test("a reminder is on the calendar with its time, who set it and where it posts, and who set it cancels it", async () => {
+    const canceled = await withReminders([reminder()]);
+    await click(chip() as HTMLElement);
+    await settle(2);
+    const details = within(document.querySelector(".cal-details") as HTMLElement);
+    expect(details.getByText("Lembrete")).toBeTruthy();
+    expect(details.getByText(/09:00/)).toBeTruthy();
+    expect(details.getByText("Criado por João")).toBeTruthy();
+    expect(details.getByText("Postado por Ada · #eng")).toBeTruthy();
+    await click(details.getByRole("button", { name: "Cancelar lembrete" }));
+    await settle(4);
+    expect(canceled).toEqual(["rem-1"]);
+    expect(chip()).toBeNull();
+  });
+
+  test("someone else's offers no cancel, and the Lembretes filter hides them", async () => {
+    await withReminders([reminder({ canCancel: false })]);
+    await click(chip() as HTMLElement);
+    await settle(2);
+    expect(screen().queryByRole("button", { name: "Cancelar lembrete" })).toBeNull();
+    await act(async () => fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" }));
+    await settle(2);
+    await click(screen().getByRole("button", { name: /^Lembretes/ }));
+    await settle(2);
+    expect(chip()).toBeNull();
   });
 });

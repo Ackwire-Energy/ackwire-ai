@@ -123,7 +123,7 @@ const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
 };
 
 describe("Notificações", () => {
-  test("how many are unread is on the title's row from the first paint, before the list arrives", async () => {
+  test("how many are unread is under the title from the first paint, before the list arrives", async () => {
     const state = seedState({
       notifications: [notification({ id: "n-a", kind: "mention" }), notification({ id: "n-b", kind: "mention" })],
     });
@@ -133,15 +133,15 @@ describe("Notificações", () => {
     await renderApp(`/org/${ORG_ID}/notifications`, { api });
     await settle(4);
     const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
-    expect(title.parentElement?.className).toBe("nt-title");
+    expect(title.nextElementSibling?.className).toBe("ac-pagehead__meta");
     expect(title.nextElementSibling?.textContent).toContain("2 não lidas");
   });
 
   test("waiting on top with the agent looking up, the rest by day, filters with counts, the badge and the tab title", async () => {
     await go();
     const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
-    // How many are unread: on the title's row, right after it.
-    expect(title.parentElement?.className).toBe("nt-title");
+    // How many are unread: the header's line, right under the title.
+    expect(title.nextElementSibling?.className).toBe("ac-pagehead__meta");
     expect(title.nextElementSibling?.textContent).toContain("3 não lidas");
     const waiting = screen().getByRole("region", { name: "Esperando você" });
     expect(waiting.textContent).toContain("Ada está parada até você responder.");
@@ -889,18 +889,9 @@ describe("Esperando você: what only points somewhere is one row", () => {
       latest: { title: "Run deploy workflow" },
       updatedAt: ago(5),
     });
-    const turn = notification({
-      id: "n-turn",
-      kind: "forum_turn",
-      waiting: true,
-      actors: [{ type: "agent", id: ATLAS_ID }],
-      source: { topicId: "t-1", label: "Preço do plano Pro" },
-      latest: { title: "Preço do plano Pro", round: 2, rounds: 3 },
-      updatedAt: ago(8),
-    });
     const items = inbox();
-    await go(seedState({ notifications: [...items, approval, turn, asks()] }));
-    for (const id of ["n-q", "n-ap", "n-turn"]) {
+    await go(seedState({ notifications: [...items, approval, asks()] }));
+    for (const id of ["n-q", "n-ap"]) {
       const line = row(id).querySelector(".nt-wacts") as HTMLElement;
       expect(line.classList.contains("ac-acts")).toBe(true);
       expect(line.lastElementChild?.matches(".nt-tail.ac-acts")).toBe(true);

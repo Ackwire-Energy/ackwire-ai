@@ -25,6 +25,7 @@ import {
   setupView,
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -241,6 +242,8 @@ export interface ExistingUsed {
   account?: MachineAccount;
   /** On a plan: it answers only its owner (ADR 0059 §5). */
   onlyOwner: boolean;
+  /** The team's right hand's own AI for the person (ADR 0137 §11): it serves them alone, so no switch. */
+  personal?: boolean;
 }
 
 /**
@@ -314,13 +317,21 @@ export function ExistingRows({
         ...(move ? { moveAccount: true } : {}),
         ...(toEveryone ? { onlyOwner: false } : {}),
       });
-      return { label: a.label, choice: planOfAccount(a), account: a, onlyOwner: next.onlyOwner };
+      return {
+        label: a.label,
+        choice: planOfAccount(a),
+        account: a,
+        onlyOwner: next.onlyOwner,
+        personal: next.scope === "mine",
+      };
     });
   // The workspace's model on that key: the agent's model where the key runs it, else Automático, which follows the key.
   const pickKey = (key: Credential) =>
     save(async () => {
       const fits = keyRuns(key, dir.agentById.get(agent.id)?.model, models.data?.models ?? []);
       if (view.brain !== "model") await api.agents.setBrain(org.id, agent.id, { brain: "model" });
+      // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
+      if (view.scope === "mine") await api.agents.setBrain(org.id, agent.id, { scope: "workspace", brain: "model" });
       await api.agents.update(org.id, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
       return { label: key.label, choice: "key", onlyOwner: false };
     });
@@ -427,7 +438,7 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
       {a?.kind === "antigravity" && geminiPersonal(a) && (
         <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
       )}
-      {a && (
+      {a && !used.personal && (
         <div className="ac-card__foot ac-iconline ai-panel__replies">
           <Icon name={on ? "audienceEveryone" : "audienceOwner"} size={14} />
           <PlanReplies
@@ -867,21 +878,23 @@ function PlanSteps({
   );
   // The sign-in in play: one just made, the computer's own chosen here, or what the agent already thinks with.
   const signIn = own?.chosen || ownSaved ? OWN_SIGN_IN : view?.brain === kind ? view : undefined;
-  // Who the agents answer, once for the plan, as its foot: its icon says it, its switch changes it.
-  const foot = (
-    <div className="ac-card__foot ac-iconline ai-panel__replies">
-      <Icon name={replyAll ? "audienceEveryone" : "audienceOwner"} size={14} />
-      <PlanReplies
-        agent={everyone || everyAgent ? null : agent.name}
-        on={replyAll}
-        onChange={(on) => void replyToEveryone(on)}
-        brain={kind}
-        plan={account?.plan ?? (signIn ? signInPlan(signIn, gates.row, kind) : null)}
-        coding={planOf(choice)}
-        disabled={replying}
-      />
-    </div>
-  );
+  // Who the agents answer, once for the plan, as its foot: its icon says it, its switch changes it. The team's right
+  // hand's own AI for the person serves them alone: no switch.
+  const foot =
+    view?.scope === "mine" ? null : (
+      <div className="ac-card__foot ac-iconline ai-panel__replies">
+        <Icon name={replyAll ? "audienceEveryone" : "audienceOwner"} size={14} />
+        <PlanReplies
+          agent={everyone || everyAgent ? null : agent.name}
+          on={replyAll}
+          onChange={(on) => void replyToEveryone(on)}
+          brain={kind}
+          plan={account?.plan ?? (signIn ? signInPlan(signIn, gates.row, kind) : null)}
+          coding={planOf(choice)}
+          disabled={replying}
+        />
+      </div>
+    );
 
   if (gates.failed)
     return (
@@ -1257,7 +1270,7 @@ function GateWait({
       <SettingNote icon="lock">
         {gate.who === "computer"
           ? t("connectAi.accountsLocked", { name: pairer ?? "", computer })
-          : t("noAi.lockedAdmins")}
+          : t("noAi.lockedOwner")}
       </SettingNote>
     );
   }
@@ -1267,7 +1280,8 @@ function GateWait({
 
 /** The API key being added: its maker (or the agentes.chat key, where the server offers one) and the key. */
 export interface KeyDraft {
-  provider: ProviderId | "platform";
+  /** `custom`: a workspace's own endpoint (ADR 0146), which has a form of its own (`endpoint`). */
+  provider: ProviderId | "platform" | typeof CUSTOM_PROVIDER;
   apiKey: string;
 }
 
@@ -1284,9 +1298,12 @@ export function KeyPanel({
   saved,
   saving,
   onSave,
+  endpoint,
 }: {
   draft: KeyDraft;
   onDraft: (draft: KeyDraft) => void;
+  /** The "Outro provedor" form, shown when it is chosen. */
+  endpoint?: ReactNode;
   /** The server has a key of its own to offer. */
   platform?: boolean;
   /** Only an admin adds an API key. */
@@ -1299,13 +1316,13 @@ export function KeyPanel({
   const fieldId = useId();
   const [touched, setTouched] = useState(false);
   const { provider, apiKey } = draft;
-  const keyOf = provider === "platform" ? null : provider;
+  const keyOf = provider === "platform" || provider === CUSTOM_PROVIDER ? null : provider;
   const maker = keyOf ? providerOf(keyOf) : undefined;
   const hint = maker && keyStepHint(maker);
   const valid = keyOf === null || keyLooksValid(keyOf, apiKey);
   const wrong = touched && apiKey.trim().length > 0 && !valid;
   const site = maker ? new URL(`https://${maker.site}`) : null;
-  const pick = (next: ProviderId | "platform") => onDraft({ provider: next, apiKey });
+  const pick = (next: KeyDraft["provider"]) => onDraft({ provider: next, apiKey });
   return (
     <Card as="section" className="ai-panel" aria-label={t("connectAi.key.title")}>
       {keyOf && (
@@ -1329,6 +1346,12 @@ export function KeyPanel({
                 <span className="ac-option__title">{p.label}</span>
               </OptionCard>
             ))}
+            {endpoint && (
+              <OptionCard pressed={provider === CUSTOM_PROVIDER} onClick={() => pick(CUSTOM_PROVIDER)}>
+                <ProviderLogo id={CUSTOM_PROVIDER} size="sm" />
+                <span className="ac-option__title">{t("endpoint.option")}</span>
+              </OptionCard>
+            )}
             {platform && (
               <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")} className="ai-key__ours">
                 <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
@@ -1338,7 +1361,14 @@ export function KeyPanel({
               </OptionCard>
             )}
           </div>
-          {keyOf && maker && site ? (
+          {provider === CUSTOM_PROVIDER ? (
+            <>
+              <p className="small muted" style={{ margin: 0 }}>
+                {t("endpoint.optionSub")}
+              </p>
+              {endpoint}
+            </>
+          ) : keyOf && maker && site ? (
             <>
               <Step
                 n={1}

@@ -1,5 +1,6 @@
 import type { WikiPageSummary } from "@agenteschat/client";
 import { useWikiPage, useWikiTree } from "@agenteschat/client";
+import { readsAsPageTitle } from "@agenteschat/client/lib/markdown";
 import { resolveWikiLink, splitSection } from "@agenteschat/client/lib/wiki";
 import { Popover, useHoverCard } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -45,6 +46,7 @@ export function WikiLinkChip({ title, label, pages }: { title: string; label: st
   const { section } = splitSection(title);
   // Under a mouse it opens at once. Focus on the link holds it open like a press, until the link's blur.
   const card = useHoverCard(0);
+  if (!page && !readsAsPageTitle(title)) return <>{label}</>;
   if (!page) {
     return (
       <button
@@ -89,7 +91,7 @@ export function WikiLinkChip({ title, label, pages }: { title: string; label: st
   );
 }
 
-/** The renderer to pass to `<Markdown wikiLink>` in chat, forum, issues and the wiki itself. */
+/** The renderer to pass to `<Markdown wikiLink>` in chat, issues and the wiki itself. */
 export function useWikiLinkRenderer(): WikiLinkRenderer {
   const { org } = useOrg();
   const tree = useWikiTree(org.id);

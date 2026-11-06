@@ -35,6 +35,7 @@ import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
 import { cutText, formatBytes, textOfBytes } from "./format";
+import { mergeReposOfCall } from "./git/repos";
 import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
 import { notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
@@ -77,7 +78,7 @@ import {
 } from "./sandbox";
 import { requestSecretTool } from "./secret-request-tool";
 import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
-import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
+import { agentSkillByName, type SkillDeps, skillFilesOf, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { MAX_RESULT_CHARS } from "./tools/gateway";
 import { WHY_MAX_CHARS } from "./tools/run-policy";
@@ -405,7 +406,12 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
   return {
     content: parts.join("\n"),
     isError: r.timedOut || r.exitCode !== 0,
-    data: { exitCode: r.exitCode, timedOut: r.timedOut, ...(r.canceled ? { canceled: r.canceled } : {}) },
+    data: {
+      exitCode: r.exitCode,
+      timedOut: r.timedOut,
+      ...(r.canceled ? { canceled: r.canceled } : {}),
+      ...(r.merge ? { merge: r.merge } : {}),
+    },
   };
 }
 
@@ -521,8 +527,13 @@ export function createSandboxToolSource(
    * `agent.tool.output` (every 250 ms at most, ≤ 64 KB per call, secrets masked).
    */
   const execLive = async (ctx: ToolContext, computer: ComputerHandle, given: ExecRequest) => {
+    const mergeRepos = ctx.approved ? [] : await mergeReposOfCall(ctx);
     // Canceling the run stops the command (killed when the provider can).
-    const request: ExecRequest = ctx.signal ? { ...given, signal: ctx.signal } : given;
+    const request: ExecRequest = {
+      ...given,
+      ...(ctx.signal ? { signal: ctx.signal } : {}),
+      ...(mergeRepos.length > 0 ? { mergeRepos } : {}),
+    };
     const { id, provider } = computer;
     if (!provider.execStream || !deps.pubsub || !ctx.toolUseId) return provider.exec(id, request);
     // Where the run's other events go.
@@ -918,7 +929,7 @@ export function createSandboxToolSource(
               });
           return {
             content: `Saved ${path} to the Drive as "${a.title}" (${a.kind}), artifact ${a.id}, version ${a.version}.`,
-            data: { artifact: { id: a.id, version: a.version } },
+            data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
           return failed(error);
@@ -973,7 +984,7 @@ export function createSandboxToolSource(
           if (!done) return { content: `Failed: ${row.error ?? "the upload did not finish"}`, isError: true };
           return {
             content: `Uploaded ${path} to the Drive as "${done.title}" (file, ${formatBytes(done.size)}), artifact ${done.id}, version ${done.version}.`,
-            data: { artifact: { id: done.id, version: done.version } },
+            data: { artifact: { id: done.id, version: done.version, title: done.title } },
           };
         } catch (error) {
           return failed(error);
@@ -1044,8 +1055,8 @@ export function createSandboxToolSource(
         try {
           const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, str(input.skill));
           if (!skill) return { content: `No skill named ${str(input.skill)} is enabled for you.`, isError: true };
-          const files = await skillFolderFiles(skillDeps(ctx), skill);
-          const target = files.find((f) => f.path === toolPath(str(input.path), computerInfo));
+          const listed = await skillFilesOf(ctx.db, skill);
+          const target = listed.find((f) => f.path === toolPath(str(input.path), computerInfo));
           if (target?.status !== "script") {
             return { content: `${str(input.path)} is not a script of ${skill.name}.`, isError: true };
           }
@@ -1056,11 +1067,22 @@ export function createSandboxToolSource(
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
           // A file past what one write to a computer carries (a big PDF) stays behind instead of failing every run.
-          const copied = files.filter((f) => f.data.byteLength <= MAX_INLINE_FILE_BYTES);
-          const left = files.filter((f) => f.data.byteLength > MAX_INLINE_FILE_BYTES).map((f) => f.path);
+          const left = listed
+            .filter((f) => f.status !== "ignored" && f.size > MAX_INLINE_FILE_BYTES)
+            .map((f) => f.path);
+          // A skill can hold thousands of files: copied once a version. Its scripts go on every run, so what runs (and
+          // what a person approved) is the skill's, whatever was written over them on the computer since.
+          const copiedMark = `${base}/.copied-v${skill.version}`;
+          const scripts = listed.filter((f) => f.status === "script").map((f) => f.path);
           const started = Date.now();
           const result = await run(ctx, async (computer) => {
-            for (const f of copied) await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
+            const copied = await computer.provider.readFile(computer.id, copiedMark);
+            for (const f of await skillFolderFiles(skillDeps(ctx), skill, copied ? scripts : undefined)) {
+              if (f.data.byteLength > MAX_INLINE_FILE_BYTES) continue;
+              await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
+            }
+            if (!copied)
+              await computer.provider.writeFile(computer.id, copiedMark, new TextEncoder().encode(skill.name));
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
               timeoutSeconds: timeout,

@@ -1228,7 +1228,7 @@ test("a local task's CLI hears its tools are there, though none of the server's 
     "work",
     { task: true, local: true, delegated: surface },
   );
-  expect((answer?.result as { instructions: string }).instructions).toStartWith("Claude Code's tools");
+  expect((answer?.result as { instructions?: string } | undefined)?.instructions).toStartWith("Claude Code's tools");
 });
 
 test("in a background task, a refused call says so and is listed; a turn's isn't", async () => {

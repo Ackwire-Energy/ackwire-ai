@@ -39,6 +39,8 @@ export function Filters({ items, value, onChange }: FiltersProps) {
       horizontal
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      // A ScrollView grows by default: in a screen's column beside another one, the chips took half the height.
+      style={{ flexGrow: 0 }}
       contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 4 }}
     >
       {items.map((item) => {

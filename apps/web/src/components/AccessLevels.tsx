@@ -38,7 +38,6 @@ const AREA_ICON: Record<string, IconName> = {
   wiki: "book",
   skills: "bolt",
   schedule: "routines",
-  forum: "message",
   sandbox: "computer",
   browser: "globe",
   setup: "edit",

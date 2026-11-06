@@ -76,7 +76,7 @@ describe("web addresses → the app's screens", () => {
   });
 
   test("pages the app lacks, and odd ids, open the website; the app's own links stay as they are", () => {
-    expect(appLinkFromUrl(`${W}/org/${O}/forum/f1`)).toEqual({ web: `/org/${O}/forum/f1` });
+    expect(appLinkFromUrl(`${W}/org/${O}/calendar`)).toEqual({ web: `/org/${O}/calendar` });
     expect(appLinkFromUrl(`${W}/org/${O}/settings/billing`)).toEqual({ web: `/org/${O}/settings/billing` });
     // A sign-in's result or an action only the website runs stays the website's.
     for (const path of [

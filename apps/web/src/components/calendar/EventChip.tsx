@@ -12,10 +12,10 @@ import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
 import { lookOf } from "@/lib/look";
 
-/** The chip's left color: only by source (person, the agent's own color, routine, due date). */
+/** The chip's left color: only by source (person, the agent's own color, routine, reminder, due date). */
 export function useAccent(item: CalItem): CSSProperties {
   const actors = useActors();
-  if (item.source === "agent" || (item.source === "routine" && item.agentId)) {
+  if (item.source === "agent" || ((item.source === "routine" || item.source === "reminder") && item.agentId)) {
     const look = lookOf(actors.dir.agentById.get(item.agentId ?? ""));
     const vars = appearanceStyle(look) as Record<string, string> | undefined;
     return { "--cal-accent": vars?.["--av-bottom"] ?? "var(--agent)" } as CSSProperties;
@@ -23,9 +23,9 @@ export function useAccent(item: CalItem): CSSProperties {
   return {};
 }
 
-/** "09:00–10:00"; a routine run is a moment: "09:00". */
+/** "09:00–10:00"; a routine run or a reminder is a moment: "09:00". */
 export const timeRange = (locale: string, it: CalItem) =>
-  it.kind === "routine"
+  it.kind === "routine" || it.kind === "reminder"
     ? formatTime(locale, it.start.toISOString())
     : `${formatTime(locale, it.start.toISOString())}–${formatTime(locale, it.end.toISOString())}`;
 
@@ -127,7 +127,18 @@ export function EventChip({
 }
 
 /** What the popover says about an item, with its actions. */
-export function ItemDetails({ item, onEdit, onDelete }: { item: CalItem; onEdit?: () => void; onDelete?: () => void }) {
+export function ItemDetails({
+  item,
+  onEdit,
+  onDelete,
+  onCancel,
+}: {
+  item: CalItem;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  /** A reminder this person may cancel. */
+  onCancel?: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
@@ -135,7 +146,6 @@ export function ItemDetails({ item, onEdit, onDelete }: { item: CalItem; onEdit?
   const channels = useChannels(org.id);
   const target = (tg: RoutineTarget) => {
     if (tg.type === "channel") return `#${channels.data?.find((c) => c.id === tg.channelId)?.name ?? ""}`;
-    if (tg.type === "forum") return t("routines.target.forumShort");
     if (tg.type === "conversation") {
       const c = channels.data?.find((x) => x.id === tg.channelId);
       return c ? `#${c.name}` : t("routines.inConversation");
@@ -188,6 +198,21 @@ export function ItemDetails({ item, onEdit, onDelete }: { item: CalItem; onEdit?
           })}
         </span>
       )}
+      {item.kind === "reminder" && item.target && (
+        <>
+          {item.setBy && (
+            <span className="small">
+              {t("calendar.reminderBy", { name: actors.name({ type: "person", id: item.setBy }) })}
+            </span>
+          )}
+          <span className="small">
+            {t("calendar.reminderPosted", {
+              agent: actors.name({ type: "agent", id: item.agentId ?? "" }),
+              target: target(item.target),
+            })}
+          </span>
+        </>
+      )}
       {item.kind === "deadline" && <span className="small">{t("calendar.deadlineDetail")}</span>}
       {item.people.length > 0 && (
         <ul className="cal-details__people">
@@ -219,6 +244,11 @@ export function ItemDetails({ item, onEdit, onDelete }: { item: CalItem; onEdit?
               {t("calendar.openRoutines")}
             </Link>
           ))}
+        {onCancel && (
+          <Button size="sm" variant="ghost" icon="trash" onClick={onCancel}>
+            {t("calendar.cancelReminder")}
+          </Button>
+        )}
         {onDelete && (
           <Button size="sm" variant="ghost" icon="trash" onClick={onDelete}>
             {t("calendar.delete")}

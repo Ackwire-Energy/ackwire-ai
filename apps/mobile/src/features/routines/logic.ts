@@ -131,15 +131,13 @@ export function routineAgents(list: readonly Pick<Routine, "agentId">[]): string
 
 // ── Icons (the phone's set) ─────────────────────────────────────────────────
 
-/** Where it delivers: a DM, a thread, a channel, the forum, the Drive. */
+/** Where it delivers: a DM, a thread, a channel, the Drive. */
 export function targetIcon(target: RoutineTarget): IconName {
   switch (target.type) {
     case "dm":
       return "chat";
     case "conversation":
       return target.threadId ? "reply" : "hash";
-    case "forum":
-      return "members";
     case "artifact":
       return "doc";
     case "widget":
@@ -301,11 +299,8 @@ export function laneTag(
 
 export const TARGET_DM = "dm";
 export const TARGET_ARTIFACT = "artifact";
-export const TARGET_FORUM = "forum";
 /** Editing a routine made in the chat (a thread or DM): keep where it delivers. */
 export const TARGET_KEEP = "keep";
-export const FORUM_ROUNDS = ["1", "2", "3", "5"] as const;
-export type ForumRounds = (typeof FORUM_ROUNDS)[number];
 
 /** Where a routine delivers, as the form's choice (a channel's id, or one of the words above). */
 export function targetChoice(target: RoutineTarget | undefined): string {
@@ -313,14 +308,7 @@ export function targetChoice(target: RoutineTarget | undefined): string {
   if (target.type === "channel") return target.channelId;
   if (target.type === "dm") return TARGET_DM;
   if (target.type === "artifact") return TARGET_ARTIFACT;
-  if (target.type === "forum") return TARGET_FORUM;
   return TARGET_KEEP;
-}
-
-/** The forum's rounds a routine has (3 when it has none, or another number). */
-export function forumRoundsOf(target: RoutineTarget | undefined): ForumRounds {
-  const rounds = target?.type === "forum" ? String(target.rounds ?? "") : "";
-  return (FORUM_ROUNDS as readonly string[]).includes(rounds) ? (rounds as ForumRounds) : "3";
 }
 
 // ── "Quando chegar um email" ────────────────────────────────────────────────
@@ -404,11 +392,8 @@ export function ruleOf(r: Routine | undefined, zone: string, today = new Date())
 /** What the form holds. */
 export interface RoutineDraft {
   agentId: string;
-  /** `targetChoice`: a channel's id, `dm`, `artifact`, `forum` or `keep`. */
+  /** `targetChoice`: a channel's id, `dm`, `artifact` or `keep`. */
   target: string;
-  /** "Um tópico no fórum": the agents who discuss (none picked: the routine's agent) and the rounds. */
-  forumAgents: string[];
-  forumRounds: ForumRounds;
   prompt: string;
   name: string;
   kind: TriggerKind;
@@ -425,8 +410,6 @@ export function draftOf(r: Routine | undefined, zone: string, today = new Date()
   return {
     agentId: r?.agentId ?? "",
     target: targetChoice(r?.target),
-    forumAgents: r?.target.type === "forum" ? r.target.agentIds : [],
-    forumRounds: forumRoundsOf(r?.target),
     prompt: r?.prompt ?? "",
     name: r?.name ?? "",
     kind: r && isEventDriven(r) ? (r.trigger.type as TriggerKind) : "schedule",
@@ -442,12 +425,7 @@ export function draftOf(r: Routine | undefined, zone: string, today = new Date()
   };
 }
 
-/** The forum's agents as sent: the ones picked, else the routine's own agent. */
-export const forumAgentsOf = (d: Pick<RoutineDraft, "forumAgents" | "agentId">) =>
-  d.forumAgents.length > 0 ? d.forumAgents : [d.agentId];
-
 export function draftTarget(d: RoutineDraft): RoutineTargetInput {
-  if (d.target === TARGET_FORUM) return { type: "forum", agentIds: forumAgentsOf(d), rounds: Number(d.forumRounds) };
   if (d.target === TARGET_DM) return { type: "dm" };
   if (d.target === TARGET_ARTIFACT) return { type: "artifact" };
   return { type: "channel", channelId: d.target };
@@ -498,12 +476,7 @@ export function draftChanges(r: Routine, d: RoutineDraft, savedRule: string, rul
   if (d.name.trim() && d.name.trim() !== r.name) patch.name = d.name.trim();
   if (r.prompt !== null && d.prompt.trim() !== r.prompt) patch.prompt = d.prompt.trim();
   if (d.agentId !== r.agentId) patch.agentId = d.agentId;
-  const forumChanged =
-    d.target === TARGET_FORUM &&
-    r.target.type === "forum" &&
-    (JSON.stringify([...forumAgentsOf(d)].sort()) !== JSON.stringify([...r.target.agentIds].sort()) ||
-      Number(d.forumRounds) !== (r.target.rounds ?? 3));
-  if (d.target !== TARGET_KEEP && (d.target !== targetChoice(r.target) || forumChanged)) patch.target = draftTarget(d);
+  if (d.target !== TARGET_KEEP && d.target !== targetChoice(r.target)) patch.target = draftTarget(d);
   const once = d.rule.freq === "once";
   const triggerChanged =
     d.kind === "connector"

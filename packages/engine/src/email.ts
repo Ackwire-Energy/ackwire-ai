@@ -1036,22 +1036,27 @@ export async function queuePlanLent(
 ) {
   const { db } = deps;
   const { agentId, accountId, actorId } = payload as { agentId: string; accountId: string; actorId: string };
-  const [row] = await db
+  const [given] = await db
     .select({
       name: agents.name,
       brain: agents.brain,
       account: agents.brainAccountId,
       lentBy: agents.brainAccountLentBy,
-      ownerId: schema.machineAccounts.createdBy,
-      provider: schema.machineAccounts.provider,
     })
     .from(agents)
-    .innerJoin(
-      schema.machineAccounts,
-      and(eq(schema.machineAccounts.orgId, agents.orgId), eq(schema.machineAccounts.id, agents.brainAccountId)),
-    )
     .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId)));
-  if (!row?.ownerId || row.account !== accountId || row.lentBy !== actorId || !isComputerBrain(row.brain)) return;
+  const [signIn] = await db
+    .select({ ownerId: schema.machineAccounts.createdBy, provider: schema.machineAccounts.provider })
+    .from(schema.machineAccounts)
+    .where(and(eq(schema.machineAccounts.orgId, orgId), eq(schema.machineAccounts.id, accountId)));
+  // Still given: on the agent, or the actor's own AI for the team's right hand (ADR 0137 §11).
+  const { personalBrain } = await import("./right-hand");
+  const own = await personalBrain(db, orgId, actorId);
+  const ownGiven = own?.brainAccountId === accountId && own.brainAccountLentBy === actorId;
+  const brain = ownGiven ? own.brain : given?.brain;
+  const stillGiven = ownGiven || (given?.account === accountId && given.lentBy === actorId);
+  if (!given || !signIn?.ownerId || !stillGiven || !brain || !isComputerBrain(brain)) return;
+  const row = { name: given.name, brain, ownerId: signIn.ownerId, provider: signIn.provider };
   const [people, [org]] = await Promise.all([
     db
       .select({ id: users.id, name: users.name, email: users.email, locale: users.locale })

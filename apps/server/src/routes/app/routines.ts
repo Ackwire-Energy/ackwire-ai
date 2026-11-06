@@ -85,15 +85,6 @@ const Target = z.union([
   z.object({ type: z.literal("channel"), channelId: z.uuid() }),
   z.object({ type: z.literal("dm") }),
   z.object({ type: z.literal("artifact") }),
-  z
-    .object({
-      type: z.literal("forum"),
-      agentIds: z.array(z.uuid()).min(1).max(8),
-      rounds: z.number().int().min(1).max(10).optional(),
-    })
-    .openapi({
-      description: "Opens a forum topic each time: the prompt is its goal; the routine's agent writes the synthesis.",
-    }),
 ]);
 /** Where an edit may point a routine: also `conversation` (a thread or DM, from an agent's reminder or routine). */
 const TargetEdit = z.union([
@@ -465,7 +456,6 @@ export function routineRoutes(deps: AppDeps) {
     db,
     pubsub: adapters.pubsub,
     context: deps.extras?.context,
-    artifacts: deps.extras?.artifacts,
     mail: adapters.mail,
     hooks,
     connectors: routineConnectorDeps(deps),

@@ -2,6 +2,7 @@ export { createFakeEmbeddings } from "./embeddings";
 
 import {
   type ContentBlock,
+  type Endpoint,
   type ModelProvider,
   type ModelRequest,
   type ModelResult,
@@ -44,6 +45,7 @@ export interface FakeCall {
   request: ModelRequest;
   apiKey: string;
   workspaceId?: string;
+  endpoint?: Endpoint;
 }
 
 /**
@@ -60,8 +62,13 @@ export function createFakeProvider(reply?: (request: ModelRequest, call: number)
     id: "anthropic",
     calls,
     countCalls,
-    async stream(request, { apiKey, workspaceId, onDelta }): Promise<ModelResult> {
-      calls.push({ request: structuredClone({ ...request, signal: undefined }), apiKey, workspaceId });
+    async stream(request, { apiKey, workspaceId, endpoint, onDelta }): Promise<ModelResult> {
+      calls.push({
+        request: structuredClone({ ...request, signal: undefined }),
+        apiKey,
+        workspaceId,
+        ...(endpoint ? { endpoint } : {}),
+      });
       const scripted = reply?.(request, calls.length);
       if (scripted instanceof Error) throw scripted;
       const lastMessage = request.messages.at(-1);

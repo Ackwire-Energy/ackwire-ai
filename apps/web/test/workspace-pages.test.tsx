@@ -78,7 +78,7 @@ describe("Aprovações", () => {
     const link = within(empty).getByRole("link", { name: "Como as aprovações funcionam" });
     expectHelpLink(link, "approvals");
     expect(empty.querySelector(".ac-empty__text")?.textContent).toBe("Como as aprovações funcionam");
-    expect(document.querySelector(".list-head")?.querySelectorAll("p")).toHaveLength(1);
+    expect(document.querySelector(".ac-pagehead")?.querySelectorAll("p")).toHaveLength(1);
   });
 
   test("refusing asks why, optional; approving covers this once, with these values", async () => {
@@ -169,7 +169,7 @@ describe("Memória e propostas", () => {
   test("tabs, search, pin, archive and edit with history", async () => {
     await go(`agents/${ADA_ID}/memory`);
     expect(screen().getByRole("heading", { level: 1, name: "O que a Ada sabe" })).toBeTruthy();
-    expect(document.querySelector(".page-sub")?.textContent).toBe(
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "O que a Ada aprendeu com as conversas e as correções do time.",
     );
     // How memory works is a page on the site, linked once under the list.
@@ -424,24 +424,18 @@ describe("Criar agente", () => {
   });
 });
 
-describe("Equipe", () => {
-  test("agents in the sky grouped by their person; a tap opens what it does and how to reach it", async () => {
-    await go("team");
-    expect(screen().getByRole("heading", { name: "Equipe" })).toBeTruthy();
-    expect(screen().getByText(/2 agentes, agrupados por quem cuida de cada um\./)).toBeTruthy();
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    expect(sky.textContent).toContain("João");
-    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
-    const card = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    expect(card.textContent).toContain("O que faz");
-    expect(card.textContent).toContain("Arquivos");
-    expect(within(card).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
+describe("Equipe (ADR 0148)", () => {
+  afterEach(() => localStorage.removeItem("agentes.team.view"));
+  const view = async (name: string) => {
+    await click(screen().getByRole("radio", { name }));
+    await settle(3);
+  };
+  const rows = () =>
+    [...document.querySelectorAll(".team-table tbody tr.team-table__row")].map(
+      (r) => r.querySelector(".team-who b")?.textContent,
     );
-    expect(screen().getByText("Nenhum agente pediu ajuda a outro nas últimas 24 h.")).toBeTruthy();
-  });
 
-  test("the card: what it does, available or with no AI, each ability named and drawn its own way", async () => {
+  test("Lista: each agent with its role, who looks after it, where it is and what it does now", async () => {
     const state = seedState({
       aiStatus: {
         any: true,
@@ -451,83 +445,112 @@ describe("Equipe", () => {
         ],
       },
     });
-    const imported = state.agents.find((a) => a.id === ADA_ID);
-    if (imported)
-      imported.instructions =
-        "# SOUL.md - Quem você é\n\n_Você não é um chatbot. Você está se tornando alguém._\n\n## Verdades\n\n- **Ajude de verdade.**";
-    const api = createFakeApi(state);
-    const team = api.agents.team;
-    api.agents.team = async (orgId) => {
-      const t = await team(orgId);
-      return {
-        ...t,
-        agents: t.agents.map((a) => ({ ...a, capabilities: ["sandbox", "desktop", "browser", "drive"] })),
-      };
-    };
-    await renderApp(`/org/${ORG_ID}/team`, { api });
-    await settle(4);
+    state.approvals = state.approvals.filter((a) => a.agentId !== ATLAS_ID);
+    await go("team", state);
+    expect(screen().getByRole("heading", { name: "Equipe" })).toBeTruthy();
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
     // The same action as the sidebar's, in the same words.
-    const head = document.querySelector(".team-head") as HTMLElement;
+    const head = document.querySelector(".ac-pagehead") as HTMLElement;
     expect(within(head).getByRole("link", { name: "Criar agente" })).toBeTruthy();
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
-    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    // Its role is beside its name; what it does comes from its instructions, in plain words: their first line,
-    // as its page starts.
-    expect(ada.querySelector(".team-card__meta")?.textContent).toContain("Dev");
-    expect(ada.querySelector(".team-card__call")?.textContent).toBe(
-      "Você não é um chatbot. Você está se tornando alguém.",
-    );
-    expect(ada.querySelector(".team-card__status")?.textContent).toBe("Disponível");
-    expect(ada.textContent).not.toContain("Livre");
-    const chip = (name: string) =>
-      Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name) as HTMLElement;
-    for (const name of ["Computador", "Tela", "Navegador", "Arquivos"]) expect(chip(name)).toBeTruthy();
-    const drawn = new Set(["Computador", "Tela", "Navegador"].map((n) => chip(n).querySelector("svg")?.innerHTML));
-    expect(drawn.size).toBe(3);
-    await click(within(sky).getByRole("button", { name: "Atlas, ver detalhes" }));
-    const atlas = screen().getByRole("dialog", { name: "Detalhes de Atlas" });
+    const table = screen().getByRole("table");
+    const ada = within(table).getByRole("link", { name: /Ada/ }).closest("tr") as HTMLElement;
+    expect(ada.textContent).toContain("Dev");
+    expect(ada.textContent).toContain("João");
+    expect(ada.textContent).toContain("eng");
+    // The fixture's request waits for Walter: that is what Ada is on now.
+    expect(ada.textContent).toContain("Esperando você");
+    const atlas = within(table).getByRole("link", { name: /Atlas/ }).closest("tr") as HTMLElement;
     expect(within(atlas).getByRole("button", { name: "Sem IA" })).toBeTruthy();
     expect(atlas.textContent).not.toContain("Disponível");
   });
 
-  test("the card names another company's service by its own mark, from the connector catalog", async () => {
-    const api = createFakeApi(seedState());
-    const team = api.agents.team;
-    api.agents.team = async (orgId) => {
-      const t = await team(orgId);
-      return {
-        ...t,
-        agents: t.agents.map((a) => ({ ...a, capabilities: ["github", "linear", "sentry", "browser"] })),
-      };
-    };
-    await renderApp(`/org/${ORG_ID}/team`, { api });
-    await settle(4);
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
-    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    const mark = (name: string) => {
-      const chip = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name);
-      const el = chip?.querySelector<HTMLElement>(".connector-icon__mark");
-      return el && [el.style.getPropertyValue("--connector-icon"), el.style.getPropertyValue("--connector-color")];
-    };
-    expect(mark("GitHub")).toEqual(['url("/connectors/github.svg")', ""]);
-    expect(mark("Linear")).toEqual(['url("/connectors/linear.svg")', "#5E6AD2"]);
-    // A service's mark sits beside the service's own name.
-    expect(mark("Sentry")).toEqual(['url("/connectors/sentry.svg")', ""]);
-    // Our own abilities keep their icons.
-    expect(mark("Navegador")).toBeNull();
-    const browser = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === "Navegador");
-    expect(browser?.querySelector("svg.ac-icon")).not.toBeNull();
+  test("Lista: search by name, role or channel, filter, and sort by a column", async () => {
+    await go("team");
+    expect(rows()).toEqual(["Ada", "Atlas"]);
+    await act(async () =>
+      fireEvent.change(screen().getByRole("searchbox", { name: "Buscar por nome, função ou canal" }), {
+        target: { value: "ops" },
+      }),
+    );
+    expect(rows()).toEqual(["Atlas"]);
+    await act(async () =>
+      fireEvent.change(screen().getByRole("searchbox", { name: "Buscar por nome, função ou canal" }), {
+        target: { value: "" },
+      }),
+    );
+    // Walter looks after none of them.
+    await click(screen().getByRole("button", { name: /^Meus/ }));
+    expect(rows()).toEqual([]);
+    expect(screen().getByText("Nenhum agente encontrado.")).toBeTruthy();
+    await click(screen().getByRole("button", { name: /^Meus/ }));
+    await click(screen().getByRole("button", { name: "Agente" }));
+    expect(rows()).toEqual(["Atlas", "Ada"]);
   });
 
-  test("the card of an agent waiting for its computer says neither Available nor No AI", async () => {
+  test("the agent waiting for its computer reads neither Available nor No AI", async () => {
     await go("team", seedState({ aiStatus: { any: true, agents: [{ agentId: ADA_ID, state: "waiting" }] } }));
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
-    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    expect(ada.querySelector(".team-card__status")).toBeNull();
+    const ada = within(screen().getByRole("table")).getByRole("link", { name: /Ada/ }).closest("tr") as HTMLElement;
+    expect(ada.textContent).not.toContain("Disponível");
     expect(within(ada).queryByRole("button", { name: "Sem IA" })).toBeNull();
-    expect(ada.textContent).toContain("Instruções de Ada.");
+  });
+
+  test("Organograma: the workspace on top, each person with the agents that report to them", async () => {
+    await go("team");
+    await view("Organograma");
+    const chart = screen().getByRole("region", { name: "Organograma" });
+    expect(chart.querySelector(".team-node--org")?.textContent).toContain("Acme");
+    const joao = [...chart.querySelectorAll(".team-tree__col")].find((c) => c.textContent?.includes("João"));
+    expect([...(joao?.querySelectorAll(".team-node--agent b") ?? [])].map((b) => b.textContent)).toEqual([
+      "Ada",
+      "Atlas",
+    ]);
+  });
+
+  test("Mapa: a column per channel; dropping an agent on another channel asks the right hand for a card", async () => {
+    const { state } = await go("team");
+    await view("Mapa");
+    const map = screen().getByRole("region", { name: "Mapa" });
+    const eng = within(map).getByRole("region", { name: "#eng" });
+    expect([...eng.querySelectorAll(".team-map__card b")].map((b) => b.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(map.querySelector(".team-map__people")?.textContent).toContain("João");
+    const ada = eng.querySelector(".team-map__card") as HTMLElement;
+    const general = map.querySelector('[data-map-col="00000000-0000-4000-8000-0000000000c1"]') as HTMLElement;
+    const dataTransfer = { setData: () => {}, getData: () => "", effectAllowed: "", dropEffect: "" };
+    await act(async () => fireEvent.dragStart(ada, { dataTransfer }));
+    await act(async () => fireEvent.dragOver(general, { dataTransfer }));
+    expect(general.getAttribute("data-drop")).toBe("true");
+    await act(async () => fireEvent.drop(general, { dataTransfer }));
+    await settle(3);
+    expect(state.calls.filter((c) => c.method === "agents.proposeChannelMove").map((c) => c.args[1])).toEqual([
+      {
+        agentId: ADA_ID,
+        fromChannelId: ENG_ID,
+        toChannelId: "00000000-0000-4000-8000-0000000000c1",
+        reason: "Levar Ada de #eng para #general, pelo mapa da equipe.",
+      },
+    ]);
+    // Nothing moved: the change waits on the card.
+    expect(state.calls.some((c) => c.method === "agentGroups.move")).toBe(false);
+  });
+
+  test("Governança e uso: Settings' use per person, with the way to Settings", async () => {
+    await go("team");
+    await view("Governança e uso");
+    const usage = screen().getByRole("region", { name: "Governança e uso" });
+    expect(
+      within(usage)
+        .getByRole("link", { name: /Também nas Configurações/ })
+        .getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/settings/usage`);
+    await settle(4);
+    expect(usage.textContent).toContain("Uso por pessoa");
+  });
+
+  test("the view chosen stays for the next visit", async () => {
+    await go("team");
+    await view("Setores");
+    cleanup();
+    await go("team");
+    expect(screen().getByRole("radio", { name: "Setores" }).getAttribute("aria-checked")).toBe("true");
   });
 });

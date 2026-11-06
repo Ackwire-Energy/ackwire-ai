@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   acceptCustomSuggestion,
   addChannelMember,
+  approvalView,
   COMPOSIO_EXECUTOR,
   type CustomDeps,
   connectCustomServer,
@@ -14,6 +15,8 @@ import {
   createRoutine,
   createScheduleToolSource,
   createToolGateway,
+  decideApproval,
+  deleteRoutine,
   type InvokeResult,
   insertMessage,
   type McpConnect,
@@ -197,11 +200,15 @@ const routineRow = async (id: string) =>
   (await f.db.select().from(schema.routines).where(eq(schema.routines.id, id)))[0];
 
 /** The person asks the agent for the routine in the chat, with the actions its job needs. */
-async function created(gateway: ReturnType<typeof createToolGateway>, ownActions: string[]) {
+async function created(
+  gateway: ReturnType<typeof createToolGateway>,
+  ownActions: string[],
+  prompt = "Manda o resumo da semana no Slack (#time) e por email para a diretoria.",
+) {
   const ctx = await personRun(f);
   const out = answered(
     await invoke(gateway, ctx, "create_routine", {
-      prompt: "Manda o resumo da semana no Slack (#time) e por email para a diretoria.",
+      prompt,
       schedule: "toda segunda às 9h",
       own_actions: ownActions,
     }),
@@ -328,5 +335,130 @@ describe("a routine's own job (routines.own_actions)", () => {
     expect(out.content).toContain("Every action in a connected app asks a person first.");
     asked(await invoke(gateway, await routineRun(f, id), EXEC, { ...exec("SLACK_SEND_MESSAGE"), why: WHY }));
     expect(mcp.calls).toEqual([]);
+  });
+});
+
+describe('"Sempre nesta rotina": a routine\'s card keeps its kind for that routine', () => {
+  const decide = (id: string, userId = f.owner.id) =>
+    decideApproval({ db: f.db, pubsub: f.pubsub }, userId, f.org.id, id, { decision: "approve", always: true });
+
+  test("offered on its card; approved, this routine's next runs do it without asking, and no other run does", async () => {
+    f = await setup();
+    const { mcp, gateway } = await world(f);
+    const { id } = await created(gateway, ["SLACK_SEND_MESSAGE"]);
+    const other = await created(gateway, [], "Manda os números do mês por email.");
+    const card = asked(await invoke(gateway, await routineRun(f, id), EXEC, { ...exec("GMAIL_SEND_EMAIL"), why: WHY }));
+    expect(card.approveAlways).toEqual({ tool: EXEC, actions: ["GMAIL_SEND_EMAIL"], routineId: id });
+    expect(approvalView(card, true).approveAlways).toEqual({
+      tool: EXEC,
+      actions: ["GMAIL_SEND_EMAIL"],
+      routineId: id,
+    });
+
+    await decide(card.id);
+    expect((await routineRow(id))?.ownActions).toEqual(["SLACK_SEND_MESSAGE", "GMAIL_SEND_EMAIL"]);
+    // No rule of the agent: "Aprovado sempre" stays as it was.
+    expect(await f.db.select().from(schema.approvalRules)).toEqual([]);
+    const audit = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "routine.own_actions_added"));
+    expect(audit.map((a) => [a.targetId, a.actorId])).toEqual([[id, f.owner.id]]);
+
+    expect(
+      answered(await invoke(gateway, await routineRun(f, id), EXEC, exec("GMAIL_SEND_EMAIL"))).isError,
+    ).toBeFalsy();
+    expect(mcp.calls.map((c) => c.args)).toEqual([exec("GMAIL_SEND_EMAIL")]);
+    // Another routine of the agent still asks.
+    asked(await invoke(gateway, await routineRun(f, other.id), EXEC, { ...exec("GMAIL_SEND_EMAIL"), why: WHY }));
+    // Undone in the routine's settings: it asks at once.
+    await updateRoutine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id, {
+      ownActions: ["SLACK_SEND_MESSAGE"],
+    });
+    asked(await invoke(gateway, await routineRun(f, id), EXEC, { ...exec("GMAIL_SEND_EMAIL"), why: WHY }));
+  });
+
+  test.each([
+    ["a merge", "GITHUB_MERGE_A_PULL_REQUEST"],
+    ["a deploy", "VERCEL_CREATE_NEW_DEPLOYMENT"],
+    ["a deletion", "SLACK_DELETE_MESSAGE"],
+    ["a removal", "NOTION_REMOVE_PAGE"],
+    ["a payment", "STRIPE_CREATE_PAYMENT_INTENT"],
+    ["a refund", "STRIPE_CREATE_REFUND"],
+  ])("never covers %s: the card still asks, without the button", async (_kind, slug) => {
+    f = await setup();
+    const { gateway } = await world(f);
+    const { id } = await created(gateway, []);
+    const card = asked(await invoke(gateway, await routineRun(f, id), EXEC, { ...exec(slug), why: WHY }));
+    expect(card.approveAlways).toBeNull();
+  });
+
+  test("beside an action it never covers, the whole call goes without the button", async () => {
+    f = await setup();
+    const { gateway } = await world(f);
+    const { id } = await created(gateway, []);
+    const input = { ...exec("SLACK_SEND_MESSAGE", "SLACK_DELETE_MESSAGE"), why: WHY };
+    expect(asked(await invoke(gateway, await routineRun(f, id), EXEC, input)).approveAlways).toBeNull();
+  });
+
+  test.each(["GMAIL_MOVE_TO_TRASH", "GITHUB_CREATE_A_REVIEW_FOR_A_PULL_REQUEST", "GOOGLEDOMAINS_RENEW_DOMAIN"])(
+    "not for %s: lost data, money or a pull request's approval",
+    async (action) => {
+      f = await setup();
+      const { gateway } = await world(f);
+      const { id } = await created(gateway, []);
+      const input = { ...exec(action), why: WHY };
+      expect(asked(await invoke(gateway, await routineRun(f, id), EXEC, input)).approveAlways).toBeNull();
+    },
+  );
+
+  test("not when the routine's creator no longer decides the agent's approvals: own actions would still ask", async () => {
+    f = await setup();
+    const { gateway } = await world(f);
+    const cora = await addMember(f.db, f.org.id, "member", "cora");
+    const { id } = await created(gateway, []);
+    await f.db.update(schema.routines).set({ createdByUserId: cora.id }).where(eq(schema.routines.id, id));
+    const card = asked(
+      await invoke(gateway, await routineRun(f, id), EXEC, { ...exec("SLACK_SEND_MESSAGE"), why: WHY }),
+    );
+    expect(card.approveAlways).toBeNull();
+  });
+
+  test("not on a routine that has no room left", async () => {
+    f = await setup();
+    const { gateway } = await world(f);
+    const { id } = await created(
+      gateway,
+      Array.from({ length: 20 }, (_, i) => `SLACK_ACTION_${i}`),
+    );
+    const card = asked(
+      await invoke(gateway, await routineRun(f, id), EXEC, { ...exec("SLACK_SEND_MESSAGE"), why: WHY }),
+    );
+    expect(card.approveAlways).toBeNull();
+  });
+
+  test("a routine deleted while it waited: the decision fails and nothing is approved", async () => {
+    f = await setup();
+    const { gateway } = await world(f);
+    const { id } = await created(gateway, []);
+    const card = asked(
+      await invoke(gateway, await routineRun(f, id), EXEC, { ...exec("SLACK_SEND_MESSAGE"), why: WHY }),
+    );
+    await deleteRoutine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id);
+    await expect(decide(card.id)).rejects.toMatchObject({ code: "approval.always_unavailable" });
+    const [row] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.id, card.id));
+    expect(row?.status).toBe("pending");
+  });
+
+  test("someone covering for its owner can't use it: approving for good is never in someone else's name", async () => {
+    f = await setup();
+    const { gateway } = await world(f);
+    const { id } = await created(gateway, []);
+    const card = asked(
+      await invoke(gateway, await routineRun(f, id), EXEC, { ...exec("SLACK_SEND_MESSAGE"), why: WHY }),
+    );
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await expect(decide(card.id, bob.id)).rejects.toThrow();
+    expect((await routineRow(id))?.ownActions).toEqual([]);
   });
 });

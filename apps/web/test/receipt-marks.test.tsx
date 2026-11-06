@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Message, steerStore } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, comfortable, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -38,7 +38,7 @@ const parts = (id: string) =>
 
 describe("a receipt never changes a message's height", () => {
   test("sent into a task at work: the mark where the check goes, the same parts as a message without it", async () => {
-    const state = seedState();
+    const state = comfortable(seedState());
     const answering = {
       seenBy: [ADA_ID],
       pickedBy: [],
@@ -83,7 +83,7 @@ describe("a receipt never changes a message's height", () => {
   });
 
   test("while the author's plan picks who answers: the clock where the check goes, nothing under the text", async () => {
-    const state = seedState();
+    const state = comfortable(seedState());
     state.messages = [said("k1", "Revisa o PR?", 2)];
     const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(8);
@@ -104,7 +104,7 @@ describe("a receipt never changes a message's height", () => {
   });
 
   test("in a DM between people, who read my latest message is their face where its check goes, in a slot each turn's time line keeps", async () => {
-    const state = seedState();
+    const state = comfortable(seedState());
     state.dms = [{ channelId: DM_ID, with: { type: "person", id: "u-joao", name: "João", handle: null } }];
     state.channelMembers[DM_ID] = [
       { type: "person", id: "u-walter" },
@@ -207,7 +207,7 @@ describe("a receipt never changes a message's height", () => {
 
 describe("its words stay reachable", () => {
   test("screen readers hear what became of it as it changes; the mark is named and opens the words", async () => {
-    const state = seedState();
+    const state = comfortable(seedState());
     state.messages = [
       said("s1", "Olha também o refresh.", 2, {
         receipts: {
@@ -250,7 +250,7 @@ describe("its words stay reachable", () => {
   });
 
   test("in a DM, who read it is a button that says it, from the keyboard or a tap, and to screen readers as it shows", async () => {
-    const state = seedState();
+    const state = comfortable(seedState());
     state.dms = [{ channelId: DM_ID, with: { type: "person", id: "u-joao", name: "João", handle: null } }];
     state.channelMembers[DM_ID] = [
       { type: "person", id: "u-walter" },
@@ -275,7 +275,7 @@ describe("its words stay reachable", () => {
 
 describe("an agent's message that mentions agents (ADR 0089)", () => {
   test("its mark lists whom it mentioned: one the judge read as no hand-off is 'Só mencionado', with 'Chamar um agente'", async () => {
-    const state = seedState();
+    const state = comfortable(seedState());
     state.messages = [
       said("a1", "Valeu @ada, por agora basta.", 2, {
         author: { type: "agent", id: ATLAS_ID },
@@ -299,7 +299,7 @@ describe("an agent's message that mentions agents (ADR 0089)", () => {
 
 describe("an agent whose AI provider is down", () => {
   test("its run parked says so under the message, not that it waits for an answer", async () => {
-    const state = seedState();
+    const state = comfortable(seedState());
     state.messages = [
       said("o1", "O build passou?", 2, {
         receipts: {
@@ -318,7 +318,7 @@ describe("an agent whose AI provider is down", () => {
 
 describe("an agent waiting on its plan's limit", () => {
   test("its run parked says so under the message, and its popover too, never that it waits for an answer", async () => {
-    const state = seedState();
+    const state = comfortable(seedState());
     state.messages = [
       said("p1", "O build passou?", 2, {
         receipts: {
@@ -331,12 +331,12 @@ describe("an agent waiting on its plan's limit", () => {
     ];
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(8);
-    expect(row("p1").textContent).toContain("Ada responde quando o plano renovar");
+    expect(row("p1").textContent).toContain("Ada está esperando o plano");
     expect(row("p1").textContent).not.toContain("esperando sua resposta");
     await act(async () => fireEvent.click(row("p1").querySelector(".ac-receipt__check") as HTMLElement));
     await settle(2);
     const popover = screen().getByRole("dialog", { name: "Agentes" });
-    expect(within(popover).getByText("Responde quando o plano renovar")).toBeTruthy();
+    expect(within(popover).getByText("Esperando o plano")).toBeTruthy();
     expect(popover.textContent).not.toContain("Escolhido pelo Jev");
   });
 });

@@ -75,7 +75,6 @@ export const APP_PAGES = {
   drive: { web: "/drive", phone: "/drive", may: null, label: "shell.drive" },
   wiki: { web: "/wiki", phone: "/wiki", may: null, label: "shell.wiki" },
   issues: { web: "/issues", phone: "/issues", may: null, label: "shell.issues" },
-  forum: { web: "/forum", phone: null, may: null, label: "shell.forum" },
   calendar: { web: "/calendar", phone: null, may: null, label: "shell.calendar" },
   agent: { web: "/agents/{agentId}", phone: "/agent/{agentId}", may: null, label: "" },
   channel: { web: "/c/{channelId}", phone: "/chat/{channelId}", may: null, label: "" },

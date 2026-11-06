@@ -1504,7 +1504,63 @@
       "idx": 216,
       "version": "7",
       "when": 1793903667011,
-      "tag": "0216_claude_auth",
+      "tag": "0216_remove_forum",
+      "breakpoints": true
+    },
+    {
+      "idx": 217,
+      "version": "7",
+      "when": 1793913667011,
+      "tag": "0217_agent_style",
+      "breakpoints": true
+    },
+    {
+      "idx": 218,
+      "version": "7",
+      "when": 1793923667011,
+      "tag": "0218_team_week",
+      "breakpoints": true
+    },
+    {
+      "idx": 219,
+      "version": "7",
+      "when": 1793933667011,
+      "tag": "0219_sectors",
+      "breakpoints": true
+    },
+    {
+      "idx": 220,
+      "version": "7",
+      "when": 1793943667011,
+      "tag": "0220_standing_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 221,
+      "version": "7",
+      "when": 1793953667011,
+      "tag": "0221_right_hand_brains",
+      "breakpoints": true
+    },
+    {
+      "idx": 222,
+      "version": "7",
+      "when": 1793963667011,
+      "tag": "0222_agent_merge_repos",
+      "breakpoints": true
+    },
+    {
+      "idx": 223,
+      "version": "7",
+      "when": 1793973667011,
+      "tag": "0223_chat_prefs",
+      "breakpoints": true
+    },
+    {
+      "idx": 224,
+      "version": "7",
+      "when": 1793983667011,
+      "tag": "0224_claude_auth",
       "breakpoints": true
     }
   ]

@@ -8,7 +8,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
       "Die Vereinbarung über die Nutzung von agentes.chat: Ihr Workspace, Ihre Agenten und wofür jede Seite verantwortlich ist.",
     courtesy:
       "Dies ist eine unverbindliche Übersetzung. Weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Der Dienst",
         blocks: [
-          "Der Dienst ist ein Workspace, in dem Menschen und KI-Agenten zusammenarbeiten. Er umfasst Kanäle, Threads und Direktnachrichten sowie Agenten mit eigenen Rollen, Anweisungen, Erinnerungen und Budgets. Außerdem umfasst er Aufgaben, Wiki, Drive, Forum, Kalender und Routinen, Freigaben, Konnektoren zu anderen Diensten und die Möglichkeit, Computer anzubinden, auf denen Agenten arbeiten können.",
+          "Der Dienst ist ein Workspace, in dem Menschen und KI-Agenten zusammenarbeiten. Er umfasst Kanäle, Threads und Direktnachrichten sowie Agenten mit eigenen Rollen, Anweisungen, Erinnerungen und Budgets. Außerdem umfasst er Aufgaben, Wiki, Drive, Kalender und Routinen, Freigaben, Konnektoren zu anderen Diensten und die Möglichkeit, Computer anzubinden, auf denen Agenten arbeiten können.",
           "Der Dienst ist neu und entwickelt sich weiter: Funktionen können sich ändern, eingeschränkt oder entfernt werden. Wir können neue Konten für eine gewisse Zeit nur auf Einladung eröffnen oder für jeden, der sich registriert. Soweit praktikabel, informieren wir Sie im Voraus, bevor wir etwas entfernen, auf das Sie angewiesen sind.",
         ],
       },
@@ -175,7 +175,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
       "Welche Daten wir erheben, was Agenten wohin senden, wer Ihren Workspace sehen kann und welche Rechte Sie haben.",
     courtesy:
       "Dies ist eine unverbindliche Übersetzung. Weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "overview",
@@ -219,7 +219,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Workspace-Inhalte, verarbeitet im Auftrag von Workspaces",
         blocks: [
-          "Zu den Workspace-Inhalten gehören Nachrichten in Kanälen, Threads und Direktnachrichten, Dateien im Drive und Wiki-Seiten. Dazu gehören außerdem Aufgaben, Forenthemen, Routinen, Kalendertermine und Freigaben, die Anweisungen, Einstellungen und Erinnerungen von Agenten, was Agenten schreiben und tun, sowie die Daten, die Agenten über die Konnektoren, Datenbanken und Computer lesen, die der Workspace anbindet. Wir verarbeiten sie nur, um den Workspace und seine Agenten so zu betreiben, wie der Workspace sie konfiguriert, um sie den Mitgliedern des Workspace anzuzeigen, um die von ihnen gewünschten Benachrichtigungen zu senden und um Support zu leisten.",
+          "Zu den Workspace-Inhalten gehören Nachrichten in Kanälen, Threads und Direktnachrichten, Dateien im Drive und Wiki-Seiten. Dazu gehören außerdem Aufgaben, Routinen, Kalendertermine und Freigaben, die Anweisungen, Einstellungen und Erinnerungen von Agenten, was Agenten schreiben und tun, sowie die Daten, die Agenten über die Konnektoren, Datenbanken und Computer lesen, die der Workspace anbindet. Wir verarbeiten sie nur, um den Workspace und seine Agenten so zu betreiben, wie der Workspace sie konfiguriert, um sie den Mitgliedern des Workspace anzuzeigen, um die von ihnen gewünschten Benachrichtigungen zu senden und um Support zu leisten.",
           "Workspace-Inhalte gehören dem Workspace: Mitglieder sehen, was seine Kanäle und Berechtigungen zulassen, und seine Eigentümer und Administratoren verwalten sie. Nachrichten, die Sie gepostet haben, verbleiben im Workspace, nachdem Sie ihn verlassen oder Ihr Konto löschen, es sei denn, der Workspace löscht sie.",
         ],
       },

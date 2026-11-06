@@ -6,7 +6,6 @@ import type {
   BlockState,
   BudgetEvent,
   ChannelEvent,
-  ForumUserEvent,
   IssueColumn,
   MachineTask,
   MemoryUpdate,
@@ -40,7 +39,6 @@ import {
   cacheApproval,
   cacheCardDelegate,
   cacheDmRead,
-  cacheForumSuggestion,
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
@@ -48,6 +46,7 @@ import {
   cachePinned,
   cacheReceipts,
   cacheTask,
+  cacheTeamCard,
   catchUpChannel,
   consultSeeds,
   createBrowserLiveConnection,
@@ -91,7 +90,6 @@ import { nextMonthIso, usageWhen } from "@agenteschat/client/lib/plan-usage";
 import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -443,10 +441,6 @@ export function RealtimeProvider({
   // Latest `t` without reconnecting when the language changes.
   const tRef = useRef(t);
   tRef.current = t;
-  // Toasts that open a page ("Abrir"): the router when there is one (tests may render without).
-  const router = useRouter({ warn: false });
-  const routerRef = useRef(router);
-  routerRef.current = router;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: one socket per org; toast and language are read live
   useEffect(() => {
@@ -545,37 +539,6 @@ export function RealtimeProvider({
       if (event.type === "issue.columns" && "columns" in event && Array.isArray(event.columns)) {
         qc.setQueryData(keys.issueColumns(orgId), event.columns as IssueColumn[]);
         void qc.invalidateQueries({ queryKey: keys.issues(orgId), predicate: (q) => q.queryKey[3] === "list" });
-      }
-      // The forum (org broadcasts): the list and the open topic refresh.
-      if ((event.type === "forum.topic.updated" || event.type === "forum.post.created") && "topicId" in event) {
-        const topicId = String(event.topicId);
-        void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
-        void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, topicId) });
-      }
-      // For me: my seated turn, a topic opened on my request, one I asked for concluded.
-      if (
-        (event.type === "forum.your_turn" || event.type === "forum.requested" || event.type === "forum.concluded") &&
-        "topicId" in event
-      ) {
-        const e = event as ForumUserEvent;
-        void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
-        void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, e.topicId) });
-        // Not while that topic is open on screen: it already shows "Sua vez" / the synthesis.
-        if (!window.location.pathname.endsWith(`/forum/${e.topicId}`))
-          toast.show(
-            tRef.current(`forum.notify.${e.type.slice("forum.".length) as "your_turn" | "requested" | "concluded"}`, {
-              title: e.title,
-            }),
-            "info",
-            {
-              label: tRef.current("forum.notify.open"),
-              run: () =>
-                void routerRef.current?.navigate({
-                  to: "/org/$orgId/forum/$topicId",
-                  params: { orgId, topicId: e.topicId },
-                }),
-            },
-          );
       }
       // An agent switched computers, or its computer was removed: the cached view takes the new target.
       applyComputerEvent(qc, orgId, event);
@@ -852,12 +815,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
       // An agent's proposal of a new agent was created or denied (by anyone): its card.
       if (event.type === "agent.proposal.updated") cacheAgentProposal(qc, orgId, event, event);
+      // The right hand's team card changed (created, failed, adjusted, dismissed, undone): the whole card.
+      if (event.type === "team.proposal.updated") cacheTeamCard(qc, orgId, event, event.card);
       if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
-      // An agent's "Vale um fórum?" card was accepted or dismissed (by anyone).
-      if (event.type === "forum.suggestion.updated") {
-        cacheForumSuggestion(qc, orgId, channelId, event.messageId, event.suggestion);
-        if (event.suggestion.topicId) void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
-      }
       // A DM between people: the other one read it ("Visto" moves).
       if (event.type === "channel.read") cacheDmRead(qc, orgId, event);
       // Someone reacted: the pills under that message change for everyone.

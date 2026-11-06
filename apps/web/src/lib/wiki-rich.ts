@@ -116,6 +116,9 @@ function blockHtml(b: MdRangedBlock, at: number): string {
       return rawHtml(`![[${b.target}]]`, b.target, "p").replace("<p ", `<p data-b="${at}" `);
     case "rule":
       return `<hr data-b="${at}">`;
+    // The editor parses without `details`: a `<details>` block stays its lines, as written.
+    case "details":
+      return tag("p", esc(`${b.summary}\n${b.body}`));
     case "table": {
       const align = (i: number) => (b.align[i] && b.align[i] !== "left" ? ` data-align="${b.align[i]}"` : "");
       const head = b.header.map((h, i) => `<th${align(i)}>${inlineHtml(h)}</th>`).join("");

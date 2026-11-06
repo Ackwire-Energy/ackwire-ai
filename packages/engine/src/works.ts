@@ -301,8 +301,8 @@ type RunLike = Pick<
 >;
 
 /**
- * Whether a run may become long work (§1): a person is behind it, in a channel or DM people read, not a mission's
- * thread nor a forum turn, not a routine's run and not one that already is.
+ * Whether a run may become long work (§1): a person is behind it, in a channel or DM people read,
+ * not a mission's thread, not a routine's run and not one that already is.
  */
 export async function workEligible(db: Executor, run: RunLike): Promise<boolean> {
   if (run.background || run.workId || isTerminal(run.status)) return false;

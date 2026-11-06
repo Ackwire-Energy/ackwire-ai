@@ -138,6 +138,24 @@ export function MeScreen() {
           },
         ]
       : []),
+    // Likewise: a server from before the choice sends no `agentStyle` (ADR 0147).
+    ...(org.org?.agentStyle !== undefined
+      ? [
+          {
+            icon: "chat" as const,
+            label: t("settings.account.agentStyle"),
+            value:
+              org.org.agentStyle === "technical"
+                ? t("settings.account.agentStyleTechnical")
+                : t("settings.account.agentStyleSimple"),
+            href: "/me/agent-style",
+          },
+        ]
+      : []),
+    // Likewise: a server from before the choice sends no `chatPrefs`.
+    ...(org.org?.chatPrefs !== undefined
+      ? [{ icon: "chat" as const, label: t("settings.account.chat.title"), href: "/me/chat-look" }]
+      : []),
     {
       icon: "sound",
       label: t("mobile.me.sounds"),

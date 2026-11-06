@@ -151,7 +151,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
  * answer when they may talk to it.
  */
 export async function openPersonAgentDm(db: Executor, orgId: string, userId: string, agentId: string) {
-  const dmKey = keyOf([`u:${userId}`, `a:${agentId}`]);
+  const dmKey = personAgentDmKey(userId, agentId);
   const existing = async () =>
     (
       await db
@@ -187,6 +187,9 @@ export async function openPersonAgentDm(db: Executor, orgId: string, userId: str
   if (!raced) throw new Error("could not open the conversation");
   return raced;
 }
+
+/** The DM key of a conversation between a person and an agent. */
+export const personAgentDmKey = (userId: string, agentId: string) => keyOf([`u:${userId}`, `a:${agentId}`]);
 
 /** The DM key of a conversation between two agents (`ask_agent`, ADR 0034): no person in it. */
 export const agentDmKey = (a: string, b: string) => keyOf([`a:${a}`, `a:${b}`]);
@@ -251,6 +254,8 @@ export interface DmSummary {
     authorType: string;
   } | null;
   unread: number;
+  /** Where the unread starts: when I last read it; null when I never did. */
+  lastReadAt: Date | null;
   /** False until I first open it (no read of mine yet): the right hand waves on that first visit (ADR 0137 §6). */
   everRead: boolean;
 }
@@ -358,6 +363,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
               }
             : null,
           unread: unread.get(c.id) ?? 0,
+          lastReadAt: readAt.get(c.id) ?? null,
           everRead: readAt.has(c.id),
           sortAt: m?.createdAt ?? c.createdAt,
         },

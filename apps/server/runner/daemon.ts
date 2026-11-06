@@ -1186,6 +1186,7 @@ export class RunnerDaemon implements RequestObserver {
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
         account: (agentId) => this.agentAccount(agentId),
+        accounts: (agentId) => this.agentAccounts(agentId),
         ...(this.opts.workers ? { start: this.opts.workers.start } : { gitCache: rootGitCache() }),
         ...(guard ? { guard } : {}),
         token: config.token,
@@ -1247,6 +1248,13 @@ export class RunnerDaemon implements RequestObserver {
       terminals: this.terminals,
       streams,
       desktopUse,
+      desktopTaken: (agentId) => {
+        if (supervisor) supervisor.desktopTaken(agentId);
+        else {
+          desktopUse.stopInput(agentId);
+          browser.stopInput(agentId);
+        }
+      },
     };
     // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
     // it lands in `hello` if it finishes first, else comes after as `accounts.changed`. Nothing reaches the
@@ -1723,14 +1731,15 @@ export class RunnerDaemon implements RequestObserver {
       const lent = new Map<string, number>();
       for (const a of list) {
         const uid = uids.get(a.id);
-        if (a.account && uid) lent.set(a.account, uid);
+        if (!uid) continue;
+        for (const id of [a.account, ...(a.accounts ?? [])]) if (id) lent.set(id, uid);
       }
       void this.accounts.keepLent(lent).catch(() => undefined);
       const here = new Set(list.map((a) => a.id));
       const gone = this.agents.filter((a) => !here.has(a.id)).map((a) => a.id);
       const hosted = this.session?.accountBrains?.brains;
-      for (const a of list) hosted?.keepAccount(a.account ?? null, a.id);
-      for (const id of gone) hosted?.keepAccount(null, id);
+      for (const a of list) hosted?.keepAccount(a.account ?? null, a.accounts, a.id);
+      for (const id of gone) hosted?.keepAccount(null, [], id);
       for (const u of readAgentUsers(this.opts.home)) {
         if (!gone.includes(u.id)) continue;
         try {
@@ -1767,6 +1776,11 @@ export class RunnerDaemon implements RequestObserver {
   private agentAccount(agentId: string): string | null {
     const id = this.agents.find((a) => a.id === agentId)?.account;
     return id && this.accounts.has(id) ? id : null;
+  }
+
+  /** The other accounts it thinks with (`MachineAgent.accounts`), while still here. */
+  private agentAccounts(agentId: string): string[] {
+    return (this.agents.find((a) => a.id === agentId)?.accounts ?? []).filter((id) => this.accounts.has(id));
   }
 
   // ── State ──────────────────────────────────────────────────────────────────

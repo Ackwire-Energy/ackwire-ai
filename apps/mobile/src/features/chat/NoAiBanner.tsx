@@ -1,10 +1,13 @@
+import { useAiStatus } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { mayConnectAi, noAiStatusKey } from "@agenteschat/client/lib/no-ai";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
 import { Button, Icon, InfoHint, Text, useReducedMotion } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
-import { useColors, useDirectory } from "../shared/hooks";
+import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import type { NoAiBannerView } from "./no-ai-banner";
 
 /**
@@ -17,7 +20,11 @@ export function NoAiBanner({ banner }: { banner: NoAiBannerView }) {
   const dir = useDirectory();
   const c = useColors();
   const reduced = useReducedMotion();
-  const name = banner.kind === "agent" ? (dir.agentById.get(banner.agentId)?.name ?? t("channel.unknownAgent")) : "";
+  const { orgId, org } = useOrg();
+  const status = useAiStatus(orgId);
+  const meId = useMeId();
+  const agent = banner.kind === "agent" ? dir.agentById.get(banner.agentId) : undefined;
+  const name = banner.kind === "agent" ? (agent?.name ?? t("channel.unknownAgent")) : "";
   const action = banner.kind === "agent" ? t("noAi.action") : t("noAi.banner.orgAction");
   const connect = () => openConnectAi(banner.agentId ? { agentId: banner.agentId } : {});
   return (
@@ -31,7 +38,7 @@ export function NoAiBanner({ banner }: { banner: NoAiBannerView }) {
       <View style={styles.text}>
         {banner.kind === "agent" ? (
           <Text variant="small" tone="ink2" style={styles.strong}>
-            {t("noAi.agent", agentGrammar(name))}
+            {t(noAiStatusKey(status.data, banner.agentId), agentGrammar(name))}
           </Text>
         ) : banner.askInChat ? (
           <InfoHint name={t("common.about", { label: action })} text={t("noAi.banner.orgHint")} variant="small">
@@ -45,7 +52,9 @@ export function NoAiBanner({ banner }: { banner: NoAiBannerView }) {
           </Text>
         )}
       </View>
-      <Button variant="secondary" size="sm" label={action} onPress={connect} />
+      {banner.kind === "org" || mayConnectAi(agent, meId, org) ? (
+        <Button variant="secondary" size="sm" label={action} onPress={connect} />
+      ) : null}
     </Animated.View>
   );
 }

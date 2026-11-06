@@ -10,8 +10,6 @@ export const strings: Partial<PushStrings> = {
   approvalFromRoutine: (routine) => `例行工作“${routine}”`,
   questionTitle: (a) => `${a} 有个问题想问你`,
   questionBody: "点按回答。",
-  forumTitle: "轮到你发表意见了",
-  forumBody: "点按加入讨论。",
   mentionTitle: (a) => `${a} 提及了你`,
   replyTitle: (a) => `${a} 回复了`,
   missionStoppedTitle: "一个专项任务已停止",
@@ -75,4 +73,5 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a} 提高了你本月的额度`,
   usageRaisedBody: "可以继续了。",
   usageRefusedTitle: (a) => `${a} 拒绝了你增加用量的申请`,
+  teamWeekReady: "你的团队周报已准备好",
 };

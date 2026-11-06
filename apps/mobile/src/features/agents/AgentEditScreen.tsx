@@ -18,6 +18,7 @@ import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { BrakesSection } from "./BrakesSection";
+import { BudgetSection } from "./BudgetSection";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { type AgentDraft, agentChanges, editableFields, fullLook } from "./edit";
 import { ErrorLine, HandleInput } from "./HandleInput";
@@ -224,6 +225,7 @@ export function AgentEditScreen({ id }: { id: string }) {
           </Text>
         ) : (
           <>
+            {admin ? <BudgetSection agent={agent} /> : null}
             <BrakesSection agent={agent} />
 
             <View style={styles.section}>

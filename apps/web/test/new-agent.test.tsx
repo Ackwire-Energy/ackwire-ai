@@ -463,7 +463,7 @@ describe("Criar agente: steps", () => {
     await toReview();
     const content = () => screen().getByRole("heading", { level: 1 }).closest(".newag__content") as HTMLElement;
     expect(title()).toBe("Tudo certo com o Theo?");
-    expect(content().textContent).toContain("PM · Organiza tarefas, resumos e o fórum.");
+    expect(content().textContent).toContain("PM · Organiza tarefas e resumos.");
     expect(content().textContent).toContain("@theo");
     // The title says it all: no lead, and no note under the summary.
     expect(content().querySelector(".onb__lead, .newag__note")).toBeNull();
@@ -1504,7 +1504,7 @@ describe("Criar agente: what gets created", () => {
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(document.querySelector(".ac-toasts")?.textContent).toContain(
-      "A Iris já existe, mas parte do que você escolheu não foi salva. Você não tem permissão para isso. Peça a um admin do workspace.",
+      "A Iris já existe, mas parte do que você escolheu não foi salva. Você não tem permissão para isso.",
     );
     expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
     expect(document.body.textContent).toContain(

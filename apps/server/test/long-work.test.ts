@@ -81,3 +81,16 @@ test("the anchor carries its work's view; agent.work goes out live; Parar is ref
   expect(end?.meta.workEnd).toMatchObject({ status: "canceled" });
   expect(after.find((m) => m.longWork)?.longWork).toMatchObject({ status: "canceled" });
 });
+
+test("Continuar agora on several: needs run ids; a run no longer paused is skipped", async () => {
+  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const go = (runIds: string[]) =>
+    owner(`/api/app/organizations/${orgId}/task-manager/continue`, { method: "POST", json: { runIds } });
+  expect((await go([])).status).toBe(400);
+  const res = await go([crypto.randomUUID()]);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ continued: 0 });
+});

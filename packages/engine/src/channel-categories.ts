@@ -59,7 +59,7 @@ export async function listChannelCategories(db: Database, actorId: string, orgId
 
 /**
  * The channels of one category (null: those with none), in sidebar order. Only named channels that aren't
- * archived: DMs and the forum never sit in the sidebar's categories.
+ * archived: DMs never sit in the sidebar's categories.
  */
 async function channelsIn(db: Executor, orgId: string, categoryId: string | null) {
   const rows = await db

@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type {
+  Agent,
   AgentBrain,
   AiAccounts,
   AiComputer,
@@ -11,6 +12,7 @@ import type {
 } from "../api/types";
 import { joinNames } from "./format";
 import { isPlanId, loginPerAgent, planName } from "./plans";
+import { isRightHand } from "./right-hand";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
 export interface PlanAccount<A extends MachineAccount> {
@@ -290,6 +292,12 @@ export function existingAi<A extends MachineAccount>(
   const rank = (r: ExistingAi<A>) => EXISTING_RANK[r.kind === "key" ? "key" : r.act];
   return [...accounts, ...live].sort((x, y) => rank(x) - rank(y));
 }
+
+/**
+ * Whether Connect an AI starts with what the person already has for the agent (`existingAi`): while it has no AI, and
+ * always for the right hand, whose plan may be one it can't think with now.
+ */
+export const listsExisting = (agent: Pick<Agent, "builtin"> | undefined, noAi: boolean) => noAi || isRightHand(agent);
 
 /** A computer's own sign-in as "Seus planos" lists it ("Conta deste computador"). */
 export interface OwnSignInRow {

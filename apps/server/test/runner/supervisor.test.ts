@@ -1188,6 +1188,9 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   };
   t.sup.handoff(handoff);
   await waitFor(() => ana.of("browser.handoff").length === 1);
+  // Root sees a person take the desktop; the agent's keys are its worker's.
+  t.sup.desktopTaken(ANA.id);
+  await waitFor(() => ana.of("desktop.taken").length === 1);
 
   // The server's socket drops: so does the worker's session, and what it ran fails.
   t.sup.detach();
@@ -3971,43 +3974,49 @@ test.if(posix)("a route or a task on a shared CLI login that can't run says why,
   expect(existsSync(h.log)).toBe(false);
 });
 
-test.if(posix)("a task on a shared CLI login: its worker prepares it, root runs the CLI, the lines go back", async () => {
-  const s = await startHostedTask(hostedTask({ prompt: "@/etc/shadow fix it" }), { where: "Your branch: a/b." });
-  expect(s.q.grant).toEqual({ kind: "hosted" });
-  // Root's word to the worker, never the server's.
-  expect(s.reply.host).toBeUndefined();
-  expect(s.reply).toMatchObject({ taskId: HOSTED_TASK, pid: 42 });
-  const exit = await s.done();
-  expect(exit).toMatchObject({ exitCode: 0, signal: null, reason: null });
-  const lines = s.ana.of("task.out").map((f) => String(f.line));
-  expect(lines.some((l) => l.includes('"type":"result"'))).toBe(true);
-  expect(lines.some((l) => l.includes('"stream_event"'))).toBe(false);
-  const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
-  expect(start.args[start.args.indexOf("--tools") + 1]).toBe("ToolSearch");
-  expect(start.args).toContain("--strict-mcp-config");
-  expect(start.args).toContain(HOSTED_SESSION);
-  // The turn's id is the task's, for the server's tools; outside a mission only the prompt tool is there.
-  expect(s.ana.of("bridge.token")[0]).toMatchObject({ task: "local", profile: "work", session: HOSTED_SESSION });
-  expect(s.ana.of("bridge.token")[1]).toMatchObject({ runId: HOSTED_TASK });
-  expect(s.ana.of("bridge.token")[1]?.serverToken).toBeUndefined();
-  expect(s.ana.of("turn.prepare")[0]).toMatchObject({ cwd: FOLDER });
-});
+test.if(posix)(
+  "a task on a shared CLI login: its worker prepares it, root runs the CLI, the lines go back",
+  async () => {
+    const s = await startHostedTask(hostedTask({ prompt: "@/etc/shadow fix it" }), { where: "Your branch: a/b." });
+    expect(s.q.grant).toEqual({ kind: "hosted" });
+    // Root's word to the worker, never the server's.
+    expect(s.reply.host).toBeUndefined();
+    expect(s.reply).toMatchObject({ taskId: HOSTED_TASK, pid: 42 });
+    const exit = await s.done();
+    expect(exit).toMatchObject({ exitCode: 0, signal: null, reason: null });
+    const lines = s.ana.of("task.out").map((f) => String(f.line));
+    expect(lines.some((l) => l.includes('"type":"result"'))).toBe(true);
+    expect(lines.some((l) => l.includes('"stream_event"'))).toBe(false);
+    const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
+    expect(start.args[start.args.indexOf("--tools") + 1]).toBe("ToolSearch");
+    expect(start.args).toContain("--strict-mcp-config");
+    expect(start.args).toContain(HOSTED_SESSION);
+    // The turn's id is the task's, for the server's tools; outside a mission only the prompt tool is there.
+    expect(s.ana.of("bridge.token")[0]).toMatchObject({ task: "local", profile: "work", session: HOSTED_SESSION });
+    expect(s.ana.of("bridge.token")[1]).toMatchObject({ runId: HOSTED_TASK });
+    expect(s.ana.of("bridge.token")[1]?.serverToken).toBeUndefined();
+    expect(s.ana.of("turn.prepare")[0]).toMatchObject({ cwd: FOLDER });
+  },
+);
 
-test.if(posix)("a mission task's CLI gets its rules, mode, allow list and server token from root's request", async () => {
-  const mission = {
-    id: "0193cccc-0000-7000-8000-000000000001",
-    rules: "Ask before any deploy.",
-    allow: ["Bash(swift *)", 3],
-    mode: "plan",
-    mcpToken: `agr_${"m".repeat(26)}`,
-  };
-  const s = await startHostedTask(hostedTask({ mission }));
-  await s.done();
-  const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
-  expect(start.system).toContain("Ask before any deploy.");
-  expect(s.ana.of("bridge.token")[0]).toMatchObject({ task: "mission", profile: "plan", allow: ["Bash(swift *)"] });
-  expect(s.ana.of("bridge.token")[1]).toMatchObject({ runId: HOSTED_TASK, serverToken: mission.mcpToken });
-});
+test.if(posix)(
+  "a mission task's CLI gets its rules, mode, allow list and server token from root's request",
+  async () => {
+    const mission = {
+      id: "0193cccc-0000-7000-8000-000000000001",
+      rules: "Ask before any deploy.",
+      allow: ["Bash(swift *)", 3],
+      mode: "plan",
+      mcpToken: `agr_${"m".repeat(26)}`,
+    };
+    const s = await startHostedTask(hostedTask({ mission }));
+    await s.done();
+    const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
+    expect(start.system).toContain("Ask before any deploy.");
+    expect(s.ana.of("bridge.token")[0]).toMatchObject({ task: "mission", profile: "plan", allow: ["Bash(swift *)"] });
+    expect(s.ana.of("bridge.token")[1]).toMatchObject({ runId: HOSTED_TASK, serverToken: mission.mcpToken });
+  },
+);
 
 test.if(posix)("a mission task in a folder with no git gets the rules for that", async () => {
   const mission = { id: "0193cccc-0000-7000-8000-000000000001", rules: "Ask before any deploy." };

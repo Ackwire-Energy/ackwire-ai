@@ -1,4 +1,5 @@
 import { type ArtifactDetail, useApi } from "@agenteschat/client";
+import { relativeDay } from "@agenteschat/client/lib/format";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, Platform } from "react-native";
@@ -79,9 +80,7 @@ export function useSavedWhen() {
   return (iso: string) => {
     const kind = whenKind(iso);
     const day =
-      kind === "time" || kind === "yesterday"
-        ? new Intl.RelativeTimeFormat(when.locale, { numeric: "auto" }).format(kind === "time" ? 0 : -1, "day")
-        : when.short(iso);
+      kind === "time" || kind === "yesterday" ? relativeDay(when.locale, kind === "time" ? 0 : -1) : when.short(iso);
     return `${day} ${when.time(iso)}`;
   };
 }
