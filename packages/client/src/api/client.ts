@@ -1,4 +1,5 @@
 import type { AppLocale } from "@agenteschat/i18n/locale";
+import type { PlanModel } from "@agenteschat/providers/plans";
 import type { DashboardsApi } from "../dashboards/api";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
@@ -627,7 +628,12 @@ export interface ApiClient {
     purge(orgId: string, agentId: string): Promise<void>;
     /** Agents no longer in the team (archived or deleted), for the names and faces of what they left. */
     former(orgId: string): Promise<FormerAgent[]>;
-    models(): Promise<{ models: Model[]; defaultModel: string }>;
+    models(): Promise<{
+      models: Model[];
+      defaultModel: string;
+      /** Absent on an older server. */
+      planModels?: Partial<Record<string, readonly PlanModel[]>>;
+    }>;
     credentials(orgId: string): Promise<Credential[]>;
     addCredential(
       orgId: string,

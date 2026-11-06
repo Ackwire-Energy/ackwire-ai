@@ -577,7 +577,7 @@ describe("the agent's AI", () => {
     };
     const view = (effectiveModel: string) => ({ brain: "claude_code" as const, effectiveModel, options: [claude] });
     const go = modelRows(t, view("deepseek-v4.1-flash"), planOf("opencode"));
-    expect(go).toHaveLength(29);
+    expect(go).toHaveLength(31);
     expect(go[0]).toEqual({
       value: "auto",
       label: "Automático",
@@ -626,7 +626,7 @@ describe("the agent's AI", () => {
     // Every maker beside its own mark, never a letter.
     expect(sections.slice(1).filter((s) => !markOf(s.maker))).toEqual([]);
     // A model that trains on what it's sent: its provider does, said behind the row's ⓘ.
-    expect(go.find((r) => r.value === "beam-free")?.note).toBe(
+    expect(go.find((r) => r.value === "iceman-contributor-free")?.note).toBe(
       "Grátis. O provedor pode usar os pedidos para treinar o modelo. Ligue a permissão no OpenCode.",
     );
     expect(sections.flatMap((s) => s.rows)).toEqual(go);

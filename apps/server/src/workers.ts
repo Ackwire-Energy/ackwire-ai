@@ -43,6 +43,7 @@ import {
   reconcileComposioConnectors,
   reconcileWorks,
   recoverStaleRuns,
+  refreshPlanModels,
   releaseJobs,
   sweepEndedInboxes,
   sweepExpiredVoice,
@@ -142,6 +143,8 @@ export const WORKER_INTERVALS_MS = {
   vaultSyncs: 5 * 60_000,
   /** Lodi's weekly card of admins whose slot just passed (ADR 0137 §9; one per person and week: its dedupe key). */
   teamWeek: 10 * 60_000,
+  /** The coding plans' public lists of models, each replica for itself: also at boot. */
+  planModels: 3600_000,
 };
 
 /**
@@ -198,6 +201,7 @@ export function startWorkers(deps: WorkerDeps) {
   });
 
   every("apps", WORKER_INTERVALS_MS.apps, () => purgeApps(db));
+  every("planModels", WORKER_INTERVALS_MS.planModels, () => refreshPlanModels());
   every("skillUpdates", WORKER_INTERVALS_MS.skillUpdates, async () => {
     if ((await enqueueSkillUpdates(db)) > 0) void ticks.get("outbox")?.();
   });

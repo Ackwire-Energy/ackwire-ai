@@ -32,7 +32,7 @@ import {
   PERMISSION_WAIT_MS,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
-import { claudeCodeModel, type PlanId, planOf } from "@agenteschat/providers/plans";
+import { claudeCodeModel, type PlanId, planForTurn, planOf } from "@agenteschat/providers/plans";
 import {
   ACCOUNT_MISSING_MESSAGE,
   ACCOUNT_SIGNED_OUT,
@@ -1741,7 +1741,8 @@ export class BrainManager {
     };
     // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
     const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
-    const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
+    const keyPlan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
+    const plan = keyPlan && planForTurn(keyPlan, req.model);
     if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
     // Protocol 28: the agent's context limit; Claude Code compacts the conversation there instead of at its window.
     if (isContextTokens(req.contextTokens)) env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(req.contextTokens);

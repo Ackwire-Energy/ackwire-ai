@@ -9,6 +9,7 @@ import type {
   PlanUsage,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { CODING_PLANS, learnPlanModels } from "@agenteschat/client/lib/plans";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -20,6 +21,7 @@ import {
   ADA_ID,
   ATLAS_ID,
   createFakeApi,
+  type FakeState,
   fakeAgentBrain,
   fakeBrowserOf,
   fakeMachinesOf,
@@ -1437,8 +1439,14 @@ describe("Quem pensa: a coding plan's models", () => {
     ...over,
   });
   /** Ada thinks with Claude Code on the MacBook, with Walter's key account of `provider`. */
-  async function onPlan(provider: string, patch: Partial<AgentBrain> = {}, over: Partial<MachineAccount> = {}) {
+  async function onPlan(
+    provider: string,
+    patch: Partial<AgentBrain> = {},
+    over: Partial<MachineAccount> = {},
+    planModels?: FakeState["planModels"],
+  ) {
     const state = seedState();
+    if (planModels) state.planModels = planModels;
     const api = createFakeApi(state);
     pairMac(api, true);
     await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
@@ -1497,7 +1505,7 @@ describe("Quem pensa: a coding plan's models", () => {
     const options = screen()
       .getAllByRole("option")
       .map((o) => o.textContent);
-    expect(options).toHaveLength(29);
+    expect(options).toHaveLength(31);
     expect(options.slice(0, 4)).toEqual([
       "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
       "MiniMax M3",
@@ -1525,7 +1533,7 @@ describe("Quem pensa: a coding plan's models", () => {
       "Reflection",
       "OpenCode",
     ]);
-    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(29);
+    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(31);
     // Every maker's own mark, never its initial.
     expect(list.querySelectorAll(".ac-brand__initial")).toHaveLength(0);
     expect(
@@ -1542,25 +1550,25 @@ describe("Quem pensa: a coding plan's models", () => {
       "Precisa da região Global no OpenCode.",
     ]);
     // A model that trains on what it's sent: its provider does, never agentes.chat.
-    const beam = screen().getByRole("option", { name: "Beam Free" });
-    expect(described(beam)).toBe(
+    const iceman = screen().getByRole("option", { name: "Iceman Contributor Free" });
+    expect(described(iceman)).toBe(
       "Grátis. O provedor pode usar os pedidos para treinar o modelo. Ligue a permissão no OpenCode.",
     );
     const tip = () => document.querySelector(".ac-menu__tip")?.textContent ?? null;
-    const info = beam.querySelector(".ac-menu__hint") as HTMLElement;
+    const info = iceman.querySelector(".ac-menu__hint") as HTMLElement;
     // The pointer resting on the ⓘ shows the note; a click on it shows it too, and never picks the model.
     await act(async () => fireEvent.pointerEnter(info, { pointerType: "mouse" }));
-    expect(tip()).toBe(described(beam) ?? "");
+    expect(tip()).toBe(described(iceman) ?? "");
     await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
     expect(tip()).toBeNull();
     await act(async () => fireEvent.click(info));
-    expect(tip()).toBe(described(beam) ?? "");
+    expect(tip()).toBe(described(iceman) ?? "");
     expect(screen().queryByRole("listbox")).not.toBeNull();
     await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
     // A real mouse enters before it clicks: the click keeps the note the hover showed.
     await act(async () => fireEvent.pointerEnter(info, { pointerType: "mouse" }));
     await act(async () => fireEvent.click(info));
-    expect(tip()).toBe(described(beam) ?? "");
+    expect(tip()).toBe(described(iceman) ?? "");
     await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
     expect(tip()).toBeNull();
     // The keys reaching the option show it as well. The key goes to the page, not the list: on an arrow, Radix
@@ -1652,6 +1660,22 @@ describe("Quem pensa: a coding plan's models", () => {
       "claude_code",
       { accountId: "acct_plan", provider: "opencode" },
     ]);
+  });
+
+  test("a model OpenCode's list added after this build: offered by its maker, and shown by its name once chosen", async () => {
+    const table = CODING_PLANS.opencode.claudeCode.models;
+    try {
+      await onPlan(
+        "opencode",
+        { model: "nova-2", effectiveModel: "nova-2" },
+        {},
+        { opencode: [...table, { id: "nova-2", label: "Nova 2", maker: "Acme" }] },
+      );
+      expect(brainCell().value).toStartWith("Nova 2");
+      expect(await offered(await brainDialog(), "Modelo")).toContain("ANova 2");
+    } finally {
+      learnPlanModels({ opencode: table });
+    }
   });
 
   test("the cell: the plan that pays in its label, the model and its effort under it, its account among two of that plan", async () => {

@@ -412,6 +412,8 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
   const g = agentGrammar(dir.agentById.get(agentId)?.name ?? "");
   const brain = useAgentBrain(orgId, agentId);
   const { busy, save } = useSaveBrain(agentId);
+  // Opened straight from a link too: the plans' lists come with it.
+  useModels();
   const view = brain.data;
   const plan = view ? brainPlan(view) : undefined;
   const rows = view ? modelRows(t, view, plan) : [];

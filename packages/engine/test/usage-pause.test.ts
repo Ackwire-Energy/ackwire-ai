@@ -1715,6 +1715,26 @@ test("a model that needs the Global region waits with no reset time and says wha
   expect((await accountUsage(f, accountId))?.models?.["deepseek-v4.1-flash"]).toMatchObject({ region: true });
 });
 
+test("a region refusal the CLI didn't call a limit says what to turn on too", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const reading: PlanUsage = {
+    windows: [{ kind: "five_hour", usedPercent: 0, resetsAt: later(5 * 3600_000).toISOString() }],
+    source: "probe",
+    at: new Date().toISOString(),
+  };
+  const { accountId } = await goAgent(f, "hy3", reading);
+  const { brain } = scripted(() => [
+    { type: "error", code: "claude_failed", message: "API Error: 403 Model not allowed in this workspace's region" },
+  ]);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, accountHandlers(f, brain));
+  const [run] = await runs(f);
+  expect(waitOf(run)).toMatchObject({ scope: "region", model: "hy3" });
+  const [note] = await notes(f, "plan_model_region_wait");
+  expect(note?.meta.bodyParams).toMatchObject({ model: "Hy3" });
+  expect((await accountUsage(f, accountId))?.models?.hy3).toMatchObject({ region: true });
+});
+
 test("a full window of the OpenCode Go account is still the account's limit", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   const reset = later(2 * 3600_000).toISOString();

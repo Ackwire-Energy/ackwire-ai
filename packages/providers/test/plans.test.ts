@@ -1,17 +1,22 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { MODEL_CATALOG } from "../src/catalog";
 import {
   CODING_PLANS,
   claudeCodeModel,
   FAST_MODE_MODELS,
   isPlanModelId,
+  learnedPlanModels,
+  learnPlanModels,
   PLAN_ALIASES,
   PLAN_IDS,
   type PlanId,
   type PlanModel,
+  planForTurn,
   planModel,
   planModelById,
   planModelValue,
+  planOf,
+  readPlanModels,
   speedFits,
 } from "../src/plans";
 
@@ -53,13 +58,12 @@ describe("coding plans' models", () => {
     expect(aliases("kimi")).toEqual({ opus: "k3.1-pro", sonnet: "kimi-for-coding", haiku: "kimi-for-coding" });
     expect(ids("minimax")).toEqual(["MiniMax-M3.1-Flash[1m]"]);
     expect(aliases("opencode")).toEqual({ opus: "minimax-m3", sonnet: "minimax-m3", haiku: "claude-haiku-5-5" });
-    // All 28 of OpenCode Go's live list (2026-11-02). The ones that train on what they're sent say so and run only
-    // when chosen: "Automático" never picks one.
-    expect(ids("opencode")).toHaveLength(28);
-    for (const m of models("opencode").filter((m) => /free|contributor/.test(m.id))) {
+    // All 30 of OpenCode Go's live list (2026-11-06). The ones that train on what they're sent say so, and those and
+    // the free ones run only when chosen: "Automático" never picks one.
+    expect(ids("opencode")).toHaveLength(30);
+    for (const m of models("opencode").filter((m) => /contributor/.test(m.id)))
       expect(m.needs === "paidTraining" || m.needs === "freeTraining").toBe(true);
-      expect(m.alias).toBeUndefined();
-    }
+    for (const m of models("opencode").filter((m) => /free|contributor/.test(m.id))) expect(m.alias).toBeUndefined();
     const cheap = models("opencode")
       .filter((m) => m.tag === "cheap")
       .map((m) => m.id);
@@ -95,16 +99,15 @@ describe("coding plans' models", () => {
       ["deepseek-v4.1-flash", "globalRegion"],
       ["muse-spark-1.3-contributor", "paidTraining"],
       ["muse-spark-1.2-contributor", "paidTraining"],
-      ["beam-free", "freeTraining"],
       ["iceman-contributor-free", "freeTraining"],
     ]);
   });
 
   test("a model its plan prices at 0 is marked free; every other one isn't", () => {
-    // OpenCode Go's live list (2026-11-02) prices exactly these at 0. Zen's free tier (`*-free` on
+    // OpenCode Go's live list (2026-11-06) prices exactly these at 0. Zen's free tier (`*-free` on
     // opencode.ai/zen/v1/models, `big-pickle`) answers only the OpenCode CLI, so no plan here lists it.
     const free = PLAN_IDS.flatMap((p) => models(p).flatMap((m) => (m.free ? [m.id] : [])));
-    expect(free).toEqual(["beam-free", "iceman-contributor-free"]);
+    expect(free).toEqual(["beam-free", "crouton-alpha-free", "iceman-contributor-free"]);
     expect(ids("opencode")).not.toContain("deepseek-v4.1-flash-free");
     expect(ids("opencode")).toContain("deepseek-v4.1-flash");
     expect(ids("opencode")).toContain("glm-5.3-flash");
@@ -177,5 +180,112 @@ describe("coding plans' models", () => {
   test("every model we offer on Codex is on Fast mode's list, Automático's picks included", () => {
     for (const [id, m] of Object.entries(MODEL_CATALOG))
       if (m.provider === "openai") expect(FAST_MODE_MODELS).toContain(id);
+  });
+});
+
+describe("a plan's public list of models", () => {
+  const go = CODING_PLANS.opencode;
+  const listed = (id: string, canonical: string | null, name: string, price = 1, more: object = {}) => ({
+    id,
+    name,
+    type: "chat",
+    ...(canonical ? { canonical_id: canonical } : {}),
+    capabilities: { tools: { supported: true } },
+    cost: { text: { input: { price }, output: { price } } },
+    ...more,
+  });
+  const list = {
+    object: "list",
+    data: [
+      listed("minimax-m3", "minimax/MiniMax-M3", "MiniMax-M3"),
+      listed("claude-haiku-5-5", "anthropic/claude-haiku-5-5", "Claude Haiku 5.5"),
+      listed("glm-5.3-flash", "zhipuai/glm-5.3-flash", "GLM-5.3-Flash"),
+      listed("glm-6", "zhipuai/glm-6", "GLM-6"),
+      listed("deepseek-v5", "deepseek/deepseek-v5", "DeepSeek V5"),
+      listed("muse-3-contributor", "meta/muse-3", "Muse 3 Contributor"),
+      listed("nova-free", null, "Nova Free", 0),
+      listed("pixel-1", "acme/pixel-1", "Pixel 1", 1, { type: "image" }),
+      listed("no-tools", "acme/no-tools", "No Tools", 1, { capabilities: { tools: { supported: false } } }),
+      listed("bad id; rm -rf /", "acme/x", "Bad"),
+      null,
+    ],
+  };
+
+  afterEach(() => learnPlanModels({ opencode: models("opencode") }));
+
+  test("names, makers and prices come from the list, the table adds what only it knows", () => {
+    const read = readPlanModels(go, list);
+    expect(read.find((m) => m.id === "minimax-m3")).toEqual({
+      id: "minimax-m3",
+      label: "MiniMax-M3",
+      maker: "minimax",
+      alias: "sonnet",
+    });
+    expect(read.find((m) => m.id === "glm-5.3-flash")).toMatchObject({
+      label: "GLM-5.3-Flash",
+      tag: "cheap",
+      maker: "zai",
+    });
+    expect(read.find((m) => m.id === "glm-6")).toEqual({ id: "glm-6", label: "GLM-6", maker: "zai" });
+    expect(read.find((m) => m.id === "deepseek-v5")?.needs).toBe("globalRegion");
+    expect(read.find((m) => m.id === "muse-3-contributor")).toMatchObject({ maker: "Meta", needs: "paidTraining" });
+    expect(read.find((m) => m.id === "nova-free")).toEqual({
+      id: "nova-free",
+      label: "Nova Free",
+      maker: "OpenCode",
+      free: true,
+    });
+  });
+
+  test("only what can answer a turn is listed, each maker's together", () => {
+    const read = readPlanModels(go, list);
+    expect(read.map((m) => m.id)).toEqual([
+      "minimax-m3",
+      "claude-haiku-5-5",
+      "glm-5.3-flash",
+      "glm-6",
+      "deepseek-v5",
+      "muse-3-contributor",
+      "nova-free",
+    ]);
+  });
+
+  test("a model an alias runs stays when the list drops it: the computers map the aliases from their own table", () => {
+    const read = readPlanModels(go, { data: [listed("glm-6", "zhipuai/glm-6", "GLM-6")] });
+    expect(read.map((m) => m.id)).toEqual(["minimax-m3", "claude-haiku-5-5", "glm-6"]);
+  });
+
+  test("an answer that isn't a list reads as nothing, and nothing changes the plan", () => {
+    for (const body of [null, "down", {}, { data: "x" }, { data: [] }, { data: [{ id: 3 }] }]) {
+      expect(readPlanModels(go, body)).toEqual([]);
+    }
+    learnPlanModels({ opencode: [] });
+    expect(planOf("opencode")?.claudeCode.models).toHaveLength(models("opencode").length);
+  });
+
+  test("once learned, every reader goes by the list: a new model runs, a dropped one runs sonnet's", () => {
+    expect(planModel(planOf("opencode") as typeof go, "glm-6").id).toBe("minimax-m3");
+    expect(isPlanModelId("glm-6")).toBe(false);
+    learnPlanModels({ opencode: readPlanModels(go, list) });
+    const plan = planOf("opencode") as typeof go;
+    expect(planModel(plan, "glm-6").label).toBe("GLM-6");
+    expect(claudeCodeModel(plan, "glm-6")).toBe("glm-6");
+    expect(planModelById("glm-6")?.maker).toBe("zai");
+    expect(claudeCodeModel(plan, "hy3")).toBe("sonnet");
+    expect(claudeCodeModel(plan, "k3.1-pro")).toBe("sonnet");
+    expect(learnedPlanModels().opencode).toEqual([...plan.claudeCode.models]);
+    expect(planOf("kimi")).toBe(CODING_PLANS.kimi);
+  });
+
+  test("a computer takes the id the server chose from the list, not anything else", () => {
+    const turn = (value: unknown) => claudeCodeModel(planForTurn(go, value), value);
+    expect(turn("glm-6")).toBe("glm-6");
+    expect(planModel(planForTurn(go, "glm-6"), "glm-6").id).toBe("glm-6");
+    expect(turn("deepseek-v4.1-flash")).toBe("deepseek-v4.1-flash");
+    for (const other of ["auto", "claude-opus-5-5", "sonnet; rm -rf /", "glm-5.3[1m]", undefined, 3])
+      expect(turn(other)).toBe("sonnet");
+    expect(turn("opus")).toBe("opus");
+    // A plan without a list stays with its own models.
+    expect(planForTurn(CODING_PLANS.kimi, "glm-6")).toBe(CODING_PLANS.kimi);
   });
 });
