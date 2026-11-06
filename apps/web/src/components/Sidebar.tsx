@@ -298,7 +298,7 @@ export function Sidebar() {
   // "Fixar no topo": pinned rows sit on top of their own section, above a thin line.
   const pinned = useSidebarPins();
   const { view, setView, pins } = pinned;
-  // "Mensagens diretas": the people I opened a DM with, latest first (an agent's row in AGENTES is its DM), pinned ones on top.
+  // "Mensagens diretas": the people I talked to or just opened a DM with, latest first (an agent's row in AGENTES is its DM), pinned ones on top.
   const pinnedPeople = pins.people.flatMap((id) => {
     const m = id === me.user.id ? undefined : dir.memberById.get(id);
     return m ? [m] : [];

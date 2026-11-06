@@ -294,6 +294,7 @@ export interface FakeState {
     with: { type: "person" | "agent"; id: string; name: string; handle: string | null };
     unread?: number;
     everRead?: boolean;
+    openedAt?: string;
   }[];
   calls: { method: string; args: unknown[] }[];
   context?: string;
@@ -3287,6 +3288,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           with: agent
             ? { type: "agent", id: agent.id, name: agent.name, handle: agent.handle }
             : { type: "person", id: person?.userId ?? "", name: person?.name ?? "", handle: null },
+          openedAt: new Date().toISOString(),
         });
         return { channelId };
       },

@@ -121,7 +121,11 @@ describe("the parts' headers", () => {
 
   test("a DM opened with a person is listed before any message", async () => {
     const state = seedState();
-    state.dms.push({ channelId: "dm-joao", with: { type: "person", id: "u-joao", name: "João", handle: null } });
+    state.dms.push({
+      channelId: "dm-joao",
+      with: { type: "person", id: "u-joao", name: "João", handle: null },
+      openedAt: new Date().toISOString(),
+    });
     await go(state);
     const dms = head("Mensagens diretas").closest(".sidebar__section") as HTMLElement;
     expect(within(dms).getByRole("link", { name: /João/ })).toBeTruthy();
