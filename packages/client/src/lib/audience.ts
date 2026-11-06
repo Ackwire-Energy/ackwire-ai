@@ -58,6 +58,10 @@ export function audienceWith(agent: Agent, userId: string): AgentAudience | null
 /** Whether I can talk to it (the server's `canTalk`; absent = yes). */
 export const canTalk = (agent: Pick<Agent, "canTalk"> | undefined) => agent?.canTalk !== false;
 
+/** Whether a button may send me to its DM: I talk to agents at all, and this one answers me. */
+export const mayAsk = (org: OrgSummary | null | undefined, agent: Pick<Agent, "canTalk"> | undefined) =>
+  can(org, "talk_to_agents") && canTalk(agent);
+
 /**
  * Whether I see how it works (instructions, tools and access, memory, files, usage, activity, settings): the
  * server's `seesDetails`, the same rule its routes enforce. Without it, only its public card.

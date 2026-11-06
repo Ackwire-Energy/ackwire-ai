@@ -38,6 +38,7 @@ import {
 import { openAgentEdit } from "../agents/AgentEditScreen";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
+import { PlanHoldNote, usePlanHold } from "../ai/parts";
 import { useFailed } from "../routines/hooks";
 import { Gap, SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
@@ -190,7 +191,8 @@ function PlanRows({
 /** The plans the workspace's AI may move onto (the admin's own, everyone's with `use_others_plans`), a tap each. */
 function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const hold = usePlanHold(orgId, org);
   const api = useApi();
   const qc = useQueryClient();
   const failed = useFailed();
@@ -206,6 +208,7 @@ function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
           void qc.invalidateQueries({ queryKey: key });
       })
       .catch(failed);
+  if (hold) return <PlanHoldNote org={org} />;
   return (
     <>
       {plans.length > 0 ? (

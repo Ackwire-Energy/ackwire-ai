@@ -22,6 +22,7 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EmptyState,
   Field,
   Input,
   List,
@@ -35,13 +36,15 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useConnectAi } from "@/components/ConnectAi";
+import { useConnectAi, useMayConnectAi } from "@/components/ConnectAi";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { planMeterText } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { AddAccount } from "./AddAccountFlow";
+import { PlanHold, usePlanHold } from "./ConnectAiSteps";
 
 /*
  * Configurações › Contas de IA, "Seus planos" (ADR 0059): the viewer's own
@@ -68,6 +71,9 @@ export function AiAccountsSection() {
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connectAi = useConnectAi();
+  const hold = usePlanHold();
+  const mayConnect = useMayConnectAi();
+  const look = useRightHandLook();
   const [open, setOpen] = useState<Open | null>(null);
   const [busy, setBusy] = useState(false);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
@@ -82,6 +88,8 @@ export function AiAccountsSection() {
   const meterText = planMeterText(t, i18n.language);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(org.id) });
   // The same picker as everywhere an AI is connected, from the card's head as Provider keys' Add key is.
+  // Under a hold its lines say what comes first: an invitation to connect a plan would contradict them.
+  const noPlans = !hold && ai.isSuccess && rows.length === 0 && own.length === 0;
   const connect = connectAi && (
     <Button size="sm" icon="plus" onClick={() => connectAi.open({})}>
       {t("aiAccounts.page.connect")}
@@ -147,12 +155,27 @@ export function AiAccountsSection() {
         icon="computer"
         title={t("aiAccounts.page.title")}
         hint={{ name: t("common.about", { label: t("aiAccounts.page.title") }), text: t("aiAccounts.page.hint") }}
-        action={connect}
+        action={!noPlans && connect}
       />
+      {hold && <PlanHold hold={hold} onKey={connectAi ? () => connectAi.open({ intent: "api_key" }) : undefined} />}
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {ai.isError && <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>}
-      {ai.isSuccess && rows.length === 0 && own.length === 0 && (
-        <p className="small muted">{t("aiAccounts.page.empty")}</p>
+      {noPlans && (
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t("aiAccounts.page.emptyTitle")}
+          actions={
+            connectAi &&
+            mayConnect && (
+              <Button variant="primary" icon="plus" onClick={() => connectAi.open({})}>
+                {t("aiAccounts.page.connect")}
+              </Button>
+            )
+          }
+        >
+          {t(mayConnect ? "aiAccounts.page.empty" : "aiAccounts.page.emptyViewer")}
+        </EmptyState>
       )}
       {own.length > 0 && (
         <List>
@@ -346,6 +369,7 @@ function AgainDialog({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
+  const hold = usePlanHold();
   const added = useRef(new Set<string>());
   const a = account.signedOut[0] ?? account.logins[0];
   if (!a) return null;
@@ -354,21 +378,25 @@ function AgainDialog({
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={a.label} closeLabel={t("common.close")} width={520}>
       <DialogBody>
-        <AddAccount
-          machineId={a.machineId}
-          kind={a.kind}
-          computer={a.computer}
-          again={a.id}
-          email={a.email}
-          local={local}
-          {...(signInProviderOf(a.provider) ? { provider: signInProviderOf(a.provider) } : {})}
-          {...(fanOut ? { fanOut } : {})}
-          onBack={onClose}
-          onAdded={(_, login) => {
-            added.current.add(login ?? a.id);
-            if (added.current.size >= (fanOut?.length ?? 1)) onDone();
-          }}
-        />
+        {hold ? (
+          <PlanHold hold={hold} />
+        ) : (
+          <AddAccount
+            machineId={a.machineId}
+            kind={a.kind}
+            computer={a.computer}
+            again={a.id}
+            email={a.email}
+            local={local}
+            {...(signInProviderOf(a.provider) ? { provider: signInProviderOf(a.provider) } : {})}
+            {...(fanOut ? { fanOut } : {})}
+            onBack={onClose}
+            onAdded={(_, login) => {
+              added.current.add(login ?? a.id);
+              if (added.current.size >= (fanOut?.length ?? 1)) onDone();
+            }}
+          />
+        )}
       </DialogBody>
     </Dialog>
   );

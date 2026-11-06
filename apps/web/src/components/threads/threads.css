@@ -926,6 +926,9 @@ html:not([data-pointer]) .thread-line:focus-visible {
   height: 100%;
   min-height: 0;
 }
+.thread-panel__chat[hidden] {
+  display: none;
+}
 .thread-head--panel {
   padding-left: 18px;
 }
@@ -1064,10 +1067,10 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-panel--wide .agp-tabs .ac-tabs {
   padding-right: 48px;
 }
-/* Under a panel: the conversation dims like under a dialog (.ac-dialog__scrim, e.g. a routine's details),
-   and a click there closes the panel. */
+/* Under a panel that floats (not one docked in a conversation): the whole window dims like under a dialog
+   (.ac-dialog__scrim, e.g. a routine's details), the sidebar too, and a click there closes the panel. */
 .thread-panel__scrim {
-  position: absolute;
+  position: fixed;
   z-index: 29;
   inset: 0;
   padding: 0;
@@ -1091,6 +1094,12 @@ html:not([data-pointer]) .thread-line:focus-visible {
   .thread-panel__scrim {
     display: none;
   }
+}
+/* A page's entrance (`page-in`) holds its last frame, and a transform held there makes the page, not the window, what
+   `position: fixed` fills, and a layer under the sidebar's: the sidebar would stay out of the scrim. Only the holding
+   stops: `animation: none` would play the entrance again when the panel closes. */
+main.shell__main:has(.thread-panel__scrim) {
+  animation-fill-mode: backwards;
 }
 /* The pinned bar: one slim line under the conversation's header, the latest pin; a click lists them all. */
 .pinbar {

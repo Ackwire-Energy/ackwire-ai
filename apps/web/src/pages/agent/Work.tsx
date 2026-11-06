@@ -69,7 +69,7 @@ import {
 import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
 import { setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
-import { keyRefusal } from "@agenteschat/client/lib/errors";
+import { holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
 import {
   allowsInApp,
@@ -84,9 +84,11 @@ import {
   aiStateOf,
   gateLine,
   kindOf,
+  planHoldOf,
   planLabel,
   planMark,
   planOfAccount,
+  planPickText,
   unsupportedGate,
 } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
@@ -106,8 +108,8 @@ import {
 import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
 import {
-  BrainPortrait,
   Button,
+  Card,
   Checkbox,
   ComputerPortrait,
   cx,
@@ -133,6 +135,7 @@ import {
   Switch,
 } from "@agenteschat/ui";
 import { extraUsageOn } from "@agenteschat/ui/plan-state";
+import { matchesWords } from "@agenteschat/ui/search";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
@@ -147,12 +150,13 @@ import {
   pickerValue,
 } from "@/components/AgentFields";
 import { AddAccount, OpenPage } from "@/components/ai/AddAccountFlow";
-import { accountOption } from "@/components/ai/ConnectAiSteps";
+import { accountOption, PlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { LoadingLine } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { ProviderSelect } from "@/components/ProviderKey";
 import { useWidenAsk } from "@/components/ReachLines";
 import {
   OpenPrefsButton,
@@ -623,11 +627,10 @@ function Footer({
 // ── Quem pensa ──────────────────────────────────────────────────────────────
 
 /*
- * The brains as a list; the chosen one opens into one card with its settings
- * full width under a hairline, each with a small label above it: the model one
- * click away, the effort as a pixel ramp, the account on that computer
- * (ADR 0041, only its owner), and at the card's foot a switch for answering
- * through the API while the computer is off.
+ * What pays, in one select with a search, as Connect an AI's; the chosen one's settings in a card right under it,
+ * each with a small label above it: the model one click away, the effort as a pixel ramp, the account on that computer
+ * (ADR 0041, only its owner), and in its advanced settings a switch for answering through the API while the computer
+ * is off.
  */
 
 /**
@@ -692,6 +695,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const edition = useComputerEdition(org.id);
   const setupQ = useComputerSetup(org.id);
   const computerSetup = setupView(setupQ.data, setupQ.dataUpdatedAt);
+  const hold = planHoldOf(edition, org.standing);
   const api = useApi();
   const toast = useToast();
   const refresh = useRefresh();
@@ -1111,37 +1115,27 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       setBusy(false);
     }
   };
-  const side = (c: AiChoice) => {
-    if (c === "key") return null;
+  /** Where a plan would think, when that says something: none there, its computer off, or the agent moving. */
+  const side = (c: AiChoice): { icon: IconName; text: string } | null => {
+    if (c === "key" || hold) return null;
     const where = homeOf(c);
-    // A coding plan's card stays on the agent's computer, where its key is: no other computer could have it.
-    if (!where)
-      return isPlanId(c) ? null : (
-        <>
-          <Icon name="block" size={14} />
-          {t("agentPage.work.brain.none")}
-        </>
-      );
+    // A coding plan's stays on the agent's computer, where its key is: no other computer could have it.
+    if (!where) return isPlanId(c) ? null : { icon: "block", text: t("agentPage.work.brain.none") };
     if (away(c))
-      return (
-        <>
-          <Icon name="alert" size={14} />
-          {edition === "cloud"
+      return {
+        icon: "alert",
+        text:
+          edition === "cloud"
             ? t("agentPage.work.brain.offCloud", { computer: where.name })
-            : t("agentPage.work.brain.off", { computer: where.name })}
-        </>
-      );
+            : t("agentPage.work.brain.off", { computer: where.name }),
+      };
     // Where the agent already works goes without saying: only a move changes something.
     if (where.machineId === work.machineId) return null;
-    return (
-      <>
-        <Icon name="computer" size={14} />
-        {t("agentPage.work.brain.moves", { computer: where.name })}
-      </>
-    );
+    return { icon: "computer", text: t("agentPage.work.brain.moves", { computer: where.name }) };
   };
   const reason = (c: AiChoice) => {
     if (c === "key") return null;
+    if (hold) return t("connectAi.billing");
     const k = kindOf(c);
     const o = view.options.find((x) => x.kind === k);
     if (!o?.reason) return null;
@@ -1153,12 +1147,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       gateLine(t, {
         gate: unsupportedGate(o.reason, edition, computerSetup),
         edition,
+        hold: holdText(t, org.standing),
         kind: k,
         computer: view.computer?.name ?? "",
         machine: work.machines.data?.find((m) => m.id === view.computer?.machineId),
       })?.text ?? null
     );
   };
+  const chosenSide = side(card);
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(
     t,
@@ -1214,7 +1210,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       ),
     },
   ];
-  const shownAccounts = view.canManageAccounts ? accountOptions : accountOptions.filter((o) => o.value !== ADD);
+  const shownAccounts =
+    view.canManageAccounts && !hold ? accountOptions : accountOptions.filter((o) => o.value !== ADD);
   // On someone else's computer only whoever connected it adds a sign-in: with nothing of the owner's there, the account
   // says so in place of an empty list.
   const lockedHere = shownAccounts.length === 0;
@@ -1448,77 +1445,75 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     >
       <Locked when={busy}>
         <DialogBody>
-          <OptionList
-            attached
+          <ProviderSelect<AiChoice>
             aria-label={t("brain.title")}
             value={card}
             onValueChange={choose}
             disabled={!can("brain")}
-            options={cards.map((c) => {
-              const where = homeOf(c);
-              const off = c !== "key" && away(c);
-              return {
-                value: c,
-                // Each plan by its maker's mark; the API key by its model's maker, or the agent itself when none is known.
-                leading:
-                  c === "key" ? (
-                    apiProvider ? (
-                      <ProviderLogo id={apiProvider} />
-                    ) : (
-                      <BrainPortrait kind="agent" state={card === c ? "working" : "idle"} agent={draft.look} />
-                    )
-                  ) : (
-                    <ProviderLogo id={planMark(c)} off={off} />
-                  ),
-                title: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
-                description:
-                  c === "key"
-                    ? t("agentPage.work.brain.modelText", g)
-                    : !where
-                      ? reason(c)
-                      : !view.canUsePlans && ownerFirst
+            matches={(o, q) => matchesWords(o.value === "key" ? o.label : planPickText(t, o.value), q)}
+            options={cards.map((c) => ({
+              value: c,
+              label: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
+              // Each plan by its maker's mark; the API key by its model's maker, or a key's mark when none is known.
+              leading:
+                c !== "key" ? (
+                  <ProviderLogo id={planMark(c)} size="xs" off={away(c)} />
+                ) : apiProvider ? (
+                  <ProviderLogo id={apiProvider} size="xs" />
+                ) : (
+                  <Icon name="key" size={16} />
+                ),
+              description:
+                c === "key"
+                  ? t("agentPage.work.brain.modelText", g)
+                  : !homeOf(c)
+                    ? reason(c)
+                    : (side(c)?.text ??
+                      (!view.canUsePlans && ownerFirst
                         ? t("agentPage.work.brain.planTextOf", { plan: planLabel(t, c), owner: ownerFirst })
-                        : t("agentPage.work.brain.planText", { plan: planLabel(t, c) }),
-                side: side(c),
-                disabled: c !== "key" && !where,
-                children:
-                  c === "key" ? (
-                    orgRows
-                  ) : adding && accountKind && view.computer ? (
-                    <AddAccount
-                      machineId={view.computer.machineId}
-                      kind={accountKind}
-                      computer={computerName}
-                      again={again?.id}
-                      // "Adicionar conta" beside the accounts the agent's choice already lists: another one.
-                      fresh
-                      {...(isPlanId(card)
-                        ? { provider: card }
-                        : signInProviderOf(again?.provider)
-                          ? { provider: signInProviderOf(again?.provider) }
-                          : {})}
-                      email={signingIn?.email}
-                      local={view.ownSignIn}
-                      onBack={() => setAdding(false)}
-                      onAdded={(a) => {
-                        setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
-                        setAccount(a.id);
-                        setArrived(a);
-                        setAdding(false);
-                      }}
-                      onUse={(a) => {
-                        setArrived(null);
-                        setAccount(a.id);
-                        setAdding(false);
-                      }}
-                      onSigningIn={setSignInBegun}
-                    />
-                  ) : (
-                    planRows
-                  ),
-              };
-            })}
+                        : t("agentPage.work.brain.planText", { plan: planLabel(t, c) }))),
+              disabled: c !== "key" && !homeOf(c),
+            }))}
           />
+          {hold && <PlanHold hold={hold} onKey={card !== "key" && can("brain") ? () => choose("key") : undefined} />}
+          {hold && card === "key" && can("brain") && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
+          {chosenSide && <SettingNote icon={chosenSide.icon}>{chosenSide.text}</SettingNote>}
+          <Card as="section" className="ai-panel" aria-label={t("brain.title")}>
+            {card === "key" ? (
+              orgRows
+            ) : adding && !hold && accountKind && view.computer ? (
+              <AddAccount
+                machineId={view.computer.machineId}
+                kind={accountKind}
+                computer={computerName}
+                again={again?.id}
+                // "Adicionar conta" beside the accounts the agent's choice already lists: another one.
+                fresh
+                {...(isPlanId(card)
+                  ? { provider: card }
+                  : signInProviderOf(again?.provider)
+                    ? { provider: signInProviderOf(again?.provider) }
+                    : {})}
+                email={signingIn?.email}
+                local={view.ownSignIn}
+                onBack={() => setAdding(false)}
+                onAdded={(a) => {
+                  setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
+                  setAccount(a.id);
+                  setArrived(a);
+                  setAdding(false);
+                }}
+                onUse={(a) => {
+                  setArrived(null);
+                  setAccount(a.id);
+                  setAdding(false);
+                }}
+                onSigningIn={setSignInBegun}
+              />
+            ) : (
+              planRows
+            )}
+          </Card>
           {card === "gemini" && adding === false && geminiPersonal(accounts.find((a) => a.id === account)) && (
             <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
           )}

@@ -156,20 +156,17 @@ export function savedReceiptLine(res: Pick<ConsolidateResult, "action" | "item" 
 export const howToSql = () =>
   sql`(${contextItems.kind} = 'note' and ${HOW_TO_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
 
-/** Subject key: lower case, accents and punctuation removed, words sorted. */
+/** A text's words: lower case, accents and punctuation removed. */
+const wordList = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .match(/[\p{L}\p{N}]+/gu) ?? [];
+
+/** Subject key: its words, once each, sorted. */
 export function normalizeSubject(subject: string) {
-  return [
-    ...new Set(
-      subject
-        .normalize("NFD")
-        .replace(/\p{Diacritic}/gu, "")
-        .toLowerCase()
-        .match(/[\p{L}\p{N}]+/gu) ?? [],
-    ),
-  ]
-    .sort()
-    .join(" ")
-    .slice(0, 200);
+  return [...new Set(wordList(subject))].sort().join(" ").slice(0, 200);
 }
 
 const words = (t: string) => new Set(normalizeSubject(t).split(" ").filter(Boolean));
@@ -185,6 +182,18 @@ export function similarity(a: string, b: string) {
 }
 
 export const SAME_ITEM_SIMILARITY = 0.8;
+
+/**
+ * The same sentence give or take a few words: the shorter one's words, in order, inside the longer one. `similarity`
+ * reads a swapped word or a new order as close, and in a sentence that is another one ("loja 3", "loja 4").
+ */
+export function sameSentence(a: string, b: string) {
+  const [x, y] = [wordList(a), wordList(b)];
+  const [shorter, longer] = x.length <= y.length ? [x, y] : [y, x];
+  let found = 0;
+  for (const word of longer) if (word === shorter[found]) found++;
+  return found > 0 && found === shorter.length && found / longer.length >= SAME_ITEM_SIMILARITY;
+}
 
 // ── Writing ──────────────────────────────────────────────────────────────────
 

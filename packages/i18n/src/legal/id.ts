@@ -8,7 +8,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
       "Perjanjian untuk menggunakan agentes.chat: ruang kerja Anda, agen Anda, dan apa yang menjadi tanggung jawab masing-masing pihak.",
     courtesy:
       "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan. Apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
-    updated: "2026-11-04",
+    updated: "2026-11-05",
     sections: [
       {
         id: "agreement",
@@ -122,7 +122,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Jangka waktu dan pengakhiran",
         blocks: [
-          "Anda dapat berhenti menggunakan Layanan dan menghapus akun Anda kapan saja di aplikasi. Kami dapat menangguhkan atau mengakhiri akses Anda karena pelanggaran material terhadap Ketentuan ini, apabila diwajibkan oleh hukum, atau dengan pemberitahuan 30 hari apabila kami menghentikan Layanan. Apabila kami mengakhiri Layanan karena alasan selain pelanggaran Anda, kami akan menyediakan Konten Ruang Kerja Anda untuk diekspor selama 30 hari, kemudian menghapusnya sebagaimana diuraikan dalam Kebijakan Privasi. Bagian-bagian yang menurut sifatnya tetap berlaku setelah pengakhiran (termasuk Bagian 6, 9, 11, 13, 14, dan 15) tetap berlaku.",
+          "Anda dapat berhenti menggunakan Layanan dan menghapus akun Anda kapan saja di aplikasi. Akun dihapus 7 hari kemudian, dan Anda dapat memulihkannya sampai saat itu. Kami dapat menangguhkan atau mengakhiri akses Anda karena pelanggaran material terhadap Ketentuan ini, apabila diwajibkan oleh hukum, atau dengan pemberitahuan 30 hari apabila kami menghentikan Layanan. Apabila kami mengakhiri Layanan karena alasan selain pelanggaran Anda, kami akan menyediakan Konten Ruang Kerja Anda untuk diekspor selama 30 hari, kemudian menghapusnya sebagaimana diuraikan dalam Kebijakan Privasi. Bagian-bagian yang menurut sifatnya tetap berlaku setelah pengakhiran (termasuk Bagian 6, 9, 11, 13, 14, dan 15) tetap berlaku.",
         ],
       },
       {
@@ -175,7 +175,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
       "Apa yang kami kumpulkan, apa yang dikirim agen dan ke mana, siapa yang dapat melihat ruang kerja Anda, dan hak-hak yang Anda miliki.",
     courtesy:
       "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan. Apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
-    updated: "2026-11-04",
+    updated: "2026-11-05",
     sections: [
       {
         id: "overview",
@@ -265,7 +265,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Data akun:** selama akun ada. Ketika Anda menghapus akun di aplikasi, akun tersebut segera dihapus dan keluar dari cadangan kami dalam waktu 30 hari, kecuali catatan yang wajib kami simpan menurut hukum. Setiap ruang kerja tempat Anda menjadi satu-satunya anggota ditutup pada saat yang sama, dan kontennya dihapus 7 hari kemudian sebagaimana diuraikan berikut ini. Ruang kerja tempat Anda pernah berada tetap menyimpan nama dan alamat email Anda dalam log auditnya selama masing-masing ruang kerja itu ada.",
+              "**Data akun:** selama akun ada. Ketika Anda menghapus akun di aplikasi, akun tersebut segera keluar dari semua perangkat dan dihapus 7 hari kemudian, kecuali Anda memulihkannya sebelum itu, lalu keluar dari cadangan kami dalam waktu 30 hari setelahnya, kecuali catatan yang wajib kami simpan menurut hukum. Setiap ruang kerja tempat Anda menjadi satu-satunya anggota ditutup pada saat yang sama, dan kontennya dihapus 7 hari kemudian sebagaimana diuraikan berikut ini. Ruang kerja tempat Anda pernah berada tetap menyimpan nama dan alamat email Anda dalam log auditnya selama masing-masing ruang kerja itu ada.",
               "**Konten Ruang Kerja:** selama ruang kerja ada, dan lebih awal apabila ruang kerja menghapus konten tertentu. Ketika paket agentes.chat suatu ruang kerja berakhir, kontennya tetap tersedia selama 90 hari dan kemudian dihapus. Ketika seorang pemilik menghapus ruang kerja, ruang kerja itu segera ditutup bagi semua orang dan kontennya dihapus 7 hari kemudian, kecuali seorang pemilik memulihkannya sebelum itu, dan keluar dari cadangan kami dalam waktu 30 hari setelahnya, kecuali konten yang wajib kami simpan menurut hukum atau sebagai catatan penyalahgunaan (di bawah).",
               "**Log:** log permintaan dan keamanan hingga 90 hari. Catatan penggunaan model (token dan biaya) selama ruang kerja ada, karena anggaran dan laporan penggunaan bergantung padanya.",
               "**Data penagihan:** selama Anda membayar suatu ruang kerja, dan setelah itu selama diwajibkan oleh hukum perpajakan dan akuntansi.",

@@ -287,7 +287,15 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
 }
 
 /** Why a computer brain can't be chosen right now. */
-export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
+export type BrainUnavailable =
+  | "no_computer"
+  | "exec_off"
+  | "runner_old"
+  | "tool_off"
+  | "not_installed"
+  | "outdated"
+  /** Its runner hasn't said which CLIs it has yet (`detectedAt`): nobody knows whether this one is there. */
+  | "not_reported";
 
 export interface BrainOption {
   kind: BrainKind;
@@ -313,6 +321,10 @@ type MachineLike = Parameters<typeof machineExecutors>[0] & {
   } | null;
 } & Parameters<typeof machineOnline>[0];
 
+/** A CLI the computer doesn't list: gone only once its runner has looked (the same check the turns make). */
+const missingCli = (machine: MachineLike): BrainUnavailable =>
+  machine.executors?.detectedAt ? "not_installed" : "not_reported";
+
 /**
  * What the agent's computer can think with; the model brain always. A
  * computer brain needs the runner's `brain.turn` (`BRAIN_PROTOCOL`, the same
@@ -328,7 +340,7 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
     else if (machine.protocol < BRAIN_PROTOCOL) reason = "runner_old";
     else if (machine.access?.tools && machine.access.tools[executor] === false) reason = "tool_off";
     else if (!found?.available.includes(executor))
-      reason = executor === "codex" && found?.codexTooOld ? "outdated" : "not_installed";
+      reason = executor === "codex" && found?.codexTooOld ? "outdated" : missingCli(machine);
     return {
       kind,
       available: !reason,
@@ -368,7 +380,7 @@ function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode" | "g
   )
     reason = "runner_old";
   else if (tools && (tools[kind] ?? tools.codex) === false) reason = "tool_off";
-  else if (!machine.executors?.[kind]) reason = "not_installed";
+  else if (!machine.executors?.[kind]) reason = missingCli(machine);
   return {
     kind,
     available: !reason,
@@ -1717,6 +1729,8 @@ export interface AiComputer {
     antigravity: boolean;
     key: boolean;
   };
+  /** Why a CLI of `brains` can't think there, as `brainOptions` says it. */
+  off: Partial<Record<BrainKind, BrainUnavailable>>;
   /** What it can think with now: Claude Code (Claude and the coding plans), Codex (ChatGPT), Cursor, OpenCode, Grok, Antigravity. */
   brains: {
     claude_code: boolean;
@@ -1783,6 +1797,7 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
           antigravity: sharesSignIns(m, "antigravity"),
           key: sharesSignIns(m, "key"),
         },
+        off: Object.fromEntries(options.flatMap((o) => (o.reason ? [[o.kind, o.reason]] : []))),
         brains: {
           claude_code: can("claude_code"),
           codex: can("codex"),

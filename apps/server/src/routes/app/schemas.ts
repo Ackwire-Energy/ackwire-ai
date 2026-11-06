@@ -549,6 +549,10 @@ export const WorkView = z
     finishedAt: z.string().nullable(),
     nextUpdateAt: z.string().nullable(),
     lastUpdate: z.object({ text: z.string(), at: z.string(), seq: z.number() }).nullable(),
+    question: z
+      .object({ text: z.string(), messageId: z.uuid().nullable() })
+      .nullable()
+      .openapi({ description: "Waiting on an answer: what its run asked, and the message that holds the card." }),
     plan: z.array(z.object({ id: z.string(), text: z.string(), state: z.enum(["todo", "doing", "done"]) })),
     issue: z.object({ id: z.uuid(), number: z.number() }).nullable(),
     resultMessageId: z.uuid().nullable(),
@@ -747,14 +751,21 @@ export const BrainKind = z
   .enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"])
   .openapi("BrainKind");
 
+export const BrainUnavailable = z.enum([
+  "no_computer",
+  "exec_off",
+  "runner_old",
+  "tool_off",
+  "not_installed",
+  "outdated",
+  "not_reported",
+]);
+
 export const BrainOption = z
   .object({
     kind: BrainKind,
     available: z.boolean(),
-    reason: z
-      .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
-      .optional()
-      .openapi({ description: "Why it can't be chosen now (computer brains)." }),
+    reason: BrainUnavailable.optional().openapi({ description: "Why it can't be chosen now (computer brains)." }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),

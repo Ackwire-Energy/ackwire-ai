@@ -43,22 +43,20 @@ describe("a form whose action is on its way", () => {
     expect(email.value).toBe("ada@acme.com");
   });
 
-  test("a key being tried: its field and every provider are off, so what is saved stays what the person sees", () => {
+  test("a key being tried: its field is off, so what is saved stays what the person sees", () => {
     const panel = (saving: boolean) => (
       <KeyPanel
         draft={{ provider: "anthropic", apiKey: "sk-ant-api03-abcdefghijklmnop" }}
         onDraft={() => {}}
-        platform
         saving={saving}
         onSave={() => {}}
       />
     );
     const { container, rerender } = render(panel(true));
-    const controls = [...container.querySelectorAll(".ac-option, input")];
-    expect(controls.length).toBeGreaterThan(2);
-    expect(controls.filter((el) => !off(el))).toEqual([]);
+    const field = container.querySelector("input") as HTMLInputElement;
+    expect(off(field)).toBe(true);
     rerender(panel(false));
-    expect(controls.filter(off)).toEqual([]);
+    expect(off(field)).toBe(false);
   });
 
   test("a dialog: its fields are off, Cancelar and × stay, and a failure gives them back", async () => {

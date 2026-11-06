@@ -199,9 +199,31 @@ describe("where a status shows", () => {
     await click(screen().getAllByRole("button", { name: "Perfil de João" })[0] as HTMLElement);
     await settle(4);
     const card = screen().getByRole("dialog", { name: "Perfil" });
-    expect(card.querySelector(".profile-card__status")?.textContent).toBe("🎧Focado no relatórioAté você mudar");
+    // No end: "Até você mudar" would talk to the reader about a choice only João has.
+    expect(card.querySelector(".profile-card__status")?.textContent).toBe("🎧Focado no relatório");
     expect(card.textContent).toContain("Presença");
     expect(card.textContent).toContain("Ocupado");
+  });
+
+  test("on a card, a status with an end says when it clears to anyone; with none, only its owner reads Até você mudar", async () => {
+    const at = new Date();
+    at.setHours(23, 59, 0, 0);
+    const state = seedState();
+    state.statuses = new Map([
+      ["u-joao", { availability: "auto", status: { text: "Almoço", emoji: "🍽️", until: at.toISOString() } }],
+      ["u-walter", { availability: "auto", status: { text: "Focado", emoji: "🎧", until: null } }],
+    ]);
+    await go(`c/${ENG_ID}`, state);
+    const line = async (name: string) => {
+      await click(screen().getAllByRole("button", { name })[0] as HTMLElement);
+      await settle(4);
+      const text = screen().getByRole("dialog", { name: "Perfil" }).querySelector(".profile-card__status")?.textContent;
+      await act(async () => fireEvent.keyDown(document.activeElement as Element, { key: "Escape" }));
+      await settle(2);
+      return text;
+    };
+    expect(await line("Perfil de João")).toMatch(/^🍽️AlmoçoSome às /);
+    expect(await line("Perfil de Walter")).toBe("🎧FocadoAté você mudar");
   });
 
   test("an agent's line: the server's in words, its own as written; who wrote it; why it reads so", async () => {

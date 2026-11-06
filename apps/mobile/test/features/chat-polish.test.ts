@@ -138,6 +138,18 @@ describe("a conversation with a pinned message", () => {
   });
 });
 
+describe("going to a message", () => {
+  test("out of pages, it waits for a cached page refreshing before saying the message can't be reached", () => {
+    const screen = src("features/chat/ChatScreen.tsx");
+    const missing = screen.indexOf('toast({ title: t("channel.jumpMissing")');
+    expect(missing).toBeGreaterThan(0);
+    expect(screen.lastIndexOf("if (seekRefreshing) return;", missing)).toBeGreaterThan(
+      screen.lastIndexOf("seekPages.current >= SEEK_MAX_PAGES", missing),
+    );
+    expect(screen).toContain("const seekRefreshing = isThread ? threadMessages.isFetching : top.isFetching;");
+  });
+});
+
 describe("back to the latest messages", () => {
   test("the round button sits at the bottom right, above the composer, riding the keyboard with it", () => {
     const screen = src("features/chat/ChatScreen.tsx");

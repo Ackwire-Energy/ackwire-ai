@@ -1,4 +1,9 @@
+import type { OrgSummary } from "@agenteschat/client";
+import { useComputerSetup } from "@agenteschat/client";
+import { computerEdition } from "@agenteschat/client/lib/computer";
 import type { keyRefusal } from "@agenteschat/client/lib/errors";
+import { planHoldOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { type CodingPlan, planReplies } from "@agenteschat/client/lib/plans";
 import * as Clipboard from "expo-clipboard";
 import { openBrowserAsync } from "expo-web-browser";
@@ -26,6 +31,16 @@ import { useColors } from "../shared/hooks";
 /**
  * The pieces the web's AI panels are made of (`SettingNote`, the numbered `Step`, `OpenPage`), on the phone.
  */
+
+/** The billing hold on this workspace that stops its plans (`planHoldOf`). */
+export const usePlanHold = (orgId: string, org: OrgSummary | null | undefined) =>
+  planHoldOf(computerEdition(useComputerSetup(orgId).data), org?.standing);
+
+/** A plan this workspace's billing hold stops, said where it would sign in (`planHoldPhoneLine`). */
+export function PlanHoldNote({ org }: { org: OrgSummary | null | undefined }) {
+  const { t } = useTranslation();
+  return <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false)}</Note>;
+}
 
 /**
  * A row of an agent's AI (its page, Connect an AI's first group): its maker's mark, its name, the lines under it

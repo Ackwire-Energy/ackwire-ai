@@ -21,6 +21,8 @@ export function enableOperatorEvents(on = true) {
 export type OperatorEventType =
   | "user.signed_up"
   | "session.created"
+  | "user.deletion_requested"
+  | "user.deletion_canceled"
   | "user.deleted"
   | "organization.created"
   | "organization.deletion_requested"

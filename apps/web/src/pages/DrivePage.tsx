@@ -16,6 +16,7 @@ import {
   rangeOf,
   sortArtifacts,
 } from "@agenteschat/client/lib/drive";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   cx,
@@ -48,6 +49,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { SelectionBar } from "@/components/SelectionBar";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
@@ -69,6 +71,8 @@ const layerOpen = () => Boolean(document.querySelector('[role="menu"], [role="li
 export function DrivePage({ open }: { open?: { id: string; version?: number } }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const look = useRightHandLook();
+  const uploads = can(org, "upload_files");
   const viewer = useArtifactViewer();
   const dir = useDirectory(org.id);
   const authorName = useAuthorName();
@@ -351,14 +355,16 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                 >
                   {t("artifacts.trash")}
                 </Button>
-                <UploadButton
-                  size="md"
-                  label={t("files.upload")}
-                  busy={uploader.busy}
-                  multiple
-                  onFiles={upload}
-                  variant="primary"
-                />
+                {uploads && !(list.isSuccess && rows.length === 0 && !filtered) && (
+                  <UploadButton
+                    size="md"
+                    label={t("files.upload")}
+                    busy={uploader.busy}
+                    multiple
+                    onFiles={upload}
+                    variant="primary"
+                  />
+                )}
               </>
             )
           }
@@ -560,13 +566,29 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
             {list.isLoading && <LoadingList count={5} trailing />}
             {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
             {list.isSuccess && rows.length === 0 && !filtered && (
-              <EmptyState sky icon="drive" title={t("drive.emptyTitle")}>
-                {t("drive.emptyText")}
+              <EmptyState
+                size="page"
+                agent={look}
+                title={t("drive.emptyTitle")}
+                actions={
+                  uploads && (
+                    <UploadButton
+                      size="md"
+                      label={t("files.upload")}
+                      busy={uploader.busy}
+                      multiple
+                      onFiles={upload}
+                      variant="primary"
+                    />
+                  )
+                }
+              >
+                {t(uploads ? "drive.emptyText" : "drive.emptyViewer")}
               </EmptyState>
             )}
             {list.isSuccess && rows.length === 0 && filtered && (
               <EmptyState
-                icon="search"
+                size="panel"
                 title={t("drive.noResults")}
                 actions={
                   <Button

@@ -476,9 +476,6 @@
   "chats.missionState.proposed": {
     "value": "Proposed"
   },
-  "chats.empty": {
-    "value": "No chats yet."
-  },
   "chats.sayHi": {
     "value": "Say hi to {{name}}."
   },
@@ -586,9 +583,6 @@
   },
   "new.people": {
     "value": "People"
-  },
-  "new.nobody": {
-    "value": "Nobody here yet."
   },
   "new.search": {
     "value": "Person or agent"
@@ -733,9 +727,6 @@
   },
   "chat.join": {
     "value": "Join the channel"
-  },
-  "chat.empty": {
-    "value": "Nobody has written here yet."
   },
   "chat.sending": {
     "value": "Sending…"
@@ -1559,12 +1550,6 @@
   "threads.section.threads": {
     "value": "Threads"
   },
-  "threads.empty": {
-    "value": "No threads or missions yet"
-  },
-  "threads.emptyHint": {
-    "value": "Hold a message to reply in a thread or turn it into a mission."
-  },
   "agents.title": {
     "value": "Agents"
   },
@@ -1597,15 +1582,6 @@
   },
   "agents.createFailed": {
     "value": "Couldn't create the agent. Maybe that name is taken."
-  },
-  "agents.empty": {
-    "value": "No agents yet."
-  },
-  "agents.noneForYou": {
-    "value": "No agent works with you yet."
-  },
-  "agents.noneForYouHint": {
-    "value": "Ask an admin for access."
   },
   "agents.freeSection": {
     "value": "Free"
@@ -2421,6 +2397,12 @@
   "me.zone.none": {
     "value": "No time zone by that name"
   },
+  "delete.intro": {
+    "value": "There's no undo."
+  },
+  "delete.introGrace": {
+    "value": "You have 7 days to change your mind."
+  },
   "delete.goes.account": {
     "value": "Your account, your access and your sessions are gone."
   },
@@ -2613,12 +2595,6 @@
   "issues.until": {
     "value": "due {{date}}"
   },
-  "issues.empty": {
-    "value": "No tasks here"
-  },
-  "issues.emptyOpen": {
-    "value": "You can also ask for one in a chat."
-  },
   "issues.loadFailed": {
     "value": "Couldn't load the tasks."
   },
@@ -2799,12 +2775,6 @@
   "drive.by": {
     "value": "{{name}} · {{when}}"
   },
-  "drive.empty": {
-    "value": "Nothing in the Drive yet"
-  },
-  "drive.emptySub": {
-    "value": "What agents and people create or send in chats shows up here."
-  },
   "drive.noResults": {
     "value": "Nothing with these filters."
   },
@@ -2840,12 +2810,6 @@
   },
   "memory.noMatch": {
     "value": "No memory with that."
-  },
-  "memory.emptyTitle": {
-    "value": "Nothing learned yet"
-  },
-  "memory.empty": {
-    "value": "As they work with you, the agents keep what they learn here."
   },
   "memory.gone": {
     "value": "This memory no longer exists."
@@ -2906,12 +2870,6 @@
       "one": "{{count}} read this week",
       "other": "{{count}} reads this week"
     }
-  },
-  "wiki.empty": {
-    "value": "Tap New page to write the first one."
-  },
-  "wiki.missing": {
-    "value": "This page no longer exists or was renamed."
   },
   "wiki.blank": {
     "value": "Blank page."
@@ -3792,12 +3750,6 @@
   "connectors.all": {
     "value": "All"
   },
-  "connectors.empty": {
-    "value": "Your agents don't use anything yet"
-  },
-  "connectors.emptySub": {
-    "value": "Connect a service and they start reading and doing things in it."
-  },
   "connectors.noResults": {
     "value": "No service by that name. Try its address."
   },
@@ -4108,20 +4060,11 @@
   "ai.yourPlan": {
     "value": "Your AI plan"
   },
-  "ai.coding": {
-    "value": "Coding plan"
-  },
-  "ai.codingSub": {
-    "value": "GLM, Kimi, MiniMax or OpenCode"
+  "ai.plansSub": {
+    "value": "Claude, ChatGPT, Gemini, GLM and others"
   },
   "ai.plansFoot": {
     "value": "Agents think with your plan, no API key needed. It signs in on the agent's computer."
-  },
-  "ai.whichPlan": {
-    "value": "Which plan"
-  },
-  "ai.codingFoot": {
-    "value": "A coding plan signs in with its own key, on the agent's computer."
   },
   "ai.change": {
     "value": "Change"
@@ -4300,21 +4243,6 @@
   },
   "vault.kindText.contact": {
     "value": "Name, company, email, phone and address agents fill in on forms."
-  },
-  "vault.empty.personalTitle": {
-    "value": "Nothing of yours yet"
-  },
-  "vault.empty.personalText": {
-    "value": "Save a login or a key here and your agents use it when you ask."
-  },
-  "vault.empty.teamTitle": {
-    "value": "Nothing shared yet"
-  },
-  "vault.empty.teamText": {
-    "value": "Save the logins and keys your agents use for the team."
-  },
-  "vault.empty.teamReadText": {
-    "value": "When someone shares a login or a key with you, it shows here."
   },
   "vault.import.title": {
     "value": "Import from a computer"
@@ -4970,5 +4898,233 @@
   },
   "team.mapHint": {
     "value": "To move an agent to another channel, use the map on the web or talk to {{name}}."
+  },
+  "empty.agents.title": {
+    "value": "Build your team of agents"
+  },
+  "empty.agents.text": {
+    "value": "Each agent takes on a role and works with you right in the chat."
+  },
+  "empty.agents.viewerTitle": {
+    "value": "Your team of agents lives here"
+  },
+  "empty.agents.viewerText": {
+    "value": "Whoever creates agents in this workspace adds the first one, and it shows up here."
+  },
+  "empty.agentsForYou.title": {
+    "value": "Your agents show up here"
+  },
+  "empty.agentsForYou.text": {
+    "value": "Whoever manages agents chooses which ones work with you."
+  },
+  "empty.drive.title": {
+    "value": "Everything the team makes, in one place"
+  },
+  "empty.drive.text": {
+    "value": "Reports, tables and files from agents and people stay here, easy to find."
+  },
+  "empty.drive.viewerTitle": {
+    "value": "Find what the team makes"
+  },
+  "empty.drive.viewerText": {
+    "value": "What agents and people create in the chats shows up here."
+  },
+  "empty.tasks.title": {
+    "value": "Hand work to the team"
+  },
+  "empty.tasks.text": {
+    "value": "Create a task for an agent or a person and follow it to the end."
+  },
+  "empty.tasks.viewerTitle": {
+    "value": "Follow the team's work"
+  },
+  "empty.tasks.viewerText": {
+    "value": "Tasks show up here as soon as someone creates the first one."
+  },
+  "empty.routines.title": {
+    "value": "Leave repeated work to your agents"
+  },
+  "empty.routines.text": {
+    "value": "A routine runs on its own, on a schedule or when something happens."
+  },
+  "empty.routines.viewerTitle": {
+    "value": "See what runs on its own"
+  },
+  "empty.routines.viewerText": {
+    "value": "Whoever manages routines or owns an agent creates them, and they show up here."
+  },
+  "empty.wiki.title": {
+    "value": "Keep what the team needs to know"
+  },
+  "empty.wiki.text": {
+    "value": "People and agents read these pages, so everyone works from the same facts."
+  },
+  "empty.wiki.viewerTitle": {
+    "value": "Look up what the team knows"
+  },
+  "empty.wiki.viewerText": {
+    "value": "Whoever edits the wiki writes the first page, and it shows up here."
+  },
+  "empty.memory.title": {
+    "value": "Your agents learn as they work"
+  },
+  "empty.memory.text": {
+    "value": "What they pick up in conversations stays here, so you can see what they know."
+  },
+  "empty.memory.ask": {
+    "value": "Let me tell you how we work here."
+  },
+  "empty.memory.noneForAgent": {
+    "value": "No memories from this agent."
+  },
+  "empty.threads.title": {
+    "value": "Every topic in its own conversation"
+  },
+  "empty.threads.text": {
+    "value": "Hold a message to reply in a thread or turn it into a mission."
+  },
+  "empty.threads.action": {
+    "value": "Go to Chats"
+  },
+  "empty.chats.title": {
+    "value": "Talk to your agents"
+  },
+  "empty.chats.text": {
+    "value": "Ask for something in a chat and an agent gets to work."
+  },
+  "empty.chats.action": {
+    "value": "New chat"
+  },
+  "empty.channels.title": {
+    "value": "Bring people and agents together"
+  },
+  "empty.channels.text": {
+    "value": "Each channel gathers whoever takes care of one subject."
+  },
+  "empty.channels.viewerTitle": {
+    "value": "The team's channels live here"
+  },
+  "empty.channels.viewerText": {
+    "value": "Whoever creates channels opens the first one, and it shows up here."
+  },
+  "empty.channels.action": {
+    "value": "Create channel"
+  },
+  "empty.people.title": {
+    "value": "Work with your team here"
+  },
+  "empty.people.text": {
+    "value": "Invite people to talk to them and to your agents in one place."
+  },
+  "empty.people.viewerTitle": {
+    "value": "Your team shows up here"
+  },
+  "empty.people.viewerText": {
+    "value": "Whoever invites people brings the rest of the team, and they show up here."
+  },
+  "empty.chat.title": {
+    "value": "It all starts with a message"
+  },
+  "empty.chat.text": {
+    "value": "Write below and everyone here sees it."
+  },
+  "empty.chat.viewerTitle": {
+    "value": "Messages show up here"
+  },
+  "empty.chat.viewerText": {
+    "value": "When someone writes, you read it here."
+  },
+  "empty.ai.title": {
+    "value": "Give your agents an AI to think with"
+  },
+  "empty.ai.text": {
+    "value": "Connect a plan you already pay for and they start working with it."
+  },
+  "empty.vaultPersonal.title": {
+    "value": "Keep your logins safe here"
+  },
+  "empty.vaultPersonal.text": {
+    "value": "Save a login or a key and your agents use it when you ask."
+  },
+  "empty.vaultTeam.title": {
+    "value": "Share logins without passing passwords around"
+  },
+  "empty.vaultTeam.text": {
+    "value": "Save the logins and keys your agents use for the team."
+  },
+  "empty.vaultTeam.viewerTitle": {
+    "value": "The team's logins show up here"
+  },
+  "empty.vaultTeam.viewerText": {
+    "value": "When someone shares a login or a key with you, it shows up here."
+  },
+  "empty.skills.title": {
+    "value": "Teach your agents how you do things"
+  },
+  "empty.skills.text": {
+    "value": "A skill holds the steps for a task, and agents open it when they need it."
+  },
+  "empty.apps.title": {
+    "value": "Ask your agents from other apps"
+  },
+  "empty.apps.text": {
+    "value": "Connect Claude or another app and ask for tasks without leaving it."
+  },
+  "empty.access.title": {
+    "value": "Choose what each agent can use"
+  },
+  "empty.access.text": {
+    "value": "Connect a service and set each agent's access here."
+  },
+  "empty.access.viewerTitle": {
+    "value": "Each agent's access shows up here"
+  },
+  "empty.access.viewerText": {
+    "value": "Whoever manages connectors connects the first service."
+  },
+  "empty.access.action": {
+    "value": "Connect a service"
+  },
+  "empty.board.title": {
+    "value": "See what matters on one board"
+  },
+  "empty.board.text": {
+    "value": "Add a widget, ask an agent for one or pin a block from the chat."
+  },
+  "empty.board.viewerTitle": {
+    "value": "This board is taking shape"
+  },
+  "empty.board.viewerText": {
+    "value": "Whoever edits this board adds the widgets, and they show up here."
+  },
+  "empty.computers.title": {
+    "value": "Bring another computer to your agents"
+  },
+  "empty.computers.text": {
+    "value": "Connect a Mac mini at home or another server with a code."
+  },
+  "empty.computers.viewerTitle": {
+    "value": "Other computers show up here"
+  },
+  "empty.computers.viewerText": {
+    "value": "Whoever connects computers adds them, and they show up here."
+  },
+  "empty.connectors.title": {
+    "value": "Give your agents real tools"
+  },
+  "empty.connectors.text": {
+    "value": "Connect a service and they start reading and acting in it."
+  },
+  "empty.connectors.viewerTitle": {
+    "value": "Your agents' tools show up here"
+  },
+  "empty.connectors.viewerText": {
+    "value": "Whoever manages connectors connects the services below."
+  },
+  "empty.audit.title": {
+    "value": "Nothing to review"
+  },
+  "empty.audit.text": {
+    "value": "When an agent does something outside the conversation, it shows up here."
   }
 }

@@ -111,43 +111,43 @@ p {
 .grid-options--sm {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
-/* The AI picker's plans and the key's makers: three tiles in the setup's column and in the dialog, two at 390px
-   wide; each a mark and its name on one line, centred on the mark, chosen or not ("OpenCode Go" is the longest). */
-.grid-options--plans {
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+/* The AI picker: what the person already has, a plan or an API key, one select of whose, and the chosen one's panel. */
+.ai-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
 }
-.grid-options--plans > .ac-option {
-  align-items: center;
+.ai-picker > .ac-option {
   gap: 10px;
   padding-inline: 10px;
 }
-.grid-options--plans .ac-option__title {
+.ai-picker .ac-option__title {
   font-size: 14px;
 }
-/* A one-line tile's check sits in its middle, as its mark and its name do. */
-.grid-options--plans > .ac-option:not(.ai-picker__key)::after {
-  top: calc(50% - 9px);
+/* The two ways to pay share the width, each its half. */
+.ai-picker__pay.ac-seg {
+  display: flex;
 }
-/* The API key row's two lines: its check sits on the first, its name's (the padding, then half the line). */
-.grid-options--plans > .ac-option.ai-picker__key::after {
+.ai-picker__pay .ac-seg__item {
+  flex: 1 1 0;
+}
+/* A row's two lines: its check sits on the first, its name's (the padding, then half the line). */
+.ai-picker > .ac-option.ai-picker__key::after {
   /* Browsers without the lh unit: the page's 22px line. */
   top: calc(var(--space-3) + 11px - 9px);
 }
 /* Behind @supports: a declaration holding var() parses even where lh is unknown, so as a second `top` it would
    replace the fallback there and then compute to auto. */
 @supports (top: 1lh) {
-  .grid-options--plans > .ac-option.ai-picker__key::after {
+  .ai-picker > .ac-option.ai-picker__key::after {
     top: calc(var(--space-3) + 0.5lh - 9px);
   }
 }
-/* The chosen plan's panel right under the plans, on a row of its own and 12px under them, before the API key row:
-   nothing comes between an option and its steps. */
-.grid-options--plans > .ai-panel {
-  grid-column: 1 / -1;
+/* The chosen option's panel, 12px under the select: nothing comes between an option and its steps. */
+.ai-picker > .ai-panel {
   margin-top: 4px;
 }
 .ai-picker__or {
-  grid-column: 1 / -1;
   margin: 6px 0 -2px;
   font-size: 13px;
   line-height: 18px;
@@ -157,14 +157,9 @@ p {
 .ai-picker__or:first-child {
   margin-top: 0;
 }
-/* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
-.grid-options--plans > .ai-picker__key {
-  grid-column: 1 / -1;
+/* Its mark leads its first line (an `.ac-iconline`). */
+.ai-picker > .ai-picker__key {
   align-items: flex-start;
-}
-/* Our own key after the six makers: a row of its own, so its name keeps its line beside the check. */
-.grid-options--plans > .ai-key__ours {
-  grid-column: 1 / -1;
 }
 .grid-fields {
   display: grid;
@@ -1185,6 +1180,9 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 @media (max-width: 640px) {
   .channel__empty .ac-empty {
     padding-inline: 16px;
+  }
+  .channel__empty .ac-empty__actions {
+    align-self: stretch;
   }
   .channel__suggestions {
     width: 100%;
@@ -5609,7 +5607,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
-.sidebar__row[data-acts]:has(> [data-status="active"]) > .sidebar__item {
+.sidebar:not([data-rail="true"]) .sidebar__row[data-acts]:has(> [data-status="active"]) > .sidebar__item {
   padding-right: var(--acts-room, 32px);
 }
 .sidebar__label {
@@ -7692,19 +7690,6 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .suspended-page__account {
   margin-top: 32px;
 }
-.computers-empty {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  padding: 6px 0;
-}
-.computers-empty__text {
-  display: flex;
-  flex: 1 1 240px;
-  flex-direction: column;
-  gap: 4px;
-}
 .computers-agent {
   flex-wrap: wrap;
 }
@@ -9501,12 +9486,23 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 }
 /* "Add account": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
    sits nearer its own words than the next step's. Wrapped, its lines never end on a word alone, in a plan's panel or
-   out of one (an agent's brain, Settings). */
+   out of one (an agent's brain, Settings). Only this gap sets what lies between the flow's parts: what goes in it keeps
+   no margin of its own, the note's included, and a choice under the steps starts on their edge. */
+:is(.agp-addacct, .ai-panel) {
+  --ai-steps-gap: 16px;
+}
 .agp-addacct {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ai-steps-gap);
   text-wrap: pretty;
+}
+.agp-addacct > .ac-setnote {
+  margin-block: 0;
+}
+.agp-addacct > .ac-btn {
+  align-self: flex-start;
+  margin-inline-start: -12px;
 }
 .agp-addacct:focus {
   outline: none;
@@ -11810,14 +11806,18 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
-.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
+.sidebar:not([data-rail="true"])
+  .sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
   > .sidebar__item
   > :is(.sidebar__item-meta, .sidebar__unread) {
   visibility: hidden;
 }
 /* The name and role run the row's width, so the buttons (`data-acts`: how many) get their own room instead of
-   covering their ends; on a two-line row they sit on the name's line, beside the face. */
-.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__item {
+   covering their ends; on a two-line row they sit on the name's line, beside the face. The rail has no such buttons:
+   room kept for them there would push the row's mark out of its 40px plate. */
+.sidebar:not([data-rail="true"])
+  .sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
+  > .sidebar__item {
   padding-right: var(--acts-room, 32px);
 }
 .sidebar__row[data-acts="2"] {
@@ -11987,7 +11987,10 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
   display: none;
 }
 /* A section of the sidebar in the person's order (SidebarOrder.tsx): its parts keep the list's spacing; a grip in the
-   gutter on hover drags it, and a line in the gap shows where it would land. The rail lays the parts out alone. */
+   gutter on hover drags it, and a line in the gap shows where it would land. The rail lays the parts out alone.
+   A grip sits on the row it moves and is that row's height, so its dots share the row's middle: a section's on its
+   header; the tools have none, so theirs is on their first row, which can't move alone, and every other tool shows
+   its own (`.sidebar__tool-grip`, ToolList). Pointing at a section's grip lights all that moves with it. */
 .sidebar__block {
   position: relative;
   display: flex;
@@ -12001,7 +12004,8 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
 .sidebar[data-rail="true"] .sidebar__block {
   display: contents;
 }
-.sidebar__grip {
+.sidebar__grip,
+.sidebar__tool-grip {
   position: absolute;
   z-index: 2;
   top: 0;
@@ -12009,7 +12013,6 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
   display: grid;
   place-items: center;
   width: 14px;
-  height: 28px;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -12021,18 +12024,42 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
     opacity 0.15s,
     color 0.15s;
 }
-.sidebar__block:has(> .sidebar__grip + :is(.sidebar__tools, .sidebar__group[role="group"])) > .sidebar__grip {
-  top: 6px;
+.sidebar__grip {
+  height: 28px;
 }
-.sidebar__block:hover > .sidebar__grip,
-.sidebar__grip:focus-visible {
+.sidebar__block[data-section="tools"] > .sidebar__grip {
+  height: 30px;
+}
+.sidebar__tools > .sidebar__item {
+  position: relative;
+}
+.sidebar__tool-grip {
+  bottom: 0;
+}
+.sidebar__block:not([data-section="tools"]):hover > .sidebar__grip,
+.sidebar__block[data-section="tools"]:has(> .sidebar__tools > :first-child:hover) > .sidebar__grip,
+.sidebar__grip:is(:hover, :focus-visible),
+.sidebar__item:hover > .sidebar__tool-grip {
   opacity: 1;
 }
-.sidebar__grip:hover {
+.sidebar__grip:hover,
+.sidebar__tool-grip:hover {
   color: var(--ink);
 }
-.sidebar__grip:active {
+.sidebar__grip:active,
+.sidebar__tool-grip:active {
   cursor: grabbing;
+}
+.sidebar__block:has(> .sidebar__grip:is(:hover, :focus-visible))::before {
+  content: "";
+  position: absolute;
+  z-index: var(--z-under);
+  inset: -2px -4px;
+  border-radius: var(--control-r-sm);
+  background: var(--side-hover);
+}
+.sidebar[data-rail="true"] .sidebar__tool-grip {
+  display: none;
 }
 html:not([data-pointer]) .sidebar__grip:focus-visible {
   outline: none;
@@ -12049,12 +12076,14 @@ html:not([data-pointer]) .sidebar__grip:focus-visible {
   bottom: -6px;
 }
 @media (pointer: coarse) {
-  .sidebar__grip {
+  .sidebar__grip,
+  .sidebar__tool-grip {
     display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sidebar__grip {
+  .sidebar__grip,
+  .sidebar__tool-grip {
     transition: none;
   }
 }
@@ -12164,6 +12193,12 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   .sidebar__section-head,
   .sidebar__section-toggle {
     min-height: var(--control-h-sm);
+  }
+  .sidebar__grip {
+    height: var(--control-h-sm);
+  }
+  .sidebar__block[data-section="tools"] > .sidebar__grip {
+    height: 36px;
   }
   .sidebar:not([data-rail="true"]) :is(.sidebar__jump, .sidebar__collapse.ac-btn) {
     height: var(--control-h-md);
@@ -12465,7 +12500,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
    the tiers under it, for whom at the right, under the name at phone width) over a hairline, the computer's wait in
    a well, who signs in, the steps, then its foot. */
 .ai-panel {
-  gap: 16px;
+  gap: var(--ai-steps-gap);
   text-wrap: pretty;
 }
 .ai-panel > .ac-setnote {

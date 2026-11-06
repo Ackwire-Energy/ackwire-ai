@@ -22,9 +22,10 @@ describe("Missões", () => {
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "Trabalho longo de um agente no computador dele, numa thread.",
     );
-    expect(screen().getByText("Nenhuma missão ainda")).toBeTruthy();
-    // The title and New mission: what a mission is, the subtitle already says.
-    expect(document.querySelector(".ac-empty__text")).toBeNull();
+    expect(screen().getByText("Dê um objetivo e acompanhe o agente")).toBeTruthy();
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Uma missão é uma thread com plano, decisões e o trabalho de um agente no computador dele.",
+    );
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     // Missões is a tab of Threads: one sidebar item.
     expect(within(nav).getByRole("link", { name: /Threads/ })).toBeTruthy();

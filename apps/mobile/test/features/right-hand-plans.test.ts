@@ -19,7 +19,7 @@ test("Connect for it offers every plan the phone offers, ChatGPT's too, and its 
   expect(sheet).not.toContain("claudeCodeOnly");
   expect(sheet).toContain("rightHandOnKey(api, orgId, one, key");
   const steps = source("ConnectAiSteps.tsx");
-  expect(steps).toContain('(["claude", "chatgpt", "grok", "gemini"] as const).map(');
+  expect(steps).toContain("options={PLAN_CHOICES.map((c) => ({");
 });
 
 test("Settings › Lodi: Sua IA opens Connect, the workspace's plan keeps Atende outras pessoas for whoever sets its AI", () => {

@@ -36,13 +36,19 @@ export function SearchPage({ scope }: { scope?: string }) {
 
   const results = (
     <>
-      {!active && <EmptyState icon="search">{t("searchPage.hint")}</EmptyState>}
+      {!active && (
+        <EmptyState size="panel" icon="search">
+          {t("searchPage.hint")}
+        </EmptyState>
+      )}
       {active && search.isLoading && <LoadingList count={4} avatar={false} />}
       {active && search.isError && !search.data && (
         <ErrorState error={search.error} onRetry={() => void search.refetch()} />
       )}
       {active && search.isSuccess && hits.length === 0 && (
-        <EmptyState icon="search">{t("searchPage.empty", { q: formatSearch(chips, q) })}</EmptyState>
+        <EmptyState size="panel" actions={<Button onClick={ws.clear}>{t("filters.clearSearch")}</Button>}>
+          {t("searchPage.empty", { q: formatSearch(chips, q) })}
+        </EmptyState>
       )}
       {active && hits.length > 0 && (
         <div className="search-results__bar">

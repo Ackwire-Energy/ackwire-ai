@@ -329,6 +329,27 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     plan: "Claude",
     url: `${APP}/org/${ORG}/notifications`,
   },
+  /** Deleted by the person: the date, the workspace that closed with it, and how to come back. */
+  "account_deleting.en": {
+    kind: "account_deleting",
+    locale: "en",
+    email: "ana@souzabakery.com",
+    orgNames: ["Souza Bakery"],
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/New_York",
+    support: "help@agentes.chat",
+    url: APP,
+  },
+  "account_deleting.pt-BR": {
+    kind: "account_deleting",
+    locale: "pt-BR",
+    email: "ana@souzabakery.com",
+    orgNames: [],
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/Sao_Paulo",
+    support: null,
+    url: APP,
+  },
   /** Two workspaces closed with it, on a server with a support address. */
   "account_deleted.en": {
     kind: "account_deleted",

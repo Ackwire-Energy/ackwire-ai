@@ -436,7 +436,7 @@ describe("Notificações", () => {
 
   test("empty: Tudo em dia", async () => {
     await go(seedState({ notifications: [] }));
-    expect(document.querySelector(".nt-calm")?.textContent).toBe(
+    expect(document.querySelector(".ac-empty--page")?.textContent).toBe(
       "Tudo em diaQuando alguém precisar de você, aparece aqui.",
     );
     expect((screen().getByRole("button", { name: "Marcar tudo como lido" }) as HTMLButtonElement).disabled).toBe(true);

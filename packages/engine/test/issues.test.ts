@@ -32,6 +32,7 @@ import {
   type WorkActor,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { runContext } from "./mail-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -667,6 +668,66 @@ describe("issues", () => {
         addPullRequest: { number: 4, url: "javascript:alert(1)" },
       }),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test("a new agent creates tasks with no card, updates what it can see of others' and never what it can't", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const { id: agentId } = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Lia", handle: "lia" },
+      NEW_AGENT_DEFAULTS,
+    );
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    const hidden = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Segredo", channelId: secret.id });
+    const theirs = await createIssue(deps, person(f.owner.id), f.org.id, {
+      title: "Da Ana",
+      assignee: { type: "person", id: f.owner.id },
+    });
+    const ctx = { ...(await runContext(f)), agentId };
+    await f.db.update(schema.agentRuns).set({ agentId }).where(eq(schema.agentRuns.id, ctx.runId));
+    const call = (name: string, input: Record<string, unknown>) =>
+      f.tools?.invoke(ctx, { toolUseId: crypto.randomUUID(), name, input });
+
+    expect(await call("create_issue", { title: "Revisar o onboarding" })).toMatchObject({
+      type: "result",
+      output: { content: expect.stringContaining("Created #") },
+    });
+    expect(await f.db.select().from(schema.approvals)).toEqual([]);
+    expect(await call("update_issue", { issue: theirs.id, status: "in_progress" })).toMatchObject({
+      type: "result",
+      output: { content: expect.stringContaining("Updated #") },
+    });
+    expect(await call("comment_issue", { issue: theirs.id, text: "Comecei." })).toMatchObject({
+      output: { content: `Commented on #${theirs.number}.` },
+    });
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: theirs.id })).assignee).toMatchObject({
+      id: f.owner.id,
+    });
+    expect(await call("update_issue", { issue: hidden.id, status: "done" })).toMatchObject({
+      output: { isError: true },
+    });
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: hidden.id })).status).toBe("todo");
+  });
+
+  test("closing someone's task while unassigning it reads as a change on the receipt, never as an assignment", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    const theirs = await createIssue({ db: f.db, pubsub: f.pubsub }, person(f.owner.id), f.org.id, {
+      title: "Da Ana",
+      assignee: { type: "person", id: f.owner.id },
+    });
+    await f.tools?.invoke(await runContext(f), {
+      toolUseId: crypto.randomUUID(),
+      name: "update_issue",
+      input: { issue: theirs.id, status: "canceled", assignee: "none" },
+    });
+    expect(await f.db.select().from(schema.agentActions)).toMatchObject([
+      { kind: "issue.updated", after: { status: "canceled", assignee: null } },
+    ]);
   });
 
   test("an agent without issues:write can't create issues; one in another channel can't see private ones", async () => {

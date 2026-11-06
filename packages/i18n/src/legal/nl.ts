@@ -8,7 +8,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
       "De overeenkomst voor het gebruik van agentes.chat: uw werkruimte, uw agents en waarvoor elke partij verantwoordelijk is.",
     courtesy:
       "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt. Indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
-    updated: "2026-11-04",
+    updated: "2026-11-05",
     sections: [
       {
         id: "agreement",
@@ -122,7 +122,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Duur en beëindiging",
         blocks: [
-          "U kunt op elk moment stoppen met het gebruik van de Dienst en uw account in de app verwijderen. Wij kunnen uw toegang opschorten of beëindigen bij een wezenlijke schending van deze Voorwaarden, waar de wet dit vereist, of met een kennisgeving van 30 dagen indien wij de Dienst stopzetten. Wanneer wij de Dienst beëindigen om andere redenen dan uw schending, stellen wij uw Werkruimte-inhoud gedurende 30 dagen beschikbaar voor export en verwijderen wij deze daarna zoals beschreven in het Privacybeleid. Bepalingen die naar hun aard de beëindiging overleven (waaronder de artikelen 6, 9, 11, 13, 14 en 15), blijven van kracht.",
+          "U kunt op elk moment stoppen met het gebruik van de Dienst en uw account in de app verwijderen. Het wordt 7 dagen later verwijderd, en u kunt het tot die tijd herstellen. Wij kunnen uw toegang opschorten of beëindigen bij een wezenlijke schending van deze Voorwaarden, waar de wet dit vereist, of met een kennisgeving van 30 dagen indien wij de Dienst stopzetten. Wanneer wij de Dienst beëindigen om andere redenen dan uw schending, stellen wij uw Werkruimte-inhoud gedurende 30 dagen beschikbaar voor export en verwijderen wij deze daarna zoals beschreven in het Privacybeleid. Bepalingen die naar hun aard de beëindiging overleven (waaronder de artikelen 6, 9, 11, 13, 14 en 15), blijven van kracht.",
         ],
       },
       {
@@ -174,7 +174,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
     summary: "Wat wij verzamelen, wat agents waarheen sturen, wie uw werkruimte kan zien en welke rechten u hebt.",
     courtesy:
       "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt. Indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
-    updated: "2026-11-04",
+    updated: "2026-11-05",
     sections: [
       {
         id: "overview",
@@ -264,7 +264,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Accountgegevens:** gedurende het bestaan van het account. Wanneer u uw account in de app verwijdert, wordt het onmiddellijk verwijderd en verdwijnt het binnen 30 dagen uit onze back-ups, met uitzondering van gegevens die wij wettelijk moeten bewaren. Elke werkruimte waarvan u het enige lid was, wordt tegelijkertijd gesloten, en de inhoud daarvan wordt 7 dagen later verwijderd zoals hierna beschreven. De werkruimten waarvan u lid was, behouden uw naam en e-mailadres in hun auditlogs zolang elk daarvan bestaat.",
+              "**Accountgegevens:** gedurende het bestaan van het account. Wanneer u uw account in de app verwijdert, wordt het onmiddellijk overal uitgelogd en 7 dagen later verwijderd, tenzij u het daarvoor herstelt, en verdwijnt het daarna binnen 30 dagen uit onze back-ups, met uitzondering van gegevens die wij wettelijk moeten bewaren. Elke werkruimte waarvan u het enige lid was, wordt tegelijkertijd gesloten, en de inhoud daarvan wordt 7 dagen later verwijderd zoals hierna beschreven. De werkruimten waarvan u lid was, behouden uw naam en e-mailadres in hun auditlogs zolang elk daarvan bestaat.",
               "**Werkruimte-inhoud:** gedurende het bestaan van de werkruimte, en eerder wanneer de werkruimte specifieke inhoud verwijdert. Wanneer het agentes.chat-abonnement van een werkruimte eindigt, blijft de inhoud ervan 90 dagen beschikbaar en wordt deze daarna verwijderd. Wanneer een eigenaar een werkruimte verwijdert, wordt deze onmiddellijk voor iedereen gesloten en wordt de inhoud 7 dagen later verwijderd, tenzij een eigenaar de werkruimte vóór die tijd herstelt, en verdwijnt deze binnen 30 dagen daarna uit onze back-ups, met uitzondering van inhoud die wij wettelijk of als registratie van misbruik (hieronder) moeten bewaren.",
               "**Logs:** verzoek- en beveiligingslogs gedurende maximaal 90 dagen. Registraties van modelgebruik (tokens en kosten) gedurende het bestaan van de werkruimte, omdat budgetten en gebruiksrapporten daarvan afhankelijk zijn.",
               "**Factuurgegevens:** zolang u voor een werkruimte betaalt, en daarna zolang de fiscale en boekhoudkundige wetgeving dat vereist.",

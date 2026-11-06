@@ -49,6 +49,7 @@ import {
   Button,
   Chip,
   cx,
+  EmptyState,
   ExpiryFuse,
   Icon,
   type IconName,
@@ -63,7 +64,6 @@ import {
   PlanStrip,
   prefersReducedMotion,
   Segmented,
-  SkyGlow,
   Spinner,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -79,7 +79,6 @@ import {
   useState,
 } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
 import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/ApprovalItem";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
@@ -94,6 +93,7 @@ import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/Widg
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow } from "@/hooks/useMatchMedia";
 import { useWraps } from "@/hooks/useWraps";
+import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
 import { ApproveAll, ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
@@ -1676,7 +1676,7 @@ export function NotificationsPage() {
       ]
         .filter(Boolean)
         .join(" · ");
-  const calmAgent = dir.agents[0];
+  const calmLook = lookOf(dir.agents[0]) ?? true;
 
   return (
     <div className="page page--list nt">
@@ -1741,32 +1741,38 @@ export function NotificationsPage() {
       {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
 
       {nothing && filter === "all" && (
-        <div className="nt-calm">
-          <div className="nt-calm__glow">
-            <SkyGlow color={colorOf(calmAgent)} />
-          </div>
-          <b>{t("notifications.calmTitle")}</b>
-          <p>{t("notifications.calmText")}</p>
-        </div>
+        <EmptyState size="page" agent={calmLook} mood="deal" title={t("notifications.calmTitle")}>
+          {t("notifications.calmText")}
+        </EmptyState>
       )}
 
       {list.isSuccess && items.length === 0 && !(nothing && filter === "all") && (
-        <div className="nt-nores">
-          {filter === "waiting" && calmAgent ? (
-            <AgentAvatar agentId={calmAgent.id} name={calmAgent.name} size="sm" expression="happy" />
-          ) : (
-            <Icon name="check" />
-          )}
-          <span>
-            {filter === "waiting"
-              ? t("notifications.noneWaiting")
-              : filter === "unread"
-                ? t("notifications.noneUnread")
-                : doneView
-                  ? t("notifications.noneDone")
-                  : t("notifications.noneHere")}
-          </span>
-        </div>
+        <EmptyState
+          size="panel"
+          // Nobody waiting and all read are wins: the others are only a filter with nothing in it.
+          agent={filter === "waiting" || filter === "unread" ? calmLook : undefined}
+          mood="deal"
+          actions={
+            filter !== "waiting" && filter !== "unread" && !doneView ? (
+              <Button
+                onClick={() => {
+                  setFilter("all");
+                  setCur(null);
+                }}
+              >
+                {t("notifications.filter.all")}
+              </Button>
+            ) : undefined
+          }
+        >
+          {filter === "waiting"
+            ? t("notifications.noneWaiting")
+            : filter === "unread"
+              ? t("notifications.noneUnread")
+              : doneView
+                ? t("notifications.noneDone")
+                : t("notifications.noneHere")}
+        </EmptyState>
       )}
 
       {waiting.length > 0 && (

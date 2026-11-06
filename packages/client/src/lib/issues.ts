@@ -14,6 +14,13 @@ export const STATUS_ICON: Record<IssueStatus, "stageTodo" | "stageProgress" | "s
   canceled: "close",
 };
 
+/** A task a DM or a private channel holds back: only who reads that conversation sees it (`channels`: the app's list). */
+export function heldBack(i: Pick<Issue, "channelId">, channels: { id: string; visibility: string }[] | undefined) {
+  if (!i.channelId || !channels) return false;
+  const channel = channels.find((c) => c.id === i.channelId);
+  return !channel || channel.visibility === "private";
+}
+
 /** An event of a task in the person's language from its code (`issues.event.*`); the server's words as the fallback. */
 export function issueEventText(t: TFunction, a: Pick<IssueActivity, "text" | "textCode" | "textParams">) {
   if (!a.textCode) return a.text;

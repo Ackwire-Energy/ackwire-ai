@@ -141,6 +141,9 @@ export function runOutcome(
     const name = by ? (nameOf(by) ?? by) : null;
     return name ? { key: "routines.code.stoppedBy", values: { name } } : { key: "routines.code.stopped", values: {} };
   }
+  // A provider's failure by its cause, in the words the conversation uses for it.
+  if (run.code.startsWith("provider_") && run.codeParams?.provider)
+    return { key: `agentPage.activity.errors.${run.code}`, values: run.codeParams, fallback };
   if ((RUN_CODES as readonly string[]).includes(run.code))
     return { key: `routines.code.${run.code}`, values: { ...(run.codeParams ?? {}) }, fallback };
   return { key: fallback, values: {} };

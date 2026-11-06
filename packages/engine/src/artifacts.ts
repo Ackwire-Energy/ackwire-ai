@@ -12,6 +12,7 @@ import { assertStorageRoom } from "./limits";
 import { can, getMembership, requireActiveMembership } from "./organizations";
 import { markdownToPdf } from "./pdf";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
+import { accountInUse } from "./standing";
 import { taskReaderSql } from "./task-access";
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
@@ -1472,7 +1473,7 @@ export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "chann
             and(
               eq(schema.organizationMembers.orgId, orgId),
               inArray(schema.organizationMembers.userId, otherPeople),
-              isNull(schema.users.blockedAt),
+              accountInUse,
             ),
           )
       : Promise.resolve([]),

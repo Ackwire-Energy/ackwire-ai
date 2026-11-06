@@ -523,6 +523,7 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
         antigravity: false,
         key: false,
       },
+      off: expect.any(Object),
       brains: {
         claude_code: expect.any(Boolean),
         codex: expect.any(Boolean),

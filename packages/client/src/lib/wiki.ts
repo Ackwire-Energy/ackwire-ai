@@ -21,6 +21,9 @@ export function leafTitle(title: string) {
   return title.split("/").pop()?.trim() || title;
 }
 
+/** The title a page's slug spells, for a link to a page that doesn't exist yet: "processos/deploy-final" → "deploy final". */
+export const titleOfSlug = (slug: string) => leafTitle(slug.split("/").pop()?.replace(/-/g, " ") ?? "");
+
 /** Resolves a `[[link]]` title against the pages: by title (case and accents ignored) or by slug. */
 export function resolveWikiLink<T extends { slug: string; title: string; folder: string }>(
   pages: T[],

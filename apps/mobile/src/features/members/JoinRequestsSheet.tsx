@@ -20,6 +20,7 @@ import { useOrg } from "@/providers/org";
 import {
   Button,
   Chip,
+  EmptyState,
   GroupedRow,
   InfoHint,
   Locked,
@@ -66,7 +67,7 @@ export function JoinRequestsSheet({ focus, onClose }: { focus?: string | undefin
   else if (list.data.length === 0)
     body = (
       <>
-        <Text tone="muted">{t("members.requests.empty")}</Text>
+        <EmptyState size="inline" title={t("members.requests.empty")} />
         <Button variant="secondary" wide label={t("mobile.common.close")} onPress={onClose} />
       </>
     );

@@ -31,6 +31,7 @@ import {
   useReducedMotion,
 } from "@/ui";
 import { AgentFace } from "../shared/Face";
+import { firstUseCopy } from "../shared/first-use";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { useSurface } from "../shared/parts";
@@ -225,7 +226,7 @@ function Gallery() {
                   </ScrollView>
                 </>
               ) : null}
-              {connectedCount === 0 ? <EmptyHint /> : null}
+              {connectedCount === 0 ? <EmptyHint acts={admin} /> : null}
             </>
           )}
           {!searching && suggestions.length > 0 ? (
@@ -259,12 +260,22 @@ function Gallery() {
           ) : null}
           {tiles.length === 0 ? (
             <EmptyState
-              icon="search"
+              size="inline"
               title={t("mobile.connectors.noResults")}
               action={
                 admin ? (
                   <Button variant="secondary" size="sm" label={t("connectors.otherConnect")} onPress={openAddress} />
-                ) : null
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t("filters.clearSearch")}
+                    onPress={() => {
+                      setQ("");
+                      setCat("all");
+                    }}
+                  />
+                )
               }
             />
           ) : (
@@ -295,9 +306,13 @@ function Gallery() {
   );
 }
 
-/** Nothing connected yet: who would use it, in a line (the MCPs section under it adds one by its address). */
-function EmptyHint() {
+/**
+ * Nothing connected yet: who would use it, in a line, with the real faces. No button: the catalog right under it is
+ * the next step (who can't connect is told who does).
+ */
+function EmptyHint({ acts }: { acts: boolean }) {
   const { t } = useTranslation();
+  const copy = firstUseCopy("connectors", acts);
   const c = useColors();
   const dir = useDirectory();
   const faces = dir.agents.slice(0, 3);
@@ -312,10 +327,10 @@ function EmptyHint() {
       </View>
       <View style={styles.hintText}>
         <Text variant="body" style={styles.bold}>
-          {t("mobile.connectors.empty")}
+          {t(copy.title)}
         </Text>
         <Text variant="small" tone="muted">
-          {t("mobile.connectors.emptySub")}
+          {t(copy.text)}
         </Text>
       </View>
     </View>

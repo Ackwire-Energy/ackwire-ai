@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const termsPtBR: LegalDocument = {
   title: "Termos de uso",
   summary: "O acordo para usar o agentes.chat: o seu workspace, os seus agentes e pelo que cada lado responde.",
-  updated: "2026-11-04",
+  updated: "2026-11-05",
   sections: [
     {
       id: "agreement",
@@ -117,7 +117,7 @@ export const termsPtBR: LegalDocument = {
       id: "termination",
       heading: "12. Vigência e encerramento",
       blocks: [
-        "Você pode parar de usar o Serviço e excluir a sua conta a qualquer momento no app. Podemos suspender ou encerrar o seu acesso por violação relevante destes Termos, quando a lei exigir, ou com 30 dias de aviso se descontinuarmos o Serviço. Quando encerrarmos o Serviço por motivo que não seja violação sua, deixaremos o seu Conteúdo do Workspace disponível para exportação por 30 dias e depois o apagaremos como descrito na Política de privacidade. As seções que, por natureza, sobrevivem ao encerramento (incluindo 6, 9, 11, 13, 14 e 15) continuam valendo.",
+        "Você pode parar de usar o Serviço e excluir a sua conta a qualquer momento no app. Ela é apagada 7 dias depois, e você pode restaurá-la até lá. Podemos suspender ou encerrar o seu acesso por violação relevante destes Termos, quando a lei exigir, ou com 30 dias de aviso se descontinuarmos o Serviço. Quando encerrarmos o Serviço por motivo que não seja violação sua, deixaremos o seu Conteúdo do Workspace disponível para exportação por 30 dias e depois o apagaremos como descrito na Política de privacidade. As seções que, por natureza, sobrevivem ao encerramento (incluindo 6, 9, 11, 13, 14 e 15) continuam valendo.",
       ],
     },
     {

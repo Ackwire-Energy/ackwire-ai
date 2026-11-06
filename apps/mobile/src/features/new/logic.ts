@@ -59,14 +59,15 @@ export type CreateItem = "agent" | "channel" | "task" | "routine" | "wiki" | "in
 const CREATE_ORDER: readonly CreateItem[] = ["agent", "channel", "task", "routine", "wiki", "invite"];
 
 /**
- * What this person may start from "New", each as the server checks it (ADR 0085): an agent (`create_agents`), a
- * channel (`create_channels`), a task (`post`), a routine (`manage_routines`, or the owner of an agent), a wiki page
+ * Whether this person may start `item`, as the server checks it (ADR 0085): an agent (`create_agents`), a channel
+ * (`create_channels`), a task (`post`), a routine (`manage_routines`, or the owner of an agent), a wiki page
  * (`edit_wiki`) and invitations (`invite_people`).
  */
-export function createItems(
+export function mayCreate(
   org: { permissions?: readonly string[] } | null | undefined,
-  { ownsAgent }: { ownsAgent: boolean },
-): CreateItem[] {
+  item: CreateItem,
+  { ownsAgent = false }: { ownsAgent?: boolean } = {},
+): boolean {
   const allowed: Record<CreateItem, boolean> = {
     agent: can(org, "create_agents"),
     channel: can(org, "create_channels"),
@@ -75,7 +76,15 @@ export function createItems(
     wiki: can(org, "edit_wiki"),
     invite: can(org, "invite_people"),
   };
-  return CREATE_ORDER.filter((item) => allowed[item]);
+  return allowed[item];
+}
+
+/** What this person may start from "New". */
+export function createItems(
+  org: { permissions?: readonly string[] } | null | undefined,
+  { ownsAgent }: { ownsAgent: boolean },
+): CreateItem[] {
+  return CREATE_ORDER.filter((item) => mayCreate(org, item, { ownsAgent }));
 }
 
 /** Names offered for a new agent (short, friendly, easy to call). */

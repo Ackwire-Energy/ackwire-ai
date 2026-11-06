@@ -38,7 +38,7 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { clearsText, isOutOfOffice } from "@agenteschat/client/lib/presence";
+import { isOutOfOffice, statusEndNote } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
@@ -313,6 +313,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
   // Presence and line as the others see them (ADR 0084): a hidden person reads offline, to themselves hidden.
   const shown = usePersonPresence(userId);
   const line = shown?.status ? personLine(shown.status) : null;
+  const endNote = shown?.status && statusEndNote(t, i18n.language, shown.status.until, userId === me.user.id);
   const seen = person?.lastSeenAt
     ? t("presence.seen", { when: relativeTime(t, i18n.language, person.lastSeenAt) })
     : null;
@@ -366,7 +367,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
           </span>
           <span>
             {line.text}
-            <small>{clearsText(t, i18n.language, shown.status.until)}</small>
+            {endNote && <small>{endNote}</small>}
           </span>
         </div>
       )}
