@@ -15,9 +15,10 @@ import {
   MenuNote,
   MenuSeparator,
   OptionList,
+  useScrollSides,
 } from "@agenteschat/ui";
 import { type Query, useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { BOARD, columnIdOf, columnsOf, isCustomBoard, STATUS_ICON, useColumnTitle, useStageName } from "@/lib/issues";
@@ -152,35 +153,6 @@ function ColumnCards({
  * customized, each column's menu, and "Nova tarefa" under A fazer. Grouped by assignee or priority: one column each.
  * Cards move between and inside columns (`useIssueDrag`).
  */
-/**
- * Which ends of a sideways scroller have more past them ("start", "end", "both" or none), kept as it scrolls or
- * resizes: the board fades and offers its arrows only there.
- */
-function useMoreSides(ref: RefObject<HTMLElement | null>) {
-  const [more, setMore] = useState<"start" | "end" | "both" | undefined>(undefined);
-  const measure = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const start = el.scrollLeft > 1;
-    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-    setMore(start && end ? "both" : start ? "start" : end ? "end" : undefined);
-  }, [ref]);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    measure();
-    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    resize?.observe(el);
-    if (el.firstElementChild) resize?.observe(el.firstElementChild);
-    el.addEventListener("scroll", measure, { passive: true });
-    return () => {
-      resize?.disconnect();
-      el.removeEventListener("scroll", measure);
-    };
-  }, [ref, measure]);
-  return more;
-}
-
 export function Board({
   groups,
   stages,
@@ -206,7 +178,7 @@ export function Board({
   const grouped = stages !== null && isCustomBoard(columns);
   const byId = new Map(groups.map((g) => [g.id, g]));
   const wrap = useRef<HTMLDivElement>(null);
-  const more = useMoreSides(wrap);
+  const more = useScrollSides(wrap);
   // About two columns at a time, as far as a hand would drag it.
   const slide = (direction: 1 | -1) => wrap.current?.scrollBy({ left: direction * 520, behavior: "smooth" });
   const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus, foot?: ReactNode) => (

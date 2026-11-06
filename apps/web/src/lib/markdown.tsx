@@ -6,6 +6,7 @@ import { MessageRef } from "@/chat/MessageRef";
 import { MermaidOrCode } from "@/components/artifacts/Mermaid";
 import { ChartOrCode } from "@/components/ChartBlock";
 import { CodeBlock } from "@/components/CodeBlock";
+import { TableBox } from "@/components/TableBox";
 
 /**
  * A small, safe Markdown renderer for chat messages and artifact documents
@@ -298,7 +299,7 @@ export function Markdown({
         );
       case "table":
         return (
-          <div key={k} className="md__table">
+          <TableBox key={k}>
             <table>
               <thead>
                 <tr>
@@ -324,7 +325,7 @@ export function Markdown({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableBox>
         );
     }
     return null;

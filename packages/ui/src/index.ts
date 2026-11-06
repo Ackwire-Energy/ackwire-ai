@@ -411,6 +411,7 @@ export {
   useHoverCard,
 } from "./hooks/useHoverCard";
 export { useNow } from "./hooks/useNow";
+export { type ScrollSides, useScrollSides } from "./hooks/useScrollSides";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
 export { driveFolder, initialsOf, isIdHandle } from "./names";
 export {

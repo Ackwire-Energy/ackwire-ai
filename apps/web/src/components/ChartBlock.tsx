@@ -33,6 +33,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useOrg } from "@/components/org-context";
+import { TableBox } from "@/components/TableBox";
 import { PinToDashboard } from "@/components/widgets/PinToDashboard";
 import { useDarkTheme, useGrowFrom } from "@/lib/grow";
 
@@ -193,7 +194,7 @@ function ChartTable({ spec }: { spec: ChartSpec }) {
     share: t("common.chartShare"),
   });
   return (
-    <div className="md__table chart-table">
+    <TableBox className="chart-table">
       <table>
         <thead>
           <tr>
@@ -219,7 +220,7 @@ function ChartTable({ spec }: { spec: ChartSpec }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableBox>
   );
 }
 
