@@ -12311,7 +12311,8 @@
     "namesMore": "{{first}} 외 {{count}}명",
     "wait": {
       "thinking": "생각 중…",
-      "held": "승인 대기 중…"
+      "held": "승인 대기 중…",
+      "said": "“{{text}}”"
     },
     "consult": {
       "asking": "{{from}}이(가) {{to}}에게 묻는 중",

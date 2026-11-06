@@ -13618,7 +13618,8 @@
     "namesMore": "{{first}} и ещё {{count}}",
     "wait": {
       "thinking": "Думает…",
-      "held": "Ждёт одобрения…"
+      "held": "Ждёт одобрения…",
+      "said": "«{{text}}»"
     },
     "consult": {
       "asking": "{{from}} спрашивает {{to}}",

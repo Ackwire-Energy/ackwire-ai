@@ -19,6 +19,10 @@ export type AgentQuestionRow = typeof agentQuestions.$inferSelect;
 /** How long a question waits for an answer before the run goes on without one. */
 export const QUESTION_TTL_MS = 24 * 3600_000;
 export const ASK_USER_TOOL = "ask_user";
+/** A question card holds one short question: never a whole reply, and never one cut to fit. */
+export const QUESTION_MAX_CHARS = 300;
+export const questionTooLong = (length: number) =>
+  `Not asked: this question is ${length} characters, and a card holds one short question (at most ${QUESTION_MAX_CHARS}). Write what you found and your plan in your text first (it is posted above the card), then call ask_user again with one short question, with choices when they fit (e.g. "Posso começar a preencher o formulário?" with Sim and Ainda não).`;
 
 /** The shape the app renders (`meta.question`, `question.asked` / `question.answered`). */
 export interface AgentQuestion {
@@ -85,12 +89,13 @@ export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource 
   const tool: ToolDefinition = {
     name: ASK_USER_TOOL,
     description:
-      "Ask the person a short clarifying question and wait for the answer. Use it only when you can't go on without their answer: the request is still ambiguous after you looked with your tools, a decision is really theirs, or a sensitive or irreversible action is next. `question` is a question to them, never a status note: an offer of optional extra work, or a note that you need nothing, goes in your normal reply, and nobody waits on it. A way to do what was asked is never optional extra work: do it, handing the person their step with its own request. Don't use it for what you can just do: internal changes (issues, priorities, assignments, memories, routines) need no ok, the person can undo them. Not for choosing between fixes: recommend one yourself. The question shows as a card with its choices and your `why` (what you found and why you ask): never write the question or the choices in your text; after calling, write nothing else and end your turn. Offer 2 to 4 short choices when the answer is one of a few options.",
+      "Ask the person one short question and wait for the answer, only when you can't go on without it: the request is still ambiguous after you looked with your tools, a decision is really theirs, or a sensitive or irreversible action is next. Never a status note or an offer of optional extra work: those go in your reply, nobody waits on them. A way to do what was asked is never optional: do it, handing the person their step with its own request. Don't ask before what you can just do and undo: issues, memories, routines, a form you fill and save before submitting. Not for choosing between fixes: recommend one. `question` is the question alone, at most 300 characters: anything longer goes in your text before the call, posted above the card. The card shows the choices and your `why`: never write them in your text; after calling, write nothing else and end your turn. Offer 2 to 4 short choices when the answer is one of a few options.",
     scope: "",
     inputSchema: {
       type: "object",
       properties: {
-        question: { type: "string", minLength: 1, maxLength: 1000 },
+        // No maxLength: a longer question gets `questionTooLong`, which says what to do instead.
+        question: { type: "string", minLength: 1 },
         choices: { type: "array", items: { type: "string", minLength: 1, maxLength: 200 }, minItems: 2, maxItems: 4 },
         person: {
           type: "string",
@@ -136,6 +141,7 @@ export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource 
         return { content: `${named} isn't in this conversation, so they wouldn't see the question.`, isError: true };
       }
       const text = typeof input.question === "string" ? input.question.trim() : "";
+      if (text.length > QUESTION_MAX_CHARS) return { content: questionTooLong(text.length), isError: true };
       // Loaded here: the check pulls in the controller, which imports most of the engine.
       const held = await (await import("./hand-off")).holdAsk(deps, ctx, text);
       if (held) return { content: held, data: { held: true } };

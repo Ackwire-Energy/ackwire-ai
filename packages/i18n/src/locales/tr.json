@@ -12724,7 +12724,8 @@
     "namesMore": "{{first}} ve {{count}} kişi daha",
     "wait": {
       "thinking": "Düşünüyor…",
-      "held": "Onay bekleniyor…"
+      "held": "Onay bekleniyor…",
+      "said": "“{{text}}”"
     },
     "consult": {
       "asking": "{{from}}, {{to}} ajanına soruyor",

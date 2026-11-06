@@ -12521,7 +12521,12 @@ export const ptBR = {
     namesMore: "{{first}} e mais {{count}}",
     /** The card above the box turns its phrase. */
     /** The waiting row's step line before its first step (`waitStep`). */
-    wait: { thinking: "Pensando…", held: "Esperando aprovação…" },
+    wait: {
+      thinking: "Pensando…",
+      held: "Esperando aprovação…",
+      /** The agent's own words for its step (what it wrote before the call), quoted. */
+      said: "“{{text}}”",
+    },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} está perguntando para {{to}}",

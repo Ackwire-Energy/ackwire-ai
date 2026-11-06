@@ -13258,7 +13258,8 @@
     "namesMore": "{{first}} e altri {{count}}",
     "wait": {
       "thinking": "Sta pensando…",
-      "held": "In attesa di approvazione…"
+      "held": "In attesa di approvazione…",
+      "said": "«{{text}}»"
     },
     "consult": {
       "asking": "{{from}} sta chiedendo a {{to}}",

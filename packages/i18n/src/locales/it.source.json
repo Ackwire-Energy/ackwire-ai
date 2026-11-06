@@ -31083,6 +31083,9 @@
   "chat.wait.held": {
     "value": "Waiting for approval…"
   },
+  "chat.wait.said": {
+    "value": "“{{text}}”"
+  },
   "chat.consult.asking": {
     "value": "{{from}} is asking {{to}}"
   },

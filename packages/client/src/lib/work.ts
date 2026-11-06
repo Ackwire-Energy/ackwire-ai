@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ConnectorDef, OrgSummary, Run, RunStep } from "../api/types";
-import type { LiveCode, LiveOutput, LiveRun, LiveWork } from "../realtime/streams";
+import type { LiveCode, LiveOutput, LiveRun, LiveStep, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
@@ -691,16 +691,23 @@ export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "too
   return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolLabel(l.tool) });
 }
 
+/** A turn quicker than this shows nothing new: its step line says the agent's own words only past it. */
+export const STEP_WORDS_AFTER_MS = 5000;
+
 /**
  * The waiting row's step line: what the agent does right now, verb first ("Usando o navegador · console.example.com…",
  * "Mexendo nos arquivos do PC · refresh.ts…"), from the same live work as its tool block; "Pensando…" while no step
- * runs; "Esperando aprovação…" while its last call waits on a person.
+ * runs; "Esperando aprovação…" while its last call waits on a person. `step`: the brain's own words for its latest call
+ * (quoted), or its own call no `agent.tool` told.
  */
-export function waitStep(t: TFunction, work: LiveWork[] | undefined): string {
+export function waitStep(t: TFunction, work: LiveWork[] | undefined, step?: LiveStep): string {
   const last = (work ?? []).findLast((w) => w.kind === "call");
   if (last?.kind === "call" && last.held) return t("chat.wait.held");
+  if (step?.said) return t("chat.wait.said", { text: step.said });
   const now = toolNow(toolItemsLive(work ?? []));
-  if (now?.state !== "run") return t("chat.wait.thinking");
+  if (now?.state !== "run") {
+    return step?.tool ? `${capitalize(activityVerb(t, toolActivity(step.tool)))}…` : t("chat.wait.thinking");
+  }
   const verb = capitalize(activityVerb(t, now));
   // The folded line keeps its first call's hint; the step line names the call running now.
   const hint = last?.kind === "call" && last.running ? toolHint(last.tool, now, last.detail) : now.hint;
@@ -710,12 +717,19 @@ export function waitStep(t: TFunction, work: LiveWork[] | undefined): string {
 
 /**
  * The bar's words for one agent whose row is out of view: the row's step with a lower-case start, after its name
- * ("Nina consultando o Email · …"), or "escrevendo…" while its words arrive and no call runs.
+ * ("Nina consultando o Email · …"), or "escrevendo…" while its words arrive and no call runs. Its own words only once
+ * the turn has gone on for `STEP_WORDS_AFTER_MS`.
  */
-export function barStep(t: TFunction, run: Pick<LiveRun, "text" | "work">, locale?: string): string {
+export function barStep(
+  t: TFunction,
+  run: Pick<LiveRun, "text" | "work" | "step" | "startedAt">,
+  locale?: string,
+  now = Date.now(),
+): string {
   const calling = (run.work ?? []).some((w) => w.kind === "call" && w.running);
   if (!calling && run.text.length > 0) return `${activityVerb(t, { kind: "writing" })}…`;
-  return lowerFirst(waitStep(t, run.work), locale);
+  const long = now - (run.startedAt ?? now) >= STEP_WORDS_AFTER_MS;
+  return lowerFirst(waitStep(t, run.work, long ? run.step : undefined), locale);
 }
 
 /** "1,2 s", "760 ms": a line's time, finer than the block's. */

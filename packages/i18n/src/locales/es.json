@@ -13186,7 +13186,8 @@
     "namesMore": "{{first}} y {{count}} más",
     "wait": {
       "thinking": "Pensando…",
-      "held": "Esperando aprobación…"
+      "held": "Esperando aprobación…",
+      "said": "«{{text}}»"
     },
     "consult": {
       "asking": "{{from}} le está preguntando a {{to}}",

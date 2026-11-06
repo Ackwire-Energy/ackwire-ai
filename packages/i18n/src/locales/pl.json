@@ -13667,7 +13667,8 @@
     "namesMore": "{{first}} i jeszcze {{count}}",
     "wait": {
       "thinking": "Myśli…",
-      "held": "Czeka na zatwierdzenie…"
+      "held": "Czeka na zatwierdzenie…",
+      "said": "„{{text}}”"
     },
     "consult": {
       "asking": "{{from}} pyta: {{to}}",

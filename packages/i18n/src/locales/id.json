@@ -12373,7 +12373,8 @@
     "namesMore": "{{first}} dan {{count}} lainnya",
     "wait": {
       "thinking": "Berpikir…",
-      "held": "Menunggu persetujuan…"
+      "held": "Menunggu persetujuan…",
+      "said": "“{{text}}”"
     },
     "consult": {
       "asking": "{{from}} sedang bertanya ke {{to}}",

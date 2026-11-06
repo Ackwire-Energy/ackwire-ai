@@ -1,5 +1,6 @@
 import { channelTopic, chatActivityTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import { modelProvider } from "@agenteschat/providers";
+import { plainLines } from "@agenteschat/ui/markdown";
 import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
@@ -10,6 +11,7 @@ import type { BrowserHandoffView } from "./browser/handoff";
 import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
+import { oneLine } from "./mail/text";
 import type { MessageMemory } from "./message-memories";
 import type { MessageView, ReactionCount } from "./messages";
 import type { TeamProposalCard } from "./team-proposals";
@@ -81,6 +83,32 @@ export function liveTurnToolStarted(runId: string) {
   const live = liveTurns.get(runId);
   if (live?.stretches) live.spoke = true;
   else if (live) live.from = live.text.length;
+}
+
+/** The most a step line says of what the agent wrote: one short line, cut with "…". */
+const STEP_WORDS_MAX = 120;
+/** How much of a stretch is kept for it: its first sentence is all that is read. */
+export const STEP_HELD_MAX = 600;
+
+/**
+ * What each run executing here wrote since its last call, held out of the chat (`createDeltaPublisher`): the words of
+ * its next call's step line (`takeStepWords`), never posted. Same ceiling as `liveTurns`.
+ */
+const stepHeld = new Map<string, string>();
+
+export function holdStepWords(runId: string, text: string) {
+  const held = text.slice(0, STEP_HELD_MAX);
+  if (held.trim()) stepHeld.set(runId, held);
+  else stepHeld.delete(runId);
+}
+
+/** The step's words, once: the first sentence of what it wrote before the call, plain, on one short line. */
+export function takeStepWords(runId: string): string | undefined {
+  const held = stepHeld.get(runId);
+  stepHeld.delete(runId);
+  const line = held ? (plainLines(held.replace(/\p{Cc}/gu, " "))[0] ?? "") : "";
+  const sentence = /^.+?[.!?…:](?=\s|$)/u.exec(line)?.[0] ?? line;
+  return oneLine(sentence.replace(/[.:]$/, ""), STEP_WORDS_MAX) || undefined;
 }
 
 /** What `GET …/active-runs` gives of it: the body so far and where it starts in the call's text (`agent.delta.at`). */
@@ -243,6 +271,8 @@ export type ChannelEvent =
       detail?: string;
       /** The model's id of this call (live output refers to it). */
       toolUseId?: string;
+      /** On the start: what the agent wrote right before this call, as one short line (`takeStepWords`). */
+      said?: string;
       /** `run_code`: the code being run (≤ 4 KB, secrets masked). */
       code?: { language: string; source: string };
       /** `permission_prompt`: the whole command it checks, as one line (≤ 1000 chars, credentials masked). */
@@ -264,6 +294,20 @@ export type ChannelEvent =
        * answer to that request (`failed` when they said no), which ends the line that waited for it.
        */
       requestId?: string;
+    }
+  /**
+   * A computer brain's own call (Claude Code's Read or Grep, Codex's shell) that ran with no `agent.tool`: the brain
+   * reports it once it ended. Its words (`said`, as on `agent.tool`) and its name are the waiting row's step line until
+   * the next call. Never stored.
+   */
+  | {
+      type: "agent.step";
+      channelId: string;
+      threadId: string | null;
+      runId: string;
+      agentId: string;
+      tool: string;
+      said?: string;
     }
   /** What a computer command prints while it runs (throttled, ≤ 64 KB per call). */
   | {

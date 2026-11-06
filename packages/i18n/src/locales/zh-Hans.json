@@ -12374,7 +12374,8 @@
     "namesMore": "{{first}} 等另外 {{count}} 位",
     "wait": {
       "thinking": "思考中…",
-      "held": "等待审批…"
+      "held": "等待审批…",
+      "said": "“{{text}}”"
     },
     "consult": {
       "asking": "{{from}} 正在询问 {{to}}",

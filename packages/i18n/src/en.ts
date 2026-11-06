@@ -12412,7 +12412,12 @@ export const en = {
     namesMore: "{{first}} and {{count}} more",
     /** The card above the box turns its phrase. */
     /** The waiting row's step line before its first step (`waitStep`). */
-    wait: { thinking: "Thinking…", held: "Waiting for approval…" },
+    wait: {
+      thinking: "Thinking…",
+      held: "Waiting for approval…",
+      /** The agent's own words for its step (what it wrote before the call), quoted. */
+      said: "“{{text}}”",
+    },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} is asking {{to}}",

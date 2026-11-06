@@ -12319,7 +12319,8 @@
     "namesMore": "{{first}}ほか{{count}}名",
     "wait": {
       "thinking": "考えています…",
-      "held": "承認を待っています…"
+      "held": "承認を待っています…",
+      "said": "「{{text}}」"
     },
     "consult": {
       "asking": "{{from}}が{{to}}に質問しています",

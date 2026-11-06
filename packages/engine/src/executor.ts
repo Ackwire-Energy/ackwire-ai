@@ -179,11 +179,14 @@ import {
 } from "./errors";
 import {
   type ChannelEvent,
+  holdStepWords,
   type LiveTurn,
   liveTurns,
   type MemoryUpdate,
   publishChannelEvent,
   publishMessageCreated,
+  STEP_HELD_MAX,
+  takeStepWords,
 } from "./events";
 import { comesBackHere, FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
@@ -226,7 +229,7 @@ import { enqueue, PermanentJobError } from "./outbox";
 import { type OutsideMemo, personWords, runReadOutside } from "./outside";
 import { assertPersonUnderLimit } from "./person-usage";
 import { createProfiler, type StageTiming } from "./profile";
-import { ASK_USER_TOOL, questionResult } from "./questions";
+import { ASK_USER_TOOL, QUESTION_MAX_CHARS, questionResult } from "./questions";
 import {
   endsWithSentinel,
   isSentinelOnly,
@@ -2764,7 +2767,7 @@ async function executeRunInner(
     const pause = await db.transaction(async (tx) => {
       const posted = await postPauseCards(tx, run, {
         approvals: [],
-        questions: [{ id: questionId, toolUseId, text: cutText(text, 1000), choices: null }],
+        questions: [{ id: questionId, toolUseId, text, choices: null }],
         secretRequestIds: [],
       });
       t.postedUpTo = t.messages.length;
@@ -3991,6 +3994,17 @@ async function executeRunInner(
             ...(deps.planLimitGraceMs !== undefined ? { limitGraceMs: deps.planLimitGraceMs } : {}),
             onExecuted: (call) => {
               executedNow.push(call);
+              // Its own call (not ours through the bridge, which said its step as it started): the step line says it
+              // now, with what it wrote before it.
+              if (!run.background && !turnTools.some((t) => t.name === call.name)) {
+                const said = takeStepWords(run.id);
+                void publishChannelEvent(deps.pubsub, {
+                  type: "agent.step",
+                  ...where,
+                  tool: call.name,
+                  ...(said ? { said } : {}),
+                }).catch(() => {});
+              }
               // The text it streams next is another model call's: never one reply with what it wrote before.
               deltas.toolEnded();
             },
@@ -4297,6 +4311,8 @@ async function executeRunInner(
         const secretAsks: string[] = [];
         /** Mission tools' own waits (a blocking decision, a review): their ids. */
         const waits: string[] = [];
+        // What it wrote before these calls is the first one's step line (`takeStepWords`), never posted.
+        if (!run.background) holdStepWords(run.id, isRightHand(agent) ? scrubSignIns(turnText, "••••").text : turnText);
         for (const use of toolUses) {
           // Canceled during a tool, or the server is shutting down: the rest never run.
           if (signal.aborted) break;
@@ -4338,6 +4354,7 @@ async function executeRunInner(
             });
           }
         }
+        takeStepWords(run.id);
         // The server is shutting down: the calls that never started say so, and the step ends as any other (its
         // results saved, its approvals and questions asked); the next instance takes the run from there.
         if (shuttingDown()) {
@@ -4692,6 +4709,9 @@ async function executeRunInner(
             }).catch(() => (saysNeedsNothing(judged) ? ("none" as const) : ("person" as const)));
         if (asks === "none") decision = { outcome: "done", rule: "asks_nothing", verdict: "done" };
       }
+      // A card holds one short question: a longer reply is posted whole, and the person's answer wakes it all the same.
+      if (decision.outcome === "ask_card" && (text || judged).length > QUESTION_MAX_CHARS)
+        decision = { outcome: "done", rule: "ask_long", verdict: decision.verdict };
       turnEnd = decision;
       if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
       t.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
@@ -5370,6 +5390,7 @@ function createDeltaPublisher(
     const open = all.slice(openAt);
     return final || open.trim().length >= WORKING_TEXT_MAX ? kept + open : kept;
   };
+  const scrubbed = (text: string) => (first.scrub ? scrubSignIns(text, "••••").text : text);
   const live: LiveTurn = { turn: first.turn, text: "", from: 0, stretches: first.stretches };
   /** Length of `all` at the last send. */
   let sentUpTo = 0;
@@ -5441,6 +5462,9 @@ function createDeltaPublisher(
       }
       all += text;
       if (text) marks.push([Date.now(), all.length]);
+      // Only its start is read for a step line (`takeStepWords`): the rest of a long stretch is never copied.
+      if (!first.quiet && all.length - text.length - openAt < STEP_HELD_MAX)
+        holdStepWords(run.id, scrubbed(all.slice(openAt, openAt + STEP_HELD_MAX)));
       if (flushMs === 0 || all.length - sentUpTo >= MAX_CHUNK) send();
       else timer ??= setTimeout(() => send(), flushMs);
     },
@@ -5448,11 +5472,13 @@ function createDeltaPublisher(
     async flush(answer = false) {
       send(answer);
       liveTurns.delete(run.id);
+      takeStepWords(run.id);
       await pending;
     },
     seq: () => seq,
     /** A call the brain ran inside its turn ended (through the bridge or on its own): later text is a new stretch. */
     toolEnded() {
+      takeStepWords(run.id);
       breaks.push([Date.now(), all.length]);
       kept = showable(false);
       openAt = all.length;

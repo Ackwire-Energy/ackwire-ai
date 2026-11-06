@@ -12794,7 +12794,8 @@
     "namesMore": "{{first}} und {{count}} weitere",
     "wait": {
       "thinking": "Denkt nach…",
-      "held": "Wartet auf Freigabe…"
+      "held": "Wartet auf Freigabe…",
+      "said": "„{{text}}“"
     },
     "consult": {
       "asking": "{{from}} fragt {{to}}",

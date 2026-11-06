@@ -13254,7 +13254,8 @@
     "namesMore": "{{first}} et {{count}} de plus",
     "wait": {
       "thinking": "Réflexion…",
-      "held": "En attente d'approbation…"
+      "held": "En attente d'approbation…",
+      "said": "« {{text}} »"
     },
     "consult": {
       "asking": "{{from}} interroge {{to}}",

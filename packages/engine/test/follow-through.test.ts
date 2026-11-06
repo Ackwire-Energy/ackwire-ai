@@ -114,6 +114,21 @@ test("a need only a person can fill, described instead of asked: one nudge to as
   ]);
 });
 
+test("a reply too long for a question card is posted whole, never cut into one", async () => {
+  const long = `Corrijo o que falta no Android. ${"Preencher a classificação de conteúdo, o título, o ícone 512x512 e o AAB assinado. ".repeat(14)}Posso fazer isso agora?`;
+  f = await setup({
+    judge: (kind) => (kind === "follow_through" ? "ask" : undefined),
+    reply: () => ({ chunks: [long] }),
+  });
+  await ask(f, "@dev o que falta para o review do android?");
+  await drainOutbox(f.db, f.handlers);
+  expect(await f.db.select().from(schema.agentQuestions)).toEqual([]);
+  expect((await agentMessages(f)).map((m) => m.body)).toEqual([long, long]);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+  const steps = await f.db.select().from(schema.agentRunSteps);
+  expect(steps.some((s) => (s.data.continuation as { rule?: string } | undefined)?.rule === "ask_long")).toBe(true);
+});
+
 test("every run's end is read once by the judge, in any language: a promise in Japanese is caught, a plain answer isn't", async () => {
   const promised = "CIはまだ実行中です。あとでもう一度確認して数字を送ります。";
   f = await setup({

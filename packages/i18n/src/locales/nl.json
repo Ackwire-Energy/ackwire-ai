@@ -12849,7 +12849,8 @@
     "namesMore": "{{first}} en nog {{count}}",
     "wait": {
       "thinking": "Denkt na…",
-      "held": "Wacht op goedkeuring…"
+      "held": "Wacht op goedkeuring…",
+      "said": "‘{{text}}’"
     },
     "consult": {
       "asking": "{{from}} vraagt {{to}} iets",

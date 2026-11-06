@@ -1,6 +1,7 @@
 {
   "app": {
     "pt-BR": [
+      "chat.wait.said",
       "access.area.skills",
       "agent.builtinName",
       "agentComputer.phone.trackpad",
@@ -2070,6 +2071,7 @@
       "linkPills.issue"
     ],
     "ko": [
+      "chat.wait.said",
       "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
@@ -2190,6 +2192,7 @@
       "teamTemplates.channels.bia"
     ],
     "zh-Hans": [
+      "chat.wait.said",
       "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
@@ -2301,6 +2304,7 @@
       "teamTemplates.channels.bia"
     ],
     "id": [
+      "chat.wait.said",
       "access.area.browser",
       "access.area.desktop",
       "agent.builtinName",
@@ -2527,6 +2531,7 @@
       "linkPills.issue"
     ],
     "tr": [
+      "chat.wait.said",
       "agent.builtinName",
       "agentPage.fields.model",
       "agentPage.work.brain.planModel",
