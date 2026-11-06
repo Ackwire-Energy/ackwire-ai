@@ -1,9 +1,26 @@
 import { createHash } from "node:crypto";
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, gte, inArray, isNull, or, rowsOf, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  or,
+  rowsOf,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { type AgentsDmReads, agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { recordAudit } from "./audit";
 import { runAuthorityById, UUID } from "./authority";
+import { routineBriefOfRun } from "./background";
+import { peopleSee } from "./consultations";
+import { isAgentOnlyDm } from "./dms";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -556,10 +573,40 @@ async function madeForSamePerson(db: Database, dm: AgentsDmReads, artifactId: st
   return rows.length > 0 && results.every(Boolean);
 }
 
+/** A room no person reads (a routine's, an agents' DM), as a channel row, or null for any other conversation. */
+async function agentRoom(db: Executor, orgId: string, channelId: string) {
+  const [channel] = await db
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), eq(channels.id, channelId)));
+  return channel && isAgentOnlyDm(channel) ? channel : null;
+}
+
+/** A run in this room made a version of the row: a room's files land where people see them, and stay the room's. */
+const madeInRoomSql = (roomId: string) => sql`exists (
+  select 1 from ${artifactVersions} join ${schema.agentRuns} on ${schema.agentRuns.id} = ${artifactVersions.runId}
+  where ${artifactVersions.artifactId} = ${artifacts.id} and ${schema.agentRuns.channelId} = ${roomId})`;
+
+/** Whether a run in `roomId` made a version of this file. */
+async function madeInRoom(db: Database, artifactId: string, roomId: string) {
+  const [row] = await db
+    .select({ id: artifacts.id })
+    .from(artifacts)
+    .where(and(eq(artifacts.id, artifactId), madeInRoomSql(roomId)));
+  return row !== undefined;
+}
+
+/** A file this agent's room saved elsewhere (`placeFile`); in the agents' DM, only one made for the same person. */
+async function ownRoomFile(db: Database, actor: Extract<ArtifactActor, { type: "agent" }>, orgId: string, id: string) {
+  if (!(await agentRoom(db, orgId, actor.channelId)) || !(await madeInRoom(db, id, actor.channelId))) return false;
+  const dm = await agentsDmReads(db, orgId, actor.channelId, () => readerOfRun(db, orgId, actor.runId));
+  return !dm || madeForSamePerson(db, dm, id);
+}
+
 /**
  * An agent's own reach, what `listArtifacts` lists and what it may change: org-wide files, its run's conversation and
- * public channels it is in (in the agents' DM, only those made for the same person), and the conversations it shares
- * with the person behind the run.
+ * public channels it is in (in the agents' DM, only those made for the same person), the conversations it shares
+ * with the person behind the run, and what its room saved elsewhere.
  */
 async function agentReaches(
   db: Database,
@@ -570,7 +617,9 @@ async function agentReaches(
   if (!a.channelId) return true;
   if (!(await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(a.channelId)) {
     const person = await personOfActor(db, orgId, actor);
-    return person !== null && (await requesterSharedChannels(db, orgId, actor.agentId, person)).includes(a.channelId);
+    if (person !== null && (await requesterSharedChannels(db, orgId, actor.agentId, person)).includes(a.channelId))
+      return true;
+    return ownRoomFile(db, actor, orgId, a.id);
   }
   const dm = await agentsDmReads(db, orgId, a.channelId, () => readerOfRun(db, orgId, actor.runId));
   return !dm || madeForSamePerson(db, dm, a.id);
@@ -715,6 +764,31 @@ async function placeNew(
   return { title, channelId, threadId };
 }
 
+/**
+ * `placeNew` for a Drive file: an agent's run in a room no person reads saves where people follow that run
+ * (`peopleSee`): where its routine reports, or the shared Drive when that is what its people chose (`toDrive`), else
+ * the conversation a consultation started in. One that answers agents only, or nobody, stays in the room, and
+ * `fileReach` tells the agent so.
+ */
+async function placeFile(
+  db: Database,
+  actor: ArtifactActor,
+  orgId: string,
+  input: { title: string; channelId?: string | null; threadId?: string | null },
+) {
+  const place = await placeNew(db, actor, orgId, input);
+  if (actor.type !== "agent" || !actor.runId) return place;
+  const room = await agentRoom(db, orgId, actor.channelId);
+  if (!room) return place;
+  const [run] = await db
+    .select()
+    .from(schema.agentRuns)
+    .where(and(eq(schema.agentRuns.orgId, orgId), eq(schema.agentRuns.id, actor.runId)));
+  if (!run) return place;
+  const brief = run.background ? await routineBriefOfRun(db, run) : null;
+  return { ...place, ...(brief?.toDrive ? { channelId: null, threadId: null } : await peopleSee(db, run, room)) };
+}
+
 /** Version 1 of a new artifact: blob, rows, index, audit and the channel event. */
 async function insertArtifact(
   deps: ArtifactDeps,
@@ -856,8 +930,8 @@ export async function insertVersion(
 /**
  * Creates an artifact (version 1). People create in the Drive (no channel:
  * the whole org sees it) or in a channel they belong to; agents create in
- * the channel and thread of their run. `html` is stored as is and marked
- * untrusted. Never a `file` (see `createFileArtifact`).
+ * the channel and thread of their run (`placeFile`). `html` is stored as is
+ * and marked untrusted. Never a `file` (see `createFileArtifact`).
  */
 export async function createArtifact(
   deps: ArtifactDeps,
@@ -865,7 +939,7 @@ export async function createArtifact(
   orgId: string,
   input: { title: string; content: unknown; channelId?: string | null; threadId?: string | null },
 ): Promise<ArtifactDetailView> {
-  const place = await placeNew(deps.db, actor, orgId, input);
+  const place = await placeFile(deps.db, actor, orgId, input);
   const content = validateContent(input.content);
   const { artifact } = await insertArtifact(deps, actor, orgId, {
     ...place,
@@ -984,9 +1058,11 @@ export async function createFileArtifact(
     threadId?: string | null;
     note?: string | null;
     author?: ArtifactAuthor;
+    /** What a tool brought back for the agent to work on, not saved for anyone: it stays in the run's conversation. */
+    byProduct?: boolean;
   },
 ): Promise<ArtifactDetailView> {
-  const place = await placeNew(deps.db, actor, orgId, input);
+  const place = await (input.byProduct ? placeNew : placeFile)(deps.db, actor, orgId, input);
   const file = fileInput(input);
   const { artifact, blob } = await insertArtifact(deps, actor, orgId, {
     ...place,
@@ -1037,6 +1113,82 @@ export async function addFileVersion(
     title: input.title,
   });
   return detail(artifact, version, storedFileContent(file.name, blob, input.bytes));
+}
+
+/**
+ * `shared_drive`: the file leaves its conversation for the workspace's shared Drive (no channel), so everyone there
+ * sees it. Who may: whoever may change it. Links and cards keep working, since it is the same file.
+ */
+export async function moveToSharedDrive(
+  deps: ArtifactDeps,
+  actor: Extract<ArtifactActor, { type: "agent" }>,
+  orgId: string,
+  artifactId: string,
+) {
+  const a = await writable(deps, actor, orgId, artifactId);
+  if (!a.inDrive) throw new ValidationError(`a ${a.kind} lives in its conversation, not in the Drive`);
+  if (!a.channelId) return;
+  const row = await deps.db.transaction(async (tx) => {
+    const [moved] = await tx
+      .update(artifacts)
+      .set({ channelId: null, threadId: null })
+      .where(and(eq(artifacts.id, a.id), eq(artifacts.orgId, orgId)))
+      .returning();
+    if (!moved) throw new NotFoundError("Artifact not found");
+    await enqueueIndex(tx, { orgId, kind: "file", sourceId: a.id });
+    await recordAudit(tx, {
+      orgId,
+      actor: authorOf(actor),
+      action: "artifact.moved_to_drive",
+      target: { type: "artifact", id: a.id },
+      details: { fromChannelId: a.channelId },
+    });
+    return moved;
+  });
+  const artifact = view(row, editableKind(row.kind));
+  await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: a.channelId, artifact });
+}
+
+const SHARED_DRIVE_HINT = "To put it there: update_artifact with shared_drive: true.";
+
+/** Where a file is and who sees it, for an agent to tell people (what `withPersonFacts` shows them). */
+export async function fileReach(db: Database, orgId: string, artifactId: string) {
+  const [a] = await db
+    .select({ channelId: artifacts.channelId, kind: channels.kind, name: channels.name, open: channels.visibility })
+    .from(artifacts)
+    .leftJoin(channels, eq(channels.id, artifacts.channelId))
+    .where(and(eq(artifacts.id, artifactId), eq(artifacts.orgId, orgId)));
+  if (!a?.channelId) return "It is in the workspace's shared Drive: everyone in the workspace sees it.";
+  if (a.kind === "task") return "It is in the Drive, on its task: whoever sees the task sees it.";
+  if (a.kind === "channel" && a.open === "public") {
+    return `It is in the shared Drive, from #${a.name}: everyone in the workspace sees it.`;
+  }
+  const notShared = `in the Drive's private section, not in the shared Drive. ${SHARED_DRIVE_HINT}`;
+  if (a.kind === "channel") return `Only the members of #${a.name} see it: it is ${notShared}`;
+  const people = await db
+    .select({ name: schema.users.name })
+    .from(channelMembers)
+    .innerJoin(schema.users, eq(schema.users.id, channelMembers.userId))
+    .where(eq(channelMembers.channelId, a.channelId));
+  if (people.length > 0) return `Only ${people.map((p) => p.name).join(", ")} can see it: it is ${notShared}`;
+  return `No person sees it: it is in a conversation between agents, not in the shared Drive. Don't say it is saved for people. ${SHARED_DRIVE_HINT}`;
+}
+
+/** The Drive files a run saved, as a message carries them, of those the people of `channelId` see (or everyone does). */
+export function filesOfRun(db: Executor, orgId: string, runId: string, channelId: string) {
+  return db
+    .selectDistinct({ id: artifacts.id, version: artifacts.currentVersion, title: artifacts.title })
+    .from(artifacts)
+    .innerJoin(artifactVersions, eq(artifactVersions.artifactId, artifacts.id))
+    .where(
+      and(
+        eq(artifacts.orgId, orgId),
+        eq(artifactVersions.runId, runId),
+        isNull(artifacts.deletedAt),
+        eq(artifacts.inDrive, true),
+        or(isNull(artifacts.channelId), eq(artifacts.channelId, channelId)),
+      ),
+    );
 }
 
 async function versionRow(db: Database, a: ArtifactRow, version?: number) {
@@ -1156,9 +1308,11 @@ export async function listArtifacts(
   await requireMember(db, actor, orgId);
   let visible: string[];
   let dm: AgentsDmReads | null = null;
+  let ownRoom: SQL | undefined;
   if (actor.type === "agent") {
     dm = await agentsDmReads(db, orgId, actor.channelId, () => readerOfRun(db, orgId, actor.runId));
     visible = await agentSearchChannels(db, orgId, actor.agentId, actor.channelId);
+    if (await agentRoom(db, orgId, actor.channelId)) ownRoom = madeInRoomSql(actor.channelId);
     if (filters.requesterUserId) {
       const shared = await requesterSharedChannels(db, orgId, actor.agentId, filters.requesterUserId);
       // A run where the agent isn't a member (the right hand, called by name) still lists that conversation.
@@ -1179,9 +1333,11 @@ export async function listArtifacts(
         eq(artifacts.orgId, orgId),
         isNull(artifacts.deletedAt),
         eq(artifacts.inDrive, true),
-        visible.length > 0
-          ? or(isNull(artifacts.channelId), inArray(artifacts.channelId, visible))
-          : isNull(artifacts.channelId),
+        or(
+          isNull(artifacts.channelId),
+          visible.length > 0 ? inArray(artifacts.channelId, visible) : undefined,
+          ownRoom,
+        ),
         filters.kind ? eq(artifacts.kind, filters.kind) : undefined,
         filters.channelId ? eq(artifacts.channelId, filters.channelId) : undefined,
         filters.since ? gte(artifacts.updatedAt, filters.since) : undefined,
@@ -1197,7 +1353,14 @@ export async function listArtifacts(
     .orderBy(desc(artifacts.updatedAt))
     .limit(Math.min(200, filters.limit ?? 100));
   const fromDm = dm
-    ? await Promise.all(rows.map((a) => a.channelId !== dm.channelId || madeForSamePerson(db, dm, a.id)))
+    ? await Promise.all(
+        rows.map(
+          (a) =>
+            !a.channelId ||
+            (a.channelId !== dm.channelId && visible.includes(a.channelId)) ||
+            madeForSamePerson(db, dm, a.id),
+        ),
+      )
     : null;
   return rows
     .filter((_, i) => fromDm?.[i] !== false)
@@ -1259,7 +1422,7 @@ export async function artifactOrigins(
     chans.map((c): [string, string] => {
       if (c.kind !== "dm") return [c.id, `#${c.name}`];
       const people = dmPeople.filter((p) => p.channelId === c.id).map((p) => p.name);
-      return [c.id, people.length ? `DM with ${people.join(", ")}` : "DM"];
+      return [c.id, people.length ? `DM with ${people.join(", ")}` : "a conversation between agents"];
     }),
   );
   const creator = new Map<string, string>([
@@ -1276,10 +1439,11 @@ export async function artifactOrigins(
 /**
  * An agent brings an artifact into its run's conversation (`share_artifact`):
  * allowed only when the person who asked can see where it came from (and the
- * agent was there too). Visible here already (same channel, org-wide or a
- * public channel): the same file is attached. From a DM or a private
- * channel: a copy is saved here, so the people here can open it; the
- * original stays where it was. Audited either way.
+ * agent was there too), or it was made for that person in the agents' DM.
+ * Visible here already (same channel, org-wide or a public channel): the same
+ * file is attached. From a DM or a private channel: a copy is saved here, so
+ * the people here can open it; the original stays where it was. Audited
+ * either way.
  */
 export async function shareArtifact(
   deps: ArtifactDeps,
@@ -1303,12 +1467,14 @@ export async function shareArtifact(
   if (!openHere) {
     // From a DM or a private channel: the requester and the agent must both be in it. Reading for a person is no
     // reason to carry a file into another audience.
+    const requester = input.requesterUserId;
+    const dm = requester ? await agentsDmReads(db, orgId, a.channelId as string, async () => requester) : null;
     const allowed =
-      (input.alsoFrom != null && a.channelId === input.alsoFrom) ||
-      (input.requesterUserId !== null &&
-        (await requesterSharedChannels(db, orgId, actor.agentId, input.requesterUserId)).includes(
-          a.channelId as string,
-        ));
+      (input.alsoFrom != null && (a.channelId === input.alsoFrom || (await madeInRoom(db, a.id, input.alsoFrom)))) ||
+      (requester !== null &&
+        (await requesterSharedChannels(db, orgId, actor.agentId, requester)).includes(a.channelId as string)) ||
+      // No person is in the agents' DM: what a teammate made there for the person asking is theirs to have.
+      (dm !== null && (await madeForSamePerson(db, dm, a.id)));
     if (!allowed) throw await agentRefusal(db, actor, orgId, artifactId);
   }
   let shared: ArtifactView = view(a, editableKind(a.kind));
@@ -1341,6 +1507,62 @@ export async function shareArtifact(
     },
   });
   return { artifact: shared, copied, from: { channelId: a.channelId, kind: origin?.kind ?? null } };
+}
+
+/**
+ * Files saved before `placeFile` still sit in rooms no person reads. Each goes where people follow the runs that made
+ * it, when all of them agree; the rest stay, so nothing reaches anyone its run wouldn't reach now. Once at boot, off
+ * its path: the code holds the rule (who a run answers), which a SQL migration couldn't.
+ * ponytail: what stays is looked at again on every boot; a mark on the row when that many ever add up.
+ */
+export async function surfaceRoomFiles(db: Database) {
+  const stuck = await db
+    .select({
+      id: artifacts.id,
+      orgId: artifacts.orgId,
+      roomId: channels.id,
+      kind: channels.kind,
+      dmKey: channels.dmKey,
+    })
+    .from(artifacts)
+    .innerJoin(channels, eq(channels.id, artifacts.channelId))
+    .where(
+      and(
+        eq(channels.kind, "dm"),
+        sql`${channels.dmKey} not like '%u:%'`,
+        eq(artifacts.inDrive, true),
+        isNull(artifacts.deletedAt),
+      ),
+    );
+  let moved = 0;
+  for (const a of stuck) {
+    const made = await db
+      .select({ run: schema.agentRuns, note: artifactVersions.note })
+      .from(artifactVersions)
+      .leftJoin(schema.agentRuns, eq(schema.agentRuns.id, artifactVersions.runId))
+      .where(eq(artifactVersions.artifactId, a.id));
+    // "From …": what a connector or an email brought in, which nobody may have meant for people.
+    if (made.some((m) => m.note?.startsWith("From "))) continue;
+    const runs = made.flatMap((m) => (m.run ? [m.run] : []));
+    if (runs.length === 0 || runs.length !== made.length) continue;
+    const places = await Promise.all(runs.map((run) => peopleSee(db, run, a)));
+    const [place] = places;
+    if (!place || place.channelId === a.roomId || places.some((p) => p.channelId !== place.channelId)) continue;
+    const [open] = await db
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.id, place.channelId), isNull(channels.archivedAt)));
+    if (!open) continue;
+    await db.transaction(async (tx) => {
+      await tx
+        .update(artifacts)
+        .set({ channelId: place.channelId, threadId: place.threadId })
+        .where(and(eq(artifacts.id, a.id), eq(artifacts.channelId, a.roomId)));
+      await enqueueIndex(tx, { orgId: a.orgId, kind: "file", sourceId: a.id });
+    });
+    moved++;
+  }
+  return moved;
 }
 
 /** Deleted files can be restored for this long; then the purge job removes their contents (all versions). */

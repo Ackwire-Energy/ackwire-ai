@@ -399,10 +399,10 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck; judge?: Judg
 }
 
 /**
- * Where people read about a run's held note (ADR 0131): where its routine reports, the conversation a consultation
- * chain started in, else the run's own conversation.
+ * Where people follow a run (a held note, ADR 0131, a saved file, ADR 0111): where its routine reports, the
+ * conversation a consultation chain started in, else the run's own conversation.
  */
-async function peopleSee(db: Executor, run: AgentRun, here: { kind: string; dmKey: string | null } | undefined) {
+export async function peopleSee(db: Executor, run: AgentRun, here: { kind: string; dmKey: string | null } | undefined) {
   const report = run.background ? (await routineBriefOfRun(db, run))?.deliverTo : undefined;
   if (report) return { channelId: report.channelId, threadId: report.threadId ?? null };
   const origin = here && isAgentOnlyDm(here) ? await consultationOrigin(db, run.orgId, run.id) : null;

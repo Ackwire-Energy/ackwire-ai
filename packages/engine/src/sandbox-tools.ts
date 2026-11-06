@@ -19,6 +19,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
+import { fileLanded, SHARED_DRIVE_INPUT } from "./artifact-tools";
 import {
   ARTIFACT_LIMITS,
   type ArtifactActor,
@@ -985,6 +986,7 @@ export function createSandboxToolSource(
           title: { type: "string", maxLength: 200 },
           artifact_id: { type: "string", minLength: 36, maxLength: 36 },
           note: { type: "string", maxLength: 500 },
+          shared_drive: SHARED_DRIVE_INPUT,
         },
         required: ["path"],
         additionalProperties: false,
@@ -1020,7 +1022,7 @@ export function createSandboxToolSource(
                 content,
               });
           return {
-            content: `Saved ${path} to the Drive as "${a.title}" (${a.kind}), artifact ${a.id}, version ${a.version}.`,
+            content: `Saved ${path} as "${a.title}" (${a.kind}), artifact ${a.id}, version ${a.version}. ${await fileLanded(deps.artifacts, ctx, a.id, input.shared_drive)}`,
             data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
@@ -1039,6 +1041,7 @@ export function createSandboxToolSource(
           title: { type: "string", maxLength: 200 },
           artifact_id: { type: "string", minLength: 36, maxLength: 36 },
           note: { type: "string", maxLength: 500 },
+          shared_drive: SHARED_DRIVE_INPUT,
         },
         required: ["path"],
         additionalProperties: false,
@@ -1075,7 +1078,7 @@ export function createSandboxToolSource(
           const done = await uploadedFile(deps.db, row);
           if (!done) return { content: `Failed: ${row.error ?? "the upload did not finish"}`, isError: true };
           return {
-            content: `Uploaded ${path} to the Drive as "${done.title}" (file, ${formatBytes(done.size)}), artifact ${done.id}, version ${done.version}.`,
+            content: `Uploaded ${path} as "${done.title}" (file, ${formatBytes(done.size)}), artifact ${done.id}, version ${done.version}. ${await fileLanded(deps.artifacts, ctx, done.id, input.shared_drive)}`,
             data: { artifact: { id: done.id, version: done.version, title: done.title } },
           };
         } catch (error) {

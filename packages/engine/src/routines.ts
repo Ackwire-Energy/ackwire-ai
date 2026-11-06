@@ -2232,6 +2232,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     name: routine.name,
     creatorUserId: creator,
     deliverTo,
+    ...(target.type === "artifact" ? { toDrive: true } : {}),
     access: routineAccessOf(routine.access),
     report: routineReportOf(routine.report),
     trigger: run.trigger,

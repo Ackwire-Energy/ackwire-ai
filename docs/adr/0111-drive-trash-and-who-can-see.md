@@ -34,5 +34,17 @@ The Drive already had a trash: deleting a file sets `artifacts.deleted_at`, the 
 - Restore and delete for good both write only while the file is still in the trash (a conditional update), so when they race the first to commit wins and a restored file keeps its contents.
 - A DM whose other side is an archived agent or a person who left (or was blocked) can't be opened (`openDm` refuses it): its files carry `audience.gone`, and the app shows no way into it.
 - The chat file card's right click (desktop app) offers "Mover para a lixeira" to the same people.
-- Moving a file between conversations isn't possible, so `audience` never changes after creation; a DM's file that someone re-attaches elsewhere stays readable only by the DM's two sides.
+- A file only moves to the shared Drive (addendum below), so `audience` otherwise never changes after creation; a DM's file that someone re-attaches elsewhere stays readable only by the DM's two sides.
 - If the trash should count toward storage, that's `storedBytesQueries` dropping the `deleted_at` filter and `restoreArtifact` dropping its room check; it stays a product decision.
+
+## Addendum 2026-11-06: a file an agent saves reaches people
+
+A file followed the run's conversation, and two conversations have no person in them: a routine's room and the agents' DM. `create_artifact` and `upload_file` said "Saved", and nobody, the routine's creator included, could find the file. A file saved in a person's DM showed only to that person, in the private section, so "salva no drive compartilhado" also failed for the rest of the team.
+
+- **Where it lands** (`placeFile`): in a room no person reads, a file goes where people follow the run (`peopleSee`): where the routine reports (its thread too), else the conversation a consultation chain started in. A DM's or a private channel's file stays with those people. A run that answers agents only, or that nobody started, stays in the room. What a connector brought back for the agent to work on (`byProduct`) isn't saved for anyone and stays too.
+- **The shared Drive** is the file with no conversation (`channel_id` null), never a computer's shared folder (ADR 0115). `shared_drive: true` on `create_artifact`, `upload_file` and `export_file` puts it there; `update_artifact` with `shared_drive` and no content moves one that exists (`moveToSharedDrive`, audited, same id, for whoever may change it).
+- **A routine set to "Um documento no Drive"** (target `artifact`) only ever reported in its creator's DM: nothing read the target past the form. Its brief now says `toDrive`, its files go to the shared Drive and its prompt asks for the document. The message still goes to the DM, with the card.
+- **The result says it** (`fileReach`): where the file is and who sees it, in the words the agent passes on, and how to reach the shared Drive when it isn't there.
+- **A room keeps its files**: a run in the room lists, reads and changes what that room saved elsewhere, in the agents' DM only what was made for the same person (`ownRoomFile`), and nothing else of the conversation the file landed in.
+- **`hand_off` carries the cards** of the files its run saved (`filesOfRun`), as a reply does. `share_artifact` stays refused in a routine, and says so. It now also brings a file made in the agents' DM for the person asking.
+- **Files already in rooms** move once, at boot (`surfaceRoomFiles`), when every version's run agrees on the place and it is still open. It is code and not a migration because who a run answers (`answersAgentsOnly`) is an audience rule SQL can't read. What a connector or an email brought in (`From …` notes), blocks, and anything with no run stay.

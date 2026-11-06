@@ -2082,7 +2082,7 @@ async function executeRunInner(
     // Loaded, not only granted: on demand, the wiki tools' own descriptions say it (token-trim B4).
     if (tools.some((t) => t.name === "create_wiki_page" || t.name === "update_wiki_page")) {
       system.push({
-        text: '# Writing to the wiki\nOnly write to the wiki (create_wiki_page, update_wiki_page, link_to_wiki) when a person asks for it in the current message ("save this to the wiki", "document…", "update page X"; in Portuguese "salva isso na wiki", "documenta…", "atualiza a página X"). Never on your own: if you think something is worth documenting, offer and wait for the person to ask. Each edit stays in the history with your name and the name of whoever asked.',
+        text: '# Writing to the wiki\nOnly write to the wiki (create_wiki_page, update_wiki_page, link_to_wiki) when a person asks for it in the current message ("save this to the wiki", "document…", "update page X"; in Portuguese "salva isso na wiki", "documenta…", "atualiza a página X") or your routine\'s instructions say so. Never on your own: if you think something is worth documenting, offer and wait for the person to ask. Each edit stays in the history with your name and the name of whoever asked.',
       });
     }
     const read = [

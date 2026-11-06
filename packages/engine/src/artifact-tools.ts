@@ -9,13 +9,16 @@ import {
   createArtifact,
   diffToPatch,
   fileFullText,
+  fileReach,
   getArtifact,
   listArtifacts,
+  moveToSharedDrive,
   shareArtifact,
   TEXT_ARTIFACT_KINDS,
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
+import { answersAgentsOnly } from "./consultations";
 import { personBehindCall } from "./requester";
 import { replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -47,6 +50,13 @@ const contentProperties = {
     description: "html: a self-contained page. It has no network: inline every script, style, image and font",
   },
 };
+
+/** The `shared_drive` input of the tools that save a Drive file. */
+export const SHARED_DRIVE_INPUT = {
+  type: "boolean",
+  description:
+    "The workspace's shared Drive (\"drive compartilhado\"): everyone in the workspace sees the file, whatever conversation this is. Set it when people ask for the shared Drive or for the whole team. Without it the file goes with this conversation: only the people of a DM or private channel see it. A computer's shared folder is not the Drive.",
+} as const;
 
 function contentFrom(kind: ArtifactKind, input: Record<string, unknown>): unknown {
   switch (kind) {
@@ -112,23 +122,38 @@ const failed = (error: unknown): ToolOutput => ({
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /**
+ * Where a file a tool just saved really is, for its result, moved first when the agent set `shared_drive`. A run that
+ * answers agents only reaches no person (`answersAgentsOnly`), so its file stays out of a Drive they read.
+ */
+export async function fileLanded(deps: ArtifactDeps, ctx: ToolContext, artifactId: string, sharedDrive: unknown) {
+  if (sharedDrive !== true) return fileReach(deps.db, ctx.orgId, artifactId);
+  if (ctx.runId && (await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId))) {
+    return "It isn't in the shared Drive: nothing of this run reaches people, it answers the agent that asked.";
+  }
+  await moveToSharedDrive(deps, actorOf(ctx) as Extract<ArtifactActor, { type: "agent" }>, ctx.orgId, artifactId);
+  return fileReach(deps.db, ctx.orgId, artifactId);
+}
+
+/**
  * Drive tools through the Tool Gateway: `create_artifact`, `update_artifact`
  * (`drive:write`), `read_artifact`, `list_artifacts` (`drive:read`). Who reads
  * what is `canRead` in artifacts.ts. What they create lands in the run's
- * channel and thread; the reply carries `meta.artifacts` for the preview card.
+ * channel and thread (`placeFile`), or with `shared_drive` in the workspace's
+ * Drive; the reply carries `meta.artifacts` for the preview card.
  */
 export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
   const tools: ToolDefinition[] = [
     {
       name: "create_artifact",
       description:
-        "Save a file people can open in the Drive: a Markdown document (reports, plans), a table, a diff, a Mermaid diagram (org charts, flows) or a self-contained HTML page. Use it for anything longer than a chat message or meant to be kept.",
+        "Save a file people can open in the Drive: a Markdown document (reports, plans), a table, a diff, a Mermaid diagram (org charts, flows) or a self-contained HTML page. Use it for anything longer than a chat message or meant to be kept. Its result says who sees it: tell people that, never more.",
       scope: "drive:write",
       inputSchema: {
         type: "object",
         properties: {
           title: { type: "string", minLength: 1, maxLength: 200 },
           kind: { enum: TEXT_ARTIFACT_KINDS },
+          shared_drive: SHARED_DRIVE_INPUT,
           ...contentProperties,
         },
         required: ["title", "kind"],
@@ -142,7 +167,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
             content: contentFrom(kind, input),
           });
           return {
-            content: `Saved "${a.title}" (${a.kind}) as artifact ${a.id}, version 1.`,
+            content: `Saved "${a.title}" (${a.kind}) as artifact ${a.id}, version 1. ${await fileLanded(deps, ctx, a.id, input.shared_drive)}`,
             data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
@@ -153,7 +178,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
     {
       name: "update_artifact",
       description:
-        "Save a new version of an artifact (old versions are kept). Send the whole new content and a short note on what changed. Uploaded files (kind file) get new versions with upload_file and artifact_id instead.",
+        "Save a new version of an artifact (old versions are kept). Send the whole new content and a short note on what changed. Uploaded files (kind file) get new versions with upload_file and artifact_id instead. With shared_drive and no content, it only moves the file to the shared Drive.",
       scope: "drive:write",
       inputSchema: {
         type: "object",
@@ -161,6 +186,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
           artifact_id: { type: "string", minLength: 36, maxLength: 36 },
           note: { type: "string", maxLength: 500 },
           title: { type: "string", maxLength: 200 },
+          shared_drive: SHARED_DRIVE_INPUT,
           ...contentProperties,
         },
         required: ["artifact_id", "note"],
@@ -170,13 +196,18 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
         try {
           const actor = actorOf(ctx);
           const current = await getArtifact(deps, actor, ctx.orgId, str(input.artifact_id));
-          const a = await updateArtifact(deps, actor, ctx.orgId, current.id, {
-            content: contentFrom(current.kind, input),
-            note: str(input.note),
-            title: str(input.title) || undefined,
-          });
+          const moveOnly =
+            input.shared_drive === true && !Object.keys(contentProperties).some((k) => input[k] !== undefined);
+          const a = moveOnly
+            ? current
+            : await updateArtifact(deps, actor, ctx.orgId, current.id, {
+                content: contentFrom(current.kind, input),
+                note: str(input.note),
+                title: str(input.title) || undefined,
+              });
+          const saved = moveOnly ? `"${a.title}":` : `Saved version ${a.version} of "${a.title}".`;
           return {
-            content: `Saved version ${a.version} of "${a.title}".`,
+            content: `${saved} ${await fileLanded(deps, ctx, a.id, input.shared_drive)}`,
             data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
