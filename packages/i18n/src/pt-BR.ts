@@ -1312,6 +1312,8 @@ export const ptBR = {
       routines: "O que os agentes fazem sozinhos, na hora marcada",
       calendar: "Reuniões e prazos da equipe",
       team: "Quem é quem: pessoas, agentes e seus grupos",
+      dashboards: "Números e gráficos que os agentes mantêm em dia",
+      taskManager: "O que cada agente está fazendo agora, e parar o que precisar",
     },
     customizeSidebar: "Personalizar a barra lateral",
     /** The sidebar's own menu (right click on its empty space), its headers' + and its rows' hover buttons. */
@@ -1331,7 +1333,6 @@ export const ptBR = {
       auto: "Quando tiver algo",
       autoHint: "Aparece quando tiver algo esperando você",
       reset: "Restaurar o padrão",
-      instant: "As mudanças valem na hora.",
       tools: "Ferramentas",
       toolsTitle: "No topo",
       order: "Ordem das seções",
@@ -1384,6 +1385,8 @@ export const ptBR = {
     threads: "Threads",
     routines: "Rotinas",
     team: "Equipe",
+    dashboards: "Painéis",
+    taskManager: "Gerenciador de tarefas",
     calendar: "Calendário",
     drive: "Drive",
     members: "Membros",
@@ -4022,7 +4025,6 @@ export const ptBR = {
     },
     highRisk: "Ação de alto risco",
     hold: "Segure para aprovar",
-    holding: "Segure…",
     holdLabel: "{{action}}: segure para confirmar",
     holdHint: "Segure o botão para aprovar. Ação de alto risco: um clique sozinho não basta.",
     holdNote: "Alto risco: segure o botão para confirmar.",
@@ -5777,6 +5779,16 @@ export const ptBR = {
     },
   },
   issues: {
+    delete: {
+      action: "Excluir tarefa",
+      title: "Excluir a tarefa #{{number}}?",
+      body: "Ela sai para todos, com a conversa e os arquivos da conversa.",
+      steps_one: "A etapa dela sai junto.",
+      steps_other: "As {{count}} etapas dela saem juntas.",
+      working: "{{name}} para o que está fazendo nela.",
+      confirm: "Excluir",
+      done: "Tarefa #{{number}} excluída.",
+    },
     assigneeFilter: "Responsável",
     priorityFilter: "Prioridade",
     title: "Tarefas",
@@ -10242,6 +10254,17 @@ export const ptBR = {
     namePlaceholder: "Ex.: Suporte",
     continueIn: "Continuar no {{name}}",
     continueInComposio: "Continuar na Composio",
+    /** Em Reconectar GitHub: o login dele só pergunta pelas organizações na primeira vez. */
+    githubOrgs: {
+      title: "Organizações que ele alcança",
+      none: "Nenhuma organização ainda.",
+      lead: "O GitHub só pergunta pelas organizações na primeira vez. Para liberar outra, abra a página do app lá e clique em Grant ao lado dela. Se você não for dono dela, o botão é Request e um dono aprova.",
+      open: "Liberar organizações no GitHub",
+      added: "Agora também: {{names}}.",
+      removed: "Não alcança mais: {{names}}.",
+      same: "Nada mudou nas organizações.",
+      failed: "Não deu para ler as organizações agora.",
+    },
     composioHelp:
       "Você entra na página da Composio, em inglês, e volta para cá. A permissão do {{name}} aparece como “Composio”.",
     or: "ou",
@@ -10781,6 +10804,7 @@ export const ptBR = {
   errors: {
     issue: {
       assigneeOutside: "Essa pessoa não está nesta conversa, então não vê esta tarefa.",
+      deleteForbidden: "Só quem criou esta tarefa ou um administrador pode excluir.",
     },
     connector: {
       labelTaken: "Já existe um conector com esse nome.",
@@ -14256,7 +14280,6 @@ export const ptBR = {
     title: "Gerenciador de tarefas",
     /** Under the title when no agent is working or waiting on you. */
     subtitle: "O que os agentes fazem agora e o que terminou hoje.",
-    nav: "Gerenciador",
     search: "Buscar tarefa, agente ou programa",
     working_one: "{{count}} trabalhando",
     working_other: "{{count}} trabalhando",
@@ -14412,7 +14435,6 @@ export const ptBR = {
       room: "Tem espaço",
       computers: "Computadores",
     },
-    navWhat: "O que cada agente está fazendo agora, e parar o que precisar",
     cards: { label: "Agentes", previous: "Agentes anteriores", next: "Mais agentes" },
     table: "Tarefas",
     noResults: "Nenhuma tarefa com essa busca.",
@@ -14618,8 +14640,6 @@ export const ptBR = {
   dashboards: {
     title: "Painéis",
     subtitle: "Números e gráficos que os agentes mantêm em dia.",
-    sidebar: "Painéis",
-    navWhat: "Números e gráficos que os agentes mantêm em dia",
     new: "Novo painel",
     back: "Painéis",
     home: "Meu Início",

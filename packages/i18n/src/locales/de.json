@@ -1327,7 +1327,9 @@
       "drive": "Dateien, Berichte und Tabellen",
       "routines": "Was Agenten selbst erledigen, pünktlich",
       "calendar": "Meetings und Fristen",
-      "team": "Wer ist wer: Personen, Agenten und ihre Gruppen"
+      "team": "Wer ist wer: Personen, Agenten und ihre Gruppen",
+      "dashboards": "Zahlen und Diagramme, die die Agenten aktuell halten",
+      "taskManager": "Was jeder Agent gerade tut, und stoppen, was nötig ist"
     },
     "customizeSidebar": "Seitenleiste anpassen",
     "sidebarMenu": {
@@ -1346,7 +1348,6 @@
       "auto": "Wenn etwas da ist",
       "autoHint": "Erscheint, wenn etwas auf dich wartet",
       "reset": "Auf Standard zurücksetzen",
-      "instant": "Änderungen gelten sofort.",
       "tools": "Tools",
       "toolsTitle": "Oben",
       "order": "Reihenfolge der Bereiche",
@@ -1398,6 +1399,8 @@
     "threads": "Threads",
     "routines": "Routinen",
     "team": "Team",
+    "dashboards": "Dashboards",
+    "taskManager": "Task-Manager",
     "calendar": "Kalender",
     "drive": "Drive",
     "members": "Mitglieder",
@@ -3963,7 +3966,6 @@
     },
     "highRisk": "Riskante Aktion",
     "hold": "Zum Freigeben halten",
-    "holding": "Halten…",
     "holdLabel": "{{action}}: zum Bestätigen halten",
     "holdHint": "Halte die Taste gedrückt, um freizugeben. Riskante Aktion: Ein einfacher Klick reicht nicht.",
     "holdNote": "Hohes Risiko: Halte die Taste gedrückt, um zu bestätigen.",
@@ -5701,6 +5703,16 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "Aufgabe löschen",
+      "title": "Aufgabe #{{number}} löschen?",
+      "body": "Sie verschwindet für alle, mit ihrem Gespräch und dessen Dateien.",
+      "steps_one": "Ihr Schritt verschwindet mit.",
+      "steps_other": "Ihre {{count}} Schritte verschwinden mit.",
+      "working": "{{name}} hört mit der Arbeit daran auf.",
+      "confirm": "Löschen",
+      "done": "Aufgabe #{{number}} gelöscht."
+    },
     "assigneeFilter": "Zuständig",
     "priorityFilter": "Priorität",
     "title": "Aufgaben",
@@ -10451,6 +10463,16 @@
     "namePlaceholder": "Z. B. Support",
     "continueIn": "Weiter bei {{name}}",
     "continueInComposio": "Weiter bei Composio",
+    "githubOrgs": {
+      "title": "Erreichte Organisationen",
+      "none": "Noch keine Organisation.",
+      "lead": "GitHub fragt nur beim ersten Mal nach Organisationen. Um eine weitere freizugeben, öffne dort die Seite der App und klicke daneben auf Grant. Wenn sie dir nicht gehört, steht dort Request und ein Inhaber bestätigt es.",
+      "open": "Organisationen auf GitHub freigeben",
+      "added": "Jetzt auch: {{names}}.",
+      "removed": "Nicht mehr: {{names}}.",
+      "same": "Bei den Organisationen hat sich nichts geändert.",
+      "failed": "Die Organisationen konnten gerade nicht gelesen werden."
+    },
     "composioHelp": "Du meldest dich auf der Seite von Composio an, auf Englisch, und kommst hierher zurück. {{name}} zeigt die Berechtigung als „Composio“ an.",
     "or": "oder",
     "withKey": "Mit einem API-Schlüssel verbinden",
@@ -11052,7 +11074,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Diese Person ist nicht in dieser Unterhaltung und sieht diese Aufgabe deshalb nicht."
+      "assigneeOutside": "Diese Person ist nicht in dieser Unterhaltung und sieht diese Aufgabe deshalb nicht.",
+      "deleteForbidden": "Nur wer diese Aufgabe erstellt hat oder ein Administrator kann sie löschen."
     },
     "connector": {
       "labelTaken": "Ein anderer Konnektor hat schon diesen Namen.",
@@ -14278,7 +14301,6 @@
   "taskManager": {
     "title": "Task-Manager",
     "subtitle": "Was die Agenten gerade tun und was heute fertig wurde.",
-    "nav": "Task-Manager",
     "search": "Aufgabe, Agent oder App suchen",
     "working_one": "{{count}} in Arbeit",
     "working_other": "{{count}} in Arbeit",
@@ -14434,7 +14456,6 @@
       "room": "Hat Platz",
       "computers": "Computer"
     },
-    "navWhat": "Was jeder Agent gerade tut, und stoppen, was nötig ist",
     "cards": {
       "label": "Agenten",
       "previous": "Vorherige Agenten",
@@ -14673,8 +14694,6 @@
   "dashboards": {
     "title": "Dashboards",
     "subtitle": "Zahlen und Diagramme, die die Agenten aktuell halten.",
-    "sidebar": "Dashboards",
-    "navWhat": "Zahlen und Diagramme, die die Agenten aktuell halten",
     "new": "Neues Dashboard",
     "back": "Dashboards",
     "home": "Mein Start",

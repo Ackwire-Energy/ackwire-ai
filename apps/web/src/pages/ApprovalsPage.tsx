@@ -685,6 +685,7 @@ export function HoldToApprove({
   const toast = useToast();
   const [holding, setHolding] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const held = useRef(false);
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -708,9 +709,11 @@ export function HoldToApprove({
     );
   const start = (el: HTMLElement) => {
     if (timer.current || pending) return;
+    held.current = false;
     setHolding(true);
     timer.current = setTimeout(() => {
       timer.current = null;
+      held.current = true;
       setHolding(false);
       onGo(el);
     }, 1100);
@@ -734,11 +737,17 @@ export function HoldToApprove({
       loading={pending}
       onPointerDown={(e: PointerEvent<HTMLButtonElement>) => {
         if (e.button > 0) return;
+        // The press is the button's until it ends: a hand that drifts past the edge is still holding.
+        e.currentTarget.setPointerCapture(e.pointerId);
         start(e.currentTarget);
       }}
       onPointerUp={stop}
-      onPointerLeave={stop}
       onPointerCancel={stop}
+      onLostPointerCapture={stop}
+      onContextMenu={(e) => {
+        // A finger's long press would open the menu and cancel the hold.
+        if (timer.current) e.preventDefault();
+      }}
       onKeyDown={(e: KeyboardEvent<HTMLButtonElement>) => {
         if ((e.key === " " || e.key === "Enter") && !e.repeat) {
           e.preventDefault();
@@ -749,11 +758,13 @@ export function HoldToApprove({
         if (e.key === " " || e.key === "Enter") stop();
       }}
       onClick={(e) => {
-        // A plain click (no hold) only explains.
-        if (e.detail > 0 && !timer.current && !pending) toast.show(t("approvals.holdHint"), "info");
+        // A plain click (no hold) only explains; the click that ends a finished hold says nothing.
+        if (e.detail > 0 && !held.current && !timer.current && !pending) toast.show(t("approvals.holdHint"), "info");
+        held.current = false;
       }}
     >
-      {holding ? t("approvals.holding") : t("approvals.hold")}
+      {/* One label: a shorter one while held would shrink the button out from under the pointer. */}
+      {t("approvals.hold")}
     </Button>
   );
 }

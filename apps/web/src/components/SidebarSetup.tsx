@@ -45,6 +45,8 @@ export const SIDEBAR_TOOLS = {
   routines: { to: "/org/$orgId/routines", icon: "routines" },
   calendar: { to: "/org/$orgId/calendar", icon: "calendar" },
   team: { to: "/org/$orgId/team", icon: "agent" },
+  dashboards: { to: "/org/$orgId/dashboards", icon: "chart" },
+  taskManager: { to: "/org/$orgId/task-manager", icon: "stageProgress" },
 } as const satisfies Record<SidebarItem, { to: string; icon: IconName }>;
 
 /**
@@ -175,7 +177,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
       title={t("shell.customizeSidebar")}
       description={t("shell.sidebarSetup.description")}
       closeLabel={t("common.close")}
-      width={520}
+      width={640}
     >
       <DialogBody>
         <ul className="sidebar-setup">
@@ -246,7 +248,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
           ))}
         </ol>
       </DialogBody>
-      <DialogFooter note={t("shell.sidebarSetup.instant")}>
+      <DialogFooter>
         <Button
           variant="ghost"
           icon="undo"

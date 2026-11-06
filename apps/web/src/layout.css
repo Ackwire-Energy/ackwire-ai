@@ -4540,6 +4540,29 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
 .cflow__text {
   margin: 0;
 }
+/* Reconectar GitHub: the organizations it reaches, the words and the way to GitHub's page, one under the other. */
+.cflow__orgs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.cflow__orgs > p {
+  margin: 0;
+}
+.cflow__orgs-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+.cflow__orgs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .cflow__oauth {
   height: auto;
   min-height: var(--control-h-md);
@@ -12145,7 +12168,8 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
 /* "Personalizar a barra lateral": a line per tool, the choices of every line starting in one column. */
 .sidebar-setup {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  /* Icon, name, choices, the two arrows. A long name wraps before the row does. */
+  grid-template-columns: auto minmax(0, max-content) 1fr auto auto;
   column-gap: 12px;
   margin: 0;
   padding: 0;
@@ -12169,14 +12193,15 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
 .sidebar-setup__row > .ac-seg {
   justify-self: start;
 }
-/* No room beside the name on a phone: the choices go under it. */
-@media (max-width: 560px) {
+/* No room beside the name on a phone: the arrows stay on its line, the choices go under it. */
+@media (max-width: 680px) {
   .sidebar-setup {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto 1fr auto auto;
     row-gap: 8px;
   }
   .sidebar-setup__row > .ac-seg {
-    grid-column: 2;
+    grid-row: 2;
+    grid-column: 2 / -1;
   }
 }
 /* Phones and touch screens keep the taller rows a finger hits, and the Go to… field and its toggle at 40px. */

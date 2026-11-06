@@ -117,7 +117,6 @@
     "refuse": "Weigeren",
     "approve": "Goedkeuren",
     "hold": "Ingedrukt houden om goed te keuren",
-    "holding": "Blijf vasthouden…",
     "holdNote": "Hoog risico: houd de knop een seconde ingedrukt.",
     "tapNote": "Goedkeuren voert het meteen uit.",
     "tapNoteAhead": "Nu goedkeuren geldt voor {{when}}.",
@@ -988,8 +987,7 @@
     "addPasswordFirst": "Voeg eerst op de website een wachtwoord toe aan je account en typ het dan hier.",
     "addPasswordWeb": "Een wachtwoord toevoegen op de website",
     "otherAccount": "Je bent ingelogd op een ander account. Er is niets verwijderd.",
-    "hold": "Ingedrukt houden om te verwijderen",
-    "holding": "Blijf vasthouden…"
+    "hold": "Ingedrukt houden om te verwijderen"
   },
   "files": {
     "type": {

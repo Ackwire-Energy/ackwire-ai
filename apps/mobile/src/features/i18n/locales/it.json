@@ -123,7 +123,6 @@
     "refuse": "Rifiuta",
     "approve": "Approva",
     "hold": "Tieni premuto per approvare",
-    "holding": "Continua a tenere premuto…",
     "holdNote": "Rischio alto: tieni premuto il pulsante per un secondo.",
     "tapNote": "Approvando, lo fa subito.",
     "tapNoteAhead": "Approvando ora copri {{when}}.",
@@ -1059,8 +1058,7 @@
     "addPasswordFirst": "Prima aggiungi una password al tuo account sul sito, poi scrivila qui.",
     "addPasswordWeb": "Aggiungi una password sul sito",
     "otherAccount": "Hai fatto l'accesso con un altro account. Non è stato eliminato nulla.",
-    "hold": "Tieni premuto per eliminare",
-    "holding": "Continua a tenere premuto…"
+    "hold": "Tieni premuto per eliminare"
   },
   "files": {
     "type": {

@@ -111,7 +111,6 @@
     "refuse": "거절",
     "approve": "승인",
     "hold": "길게 눌러 승인",
-    "holding": "계속 누르고 있어요…",
     "holdNote": "위험도 높음: 버튼을 1초 동안 누르고 있어 주세요.",
     "tapNote": "승인하면 바로 실행돼요.",
     "tapNoteAhead": "지금 승인하면 {{when}}에 실행돼요.",
@@ -917,8 +916,7 @@
     "addPasswordFirst": "먼저 웹사이트에서 계정에 비밀번호를 추가한 다음 여기에 입력하세요.",
     "addPasswordWeb": "웹사이트에서 비밀번호 추가",
     "otherAccount": "다른 계정으로 로그인했어요. 아무것도 삭제되지 않았어요.",
-    "hold": "길게 눌러 삭제",
-    "holding": "계속 누르고 있어요…"
+    "hold": "길게 눌러 삭제"
   },
   "files": {
     "type": {

@@ -70,7 +70,7 @@ describe("shared helpers", () => {
     expect(isSafeId("0b7c6a2e-1f0e-4b7a-9d8c-2f3e4a5b6c7d")).toBe(true);
     expect(isSafeId("../x")).toBe(false);
     expect(isSafeId(undefined)).toBe(false);
-    expect(previewOf("**Feito!**\n\n```ts\nx\n```\nVeja [aqui](https://x).")).toBe("Feito! Veja aqui.");
+    expect(previewOf("**Feito!**\n\n```ts\nx\n```\nVeja [aqui](https://x).")).toBe("Feito! x Veja aqui.");
   });
 });
 

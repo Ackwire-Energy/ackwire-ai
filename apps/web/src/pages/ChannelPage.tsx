@@ -119,7 +119,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
-import { hasWideBlock } from "@agenteschat/client/lib/markdown";
+import { hasWideBlock, plainLine } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText, textOrMedia } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
@@ -3955,7 +3955,7 @@ export const TimelineMessage = memo(function TimelineMessage({
     return {
       author: dir.authorName(found.author),
       mine: found.author.type === "person" && found.author.id === me.user.id,
-      text: textOrMedia(t, found.body, found.meta),
+      text: plainLine(textOrMedia(t, found.body, found.meta)),
     };
   };
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.

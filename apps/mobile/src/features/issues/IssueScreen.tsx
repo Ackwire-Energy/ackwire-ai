@@ -15,7 +15,14 @@ import {
 import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
-import { conversationLine, isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
+import {
+  canDeleteIssue,
+  conversationLine,
+  deleteIssueText,
+  isOpen,
+  PRIORITIES,
+  STATUSES,
+} from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -32,6 +39,7 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
 import {
   Button,
   Chip,
@@ -48,6 +56,7 @@ import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";
 import { chatHref } from "../links/logic";
+import { confirmAction } from "../settings/parts";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -693,6 +702,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
   const qc = useQueryClient();
   const dir = useDirectory();
   const meId = useMeId();
+  const { org } = useOrg();
   const action = useIssueAction(orgId);
   const columns = useIssueColumns(orgId);
   const columnLabel = useColumnLabel();
@@ -833,6 +843,34 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
           { type: "update", id: i.id, patch: { status: "canceled" } },
           t("mobile.issues.actions.canceled", { number: i.number }),
         ),
+    });
+  if (canDeleteIssue(org, i, meId))
+    items.push({
+      key: "delete",
+      icon: "trash",
+      danger: true,
+      label: t("issues.delete.action"),
+      onPress: () => {
+        sheet.close();
+        const working = i.work && i.work.state !== "stalled" && i.assignee ? dir.nameOf(i.assignee) : null;
+        confirmAction({
+          title: t("issues.delete.title", { number: i.number }),
+          text: deleteIssueText(t, i, working),
+          action: t("issues.delete.confirm"),
+          cancel: t("common.cancel"),
+          onConfirm: () =>
+            action.mutate(
+              { type: "delete", id: i.id },
+              {
+                onSuccess: () => {
+                  toast({ title: t("issues.delete.done", { number: i.number }) });
+                  router.back();
+                },
+                onError: failed,
+              },
+            ),
+        });
+      },
     });
   return <ActionList items={items} />;
 }

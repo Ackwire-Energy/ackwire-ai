@@ -1327,7 +1327,9 @@
       "drive": "Dosyalar, raporlar ve tablolar",
       "routines": "Ajanların zamanında kendi başlarına yaptıkları",
       "calendar": "Toplantılar ve son tarihler",
-      "team": "Kim kimdir: kişiler, ajanlar ve grupları"
+      "team": "Kim kimdir: kişiler, ajanlar ve grupları",
+      "dashboards": "Ajanların güncel tuttuğu sayılar ve grafikler",
+      "taskManager": "Her ajanın şu an ne yaptığı ve gerekeni durdurma"
     },
     "customizeSidebar": "Kenar çubuğunu özelleştir",
     "sidebarMenu": {
@@ -1346,7 +1348,6 @@
       "auto": "Bir şey olduğunda",
       "autoHint": "Sizi bekleyen bir şey olduğunda görünür",
       "reset": "Varsayılana dön",
-      "instant": "Değişiklikler hemen uygulanır.",
       "tools": "Araçlar",
       "toolsTitle": "Üstte",
       "order": "Bölüm sırası",
@@ -1398,6 +1399,8 @@
     "threads": "İleti dizileri",
     "routines": "Rutinler",
     "team": "Ekip",
+    "dashboards": "Panolar",
+    "taskManager": "Görev yöneticisi",
     "calendar": "Takvim",
     "drive": "Drive",
     "members": "Üyeler",
@@ -3947,7 +3950,6 @@
     },
     "highRisk": "Yüksek riskli işlem",
     "hold": "Onaylamak için basılı tutun",
-    "holding": "Basılı tutun…",
     "holdLabel": "{{action}}: onaylamak için basılı tutun",
     "holdHint": "Onaylamak için düğmeyi basılı tutun. Yüksek riskli işlem: tek tıklama yetmez.",
     "holdNote": "Yüksek risk: onaylamak için düğmeyi basılı tutun.",
@@ -5662,6 +5664,16 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "Görevi sil",
+      "title": "#{{number}} görevi silinsin mi?",
+      "body": "Sohbeti ve sohbetin dosyalarıyla birlikte herkes için silinir.",
+      "steps_one": "Adımı da silinir.",
+      "steps_other": "{{count}} adımı da silinir.",
+      "working": "{{name}} bu görev üzerindeki işini bırakır.",
+      "confirm": "Sil",
+      "done": "#{{number}} görevi silindi."
+    },
     "assigneeFilter": "Atanan",
     "priorityFilter": "Öncelik",
     "title": "Görevler",
@@ -10387,6 +10399,16 @@
     "namePlaceholder": "Örn. Destek",
     "continueIn": "{{name}} ile devam et",
     "continueInComposio": "Composio ile devam et",
+    "githubOrgs": {
+      "title": "Erişilen kuruluşlar",
+      "none": "Henüz kuruluş yok.",
+      "lead": "GitHub kuruluşları yalnızca ilk seferde sorar. Başka bir tane eklemek için oradaki uygulama sayfasını açın ve yanındaki Grant düğmesine basın. Sahibi değilseniz düğmede Request yazar ve bir sahip onaylar.",
+      "open": "GitHub'da kuruluşlara izin ver",
+      "added": "Artık bunlar da var: {{names}}.",
+      "removed": "Artık yok: {{names}}.",
+      "same": "Kuruluşlarda bir şey değişmedi.",
+      "failed": "Kuruluşlar şu anda okunamadı."
+    },
     "composioHelp": "Composio sayfasında İngilizce olarak giriş yapıp buraya dönersiniz. {{name}} izni “Composio” olarak gösterir.",
     "or": "veya",
     "withKey": "API anahtarıyla bağla",
@@ -10988,7 +11010,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Bu kişi bu konuşmada değil, bu yüzden bu görevi göremez."
+      "assigneeOutside": "Bu kişi bu konuşmada değil, bu yüzden bu görevi göremez.",
+      "deleteForbidden": "Bu görevi yalnızca oluşturan kişi veya bir yönetici silebilir."
     },
     "connector": {
       "labelTaken": "Bu ad başka bir bağlayıcıda zaten var.",
@@ -14208,7 +14231,6 @@
   "taskManager": {
     "title": "Görev yöneticisi",
     "subtitle": "Ajanların şu an yaptıkları ve bugün bitenler.",
-    "nav": "Görev yöneticisi",
     "search": "Görev, ajan veya uygulama ara",
     "working_one": "{{count}} çalışıyor",
     "working_other": "{{count}} çalışıyor",
@@ -14364,7 +14386,6 @@
       "room": "Yer var",
       "computers": "Bilgisayarlar"
     },
-    "navWhat": "Her ajanın şu an ne yaptığı ve gerekeni durdurma",
     "cards": {
       "label": "Ajanlar",
       "previous": "Önceki ajanlar",
@@ -14603,8 +14624,6 @@
   "dashboards": {
     "title": "Panolar",
     "subtitle": "Ajanların güncel tuttuğu sayılar ve grafikler.",
-    "sidebar": "Panolar",
-    "navWhat": "Ajanların güncel tuttuğu sayılar ve grafikler",
     "new": "Yeni pano",
     "back": "Panolar",
     "home": "Ana sayfam",

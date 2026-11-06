@@ -1291,7 +1291,9 @@
       "drive": "ファイル、レポート、表",
       "routines": "エージェントが時間どおりに自動で行うこと",
       "calendar": "会議と締め切り",
-      "team": "誰が誰か：メンバー、エージェント、そのグループ"
+      "team": "誰が誰か：メンバー、エージェント、そのグループ",
+      "dashboards": "エージェントが最新に保つ数値やグラフ",
+      "taskManager": "各エージェントが今していることを見て、必要なものを停止できます"
     },
     "customizeSidebar": "サイドバーをカスタマイズ",
     "sidebarMenu": {
@@ -1310,7 +1312,6 @@
       "auto": "何かあるとき",
       "autoHint": "あなたを待っているものがあるときに表示されます",
       "reset": "デフォルトに戻す",
-      "instant": "変更はすぐに反映されます。",
       "tools": "ツール",
       "toolsTitle": "上部",
       "order": "セクションの順序",
@@ -1360,6 +1361,8 @@
     "threads": "スレッド",
     "routines": "ルーティン",
     "team": "チーム",
+    "dashboards": "ダッシュボード",
+    "taskManager": "タスクマネージャー",
     "calendar": "カレンダー",
     "drive": "Drive",
     "members": "メンバー",
@@ -3808,7 +3811,6 @@
     },
     "highRisk": "高リスクの操作",
     "hold": "長押しで承認",
-    "holding": "押し続けて…",
     "holdLabel": "{{action}}: 長押しで確定",
     "holdHint": "ボタンを長押しして承認してください。高リスクの操作のため、1回のクリックでは承認できません。",
     "holdNote": "高リスク: ボタンを長押しして確定してください。",
@@ -5483,6 +5485,15 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "タスクを削除",
+      "title": "タスク #{{number}} を削除しますか？",
+      "body": "会話と会話内のファイルも含めて、全員の画面から消えます。",
+      "steps_other": "{{count}} 件のステップも一緒に消えます。",
+      "working": "{{name}}はこのタスクの作業をやめます。",
+      "confirm": "削除",
+      "done": "タスク #{{number}} を削除しました。"
+    },
     "assigneeFilter": "担当者",
     "priorityFilter": "優先度",
     "title": "タスク",
@@ -10028,6 +10039,16 @@
     "namePlaceholder": "例: サポート",
     "continueIn": "{{name}}で続ける",
     "continueInComposio": "Composioで続ける",
+    "githubOrgs": {
+      "title": "届いている組織",
+      "none": "組織はまだありません。",
+      "lead": "GitHub が組織を確認するのは最初の一度だけです。追加するには、GitHub でアプリのページを開き、組織の横の Grant を押してください。オーナーでない場合、ボタンは Request になり、オーナーが承認します。",
+      "open": "GitHub で組織を許可",
+      "added": "新しく追加: {{names}}。",
+      "removed": "届かなくなった組織: {{names}}。",
+      "same": "組織に変更はありません。",
+      "failed": "今は組織を読み取れませんでした。"
+    },
     "composioHelp": "Composioのページ（英語）でログインして、ここに戻ってきます。{{name}}では権限が「Composio」と表示されます。",
     "or": "または",
     "withKey": "APIキーで接続",
@@ -10613,7 +10634,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "この人はこの会話に参加していないため、このタスクを見ることができません。"
+      "assigneeOutside": "この人はこの会話に参加していないため、このタスクを見ることができません。",
+      "deleteForbidden": "このタスクを削除できるのは作成者か管理者だけです。"
     },
     "connector": {
       "labelTaken": "この名前はすでに別のコネクタで使われています。",
@@ -13789,7 +13811,6 @@
   "taskManager": {
     "title": "タスクマネージャー",
     "subtitle": "エージェントが今していることと、今日終わったこと。",
-    "nav": "タスクマネージャー",
     "search": "タスク、エージェント、アプリを検索",
     "working_other": "{{count}}件作業中",
     "waiting_other": "{{count}}件があなたの対応待ち",
@@ -13932,7 +13953,6 @@
       "room": "空きあり",
       "computers": "コンピューター"
     },
-    "navWhat": "各エージェントが今していることを見て、必要なものを停止できます",
     "cards": {
       "label": "エージェント",
       "previous": "前のエージェント",
@@ -14169,8 +14189,6 @@
   "dashboards": {
     "title": "ダッシュボード",
     "subtitle": "エージェントが最新に保つ数値やグラフ。",
-    "sidebar": "ダッシュボード",
-    "navWhat": "エージェントが最新に保つ数値やグラフ",
     "new": "新しいダッシュボード",
     "back": "ダッシュボード",
     "home": "マイホーム",

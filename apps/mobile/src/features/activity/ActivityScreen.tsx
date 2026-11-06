@@ -335,12 +335,7 @@ function ApproveHere({ approval: a }: { approval: Approval }) {
     <AskButtons
       primary={
         high ? (
-          <HoldButton
-            size="card"
-            label={t("mobile.approval.hold")}
-            holdLabel={t("mobile.approval.holding")}
-            onConfirm={() => approve()}
-          />
+          <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
         ) : (
           <Button
             variant="primary"

@@ -52,6 +52,7 @@ import { inPlaceClick } from "@/lib/navigate";
 import { useOpenParam } from "@/lib/open-param";
 import { type ToastText, useToast } from "@/lib/toast";
 import { AddColumnDialog, Board, type CardState, type IssueGroup, useMoveIssue, usePatchIssue } from "./IssueBoard";
+import { IssueDeleteProvider, useIssueDeleting } from "./IssueDelete";
 import { IssueDialog } from "./IssuePage";
 import { DisplayButton, IssueFilters, PRIORITY_ICON } from "./IssuesToolbar";
 import { type CardMove, type DropResult, type IssueDrag, useIssueDrag } from "./issue-drag";
@@ -124,148 +125,155 @@ export function IssuesPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [posts]);
   return (
-    <div className="page issues">
-      <div className="issues__main">
-        <PageHeader
-          className="issues-head"
-          title={t("issues.title")}
-          meta={
-            <>
-              <span>
-                {t("issues.summary", {
-                  open: open.length,
-                  agents: open.filter((i) => i.assignee?.type === "agent").length,
-                })}
-              </span>
-              {open.some((i) => !i.assignee) && (
-                <span> · {t("issues.unassigned", { count: open.filter((i) => !i.assignee).length })}</span>
-              )}
-            </>
-          }
-          actions={
-            // The empty state takes over this button: one way in, in the middle of the page.
-            !noIssues &&
-            posts && (
-              <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
-                {t("issues.new")}
-              </Button>
-            )
-          }
-        />
-        <WorkingNow issues={all} onOpen={toggle} />
-        <Toolbar
-          label={t("issues.filters")}
-          search={
-            <SearchField
-              ref={searchRef}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onClear={() => setQ("")}
-              clearLabel={copy.clearSearch}
-              placeholder={t("issues.search")}
-              aria-label={t("issues.search")}
-              shortcut={<Kbd aria-hidden="true">/</Kbd>}
-            />
-          }
-          actions={
-            <span className="issues-tools">
-              <DisplayButton view={view} onChange={changeView} />
-              {view.group === "stage" && (
-                <Menu
-                  align="end"
-                  label={t("issues.moreOptions")}
-                  trigger={<Button size="sm" iconOnly icon="more" aria-label={t("issues.moreOptions")} />}
-                >
-                  <MenuItem icon="layers" onSelect={() => setAddingColumn(true)} disabled={!columns}>
-                    {t("issues.columns.add")}
-                  </MenuItem>
-                </Menu>
-              )}
-            </span>
-          }
-        >
-          <IssueFilters view={view} issues={all} onChange={changeView} />
-        </Toolbar>
-        {(issues.isLoading || viewLoading || (!columns && columnsQuery.isLoading)) &&
-          (view.layout === "board" ? (
-            <div className="issues-board">
-              {BOARD.map((status) => (
-                <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
-                  <div className="issues-col__head">
-                    <h2>{t(`issues.status.${status}`)}</h2>
-                  </div>
-                  <LoadingCards count={2} className="loading-cards loading-cards--tight" />
-                </section>
-              ))}
-            </div>
-          ) : (
-            <LoadingList count={5} avatar={false} trailing />
-          ))}
-        {issues.isError && !issues.data && <ErrorState error={issues.error} onRetry={() => void issues.refetch()} />}
-        {noIssues && (
-          <EmptyState
-            size="page"
-            agent={look}
-            title={t(posts ? "issues.emptyTitle" : "issues.emptyViewerTitle")}
+    <IssueDeleteProvider onDeleted={() => setOpenParam(null)}>
+      <div className="page issues">
+        <div className="issues__main">
+          <PageHeader
+            className="issues-head"
+            title={t("issues.title")}
+            meta={
+              <>
+                <span>
+                  {t("issues.summary", {
+                    open: open.length,
+                    agents: open.filter((i) => i.assignee?.type === "agent").length,
+                  })}
+                </span>
+                {open.some((i) => !i.assignee) && (
+                  <span> · {t("issues.unassigned", { count: open.filter((i) => !i.assignee).length })}</span>
+                )}
+              </>
+            }
             actions={
+              // The empty state takes over this button: one way in, in the middle of the page.
+              !noIssues &&
               posts && (
-                <>
-                  <Button variant="primary" icon="plus" onClick={() => setCreating({ columnId: null })}>
-                    {t("issues.new")}
-                  </Button>
-                  <AskAgentButton draft={t("issues.askFirst")} />
-                </>
+                <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
+                  {t("issues.new")}
+                </Button>
               )
             }
-          >
-            {t(posts ? "issues.empty" : "issues.emptyViewer")}
-          </EmptyState>
-        )}
-        {issues.isSuccess && filtered.length === 0 && (all.length > 0 || search) && (
-          <EmptyState
-            size="panel"
+          />
+          <WorkingNow issues={all} onOpen={toggle} />
+          <Toolbar
+            label={t("issues.filters")}
+            search={
+              <SearchField
+                ref={searchRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onClear={() => setQ("")}
+                clearLabel={copy.clearSearch}
+                placeholder={t("issues.search")}
+                aria-label={t("issues.search")}
+                shortcut={<Kbd aria-hidden="true">/</Kbd>}
+              />
+            }
             actions={
-              <Button
-                onClick={() => {
-                  setQ("");
-                  changeView({ assignees: [], priorities: [] });
-                }}
-              >
-                {copy.clearAll}
-              </Button>
+              <span className="issues-tools">
+                <DisplayButton view={view} onChange={changeView} />
+                {view.group === "stage" && (
+                  <Menu
+                    align="end"
+                    label={t("issues.moreOptions")}
+                    trigger={<Button size="sm" iconOnly icon="more" aria-label={t("issues.moreOptions")} />}
+                  >
+                    <MenuItem icon="layers" onSelect={() => setAddingColumn(true)} disabled={!columns}>
+                      {t("issues.columns.add")}
+                    </MenuItem>
+                  </Menu>
+                )}
+              </span>
             }
           >
-            {t("issues.noResults")}
-          </EmptyState>
+            <IssueFilters view={view} issues={all} onChange={changeView} />
+          </Toolbar>
+          {(issues.isLoading || viewLoading || (!columns && columnsQuery.isLoading)) &&
+            (view.layout === "board" ? (
+              <div className="issues-board">
+                {BOARD.map((status) => (
+                  <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
+                    <div className="issues-col__head">
+                      <h2>{t(`issues.status.${status}`)}</h2>
+                    </div>
+                    <LoadingCards count={2} className="loading-cards loading-cards--tight" />
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <LoadingList count={5} avatar={false} trailing />
+            ))}
+          {issues.isError && !issues.data && <ErrorState error={issues.error} onRetry={() => void issues.refetch()} />}
+          {noIssues && (
+            <EmptyState
+              size="page"
+              agent={look}
+              title={t(posts ? "issues.emptyTitle" : "issues.emptyViewerTitle")}
+              actions={
+                posts && (
+                  <>
+                    <Button variant="primary" icon="plus" onClick={() => setCreating({ columnId: null })}>
+                      {t("issues.new")}
+                    </Button>
+                    <AskAgentButton draft={t("issues.askFirst")} />
+                  </>
+                )
+              }
+            >
+              {t(posts ? "issues.empty" : "issues.emptyViewer")}
+            </EmptyState>
+          )}
+          {issues.isSuccess && filtered.length === 0 && (all.length > 0 || search) && (
+            <EmptyState
+              size="panel"
+              actions={
+                <Button
+                  onClick={() => {
+                    setQ("");
+                    changeView({ assignees: [], priorities: [] });
+                  }}
+                >
+                  {copy.clearAll}
+                </Button>
+              }
+            >
+              {t("issues.noResults")}
+            </EmptyState>
+          )}
+          {columnsQuery.isError && !columns && (
+            <ErrorState error={columnsQuery.error} onRetry={() => void columnsQuery.refetch()} />
+          )}
+          {!viewLoading && filtered.length > 0 && columns && (
+            <IssuesBody
+              view={view}
+              columns={columns}
+              issues={filtered.filter((i) => view.showCanceled || i.status !== "canceled")}
+              all={all}
+              openNumber={openNumber}
+              onOpen={toggle}
+              onNew={(columnId) => setCreating({ columnId })}
+            />
+          )}
+        </div>
+        {opened && (
+          <IssueDialog issue={opened} focusMessageId={focusParam ?? undefined} onClose={() => setOpenParam(null)} />
         )}
-        {columnsQuery.isError && !columns && (
-          <ErrorState error={columnsQuery.error} onRetry={() => void columnsQuery.refetch()} />
-        )}
-        {!viewLoading && filtered.length > 0 && columns && (
-          <IssuesBody
-            view={view}
+        <NewIssueDialog
+          open={creating !== false}
+          columnId={creating ? creating.columnId : null}
+          columns={columns ?? []}
+          onClose={() => setCreating(false)}
+        />
+        {columns && (
+          <AddColumnDialog
+            open={addingColumn}
+            afterId={null}
             columns={columns}
-            issues={filtered.filter((i) => view.showCanceled || i.status !== "canceled")}
-            all={all}
-            openNumber={openNumber}
-            onOpen={toggle}
-            onNew={(columnId) => setCreating({ columnId })}
+            onClose={() => setAddingColumn(false)}
           />
         )}
       </div>
-      {opened && (
-        <IssueDialog issue={opened} focusMessageId={focusParam ?? undefined} onClose={() => setOpenParam(null)} />
-      )}
-      <NewIssueDialog
-        open={creating !== false}
-        columnId={creating ? creating.columnId : null}
-        columns={columns ?? []}
-        onClose={() => setCreating(false)}
-      />
-      {columns && (
-        <AddColumnDialog open={addingColumn} afterId={null} columns={columns} onClose={() => setAddingColumn(false)} />
-      )}
-    </div>
+    </IssueDeleteProvider>
   );
 }
 
@@ -621,12 +629,13 @@ function WhoLine({ issue: i }: { issue: Issue }) {
   );
 }
 
-/** An issue's right click (board card, list row): open beside the list, open its page, copy its link. */
+/** An issue's right click (board card, list row): open beside the list, open its page, copy its link, delete it. */
 function useIssueMenu() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const navigate = useNavigate();
   const toast = useToast();
+  const { ask, mayDelete } = useIssueDeleting();
   return (i: Issue, onOpen: () => void) =>
     entityMenu(() => [
       { kind: "header", label: `#${i.number} ${i.title}` },
@@ -650,6 +659,19 @@ function useIssueMenu() {
             toast.show(t("contextMenu.linkCopied")),
           ),
       },
+      ...(mayDelete(i)
+        ? ([
+            { kind: "separator" },
+            {
+              kind: "item",
+              id: "delete",
+              label: t("issues.delete.action"),
+              icon: "trash",
+              danger: true,
+              run: () => ask(i),
+            },
+          ] as const)
+        : []),
     ]);
 }
 

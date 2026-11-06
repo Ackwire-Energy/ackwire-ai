@@ -1363,7 +1363,9 @@
       "drive": "Archivos, informes y tablas",
       "routines": "Lo que los agentes hacen solos, a su hora",
       "calendar": "Reuniones y plazos",
-      "team": "Quién es quién: personas, agentes y sus grupos"
+      "team": "Quién es quién: personas, agentes y sus grupos",
+      "dashboards": "Números y gráficos que los agentes mantienen al día",
+      "taskManager": "Lo que cada agente está haciendo ahora, y detener lo que necesites"
     },
     "customizeSidebar": "Personalizar la barra lateral",
     "sidebarMenu": {
@@ -1382,7 +1384,6 @@
       "auto": "Cuando hay algo",
       "autoHint": "Aparece cuando algo te espera",
       "reset": "Restablecer",
-      "instant": "Los cambios se aplican al instante.",
       "tools": "Herramientas",
       "toolsTitle": "Arriba",
       "order": "Orden de las secciones",
@@ -1436,6 +1437,8 @@
     "threads": "Hilos",
     "routines": "Rutinas",
     "team": "Equipo",
+    "dashboards": "Paneles",
+    "taskManager": "Gestor de tareas",
     "calendar": "Calendario",
     "drive": "Drive",
     "members": "Miembros",
@@ -4086,7 +4089,6 @@
     },
     "highRisk": "Acción de alto riesgo",
     "hold": "Mantén presionado para aprobar",
-    "holding": "Mantén…",
     "holdLabel": "{{action}}: mantén presionado para confirmar",
     "holdHint": "Mantén presionado el botón para aprobar. Acción de alto riesgo: un solo clic no alcanza.",
     "holdNote": "Alto riesgo: mantén presionado el botón para confirmar.",
@@ -5857,6 +5859,17 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "Eliminar tarea",
+      "title": "¿Eliminar la tarea #{{number}}?",
+      "body": "Desaparece para todos, con su conversación y los archivos de la conversación.",
+      "steps_one": "Su paso también se va.",
+      "steps_many": "Sus {{count}} pasos también se van.",
+      "steps_other": "Sus {{count}} pasos también se van.",
+      "working": "{{name}} deja lo que está haciendo en ella.",
+      "confirm": "Eliminar",
+      "done": "Tarea #{{number}} eliminada."
+    },
     "assigneeFilter": "Responsable",
     "priorityFilter": "Prioridad",
     "title": "Tareas",
@@ -10791,6 +10804,16 @@
     "namePlaceholder": "Ej.: Soporte",
     "continueIn": "Continuar en {{name}}",
     "continueInComposio": "Continuar en Composio",
+    "githubOrgs": {
+      "title": "Organizaciones a las que llega",
+      "none": "Ninguna organización todavía.",
+      "lead": "GitHub solo pregunta por las organizaciones la primera vez. Para añadir otra, abre allí la página de la app y pulsa Grant a su lado. Si no eres propietario, el botón dice Request y un propietario lo aprueba.",
+      "open": "Autorizar organizaciones en GitHub",
+      "added": "Ahora también: {{names}}.",
+      "removed": "Ya no: {{names}}.",
+      "same": "Nada cambió en las organizaciones.",
+      "failed": "No se pudieron leer las organizaciones ahora."
+    },
     "composioHelp": "Inicias sesión en la página de Composio, en inglés, y vuelves aquí. {{name}} muestra el permiso como “Composio”.",
     "or": "o",
     "withKey": "Conectar con una clave de API",
@@ -11408,7 +11431,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Esta persona no está en esta conversación, así que no ve esta tarea."
+      "assigneeOutside": "Esta persona no está en esta conversación, así que no ve esta tarea.",
+      "deleteForbidden": "Solo quien creó esta tarea o un administrador puede eliminarla."
     },
     "connector": {
       "labelTaken": "Otro conector ya tiene este nombre.",
@@ -14732,7 +14756,6 @@
   "taskManager": {
     "title": "Gestor de tareas",
     "subtitle": "Lo que los agentes hacen ahora y lo que terminó hoy.",
-    "nav": "Gestor de tareas",
     "search": "Busca una tarea, agente o app",
     "working_one": "{{count}} trabajando",
     "working_many": "{{count}} trabajando",
@@ -14901,7 +14924,6 @@
       "room": "Tiene espacio",
       "computers": "Computadoras"
     },
-    "navWhat": "Lo que cada agente está haciendo ahora, y detener lo que necesites",
     "cards": {
       "label": "Agentes",
       "previous": "Agentes anteriores",
@@ -15142,8 +15164,6 @@
   "dashboards": {
     "title": "Paneles",
     "subtitle": "Números y gráficos que los agentes mantienen al día.",
-    "sidebar": "Paneles",
-    "navWhat": "Números y gráficos que los agentes mantienen al día",
     "new": "Nuevo panel",
     "back": "Paneles",
     "home": "Mi inicio",

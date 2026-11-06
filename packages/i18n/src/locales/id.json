@@ -1291,7 +1291,9 @@
       "drive": "File, laporan, dan tabel",
       "routines": "Yang dikerjakan agen sendiri, tepat waktu",
       "calendar": "Rapat dan tenggat",
-      "team": "Siapa siapa: orang, agen, dan grupnya"
+      "team": "Siapa siapa: orang, agen, dan grupnya",
+      "dashboards": "Angka dan grafik yang dijaga tetap terbaru oleh agen",
+      "taskManager": "Apa yang sedang dikerjakan tiap agen, dan hentikan yang perlu"
     },
     "customizeSidebar": "Sesuaikan sidebar",
     "sidebarMenu": {
@@ -1310,7 +1312,6 @@
       "auto": "Saat ada sesuatu",
       "autoHint": "Muncul saat ada yang menunggumu",
       "reset": "Kembalikan ke default",
-      "instant": "Perubahan langsung berlaku.",
       "tools": "Alat",
       "toolsTitle": "Di atas",
       "order": "Urutan bagian",
@@ -1360,6 +1361,8 @@
     "threads": "Utas",
     "routines": "Rutinitas",
     "team": "Tim",
+    "dashboards": "Dasbor",
+    "taskManager": "Pengelola tugas",
     "calendar": "Kalender",
     "drive": "Drive",
     "members": "Anggota",
@@ -3823,7 +3826,6 @@
     },
     "highRisk": "Tindakan berisiko tinggi",
     "hold": "Tahan untuk menyetujui",
-    "holding": "Tahan…",
     "holdLabel": "{{action}}: tahan untuk mengonfirmasi",
     "holdHint": "Tahan tombolnya untuk menyetujui. Tindakan berisiko tinggi: satu klik saja tidak cukup.",
     "holdNote": "Risiko tinggi: tahan tombolnya untuk mengonfirmasi.",
@@ -5511,6 +5513,15 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "Hapus tugas",
+      "title": "Hapus tugas #{{number}}?",
+      "body": "Tugas ini hilang untuk semua orang, beserta percakapan dan file percakapannya.",
+      "steps_other": "{{count}} langkahnya ikut hilang.",
+      "working": "{{name}} berhenti mengerjakannya.",
+      "confirm": "Hapus",
+      "done": "Tugas #{{number}} dihapus."
+    },
     "assigneeFilter": "Penanggung jawab",
     "priorityFilter": "Prioritas",
     "title": "Tugas",
@@ -10082,6 +10093,16 @@
     "namePlaceholder": "Mis. Dukungan",
     "continueIn": "Lanjutkan di {{name}}",
     "continueInComposio": "Lanjutkan di Composio",
+    "githubOrgs": {
+      "title": "Organisasi yang terjangkau",
+      "none": "Belum ada organisasi.",
+      "lead": "GitHub hanya menanyakan organisasi pada kali pertama. Untuk menambahkan yang lain, buka halaman aplikasi di sana dan tekan Grant di sampingnya. Jika Anda bukan pemiliknya, tombolnya bertuliskan Request dan pemilik yang menyetujui.",
+      "open": "Izinkan organisasi di GitHub",
+      "added": "Sekarang juga: {{names}}.",
+      "removed": "Tidak lagi: {{names}}.",
+      "same": "Tidak ada yang berubah pada organisasi.",
+      "failed": "Organisasi tidak bisa dibaca sekarang."
+    },
     "composioHelp": "Kamu masuk di halaman Composio, dalam bahasa Inggris, lalu kembali ke sini. {{name}} menampilkan izinnya sebagai “Composio”.",
     "or": "atau",
     "withKey": "Hubungkan dengan kunci API",
@@ -10667,7 +10688,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Orang ini tidak ada di percakapan ini, jadi tidak bisa melihat tugas ini."
+      "assigneeOutside": "Orang ini tidak ada di percakapan ini, jadi tidak bisa melihat tugas ini.",
+      "deleteForbidden": "Hanya pembuat tugas ini atau administrator yang bisa menghapusnya."
     },
     "connector": {
       "labelTaken": "Konektor lain sudah memakai nama ini.",
@@ -13891,7 +13913,6 @@
   "taskManager": {
     "title": "Pengelola tugas",
     "subtitle": "Apa yang sedang dikerjakan agen dan apa yang selesai hari ini.",
-    "nav": "Pengelola tugas",
     "search": "Cari tugas, agen, atau aplikasi",
     "working_other": "{{count}} sedang bekerja",
     "waiting_other": "{{count}} menunggumu",
@@ -14034,7 +14055,6 @@
       "room": "Ada tempat",
       "computers": "Komputer"
     },
-    "navWhat": "Apa yang sedang dikerjakan tiap agen, dan hentikan yang perlu",
     "cards": {
       "label": "Agen",
       "previous": "Agen sebelumnya",
@@ -14271,8 +14291,6 @@
   "dashboards": {
     "title": "Dasbor",
     "subtitle": "Angka dan grafik yang dijaga tetap terbaru oleh agen.",
-    "sidebar": "Dasbor",
-    "navWhat": "Angka dan grafik yang dijaga tetap terbaru oleh agen",
     "new": "Dasbor baru",
     "back": "Dasbor",
     "home": "Berandaku",

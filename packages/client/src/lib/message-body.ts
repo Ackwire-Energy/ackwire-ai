@@ -195,8 +195,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
 /**
  * A conversation list's last-message line: a body the server wrote (`meta` from the list, same keys as
  * the message's) in the reader's language, as the chat shows it, on one plain line, never naming a computer; a GIF
- * or a sticker with no text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries); else the text
- * as is.
+ * or a sticker with no text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries).
  */
 export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
   // Never a voice message's words, even from a server that sent them (ADR 0100).
@@ -205,7 +204,5 @@ export function previewBody(t: TFunction, text: string, meta: Meta | null, media
     const kind = mediaKindOf(mediaKind) ?? mediaKindOf(meta?.mediaKind) ?? mediaKindOf(meta?.media);
     if (kind) return mediaWord(t, kind);
   }
-  if (!meta) return text;
-  const shown = serverBody(t, text, meta);
-  return shown === text ? text : previewOf(shown);
+  return previewOf(meta ? serverBody(t, text, meta) : text);
 }

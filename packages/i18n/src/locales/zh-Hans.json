@@ -1291,7 +1291,9 @@
       "drive": "文件、报告和表格",
       "routines": "智能体按时自己完成的工作",
       "calendar": "会议和截止日期",
-      "team": "谁是谁：成员、智能体及其分组"
+      "team": "谁是谁：成员、智能体及其分组",
+      "dashboards": "智能体保持更新的数字和图表",
+      "taskManager": "查看每个智能体正在做什么，并停止需要停止的任务"
     },
     "customizeSidebar": "自定义侧边栏",
     "sidebarMenu": {
@@ -1310,7 +1312,6 @@
       "auto": "有内容时显示",
       "autoHint": "有事等你处理时显示",
       "reset": "恢复默认",
-      "instant": "更改会立即生效。",
       "tools": "工具",
       "toolsTitle": "顶部",
       "order": "分区顺序",
@@ -1360,6 +1361,8 @@
     "threads": "话题",
     "routines": "例行工作",
     "team": "团队",
+    "dashboards": "仪表盘",
+    "taskManager": "任务管理器",
     "calendar": "日历",
     "drive": "Drive",
     "members": "成员",
@@ -3811,7 +3814,6 @@
     },
     "highRisk": "高风险操作",
     "hold": "按住以批准",
-    "holding": "按住…",
     "holdLabel": "{{action}}：按住以确认",
     "holdHint": "按住按钮以批准。高风险操作：单击不够。",
     "holdNote": "高风险：按住按钮以确认。",
@@ -5523,6 +5525,15 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "删除任务",
+      "title": "删除任务 #{{number}}？",
+      "body": "它会对所有人消失，连同它的对话和对话中的文件。",
+      "steps_other": "它的 {{count}} 个步骤也会一起删除。",
+      "working": "{{name}} 会停止这项任务上的工作。",
+      "confirm": "删除",
+      "done": "任务 #{{number}} 已删除。"
+    },
     "assigneeFilter": "负责人",
     "priorityFilter": "优先级",
     "title": "任务",
@@ -10089,6 +10100,16 @@
     "namePlaceholder": "例如：客服",
     "continueIn": "在 {{name}} 上继续",
     "continueInComposio": "在 Composio 上继续",
+    "githubOrgs": {
+      "title": "可访问的组织",
+      "none": "还没有组织。",
+      "lead": "GitHub 只在第一次询问组织。要添加其他组织，请在 GitHub 打开应用页面，然后点击组织旁边的 Grant。如果你不是所有者，按钮显示为 Request，由所有者批准。",
+      "open": "在 GitHub 上授权组织",
+      "added": "现在还包括：{{names}}。",
+      "removed": "不再包括：{{names}}。",
+      "same": "组织没有变化。",
+      "failed": "现在无法读取组织。"
+    },
     "composioHelp": "你会在 Composio 的英文页面上登录，然后回到这里。{{name}} 会把这项权限显示为“Composio”。",
     "or": "或",
     "withKey": "用 API 密钥连接",
@@ -10674,7 +10695,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "这个人不在这段对话中，因此看不到这个任务。"
+      "assigneeOutside": "这个人不在这段对话中，因此看不到这个任务。",
+      "deleteForbidden": "只有这项任务的创建者或管理员可以删除它。"
     },
     "connector": {
       "labelTaken": "已有其他连接器使用这个名称。",
@@ -13964,7 +13986,6 @@
   "taskManager": {
     "title": "任务管理器",
     "subtitle": "智能体现在在做什么，以及今天完成了什么。",
-    "nav": "任务管理器",
     "search": "搜索任务、智能体或应用",
     "working_other": "{{count}} 个进行中",
     "waiting_other": "{{count}} 个等你处理",
@@ -14107,7 +14128,6 @@
       "room": "有空位",
       "computers": "电脑"
     },
-    "navWhat": "查看每个智能体正在做什么，并停止需要停止的任务",
     "cards": {
       "label": "智能体",
       "previous": "前面的智能体",
@@ -14344,8 +14364,6 @@
   "dashboards": {
     "title": "仪表盘",
     "subtitle": "智能体保持更新的数字和图表。",
-    "sidebar": "仪表盘",
-    "navWhat": "智能体保持更新的数字和图表",
     "new": "新建仪表盘",
     "back": "仪表盘",
     "home": "我的首页",

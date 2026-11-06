@@ -278,9 +278,6 @@
   "approval.hold": {
     "value": "Hold to approve"
   },
-  "approval.holding": {
-    "value": "Keep holding…"
-  },
   "approval.holdNote": {
     "value": "High risk: hold the button for a second."
   },
@@ -2429,9 +2426,6 @@
   },
   "delete.hold": {
     "value": "Hold to delete"
-  },
-  "delete.holding": {
-    "value": "Keep holding…"
   },
   "files.type.image": {
     "value": "Image"

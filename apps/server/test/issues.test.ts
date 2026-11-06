@@ -109,3 +109,17 @@ test("board columns API: list, add, rename, move a task, delete with a destinati
   expect(deleted.status).toBe(200);
   expect(await (await api(`/issues/${issue.id}`)).json()).toMatchObject({ status: "done", columnId: done?.id });
 });
+
+test("deleting a task: 204, gone from the list and its address; a member who didn't create it is refused", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const created = (await (await api("/issues", { json: { title: "Sobrou" } })).json()) as { id: string };
+  const deleted = await api(`/issues/${created.id}`, { method: "DELETE" });
+  expect(deleted.status).toBe(204);
+  expect((await api("/issues/by-number/1")).status).toBe(404);
+  expect(await (await api("/issues")).json()).toMatchObject({ issues: [] });
+  expect((await api(`/issues/${created.id}`, { method: "DELETE" })).status).toBe(404);
+});

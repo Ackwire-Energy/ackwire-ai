@@ -143,6 +143,8 @@ describe("the word for a GIF or a sticker where text shows", () => {
     expect(previewBody(t, "", { media: { kind: "gif" } })).toBe("GIF");
     expect(previewBody(t, "valeu!", null, "sticker")).toBe("valeu!");
     expect(previewBody(t, "", null)).toBe("");
+    expect(previewBody(t, "**O deploy**\n\n| a |\n| - |\n| b |", null)).toBe("O deploy a b");
+    expect(previewBody(t, "**O deploy**", {})).toBe("O deploy");
   });
 
   test("a quote of a GIF says GIF, read from the server's reply ref and written in the optimistic one", () => {
@@ -191,6 +193,7 @@ describe("the word for a GIF or a sticker where text shows", () => {
 
   test("a search hit says its words, else what it was: only a voice message's hit says voice message", () => {
     expect(hitText(t, { snippet: "deploy notes", mediaKind: "gif" })).toBe("deploy notes");
+    expect(hitText(t, { snippet: "**O deploy**\n\n```sh\nbun run\n```" })).toBe("O deploy bun run");
     expect(hitText(t, { snippet: "", mediaKind: "voice" })).toBe("Mensagem de voz");
     // Listed by filters alone: a GIF or a sticker sent with no words.
     expect(hitText(t, { snippet: "", mediaKind: "gif" })).toBe("GIF");

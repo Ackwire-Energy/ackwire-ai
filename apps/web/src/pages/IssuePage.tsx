@@ -27,7 +27,7 @@ import {
   WorkSweep,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -56,6 +56,7 @@ import { Markdown } from "@/lib/markdown";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { useIssueRealtime } from "@/realtime/context";
+import { IssueDeleteButton, IssueDeleteProvider } from "./IssueDelete";
 import "./issues.css";
 
 /** One issue as a page (`/issues/131`); the board opens the same details in its panel. */
@@ -67,25 +68,33 @@ export function IssuePage({ number }: { number: number }) {
   const [focus] = useOpenParam("m");
   const [talk, setTalk] = useState(Boolean(focus));
   const i = issue.data;
+  const navigate = useNavigate();
   return (
-    <div className={cx("page page--full", talk && i && "issue-page--talk")}>
-      <div className="issue-page__main">
-        <div className="issue-page__bar">
-          <Link to="/org/$orgId/issues" params={{ orgId: org.id }} className="ac-back">
-            <Icon name="chevronLeft" />
-            {t("issues.back")}
-          </Link>
-          {i && <TaskConversationButton issue={i} open={talk} onToggle={() => setTalk((v) => !v)} />}
+    <IssueDeleteProvider onDeleted={() => void navigate({ to: "/org/$orgId/issues", params: { orgId: org.id } })}>
+      <div className={cx("page page--full", talk && i && "issue-page--talk")}>
+        <div className="issue-page__main">
+          <div className="issue-page__bar">
+            <Link to="/org/$orgId/issues" params={{ orgId: org.id }} className="ac-back">
+              <Icon name="chevronLeft" />
+              {t("issues.back")}
+            </Link>
+            {i && (
+              <span className="issue-page__tools">
+                <IssueDeleteButton issue={i} />
+                <TaskConversationButton issue={i} open={talk} onToggle={() => setTalk((v) => !v)} />
+              </span>
+            )}
+          </div>
+          {issue.isError && <Alert>{t("issues.notFound")}</Alert>}
+          {i && <IssueDetails issue={i} variant="page" onConversation={() => setTalk(true)} />}
         </div>
-        {issue.isError && <Alert>{t("issues.notFound")}</Alert>}
-        {i && <IssueDetails issue={i} variant="page" onConversation={() => setTalk(true)} />}
+        {talk && i && (
+          <aside className="issue-page__talk" aria-label={t("issues.conversation.title")}>
+            <TaskConversationPanel issue={i} focusMessageId={focus ?? undefined} onClose={() => setTalk(false)} />
+          </aside>
+        )}
       </div>
-      {talk && i && (
-        <aside className="issue-page__talk" aria-label={t("issues.conversation.title")}>
-          <TaskConversationPanel issue={i} focusMessageId={focus ?? undefined} onClose={() => setTalk(false)} />
-        </aside>
-      )}
-    </div>
+    </IssueDeleteProvider>
   );
 }
 
@@ -138,36 +147,43 @@ export function IssueDialog({
   const focus = focusMessageId;
   const [talk, setTalk] = useState(Boolean(focus));
   return (
-    <DetailsDialog
-      actions={<TaskConversationButton issue={i} open={talk} onToggle={() => setTalk((v) => !v)} />}
-      side={
-        talk ? <TaskConversationPanel issue={i} focusMessageId={focus} onClose={() => setTalk(false)} /> : undefined
-      }
-      open
-      onOpenChange={(o) => !o && onClose()}
-      closeLabel={t("issues.close")}
-      size="lg"
-      fill
-      titleHidden
-      eyebrow={<IssueBarTitle issue={i} />}
-      title={i.title}
-      // Esc in a text being edited in place saves it and stays: the dialog closes on the next Esc.
-      onEscapeKeyDown={(e) => {
-        const el = document.activeElement;
-        if (el instanceof HTMLElement && el.closest("[data-inplace]")) {
-          e.preventDefault();
-          el.blur();
+    <IssueDeleteProvider onDeleted={onClose}>
+      <DetailsDialog
+        actions={
+          <>
+            <IssueDeleteButton issue={i} />
+            <TaskConversationButton issue={i} open={talk} onToggle={() => setTalk((v) => !v)} />
+          </>
         }
-      }}
-      page={{
-        label: t("issues.openPage"),
-        render: (props) => (
-          <Link to="/org/$orgId/issues/$number" params={{ orgId: org.id, number: String(i.number) }} {...props} />
-        ),
-      }}
-    >
-      <IssueDetails issue={i} variant="dialog" onConversation={() => setTalk(true)} />
-    </DetailsDialog>
+        side={
+          talk ? <TaskConversationPanel issue={i} focusMessageId={focus} onClose={() => setTalk(false)} /> : undefined
+        }
+        open
+        onOpenChange={(o) => !o && onClose()}
+        closeLabel={t("issues.close")}
+        size="lg"
+        fill
+        titleHidden
+        eyebrow={<IssueBarTitle issue={i} />}
+        title={i.title}
+        // Esc in a text being edited in place saves it and stays: the dialog closes on the next Esc.
+        onEscapeKeyDown={(e) => {
+          const el = document.activeElement;
+          if (el instanceof HTMLElement && el.closest("[data-inplace]")) {
+            e.preventDefault();
+            el.blur();
+          }
+        }}
+        page={{
+          label: t("issues.openPage"),
+          render: (props) => (
+            <Link to="/org/$orgId/issues/$number" params={{ orgId: org.id, number: String(i.number) }} {...props} />
+          ),
+        }}
+      >
+        <IssueDetails issue={i} variant="dialog" onConversation={() => setTalk(true)} />
+      </DetailsDialog>
+    </IssueDeleteProvider>
   );
 }
 

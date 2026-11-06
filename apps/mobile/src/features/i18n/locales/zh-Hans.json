@@ -111,7 +111,6 @@
     "refuse": "拒绝",
     "approve": "批准",
     "hold": "长按以批准",
-    "holding": "继续按住…",
     "holdNote": "高风险：按住按钮一秒。",
     "tapNote": "批准后会立即执行。",
     "tapNoteAhead": "现在批准将覆盖{{when}}。",
@@ -917,8 +916,7 @@
     "addPasswordFirst": "请先在网站上为你的账号添加密码，然后在这里输入。",
     "addPasswordWeb": "在网站上添加密码",
     "otherAccount": "你登录了另一个账号。没有删除任何内容。",
-    "hold": "长按以删除",
-    "holding": "继续按住…"
+    "hold": "长按以删除"
   },
   "files": {
     "type": {

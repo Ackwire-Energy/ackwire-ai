@@ -2036,6 +2036,18 @@ export const useGitHubRepos = (orgId: string, enabled = true) => {
   });
 };
 
+/** The organizations GitHub lets us reach. Read again on every return to the tab: they're granted on GitHub's own page. */
+export const useGithubAccess = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.githubAccess(orgId),
+    queryFn: () => api.githubApp.access(orgId),
+    enabled,
+    refetchOnWindowFocus: "always",
+    retry: false,
+  });
+};
+
 /** The GitHub repositories an agent may use, in order (empty = every repository). */
 export const useAgentRepos = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
@@ -3781,6 +3793,7 @@ export function useIssueAction(orgId: string) {
       action:
         | { type: "create"; input: IssueInput }
         | { type: "update"; id: string; patch: IssuePatch }
+        | { type: "delete"; id: string }
         | { type: "criterion"; id: string; criterionId: string; done: boolean }
         | { type: "comment"; id: string; text: string; attachmentIds?: string[] }
         | { type: "ask"; id: string; agentId: string },
@@ -3790,6 +3803,8 @@ export function useIssueAction(orgId: string) {
           return api.issues.create(orgId, action.input);
         case "update":
           return api.issues.update(orgId, action.id, action.patch);
+        case "delete":
+          return api.issues.delete(orgId, action.id);
         case "criterion":
           return api.issues.setCriterion(orgId, action.id, action.criterionId, action.done);
         case "comment":
@@ -5418,7 +5433,7 @@ function readOncePerBurst(key: string, read: () => void) {
 
 /** A task changed, a reply in its conversation too (ADR 0145): the boards on screen read again, once per burst. */
 export function applyIssueEvent(qc: QueryClient, orgId: string, event: { type: string }) {
-  if (event.type === "issue.created" || event.type === "issue.updated")
+  if (event.type === "issue.created" || event.type === "issue.updated" || event.type === "issue.deleted")
     readOncePerBurst(`${orgId}:issues`, () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }));
 }
 

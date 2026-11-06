@@ -7,6 +7,7 @@ import {
   useConnectWithKey,
   useCustomServerAction,
   useCustomServers,
+  useGithubAccess,
   useRenameConnection,
   useStartOAuth,
 } from "@agenteschat/client";
@@ -26,6 +27,7 @@ import {
   fromConnection,
   fromServer,
   itemName,
+  orgAccessChange,
   outcomeText,
 } from "@agenteschat/client/lib/connected";
 import { humanize, isHttpsUrl, sameServer } from "@agenteschat/client/lib/custom-tools";
@@ -41,6 +43,7 @@ import {
 import {
   Alert,
   Button,
+  Chip,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -49,6 +52,7 @@ import {
   Input,
   Locked,
   Segmented,
+  Skeleton,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -62,6 +66,7 @@ import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 import { oauthReturnPath } from "@/lib/desktop";
+import { forgetGithubOrgs, keepGithubOrgs, readGithubOrgs } from "@/lib/github-orgs";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "./ToolReview";
@@ -273,9 +278,12 @@ function ConnectStep({
   const name = (def ? def.label : fixed ? (accounts[0]?.label ?? item?.label) : label.trim()) || undefined;
   const back = returnTo ? oauthReturnPath(returnTo) : returnPath(org.id);
 
+  const githubOrgs = mode === "reconnect" && def?.id === "github" && !viaComposio;
+  const access = useGithubAccess(org.id, githubOrgs);
   const startOAuth = () => {
     setTouched("oauth");
     if (askUrl && !isHttpsUrl(url)) return;
+    if (githubOrgs && access.data?.orgs) keepGithubOrgs(access.data.orgs);
     if (byAddress) {
       connect.mutate({ serverUrl, label: name, returnTo: back, connectionId }, { onSuccess: byAddressResult });
     } else if (def) {
@@ -382,6 +390,7 @@ function ConnectStep({
               />
             </Field>
           )}
+          {githubOrgs && <GithubOrgs />}
           {canOAuth && (
             <Button
               variant="primary"
@@ -429,6 +438,69 @@ function ConnectStep({
         <Button onClick={onClose}>{t("common.cancel")}</Button>
       </DialogFooter>
     </>
+  );
+}
+
+/**
+ * The organizations GitHub lets us reach, on Reconectar: GitHub's sign-in asks about them only the first time, so it
+ * comes straight back and more of them are granted on its own page. Coming back from either, this says what changed.
+ */
+function GithubOrgs() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const access = useGithubAccess(org.id);
+  const [kept] = useState(readGithubOrgs);
+  useEffect(forgetGithubOrgs, []);
+  const orgs = access.data?.orgs ?? null;
+  const manageUrl = access.data?.manageUrl;
+  const [opened, setOpened] = useState<readonly string[] | null>(null);
+  const before = kept ?? opened;
+  const change = before && orgs && !access.isFetching ? orgAccessChange(t, before, orgs) : null;
+  return (
+    <section className="cflow__orgs" aria-label={t("connectFlow.githubOrgs.title")}>
+      <h3 className="cflow__orgs-title">{t("connectFlow.githubOrgs.title")}</h3>
+      {access.isPending ? (
+        <Skeleton height={24} />
+      ) : orgs === null ? (
+        <>
+          <p className="small muted">{t("connectFlow.githubOrgs.failed")}</p>
+          <Button size="sm" loading={access.isFetching} onClick={() => void access.refetch()}>
+            {t("common.retry")}
+          </Button>
+        </>
+      ) : orgs.length > 0 ? (
+        <ul className="cflow__orgs-list">
+          {orgs.map((o) => (
+            <li key={o}>
+              <Chip>{o}</Chip>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="small muted">{t("connectFlow.githubOrgs.none")}</p>
+      )}
+      {change && (
+        <p className="small" aria-live="polite">
+          {change}
+        </p>
+      )}
+      {manageUrl && (
+        <>
+          <p className="small muted">{t("connectFlow.githubOrgs.lead")}</p>
+          <Button
+            asChild
+            size="sm"
+            onClick={() => {
+              if (orgs) setOpened(orgs);
+            }}
+          >
+            <a href={manageUrl} target="_blank" rel="noreferrer">
+              {t("connectFlow.githubOrgs.open")}
+            </a>
+          </Button>
+        </>
+      )}
+    </section>
   );
 }
 
