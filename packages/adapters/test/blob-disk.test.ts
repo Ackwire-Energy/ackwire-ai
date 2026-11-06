@@ -62,3 +62,11 @@ test("a key never reaches outside the folder", async () => {
   }
   expect(await readdir(dir)).toEqual([]);
 });
+
+test("streamed: the file as it is read; nothing for a missing key", async () => {
+  const store = createDiskBlobStore(dir);
+  await store.put("orgs/o1/big", bytes("all of it"), { contentType: "application/zip" });
+  expect(await new Response(await store.stream?.("orgs/o1/big")).text()).toBe("all of it");
+  expect(await store.stream?.("orgs/o1/gone")).toBeNull();
+  expect(store.stream?.("../outside")).rejects.toThrow("outside the files folder");
+});

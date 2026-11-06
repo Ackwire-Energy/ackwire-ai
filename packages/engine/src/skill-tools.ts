@@ -5,6 +5,7 @@ import { sniffModelImage } from "./avatars";
 import { learnTrust } from "./context/learn";
 import { changeSkillAsAgent } from "./context/learned-skills";
 import { publishMessageCreated } from "./events";
+import { copyToComputer, type StoredFile } from "./file-pulls";
 import { cutText, formatBytes } from "./format";
 import type { Judge } from "./judge";
 import { insertMessage, messageView } from "./messages";
@@ -98,10 +99,11 @@ export function createSkillToolSource(
   deps: SkillDeps & { pubsub?: PubSub; judge?: Judge; computer?: SandboxDeps },
 ): ToolSource {
   /** Saves a skill's file on the agent's computer: its path there, or why it couldn't be. */
-  const saveOnComputer = async (ctx: ToolContext, path: string, data: Uint8Array) => {
+  const saveOnComputer = async (ctx: ToolContext, path: string, file: StoredFile) => {
     const computer = deps.computer;
     if (!computer) return { why: "There is no computer here to save it on." };
-    return withSandbox(computer, ctx, (c) => c.provider.writeFile(c.id, path, data)).then(
+    const pull = { db: ctx.db, blobs: deps.blobs, publicUrl: computer.publicUrl };
+    return withSandbox(computer, ctx, (c) => copyToComputer(pull, ctx, c, path, file)).then(
       () => ({ saved: path }),
       (error: unknown) => ({ why: error instanceof Error ? error.message : String(error) }),
     );
@@ -199,7 +201,7 @@ export function createSkillToolSource(
             image && !ctx.bridge
               ? ` It is too large to show you here (max ${formatBytes(SKILL_LIMITS.imageBytes)}).`
               : "";
-          const result = await saveOnComputer(ctx, `.skills/${skill.name}/${path}`, file.data);
+          const result = await saveOnComputer(ctx, `.skills/${skill.name}/${path}`, file.stored);
           if ("saved" in result) {
             return {
               content: `${about}:${tooLarge} saved to ${result.saved} in your folder on your computer: open it there with your own tools${image && ctx.bridge ? ", which show images" : ""}.`,

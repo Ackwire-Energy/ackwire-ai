@@ -37,6 +37,10 @@ export function createDiskBlobStore(root: string): BlobStore {
         throw error;
       }
     },
+    async stream(key) {
+      const file = Bun.file(pathOf(key));
+      return (await file.exists()) ? file.stream() : null;
+    },
     async delete(key) {
       const path = pathOf(key);
       await rm(`${path}.type`, { force: true });

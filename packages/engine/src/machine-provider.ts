@@ -2,6 +2,7 @@ import {
   type AgentScope,
   type ExecRequest,
   type ExecResult,
+  FILE_PULL_PROTOCOL,
   MAX_INLINE_FILE_BYTES,
   policyRefusal,
   type SandboxProvider,
@@ -9,7 +10,8 @@ import {
   SECRETS_PROTOCOL,
   VAULT_PROTOCOL,
 } from "@agenteschat/adapters";
-import { type MachineCaller, MachineRequestError } from "./machine-hub";
+import { ARTIFACT_LIMITS } from "./artifacts";
+import { type MachineCaller, MachineRequestError, type MachineStatus } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
 
 /** Provider id of connected machines; their computer id is the machine id. */
@@ -47,7 +49,7 @@ export function notAllowedMessage(name: string, detail: string, path?: string, m
  * Runner error codes → what the agent reads (and tells the people). The runner's error stays as the `cause` of the
  * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0144 §4).
  */
-function explain(error: unknown, name: string, path?: string, managed = false): Error {
+function explain(error: unknown, name: string, path?: string, managed = false, tooLarge?: string): Error {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error : new Error(String(error));
   const said = (message: string) => new Error(message, { cause: error });
   switch (error.code) {
@@ -61,10 +63,13 @@ function explain(error: unknown, name: string, path?: string, managed = false): 
       return said(error.message);
     case "too_large":
       return said(
-        `${path ?? "The file"} is too large to move this way (max ${MB(MAX_INLINE_FILE_BYTES)}); use upload_file to send big files to the Drive.`,
+        tooLarge ??
+          `${path ?? "The file"} is too large to read here (max ${MB(MAX_INLINE_FILE_BYTES)}). upload_file sends it to the Drive, up to ${MB(ARTIFACT_LIMITS.fileBytes)}.`,
       );
     case "upload_failed":
       return said(`${path ?? "The file"} didn't reach the Drive. ${error.message}`);
+    case "pull_failed":
+      return said(`${path ?? "The file"} didn't reach ${name}: ${error.message}`);
     case "not_allowed":
       // The command policy's `never` (a push our git proxy refuses): callers read its code, as below.
       return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path, managed));
@@ -86,18 +91,22 @@ function explain(error: unknown, name: string, path?: string, managed = false): 
 /**
  * Connected machines as a `SandboxProvider` (ADR 0025): the channel over the hub. A machine is on while its
  * runner is connected; people pair it, and we never create, start or stop it. Files travel base64 up to 5 MB;
- * uploads go through `push`, straight to our upload URL. Every request is for `agent`, which the runner keeps
- * in its own folder of the workspace.
+ * past that the computer moves them itself over HTTP, to our upload URL (`push`) or from our file URL (`pull`).
+ * Every request is for `agent`, which the runner keeps in its own folder of the workspace.
  */
 export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentScope): SandboxProvider {
-  const guard = async <T>(id: string, fn: () => Promise<T>, path?: string): Promise<T> => {
+  const guard = async <T>(id: string, fn: () => Promise<T>, path?: string, tooLarge?: string): Promise<T> => {
     try {
       return await fn();
     } catch (error) {
       if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
       const status = await hub.status(id);
-      throw explain(error, status?.name ?? "computer", path, status?.kind === "managed");
+      throw explain(error, status?.name ?? "computer", path, status?.kind === "managed", tooLarge);
     }
+  };
+  const pullRefusal = async (id: string) => {
+    const status = await hub.status(id);
+    return status && status.protocol < FILE_PULL_PROTOCOL ? pullUpdateText(status) : null;
   };
   const execOn = async (
     id: string,
@@ -137,7 +146,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
     async writeFile(id, path, data) {
       if (data.byteLength > MAX_INLINE_FILE_BYTES) {
         throw new Error(
-          `${path} is too large to copy to a connected computer (max ${MB(MAX_INLINE_FILE_BYTES)}); ask the person to put it on that machine.`,
+          `${path} is too large to write in one piece (max ${MB(MAX_INLINE_FILE_BYTES)}). A Drive file reaches the computer whole with import_file, up to ${MB(ARTIFACT_LIMITS.fileBytes)}.`,
         );
       }
       await guard(
@@ -201,9 +210,24 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
               );
             }),
         path,
+        `${path} is too large to send to the Drive (max ${MB(target.maxBytes)}).`,
       );
     },
+    pullRefusal,
+    async pullFile(id, path, { signal, ...source }) {
+      const refusal = await pullRefusal(id);
+      if (refusal) throw new Error(refusal);
+      await guard(id, () => hub.call(id, { agent, op: "pull", path, ...source }, { signal }), path);
+    },
   };
+}
+
+/** What a computer too old for `pull` answers for a file past what a `write` carries. */
+export function pullUpdateText(status: Pick<MachineStatus, "name" | "kind">) {
+  const what = `receive files over ${MB(MAX_INLINE_FILE_BYTES)}`;
+  return status.kind === "managed"
+    ? `The computer ${status.name} needs an update to ${what}. It updates by itself, so try again later.`
+    : vaultUpdateText(status.name, what);
 }
 
 /** What a computer too old for the Vault answers (ADR 0144): its owner updates the runner. */

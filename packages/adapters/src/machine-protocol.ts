@@ -520,6 +520,11 @@ export const VAULT_PROTOCOL = 45;
  */
 export const SPEED_PROTOCOL = 46;
 /**
+ * From this protocol on: `pull`. A file too big for a `write` is fetched by the computer itself from a one-use URL of
+ * ours and lands whole or not at all. An older runner takes files up to `MAX_INLINE_FILE_BYTES` only.
+ */
+export const FILE_PULL_PROTOCOL = 47;
+/**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
@@ -1119,7 +1124,7 @@ export const HELLO_TIMEOUT_MS = 10_000;
 export const HEARTBEAT_MS = 25_000;
 /** Largest text frame either side accepts (a `write` of 5 MB is about 6.7 MB in base64). */
 export const MAX_FRAME_BYTES = 8 * 1024 * 1024;
-/** `read`/`write` bodies (base64 in JSON); larger files go through `push`. */
+/** `read`/`write` bodies (base64 in JSON); larger files go through `push` and `pull`. */
 export const MAX_INLINE_FILE_BYTES = 5 * 1024 * 1024;
 
 export const MACHINE_TOKEN_PREFIX = "agm_";
@@ -1733,6 +1738,17 @@ export type MachineRequest = (
       uploadId: string;
       maxBytes: number;
     }
+  /** Protocol 47 (`FILE_PULL_PROTOCOL`): `write`'s path rules, the bytes fetched from `url` instead of sent here. */
+  | {
+      op: "pull";
+      path: string;
+      /** Absolute URL of our file endpoint (`GET`, machine token as bearer), good for one fetch. */
+      url: string;
+      pullId: string;
+      size: number;
+      /** Hex; absent for a stored file with no recorded hash (a skill's), which is then checked by size alone. */
+      sha256?: string;
+    }
   /**
    * Protocol 12: one `agent-browser` command in the request's agent's session
    * (`open`, `snapshot`, `click`…; `args` as on its command line, without
@@ -1822,6 +1838,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "write",
   "list",
   "push",
+  "pull",
   "secret",
   "account",
   "task.start",
@@ -1873,6 +1890,8 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
+  /** What landed at the path: its bytes and SHA-256 (hex). */
+  pull: { size: number; sha256: string };
   /**
    * `keypair`: public key, and `sites` from a runner that keeps a `site` target out of its commands; `deliver`/
    * `activate`: size; an older activation may be superseded.
@@ -1998,6 +2017,8 @@ export type MachineErrorCode =
   | "exec_disabled"
   | "too_large"
   | "upload_failed"
+  /** Protocol 46: a `pull` didn't land; its message says why, for people. */
+  | "pull_failed"
   /**
    * `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`); `brain.turn` while the computer
    * has no room for one more turn (ADR 0025 §5, admission). Try again later.
