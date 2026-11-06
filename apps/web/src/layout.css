@@ -1972,16 +1972,18 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   overscroll-behavior-x: contain;
 }
 .md__table[data-more="end"] > .md__table-scroll {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent), var(--scroll-strip-x);
+  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent), var(--scroll-strip-x);
 }
 .md__table[data-more="start"] > .md__table-scroll {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px);
-  mask-image: linear-gradient(to right, transparent, #000 48px);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px), var(--scroll-strip-x);
+  mask-image: linear-gradient(to right, transparent, #000 48px), var(--scroll-strip-x);
 }
 .md__table[data-more="both"] > .md__table-scroll {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
-  mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent), var(--scroll-strip-x);
+  mask-image:
+    linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent), var(--scroll-strip-x);
 }
 .md__table table {
   border-collapse: collapse;

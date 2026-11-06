@@ -74,9 +74,11 @@ html[data-pointer] :focus-visible {
   --scroll-thumb-hover: color-mix(in srgb, var(--ink) 36%, transparent);
 }
 /* A scroller that fades its content at an end with a mask adds this layer to it: the fade then spares the strip our
-   scrollbar is drawn in, and the thumb ends round. Nothing where we draw no scrollbar. */
+   scrollbar is drawn in, and the thumb ends round. Nothing where we draw no scrollbar. `-x`: for a sideways scroller,
+   whose scrollbar runs along the bottom. */
 :root {
   --scroll-strip: linear-gradient(transparent 0 0);
+  --scroll-strip-x: linear-gradient(transparent 0 0);
 }
 @media (hover: hover) and (pointer: fine) {
   ::-webkit-scrollbar {
@@ -86,6 +88,7 @@ html[data-pointer] :focus-visible {
   @supports selector(::-webkit-scrollbar) {
     :root {
       --scroll-strip: linear-gradient(to left, #000 8px, transparent 0);
+      --scroll-strip-x: linear-gradient(to top, #000 8px, transparent 0);
     }
   }
   ::-webkit-scrollbar-track,

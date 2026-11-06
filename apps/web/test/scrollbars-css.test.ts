@@ -79,6 +79,7 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".level-matrix": "content",
   ".pu-table-card": "content",
   ".machine-command__code": "content",
+  ".md__table-scroll": "content",
   ".issues-boardwrap": "strip",
   ".team-tree": "content",
   ".mi-log": "content",
@@ -191,8 +192,12 @@ describe("our scrollbars, never the browser's", () => {
     expect(value(atRule(kit, "@supports selector(::-webkit-scrollbar)"), ":root", "--scroll-strip")).toBe(
       `linear-gradient(to left, #000 ${width}, transparent 0)`,
     );
+    expect(value(atRule(kit, "@supports selector(::-webkit-scrollbar)"), ":root", "--scroll-strip-x")).toBe(
+      `linear-gradient(to top, #000 ${width}, transparent 0)`,
+    );
     // Nothing where the kit draws no scrollbar.
     expect(value(topLevel(source), ":root", "--scroll-strip")).toBe("linear-gradient(transparent 0 0)");
+    expect(value(topLevel(source), ":root", "--scroll-strip-x")).toBe("linear-gradient(transparent 0 0)");
     const scrollers = await selectorsWith((p, v) => /^overflow(-[xy])?$/.test(p) && /auto|scroll/.test(v));
     const strips = await selectorsWith((p, v) => p === "scrollbar-width" && v === "none");
     const on = (scroller: string, s: string) =>
@@ -204,7 +209,7 @@ describe("our scrollbars, never the browser's", () => {
           for (const [p, v] of rule.declarations)
             if (/^(-webkit-)?mask(-image)?$/.test(p)) masks.push([`${file}: ${s} {${p}}`, v]);
     expect(masks.map(([at]) => at)).toContain("apps/web/src/layout.css: .channel__messages {mask-image}");
-    expect(masks.filter(([, v]) => !/,\s*var\(--scroll-strip\)$/.test(v)).map(([at]) => at)).toEqual([]);
+    expect(masks.filter(([, v]) => !/,\s*var\(--scroll-strip(-x)?\)$/.test(v)).map(([at]) => at)).toEqual([]);
   });
 
   test("an agent's HTML page scrolls with ours: the kit's sizes, a grey for any page, the track on its own background", async () => {
