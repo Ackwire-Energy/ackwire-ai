@@ -40,7 +40,7 @@ import { type CacheFill, type CloneSlots, gitSync } from "./git";
 import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
-import { agentWorkspace, isInside, resolveForAgent } from "./paths";
+import { agentWorkspace, hiddenIn, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
 import type { Spawn } from "./scope-gate";
@@ -240,6 +240,8 @@ export interface HandlerContext {
   };
   /** Set per request (protocol 10): the folders allowed for the request's agent, as real paths. */
   grants?: string[];
+  /** A worker (system mode): its agent's home, as a real path. */
+  ownHome?: string;
   /** Protocol 12: the agents' browsers (ADR 0040); without it the runner refuses `browser.*`. */
   browser?: BrowserManager;
   /** Protocol 13: the computer brains' accounts (ADR 0041); without it the runner refuses `account`. */
@@ -309,7 +311,21 @@ function requireTool(ctx: HandlerContext, tool: keyof RunnerTools) {
   throw new RunnerError("not_allowed", `${TOOL_LABEL[tool]} is turned off on this computer (${how})`);
 }
 
-const resolvePath = (ctx: HandlerContext, input: string) => resolveForAgent(ctx.workspaceReal, ctx.grants, input);
+const resolvePath = (ctx: HandlerContext, input: string) =>
+  resolveForAgent(ctx.workspaceReal, ctx.grants, input, ctx.ownHome ? { path: ctx.ownHome, reads: false } : undefined);
+
+/**
+ * A path to read or send out. While commands are on the agent's home counts as its own: its user reads it anyway, so
+ * this is no wider a reach. The worker runs as that user, so a link swapped in after the check opens nothing a command
+ * of the agent couldn't.
+ */
+const resolveToRead = (ctx: HandlerContext, input: string) =>
+  resolveForAgent(
+    ctx.workspaceReal,
+    ctx.grants,
+    input,
+    ctx.ownHome ? { path: ctx.ownHome, reads: toolOn(ctx, "commands") } : undefined,
+  );
 
 async function doExec(
   ctx: HandlerContext,
@@ -363,7 +379,7 @@ async function doExec(
  * so is an agent browser's profile, its logins: a folder that holds one goes without it (`zipFolder`).
  */
 async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested: string) {
-  const target = await resolvePath(ctx, requested);
+  const target = await resolveToRead(ctx, requested);
   if (inBrowserProfile(target.abs)) {
     throw new RunnerError("bad_request", `${requested} holds your browser's logins. It stays on this computer.`);
   }
@@ -377,7 +393,7 @@ async function doRead(
   req: Extract<MachineRequest, { op: "read" }>,
   secrets: Secrets,
 ): Promise<MachineReplies["read"]> {
-  const target = await resolvePath(ctx, requireString(req.path, "path"));
+  const target = await resolveToRead(ctx, requireString(req.path, "path"));
   if (!target.exists) return { base64: null, size: 0 };
   const st = await stat(target.abs);
   if (st.isDirectory()) throw new RunnerError("bad_request", `${req.path} is a folder`);
@@ -434,7 +450,7 @@ async function doList(
   ctx: HandlerContext,
   req: Extract<MachineRequest, { op: "list" }>,
 ): Promise<MachineReplies["list"]> {
-  const target = await resolvePath(ctx, typeof req.path === "string" ? req.path : "");
+  const target = await resolveToRead(ctx, typeof req.path === "string" ? req.path : "");
   if (!target.exists) return { entries: [] };
   const root = target.root ?? ctx.workspaceReal;
   const st = await stat(target.abs);
@@ -452,6 +468,7 @@ async function doList(
     for (const item of items) {
       if (entries.length >= MAX_LIST_ENTRIES) return;
       const childAbs = path.join(abs, item.name);
+      if (target.inHome && hiddenIn(root, childAbs)) continue;
       const childRel = rel ? `${rel.replace(/\/+$/, "")}/${item.name}` : item.name;
       let isDir = item.isDirectory();
       let size = 0;
@@ -460,6 +477,7 @@ async function doList(
         if (item.isSymbolicLink()) {
           const real = await realpath(childAbs);
           if (!isInside(root, real)) continue; // leaves the workspace (or the allowed folder)
+          if (target.inHome && hiddenIn(root, real)) continue;
           const s = await stat(real);
           isDir = s.isDirectory();
           size = isDir ? 0 : s.size;
@@ -663,7 +681,7 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
         maxBytes: clampInt(req.maxBytes, 0, Number.MAX_SAFE_INTEGER, 0),
         fetch: ctx.fetch,
         signal: scope.signal,
-        resolve: (p) => resolvePath(ctx, p),
+        resolve: (p) => resolveToRead(ctx, p),
       });
     default:
       throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);

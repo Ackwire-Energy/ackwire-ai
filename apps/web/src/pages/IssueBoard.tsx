@@ -17,7 +17,7 @@ import {
   OptionList,
 } from "@agenteschat/ui";
 import { type Query, useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { BOARD, columnIdOf, columnsOf, isCustomBoard, STATUS_ICON, useColumnTitle, useStageName } from "@/lib/issues";
@@ -152,6 +152,35 @@ function ColumnCards({
  * customized, each column's menu, and "Nova tarefa" under A fazer. Grouped by assignee or priority: one column each.
  * Cards move between and inside columns (`useIssueDrag`).
  */
+/**
+ * Which ends of a sideways scroller have more past them ("start", "end", "both" or none), kept as it scrolls or
+ * resizes: the board fades and offers its arrows only there.
+ */
+function useMoreSides(ref: RefObject<HTMLElement | null>) {
+  const [more, setMore] = useState<"start" | "end" | "both" | undefined>(undefined);
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const start = el.scrollLeft > 1;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setMore(start && end ? "both" : start ? "start" : end ? "end" : undefined);
+  }, [ref]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    measure();
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    resize?.observe(el);
+    if (el.firstElementChild) resize?.observe(el.firstElementChild);
+    el.addEventListener("scroll", measure, { passive: true });
+    return () => {
+      resize?.disconnect();
+      el.removeEventListener("scroll", measure);
+    };
+  }, [ref, measure]);
+  return more;
+}
+
 export function Board({
   groups,
   stages,
@@ -176,6 +205,10 @@ export function Board({
   const [deleting, setDeleting] = useState<IssueColumn | null>(null);
   const grouped = stages !== null && isCustomBoard(columns);
   const byId = new Map(groups.map((g) => [g.id, g]));
+  const wrap = useRef<HTMLDivElement>(null);
+  const more = useMoreSides(wrap);
+  // About two columns at a time, as far as a hand would drag it.
+  const slide = (direction: 1 | -1) => wrap.current?.scrollBy({ left: direction * 520, behavior: "smooth" });
   const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus, foot?: ReactNode) => (
     <section
       key={g.id}
@@ -191,79 +224,105 @@ export function Board({
 
   return (
     <>
-      <div className="issues-boardwrap">
-        <div className={cx("issues-board", grouped && "is-grouped")}>
-          {stages ? (
-            stages.map(({ stage, columns: cols }) => (
-              <section
-                key={stage}
-                className="issues-stage"
-                style={{ "--n": cols.length } as CSSProperties}
-                // A named region only when it groups columns (a plain board names each column).
-                aria-label={grouped ? stageName(stage) : undefined}
-              >
-                {grouped && (
-                  <div className="issues-stage__head">
-                    <Icon name={STATUS_ICON[stage]} size={16} />
-                    <h2>{stageName(stage)}</h2>
-                    <span>{cols.reduce((n, c) => n + dnd.count(c.id), 0)}</span>
+      {/* More columns than the width: the board fades at that side and an arrow there slides it (no scrollbar). */}
+      <div className="issues-boardframe" data-more={more}>
+        {/* A rail of no height that sticks as the page scrolls: the arrows stay in view on a long board. */}
+        <div className="issues-boardframe__rail">
+          <button
+            type="button"
+            className="issues-boardframe__arrow issues-boardframe__arrow--start"
+            aria-label={t("look.previous")}
+            title={t("look.previous")}
+            hidden={more !== "start" && more !== "both"}
+            onClick={() => slide(-1)}
+          >
+            <Icon name="chevronLeft" size={18} />
+          </button>
+          <button
+            type="button"
+            className="issues-boardframe__arrow issues-boardframe__arrow--end"
+            aria-label={t("look.next")}
+            title={t("look.next")}
+            hidden={more !== "end" && more !== "both"}
+            onClick={() => slide(1)}
+          >
+            <Icon name="chevronRight" size={18} />
+          </button>
+        </div>
+        <div ref={wrap} className="issues-boardwrap">
+          <div className={cx("issues-board", grouped && "is-grouped")}>
+            {stages ? (
+              stages.map(({ stage, columns: cols }) => (
+                <section
+                  key={stage}
+                  className="issues-stage"
+                  style={{ "--n": cols.length } as CSSProperties}
+                  // A named region only when it groups columns (a plain board names each column).
+                  aria-label={grouped ? stageName(stage) : undefined}
+                >
+                  {grouped && (
+                    <div className="issues-stage__head">
+                      <Icon name={STATUS_ICON[stage]} size={16} />
+                      <h2>{stageName(stage)}</h2>
+                      <span>{cols.reduce((n, c) => n + dnd.count(c.id), 0)}</span>
+                    </div>
+                  )}
+                  <div className="issues-stage__cols">
+                    {cols.map((col, k) => {
+                      const g = byId.get(col.id);
+                      if (!g) return null;
+                      return column(
+                        g,
+                        <ColumnHead
+                          column={col}
+                          siblings={cols}
+                          index={k}
+                          count={dnd.count(col.id)}
+                          showIcon={!grouped}
+                          renaming={renaming === col.id}
+                          onRename={() => setRenaming(col.id)}
+                          onRenamed={() => setRenaming(null)}
+                          onAddAfter={() => setAdding({ afterId: col.id })}
+                          onDelete={() => setDeleting(col)}
+                        />,
+                        stage,
+                        col.stage === "todo" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon="plus"
+                            block
+                            className="issues-col__add"
+                            aria-label={t("issues.newIn", { column: title(col) })}
+                            onClick={() => onNew(col.id)}
+                          >
+                            {t("issues.new")}
+                          </Button>
+                        ),
+                      );
+                    })}
                   </div>
-                )}
+                </section>
+              ))
+            ) : (
+              <section className="issues-stage" style={{ "--n": groups.length } as CSSProperties}>
                 <div className="issues-stage__cols">
-                  {cols.map((col, k) => {
-                    const g = byId.get(col.id);
-                    if (!g) return null;
-                    return column(
+                  {groups.map((g) =>
+                    column(
                       g,
-                      <ColumnHead
-                        column={col}
-                        siblings={cols}
-                        index={k}
-                        count={dnd.count(col.id)}
-                        showIcon={!grouped}
-                        renaming={renaming === col.id}
-                        onRename={() => setRenaming(col.id)}
-                        onRenamed={() => setRenaming(null)}
-                        onAddAfter={() => setAdding({ afterId: col.id })}
-                        onDelete={() => setDeleting(col)}
-                      />,
-                      stage,
-                      col.stage === "todo" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon="plus"
-                          block
-                          className="issues-col__add"
-                          aria-label={t("issues.newIn", { column: title(col) })}
-                          onClick={() => onNew(col.id)}
-                        >
-                          {t("issues.new")}
-                        </Button>
-                      ),
-                    );
-                  })}
+                      <div className="issues-col__head">
+                        {g.lead}
+                        <h2>{g.name}</h2>
+                        <span className="tabular" data-count={g.id}>
+                          {dnd.count(g.id)}
+                        </span>
+                      </div>,
+                    ),
+                  )}
                 </div>
               </section>
-            ))
-          ) : (
-            <section className="issues-stage" style={{ "--n": groups.length } as CSSProperties}>
-              <div className="issues-stage__cols">
-                {groups.map((g) =>
-                  column(
-                    g,
-                    <div className="issues-col__head">
-                      {g.lead}
-                      <h2>{g.name}</h2>
-                      <span className="tabular" data-count={g.id}>
-                        {dnd.count(g.id)}
-                      </span>
-                    </div>,
-                  ),
-                )}
-              </div>
-            </section>
-          )}
+            )}
+          </div>
         </div>
       </div>
       {stages && (

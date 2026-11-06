@@ -22,7 +22,7 @@ import {
 import { fromConnection, itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
-import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   changedByText,
@@ -39,6 +39,7 @@ import {
   skillPendingViews,
   skillPickOf,
   skillRefusalText,
+  skillRemovalText,
   skillSourceViaText,
   skillUpdateErrorText,
   skillUpdateWords,
@@ -50,6 +51,7 @@ import {
   Alert,
   Button,
   Card,
+  CardHeader,
   Checkbox,
   CheckboxPill,
   Chip,
@@ -187,16 +189,18 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   return (
     <Card aria-labelledby="sec-skills">
-      <div className="row" style={{ gap: 12 }}>
-        <h2 id="sec-skills" className="ac-card__title" style={{ flex: "1 1 280px" }}>
-          {t("skills.title")}
-        </h2>
-        {!unavailable && (
-          <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
-            {t("skills.install")}
-          </Button>
-        )}
-      </div>
+      <CardHeader
+        id="sec-skills"
+        icon="bulb"
+        title={t("skills.title")}
+        action={
+          !unavailable && (
+            <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
+              {t("skills.install")}
+            </Button>
+          )
+        }
+      />
       {unavailable && <p className="small muted">{t("skills.unavailable")}</p>}
       {settings.data && (
         <>
@@ -1143,17 +1147,7 @@ export function SkillSheet({
           open={removing}
           onOpenChange={setRemoving}
           title={t("skills.removeTitle", { name: s.name })}
-          description={
-            users.length > 0
-              ? t("skills.removeAgents", {
-                  count: users.length,
-                  names: joinNames(
-                    users.map((a) => a.name),
-                    t,
-                  ),
-                })
-              : t("skills.removeNone")
-          }
+          description={skillRemovalText(t, users)}
           closeLabel={t("common.close")}
           width={440}
         >

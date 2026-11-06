@@ -8,7 +8,7 @@ import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
 import { holdsMessages } from "./run-hold";
-import { type AgentRun, addRunStep, isTerminal, replyThreadOf } from "./runs";
+import { type AgentRun, addRunStep, computerWaitOf, isTerminal, replyThreadOf } from "./runs";
 import { runStretchOf } from "./stretch";
 import { loadTalkerSnapshot, type TalkerSnapshot } from "./talker-snapshot";
 import type { WaitMessageOutcome } from "./waits";
@@ -106,6 +106,7 @@ const SYSTEM = (name: string) =>
     "- Never promise an action the task may not take, and never say you did something. You can't run tools, change anything or grant anything.",
     '- When the task will handle the message (a correction, a new instruction, more detail), say briefly that it\'s noted and when it will be read (e.g. "Anotado, leio assim que terminar este passo.").',
     "- A question you can answer from the snapshot (status, what it's doing, what it waits on): answer it plainly.",
+    "- While `waitingOn` names its computer, the task isn't working and has no step to finish: say what it waits for and that it reads the message once it gets there. Never say it is working.",
     "- If the message only asks to stop or cancel, or is small talk that needs no answer, or the conversation already answered it: pass.",
     "- Pass whenever there's nothing useful to add. Silence is fine.",
     "- Write in the person's language. One or two short sentences. No greetings, no markdown headings, no @mentions.",
@@ -246,7 +247,11 @@ export function createTalker(deps: TalkerDeps): Talker {
       if (await heldOrHandedOn(deps.db, run, message.id)) return decide("held");
       try {
         const snapshot = await loadTalkerSnapshot(deps.db, {
-          run: waited ? { ...run, status: landed.status } : run,
+          run: waited
+            ? { ...run, status: landed.status }
+            : computerWaitOf(run)
+              ? { ...run, status: "waiting_input" }
+              : run,
           agent,
           message,
           live,
@@ -259,7 +264,8 @@ export function createTalker(deps: TalkerDeps): Talker {
         // The cheap model couldn't answer (no API key, an outage, too slow): the server's own status line, so a
         // person asking a working agent always hears what it does (ADR 0131 §2).
         const reply = typeof answer === "string" ? { text: answer, meta: {} } : await statusReply(deps.db, run, at);
-        const posted = await postReply(deps, run, agent, message, reply.text, at, reply.meta);
+        const waits = run.status !== "running" || computerWaitOf(run) !== null;
+        const posted = await postReply(deps, run, agent, message, reply.text, at, reply.meta, waits);
         decide(posted ?? "reply");
       } catch {
         decide("error");
@@ -276,6 +282,21 @@ const FAILED = Symbol("failed");
  * now (its automatic status line), worded by the apps (`talker_status`); the English is the fallback.
  */
 export async function statusReply(db: Executor, run: AgentRun, now: Date) {
+  const wait = computerWaitOf(run);
+  if (wait === "away") {
+    return {
+      text: "Waiting for my computer to come back. I'll read your message as soon as it's back.",
+      meta: { bodyCode: "talker_status", bodyParams: { minutes: "0", steps: "0", wait } },
+    };
+  }
+  if (wait === "queued") {
+    const since = (run.transcript as { roomWaitSince?: number } | null)?.roomWaitSince ?? run.updatedAt.getTime();
+    const minutes = Math.max(1, Math.round((now.getTime() - since) / 60_000));
+    return {
+      text: `Waiting for the computer (${minutes} min). I'll read your message when my turn comes.`,
+      meta: { bodyCode: "talker_status", bodyParams: { minutes: String(minutes), steps: "0", wait } },
+    };
+  }
   const [a] = await db
     .select({ runId: schema.agents.statusRunId, kind: schema.agents.statusKind, subject: schema.agents.statusSubject })
     .from(schema.agents)
@@ -347,6 +368,8 @@ async function postReply(
   text: string,
   at: Date,
   extraMeta: Record<string, unknown> = {},
+  /** Its task waits (its computer, a person): the apps say "while waiting", not "while working". */
+  waits = false,
 ): Promise<TalkerSkip | null> {
   const result = await deps.db.transaction(async (tx) => {
     const [locked] = await tx.select().from(agentRuns).where(eq(agentRuns.id, run.id)).for("update");
@@ -379,7 +402,11 @@ async function postReply(
       threadId: replyThreadOf(run),
       author: { type: "agent", agentId: agent.id, runId: null, hop: run.hop, stretchId: runStretchOf(locked) },
       body: text,
-      meta: { talker: { runId: run.id, inReplyTo: message.id }, notice, ...extraMeta },
+      meta: {
+        talker: { runId: run.id, inReplyTo: message.id, ...(waits ? { waiting: true } : {}) },
+        notice,
+        ...extraMeta,
+      },
     });
     await tx
       .update(agentRuns)

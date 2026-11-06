@@ -36,7 +36,8 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, HoldButton, Icon, Text, useToast } from "@/ui";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { Button, Count, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalAheadLine,
@@ -46,7 +47,10 @@ import {
   ApprovalTraits,
   ApproveAlwaysButton,
   ApproveAlwaysHint,
+  approvalHeadline,
   approvalTitleText,
+  useApprovalSource,
+  useApproveNow,
   useCancelAhead,
   useOriginShort,
 } from "../approvals/parts";
@@ -57,7 +61,6 @@ import { genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { askEndedAt } from "./ask-store";
 import { AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "./asks";
 import { markName, threadFaces } from "./logic";
 
@@ -102,34 +105,35 @@ export function ApprovalInline({ approvalId, messageId }: { approvalId: string; 
   return <ApprovalDone approval={a} />;
 }
 
-/** One decided request, as one line: how it ended and its values, so several of one tool are told apart. */
+/**
+ * One decided request, as the conversation's event line: how it ended and what it did ("Aprovado por você · Gerar
+ * imagem"); its values (so several of one tool are told apart), when it goes out if approved ahead, and the reason
+ * open under it.
+ */
 function ApprovalDone({ approval: a }: { approval: Approval }) {
   const { t, i18n } = useTranslation();
   const meId = useMeId();
   const dir = useDirectory();
   const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
-  // Approved ahead and still to run: when it goes out, said on its line, and a way to withdraw it.
+  // Approved ahead and still to run: when it goes out, said under its line, and a way to withdraw it.
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   const cancelAhead = useCancelAhead();
-  const words = [
-    `${outcome}: ${markName(approvalTitleText(t, a))}`,
+  const lines = [
     approvalSummary(a, i18n.language),
     scheduled ? t("approval.ahead.scheduled", { when: nextLabel(i18n.language, scheduled) }) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+    a.reason ? t("approval.reasonLine", { reason: a.reason }) : null,
+  ].filter((x): x is string => Boolean(x));
   const done = (
     <AskDone
       done={a.status === "approved"}
-      words={words}
-      at={scheduled ? null : askEndedAt(a)}
+      words={`${outcome} · ${markName(approvalHeadline(t, a, i18n.language))}`}
       more={
-        a.reason
+        lines.length > 0
           ? {
               label: t("approval.seeDetails"),
               content: (
                 <Text variant="small" tone="muted">
-                  {t("approval.reasonLine", { reason: a.reason })}
+                  {lines.join("\n")}
                 </Text>
               ),
             }
@@ -236,9 +240,10 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   };
   const head = (run: Approval[]) =>
     t("approval.run.head", { count: run.length, name, what: run[0] ? approvalTitleText(t, run[0]) : "" });
-  const item = (a: Approval, inRun: boolean) => (
+  const item = (a: Approval, inRun: boolean, divider: boolean) => (
     <ApprovalGroupItem
       key={a.id}
+      divider={divider}
       approval={a}
       lead={leadItem}
       name={name}
@@ -303,11 +308,11 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       well={
         single
           ? {
-              tile: <ApprovalMark approval={first} size={32} />,
+              tile: <ApprovalMark approval={first} size={20} />,
               title: head(single),
               more: {
                 label: t("approval.run.show"),
-                content: <View style={styles.items}>{single.map((a) => item(a, true))}</View>,
+                content: <View style={styles.nested}>{single.map((a) => item(a, true, true))}</View>,
                 open: opened.has(keys[0] ?? ""),
                 onToggle: () => toggle(keys[0]),
               },
@@ -322,13 +327,15 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
             {runs.map((run, i) => {
               const [lead] = run;
               if (!lead) return null;
-              if (run.length < 2) return item(lead, false);
+              if (run.length < 2) return item(lead, false, i > 0);
               const key = keys[i] ?? lead.id;
               const open = opened.has(key);
               return (
-                <View key={key} style={[styles.item, { backgroundColor: c.sunken }]}>
+                <View key={key} style={[styles.item, i > 0 && [styles.divided, { borderTopColor: c.line2 }]]}>
                   <View style={styles.itemRow}>
-                    <ApprovalMark approval={lead} size={24} />
+                    <LineIcon variant="subhead" size={24}>
+                      <ApprovalMark approval={lead} size={24} />
+                    </LineIcon>
                     <View style={styles.grow}>
                       <Text variant="subhead" tone="ink" style={styles.bold}>
                         {head(run)}
@@ -340,7 +347,8 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                         }}
                         accessibilityRole="button"
                         accessibilityState={{ expanded: open }}
-                        hitSlop={6}
+                        // An 18-point line: the slop gives "Show" the 44 a finger needs.
+                        hitSlop={{ top: 13, bottom: 13, left: 6, right: 6 }}
                         style={({ pressed }) => [styles.runMore, pressed && styles.pressed]}
                       >
                         <Text variant="footnote" tone="ink2" style={styles.bold}>
@@ -353,7 +361,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                     </View>
                   </View>
                   {decide(run, t("approval.run.approve"), true)}
-                  {open ? <View style={styles.items}>{run.map((a) => item(a, true))}</View> : null}
+                  {open ? run.map((a) => item(a, true, true)) : null}
                 </View>
               );
             })}
@@ -361,8 +369,9 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
           </View>
         )
       }
+      expiry={deadline ? <ExpiryLine createdAt={first.createdAt} expiresAt={deadline} /> : undefined}
       foot={
-        <AskFoot expiry={deadline ? <ExpiryLine createdAt={first.createdAt} expiresAt={deadline} /> : undefined}>
+        <AskFoot>
           {single ? decide(single, t("approval.run.approve"), true) : decide(items, t("approval.all.approve"), false)}
         </AskFoot>
       }
@@ -376,6 +385,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
  * how it ended once decided.
  */
 function ApprovalGroupItem({
+  divider,
   approval: a,
   lead,
   name,
@@ -384,6 +394,8 @@ function ApprovalGroupItem({
   onApprove,
   onAlways,
 }: {
+  /** A hairline above it: every item but the card's first. */
+  divider: boolean;
   approval: Approval;
   lead: Approval;
   name: string;
@@ -396,20 +408,24 @@ function ApprovalGroupItem({
   const meId = useMeId();
   const dir = useDirectory();
   const c = useColors();
+  const reduced = useReducedMotion();
   const cancelAhead = useCancelAhead();
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   const pending = a.status === "pending";
+  const source = useApprovalSource(a);
   const detail = a.email
     ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
     : !a.connector
       ? a.detail
-      : approvalSummary(a, i18n.language) || null;
+      : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   const own = itemOwnWords(a, lead);
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   return (
-    <View style={[styles.item, { backgroundColor: c.sunken }, !pending && styles.itemDone]}>
+    <View style={[styles.item, divider && [styles.divided, { borderTopColor: c.line2 }], !pending && styles.itemDone]}>
       <View style={styles.itemRow}>
-        <ApprovalMark approval={a} size={24} />
+        <LineIcon variant="subhead" size={24}>
+          <ApprovalMark approval={a} size={24} />
+        </LineIcon>
         <View style={styles.grow}>
           <Text variant="subhead" tone="ink" numberOfLines={2} style={styles.bold}>
             {approvalTitleText(t, a)}
@@ -465,7 +481,8 @@ function ApprovalGroupItem({
           </>
         ) : null
       ) : (
-        <>
+        // Decided while the card shows: how it ended fades in where its buttons were.
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.item}>
           <Text variant="footnote" tone="muted">
             {[
               decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name),
@@ -485,7 +502,7 @@ function ApprovalGroupItem({
               />
             </View>
           ) : null}
-        </>
+        </Animated.View>
       )}
     </View>
   );
@@ -500,48 +517,24 @@ function ApprovalGroupItem({
  */
 function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const { t, i18n } = useTranslation();
-  const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
-  const toast = useToast();
   const asks = useAskStore();
-  const decide = useDecideApproval(orgId);
   const origin = useOriginShort(a);
   const name = dir.agentById.get(a.agentId)?.name ?? "";
-  const g = genderOf(name);
-  const high = approvalRisk(a) === "high";
   const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
   const owner = approvalWaitsFor(a, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
   const requester = requesterDecidesLine(t, a);
-  const approve = (always = false) =>
-    decide.mutate(
-      { id: a.id, decision: "approve", always },
-      {
-        onSuccess: () => {
-          if (!high) successHaptic();
-          asks?.settle(a.id);
-          toast({
-            ...(always
-              ? approveAlwaysToast(t, name, alwaysRoutineName(t, a))
-              : {
-                  title: t("mobile.approval.approved"),
-                  subtitle: a.runAt
-                    ? t("mobile.approval.approvedAhead", { when: nextLabel(i18n.language, a.runAt) })
-                    : t(`mobile.approval.approvedSub${g}`, { name }),
-                }),
-            agentId: a.agentId,
-          });
-        },
-        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
-      },
-    );
+  // The same approving as Atividade's card: the haptic, the toast saying what follows.
+  const { approve, pending, high } = useApproveNow(a, () => asks?.settle(a.id));
   // An email says to whom and about what; a connector's detail is its raw call (`tool · key=value`), so its
   // values in words instead, the call under "Ver detalhes".
+  const source = useApprovalSource(a);
   const detail = a.email
     ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
     : !a.connector
       ? a.detail
-      : approvalSummary(a, i18n.language) || null;
+      : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   return (
     <AskCard
       id={a.id}
@@ -550,8 +543,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       waitsFor={a.canDecide ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
       lead={approvalWhy(a) ?? t("approval.askPlain")}
       well={{
-        tile: <ApprovalMark approval={a} size={32} />,
-        title: approvalTitleText(t, a),
+        tile: <ApprovalMark approval={a} size={20} />,
+        title: approvalHeadline(t, a, i18n.language),
         detail,
         more: {
           label: a.email ? t("approval.seeEmail") : t("approval.seeDetails"),
@@ -567,7 +560,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
               )}
               {origin ? (
                 <View style={styles.origin}>
-                  <Icon name="clock" size={13} color={c.muted} />
+                  <LineIcon variant="footnote" name="clock" size={13} color={c.muted} />
                   <Text variant="footnote" tone="muted" style={styles.grow}>
                     {origin}
                   </Text>
@@ -582,9 +575,10 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
           ),
         },
       }}
-      body={<ApprovalAheadLine approval={a} />}
+      body={aheadPhase(a) === "asking" && a.runAt ? <ApprovalAheadLine approval={a} /> : undefined}
+      expiry={<ExpiryLine createdAt={a.createdAt} expiresAt={a.expiresAt} />}
       foot={
-        <AskFoot expiry={<ExpiryLine createdAt={a.createdAt} expiresAt={a.expiresAt} />}>
+        <AskFoot>
           {a.canDecide ? (
             <>
               <View style={styles.itemActs}>
@@ -601,11 +595,11 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
                     size="card"
                     icon="check"
                     label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
-                    disabled={decide.isPending}
+                    disabled={pending}
                     onPress={() => approve()}
                   />
                 )}
-                <ApproveAlwaysButton approval={a} disabled={decide.isPending} onPress={() => approve(true)} />
+                <ApproveAlwaysButton approval={a} disabled={pending} onPress={() => approve(true)} />
                 <Button
                   variant="secondary"
                   size="card"
@@ -804,6 +798,8 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
       onPress={() => router.push(chatHref(thread.channelId, thread.id))}
       accessibilityRole="button"
       accessibilityLabel={t("mobile.chat.replies", { count: thread.replyCount })}
+      // A 36-point link under the message: the slop gives it the 44 a finger needs.
+      hitSlop={{ top: 4, bottom: 4 }}
       style={({ pressed }) => [styles.tlink, surface, pressed && styles.pressed]}
     >
       <View style={styles.faces}>
@@ -815,7 +811,7 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
       </View>
       {thread.replyCount > 0 ? (
         <>
-          <Count value={thread.replyCount} size={13} />
+          <Count value={thread.replyCount} size={15} />
           <Text variant="small" tone="ink2" style={styles.bold}>
             {t("mobile.chat.repliesWord", { count: thread.replyCount })}
           </Text>
@@ -834,17 +830,22 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1 },
+  grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   bold: { fontWeight: "600" },
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  // Requests sharing one card: each a well of its own, decided ones quieter.
+  // Requests sharing one card: flat rows divided by hairlines (never a plate in a card), decided ones quieter.
   items: { gap: 8, marginTop: 10 },
-  item: { gap: 8, padding: 10, borderRadius: 12 },
+  // A run's requests, unfolded under it or in the card's well: each with its hairline above.
+  nested: { gap: 8 },
+  item: { gap: 8 },
+  // 12 above the hairline (with the list's gap) and 12 under it.
+  divided: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   itemDone: { opacity: 0.7 },
-  itemRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // The mark on the title's first line: centred on the whole item it floated beside a two-line title and its values.
+  itemRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   // A request's decision: one row under its values, left-aligned, every button the strip's height.
   itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   runMore: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", marginTop: 4 },
@@ -874,7 +875,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     paddingLeft: 8,
     paddingRight: 12,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   faces: { flexDirection: "row", marginRight: 2 },
   overlap: { marginLeft: -6 },

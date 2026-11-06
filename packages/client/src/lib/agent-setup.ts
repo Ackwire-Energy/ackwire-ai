@@ -10,7 +10,7 @@ import type {
   NewAgentSetup,
 } from "../api/types";
 import { thinksWith } from "./brain";
-import { advancedParts, effortLevel } from "./brain-advanced";
+import { advancedParts, effortLevel, viewSpeedFits } from "./brain-advanced";
 import { isContextLimit } from "./context-limits";
 import { firstName } from "./format";
 import { planLabel, planOfAccount } from "./no-ai";
@@ -32,6 +32,7 @@ export function setupOfBrain(view: AgentBrain): AgentSetup | null {
     account: view.account,
     model: view.model,
     effort: view.effort,
+    ...(viewSpeedFits(view) ? { speed: view.speed } : {}),
     contextTokens: view.contextTokens,
     fallback: view.fallback,
     onlyOwner: view.onlyOwner,
@@ -206,6 +207,7 @@ export function newAgentStartText(
     apiKey: true,
     now: {
       effort: effortLevel(start.input.effort),
+      speed: "standard",
       contextTokens: isContextLimit(start.input.contextTokens) ? start.input.contextTokens : null,
       onlyOwner: true,
       fallback: start.input.fallback ?? true,

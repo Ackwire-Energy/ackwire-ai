@@ -220,7 +220,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                   <ProfileTrigger
                     actor={{ type: "person", id: m.userId }}
                     label={t("profile.of", { name: m.name })}
-                    className="profile-trigger--name members-person__name"
+                    className="profile-trigger--name members-person__name ac-captop"
                   >
                     {m.name}
                     {isMe ? t("common.youSuffix") : ""}
@@ -230,7 +230,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                     <span>{m.email}</span>
                   </span>
                 </span>
-                <span className="members-person__end">
+                <span className="members-person__end ac-captail ac-captop">
                   <span className="small muted members-person__seen">
                     {m.online
                       ? t("members.activeNow")

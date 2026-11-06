@@ -1,4 +1,5 @@
 import { useNotificationCount } from "@agenteschat/client";
+import { workspaceLabel, workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { MenuAt, MenuHeading, MenuItem, MenuReactions, MenuSeparator } from "@agenteschat/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
@@ -153,6 +154,7 @@ const ECHO_MS = 400;
  * `window.__agentesMenu(action)`. Mounted in the workspace, where they make sense.
  */
 export function MenuBarActions({ orgId }: { orgId: string }) {
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   useEffect(() => {
     const keyed = new Map<string, number>();
@@ -192,7 +194,8 @@ export function MenuBarActions({ orgId }: { orgId: string }) {
 
   // The Go menu lists the person's organizations.
   const { me } = useOrg();
-  const orgList = me.organizations.map((o) => ({ id: o.id, name: o.name }));
+  const notes = workspaceNotes(t, i18n.language, me.organizations);
+  const orgList = me.organizations.map((o) => ({ id: o.id, name: workspaceLabel(o.name, notes.get(o.id)) }));
   const orgsKey = JSON.stringify(orgList);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the list is sent when its content changes
   useEffect(() => {

@@ -17,6 +17,7 @@ import {
   INTERRUPTED_BY_RESTART,
   replyThreadOf,
   runErrorDetail,
+  shownStatusSql,
   transitionRun,
 } from "./runs";
 import { USAGE_WAIT_CODES } from "./usage-pause";
@@ -348,7 +349,8 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     pending: string[] | string | null;
     background: boolean | string;
   }>(
-    await db.execute(sql`select r.id, r.agent_id, r.status, r.thread_root_id, r.trigger_message_id, r.started_at,
+    // Asking its computer from the line (`computerWaitOf`) it still waits: no "thinking" row for the ask.
+    await db.execute(sql`select r.id, r.agent_id, ${shownStatusSql} as status, r.thread_root_id, r.trigger_message_id, r.started_at,
         r.heartbeat_at, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending,
         (r.background or r.work_id is not null) as background
       from ${agentRuns} r join ${channels} c on c.id = r.channel_id

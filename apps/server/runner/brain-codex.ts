@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFile, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -7,6 +7,7 @@ import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   type BrainEffort,
+  type BrainSpeed,
   isAccountId,
   isBrainEffort,
   isContextTokens,
@@ -72,6 +73,7 @@ export const CODEX_TOOL_OUTPUT_MAX = 4000;
 /** Sessions remembered (oldest forgotten first). */
 export const CODEX_THREADS_MAX = 2000;
 const KILL_GRACE_MS = 5000;
+const CODEX_LOGIN_STATUS_MS = 5000;
 
 /** The engine's `BrainEvent` (ADR 0032 contract), as the runner sends it in `brain.event`. */
 export type CodexBrainEvent =
@@ -97,7 +99,8 @@ export type CodexBrainEvent =
   | { type: "done"; text: string; session?: { id: string } }
   | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15 (app-server only): messages handed with `brain.steer` that the turn read. */
-  | { type: "steer_read"; uuids: string[] };
+  | { type: "steer_read"; uuids: string[] }
+  | { type: "speed_fallback"; message: string };
 
 /** `brain.turn` with `kind: "codex"` (contract: "Runner"). */
 export interface CodexBrainTurnRequest {
@@ -115,6 +118,8 @@ export interface CodexBrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks. */
   effort?: BrainEffort;
+  /** Protocol 46: Fast mode on this turn. */
+  speed?: BrainSpeed;
   /** Protocol 28: the agent's context limit in tokens. */
   contextTokens?: number;
   /** Protocol 16: the turn's permission profile (absent: `work`); protocol 41: `chat`, the team's right hand. */
@@ -200,6 +205,46 @@ export const codexProfileOf = (req: { permissions?: { mode?: unknown } }): Comma
 
 /** The Codex sandbox of a profile (`--sandbox`, the app-server's `sandbox`): never with the network. */
 export const codexSandbox = (profile: CommandProfile) => (profile === "plan" ? "read-only" : "workspace-write");
+
+/**
+ * Fast mode on a `codex exec` turn. `fast` reaches the provider as `service_tier: "priority"` (codex-cli 0.166.0), and
+ * a model that doesn't list the tier goes out without one. `features.` rather than `--enable`: the flag fails the turn
+ * on a Codex that doesn't know the feature, the key doesn't.
+ */
+export const CODEX_FAST_CONFIG = ['service_tier="fast"', "features.fast_mode=true"];
+
+/**
+ * Every other `codex exec` turn. `exec resume` goes on with the tier the thread last ran with, and leaving
+ * `service_tier` out doesn't clear it: only the feature off does (codex-cli 0.165.0 and 0.166.0). It also holds against
+ * a `service_tier` in the config of the person's own computer.
+ */
+export const CODEX_STANDARD_CONFIG = ["features.fast_mode=false"];
+
+/**
+ * A provider's words we know for a refused tier, or a Codex that can't read the setting. On the wire the tier is
+ * `priority`.
+ */
+const CODEX_FAST_REFUSED = /service[_ ]tier|fast[_ ]mode|priority/i;
+
+/**
+ * This failure may be Fast's. No real refusal has been seen yet, so anything the provider failed comes in, not only
+ * the words above: going again costs one try on a turn that was lost anyway. A dropped connection is the engine's
+ * retry, and a plan's limit or a lost sign-in aren't about speed.
+ */
+const fastMayHaveFailed = (error: Extract<CodexBrainEvent, { type: "error" }>) =>
+  error.code === "codex_failed" && (!error.retryable || CODEX_FAST_REFUSED.test(error.message));
+
+/** The computer's own Codex is on a ChatGPT sign-in, not an API key, where Fast bills the key at a higher rate. */
+const ownChatGptSignIn = (opts: Pick<CodexTurnOptions, "bin" | "env">) =>
+  new Promise<boolean>((resolve) => {
+    const env = { ...process.env, ...opts.env };
+    execFile(
+      resolveCommand(opts.bin ?? "codex", env.PATH),
+      ["login", "status"],
+      { env, timeout: CODEX_LOGIN_STATUS_MS },
+      (err, stdout, stderr) => resolve(!err && /logged in using chatgpt/i.test(`${stdout}${stderr}`)),
+    );
+  });
 
 /** The agent's context limit as Codex's own: it compacts the conversation there instead of at its window. */
 export const codexContextOverride = (tokens: unknown): string[] =>
@@ -330,6 +375,8 @@ export function codexTurnArgs(input: {
   writableRoots?: string[];
   /** Protocol 13: `-c model_reasoning_effort` (anything else is left out). */
   effort?: BrainEffort;
+  /** Protocol 46: `fast`, `CODEX_FAST_CONFIG`; anything else, `CODEX_STANDARD_CONFIG`. */
+  speed?: BrainSpeed;
   /** Protocol 28: `-c model_auto_compact_token_limit` (anything else is left out). */
   contextTokens?: number;
   /** Protocol 16: the sandbox (default `work`: workspace-write; `plan`: read-only). Never the network. */
@@ -363,6 +410,7 @@ export function codexTurnArgs(input: {
     ...(isBrainEffort(input.effort)
       ? ["-c", `model_reasoning_effort=${JSON.stringify(codexEffort(input.effort))}`]
       : []),
+    ...(input.speed === "fast" ? CODEX_FAST_CONFIG : CODEX_STANDARD_CONFIG).flatMap((c) => ["-c", c]),
     ...codexContextOverride(input.contextTokens),
     ...(input.model ? ["-m", input.model] : []),
     "-o",
@@ -615,6 +663,8 @@ export interface CodexTurnInput {
   /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
   account?: { id: string; home: string };
   effort?: BrainEffort;
+  /** Protocol 46: Fast mode on this turn. */
+  speed?: BrainSpeed;
   /** Protocol 28: the agent's context limit in tokens. */
   contextTokens?: number;
   /** App-server mode: the agent (one process per agent and session) and its folder (the MCP bridge's). */
@@ -652,8 +702,33 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
   }
   // A long-lived app-server takes messages mid-turn; exec runs the turns it can't (an older CLI, a failed handshake…).
   // A `chat` turn's flags exist only for `exec`.
-  if (opts.app && !input.chat) return opts.app.turn({ ...input, version }, opts, () => runCodexExec(input, opts));
-  return runCodexExec(input, opts);
+  const run = (turn: CodexTurnInput, turnOpts: CodexTurnOptions) =>
+    turnOpts.app && !turn.chat
+      ? turnOpts.app.turn({ ...turn, version }, turnOpts, () => runCodexExec(turn, turnOpts))
+      : runCodexExec(turn, turnOpts);
+  const { speed: _speed, ...standard } = input;
+  if (input.speed !== "fast" || (!input.account && !(await ownChatGptSignIn(opts)))) return run(standard, opts);
+  // Fast never costs a reply: failed before anything happened, the same turn goes again at standard speed.
+  const first: { started?: boolean; refused?: string } = {};
+  await run(input, {
+    ...opts,
+    emit: (event) => {
+      if (event.type === "error" && !first.started && fastMayHaveFailed(event)) first.refused = event.message;
+      else {
+        first.started = true;
+        opts.emit(event);
+      }
+    },
+  });
+  const { refused } = first;
+  if (refused === undefined) return;
+  return run(standard, {
+    ...opts,
+    emit: (event) => {
+      if (event.type === "done") opts.emit({ type: "speed_fallback", message: refused });
+      opts.emit(event);
+    },
+  });
 }
 
 /** One turn as `codex exec --json` (the version already checked). */
@@ -675,6 +750,7 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     mcp: input.mcp.url ? { url: input.mcp.url } : { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
     ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
     ...(input.effort ? { effort: input.effort } : {}),
+    ...(input.speed ? { speed: input.speed } : {}),
     ...(input.contextTokens ? { contextTokens: input.contextTokens } : {}),
     profile: input.profile ?? "work",
     ...(input.chat ? { chat: true } : {}),
@@ -893,6 +969,7 @@ export async function handleCodexBrainTurn(
         ...(writableRoots.length ? { writableRoots } : {}),
         ...(account ? { account } : {}),
         ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
+        ...(req.speed === "fast" && !chat ? { speed: "fast" as const } : {}),
         ...(isContextTokens(req.contextTokens) ? { contextTokens: req.contextTokens } : {}),
         agentId: String(req.agent.id),
         folder,

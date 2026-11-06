@@ -219,7 +219,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} adalah kodemu untuk menghapus ruang kerja`,
-    subjectAccount: (code) => `${code} adalah kodemu untuk menghapus akunmu`,
+    subjectAccount: (code) => `${code} adalah kodemu untuk menghapus seluruh akunmu`,
     preheader: "Ketik di agentes.chat untuk mengonfirmasi. Kodenya berlaku 10 menit.",
     headline: "Kodemu",
     workspace: (org) => [
@@ -228,9 +228,9 @@ export const words: EmailWords = {
       ". Ruang kerja ini langsung ditutup untuk semua orang dan dihapus permanen 7 hari kemudian.",
     ],
     account: (email) => [
-      "Ketik kode ini untuk menghapus akun ",
+      "Ketik kode ini untuk menghapus seluruh akun ",
       { b: email },
-      ". Akun ini langsung hilang, dan ruang kerja yang hanya berisi kamu ikut ditutup.",
+      ", bukan hanya satu ruang kerja. Akun ini langsung hilang, dan ruang kerja yang hanya berisi kamu ikut ditutup.",
     ],
     support: (address) => [
       "Berlaku 10 menit, dan tidak ada yang dihapus tanpa kode ini. Kalau ini bukan kamu, jangan bagikan kodenya dan kirim email ke ",

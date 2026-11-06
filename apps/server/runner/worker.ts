@@ -709,6 +709,8 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     },
     paused: () => state.paused.paused,
     access: () => state.access,
+    // The workspace a worker is given is its agent's home (`workerCommand`).
+    ownHome: workspaceReal,
     browser,
     desktopUse,
   };

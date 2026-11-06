@@ -20,11 +20,11 @@ import { isPlanId, planOf, signInProviderOf } from "@agenteschat/client/lib/plan
 import {
   Button,
   Card,
+  CardHeader,
   Dialog,
   DialogBody,
   DialogFooter,
   Field,
-  InfoHint,
   Input,
   List,
   Menu,
@@ -143,17 +143,13 @@ export function AiAccountsSection() {
 
   return (
     <Card aria-labelledby="sec-plans">
-      <div className="row" style={{ gap: 12 }}>
-        <span className="ac-hintline" style={{ flex: "1 1 280px" }}>
-          <h2 id="sec-plans" className="ac-card__title">
-            {t("aiAccounts.page.title")}
-          </h2>
-          <InfoHint name={t("common.about", { label: t("aiAccounts.page.title") })}>
-            {t("aiAccounts.page.hint")}
-          </InfoHint>
-        </span>
-        {connect}
-      </div>
+      <CardHeader
+        id="sec-plans"
+        icon="computer"
+        title={t("aiAccounts.page.title")}
+        hint={{ name: t("common.about", { label: t("aiAccounts.page.title") }), text: t("aiAccounts.page.hint") }}
+        action={connect}
+      />
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {ai.isError && <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>}
       {ai.isSuccess && rows.length === 0 && own.length === 0 && (
@@ -239,7 +235,7 @@ export function AiAccountsSection() {
                     )
                   )}
                 </span>
-                <div className="ac-acts">
+                <div className="ac-acts ac-captail ac-captop">
                   {give.length === 1 && give[0] ? (
                     <Button variant="ghost" size="sm" onClick={() => give[0] && void giveTo(a, give[0])}>
                       {t("aiAccounts.page.useFor", agentGrammar(give[0].name))}

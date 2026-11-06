@@ -24,6 +24,7 @@ import {
   GroupedRow,
   Icon,
   IconButton,
+  LineIcon,
   PressScale,
   systemText,
   Text,
@@ -167,6 +168,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
           onPress: () =>
             remove.mutate(w.id, {
               onSuccess: () => {
+                successHaptic();
                 toast({ title: t("mobile.dashboards.widget.removed") });
                 goBack();
               },
@@ -228,10 +230,12 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
         />
         {w.status === "failed" && w.failure ? (
           <View style={styles.failure}>
-            <Icon name="info" size={16} color={c.warn} />
-            <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
-              {words.failure(w)}
-            </Text>
+            <View style={styles.failureLine}>
+              <LineIcon name="info" size={13} color={c.warn} variant="footnote" />
+              <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
+                {words.failure(w)}
+              </Text>
+            </View>
             {w.canEdit ? (
               <Button
                 size="sm"
@@ -474,6 +478,8 @@ const styles = StyleSheet.create({
   centerText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   failure: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingTop: 10 },
+  // The icon on the reason's first line when it wraps (the button stays centered beside the reason).
+  failureLine: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "flex-start", gap: 8 },
   alert: { gap: 8, paddingBottom: 12 },
   condition: { marginHorizontal: 14 },
   alertSave: { alignItems: "flex-end", paddingHorizontal: 14 },

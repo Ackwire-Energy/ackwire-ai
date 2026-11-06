@@ -248,7 +248,7 @@ export const en = {
   },
   deletionCode: {
     subjectWorkspace: (code: string) => `${code} is your code to delete a workspace`,
-    subjectAccount: (code: string) => `${code} is your code to delete your account`,
+    subjectAccount: (code: string) => `${code} is your code to delete your whole account`,
     preheader: "Type it in agentes.chat to confirm. It works for 10 minutes.",
     headline: "Your code",
     workspace: (org: string): Text => [
@@ -257,9 +257,9 @@ export const en = {
       ". It closes for everyone at once and is deleted for good 7 days later.",
     ],
     account: (email: string): Text => [
-      "Type this code to delete the account ",
+      "Type this code to delete the whole account ",
       { b: email },
-      ". It goes at once, and the workspaces only you are in close with it.",
+      ", not just one workspace. It goes at once, and the workspaces only you are in close with it.",
     ],
     support: (address: string): Text => [
       "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and write to ",

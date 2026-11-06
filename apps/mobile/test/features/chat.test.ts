@@ -64,6 +64,7 @@ import {
   turnPhase,
   turnRuns,
   turnShows,
+  turnSignature,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -488,7 +489,7 @@ describe("working line", () => {
     expect(entriesOffScreen(workingEntries([ada], [], name), [ada], adaShows)).toEqual([]);
   });
 
-  test("its row out of view, the line speaks for that one agent: its step, its time, Ver and its stop", async () => {
+  test("its row out of view, the line speaks for that one agent: its step, its time right after it, and Ver", async () => {
     const en = await translator("en");
     const now = 1_000_000;
     const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: now - 16_000 });
@@ -512,13 +513,13 @@ describe("working line", () => {
     // Two agents out of view: the line can't say whose time or stop.
     const both = workingEntries([ada, atlas], [], name);
     expect(awayRun(both, [ada, atlas], () => false)).toBeUndefined();
-    // The step keeps one width in the line, so the clock and the stop never move as it turns.
+    // The step takes its own width, so its time follows the words instead of floating after a fixed gap.
     const lines = await source("features/chat/LiveRows.tsx");
-    expect(lines).toContain("barStep: { flexBasis: 150, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
-    // "Ver" only once its row is in the conversation, and then the stop after it, without a second rule.
+    expect(lines).toContain("barStep: { flexShrink: 1, minWidth: 0 },");
+    // "Ver" only once its row is in the conversation; no stop of the line's own (the composer's, under it, is the one).
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
     expect(line).toContain("const seeable = away && turnShows(away) ? away : undefined;");
-    expect(line).toContain("<LineStop runs={stoppable} onStop={onStop} rule={!seeable} />");
+    expect(line).not.toContain("<LineStop");
   });
 
   test("the row's stop: the latest run here I may stop (the web's rule), never a guess", () => {
@@ -927,6 +928,21 @@ describe("an agent's turn as one block", () => {
     expect(turnShows({ ...fresh, work: [call("1", "sentry_list_issues", true)] })).toBe(false);
     expect(turnShows({ ...fresh, text: "Oi" })).toBe(true);
     expect(turnShows({ ...fresh, work: [{ kind: "say", text: "Vou ler.", turn: 1 }] })).toBe(true);
+  });
+
+  test("a call refused for its arguments: quiet once made right, plain when the run ends without it", () => {
+    const slip = { ...call("1", "offer_connect_app", false), failed: true, slip: true };
+    const made = turnItems(run({ runId: "r", work: [slip, call("2", "offer_connect_app", false)] }));
+    expect(made.map((x) => x.kind === "call" && x.line.state)).toEqual(["stop", "done"]);
+    expect(toolNow(turnItems(run({ runId: "r", work: [slip] })))?.state).toBe("run");
+    expect(toolNow(turnItems(run({ runId: "r", work: [slip] }), true))?.state).toBe("fail");
+    expect(toolNow(turnItems(run({ runId: "r", status: "failed", work: [slip] })))?.state).toBe("fail");
+  });
+
+  test("the end of what it said reaching its line changes what the saved reply keeps", () => {
+    const said = (text: string) =>
+      turnSignature(turnItems(run({ runId: "r", work: [{ kind: "say", text, turn: 1 }] })));
+    expect(said("Se você me passar o `build.gradle`")).not.toBe(said("Se você me pa"));
   });
 
   test("the header word: thinking, working on steps, writing, stopped", () => {

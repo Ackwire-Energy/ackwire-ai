@@ -5,6 +5,7 @@ import {
   audienceLines,
   audiencePatch,
   audienceWithMe,
+  opensDetails,
   opensOthersPlan,
   setupPlanOpens,
   setupPlanQuestion,
@@ -166,4 +167,12 @@ describe("setupPlanQuestion (Usar em outros agentes)", () => {
     expect(lines[0]).toContain('"owner":"João"');
     expect(lines[1]).toContain('"owner":"Bia"');
   });
+});
+
+test("an agent's picture leads to its details unless it left the team or the viewer sees only its public card", () => {
+  expect(opensDetails({})).toBe(true);
+  expect(opensDetails({ seesDetails: true })).toBe(true);
+  expect(opensDetails({ seesDetails: false })).toBe(false);
+  expect(opensDetails({ former: "archived" })).toBe(false);
+  expect(opensDetails(undefined)).toBe(false);
 });

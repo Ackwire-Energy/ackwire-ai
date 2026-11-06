@@ -2,9 +2,23 @@ import { useMission, useMissionDecisions, useMissionReviews, useThreadInfo, useT
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ComputerIcon, ComputerPortrait, useComputerKind } from "@/computer/ComputerPortrait";
-import { Button, Card, Chip, Count, Icon, IconButton, PixelOrbit, PlanTrack, Section, Text } from "@/ui";
+import {
+  Button,
+  Card,
+  Chip,
+  Count,
+  Icon,
+  IconButton,
+  LineIcon,
+  PixelOrbit,
+  PlanTrack,
+  Section,
+  Text,
+  useReducedMotion,
+} from "@/ui";
 import { ThreadOptions } from "../chat/sheets";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
@@ -56,6 +70,11 @@ function Mission({ id }: { id: string }) {
   const computer = useComputerKind(orgId, m?.machine?.id);
   const cloud = useEdition() === "cloud";
   const names = useNamesComputers();
+  // What waits on you leaves as it is decided, a step's mark changes as it moves on, and the sections under them
+  // slide into place; nothing moves with reduced motion.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
 
   if (!m) {
     return (
@@ -113,7 +132,7 @@ function Mission({ id }: { id: string }) {
         <View style={styles.head}>
           <View style={styles.row}>
             <Icon name="target" size={15} color={c.muted} />
-            <Text variant="small" tone="muted" style={styles.bold}>
+            <Text variant="small" tone="muted" style={[styles.bold, styles.shrink]}>
               {channelName ? t("mobile.mission.in", { channel: channelName }) : t("mobile.mission.kind")}
             </Text>
           </View>
@@ -131,7 +150,7 @@ function Mission({ id }: { id: string }) {
               .join(" · ")}
           </Text>
           {m.branch ? (
-            <View style={styles.row}>
+            <View style={[styles.row, styles.baseline]}>
               <Text style={[styles.mono, styles.shrink, { color: c.muted }]} numberOfLines={1}>
                 {m.branch}
               </Text>
@@ -194,18 +213,26 @@ function Mission({ id }: { id: string }) {
           </View>
         ) : null}
 
-        {waitingN > 0 ? (
-          <Section title={t("mobile.home.waiting")} count={waitingN}>
-            <View style={styles.stack}>
-              {waiting.reviews.map((r) => (
-                <ReviewCardView key={r.id} review={r} mission={m} />
-              ))}
-              {waiting.decisions.map((d) => (
-                <DecisionCardView key={d.id} decision={d} mission={m} />
-              ))}
-            </View>
-          </Section>
-        ) : null}
+        <LayoutAnimationConfig skipEntering>
+          {waitingN > 0 ? (
+            <Animated.View {...fade} layout={layout}>
+              <Section title={t("mobile.home.waiting")} count={waitingN}>
+                <View style={styles.stack}>
+                  {waiting.reviews.map((r) => (
+                    <Animated.View key={r.id} {...fade} layout={layout}>
+                      <ReviewCardView review={r} mission={m} />
+                    </Animated.View>
+                  ))}
+                  {waiting.decisions.map((d) => (
+                    <Animated.View key={d.id} {...fade} layout={layout}>
+                      <DecisionCardView decision={d} mission={m} />
+                    </Animated.View>
+                  ))}
+                </View>
+              </Section>
+            </Animated.View>
+          ) : null}
+        </LayoutAnimationConfig>
 
         {sessions.length > 0 ? (
           <Section title={t("mobile.mission.onComputer")}>
@@ -215,7 +242,9 @@ function Mission({ id }: { id: string }) {
                   key={s.id}
                   style={[styles.sess, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
                 >
-                  <ComputerPortrait kind={computer} state={m.machine?.online === false ? "offline" : "online"} />
+                  <View style={styles.portrait}>
+                    <ComputerPortrait kind={computer} state={m.machine?.online === false ? "offline" : "online"} />
+                  </View>
                   <View style={styles.grow}>
                     <Text variant="body" style={styles.bold} numberOfLines={2}>
                       {s.mode === "setup" ? t("mobile.mission.setupTitle") : s.title}
@@ -255,41 +284,48 @@ function Mission({ id }: { id: string }) {
         {rows.length > 0 ? (
           <Section title={t("mobile.mission.plan.section")} count={rows.length}>
             <Card>
-              {rows.map((it, i) => (
-                <View
-                  key={it.id}
-                  style={[
-                    styles.planRow,
-                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-                  ]}
-                >
-                  <View style={styles.st}>
-                    {it.status === "done" ? (
-                      <Icon name="check" size={18} color={c.ok} />
-                    ) : it.status === "doing" ? (
-                      <PixelOrbit color={color} size={14} />
-                    ) : it.status === "waiting_you" ? (
-                      <Icon name="clock" size={18} color={c.muted} />
-                    ) : (
-                      <Icon name="circle" size={18} color={c.faint} />
-                    )}
-                  </View>
-                  <View style={styles.grow}>
-                    <Text
-                      variant="body"
-                      tone={it.status === "done" ? "muted" : it.status === "todo" ? "ink2" : "ink"}
-                      style={it.status === "doing" || it.status === "waiting_you" ? styles.bold : undefined}
-                    >
-                      {it.title}
-                    </Text>
-                    {it.status === "doing" || it.status === "waiting_you" ? (
-                      <Text variant="small" tone="muted">
-                        {t(it.status === "doing" ? "mobile.mission.plan.doing" : "mobile.mission.plan.waiting")}
+              {/* The marks there when the plan shows don't fade in; only a step that moves on does. */}
+              <LayoutAnimationConfig skipEntering>
+                {rows.map((it, i) => (
+                  <View
+                    key={it.id}
+                    style={[
+                      styles.planRow,
+                      i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                    ]}
+                  >
+                    {/* On the item's first line, however many lines it takes. */}
+                    <LineIcon variant="body" size={18}>
+                      {/* Keyed by the step's state: a step moving on cross-fades its mark. */}
+                      <Animated.View key={it.status} {...fade} style={styles.st}>
+                        {it.status === "done" ? (
+                          <Icon name="check" size={18} color={c.ok} />
+                        ) : it.status === "doing" ? (
+                          <PixelOrbit color={color} size={14} />
+                        ) : it.status === "waiting_you" ? (
+                          <Icon name="clock" size={18} color={c.muted} />
+                        ) : (
+                          <Icon name="circle" size={18} color={c.faint} />
+                        )}
+                      </Animated.View>
+                    </LineIcon>
+                    <View style={styles.grow}>
+                      <Text
+                        variant="body"
+                        tone={it.status === "done" ? "muted" : it.status === "todo" ? "ink2" : "ink"}
+                        style={it.status === "doing" || it.status === "waiting_you" ? styles.bold : undefined}
+                      >
+                        {it.title}
                       </Text>
-                    ) : null}
+                      {it.status === "doing" || it.status === "waiting_you" ? (
+                        <Text variant="small" tone="muted">
+                          {t(it.status === "doing" ? "mobile.mission.plan.doing" : "mobile.mission.plan.waiting")}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              ))}
+                ))}
+              </LayoutAnimationConfig>
             </Card>
           </Section>
         ) : null}
@@ -328,6 +364,8 @@ const styles = StyleSheet.create({
   head: { paddingHorizontal: 20, gap: 4 },
   progCard: { marginHorizontal: 16, marginTop: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // Two sizes of text on one line: they share a baseline.
+  baseline: { alignItems: "baseline" },
   title: { marginTop: 4 },
   bold: { fontWeight: "600" },
   grow: { flex: 1 },
@@ -338,12 +376,14 @@ const styles = StyleSheet.create({
   btn: { flexDirection: "row", paddingHorizontal: 16, marginTop: 16 },
   stack: { gap: 8 },
   setup: { paddingHorizontal: 16, marginTop: 8 },
-  sess: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  // The time on the title's first line (its baseline), never centered beside two lines; the portrait centered.
+  sess: { flexDirection: "row", alignItems: "baseline", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  portrait: { alignSelf: "center" },
   caret: { width: 2, height: 12 },
   meta: { alignItems: "flex-end", gap: 4, maxWidth: 110 },
   mono: { fontFamily: MONO, fontSize: 12 },
-  planRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  st: { width: 22, alignItems: "center" },
+  planRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  st: { width: 22, height: 18, alignItems: "center", justifyContent: "center" },
   dec: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   decText: { fontWeight: "500" },
 });

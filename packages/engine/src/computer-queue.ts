@@ -1,5 +1,17 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, rowsOf, type SQL, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  or,
+  rowsOf,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { TtlCache } from "./cache";
 import { NotFoundError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -30,6 +42,12 @@ const inLine = and(
   sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'`,
 );
 const waitingForRoom = (machineId: string) => and(eq(agentRuns.waitingMachineId, machineId), inLine);
+/**
+ * The line as people read it: also the run asking from it (`computerWaitOf`), which the computer may still refuse.
+ * Read as gone, its row went away at every ask, and a person's message starts one the moment the apps read the line.
+ */
+const shownInLine = (machineId: string) =>
+  and(eq(agentRuns.waitingMachineId, machineId), or(inLine, eq(agentRuns.status, "running")));
 const waitIdSql = sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`;
 const peopleSql = sql`coalesce((${agentRuns.transcript}->>'roomPeople')::boolean, false)`;
 const askedSql = sql`coalesce((${agentRuns.transcript}->>'roomAsked')::boolean, false)`;
@@ -367,6 +385,7 @@ export async function computerQueue(
         and(
           eq(agentRuns.orgId, orgId),
           eq(agentRuns.status, "running"),
+          isNull(agentRuns.waitingMachineId),
           sql`${agentRuns.transcript}->'roomAsk'->>'machineId' = ${machineId}`,
         ),
       )
@@ -375,7 +394,7 @@ export async function computerQueue(
       .select({ ...cols, people: sql<boolean>`${peopleSql}` })
       .from(agentRuns)
       .leftJoin(messages, trigger)
-      .where(and(eq(agentRuns.orgId, orgId), waitingForRoom(machineId)))
+      .where(and(eq(agentRuns.orgId, orgId), shownInLine(machineId)))
       .orderBy(rankSql(now), sinceSql, agentRuns.id),
     typicalTurns(db, orgId),
   ]);

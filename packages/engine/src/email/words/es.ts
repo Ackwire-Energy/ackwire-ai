@@ -229,7 +229,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} es tu código para eliminar un espacio de trabajo`,
-    subjectAccount: (code) => `${code} es tu código para eliminar tu cuenta`,
+    subjectAccount: (code) => `${code} es tu código para eliminar toda tu cuenta`,
     preheader: "Escríbelo en agentes.chat para confirmar. Es válido por 10 minutos.",
     headline: "Tu código",
     workspace: (org) => [
@@ -238,9 +238,9 @@ export const words: EmailWords = {
       ". Se cierra para todos al instante y se elimina para siempre 7 días después.",
     ],
     account: (email) => [
-      "Escribe este código para eliminar la cuenta ",
+      "Escribe este código para eliminar toda la cuenta ",
       { b: email },
-      ". Se elimina al instante, y los espacios de trabajo donde solo estás tú se cierran con ella.",
+      ", no solo un espacio de trabajo. Se elimina al instante, y los espacios de trabajo donde solo estás tú se cierran con ella.",
     ],
     support: (address) => [
       "Es válido por 10 minutos, y no se elimina nada sin él. Si no fuiste tú, no lo compartas y escribe a ",

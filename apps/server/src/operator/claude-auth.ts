@@ -63,7 +63,7 @@ const OrgClaudeAuth = z
         protocol: z.number().int(),
         claudeLoginMethods: z.array(AuthMethod).openapi({
           description:
-            "What a new Claude sign-in for all agents can use there: what its runner said (protocol 46), else what older runners do.",
+            "What a new Claude sign-in for all agents can use there: what its runner said (protocol 47), else what older runners do.",
         }),
         supportsSelected: z.boolean().openapi({
           description: "It can use the method the policy gives it now; else such a sign-in there is refused.",
@@ -81,7 +81,7 @@ const policyJson = (p: ClaudeAuthPolicy) => ({
 });
 
 /**
- * How new Claude sign-ins for all agents are made (ADR 0149): the installation's policy and how the connections
+ * How new Claude sign-ins for all agents are made (ADR 0150): the installation's policy and how the connections
  * people have now sign in. A change reaches only sign-ins started after it; every connection keeps its method.
  */
 export function registerOperatorClaudeAuth(api: OpenAPIHono, { db }: OperatorDeps) {

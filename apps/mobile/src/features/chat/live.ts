@@ -20,6 +20,7 @@ import {
   cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
+  cacheReceipts,
   cacheTeamCard,
   catchUpChannel,
   consultSeeds,
@@ -44,6 +45,7 @@ import {
   type SecretRequest,
   type StreamsState,
   seedReceipt,
+  seedReceipts,
   staleProvisional,
   startThreadCache,
   stopTyping,
@@ -82,7 +84,8 @@ type Action =
   | { type: "reconcile"; channelId: string; active: Parameters<typeof reconcileRuns>[2]; at: number; askedAt: number }
   | { type: "consults"; channelId: string; open: OpenConsult[]; at: number; askedAt: number }
   | { type: "expect"; channelId: string; threadId: string; messageId: string; agentIds: string[]; at: number }
-  | { type: "seed"; messages: readonly Message[] }
+  /** `before`: the receipts when the read was asked for; one that hasn't changed since takes the read as it is. */
+  | { type: "seed"; messages: readonly Message[]; before?: ReceiptsState }
   | { type: "stopping"; runId: string; byUserId: string }
   | { type: "unstopping"; runId: string }
   | { type: "dismiss"; runId: string }
@@ -121,8 +124,7 @@ function reduce(state: LiveState, action: Action): LiveState {
       return typing === state.typing ? state : { ...state, typing };
     }
     case "seed": {
-      let receipts = state.receipts;
-      for (const m of action.messages) receipts = seedReceipt(receipts, m);
+      const receipts = seedReceipts(state.receipts, action.messages, action.before);
       return receipts === state.receipts ? state : { ...state, receipts };
     }
     case "reconcile":
@@ -391,7 +393,14 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     const offSubscribed = connection?.onSubscribed((id) => {
       if (id !== channelId) return;
       check();
-      void catchUpChannel(api, qc, orgId, channelId);
+      const before = stateRef.current.receipts;
+      void catchUpChannel(api, qc, orgId, channelId).then((read) => {
+        if (!alive) return;
+        dispatch({ type: "seed", messages: read, before });
+        cacheReceipts(qc, orgId, channelId, read);
+      });
+      // The lines of its computers too: a `computer.queue` it missed leaves a wait's place unsaid.
+      void qc.invalidateQueries({ queryKey: [...keys.machines(orgId), "queue"] });
     });
     return () => {
       alive = false;

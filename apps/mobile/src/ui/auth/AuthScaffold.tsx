@@ -50,7 +50,7 @@ export function AuthScaffold({
   expression,
   overlay,
 }: AuthScaffoldProps) {
-  const { colors } = useTheme();
+  const { colors, reducedMotion } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -74,7 +74,7 @@ export function AuthScaffold({
             fade={0.55}
             style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
           />
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", paddingBottom: 18 }}>
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", paddingBottom: 16 }}>
             <AgentAvatar
               agent={{ color: "sky", eyes: "round", id: "agentes" }}
               size={72}
@@ -90,7 +90,7 @@ export function AuthScaffold({
         </Animated.View>
         <Animated.View
           key={stepKey}
-          entering={FadeIn.duration(220)}
+          entering={reducedMotion ? undefined : FadeIn.duration(220)}
           style={{ paddingHorizontal: 24, paddingTop: 8, flex: 1 }}
         >
           {progress ? (
@@ -107,7 +107,7 @@ export function AuthScaffold({
               {subtitle}
             </Text>
           ) : null}
-          <View style={{ marginTop: 22, gap: 10 }}>{children}</View>
+          <View style={{ marginTop: 24, gap: 10 }}>{children}</View>
           <View style={{ flex: 1 }} />
           {footer ? <View style={{ marginTop: 24, alignItems: "center" }}>{footer}</View> : null}
         </Animated.View>

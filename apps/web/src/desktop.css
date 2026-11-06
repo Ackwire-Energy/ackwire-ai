@@ -22,6 +22,8 @@ html[data-desktop="linux"] {
 .titlebar {
   position: relative;
   isolation: isolate;
+  /* Its width, for the search field's centring (below). */
+  container-type: inline-size;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -47,31 +49,41 @@ html[data-desktop="linux"] {
   display: flex;
   gap: 2px;
 }
-/* The sidebar's ⌘K field (.sidebar__jump), centred in the bar. */
+/*
+ * The sidebar's ⌘K field (.sidebar__jump): a small field of the ruler (32, r10), centred in the bar. Centred on the
+ * window, not on what's left after the buttons: it moves back by half the room the window's buttons and the nav take
+ * (`--titlebar-nav`: three 32px buttons and their two 2px gaps, two where a tablet has no sidebar button), but never
+ * past the free room on its left, so in a narrow window it stops beside the nav instead of sliding over it.
+ */
 .titlebar__search {
+  --titlebar-nav: calc(2 * var(--control-h-sm) + 2px);
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 0 1 460px;
   min-width: 0;
-  height: 28px;
+  height: var(--control-h-sm);
   margin: 0 auto;
-  /* Centred on the window, not on what's left after the buttons. */
-  transform: translateX(calc((var(--titlebar-lights) + 96px) / -2));
+  --titlebar-half: calc((var(--titlebar-lights) + var(--titlebar-nav)) / 2);
+  --titlebar-room: max(0px, (100cqw - var(--titlebar-nav) - 12px - 460px) / 2);
+  transform: translateX(calc(-1 * min(var(--titlebar-half), var(--titlebar-room))));
   padding: 0 8px 0 10px;
   border: 0;
-  border-radius: var(--control-r-md);
+  border-radius: var(--control-r-sm);
   background: var(--field-bg);
   box-shadow: inset 0 0 0 1px var(--field-line);
   font: inherit;
-  font-size: var(--control-fs-md);
+  font-size: var(--control-fs-sm);
   line-height: normal;
   color: var(--faint);
   cursor: pointer;
 }
+.titlebar:has(> .titlebar__nav > :nth-child(3)) .titlebar__search {
+  --titlebar-nav: calc(3 * var(--control-h-sm) + 2 * 2px);
+}
 .titlebar__search > .ac-icon {
-  width: 15px;
-  height: 15px;
+  width: var(--control-icon-sm);
+  height: var(--control-icon-sm);
 }
 .titlebar__search-label {
   flex: 1;
@@ -132,6 +144,23 @@ html[data-desktop="mac"]:not([data-fullscreen]) .onb__rail {
   html[data-desktop="mac"]:not([data-fullscreen]) .onb__body {
     padding-top: calc(var(--titlebar-h) + 8px + 16px);
   }
+}
+
+/* The sidebar's drawer (a window zoomed in with ⌘+ narrows to it) hangs from the window's top-left corner, over the
+   title bar, and the window's buttons stay drawn on top of it: it starts under them, as the onboarding's rail does,
+   instead of the workspace card sitting behind them. */
+@media (max-width: 760px) {
+  html[data-desktop="mac"]:not([data-fullscreen]) .shell .sidebar {
+    padding-top: calc(var(--titlebar-h) + 8px);
+  }
+}
+
+/* The agent's computer at full size fills the window, title bar included, with the window's buttons drawn over its
+   head. Unless the page really went full screen (the engine's, or the system's), it fills the room under the bar,
+   as the computer's window already centres in it. */
+html[data-desktop="mac"]:not([data-fullscreen], :fullscreen) .ac-dialog.cmp-dialog.is-full {
+  top: var(--titlebar-h);
+  height: auto;
 }
 
 /*

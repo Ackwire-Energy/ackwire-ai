@@ -96,7 +96,7 @@ export function NewIssueForm() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.in, { paddingBottom: 22 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         <TextArea
           value={title}
@@ -205,6 +205,7 @@ export function NewIssueForm() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 18, paddingTop: 8, gap: 12 },
+  // A form's 16 pt sides, as Nova rotina's.
+  in: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   inline: { paddingVertical: 10, marginHorizontal: -2 },
 });

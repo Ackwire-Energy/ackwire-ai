@@ -125,10 +125,13 @@ export function AskActions({ take, onCancel }: { take?: ReactNode; onCancel: () 
 }
 
 /**
- * Pronto or Devolver, under the screen or the page: one quiet row, the button focused (Enter hands back), and "Deixar
- * um recado" for a word to the agent, which it reads as the person's own. The note opens by itself where the request
- * asked the person something (`handoffWantsWords`). Open, it is one line that grows as it wraps (`.brw-ac__note`);
- * Enter hands back as in the chat, while Shift+Enter, an input method's Enter and a phone's return key add a line.
+ * Pronto or Devolver, under the screen or the page for as long as the person is in control: one click hands back.
+ * "Deixar um recado" opens a word to the agent, which it reads as the person's own, in the title's place. Where the
+ * request asked the person something (`handoffWantsWords`) it is open from the start. Only that link and a click in the
+ * note take the keys: a press anywhere else in the bar leaves them on the screen or the page, where Enter stays the
+ * page's. Open, it is one line that grows as it wraps (`.brw-ac__note`). Enter hands back as in the chat, while
+ * Shift+Enter, an input method's Enter and a phone's return key add a line, and Esc closes it empty, the keys back
+ * where they were.
  */
 export function HandBackFoot({
   title,
@@ -139,7 +142,7 @@ export function HandBackFoot({
   noteFirst,
   pending,
   onBack,
-  onCancel,
+  other,
 }: {
   title: string;
   label: string;
@@ -151,58 +154,70 @@ export function HandBackFoot({
   noteFirst: boolean;
   pending: boolean;
   onBack: () => void;
-  onCancel: () => void;
+  /** The other way out (a request's Desistir), before the main one. */
+  other?: ReactNode;
 }) {
   const { t } = useTranslation();
-  // A note written before Voltar opens again with it: nothing goes to the agent out of sight.
+  // A note written before "Não consegui" opens again with it: nothing goes to the agent out of sight.
   const [writing, setWriting] = useState(noteFirst || Boolean(note?.trim()));
+  const keysWere = useRef<HTMLElement | null>(null);
   const noted = writing && note !== undefined;
   const back = () => {
     if (!pending) onBack();
   };
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: Esc anywhere in the row goes back to control
+    // biome-ignore lint/a11y/noStaticElementInteractions: a press on the bar keeps the keys where they are
     <div
       className="brw-ac__foot brw-ac__fail brw-ac__back"
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onCancel();
+      onMouseDown={(e) => {
+        if (!(e.target instanceof HTMLTextAreaElement)) e.preventDefault();
       }}
     >
-      {noted && (
-        <>
-          <b>{title}</b>
+      <div className="brw-ac__row">
+        {noted ? (
           <Textarea
             rows={1}
             autoGrow
             className="brw-ac__note"
-            autoFocus
+            autoFocus={keysWere.current !== null}
             value={note}
             onChange={(e) => onNote?.(e.target.value)}
             placeholder={t("browser.inCard.backPlaceholder", grammar)}
             aria-label={t("browser.inCard.backLabel", grammar)}
             maxLength={1000}
             onKeyDown={(e) => {
+              if (e.key === "Escape" && !noteFirst && !note.trim()) {
+                setWriting(false);
+                keysWere.current?.focus({ preventScroll: true });
+              }
               if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
               e.preventDefault();
               back();
             }}
           />
-        </>
-      )}
-      <div className="brw-ac__row">
-        {!noted && <b>{title}</b>}
-        {!noted && note !== undefined && (
-          <button type="button" className="ac-link ac-link--muted brw-ac__add" onClick={() => setWriting(true)}>
-            {t("browser.inCard.addNote")}
-          </button>
+        ) : (
+          <>
+            <b>{title}</b>
+            {note !== undefined && (
+              <button
+                type="button"
+                className="ac-link ac-link--muted brw-ac__add"
+                onClick={() => {
+                  keysWere.current = document.activeElement as HTMLElement | null;
+                  setWriting(true);
+                }}
+              >
+                {t("browser.inCard.addNote")}
+              </button>
+            )}
+          </>
         )}
-        <span className="brw-grow" />
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          {t("browser.live.back")}
-        </Button>
-        <Button size="sm" variant="primary" icon="check" autoFocus={!noted} loading={pending} onClick={back}>
-          {label}
-        </Button>
+        <span className="brw-ac__ways">
+          {other}
+          <Button size="sm" variant="primary" icon="check" loading={pending} onClick={back}>
+            {label}
+          </Button>
+        </span>
       </div>
     </div>
   );

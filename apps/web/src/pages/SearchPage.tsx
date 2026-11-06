@@ -187,9 +187,11 @@ function HitRow({
   ]
     .filter(Boolean)
     .join(" · ");
+  // A message's face leads the row (an .ac-iconline lead, on the first line); other hits start with their text.
+  const face = hit.kind === "message" && !!hit.author;
   const body = (
-    <span className="search-hit">
-      {hit.kind === "message" && hit.author && <ActorAvatar actor={hit.author} name={hit.author.name} size="sm" />}
+    <span className={face ? "search-hit ac-iconline" : "search-hit"}>
+      {face && hit.author && <ActorAvatar actor={hit.author} name={hit.author.name} size="sm" />}
       <span className="list-col">
         <span className="small muted">{meta}</span>
         <span>{hitText(t, hit)}</span>

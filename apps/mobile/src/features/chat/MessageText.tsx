@@ -172,13 +172,13 @@ function Details({
           tapHaptic();
           setOpen((v) => !v);
         }}
-        style={styles.summary}
+        style={({ pressed }) => [styles.summary, pressed && styles.pressed]}
       >
         <Text variant="body" tone="muted" style={[styles.line, styles.flex, styles.heading]}>
           {summary.length > 0 ? <Spans inline={summary} channelRefs={channelRefs} /> : "…"}
         </Text>
         <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={13} color={c.muted} />
+          <Icon name="chev" size={15} color={c.muted} />
         </View>
       </Pressable>
       {open ? (
@@ -222,11 +222,12 @@ const styles = StyleSheet.create({
   cut: { borderRadius: 10, overflow: "hidden" },
   details: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
   },
   summary: { flexDirection: "row", alignItems: "center", gap: 8 },
+  pressed: { opacity: 0.6 },
   flip: { transform: [{ rotate: "180deg" }] },
 });

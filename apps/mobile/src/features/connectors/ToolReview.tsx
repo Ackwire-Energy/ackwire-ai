@@ -8,19 +8,14 @@ import {
   useMailAction,
 } from "@agenteschat/client";
 import { mailActionsChanged, mailActionsFrom, mailReviewTools } from "@agenteschat/client/lib/mail";
-import {
-  countLevels,
-  levelSummary,
-  type ReviewTool,
-  reviewDecisions,
-  reviewToolsOf,
-} from "@agenteschat/client/lib/tool-review";
-import { useDeferredValue, useMemo, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Icon, SearchField, Segmented, Text } from "@/ui";
+import { type ReviewTool, reviewDecisions, reviewToolsOf } from "@agenteschat/client/lib/tool-review";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { Button, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Icon, SearchField, Text } from "@/ui";
+import { chooseAction } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";
-import { errorHaptic, MONO, successHaptic, Tile } from "../shared/parts";
+import { errorHaptic, successHaptic } from "../shared/parts";
 import { Problem } from "./Problem";
 import {
   acceptAll,
@@ -34,10 +29,16 @@ import {
   type ReviewState,
   reviewAgain,
   reviewTarget,
-  type SubjectGroup,
   subjectsOf,
   waitingHits,
 } from "./review";
+
+/** What a screen pins at its bottom for the review's save: the words, whether it is busy, what a tap does. */
+export interface SaveBar {
+  label: string;
+  busy: boolean;
+  onPress: () => void;
+}
 
 /**
  * "O que faz", between connecting and who uses it (the web's second step): a server connected by its address
@@ -51,12 +52,15 @@ export function ReviewStep({
   name,
   onNext,
   onScreen = false,
+  onSaveBar,
 }: {
   connectionId: string;
   def: ConnectorDef | null;
   name: string;
   onNext: () => void;
   onScreen?: boolean;
+  /** On its own screen, the save goes to the screen's bottom bar (ref-stable: a state setter); null when none. */
+  onSaveBar?: (bar: SaveBar | null) => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -70,25 +74,26 @@ export function ReviewStep({
   );
   if (target.kind === "server") {
     return (
-      <ServerReview key={target.server.id} server={target.server} name={name} onNext={onNext} onScreen={onScreen} />
+      <ServerReview
+        key={target.server.id}
+        server={target.server}
+        name={name}
+        onNext={onNext}
+        onScreen={onScreen}
+        onSaveBar={onSaveBar}
+      />
     );
   }
   if (target.kind === "loading") return <ActivityIndicator color={c.muted} />;
   const tools = target.kind === "catalog" ? catalogReviewTools(t, target.def) : [];
   return (
     <>
-      {target.kind === "catalog" ? (
-        <Text variant="body" tone="muted">
-          {t("toolReview.catalogLead", { name })}
-        </Text>
-      ) : null}
       {tools.length === 0 ? (
-        <Text variant="small" tone="muted">
-          {t("toolReview.noTools")}
-        </Text>
+        <GroupedFooter>{t("toolReview.noTools")}</GroupedFooter>
       ) : (
         <ToolList tools={tools} levelOf={(x) => x.level} />
       )}
+      {target.kind === "catalog" ? <GroupedFooter>{t("toolReview.catalogLead", { name })}</GroupedFooter> : null}
       {onScreen ? null : <Button variant="primary" wide label={t("connectFlow.next")} onPress={onNext} />}
     </>
   );
@@ -100,11 +105,13 @@ function ServerReview({
   name,
   onNext,
   onScreen,
+  onSaveBar,
 }: {
   server: CustomServer;
   name: string;
   onNext: () => void;
   onScreen: boolean;
+  onSaveBar?: ((bar: SaveBar | null) => void) | undefined;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -139,50 +146,49 @@ function ServerReview({
       },
     );
   };
+  const saveLabel = save.isPending
+    ? t("mobile.connectors.review.saving")
+    : onScreen
+      ? t("common.save")
+      : t("connectFlow.next");
+  // Pinned at the screen's bottom (Ferramentas): the bar gets the words and the state, a tap the latest `next`.
+  const nextNow = useRef(next);
+  useEffect(() => {
+    nextNow.current = next;
+  });
+  useEffect(() => {
+    onSaveBar?.({ label: saveLabel, busy, onPress: () => nextNow.current() });
+  }, [onSaveBar, saveLabel, busy]);
+  useEffect(() => () => onSaveBar?.(null), [onSaveBar]);
   return (
     <>
-      {server.toolsError ? (
-        <Problem text={t("toolReview.unreadable", { reason: server.toolsError })} />
-      ) : (
-        <Text variant="body" tone="muted">
-          {t("toolReview.lead", { count: tools.length, name })}
-        </Text>
-      )}
-      <Button
-        variant="secondary"
-        size="sm"
-        label={
-          refresh.isPending
-            ? t("mobile.connectors.review.refreshing")
-            : server.toolsError
-              ? t("common.retry")
-              : t("toolReview.refresh")
-        }
-        disabled={busy}
-        onPress={lookAgain}
-      />
+      {server.toolsError ? <Problem text={t("toolReview.unreadable", { reason: server.toolsError })} /> : null}
       {tools.length === 0 ? (
         server.toolsError ? null : (
-          <Text variant="small" tone="muted">
-            {t("toolReview.noTools")}
-          </Text>
+          <GroupedFooter>{t("toolReview.noTools")}</GroupedFooter>
         )
       ) : (
         <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
       )}
+      {/* Asking the server again is the last row: it rarely changes right after connecting. */}
+      <View>
+        <GroupedList>
+          <GroupedRow
+            label={
+              refresh.isPending
+                ? t("mobile.connectors.review.refreshing")
+                : server.toolsError
+                  ? t("common.retry")
+                  : t("toolReview.refresh")
+            }
+            disabled={busy}
+            onPress={lookAgain}
+          />
+        </GroupedList>
+        <GroupedFooter>{left > 0 ? t("toolReview.missing", { count: left }) : t("toolReview.later")}</GroupedFooter>
+      </View>
       {failed ? <Problem key={failed} text={failed} /> : null}
-      <Text variant="small" tone="muted">
-        {left > 0 ? t("toolReview.missing", { count: left }) : t("toolReview.later")}
-      </Text>
-      <Button
-        variant="primary"
-        wide
-        label={
-          save.isPending ? t("mobile.connectors.review.saving") : onScreen ? t("common.save") : t("connectFlow.next")
-        }
-        disabled={busy}
-        onPress={next}
-      />
+      {onSaveBar ? null : <Button variant="primary" wide label={saveLabel} disabled={busy} onPress={next} />}
     </>
   );
 }
@@ -244,40 +250,14 @@ export function MailReview({
   );
 }
 
-/** "Ferramentas" on a connection or a mailbox: how many tools, how many wait for a decision ("Revisar"). */
-export function ToolsRow({ count, waiting = 0, onPress }: { count: number; waiting?: number; onPress: () => void }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const line = waiting > 0 ? t("toolReview.decideTitle", { count: waiting }) : t("toolReview.subjectCount", { count });
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${t("connectors.tools")}, ${line}`}
-      style={({ pressed }) => [styles.row, { borderColor: c.line }, pressed && { backgroundColor: c.sunken }]}
-    >
-      <Tile icon="list" size={36} />
-      <View style={styles.grow}>
-        <Text variant="body" style={styles.bold}>
-          {t("connectors.tools")}
-        </Text>
-        <Text variant="small" tone="muted" numberOfLines={1} style={waiting > 0 && { color: c.warn }}>
-          {line}
-        </Text>
-      </View>
-      {waiting > 0 ? (
-        <Text variant="small" style={[styles.bold, { color: c.warn }]}>
-          {t("connectors.review")}
-        </Text>
-      ) : null}
-      <Icon name="right" size={15} color={c.faint} />
-    </Pressable>
-  );
-}
+/** The levels' groups, in the order that matters most: what asks first, what is off last. */
+const LEVEL_ORDER: ToolDecision[] = ["approval", "write", "read", "off"];
 
 /**
- * The tools, as the web lists them: (editable) a summary when nothing waits, then every tool by subject under
- * one search, with "Precisam da sua decisão" first; a subject opens to its tools. Read-only shows each level.
+ * The tools, as the phone's settings list them: one search, then (editable) "Precisam da sua decisão" first, each with
+ * our suggestion as its value and "Aceitar as sugestões" under them; then every other tool grouped by what it may do
+ * (Pede sua aprovação · Muda coisas · Só consulta · Desligada), its level as the row's value. A tap opens the system's
+ * choice of levels, each said in a line. Read-only shows the same groups without the choice.
  */
 function ToolList({
   tools,
@@ -290,33 +270,47 @@ function ToolList({
   review?: { state: ReviewState; onChange: (state: ReviewState) => void };
 }) {
   const { t } = useTranslation();
+  const c = useColors();
   const [q, setQ] = useState("");
   const query = useDeferredValue(q);
   const searching = query.trim().length > 0;
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
   const state = review?.state;
   const waiting = state ? tools.filter((x) => isWaiting(state, x)) : [];
   const hits = state ? waitingHits(state, tools, query) : [];
-  const groups = subjectsOf(t, state ? tools.filter((x) => !isWaiting(state, x)) : tools, query);
-  const toggle = (subject: string) =>
-    setOpen((s) => {
-      const next = new Set(s);
-      if (next.has(subject)) next.delete(subject);
-      else next.add(subject);
-      return next;
-    });
+  const rest = subjectsOf(t, state ? tools.filter((x) => !isWaiting(state, x)) : tools, query).flatMap((g) => g.hits);
+  const reviewable = tools.filter((x) => x.pending).length;
+  const pick = (tool: ReviewTool) => {
+    if (!review) return;
+    const now = chosenLevel(review.state, tool);
+    chooseAction(
+      tool.label,
+      choicesOf(tool).map((level) => ({
+        label: t(`toolReview.help.${level}`),
+        onPress: () =>
+          review.onChange(
+            level === now && isWaiting(review.state, tool)
+              ? confirm(review.state, tool)
+              : choose(review.state, tool, level),
+          ),
+      })),
+      t("common.cancel"),
+    );
+  };
+  const row = ({ tool, tech }: { tool: ReviewTool; tech: boolean }, suggested = false) => (
+    <GroupedRow
+      key={tool.name}
+      label={tool.label}
+      labelLines={2}
+      {...(tech ? { sub: tool.name } : {})}
+      value={t(`toolReview.short.${levelOf(tool)}`)}
+      {...(suggested ? { valueLeading: <Icon name="wait" size={13} color={c.amber} /> } : {})}
+      chevron={Boolean(review)}
+      {...(review ? { onPress: () => pick(tool) } : {})}
+    />
+  );
+  // One block: a sheet's or a screen's gap goes around the list, never between a group's header and its rows.
   return (
-    <>
-      {review && waiting.length === 0 ? (
-        <Done
-          summary={levelSummary(t, countLevels(tools.map((x) => ({ level: levelOf(x) }))))}
-          reviewable={tools.filter((x) => x.pending).length}
-          onReview={() => review.onChange(reviewAgain(review.state))}
-        />
-      ) : null}
-      <Text variant="footnote" tone="faint" style={styles.label}>
-        {t("toolReview.all", { count: tools.length })}
-      </Text>
+    <View>
       <SearchField
         value={q}
         onChangeText={setQ}
@@ -324,260 +318,59 @@ function ToolList({
         accessibilityLabel={t("toolReview.search")}
       />
       {review && hits.length > 0 ? (
-        <Waiting
-          count={waiting.length}
-          hits={hits}
-          searching={searching}
-          state={review.state}
-          onChange={review.onChange}
-        />
-      ) : null}
-      {groups.map((g) => (
-        <Subject
-          key={g.subject}
-          group={g}
-          open={searching || open.has(g.subject)}
-          searching={searching}
-          onToggle={() => toggle(g.subject)}
-          levelOf={levelOf}
-          onLevel={review ? (tool, level) => review.onChange(choose(review.state, tool, level)) : undefined}
-        />
-      ))}
-      {groups.length === 0 && hits.length === 0 ? (
-        <Text variant="small" tone="muted">
-          {t("toolReview.noMatch", { q: query.trim() })}
-        </Text>
-      ) : null}
-    </>
-  );
-}
-
-/** Nothing waits: it says so, how the levels came out, and "Rever as sugestões" when there were any. */
-function Done({ summary, reviewable, onReview }: { summary: string; reviewable: number; onReview: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <View style={styles.done}>
-      <Text variant="body" style={styles.bold}>
-        {t("toolReview.doneTitle")}
-      </Text>
-      {summary ? (
-        <Text variant="small" tone="muted">
-          {summary}
-        </Text>
-      ) : null}
-      {reviewable > 0 ? (
-        <Pressable onPress={onReview} accessibilityRole="button" hitSlop={6} style={styles.link}>
-          <Text variant="small" style={styles.bold}>
-            {t("toolReview.review", { count: reviewable })}
-          </Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-/** "Precisam da sua decisão": the tools whose names don't say what they do, each with our suggestion. */
-function Waiting({
-  count,
-  hits,
-  searching,
-  state,
-  onChange,
-}: {
-  count: number;
-  hits: { tool: ReviewTool; tech: boolean }[];
-  searching: boolean;
-  state: ReviewState;
-  onChange: (state: ReviewState) => void;
-}) {
-  const { t } = useTranslation();
-  const c = useColors();
-  return (
-    <View style={[styles.box, { borderColor: c.line }]}>
-      <View style={styles.grow}>
-        <Text variant="body" style={styles.bold}>
-          {t("toolReview.decideTitle", { count })}
-        </Text>
-        <Text variant="small" tone="muted">
-          {t("toolReview.decideHelp")}
-        </Text>
-      </View>
-      {searching ? null : (
-        <Button
-          variant="secondary"
-          size="sm"
-          label={t("toolReview.acceptAll")}
-          onPress={() =>
-            onChange(
-              acceptAll(
-                state,
-                hits.map((h) => h.tool),
-              ),
-            )
-          }
-        />
-      )}
-      {hits.map(({ tool, tech }) => (
-        <ToolRow
-          key={tool.name}
-          tool={tool}
-          tech={tech}
-          level={chosenLevel(state, tool)}
-          waiting
-          onLevel={(level) => onChange(choose(state, tool, level))}
-          onOk={() => onChange(confirm(state, tool))}
-        />
-      ))}
-    </View>
-  );
-}
-
-/** One subject: its name, how many tools and how they're set; open, its tools. */
-function Subject({
-  group,
-  open,
-  searching,
-  onToggle,
-  levelOf,
-  onLevel,
-}: {
-  group: SubjectGroup;
-  open: boolean;
-  searching: boolean;
-  onToggle: () => void;
-  levelOf: (tool: ReviewTool) => ToolDecision;
-  onLevel: ((tool: ReviewTool, level: ToolDecision) => void) | undefined;
-}) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const summary = levelSummary(t, countLevels(group.tools.map((x) => ({ level: levelOf(x) }))));
-  const count = searching
-    ? t("toolReview.subjectHits", { hits: group.hits.length, count: group.tools.length })
-    : t("toolReview.subjectCount", { count: group.tools.length });
-  const line = summary ? `${count} · ${summary}` : count;
-  return (
-    <View style={[styles.box, { borderColor: c.line }]}>
-      <Pressable
-        onPress={onToggle}
-        disabled={searching}
-        accessibilityRole="button"
-        accessibilityLabel={`${group.label}, ${line}`}
-        accessibilityState={{ expanded: open }}
-        hitSlop={6}
-        style={styles.head}
-      >
-        <View style={styles.grow}>
-          <Text variant="body" numberOfLines={1} style={styles.bold}>
-            {group.label}
-          </Text>
-          <Text variant="small" tone="muted">
-            {line}
-          </Text>
-        </View>
-        {searching ? null : <Icon name={open ? "chev" : "right"} size={15} color={c.faint} />}
-      </Pressable>
-      {open
-        ? group.hits.map(({ tool, tech }) => (
-            <ToolRow
-              key={tool.name}
-              tool={tool}
-              tech={tech}
-              level={levelOf(tool)}
-              onLevel={onLevel ? (level) => onLevel(tool, level) : undefined}
-            />
-          ))
-        : null}
-    </View>
-  );
-}
-
-/**
- * A tool: its readable name (the technical one when the search matched it), our suggestion while it waits,
- * and the web's choices (Consulta · Muda · Aprovação · Desligada; sensitive ones only the last two); read-only,
- * its level.
- */
-function ToolRow({
-  tool,
-  tech,
-  level,
-  waiting = false,
-  onLevel,
-  onOk,
-}: {
-  tool: ReviewTool;
-  tech: boolean;
-  level: ToolDecision;
-  waiting?: boolean;
-  onLevel: ((level: ToolDecision) => void) | undefined;
-  onOk?: () => void;
-}) {
-  const { t } = useTranslation();
-  const c = useColors();
-  return (
-    <View style={[styles.tool, { borderTopColor: c.line }]}>
-      <View style={styles.head}>
-        <View style={styles.grow}>
-          <Text variant="body" numberOfLines={2}>
-            {tool.label}
-          </Text>
-          {waiting ? (
-            <Text variant="small" tone="muted">
-              <Trans
-                i18nKey="toolReview.suggestion"
-                values={{
-                  level: t(`toolReview.one.${tool.suggested}`),
-                  reason: t(`toolReview.reason.${tool.reason ?? "unknown"}`, {
-                    defaultValue: t("toolReview.reason.unknown"),
-                  }),
-                }}
-                components={{ b: <Text variant="small" style={styles.bold} /> }}
+        <>
+          <GroupedHeader>{t("toolReview.decideTitle", { count: waiting.length })}</GroupedHeader>
+          <GroupedList>{hits.map((h) => row(h, true))}</GroupedList>
+          <GroupedFooter>{t("toolReview.decideHelp")}</GroupedFooter>
+          {searching ? null : (
+            <View style={styles.accept}>
+              <Button
+                variant="secondary"
+                wide
+                label={t("toolReview.acceptAll")}
+                onPress={() =>
+                  review.onChange(
+                    acceptAll(
+                      review.state,
+                      hits.map((h) => h.tool),
+                    ),
+                  )
+                }
               />
-            </Text>
-          ) : null}
-          {tech ? (
-            <Text variant="caption" tone="faint" numberOfLines={1} style={styles.mono}>
-              {tool.name}
-            </Text>
-          ) : null}
+            </View>
+          )}
+        </>
+      ) : null}
+      {review && waiting.length === 0 && reviewable > 0 && !searching ? (
+        <View style={styles.again}>
+          <GroupedList>
+            <GroupedRow
+              label={t("toolReview.review", { count: reviewable })}
+              chevron
+              onPress={() => review.onChange(reviewAgain(review.state))}
+            />
+          </GroupedList>
         </View>
-        {onLevel ? null : (
-          <Text variant="small" tone="muted">
-            {t(`toolReview.choice.${level}`)}
-          </Text>
-        )}
-        {onOk ? <Button variant="secondary" size="sm" label={t("toolReview.ok")} onPress={onOk} /> : null}
-      </View>
-      {onLevel ? (
-        // Four choices can be wider than a small phone's sheet: they scroll sideways there.
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <Segmented
-            items={choicesOf(tool).map((l) => ({ key: l, label: t(`toolReview.short.${l}`) }))}
-            value={level}
-            onChange={(k) => onLevel(k as ToolDecision)}
-          />
-        </ScrollView>
+      ) : null}
+      {LEVEL_ORDER.map((level) => {
+        const these = rest.filter((h) => levelOf(h.tool) === level);
+        if (these.length === 0) return null;
+        return (
+          <View key={level}>
+            <GroupedHeader>{`${t(`toolReview.choice.${level}`)} · ${these.length}`}</GroupedHeader>
+            <GroupedList>{these.map((h) => row(h))}</GroupedList>
+          </View>
+        );
+      })}
+      {rest.length === 0 && hits.length === 0 ? (
+        <GroupedFooter>{t("toolReview.noMatch", { q: query.trim() })}</GroupedFooter>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0 },
-  bold: { fontWeight: "600" },
-  label: { letterSpacing: 0.3 },
-  mono: { fontFamily: MONO },
-  done: { gap: 2 },
-  link: { alignSelf: "flex-start", marginTop: 6 },
-  // The sheet's card (as each agent's in who uses it): a hairline, radius 14.
-  box: { gap: 10, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
-  head: { flexDirection: "row", alignItems: "center", gap: 10 },
-  tool: { gap: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  accept: { paddingTop: 12 },
+  // A header's room above a group with none.
+  again: { paddingTop: 20 },
 });

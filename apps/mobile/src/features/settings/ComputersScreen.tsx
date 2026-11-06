@@ -36,7 +36,7 @@ import { SetupWait } from "../computer/SetupWait";
 import { computerIcon } from "../outages/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useMeId } from "../shared/hooks";
-import { goBack, successHaptic } from "../shared/parts";
+import { goBack, Loaded, successHaptic } from "../shared/parts";
 import {
   type AgentComputerPick,
   agentComputerPick,
@@ -115,9 +115,11 @@ export function ComputersScreen() {
           <ActivityIndicator color={c.muted} style={styles.loading} />
         )
       ) : view ? (
-        <WorkspaceComputer view={view} />
+        <Loaded>
+          <WorkspaceComputer view={view} />
+        </Loaded>
       ) : (
-        <>
+        <Loaded>
           <HostComputer />
           <OtherComputers />
           <AgentComputers />
@@ -130,7 +132,7 @@ export function ComputersScreen() {
               onPress={() => openPage(helpUrl("computers", i18n.language))}
             />
           </GroupedList>
-        </>
+        </Loaded>
       )}
     </SettingsPage>
   );

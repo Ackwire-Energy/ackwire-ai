@@ -79,7 +79,7 @@ function OutageNotice({ outage: o, onDismiss }: { outage: MachineOutage; onDismi
           accessibilityRole="summary"
           accessibilityLabel={`${text.a11y}. ${text.title}. ${text.sub}`}
         >
-          <LineIcon name={computerIcon(o.platform)} variant="callout" size={22} color={c.amber} />
+          <LineIcon name={computerIcon(o.platform)} variant="callout" size={16} color={c.amber} />
           <View style={styles.tx}>
             <Text variant="callout" tone="ink" style={styles.bold} numberOfLines={2}>
               {text.title}

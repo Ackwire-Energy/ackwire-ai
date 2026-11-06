@@ -3,7 +3,7 @@ import { Link, router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet, View } from "react-native";
-import { Count, Icon, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
+import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
 import type { RowAction } from "../categories/menus";
 import { agentIntro } from "../chat/intent";
@@ -43,7 +43,6 @@ export const ConversationRowView = memo(function ConversationRowView({
   onOpen,
   pinned = false,
   holdActions,
-  tinted = false,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -53,7 +52,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   agent?: AgentRowState;
   /** A row on the home: its menu (Fixar no topo, a channel's Mover para…), given the row. */
   onHold?: (row: ConversationRow) => void;
-  /** On top of its section ("Fixar no topo"): a small pin where the unread count would be. */
+  /** On top of its section ("Fixar no topo"): said to screen readers; the order shows it, no mark. */
   pinned?: boolean;
   /** What the long press does, for screen readers. */
   holdLabel?: string;
@@ -67,8 +66,6 @@ export const ConversationRowView = memo(function ConversationRowView({
   onOpen?: () => void;
   /** The long press's actions for iOS's own menu under the preview (`onHold`'s sheet elsewhere). */
   holdActions?: (row: ConversationRow) => RowAction[];
-  /** On the agent blue's soft tint (the right hand's row, ADR 0137). */
-  tinted?: boolean;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -151,7 +148,7 @@ export const ConversationRowView = memo(function ConversationRowView({
       <View style={styles.work}>
         {lines.state === "working" ? <PixelOrbit color={orbitColor} size={13} /> : null}
         {lines.state === "waiting" ? (
-          <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
+          <LineIcon name="wait" size={15} color={c.amber} variant="small" text={LIST_PREVIEW} />
         ) : null}
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text
@@ -170,7 +167,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = [verb, agentState.title].filter(Boolean).join(" · ");
     line = (
       <View style={styles.work}>
-        <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
+        <LineIcon name="wait" size={15} color={c.amber} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text variant="small" style={[LIST_PREVIEW, styles.em, { color: c.amber }]}>
             {verb}
@@ -183,7 +180,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = t("mobile.outage.rowWaiting", { computer: agentState.computer });
     line = (
       <View style={styles.work}>
-        <LineIcon name="clock" size={14} color={c.muted} variant="small" text={LIST_PREVIEW} />
+        <LineIcon name="clock" size={15} color={c.muted} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           {label}
         </Text>
@@ -281,7 +278,6 @@ export const ConversationRowView = memo(function ConversationRowView({
       accessibilityRole="button"
       accessibilityLabel={a11y}
       divider={divider}
-      {...(tinted ? { background: c.agentSoft } : {})}
       unread={r.unread > 0}
       leading={leading}
       title={name}
@@ -295,13 +291,7 @@ export const ConversationRowView = memo(function ConversationRowView({
         ) : null
       }
       sub={line}
-      trailing={
-        badge > 0 ? (
-          <Count value={badge} max={99} inverted />
-        ) : pinned ? (
-          <Icon name="pin" size={14} color={c.faint} />
-        ) : null
-      }
+      trailing={badge > 0 ? <Count value={badge} max={99} inverted /> : null}
     />
   );
   if (!peeks || !peekHref) return row(open);
@@ -357,6 +347,6 @@ function RowTrigger({
 
 const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
-  work: { flexDirection: "row", alignItems: "center", gap: 7, minWidth: 0 },
+  work: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
   em: { fontWeight: "500" },
 });

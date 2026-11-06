@@ -75,6 +75,17 @@
     transform: translateX(18px);
   }
 }
+/* Reduced motion: each step fades in where it stands, and the host arrives without its pop. */
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .onb__body,
+    .onb__bubble,
+    .onb__answer,
+    .onb__actions {
+      transform: none;
+    }
+  }
+}
 .onb__back {
   align-self: flex-start;
   display: inline-flex;
@@ -125,9 +136,35 @@ html:not([data-pointer]) .onb__signout:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Deleting the account, apart from the workspace's way out and from Sair, under a heading of its own. */
+.onb__account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: 16px;
+}
+.onb__account-title {
+  padding: 0 10px;
+  color: var(--faint);
+  font-size: 12px;
+}
 @media (max-width: 760px) {
+  .onb__rail {
+    flex-wrap: wrap;
+  }
   .onb__signout {
     align-self: center;
+  }
+  /* A row of its own: the rail is a row here, and beside Sair it would read as one of its actions. */
+  .onb__account {
+    flex-basis: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
   }
 }
 /* The host's face and its bubble start at one top, the bubble's small corner pointing at the face. */
@@ -146,6 +183,11 @@ html:not([data-pointer]) .onb__signout:focus-visible {
 /* A host agent that just arrived pops in. */
 .onb__host[data-fresh] .ac-avatar {
   animation: onb-pop 0.5s var(--spring) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .onb__host[data-fresh] .ac-avatar {
+    animation: none;
+  }
 }
 @keyframes onb-pop {
   from {

@@ -4,7 +4,7 @@ import { createLogger } from "../src/logger";
 import { createOperatorApp } from "../src/operator/app";
 import { createTestServer, type TestServer } from "./harness";
 
-/** ADR 0149: the operator's reads of the AI accounts people connected. */
+/** ADR 0150: the operator's reads of the AI accounts people connected. */
 
 const TOKEN = "operator-test-token-".padEnd(48, "x");
 const RANGE = "from=2026-10-01&to=2026-10-31";
@@ -31,8 +31,8 @@ beforeAll(async () => {
   const m = await t.db
     .insert(schema.machines)
     .values([
-      { orgId: ada, name: "Box", protocol: 46, runnerVersion: "1.2.3", executors: { mode: "system", ...signedIn } },
-      { orgId: ada, name: "Mac", protocol: 46, executors: { claude: { version: "2.1.0", loggedIn: false } } },
+      { orgId: ada, name: "Box", protocol: 47, runnerVersion: "1.2.3", executors: { mode: "system", ...signedIn } },
+      { orgId: ada, name: "Mac", protocol: 47, executors: { claude: { version: "2.1.0", loggedIn: false } } },
       { orgId: lia, name: "Lia box", protocol: 45, executors: signedIn },
       { orgId: lia, name: "Gone", executors: signedIn, deletedAt: new Date() },
     ])
@@ -288,7 +288,7 @@ test("the list: keyset pages newest first, agents counted once each, no email or
     usageAt: "2026-10-05T10:00:00.000Z",
     usageSource: "probe",
     runnerVersion: "1.2.3",
-    protocol: 46,
+    protocol: 47,
   });
   expect(seen.find((a) => a.id === id(2))?.runnerVersion).toBeNull();
 });

@@ -15,9 +15,11 @@
   pointer-events: none;
 }
 .ni {
+  /* Its own ground, also the ring that cuts the small faces out of each other. */
+  --ni-bg: #141413;
   pointer-events: auto;
   max-width: min(560px, 100%);
-  background: #141413;
+  background: var(--ni-bg);
   color: var(--ink);
   border-radius: 24px;
   box-shadow:
@@ -27,7 +29,7 @@
   animation: ni-in 0.55s cubic-bezier(0.3, 1.25, 0.4, 1) both;
 }
 :root[data-theme="dark"] .ni {
-  background: #000;
+  --ni-bg: #000;
   box-shadow:
     0 18px 40px -14px rgba(0, 0, 0, 0.8),
     0 0 0 1px rgba(255, 255, 255, 0.12);
@@ -108,7 +110,7 @@ html:not([data-pointer]) .ni__pill:focus-visible {
     transform: translateY(3px);
   }
 }
-.ni__face {
+.ni .ni__face {
   width: 32px;
   height: 32px;
   flex: none;
@@ -137,23 +139,35 @@ html:not([data-pointer]) .ni__pill:focus-visible {
   font-size: 14px;
   color: var(--ink-muted);
 }
+/* The others: their small faces and "+N" as one stack, each cut out of the next by the island's own ground (the dark
+   theme's is black: a fixed ring drew gray circles there). */
 .ni__faces {
   display: flex;
   flex: none;
+  margin-left: 6px;
 }
-.ni__mini {
+.ni .ni__mini {
   width: 22px;
   height: 22px;
   margin-left: -6px;
-  box-shadow: 0 0 0 2px #141413;
+  box-shadow: 0 0 0 2px var(--ni-bg);
+}
+/* A notice with no face of its own (the workspace telling) keeps its glyph small inside the 22px circle. */
+.ni__mini.ni__sys .ac-icon {
+  width: 12px;
+  height: 12px;
+}
+.ni__faces + .ni__count {
+  margin-left: -16px;
+  box-shadow: 0 0 0 2px var(--ni-bg);
 }
 .ni__count {
   flex: none;
   min-width: 22px;
   height: 22px;
-  padding: 0 7px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: #2a2a28;
   font-size: 12px;
   font-weight: 700;
   color: var(--ink);
@@ -217,8 +231,11 @@ html:not([data-pointer]) .ni__pill:focus-visible {
   min-width: 0;
   padding-right: 26px;
 }
-.ni__title {
+/* Its reset at no weight, so the rise to the face's top (`.ac-captop`) wins it. */
+:where(.ni__title) {
   margin: 0;
+}
+.ni__title {
   font-size: 14px;
   line-height: 1.35;
   color: var(--ink-muted);
@@ -243,8 +260,15 @@ html:not([data-pointer]) .ni__pill:focus-visible {
   gap: 6px;
   margin-top: 10px;
 }
-/* Choices can be whole sentences: each grows with its text and wraps inside the card, a pill while it is one line
-   and a rounded box once it takes more. */
+/* Only buttons (no answers to pick): they end the notice at its right edge, where the × above ends, the main one
+   last; the body's room for the × is only for the title's lines. */
+.ni__acts:not(:has(.ni__choice)) {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  margin-right: -26px;
+}
+/* Choices can be whole sentences: each grows with its text and wraps inside the card. They are buttons, so the
+   ruler's small corner (30% of 32), not a pill. */
 .ni__choice {
   all: unset;
   box-sizing: border-box;
@@ -252,9 +276,9 @@ html:not([data-pointer]) .ni__pill:focus-visible {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  min-height: 32px;
+  min-height: var(--control-h-sm);
   padding: 6px 14px;
-  border-radius: 16px;
+  border-radius: var(--control-r-sm);
   font-size: 13.5px;
   font-weight: 650;
   line-height: normal;
@@ -352,6 +376,8 @@ html:not([data-pointer]) .ni__choice:focus-visible {
   .ni,
   .ni--leaving,
   .ni__pill > *,
+  .ni__pill > *:not(.ni__line),
+  .ni__see.ac-btn,
   .ni__item {
     animation: none;
   }

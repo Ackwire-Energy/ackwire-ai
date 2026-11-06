@@ -9,7 +9,7 @@ import { signInOneTime } from "@/lib/auth";
 import { writeValue } from "@/lib/storage";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
-import { Button, Card, haptics, Icon, PixelOrbit, Text, useTheme } from "@/ui";
+import { Button, Card, haptics, Icon, LineIcon, PixelOrbit, Text, useTheme } from "@/ui";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { rememberSignIn } from "@/ui/auth/SocialButtons";
 import { LAST_EMAIL } from "./AuthFlow";
@@ -177,7 +177,9 @@ function WaitCard({ title, sub }: { title: string; sub: string }) {
   return (
     <Card>
       <View style={styles.wait}>
-        <PixelOrbit color="sky" size={16} />
+        <LineIcon variant="subhead" size={16}>
+          <PixelOrbit color="sky" size={16} />
+        </LineIcon>
         <View style={styles.grow}>
           <Text variant="subhead" style={styles.strong}>
             {title}
@@ -207,7 +209,8 @@ function LockLine({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
-  wait: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
+  // The orbit on the title's line, never centered between the title and the line under it.
+  wait: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 14 },
   grow: { flex: 1, minWidth: 0 },
   strong: { fontWeight: "600" },
   lock: { flexDirection: "row", gap: 8, marginTop: 4 },

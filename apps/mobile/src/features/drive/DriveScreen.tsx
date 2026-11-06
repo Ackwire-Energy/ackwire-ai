@@ -1,8 +1,9 @@
 import { type ArtifactFilters, useArtifacts } from "@agenteschat/client";
-import { Fragment, useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
-import { Button, EmptyState, Filters, SearchField, SectionHeader, Text } from "@/ui";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { Button, EmptyState, Filters, SearchField, SectionHeader, Text, useReducedMotion } from "@/ui";
 import { useColors, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { DriveCard } from "./DriveCard";
@@ -47,6 +48,11 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
       : t(`mobile.drive.section.${s.label.kind}`);
   const total = all.length;
   const visible = sections.reduce((n, s) => n + s.items.length, 0);
+  // The grid fades in over the spinner, and a day that comes or goes with a filter or "Show more" fades while the rest
+  // slide into place; what shows when the screen opens doesn't fade card by card.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
   return (
     <PushedLargeTitle
       title={t("mobile.drive.title")}
@@ -87,33 +93,35 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
           <EmptyState icon="drive" title={t("mobile.drive.empty")} subtitle={t("mobile.drive.emptySub")} />
         )
       ) : (
-        <>
-          {sections.map((s) => (
-            <Fragment key={s.key}>
-              <SectionHeader title={label(s)} count={s.items.length} />
-              <View style={styles.grid}>
-                {gridRows(s.items).map((row) => (
-                  <View key={row.map((a) => a.id).join(":")} style={styles.row}>
-                    {row.map((a) => (
-                      <DriveCard key={a.id} artifact={a} highlighted={a.id === highlightId} />
-                    ))}
-                    {row.length === 1 ? <View style={styles.spacer} /> : null}
-                  </View>
-                ))}
-              </View>
-            </Fragment>
-          ))}
-          {visible < total ? (
-            <View style={styles.more}>
-              <Button
-                variant="secondary"
-                size="sm"
-                label={t("mobile.drive.more")}
-                onPress={() => setShown((n) => n + PAGE)}
-              />
-            </View>
-          ) : null}
-        </>
+        <Animated.View {...fade}>
+          <LayoutAnimationConfig skipEntering>
+            {sections.map((s) => (
+              <Animated.View key={s.key} {...fade} layout={layout}>
+                <SectionHeader title={label(s)} count={s.items.length} />
+                <View style={styles.grid}>
+                  {gridRows(s.items).map((row) => (
+                    <View key={row.map((a) => a.id).join(":")} style={styles.row}>
+                      {row.map((a) => (
+                        <DriveCard key={a.id} artifact={a} highlighted={a.id === highlightId} />
+                      ))}
+                      {row.length === 1 ? <View style={styles.spacer} /> : null}
+                    </View>
+                  ))}
+                </View>
+              </Animated.View>
+            ))}
+            {visible < total ? (
+              <Animated.View {...fade} layout={layout} style={styles.more}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={t("mobile.drive.more")}
+                  onPress={() => setShown((n) => n + PAGE)}
+                />
+              </Animated.View>
+            ) : null}
+          </LayoutAnimationConfig>
+        </Animated.View>
       )}
     </PushedLargeTitle>
   );

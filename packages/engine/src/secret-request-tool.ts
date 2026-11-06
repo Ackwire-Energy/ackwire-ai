@@ -1,6 +1,7 @@
 import { isReservedSecretName } from "@agenteschat/adapters";
 import { and, eq, gt, isNull, ne, or, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { isAbsoluteMachinePath, pathInOwnFolder } from "./machine-access";
 import { type ComputerHandle, requireComputerManager } from "./sandbox";
 import {
   MAX_PENDING_SECRETS,
@@ -78,7 +79,7 @@ export function requestSecretTool(opts: {
     description: [
       opts.browserOnly
         ? "Ask the person who asked you for a password or code to sign in on a site in your browser, and whenever they ask to send one privately. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Give `username` when you know the account, and `code` for a one-time code. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`."
-        : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). For a site your browser signs in to, give `site` (and `username` when you know it, or `code` for a one-time code). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it. Look in the Vault first (`vault_list`) when you have it: a saved login or key needs no request.",
+        : "Ask the person who asked you for a secret your computer needs: a key no connector covers, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). For a site your browser signs in to, give `site` (and `username` when you know it, or `code` for a one-time code). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it. Look in the Vault first (`vault_list`) when you have it: a saved login or key needs no request.",
       AGAIN,
     ].join(" "),
     scope: opts.scope,
@@ -110,13 +111,13 @@ export function requestSecretTool(opts: {
               maxLength: 300,
               description: "What it is for, shown to the person",
             },
-            target: { enum: ["env", "file"] },
+            target: { enum: ["env", "file"], description: "env (default) or file" },
             path: { type: "string", maxLength: 300, description: "With target file: where it goes in your workspace" },
             site,
             username,
             code,
           },
-          required: ["name", "purpose", "target"],
+          required: ["name", "purpose"],
           additionalProperties: false,
         },
     describe: (input) => ({ title: `Ask for the secret ${str(input.name)}` }),
@@ -136,9 +137,10 @@ export function requestSecretTool(opts: {
             isError: true,
           };
         }
-        const file = !opts.browserOnly && input.target === "file";
-        const path = file ? (opts.toolPath?.(str(input.path)) ?? "") : "";
-        if (file && (!path || path === ".agentes" || path.startsWith(".agentes/"))) {
+        const file =
+          !opts.browserOnly && (input.target === "file" || (input.target === undefined && Boolean(str(input.path))));
+        const path = file ? pathInOwnFolder(opts.toolPath?.(str(input.path)) ?? "", ctx.agentId) : "";
+        if (file && (!path || path === ".agentes" || path.startsWith(".agentes/") || isAbsoluteMachinePath(path))) {
           return { content: "With target file, give a path inside your workspace (e.g. .npmrc).", isError: true };
         }
         const rawSite = str(input.site).trim();

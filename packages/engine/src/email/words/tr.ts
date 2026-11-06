@@ -238,7 +238,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `Çalışma alanı silme kodunuz: ${code}`,
-    subjectAccount: (code) => `Hesabınızı silme kodunuz: ${code}`,
+    subjectAccount: (code) => `Hesabınızın tamamını silme kodunuz: ${code}`,
     preheader: "Onaylamak için agentes.chat'e yazın. 10 dakika geçerli.",
     headline: "Kodunuz",
     workspace: (org) => [
@@ -247,7 +247,7 @@ export const words: EmailWords = {
     ],
     account: (email) => [
       { b: email },
-      " hesabını silmek için bu kodu yazın. Hesap hemen silinir ve yalnızca sizin bulunduğunuz çalışma alanları da onunla birlikte kapanır.",
+      " hesabının tamamını silmek için bu kodu yazın, yalnızca bir çalışma alanını değil. Hesap hemen silinir ve yalnızca sizin bulunduğunuz çalışma alanları da onunla birlikte kapanır.",
     ],
     support: (address) => [
       "10 dakika geçerli ve bu kod olmadan hiçbir şey silinmez. Bu siz değilseniz kodu kimseyle paylaşmayın ve ",

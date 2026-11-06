@@ -169,6 +169,7 @@ export {
   PickerHeading,
   SearchInput,
   Textarea,
+  useAutoGrow,
   useFieldControl,
 } from "./components/Field";
 export {

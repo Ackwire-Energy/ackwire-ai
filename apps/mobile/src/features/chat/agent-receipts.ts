@@ -7,6 +7,7 @@ import {
   receiptView,
   type SteerPhase,
   type SteerState,
+  steerWords,
 } from "@agenteschat/client";
 import { listNames } from "@agenteschat/client/lib/activity";
 import { isEventLine } from "@agenteschat/client/lib/notices";
@@ -138,7 +139,7 @@ export const receiptShows = (line: ReceiptLine | null, steered: boolean): line i
 /** The mark a person's message carries beside its text, in room its row already has. */
 export type ReceiptMarkView =
   /** My message sent into a task at work: the agent's face once it read it, else the phase's small mark. */
-  | { kind: "steer"; agentId: string; state: SteerPhase }
+  | { kind: "steer"; agentId: string; state: SteerPhase; words: ReturnType<typeof steerWords> }
   /** My latest message in a DM between people, once they read it: their face. */
   | { kind: "seen"; personId: string }
   /** The latest person's message's agents' receipt when it asks nothing of you: the first agent's face and the mark. */
@@ -150,7 +151,7 @@ export function markOf(
   seenBy: string | null | undefined,
   receipt: MessageReceipt | undefined,
 ): ReceiptMarkView | null {
-  if (steer) return { kind: "steer", agentId: steer.agentId, state: steer.state };
+  if (steer) return { kind: "steer", agentId: steer.agentId, state: steer.state, words: steerWords(steer, receipt) };
   if (seenBy) return { kind: "seen", personId: seenBy };
   const line = receiptLine(receipt);
   if (!line || keepsLine(line)) return null;
@@ -163,7 +164,7 @@ export function markLabel(
   view: ReceiptMarkView,
   names: { agent: (id: string) => string; person: (id: string) => string },
 ): string {
-  if (view.kind === "steer") return t(`mobile.chat.steer.${view.state}`, { name: names.agent(view.agentId) });
+  if (view.kind === "steer") return t(`mobile.chat.steer.${view.words}`, { name: names.agent(view.agentId) });
   if (view.kind === "seen") return t("receipts.seenBy", { names: names.person(view.personId) });
   const agents = view.label.agents;
   return t(view.label.key, { count: agents.length, names: listNames(t, agents.map(names.agent)) });

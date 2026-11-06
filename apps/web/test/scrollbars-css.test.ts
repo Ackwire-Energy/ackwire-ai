@@ -79,7 +79,7 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".level-matrix": "content",
   ".pu-table-card": "content",
   ".machine-command__code": "content",
-  ".issues-boardwrap": "content",
+  ".issues-boardwrap": "strip",
   ".team-tree": "content",
   ".mi-log": "content",
   ".mi-cmd__line": "content",
@@ -293,8 +293,13 @@ describe("the open sidebar", () => {
     const source = await read("apps/web/src/layout.css");
     const layout = topLevel(source);
     const kit = atRule(await read(KIT), POINTER);
-    // Where the kit draws ours, and only there: elsewhere the scrollbar takes no room, or room of its own size.
-    const ours = atRule(atRule(source, POINTER), "@supports selector(::-webkit-scrollbar)");
+    // Where the kit draws ours and the room is really kept, and only there: elsewhere the scrollbar takes no room, or
+    // room of its own size, and a WebKit without `scrollbar-gutter` (the Mac app's) keeps none while the list doesn't
+    // scroll, so the list keeps its full side padding.
+    const ours = atRule(
+      atRule(source, POINTER),
+      "@supports selector(::-webkit-scrollbar) and (scrollbar-gutter: stable)",
+    );
     const list = '.sidebar:not([data-rail="true"]) .sidebar__scroll';
     const sidebar = sides(value(layout, ".sidebar", "padding"));
     const padding = px(value(ours, list, "padding-right"));

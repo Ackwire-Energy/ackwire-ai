@@ -139,6 +139,12 @@ test("Perfis do navegador: each row says Livre or who uses it, its agents and Fa
     "Mudar quem pode usar",
     "Apagar perfil",
   ]);
+  const remove = [...document.querySelectorAll(".ac-menu .ac-menu__item")].at(-1) as HTMLElement;
+  await act(async () => fireEvent.click(remove));
+  await settle(2);
+  expect(screen().getByRole("dialog", { name: "Apagar o perfil Empresa A?" }).textContent).toContain(
+    "1 agente perde o acesso. Não dá para desfazer.",
+  );
 });
 
 test("an outdated computer says to update it instead of offering Novo perfil", async () => {

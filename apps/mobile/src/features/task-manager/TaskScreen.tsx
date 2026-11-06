@@ -16,7 +16,7 @@ import { Button, Card, PixelDone, PixelFail, PixelStop, PixelStopped, Section, T
 import { RunSteps } from "../chat/ToolCalls";
 import { chatHref } from "../links/logic";
 import { useOpenQueue } from "../queue/QueueSheet";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
@@ -138,7 +138,7 @@ function Ended({ task }: { task: EndedTask }) {
               ) : (
                 <PixelStopped size={10} />
               )}
-              <Text variant="footnote" tone="ink2" style={styles.semibold}>
+              <Text variant="footnote" tone="ink2" style={[styles.semibold, styles.shrink]}>
                 {endedText(t, task, meId)}
               </Text>
             </View>
@@ -194,8 +194,10 @@ function Page({
       >
         <View style={styles.head}>
           <View style={styles.row}>
-            <AgentFace agentId={task.agentId} size={24} live={false} />
-            <Text variant="small" tone="muted" style={styles.semibold}>
+            <OpensAgent agentId={task.agentId}>
+              <AgentFace agentId={task.agentId} size={24} live={false} />
+            </OpensAgent>
+            <Text variant="small" tone="muted" style={[styles.semibold, styles.shrink]}>
               {agent?.name ?? t("channel.unknownAgent")}
             </Text>
           </View>
@@ -253,6 +255,7 @@ function Page({
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   scroll: { paddingTop: 4 },

@@ -216,8 +216,8 @@ function StatusEditor() {
             onPress={() => edit({ text: "", emoji: null, until: { choice: "never" } })}
             accessibilityRole="button"
             accessibilityLabel={t("presence.wipe")}
-            hitSlop={10}
-            style={[styles.wipe, { backgroundColor: c.faint }]}
+            hitSlop={11}
+            style={({ pressed }) => [styles.wipe, { backgroundColor: c.faint }, pressed && styles.wipePressed]}
           >
             <Icon name="x" size={12} color={c.raised} />
           </Pressable>
@@ -243,6 +243,8 @@ function StatusEditor() {
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
               accessibilityLabel={label}
+              // A 34-point suggestion: the slop makes its target 44.
+              hitSlop={{ top: 5, bottom: 5 }}
               style={({ pressed }) => [
                 styles.chip,
                 { backgroundColor: c.raised, boxShadow: shadows.e1 },
@@ -319,11 +321,12 @@ const styles = StyleSheet.create({
   keyEmoji: { fontSize: 21, lineHeight: 26 },
   input: { flex: 1, minWidth: 0, paddingVertical: 8, paddingHorizontal: 2 },
   wipe: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", opacity: 0.55 },
+  wipePressed: { opacity: 0.3 },
   // The chips run to the screen's edges under the field.
   chipsRow: { marginHorizontal: -16 },
   chips: { gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   chip: {
-    height: 34,
+    minHeight: 34,
     paddingHorizontal: 13,
     borderRadius: 17,
     borderWidth: 1.5,

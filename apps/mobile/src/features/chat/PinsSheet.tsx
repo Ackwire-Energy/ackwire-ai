@@ -46,16 +46,18 @@ export function PinnedBar({
       onPress={onOpen}
       accessibilityRole="button"
       accessibilityLabel={t("mobile.pins.bar", { count: list.length })}
+      // A 36-point bar: the slop reaches 44 into the conversation under it, never into the header above.
+      hitSlop={{ bottom: 8 }}
       style={({ pressed }) => [styles.bar, { borderBottomColor: c.line2, backgroundColor: pressed ? c.sunken : c.bg }]}
     >
-      <Icon name="pin" size={14} color={c.faint} />
+      <Icon name="pin" size={13} color={c.faint} />
       <Text variant="footnote" tone="ink2" numberOfLines={1} style={styles.grow}>
         <Text variant="footnote" tone="ink" style={styles.bold}>
           {dir.nameOf(latest.message.author) || t("mobile.chat.someone")}
         </Text>{" "}
         {previewOf(textOrMedia(t, latest.message.body, latest.message.meta))}
       </Text>
-      {list.length > 1 ? <Count value={list.length} /> : null}
+      {list.length > 1 ? <Count value={list.length} size={13} /> : null}
     </Pressable>
   );
 }

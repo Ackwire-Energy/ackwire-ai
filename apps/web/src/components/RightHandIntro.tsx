@@ -226,7 +226,7 @@ function StartCard({
                     >
                       <AgentAvatar name={name} appearance={normalizeAppearance(PRESET_LOOK[p])} size="sm" />
                       <span className="rh-intro__preset-text">
-                        <b>{name}</b>
+                        <b className="ac-captop">{name}</b>
                         <small>{t(`onboarding.presets.${p}.role`)}</small>
                       </span>
                     </button>

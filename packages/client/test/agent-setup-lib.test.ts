@@ -115,8 +115,9 @@ describe("Usar em outros agentes", () => {
       fallback: false,
       onlyOwner: true,
       account: "acc",
+      accounts: [],
       computer: { machineId: "m1", name: "MacBook", online: true },
-    } as AgentBrain;
+    } as unknown as AgentBrain;
     expect(setupOfBrain(view)).toEqual({
       brain: "claude_code",
       machineId: "m1",

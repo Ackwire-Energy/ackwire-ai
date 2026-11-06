@@ -86,3 +86,12 @@ export const lastTabbable = (root: Element) =>
         el.checkVisibility?.({ checkVisibilityCSS: true }) !== false,
     )
     .at(-1);
+
+/**
+ * Whether something on the page holds the focus: what opened as an overlay closed keeps it, the overlay gives none back.
+ * A dialog itself doesn't count: an outer dialog takes the focus back as an inner one closes, for lack of anywhere else.
+ */
+export const focusHeld = () => {
+  const held = document.activeElement;
+  return held !== null && held !== document.body && !held.matches('[role="dialog"]');
+};

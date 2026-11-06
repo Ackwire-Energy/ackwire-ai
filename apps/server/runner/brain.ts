@@ -243,7 +243,7 @@ const NETWORK_TEXT =
 /** How Claude Code words a provider's answer in an error text: "API Error: 403 {…}". */
 const API_ERROR_STATUS = /\bAPI Error: (\d{3})\b/;
 
-/** Why the provider refused or failed a call (protocol 46), and its HTTP status when the CLI said one. */
+/** Why the provider refused or failed a call (protocol 47), and its HTTP status when the CLI said one. */
 export interface ProviderFailure {
   cause?: ProviderFailureCause;
   httpStatus?: number;

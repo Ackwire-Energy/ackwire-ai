@@ -298,7 +298,8 @@ describe("deleting an account", () => {
     const plan = await (await bia("/api/app/account/deletion")).json();
     expect(plan).toEqual({
       closes: [
-        { id: solo, name: "Solo" },
+        // What it holds, so the page can say which is which.
+        { id: solo, name: "Solo", agents: expect.any(Number), messages: expect.any(Number) },
         { id: old, name: "Old", deletion },
       ],
       leaves: [

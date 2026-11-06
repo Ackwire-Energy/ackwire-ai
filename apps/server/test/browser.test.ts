@@ -292,6 +292,17 @@ describe("live view socket", () => {
       expect(await until((f) => f.type === "error" && f.agentId === AGENT)).toMatchObject({ code: "not_found" });
       ws.send(JSON.stringify({ type: "browser.input", agentId: org.agentId, events: [{ kind: "text", text: "a" }] }));
       expect(await until((f) => f.code === "not_in_control")).toBeTruthy();
+      // In control, and the computer couldn't put it on the page: the view hears that too.
+      const realInput = t.engine.browserLive.input;
+      t.engine.browserLive.input = async () => ({ accepted: 0, refused: false, failed: 1 });
+      ws.send(JSON.stringify({ type: "browser.watch", agentId: org.agentId }));
+      await until((f) => f.type === "browser.unavailable");
+      ws.send(JSON.stringify({ type: "browser.input", agentId: org.agentId, events: [{ kind: "text", text: "a" }] }));
+      expect(await until((f) => f.code === "input_failed")).toMatchObject({ agentId: org.agentId });
+      t.engine.browserLive.input = async () => ({ accepted: 1, refused: false, nowhere: true });
+      ws.send(JSON.stringify({ type: "browser.input", agentId: org.agentId, events: [{ kind: "text", text: "a" }] }));
+      expect(await until((f) => f.code === "no_field")).toMatchObject({ agentId: org.agentId });
+      t.engine.browserLive.input = realInput;
       ws.close();
     } finally {
       await Promise.race([server.stop(true), Bun.sleep(500)]);

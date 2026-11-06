@@ -12,7 +12,9 @@ import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { ValidationError } from "./errors";
 import { cutText } from "./format";
+import { fullMachinePath } from "./machine-access";
 import type { MachineMissionHooks } from "./machine-hub";
+import { createMachineSandboxProvider } from "./machine-provider";
 import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
 import { handlePermissionPrompt, runPermissionPrompt } from "./mission-commands";
 import { NOT_FOR_MISSION, runActsForMission } from "./mission-context";
@@ -93,6 +95,8 @@ const masked = (value: unknown): unknown =>
 
 /** A path the executor gave (relative to where it runs) as a path in the agent's folder. */
 function taskPath(task: Pick<MachineTaskRow, "cwd">, given: string) {
+  const full = fullMachinePath(given);
+  if (full) return full;
   if (given.startsWith(FOLDER_PREFIX)) {
     const inFolder = workspacePath(given.slice(FOLDER_PREFIX.length));
     if (!inFolder || inFolder.split("/").includes("..")) {
@@ -128,14 +132,15 @@ async function uploadFromTask(
   });
   const agent = await getAgentCached(deps.db, mission.orgId, mission.agentId);
   try {
-    await deps.hub.call<"push">(task.machineId, {
-      op: "push",
+    await createMachineSandboxProvider(deps.hub, { id: mission.agentId, handle: agent?.handle ?? "agent" }).pushFile(
+      task.machineId,
       path,
-      url: `${(deps.publicUrl ?? "").replace(/\/$/, "")}/api/machines/uploads/${upload.id}`,
-      uploadId: upload.id,
-      maxBytes: upload.maxBytes,
-      agent: { id: mission.agentId, handle: agent?.handle ?? "agent" },
-    });
+      {
+        url: `${(deps.publicUrl ?? "").replace(/\/$/, "")}/api/machines/uploads/${upload.id}`,
+        uploadId: upload.id,
+        maxBytes: upload.maxBytes,
+      },
+    );
   } catch (error) {
     await failUpload(deps, upload.id, error instanceof Error ? error.message : String(error));
     throw error;

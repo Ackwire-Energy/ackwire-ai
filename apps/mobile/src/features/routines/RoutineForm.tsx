@@ -374,7 +374,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 32 + insets.bottom }]}
       >
         {agents.length === 0 && !dir.loading ? <GroupedFooter>{t("routines.form.noAgents")}</GroupedFooter> : null}
         {!editing && !d.prompt.trim() ? (
@@ -510,7 +510,12 @@ function Form({ routine }: { routine: Routine | undefined }) {
                 <Text variant="footnote" tone="faint">
                   {t("routines.form.utcHint", { zone: timezoneName(d.rule.timezone, i18n.language) })}
                 </Text>
-                <Pressable onPress={() => setZone("UTC")} accessibilityRole="button" hitSlop={8}>
+                <Pressable
+                  onPress={() => setZone("UTC")}
+                  accessibilityRole="button"
+                  hitSlop={14}
+                  style={({ pressed }) => (pressed ? styles.pressed : null)}
+                >
                   <Text variant="footnote" tone="ink2" style={styles.link}>
                     {t("routines.form.keepUtc")}
                   </Text>
@@ -808,6 +813,7 @@ const styles = StyleSheet.create({
   stacked: { paddingHorizontal: 14, paddingTop: 10 },
   utc: { paddingTop: 7, paddingHorizontal: 16, gap: 4 },
   link: { fontWeight: "600", textDecorationLine: "underline" },
+  pressed: { opacity: 0.6 },
   error: { paddingTop: 7, paddingHorizontal: 16 },
   bold: { fontWeight: "600" },
   warning: { paddingTop: 7, paddingHorizontal: 16, gap: 8, alignItems: "flex-start" },

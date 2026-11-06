@@ -20,12 +20,13 @@ import { gradientOf } from "@agenteschat/ui/agent/engine";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Icon, ProviderLogo, Text } from "@/ui";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { PushedHeader } from "../shared/parts";
+import { Loaded, PushedHeader } from "../shared/parts";
 import { AccountHead, PlanMeter, Swatch, UsageCard, UsageDays } from "./parts";
 
 /*
@@ -64,26 +65,31 @@ export function AgentUsageScreen({ agentId }: { agentId: string }) {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
-        {usage.isLoading ? <ActivityIndicator color={c.muted} /> : null}
-        {!usage.isLoading && !data ? (
-          <Text variant="small" tone="muted">
-            {t("common.loadFailed")}
-          </Text>
-        ) : null}
-        {data ? (
-          <>
-            <Month data={data} name={name} tones={tones} />
-            {data.current ? <Now data={data} agentId={agentId} name={name} /> : null}
-            {data.sources.length > 0 ? (
-              <BySource
-                data={data}
-                name={name}
-                onApi={!agent?.brain || agent.brain.kind === "model"}
-                apiTone={apiTone}
-              />
-            ) : null}
-          </>
-        ) : null}
+        {/* The numbers fade in over the spinner; numbers already here when the screen opens just show. */}
+        <LayoutAnimationConfig skipEntering>
+          {usage.isLoading ? <ActivityIndicator color={c.muted} /> : null}
+          {!usage.isLoading && !data ? (
+            <Text variant="small" tone="muted">
+              {t("common.loadFailed")}
+            </Text>
+          ) : null}
+          {data ? (
+            <Loaded>
+              <View style={styles.stack}>
+                <Month data={data} name={name} tones={tones} />
+                {data.current ? <Now data={data} agentId={agentId} name={name} /> : null}
+                {data.sources.length > 0 ? (
+                  <BySource
+                    data={data}
+                    name={name}
+                    onApi={!agent?.brain || agent.brain.kind === "model"}
+                    apiTone={apiTone}
+                  />
+                ) : null}
+              </View>
+            </Loaded>
+          ) : null}
+        </LayoutAnimationConfig>
       </ScrollView>
     </View>
   );
@@ -283,14 +289,17 @@ function BySource({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
+  // The page's own gap, for the cards that fade in together.
+  stack: { gap: 14 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   tabular: { fontVariant: ["tabular-nums"] },
   sentence: { fontWeight: "500", lineHeight: 26 },
   legend: { flexDirection: "row", flexWrap: "wrap", rowGap: 4, columnGap: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  source: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 12 },
-  acct: { flexDirection: "row", alignItems: "center", gap: 12 },
+  // The line under the name wraps: the mark and the numbers stay on the name's line instead of the block's middle.
+  source: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 12 },
+  acct: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   key: {
     width: 30,
     height: 30,

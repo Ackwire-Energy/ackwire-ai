@@ -5,6 +5,7 @@ import {
   type ReceiptView,
   receiptTicks,
   receiptView,
+  steerWords,
   useApi,
   useReactions,
   useSteerState,
@@ -97,7 +98,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const steer = useSteerState(org.id, message.channelId, part === "check" ? message.id : "");
   const steerName = steer ? dir.agentById.get(steer.agentId)?.name : undefined;
   const steered =
-    steer && steerName ? { steer, name: steerName, text: t(`run.steer.${steer.state}`, { name: steerName }) } : null;
+    steer && steerName
+      ? { steer, name: steerName, text: t(`run.steer.${steerWords(steer, receipt)}`, { name: steerName }) }
+      : null;
   const view = receiptView(receipt);
   const status = view.status;
   const callAgent =

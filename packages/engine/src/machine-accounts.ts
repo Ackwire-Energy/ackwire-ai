@@ -126,7 +126,7 @@ export interface MachineAccountView {
   email: string | null;
   plan: string | null;
   status: MachineAccountStatus;
-  /** False: the computer's last look at its status said nothing for sure (protocol 46); `status` is the last known. */
+  /** False: the computer's last look at its status said nothing for sure (protocol 47); `status` is the last known. */
   statusKnown: boolean;
   /** Whose it is; null: nobody's (its person was deleted, or the desktop app signed it in where nobody paired). */
   ownerId: string | null;
@@ -145,7 +145,7 @@ export interface MachineAccountView {
   keyHint: string | null;
   /** It thinks for every agent its owner gives it on that computer (protocol 29); else for one. */
   shared: boolean;
-  /** Claude's organization it is signed in to (opaque, protocol 46), for its owner's eyes only; null: not known. */
+  /** Claude's organization it is signed in to (opaque, protocol 47), for its owner's eyes only; null: not known. */
   providerOrgId: string | null;
 }
 
@@ -485,7 +485,7 @@ interface Settled {
 }
 
 /**
- * What a report says of how an account signs in and whether it is signed in (protocol 46). An inconclusive look
+ * What a report says of how an account signs in and whether it is signed in (protocol 47). An inconclusive look
  * (`statusUnknown`) leaves a listed account's status as it was; the method and Claude's organization stay as last
  * known when the report doesn't say them.
  */
@@ -1125,7 +1125,7 @@ export async function beginAccountLogin(
   const shared =
     protocol >= (kind === "codex" ? SHARED_CODEX_PROTOCOL : SHARED_ACCOUNTS_PROTOCOL) && sharedSignIn(kind, provider);
   const again = accountId !== undefined;
-  // A Claude subscription sign-in for all agents (ADR 0149): a new one takes the policy's method once, kept on its
+  // A Claude subscription sign-in for all agents (ADR 0150): a new one takes the policy's method once, kept on its
   // row; signing in again keeps the row's, whatever the policy says now (none known: the runner does as before).
   let method: ClaudeLoginMethod | undefined;
   if (kind === "claude_code" && provider === undefined && (again || shared)) {

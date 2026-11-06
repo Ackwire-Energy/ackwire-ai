@@ -1,6 +1,7 @@
-import type { Message } from "@agenteschat/client";
+import type { Agent, Message } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
+import { seesDetails } from "@agenteschat/client/lib/audience";
 import { pairItemOf } from "@agenteschat/client/lib/consult-group";
 import { formatTime } from "@agenteschat/client/lib/format";
 import {
@@ -23,6 +24,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { MessageBody } from "@/chat/MessageBody";
+import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ConsultPairRow } from "@/components/ConsultGroup";
 import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
@@ -173,6 +175,28 @@ export function NoticeLine({ message }: { message: Message }) {
       labels={{ show: t("chat.notice.show"), hide: t("chat.notice.hide") }}
       action={followUp?.pending ? <CancelFollowUp messageId={message.id} /> : undefined}
     />
+  );
+}
+
+/** Under a reply that came at standard speed because Fast was refused (`meta.speedFallback`), with the way to the agent. */
+export function SpeedFallbackLine({ agent }: { agent: Agent | undefined }) {
+  const { t } = useTranslation();
+  const openPanel = useOpenAgentPanel();
+  return (
+    <div className="cn-line cn-line--part ac-iconline">
+      <Icon name="info" size={14} />
+      <span className="cn-line__text">
+        {t("chat.speedFallback.text")}
+        {openPanel && agent && seesDetails(agent) && (
+          <>
+            {" "}
+            <button type="button" className="ac-link" onClick={() => openPanel(agent.id)}>
+              {t("chat.speedFallback.action")}
+            </button>
+          </>
+        )}
+      </span>
+    </div>
   );
 }
 

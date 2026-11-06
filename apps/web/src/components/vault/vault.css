@@ -77,7 +77,7 @@
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .vlt-row__text {
   min-width: 0;

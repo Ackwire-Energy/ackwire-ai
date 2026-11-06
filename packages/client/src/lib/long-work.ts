@@ -194,6 +194,9 @@ export function autoUpdateText(t: TFunction, params: Record<string, unknown>): s
 export function talkerStatusText(t: TFunction, params: Record<string, unknown>): string {
   const say = loose(t);
   const minutes = Number(params.minutes ?? 0);
+  // Waiting for its computer it isn't working: the minutes are the wait's, and away there is no telling how long.
+  if (params.wait === "away") return say("work.statusReplyAway");
+  if (params.wait === "queued") return say("work.statusReplyQueued", { duration: workDuration(t, minutes * 60_000) });
   const head = say("work.statusReply", { duration: workDuration(t, minutes * 60_000) });
   const kind = typeof params.kind === "string" ? params.kind : null;
   if (!kind) return head;

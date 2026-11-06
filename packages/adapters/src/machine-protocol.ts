@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 47;
+export const MACHINE_PROTOCOL_VERSION = 48;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -514,6 +514,12 @@ export const ANTIGRAVITY_PROTOCOL = 44;
  */
 export const VAULT_PROTOCOL = 45;
 /**
+ * From this protocol on (ADR 0149): `brain.turn` carries `speed`, and a Codex turn that failed at that speed before
+ * anything happened goes again at standard speed, with a `speed_fallback` event right before its `done`. An older
+ * runner never sees it.
+ */
+export const SPEED_PROTOCOL = 46;
+/**
  * From this protocol on: how each account signs in. Accounts carry `authMethod` (from what the runner keeps beside
  * and in the folder, never guessed), `statusUnknown` when the last look at their status said nothing for sure, and
  * Claude's `providerOrgId` / `orgName`; `hello` says which methods a new Claude sign-in for all agents can use here
@@ -521,7 +527,7 @@ export const VAULT_PROTOCOL = 45;
  * its `cause` and the provider's `httpStatus`. The server sends `method` to no older runner, and reads an older
  * runner's missing `claudeLoginMethods` as `claudeLoginMethodsOf` says.
  */
-export const CLAUDE_AUTH_PROTOCOL = 46;
+export const CLAUDE_AUTH_PROTOCOL = 47;
 /**
  * From this protocol on: a system-mode runner may list `cli_login` in `claudeLoginMethods`. Its turns on such a sign-in
  * run in root, as the sign-in's own OS user, with no tool of the CLI's that touches files or runs code; each agent's
@@ -531,7 +537,7 @@ export const CLAUDE_AUTH_PROTOCOL = 46;
  * server's side of the wire only the `agents` frame changes: its `deleted` says which agents are gone for good, what an
  * archived or moved agent, which also leaves the list, isn't. An older runner just never lists the method.
  */
-export const CLAUDE_SHARED_PROTOCOL = 47;
+export const CLAUDE_SHARED_PROTOCOL = 48;
 /**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
@@ -601,12 +607,18 @@ export const BRAIN_EFFORTS: readonly BrainEffort[] = ["low", "medium", "high", "
 export const isBrainEffort = (v: unknown): v is BrainEffort =>
   typeof v === "string" && (BRAIN_EFFORTS as readonly string[]).includes(v);
 
+/** How fast an agent answers in conversations (ADR 0149): `fast` is the provider's Fast mode. */
+export type BrainSpeed = "standard" | "fast";
+export const BRAIN_SPEEDS: readonly BrainSpeed[] = ["standard", "fast"];
+export const isBrainSpeed = (v: unknown): v is BrainSpeed =>
+  typeof v === "string" && (BRAIN_SPEEDS as readonly string[]).includes(v);
+
 /** A `brain.turn`'s `contextTokens` the runner applies (protocol 28): a whole number of tokens in a sane range. */
 export const isContextTokens = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 50_000 && v <= 10_000_000;
 
 /**
- * How an account signs in (protocol 46). `cli_login`: the CLI's own sign-in, kept and refreshed by the CLI in the
+ * How an account signs in (protocol 47). `cli_login`: the CLI's own sign-in, kept and refreshed by the CLI in the
  * folder. `setup_token`: `claude setup-token`'s long-lived token, kept by root and handed to each turn. `api_key`: a
  * pasted key (a coding plan's, Cursor's, OpenCode's).
  */
@@ -617,13 +629,13 @@ export const isAuthMethod = (v: unknown): v is AuthMethod => AUTH_METHODS.some((
 export type ClaudeLoginMethod = Exclude<AuthMethod, "api_key">;
 export const isClaudeLoginMethod = (v: unknown): v is ClaudeLoginMethod => v === "cli_login" || v === "setup_token";
 /**
- * What a new Claude sign-in for all agents can use on a computer: what its runner said (protocol 46), else what
+ * What a new Claude sign-in for all agents can use on a computer: what its runner said (protocol 47), else what
  * runners did before saying it (`claude setup-token` in system mode, the CLI's own sign-in elsewhere).
  */
 export const claudeLoginMethodsOf = (said: readonly AuthMethod[] | undefined, system: boolean): AuthMethod[] =>
   said ? [...said] : [system ? "setup_token" : "cli_login"];
 
-/** Why a provider refused or failed a turn (protocol 46), as far as the runner could tell from the CLI. */
+/** Why a provider refused or failed a turn (protocol 47), as far as the runner could tell from the CLI. */
 export type ProviderFailureCause =
   | "auth_rejected"
   | "account_disabled"
@@ -675,14 +687,14 @@ export interface RunnerAccountInfo {
   keyHint?: string;
   /** Protocol 29: it thinks for several of its owner's agents at once. */
   shared?: boolean;
-  /** Protocol 46: how it signs in, when the runner knows for sure. */
+  /** Protocol 47: how it signs in, when the runner knows for sure. */
   authMethod?: AuthMethod;
   /**
-   * Protocol 46: the last look at its status was inconclusive (the CLI timed out, didn't start or answered nothing
+   * Protocol 47: the last look at its status was inconclusive (the CLI timed out, didn't start or answered nothing
    * readable); `loggedIn` is then the last conclusive answer the runner knew.
    */
   statusUnknown?: true;
-  /** Protocol 46: the Claude organization it signed in to (no secret). */
+  /** Protocol 47: the Claude organization it signed in to (no secret). */
   providerOrgId?: string;
   orgName?: string;
 }
@@ -758,7 +770,7 @@ export type AccountRequest =
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
    * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
    * Protocol 29, `shared`: one sign-in for every agent of its owner there (`SHARED_ACCOUNTS_PROTOCOL`).
-   * Protocol 46, `method` (a Claude subscription sign-in only): `setup_token` in system mode for all agents, or
+   * Protocol 47, `method` (a Claude subscription sign-in only): `setup_token` in system mode for all agents, or
    * `cli_login`; a runner that can't do it refuses (`unsupported`) and never signs in another way, and `again` on an
    * account that signs in another way is refused too. Absent: as before.
    */
@@ -1386,12 +1398,14 @@ export type WireBrainEvent =
       message: string;
       retryable?: boolean;
       worked?: boolean;
-      /** Protocol 46: why the provider refused or failed it, and its HTTP status when the CLI said one. */
+      /** Protocol 47: why the provider refused or failed it, and its HTTP status when the CLI said one. */
       cause?: ProviderFailureCause;
       httpStatus?: number;
     }
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
-  | { type: "steer_read"; uuids: string[] };
+  | { type: "steer_read"; uuids: string[] }
+  /** Protocol 46: Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
+  | { type: "speed_fallback"; message: string };
 
 /**
  * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
@@ -1465,6 +1479,8 @@ export interface BrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /** Protocol 46: `fast` asks for the provider's Fast mode on this turn; absent: standard speed. */
+  speed?: BrainSpeed;
   /**
    * `opencode`: no account on a computer nobody connected, so OpenCode's own free tier alone (`opencode/*` models,
    * no key from the runner's env); ADR 0132.
@@ -1726,12 +1742,12 @@ export interface RunnerInfo {
   ownUsage?: OwnPlanUsage;
   /** Protocol 22: how big the computer is. */
   size?: MachineSize;
-  /** Protocol 46: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
+  /** Protocol 47: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
   claudeLoginMethods?: AuthMethod[];
   /** Why this computer doesn't list `cli_login` for all agents though it was switched on (its self-check's answer). */
   claudeLoginBlocked?: string;
   /**
-   * Protocol 46 (system mode): root's Claude sign-in, status, sign-out and usage CLIs run in the `agentes-auth`
+   * Protocol 47 (system mode): root's Claude sign-in, status, sign-out and usage CLIs run in the `agentes-auth`
    * group, which the computer's egress rules may route apart from the rest of root.
    */
   authEgressGroup?: true;
@@ -2010,8 +2026,11 @@ export interface MachineReplies {
   "browser.stream.start": { mode: BrowserStreamMode };
   "browser.stream.stop": { stopped: boolean };
   /** Events sent to the page. */
-  /** `failed`: events the browser didn't confirm (absent when all went through). */
-  "browser.input": { accepted: number; failed?: number };
+  /**
+   * `failed`: events the browser didn't confirm (absent when all went through). `nowhere`: text went to a page with
+   * nothing focused that takes it.
+   */
+  "browser.input": { accepted: number; failed?: number; nowhere?: boolean };
   /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
   "browser.batch": {
     answers: { success: boolean; data: unknown; error?: string; code?: string }[];
@@ -2130,7 +2149,7 @@ export type MachineErrorCode =
    */
   | "approval_needed"
   /**
-   * Protocol 46: this runner can't do it the way it was asked (a Claude sign-in `method` it can't use here); the
+   * Protocol 47: this runner can't do it the way it was asked (a Claude sign-in `method` it can't use here); the
    * message says why. Older servers read it like `internal`.
    */
   | "unsupported"
@@ -2518,6 +2537,8 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         .map((u) => u.slice(0, 64));
       return uuids.length ? { type: "steer_read", uuids } : null;
     }
+    case "speed_fallback":
+      return { type: "speed_fallback", message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message) };
     default:
       return null;
   }

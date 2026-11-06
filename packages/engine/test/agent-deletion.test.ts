@@ -193,6 +193,7 @@ async function seed() {
       missionCommandApproval: "never",
       brainModel: "opus",
       brainEffort: "high",
+      brainSpeed: "fast",
       brainFallback: false,
       operatorHoldAt: new Date(),
       operatorHoldReason: "abuse",
@@ -243,6 +244,7 @@ describe("deleting an agent", () => {
       brainModel: null,
       brainFallback: true,
       brainEffort: null,
+      brainSpeed: "standard",
       operatorHoldAt: null,
       operatorHoldReason: null,
     });

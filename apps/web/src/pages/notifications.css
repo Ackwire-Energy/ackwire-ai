@@ -87,6 +87,8 @@
 .nt-wait > * {
   --raised: var(--raised-2);
   --surface-raised: var(--raised-2);
+  --card-face-top: var(--raised-2);
+  --card-key-bottom: var(--raised-2);
 }
 .nt-wh {
   display: flex;
@@ -149,7 +151,7 @@
 }
 html:not([data-pointer]) .nt-wi:focus-visible,
 html:not([data-pointer]) .nt-item:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--focus-color);
+  box-shadow: var(--focus-ring-inset);
 }
 .nt-face {
   grid-row: 1 / span 3;
@@ -253,7 +255,7 @@ html:not([data-pointer]) .nt-item:focus-visible {
 /* On touch a ghost at the item's edge reaches to 2px from it (a phone's 14px padding, the 12px plate), and the item
    clips: the ring goes inside, as the item's own does. */
 html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--focus-color);
+  box-shadow: var(--focus-ring-inset);
 }
 
 /* ── What only points somewhere: one row, opened by a click on it ─────────── */
@@ -439,11 +441,18 @@ html:not([data-pointer]) .nt-sug button:focus-visible {
 .nt-item:only-child {
   border-radius: 20px;
 }
+/* The row's ground, opaque over the list card's face, is also the ring that cuts a second face or an emoji out of the
+   first (`.nt-stk`, `.nt-emo`): a fixed card-colored ring drew a lighter circle on a hovered or current row in dark. */
+.nt-item {
+  --nt-ground: var(--raised);
+}
 .nt-item:hover {
-  background: color-mix(in srgb, var(--sunken) 40%, transparent);
+  --nt-ground: color-mix(in srgb, var(--sunken) 40%, var(--raised));
+  background: var(--nt-ground);
 }
 .nt-item.is-cur {
-  background: color-mix(in srgb, var(--sunken) 75%, transparent);
+  --nt-ground: color-mix(in srgb, var(--sunken) 75%, var(--raised));
+  background: var(--nt-ground);
 }
 /* A box of its own, so the face's top is the row's (no line around it). */
 .nt-who {
@@ -464,6 +473,12 @@ html:not([data-pointer]) .nt-sug button:focus-visible {
 }
 .nt-l1:only-child {
   margin-top: 3px;
+}
+/* With a line under it, the headline's capitals start at the face's top (the kit's `.ac-captop` rise on its 22px
+   line), as a chat name does; its chips and time rise with it. */
+.nt-l1:not(:only-child) {
+  line-height: 22px;
+  margin-top: calc(var(--cap-top) - 11px);
 }
 .nt-what {
   min-width: 0;
@@ -584,7 +599,7 @@ html:not([data-pointer]) .nt-sug button:focus-visible {
   position: absolute;
   right: -2px;
   bottom: -2px;
-  box-shadow: 0 0 0 2px var(--raised);
+  box-shadow: 0 0 0 2px var(--nt-ground, var(--raised));
 }
 .nt-more {
   display: inline-flex;
@@ -680,7 +695,7 @@ html:not([data-pointer]) .nt-more:focus-visible {
   height: 22px;
   border-radius: 50%;
   background: var(--sunken);
-  box-shadow: 0 0 0 2px var(--raised);
+  box-shadow: 0 0 0 2px var(--nt-ground, var(--raised));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1014,14 +1029,26 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   .nt-wr__l1:has(> .nt-wr__left) > .nt-wr__tm {
     display: none;
   }
+  /* The source chips go under the headline: beside it, two of them (a task's number and its status change) took
+     ~300px and never shrank, leaving the words nothing and running past the card. */
   .nt-l1 {
+    flex-wrap: wrap;
+    row-gap: 4px;
     align-items: flex-start;
   }
   .nt-l1:only-child {
     margin-top: 0;
   }
   .nt-what {
+    flex: 1 1 0;
     white-space: normal;
+  }
+  .nt-tags {
+    order: 1;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    min-width: 0;
+    margin-left: 0;
   }
   .nt-tm {
     padding-top: 1px;
@@ -1081,6 +1108,12 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   .nt-item,
   .nt-wi,
   .nt-item::after,
+  /* As specific as the rules that start them: a media query adds no weight. */
+  .nt-item.is-new,
+  .nt-wi.is-new,
+  .nt-item.is-new::after,
+  .nt-item.is-pulse,
+  .nt-nb[data-tip]:hover::after,
   .nt-acts,
   .nt-nb,
   .nt-nb::after,

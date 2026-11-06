@@ -349,6 +349,7 @@
     },
     "steer": {
       "waiting": "{{name}} przeczyta to przy następnej przerwie",
+      "computer": "{{name}} przeczyta to, gdy dostanie komputer",
       "now": "{{name}} przerywa, żeby to przeczytać",
       "delivered": "{{name}} ma to już u siebie",
       "held": "{{name}} przeczyta to po twojej decyzji",
@@ -1125,8 +1126,6 @@
     }
   },
   "delete": {
-    "title": "Usuń konto",
-    "intro": "Tego nie da się cofnąć.",
     "goes": {
       "account": "Twoje konto, dostęp i sesje znikną.",
       "orgs": "Przestrzenie robocze, w których jesteś jedynym członkiem, zostaną usunięte.",
@@ -1402,6 +1401,9 @@
     "review": "Sprawdź",
     "answer": "Odpowiedz",
     "open": "Otwórz",
+    "toolsTitle": "Zmienił narzędzia, które zatwierdziłeś",
+    "toolsWhy": "Agenci używają zatwierdzonej wersji, dopóki nie zaakceptujesz nowej.",
+    "reviewChanges": "Przejrzyj zmiany",
     "clear": {
       "title": "Nic na ciebie nie czeka",
       "text": "Gdy agent będzie cię potrzebował, najpierw zobaczysz to tutaj."

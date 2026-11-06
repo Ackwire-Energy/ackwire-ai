@@ -60,7 +60,7 @@ export function ChannelHello({
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
               >
                 {i > 0 ? <View style={[styles.sep, { backgroundColor: c.line2 }]} /> : null}
-                <AgentFace agentId={agent.id} size={28} />
+                <AgentFace agentId={agent.id} size={FACE} />
                 <Text variant="callout" tone="ink" style={[styles.grow, styles.ask]}>
                   {label}
                 </Text>
@@ -76,6 +76,12 @@ export function ChannelHello({
   );
 }
 
+/** A suggestion's row (FirstDay's): its inset, the face, the gap to the words, and the words' first line (callout). */
+const INSET = 14;
+const FACE = 28;
+const GAP = 12;
+const LINE = 21;
+
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   content: { flexGrow: 1, justifyContent: "flex-end", paddingHorizontal: 16, paddingTop: 8 },
@@ -84,13 +90,13 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
+    gap: GAP,
     minHeight: 52,
-    paddingHorizontal: 14,
+    paddingHorizontal: INSET,
     paddingVertical: 12,
   },
-  sep: { position: "absolute", top: 0, left: 54, right: 0, height: StyleSheet.hairlineWidth },
-  // The first line's middle on the face's middle (28 against a 21 line); the icon too.
-  ask: { fontWeight: "500", marginTop: 3 },
-  send: { marginTop: 6 },
+  sep: { position: "absolute", top: 0, left: INSET + FACE + GAP, right: 0, height: StyleSheet.hairlineWidth },
+  // The first line's middle on the face's middle; the send icon (16) too.
+  ask: { fontWeight: "500", marginTop: (FACE - LINE) / 2 },
+  send: { marginTop: (FACE - 16) / 2 },
 });

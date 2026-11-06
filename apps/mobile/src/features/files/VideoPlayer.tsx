@@ -252,7 +252,8 @@ function BarButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      hitSlop={4}
+      // 34 pt with 5 around: the 44 pt a finger needs.
+      hitSlop={5}
       style={({ pressed }) => [styles.btn, pressed && { backgroundColor: c.plate }]}
     >
       <Icon name={icon} size={20} color={c.ink} />
@@ -384,7 +385,7 @@ const styles = StyleSheet.create({
   btn: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   time: { paddingHorizontal: 4, fontVariant: ["tabular-nums"] },
   track: { flex: 1, height: 34, justifyContent: "center", marginHorizontal: 6 },
-  line: { height: 4, borderRadius: 2, overflow: "hidden" },
+  line: { height: 4, borderRadius: 999, overflow: "hidden" },
   filled: { height: 4 },
   knob: {
     position: "absolute",

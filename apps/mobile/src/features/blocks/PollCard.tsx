@@ -1,8 +1,9 @@
 import { useArtifact, usePoll, useVote } from "@agenteschat/client";
 import { pollAnswered, pollIsOpen, pollTally, pollToggle } from "@agenteschat/client/lib/blocks";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Icon, Sky, Text, useToast } from "@/ui";
+import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Icon, Sky, Text, textLineOf, useToast } from "@/ui";
+import { leadBox } from "@/ui/type-scale";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
@@ -23,6 +24,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
   const artifact = useArtifact(orgId, id, version);
   const query = usePoll(orgId, id);
   const vote = useVote(orgId, id);
+  const { fontScale } = useWindowDimensions();
   const a = artifact.data;
   const poll = query.data;
   if (a?.content.kind !== "poll" || !poll) {
@@ -40,6 +42,8 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
   const tally = pollTally(options, poll);
   const top = Math.max(...tally.map((o) => o.voters.length));
   const nameOf = (userId: string) => dir.memberById.get(userId)?.name ?? t("mobile.blocks.someone");
+  // An option's label wraps: its box, mark and faces sit on its first line, not centred on the whole option.
+  const line = textLineOf("body", fontScale);
   const closes = new Intl.DateTimeFormat(i18n.language, { dateStyle: "short", timeStyle: "short" }).format(
     new Date(poll.closesAt),
   );
@@ -81,16 +85,22 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
               style={[styles.option, { borderColor: c.line2 }]}
             >
               <View style={[styles.fill, { width: `${o.share * 100}%`, backgroundColor: c.line }]} />
-              <View
-                style={[styles.box, { borderColor: c.faint }, mine && { backgroundColor: c.ink, borderColor: c.ink }]}
-              >
-                {mine ? <Icon name="check" size={13} color={c.raised} /> : null}
+              <View style={leadBox(line, 20)}>
+                <View
+                  style={[styles.box, { borderColor: c.faint }, mine && { backgroundColor: c.ink, borderColor: c.ink }]}
+                >
+                  {mine ? <Icon name="check" size={13} color={c.raised} /> : null}
+                </View>
               </View>
               <Text variant="body" style={[styles.label, styles.bold]}>
                 {o.label}
               </Text>
-              {won ? <View style={[styles.mark, { backgroundColor: c.ok }]} /> : null}
-              <View style={styles.faces}>
+              {won ? (
+                <View style={leadBox(line, 5)}>
+                  <View style={[styles.mark, { backgroundColor: c.ok }]} />
+                </View>
+              ) : null}
+              <View style={[styles.faces, { minHeight: line.height }]}>
                 {o.voters.slice(0, FACES).map((v) => (
                   <View key={v} style={[styles.face, { backgroundColor: c.line2, borderColor: c.raised }]}>
                     <Text variant="caption" style={styles.bold}>
@@ -138,13 +148,14 @@ const styles = StyleSheet.create({
   head: { gap: 1, paddingHorizontal: 14, paddingTop: 12 },
   bold: { fontWeight: "600" },
   options: { gap: 6, padding: 14, paddingTop: 10 },
+  // Top-aligned with 12 above and below: one line is 46 tall and centred as before, a wrapping label grows down.
   option: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     minHeight: 46,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 12,
     overflow: "hidden",
     borderWidth: 1,
     borderRadius: 12,

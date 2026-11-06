@@ -10,7 +10,7 @@ import { onLiveMachine } from "./ai-accounts-analytics";
 import { ValidationError } from "./errors";
 
 /**
- * How NEW Claude sign-ins for all agents are made on computers where each agent is its own OS user (ADR 0149),
+ * How NEW Claude sign-ins for all agents are made on computers where each agent is its own OS user (ADR 0150),
  * set through the operator API: `claude setup-token` everywhere (no row: what runners always did), or Claude's own
  * login for the listed workspaces or for all. Anywhere else such a sign-in is always Claude's own login. A
  * connection keeps the method it started with (`machine_accounts.auth_method`), so a change here only reaches

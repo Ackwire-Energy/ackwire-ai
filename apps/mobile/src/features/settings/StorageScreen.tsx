@@ -366,6 +366,6 @@ const styles = StyleSheet.create({
   loading: { marginVertical: 16 },
   input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
   progress: { gap: 8, paddingHorizontal: 14, paddingVertical: 14 },
-  error: { paddingTop: 7, paddingHorizontal: 16 },
-  buttons: { gap: 10, paddingTop: 18 },
+  error: { paddingTop: 8, paddingHorizontal: 16 },
+  buttons: { gap: 10, paddingTop: 20 },
 });

@@ -75,10 +75,12 @@ export function DriveTrash() {
                 <b>{a.title}</b>
                 <small>
                   <ActorAvatar size="xs" actor={a.createdBy} name={authorName(a.createdBy)} />
-                  {t("drive.trashBy", {
-                    name: authorName(a.createdBy),
-                    when: relativeTime(t, i18n.language, a.deletedAt),
-                  })}
+                  <span className="drive-trash__by">
+                    {t("drive.trashBy", {
+                      name: authorName(a.createdBy),
+                      when: relativeTime(t, i18n.language, a.deletedAt),
+                    })}
+                  </span>
                 </small>
               </span>
               <Chip

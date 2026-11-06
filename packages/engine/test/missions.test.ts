@@ -92,6 +92,8 @@ function missionRunner(hub: MachineHub) {
   const canceled: string[] = [];
   /** `mission.worktree` requests (ADR 0044). */
   const worktree: Extract<Request, { op: "mission.worktree" }>[] = [];
+  /** How `push` fails. */
+  const pushes: { refusal?: { code: string; message: string } } = {};
   /** What `task.output` answers, per task. */
   const outputs = new Map<string, string[]>();
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
@@ -147,6 +149,9 @@ function missionRunner(hub: MachineHub) {
           files.set(frame.path, Buffer.from(frame.base64, "base64").toString("utf8"));
           return ok({ size: frame.base64.length });
         }
+        if (frame.op === "push" && pushes.refusal) {
+          return void reply({ type: "result", id: frame.id, ok: false, error: pushes.refusal });
+        }
         return ok({});
       }, 1);
     },
@@ -163,6 +168,7 @@ function missionRunner(hub: MachineHub) {
     canceled,
     worktree,
     outputs,
+    pushes,
     close: () => hub.close(conn),
     frame: (frame: Record<string, unknown>) => reply(frame),
     hello: (token: string) => hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true })),
@@ -552,6 +558,18 @@ describe("missions (ADR 0029)", () => {
     const approved = await approveProvisionalDecisions(md(), f.owner.id, f.org.id, view.id);
     expect(approved.map((x) => x.status)).toEqual(["taken"]);
     expect(runner.started.length).toBe(before);
+  });
+
+  test("upload_artifact: a path written in full reaches the runner as is, and a refusal reads like upload_file's", async () => {
+    const { view, runner, task: main } = await proposed();
+    await startMission(md(), f.owner.id, f.org.id, view.id);
+    const full = "/home/ag-0193aaaa/dev-0193aaaa/clips/big.mp4";
+    runner.pushes.refusal = { code: "too_large", message: "The file has 90000000 bytes (max 52428800)" };
+    const big = await runner.mcp(main.taskId, "upload_artifact", { path: full });
+    expect(runner.sent.filter((s) => s.type === "request" && s.op === "push")).toEqual([
+      expect.objectContaining({ path: full }),
+    ]);
+    expect(JSON.stringify(big)).toContain("is over the 50 MB the Drive takes per file");
   });
 
   test("reviews: approve or ask for changes resumes the item session with the outcome", async () => {

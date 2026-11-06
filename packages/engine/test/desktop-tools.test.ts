@@ -176,6 +176,23 @@ test("a plan of three steps: an app by its name, a target by name, typing; each 
   ]);
 });
 
+test("desktop_do takes the field a model guesses: `value` on a fill, `text` on a select", async () => {
+  const d = await desktopSetup();
+  await d.grant(DESKTOP_SCOPE, SANDBOX_SCOPE);
+  const sent = d.since();
+  const out = await d.call("desktop_do", {
+    steps: [
+      { do: "fill", target: "e29", value: "/home/agent" },
+      { do: "select", target: "e29", text: "Documents" },
+    ],
+  });
+  expect(out.isError).toBeUndefined();
+  expect(acts(sent()).map((a) => a.action)).toEqual([
+    { kind: "fill", at: { ref: "e29" }, text: "/home/agent" },
+    { kind: "select", at: { ref: "e29" }, value: "Documents" },
+  ]);
+});
+
 test("words the screen doesn't name exactly go to the judge's Choice", async () => {
   const judge = createFakeJudge((kind, id, state) => {
     if (kind !== "screen_target") return undefined;

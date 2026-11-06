@@ -5,6 +5,7 @@ import type {
   BrainEffortSetting,
   BrainKind,
   BrainOption,
+  BrainSpeed,
   CommandApproval,
   Machine,
   MachineAccount,
@@ -64,6 +65,7 @@ import {
   advancedDefaults,
   advancedParts,
   isAdvancedDefault,
+  SPEEDS,
 } from "@agenteschat/client/lib/brain-advanced";
 import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
@@ -98,6 +100,7 @@ import {
   planModel as planModelOf,
   planOf,
   signInProviderOf,
+  speedFits,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
@@ -308,6 +311,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
           level: t(`agentPage.work.brain.effortsLower.${shownEffort(view.effort)}`),
         })
       : null;
+  const speed = agent.brain?.speed ? t("agentPage.work.brain.speeds.fast") : null;
   const target = work.target;
   const machine = target?.kind === "machine" ? target : null;
   // Read once the server says where it works: "no computer" never shows while that loads.
@@ -365,7 +369,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
                   : t("agentPage.work.cell.brainWith", { plan: planLabel(t, ai) })
               }
               value={ai === "key" ? orgModel : planModel}
-              more={ai === "key" ? null : effort}
+              more={ai === "key" ? null : [effort, speed].filter(Boolean).join(" · ")}
               sub={sub}
               openLabel={t("agentPage.work.open.brain")}
               onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
@@ -709,6 +713,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [key, setKey] = useState(saved.key ?? DEFAULT_KEY);
   const [account, setAccount] = useState<string | null>(view.account);
   const [effort, setEffort] = useState<ShownEffort>(shownEffort(view.effort));
+  const [speed, setSpeed] = useState<BrainSpeed>(view.speed);
   const savedContext = isContextLimit(view.contextTokens) ? view.contextTokens : null;
   const [contextTokens, setContextTokens] = useState<ContextLimit | null>(savedContext);
   // "Configuração avançada" open: what it edits, put on the form by "Pronto" (nothing saves before "Usar").
@@ -874,6 +879,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const effortToSave: BrainEffortSetting = isAuto(planModel) ? AUTO : effort;
   const savedEffort: BrainEffortSetting = isAuto(view.effort) ? AUTO : shownEffort(view.effort);
   const effortChanged = kind !== "model" && effortToSave !== savedEffort;
+  // Where it doesn't apply the choice stays saved, untouched, for a model or sign-in that takes it.
+  const speedOn = !view.scope && speedFits({ kind, provider: current?.provider, model: planModel });
+  const speedChanged = speedOn && speed !== view.speed;
+  const shownSpeed = speedOn ? speed : "standard";
   const savedOnlyOwner = kind === view.brain ? view.onlyOwner : true;
   const onlyOwner = share?.kind === kind ? share.onlyOwner : savedOnlyOwner;
   const shareChanged = kind !== "model" && onlyOwner !== savedOnlyOwner;
@@ -899,6 +908,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     extraUsage === view.extraUsage &&
     !accountChanged &&
     !effortChanged &&
+    !speedChanged &&
     !shareChanged &&
     !contextChanged &&
     (kind === "model"
@@ -947,6 +957,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       fallback,
       ...(extraUsage !== view.extraUsage ? { extraUsage } : {}),
       ...(effortChanged ? { effort: effortToSave } : {}),
+      ...(speedChanged ? { speed } : {}),
       ...(accountChanged ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
       ...(shareChanged ? { onlyOwner } : {}),
       ...(contextChanged ? { contextTokens } : {}),
@@ -959,6 +970,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       refresh();
       const same =
         !effortChanged &&
+        !speedChanged &&
         !contextChanged &&
         card === savedCard &&
         fallback === view.fallback &&
@@ -1050,6 +1062,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             account: accountsOn ? account : null,
             model: planModel === option?.defaultModel ? null : planModel,
             effort: effortToSave,
+            ...(speedOn ? { speed } : {}),
             contextTokens: shownContext,
             fallback,
             onlyOwner,
@@ -1062,7 +1075,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       kind,
       autoModel: isAuto(kind === "model" ? model : planModel),
       apiKey,
-      now: { effort, contextTokens: shownContext, onlyOwner, fallback },
+      now: { effort, speed: shownSpeed, contextTokens: shownContext, onlyOwner, fallback },
     }),
     ...(carried ? [autonomyWords(t, carried)] : []),
   ].join(" · ");
@@ -1339,8 +1352,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   );
   const freeHint = planFreeHint(t, plan);
   // "Configuração avançada" names what it holds.
-  const advancedNow: Advanced = { effort, contextTokens: shownContext, onlyOwner, fallback };
-  const advancedLine = advancedContents(t, { kind, autoModel: isAuto(planModel) });
+  const advancedNow: Advanced = { effort, speed: shownSpeed, contextTokens: shownContext, onlyOwner, fallback };
+  const advancedLine = advancedContents(t, { kind, autoModel: isAuto(planModel), speed: speedOn });
   const advancedRow = (
     <AdvancedRow
       line={advancedLine}
@@ -1566,6 +1579,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
                   />
                 ))}
+              {speedOn && <SpeedField value={adv.speed} onChange={(s) => setAdv({ ...adv, speed: s })} />}
               <ContextField
                 value={adv.contextTokens}
                 options={contextOptions}
@@ -1623,6 +1637,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 // Letting more people in on someone else's plan asks first: it spends their plan.
                 if (onlyOwner && !adv.onlyOwner && !(await asks.ask(EVERYONE_AUDIENCE)([]))) return;
                 setEffort(adv.effort);
+                if (speedOn) setSpeed(adv.speed);
                 setContextTokens(adv.contextTokens);
                 setFallback(adv.fallback);
                 if (adv.onlyOwner !== onlyOwner) setShare({ kind, onlyOwner: adv.onlyOwner });
@@ -1854,6 +1869,25 @@ function AdvancedRow({
         </span>
         <Icon name="chevronRight" size={16} className="agp-advrow__chev" />
       </button>
+    </div>
+  );
+}
+
+/** Velocidade: Padrão or Rápida, with what Rápida costs and where it doesn't apply. */
+function SpeedField({ value, onChange }: { value: BrainSpeed; onChange: (value: BrainSpeed) => void }) {
+  const { t } = useTranslation();
+  const label = t("agentPage.work.brain.speed");
+  return (
+    <div className="agp-brainfield">
+      <span className="ac-effort__head">{label}</span>
+      <Segmented
+        className="agp-brainseg"
+        label={label}
+        value={value}
+        onValueChange={onChange}
+        options={SPEEDS.map((s) => ({ value: s, label: t(`agentPage.work.brain.speeds.${s}`) }))}
+      />
+      <span className="agp-brainfield__hint">{t("agentPage.work.brain.speedText")}</span>
     </div>
   );
 }

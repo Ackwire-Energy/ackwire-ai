@@ -26,6 +26,7 @@ import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, PersonAvatar, us
 import { Page } from "../me/parts";
 import { Face } from "../shared/Face";
 import { useColors, useMeId } from "../shared/hooks";
+import { errorHaptic, Loaded, successHaptic } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { InvitationSheet } from "./InviteSheets";
 import {
@@ -84,17 +85,21 @@ function Members() {
 
       <GroupedHeader>{list ? `${t("members.people")} · ${list.length}` : t("members.people")}</GroupedHeader>
       {list ? (
-        <GroupedList>
-          {membersByName(list, i18n.language).map((m) => (
-            <GroupedRow
-              key={m.userId}
-              leading={<Face who={{ type: "person", id: m.userId }} size={30} live={false} presence ring={c.raised} />}
-              label={m.userId === meId ? `${m.name}${t("common.youSuffix")}` : m.name}
-              sub={memberLine(t, i18n.language, m, roles)}
-              {...(removable(m) ? { more: true, onPress: () => void remove(m) } : {})}
-            />
-          ))}
-        </GroupedList>
+        <Loaded>
+          <GroupedList>
+            {membersByName(list, i18n.language).map((m) => (
+              <GroupedRow
+                key={m.userId}
+                leading={
+                  <Face who={{ type: "person", id: m.userId }} size={30} live={false} presence ring={c.raised} />
+                }
+                label={m.userId === meId ? `${m.name}${t("common.youSuffix")}` : m.name}
+                sub={memberLine(t, i18n.language, m, roles)}
+                {...(removable(m) ? { more: true, onPress: () => void remove(m) } : {})}
+              />
+            ))}
+          </GroupedList>
+        </Loaded>
       ) : (
         <ActivityIndicator color={c.muted} style={styles.loading} />
       )}
@@ -115,8 +120,10 @@ function useRemoveFlow() {
   const toast = useToast();
   const remove = useRemoveMember(orgId);
   const orgName = org?.name ?? "";
-  const failed = (e: unknown) =>
+  const failed = (e: unknown) => {
+    errorHaptic();
     toast({ title: knownErrorText(t, e, i18n.language) ?? t("mobile.app.failed"), icon: "x" });
+  };
   return async (m: Person) => {
     const mine = m.userId === meId;
     let lines: string[];
@@ -133,6 +140,7 @@ function useRemoveFlow() {
     const go = async () => {
       try {
         await remove.mutateAsync(m.userId);
+        successHaptic();
         toast({
           title: mine
             ? t("members.remove.left", { org: orgName })
@@ -249,8 +257,10 @@ function Suggestions() {
   const cancelIt = async (id: string) => {
     try {
       await cancel.mutateAsync(id);
+      successHaptic();
       toast({ title: t("members.suggest.cancelled") });
     } catch (e) {
+      errorHaptic();
       toast({ title: knownErrorText(t, e, i18n.language) ?? t("mobile.app.failed"), icon: "x" });
     }
   };

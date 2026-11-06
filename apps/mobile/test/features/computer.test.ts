@@ -364,3 +364,29 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "selfhost")).toBe(false);
   });
 });
+
+describe("the agent's computer, from the app's own pieces", () => {
+  const read = (path: string) => Bun.file(new URL(`../../src/features/${path}`, import.meta.url).pathname).text();
+
+  test("actions ride the screen's capsule; a request is the chat's card; Agora is the live trail", async () => {
+    const [screen, page, cover] = await Promise.all([
+      read("computer/AgentScreen.tsx"),
+      read("computer/ComputerScreen.tsx"),
+      read("computer/Cover.tsx"),
+    ]);
+    // Taking control, the keyboard, laying it down and the way out: on the capsule, never loose in a corner.
+    expect(screen).toContain("{docked ? <EdgeDock>{dock}</EdgeDock> : null}");
+    expect(screen).not.toContain("styles.padTurn");
+    expect(screen).toContain("<DockDone label={doneLabel} loading={finishing} onPress={handBack} />");
+    // The request for help: the chat's card with Ajudar and Agora não, not a gray line over the screen.
+    expect(screen).toContain("<AskCard");
+    expect(screen).not.toContain("agentComputer.ask.banner");
+    // What it did: the browser's trail, live; and the chat's composer to it.
+    expect(screen).toContain("<LiveTrail steps={steps} color={color} now={now} />");
+    expect(screen).toContain("<Composer");
+    // The header is the conversation's glass pill.
+    expect(page).toContain("<HeaderPill");
+    // A state with nothing live says itself on the screen, with no card inside it (glass only over a live picture).
+    expect(cover.slice(cover.indexOf("const screen = ("))).not.toContain("<Glass");
+  });
+});

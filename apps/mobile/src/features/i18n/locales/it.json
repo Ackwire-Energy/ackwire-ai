@@ -335,6 +335,7 @@
     },
     "steer": {
       "waiting": "{{name}} lo legge alla prossima pausa",
+      "computer": "{{name}} lo legge quando ha il computer",
       "now": "{{name}} si è fermato per leggerlo",
       "delivered": "{{name}} l'ha ricevuto",
       "held": "{{name}} lo legge dopo la tua decisione",
@@ -1054,8 +1055,6 @@
     }
   },
   "delete": {
-    "title": "Elimina il tuo account",
-    "intro": "Non si può annullare.",
     "goes": {
       "account": "Il tuo account, i tuoi accessi e le tue sessioni spariscono.",
       "orgs": "Gli spazi di lavoro in cui sei l'unico membro vengono eliminati.",
@@ -1324,6 +1323,9 @@
     "review": "Rivedi",
     "answer": "Rispondi",
     "open": "Apri",
+    "toolsTitle": "Ha cambiato strumenti che hai approvato",
+    "toolsWhy": "Gli agenti usano la versione approvata finché non accetti quella nuova.",
+    "reviewChanges": "Rivedi le modifiche",
     "clear": {
       "title": "Niente ti aspetta",
       "text": "Quando un agente ha bisogno di te, compare prima qui."

@@ -4,15 +4,14 @@ import { mergeChoices } from "@agenteschat/client/lib/repos";
 import { matchesWords } from "@agenteschat/ui/search";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet } from "react-native";
-import { GroupedList, GroupedRow, SearchField, Section, Sheet, Text, useToast } from "@/ui";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, SearchField, Sheet, useToast } from "@/ui";
 import { useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 
 /**
  * "Pode fazer merge sem perguntar", as under GitHub on the web's Ferramentas e acesso: where the agent merges with no
  * approval card. Its owner or an admin chooses in a sheet, each switch saved at once. Shown only when there is
- * something chosen, or something to choose.
+ * something chosen, or something to choose. A grouped list with its header and footer, as the profile's Access view.
  */
 export function MergeReposSection({ agentId, name, mayEdit }: { agentId: string; name: string; mayEdit: boolean }) {
   const { t } = useTranslation();
@@ -32,7 +31,8 @@ export function MergeReposSection({ agentId, name, mayEdit }: { agentId: string;
       onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
     });
   return (
-    <Section title={t("repos.merge.label")}>
+    <>
+      <GroupedHeader>{t("repos.merge.label")}</GroupedHeader>
       <GroupedList>
         {list.map((repo) => (
           <GroupedRow key={repo} label={repo} icon="code" />
@@ -45,9 +45,7 @@ export function MergeReposSection({ agentId, name, mayEdit }: { agentId: string;
           />
         ) : null}
       </GroupedList>
-      <Text variant="small" tone="muted" style={styles.foot}>
-        {list.length === 0 ? t("repos.merge.none") : t("repos.merge.help")}
-      </Text>
+      <GroupedFooter>{list.length === 0 ? t("repos.merge.none") : t("repos.merge.help")}</GroupedFooter>
       <Sheet open={picking} onClose={() => setPicking(false)}>
         <SheetTitle title={t("repos.merge.dialogTitle", agentGrammar(name))} />
         <SearchField value={q} onChangeText={setQ} placeholder={t("repos.search")} autoCorrect={false} />
@@ -65,8 +63,6 @@ export function MergeReposSection({ agentId, name, mayEdit }: { agentId: string;
             ))}
         </GroupedList>
       </Sheet>
-    </Section>
+    </>
   );
 }
-
-const styles = StyleSheet.create({ foot: { paddingHorizontal: 4, marginTop: 8 } });

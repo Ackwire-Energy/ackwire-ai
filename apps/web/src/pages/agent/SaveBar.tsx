@@ -49,7 +49,7 @@ export function SaveBar({
         onOpenChange={setOpen}
         className="agp-changes"
         trigger={
-          <Button variant="ghost" size="sm" icon={open ? "chevronDown" : "arrowUp"} aria-expanded={open}>
+          <Button variant="ghost" icon={open ? "chevronDown" : "arrowUp"} aria-expanded={open}>
             {t("agentPage.saveBar.see")}
           </Button>
         }
@@ -95,7 +95,8 @@ export function SaveBar({
           ))}
         </ul>
       </Popover>
-      <Button variant="ghost" size="sm" onClick={onDiscard} disabled={saving}>
+      {/* Save's height: the bar's buttons are one row of the ruler. */}
+      <Button variant="ghost" onClick={onDiscard} disabled={saving}>
         {t("edit.discard")}
       </Button>
       <Button

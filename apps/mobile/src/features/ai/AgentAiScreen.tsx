@@ -8,7 +8,7 @@ import {
   signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
-import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
+import { advancedContents, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -317,7 +317,11 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               <GroupedList>
                 <GroupedRow
                   label={t("agentPage.work.brain.advanced.title")}
-                  sub={advancedContents(t, { kind: view.brain, autoModel: isAuto(view.effectiveModel) })}
+                  sub={advancedContents(t, {
+                    kind: view.brain,
+                    autoModel: isAuto(view.effectiveModel),
+                    speed: viewSpeedFits(view),
+                  })}
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />
@@ -480,11 +484,11 @@ const styles = StyleSheet.create({
   loading: { marginTop: 16 },
   meter: { paddingHorizontal: 14, paddingVertical: 12 },
   // A list without a header keeps a header's room above it.
-  advanced: { marginTop: 18 },
+  advanced: { marginTop: 20 },
   dock: { position: "absolute", left: 10, right: 10, borderRadius: 28 },
   dockGlass: {
-    paddingHorizontal: 15,
-    paddingTop: 13,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 10,
     borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,

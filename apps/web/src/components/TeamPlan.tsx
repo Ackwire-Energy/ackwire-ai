@@ -136,27 +136,30 @@ export function TeamPlanBody({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a
         {plan.agents.map((a) => (
           <li key={a.handle} className="tp-agent">
             <AgentAvatar name={a.name} appearance={lookOf(a)} size="md" />
-            <span className="tp-agent__text">
+            <span className="tp-agent__text ac-captop">
               <span>
                 <b>{a.name}</b> <span className="muted">{a.role}</span>
               </span>
               <span className="tp-agent__line">{a.line}</span>
             </span>
-            <span className="tp-pill">
-              <Icon name="channel" size={14} />
-              <span>{a.channel}</span>
-              {plan.newChannels.includes(a.channel) && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
+            {/* On the name's line, whatever the description's length. */}
+            <span className="tp-agent__tail ac-captop">
+              <span className="tp-pill">
+                <Icon name="channel" size={14} />
+                <span>{a.channel}</span>
+                {plan.newChannels.includes(a.channel) && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
+              </span>
+              {onAdjust && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t("teamPlan.card.adjustName", { name: a.name })}
+                  onClick={() => onAdjust(a)}
+                >
+                  {t("teamPlan.card.adjust")}
+                </Button>
+              )}
             </span>
-            {onAdjust && (
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={t("teamPlan.card.adjustName", { name: a.name })}
-                onClick={() => onAdjust(a)}
-              >
-                {t("teamPlan.card.adjust")}
-              </Button>
-            )}
           </li>
         ))}
       </ul>
@@ -410,22 +413,25 @@ function FirstTaskCard({ message, card }: { message: Message; card: TeamProposal
             {tasks.map((f) => (
               <li key={f.agentId} className="tp-agent">
                 <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
-                <span className="tp-agent__text">
+                <span className="tp-agent__text ac-captop">
                   <b>{f.name}</b>
                   <span className="tp-agent__line">{f.task}</span>
                 </span>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setDraftFor(`agent:${f.agentId}`, f.task);
-                    void navigate({
-                      to: "/org/$orgId/dm/agent/$agentId",
-                      params: { orgId: org.id, agentId: f.agentId },
-                    });
-                  }}
-                >
-                  {t("teamPlan.firstTask.open")}
-                </Button>
+                {/* On the name's line, as on the team card's rows, however long the task runs. */}
+                <span className="tp-agent__tail ac-captop">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setDraftFor(`agent:${f.agentId}`, f.task);
+                      void navigate({
+                        to: "/org/$orgId/dm/agent/$agentId",
+                        params: { orgId: org.id, agentId: f.agentId },
+                      });
+                    }}
+                  >
+                    {t("teamPlan.firstTask.open")}
+                  </Button>
+                </span>
               </li>
             ))}
           </ul>
@@ -628,9 +634,9 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
         <h3 className="tp-gallery__title">{chosen.name}</h3>
         <p className="muted">{chosen.description}</p>
         <TeamPlanBody plan={chosen.team} />
-        <p className="small muted ac-faceline">
+        <p className={lodi ? "small muted ac-iconline" : "small muted"}>
           {lodi && <AgentAvatar agentId={lodi.id} name={name} size="xs" />}
-          <span className="ac-captop">{t("teamPlan.templates.tailor")}</span>
+          <span>{t("teamPlan.templates.tailor")}</span>
         </p>
       </>
     );
@@ -651,7 +657,7 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
               <li key={x.id}>
                 <button
                   type="button"
-                  className="tp-gallery__item"
+                  className="tp-gallery__item ac-iconline"
                   aria-pressed={x.id === chosen?.id}
                   onClick={() => setPicked(x.id)}
                 >
@@ -670,7 +676,7 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
             <li>
               <button
                 type="button"
-                className="tp-gallery__item"
+                className="tp-gallery__item ac-iconline"
                 onClick={() => {
                   onClose();
                   actions?.focusComposer();

@@ -165,6 +165,37 @@ export async function reduceMachineAccess(
 /** An absolute path on macOS, Linux or Windows (`~/…` too: the runner expands it). */
 export const isAbsoluteMachinePath = (path: string) => /^(\/|~\/|~$|[A-Za-z]:[\\/])/.test(path);
 
+/**
+ * A path written in full inside the agent's own folder (`<handle>-<first 8 of its id>`, wherever it sits) as the
+ * relative path it is there, which is how a secret's file is kept. Any other path stays as it is.
+ */
+export function pathInOwnFolder(path: string, agentId: string) {
+  if (!isAbsoluteMachinePath(path)) return path;
+  const id8 = agentId
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 8);
+  const parts = path
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((p) => p !== "" && p !== ".");
+  // `/home/ag-<id8>` ends the same way and is the agent's home, not its folder.
+  const at = parts.map((p, i) => p.endsWith(`-${id8}`) && !(i === 1 && parts[0] === "home" && p === `ag-${id8}`));
+  const last = at.lastIndexOf(true);
+  return last < 0 ? path : parts.slice(last + 1).join("/");
+}
+
+/**
+ * A path written in full, for the runner to check against the agent's folder, allowed folders and home; null for any
+ * other (`/workspace/…` is the agent's folder under another name).
+ */
+export function fullMachinePath(raw: string) {
+  const path = raw.trim();
+  if (!isAbsoluteMachinePath(path) || /^\/workspace(\/|$)/.test(path)) return null;
+  if (path.replace(/\\/g, "/").split("/").includes("..")) throw new Error(`invalid path: ${raw}`);
+  return path;
+}
+
 export type FolderRequestResult =
   | { status: "granted"; requestId: string; path: string }
   | { status: "pending"; requestId: string; path: string };

@@ -20,7 +20,7 @@ import { openAgentAi } from "../ai/AgentAiScreen";
 import { AnswerAnywayButton, DontRunButton } from "../ai/UsagePauseCard";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
@@ -105,7 +105,11 @@ export function UsageQueueSheet({ agentId, tab: initialTab = "queued" }: { agent
     <>
       <SheetTitle
         // Asleep while it waits on the limit, at work once it picks up.
-        leading={<AgentFace agentId={agentId} size={32} mode={resuming ? "run" : queue.reason ? "sleep" : "idle"} />}
+        leading={
+          <OpensAgent agentId={agentId}>
+            <AgentFace agentId={agentId} size={32} mode={resuming ? "run" : queue.reason ? "sleep" : "idle"} />
+          </OpensAgent>
+        }
         title={usageQueueTitle(t, i18n.language, agent, queue, new Date(now))}
         hint={shared || undefined}
       />
@@ -181,7 +185,7 @@ function WaitingRow({ n, row, agentId, now }: { n: number; row: UsageQueueRow; a
   return (
     <View style={styles.row}>
       <Pressable
-        style={styles.open}
+        style={({ pressed }) => [styles.open, pressed && styles.pressed]}
         onPress={() => open(row)}
         accessibilityRole="link"
         accessibilityLabel={`${n}. ${where}, ${who}`}
@@ -222,7 +226,7 @@ function SkippedRow({ row, agentId, now }: { row: UsageQueueClosedRow; agentId: 
   return (
     <View style={styles.skipped}>
       <Pressable
-        style={styles.skippedOpen}
+        style={({ pressed }) => [styles.skippedOpen, pressed && styles.pressed]}
         onPress={() => open(row)}
         accessibilityRole="link"
         accessibilityLabel={`${where}, ${ago}, ${why}`}
@@ -278,20 +282,25 @@ function StopAll({ agentId, count }: { agentId: string; count: number }) {
   );
 }
 
+/** A row's place-in-line column and the gap to its words. */
+const N_WIDTH = 16;
+const N_GAP = 10;
+
 const styles = StyleSheet.create({
   loading: { marginVertical: 24 },
   failed: { gap: 12, alignItems: "flex-start", marginVertical: 12 },
   // The row is the conversation's link, 44pt tall; "Não rodar" keeps its own target on the right.
   row: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  open: { flex: 1, minWidth: 0, flexDirection: "row", gap: 10, paddingVertical: 12 },
-  n: { width: 16, fontVariant: ["tabular-nums"], fontWeight: "600" },
+  open: { flex: 1, minWidth: 0, flexDirection: "row", gap: N_GAP, paddingVertical: 12 },
+  pressed: { opacity: 0.6 },
+  n: { width: N_WIDTH, fontVariant: ["tabular-nums"], fontWeight: "600" },
   what: { flex: 1, minWidth: 0 },
   name: { fontWeight: "600" },
   // The 36pt text button centered on the row's first line (12 above a 20pt line).
   act: { paddingTop: 4 },
   now: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 12 },
   // "+1 que você não vê": under the rows' text, past the number column.
-  hidden: { paddingLeft: 26, marginTop: -4 },
+  hidden: { paddingLeft: N_WIDTH + N_GAP, marginTop: -4 },
   skipped: { paddingVertical: 8 },
   skippedOpen: { paddingVertical: 4 },
   // Words-only actions: the ghost button's own side padding hangs outside, so its words line up with the text.

@@ -12,14 +12,15 @@ import { approvalNews, JOIN_REASON_MAX } from "@agenteschat/client/lib/join-requ
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { sortRoles } from "@agenteschat/client/lib/roles";
-import { type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Share, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Share, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, GroupedList, GroupedRow, InfoHint, PersonAvatar, SheetScreen, Text, useToast } from "@/ui";
+import { Button, Chip, GroupedRow, InfoHint, PersonAvatar, SheetScreen, Text, useReducedMotion, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
-import { successHaptic, useSurface } from "../shared/parts";
+import { errorHaptic, successHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { focusedFirst, requestChips } from "./logic";
 import { MembersFullNote } from "./MembersFullNote";
@@ -75,12 +76,35 @@ export function JoinRequestsSheet({ focus, onClose }: { focus?: string | undefin
   return (
     <SheetScreen>
       <SheetTitle title={t("members.requests.title")} subtitle={orgName || undefined} />
-      {handOffs.map((h) => (
-        <HandOff key={h.url} name={h.name} onShare={() => share(h.url)} />
-      ))}
-      <MembersFullNote />
-      {body}
+      {/* Cards answered here leave, and the links handed over arrive, while the sheet is open: they fade and the rest
+          slides into place. Those there as it opens simply are. */}
+      <LayoutAnimationConfig skipEntering>
+        {handOffs.map((h) => (
+          <HandOff key={h.url} name={h.name} onShare={() => share(h.url)} />
+        ))}
+        <MembersFullNote />
+        {body}
+      </LayoutAnimationConfig>
     </SheetScreen>
+  );
+}
+
+const CARD_IN = FadeIn.duration(160);
+const CARD_OUT = FadeOut.duration(120);
+const CARD_SLIDE = LinearTransition.duration(220);
+
+/** A card of the sheet that comes, goes and moves while it is watched (none of it with reduced motion). */
+function Moving({ style, children }: { style: StyleProp<ViewStyle>; children: ReactNode }) {
+  const reduced = useReducedMotion();
+  return (
+    <Animated.View
+      entering={reduced ? undefined : CARD_IN}
+      exiting={reduced ? undefined : CARD_OUT}
+      layout={reduced ? undefined : CARD_SLIDE}
+      style={style}
+    >
+      {children}
+    </Animated.View>
   );
 }
 
@@ -100,7 +124,9 @@ function RequestCard({
 }) {
   const { t, i18n } = useTranslation();
   const { orgId } = useOrg();
+  const c = useColors();
   const surface = useSurface();
+  const reduced = useReducedMotion();
   const chips = requestChips(t, i18n.language, r);
   const toast = useToast();
   const approve = useApproveJoinRequest(orgId);
@@ -111,7 +137,10 @@ function RequestCard({
   const [reason, setReason] = useState("");
   const busy = approve.isPending || deny.isPending;
   // Someone else answered first, or it ran out: said in words, and the list refreshes (the hooks refetch).
-  const failed = (e: unknown) => toast({ title: knownErrorText(t, e) ?? t("mobile.app.failed"), icon: "x" });
+  const failed = (e: unknown) => {
+    errorHaptic();
+    toast({ title: knownErrorText(t, e) ?? t("mobile.app.failed"), icon: "x" });
+  };
 
   // Awaited, not `mutate`'s callbacks: the answered card leaves the list (unmounting) before those would run, and
   // the link a server without email returns must still reach the approver.
@@ -143,7 +172,7 @@ function RequestCard({
   };
 
   return (
-    <View style={[styles.card, surface]}>
+    <Moving style={[styles.card, surface]}>
       <View
         style={styles.who}
         accessible
@@ -169,8 +198,9 @@ function RequestCard({
           {t("members.requests.note", { note: r.note })}
         </Text>
       ) : null}
+      {/* Denying swaps the answer for the reason, faded in place. */}
       {denying ? (
-        <>
+        <Animated.View key="deny" entering={reduced ? undefined : CARD_IN} style={styles.swap}>
           <View style={styles.field}>
             <TextArea
               value={reason}
@@ -198,9 +228,9 @@ function RequestCard({
               <Button variant="ghost" wide label={t("mobile.common.back")} onPress={() => setDenying(false)} />
             </View>
           </View>
-        </>
+        </Animated.View>
       ) : (
-        <>
+        <Animated.View key="answer" entering={reduced ? undefined : CARD_IN} style={styles.swap}>
           {roles.length > 0 ? (
             <View style={styles.field}>
               <InfoHint
@@ -212,17 +242,20 @@ function RequestCard({
                   {t("mobile.joinRequests.roles")}
                 </Text>
               </InfoHint>
-              <GroupedList>
-                {roles.map((role) => (
-                  <GroupedRow
-                    key={role.id}
-                    label={role.name}
-                    toggle={roleIds.includes(role.id)}
-                    disabled={busy}
-                    onPress={() => flip(role.id)}
-                  />
+              {/* Flat in the card (never a card in a card): the rows' text on the card's own 16 pt edge. */}
+              <View style={styles.rows}>
+                {roles.map((role, i) => (
+                  <Fragment key={role.id}>
+                    {i > 0 ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
+                    <GroupedRow
+                      label={role.name}
+                      toggle={roleIds.includes(role.id)}
+                      disabled={busy}
+                      onPress={() => flip(role.id)}
+                    />
+                  </Fragment>
                 ))}
-              </GroupedList>
+              </View>
             </View>
           ) : null}
           <View style={styles.acts}>
@@ -246,9 +279,9 @@ function RequestCard({
               />
             </View>
           </View>
-        </>
+        </Animated.View>
       )}
-    </View>
+    </Moving>
   );
 }
 
@@ -257,22 +290,27 @@ function HandOff({ name, onShare }: { name: string; onShare: () => void }) {
   const { t } = useTranslation();
   const surface = useSurface();
   return (
-    <View style={[styles.card, surface]}>
+    <Moving style={[styles.card, surface]}>
       <Text variant="title">{t("members.requests.copyTitle", { name })}</Text>
       <Text variant="small" tone="muted">
         {t("members.requests.copyText", { name })}
       </Text>
       <Button variant="primary" wide icon="share" label={t("mobile.joinRequests.share")} onPress={onShare} />
-    </View>
+    </Moving>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 22, paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
+  card: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
+  // The card's own column inside the swap.
+  swap: { gap: 10 },
   who: { flexDirection: "row", alignItems: "center", gap: 10 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   field: { gap: 6 },
+  // A grouped row pads its text 14: pulled out by as much, the text meets the card's 16.
+  rows: { marginHorizontal: -14 },
+  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
   acts: { flexDirection: "row", gap: 8 },
 });

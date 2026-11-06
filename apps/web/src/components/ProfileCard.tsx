@@ -68,6 +68,7 @@ import { useOpensComputer } from "@/components/computer/facts";
 import { useOpenComputer } from "@/components/computer/open";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { LetMeTalkButton, useWidenAsk } from "@/components/ReachLines";
 import { useEmojiLabels } from "@/components/Reactions";
@@ -122,6 +123,11 @@ export function ProfileTrigger({
   const agentEntries = useAgentMenu();
   const personEntries = usePersonMenu();
   const button = useRef<HTMLButtonElement>(null);
+  // The trigger takes the focus before the card goes: what opens from the card (the agent's panel) gives it back there.
+  const leave = () => {
+    if (document.activeElement?.closest(".mcard__frame")) button.current?.focus();
+    card.close();
+  };
   const menu = entityMenu(() => {
     if (actor.type === "agent") {
       const agent = dir.agentById.get(actor.id);
@@ -156,9 +162,9 @@ export function ProfileTrigger({
         // A press inside a card the pointer opened keeps it (its menus and pickers open outside it).
         <div className="mcard__frame" onPointerDownCapture={() => card.open === "hover" && card.onOpenChange(true)}>
           {actor.type === "agent" ? (
-            <AgentCard agentId={actor.id} onDone={card.close} />
+            <AgentCard agentId={actor.id} onDone={leave} />
           ) : (
-            <PersonCard userId={actor.id} onDone={card.close} />
+            <PersonCard userId={actor.id} onDone={leave} />
           )}
         </div>
       )}
@@ -252,33 +258,35 @@ function MessageBox({ target, label, onSent }: { target: DmTarget; label: string
     );
   };
   return (
-    <div className="ac-input-affix mcard__dm">
-      <input
-        ref={field}
-        value={text}
-        placeholder={label}
-        aria-label={label}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-          e.preventDefault();
-          submit();
-        }}
-      />
-      <EmojiPickerPopover
-        labels={emojiLabels}
-        side="top"
-        align="end"
-        onPick={(emoji) => {
-          setText((v) => v + emoji);
-          field.current?.focus();
-        }}
-        trigger={
-          <button type="button" className="mcard__emoji" aria-label={t("presence.emoji")} title={t("presence.emoji")}>
-            <Icon name="smile" size={18} />
-          </button>
-        }
-      />
+    <div className="mcard__foot">
+      <div className="ac-input-affix mcard__dm">
+        <input
+          ref={field}
+          value={text}
+          placeholder={label}
+          aria-label={label}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            submit();
+          }}
+        />
+        <EmojiPickerPopover
+          labels={emojiLabels}
+          side="top"
+          align="end"
+          onPick={(emoji) => {
+            setText((v) => v + emoji);
+            field.current?.focus();
+          }}
+          trigger={
+            <button type="button" className="mcard__emoji" aria-label={t("presence.emoji")} title={t("presence.emoji")}>
+              <Icon name="smile" size={18} />
+            </button>
+          }
+        />
+      </div>
     </div>
   );
 }
@@ -485,7 +493,11 @@ function RightHandCardBody({ agent, onDone }: { agent: Agent; onDone: () => void
     <CardShell
       agent
       sky={<ProfileSky color={colorOf(agent)} />}
-      face={<AgentAvatar agentId={agent.id} size="lg" name={agent.name} />}
+      face={
+        <OpensAgent agentId={agent.id} onOpen={onDone}>
+          <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
+        </OpensAgent>
+      }
     >
       <div className="list-col mcard__names">
         <span className="profile-card__name">{agent.name}</span>
@@ -592,14 +604,16 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       agent
       sky={<ProfileSky color={colorOf(agent)} busy={busy} />}
       face={
-        <AgentAvatar
-          agentId={agent.id}
-          size="lg"
-          name={agent.name}
-          presence={shown?.presence ?? null}
-          presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
-          asleep={isOutOfOffice(shown?.line)}
-        />
+        <OpensAgent agentId={agent.id} onOpen={onDone}>
+          <AgentAvatar
+            agentId={agent.id}
+            size="lg"
+            name={agent.name}
+            presence={shown?.presence ?? null}
+            presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
+            asleep={isOutOfOffice(shown?.line)}
+          />
+        </OpensAgent>
       }
       act={
         toComputer && (

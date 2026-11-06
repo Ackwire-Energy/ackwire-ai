@@ -166,7 +166,7 @@ html:not([data-pointer]) .brw-site button:focus-visible {
 }
 .brw-use__acts {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 .brw-confirm {
@@ -848,6 +848,19 @@ html:not([data-pointer]) .brw-ac__stage[tabindex]:focus-visible {
 .brw-ac__add {
   font-size: 13px;
 }
+/* The note takes the title's place, and a line of its own where the row is narrow: the buttons stay together, on the right. */
+.brw-ac__ways {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+.brw-ac__back .brw-ac__note {
+  flex: 1 1 240px;
+  min-width: 0;
+}
 /*
  * A note to the agent (handing back, or why it couldn't be done): one line in the middle of its field that grows as it
  * wraps, up to four lines (10 + 4 × 22 + 10, and the border), with no grip.
@@ -904,9 +917,6 @@ html:not([data-pointer]) .brw-ac__stage[tabindex]:focus-visible {
 .brw-tfield__tool[aria-pressed="true"] {
   color: var(--ink);
   background: var(--sunken);
-}
-.brw-tfield__send {
-  border-radius: 50%;
 }
 .brw-keycaps {
   position: absolute;
@@ -1195,6 +1205,12 @@ html:not([data-pointer]) .brw-kc:focus-visible {
   font-size: 12.5px;
 }
 @media (max-width: 760px) {
+  .brw-steps__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* The agent's Work tab in the panel beside its DM: three steps across 420px would be three slivers. */
+@container agp-side (max-width: 760px) {
   .brw-steps__grid {
     grid-template-columns: minmax(0, 1fr);
   }
