@@ -63,7 +63,7 @@
 .ac-msg[data-look="bubbles"] .ac-msg__gutter-time {
   display: none;
 }
-/* The pair row before a reply ("Atlas ⇄ Ada"): its first face centred over the bubbles' 32px face (the row's 8px +
+/* The pair row before a reply ("Theo ⇄ Iris"): its first face centred over the bubbles' 32px face (the row's 8px +
    7px, less the button's own 10px). A reach line's pair row keeps its place in the line. */
 .channel__messages[data-look="bubbles"] .consult-pair:not(.ag-rc--talk > .consult-pair) {
   padding-left: 5px;
