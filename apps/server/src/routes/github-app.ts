@@ -44,6 +44,21 @@ const Installation = z
   })
   .openapi("GitHubAppInstallation");
 
+/** What reaches the workspace's GitHub from the server: our app, its REST API, and the workspace's GitHub connection. */
+export function githubAccess(deps: AppDeps) {
+  return {
+    app: githubAppConfig(deps.config),
+    http: { fetch: deps.extras?.http ?? fetch, apiUrl: "https://api.github.com" },
+    connectors: {
+      db: deps.db,
+      keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
+      oauthApps: connectorOAuthApps(deps.config),
+      publicUrl: deps.config.PUBLIC_URL,
+      http: deps.extras?.http,
+    },
+  };
+}
+
 function installDeps(deps: AppDeps): GitHubAppInstallDeps {
   return {
     db: deps.db,
@@ -145,18 +160,7 @@ export function githubAppRoutes(deps: AppDeps) {
     private: z.boolean(),
     updatedAt: z.string().nullable(),
   });
-  const listing = {
-    db: deps.db,
-    connectors: {
-      db: deps.db,
-      keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
-      oauthApps: connectorOAuthApps(deps.config),
-      publicUrl: deps.config.PUBLIC_URL,
-      http: deps.extras?.http,
-    },
-    app: install.app,
-    github: install.http,
-  };
+  const listing = { db: deps.db, connectors: githubAccess(deps).connectors, app: install.app, github: install.http };
 
   app.openapi(
     createRoute({

@@ -18,6 +18,7 @@ export type AppHref =
   | `/chat/${string}?handoff=${string}`
   | `/chat/${string}?thread=${string}&handoff=${string}`
   | `/agent/${string}`
+  | `/agent-model/${string}`
   | `/computer/${string}`
   | `/handoff/${string}`
   | `/issues/${number}`

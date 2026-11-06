@@ -1,5 +1,14 @@
 import type { TFunction } from "i18next";
-import type { ApiRule, AppNotification, Routine, RoutineRun, RoutineRunStatus, RoutineTarget } from "../api/types";
+import type {
+  ApiRule,
+  AppNotification,
+  Routine,
+  RoutineEvent,
+  RoutineRun,
+  RoutineRunStatus,
+  RoutineTarget,
+  WebhookProvider,
+} from "../api/types";
 import type { RunStatus } from "./calendar";
 import { clockAt, whenAt } from "./format";
 
@@ -314,7 +323,9 @@ export function routineStateWords(
     case "needs_webhook":
       return {
         key: "routines.state.needsWebhook",
-        values: { provider: r.trigger.type === "event" && r.trigger.event.startsWith("sentry.") ? "Sentry" : "GitHub" },
+        values: {
+          provider: r.trigger.type === "event" && eventWebhook(r.trigger.event) === "sentry" ? "Sentry" : "GitHub",
+        },
         icon: "alert",
         tone: "waiting",
       };
@@ -418,3 +429,11 @@ export function busyOnComputer(
     ? { key: "routines.busyComputer", values: { count: perDay, machine } }
     : { key: "routines.busyAnyComputer", values: { count: perDay } };
 }
+
+/** The service whose webhook brings an event (the engine's `EVENT_WEBHOOK`); null for one made here. */
+export const eventWebhook = (event: RoutineEvent): WebhookProvider | null =>
+  event === "sentry.issue_created"
+    ? "sentry"
+    : event === "github.pr_opened" || event === "deploy.succeeded"
+      ? "github"
+      : null;

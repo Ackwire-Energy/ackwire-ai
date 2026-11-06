@@ -51,6 +51,7 @@ import {
 } from "@agenteschat/client/lib/routine-templates";
 import {
   busyOnComputer,
+  eventWebhook,
   healthWords,
   isRunAtWork,
   isStoppable,
@@ -138,6 +139,7 @@ import { MenuEntries } from "@/components/DesktopMenus";
 import { DetailsLink } from "@/components/details-link";
 import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
 import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
+import { EventWebhookSetup } from "@/components/EventWebhookSetup";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { SwitchComputerDialog } from "@/components/MachineOutages";
@@ -1381,6 +1383,11 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                   </p>
                 )}
               </DetailsSection>
+              {r.trigger.type === "event" && eventWebhook(r.trigger.event) && !done && (
+                <DetailsSection title={t("routines.form.event")}>
+                  <EventWebhookSetup provider={eventWebhook(r.trigger.event) ?? "github"} />
+                </DetailsSection>
+              )}
               {r.trigger.type === "webhook" && (
                 <DetailsSection title={t("routines.form.kind.webhook")}>
                   {r.canManage ? (
@@ -2685,6 +2692,9 @@ function RoutineDialog({
                       options={ROUTINE_EVENTS.map((e) => ({ value: e, label: t(`routines.event.${e}`) }))}
                     />
                   </Field>
+                )}
+                {kind === "event" && eventWebhook(event) && (
+                  <EventWebhookSetup provider={eventWebhook(event) ?? "github"} />
                 )}
                 {busy && (
                   <p className="routine-note small ac-iconline" role="status">

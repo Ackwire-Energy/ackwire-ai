@@ -3682,6 +3682,9 @@
       "takeBackAll": "Van alle agents terugnemen",
       "done": "Je abonnement is terug"
     },
+    "planModelDropped": {
+      "choose": "Ander model kiezen"
+    },
     "docTitleUnread": "({{count}}) Meldingen",
     "summaryWaiting_one": "{{count}} ding wacht op jou",
     "summaryWaiting_other": "{{count}} dingen wachten op jou",
@@ -3782,6 +3785,7 @@
       "browserProfileRequest": "<b>{{name}}</b> vraagt om nog een browserprofiel voor <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> heeft het scherm van de computer van <b>{{agent}}</b> overgenomen",
       "planLent": "<b>{{name}}</b> heeft je {{plan}}-abonnement aan <b>{{agent}}</b> gekoppeld",
+      "planModelDropped": "{{model}} is uit {{plan}} gehaald. <b>{{name}}</b> gebruikt {{runs}} tot je een ander model kiest.",
       "routineWaitingPlan": "<b>{{name}}</b> wacht tot zijn abonnement wordt gereset om een routine uit te voeren",
       "planResetUnknown": "{{plan}} heeft niet gezegd wanneer de limiet wordt gereset. Het werk van <b>{{name}}</b> wacht nog.",
       "catchUpClosed_one": "<b>{{name}}</b> is terug en heeft {{count}} gesprek overgeslagen dat geen antwoord nodig had",
@@ -6149,6 +6153,48 @@
         "rate_limited": "Geweigerd: te veel aanroepen per minuut"
       }
     },
+    "setup": {
+      "title": "{{provider}}-webhook",
+      "working": "Werkt. {{provider}} stuurt zijn events al hierheen.",
+      "waiting": {
+        "github": "Wachten op GitHub. Het stuurt een ping zodra de webhook is opgeslagen.",
+        "sentry": "Wachten op Sentry. Het belt zodra er een nieuwe fout is."
+      },
+      "refused": {
+        "github": "GitHub belde met een ander geheim. Kopieer het Secret hieronder opnieuw in de webhook.",
+        "sentry": "Sentry belde met een ander geheim. Plak het Client Secret van de integratie opnieuw."
+      },
+      "timeout": "Er kwam niets binnen in 3 minuten. Controleer de URL en het geheim en test opnieuw.",
+      "adminOnly": "Wie connectors beheert, zet de {{provider}}-webhook aan. Vraag een admin om deze routine te openen.",
+      "test": "Testen",
+      "retest": "Opnieuw testen",
+      "copied": "Gekopieerd.",
+      "github": {
+        "repo": "Repo",
+        "repoPlaceholder": "eigenaar/naam",
+        "oneClick": "Webhook maken",
+        "added": "Webhook gemaakt in {{repo}}.",
+        "byHand": "Of met de hand: in de repository, Settings › Webhooks › Add webhook.",
+        "open": "Open in de repository Settings › Webhooks › Add webhook.",
+        "openLink": "Openen op GitHub",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Kies bij de events Pull requests en Deployment statuses, en dan Add webhook.",
+        "another": "Aan een andere repository toevoegen"
+      },
+      "sentry": {
+        "open": "Maak in Sentry een interne integratie.",
+        "openLink": "Openen in Sentry",
+        "url": "Webhook URL",
+        "events": "Vink onder Webhooks issue aan en sla op.",
+        "secret": "Client Secret van de integratie",
+        "secretPlaceholder": "Plak het Client Secret",
+        "secretSaved": "Opgeslagen. Plak een nieuw om het te vervangen",
+        "save": "Opslaan",
+        "saved": "Client Secret opgeslagen."
+      }
+    },
     "once": "Eenmalig · {{weekday}} {{date}} om {{time}}{{zone}}",
     "reminder": "Herinnering",
     "fired": "Uitgevoerd",
@@ -6445,8 +6491,8 @@
       },
       "prs": {
         "name": "Nieuwe PR's reviewen",
-        "text": "Werkdagen om 9:00 en 14:00 leest de agent nieuwe PR's en wijst op risico's.",
-        "prompt": "Bekijk de PR's die sinds de vorige keer zijn geopend. Lees elke diff, wijs op risico's en zeg wat je met de hand moet testen."
+        "text": "Als er een PR opent, leest de agent hem en geeft commentaar.",
+        "prompt": "Lees de diff van de nieuwe PR, wijs op risico's en zeg wat je met de hand moet testen."
       },
       "week": {
         "name": "Weekafsluiting",
@@ -11243,6 +11289,12 @@
     }
   },
   "errors": {
+    "webhook": {
+      "githubNoAccess": "De GitHub van deze workspace kan geen webhooks maken in {{repo}}. Volg de stappen hieronder om hem met de hand te maken.",
+      "githubFailed": "GitHub heeft de webhook in {{repo}} niet gemaakt ({{status}}). Volg de stappen hieronder om hem met de hand te maken.",
+      "invalidSecret": "Plak het hele Client Secret, zonder spaties.",
+      "invalidRepo": "Schrijf de repository als eigenaar/naam."
+    },
     "issue": {
       "assigneeOutside": "Deze persoon zit niet in dit gesprek en ziet deze taak dus niet."
     },

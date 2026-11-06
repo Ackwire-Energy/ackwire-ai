@@ -1589,6 +1589,12 @@
   "agents.noGroupSection": {
     "value": "No department"
   },
+  "team.entry": {
+    "value": "List, org chart and map"
+  },
+  "team.mapHint": {
+    "value": "To move an agent to another channel, use the map on the web or talk to {{name}}."
+  },
   "agentEdit.missing": {
     "value": "This agent no longer exists."
   },
@@ -1732,6 +1738,9 @@
   },
   "activity.title": {
     "value": "Activity"
+  },
+  "activity.chooseModel": {
+    "value": "Choose another model"
   },
   "activity.filter.all": {
     "value": "All"
@@ -2002,6 +2011,22 @@
     "female": {
       "one": "{{names}} took control of the screen of {{agent}}'s computer",
       "other": "{{names}} took control of the screen of {{agent}}'s computer"
+    }
+  },
+  "activity.kind.plan_lent": {
+    "value": {
+      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
+      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    },
+    "female": {
+      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
+      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    }
+  },
+  "activity.kind.plan_model_dropped": {
+    "value": {
+      "one": "{{model}} left {{plan}}. {{names}} is using {{runs}} for now",
+      "other": "{{model}} left {{plan}}. {{names}} is using {{runs}} for now"
     }
   },
   "activity.kind.connector_tool_changed": {
@@ -4894,22 +4919,6 @@
   },
   "dashboards.notice.card.proposal": {
     "value": "Dashboard"
-  },
-  "activity.kind.plan_lent": {
-    "value": {
-      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
-      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
-    },
-    "female": {
-      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
-      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
-    }
-  },
-  "team.entry": {
-    "value": "List, org chart and map"
-  },
-  "team.mapHint": {
-    "value": "To move an agent to another channel, use the map on the web or talk to {{name}}."
   },
   "empty.agents.title": {
     "value": "Build your team of agents"

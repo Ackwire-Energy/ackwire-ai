@@ -688,6 +688,10 @@
     "freeSection": "Libres",
     "noGroupSection": "Sans service"
   },
+  "team": {
+    "entry": "Liste, organigramme et carte",
+    "mapHint": "Pour changer un agent de canal, utilisez la carte sur le web ou parlez à {{name}}."
+  },
   "agentEdit": {
     "missing": "Cet agent n'existe plus.",
     "saved": "Modifications enregistrées",
@@ -748,6 +752,7 @@
   },
   "activity": {
     "title": "Activité",
+    "chooseModel": "Choisir un autre modèle",
     "filter": {
       "all": "Tout",
       "waiting": "Vous attend",
@@ -883,6 +888,15 @@
       "desktop_taken_female_one": "{{names}} a pris le contrôle de l'écran de l'ordinateur de {{agent}}",
       "desktop_taken_female_many": "{{names}} ont pris le contrôle de l'écran de l'ordinateur de {{agent}}",
       "desktop_taken_female_other": "{{names}} ont pris le contrôle de l'écran de l'ordinateur de {{agent}}",
+      "plan_lent_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_model_dropped_one": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
+      "plan_model_dropped_many": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
+      "plan_model_dropped_other": "{{model}} a quitté {{plan}}. {{names}} utilise {{runs}} pour l’instant",
       "connector_tool_changed_one": "Un serveur connecté a modifié des outils que vous aviez approuvés",
       "connector_tool_changed_many": "Un serveur connecté a modifié des outils que vous aviez approuvés",
       "connector_tool_changed_other": "Un serveur connecté a modifié des outils que vous aviez approuvés",
@@ -894,13 +908,7 @@
       "computer_no_chrome_other": "Des ordinateurs ont besoin de Google Chrome. Téléchargez-le sur google.com/chrome",
       "app_created_one": "Une app d'IA a créé des choses pour vous",
       "app_created_many": "Une app d'IA a créé des choses pour vous",
-      "app_created_other": "Une app d'IA a créé des choses pour vous",
-      "plan_lent_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_female_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_female_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_female_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}"
+      "app_created_other": "Une app d'IA a créé des choses pour vous"
     },
     "markRead": "Marquer comme lu",
     "markUnread": "Marquer comme non lu",
@@ -2119,10 +2127,6 @@
         "proposal": "Tableau de bord"
       }
     }
-  },
-  "team": {
-    "entry": "Liste, organigramme et carte",
-    "mapHint": "Pour changer un agent de canal, utilisez la carte sur le web ou parlez à {{name}}."
   },
   "empty": {
     "agents": {

@@ -850,3 +850,69 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   border-radius: var(--control-r-md);
   background: var(--sunken);
 }
+
+/* A GitHub or Sentry event's webhook: the service's mark and name, whether it works, the steps, Testar. */
+.routine-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--control-r-md);
+  background: var(--sunken);
+}
+.routine-setup__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.routine-setup__status {
+  margin: 0;
+}
+.routine-setup__status[data-tone="ok"] {
+  color: var(--ok);
+}
+.routine-setup__status[data-tone="warn"] {
+  color: var(--attention);
+}
+.routine-setup__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  list-style: none;
+  counter-reset: setup-step;
+}
+.routine-setup__steps > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 28px;
+  counter-increment: setup-step;
+  font-size: 13px;
+  line-height: 18px;
+}
+/* The step's number, as tall as the step's 18px line: centred on its first line's capitals. */
+.routine-setup__steps > li::before {
+  content: counter(setup-step);
+  position: absolute;
+  left: 0;
+  top: calc(-1 * var(--cap-mid));
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+.routine-setup__steps p {
+  margin: 0;
+}

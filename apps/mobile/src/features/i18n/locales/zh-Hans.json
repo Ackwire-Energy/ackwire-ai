@@ -642,6 +642,10 @@
     "freeSection": "空闲",
     "noGroupSection": "无部门"
   },
+  "team": {
+    "entry": "列表、组织架构图和地图",
+    "mapHint": "要把智能体移到另一个频道，请使用网页版的地图，或和 {{name}} 对话。"
+  },
   "agentEdit": {
     "missing": "此智能体已不存在。",
     "saved": "更改已保存",
@@ -700,6 +704,7 @@
   },
   "activity": {
     "title": "动态",
+    "chooseModel": "选择其他模型",
     "filter": {
       "all": "全部",
       "waiting": "等你处理",
@@ -757,12 +762,13 @@
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
       "desktop_taken_other": "{{names}} 接管了 {{agent}} 的电脑屏幕",
       "desktop_taken_female_other": "{{names}} 接管了 {{agent}} 的电脑屏幕",
+      "plan_lent_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
+      "plan_lent_female_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
+      "plan_model_dropped_other": "{{model}} 已从 {{plan}} 下架。{{names}} 暂时使用 {{runs}}",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
       "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",
-      "app_created_other": "一个 AI 应用为你创建了内容",
-      "plan_lent_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
-      "plan_lent_female_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}"
+      "app_created_other": "一个 AI 应用为你创建了内容"
     },
     "markRead": "标为已读",
     "markUnread": "标为未读",
@@ -1921,10 +1927,6 @@
         "proposal": "仪表盘"
       }
     }
-  },
-  "team": {
-    "entry": "列表、组织架构图和地图",
-    "mapHint": "要把智能体移到另一个频道，请使用网页版的地图，或和 {{name}} 对话。"
   },
   "empty": {
     "agents": {

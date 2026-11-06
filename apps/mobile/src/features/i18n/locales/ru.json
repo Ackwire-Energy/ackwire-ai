@@ -711,6 +711,10 @@
     "freeSection": "Свободны",
     "noGroupSection": "Без отдела"
   },
+  "team": {
+    "entry": "Список, оргструктура и карта",
+    "mapHint": "Чтобы перенести агента в другой канал, используйте карту в веб-версии или поговорите с {{name}}."
+  },
   "agentEdit": {
     "missing": "Этого агента больше нет.",
     "saved": "Изменения сохранены",
@@ -772,6 +776,7 @@
   },
   "activity": {
     "title": "Активность",
+    "chooseModel": "Выбрать другую модель",
     "filter": {
       "all": "Все",
       "waiting": "Ждёт вас",
@@ -946,6 +951,18 @@
       "desktop_taken_female_few": "{{names}} взяли управление экраном компьютера {{agent}}",
       "desktop_taken_female_many": "{{names}} взяли управление экраном компьютера {{agent}}",
       "desktop_taken_female_other": "{{names}} взяли управление экраном компьютера {{agent}}",
+      "plan_lent_one": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_few": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_many": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_other": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_female_one": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_female_few": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_female_many": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_female_other": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_model_dropped_one": "{{model}} больше нет в {{plan}}. {{names}} пока использует {{runs}}",
+      "plan_model_dropped_few": "{{model}} больше нет в {{plan}}. {{names}} пока использует {{runs}}",
+      "plan_model_dropped_many": "{{model}} больше нет в {{plan}}. {{names}} пока использует {{runs}}",
+      "plan_model_dropped_other": "{{model}} больше нет в {{plan}}. {{names}} пока использует {{runs}}",
       "connector_tool_changed_one": "Подключённый сервер изменил одобренные вами инструменты",
       "connector_tool_changed_few": "Подключённый сервер изменил одобренные вами инструменты",
       "connector_tool_changed_many": "Подключённый сервер изменил одобренные вами инструменты",
@@ -961,15 +978,7 @@
       "app_created_one": "Приложение ИИ кое-что создало для вас",
       "app_created_few": "Приложение ИИ кое-что создало для вас",
       "app_created_many": "Приложение ИИ кое-что создало для вас",
-      "app_created_other": "Приложение ИИ кое-что создало для вас",
-      "plan_lent_one": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
-      "plan_lent_few": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
-      "plan_lent_many": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
-      "plan_lent_other": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
-      "plan_lent_female_one": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
-      "plan_lent_female_few": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
-      "plan_lent_female_many": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
-      "plan_lent_female_other": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}"
+      "app_created_other": "Приложение ИИ кое-что создало для вас"
     },
     "markRead": "Отметить как прочитанное",
     "markUnread": "Отметить как непрочитанное",
@@ -2227,10 +2236,6 @@
         "proposal": "Дашборд"
       }
     }
-  },
-  "team": {
-    "entry": "Список, оргструктура и карта",
-    "mapHint": "Чтобы перенести агента в другой канал, используйте карту в веб-версии или поговорите с {{name}}."
   },
   "empty": {
     "agents": {

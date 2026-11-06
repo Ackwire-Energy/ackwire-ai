@@ -164,6 +164,8 @@ import type {
   ThreadPatch,
   ToolDecision,
   UnreadEvent,
+  WebhookProvider,
+  WebhookSetup,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
@@ -3885,6 +3887,39 @@ export function useRoutineHookAction(orgId: string, id: string) {
     onSuccess: ({ hook }) => qc.setQueryData(keys.routineHook(orgId, id), hook),
     // The list carries the address too, and a test starts a run (both under the routines' key).
     onSettled: () => void qc.invalidateQueries({ queryKey: keys.routines(orgId) }),
+  });
+}
+
+/**
+ * Whether GitHub's or Sentry's webhook works here (`null`: not asked). `waiting`: asked again every few seconds, while
+ * Testar waits for its first call.
+ */
+export const useWebhookSetup = (orgId: string, provider: WebhookProvider | null, waiting = false) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.webhookSetup(orgId, provider ?? ""),
+    queryFn: () => api.routines.webhookSetup(orgId, provider ?? "github"),
+    enabled: provider !== null,
+    refetchInterval: waiting ? 3000 : false,
+    // The person is likely on GitHub's or Sentry's tab saving the webhook while Testar waits.
+    refetchIntervalInBackground: waiting,
+  });
+};
+
+/** Makes the webhook, pastes the service's secret or adds it to a GitHub repository; the routines' states follow. */
+export function useWebhookSetupAction(orgId: string, provider: WebhookProvider) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      action: { type: "ensure" } | { type: "secret"; secret: string } | { type: "repo"; repo: string },
+    ): Promise<WebhookSetup> =>
+      action.type === "ensure"
+        ? api.routines.ensureWebhook(orgId, provider)
+        : action.type === "secret"
+          ? api.routines.setWebhookSecret(orgId, provider, action.secret)
+          : api.routines.addWebhookToRepo(orgId, action.repo),
+    onSuccess: (setup) => qc.setQueryData(keys.webhookSetup(orgId, provider), setup),
   });
 }
 

@@ -176,6 +176,7 @@ type WhatKey =
   | "browserProfileRequest"
   | "desktopTaken"
   | "planLent"
+  | "planModelDropped"
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"

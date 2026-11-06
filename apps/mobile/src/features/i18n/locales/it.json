@@ -688,6 +688,10 @@
     "freeSection": "Liberi",
     "noGroupSection": "Nessun reparto"
   },
+  "team": {
+    "entry": "Elenco, organigramma e mappa",
+    "mapHint": "Per spostare un agente in un altro canale, usa la mappa sul web o parla con {{name}}."
+  },
   "agentEdit": {
     "missing": "Questo agente non esiste più.",
     "saved": "Modifiche salvate",
@@ -748,6 +752,7 @@
   },
   "activity": {
     "title": "Attività recenti",
+    "chooseModel": "Scegli un altro modello",
     "filter": {
       "all": "Tutto",
       "waiting": "Ti aspetta",
@@ -883,6 +888,15 @@
       "desktop_taken_female_one": "{{names}} ha preso il controllo dello schermo del computer di {{agent}}",
       "desktop_taken_female_many": "{{names}} hanno preso il controllo dello schermo del computer di {{agent}}",
       "desktop_taken_female_other": "{{names}} hanno preso il controllo dello schermo del computer di {{agent}}",
+      "plan_lent_one": "{{names}} ha collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_many": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_other": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_female_one": "{{names}} ha collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_female_many": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_female_other": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_model_dropped_one": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
+      "plan_model_dropped_many": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
+      "plan_model_dropped_other": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
       "connector_tool_changed_one": "Un server connesso ha cambiato strumenti che avevi approvato",
       "connector_tool_changed_many": "Un server connesso ha cambiato strumenti che avevi approvato",
       "connector_tool_changed_other": "Un server connesso ha cambiato strumenti che avevi approvato",
@@ -894,13 +908,7 @@
       "computer_no_chrome_other": "Alcuni computer hanno bisogno di Google Chrome. Scaricalo da google.com/chrome",
       "app_created_one": "Un'app di IA ha creato qualcosa per te",
       "app_created_many": "Un'app di IA ha creato qualcosa per te",
-      "app_created_other": "Un'app di IA ha creato qualcosa per te",
-      "plan_lent_one": "{{names}} ha collegato il tuo piano {{plan}} a {{agent}}",
-      "plan_lent_many": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
-      "plan_lent_other": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
-      "plan_lent_female_one": "{{names}} ha collegato il tuo piano {{plan}} a {{agent}}",
-      "plan_lent_female_many": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
-      "plan_lent_female_other": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}"
+      "app_created_other": "Un'app di IA ha creato qualcosa per te"
     },
     "markRead": "Segna come letto",
     "markUnread": "Segna come non letto",
@@ -2119,10 +2127,6 @@
         "proposal": "Dashboard"
       }
     }
-  },
-  "team": {
-    "entry": "Elenco, organigramma e mappa",
-    "mapHint": "Per spostare un agente in un altro canale, usa la mappa sul web o parla con {{name}}."
   },
   "empty": {
     "agents": {

@@ -230,7 +230,11 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.chart.workspace",
-      "files.video.volume"
+      "files.video.volume",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "es": [
       "agent.builtinName",
@@ -417,7 +421,11 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.list.col.roles",
-      "connectAi.pick.plan"
+      "connectAi.pick.plan",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "fr": [
       "deleteAccount.agentCount",
@@ -768,7 +776,11 @@
       "files.video.pause",
       "files.video.volume",
       "taskManager.waitGroup.routines",
-      "agentPage.work.brain.speeds.standard"
+      "agentPage.work.brain.speeds.standard",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "de": [
       "access.agentCol",
@@ -1130,7 +1142,11 @@
       "team.list.col.person",
       "approvals.review.state",
       "agentSide.label",
-      "agentPage.work.brain.speeds.standard"
+      "agentPage.work.brain.speeds.standard",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "it": [
       "queue.fill.routine",
@@ -1421,7 +1437,11 @@
       "teamTemplates.channels.ada",
       "files.video.volume",
       "taskManager.waitGroup.routines",
-      "agentPage.work.brain.speeds.standard"
+      "agentPage.work.brain.speeds.standard",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "nl": [
       "deleteAccount.agentCount",
@@ -1921,7 +1941,11 @@
       "approvals.review.state",
       "files.video.volume",
       "taskManager.waitGroup.routines",
-      "agentSide.label"
+      "agentSide.label",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "ja": [
       "access.area.vault",
@@ -2044,7 +2068,11 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "ko": [
       "access.area.vault",
@@ -2164,7 +2192,11 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "zh-Hans": [
       "access.area.vault",
@@ -2275,7 +2307,11 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "id": [
       "access.area.browser",
@@ -2494,7 +2530,11 @@
       "teamTemplates.channels.ada",
       "agentGroups.rename",
       "approvals.review.state",
-      "files.video.volume"
+      "files.video.volume",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "tr": [
       "agent.builtinName",
@@ -2625,7 +2665,11 @@
       "endpoint.styles.anthropic",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
-      "connectAi.pick.plan"
+      "connectAi.pick.plan",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "pl": [
       "deleteAccount.agentCount",
@@ -2847,7 +2891,11 @@
       "teamTemplates.channels.ada",
       "team.agents",
       "team.list.col.agent",
-      "connectAi.pick.plan"
+      "connectAi.pick.plan",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "ru": [
       "agent.builtinName",
@@ -2956,7 +3004,11 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ]
   },
   "mobile-base": {

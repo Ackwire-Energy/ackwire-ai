@@ -688,6 +688,10 @@
     "freeSection": "Libres",
     "noGroupSection": "Sin departamento"
   },
+  "team": {
+    "entry": "Lista, organigrama y mapa",
+    "mapHint": "Para mover un agente a otro canal, usa el mapa en la web o habla con {{name}}."
+  },
   "agentEdit": {
     "missing": "Este agente ya no existe.",
     "saved": "Cambios guardados",
@@ -748,6 +752,7 @@
   },
   "activity": {
     "title": "Actividad",
+    "chooseModel": "Elegir otro modelo",
     "filter": {
       "all": "Todo",
       "waiting": "Esperándote",
@@ -883,6 +888,15 @@
       "desktop_taken_female_one": "{{names}} tomó el control de la pantalla del computador de {{agent}}",
       "desktop_taken_female_many": "{{names}} tomaron el control de la pantalla del computador de {{agent}}",
       "desktop_taken_female_other": "{{names}} tomaron el control de la pantalla del computador de {{agent}}",
+      "plan_lent_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
+      "plan_lent_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
+      "plan_lent_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
+      "plan_lent_female_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
+      "plan_lent_female_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
+      "plan_lent_female_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
+      "plan_model_dropped_one": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
+      "plan_model_dropped_many": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
+      "plan_model_dropped_other": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
       "connector_tool_changed_one": "Un servidor conectado cambió herramientas que aprobaste",
       "connector_tool_changed_many": "Un servidor conectado cambió herramientas que aprobaste",
       "connector_tool_changed_other": "Un servidor conectado cambió herramientas que aprobaste",
@@ -894,13 +908,7 @@
       "computer_no_chrome_other": "Computadoras necesitan Google Chrome. Descárgalo en google.com/chrome",
       "app_created_one": "Una app de IA creó cosas para ti",
       "app_created_many": "Una app de IA creó cosas para ti",
-      "app_created_other": "Una app de IA creó cosas para ti",
-      "plan_lent_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
-      "plan_lent_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
-      "plan_lent_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
-      "plan_lent_female_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
-      "plan_lent_female_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
-      "plan_lent_female_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}"
+      "app_created_other": "Una app de IA creó cosas para ti"
     },
     "markRead": "Marcar como leído",
     "markUnread": "Marcar como no leído",
@@ -2119,10 +2127,6 @@
         "proposal": "Panel"
       }
     }
-  },
-  "team": {
-    "entry": "Lista, organigrama y mapa",
-    "mapHint": "Para mover un agente a otro canal, usa el mapa en la web o habla con {{name}}."
   },
   "empty": {
     "agents": {

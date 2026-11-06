@@ -711,6 +711,10 @@
     "freeSection": "Wolni",
     "noGroupSection": "Bez działu"
   },
+  "team": {
+    "entry": "Lista, schemat organizacyjny i mapa",
+    "mapHint": "Aby przenieść agenta do innego kanału, użyj mapy w wersji webowej albo porozmawiaj z {{name}}."
+  },
   "agentEdit": {
     "missing": "Ten agent już nie istnieje.",
     "saved": "Zmiany zapisane",
@@ -772,6 +776,7 @@
   },
   "activity": {
     "title": "Aktywność",
+    "chooseModel": "Wybierz inny model",
     "filter": {
       "all": "Wszystko",
       "waiting": "Czeka na ciebie",
@@ -946,6 +951,18 @@
       "desktop_taken_female_few": "Ekran komputera {{agent}} przejęty przez {{names}}",
       "desktop_taken_female_many": "Ekran komputera {{agent}} przejęty przez {{names}}",
       "desktop_taken_female_other": "Ekran komputera {{agent}} przejęty przez {{names}}",
+      "plan_lent_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_model_dropped_one": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
+      "plan_model_dropped_few": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
+      "plan_model_dropped_many": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
+      "plan_model_dropped_other": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
       "connector_tool_changed_one": "Podłączony serwer zmienił zatwierdzone przez ciebie narzędzia",
       "connector_tool_changed_few": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
       "connector_tool_changed_many": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
@@ -961,15 +978,7 @@
       "app_created_one": "Aplikacja AI coś dla ciebie utworzyła",
       "app_created_few": "Aplikacje AI coś dla ciebie utworzyły",
       "app_created_many": "Aplikacje AI coś dla ciebie utworzyły",
-      "app_created_other": "Aplikacje AI coś dla ciebie utworzyły",
-      "plan_lent_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}"
+      "app_created_other": "Aplikacje AI coś dla ciebie utworzyły"
     },
     "markRead": "Oznacz jako przeczytane",
     "markUnread": "Oznacz jako nieprzeczytane",
@@ -2227,10 +2236,6 @@
         "proposal": "Dashboard"
       }
     }
-  },
-  "team": {
-    "entry": "Lista, schemat organizacyjny i mapa",
-    "mapHint": "Aby przenieść agenta do innego kanału, użyj mapy w wersji webowej albo porozmawiaj z {{name}}."
   },
   "empty": {
     "agents": {

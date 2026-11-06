@@ -3788,6 +3788,9 @@
       "takeBackAll": "Riprendi da tutti gli agenti",
       "done": "Il tuo piano è tornato"
     },
+    "planModelDropped": {
+      "choose": "Scegli un altro modello"
+    },
     "docTitleUnread": "({{count}}) Notifiche",
     "summaryWaiting_one": "{{count}} cosa ti aspetta",
     "summaryWaiting_many": "{{count}} cose ti aspettano",
@@ -3897,6 +3900,7 @@
       "browserProfileRequest": "<b>{{name}}</b> chiede un profilo browser in più per <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> ha preso il controllo dello schermo del computer di <b>{{agent}}</b>",
       "planLent": "<b>{{name}}</b> ha collegato il tuo piano {{plan}} a <b>{{agent}}</b>",
+      "planModelDropped": "{{model}} è uscito da {{plan}}. <b>{{name}}</b> usa {{runs}} finché non scegli un altro modello.",
       "routineWaitingPlan": "<b>{{name}}</b> aspetta che il suo piano si azzeri per eseguire una routine",
       "planResetUnknown": "{{plan}} non ha detto quando si azzera il limite. Il lavoro di <b>{{name}}</b> è ancora in attesa.",
       "catchUpClosed_one": "<b>{{name}}</b> è tornato e ha saltato {{count}} conversazione che non aveva bisogno di risposta",
@@ -6331,6 +6335,48 @@
         "rate_limited": "Rifiutata: troppe chiamate al minuto"
       }
     },
+    "setup": {
+      "title": "Webhook di {{provider}}",
+      "working": "Funziona. {{provider}} manda già i suoi eventi qui.",
+      "waiting": {
+        "github": "In attesa di GitHub. Manda un ping appena il webhook viene salvato.",
+        "sentry": "In attesa di Sentry. Chiama quando arriva un errore nuovo."
+      },
+      "refused": {
+        "github": "GitHub ha chiamato con un altro segreto. Copia di nuovo il Secret qui sotto nel webhook.",
+        "sentry": "Sentry ha chiamato con un altro segreto. Incolla di nuovo il Client Secret dell’integrazione."
+      },
+      "timeout": "Non è arrivato niente in 3 minuti. Controlla l’URL e il segreto, poi prova di nuovo.",
+      "adminOnly": "Chi gestisce i connettori attiva il webhook di {{provider}}. Chiedi a un admin di aprire questa routine.",
+      "test": "Prova",
+      "retest": "Prova di nuovo",
+      "copied": "Copiato.",
+      "github": {
+        "repo": "Repository GitHub",
+        "repoPlaceholder": "proprietario/nome",
+        "oneClick": "Crea il webhook",
+        "added": "Webhook creato in {{repo}}.",
+        "byHand": "Oppure a mano: nel repository, Settings › Webhooks › Add webhook.",
+        "open": "Nel repository, apri Settings › Webhooks › Add webhook.",
+        "openLink": "Apri su GitHub",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Negli eventi, scegli Pull requests e Deployment statuses, poi Add webhook.",
+        "another": "Aggiungi a un altro repository"
+      },
+      "sentry": {
+        "open": "In Sentry, crea un’integrazione interna.",
+        "openLink": "Apri in Sentry",
+        "url": "Webhook URL",
+        "events": "In Webhooks, spunta issue e salva.",
+        "secret": "Client Secret dell’integrazione",
+        "secretPlaceholder": "Incolla il Client Secret",
+        "secretSaved": "Salvato. Incollane un altro per sostituirlo",
+        "save": "Salva",
+        "saved": "Client Secret salvato."
+      }
+    },
     "once": "Una volta · {{weekday}} {{date}} alle {{time}}{{zone}}",
     "reminder": "Promemoria",
     "fired": "Scattato",
@@ -6629,8 +6675,8 @@
       },
       "prs": {
         "name": "Rivedi le nuove PR",
-        "text": "Nei giorni feriali alle 9 e alle 14, l'agente legge le nuove PR e segnala i rischi.",
-        "prompt": "Guarda le PR aperte dall'ultima volta. Leggi ogni diff, segnala i rischi e indica cosa testare a mano."
+        "text": "Quando si apre una PR, l'agente la legge e la commenta.",
+        "prompt": "Leggi il diff della nuova PR, segnala i rischi e indica cosa testare a mano."
       },
       "week": {
         "name": "Bilancio della settimana",
@@ -11616,6 +11662,12 @@
     }
   },
   "errors": {
+    "webhook": {
+      "githubNoAccess": "Il GitHub di questo workspace non può creare webhook in {{repo}}. Segui i passaggi qui sotto per crearlo a mano.",
+      "githubFailed": "GitHub non ha creato il webhook in {{repo}} ({{status}}). Segui i passaggi qui sotto per crearlo a mano.",
+      "invalidSecret": "Incolla il Client Secret intero, senza spazi.",
+      "invalidRepo": "Scrivi il repository come proprietario/nome."
+    },
     "issue": {
       "assigneeOutside": "Questa persona non è in questa conversazione, quindi non vede questa attività."
     },

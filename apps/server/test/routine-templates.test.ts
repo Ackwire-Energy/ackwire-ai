@@ -1,10 +1,12 @@
 import { expect, test } from "bun:test";
 import { ROUTINE_TEMPLATES, templateRule } from "@agenteschat/client/lib/routine-templates";
+import { eventWebhook } from "@agenteschat/client/lib/routine-view";
 import {
   type ConnectorListingEntry,
   connectorListing,
   EVENT_WEBHOOK,
   normalizeRule,
+  ROUTINE_EVENTS,
   ruleToCron,
   type ScheduleRule,
 } from "@agenteschat/engine";
@@ -26,7 +28,10 @@ test("the server takes every template's schedule as it is", () => {
   }
 });
 
-test("no template waits on a webhook, which nobody can set up from the app", () => {
-  const waiting = ROUTINE_TEMPLATES.filter((x) => x.kind === "event" && EVENT_WEBHOOK[x.event]).map((x) => x.key);
-  expect(waiting).toEqual([]);
+test("the apps know which service's webhook each event comes through, as the server does", () => {
+  for (const event of ROUTINE_EVENTS)
+    if (event !== "email.received" && event !== "webhook.received")
+      expect({ event, provider: eventWebhook(event) }).toEqual({ event, provider: EVENT_WEBHOOK[event] ?? null });
+  // Revisar PRs novos waits on GitHub's webhook, which its form sets up.
+  expect(ROUTINE_TEMPLATES.find((x) => x.key === "prs")).toMatchObject({ kind: "event", event: "github.pr_opened" });
 });

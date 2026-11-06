@@ -117,12 +117,9 @@ const Notification = z
         description:
           "`run_failed` on a computer brain: the plan's name its cause names; `plan_lent`, `plan_model_dropped`: the plan's.",
       }),
-      nowModel: z
-        .string()
-        .optional()
-        .openapi({
-          description: "`plan_model_dropped`: the model the agent's turns run now (`title`: the one that left).",
-        }),
+      nowModel: z.string().optional().openapi({
+        description: "`plan_model_dropped`: the model the agent's turns run now (`title`: the one that left).",
+      }),
       holdKind: z
         .string()
         .optional()

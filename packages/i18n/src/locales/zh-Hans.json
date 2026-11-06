@@ -3549,6 +3549,9 @@
       "takeBackAll": "从所有智能体收回",
       "done": "你的套餐已收回"
     },
+    "planModelDropped": {
+      "choose": "选择其他模型"
+    },
     "docTitleUnread": "({{count}}) 通知",
     "summaryWaiting_other": "{{count}} 件事等你处理",
     "summaryUnread_other": "{{count}} 条未读",
@@ -3639,6 +3642,7 @@
       "browserProfileRequest": "<b>{{name}}</b> 申请为 <b>{{agent}}</b> 再添加一个浏览器配置文件",
       "desktopTaken": "<b>{{name}}</b> 接管了 <b>{{agent}}</b> 的电脑屏幕",
       "planLent": "<b>{{name}}</b> 把你的 {{plan}} 套餐连接到了 <b>{{agent}}</b>",
+      "planModelDropped": "{{model}} 已从 {{plan}} 下架。在你选择其他模型之前，<b>{{name}}</b> 会使用 {{runs}}。",
       "routineWaitingPlan": "<b>{{name}}</b> 正在等待套餐额度重置后运行例行工作",
       "planResetUnknown": "{{plan}} 没有说明额度何时重置。<b>{{name}}</b> 的工作仍在等待。",
       "catchUpClosed_other": "<b>{{name}}</b> 已恢复，并跳过了 {{count}} 个无需回复的对话",
@@ -5921,6 +5925,48 @@
         "rate_limited": "已拒绝：每分钟调用次数过多"
       }
     },
+    "setup": {
+      "title": "{{provider}} Webhook",
+      "working": "运行正常。{{provider}} 已在把事件发到这里。",
+      "waiting": {
+        "github": "正在等待 GitHub。保存 Webhook 后它会立刻发送一次 ping。",
+        "sentry": "正在等待 Sentry。出现新错误时它会调用。"
+      },
+      "refused": {
+        "github": "GitHub 用了另一个密钥调用。请把下面的 Secret 重新复制到 Webhook 中。",
+        "sentry": "Sentry 用了另一个密钥调用。请重新粘贴该集成的 Client Secret。"
+      },
+      "timeout": "3 分钟内没有收到任何内容。请检查 URL 和密钥，然后再测试一次。",
+      "adminOnly": "{{provider}} Webhook 由管理连接器的人开启。请让管理员打开这个例行任务。",
+      "test": "测试",
+      "retest": "再测试一次",
+      "copied": "已复制。",
+      "github": {
+        "repo": "仓库",
+        "repoPlaceholder": "所有者/名称",
+        "oneClick": "创建 Webhook",
+        "added": "已在 {{repo}} 中创建 Webhook。",
+        "byHand": "也可以手动：在仓库中打开 Settings › Webhooks › Add webhook。",
+        "open": "在仓库中打开 Settings › Webhooks › Add webhook。",
+        "openLink": "在 GitHub 中打开",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "在事件中选择 Pull requests 和 Deployment statuses，然后点 Add webhook。",
+        "another": "添加到另一个仓库"
+      },
+      "sentry": {
+        "open": "在 Sentry 中创建一个内部集成。",
+        "openLink": "在 Sentry 中打开",
+        "url": "Webhook URL",
+        "events": "在 Webhooks 下勾选 issue 并保存。",
+        "secret": "集成的 Client Secret",
+        "secretPlaceholder": "粘贴 Client Secret",
+        "secretSaved": "已保存。粘贴新的即可替换",
+        "save": "保存",
+        "saved": "Client Secret 已保存。"
+      }
+    },
     "once": "一次 · {{date}}（{{weekday}}）{{time}}{{zone}}",
     "reminder": "提醒",
     "fired": "已触发",
@@ -6215,8 +6261,8 @@
       },
       "prs": {
         "name": "审查新 PR",
-        "text": "工作日 9 点和 14 点，智能体阅读新 PR 并指出风险。",
-        "prompt": "查看上次以来新开的 PR。阅读每个 diff，指出风险，并说明需要手动测试什么。"
+        "text": "有 PR 创建时，智能体会阅读并发表评论。",
+        "prompt": "阅读新 PR 的 diff，指出风险，并说明需要手动测试什么。"
       },
       "week": {
         "name": "每周总结",
@@ -10804,6 +10850,12 @@
     }
   },
   "errors": {
+    "webhook": {
+      "githubNoAccess": "这个工作区的 GitHub 无法在 {{repo}} 中创建 Webhook。请按下面的步骤手动创建。",
+      "githubFailed": "GitHub 没有在 {{repo}} 中创建 Webhook（{{status}}）。请按下面的步骤手动创建。",
+      "invalidSecret": "请完整粘贴 Client Secret，不要带空格。",
+      "invalidRepo": "请把仓库写成 所有者/名称。"
+    },
     "issue": {
       "assigneeOutside": "这个人不在这段对话中，因此看不到这个任务。"
     },

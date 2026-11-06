@@ -6178,6 +6178,50 @@ export const ptBR = {
         rate_limited: "Recusada: chamadas demais por minuto",
       },
     },
+    setup: {
+      /** Over a GitHub or Sentry event's webhook, in the routine form and on its page: `provider` GitHub or Sentry. */
+      title: "Webhook do {{provider}}",
+      working: "Funcionando. O {{provider}} já manda os eventos para cá.",
+      waiting: {
+        github: "Esperando o GitHub. Ele manda um ping assim que o webhook é salvo.",
+        sentry: "Esperando o Sentry. Ele chama quando surge um erro novo.",
+      },
+      refused: {
+        github: "O GitHub chamou com outro segredo. Copie o Secret abaixo de novo no webhook.",
+        sentry: "O Sentry chamou com outro segredo. Cole de novo o Client Secret da integração.",
+      },
+      timeout: "Nada chegou em 3 minutos. Confira a URL e o segredo e teste de novo.",
+      adminOnly: "Quem cuida dos conectores liga o webhook do {{provider}}. Peça a um admin para abrir esta rotina.",
+      test: "Testar",
+      retest: "Testar de novo",
+      copied: "Copiado.",
+      github: {
+        repo: "Repositório",
+        repoPlaceholder: "dono/nome",
+        oneClick: "Criar o webhook",
+        /** After the one-click add: `repo` is owner/name. */
+        added: "Webhook criado no {{repo}}.",
+        byHand: "Ou à mão: no repositório, Settings\u00a0›\u00a0Webhooks\u00a0›\u00a0Add webhook.",
+        open: "No repositório, abra Settings\u00a0›\u00a0Webhooks\u00a0›\u00a0Add webhook.",
+        openLink: "Abrir no GitHub",
+        url: "Payload URL",
+        type: "Content type: application/json",
+        secret: "Secret",
+        events: "Em eventos, escolha Pull requests e Deployment statuses e clique em Add webhook.",
+        another: "Ligar em outro repositório",
+      },
+      sentry: {
+        open: "No Sentry, crie uma integração interna.",
+        openLink: "Abrir no Sentry",
+        url: "Webhook URL",
+        events: "Em Webhooks, marque issue e salve.",
+        secret: "Client Secret da integração",
+        secretPlaceholder: "Cole o Client Secret",
+        secretSaved: "Salvo. Cole outro para trocar",
+        save: "Salvar",
+        saved: "Client Secret salvo.",
+      },
+    },
     once: "Uma vez · {{weekday}}, {{date}} às {{time}}{{zone}}",
     reminder: "Lembrete",
     fired: "Disparado",
@@ -6477,9 +6521,8 @@ export const ptBR = {
       },
       prs: {
         name: "Revisar PRs novos",
-        text: "Dias úteis às 9h e às 14h, o agente lê os PRs novos e aponta riscos.",
-        prompt:
-          "Veja os PRs abertos desde a última vez. Leia o diff de cada um, aponte riscos e diga o que testar à mão.",
+        text: "Quando abrir um PR, o agente lê e comenta.",
+        prompt: "Leia o diff do PR novo, aponte riscos e diga o que testar à mão.",
       },
       week: {
         name: "Fechamento da semana",
@@ -10934,6 +10977,14 @@ export const ptBR = {
     },
   },
   errors: {
+    /** Setting up a GitHub or Sentry routine's webhook: `repo` is owner/name, `status` GitHub's HTTP status. */
+    webhook: {
+      githubNoAccess:
+        "O GitHub deste workspace não pode criar webhooks no {{repo}}. Siga os passos abaixo para criar à mão.",
+      githubFailed: "O GitHub não criou o webhook no {{repo}} ({{status}}). Siga os passos abaixo para criar à mão.",
+      invalidSecret: "Cole o Client Secret inteiro, sem espaços.",
+      invalidRepo: "Escreva o repositório como dono/nome.",
+    },
     issue: {
       assigneeOutside: "Essa pessoa não está nesta conversa, então não vê esta tarefa.",
     },

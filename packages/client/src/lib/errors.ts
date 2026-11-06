@@ -18,6 +18,10 @@ export const REAUTH_PASSWORD = "reauth.password";
  * own message is English). Anything else falls back to that message.
  */
 const KNOWN = {
+  "webhook.github_no_access": "errors.webhook.githubNoAccess",
+  "webhook.github_failed": "errors.webhook.githubFailed",
+  "webhook.invalid_secret": "errors.webhook.invalidSecret",
+  "webhook.invalid_repo": "errors.webhook.invalidRepo",
   "channel.post_denied": "channel.perms.readOnlyComposer",
   "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
