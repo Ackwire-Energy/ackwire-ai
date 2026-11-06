@@ -1,5 +1,5 @@
 import { useProposals } from "@agenteschat/client";
-import { isOpen, proposalWhy } from "@agenteschat/client/lib/proposals";
+import { isOpen, proposalWhy, sortProposals } from "@agenteschat/client/lib/proposals";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { EmptyState, Text } from "@/ui";
@@ -15,7 +15,7 @@ export function ProposalsScreen() {
   const orgId = useOrgId();
   const proposals = useProposals(orgId);
   const pull = usePullRefresh(proposals.refetch);
-  const open = (proposals.data ?? []).filter(isOpen);
+  const open = sortProposals((proposals.data ?? []).filter(isOpen));
   return (
     <PushedLargeTitle
       title={t("shell.proposals")}

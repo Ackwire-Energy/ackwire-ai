@@ -2029,7 +2029,7 @@ export interface Proposal {
   title: string;
   why: string;
   /** How it came, said by `proposalWhy` in the person's language; `why` holds the words it is about, if any. */
-  whyCode?: "refused" | "corrected" | "seen" | "skill" | "asked" | null;
+  whyCode?: "refused" | "corrected" | "seen" | "skill" | "asked" | "budget" | "no_channel" | null;
   /** `type` names the source for translation; `where` is the server's English text. */
   evidence: {
     where: string;

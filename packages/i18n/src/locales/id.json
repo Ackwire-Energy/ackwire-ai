@@ -4703,7 +4703,9 @@
       "corrected": "Seseorang mengoreksi: {{text}}",
       "seen": "Agen melihat ini lebih dari sekali.",
       "skill": "Ini muncul dari penggunaan skill ini.",
-      "asked": "Diminta dalam percakapan."
+      "asked": "Diminta dalam percakapan.",
+      "budget": "Berhenti minggu ini karena mencapai anggaran bulanan.",
+      "noChannel": "Tidak ada di kanal mana pun."
     },
     "subtitle": "Perubahan yang diusulkan agen. Tidak ada yang berubah sebelum ada yang menerima.",
     "list": "Usulan",

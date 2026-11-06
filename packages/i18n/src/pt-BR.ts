@@ -4962,6 +4962,8 @@ export const ptBR = {
       seen: "O agente notou isso mais de uma vez.",
       skill: "Veio do uso desta skill.",
       asked: "Pedido em uma conversa.",
+      budget: "Parou no orçamento mensal esta semana.",
+      noChannel: "Não está em nenhum canal.",
     },
     subtitle: "O que os agentes propõem mudar no time. Nada muda sem alguém aceitar.",
     list: "Propostas",

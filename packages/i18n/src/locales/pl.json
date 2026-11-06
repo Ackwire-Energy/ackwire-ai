@@ -5245,7 +5245,9 @@
       "corrected": "Ktoś poprawił: {{text}}",
       "seen": "Agent zauważył to więcej niż raz.",
       "skill": "Wynika to z używania tej umiejętności.",
-      "asked": "Prośba z rozmowy."
+      "asked": "Prośba z rozmowy.",
+      "budget": "W tym tygodniu zatrzymał się na miesięcznym budżecie.",
+      "noChannel": "Nie jest w żadnym kanale."
     },
     "subtitle": "Zmiany proponowane przez agentów. Nic się nie zmienia bez akceptacji.",
     "list": "Propozycje",

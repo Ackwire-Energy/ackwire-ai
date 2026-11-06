@@ -4851,7 +4851,9 @@
       "corrected": "Bir kişi düzeltti: {{text}}",
       "seen": "Ajan bunu birden çok kez fark etti.",
       "skill": "Bu beceriyi kullanmaktan çıktı.",
-      "asked": "Bir konuşmada istendi."
+      "asked": "Bir konuşmada istendi.",
+      "budget": "Bu hafta aylık bütçesine ulaşıp durdu.",
+      "noChannel": "Hiçbir kanalda değil."
     },
     "subtitle": "Ajanların önerdiği değişiklikler. Biri kabul etmeden hiçbir şey değişmez.",
     "list": "Öneriler",

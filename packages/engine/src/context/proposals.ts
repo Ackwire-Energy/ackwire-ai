@@ -9,6 +9,7 @@ import {
   gte,
   inArray,
   isNull,
+  ne,
   or,
   schema,
   sql,
@@ -80,8 +81,17 @@ const {
 
 export type Proposal = typeof contextProposals.$inferSelect;
 
-/** The reason of a proposal whose agent gave none (the apps say it in the person's language). */
+/** The reason of a proposal whose agent gave none. */
 export const ASKED_IN_CONVERSATION = "Asked in conversation.";
+/** The team week's reasons for a settings row. */
+export const OVER_BUDGET_REASON = "It stopped at its monthly budget this week.";
+export const NO_CHANNEL_REASON = "It is in no channel.";
+/** The reasons the server writes itself: the agent reads them as they are, people through `whyCode`, in their language. */
+export const SERVER_REASONS: Record<string, "asked" | "budget" | "no_channel"> = {
+  [ASKED_IN_CONVERSATION]: "asked",
+  [OVER_BUDGET_REASON]: "budget",
+  [NO_CHANNEL_REASON]: "no_channel",
+};
 
 /** When an item is strong enough to propose turning it into instructions or org context. */
 export const PROMOTION = { minRecurrence: 2, minConfidence: 0.8, minRelevance: 0.7 };
@@ -165,8 +175,11 @@ export async function proposeFromItem(
   const proposedText = withLearnedBullet(current, itemWords(item).text);
   if (proposedText === current) return null;
   const diff = lineDiff(current, proposedText);
+  const baseHash = sha256(current);
   // Already waiting, or already refused: asking again is the noise a refusal is meant to end.
-  if (await sameChange(db, { orgId: item.orgId, target, agentId, proposedText, diff }, ["pending", "rejected"])) {
+  if (
+    await sameChange(db, { orgId: item.orgId, target, agentId, baseHash, proposedText, diff }, ["pending", "rejected"])
+  ) {
     await db.update(contextItems).set({ proposedAt: new Date() }).where(eq(contextItems.id, item.id));
     return null;
   }
@@ -185,7 +198,7 @@ export async function proposeFromItem(
         target,
         agentId,
         proposedByAgentId: agentId,
-        baseHash: sha256(current),
+        baseHash,
         proposedText,
         diff,
         rationale: `Seen ${item.recurrence}× (confidence ${item.confidence.toFixed(2)}, evidence: ${evidence || "none"}).`,
@@ -199,7 +212,7 @@ export async function proposeFromItem(
 }
 
 /** Each person's one inbox row for the proposals waiting on them: it stays until none does. */
-const WAITING_GROUP = "proposals-waiting";
+export const WAITING_GROUP = "proposals-waiting";
 
 /**
  * Tells who may decide them that proposals wait: one event per person, and the inbox row of whoever can see and decide
@@ -324,8 +337,8 @@ async function unsentHidden(db: Database, actorId: string, p: Proposal) {
   return !card || !(await userVisibleChannels(db, p.orgId, actorId)).includes(card.channelId);
 }
 
-async function mayDecide(db: Database, actorId: string, p: Proposal) {
-  const membership = await requirePermission(db, actorId, p.orgId, "read");
+async function mayDecide(db: Database, actorId: string, p: Proposal, known?: Membership) {
+  const membership = known ?? (await requirePermission(db, actorId, p.orgId, "read"));
   if (p.target === "agent_settings") return !(await unsentHidden(db, actorId, p)) && maySettle(db, actorId, p);
   if (isAgentSetting(p)) {
     if (can(membership, "manage_agents")) return true;
@@ -371,18 +384,21 @@ export async function listProposals(
   for (const r of rows) {
     if (await unsentHidden(db, actorId, r)) continue;
     if (outdated.has(r.id)) out.push({ ...r, status: "stale", canDecide: false });
-    else out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
+    else out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r, membership)) });
   }
   return out;
 }
 
-/** Open rows whose text changed since, so accepting can only fail: they show as stale, and nobody is asked to decide. */
+/**
+ * Open rows accepting can only fail: their text changed since, or their agent was archived (a settings row can still
+ * delete it). They show as stale, and nobody is asked to decide.
+ */
 async function outdatedIds(db: Database, orgId: string, rows: Proposal[]) {
   const open = rows.filter((r) => r.status === "pending");
   const agentIds = [...new Set(open.flatMap((r) => (r.agentId ? [r.agentId] : [])))];
   const team = agentIds.length
     ? await db
-        .select({ id: agents.id, instructions: agents.instructions, role: agents.role })
+        .select({ id: agents.id, instructions: agents.instructions, role: agents.role, archivedAt: agents.archivedAt })
         .from(agents)
         .where(inArray(agents.id, agentIds))
     : [];
@@ -399,6 +415,7 @@ async function outdatedIds(db: Database, orgId: string, rows: Proposal[]) {
   return new Set(
     open
       .filter((r) => {
+        if (r.target !== "agent_settings" && byId.get(r.agentId ?? "")?.archivedAt) return true;
         const text = current(r);
         return text !== undefined && sha256(text) !== r.baseHash;
       })
@@ -509,6 +526,8 @@ export async function decideProposal(
           ...(p.target === "agent_settings" ? { via: p.proposedByAgentId, settings: p.settings } : {}),
         },
       });
+    if (status === "accepted" && (p.target === "agent_instructions" || p.target === "org_context"))
+      await carryOpenRows(tx, p, finalText);
     // The lesson now lives in the instructions (or the org context): its memory item leaves memory,
     // or the prompt would carry it twice.
     if (status === "accepted" && p.itemIds.length > 0) {
@@ -567,6 +586,37 @@ const proposerOf = async (db: Database, p: Proposal) =>
   p.proposedByAgentId ? getAgent(db, p.orgId, p.proposedByAgentId) : null;
 
 /**
+ * Accepting one change moves the text the others waiting on it were made against. One that only adds rules still
+ * holds, so it moves onto the new text: of several, accepting the first must not end the rest. Any other reads as stale.
+ */
+async function carryOpenRows(tx: Executor, p: Proposal, text: string) {
+  const open = await tx
+    .select()
+    .from(contextProposals)
+    .where(
+      and(
+        eq(contextProposals.orgId, p.orgId),
+        eq(contextProposals.target, p.target),
+        p.agentId ? eq(contextProposals.agentId, p.agentId) : isNull(contextProposals.agentId),
+        eq(contextProposals.status, "pending"),
+        eq(contextProposals.baseHash, p.baseHash),
+        ne(contextProposals.id, p.id),
+      ),
+    );
+  const max = p.target === "org_context" ? TEXT_MAX.context : TEXT_MAX.instructions;
+  for (const r of open) {
+    const lines = r.diff.split("\n").filter((l) => /^[+-]/.test(l) && l.slice(1).trim() && l.slice(1) !== LEARNED);
+    if (!lines.every((l) => l.startsWith("+- "))) continue;
+    const proposedText = lines.reduce((next, l) => withLearnedBullet(next, l.slice(3)), text);
+    if (proposedText === text || proposedText.length > max) continue;
+    await tx
+      .update(contextProposals)
+      .set({ baseHash: sha256(text), proposedText, diff: lineDiff(text, proposedText) })
+      .where(eq(contextProposals.id, r.id));
+  }
+}
+
+/**
  * After a decision: the inbox entries asking for it are done, and the person who asked sees "Aplicado por …" or
  * "Recusado por …" on their card live (`proposal.decided`).
  */
@@ -581,8 +631,11 @@ async function settled(deps: { db: Database; pubsub?: PubSub }, p: Proposal) {
   const done: string[] = [];
   for (const { userId } of open) if ((await proposalsWaitingFor(deps.db, userId, p.orgId)) === 0) done.push(userId);
   await resolveNotifications(deps, p.orgId, { groupKey: WAITING_GROUP, userIds: done });
-  if (p.requestedByUserId && p.requestedByUserId !== p.decidedByUserId)
-    await publishUserEvent(deps.pubsub, p.orgId, p.requestedByUserId, {
+  // Who else could decide it has it in their count.
+  const told = new Set([...(p.requestedByUserId ? [p.requestedByUserId] : []), ...(await deciders(deps.db, p))]);
+  told.delete(p.decidedByUserId ?? "");
+  for (const userId of told)
+    await publishUserEvent(deps.pubsub, p.orgId, userId, {
       type: "proposal.decided",
       proposalId: p.id,
       status: p.status,
@@ -634,7 +687,7 @@ export async function askProposal(
       ...(card ? { messageId: card.messageId, channelId: card.channelId } : {}),
       ...(target ? { agentId: target.id, label: target.name } : {}),
     },
-    latest: row.rationale === ASKED_IN_CONVERSATION ? {} : { text: cutText(row.rationale, 280) },
+    latest: SERVER_REASONS[row.rationale] ? {} : { text: cutText(row.rationale, 280) },
   }).catch(() => {});
   return row;
 }
@@ -664,6 +717,7 @@ export async function proposeSkillChange(
     orgId: input.orgId,
     target: "skill" as const,
     agentId: input.agentId,
+    baseHash: sha256(base),
     proposedText: input.body,
     diff: lineDiff(base, input.body),
     access: [
@@ -682,7 +736,6 @@ export async function proposeSkillChange(
     .values({
       ...row,
       proposedByAgentId: input.agentId,
-      baseHash: sha256(base),
       rationale: input.file
         ? `A change to ${input.file.path} of the skill ${input.skill.name} from using it.`
         : `A fix to the skill ${input.skill.name} from using it.`,
@@ -773,10 +826,13 @@ function changeLine(p: ProposedChange) {
   return lines("+") || (lines("-") ? `removing "${lines("-")}"` : "");
 }
 
-/** A row of the same target with one of `statuses` asking for the same change as `row`. */
+/**
+ * A row of the same target with one of `statuses` asking for the same change as `row`. An open one made against an
+ * older text doesn't count: it reads as stale (`outdatedIds`), so it can't stand for this one.
+ */
 async function sameChange(
   db: Database,
-  row: ProposedChange & Pick<Proposal, "orgId"> & { agentId?: string | null; skillPath?: string | null },
+  row: ProposedChange & Pick<Proposal, "orgId" | "baseHash"> & { agentId?: string | null; skillPath?: string | null },
   statuses: Proposal["status"][],
 ): Promise<Proposal | undefined> {
   const rows = await db
@@ -792,7 +848,7 @@ async function sameChange(
       ),
     );
   const line = changeLine(row);
-  return rows.find((r) => changeLine(r) === line);
+  return rows.find((r) => changeLine(r) === line && (r.status !== "pending" || r.baseHash === row.baseHash));
 }
 
 /**

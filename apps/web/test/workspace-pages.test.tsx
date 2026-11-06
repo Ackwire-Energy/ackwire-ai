@@ -279,6 +279,28 @@ describe("Memória e propostas (fase 5)", () => {
     expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/approvals`);
   });
 
+  test("stale rows aren't listed, what waits on you comes first and says so, and an empty tab has no count", async () => {
+    const state = seedState();
+    const [mine, other] = state.proposals;
+    if (!mine || !other) throw new Error("two proposals expected");
+    state.proposals.push({ ...other, id: "prop-twin", stale: true, status: "refused" });
+    Object.assign(mine, { canDecide: false, createdAt: "2026-11-05T10:00:00.000Z" });
+    Object.assign(other, { canDecide: true, createdAt: "2026-11-01T10:00:00.000Z" });
+    await go("proposals", state);
+    const rows = within(screen().getByRole("navigation", { name: "Propostas" })).getAllByRole("button");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.textContent).toContain("Aguardando você");
+    expect(rows[0]?.getAttribute("aria-current")).toBe("true");
+  });
+
+  test("a tab with nothing waiting shows no count", async () => {
+    const state = seedState();
+    state.approvals = [];
+    for (const p of state.proposals) p.canDecide = false;
+    await go("proposals", state);
+    expect(screen().getByRole("tab", { name: /Pedidos/ }).textContent).toBe("Pedidos");
+  });
+
   test("proposals you can't decide have no actions", async () => {
     const state = seedState();
     for (const p of state.proposals) p.canDecide = false;

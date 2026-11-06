@@ -608,6 +608,15 @@ describe("agent page: memory and proposals", () => {
     expect(document.body.textContent).toContain("Mudança aceita. As instruções foram atualizadas.");
   });
 
+  test("a reason the server wrote reads in the person's language on the agent's page too", async () => {
+    const state = seedState();
+    const prop = state.proposals.find((p) => p.id === "prop-1");
+    if (prop) Object.assign(prop, { why: "", whyCode: "seen" });
+    await go("?tab=memory", state);
+    const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
+    expect(card.textContent).toContain("O agente notou isso mais de uma vez.");
+  });
+
   test("Editar antes de aceitar sends the final text; Recusar refuses", async () => {
     const { state } = await go("?tab=memory");
     const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });

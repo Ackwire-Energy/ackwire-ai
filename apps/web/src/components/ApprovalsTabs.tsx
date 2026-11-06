@@ -22,8 +22,12 @@ export function ApprovalsTabs({ value }: { value: "requests" | "proposals" }) {
         }
         label={t("approvals.title")}
         items={[
-          { value: "requests", label: t("approvals.tabs.requests"), count: overview?.approvalsWaitingForMe },
-          { value: "proposals", label: t("proposals.title"), count: overview?.proposalsWaitingForMe },
+          {
+            value: "requests",
+            label: t("approvals.tabs.requests"),
+            count: overview?.approvalsWaitingForMe || undefined,
+          },
+          { value: "proposals", label: t("proposals.title"), count: overview?.proposalsWaitingForMe || undefined },
         ]}
       >
         {null}

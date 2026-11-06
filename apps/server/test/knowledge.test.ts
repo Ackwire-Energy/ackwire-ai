@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { proposeChange, proposeSettings } from "@agenteschat/engine";
+import { OVER_BUDGET_REASON, proposeChange, proposeSettings, WAITING_GROUP } from "@agenteschat/engine";
 import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -315,4 +315,50 @@ test("the server's own lessons reach people without their template, a proposal's
     .set({ itemIds: [crypto.randomUUID()] })
     .where(eq(schema.contextProposals.id, row?.id ?? ""));
   expect(await reasons()).toMatchObject([{ why: "", whyCode: "seen", evidence: [] }]);
+});
+
+test("the team week's reasons reach people as codes, and the list ends an inbox row with nothing left to decide", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string) => owner(`/api/app/organizations/${orgId}${path}`);
+  const [me] = await t.db.select().from(schema.organizationMembers).where(eq(schema.organizationMembers.orgId, orgId));
+  const [row] = await t.db
+    .insert(schema.contextProposals)
+    .values({
+      orgId,
+      target: "agent_settings",
+      agentId,
+      baseHash: "x",
+      proposedText: "",
+      diff: "",
+      settings: [],
+      requestedByUserId: me?.userId ?? "",
+      rationale: OVER_BUDGET_REASON,
+    })
+    .returning();
+  const list = async () =>
+    ((await (await api("/proposals")).json()) as { proposals: { why: string; whyCode: string | null }[] }).proposals;
+  expect(await list()).toMatchObject([{ why: "", whyCode: "budget" }]);
+
+  await t.db.insert(schema.notifications).values({
+    orgId,
+    userId: me?.userId ?? "",
+    kind: "proposal_waiting",
+    waiting: true,
+    groupKey: WAITING_GROUP,
+  });
+  const open = async () =>
+    (await t.db.select().from(schema.notifications).where(eq(schema.notifications.groupKey, WAITING_GROUP))).filter(
+      (n) => n.doneAt === null,
+    );
+  await list();
+  expect(await open()).toHaveLength(1);
+  await t.db
+    .update(schema.contextProposals)
+    .set({ status: "stale" })
+    .where(eq(schema.contextProposals.id, row?.id ?? ""));
+  await list();
+  expect(await open()).toEqual([]);
 });

@@ -11931,6 +11931,12 @@
   "proposals.whyCode.asked": {
     "value": "Asked for in a conversation."
   },
+  "proposals.whyCode.budget": {
+    "value": "It stopped at its monthly budget this week."
+  },
+  "proposals.whyCode.noChannel": {
+    "value": "It is in no channel."
+  },
   "proposals.subtitle": {
     "value": "Changes the agents propose. Nothing changes until someone accepts."
   },

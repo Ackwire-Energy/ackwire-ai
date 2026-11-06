@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { userTopic } from "@agenteschat/adapters";
 import { and, eq, migrationsFolder, schema, sql } from "@agenteschat/db";
 import {
+  archiveAgent,
   consolidateItem,
   consolidateOrg,
   createAgent,
@@ -13,6 +15,7 @@ import {
   orgOverview,
   proposeChange,
   proposeFromItem,
+  receiptLine,
   updateAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -101,8 +104,14 @@ describe("what people read of the server's own lessons", () => {
   test("only the words it is about, and how they came", async () => {
     f = await setup();
     const of = (content: string) => itemWords({ content });
-    expect(of(`${REFUSED}## Learned - Remover o sistema antigo.`)).toEqual({ text: "Remover o sistema antigo.", how: "refused" });
-    expect(of(`${REFUSED}- ${REFUSED}- Remover o sistema antigo.`)).toEqual({ text: "Remover o sistema antigo.", how: "refused" });
+    expect(of(`${REFUSED}## Learned - Remover o sistema antigo.`)).toEqual({
+      text: "Remover o sistema antigo.",
+      how: "refused",
+    });
+    expect(of(`${REFUSED}- ${REFUSED}- Remover o sistema antigo.`)).toEqual({
+      text: "Remover o sistema antigo.",
+      how: "refused",
+    });
     expect(of(`${REFUSED}role: Designer`)).toEqual({ text: "Designer", how: "refused" });
     expect(of(`${REFUSED}removing "Seja breve."`)).toEqual({ text: "Seja breve.", how: "refused" });
     expect(of('"Fazer deploy" was refused by a person.')).toEqual({ text: "Fazer deploy", how: "refused" });
@@ -112,6 +121,20 @@ describe("what people read of the server's own lessons", () => {
       how: "corrected",
     });
     expect(of("Prefere respostas curtas.")).toEqual({ text: "Prefere respostas curtas.", how: null });
+  });
+
+  test("a correction's chat receipt says the person's words", async () => {
+    f = await setup();
+    const correction = {
+      title: "",
+      content: 'A person corrected "O build roda no CI": Roda no Buildkite.',
+      kind: "lesson" as const,
+      agentId: "a",
+      scopeType: "agent" as const,
+      createdByKind: "person" as const,
+      evidence: [{ type: "human" as const, ref: "m", at: "2026-11-06" }],
+    };
+    expect(receiptLine(correction)).toBe("Roda no Buildkite.");
   });
 
   test("a correction reaches the instructions in the person's own words", async () => {
@@ -147,6 +170,17 @@ describe("the same change", () => {
     expect(after?.proposedAt).not.toBeNull();
   });
 
+  test("is asked again once the row waiting for it can't be accepted any more", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    await propose([ada.id], "Responder em português.");
+    await updateAgent(f.db, f.owner.id, f.org.id, ada.id, { instructions: "Outro texto." });
+    const [fresh] = (await propose([ada.id], "Responder em português.")).proposals;
+    expect(fresh).toBeDefined();
+    const mine = (await listProposals(f.db, f.owner.id, f.org.id)).filter((p) => p.canDecide);
+    expect(mine.map((p) => p.id)).toEqual([fresh?.id ?? ""]);
+  });
+
   test("for another agent is another change", async () => {
     f = await setup();
     const ada = await teammate("ada");
@@ -176,12 +210,67 @@ describe("what waits on a person", () => {
     expect(row?.actors).toEqual([expect.objectContaining({ type: "agent", id: f.agent.id })]);
     expect(await inbox(bia.id)).toEqual([]);
 
+    // Accepting one moves the text the other was made against: it still waits, on the new text.
     await decideProposal(f.db, f.owner.id, f.org.id, first?.id ?? "", "accept");
-    // Accepting one changed the text the other was made against: it can't be applied any more.
+    expect((await orgOverview(f.db, f.owner.id, f.org.id)).proposalsWaitingForMe).toBe(1);
+    expect(await inbox(f.owner.id)).toHaveLength(1);
+    await decideProposal(f.db, f.owner.id, f.org.id, second?.id ?? "", "accept");
     expect((await orgOverview(f.db, f.owner.id, f.org.id)).proposalsWaitingForMe).toBe(0);
     expect(await inbox(f.owner.id)).toEqual([]);
-    const shown = (await listProposals(f.db, f.owner.id, f.org.id)).find((p) => p.id === second?.id);
+    const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, ada.id));
+    expect(agent?.instructions).toContain("- Primeira regra.\n- Segunda regra.");
+  });
+
+  test("accepted with other words, the others still add their rule to what was accepted", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const [first] = (await propose([ada.id], "Primeira regra.")).proposals;
+    const [second] = (await propose([ada.id], "Segunda regra.")).proposals;
+    await decideProposal(f.db, f.owner.id, f.org.id, first?.id ?? "", "accept", { finalText: "Texto novo." });
+    await decideProposal(f.db, f.owner.id, f.org.id, second?.id ?? "", "accept");
+    const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, ada.id));
+    expect(agent?.instructions).toBe("Texto novo.\n\n## Learned\n- Segunda regra.");
+  });
+
+  test("a swap of existing words can't be carried: it reads as stale once the text moved", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const [first] = (await propose([ada.id], "Primeira regra.")).proposals;
+    const swap = await proposeChange(
+      { db: f.db, pubsub: f.pubsub, judge: f.context.judge },
+      {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        target: "agent_instructions",
+        agentIds: [ada.id],
+        change: "Seja detalhado.",
+        replaces: "Seja breve.",
+        rationale: "",
+        requesterId: f.owner.id,
+      },
+    );
+    await decideProposal(f.db, f.owner.id, f.org.id, first?.id ?? "", "accept");
+    const shown = (await listProposals(f.db, f.owner.id, f.org.id)).find((p) => p.id === swap.proposals[0]?.id);
     expect(shown).toMatchObject({ status: "stale", canDecide: false });
+  });
+
+  test("an archived agent's rows wait on nobody", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    await propose([ada.id], "Uma regra.");
+    await archiveAgent(f.db, f.owner.id, f.org.id, ada.id);
+    expect((await orgOverview(f.db, f.owner.id, f.org.id)).proposalsWaitingForMe).toBe(0);
+  });
+
+  test("whoever else could decide hears it is done, so their count moves", async () => {
+    f = await setup();
+    const sam = await addMember(f.db, f.org.id, "admin", "sam");
+    const ada = await teammate("ada");
+    const [row] = (await propose([ada.id], "Uma regra.")).proposals;
+    const heard: { type: string }[] = [];
+    f.pubsub.subscribe(userTopic(f.org.id, sam.id), (e) => heard.push(e as { type: string }));
+    await decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "reject", { pubsub: f.pubsub });
+    expect(heard.map((e) => e.type)).toContain("proposal.decided");
   });
 
   test("a row whose text changed by hand stops waiting too", async () => {
@@ -199,7 +288,7 @@ describe("migration 0265", () => {
     "--> statement-breakpoint",
   );
 
-  test("drops what refusals made, closes repeats, and leaves everything else as it was", async () => {
+  test("closes what refusals made, closes repeats, and leaves everything else as it was", async () => {
     f = await setup();
     const ada = await teammate("ada");
     const row = (diff: string, status: "pending" | "rejected" | "accepted", agentId = f.agent.id, ago = 0) => ({
@@ -215,6 +304,7 @@ describe("migration 0265", () => {
     });
     const junk = ` Seja breve.\n+\n+## Learned\n+- ${REFUSED}## Learned - Remover o sistema antigo.`;
     const twin = " Seja breve.\n+\n+## Learned\n+- Sempre pedir revisão.";
+    const corrected = await lesson('A person corrected "O CI": Roda no Buildkite.');
     const ids = await f.db
       .insert(schema.contextProposals)
       .values([
@@ -226,6 +316,13 @@ describe("migration 0265", () => {
         row(twin, "pending", f.agent.id, 1),
         row(twin, "pending", ada.id),
         row(" Seja breve.\n+\n+## Learned\n+- Outra coisa.", "pending"),
+        row(' Seja breve.\n+\n+## Learned\n+- "Fazer deploy" was refused by a person.', "pending"),
+        row(' Seja breve.\n+\n+## Learned\n+- "Fazer deploy" was refused: hoje não', "rejected"),
+        {
+          ...row(' Seja breve.\n+\n+## Learned\n+- A person corrected "O CI": Roda no Buildkite.', "pending"),
+          itemIds: [corrected.id],
+        },
+        row(' Seja breve.\n+- Quem "foi" was refused não é modelo.', "pending"),
       ])
       .returning({ id: schema.contextProposals.id });
     const id = (i: number) => ids[i]?.id;
@@ -245,21 +342,48 @@ describe("migration 0265", () => {
     for (const statement of statements) await f.db.execute(sql.raw(statement));
 
     const after = new Map((await rows()).map((p) => [p.id, p.status]));
-    expect(after.has(id(0) ?? "")).toBe(false);
-    expect(after.has(id(1) ?? "")).toBe(false);
+    expect([0, 1].map((i) => after.get(id(i) ?? ""))).toEqual(["stale", "stale"]);
     expect(after.get(id(2) ?? "")).toBe("accepted");
     expect([3, 4, 5].map((i) => after.get(id(i) ?? ""))).toEqual(["stale", "stale", "pending"]);
     expect(after.get(id(6) ?? "")).toBe("pending");
     expect(after.get(id(7) ?? "")).toBe("pending");
+    expect([8, 9, 10].map((i) => after.get(id(i) ?? ""))).toEqual(["stale", "stale", "stale"]);
+    expect(after.get(id(11) ?? "")).toBe("pending");
+    const [again] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, corrected.id));
+    expect(again?.proposedAt).toBeNull();
+    expect((await proposeFromItem(f, again as NonNullable<typeof again>))?.proposedText).toContain(
+      "- Roda no Buildkite.",
+    );
     const items = await f.db
       .select()
       .from(schema.contextItems)
       .where(and(eq(schema.contextItems.orgId, f.org.id), eq(schema.contextItems.kind, "lesson")));
-    expect(new Map(items.map((i) => [i.content, i.status]))).toEqual(
-      new Map([
-        [nested, "archived"],
-        [`${REFUSED}- Remover o sistema antigo.`, "active"],
-      ]),
-    );
+    const status = new Map(items.map((i) => [i.content, i.status]));
+    expect(status.get(nested)).toBe("archived");
+    expect(status.get(`${REFUSED}- Remover o sistema antigo.`)).toBe("active");
+  });
+
+  test("who reviews memory gets one inbox row for what already waits, and it ends as any other", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const ada = await teammate("ada");
+    const [row] = (await propose([ada.id], "Uma regra.", f.owner.id)).proposals;
+    await propose([ada.id], "Outra regra.", f.owner.id);
+    await f.db.delete(schema.notifications).where(eq(schema.notifications.kind, "proposal_waiting"));
+
+    for (const statement of statements) await f.db.execute(sql.raw(statement));
+
+    const inbox = async (userId: string) =>
+      (await listNotifications(f, userId, f.org.id, { filter: "waiting" })).items.filter(
+        (n) => n.kind === "proposal_waiting",
+      );
+    const [waiting, ...more] = await inbox(f.owner.id);
+    expect(more).toEqual([]);
+    expect(waiting).toMatchObject({ waiting: true, count: 2 });
+    expect(waiting?.actors).toEqual([expect.objectContaining({ type: "agent", id: f.agent.id })]);
+    expect(await inbox(bia.id)).toEqual([]);
+
+    await decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "reject");
+    expect(await inbox(f.owner.id)).toHaveLength(1);
   });
 });

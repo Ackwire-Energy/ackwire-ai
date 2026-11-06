@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNull, rowsOf, schema, sql } from "@agenteschat/db";
 import { listApprovals } from "./approvals";
 import { canTalkTo, speakerFor } from "./audience";
-import { proposeSettings } from "./context/proposals";
+import { NO_CHANNEL_REASON, OVER_BUDGET_REASON, proposeSettings } from "./context/proposals";
 import { openPersonAgentDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated } from "./events";
@@ -400,7 +400,7 @@ async function settingsProposal(
       orgId: w.orgId,
       agentId: w.rightHandId,
       targets: [{ agentId, lines: [line] }],
-      rationale: field === "budget" ? "It stopped at its monthly budget this week." : "It is in no channel.",
+      rationale: field === "budget" ? OVER_BUDGET_REASON : NO_CHANNEL_REASON,
       requesterId: w.userId,
     },
   );

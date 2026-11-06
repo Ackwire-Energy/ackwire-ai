@@ -5068,7 +5068,9 @@
       "corrected": "Une personne a corrigé : {{text}}",
       "seen": "L’agent a remarqué cela plus d’une fois.",
       "skill": "Cela vient de l’utilisation de cette skill.",
-      "asked": "Demandé dans une conversation."
+      "asked": "Demandé dans une conversation.",
+      "budget": "Il s’est arrêté cette semaine à son budget mensuel.",
+      "noChannel": "Il n’est dans aucun canal."
     },
     "subtitle": "Les changements proposés par les agents. Rien ne change sans accord.",
     "list": "Propositions",

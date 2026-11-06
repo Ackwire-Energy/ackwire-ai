@@ -15,6 +15,7 @@ import {
   proposerOf,
   removalOf,
   rowStatus,
+  sortProposals,
   staleCount,
 } from "../src/lib/proposals";
 
@@ -166,6 +167,18 @@ describe("the server's reasons", () => {
     expect(proposalWhy(t, { why: "Fica mais claro." })).toBe("Fica mais claro.");
     expect(proposalWhy(t, { why: "Remover", whyCode: "refused" })).toBe('proposals.whyCode.refused {"text":"Remover"}');
     expect(proposalWhy(t, { why: "", whyCode: "seen" })).toBe("proposals.whyCode.seen");
+    expect(proposalWhy(t, { why: "", whyCode: "no_channel" })).toBe("proposals.whyCode.noChannel");
+  });
+  test("what waits on me first, then on someone else, then what ended", () => {
+    const row = (id: string, status: Proposal["status"], canDecide: boolean, createdAt: string) =>
+      ({ id, status, canDecide, createdAt }) as Proposal;
+    const sorted = sortProposals([
+      row("ended", "accepted", false, "2026-11-05"),
+      row("other", "pending", false, "2026-11-04"),
+      row("old", "pending", true, "2026-11-01"),
+      row("new", "pending", true, "2026-11-02"),
+    ]);
+    expect(sorted.map((p) => p.id)).toEqual(["new", "old", "other", "ended"]);
   });
   test("a lesson from a refusal says so", () => {
     expect(memoryLine(t, { text: "Remover", how: "refused" })).toBe('memory.fromRefusal {"text":"Remover"}');

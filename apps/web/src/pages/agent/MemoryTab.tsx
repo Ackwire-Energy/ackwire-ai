@@ -11,7 +11,7 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { memoryLine, proposalTitle } from "@agenteschat/client/lib/proposals";
+import { memoryLine, proposalTitle, proposalWhy } from "@agenteschat/client/lib/proposals";
 import {
   Alert,
   Button,
@@ -96,7 +96,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         }
       />
       <p className="agp-why">
-        <b>{t("proposals.why")}:</b> {proposal.why}
+        <b>{t("proposals.why")}:</b> {proposalWhy(t, proposal)}
       </p>
       {editing ? (
         <Locked when={decide.isPending || stale || proposal.stale}>

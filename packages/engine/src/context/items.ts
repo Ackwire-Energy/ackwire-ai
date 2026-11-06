@@ -167,7 +167,7 @@ export const learnedQuietly = (i: Pick<ContextItem, "kind" | "agentId" | "scopeT
  */
 export const receiptLine = (
   i: Pick<ContextItem, "title" | "content" | "kind" | "agentId" | "scopeType" | "createdByKind" | "evidence">,
-) => (learnedQuietly(i) ? "" : i.title.trim() || (i.createdByKind === "person" ? i.content : ""));
+) => (learnedQuietly(i) ? "" : i.title.trim() || (i.createdByKind === "person" ? itemWords(i).text : ""));
 /**
  * The receipt line for a write, "" for none. A quiet write that replaces or disputes what a person said, or what a
  * person wrote (an app's import has no human evidence), still gets one: a person's memory never changes unseen.

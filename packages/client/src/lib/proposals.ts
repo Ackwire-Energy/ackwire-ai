@@ -36,6 +36,13 @@ export const proposerOf = (p: Pick<Proposal, "agentId" | "proposedByAgentId">) =
 /** Still waiting for a decision. */
 export const isOpen = (p: Pick<Proposal, "status" | "stale">) => p.status === "pending" && !p.stale;
 
+const place = (p: Proposal) => (isOpen(p) ? (p.canDecide ? 0 : 1) : 2);
+
+/** What waits on me first, then what waits on someone else, then what was decided: newest first inside each. */
+export function sortProposals(list: Proposal[]) {
+  return [...list].sort((a, b) => place(a) - place(b) || (a.createdAt < b.createdAt ? 1 : -1));
+}
+
 export interface ChangedLine {
   kind: "add" | "del";
   text: string;
@@ -191,6 +198,10 @@ export function proposalWhy(t: TFunction, p: Pick<Proposal, "why" | "whyCode">):
       return t("proposals.whyCode.skill");
     case "asked":
       return t("proposals.whyCode.asked");
+    case "budget":
+      return t("proposals.whyCode.budget");
+    case "no_channel":
+      return t("proposals.whyCode.noChannel");
     default:
       return p.why;
   }

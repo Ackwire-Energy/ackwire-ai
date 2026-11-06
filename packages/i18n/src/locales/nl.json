@@ -4920,7 +4920,9 @@
       "corrected": "Iemand heeft gecorrigeerd: {{text}}",
       "seen": "De agent zag dit meer dan eens.",
       "skill": "Dit komt uit het gebruik van deze skill.",
-      "asked": "Gevraagd in een gesprek."
+      "asked": "Gevraagd in een gesprek.",
+      "budget": "Is deze week gestopt bij het maandbudget.",
+      "noChannel": "Zit in geen enkel kanaal."
     },
     "subtitle": "Wijzigingen die de agents voorstellen. Niets verandert zonder akkoord.",
     "list": "Voorstellen",

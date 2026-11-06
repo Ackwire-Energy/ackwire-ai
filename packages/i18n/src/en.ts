@@ -4908,6 +4908,8 @@ export const en = {
       seen: "The agent noticed this more than once.",
       skill: "It came from using this skill.",
       asked: "Asked for in a conversation.",
+      budget: "It stopped at its monthly budget this week.",
+      noChannel: "It is in no channel.",
     },
     subtitle: "Changes the agents propose. Nothing changes until someone accepts.",
     list: "Proposals",

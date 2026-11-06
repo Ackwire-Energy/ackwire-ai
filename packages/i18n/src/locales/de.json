@@ -4871,7 +4871,9 @@
       "corrected": "Eine Person hat korrigiert: {{text}}",
       "seen": "Der Agent hat das mehr als einmal bemerkt.",
       "skill": "Das kam aus der Nutzung dieses Skills.",
-      "asked": "In einem Gespräch gewünscht."
+      "asked": "In einem Gespräch gewünscht.",
+      "budget": "Hat diese Woche das Monatsbudget erreicht und angehalten.",
+      "noChannel": "Ist in keinem Kanal."
     },
     "subtitle": "Änderungen, die die Agenten vorschlagen. Nichts ändert sich ohne Zustimmung.",
     "list": "Vorschläge",
