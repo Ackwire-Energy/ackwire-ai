@@ -2,6 +2,7 @@ import { AGENT_FOLDERS_PROTOCOL, type SandboxProvider } from "@agenteschat/adapt
 import { type Database, eq, schema } from "@agenteschat/db";
 import { getAgent, getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
+import type { WorkspaceComputer } from "./context";
 import { ForbiddenError, NotFoundError } from "./errors";
 import { cutText, cutTextEnd } from "./format";
 import { computerBackSoon, type MachineCaller } from "./machine-hub";
@@ -47,11 +48,13 @@ export interface SandboxDeps {
   git?: { publicUrl: string; secret: string } | null;
   /** Our public base URL: computers send files (`pushFile`) to `{publicUrl}/api/machines/uploads/{id}`. */
   publicUrl?: string;
+  /** Each workspace gets its own computer here: an agent with none waits for it (`computerPreparing`). */
+  workspaceComputer?: WorkspaceComputer;
 }
 
 /** Told when the agent has no computer. */
 export const NO_COMPUTER_MESSAGE =
-  "You have no computer yet. Ask an admin or your owner to look at Settings → Computers.";
+  "You have no computer: no connected computer was chosen for you. Ask an admin or your owner to connect one (Settings → Computers).";
 
 /** Told instead while the workspace's own computer is still being prepared (ADR 0056 §10). */
 export const PREPARING_COMPUTER_MESSAGE =
@@ -159,7 +162,7 @@ export async function withSandbox<T>(
   if (agent?.machineId) {
     return withMachine(deps, ctx, { machineId: agent.machineId, handle: agent.handle, name: agent.name }, fn, options);
   }
-  const preparing = await computerPreparing(deps.db, ctx.orgId);
+  const preparing = await computerPreparing(deps, ctx.orgId);
   throw new SandboxUnavailableError(preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE);
 }
 
@@ -222,7 +225,7 @@ export async function withConnectedMachine<T>(
 
 /** Which computer the agent's tools act on, as the agent reads it (tool descriptions, `computer_status`). */
 export async function agentComputerInfo(
-  deps: Pick<SandboxDeps, "db" | "machines">,
+  deps: Pick<SandboxDeps, "db" | "machines" | "workspaceComputer">,
   orgId: string,
   agentId: string,
   /** In a mission's thread: the mission's computer (ADR 0029), which may not be the agent's. */
@@ -251,7 +254,7 @@ export async function agentComputerInfo(
   const agent = await getAgentCached(deps.db, orgId, agentId);
   if (machineOverride && !machineOverride.machineId) return { kind: "removed" };
   const machineId = machineOverride?.machineId ?? agent?.machineId;
-  if (!machineId) return { kind: "none", preparing: await computerPreparing(deps.db, orgId) };
+  if (!machineId) return { kind: "none", preparing: await computerPreparing(deps, orgId) };
   const status = await deps.machines?.hub.status(machineId);
   if (!status || status.orgId !== orgId) return { kind: "removed" };
   return {

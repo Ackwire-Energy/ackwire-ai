@@ -176,7 +176,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   "browser:use": {
     label: "Use a browser",
     description:
-      "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.",
+      "Browse websites in its own browser on the agent's computer (logins kept per agent). Needs the browser turned on on that computer.",
   },
   "desktop:use": {
     label: "Use its desktop",

@@ -1950,16 +1950,17 @@ export interface WorkspaceComputer {
 
 /**
  * For every agent where people can't connect a computer (`machine.pairing_off`): the models' own habit is a bigger
- * server, and nothing else in the prompt says it can't be done here. Plans stay on the billing service (ADR 0079),
- * so the prompt names none.
+ * server, and nothing else in the prompt says it can't be done here. It speaks of computers for the agents only: a
+ * server of the customer's own stays work an agent may reach. Plans stay on the billing service (ADR 0079), so the
+ * prompt names none.
  */
 export function workspaceComputerText({ billing }: WorkspaceComputer) {
   return [
-    "# This workspace's computer",
-    `Its one computer is always on and updates by itself. Nobody connects, rents or reaches another here (no pairing, install command, SSH): never suggest it. When full, work slows or waits in line: finish or stop what can wait (Task manager), one heavy job at a time. ${
+    "# The computer",
+    `The agents work on one always-on, self-updating computer. No other can join it, nobody SSHes in: never suggest renting or connecting one, nor installing the runner. When full, work slows or queues: finish or stop what can wait (Task manager), one heavy job at a time. ${
       billing
-        ? "Past that, Settings › Plan and billing shows if a bigger plan brings a bigger one; another workspace has its own."
-        : "Past that, only whoever runs this server can give it a bigger one."
+        ? "Past that: a bigger plan may bring a bigger one (Settings › Plan and billing); another workspace, on its own plan, has its own."
+        : "Past that: only whoever runs this server can give it a bigger one."
     } Nothing else exists: say so.`,
   ].join("\n");
 }

@@ -67,7 +67,7 @@ export function desktopUseUnavailableText(s: Extract<AgentDesktopUseStatus, { av
   const on = s.machineName ? `the computer ${s.machineName}` : "your computer";
   switch (s.code) {
     case "no_machine":
-      return "Your desktop only runs on a computer, and you don't have one yet. Ask your owner or an admin to look at Settings → Computers.";
+      return "Your desktop only runs on a connected computer, and you don't use one. Ask your owner or an admin to choose one for you.";
     case "machine_removed":
       return REMOVED_COMPUTER_MESSAGE;
     case "outdated":

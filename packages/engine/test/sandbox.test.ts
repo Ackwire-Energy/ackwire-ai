@@ -22,6 +22,7 @@ import {
   NotFoundError,
   notAllowedMessage,
   postPersonMessage,
+  REMOVED_COMPUTER_MESSAGE,
   setAgentAccess,
   setAgentMergeRepositories,
   setAgentSkills,
@@ -151,6 +152,9 @@ describe("access", () => {
     expect((await f.tools?.list(ctx))?.map((t) => t.name)).toContain("run_code");
     // Granted, but no computer was chosen for it: computer_status says so.
     expect(await call(ctx, "computer_status", {})).toMatchObject({ isError: true, content: NO_COMPUTER_MESSAGE });
+    // Where people connect their own, that is what to do.
+    expect(NO_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to connect one (Settings → Computers).");
+    expect(REMOVED_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to choose another one.");
   });
 });
 
@@ -284,7 +288,7 @@ describe("network", () => {
       exec: () => ({ exitCode: 6, stdout: "", stderr: "curl: (6) Could not resolve host: example.com" }),
     });
     const out = await call(await runCtx(), "run_code", { language: "bash", code: "curl https://example.com" });
-    expect(out.content).toContain("network failure: this is a connected computer");
+    expect(out.content).toContain("network failure: this computer is on its own network");
     expect(out.content).not.toContain("no internet");
   });
 });

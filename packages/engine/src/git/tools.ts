@@ -257,7 +257,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
                   isError: true,
                 };
               }
-              const preparing = await computerPreparing(c.db, c.orgId);
+              const preparing = await computerPreparing({ ...deps.sandbox, db: c.db }, c.orgId);
               return { content: preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE, isError: true };
             } catch (error) {
               return failed(error);

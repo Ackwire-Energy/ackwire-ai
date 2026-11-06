@@ -49,7 +49,7 @@ export interface MachineDeps {
 }
 
 export const REMOVED_COMPUTER_MESSAGE =
-  "Your computer was removed. Ask an admin or your owner to look at Settings → Computers.";
+  "Your connected computer was removed. Ask an admin or your owner to choose another one.";
 
 /**
  * The machine can't be reached now (runner not connected): nothing was sent. The workspace's own computer

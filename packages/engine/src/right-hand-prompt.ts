@@ -5,7 +5,7 @@ import { listChannels } from "./channels";
 import type { WorkspaceComputer } from "./context";
 import { can, getMembership } from "./organizations";
 import type { RolePermission } from "./permissions";
-import { accountInUse } from "./standing";
+import { accountInUse, isBillingHold, orgStanding } from "./standing";
 import { agentBudgetsThisMonth } from "./usage";
 
 const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
@@ -157,6 +157,7 @@ export async function rightHandPrompt(
       .join("; ");
   });
   const hidden = team.length - seen.length;
+  const unpaid = deps.workspaceComputer && computers.length === 0 && isBillingHold(await orgStanding(db, orgId));
 
   const checklist = [
     anyAi === false
@@ -173,7 +174,7 @@ export async function rightHandPrompt(
       : "",
     computers.length === 0
       ? deps.workspaceComputer
-        ? `This workspace's computer isn't ready yet, so the agents can't browse or run code. Nobody sets it up: it comes by itself${deps.workspaceComputer.billing ? " once the plan is paid" : ""}, and Settings › Computers shows how far it is.`
+        ? `This workspace's computer isn't ready yet, so the agents can't browse or run code. Nobody sets it up: ${unpaid ? "it comes by itself once the plan is paid (Settings › Plan and billing)" : "it is on its way, and Settings › Computers shows how far it is"}.`
         : "No computer is ready for the agents yet, so they can't browse or run code: say where it is set up (Settings › Computers)."
       : "",
     seen.some((a) => channelsOf(a.id).length === 0)

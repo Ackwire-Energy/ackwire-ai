@@ -103,7 +103,7 @@ const size = (r: ModelRequest) =>
  * stopped repeating others, and 45,669 with a send to someone else settled from the conversation before it goes
  * (no assumption on what can't be undone), nothing offered or promised beyond the list and files on `send_dm`, 45,475
  * with `request_permission` down to one reason (`why`) and the task board on by default; the ceiling leaves a little
- * room. Where each workspace gets its own computer, `workspaceComputerText` adds its 436 to that.
+ * room. Where each workspace gets its own computer, `workspaceComputerText` adds its 441 to that.
  */
 const OI_CEILING_CHARS = 45_900;
 
@@ -118,7 +118,7 @@ test("a DM 'oi' stays under the size ceiling", async () => {
 test("a DM 'oi' on the Cloud, with what it says about the workspace's computer, stays under it too", async () => {
   const [request] = await play(TURNS.find((t) => t.id === "greet-dm") as ScriptedTurn, { billing: true });
   if (!request) throw new Error("no call");
-  expect(systemText(request.system)).toContain("# This workspace's computer");
+  expect(systemText(request.system)).toContain("# The computer");
   console.log(`DM 'oi' on the Cloud: ${size(request)} chars`);
   expect(size(request)).toBeLessThan(OI_CEILING_CHARS);
 }, 60_000);

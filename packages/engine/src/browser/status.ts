@@ -21,7 +21,7 @@ export type AgentBrowserStatus =
       online: boolean;
       /** The runner's protocol (17 and later: batched commands and images, ADR 0054). */
       protocol: number;
-      kind?: MachineStatus["kind"];
+      kind: MachineStatus["kind"];
     }
   | {
       available: false;
@@ -81,7 +81,7 @@ export function browserUnavailableText(s: Extract<AgentBrowserStatus, { availabl
   const on = s.machineName ? `the computer ${s.machineName}` : "your computer";
   switch (s.code) {
     case "no_machine":
-      return "The browser only runs on a computer, and you don't have one yet. Ask your owner or an admin to look at Settings → Computers.";
+      return "The browser only runs on a connected computer, and you don't use one. Ask your owner or an admin to choose one for you.";
     case "machine_removed":
       return REMOVED_COMPUTER_MESSAGE;
     case "outdated":

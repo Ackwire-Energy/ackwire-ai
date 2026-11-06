@@ -24,6 +24,7 @@ import {
   setAgentAudience,
   setAgentChannels,
   setAgentComputerTarget,
+  setBillingHold,
   updateAgent,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
@@ -280,22 +281,32 @@ test("what it and the agents advise about computers follows where the server get
     [f.agent, agentRun],
   ] as const) {
     const cloud = await text(agent, run, { billing: true });
-    expect(cloud).toContain("Nobody connects, rents or reaches another here (no pairing, install command, SSH)");
-    expect(cloud).toContain("Settings › Plan and billing shows if a bigger plan brings a bigger one");
-    expect(cloud).toContain("another workspace has its own");
+    expect(cloud).toContain(
+      "No other can join it, nobody SSHes in: never suggest renting or connecting one, nor installing the runner.",
+    );
+    expect(cloud).toContain("a bigger plan may bring a bigger one (Settings › Plan and billing)");
+    expect(cloud).toContain("another workspace, on its own plan, has its own");
+    // A server of the customer's own is work an agent may still reach: only computers for the agents are ruled out.
+    expect(cloud).not.toMatch(/never suggest (it|SSH)|no (pairing|SSH)/);
     expect(cloud).toContain("Task manager");
     // Its own provisioner, no plans: no page to send anyone to.
     const provisioned = await text(agent, run, { billing: false });
     expect(provisioned).toContain("only whoever runs this server can give it a bigger one");
     expect(provisioned).not.toContain("Plan and billing");
     // People connect their own: today's words, none of the block.
-    expect(await text(agent, run)).not.toContain("# This workspace's computer");
+    expect(await text(agent, run)).not.toContain("# The computer");
   }
 
-  const cloud = await text(lodi, lodiRun, { billing: true });
-  expect(cloud).toContain("Nobody sets it up: it comes by itself once the plan is paid");
-  expect(cloud).not.toContain("say where it is set up");
-  expect(await text(lodi, lodiRun, { billing: false })).toContain("it comes by itself, and Settings › Computers");
+  // Paid, a 100% coupon included: no hold, so nobody is sent to pay for the computer they are waiting for.
+  const paid = await text(lodi, lodiRun, { billing: true });
+  expect(paid).toContain("Nobody sets it up: it is on its way, and Settings › Computers shows how far it is.");
+  expect(paid).not.toContain("once the plan is paid");
+  expect(paid).not.toContain("say where it is set up");
+  expect(await text(lodi, lodiRun, { billing: false })).toContain("it is on its way");
+  await setBillingHold({ db: f.db }, f.org.id, "payment");
+  expect(await text(lodi, lodiRun, { billing: true })).toContain(
+    "Nobody sets it up: it comes by itself once the plan is paid (Settings › Plan and billing).",
+  );
   const own = await text(lodi, lodiRun);
   expect(own).toContain("No computer is ready for the agents yet");
   expect(own).toContain("say where it is set up (Settings › Computers)");

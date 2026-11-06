@@ -788,6 +788,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         machineName: machine.name,
         online: machine.online,
         protocol: machine.protocol,
+        kind: machine.kind,
       };
     } else {
       const own = await machineOf(ctx);
@@ -981,7 +982,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   async function loginRefusal(
     ctx: ToolContext,
     id: string,
-    status: { machineName: string; protocol: number; kind?: string },
+    status: Pick<Extract<AgentBrowserStatus, { available: true }>, "machineName" | "protocol" | "kind">,
     profile: { id: string; name: string } | null,
     made: boolean,
   ): Promise<string | null> {
