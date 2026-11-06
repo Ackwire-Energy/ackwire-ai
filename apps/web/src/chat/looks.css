@@ -63,6 +63,11 @@
 .ac-msg[data-look="bubbles"] .ac-msg__gutter-time {
   display: none;
 }
+/* The pair row before a reply ("Atlas ⇄ Ada"): its first face centred over the bubbles' 32px face (the row's 8px +
+   7px, less the button's own 10px). A reach line's pair row keeps its place in the line. */
+.channel__messages[data-look="bubbles"] .consult-pair:not(.ag-rc--talk > .consult-pair) {
+  padding-left: 5px;
+}
 /* Everyone's words in a bubble, as wide as what they say, up to 76% of the column; cards stay out, on its left edge. */
 .ac-msg[data-look="bubbles"] .ac-msg__text {
   --bubble-w: min(76%, 680px);
@@ -391,6 +396,11 @@
 }
 .ac-msg[data-look="compact"] .ac-msg__body {
   display: block;
+}
+/* The pair row before a reply: its first face on the small face's column (62px, less the button's own 10px). */
+.channel__messages[data-look="compact"] .consult-pair:not(.ag-rc--talk > .consult-pair) {
+  margin: 2px 0 0;
+  padding-left: 52px;
 }
 .ac-msg[data-look="compact"] .ac-msg__head {
   display: inline;
