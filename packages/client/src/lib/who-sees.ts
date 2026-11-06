@@ -26,11 +26,11 @@ export const pickedOf = (a: { mode: "everyone" | "people"; userIds?: readonly st
 
 /**
  * A wiki page's list, roles included: the page's roles stay on a list of people, and "only me" means it. `roleIds`:
- * the ones on the page now.
+ * the ones on the page now. `kind`: the option picked, as a list may hold me alone and keep its roles.
  */
-export function wikiAudienceOf(next: AudienceChoice, roleIds: string[], myId: string) {
+export function wikiAudienceOf(next: AudienceChoice, roleIds: string[], kind: AudienceKind) {
   if (next.mode === "everyone") return null;
-  return { roleIds: audienceKind(next, myId) === "me" ? [] : roleIds, userIds: next.userIds };
+  return { roleIds: kind === "me" ? [] : roleIds, userIds: next.userIds };
 }
 
 /** The setting in a few words: "Todos no workspace", "Só eu", "Só Ana", "Ana e Bia", "Ana, Bia e mais 2". */

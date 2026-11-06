@@ -43,10 +43,10 @@ describe("an administrator's channels on the phone", () => {
 test("a list starts as it is, and only me on a page leaves its roles out", () => {
   expect([...pickedOf({ mode: "people", userIds: ["ana"] }, "me")]).toEqual(["ana"]);
   expect([...pickedOf({ mode: "everyone" }, "me")]).toEqual(["me"]);
-  expect(wikiAudienceOf({ mode: "everyone" }, ["r"], "me")).toBeNull();
+  expect(wikiAudienceOf({ mode: "everyone" }, ["r"], "everyone")).toBeNull();
   expect(wikiAudienceOf({ mode: "people", userIds: ["me"] }, ["r"], "me")).toEqual({ roleIds: [], userIds: ["me"] });
-  expect(wikiAudienceOf({ mode: "people", userIds: ["ana"] }, ["r"], "me")).toEqual({
+  expect(wikiAudienceOf({ mode: "people", userIds: ["me"] }, ["r"], "people")).toEqual({
     roleIds: ["r"],
-    userIds: ["ana"],
+    userIds: ["me"],
   });
 });

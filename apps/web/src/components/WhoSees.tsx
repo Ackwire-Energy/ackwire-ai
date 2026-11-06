@@ -78,6 +78,7 @@ export function WhoSeesDialog({
   title,
   value,
   note,
+  peopleNote,
   extra,
   saving = false,
   onSave,
@@ -87,16 +88,21 @@ export function WhoSeesDialog({
   value: { mode: "everyone" | "people"; userIds?: readonly string[] };
   /** Said above the administrators' line. */
   note?: string;
+  /** The same, while it's a list of people: others stay on it, so it opens as a list, even of me alone. */
+  peopleNote?: string;
   extra?: ReactNode;
   saving?: boolean;
-  onSave: (audience: AudienceChoice) => void;
+  onSave: (audience: AudienceChoice, kind: AudienceKind) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const myId = me.user.id;
-  const [kind, setKind] = useState<AudienceKind>(() => audienceKind(value, myId));
+  const [kind, setKind] = useState<AudienceKind>(() => {
+    const now = audienceKind(value, myId);
+    return now === "me" && peopleNote ? "people" : now;
+  });
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => pickedOf(value, myId));
   const stays = !can(org, "administrator");
   const [q, setQ] = useState("");
@@ -165,7 +171,9 @@ export function WhoSeesDialog({
               </ul>
             </>
           )}
-          <p className="small muted who-sees__note">{note ? `${note} ${t("whoSees.admins")}` : t("whoSees.admins")}</p>
+          <p className="small muted who-sees__note">
+            {[note, kind === "people" ? peopleNote : undefined, t("whoSees.admins")].filter(Boolean).join(" ")}
+          </p>
         </Locked>
       </DialogBody>
       <DialogFooter>
@@ -178,7 +186,7 @@ export function WhoSeesDialog({
           variant="primary"
           disabled={!ready || saving}
           loading={saving}
-          onClick={() => onSave(audienceOfKind(kind, [...picked], myId))}
+          onClick={() => onSave(audienceOfKind(kind, [...picked], myId), kind)}
         >
           {t("common.save")}
         </Button>

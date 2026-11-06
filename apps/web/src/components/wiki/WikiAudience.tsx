@@ -57,7 +57,7 @@ export function WikiAudienceDialog({
  */
 export function WikiWhoSeesDialog({ page, onClose }: { page: WikiPage; onClose: () => void }) {
   const { t, i18n } = useTranslation();
-  const { org, me } = useOrg();
+  const { org } = useOrg();
   const toast = useToast();
   const action = useWikiAction(org.id);
   const [advanced, setAdvanced] = useState(false);
@@ -70,7 +70,7 @@ export function WikiWhoSeesDialog({ page, onClose }: { page: WikiPage; onClose: 
     <WhoSeesDialog
       title={t("whoSees.pageTitle")}
       value={value}
-      note={roleIds.length > 0 ? t("whoSees.rolesToo") : undefined}
+      peopleNote={roleIds.length > 0 ? t("whoSees.rolesToo") : undefined}
       saving={action.isPending}
       extra={
         can(org, "manage_roles") ? (
@@ -80,9 +80,9 @@ export function WikiWhoSeesDialog({ page, onClose }: { page: WikiPage; onClose: 
         ) : null
       }
       onClose={onClose}
-      onSave={(next) =>
+      onSave={(next, kind) =>
         action.mutate(
-          { type: "who", slug: page.slug, audience: wikiAudienceOf(next, roleIds, me.user.id) },
+          { type: "who", slug: page.slug, audience: wikiAudienceOf(next, roleIds, kind) },
           { onSuccess: onClose, onError: (e) => toast.show(errorText(t, e, i18n.language), "error") },
         )
       }

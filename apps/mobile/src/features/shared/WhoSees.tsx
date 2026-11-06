@@ -36,9 +36,16 @@ export function useWhoSeesLabel() {
 }
 
 /** What the three options hold while someone chooses. */
-export function useWhoSeesDraft(value: { mode: "everyone" | "people"; userIds?: readonly string[] }) {
+export function useWhoSeesDraft(
+  value: { mode: "everyone" | "people"; userIds?: readonly string[] },
+  /** Others stay on a list (a page's roles): it opens as a list, even of me alone. */
+  listed = false,
+) {
   const meId = useMeId() ?? "";
-  const [kind, setKind] = useState<AudienceKind>(() => audienceKind(value, meId));
+  const [kind, setKind] = useState<AudienceKind>(() => {
+    const now = audienceKind(value, meId);
+    return now === "me" && listed ? "people" : now;
+  });
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => pickedOf(value, meId));
   const toggle = (id: string) =>
     setPicked((now) => {
@@ -154,12 +161,11 @@ function PageForm({
   const { t } = useTranslation();
   const failed = useFailed();
   const { org } = useOrg();
-  const meId = useMeId() ?? "";
   const action = useWikiAction(useOrgId());
-  const draft = useWhoSeesDraft(value);
+  const draft = useWhoSeesDraft(value, roleIds.length > 0);
   const save = () =>
     action.mutate(
-      { type: "who", slug, audience: wikiAudienceOf(draft.choice, roleIds, meId) },
+      { type: "who", slug, audience: wikiAudienceOf(draft.choice, roleIds, draft.kind) },
       {
         onSuccess: () => {
           successHaptic();
@@ -171,7 +177,7 @@ function PageForm({
   return (
     <Form
       title={t("whoSees.pageTitle")}
-      note={roleIds.length > 0 ? t("whoSees.rolesToo") : undefined}
+      note={roleIds.length > 0 && draft.kind === "people" ? t("whoSees.rolesToo") : undefined}
       draft={draft}
       saving={action.isPending}
       onSave={save}
