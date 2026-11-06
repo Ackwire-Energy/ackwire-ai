@@ -14,12 +14,14 @@ import {
   signInAgainPlan,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useTheme } from "@/ui";
+import { TeamTemplatesSheet } from "../right-hand/TeamCard";
 import { useDirectory, useMeId } from "../shared/hooks";
 import { usePlanHold } from "./parts";
 
@@ -182,6 +184,7 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
   const messages = m.threadId ? thread.data : channel;
   const started = useRef(false);
   const [answer, setAnswer] = useState<Answer | null>(null);
+  const [templates, setTemplates] = useState(false);
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const ai = aiStateOf(status.data, card.agentId);
@@ -208,6 +211,8 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
   // Not known yet: no moment of "Plano ativo" on a card an AI has long answered.
   if (state === "connect" && !status.data) return null;
   const code = hold ?? "payment";
+  // With no team yet, the way to one needs no model.
+  const noTeam = isRightHand(agent) && can(org, "create_agents") && dir.agents.every(isRightHand);
   const title =
     state === "held" || state === "paid"
       ? t("noAi.kept.title")
@@ -235,6 +240,21 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
           <Text variant="footnote" tone="muted">
             {t(can(org, "manage_billing") ? "connectAi.billingWeb" : "standing.billing.askAdmin")}
           </Text>
+          {state === "held" && noTeam ? (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                label={t("teamPlan.start.templates")}
+                onPress={() => setTemplates(true)}
+              />
+              <TeamTemplatesSheet
+                open={templates}
+                onClose={() => setTemplates(false)}
+                onNone={() => setTemplates(false)}
+              />
+            </>
+          ) : null}
         </>
       ) : state === "connect" ? (
         mayConnectAi(agent, meId, org) ? (
