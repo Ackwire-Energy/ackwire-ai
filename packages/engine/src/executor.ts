@@ -173,7 +173,14 @@ import { askVerdict, handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { type Judge, judgeCallOf } from "./judge";
-import { type KeyLinePlace, keyLineGate, keyLineOf, kickKeyLine, rateLimited } from "./key-line";
+import {
+  KEY_LINE_PERSON_MINUTES,
+  type KeyLinePlace,
+  keyLineGate,
+  keyLineOf,
+  kickKeyLine,
+  rateLimited,
+} from "./key-line";
 import { answerNoTurn, deliverLive, listenLiveSteering, renderSteered } from "./live-steer";
 import { publishAccountsChanged, touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
@@ -916,12 +923,14 @@ async function executeRunInner(
         >`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'since', ${agentRuns.transcript}->'usageWait'->>'since')`,
         busyRetries: sql<number | null>`(${agentRuns.transcript}->'catchUpTriage'->>'busyRetries')::int`,
         keyLine: sql<string | null>`${agentRuns.transcript}->'outage'->>'line'`,
+        outageWait: sql<string | null>`${agentRuns.transcript}->'outage'->>'waitId'`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
-    // Only the head of its key's line tries the provider again; the others look later, without claiming.
-    if (row.keyLine) {
+    // Only the head of its key's line tries the provider again; the others look later, without claiming. A wake for
+    // another wait (its budget, once back from the park) isn't this line's to hold.
+    if (row.keyLine && row.outageWait === options.wait) {
       const behind = await keyLineGate(db, { id: runId, orgId: row.orgId }, row.keyLine);
       if (behind) {
         await enqueue(db, {
@@ -2054,9 +2063,10 @@ async function executeRunInner(
     const n = t.outage?.n ?? 0;
     if (Date.now() - since >= OUTAGE_PARK.maxMs) return false;
     const waitId = Bun.randomUUIDv7();
-    const minutes = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
-    const at = Date.now() + minutes * 60_000;
     const people = Boolean(t.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
+    const step = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
+    const minutes = line && people ? Math.min(step, KEY_LINE_PERSON_MINUTES) : step;
+    const at = Date.now() + minutes * 60_000;
     t.outage = { since, n: n + 1, waitId, ...(line ? { line, at, people } : {}) };
     await deferred;
     await addRunStep(db, run, "error", { reason: "provider_outage", message, parked: n + 1 });

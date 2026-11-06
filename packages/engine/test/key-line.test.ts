@@ -1,7 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
 import { and, eq, schema, sql } from "@agenteschat/db";
-import { ProviderError } from "@agenteschat/providers";
-import { KEY_LINE_LOOK_MS, KEY_LINE_SPACING_MS, keyLineGate, keyLineOf, kickKeyLine, rateLimited } from "../src";
+import { customModelId, ProviderError } from "@agenteschat/providers";
+import {
+  KEY_LINE_LOOK_MS,
+  KEY_LINE_PERSON_MINUTES,
+  KEY_LINE_SPACING_MS,
+  KEY_LINE_TRY_MS,
+  keyLineGate,
+  keyLineOf,
+  kickKeyLine,
+  rateLimited,
+} from "../src";
 import { closeWorlds, world } from "./autonomy/harness";
 
 afterEach(closeWorlds);
@@ -51,6 +60,72 @@ test("what joins a line: a rate limit on a key, never an outage", () => {
   expect(rateLimited(new ProviderError("overloaded", true, 529))).toBe(false);
   expect(keyLineOf({ credentialId: "k1", model: "claude-haiku-5-5" })).toBe("k1");
   expect(keyLineOf({ credentialId: null, model: "claude-haiku-5-5" })).toBe(LINE);
+  // Two endpoints of one workspace are two keys, whatever the agent's own.
+  const endpoint = "11111111-1111-4111-8111-111111111111";
+  expect(keyLineOf({ credentialId: null, model: customModelId(endpoint, "m") })).toBe(endpoint);
+  expect(keyLineOf({ credentialId: "k1", model: customModelId(endpoint, "m") })).toBe(endpoint);
+});
+
+test("a head that parked on something else, or has no job coming, holds nobody", async () => {
+  const w = await parked({ on: false }, []);
+  const [a, b, c] = await threeRuns(w);
+  const org = w.f.org.id;
+  // Back from the park and out of budget: it waits for a month, with its place still written down.
+  await place(w, a.id, { since: 1, at: NOW, people: false });
+  await w.db
+    .update(schema.agentRuns)
+    .set({
+      transcript: sql`jsonb_set(${schema.agentRuns.transcript}, '{waitingForBrain}', '{"code":"budget"}'::jsonb)`,
+    })
+    .where(eq(schema.agentRuns.id, a.id));
+  await place(w, b.id, { since: 2, at: NOW, people: false });
+  expect(await keyLineGate(w.db, { id: b.id, orgId: org }, LINE, NOW)).toBeNull();
+  // Its wake job ran out of attempts: nothing moved its `at`, so the next one doesn't wait for it.
+  await place(w, b.id, { since: 2, at: NOW - KEY_LINE_TRY_MS - 1, people: false });
+  await place(w, c.id, { since: 3, at: NOW, people: false });
+  expect(await keyLineGate(w.db, { id: c.id, orgId: org }, LINE, NOW)).toBeNull();
+});
+
+test("every look moves a waiting run's `at`, so one that is only waiting keeps holding its place", async () => {
+  const w = await parked({ on: false }, []);
+  const [a, b, c] = await threeRuns(w);
+  const org = w.f.org.id;
+  const later = NOW + 60 * 60_000;
+  await place(w, a.id, { since: 1, at: later, people: false });
+  await place(w, b.id, { since: 2, at: NOW - KEY_LINE_TRY_MS - 1, people: false });
+  await place(w, c.id, { since: 3, at: NOW, people: false });
+  const look = await keyLineGate(w.db, { id: b.id, orgId: org }, LINE, NOW);
+  expect(look).toEqual({ retryAt: later + KEY_LINE_SPACING_MS });
+  await w.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, a.id));
+  expect(await keyLineGate(w.db, { id: c.id, orgId: org }, LINE, later + KEY_LINE_SPACING_MS)).toEqual({
+    retryAt: later + 2 * KEY_LINE_SPACING_MS,
+  });
+});
+
+test("a dozen messages to one agent are all people's: while one's call is out the others wait for it", async () => {
+  const w = await parked({ on: false }, []);
+  const [a, b] = await threeRuns(w);
+  const org = w.f.org.id;
+  await place(w, a.id, { since: 1, at: NOW, people: true });
+  await place(w, b.id, { since: 2, at: NOW, people: true });
+  expect(await keyLineGate(w.db, { id: a.id, orgId: org }, LINE, NOW)).toBeNull();
+  await w.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, a.id));
+  expect(await keyLineGate(w.db, { id: b.id, orgId: org }, LINE, NOW)).toEqual({ retryAt: NOW + KEY_LINE_SPACING_MS });
+});
+
+test("a person's run on a limit is never parked past 15 minutes, so a new message doesn't wait an hour behind it", async () => {
+  const w = await parked({ on: true }, []);
+  await w.say("@otto um");
+  await w.settle();
+  for (const _ of [1, 2, 3, 4]) await w.advance(60);
+  const [run] = await w.runs();
+  const [row] = await w.db
+    .select({ transcript: schema.agentRuns.transcript })
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, run?.id ?? ""));
+  const outage = (row?.transcript as unknown as { outage: { n: number; at: number } } | undefined)?.outage;
+  expect(outage?.n).toBeGreaterThan(3);
+  expect((outage?.at ?? Infinity) - Date.now()).toBeLessThanOrEqual(KEY_LINE_PERSON_MINUTES * 60_000);
 });
 
 test("only the oldest run tries; the others look again right after it", async () => {
