@@ -8546,8 +8546,6 @@
     "elapsedMinutes": "{{m}} mnt {{s}} dtk",
     "stopAgent": "Hentikan {{name}}",
     "stopAgent_female": "Hentikan {{name}}",
-    "stoppedByYou": "Berhenti di sini",
-    "stoppedBy": "{{name}} menghentikannya di sini",
     "stopped": "Berhenti di sini",
     "continueRun": "Lanjutkan",
     "stepLimit": "Mencapai batas langkah",
@@ -14022,7 +14020,6 @@
     "stopped": {
       "line": "Kamu menghentikan {{agent}}",
       "lineBy": "{{name}} menghentikan {{agent}}",
-      "told": "Menunggu ada yang meminta untuk lanjut.",
       "reason": "Alasan: «{{reason}}»",
       "sayWhy": "Beri alasan",
       "whyPlaceholder": "Mau kasih alasan? (opsional)",

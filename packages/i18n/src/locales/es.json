@@ -9161,8 +9161,6 @@
     "elapsedMinutes": "{{m}} min {{s}} s",
     "stopAgent": "Detener a {{name}}",
     "stopAgent_female": "Detener a {{name}}",
-    "stoppedByYou": "Se detuvo aquí",
-    "stoppedBy": "{{name}} lo detuvo aquí",
     "stopped": "Se detuvo aquí",
     "continueRun": "Continuar",
     "stepLimit": "En el límite de pasos",
@@ -14887,7 +14885,6 @@
     "stopped": {
       "line": "Detuviste a {{agent}}",
       "lineBy": "{{name}} detuvo a {{agent}}",
-      "told": "Espera a que alguien le pida seguir.",
       "reason": "Motivo: «{{reason}}»",
       "sayWhy": "Decir el motivo",
       "whyPlaceholder": "¿Quieres decir por qué? (opcional)",

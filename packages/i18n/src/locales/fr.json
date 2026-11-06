@@ -9227,8 +9227,6 @@
     "elapsedMinutes": "{{m}} min {{s}} s",
     "stopAgent": "Arrêter {{name}}",
     "stopAgent_female": "Arrêter {{name}}",
-    "stoppedByYou": "Arrêté ici",
-    "stoppedBy": "{{name}} l'a arrêté ici",
     "stopped": "Arrêté ici",
     "continueRun": "Continuer",
     "stepLimit": "Limite d'étapes atteinte",
@@ -15027,7 +15025,6 @@
     "stopped": {
       "line": "Vous avez arrêté {{agent}}",
       "lineBy": "{{name}} a arrêté {{agent}}",
-      "told": "Attend qu'on lui demande de continuer.",
       "reason": "Raison : « {{reason}} »",
       "sayWhy": "Donner la raison",
       "whyPlaceholder": "Vous voulez dire pourquoi ? (facultatif)",

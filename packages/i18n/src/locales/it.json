@@ -9243,8 +9243,6 @@
     "elapsedSeconds": "{{n}}s",
     "elapsedMinutes": "{{m}}m {{s}}s",
     "stopAgent": "Ferma {{name}}",
-    "stoppedByYou": "Fermato qui",
-    "stoppedBy": "{{name}} l'ha fermato qui",
     "stopped": "Fermato qui",
     "continueRun": "Continua",
     "stepLimit": "Al limite di passaggi",
@@ -15031,7 +15029,6 @@
     "stopped": {
       "line": "Hai fermato {{agent}}",
       "lineBy": "{{name}} ha fermato {{agent}}",
-      "told": "Aspetta che qualcuno chieda di continuare.",
       "reason": "Motivo: «{{reason}}»",
       "sayWhy": "Spiega perché",
       "whyPlaceholder": "Vuoi dire perché? (facoltativo)",

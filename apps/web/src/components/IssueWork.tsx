@@ -1,7 +1,7 @@
 import { type Message, useIssue } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { type IssueWorkRef, issueTakenOf, STATUS_ICON } from "@agenteschat/client/lib/issues";
-import { Chip, Icon } from "@agenteschat/ui";
+import { Chip, EventPill, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -59,7 +59,7 @@ export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId
   );
 }
 
-/** Where the issue came from (a channel message): one quiet line, "Ada pegou a issue #24 · título". */
+/** Where the issue came from (a channel message): one event pill, "Ada took task #24 · its title", linking to it. */
 export function IssueTakenLine({ message }: { message: Message }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -69,20 +69,21 @@ export function IssueTakenLine({ message }: { message: Message }) {
   if (!taken) return null;
   const name = dir.authorName(message.author);
   return (
-    <div className="iw-line ac-iconline" data-message-id={message.id}>
-      <Icon name="issues" size={14} />
-      <span>
-        {t("chat.issueWork.taken", { name })}{" "}
-        <Link
-          to="/org/$orgId/issues/$number"
-          params={{ orgId: org.id, number: String(taken.number) }}
-          className="iw-line__link"
-          onClick={inPlace ? (e) => inPlaceClick(e, () => inPlace.issue(taken.number)) : undefined}
-        >
-          <span className="tabular">#{taken.number}</span> · {taken.title}
-        </Link>{" "}
-        · {formatTime(i18n.language, message.createdAt)}
-      </span>
-    </div>
+    <EventPill
+      className="iw-line"
+      data-message-id={message.id}
+      mark={<Icon name="issues" size={14} />}
+      time={formatTime(i18n.language, message.createdAt)}
+    >
+      {t("chat.issueWork.taken", { name })}{" "}
+      <Link
+        to="/org/$orgId/issues/$number"
+        params={{ orgId: org.id, number: String(taken.number) }}
+        className="iw-line__link"
+        onClick={inPlace ? (e) => inPlaceClick(e, () => inPlace.issue(taken.number)) : undefined}
+      >
+        <span className="tabular">#{taken.number}</span> · {taken.title}
+      </Link>
+    </EventPill>
   );
 }

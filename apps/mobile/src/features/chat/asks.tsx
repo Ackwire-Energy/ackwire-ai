@@ -44,7 +44,19 @@ import Animated, {
 } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { Sky } from "@/sky/Sky";
-import { CHROME_MAX_SCALE, Fuse, Icon, type IconName, LineIcon, Text, useReducedMotion, useTheme } from "@/ui";
+import {
+  CHROME_MAX_SCALE,
+  EventPill,
+  EventPillAction,
+  EventPillText,
+  Fuse,
+  Icon,
+  type IconName,
+  LineIcon,
+  Text,
+  useReducedMotion,
+  useTheme,
+} from "@/ui";
 import { approvalTitleText } from "../approvals/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
@@ -65,8 +77,6 @@ import {
 import { LineStop, useRowsInView } from "./LiveRows";
 import {
   approvalIdOf,
-  LINE_GAP,
-  LINE_MARK,
   lineStops,
   markedParts,
   markName,
@@ -588,34 +598,48 @@ export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null
 }
 
 /**
- * A decided request: no card, one line in the conversation where the message's text starts, as every event in a
- * message is drawn: a mark on its first line (a check in green when it went through, an × when it didn't)
- * and its words (what `markName` wraps in bold) on one line. With `more`, the line opens the rest under it (and
- * the words in full); the line has no room for `label`, so it reaches screen readers as the hint.
+ * A decided request: no card, one pill (`EventPill`) in the conversation where the message's text starts, as every
+ * automatic event: a check in green when it went through, an × when it didn't, its words (what `markName` wraps in
+ * bold) and `time`, when it was decided. `more` is an action ("See details", with a chevron) that opens the rest under
+ * the pill; `actions` go before it (a request approved ahead still to run: "Cancel").
  */
 export function AskDone({
   done,
   words,
+  time,
   more,
+  actions,
 }: {
   done: boolean;
   words: string;
-  more?: { label: string; content: ReactNode } | null;
+  time?: string;
+  /** `card`: what opens is a card of its own (the request as it was), drawn without the text's rule beside it. */
+  more?: { label: string; content: ReactNode; card?: boolean } | null;
+  actions?: ReactNode;
 }) {
   const c = useColors();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
-  const line = (
-    <>
-      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.doneMark}>
-        <Icon name={done ? "check" : "x"} size={LINE_MARK} color={done ? c.ok : c.faint} />
-      </View>
-      <Text
-        variant="small"
-        tone="muted"
-        numberOfLines={open ? undefined : 1}
-        maxFontSizeMultiplier={CHROME_MAX_SCALE}
-        style={styles.doneWords}
+  // A card turning into this pill fades into it (an old one fades as it scrolls in, as the cards do).
+  return (
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.done}>
+      <EventPill
+        mark={done ? "check" : "x"}
+        markColor={done ? c.ok : c.faint}
+        time={time}
+        actions={[
+          actions,
+          more ? (
+            <EventPillAction key="more" label={more.label} expanded={open} onPress={() => setOpen((o) => !o)} />
+          ) : null,
+        ]}
+        below={
+          more && open ? (
+            <Animated.View entering={reduced ? undefined : FadeIn.duration(220)}>
+              {more.card ? more.content : <EventPillText>{more.content}</EventPillText>}
+            </Animated.View>
+          ) : null
+        }
       >
         {markedParts(words).map((p, i) =>
           p.bold ? (
@@ -627,40 +651,7 @@ export function AskDone({
             p.text
           ),
         )}
-      </Text>
-    </>
-  );
-  // A card turning into this line fades into it (an old one fades as it scrolls in, as the cards do).
-  const enter = reduced ? undefined : FadeIn.duration(160);
-  if (!more)
-    return (
-      <Animated.View entering={enter} style={styles.done}>
-        {line}
-      </Animated.View>
-    );
-  return (
-    <Animated.View entering={enter}>
-      <Pressable
-        onPress={() => {
-          tapHaptic();
-          setOpen((o) => !o);
-        }}
-        accessibilityRole="button"
-        accessibilityHint={more.label}
-        accessibilityState={{ expanded: open }}
-        hitSlop={12}
-        style={({ pressed }) => [styles.done, pressed && styles.pressed]}
-      >
-        {line}
-        <View style={[styles.doneMark, open ? styles.flip : undefined]}>
-          <Icon name="chev" size={13} color={c.faint} />
-        </View>
-      </Pressable>
-      {open ? (
-        <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} style={styles.doneMore}>
-          {more.content}
-        </Animated.View>
-      ) : null}
+      </EventPill>
     </Animated.View>
   );
 }
@@ -815,13 +806,8 @@ const styles = StyleSheet.create({
   expiry: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
   fuse: { width: 44 },
   expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
-  // A decided request: an event line on the conversation itself, nothing around it; the mark on the first line's
-  // reading middle (a 20-point line), the words to the end of the column.
-  done: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP, alignSelf: "stretch", marginTop: 8 },
-  doneMark: { height: 20, justifyContent: "center" },
-  doneWords: { flex: 1, minWidth: 0 },
-  // Under the words, not the mark.
-  doneMore: { marginTop: 6, marginLeft: LINE_MARK + LINE_GAP, gap: 4 },
+  // A decided request: its pill on the conversation itself, from where the message's text starts.
+  done: { alignSelf: "stretch", marginTop: 8 },
   // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.
   dock: { paddingHorizontal: 4, paddingBottom: 6 },
   pill: {

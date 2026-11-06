@@ -8721,8 +8721,6 @@ export const en = {
     elapsedSeconds: "{{n}}s",
     elapsedMinutes: "{{m}}m {{s}}s",
     stopAgent: "Stop {{name}}",
-    stoppedByYou: "Stopped here",
-    stoppedBy: "{{name}} stopped here",
     stopped: "Stopped here",
     continueRun: "Continue",
     stepLimit: "At the step limit",
@@ -14142,7 +14140,6 @@ export const en = {
     stopped: {
       line: "You stopped {{agent}}",
       lineBy: "{{name}} stopped {{agent}}",
-      told: "Waits until someone asks to continue.",
       reason: "Reason: «{{reason}}»",
       sayWhy: "Add a reason",
       whyPlaceholder: "Want to say why? (optional)",

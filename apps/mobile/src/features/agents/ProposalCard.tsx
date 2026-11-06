@@ -41,9 +41,9 @@ import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
-import { useDirectory, useMeId } from "../shared/hooks";
+import { useDirectory, useMeId, useWhen } from "../shared/hooks";
 import { fullLook } from "./edit";
-import { DelegateUndo } from "./RightHandDelegate";
+import { useDelegateUndoAction } from "./RightHandDelegate";
 
 /**
  * An agent's proposal of a new agent (ADR 0081): while it is open, the request card (the agent's reason, the draft
@@ -79,6 +79,7 @@ export function AgentProposalView({
   const { orgId, org } = useOrg();
   const meId = useMeId();
   const dir = useDirectory();
+  const when = useWhen();
   const { colors } = useTheme();
   const create = useCreateProposedAgent(orgId);
   const makeRoutine = useCreateProposedRoutine(orgId);
@@ -111,6 +112,7 @@ export function AgentProposalView({
   const lines = proposalLines(card, { userId: meId ?? "", admin: can(org, "manage_agents") });
   // The right hand looked at it for the person it is for (ADR 0139): its line, Desfazer and "Por quê?".
   const delegate = card.delegate;
+  const delegateUndo = useDelegateUndoAction(delegate);
   const delegated = delegate
     ? delegateLine(
         t,
@@ -287,8 +289,11 @@ export function AgentProposalView({
   return (
     <AskDone
       done={status === "created" && delegate?.state !== "undone"}
-      words={byRightHand ? `${markName(draft.name)} · ${delegated}` : `${outcome} · ${markName(draft.name)}`}
+      words={`${byRightHand ? delegated : outcome}: ${markName(draft.name)}`}
+      time={card.decidedAt ? when.short(card.decidedAt) : undefined}
+      actions={byRightHand ? delegateUndo : null}
       more={{
+        card: true,
         label: t(byRightHand && delegate?.state === "approved" ? "rightHandApprovals.card.why" : "ask.seeChange"),
         content: (
           <View style={[styles.card, { backgroundColor: colors.sunken }]}>
@@ -318,7 +323,6 @@ export function AgentProposalView({
                 ? delegateUndoLine(t, i18n.language, delegate, draft.name)
                 : suggestedAiText(t, draft.ai)}
             </Text>
-            {byRightHand ? <DelegateUndo d={delegate} /> : null}
             {status === "created" && (card.agentId || routineLeft(card)) ? (
               <View style={styles.acts}>
                 {card.agentId ? (

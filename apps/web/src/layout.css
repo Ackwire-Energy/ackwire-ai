@@ -6276,8 +6276,8 @@ html:not([data-pointer]) .stop-run:focus-visible {
   margin: 0 2px 0 4px;
   background: var(--line);
 }
-/* "Stopped here · Continue" under a stopped answer. */
-.run-canceled {
+/* Continue alone under an answer whose text already says why it stopped; a stopped answer's pill is `StopPill`. */
+p.run-canceled {
   display: inline-flex;
   align-items: center;
   gap: 6px;

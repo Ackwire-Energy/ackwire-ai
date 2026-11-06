@@ -258,39 +258,24 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 
 /*
- * A decided request (RequestDone): no card, one quiet line. A pixel mark, words that wrap, and "Ver …" right after them.
+ * A decided request (RequestDone): no card, one event pill (`EventPill`). A pixel mark, words that wrap, its time, and
+ * its actions in the frame ("Ver …" opens the rest under it).
  */
 .rq-done {
   max-width: var(--msg-card-w);
   margin-top: 2px;
 }
-/* Right under the name it is the message's words, not a card: a message with a request stacks its body with the
-   cards' 8px gap (`stacked`), which pulled the line away from the name; it sits 2px under it, as a text does. */
+/* Right under the name: a message with a request stacks its body with the cards' 8px gap (`stacked`), which pulled
+   the pill away from the name; it sits 4px under it. */
 .ac-msg__head + .rq-done {
-  margin-top: -6px;
+  margin-top: -4px;
 }
-.rq-done__line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--muted);
-}
-/* The mark and the buttons stand on the first line of its words, however many they wrap to. */
+/* The mark: the pill's own, a pixel square or bar on its words' first line. */
 .rq-done__mark {
-  flex: none;
   display: inline-grid;
   place-items: center;
   width: 14px;
-  height: 20px;
-}
-.rq-done__line > .ac-btn {
-  flex: none;
-  margin-block: -6px;
-}
-.rq-done__line > .rq__more {
-  margin-block: -2px;
+  height: 18px;
 }
 .rq-done__mark > span {
   width: 8px;
@@ -302,6 +287,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
   height: 5px;
   background: var(--ok);
 }
+/* Its words wrap, never cut. */
 .rq-done__text {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -312,6 +298,8 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 /* What it opens is someone's words: a long reason wraps and keeps its lines. */
 .rq-done .rq__details {
+  align-self: stretch;
+  margin-top: 0;
   overflow-wrap: anywhere;
   white-space: pre-line;
 }

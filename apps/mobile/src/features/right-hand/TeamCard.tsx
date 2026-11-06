@@ -33,14 +33,14 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, fieldText, Icon, LineIcon, Locked, Sheet, Text } from "@/ui";
+import { AgentAvatar, Button, EventPillAction, fieldText, Icon, LineIcon, Locked, Sheet, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
 import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
-import { useColors, useDirectory, useMeId } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useWhen } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 
@@ -267,6 +267,7 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
   const { orgId, org } = useOrg();
   const meId = useMeId();
   const dir = useDirectory();
+  const when = useWhen();
   const failed = useFailed();
   const team = useTeamCard(orgId, { channelId: m.channelId, messageId: m.id });
   const [adjusting, setAdjusting] = useState<TeamAgentDraft | null>(null);
@@ -363,6 +364,7 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
       </>
     );
   }
+  const decidedAt = card.decidedAt ? when.short(card.decidedAt) : undefined;
   if (status === "created") {
     const by = card.decidedByUserId === meId ? null : dir.memberById.get(card.decidedByUserId ?? "")?.name;
     const undoable = teamUndoable(card, { userId: meId ?? "", admin: can(org, "manage_agents") });
@@ -371,21 +373,15 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
         <AskDone
           done
           words={`${by ? t("teamPlan.card.created", { name: by }) : t("teamPlan.card.createdYou")}: ${names}`}
-          more={
-            undoable
-              ? {
-                  label: t("agentActions.undo"),
-                  content: (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      label={t("agentActions.undo")}
-                      loading={team.undo.isPending}
-                      onPress={() => team.undo.mutate(undefined, { onError: failed })}
-                    />
-                  ),
-                }
-              : undefined
+          time={decidedAt}
+          actions={
+            undoable ? (
+              <EventPillAction
+                label={t("agentActions.undo")}
+                loading={team.undo.isPending}
+                onPress={() => team.undo.mutate(undefined, { onError: failed })}
+              />
+            ) : null
           }
         />
         {card.created?.skipped.includes("skills") ? (
@@ -400,6 +396,7 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
   return (
     <AskDone
       done={false}
+      time={decidedAt}
       words={`${t(
         status === "superseded"
           ? "rightHand.card.superseded"

@@ -203,6 +203,7 @@ import {
   type PlusPick,
   ThreadOptions,
 } from "./sheets";
+import { StoppedRunsContext, stoppedRunsKey, stoppedRunsOf } from "./stopped-runs";
 import { turnOrder, turnRuns, withOpacity } from "./turn";
 import { JumpToMessageContext } from "./WorkLine";
 
@@ -664,6 +665,12 @@ function Chat({
   const foldsKey = [...foldsNow].map(([id, f]) => `${id}:${f.fold === "line" ? f.messageId : f.fold}`).join(" ");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `foldsKey` stands for the folds
   const consultFolds = useMemo(() => foldsNow, [foldsKey]);
+  // One stop is one pill: the stopped reply's, with its notice's words (who, the reason), the notice itself drawing
+  // nothing while that reply is here (`stoppedRunsOf`). Rebuilt with the messages, redrawn only when a stop changes.
+  const stoppedNow = useMemo(() => stoppedRunsOf(shownMessages), [shownMessages]);
+  const stoppedKey = stoppedRunsKey(stoppedNow);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `stoppedKey` stands for the stops
+  const stoppedRuns = useMemo(() => stoppedNow, [stoppedKey]);
   const lineConsults = useMemo(
     () => consultsForLine(consults, consultBlocksNearEnd(shownMessages, consultList, liveTurns, "first")),
     [consults, shownMessages, consultList, liveTurns],
@@ -1991,66 +1998,69 @@ function Chat({
                     <JumpToMessageContext.Provider value={jumpToMessage}>
                       <RowLookContext.Provider value={rowLook}>
                         <LiveRowsProvider value={liveRows}>
-                          <KeyboardAwareLegendList
-                            ref={listRef}
-                            style={styles.grow}
-                            data={shownRows}
-                            keyExtractor={rowKey}
-                            getItemType={rowType}
-                            renderItem={renderItem}
-                            // The list redraws mounted rows only when this changes: what a row shows beyond its message
-                            // (the thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-                            extraData={renderItem}
-                            estimatedItemSize={72}
-                            // Opens at the latest message, short conversations sit at the bottom like any chat.
-                            initialScrollAtEnd
-                            alignItemsAtEnd
-                            // New messages, a reply growing word by word and the working line keep the end in view, but
-                            // only while the person is near it.
-                            maintainScrollAtEnd={!readHold}
-                            maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-                            // Older pages above and rows changing size keep what is on screen still.
-                            maintainVisibleContentPosition
-                            // Our own insets, never the system's (the keyboard library's advice for chat lists): the
-                            // bar's room is the content's top padding, the indicator kept below the bar.
-                            contentInsetAdjustmentBehavior="never"
-                            automaticallyAdjustContentInsets={false}
-                            scrollIndicatorInsets={{ top: headerHeight }}
-                            // Still while a sheet or the agent's computer covers the conversation.
-                            freeze={freeze}
-                            onReady={revealList}
-                            onStartReached={loadOlder}
-                            // A look at the waiting requests' cards and the live rows, once a frame and only while
-                            // there is one.
-                            onScroll={onListScroll}
-                            onViewableItemsChanged={onViewable}
-                            viewabilityConfig={STICKER_VIEW}
-                            onScrollBeginDrag={() => {
-                              dragging.current = true;
-                              showDay();
-                            }}
-                            onScrollEndDrag={() => {
-                              releaseAtEnd();
-                              hideDay();
-                            }}
-                            onMomentumScrollBegin={showDay}
-                            onMomentumScrollEnd={() => {
-                              releaseAtEnd();
-                              hideDay();
-                            }}
-                            onStartReachedThreshold={0.5}
-                            keyboardDismissMode="interactive"
-                            keyboardShouldPersistTaps="handled"
-                            keyboardOffset={lift}
-                            contentInsetEndAdjustment={contentInsetEndAdjustment}
-                            contentContainerStyle={listPad}
-                            // The right hand's greeting stays at the conversation's start, once the start is loaded.
-                            ListHeaderComponent={
-                              dmAgent && rightHand && (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
-                                <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
-                              ) : undefined
-                            }
-                          />
+                          <StoppedRunsContext.Provider value={stoppedRuns}>
+                            <KeyboardAwareLegendList
+                              ref={listRef}
+                              style={styles.grow}
+                              data={shownRows}
+                              keyExtractor={rowKey}
+                              getItemType={rowType}
+                              renderItem={renderItem}
+                              // The list redraws mounted rows only when this changes: what a row shows beyond its
+                              // message (the thread link that loads after it, a held state) lives in `renderItem`'s
+                              // dependencies.
+                              extraData={renderItem}
+                              estimatedItemSize={72}
+                              // Opens at the latest message, short conversations sit at the bottom like any chat.
+                              initialScrollAtEnd
+                              alignItemsAtEnd
+                              // New messages, a reply growing word by word and the working line keep the end in view,
+                              // but only while the person is near it.
+                              maintainScrollAtEnd={!readHold}
+                              maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+                              // Older pages above and rows changing size keep what is on screen still.
+                              maintainVisibleContentPosition
+                              // Our own insets, never the system's (the keyboard library's advice for chat lists): the
+                              // bar's room is the content's top padding, the indicator kept below the bar.
+                              contentInsetAdjustmentBehavior="never"
+                              automaticallyAdjustContentInsets={false}
+                              scrollIndicatorInsets={{ top: headerHeight }}
+                              // Still while a sheet or the agent's computer covers the conversation.
+                              freeze={freeze}
+                              onReady={revealList}
+                              onStartReached={loadOlder}
+                              // A look at the waiting requests' cards and the live rows, once a frame and only while
+                              // there is one.
+                              onScroll={onListScroll}
+                              onViewableItemsChanged={onViewable}
+                              viewabilityConfig={STICKER_VIEW}
+                              onScrollBeginDrag={() => {
+                                dragging.current = true;
+                                showDay();
+                              }}
+                              onScrollEndDrag={() => {
+                                releaseAtEnd();
+                                hideDay();
+                              }}
+                              onMomentumScrollBegin={showDay}
+                              onMomentumScrollEnd={() => {
+                                releaseAtEnd();
+                                hideDay();
+                              }}
+                              onStartReachedThreshold={0.5}
+                              keyboardDismissMode="interactive"
+                              keyboardShouldPersistTaps="handled"
+                              keyboardOffset={lift}
+                              contentInsetEndAdjustment={contentInsetEndAdjustment}
+                              contentContainerStyle={listPad}
+                              // The right hand's greeting stays at the conversation's start, once the start is loaded.
+                              ListHeaderComponent={
+                                dmAgent && rightHand && (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
+                                  <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
+                                ) : undefined
+                              }
+                            />
+                          </StoppedRunsContext.Provider>
                         </LiveRowsProvider>
                       </RowLookContext.Provider>
                     </JumpToMessageContext.Provider>

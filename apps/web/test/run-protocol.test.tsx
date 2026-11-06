@@ -120,7 +120,7 @@ describe("work summary and stopped messages", () => {
 });
 
 describe("in the channel", () => {
-  test("a stopped message shows its text, 'Stopped here' and Continue", async () => {
+  test("a stopped message shows its text, its pill 'You stopped Ada' and Continue", async () => {
     const state = seedState();
     state.messages.push({
       id: "m-stopped",
@@ -137,7 +137,7 @@ describe("in the channel", () => {
     await settle(5);
     const msg = screen().getByText("Comecei a revisar o PR.").closest(".ac-msg") as HTMLElement;
     const line = msg.querySelector(".run-canceled") as HTMLElement;
-    expect(line.textContent).toContain("Parou aqui");
+    expect(line.textContent).toContain("Você parou a Ada");
     expect(msg.querySelector(".ac-msg__text")?.textContent).not.toContain("Interrompido");
     // Continuar picks it up from where it stopped; the button goes away.
     await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Continuar" })));

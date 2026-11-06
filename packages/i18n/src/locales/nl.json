@@ -8930,8 +8930,6 @@
     "elapsedSeconds": "{{n}}s",
     "elapsedMinutes": "{{m}}m {{s}}s",
     "stopAgent": "{{name}} stoppen",
-    "stoppedByYou": "Hier gestopt",
-    "stoppedBy": "{{name}} stopte hier",
     "stopped": "Hier gestopt",
     "continueRun": "Doorgaan",
     "stepLimit": "Op de stappenlimiet",
@@ -14596,7 +14594,6 @@
     "stopped": {
       "line": "Je hebt {{agent}} gestopt",
       "lineBy": "{{name}} heeft {{agent}} gestopt",
-      "told": "Wacht tot iemand vraagt om verder te gaan.",
       "reason": "Reden: «{{reason}}»",
       "sayWhy": "Zeg waarom",
       "whyPlaceholder": "Wil je zeggen waarom? (optioneel)",

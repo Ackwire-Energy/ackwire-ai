@@ -8866,8 +8866,6 @@
     "elapsedMinutes": "{{m}} min {{s}} s",
     "stopAgent": "{{name}} stoppen",
     "stopAgent_female": "{{name}} stoppen",
-    "stoppedByYou": "Hier gestoppt",
-    "stoppedBy": "{{name}} hat hier gestoppt",
     "stopped": "Hier gestoppt",
     "continueRun": "Weiter",
     "stepLimit": "Am Schrittlimit",
@@ -14421,7 +14419,6 @@
     "stopped": {
       "line": "Du hast {{agent}} gestoppt",
       "lineBy": "{{name}} hat {{agent}} gestoppt",
-      "told": "Wartet, bis jemand ums Weitermachen bittet.",
       "reason": "Grund: „{{reason}}“",
       "sayWhy": "Grund nennen",
       "whyPlaceholder": "Möchtest du sagen, warum? (optional)",

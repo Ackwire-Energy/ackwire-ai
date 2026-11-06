@@ -8557,8 +8557,6 @@
     "elapsedSeconds": "{{n}} 秒",
     "elapsedMinutes": "{{m}} 分 {{s}} 秒",
     "stopAgent": "停止 {{name}}",
-    "stoppedByYou": "在这里停止",
-    "stoppedBy": "{{name}} 在这里停止了",
     "stopped": "在这里停止",
     "continueRun": "继续",
     "stepLimit": "已达到步骤上限",
@@ -14095,7 +14093,6 @@
     "stopped": {
       "line": "你停止了 {{agent}}",
       "lineBy": "{{name}} 停止了 {{agent}}",
-      "told": "会等到有人让它继续。",
       "reason": "原因：“{{reason}}”",
       "sayWhy": "说明原因",
       "whyPlaceholder": "想说明原因吗？（可选）",

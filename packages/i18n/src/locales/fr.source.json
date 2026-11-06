@@ -21639,12 +21639,6 @@
   "run.stopAgent": {
     "value": "Stop {{name}}"
   },
-  "run.stoppedByYou": {
-    "value": "Stopped here"
-  },
-  "run.stoppedBy": {
-    "value": "{{name}} stopped here"
-  },
   "run.stopped": {
     "value": "Stopped here"
   },
@@ -34815,9 +34809,6 @@
   },
   "taskManager.stopped.lineBy": {
     "value": "{{name}} stopped {{agent}}"
-  },
-  "taskManager.stopped.told": {
-    "value": "Waits until someone asks to continue."
   },
   "taskManager.stopped.reason": {
     "value": "Reason: «{{reason}}»"

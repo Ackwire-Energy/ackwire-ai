@@ -659,15 +659,19 @@ export function AgentProposalCardView({
           label: t(delegate?.state === "approved" ? "rightHandApprovals.card.why" : "approval.seeDetails"),
           content: details,
         }}
+        time={delegate?.at ? whenAt(t, i18n.language, delegate.at) : undefined}
       >
         <b>{draft.name}</b> · {delegated}
-        {delegate?.at && ` · ${whenAt(t, i18n.language, delegate.at)}`}
       </RequestDone>
     );
   return (
-    <RequestDone done={status === "created"} label={title} more={{ label: t("approval.seeDetails"), content: details }}>
+    <RequestDone
+      done={status === "created"}
+      label={title}
+      more={{ label: t("approval.seeDetails"), content: details }}
+      time={at ? whenAt(t, i18n.language, at) : undefined}
+    >
       {ended}: <b>{draft.name}</b>
-      {at && ` · ${whenAt(t, i18n.language, at)}`}
     </RequestDone>
   );
 }

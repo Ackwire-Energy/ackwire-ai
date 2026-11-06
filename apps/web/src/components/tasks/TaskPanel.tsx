@@ -164,9 +164,7 @@ export function TaskPanel({
                           })
                         : t("taskManager.state.stopped")}
                   </b>
-                  {" · "}
-                  {t("taskManager.stopped.told")}
-                  {reason && ` ${t("taskManager.stopped.reason", { reason })}`}
+                  {reason && ` · ${t("taskManager.stopped.reason", { reason })}`}
                 </span>
               </p>
               {byMe && !reason && <SayWhy runId={runId} onSent={setSent} />}

@@ -1,5 +1,5 @@
 import type { Agent } from "@agenteschat/client";
-import { ExpiryFuse, Locked } from "@agenteschat/ui";
+import { EventPill, EventPillMore, ExpiryFuse, Locked } from "@agenteschat/ui";
 import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CardSky, colorOf } from "./Sky";
@@ -268,45 +268,59 @@ function RequestMore({ open, onClick, children }: { open: boolean; onClick: () =
 }
 
 /**
- * A decided request: no card, one quiet line in the conversation. A pixel mark (a square when it went through, a
- * short bar when it was refused, expired or not applied), its words, and "Ver …" opening the rest under the line.
+ * A decided request: no card, one event pill in the conversation (`EventPill`). A pixel mark (a square when it went
+ * through, a short bar when it was refused, expired or not applied), its words, its time, and its actions in the
+ * frame: "Ver …" opens the rest under it.
  */
 export function RequestDone({
   done,
   label,
   more,
   action,
+  time,
   children,
 }: {
   /** It went through. */
   done: boolean;
   /** The group's accessible name. */
   label: string;
-  /** What the line leaves out, and the button that opens it. */
+  /** What the pill leaves out, and the action that opens it. */
   more?: { label: string; content: ReactNode };
-  /** A button at the line's end (Desfazer). */
+  /** Its own actions (Desfazer, Cancelar): `EventPillAction`s. */
   action?: ReactNode;
-  /** The words: what it was, how it ended and, when the request has one, the time. */
+  /** When it was decided. */
+  time?: string;
+  /** The words: what it was and how it ended. */
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const actions =
+    action || more ? (
+      <>
+        {action}
+        {more && (
+          <EventPillMore open={open} onClick={() => setOpen((v) => !v)}>
+            {more.label}
+          </EventPillMore>
+        )}
+      </>
+    ) : undefined;
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div className="rq-done" role="group" aria-label={label}>
-      <div className="rq-done__line">
+    <EventPill
+      className="rq-done"
+      role="group"
+      aria-label={label}
+      mark={
         <span className="rq-done__mark" data-done={done || undefined} aria-hidden="true">
           <span />
         </span>
-        <span className="rq-done__text">{children}</span>
-        {action}
-        {more && (
-          <RequestMore open={open} onClick={() => setOpen((v) => !v)}>
-            {more.label}
-          </RequestMore>
-        )}
-      </div>
-      {open && more && <div className="rq__details">{more.content}</div>}
-    </div>
+      }
+      time={time}
+      actions={actions}
+      below={open && more ? <div className="rq__details">{more.content}</div> : undefined}
+    >
+      <span className="rq-done__text">{children}</span>
+    </EventPill>
   );
 }
 

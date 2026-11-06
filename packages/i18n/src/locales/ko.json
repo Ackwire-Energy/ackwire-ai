@@ -8487,8 +8487,6 @@
     "elapsedMinutes": "{{m}}분 {{s}}초",
     "stopAgent": "{{name}} 중지",
     "stopAgent_female": "{{name}} 중지",
-    "stoppedByYou": "여기서 멈춤",
-    "stoppedBy": "{{name}}이(가) 여기서 멈춤",
     "stopped": "여기서 멈춤",
     "continueRun": "계속",
     "stepLimit": "단계 한도 도달",
@@ -13912,7 +13910,6 @@
     "stopped": {
       "line": "{{agent}}을(를) 중지했어요",
       "lineBy": "{{name}}이(가) {{agent}}을(를) 중지했어요",
-      "told": "누군가 요청할 때까지 기다려요.",
       "reason": "이유: «{{reason}}»",
       "sayWhy": "이유 말하기",
       "whyPlaceholder": "이유를 알려 줄래요? (선택)",

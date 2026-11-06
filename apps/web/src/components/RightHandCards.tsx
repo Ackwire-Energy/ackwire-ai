@@ -44,7 +44,7 @@ import {
   sentToText,
   settingLineText,
 } from "@agenteschat/client/lib/proposals";
-import { Button, Icon, Switch } from "@agenteschat/ui";
+import { Button, EventPillAction, Icon, Switch } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -159,10 +159,8 @@ function RemovalCard({
         label={label}
         action={
           undoable && (
-            <Button
-              size="sm"
-              variant="ghost"
-              loading={actions.undoAll.isPending}
+            <EventPillAction
+              disabled={actions.undoAll.isPending}
               onClick={() =>
                 message &&
                 actions.undoAll.mutate(message.id, {
@@ -172,12 +170,12 @@ function RemovalCard({
               }
             >
               {t("rightHand.card.undo")}
-            </Button>
+            </EventPillAction>
           )
         }
+        time={first.decidedAt ? formatTime(i18n.language, first.decidedAt) : undefined}
       >
         {who}: <b>{(done.length ? done : rows).map(nameOf).join(", ")}</b>
-        {first.decidedAt && ` · ${formatTime(i18n.language, first.decidedAt)}`}
         {undone && ` · ${t("rightHand.card.undone")}`}
       </RequestDone>
     );
@@ -360,10 +358,8 @@ function SettingsRow({
           byRightHand
             ? first && <DelegateUndo d={delegate} />
             : undoable && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  loading={actions.undo.isPending}
+                <EventPillAction
+                  disabled={actions.undo.isPending}
                   onClick={() =>
                     actions.undo.mutate(receipt.id, {
                       onSuccess: () => void qc.invalidateQueries({ queryKey: keys.agents(org.id) }),
@@ -372,12 +368,12 @@ function SettingsRow({
                   }
                 >
                   {t("rightHand.card.undo")}
-                </Button>
+                </EventPillAction>
               )
         }
+        time={p.decidedAt ? formatTime(i18n.language, p.decidedAt) : undefined}
       >
         {who}: <b>{[name, ...lines.map((l) => `${lowerFirst(l.field, i18n.language)} ${l.to}`)].join(" · ")}</b>
-        {p.decidedAt && ` · ${formatTime(i18n.language, p.decidedAt)}`}
         {receipt?.undoneAt && ` · ${t("rightHand.card.undone")}`}
       </RequestDone>
     );
