@@ -13,7 +13,7 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { answerAfter, BUSINESS_TYPES, startCardPassed } from "@agenteschat/client/lib/team-plan";
+import { BUSINESS_TYPES, startCardAnswer } from "@agenteschat/client/lib/team-plan";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -64,7 +64,6 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org?.agentStyle === null,
   });
-  const cardPassed = startCardPassed(useMessages(orgId, channelId).data);
   const send = useSendAnswer(channelId);
   return (
     <View style={styles.intro}>
@@ -112,7 +111,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
         )}
         {cards.includes("next") && first && <NextCard first={first} />}
         {cards.includes("style") && <StyleCard />}
-        {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cardPassed }) ? (
+        {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cards }) ? (
           <View>
             <Text variant="small" tone="muted">
               {t("rightHand.intro.again.question")}
@@ -161,8 +160,9 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
     onError: failed,
     onSettled: () => qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
   });
-  const answer = first ? answerAfter(messages, null) : null;
   const other = t("teamPlan.business.other");
+  const choices = BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`));
+  const answer = first ? startCardAnswer(messages, choices) : null;
   return (
     <IntroCard
       icon="agent"
@@ -171,13 +171,13 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
     >
       {first ? (
         <AnswerChips
-          choices={BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`))}
+          choices={choices}
           multiple={false}
           answer={answer}
           onSend={(text) => (text === other ? requestComposerText(channelId, "") : send(text))}
         />
       ) : null}
-      {presetsOpen ? (
+      {presetsOpen && answer === null ? (
         <>
           {/* Flat rows on the card, divided by hairlines: a tap makes that agent (its "+" says so). */}
           <Locked when={create.isPending}>
@@ -223,39 +223,36 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
           />
         </>
       ) : null}
-      <Text variant="caption" tone="muted">
-        {t("teamPlan.start.footer")}
-      </Text>
-      <Button
-        variant="secondary"
-        size="card"
-        wide
-        label={t("teamPlan.start.templates")}
-        onPress={() => setTemplates(true)}
-      />
-      {presetsOpen ? null : (
-        <Button
-          variant="ghost"
-          size="card"
-          wide
-          label={t("teamPlan.start.presets")}
-          onPress={() => setPresetsOpen(true)}
-        />
-      )}
-      <Button
-        variant="ghost"
-        size="card"
-        wide
-        label={t("rightHand.intro.start.import")}
-        onPress={() => router.push("/settings/import")}
-      />
-      <Button
-        variant="ghost"
-        size="card"
-        wide
-        label={t("rightHand.intro.start.form")}
-        onPress={() => router.push("/new-agent")}
-      />
+      {answer === null ? (
+        <>
+          <Text variant="caption" tone="muted">
+            {t("teamPlan.start.footer")}
+          </Text>
+          <Button
+            variant="secondary"
+            size="card"
+            wide
+            label={t("teamPlan.start.templates")}
+            onPress={() => setTemplates(true)}
+          />
+          {presetsOpen ? null : (
+            <Button
+              variant="ghost"
+              size="card"
+              wide
+              label={t("teamPlan.start.presets")}
+              onPress={() => setPresetsOpen(true)}
+            />
+          )}
+          <Button
+            variant="ghost"
+            size="card"
+            wide
+            label={t("rightHand.intro.start.import")}
+            onPress={() => router.push("/settings/import")}
+          />
+        </>
+      ) : null}
       <TeamTemplatesSheet
         open={templates}
         onClose={() => setTemplates(false)}

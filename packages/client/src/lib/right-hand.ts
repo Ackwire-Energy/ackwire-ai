@@ -109,23 +109,24 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
 export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p) => !teamHandles.includes(p));
 
 /**
- * Whether its greeting ends with the way to build the team with it, for whoever may create agents once an AI is there.
- * Not while the start card still asks, or its interview runs: with no team, those are the way.
+ * Whether its greeting ends with the way to build the team again, for whoever may create agents once an AI is there:
+ * only with a team and no card left under the greeting (`cards`), which would offer the same or ask something first.
  */
 export const offersTeamSetup = (s: {
   noAi: boolean;
   aiKnown: boolean;
   createsAgents: boolean;
   hasTeam: boolean;
-  /** `startCardPassed`. */
-  cardPassed: boolean;
-}) => s.aiKnown && !s.noAi && s.createsAgents && (s.hasTeam || s.cardPassed);
+  /** `introCards`. */
+  cards: readonly string[];
+}) => s.aiKnown && !s.noAi && s.createsAgents && s.hasTeam && s.cards.length === 0;
 
 /**
- * The cards under the right hand's greeting at the top of its DM (ADR 0137): Connect AI while there is none. With one,
- * how to start (for whoever may create agents): with no agent yet, or, still alone, while the team is only ready-made
- * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. Last, once an AI is
- * there, how the person wants agents to talk to them, until they pick (ADR 0147).
+ * The cards under the right hand's greeting at the top of its DM (ADR 0137), one question at a time: Connect AI while
+ * there is none. With one, how to start (for whoever may create agents): with no agent yet, or, still alone, while the
+ * team is only ready-made agents and some are left, each tile its own Criar, beside what next. Once that is settled,
+ * how the person wants agents to talk to them, until they pick (ADR 0147), and only then what next: the team here and
+ * nobody else yet.
  */
 export function introCards(s: {
   noAi: boolean;
@@ -147,9 +148,7 @@ export function introCards(s: {
     (s.teamHandles.length === 0 ||
       (s.alone && presetsLeft(s.teamHandles).length > 0 && s.teamHandles.every((h) => presets.has(h))));
   const next = s.teamHandles.length > 0 && s.alone;
-  return [
-    ...(start ? (["start"] as const) : []),
-    ...(next ? (["next"] as const) : []),
-    ...(s.askStyle && s.aiKnown ? (["style"] as const) : []),
-  ];
+  if (start) return next ? ["start", "next"] : ["start"];
+  if (s.askStyle && s.aiKnown) return ["style"];
+  return next ? ["next"] : [];
 }

@@ -16,7 +16,7 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { answerAfter, BUSINESS_TYPES, startCardPassed } from "@agenteschat/client/lib/team-plan";
+import { BUSINESS_TYPES, startCardAnswer } from "@agenteschat/client/lib/team-plan";
 import { AgentSticker, Button, Icon, Message, MessageText, normalizeAppearance, WAVE_SECONDS } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -40,11 +40,10 @@ import { useToast } from "@/lib/toast";
 
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
- * any AI is connected: its greeting, then the first card the workspace needs. No AI yet: Connect AI. An AI and no
- * agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A team and
- * nobody else here yet: inviting people and the first task. Last, until the person picks, how agents talk to them
- * (ADR 0147). Once the start card has stopped asking, a line to build the team with it, at any time. On the person's
- * first visit, its waving sticker under the greeting, drawn as a sticker message is and decorative (the greeting
+ * any AI is connected: its greeting, then the one card the workspace needs next (`introCards`). No AI yet: Connect
+ * AI. An AI and no agent besides it: how to start. A team: how agents talk to the person (ADR 0147) until they pick,
+ * then, nobody else here yet, inviting people and the first task. With no card left, a line to build the team with
+ * it, at any time. On the person's first visit, its waving sticker under the greeting, drawn as a sticker message is and decorative (the greeting
  * already says hello). Its face and name open the profile card, as on any message.
  */
 export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: string }) {
@@ -55,7 +54,6 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
   const members = useMembers(org.id);
   const connect = useConnectAi();
   const actions = useChannelActions();
-  const messages = useMessages(org.id, channelId).data;
   const wave = useRightHandWave(org.id, agent.id);
   const team = dir.agents.filter((a) => !isRightHand(a));
   const teamHandles = team.map((a) => a.handle);
@@ -126,13 +124,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
       )}
       {cards.includes("next") && team[0] && <NextCard agent={agent} first={team[0]} />}
       {cards.includes("style") && <StyleCard agent={agent} />}
-      {offersTeamSetup({
-        noAi,
-        aiKnown,
-        createsAgents,
-        hasTeam: team.length > 0,
-        cardPassed: startCardPassed(messages),
-      }) && (
+      {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cards }) && (
         <p className="rh-intro__again small muted">
           {t("rightHand.intro.again.question")}{" "}
           <TextAction onClick={() => actions?.resend(t("rightHand.intro.again.message"))}>
@@ -147,7 +139,8 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
 /**
  * How to start (ADR 0137 §10). With no agent yet: "O que a Acme faz?", business types to tap or a sentence to write
  * (each tap the person's own message, which starts the right hand's interview), and the other ways in under it: the
- * team templates, the ready-made agents, an import or the form. Answered, it reads "respondida" with the pick checked.
+ * team templates, the ready-made agents or an import. Answered, it reads "respondida" with the pick alone, and those
+ * ways in are gone.
  * With ready-made agents already made, the tiles of the ones left, each its own Criar.
  */
 function StartCard({
@@ -186,9 +179,10 @@ function StartCard({
     onError: (e) => toast.show(errorText(t, e), "error"),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.agents(org.id) }),
   });
-  const answer = first ? answerAfter(messages, null) : null;
-  const question = first ? t("teamPlan.start.question", { org: org.name }) : t("rightHand.intro.start.question");
   const other = t("teamPlan.business.other");
+  const choices = BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`));
+  const answer = first ? startCardAnswer(messages, choices) : null;
+  const question = first ? t("teamPlan.start.question", { org: org.name }) : t("rightHand.intro.start.question");
   return (
     <>
       <RequestCard
@@ -205,14 +199,14 @@ function StartCard({
           <>
             {first && (
               <AnswerChips
-                choices={BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`))}
+                choices={choices}
                 multiple={false}
                 answer={answer}
                 onSend={(text) => (text === other ? actions?.focusComposer() : actions?.resend(text))}
               />
             )}
             {first && answer === null && <p className="tp-start__write">{t("teamPlan.start.orWrite")}</p>}
-            {presetsOpen && (
+            {presetsOpen && answer === null && (
               <div className="rh-intro__presets">
                 {left.map((p) => {
                   const name = t(`onboarding.presets.${p}.name`);
@@ -238,37 +232,32 @@ function StartCard({
           </>
         }
         actions={
-          <span className="tp-start__foot">
-            <span className="small muted">{t("teamPlan.start.footer")}</span>
-            <Button size="sm" onClick={() => setTemplates(true)}>
-              {t("teamPlan.start.templates")}
-            </Button>
-            {presetsOpen ? (
-              <Button size="sm" variant="ghost" loading={create.isPending} onClick={() => create.mutate(left)}>
-                {t("rightHand.intro.start.team")}
+          answer === null && (
+            <span className="tp-start__foot">
+              <span className="small muted">{t("teamPlan.start.footer")}</span>
+              <Button size="sm" onClick={() => setTemplates(true)}>
+                {t("teamPlan.start.templates")}
               </Button>
-            ) : (
-              <Button size="sm" variant="ghost" onClick={() => setPresetsOpen(true)}>
-                {t("teamPlan.start.presets")}
+              {presetsOpen ? (
+                <Button size="sm" variant="ghost" loading={create.isPending} onClick={() => create.mutate(left)}>
+                  {t("rightHand.intro.start.team")}
+                </Button>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => setPresetsOpen(true)}>
+                  {t("teamPlan.start.presets")}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "import" } })
+                }
+              >
+                {t("rightHand.intro.start.import")}
               </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "import" } })
-              }
-            >
-              {t("rightHand.intro.start.import")}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id } })}
-            >
-              {t("rightHand.intro.start.form")}
-            </Button>
-          </span>
+            </span>
+          )
         }
       />
       <TeamTemplatesDialog open={templates} onClose={() => setTemplates(false)} />

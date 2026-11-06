@@ -76,6 +76,31 @@ describe("a message that mentions me", () => {
     expect(value(css, ".ac-mention--agent", "background")).toBe("var(--mention-bg)");
     expect(value(css, '[data-theme="dark"] .ac-mention--agent', "color")).toBe("var(--mention-ink-dark)");
   });
+
+  test("only a mention of me tints a row: my own, one row like anyone's, gets no plate even under the pointer", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-mine",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-walter" },
+      body: "@joao consegue olhar?",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: new Date().toISOString(),
+    } as Message);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const mine = row("m-mine");
+    expect(mine.classList.contains("ac-msg--mentions-me")).toBe(false);
+    expect(mine.dataset.own).toBe("true");
+    const css = await sheet("packages/ui/src/styles/components.css", "apps/web/src/layout.css");
+    expect(value(css, ".ac-msg[data-own]:hover", "background")).toBe("none");
+    // The just-landed plate is gone; a linked message still fades.
+    const layout = await Bun.file(join(ROOT, "apps/web/src/layout.css")).text();
+    expect(layout).not.toContain("ac-msg--fresh");
+    expect(layout).toContain("msg-focus 2.4s");
+  });
 });
 
 describe("Fixar mensagem", () => {

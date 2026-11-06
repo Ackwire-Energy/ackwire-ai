@@ -5319,8 +5319,10 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   border-radius: 14px;
   transition: background-color 0.12s;
 }
-.ac-msg:hover {
-  background: var(--plate-soft);
+@media (hover: hover) {
+  .ac-msg:hover {
+    background: var(--plate-soft);
+  }
 }
 /* The row a menu is open for (a tap on touch), a step brighter than a hover. */
 .ac-msg[data-menu-open="true"] {
@@ -5404,7 +5406,8 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   padding-left: 96px;
 }
 .ac-msg--own:hover,
-.ac-msg--own[data-menu-open="true"] {
+.ac-msg--own[data-menu-open="true"],
+.ac-msg[data-own]:hover {
   background: none;
 }
 /* 70% of the row where it is wide; in a narrow column (a thread or a task's conversation beside the chat, ~250px

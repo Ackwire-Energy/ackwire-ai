@@ -1444,10 +1444,6 @@ function ChannelView({
           autoScrollUntil.current = Date.now() + 600;
           el.scrollTo({ top: land.top, behavior: "smooth" });
         } else el.scrollTop = land.top;
-        if (!reducedMotionRef.current) {
-          row.classList.add("ac-msg--fresh");
-          setTimeout(() => row.classList.remove("ac-msg--fresh"), HIGHLIGHT_MS);
-        }
         return;
       }
     }

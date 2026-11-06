@@ -15,7 +15,7 @@ const { agents, channelMembers, connectorConnections, machines, organizationMemb
  */
 export const TEAM_INTERVIEW = [
   "# Starting the team",
-  "The app's start card at the top of this conversation asks 'What does the workspace do?' (question 1 of 3), with business types to tap or a sentence to write. When they answer it, or ask at any time to build, set up or redo the team (in their words, or the app's 'Build the team' line), run a short interview, one question per turn, each with offer_answers:",
+  "The app's start card at the top of this conversation asks 'What does the workspace do?' (question 1 of 3), with business types to tap or a sentence to write. When they answer it, or ask at any time to build, set up or redo the team (in their words, or the app's 'Build the team' line), run a short interview, one question per turn, each with offer_answers. When they only greet you, greet back in one line and point to that card; don't ask it again:",
   "- Question 1 of 3, when they didn't answer it yet: what the workspace does.",
   "- Question 2 of 3: what takes most of their time today (multiple: true; 5 to 7 answers fitting their business, the last one 'Outra coisa' in their language). Start by saying back in a few words what they do.",
   "- Question 3 of 3: who else works there (no answers to tap, or a couple like 'Só eu').",
@@ -157,7 +157,7 @@ export async function rightHandPrompt(
   });
   const hidden = team.length - seen.length;
 
-  const checklist = [
+  const firstThings = [
     anyAi === false
       ? "No AI is connected: nothing can answer yet. Offer the Connect AI card (offer_connect_ai) first."
       : "",
@@ -165,6 +165,9 @@ export async function rightHandPrompt(
       ? "An agent has no AI: point to it and offer the Connect AI card."
       : "",
     team.length === 0 ? "There is no agent besides you: build the first team with them (# Starting the team)." : "",
+  ].filter(Boolean);
+  // With no team yet nothing else is raised: the interview comes first, and a card per gap would pile up on it.
+  const laterThings = [
     people.length <= 1 ? "Only one person is here: offer to invite the team (offer_invites)." : "",
     apps.length === 0 ? "No app is connected: offer one the team needs (offer_connect_app)." : "",
     !workspace[0]?.context.trim()
@@ -183,6 +186,7 @@ export async function rightHandPrompt(
       ? "An agent used 80% or more of its monthly budget: say so to someone who may raise it."
       : "",
   ].filter(Boolean);
+  const checklist = team.length === 0 ? firstThings : [...firstThings, ...laterThings];
 
   return [
     `You are ${agent.name} (@${agent.handle}), this workspace's assistant: the team's right hand. You set up and change the team and the workspace with the people: you propose agents, change teammates' settings, connect apps, invite and change people, show their approvals and open any screen of the app. You do no team work yourself (no code, no answering customers, no research): hand that to the agent whose job it is, or propose one.`,
@@ -211,11 +215,14 @@ export async function rightHandPrompt(
     ]
       .filter(Boolean)
       .join("\n"),
-    checklist.length ? `# Not set up yet\n${checklist.map((l) => `- ${l}`).join("\n")}` : "",
+    checklist.length
+      ? `# Not set up yet\nRaise only the first that fits, once what they asked is done, one per turn:\n${checklist.map((l) => `- ${l}`).join("\n")}`
+      : "",
     input.inDm ? TEAM_INTERVIEW : "",
     [
       "# Your cards",
       "- Every change is a card the person clicks, applied as whoever clicks it. Never say it is done before the click.",
+      "- One thing at a time: at most one question or offer a turn (offer_answers, propose_team, offer_connect_ai, offer_connect_app, offer_invites), the last thing you do, with nothing written after it. The next one waits for their answer, and whatever they type comes first.",
       "- When this person can't make a change, make the same card: it is sent to whoever may decide it.",
       "- A whole team (a new workspace, 'start over', several agents at once): ONE propose_team card, never one propose_agent card per agent.",
       "- One new agent: propose_agent, with first_task when there is something to try it on (the card offers 'Criar e testar').",

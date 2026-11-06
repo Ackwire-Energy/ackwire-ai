@@ -489,6 +489,10 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
 }
 
 /* The agent's one card while it waits for its computer (instead of repeated messages); a card face, never the well. */
+.ac-msg__text ~ .waitcard,
+.ac-msg-media ~ .waitcard {
+  margin-top: 14px;
+}
 .waitcard {
   display: flex;
   flex-direction: column;
@@ -1039,7 +1043,8 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 /* Turns are told apart by space: ~10px between messages; the same author
    within 5 minutes continues the row above. */
 /* A message that @mentions the viewer: a tinted row, its corners all round. No accent bar on its left edge: the tint
-   and the name in the words say it. */
+   and the name in the words say it. No other row carries a plate at rest (only a hover on someone else's row, an open
+   menu or a linked message, and those pass). */
 .channel__messages .ac-msg--mentions-me {
   background: color-mix(in srgb, var(--attention) 9%, transparent);
   border-radius: 14px;
@@ -6171,9 +6176,11 @@ html:not([data-pointer]) .msg-quote:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
-/* `?m=`: the linked message gets a soft plate that fades. */
-.channel__messages .ac-msg--focus {
-  background: var(--plate);
+/* `?m=`: the linked message gets a soft plate that fades into the row's own color. */
+@media (prefers-reduced-motion: reduce) {
+  .channel__messages .ac-msg--focus {
+    background: var(--plate);
+  }
 }
 @media (prefers-reduced-motion: no-preference) {
   .channel__messages .ac-msg--focus {
@@ -6184,15 +6191,6 @@ html:not([data-pointer]) .msg-quote:focus-visible {
   0%,
   40% {
     background-color: var(--plate);
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-/* A long answer that just landed at its start: the same fading plate (never with reduced motion, see ChannelPage). */
-@media (prefers-reduced-motion: no-preference) {
-  .channel__messages .ac-msg--fresh {
-    animation: msg-focus 2.4s var(--out);
   }
 }
 

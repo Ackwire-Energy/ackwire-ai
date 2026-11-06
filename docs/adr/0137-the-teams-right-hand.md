@@ -223,6 +223,17 @@ One AI for the whole workspace didn't fit a private DM per person. Lodi's plan w
 
 The start card reads the conversation's first message as its answer and leaves once the team grows, so someone who wrote before connecting an AI, or came back later with agents already here, had no way in. For whoever may create agents, once an AI is there and the start card has stopped asking with no interview under way, the greeting ends with a line and a text action ("Montar o time") that sends their message. The interview is in its prompt in every DM, not only with no team: asked in words or by that line it runs, asks question 1 when it wasn't answered, and proposes around the agents already here.
 
+## Amendment (2026-11-06): one thing at a time (§10)
+
+A first conversation piled up: the start card and "how should I talk to you?" asked at once, the prompt's "not set up yet" list had it offer invites, apps and the computer on top of the interview, and a greeting read as the start card's answer, which left it "respondida" with live buttons and a second "build the team" line under it. So:
+
+- **The greeting's cards are one question at a time** (`introCards`): Connect AI, the start card, then how agents talk, then what next. The ready-made tiles keep what next beside them, as neither waits on an answer. The "build the team" line shows only with a team and no card left.
+- **The start card's answer is one of its choices, or a message the interview followed** (`startCardAnswer`). Anything else leaves it asking. Answered, it keeps only the pick: no other chips, no footer. Answered chips are the same under a question.
+- **One question or offer a turn.** `offer_answers`, `propose_team`, `offer_connect_ai`, `offer_connect_app` and `offer_invites` go through `cardsLeft(ctx, true)`: for the right hand a second one in a turn isn't posted and the tool tells it to end the turn, as no error, since nothing failed. Other cards (several `propose_agent`, settings changes) stay as they were: the person asked for those.
+- **Nothing waits on a card.** It is only ever a limit on what the right hand posts: the composer stays free, and whatever the person types comes first.
+- **With no team, "Not set up yet" holds only the AI and the team**; with one, it raises the first that fits, once what they asked is done, one per turn.
+- `propose_team`'s routines ask for cron: words need the workspace's small model through the gateway, which a workspace on a plan alone doesn't have, so the first card failed with a schedule error.
+
 ## Amendment (2026-11-06): it reads the Drive and the wiki for the person (§12)
 
 ### Context
