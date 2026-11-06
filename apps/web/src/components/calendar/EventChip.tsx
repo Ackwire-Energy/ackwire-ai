@@ -79,6 +79,8 @@ export function EventChip({
   const cadence = useCadence();
   const band = Boolean(item.runs);
   const time = band ? cadence(item) : item.allDay ? t("calendar.allDay") : timeRange(i18n.language, item);
+  // Where a range's start ends: all of it when `time` isn't a range.
+  const startsAt = band || item.allDay ? time.length : formatTime(i18n.language, item.start.toISOString()).length;
   const title =
     item.kind === "deadline" ? t("calendar.deadline", { number: item.issueNumber, title: item.title }) : item.title;
   const label =
@@ -109,7 +111,12 @@ export function EventChip({
           {face && <AgentAvatar agentId={face} size="xs" name="" className="cal-chip__avatar" />}
           <span className="cal-chip__text">
             <span className="cal-chip__title">{title}</span>
-            {variant === "block" && <span className="cal-chip__time tabular">{time}</span>}
+            {variant === "block" && (
+              <span className="cal-chip__time tabular">
+                {time.slice(0, startsAt)}
+                <span className="cal-chip__end">{time.slice(startsAt)}</span>
+              </span>
+            )}
             {variant === "line" && (band || !item.allDay) && (
               <span className="cal-chip__time tabular">
                 {band ? time : formatTime(i18n.language, item.start.toISOString())}

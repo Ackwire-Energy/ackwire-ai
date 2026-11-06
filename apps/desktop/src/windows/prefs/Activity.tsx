@@ -106,7 +106,7 @@ export function Activity() {
     ...homes.map((h) => ({
       value: h.homeId,
       label: orgName(h),
-      mark: <OrgTile name={orgName(h)} logo={h.logo} size="sm" />,
+      mark: <OrgTile logo={h.logo} size="sm" />,
     })),
   ];
   const groups = groupByDay(entries);

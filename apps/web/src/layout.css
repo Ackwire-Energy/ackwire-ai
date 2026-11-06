@@ -170,17 +170,6 @@ p {
 .grid-fields--wide {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
 }
-.org-badge {
-  width: 48px;
-  height: 48px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  font-weight: 700;
-  font-size: 20px;
-}
 .soft-box {
   display: flex;
   flex-wrap: wrap;
@@ -3262,6 +3251,12 @@ html:not([data-pointer]) .channel-ref:focus-visible {
 }
 .level-matrix tbody th {
   font-weight: 600;
+}
+/* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. */
+@media (max-width: 760px) {
+  .level-matrix th:first-child {
+    width: 45%;
+  }
 }
 .level-matrix__head,
 .level-matrix__agent {
@@ -9980,13 +9975,12 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
 .agp-attn__t b {
   font-weight: 600;
 }
-/* One line box as tall as the title's (15/22), with its rise (`ac-captop`): the button overflows it evenly, so it sits
-   centred on that line. */
+/* In the row's middle, as Home's rows: on the title's line a 32px button would reach the card's edge. */
 .agp-attn__tail {
   display: flex;
   flex: none;
+  align-self: center;
   align-items: center;
-  height: 22px;
 }
 .agp-attn__t span {
   color: var(--muted);

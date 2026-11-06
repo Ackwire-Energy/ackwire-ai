@@ -80,7 +80,7 @@ export function Folders() {
             options={homes.map((h) => ({
               value: h.homeId,
               label: orgName(h),
-              mark: <OrgTile name={orgName(h)} logo={h.logo} size="sm" />,
+              mark: <OrgTile logo={h.logo} size="sm" />,
             }))}
           />
         </div>

@@ -919,7 +919,6 @@ function ReqRow({ approval: a, selected, onOpen }: { approval: Approval; selecte
         <ViaGlyph via={via} />
         {where && <span className="ap-li__where">{where}</span>}
         <span className="ap-li__when">
-          {where ? "· " : ""}
           {p === "waiting" || p === "running"
             ? relativeTime(t, i18n.language, a.createdAt)
             : decisionLabel(t, i18n.language, a, me.user.id, dir.memberById)}

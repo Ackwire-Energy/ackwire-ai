@@ -12,6 +12,7 @@ import {
   type Expression,
   Icon,
   type IconName,
+  LogoMark,
   normalizeAppearance,
 } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useState } from "react";
@@ -87,19 +88,13 @@ export function HelpLink({ slug, section, children }: { slug: HelpSlug; section?
   );
 }
 
+const ORG_TILE_PX = { sm: 16, md: 20, lg: 30 };
+
 /**
- * An organization's tile: its logo when it has one (a `data:` URL from the runner), otherwise its
- * first letter on ink, with the agent symbol's cut corner either way.
+ * An organization's tile: its logo when it has one (a `data:` URL from the runner), otherwise the pixel mark, as the
+ * web and the phone show a workspace with no logo.
  */
-export function OrgTile({
-  name,
-  logo,
-  size = "md",
-}: {
-  name: string;
-  logo?: string | null;
-  size?: "sm" | "md" | "lg";
-}) {
+export function OrgTile({ logo, size = "md" }: { logo?: string | null; size?: "sm" | "md" | "lg" }) {
   const [broken, setBroken] = useState<string | null>(null);
   if (logo && broken !== logo) {
     return (
@@ -114,11 +109,7 @@ export function OrgTile({
       />
     );
   }
-  return (
-    <span className="dk-org" data-size={size} aria-hidden="true">
-      {(name.trim()[0] ?? "?").toUpperCase()}
-    </span>
-  );
+  return <LogoMark className="dk-orgmark" size={ORG_TILE_PX[size]} />;
 }
 
 /** An agent drawn by the shared engine, from the look the server sends with the agents frame. */

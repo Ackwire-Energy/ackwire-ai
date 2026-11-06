@@ -203,6 +203,9 @@ p {
   object-fit: cover;
   background: transparent;
 }
+.dk-orgmark {
+  flex: none;
+}
 .dk-avs {
   display: inline-flex;
   align-items: center;

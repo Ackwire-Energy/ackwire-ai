@@ -185,13 +185,7 @@ function OrgLine({ org }: { org: OrgFacts }) {
       : null;
   return (
     <div className="invite__org ac-faceline">
-      {org.logo ? (
-        <OrgMark logo={org.logo} size={32} />
-      ) : (
-        <span className="org-badge" aria-hidden="true">
-          {org.name.trim()[0]?.toUpperCase()}
-        </span>
-      )}
+      <OrgMark logo={org.logo} size={32} />
       <div className="invite__org-text">
         <b className={cx("invite__org-name", (org.by || crew) && "ac-captop")}>{org.name}</b>
         {org.by && <span>{t("invite.from", { name: org.by })}</span>}
