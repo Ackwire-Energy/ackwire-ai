@@ -9680,10 +9680,24 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
     inset 2px 0 0 var(--ink);
 }
 /*
- * The overview, one column: its cards and the Ficha a readable width, under the face and name.
+ * The overview. Wide: what it does and its recent work on the left, the Ficha as a column on the right (its rows
+ * put the label over the value there). The last row takes what the Ficha needs past the left column, so the
+ * left cards never spread apart. Narrow (the panel, below 1100px): one column in the markup's order.
  */
 .agp-overview {
-  max-width: 820px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  grid-template-rows: auto auto 1fr;
+  align-items: start;
+  gap: 16px 24px;
+  max-width: 1240px;
+}
+.agp-overview > * {
+  grid-column: 1;
+}
+.agp-overview > .agp-overview__side {
+  grid-column: 2;
+  grid-row: 1 / span 3;
 }
 /*
  * The Ficha (Overview): how it works and who it works with, as two lists of rows on the root card's face. A row is
@@ -9723,6 +9737,9 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
     "key label sub tail";
   gap: 0 12px;
   align-items: center;
+  /* The tracks keep their content's height: stretched to the row's min height, the value would sit in the top half
+     while the label, spanning both, stays centered. */
+  align-content: center;
   width: calc(100% - 8px);
   min-height: 50px;
   margin: 0 4px;

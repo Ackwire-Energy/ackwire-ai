@@ -264,6 +264,13 @@
   .agp-cols {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* The overview in one column: the Ficha between what it does and its recent work. */
+  .agp-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 820px;
+  }
 }
 @media (max-width: 900px) {
   .agp-cfg {
@@ -357,6 +364,12 @@
 @container agp-side (max-width: 1100px) {
   .agp-cols {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .agp-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 820px;
   }
 }
 @container agp-side (max-width: 900px) {

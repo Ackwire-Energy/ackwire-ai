@@ -40,7 +40,7 @@ export function OverviewTab() {
   return (
     <>
       <ReadOnlyNote />
-      <div className="agp-col agp-overview">
+      <div className="agp-overview">
         {(approvals > 0 || pending.length > 0) && (
           <div className="agp-attns">
             {approvals > 0 && (
@@ -114,9 +114,11 @@ export function OverviewTab() {
           )}
         </Card>
 
-        <Ficha />
+        <div className="agp-col agp-overview__side">
+          <Ficha />
+        </div>
 
-        <Card as="section" className="agp-card" aria-labelledby="ov-recent">
+        <Card as="section" className="agp-card agp-overview__recent" aria-labelledby="ov-recent">
           <CardHead
             id="ov-recent"
             icon="routines"
