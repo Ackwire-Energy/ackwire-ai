@@ -45,7 +45,8 @@ const openTab = async (name: RegExp) => {
     fireEvent.pointerDown(within(tabs).getByRole("button", { name: /^Mais/ }), { button: 0, ctrlKey: false }),
   );
   await settle(2);
-  await click(within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name }));
+  // Named by its button: "Mais", or "Mais 2" while those tabs hold unsaved changes.
+  await click(within(screen().getByRole("menu", { name: /^Mais/ })).getByRole("menuitem", { name }));
   await settle(2);
 };
 const saveBar = () => screen().queryByRole("region", { name: "Alterações não salvas" });
