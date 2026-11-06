@@ -1,8 +1,10 @@
 import {
+  asksPicture,
   BROWSER_FPS,
   type BrowserHandoff,
   browserFrameDataUrl,
   browserSteps,
+  type DesktopViewState,
   handoffFuse,
   handoffTimeLeft,
   isOpenHandoff,
@@ -13,7 +15,9 @@ import {
   useAgentScreenControl,
   useBrowserHandoffActions,
   useBrowserProfileMutations,
+  useBrowserScreen,
   useBrowserStuck,
+  useDesktopPicture,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
@@ -29,12 +33,14 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import { useAppActive } from "@/lib/useAppActive";
 import { Sky } from "@/sky/Sky";
 import { Button, Fuse, Icon, PixelOrbit, Text, useToast } from "@/ui";
+import { ScreenWatch, type ScreenWatchHandle } from "../computer/ScreenWatch";
 import { useColors, useDirectory, useEdition, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
-import { pageGapKey, pageNoteOf, siteOf, skyBehind, stepText, waitsForPage } from "./logic";
+import { framesWanted, pageGapKey, pageNoteOf, siteOf, skyBehind, stepText, waitsForPage } from "./logic";
 import { AddressBar, browserTyping, FrameView, TypeBar, useLiveConnection } from "./parts";
 import { useFinishHandoff } from "./useFinishHandoff";
 
@@ -126,39 +132,81 @@ export function BrowserCard({
   const holding = Boolean(meId) && handoff?.status === "active" && handoff.controllerUserId === meId;
   const working = Boolean(run) || busy;
   const watching = open || working || holding;
+  // Its browser on the agent's screen, which this person may watch: the card shows that whole screen instead of the
+  // browser's frames (ADR 0058 §7), only while open with the app in front, and lingering a little after.
+  const active = useAppActive();
+  const screen = useBrowserScreen(orgId, agentId, {
+    enabled: !surface && !profile,
+    userId: meId ?? "",
+    shown: open && active,
+    poll: open || working,
+    holdsBrowser: holding,
+  });
+  const onScreen = screen.desktop;
+  const [pageState, setPageState] = useState<DesktopViewState>("connecting");
+  const watchRef = useRef<ScreenWatchHandle>(null);
+  // The screen's view stays loaded while its stream lingers after the card folds, so a quick reopen reuses the page
+  // and its socket; once gone, the next one opens afresh: nothing to drive until it says it's live.
+  const screenMounted = onScreen && (open || screen.connect);
+  useEffect(() => {
+    if (!screenMounted) setPageState("connecting");
+  }, [screenMounted]);
   // Closed, the card's picture is a thumbnail: a frame a second is plenty, on mobile data too (ADR 0040 §7.1).
   // Open, the page at the stream's own rate (several views of one agent get the most any of them needs).
   const live = useLiveConnection(
     profile ? profileLiveKey(profile.id) : agentId,
-    watching || Boolean(profile),
+    framesWanted({
+      watching,
+      profile: Boolean(profile),
+      holding,
+      settled: screen.settled,
+      desktop: onScreen,
+    }),
     open ? undefined : BROWSER_FPS.preview,
   );
-  const controller = live.handoff?.controllerUserId ?? live.controllerUserId ?? handoff?.controllerUserId ?? null;
+  // Closed on the agent's screen: a recent picture of it, never a stream.
+  const shot = useDesktopPicture(orgId, agentId, {
+    enabled: onScreen && active && asksPicture(!open && working, screen.status.data ?? null),
+    working,
+  });
+  const picture = onScreen && !open ? shot.data?.picture : null;
+  const controller =
+    live.handoff?.controllerUserId ??
+    live.controllerUserId ??
+    handoff?.controllerUserId ??
+    // The desktop's controller holds the browser only while the browser is on that screen.
+    (screen.status.data?.browserOnDesktop ? screen.status.data.controllerUserId : null) ??
+    null;
   const mine = Boolean(meId) && controller === meId;
   const waiting = handoff?.status === "pending";
   const steps = browserSteps(run?.work);
   const host = siteOf(live.frame?.metadata.url, steps);
   const doing = steps.at(-1);
   const helper = controller && !mine ? dir.nameOf({ type: "person", id: controller }) : "";
-  const closed = live.unavailable === "closed";
+  const closed = !onScreen && live.unavailable === "closed";
   useEffect(() => onClosed?.(closed), [closed, onClosed]);
   // Assumir and Parar need a live page to drive; full screen, Assumir also opens a closed browser (there is
   // an address to open a site there).
-  const ready = watching && Boolean(live.frame) && !live.unavailable;
+  const ready = onScreen ? open && pageState === "live" : watching && Boolean(live.frame) && !live.unavailable;
   const canTake = canTakeOver && (ready || (surface && closed));
   const goShown = surface && mine && (closed || !live.frame || isBlankPage(live.frame.metadata.url));
   // Opening or reconnecting for too long says so, with Try again (as on the web). Only while the app's socket is
   // open: without a network no page can come, and the agent's browser isn't the one to blame.
   const [attempt, setAttempt] = useState(0);
   const waitingForPage =
-    watching && live.online && !live.hidden && waitsForPage(live.unavailable) && !(live.frame && !live.unavailable);
+    !onScreen &&
+    watching &&
+    live.online &&
+    !live.hidden &&
+    waitsForPage(live.unavailable) &&
+    !(live.frame && !live.unavailable);
   const stuck = useBrowserStuck(waitingForPage, attempt);
   const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
   // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
   const hiddenNote = surface
     ? t("browser.inCard.hiddenHelp", agentGrammar(name))
     : t("mobile.browser.live.hidden", { name: helper });
-  const sky = !live.frame && skyBehind(note);
+  const sky = !onScreen && !live.frame && skyBehind(note);
   const doneLabel = handoff?.kind === "takeover" ? t("mobile.browser.live.handBack") : t("mobile.browser.live.done");
 
   // A push or the inbox opened this request: the card opens and takes the control (first one wins).
@@ -224,6 +272,11 @@ export function BrowserCard({
   const retry = () => {
     tapHaptic();
     setAttempt((n) => n + 1);
+    if (onScreen) {
+      watchRef.current?.retry();
+      void screen.status.refetch();
+      return;
+    }
     if (mayDrive && !profile) void actions.restart(agentId).catch(failedToast).finally(live.retry);
     else live.retry();
   };
@@ -276,7 +329,18 @@ export function BrowserCard({
           {!open ? (
             // Closed: the page's small live picture.
             <View style={[styles.thumb, { backgroundColor: c.sunken, borderColor: c.line }]}>
-              {live.frame ? (
+              {onScreen ? (
+                picture ? (
+                  <Image
+                    source={{ uri: `data:image/jpeg;base64,${picture.data}` }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="contain"
+                    fadeDuration={0}
+                  />
+                ) : (
+                  <Icon name="globe" size={18} color={c.faint} />
+                )
+              ) : live.frame ? (
                 <Image
                   source={{ uri: browserFrameDataUrl(live.frame) ?? undefined }}
                   style={StyleSheet.absoluteFill}
@@ -347,45 +411,64 @@ export function BrowserCard({
         </Pressable>
       )}
 
+      {/* One place in the tree for the screen, open or folded, so folding parks it (out of the layout) instead of
+          closing it. */}
+      {screenMounted ? (
+        <ScreenWatch
+          ref={watchRef}
+          agentId={agentId}
+          connect={screen.connect}
+          parked={!open}
+          onState={(state) => {
+            setPageState(state);
+            screen.report(state);
+          }}
+          style={[styles.screen, !mine && !helper && steps.length === 0 && styles.pageLast]}
+        />
+      ) : null}
       {open ? (
         <>
-          <View
-            style={[
-              styles.page,
-              // Nothing under the page (no controls, note or steps): it keeps the card's margin at the bottom too.
-              !mine && !(helper && !live.hidden) && steps.length === 0 && styles.pageLast,
-              sky ? null : { backgroundColor: c.sunken },
-            ]}
-          >
-            {sky ? <Sky color={color} surface="raised" depth={0.95} fade={0} style={StyleSheet.absoluteFill} /> : null}
-            {live.frame ? <FrameView frame={live.frame} enabled={mine} onInput={live.sendInput} /> : null}
-            {!live.frame || live.unavailable ? (
-              <View style={[styles.center, live.frame ? styles.overlay : null]}>
-                <View style={sky ? [styles.onSky, raised] : styles.lines}>
-                  {note.spin ? (
-                    <ActivityIndicator color={c.muted} />
-                  ) : note.say === "hidden" ? (
-                    <Icon name="eyeoff" size={18} color={c.muted} />
-                  ) : null}
-                  <Text variant="small" tone="ink" style={[styles.semibold, styles.centerText]}>
-                    {note.say === "starting"
-                      ? t(`mobile.browser.card.starting${g}`, { name })
-                      : note.say === "hidden"
-                        ? hiddenNote
-                        : t(pageGapKey(note.say, g, cloud), { name })}
-                  </Text>
-                  {note.help && (note.help !== "stuckHelp" || mayDrive) ? (
-                    <Text variant="caption" tone="muted" style={styles.centerText}>
-                      {t(`mobile.browser.live.${note.help}${g}`, { name })}
+          {onScreen ? null : (
+            <View
+              style={[
+                styles.page,
+                // Nothing under the page (no controls, note or steps): it keeps the card's margin at the bottom too.
+                !mine && !(helper && !live.hidden) && steps.length === 0 && styles.pageLast,
+                sky ? null : { backgroundColor: c.sunken },
+              ]}
+            >
+              {sky ? (
+                <Sky color={color} surface="raised" depth={0.95} fade={0} style={StyleSheet.absoluteFill} />
+              ) : null}
+              {live.frame ? <FrameView frame={live.frame} enabled={mine} onInput={live.sendInput} /> : null}
+              {!live.frame || live.unavailable ? (
+                <View style={[styles.center, live.frame ? styles.overlay : null]}>
+                  <View style={sky ? [styles.onSky, raised] : styles.lines}>
+                    {note.spin ? (
+                      <ActivityIndicator color={c.muted} />
+                    ) : note.say === "hidden" ? (
+                      <Icon name="eyeoff" size={18} color={c.muted} />
+                    ) : null}
+                    <Text variant="small" tone="ink" style={[styles.semibold, styles.centerText]}>
+                      {note.say === "starting"
+                        ? t(`mobile.browser.card.starting${g}`, { name })
+                        : note.say === "hidden"
+                          ? hiddenNote
+                          : t(pageGapKey(note.say, g, cloud), { name })}
                     </Text>
-                  ) : null}
-                  {note.say === "stuck" ? (
-                    <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={retry} />
-                  ) : null}
+                    {note.help && (note.help !== "stuckHelp" || mayDrive) ? (
+                      <Text variant="caption" tone="muted" style={styles.centerText}>
+                        {t(`mobile.browser.live.${note.help}${g}`, { name })}
+                      </Text>
+                    ) : null}
+                    {note.say === "stuck" ? (
+                      <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={retry} />
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-            ) : null}
-          </View>
+              ) : null}
+            </View>
+          )}
           {mine ? (
             <View style={styles.control}>
               {goShown ? (
@@ -491,6 +574,8 @@ const styles = StyleSheet.create({
   hint: { marginTop: 2 },
   flip: { transform: [{ rotate: "180deg" }] },
   page: { aspectRatio: 16 / 10, marginHorizontal: 8, borderRadius: 12, overflow: "hidden" },
+  // The whole screen, its own shape (ScreenWatch sets it): never cropped.
+  screen: { marginHorizontal: 8, borderRadius: 12 },
   pageLast: { marginBottom: 8 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 },
   lines: { alignItems: "center", gap: 8 },

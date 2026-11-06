@@ -33,6 +33,7 @@ const DesktopStatus = z
     held: z.boolean().openapi({
       description: "The agent is held, or its workspace is on hold: people may watch, nobody takes control.",
     }),
+    browserOnDesktop: z.boolean().openapi({ description: "The agent's browser runs on this desktop (ADR 0058 §7)." }),
   })
   .openapi("DesktopStatus");
 

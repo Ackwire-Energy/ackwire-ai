@@ -493,8 +493,9 @@ export function buildEngine(o: EngineOptions) {
         { db, hub: machineHub, rateLimiter: adapters.rateLimiter, pubsub: adapters.pubsub },
         input,
       );
-      // Someone opened the agent's desktop: its browser gets ready for the agent's next command meanwhile.
-      if (input.request.kind === "desktop" && "machineId" in target && !target.held) {
+      // Someone opened the agent's desktop: its browser gets ready for the agent's next command meanwhile. Not for
+      // a browser card's view (ADR 0058 §7): a card that only looks doesn't start Chrome again after Stop.
+      if (input.request.kind === "desktop" && "machineId" in target && !target.held && !input.preview) {
         warmBrowser({ orgId: input.orgId, agentId: input.agentId, machineId: target.machineId });
       }
       return target;

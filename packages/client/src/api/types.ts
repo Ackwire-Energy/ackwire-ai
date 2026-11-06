@@ -6608,6 +6608,8 @@ export interface DesktopStatus {
   controlRefusal?: "pairer" | "owner_plan" | "role" | "not_allowed" | null;
   /** The agent is held, or the workspace is on hold: people watch, nobody takes control. */
   held: boolean;
+  /** The agent's browser runs on this desktop (ADR 0058 §7). Absent from older servers. */
+  browserOnDesktop?: boolean;
 }
 
 /** `GET …/desktop/picture`: a recent picture of the agent's screen, or why there is none. */

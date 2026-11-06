@@ -140,3 +140,29 @@
     display: none;
   }
 }
+
+/*
+ * The browser card's view of the screen its browser runs on (ADR 0058 §7): the whole screen, scaled into the card
+ * in its own shape (no bands, nothing cut), the card's covers over it.
+ */
+.dsk--card {
+  gap: 0;
+}
+.dsk--card > .dsk-stage {
+  position: relative;
+}
+.brw-mf .dsk-screen {
+  max-height: none;
+  border-radius: 0;
+  box-shadow: none;
+  aspect-ratio: 1280 / 900;
+}
+.brw-ac.is-full .dsk--card,
+.brw-ac.is-full .dsk--card > .dsk-stage {
+  height: 100%;
+}
+.brw-ac.is-full .dsk-screen {
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+}

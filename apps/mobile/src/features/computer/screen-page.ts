@@ -31,9 +31,11 @@ const VIEW_STATES: ReadonlySet<string> = new Set<DesktopViewState>([
   "ended",
 ]);
 
-/** The page's address for one agent. */
-export const screenPageUrl = (server: string, orgId: string, agentId: string) =>
-  `${server}/screen.html?${new URLSearchParams({ o: orgId, a: agentId }).toString()}`;
+/** The page's address for one agent. `preview`: a browser card's view, which only watches (ADR 0058 §7). */
+export const screenPageUrl = (server: string, orgId: string, agentId: string, o: { preview?: boolean } = {}) => {
+  const query = new URLSearchParams({ o: orgId, a: agentId, ...(o.preview ? { p: "1" } : {}) });
+  return `${server}/screen.html?${query.toString()}`;
+};
 
 /** This WebView holds a session, so only the server's own page ever loads in it: never a link, a redirect or a frame. */
 export function screenPageStays(server: string, url: string): boolean {

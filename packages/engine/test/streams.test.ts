@@ -481,6 +481,88 @@ describe("the broker", () => {
   });
 });
 
+describe("a browser card's view of the screen (ADR 0058 §7)", () => {
+  test("never starts the desktop, holds 3 of its 4 places, yields to a full viewer and never changes mode", async () => {
+    f = await setup();
+    const machine = await paired();
+    let off = true;
+    let refuseOnce = false;
+    const { broker, requests } = brokerFor(machine, {
+      authorize: async (input) => ({
+        machineId: machine.machineId,
+        agent: { id: input.agentId, handle: "dev" },
+        switches: true,
+      }),
+      reply: async (request) => {
+        if (request.op !== "stream.open") throw new Error(`unexpected ${request.op}`);
+        if (off && request.start !== true) {
+          throw new MachineRequestError("desktop_off", "The agent's desktop isn't running");
+        }
+        // The computer still counts the card's view that just yielded, until its data socket has closed.
+        if (refuseOnce) {
+          refuseOnce = false;
+          throw new MachineRequestError("too_many_streams", "Too many");
+        }
+        const link = broker.accept(fakeSocket().socket);
+        const hello = { type: "stream.hello", token: machine.token, streamId: request.streamId };
+        await broker.fromRunner(link, JSON.stringify(hello));
+        return { opened: true };
+      },
+    });
+    const preview = (userId = f.owner.id): StreamInput => ({
+      ...input(WATCH, f.agent.id, userId),
+      preview: true,
+      switches: true,
+    });
+    const open = async (what: StreamInput) => {
+      const viewer = fakeSocket();
+      const stream = broker.open(viewer.socket, what);
+      await until(() => stream.runner !== null || viewer.closed !== null, "the stream");
+      return { viewer, stream };
+    };
+
+    // A desktop that isn't running stays so: refused, with no start and no start after it.
+    const stopped = await open(preview());
+    expect(stopped.viewer.closed).toEqual({ code: STREAM_CLOSE.refused, reason: "desktop_off" });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ op: "stream.open", kind: "desktop", mode: "watch" });
+    expect(requests[0]).not.toHaveProperty("start");
+
+    off = false;
+    const cards = [await open(preview()), await open(preview("bia")), await open(preview("caio"))];
+    expect(cards.every((c) => c.viewer.closed === null && c.stream.runner !== null)).toBe(true);
+    for (const r of requests.slice(1)) expect(r).not.toHaveProperty("start");
+    // A fourth card would take the last place, which stays for whoever opens the screen itself.
+    expect((await open(preview("dani"))).viewer.closed).toEqual({
+      code: STREAM_CLOSE.tooMany,
+      reason: "too_many_streams",
+    });
+
+    // Never turned to control: no `{"type":"mode"}` frame, nothing switched.
+    broker.switchWhere(() => true, "control");
+    for (const c of cards) {
+      expect(broker.switches(c.stream)).toBe(false);
+      expect(c.stream.request).toEqual(WATCH);
+      expect(c.viewer.sent).toEqual([]);
+    }
+
+    // A person opening the screen itself takes the last place, then the oldest card's.
+    const first = await open(input(WATCH));
+    expect(first.viewer.closed).toBeNull();
+    refuseOnce = true;
+    const before = requests.length;
+    const second = await open(input(WATCH, f.agent.id, "bia"));
+    expect(second.viewer.closed).toBeNull();
+    expect(second.stream.runner).not.toBeNull();
+    expect(cards[0]?.viewer.closed).toEqual({ code: STREAM_CLOSE.tooMany, reason: "preview_yield" });
+    expect(cards.slice(1).every((c) => c.viewer.closed === null)).toBe(true);
+    // Asked again once, after the computer's own count let go of the card's view.
+    expect(requests.slice(before).map((r) => r.op)).toEqual(["stream.open", "stream.open"]);
+    expect(requests.at(-1)).toMatchObject({ start: true });
+    expect(broker.count(f.agent.id, "desktop")).toBe(4);
+  });
+});
+
 describe("who may open which stream, and where", () => {
   const setMachine = (id: string, values: Partial<typeof schema.machines.$inferInsert>) =>
     f.db.update(schema.machines).set(values).where(eq(schema.machines.id, id));

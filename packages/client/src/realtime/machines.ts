@@ -113,6 +113,12 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   const executors = e.type === "machine.updated" && e.executors !== undefined;
   if ((e.type !== "machine.state" && e.type !== "machine.updated") || e.access !== undefined || accounts || executors) {
     void qc.invalidateQueries({ queryKey: keys.browser(orgId) });
+    // The agents' screens too: a browser card on one goes back to its frames at once (ADR 0058 §7). Their states
+    // only: each picture asked again is a capture on a computer.
+    void qc.invalidateQueries({
+      queryKey: keys.agentDesktops(orgId),
+      predicate: (q) => q.queryKey.length === keys.agentDesktop(orgId, "").length,
+    });
     void qc.invalidateQueries({ predicate: (q) => isAgentBrainKey(q.queryKey, orgId) });
     void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
     void qc.invalidateQueries({ queryKey: keys.planUsage(orgId) });
@@ -226,6 +232,7 @@ export function applyComputerEvent(qc: QueryClient, orgId: string, event: { type
   // A new computer changes what can think and whether the browser is there.
   void qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, e.agentId) });
   void qc.invalidateQueries({ queryKey: keys.agentBrowser(orgId, e.agentId) });
+  void qc.invalidateQueries({ queryKey: keys.agentDesktop(orgId, e.agentId), exact: true });
 }
 
 const SETUP_FIELDS = [
