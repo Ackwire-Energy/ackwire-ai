@@ -182,7 +182,10 @@ export async function mySidebarToolOrder(db: Database, orgId: string, userId: st
   return sidebarToolOrderOf((row?.items as Record<string, unknown> | undefined)?.[TOOLS_KEY]);
 }
 
-/** Saves the person's order of the tools in this workspace (`null`: back to the default); places and sections stay. */
+/**
+ * Saves the person's order of the tools in this workspace (`null`: back to the default); places and sections stay. A
+ * tab left open across a deploy sends the tools it knew, so `order` goes through `sidebarToolOrderOf` and isn't refused.
+ */
 export async function setMySidebarToolOrder(
   db: Database,
   orgId: string,
@@ -190,8 +193,6 @@ export async function setMySidebarToolOrder(
   order: readonly string[] | null,
 ): Promise<SidebarItem[]> {
   await requirePermission(db, userId, orgId, "read");
-  if (order !== null && (order.length !== SIDEBAR_ITEMS.length || sidebarToolOrderOf(order).join() !== order.join()))
-    throw new ValidationError("the order must list every tool once");
   const items = organizationMembers.sidebarItems;
   const [row] = await db
     .update(organizationMembers)
@@ -199,7 +200,7 @@ export async function setMySidebarToolOrder(
       sidebarItems:
         order === null
           ? sql`${items} - ${TOOLS_KEY}::text`
-          : sql`${items} || jsonb_build_object(${TOOLS_KEY}::text, ${JSON.stringify(order)}::jsonb)`,
+          : sql`${items} || jsonb_build_object(${TOOLS_KEY}::text, ${JSON.stringify(sidebarToolOrderOf(order))}::jsonb)`,
     })
     .where(mine(orgId, userId))
     .returning({ items });

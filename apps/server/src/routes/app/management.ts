@@ -962,7 +962,7 @@ export function managementRoutes(deps: AppDeps) {
       summary: "Order the tools at the top of your sidebar in this workspace",
       description:
         "Yours alone, on every device. `order: null` goes back to the default; the tools' places and the sections' order stay.",
-      request: { params: OrgParams, body: body(z.object({ order: SidebarToolOrder.nullable() })) },
+      request: { params: OrgParams, body: body(z.object({ order: z.array(z.string().max(40)).max(100).nullable() })) },
       responses: { 200: json(z.object({ order: SidebarToolOrder })), ...errors },
     }),
     async (c) => {
