@@ -40,7 +40,7 @@ import { type CacheFill, type CloneSlots, gitSync } from "./git";
 import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
-import { agentWorkspace, hiddenIn, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
+import { agentWorkspace, hiddenIn, isInside, resolveForAgent } from "./paths";
 import { pullFile } from "./pull";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
