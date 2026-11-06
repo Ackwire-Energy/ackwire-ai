@@ -101,6 +101,9 @@ export function useConnection(): RealtimeConnection | null {
   return useRealtime().connection;
 }
 
+/** The organization's WebSocket is open now: my own row in the people reads connected (`withMyConnection`). */
+export const useSocketOpen = () => useRealtime().status === "open";
+
 /** Theme colors by token name (`bg`, `raised`, `sunken`, `line`, `ink`, `muted`, `faint`, `agent`, `danger`…). */
 export function useColors() {
   return useTheme().colors;

@@ -9,11 +9,12 @@ import type {
   Person,
 } from "@agenteschat/client";
 import { keys, useApi } from "@agenteschat/client";
-import { agentPresenceShown, agentStatusText } from "@agenteschat/client/lib/presence";
+import { agentPresenceShown, agentStatusText, withMyConnection } from "@agenteschat/client/lib/presence";
 import { useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useCallback } from "react";
 import { useOrg } from "@/components/org-context";
+import { useConnectionStatus } from "@/realtime/context";
 
 /*
  * Presence and written status (ADR 0084) for one person or one agent, read from the lists every screen shares
@@ -42,11 +43,18 @@ export interface PersonPresence {
   person: Person;
 }
 
+/** This app's socket is open: my own row reads connected (`withMyConnection`), wherever I'm shown. */
+const useConnected = () => useConnectionStatus() === "open";
+
 /** A person's presence and line; null while the people load or for someone not in the workspace. */
 export function usePersonPresence(userId: string | null | undefined): PersonPresence | null {
   const { org } = useOrg();
   const api = useApi();
-  const pick = useCallback((list: Person[]) => list.find((p) => p.userId === userId) ?? null, [userId]);
+  const connected = useConnected();
+  const pick = useCallback(
+    (list: Person[]) => withMyConnection(list, connected).find((p) => p.userId === userId) ?? null,
+    [userId, connected],
+  );
   const person = useQuery({
     queryKey: keys.people(org.id),
     queryFn: () => api.orgs.people(org.id),
@@ -58,12 +66,15 @@ export function usePersonPresence(userId: string | null | undefined): PersonPres
   return { presence: person.presence, status: live(person.status), person };
 }
 
-const presenceMap = (list: Person[]) => new Map(list.map((p) => [p.userId, p.presence]));
-
 /** Everyone's presence in the workspace by user id (empty while the people load). */
 export function usePresences(): Map<string, MemberPresence> {
   const { org } = useOrg();
   const api = useApi();
+  const connected = useConnected();
+  const presenceMap = useCallback(
+    (list: Person[]) => new Map(withMyConnection(list, connected).map((p) => [p.userId, p.presence])),
+    [connected],
+  );
   return (
     useQuery({
       queryKey: keys.people(org.id),

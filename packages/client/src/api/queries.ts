@@ -31,6 +31,7 @@ import {
   upsertInPages,
   withServerCounts,
 } from "../lib/notifications";
+import { withMyConnection } from "../lib/presence";
 import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
@@ -2241,10 +2242,17 @@ export function useUpdateSettings(orgId: string) {
   });
 }
 
-export const usePeople = (orgId: string) => {
+/** The people with their presence; `connected`: this app's socket is open, so my row reads connected (`withMyConnection`). */
+export const usePeople = (orgId: string, connected = false) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.people(orgId), queryFn: () => api.orgs.people(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.people(orgId),
+    queryFn: () => api.orgs.people(orgId),
+    staleTime: 30_000,
+    select: connected ? connectedPeople : undefined,
+  });
 };
+const connectedPeople = (people: Person[]) => withMyConnection(people, true);
 
 /**
  * Your availability and line (ADR 0084), shown at once in the people (yours is the only row that changes);

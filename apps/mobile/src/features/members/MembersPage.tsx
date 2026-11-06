@@ -25,7 +25,7 @@ import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, PersonAvatar, useToast } from "@/ui";
 import { Page } from "../me/parts";
 import { Face } from "../shared/Face";
-import { useColors, useMeId } from "../shared/hooks";
+import { useColors, useMeId, useSocketOpen } from "../shared/hooks";
 import { errorHaptic, Loaded, successHaptic } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { InvitationSheet } from "./InviteSheets";
@@ -59,7 +59,7 @@ function Members() {
   const { orgId, org } = useOrg();
   const c = useColors();
   const meId = useMeId();
-  const people = usePeople(orgId);
+  const people = usePeople(orgId, useSocketOpen());
   const roles = useRoles(orgId).data?.roles ?? [];
   const invites = can(org, "invite_people");
   const list = people.data;
