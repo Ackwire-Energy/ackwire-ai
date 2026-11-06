@@ -90,6 +90,12 @@ describe("one rhythm, the web's numbers (chat-rhythm-css.test.ts holds them to t
     expect(styleOf(group, "rule")).toContain("flex: 1");
     expect(group).not.toContain("marginBottom: -6");
     // Inside a message, between turns too: the body's part gap and the line's own room make the turn's.
-    expect(group).toContain("marginVertical: rhythm.turn - rhythm.part");
+    expect(group).toContain("marginTop: gap ?? rhythm.turn - rhythm.part,");
+    expect(group).toContain("marginBottom: rhythm.turn - rhythm.part,");
+    // Two in a row stack at the part gap, as the list's quiet lines: the room under the first, the list's gap and the
+    // second's margin add up to it.
+    const reach = await read("chat/ReachLines.tsx");
+    expect(reach).toContain("list: { gap: LIST_GAP }");
+    expect(reach).toContain("gap={talkAbove ? rhythm.part - (rhythm.turn - rhythm.part) - LIST_GAP : undefined}");
   });
 });

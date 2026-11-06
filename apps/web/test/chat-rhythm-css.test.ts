@@ -175,4 +175,12 @@ test("the agents' line is the conversation's width, the pair on its middle, and 
     r.selectors.some((s) => s.includes(".ag-rc--talk:last-child") && s.endsWith("+*")),
   );
   expect(after?.declarations).toContainEqual(["--row-gap", "var(--msg-part-gap)"]);
+  // Two in a row stack at the part gap: the room under the first, the stack's 6px and this margin add up to it.
+  expect(last(".ag-rcs--stack", "gap")).toBe("6px");
+  const next = rules(css).find((r) => r.selectors.some((s) => s.endsWith(".ag-rc--talk+.ag-rc--talk")));
+  expect(next?.declarations).toContainEqual(["padding-top", "0"]);
+  expect(next?.declarations).toContainEqual([
+    "margin-top",
+    "calc(2 * var(--msg-part-gap) - var(--msg-turn-gap) - 6px)",
+  ]);
 });

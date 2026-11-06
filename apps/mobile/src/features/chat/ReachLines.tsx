@@ -27,6 +27,9 @@ import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
 import { ConsultPairRow, useConsultById } from "./ConsultGroup";
+import { useRhythm } from "./look";
+
+const LIST_GAP = 8;
 
 /**
  * On the phone, under an agent's message, every agent it @named that its mention didn't wake (`meta.reach`): one
@@ -39,15 +42,26 @@ export function ReachLines({ message: m }: { message: Message }) {
   if (m.author.type !== "agent" || list.length === 0) return null;
   return (
     <View style={styles.list}>
-      {list.map((e) => (
-        <Row key={e.agentId} entry={e} channelId={m.channelId} authorId={m.author.id ?? ""} />
+      {list.map((e, i) => (
+        <Row key={e.agentId} entry={e} above={list[i - 1]} channelId={m.channelId} authorId={m.author.id ?? ""} />
       ))}
     </View>
   );
 }
 
-function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: string; authorId: string }) {
+function Row({
+  entry: e,
+  above,
+  channelId,
+  authorId,
+}: {
+  entry: ReachEntry;
+  above: ReachEntry | undefined;
+  channelId: string;
+  authorId: string;
+}) {
   const { t } = useTranslation();
+  const rhythm = useRhythm();
   const { colors } = useTheme();
   const orgId = useOrgId();
   const dir = useDirectory();
@@ -58,6 +72,7 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   const g = agentGrammar(agent?.name ?? `@${e.handle}`);
   const handed = Boolean(e.consultationId);
   const talk = useConsultById(channelId, reachOpens(e) ? e.consultationId : undefined);
+  const talkAbove = useConsultById(channelId, above && reachOpens(above) ? above.consultationId : undefined);
   const runs = boldRuns(t(reachKey(e) as "reach.handed", { ...g, place }) as string);
   const detail = [
     !handed && e.outside ? t("reach.outside", { place }) : null,
@@ -66,7 +81,18 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
     .filter(Boolean)
     .join(" · ");
   // Handed to it by direct message: the two agents talking, as the pair row that opens their conversation.
-  if (talk) return <ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />;
+  // Under another such line they stack as one group, as the list's quiet lines do: the part gap between them, past
+  // the room the one above keeps under it and the list's own gap.
+  if (talk)
+    return (
+      <ConsultPairRow
+        askerId={authorId}
+        channelId={channelId}
+        items={[talk]}
+        inline
+        gap={talkAbove ? rhythm.part - (rhythm.turn - rhythm.part) - LIST_GAP : undefined}
+      />
+    );
   return (
     <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
       <View style={styles.tx}>
@@ -215,7 +241,7 @@ export function confirmQuestion(t: TFunction, question: { title: string; descrip
 }
 
 const styles = StyleSheet.create({
-  list: { gap: 8 },
+  list: { gap: LIST_GAP },
   locked: { alignItems: "center", gap: 10, paddingVertical: 6 },
   lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },

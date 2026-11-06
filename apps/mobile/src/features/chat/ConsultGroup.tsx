@@ -122,7 +122,7 @@ export function ConsultPairRow({
   items: readonly ConsultPairItem[];
   /** Inside a message (its reach lines): it reaches past the row's body to the conversation's width. */
   inline?: boolean;
-  /** Under what shows above it (a turn's, or a part's under another quiet line). */
+  /** Under what shows above it (a turn's, or a part's under another quiet line). Inline: its margin above. */
   gap?: number;
 }) {
   const { t, i18n } = useTranslation();
@@ -149,7 +149,8 @@ export function ConsultPairRow({
               marginLeft: LINE_INSET - inset.left,
               marginRight: LINE_INSET - inset.right,
               // Between turns, as the list's own line: the turn's gap on both sides, of which the body's part is one.
-              marginVertical: rhythm.turn - rhythm.part,
+              marginTop: gap ?? rhythm.turn - rhythm.part,
+              marginBottom: rhythm.turn - rhythm.part,
             }
           : { marginTop: gap ?? rhythm.turn, paddingHorizontal: LINE_INSET },
       ]}
