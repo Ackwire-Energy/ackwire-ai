@@ -119,6 +119,22 @@ test("config: Claude's own login for all agents is off unless its switch is whol
   expect(paired.claudeSharedLogin).toEqual(on as never);
 });
 
+test("config: the auth route is only ever the guard's true, and a new pairing keeps it", () => {
+  expect(normalizeStored({ networkAuthRoute: true }).networkAuthRoute).toBe(true);
+  expect(normalizeStored({ networkAuthRoute: "true" })).toEqual({});
+  const paired = configFromGrant(
+    { mode: "system", networkAuthRoute: true },
+    {
+      server: "https://app.example.com",
+      grant: { machineId: "m", token: "t", name: "n", org: { id: "o", name: "O" } } as never,
+      workspace: "/w",
+      tools: { commands: true } as never,
+      desktop: false,
+    },
+  );
+  expect(paired.networkAuthRoute).toBe(true);
+});
+
 test("a system home paired again stays a system home", () => {
   const grant = { token: "agm_new", machineId: "m2", name: "box", org: { id: "o1", name: "Acme" } };
   const input = {

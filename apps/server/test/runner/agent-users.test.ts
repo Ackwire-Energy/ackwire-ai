@@ -914,13 +914,13 @@ test.if(process.platform !== "win32")(
 );
 
 test.if(process.platform !== "win32")(
-  "the self-check with a network hook: revision 3, a real agent's route, and no byte outside the relay",
+  "the self-check with a network hook: the auth route, a real agent's route, and no byte outside the relay",
   async () => {
-    const network = { networkLauncher: "/usr/bin/true", networkRevision: 3 };
+    const network = { networkLauncher: "/usr/bin/true", networkRevision: 2, networkAuthRoute: true as const };
     const config = { mode: "system" as const, claudeSharedLogin: SWITCH, server: "https://app.example.com" };
     const older = selfCheck();
-    older.check.config = { ...config, ...network, networkRevision: 2 };
-    expect(await accountSelfCheck(older.check)).toContain("older");
+    older.check.config = { ...config, ...network, networkAuthRoute: undefined };
+    expect(await accountSelfCheck(older.check)).toContain("don't route");
 
     const empty = selfCheck();
     empty.check.config = { ...config, ...network };

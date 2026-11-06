@@ -25,8 +25,6 @@ export const SELF_CHECK_EVERY_MS = 6 * 3600_000;
 const PROBE_ACCOUNT = "00000000-0000-4000-8000-000000000000";
 const PROBE_AGENT: AgentUser = { id: PROBE_ACCOUNT, user: "ag-00000000", uid: PROBE_AGENT_UID };
 const PROBE_TIMEOUT_MS = 20_000;
-/** The network hook's first revision whose namespaces route the sign-in users' group. */
-const MIN_NETWORK_REVISION = 3;
 
 /**
  * Run as the stand-in agent (`$1` the sign-in's folder, `$2` the probe CLI's pid); succeeds only when the kernel
@@ -123,9 +121,9 @@ export async function accountSelfCheck(c: SelfCheck): Promise<string | null> {
   if (said === null) return "The Claude CLI didn't start as the sign-in's user";
   if (said) return said;
 
-  const { networkLauncher, networkMark, networkRevision, server } = c.config;
+  const { networkLauncher, networkMark, networkRevision, networkAuthRoute, server } = c.config;
   if (!networkLauncher) return null;
-  if ((networkRevision ?? 0) < MIN_NETWORK_REVISION) return `The network hook is older than ${MIN_NETWORK_REVISION}`;
+  if (!networkAuthRoute) return "The agents' networks don't route the sign-in's user";
   // Only a real agent's uid: the network hook starts namespaces for nothing else.
   const agent = readAgentUsers(c.home)[0];
   if (!agent) return "No agent here yet to try the network with";

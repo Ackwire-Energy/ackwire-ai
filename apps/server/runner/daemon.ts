@@ -225,6 +225,7 @@ export function configFromGrant(
     ...(prev?.networkMark ? { networkMark: prev.networkMark } : {}),
     ...(prev?.networkDrainSeconds ? { networkDrainSeconds: prev.networkDrainSeconds } : {}),
     ...(prev?.networkRevision !== undefined ? { networkRevision: prev.networkRevision } : {}),
+    ...(prev?.networkAuthRoute ? { networkAuthRoute: prev.networkAuthRoute } : {}),
     ...(prev?.claudeSharedLogin ? { claudeSharedLogin: prev.claudeSharedLogin } : {}),
     ...(prev?.maxConcurrentTasks ? { maxConcurrentTasks: prev.maxConcurrentTasks } : {}),
     ...(prev?.taskMaxSeconds ? { taskMaxSeconds: prev.taskMaxSeconds } : {}),
@@ -788,6 +789,10 @@ export class RunnerDaemon implements RequestObserver {
       });
     }
     this.armResume();
+    // The switch goes with its route, so a CLI left running would go out directly.
+    if (!initial && prev?.claudeSharedLogin && !next?.claudeSharedLogin) {
+      for (const u of readAgentUsers(this.opts.home)) this.accountUsers?.stopScopes(u.uid);
+    }
 
     const prevAccess = withShared(effectiveAccess(prev), this.shared);
     const nextAccess = withShared(effectiveAccess(next), this.shared);

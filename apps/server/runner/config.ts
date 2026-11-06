@@ -66,6 +66,8 @@ export interface RunnerConfig {
   networkDrainSeconds?: number;
   /** Root-controlled context revision: bump when an unchanged helper path changes isolation behavior. */
   networkRevision?: number;
+  /** The agents' networks route the sign-in users' group now. Not part of the revision: nothing restarts for it. */
+  networkAuthRoute?: true;
   /** System mode: absent, a Claude sign-in for all agents is `claude setup-token`'s, as ever. */
   claudeSharedLogin?: ClaudeSharedLogin;
   /**
@@ -224,6 +226,7 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
     ...(Number.isSafeInteger(raw.networkRevision) && (raw.networkRevision as number) >= 0
       ? { networkRevision: raw.networkRevision as number }
       : {}),
+    ...(raw.networkAuthRoute === true ? { networkAuthRoute: true as const } : {}),
     ...(Number.isInteger(raw.networkDrainSeconds) &&
     (raw.networkDrainSeconds as number) >= 30 &&
     (raw.networkDrainSeconds as number) <= 3600

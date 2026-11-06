@@ -2532,6 +2532,61 @@ test.if(posix)(
   20_000,
 );
 
+test.if(posix)("the login switch going away stops that login's running CLIs, and only then", async () => {
+  const home = newHome();
+  const ws = tempDir("root-ws-");
+  dirs.push(ws);
+  const ana = userOf(ANA);
+  writeFileSync(path.join(home, AGENT_USERS_FILE), JSON.stringify([ana]));
+  const config = {
+    server: "https://agentes.test",
+    machineId: "m1",
+    name: "box",
+    token: "agm_machine_token_never_shown_123456",
+    workspace: ws,
+    mode: "system",
+    agentUidRange: [21000, 21099],
+  } as StoredConfig;
+  const claudeSharedLogin = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" as const };
+  writeConfig({ ...config, claudeSharedLogin }, home);
+  const stopped: number[] = [];
+  const daemon = new RunnerDaemon({
+    probeEgress: async () => null,
+    home,
+    mode: "start",
+    log: () => {},
+    executors: () => ({}),
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    caffeinate: false,
+    dial: (_url, handlers) => new FakeSocket(handlers),
+    workers: { user: userOf, start: (user) => new FakeWorker(user) },
+    accountUsers: {
+      sweep: () => {},
+      stopScopes: (uid) => void stopped.push(uid),
+      sweepAgent: () => {},
+      launcher: () => ({ prefix: [], env: {}, home }),
+      remove: () => {},
+      ensure: () => {
+        throw new Error("no user here");
+      },
+      room: () => {},
+      bridge: () => "",
+    },
+    selfCheck: async () => null,
+  });
+  daemon.start();
+  try {
+    writeConfig({ ...config, claudeSharedLogin, name: "desk" }, home);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(stopped).toEqual([]);
+    writeConfig(config, home);
+    await waitFor(() => stopped.length > 0, 5000);
+    expect(stopped).toEqual([ana.uid]);
+  } finally {
+    await daemon.stop();
+  }
+});
+
 test.if(posix)(
   "a system-mode runner hosts a shared CLI login's turns in root, and tells them apart by its marker",
   async () => {
