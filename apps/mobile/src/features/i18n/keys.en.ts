@@ -454,8 +454,6 @@ export const featureKeysEn = {
     camera: "Camera",
     photos: "Photos",
     file: "File",
-    audio: "Audio",
-    audioSoon: "Audio is coming soon.",
     noCamera: "No camera access. Allow it in the phone's Settings.",
     mission: "Start a mission",
     missionHint: "Long work, with a plan, from start to finish",

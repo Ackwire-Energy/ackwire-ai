@@ -448,8 +448,6 @@
     "camera": "Kamera",
     "photos": "Fotoğraflar",
     "file": "Dosya",
-    "audio": "Ses",
-    "audioSoon": "Ses yakında geliyor.",
     "noCamera": "Kamera erişimi yok. Telefonun Ayarlar bölümünden izin verin.",
     "mission": "Misyon başlat",
     "missionHint": "Baştan sona, planlı uzun bir iş",

@@ -461,8 +461,6 @@ export const featureKeysPtBR = {
     camera: "Câmera",
     photos: "Fotos",
     file: "Arquivo",
-    audio: "Áudio",
-    audioSoon: "Áudio chega em breve.",
     noCamera: "Sem acesso à câmera. Libere nos Ajustes do celular.",
     mission: "Começar uma missão",
     missionHint: "Um trabalho longo, com plano, do começo ao fim",

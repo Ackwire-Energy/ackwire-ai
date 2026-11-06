@@ -258,16 +258,15 @@ export function MessageActions({
 
 // ── "+" in the composer ──────────────────────────────────────────────────────
 
-export type PlusPick = "camera" | "photos" | "file" | "audio" | "mission" | "summary" | "remind";
+export type PlusPick = "camera" | "photos" | "file" | "mission" | "summary" | "remind";
 
 export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
   const { t } = useTranslation();
   const surface = useSurface();
-  const tiles: { key: PlusPick; icon: "camera" | "image" | "file" | "mic"; label: string }[] = [
+  const tiles: { key: PlusPick; icon: "camera" | "image" | "file"; label: string }[] = [
     { key: "camera", icon: "camera", label: t("mobile.plus.camera") },
     { key: "photos", icon: "image", label: t("mobile.plus.photos") },
     { key: "file", icon: "file", label: t("mobile.plus.file") },
-    { key: "audio", icon: "mic", label: t("mobile.plus.audio") },
   ];
   return (
     <>

@@ -463,8 +463,6 @@
     "camera": "Cámara",
     "photos": "Fotos",
     "file": "Archivo",
-    "audio": "Audio",
-    "audioSoon": "El audio llega pronto.",
     "noCamera": "Sin acceso a la cámara. Permítelo en la Configuración del teléfono.",
     "mission": "Empezar una misión",
     "missionHint": "Trabajo largo, con un plan, de principio a fin",

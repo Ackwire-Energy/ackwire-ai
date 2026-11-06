@@ -463,8 +463,6 @@
     "camera": "Appareil photo",
     "photos": "Photos",
     "file": "Fichier",
-    "audio": "Audio",
-    "audioSoon": "L'audio arrive bientôt.",
     "noCamera": "Pas d'accès à l'appareil photo. Autorisez-le dans les Réglages du téléphone.",
     "mission": "Lancer une mission",
     "missionHint": "Un travail long, avec un plan, du début à la fin",
