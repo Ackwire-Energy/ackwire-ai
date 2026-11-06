@@ -1,5 +1,13 @@
 import type { Issue, IssueActivity, IssuePriority } from "@agenteschat/client";
-import { keys, useChannels, useIssue, useIssueAction, useIssueActivity, useIssueColumns } from "@agenteschat/client";
+import {
+  ApiError,
+  keys,
+  useChannels,
+  useIssue,
+  useIssueAction,
+  useIssueActivity,
+  useIssueColumns,
+} from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -67,7 +75,8 @@ export function IssuePage({ number }: { number: number }) {
   // `?m=`: a link or a notice named a message of its conversation: it opens there.
   const [focus] = useOpenParam("m");
   const [talk, setTalk] = useState(Boolean(focus));
-  const i = issue.data;
+  // Out of reach since it opened (someone changed who sees it): what's on screen goes.
+  const i = issue.error instanceof ApiError && issue.error.status === 404 ? undefined : issue.data;
   return (
     <div className={cx("page page--full", talk && i && "issue-page--talk")}>
       <div className="issue-page__main">

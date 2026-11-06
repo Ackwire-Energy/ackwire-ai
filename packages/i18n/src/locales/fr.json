@@ -15605,7 +15605,9 @@
     "search": "Chercher une personne",
     "noMatch": "Personne avec ce nom",
     "moreOptions": "Plus d'options",
-    "receipt": "Qui le voit : {{who}}"
+    "receipt": "Qui le voit : {{who}}",
+    "limited": "accès limité",
+    "rolesToo": "Les rôles déjà sur cette page continuent de la voir."
   },
   "teamTemplates": {
     "lead": "Une équipe pour {{org}}, chaque agent dans son canal. Tu peux l'ajuster avant de la créer.",

@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
   archiveChannel,
+  askAgentToImplement,
   buildTeamWeek,
   calendarRange,
   channelCard,
@@ -20,6 +21,7 @@ import {
   getIssue,
   getWikiPage,
   grantScopes,
+  issueFromMessage,
   joinChannel,
   listArtifacts,
   listAudit,
@@ -115,7 +117,10 @@ describe("what changing who sees a task reaches", () => {
 
   test("who stops seeing it loses its open conversation at once; who still sees it doesn't", async () => {
     const { ana, bia, adm } = await team();
-    const task = await createIssue(deps(), person(ana.id), f.org.id, { title: "Plano", audience: only(ana.id, bia.id) });
+    const task = await createIssue(deps(), person(ana.id), f.org.id, {
+      title: "Plano",
+      audience: only(ana.id, bia.id),
+    });
     const { channelId } = await openTaskConversation(f.db, person(ana.id), f.org.id, task.id);
     const heard: RealtimeEvent[] = [];
     f.pubsub.subscribe(orgTopic(f.org.id), (e) => heard.push(e));
@@ -302,6 +307,36 @@ describe("what an administrator reaches, and what stays closed", () => {
     await archiveChannel(f.db, ana.id, f.org.id, secret.id);
     const range = await calendarRange({ db: f.db }, bia.id, f.org.id, "2026-11-01T00:00:00Z", "2026-12-01T00:00:00Z");
     expect(range.events.map((e) => e.title)).toEqual(["Reunião"]);
+  });
+});
+
+describe("what a conversation hears of a limited task", () => {
+  const receiptsOf = async () =>
+    (await f.db.select().from(schema.agentActions)).map((a) => ({ target: a.target, params: a.params }));
+
+  test("a receipt in a public channel keeps its title, where only some see the task", async () => {
+    const { ana } = await team();
+    const call = await toolsIn(f.general.id);
+    const made = await call("create_issue", { title: "Demissão da Bia", visible_to: "requester" });
+    expect(JSON.stringify(await receiptsOf())).not.toContain("Demissão da Bia");
+    expect(JSON.stringify(made)).toContain("don't repeat");
+    await call("update_issue", { issue: "#1", priority: "high" });
+    expect(JSON.stringify(await receiptsOf())).not.toContain("Demissão da Bia");
+    expect(await seen(f.owner.id)).toEqual(["Demissão da Bia"]);
+    expect(await seen(ana.id)).toEqual([]);
+    await call("create_issue", { title: "Onboarding" });
+    expect(JSON.stringify(await receiptsOf())).toContain("Onboarding");
+  });
+
+  test("the line that an agent took a task stays out of the channel once it's limited", async () => {
+    const { ana } = await team();
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: ana.id });
+    const message = await postPersonMessage(deps(), ana.id, f.org.id, f.general.id, { body: "Demissão da Bia" });
+    const task = await issueFromMessage(deps(), ana.id, f.org.id, message.id);
+    await setIssueAudience(deps(), person(ana.id), f.org.id, task.id, only(ana.id));
+    await askAgentToImplement(deps(), ana.id, f.org.id, task.id, f.agent.id);
+    const lines = await listMessages(f.db, ana.id, f.org.id, f.general.id);
+    expect(lines.filter((m) => m.meta.issueTaken)).toEqual([]);
   });
 });
 

@@ -14471,7 +14471,9 @@
     "search": "사람 검색",
     "noMatch": "그 이름을 가진 사람이 없어요",
     "moreOptions": "옵션 더 보기",
-    "receipt": "볼 수 있는 사람: {{who}}"
+    "receipt": "볼 수 있는 사람: {{who}}",
+    "limited": "제한된 접근",
+    "rolesToo": "이 페이지에 이미 있는 역할은 계속 볼 수 있습니다."
   },
   "teamTemplates": {
     "lead": "{{org}}를 위한 팀, 에이전트마다 자기 채널이 있어요. 만들기 전에 조정할 수 있어요.",

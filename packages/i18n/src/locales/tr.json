@@ -14921,7 +14921,9 @@
     "search": "Kişi ara",
     "noMatch": "Bu adda kimse yok",
     "moreOptions": "Diğer seçenekler",
-    "receipt": "Kimler görüyor: {{who}}"
+    "receipt": "Kimler görüyor: {{who}}",
+    "limited": "sınırlı erişim",
+    "rolesToo": "Bu sayfada zaten olan roller onu görmeye devam eder."
   },
   "teamTemplates": {
     "lead": "{{org}} için bir ekip, her ajan kendi kanalında. Oluşturmadan önce ayarlayabilirsin.",

@@ -14991,7 +14991,9 @@
     "search": "Person suchen",
     "noMatch": "Niemand mit diesem Namen",
     "moreOptions": "Weitere Optionen",
-    "receipt": "Wer es sieht: {{who}}"
+    "receipt": "Wer es sieht: {{who}}",
+    "limited": "eingeschränkter Zugriff",
+    "rolesToo": "Die Rollen, die schon auf dieser Seite sind, sehen sie weiterhin."
   },
   "teamTemplates": {
     "lead": "Ein Team für {{org}}, jeder Agent in seinem eigenen Kanal. Du kannst es vor dem Erstellen anpassen.",

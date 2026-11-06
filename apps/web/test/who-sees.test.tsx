@@ -3,12 +3,14 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Channel } from "@agenteschat/client";
+import { ApiError, type Channel } from "@agenteschat/client";
 import { joinable } from "@agenteschat/client/lib/channel-access";
 import { audienceKind, audienceOfKind, whoSeesLabel } from "@agenteschat/client/lib/who-sees";
+import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { act, cleanup } from "@testing-library/react";
 import type { TFunction } from "i18next";
 import { IssueWhoSeesDialog } from "@/components/WhoSees";
+import { IssuePage } from "@/pages/IssuePage";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderPage, settle } from "./render";
 
@@ -69,5 +71,32 @@ describe("Quem vê on a task", () => {
     await act(async () => finish());
     await settle(3);
     expect(closed).toBe(true);
+  });
+
+  test("a task someone took out of my reach while it's open goes from the page", async () => {
+    const api = createFakeApi(seedState());
+    const issue = await api.issues.create(ORG_ID, { title: "Plano secreto" });
+    let client: QueryClient | undefined;
+    const Probe = () => {
+      client = useQueryClient();
+      return null;
+    };
+    await renderPage(
+      <>
+        <Probe />
+        <IssuePage number={issue.number} />
+      </>,
+      { api, org: true },
+    );
+    await settle(5);
+    expect(document.body.textContent).toContain("Plano secreto");
+    api.issues.get = async () => {
+      throw new ApiError(404, "not_found", "Issue not found");
+    };
+    await act(async () => {
+      await client?.invalidateQueries({ queryKey: ["org", ORG_ID, "issues"] });
+    });
+    await settle(5);
+    expect(document.body.textContent).not.toContain("Plano secreto");
   });
 });

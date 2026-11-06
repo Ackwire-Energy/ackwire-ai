@@ -12,6 +12,7 @@ import {
   type IssueStatus,
   type IssueView,
   listIssues,
+  nameableIn,
   setCriterion,
   updateIssue,
   type WorkActor,
@@ -124,7 +125,8 @@ async function issueChange(
   if (diff.fields.length === 0) return null;
   const assignee = i.assignee;
   const name = assignee ? (await assigneeNames(deps, ctx, [i])).get(assignee.id)?.replace(" (you)", "") : undefined;
-  const params: AgentActionParams = { number: i.number, title: i.title, fields: diff.fields };
+  const title = (await nameableIn(deps.db, ctx.channelId, i)) ? i.title : "";
+  const params: AgentActionParams = { number: i.number, title, fields: diff.fields };
   if (diff.fields.includes("status")) params.status = i.status;
   if (diff.fields.includes("priority")) params.priority = i.priority;
   if (diff.fields.includes("dueDate")) params.dueDate = i.dueDate;
@@ -143,7 +145,7 @@ async function issueChange(
       diff.fields.every((f) => f === "assignee" || (f === "status" && i.status === "in_progress"))
         ? "issue.assigned"
         : "issue.updated",
-    target: { type: "issue", id: i.id, number: i.number, title: i.title },
+    target: { type: "issue", id: i.id, number: i.number, title },
     params,
     before: diff.before,
     after: diff.after,
@@ -161,7 +163,7 @@ const STATUSES = ["todo", "in_progress", "in_review", "done", "canceled"];
 const PRIORITIES = ["low", "normal", "high"];
 
 /** What the agent tells the person after making a task: they change it on the task, in one click. */
-function whoSees(i: IssueView) {
+function whoSees(i: IssueView, nameable: boolean) {
   const { mode, channelId, userIds } = i.audience;
   const who =
     mode === "everyone"
@@ -169,7 +171,8 @@ function whoSees(i: IssueView) {
       : channelId
         ? "the people in this conversation"
         : `${userIds.length} chosen ${userIds.length === 1 ? "person" : "people"}`;
-  return `Who sees it: ${who}, and administrators. Say so in your reply; they can change it on the task.`;
+  const told = `Who sees it: ${who}, and administrators. Say so in your reply; they can change it on the task.`;
+  return nameable ? told : `${told} Others read this conversation: don't repeat what the task says here.`;
 }
 
 /**
@@ -247,19 +250,19 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
                 ...(str(input.due_date) ? { dueDate: str(input.due_date) } : {}),
                 ...(audience ? { audience } : {}),
               }),
-            (created) => ({
-              kind: "issue.created",
-              target: { type: "issue", id: created.id, number: created.number, title: created.title },
-              params: {
-                number: created.number,
-                title: created.title,
-                audience: created.audience.mode,
-              },
-              after: issueSnapshot(created),
-            }),
+            async (created, db) => {
+              const title = (await nameableIn(db, ctx.channelId, created)) ? created.title : "";
+              return {
+                kind: "issue.created",
+                target: { type: "issue", id: created.id, number: created.number, title },
+                params: { number: created.number, title, audience: created.audience.mode },
+                after: issueSnapshot(created),
+              };
+            },
           );
+          const nameable = await nameableIn(deps.db, ctx.channelId, i);
           return {
-            content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i)}`,
+            content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i, nameable)}`,
             data: { issue: { id: i.id, number: i.number } },
           };
         } catch (error) {

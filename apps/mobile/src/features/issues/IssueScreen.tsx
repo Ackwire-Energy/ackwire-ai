@@ -1,5 +1,6 @@
 import {
   type Actor,
+  ApiError,
   type Issue,
   type IssueColumn,
   type IssuePriority,
@@ -105,7 +106,8 @@ function IssueView({ number, focusId }: { number: number; focusId: string | null
     ]),
   );
   const sheet = useSheet();
-  const i = issue.data;
+  // Out of reach since it opened (someone changed who sees it): what's on screen goes.
+  const i = issue.error instanceof ApiError && issue.error.status === 404 ? undefined : issue.data;
   const openConversation = useOpenConversation();
   // A notice or a link named a message of its conversation: straight there, once.
   const focused = useRef(false);

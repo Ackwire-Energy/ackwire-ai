@@ -15166,7 +15166,9 @@
     "search": "Persoon zoeken",
     "noMatch": "Niemand met die naam",
     "moreOptions": "Meer opties",
-    "receipt": "Wie het ziet: {{who}}"
+    "receipt": "Wie het ziet: {{who}}",
+    "limited": "beperkte toegang",
+    "rolesToo": "De rollen die al op deze pagina staan, blijven haar zien."
   },
   "teamTemplates": {
     "lead": "Een team voor {{org}}, elke agent in een eigen kanaal. Je kunt het aanpassen voordat je het maakt.",

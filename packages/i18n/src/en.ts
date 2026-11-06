@@ -14699,6 +14699,8 @@ export const en = {
     noMatch: "Nobody with that name",
     moreOptions: "More options",
     receipt: "Who sees it: {{who}}",
+    limited: "limited access",
+    rolesToo: "The roles already on this page keep seeing it.",
   },
   teamTemplates: {
     lead: "A team for {{org}}, each agent in its own channel. You can adjust it before creating.",

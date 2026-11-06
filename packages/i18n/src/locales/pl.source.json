@@ -36265,6 +36265,12 @@
   "whoSees.receipt": {
     "value": "Who sees it: {{who}}"
   },
+  "whoSees.limited": {
+    "value": "limited access"
+  },
+  "whoSees.rolesToo": {
+    "value": "The roles already on this page keep seeing it."
+  },
   "teamTemplates.lead": {
     "value": "A team for {{org}}, each agent in its own channel. You can adjust it before creating."
   },

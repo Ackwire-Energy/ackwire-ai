@@ -3,6 +3,7 @@ import { useRoles, useSetWikiFolderAudience, useWikiAction, useWikiFolderAudienc
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import { wikiAudienceOf } from "@agenteschat/client/lib/who-sees";
 import {
   OPEN_WIKI_ACCESS,
   type WikiAccess,
@@ -56,10 +57,11 @@ export function WikiAudienceDialog({
  */
 export function WikiWhoSeesDialog({ page, onClose }: { page: WikiPage; onClose: () => void }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const toast = useToast();
   const action = useWikiAction(org.id);
   const [advanced, setAdvanced] = useState(false);
+  const roleIds = page.audience?.roleIds ?? [];
   if (advanced) return <WikiAudienceDialog page={page} onClose={onClose} />;
   const value = page.audience
     ? { mode: "people" as const, userIds: page.audience.userIds }
@@ -68,6 +70,7 @@ export function WikiWhoSeesDialog({ page, onClose }: { page: WikiPage; onClose: 
     <WhoSeesDialog
       title={t("whoSees.pageTitle")}
       value={value}
+      note={roleIds.length > 0 ? t("whoSees.rolesToo") : undefined}
       saving={action.isPending}
       extra={
         can(org, "manage_roles") ? (
@@ -79,12 +82,7 @@ export function WikiWhoSeesDialog({ page, onClose }: { page: WikiPage; onClose: 
       onClose={onClose}
       onSave={(next) =>
         action.mutate(
-          {
-            type: "who",
-            slug: page.slug,
-            audience:
-              next.mode === "everyone" ? null : { roleIds: page.audience?.roleIds ?? [], userIds: next.userIds },
-          },
+          { type: "who", slug: page.slug, audience: wikiAudienceOf(next, roleIds, me.user.id) },
           { onSuccess: onClose, onError: (e) => toast.show(errorText(t, e, i18n.language), "error") },
         )
       }

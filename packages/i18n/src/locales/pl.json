@@ -16017,7 +16017,9 @@
     "search": "Szukaj osoby",
     "noMatch": "Nikt o takim imieniu",
     "moreOptions": "Więcej opcji",
-    "receipt": "Kto to widzi: {{who}}"
+    "receipt": "Kto to widzi: {{who}}",
+    "limited": "ograniczony dostęp",
+    "rolesToo": "Role, które są już na tej stronie, nadal ją widzą."
   },
   "teamTemplates": {
     "lead": "Zespół dla {{org}}, każdy agent na własnym kanale. Możesz go dostosować przed utworzeniem.",

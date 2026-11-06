@@ -1,11 +1,13 @@
 import type { Issue } from "@agenteschat/client";
 import { useIssueAction } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   type AudienceChoice,
   type AudienceKind,
   audienceKind,
   audienceOfKind,
+  pickedOf,
   whoSeesLabel,
 } from "@agenteschat/client/lib/who-sees";
 import {
@@ -95,7 +97,8 @@ export function WhoSeesDialog({
   const dir = useDirectory(org.id);
   const myId = me.user.id;
   const [kind, setKind] = useState<AudienceKind>(() => audienceKind(value, myId));
-  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set([myId, ...(value.userIds ?? [])]));
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => pickedOf(value, myId));
+  const stays = !can(org, "administrator");
   const [q, setQ] = useState("");
   const people = useMemo(() => {
     const words = q.trim().toLowerCase();
@@ -148,7 +151,8 @@ export function WhoSeesDialog({
                       <label htmlFor={id} className="who-sees__person">
                         <Checkbox
                           id={id}
-                          checked={picked.has(m.userId)}
+                          checked={picked.has(m.userId) || (stays && m.userId === myId)}
+                          disabled={stays && m.userId === myId}
                           onCheckedChange={(on) => toggle(m.userId, on)}
                         />
                         <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />

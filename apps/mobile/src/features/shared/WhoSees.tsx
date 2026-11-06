@@ -5,7 +5,9 @@ import {
   type AudienceKind,
   audienceKind,
   audienceOfKind,
+  pickedOf,
   whoSeesLabel,
+  wikiAudienceOf,
 } from "@agenteschat/client/lib/who-sees";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -37,7 +39,7 @@ export function useWhoSeesLabel() {
 export function useWhoSeesDraft(value: { mode: "everyone" | "people"; userIds?: readonly string[] }) {
   const meId = useMeId() ?? "";
   const [kind, setKind] = useState<AudienceKind>(() => audienceKind(value, meId));
-  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set([meId, ...(value.userIds ?? [])]));
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => pickedOf(value, meId));
   const toggle = (id: string) =>
     setPicked((now) => {
       const next = new Set(now);
@@ -52,6 +54,8 @@ export function useWhoSeesDraft(value: { mode: "everyone" | "people"; userIds?: 
 export function WhoSeesRows({ draft }: { draft: ReturnType<typeof useWhoSeesDraft> }) {
   const { t } = useTranslation();
   const dir = useDirectory();
+  const meId = useMeId();
+  const stays = !can(useOrg().org, "administrator");
   return (
     <>
       <GroupedList>
@@ -72,8 +76,8 @@ export function WhoSeesRows({ draft }: { draft: ReturnType<typeof useWhoSeesDraf
               key={m.userId}
               label={m.name}
               leading={<Face who={{ type: "person", id: m.userId }} size={26} live={false} />}
-              checked={draft.picked.has(m.userId)}
-              onPress={() => draft.toggle(m.userId)}
+              checked={draft.picked.has(m.userId) || (stays && m.userId === meId)}
+              onPress={stays && m.userId === meId ? undefined : () => draft.toggle(m.userId)}
             />
           ))}
         </GroupedList>
@@ -150,15 +154,12 @@ function PageForm({
   const { t } = useTranslation();
   const failed = useFailed();
   const { org } = useOrg();
+  const meId = useMeId() ?? "";
   const action = useWikiAction(useOrgId());
   const draft = useWhoSeesDraft(value);
   const save = () =>
     action.mutate(
-      {
-        type: "who",
-        slug,
-        audience: draft.choice.mode === "everyone" ? null : { roleIds, userIds: draft.choice.userIds },
-      },
+      { type: "who", slug, audience: wikiAudienceOf(draft.choice, roleIds, meId) },
       {
         onSuccess: () => {
           successHaptic();
@@ -170,6 +171,7 @@ function PageForm({
   return (
     <Form
       title={t("whoSees.pageTitle")}
+      note={roleIds.length > 0 ? t("whoSees.rolesToo") : undefined}
       draft={draft}
       saving={action.isPending}
       onSave={save}

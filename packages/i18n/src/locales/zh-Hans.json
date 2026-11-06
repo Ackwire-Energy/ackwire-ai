@@ -14654,7 +14654,9 @@
     "search": "搜索成员",
     "noMatch": "没有这个名字的人",
     "moreOptions": "更多选项",
-    "receipt": "谁能看到：{{who}}"
+    "receipt": "谁能看到：{{who}}",
+    "limited": "访问受限",
+    "rolesToo": "已在此页面上的角色仍可查看。"
   },
   "teamTemplates": {
     "lead": "为{{org}}准备的团队，每个智能体都有自己的频道。创建前可以调整。",

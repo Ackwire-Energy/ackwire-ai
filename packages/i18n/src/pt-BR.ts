@@ -14941,6 +14941,8 @@ export const ptBR = {
     noMatch: "Ninguém com esse nome",
     moreOptions: "Mais opções",
     receipt: "Quem vê: {{who}}",
+    limited: "acesso limitado",
+    rolesToo: "Os papéis que já estão nesta página continuam vendo.",
   },
   teamTemplates: {
     lead: "Um time para a {{org}}, cada agente no seu canal. Dá para ajustar antes de criar.",

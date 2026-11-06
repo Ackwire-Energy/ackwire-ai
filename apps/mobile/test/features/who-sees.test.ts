@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { audienceKind, audienceOfKind } from "@agenteschat/client/lib/who-sees";
+import { audienceKind, audienceOfKind, pickedOf, wikiAudienceOf } from "@agenteschat/client/lib/who-sees";
 import { buildConversations } from "../../src/features/chats/logic";
 
 const src = (path: string) => readFileSync(join(import.meta.dir, "../../src", path), "utf8");
@@ -37,5 +37,16 @@ describe("an administrator's channels on the phone", () => {
     const chat = src("features/chat/ChatScreen.tsx");
     expect(chat).toContain("const readable = member || admin;");
     expect(chat).toContain('t("channel.adminReading")');
+  });
+});
+
+test("a list starts as it is, and only me on a page leaves its roles out", () => {
+  expect([...pickedOf({ mode: "people", userIds: ["ana"] }, "me")]).toEqual(["ana"]);
+  expect([...pickedOf({ mode: "everyone" }, "me")]).toEqual(["me"]);
+  expect(wikiAudienceOf({ mode: "everyone" }, ["r"], "me")).toBeNull();
+  expect(wikiAudienceOf({ mode: "people", userIds: ["me"] }, ["r"], "me")).toEqual({ roleIds: [], userIds: ["me"] });
+  expect(wikiAudienceOf({ mode: "people", userIds: ["ana"] }, ["r"], "me")).toEqual({
+    roleIds: ["r"],
+    userIds: ["ana"],
   });
 });

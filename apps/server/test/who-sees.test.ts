@@ -115,6 +115,25 @@ test("administrators through the routes: a private channel opens and joins; a DM
   expect((await listed(adm)).find((c) => c.id === room.id)).toMatchObject({ isMember: true, seenAsAdmin: false });
 });
 
+test("an administrator opens the threads and missions of a channel they aren't in; a DM's stay closed", async () => {
+  const { ana, bia, adm, api, biaId } = await team();
+  const room = (await (await api(ana, "/channels", { json: { name: "secreto", visibility: "private" } })).json()) as {
+    id: string;
+  };
+  const root = (await (await api(ana, `/channels/${room.id}/messages`, { json: { body: "Pergunta" } })).json()) as {
+    id: string;
+  };
+  await api(ana, `/channels/${room.id}/messages`, { json: { body: "Resposta", threadId: root.id } });
+  const { channelId: dm } = (await (await api(ana, "/dms", { json: { userId: biaId } })).json()) as {
+    channelId: string;
+  };
+  const threads = await api(adm, `/channels/${room.id}/threads`);
+  expect(threads.status).toBe(200);
+  expect(((await threads.json()) as { threads: { id: string }[] }).threads.map((x) => x.id)).toEqual([root.id]);
+  expect((await api(bia, `/channels/${room.id}/threads`)).status).toBe(403);
+  expect((await api(adm, `/channels/${dm}/threads`)).status).toBe(403);
+});
+
 test("the audit route keeps a limited task's title from view_audit alone, not from an administrator", async () => {
   const { owner, ana, adm, api, anaId, biaId, bia } = await team();
   const { id: role } = (await (

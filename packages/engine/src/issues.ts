@@ -376,17 +376,26 @@ async function canSee(db: Database, actor: IssueActor, orgId: string, t: TaskRef
  * Of `ids`, the tasks an agent may list in its run's conversation for `person`: what it says reaches everyone there,
  * so everyone there must see them. Never in a public channel, read by the whole workspace.
  */
-async function seenByConversation(db: Database, person: string, channelId: string, ids: string[]) {
+async function seenByConversation(db: Database, person: string | null, channelId: string, ids: string[]) {
   if (ids.length === 0) return new Set<string>();
   const rows = rowsOf<{ id: string }>(
     await db.execute(sql`select t.id from ${issues} t join ${channels} c on c.id = ${channelId}::uuid
       where t.id = any(${`{${ids.join(",")}}`}::uuid[]) and c.kind <> 'task'
         and not (c.kind = 'channel' and c.visibility = 'public')
-        and ${taskSeenSql("t", sql`${person}::text`)}
+        ${person ? sql`and ${taskSeenSql("t", sql`${person}::text`)}` : sql``}
         and not exists (select 1 from ${channelMembers} h where h.channel_id = c.id and h.user_id is not null
           and not ${taskSeenSql("t", sql`h.user_id`)})`),
   );
   return new Set(rows.map((r) => r.id));
+}
+
+/**
+ * Whether what an agent says of a task may name it in a conversation: its own, or one where everyone sees it. A task
+ * for the workspace goes anywhere.
+ */
+export async function nameableIn(db: Database, channelId: string, task: IssueView) {
+  if (task.audience.mode === "everyone" || task.conversation?.channelId === channelId) return true;
+  return (await seenByConversation(db, null, channelId, [task.id])).has(task.id);
 }
 
 async function requireOrgMember(db: Database, actor: IssueActor, orgId: string) {
@@ -1519,7 +1528,8 @@ export async function askAgentToImplement(
 /** An issue made from a channel message: one discreet line there ("Ada took issue #24"), never a thread. */
 async function announceTaken(deps: IssueDeps, issue: IssueRow, card: IssueWorkMeta) {
   const source = issue.source as IssueSource;
-  if (source.type !== "message" || !deps.pubsub) return;
+  // Limited since it was made: the people of the message's channel may not see it.
+  if (source.type !== "message" || !deps.pubsub || issue.restricted) return;
   const origin = await getMessage(deps.db, issue.orgId, source.messageId);
   if (!origin || origin.channelId !== source.channelId) return;
   const [channel] = await deps.db

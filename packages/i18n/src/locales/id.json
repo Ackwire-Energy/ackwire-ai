@@ -14581,7 +14581,9 @@
     "search": "Cari orang",
     "noMatch": "Tidak ada orang dengan nama itu",
     "moreOptions": "Opsi lainnya",
-    "receipt": "Siapa yang melihat: {{who}}"
+    "receipt": "Siapa yang melihat: {{who}}",
+    "limited": "akses terbatas",
+    "rolesToo": "Peran yang sudah ada di halaman ini tetap melihatnya."
   },
   "teamTemplates": {
     "lead": "Tim untuk {{org}}, tiap agen di kanalnya sendiri. Kamu bisa menyesuaikannya sebelum membuat.",
