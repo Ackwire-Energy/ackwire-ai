@@ -650,7 +650,7 @@ async function agentRefusal(db: Database, actor: Extract<ArtifactActor, { type: 
     ? ""
     : " Nobody is behind this run, so you only reach this conversation, public channels you are in and the Drive.";
   return new NotFoundError(
-    `File not found: ${id} is no file you can open from here. The id may be wrong, or the file is in a conversation out of your reach.${nobody} Copy the whole id from list_artifacts or an "(attached files: …)" line, never from memory. If that isn't it, say so and ask someone who sees the file to attach it here or put it in the Drive; this id won't work again.`,
+    `File not found: ${id} is no file you can open from here. The id may be wrong, or the file is in a conversation out of your reach.${nobody} Copy the whole id from list_artifacts or an "(attached files: …)" line, never from memory. If that isn't it, say so and ask someone who sees the file to attach it here or put it in the Drive. This id won't work again.`,
   );
 }
 
