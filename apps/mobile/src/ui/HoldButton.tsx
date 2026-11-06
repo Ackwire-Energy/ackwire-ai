@@ -124,13 +124,24 @@ export function HoldButton({
         </Animated.View>
         <View style={[styles.edge, { backgroundColor: look.highlight }]} />
         <Icon name="check" size={s.icon} color={look.text} />
-        <RNText
-          numberOfLines={1}
-          maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={[systemText(s.text, weights.semibold), { color: look.text }]}
-        >
-          {holding ? holdLabel : label}
-        </RNText>
+        {/* Both words in one place, only one seen: the button keeps the label's width while held ("Hold…" is the
+            shorter), so nothing beside it moves. */}
+        <View>
+          <RNText
+            numberOfLines={1}
+            maxFontSizeMultiplier={CHROME_MAX_SCALE}
+            style={[systemText(s.text, weights.semibold), { color: look.text, opacity: holding ? 0 : 1 }]}
+          >
+            {label}
+          </RNText>
+          <RNText
+            numberOfLines={1}
+            maxFontSizeMultiplier={CHROME_MAX_SCALE}
+            style={[systemText(s.text, weights.semibold), styles.held, { color: look.text, opacity: holding ? 1 : 0 }]}
+          >
+            {holdLabel}
+          </RNText>
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -146,4 +157,5 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   edge: { position: "absolute", left: 0, right: 0, top: 0, height: 1 },
+  held: { position: "absolute", left: 0, right: 0, top: 0 },
 });

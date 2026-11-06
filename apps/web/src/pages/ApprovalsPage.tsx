@@ -753,7 +753,11 @@ export function HoldToApprove({
         if (e.detail > 0 && !timer.current && !pending) toast.show(t("approvals.holdHint"), "info");
       }}
     >
-      {holding ? t("approvals.holding") : t("approvals.hold")}
+      {/* Both words in one place, only one seen: the button keeps the longer one's width while held. */}
+      <span className="ap-hold__label">
+        <span hidden={holding || undefined}>{t("approvals.hold")}</span>
+        <span hidden={!holding || undefined}>{t("approvals.holding")}</span>
+      </span>
     </Button>
   );
 }

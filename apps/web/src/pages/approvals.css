@@ -314,6 +314,18 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
   transform: scaleX(1);
   transition: transform 1.1s linear;
 }
+/* "Hold to approve" and "Hold…" share one cell: the button is as wide as the longer while held, so nothing beside it
+   moves. The hidden one keeps its room. */
+.ap-hold__label {
+  display: inline-grid;
+}
+.ap-hold__label > span {
+  grid-area: 1 / 1;
+}
+.ap-hold__label > span[hidden] {
+  display: block;
+  visibility: hidden;
+}
 
 /* Refuse with a reason. */
 .ap-refuse {
