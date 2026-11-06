@@ -300,7 +300,7 @@ export const TurnRow = memo(function TurnRow({
                 {wordsOnTop && run.text ? (
                   <RevealText text={run.text} live={phase === "writing"} accent={color} />
                 ) : said ? (
-                  <View style={styles.say}>
+                  <View style={run.text ? { marginBottom: rhythm.part } : undefined}>
                     <MessageText body={said} selectable={false} />
                   </View>
                 ) : null}
@@ -853,7 +853,6 @@ const styles = StyleSheet.create({
   who: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4, minHeight: 19 },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   state: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
-  say: { marginVertical: 2 },
   // As wide as the box, whatever it says: a turning phrase or a face coming and going never moves its edge.
   dock: { paddingHorizontal: 4, paddingBottom: 6 },
   pill: {

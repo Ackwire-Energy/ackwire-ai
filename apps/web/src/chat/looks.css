@@ -287,9 +287,10 @@
 
 /* ── Compacta: the time, a small face, the name and the text on one line. ── */
 .ac-msg[data-look="compact"] {
+  --msg-inline: 12px;
   display: block;
   min-height: 20px;
-  padding-inline: 88px 12px;
+  padding-inline: 88px var(--msg-inline);
 }
 .ac-msg[data-look="compact"] .ac-msg__gutter,
 .ac-msg[data-look="compact"] .ac-msg__head .ac-msg__time,
@@ -365,6 +366,11 @@
 .ac-msg[data-look="compact"] .ac-msg__text .md > :is(.md__table, .code-card) {
   max-width: min(100%, var(--msg-card-w));
   margin-block: 4px;
+}
+/* On the name's line, as the words are. */
+.ac-msg[data-look="compact"] .choice-reply {
+  display: inline-flex;
+  vertical-align: top;
 }
 .ac-msg[data-look="compact"] .ac-msg__body > .ac-tools .ac-tools__head {
   min-height: 28px;

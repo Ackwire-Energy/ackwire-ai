@@ -461,7 +461,7 @@ export const MessageRow = memo(function MessageRow({
         <RowPartContext.Provider value={true}>
           <View style={[styles.meParts, { gap: rhythm.part }]}>
             {m.pinned ? (
-              <View style={[styles.pinLine, styles.meEnd]}>
+              <View style={[styles.pinLine, styles.meEnd, { marginBottom: PIN_GAP - rhythm.part }]}>
                 <PinMark />
                 <Text variant="caption" tone="faint">
                   {t("mobile.pins.mark")}
@@ -588,7 +588,7 @@ export const MessageRow = memo(function MessageRow({
   );
   const pinLine =
     grouped && m.pinned ? (
-      <View style={styles.pinLine}>
+      <View style={[styles.pinLine, { marginBottom: PIN_GAP }]}>
         <PinMark />
         <Text variant="caption" tone="faint">
           {t("mobile.pins.mark")}
@@ -627,9 +627,17 @@ export const MessageRow = memo(function MessageRow({
   const inBubble = bubbled && Boolean(body) && !brainWait && !choiceReply;
   const tagged = Boolean(reminder || via || routine || talker || helping || m.pinned);
   const opener = opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null;
+  // Outside a bubble the line it opened with is a part of its own, as the web's second text.
+  const openerPart = opener && words ? <View style={{ marginBottom: rhythm.part }}>{opener}</View> : opener;
   const reportOpened =
     report && reportOpen ? (
-      <View style={[styles.report, { borderLeftColor: c.line }]}>
+      <View
+        style={[
+          styles.report,
+          { borderLeftColor: c.line },
+          (inBubble || opener || words) && { marginBottom: rhythm.part },
+        ]}
+      >
         <MessageText body={report} />
       </View>
     ) : null;
@@ -648,7 +656,9 @@ export const MessageRow = memo(function MessageRow({
           styles.msg,
           bubbled && lookRows.bubblesRow,
           compact && lookRows.compactRow,
-          rowFrame(rhythm.block, quoteAbove ? QUOTE_GAP : rowGap),
+          rowFrame(rhythm.block, rowGap),
+          // On the quote it answers, its plate never over it.
+          quoteAbove && styles.replied,
           // A mention of me: the row's tint says it, with round corners; no accent bar on its left edge.
           mentionsMe && { backgroundColor: `${c.amber}17`, borderRadius: 14 },
           pressed && press && { backgroundColor: c.sunken },
@@ -694,7 +704,7 @@ export const MessageRow = memo(function MessageRow({
                       {!reportOpened && !opener ? words : null}
                     </View>
                     {reportOpened}
-                    {opener}
+                    {openerPart}
                     {reportOpened || opener ? words : null}
                   </>
                 ) : (
@@ -702,7 +712,7 @@ export const MessageRow = memo(function MessageRow({
                     {grouped ? null : who(false)}
                     {pinLine}
                     {reportOpened}
-                    {opener}
+                    {openerPart}
                     {words}
                   </>
                 )}
@@ -1101,6 +1111,8 @@ const BUBBLE_CUT = 6;
 
 /** A row under the quote it answers: they read as one. */
 const QUOTE_GAP = 2;
+/** A pin's caption stays on its message, as a name on its words. */
+const PIN_GAP = 2;
 
 /** The bubble's corners by its place in a run of my rows: the sides it shares with its neighbours square off. */
 const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBottomRightRadius?: number }> = {
@@ -1129,6 +1141,7 @@ const styles = StyleSheet.create({
     paddingLeft: MSG_INSET,
     paddingRight: 16,
   },
+  replied: { marginTop: 0, paddingTop: QUOTE_GAP },
   avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
   // A long pick wraps: the check stays on its first line.
@@ -1190,7 +1203,7 @@ const styles = StyleSheet.create({
   tagPress: { flexShrink: 1, maxWidth: "100%", alignSelf: "center" },
   pin: { alignSelf: "center" },
   // The routine report a message answers, unfolded under its name (like the notice line's text).
-  report: { marginTop: 2, marginBottom: 4, paddingLeft: 10, borderLeftWidth: 2 },
+  report: { marginTop: 2, paddingLeft: 10, borderLeftWidth: 2 },
   tag: {
     flexDirection: "row",
     alignItems: "center",
@@ -1201,7 +1214,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 999,
   },
-  pinLine: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
+  pinLine: { flexDirection: "row", alignItems: "center", gap: 4 },
   reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   // The outline is always there (clear unless it is mine), so a pill keeps its size when I add or take mine.
   react: {

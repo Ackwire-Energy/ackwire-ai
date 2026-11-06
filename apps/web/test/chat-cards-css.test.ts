@@ -107,10 +107,10 @@ test("a card's rows start under its title: a row's hover never covers it", () =>
   expect(value(".ac-card__head+.settings-rows>.settings-row:first-child", "border-top")).toBe("1px solid var(--line)");
 });
 
-test("two agents talking is one pair row; on a reach line it stands at the row's width, its own ends off", () => {
+test("two agents talking is one pair row; on a reach line it ends where the list's own line ends", () => {
   expect(value(".consult-pair__row", "display")).toBe("inline-flex");
   expect(value(".consult-pair__name", "text-overflow")).toBeUndefined();
-  expect(value(".ag-rcs .ag-rc--talk>.consult-pair", "padding-inline")).toBe("0");
+  expect(value(".ag-rcs .ag-rc--talk>.consult-pair", "padding-inline")).toBe("calc(16px - var(--msg-inline))");
 });
 
 test("a select's list keeps room under its last row once scrolled to the bottom", () => {

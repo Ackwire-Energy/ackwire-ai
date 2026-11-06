@@ -1012,7 +1012,7 @@ textarea.ac-input {
 :root {
   --msg-part-gap: 8px;
   --msg-turn-gap: 20px;
-  --msg-block: 6px;
+  --msg-block: 4px;
   /* The avatar column and its gap: how far a body stands in from its row. */
   --msg-lead: calc(36px + var(--space-3));
 }
@@ -1111,6 +1111,10 @@ textarea.ac-input {
   width: 36px;
   display: flex;
   justify-content: center;
+}
+/* No height of its own: the time's 26px line would stand under a shorter row's one line and open its gap. */
+.ac-msg__gutter {
+  height: 0;
 }
 .ac-msg__avatar {
   /* Top of the avatar on the author line, never centered on a long message. */

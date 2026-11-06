@@ -364,7 +364,8 @@
 }
 /* The person's pick, sent from a choice card: one compact line, not a bubble of its own words. */
 .choice-reply {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 6px;
   font-size: 13.5px;

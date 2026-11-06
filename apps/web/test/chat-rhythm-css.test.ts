@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { CHAT_RHYTHM } from "@agenteschat/client/lib/chat-look";
-import { builtCss, declarations, rules } from "./built-css";
+import { atRule, builtCss, declarations, rules } from "./built-css";
 
 const SHEETS = [
   "src/styles.css",
@@ -78,8 +78,9 @@ test("one token pair per look, the same numbers the phone reads", () => {
 
 test("the list spends the two gaps: no flex gap, and a row gives its plate's room back", () => {
   expect(last(".channel__messages", "gap")).toBeUndefined();
-  expect(last(".channel__messages > *", "margin-top")).toBe("var(--row-gap)");
-  expect(last(".channel__messages > *", "--row-gap")).toBe("var(--msg-turn-gap)");
+  const row = ".channel__messages > :not(.channel__empty)";
+  expect(last(row, "margin-block")).toBe("var(--row-gap) 0");
+  expect(last(row, "--row-gap")).toBe("var(--msg-turn-gap)");
   expect(last(".channel__messages > .ac-msg + .ac-msg--grouped", "--row-gap")).toBe("var(--msg-part-gap)");
   expect(last(".channel__messages > .ac-msg", "margin-block")).toBe(
     "calc(var(--row-gap) - var(--msg-block)) calc(-1 * var(--msg-block))",
@@ -96,6 +97,32 @@ test("the list spends the two gaps: no flex gap, and a row gives its plate's roo
       r.selectors.filter((s) => /^\.ac-msg(?![\w-])[^ >+~]*$/.test(s) || /^\.ac-msg--(own|grouped)[^ >+~]*$/.test(s)),
     );
   expect(rowRoom.filter((s) => s !== ".ac-msg")).toEqual([]);
+});
+
+test("two tinted rows of a turn meet and never overlap", () => {
+  for (const { part, block } of Object.values(CHAT_RHYTHM)) expect(2 * block).toBeLessThanOrEqual(part);
+});
+
+test("the list's gap is what stands above a row, whatever the row sets outside the list", () => {
+  // `.channel__notice` and `.mi-card` carry a margin for where they stand alone: one class never beats the list's two.
+  const weight = (s: string) => (s.match(/\.[\w-]+/g) ?? []).length;
+  expect(weight(".channel__messages>:not(.channel__empty)")).toBeGreaterThan(weight(".channel__notice"));
+  expect(last(".channel__messages > :is(.ac-divider,.channel__notice)", "padding-block")).toBe("0");
+  expect(declarations(css, ".thread-marker").filter(([p]) => /^padding(-bottom|-block)?$/.test(p))).toEqual([]);
+  // The first row of a conversation has nothing to stand off, a quiet line either.
+  const quiet = rules(css).find((r) =>
+    r.declarations.some(([p, v]) => p === "--row-gap" && v === "var(--msg-part-gap)"),
+  );
+  expect(quiet?.selectors.join()).toContain(".channel__spacer");
+  expect(last(".channel__messages > .channel__spacer + *", "--row-gap")).toBe("0px");
+});
+
+test("a row is as tall as what it shows", () => {
+  // The hidden time beside a grouped row's one short line, and a line box around an inline card, both added height.
+  expect(last(".ac-msg__gutter", "height")).toBe("0");
+  expect(last(".choice-reply", "display")).toBe("flex");
+  // A reply's quote stays 2px over its row at a phone's width: the narrow rule leaves the rows' gap alone.
+  expect(atRule(css, "@media (max-width: 760px)")).not.toMatch(/\.channel__messages \.ac-msg\{[^}]*(?<!-)gap:/);
 });
 
 test("a message's body sets what stands between its parts, and no part sets it for itself", () => {
@@ -137,4 +164,8 @@ test("the agents' line is the conversation's width, the pair on its middle, and 
   expect(last(".consult-pair__row", "padding")).toBe("0 20px");
   // Inside a message it leaves the row's body for the same width.
   expect(last(".ag-rc--talk", "margin-left")).toBe("calc(-1 * var(--msg-lead))");
+  // And comes short of the list's by what a look's rows stand in from it: the two lines end on the same point.
+  expect(last(".ag-rcs .ag-rc--talk > .consult-pair", "padding-inline")).toBe("calc(16px - var(--msg-inline))");
+  expect(last(".consult-pair", "padding-inline")).toBe("16px");
+  expect(last('.ac-msg[data-look="compact"]', "--msg-inline")).toBe("12px");
 });

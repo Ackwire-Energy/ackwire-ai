@@ -174,7 +174,7 @@
   }
   .channel__messages .ac-msg {
     --msg-inline: 12px;
-    gap: 10px;
+    column-gap: 10px;
   }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);

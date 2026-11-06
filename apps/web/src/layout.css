@@ -1056,24 +1056,27 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 }
 /*
  * Turns are told apart by space. What stands in the list takes the turn gap above it; the next row of a turn, and a
- * quiet line under another, the part gap. A row gives back the room of its plate, so it counts as what shows.
+ * quiet line under another, the part gap. A row gives back the room of its plate, so it counts as what shows. Two
+ * classes' weight: a notice or a card keeps its margin for where it stands alone, and never here.
  */
-.channel__messages > * {
+.channel__messages > :not(.channel__empty) {
   --row-gap: var(--msg-turn-gap);
-  margin-top: var(--row-gap);
+  margin-block: var(--row-gap) 0;
 }
 .channel__messages > :first-child,
-.channel__spacer + * {
+.channel__messages > .channel__spacer + * {
   --row-gap: 0px;
 }
 .channel__messages > .ac-msg + .ac-msg--grouped,
-.channel__messages > :not(.ac-msg, .ac-divider, .channel__unread) + :not(.ac-msg, .ac-divider, .channel__unread) {
+.channel__messages
+  > :not(.ac-msg, .ac-divider, .channel__unread, .channel__spacer)
+  + :not(.ac-msg, .ac-divider, .channel__unread) {
   --row-gap: var(--msg-part-gap);
 }
 .channel__messages > .ac-msg {
   margin-block: calc(var(--row-gap) - var(--msg-block)) calc(-1 * var(--msg-block));
 }
-.channel__messages > .ac-divider {
+.channel__messages > :is(.ac-divider, .channel__notice) {
   padding-block: 0;
 }
 /* A message that @mentions the viewer: a tinted row, its corners all round. No accent bar on its left edge: the tint

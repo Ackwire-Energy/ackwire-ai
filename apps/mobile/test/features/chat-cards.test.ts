@@ -19,7 +19,7 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(row, [
-          "{opener}\n                    {words}\n                  </>\n                )}",
+          "{openerPart}\n                    {words}\n                  </>\n                )}",
           "<Receipts message={m} />",
           "{cards}\n            {/* Its tools after",
           "<TurnTools",

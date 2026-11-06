@@ -32,7 +32,8 @@ describe("one rhythm, the web's numbers (chat-rhythm-css.test.ts holds them to t
 
   test("the rows take their room from it, the parts from the body's gap, none from a margin of its own", async () => {
     const row = await read("chat/MessageRow.tsx");
-    expect(row).toContain("rowFrame(rhythm.block, quoteAbove ? QUOTE_GAP : rowGap)");
+    expect(row).toContain("rowFrame(rhythm.block, rowGap)");
+    expect(row).toContain("quoteAbove && styles.replied");
     expect(row).toContain("[styles.body, { gap: rhythm.part }]");
     expect(row).toContain("[styles.meParts, { gap: rhythm.part }]");
     expect(await read("chat/LiveRows.tsx")).toContain("rowFrame(rhythm.block, rhythm.turn)");
@@ -64,6 +65,22 @@ describe("one rhythm, the web's numbers (chat-rhythm-css.test.ts holds them to t
       const sheet = await read(file);
       for (const key of keys) expect(styleOf(sheet, key)).not.toMatch(/margin(Top|Bottom|Vertical)/);
     }
+  });
+
+  test("what stacks inside a row's words takes the part gap too", async () => {
+    const row = await read("chat/MessageRow.tsx");
+    // The line it opened with and an unfolded report, outside a bubble, stand a part from the words under them.
+    expect(row).toContain("opener && words ? <View style={{ marginBottom: rhythm.part }}>{opener}</View> : opener");
+    expect(row).toContain("(inBubble || opener || words) && { marginBottom: rhythm.part }");
+    expect(styleOf(row, "report")).not.toContain("marginBottom");
+    // A pin's caption stays on its words on either side: the body's gap is paid back on my rows.
+    expect(styleOf(row, "pinLine")).not.toContain("marginBottom");
+    expect(row).toContain("marginBottom: PIN_GAP - rhythm.part");
+    // A row under its quote keeps its plate off the quote.
+    expect(styleOf(row, "replied")).toContain("marginTop: 0");
+    const live = await read("chat/LiveRows.tsx");
+    expect(live).toContain("run.text ? { marginBottom: rhythm.part } : undefined");
+    expect(live).not.toContain("styles.say");
   });
 
   test("the agents' line runs across the conversation, the pair on its middle, under the list's gap", async () => {

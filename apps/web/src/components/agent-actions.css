@@ -196,7 +196,8 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   min-height: 26px;
   font-size: 13px;
 }
+/* The row's own edge is short of the line's (`.consult-pair`) by a look's side padding: the rest is the same 16px. */
 .ag-rcs .ag-rc--talk > .consult-pair {
   flex: 1 1 100%;
-  padding-inline: 0;
+  padding-inline: calc(16px - var(--msg-inline));
 }
