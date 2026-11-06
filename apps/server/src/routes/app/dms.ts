@@ -49,6 +49,7 @@ const Dm = z
       description:
         "False until you first read it (`POST …/channels/{channelId}/read`): the right hand waves on that first visit.",
     }),
+    openedAt: z.string().openapi({ description: "When the DM began: where it sorts until its first message." }),
   })
   .openapi("DirectMessage");
 
@@ -75,6 +76,7 @@ export function dmRoutes(deps: AppDeps) {
           dms: dms.map((d) => ({
             ...d,
             lastReadAt: iso(d.lastReadAt),
+            openedAt: d.openedAt.toISOString(),
             lastMessage: d.lastMessage ? { ...d.lastMessage, createdAt: d.lastMessage.createdAt.toISOString() } : null,
           })),
         },

@@ -18,6 +18,7 @@ import {
   deleteChannel,
   joinChannel,
   listChannelMembers,
+  listDms,
   openDm,
   openPersonAgentDm,
   PROPOSE_TEAM_TOOL,
@@ -346,7 +347,7 @@ describe("every path that changes the agents or the channels tells the workspace
     expect(announced(log, AGENTS)).toBe(2);
   });
 
-  test("a new DM reaches its people's other devices, and only theirs", async () => {
+  test("a new DM reaches the other devices of who opened it, and the other person with its first message", async () => {
     f = await setup();
     const { db, pubsub, org, owner, agent } = f;
     const bia = await addMember(db, org.id, "member", "bia");
@@ -361,11 +362,49 @@ describe("every path that changes the agents or the channels tells the workspace
     const log = watch(f);
     await openDm(db, owner.id, org.id, { agentId: agent.id }, { pubsub });
     expect(heard).toEqual(["owner"]);
+    const dm = await openDm(db, owner.id, org.id, { userId: bia.id }, { pubsub });
+    expect(heard).toEqual(["owner", "owner"]);
     await openDm(db, owner.id, org.id, { userId: bia.id }, { pubsub });
-    expect(heard).toEqual(["owner", "owner", "bia"]);
-    await openDm(db, owner.id, org.id, { userId: bia.id }, { pubsub });
-    expect(heard).toHaveLength(3);
+    expect(heard).toHaveLength(2);
     expect(announced(log, CHANNELS)).toBe(0);
+
+    const listed = async (id: string) => (await listDms(db, id, org.id)).map((d) => d.channelId);
+    expect(await listed(owner.id)).toContain(dm.id);
+    expect(await listed(bia.id)).toEqual([]);
+
+    // The first message shows it to the other person.
+    const cara = await addMember(db, org.id, "member", "cara");
+    const toCara = await openDm(db, owner.id, org.id, { userId: cara.id }, { pubsub });
+    expect(await listed(cara.id)).toEqual([]);
+    await postPersonMessage({ db, pubsub }, owner.id, org.id, toCara.id, { body: "oi" });
+    expect(await listed(cara.id)).toEqual([toCara.id]);
+
+    // Or their own opening it: their other devices hear it once, nothing counts as read, and the DM stays theirs.
+    heard.length = 0;
+    await openDm(db, bia.id, org.id, { userId: owner.id }, { pubsub });
+    await openDm(db, bia.id, org.id, { userId: owner.id }, { pubsub });
+    expect(heard).toEqual(["bia"]);
+    expect(await listed(bia.id)).toEqual([dm.id]);
+    await postPersonMessage({ db, pubsub }, owner.id, org.id, dm.id, { body: "oi" });
+    expect((await listDms(db, bia.id, org.id))[0]?.unread).toBe(1);
+  });
+
+  test("a DM with an agent is listed even with no message, and opening it reads nothing (the right hand's wave)", async () => {
+    f = await setup();
+    const { db, pubsub, org, owner, agent } = f;
+    const made = await openPersonAgentDm(db, org.id, owner.id, agent.id);
+    await openDm(db, owner.id, org.id, { agentId: agent.id }, { pubsub });
+    expect(await listDms(db, owner.id, org.id)).toMatchObject([{ channelId: made.id, everRead: false }]);
+  });
+
+  test("a DM with no message sorts by when it began, so the one just opened is first", async () => {
+    f = await setup();
+    const { db, pubsub, org, owner, agent } = f;
+    const bia = await addMember(db, org.id, "member", "bia");
+    const talked = await openDm(db, owner.id, org.id, { agentId: agent.id }, { pubsub });
+    await postPersonMessage({ db, pubsub }, owner.id, org.id, talked.id, { body: "oi" });
+    const opened = await openDm(db, owner.id, org.id, { userId: bia.id }, { pubsub });
+    expect((await listDms(db, owner.id, org.id)).map((d) => d.channelId)).toEqual([opened.id, talked.id]);
   });
 
   test("an archived agent stays a member, but leaves what a channel lists until it is back", async () => {

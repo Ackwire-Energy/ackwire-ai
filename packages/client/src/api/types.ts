@@ -2836,6 +2836,8 @@ export interface DirectMessage {
   lastReadAt?: string | null;
   /** False until this person first reads it (server side, so on every device): the right hand waves then. */
   everRead?: boolean;
+  /** When the DM began: where it sorts until its first message. Absent from an older server. */
+  openedAt?: string;
 }
 
 /**

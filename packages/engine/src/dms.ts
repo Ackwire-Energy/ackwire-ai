@@ -58,6 +58,25 @@ async function reopenDm(
 }
 
 /**
+ * A person opens a DM the other one started: until now their list left it out (`listDms`), from here on it holds it.
+ * The read sits where the DM began, so it marks nothing read. True when it joined their list just now.
+ */
+async function openedByTheOther(
+  db: Executor,
+  orgId: string,
+  dm: { id: string; createdAt: Date; createdByUserId: string | null },
+  userId: string,
+) {
+  if (dm.createdByUserId === userId) return false;
+  const seen = await db
+    .insert(channelReads)
+    .values({ orgId, channelId: dm.id, userId, lastReadAt: dm.createdAt })
+    .onConflictDoNothing()
+    .returning({ userId: channelReads.userId });
+  return seen.length > 0;
+}
+
+/**
  * Someone joining the workspace again goes back into their old DMs whose other people are all still in it, so a
  * colleague writing in the old DM from the sidebar reaches them without anyone opening it anew.
  */
@@ -114,44 +133,42 @@ export async function openDm(
         .where(and(eq(channels.orgId, orgId), eq(channels.dmKey, dmKey)))
     )[0];
   const found = await existing();
-  if (found) {
-    await reopenDm(db, orgId, found);
-    return found;
-  }
   // A new DM with an agent this person can't talk to isn't started (unless they manage agents); an old one stays readable.
-  if (blockedAgent) throw await audienceError(db, blockedAgent);
-  const created = await db.transaction(async (tx) => {
-    const [channel] = await tx
-      .insert(channels)
-      .values({
-        orgId,
-        name: `dm-${sha256(`${orgId}|${dmKey}`).slice(0, 20)}`,
-        visibility: "private",
-        kind: "dm",
-        dmKey,
-        createdByUserId: actorId,
-      })
-      .onConflictDoNothing()
-      .returning();
-    if (!channel) return null;
-    await tx.insert(channelMembers).values({ orgId, channelId: channel.id, userId: actorId });
-    await tx
-      .insert(channelMembers)
-      .values(
-        "userId" in target
-          ? { orgId, channelId: channel.id, userId: target.userId }
-          : { orgId, channelId: channel.id, agentId: target.agentId },
-      );
-    return channel;
-  });
-  if ("agentId" in target) caches.scopes.deletePrefix(`${orgId}:${target.agentId}:visible`);
-  // Only its people: the other's list and this person's other devices, before anyone writes in it.
-  if (created) {
-    for (const userId of "userId" in target ? [actorId, target.userId] : [actorId])
-      await publishUserEvent(options.pubsub, orgId, userId, { type: "channels.changed" });
-  }
-  const channel = created ?? (await existing()); // a concurrent open won the race
+  if (!found && blockedAgent) throw await audienceError(db, blockedAgent);
+  if (found) await reopenDm(db, orgId, found);
+  const created = found
+    ? null
+    : await db.transaction(async (tx) => {
+        const [channel] = await tx
+          .insert(channels)
+          .values({
+            orgId,
+            name: `dm-${sha256(`${orgId}|${dmKey}`).slice(0, 20)}`,
+            visibility: "private",
+            kind: "dm",
+            dmKey,
+            createdByUserId: actorId,
+          })
+          .onConflictDoNothing()
+          .returning();
+        if (!channel) return null;
+        await tx.insert(channelMembers).values({ orgId, channelId: channel.id, userId: actorId });
+        await tx
+          .insert(channelMembers)
+          .values(
+            "userId" in target
+              ? { orgId, channelId: channel.id, userId: target.userId }
+              : { orgId, channelId: channel.id, agentId: target.agentId },
+          );
+        return channel;
+      });
+  if (created && "agentId" in target) caches.scopes.deletePrefix(`${orgId}:${target.agentId}:visible`);
+  const channel = found ?? created ?? (await existing()); // a concurrent open won the race
   if (!channel) throw new Error("could not open the conversation");
+  // In my list on my other devices, before anyone writes in it. Never the other's: it reaches them with its first
+  // message (`channel.activity`), an unused DM being noise there.
+  if (created || found?.archivedAt || ("userId" in target && (await openedByTheOther(db, orgId, channel, actorId))))
+    await publishUserEvent(options.pubsub, orgId, actorId, { type: "channels.changed" });
   return channel;
 }
 
@@ -269,13 +286,19 @@ export interface DmSummary {
   lastReadAt: Date | null;
   /** False until I first open it (no read of mine yet): the right hand waves on that first visit (ADR 0137 §6). */
   everRead: boolean;
+  /** When the DM began: where it sorts until its first message. */
+  openedAt: Date;
 }
 
-/** My direct conversations, newest activity first, with unread counts. */
+/**
+ * My direct conversations, newest activity first (one with no message yet sorts by when it began, so a new one is on
+ * top), with unread counts. An empty DM the other person opened isn't one yet: it shows with its first message, or
+ * once I open it myself. A DM with an agent always shows.
+ */
 export async function listDms(db: Database, actorId: string, orgId: string): Promise<DmSummary[]> {
   await requirePermission(db, actorId, orgId, "read");
   const mine = await db
-    .select({ id: channels.id, createdAt: channels.createdAt })
+    .select({ id: channels.id, createdAt: channels.createdAt, createdByUserId: channels.createdByUserId })
     .from(channels)
     .innerJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, actorId)))
     .where(and(eq(channels.orgId, orgId), eq(channels.kind, "dm"), isNull(channels.archivedAt)));
@@ -357,6 +380,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
       const o = others.find((x) => x.channelId === c.id);
       if (!o) return [];
       const m = lastBy.get(c.id);
+      if (!m && o.userId && c.createdByUserId !== actorId && !readAt.has(c.id)) return [];
       return [
         {
           channelId: c.id,
@@ -376,6 +400,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
           unread: unread.get(c.id) ?? 0,
           lastReadAt: readAt.get(c.id) ?? null,
           everRead: readAt.has(c.id),
+          openedAt: c.createdAt,
           sortAt: m?.createdAt ?? c.createdAt,
         },
       ];
