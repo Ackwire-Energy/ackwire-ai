@@ -165,7 +165,10 @@ test("a request the provider rejects fails the run and is told as a failed job",
   await post(f, "@dev hi");
   expect(await toldAboutRun(f)).toEqual(["1 failed: provider rejected the request (400)"]);
   const [run] = await f.db.select().from(schema.agentRuns);
-  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: provider rejected the request (400)"]);
+  expect([run?.status, run?.error]).toEqual([
+    "failed",
+    "provider_error: said@Claude: provider rejected the request (400)",
+  ]);
 });
 
 test("the account's own refusal (an invalid key) fails the run untold: the person sees why", async () => {
@@ -173,7 +176,7 @@ test("the account's own refusal (an invalid key) fails the run untold: the perso
   await post(f, "@dev hi");
   expect(await toldAboutRun(f)).toEqual([]);
   const [run] = await f.db.select().from(schema.agentRuns);
-  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: account: invalid provider API key"]);
+  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: invalid_key@Claude: invalid provider API key"]);
 });
 
 test("a refused request fails the run with the provider's words, credentials masked, on the run and its error step", async () => {
@@ -188,7 +191,8 @@ test("a refused request fails the run with the provider's words, credentials mas
   await post(f, "@dev hi");
   await drainOutbox(f.db, f.handlers);
   const [run] = await f.db.select().from(schema.agentRuns);
-  const reason = "provider_error: provider rejected the request (400 invalid_request_error): key •••• is not allowed";
+  const reason =
+    "provider_error: said@Claude: provider rejected the request (400 invalid_request_error): key •••• is not allowed";
   expect([run?.status, run?.error]).toEqual(["failed", reason]);
   const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "error"));
   expect(steps.map((s) => s.data)).toEqual([{ reason }]);

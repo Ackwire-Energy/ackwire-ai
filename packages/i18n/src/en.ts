@@ -4715,6 +4715,15 @@ export const en = {
         /** Its 401, 402, 403 or 429: the provider's own words (`detail`) show only on hover. */
         provider_account: "The provider refused the key: it may be invalid, out of credit or over its quota.",
         provider_unavailable: "The model provider didn't answer: {{detail}}",
+        provider_no_credit: "No credit left at {{provider}}. Add credit there or use another key.",
+        provider_invalid_key: "The key was refused by {{provider}}: it's invalid or was revoked. Use another key.",
+        provider_no_access: "Refused by {{provider}}: {{detail}}",
+        provider_model_unavailable: "This model isn't available at {{provider}} right now. Choose another model.",
+        provider_rate_limit: "Too many requests to {{provider}} right now. Ask again in a little while.",
+        provider_down: "The AI at {{provider}} is down or overloaded. Ask again in a little while.",
+        provider_timeout: "No answer from {{provider}} in time. Ask again in a little while.",
+        provider_unreachable: "The connection from our server to {{provider}} failed. Ask again in a little while.",
+        provider_said: "The answer from {{provider}}: {{detail}}",
         canceled: "Someone stopped the task.",
         interrupted: "Interrupted by a server restart.",
         missing_credential: "The workspace has no {{provider}} key.",
@@ -12611,6 +12620,17 @@ export const en = {
       brain_unavailable_plan_owner:
         "{{brain}} would think with a plan that isn't my owner's, so I won't use it. Connect my owner's account on my page.",
       provider_unavailable: "My AI provider isn't answering right now. I'll answer as soon as it's back.",
+      provider_wait_rate_limit:
+        "{{provider}} is limiting requests on this key right now. I'll answer as soon as it lets me.",
+      provider_wait_down: "{{provider}} is down or overloaded right now. I'll answer as soon as it's back.",
+      provider_wait_timeout: "{{provider}} is taking too long to answer. I'll answer as soon as it responds.",
+      provider_wait_unreachable:
+        "The connection from our server to {{provider}} failed. I'll answer as soon as it's back.",
+      provider_wait_said:
+        "{{provider}} answered with an error ({{detail}}). I'll try again and answer as soon as it works.",
+      provider_wait_ours:
+        "Something on our side is blocking my AI, not your account. I'll answer as soon as it's fixed.",
+      provider_back: "My AI is back.",
       brain_busy: "My computer is busy with other tasks right now. I'll answer as soon as it's free.",
       brain_queued: "Still in line for the computer. I'll answer as soon as it has room.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",

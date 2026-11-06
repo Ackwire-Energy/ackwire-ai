@@ -157,13 +157,33 @@ export type KeyCheck =
 const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
 /** The call's own key first: a key of an unusual shape is one no pattern knows. */
-const withoutKey = (text: string, apiKey: string) => redactCredentials(text.replaceAll(apiKey, "••••"));
+const withoutKey = (text: string, apiKey: string) => redactCredentials(apiKey ? text.replaceAll(apiKey, "••••") : text);
 
-/** A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked. */
-const masked = (error: unknown, apiKey: string) =>
-  error instanceof ProviderError
-    ? new ProviderError(withoutKey(error.message, apiKey), error.retryable, error.status, error.partial)
-    : error;
+/**
+ * A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked,
+ * and who answered, on whose key. The key it ran on goes by its value: not every provider's has a shape we know.
+ */
+const masked = (
+  error: unknown,
+  provider: string,
+  key: { apiKey: string; credentialId: string | null; endpoint?: Endpoint },
+) => {
+  if (!(error instanceof ProviderError)) return error;
+  const clean = (text: string) => withoutKey(text, key.apiKey);
+  const out = new ProviderError(
+    clean(error.message),
+    error.retryable,
+    error.status,
+    error.partial,
+    error.said && clean(error.said),
+  );
+  // A workspace's own endpoint has no name of its own: people know it by its address.
+  out.provider = key.endpoint
+    ? redactCredentials(key.endpoint.baseURL.replace(/^https?:\/\//, "").split("/")[0] ?? "")
+    : provider;
+  out.platformKey = key.credentialId === null;
+  return out;
+};
 
 /**
  * The only way to call a model (docs/adr/0007, 0012). For every call:
@@ -307,7 +327,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     if (info) return info;
     if (!isOpenRouterModel(model)) throw new ValidationError(`Model ${model} is not in the catalog`);
     // Without its list no call can be priced: like an outage, the run tries again later.
-    if (!openRouterListed()) throw new ProviderError("could not reach provider", true);
+    if (!openRouterListed()) {
+      const outage = new ProviderError("could not reach provider", true);
+      outage.provider = label("openrouter");
+      throw outage;
+    }
     throw new ValidationError(`OpenRouter doesn't list ${model} anymore. Pick another model in the agent's settings.`);
   }
 
@@ -755,7 +779,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         });
         if (personId && usage)
           await addPersonSpend(db, { orgId: agent.orgId, personId, amountNanoUsd: actual, at: now() });
-        throw masked(error, key.apiKey);
+        throw masked(error, label(providerId), key);
       }
 
       const { record, spent, personSpent } = await settleCall({
@@ -943,7 +967,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       } catch (error) {
         const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
         if (usage) await recordUsage(db, { ...base, model: call.model, usage, partial: true });
-        throw masked(error, key.apiKey);
+        throw masked(error, label(providerId), key);
       }
       const record = await recordUsage(db, {
         ...base,

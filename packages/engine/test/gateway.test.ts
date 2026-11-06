@@ -8,8 +8,10 @@ import {
   BudgetExceededError,
   createCredential,
   createModelGateway,
+  executeRun,
   listCredentials,
   MissingCredentialError,
+  postPersonMessage,
   revokeCredential,
   rotateCredential,
   updateAgent,
@@ -399,6 +401,38 @@ test("a provider that echoes the call's key doesn't pass it on, whatever its sha
   });
   const error = await call(f).catch((e: Error) => e);
   expect((error as Error).message).toBe("provider rejected the request (400): bad ••••");
+});
+
+test("a provider's failure leaves with who answered and with the key it ran on masked, whatever its shape", async () => {
+  const plain = "sk-ant-test-key-1234";
+  f = await setup({ reply: () => new ProviderError(`no ${plain}`, false, 400, undefined, `the key ${plain} is odd`) });
+  const error = (await call(f).catch((e) => e)) as ProviderError;
+  expect(error).toMatchObject({ provider: "Claude", platformKey: false, said: "the key •••• is odd" });
+  expect(error.message).toBe("no ••••");
+});
+
+test("a refusal on the server's own key is reported, as nobody else will tell us; one on a person's isn't", async () => {
+  const seen = async (platform: boolean) => {
+    f = await setup({
+      platform: { resolve: async () => ({ apiKey: "platform-key" }) },
+      reply: () => new ProviderError("no prepaid credit left at the provider", false, 402),
+    });
+    if (platform) {
+      await revokeCredential(f.db, f.owner.id, f.org.id, f.credential.id);
+      await f.db.update(schema.agents).set({ credentialId: null }).where(eq(schema.agents.id, f.agent.id));
+    }
+    const asked = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev oi",
+    });
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, asked.id));
+    const reported: unknown[] = [];
+    await executeRun(f.jobDeps, run?.id as string, { finalAttempt: true, failed: (e) => reported.push(e) });
+    await f.close();
+    return reported.length;
+  };
+  expect(await seen(true)).toBe(1);
+  expect(await seen(false)).toBe(0);
+  f = await setup();
 });
 
 test("usage summary needs view_usage", async () => {

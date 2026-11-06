@@ -69,6 +69,14 @@ describe("a routine's runs", () => {
     const names: Record<string, string> = { "u-joao": "João" };
     const say = (r: RoutineRun) => runOutcome(r, (id) => names[id] ?? null);
     expect(say(run({ status: "reported" }))).toEqual({ key: "routines.outcome.reported", values: {} });
+    // A provider's failure by its cause, with the conversation's words; without the provider, the plain failure.
+    const params = { provider: "OpenRouter", detail: "Insufficient credits" };
+    expect(say(run({ status: "failed", code: "provider_no_credit", codeParams: params }))).toEqual({
+      key: "agentPage.activity.errors.provider_no_credit",
+      values: params,
+      fallback: "routines.outcome.failed",
+    });
+    expect(say(run({ status: "failed", code: "provider_no_credit" })).key).toBe("routines.outcome.failed");
     // A run that told people says so, whatever its code (its final text became the report).
     expect(say(run({ status: "reported", code: "auto_report" })).key).toBe("routines.outcome.reported");
     expect(say(run({ status: "silent" })).key).toBe("routines.outcome.silent");

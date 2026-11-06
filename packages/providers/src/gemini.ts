@@ -344,5 +344,11 @@ function errorOf(status: number | undefined, code: string | undefined, message?:
   if ((status ?? 0) >= 500 || (code && RETRYABLE.has(code))) return new ProviderError("provider error", true, status);
   const why = [status, code].filter(Boolean).join(" ");
   const said = message ? shortSaid(message) : "";
-  return new ProviderError(`provider rejected the request (${why || "?"})${said ? `: ${said}` : ""}`, false, status);
+  return new ProviderError(
+    `provider rejected the request (${why || "?"})${said ? `: ${said}` : ""}`,
+    false,
+    status,
+    undefined,
+    said || undefined,
+  );
 }

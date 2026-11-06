@@ -425,7 +425,19 @@ describe("preserved thinking: thinking sent back under other tools (accounts cre
       retryable: false,
       status: 400,
       message: `${REFUSAL} (sent again without its thinking: provider rejected the request (400 invalid_request_error): prompt is too long: 1048577 tokens > 1000000 maximum)`,
+      said: "prompt is too long: 1048577 tokens > 1000000 maximum",
     });
+  });
+
+  test("a 403 keeps the API's words: they say why the key has no access", async () => {
+    const said = "This organization has been disabled.";
+    const { fetcher } = scripted(
+      JSON.stringify({ type: "error", error: { type: "permission_error", message: said } }),
+      403,
+    );
+    const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
+    const error = await ask(provider, unreadableHistory(), AFTER).catch((e: unknown) => e);
+    expect(error).toMatchObject({ message: `provider denied access (403 permission_error): ${said}`, status: 403, said });
   });
 
   test("a refused request keeps the API's error type and words, capped; one not about thinking goes once", async () => {

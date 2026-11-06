@@ -11376,6 +11376,33 @@
   "agentPage.activity.errors.provider_unavailable": {
     "value": "The model provider didn't answer: {{detail}}"
   },
+  "agentPage.activity.errors.provider_no_credit": {
+    "value": "No credit left at {{provider}}. Add credit there or use another key."
+  },
+  "agentPage.activity.errors.provider_invalid_key": {
+    "value": "The key was refused by {{provider}}: it's invalid or was revoked. Use another key."
+  },
+  "agentPage.activity.errors.provider_no_access": {
+    "value": "Refused by {{provider}}: {{detail}}"
+  },
+  "agentPage.activity.errors.provider_model_unavailable": {
+    "value": "This model isn't available at {{provider}} right now. Choose another model."
+  },
+  "agentPage.activity.errors.provider_rate_limit": {
+    "value": "Too many requests to {{provider}} right now. Ask again in a little while."
+  },
+  "agentPage.activity.errors.provider_down": {
+    "value": "The AI at {{provider}} is down or overloaded. Ask again in a little while."
+  },
+  "agentPage.activity.errors.provider_timeout": {
+    "value": "No answer from {{provider}} in time. Ask again in a little while."
+  },
+  "agentPage.activity.errors.provider_unreachable": {
+    "value": "The connection from our server to {{provider}} failed. Ask again in a little while."
+  },
+  "agentPage.activity.errors.provider_said": {
+    "value": "The answer from {{provider}}: {{detail}}"
+  },
   "agentPage.activity.errors.canceled": {
     "value": "Someone stopped the task."
   },
@@ -31577,6 +31604,27 @@
   },
   "chat.body.provider_unavailable": {
     "value": "My AI provider isn't answering right now. I'll answer as soon as it's back."
+  },
+  "chat.body.provider_wait_rate_limit": {
+    "value": "{{provider}} is limiting requests on this key right now. I'll answer as soon as it lets me."
+  },
+  "chat.body.provider_wait_down": {
+    "value": "{{provider}} is down or overloaded right now. I'll answer as soon as it's back."
+  },
+  "chat.body.provider_wait_timeout": {
+    "value": "{{provider}} is taking too long to answer. I'll answer as soon as it responds."
+  },
+  "chat.body.provider_wait_unreachable": {
+    "value": "The connection from our server to {{provider}} failed. I'll answer as soon as it's back."
+  },
+  "chat.body.provider_wait_said": {
+    "value": "{{provider}} answered with an error ({{detail}}). I'll try again and answer as soon as it works."
+  },
+  "chat.body.provider_wait_ours": {
+    "value": "Something on our side is blocking my AI, not your account. I'll answer as soon as it's fixed."
+  },
+  "chat.body.provider_back": {
+    "value": "My AI is back."
   },
   "chat.body.brain_busy": {
     "value": "My computer is busy with other tasks right now. I'll answer as soon as it's free."

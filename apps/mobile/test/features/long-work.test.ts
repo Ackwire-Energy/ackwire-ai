@@ -250,6 +250,12 @@ describe("a finished work's anchor (ADR 0121, owner decisions)", () => {
   test("Continuar only under the end of a work its AI provider failed, until it was continued", () => {
     const end = (over: Record<string, unknown>) => ({ workEnd: { id: "w1", status: "failed", ...over } });
     expect(workContinuable(end({ errorCode: "run.provider_error" }))).toEqual({ continuedRunId: null });
+    expect(workContinuable(end({ errorCode: "run.provider_no_credit" }))).toEqual({ continuedRunId: null });
+    // On the server's own key it reads as ours, and it goes on all the same; an error of ours with no provider doesn't.
+    expect(workContinuable(end({ errorCode: "run.our_error", errorParams: { provider: "Claude" } }))).toEqual({
+      continuedRunId: null,
+    });
+    expect(workContinuable(end({ errorCode: "run.our_error" }))).toBeNull();
     expect(workContinuable(end({ errorCode: "run.provider_unavailable", continuedRunId: "r2" }))).toEqual({
       continuedRunId: "r2",
     });
