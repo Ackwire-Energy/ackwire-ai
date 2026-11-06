@@ -1771,6 +1771,11 @@
     "linkCopied": "Enlace copiado.",
     "reply": "Responder",
     "quoteOf": "Respuesta a {{name}}: {{excerpt}}. Ver el mensaje",
+    "quoteGone": "Mensaje original eliminado",
+    "jumpTooFar": "Ese mensaje está demasiado atrás para abrirlo desde aquí.",
+    "quoteNoWords": "Mensaje sin texto",
+    "replyingTo": "Respondiendo a {{name}}",
+    "cancelReply": "Cancelar respuesta",
     "emoji": "Emoji",
     "uploading": "subiendo…",
     "uploadFailed": "no se subió",
@@ -11337,6 +11342,7 @@
       "titleNoLetters": "Un título necesita letras o números.",
       "lockAdminsOnly": "Solo los admins bloquean páginas."
     },
+    "replyGone": "El mensaje al que respondías ya no está aquí.",
     "media": {
       "off": "Los GIF y stickers están desactivados en este espacio de trabajo.",
       "notFound": "Ese GIF ya no está disponible. Elige otro.",

@@ -59,6 +59,7 @@ export function MessageActions({
   thread,
   onMission,
   onRemind,
+  onReply,
 }: {
   message: Message;
   /** "Transformar em missão" is offered (a channel or a DM, not a mission thread). */
@@ -69,6 +70,8 @@ export function MessageActions({
   onMission: (goal: string, threadId: string) => void;
   /** "Lembrar disso": the screen opens the reminder sheet for this message. */
   onRemind: (m: Message) => void;
+  /** "Responder" in a thread: the next message answers this one. Absent where nothing can be written. */
+  onReply?: (m: Message) => void;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -145,6 +148,19 @@ export function MessageActions({
       )}
       <ActionList
         items={[
+          ...(inThread && !m.local && onReply
+            ? [
+                {
+                  key: "reply",
+                  icon: "reply" as const,
+                  label: t("channel.reply"),
+                  onPress: () => {
+                    sheet.close();
+                    onReply(m);
+                  },
+                },
+              ]
+            : []),
           ...(!inThread && !m.local
             ? [
                 {

@@ -2549,6 +2549,8 @@ export interface ReplyRef {
   excerpt: string;
   /** What it quotes was a GIF or a sticker (ADR 0091): the quote says so where its excerpt is empty. */
   media?: MediaKind;
+  /** The original is gone: the server keeps nothing of it here. */
+  deleted?: boolean;
 }
 
 // ── GIFs and stickers in chat (ADR 0091) ──────────────────────────────────────

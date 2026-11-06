@@ -93,7 +93,7 @@ test("the built stylesheet keeps the hover bar placed by its middle, 4px lower a
   expect(offsetY(transform(".ac-msg__actions"))).toEqual({ px: 4, pct: -50 });
   for (const shown of [
     ".ac-msg:hover .ac-msg__actions",
-    ".ac-msg:focus-within .ac-msg__actions",
+    "html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions",
     '.ac-msg__actions[data-open="true"]',
     '.ac-msg__actions:has([aria-expanded="true"])',
   ])

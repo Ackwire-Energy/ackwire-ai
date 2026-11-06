@@ -1772,7 +1772,7 @@ export function quotedLine(meta: Record<string, unknown> | null | undefined): st
   if ((typeof r.excerpt !== "string" || !r.excerpt) && r.mediaKind === "voice") {
     return `(replying to ${who}'s voice message)\n`;
   }
-  if (typeof r.excerpt !== "string" || !r.excerpt) return "";
+  if (typeof r.excerpt !== "string" || !r.excerpt) return `(replying to ${who})\n`;
   return `(replying to ${who}: "${r.excerpt}")\n`;
 }
 

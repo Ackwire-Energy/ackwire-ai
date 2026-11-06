@@ -16,7 +16,7 @@ import {
   wrapSelection,
 } from "@agenteschat/client/lib/wiki";
 import { readZip } from "@agenteschat/client/lib/zip";
-import { HOVER_CLOSE_MS } from "@agenteschat/ui";
+import { HOVER_CLOSE_MS, trackInput } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { graphWidth, layoutGraph, neighborsOf } from "@/components/WikiGraph";
@@ -493,10 +493,21 @@ describe("links everywhere", () => {
     await act(() => new Promise((r) => setTimeout(r, HOVER_CLOSE_MS + 20)));
     expect(preview()).toBeNull();
     expect(document.activeElement === box).toBe(true);
+    // Focus a script hands back (a panel closing) opens nothing; the keys' does.
+    trackInput();
     await act(async () => link.focus());
+    await settle(2);
+    expect(preview()).toBeNull();
+    await act(async () => box.focus());
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "Tab" });
+      link.focus();
+      fireEvent.keyUp(document.body, { key: "Tab" });
+    });
     await settle(2);
     expect(preview()).not.toBeNull();
     expect(document.activeElement === link).toBe(true);
+    await act(async () => fireEvent.pointerDown(document.body));
   });
 
   test("Salvar na wiki from an agent's message appends it with the source", async () => {

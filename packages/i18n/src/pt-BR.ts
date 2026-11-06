@@ -1694,6 +1694,11 @@ export const ptBR = {
     linkCopied: "Link copiado.",
     reply: "Responder",
     quoteOf: "Resposta a {{name}}: {{excerpt}}. Ver a mensagem",
+    quoteGone: "Mensagem original apagada",
+    jumpTooFar: "Essa mensagem está longe demais para abrir daqui.",
+    quoteNoWords: "Mensagem sem texto",
+    replyingTo: "Respondendo a {{name}}",
+    cancelReply: "Cancelar resposta",
     emoji: "Emoji",
     uploading: "enviando…",
     uploadFailed: "não foi enviado",
@@ -10707,6 +10712,7 @@ export const ptBR = {
       titleNoLetters: "O título precisa de letras ou números.",
       lockAdminsOnly: "Só admins trancam páginas.",
     },
+    replyGone: "A mensagem que você estava respondendo não está mais aqui.",
     /** GIFs and stickers (ADR 0091). */
     media: {
       off: "GIFs e figurinhas estão desligados neste workspace.",

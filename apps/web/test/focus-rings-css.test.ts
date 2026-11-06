@@ -49,4 +49,29 @@ describe("focus rings", () => {
     expect(ungated).toEqual([]);
     expect(colored).toEqual([]);
   });
+
+  test("a tooltip or the row's hover chrome opens on the keys' focus only, never on focus a script handed back", async () => {
+    const sheets = ["packages/ui/src/styles/components.css"];
+    for await (const path of new Glob("apps/web/src/**/*.css").scan(ROOT)) sheets.push(path);
+    const ungated: string[] = [];
+    for (const path of sheets) {
+      const css = (await Bun.file(ROOT + path).text())
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        // A tap on touch has no hover to go by: that's the press's own focus.
+        .replace(/@media \(hover: none\)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "");
+      for (const [, list = ""] of css.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+        for (const selector of selectors(list)) {
+          if (
+            !/:focus(-visible|-within)?\b.*(__tip|__note-tip|\.ac-msg__actions|__gutter-time|\.ac-react--add)/.test(
+              selector,
+            )
+          )
+            continue;
+          if (/\.ac-msg__note:focus \.ac-msg__note-tip/.test(selector)) continue;
+          if (!selector.startsWith(KEYS_ONLY)) ungated.push(`${path}: ${selector}`);
+        }
+      }
+    }
+    expect(ungated).toEqual([]);
+  });
 });

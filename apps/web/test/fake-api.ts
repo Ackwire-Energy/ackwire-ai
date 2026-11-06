@@ -2952,12 +2952,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           ? state.messages.find((m) => m.clientId === input.clientId && m.author.id === (state.me?.user.id ?? null))
           : undefined;
         if (resent) return resent;
-        // Like the server: the quoted message must be in this channel; the meta is built here.
+        // Like the server: the quoted message must be in this channel and, from a thread, in that thread; the meta is
+        // built here.
         const meta: Record<string, unknown> = {};
         if (input.replyTo) {
           const quoted = state.messages.find((m) => m.id === input.replyTo);
-          if (!quoted || quoted.channelId !== channelId) {
-            throw new ApiError(400, "message.reply_not_found", "replyTo must be a message of this channel");
+          const elsewhere = input.threadId && quoted?.id !== input.threadId && quoted?.threadId !== input.threadId;
+          if (!quoted || quoted.channelId !== channelId || elsewhere) {
+            throw new ApiError(400, "message.reply_not_found", "replyTo must be a message of this conversation");
           }
           const who =
             quoted.author.type === "agent"
