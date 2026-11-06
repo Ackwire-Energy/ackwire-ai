@@ -1674,7 +1674,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Удалить",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Стрелка влево",
+        "ArrowUp": "Стрелка вверх",
+        "ArrowDown": "Стрелка вниз",
+        "ArrowRight": "Стрелка вправо"
       },
       "unavailable": {
         "reconnectingF": "Переподключаемся…",

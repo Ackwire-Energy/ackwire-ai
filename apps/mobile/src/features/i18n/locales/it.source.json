@@ -3672,6 +3672,18 @@
   "browser.live.key.Escape": {
     "value": "Esc"
   },
+  "browser.live.key.ArrowLeft": {
+    "value": "Left arrow"
+  },
+  "browser.live.key.ArrowUp": {
+    "value": "Up arrow"
+  },
+  "browser.live.key.ArrowDown": {
+    "value": "Down arrow"
+  },
+  "browser.live.key.ArrowRight": {
+    "value": "Right arrow"
+  },
   "browser.live.unavailable.reconnectingF": {
     "value": "Reconnecting…"
   },

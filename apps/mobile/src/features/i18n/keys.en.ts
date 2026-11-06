@@ -1499,6 +1499,10 @@ export const featureKeysEn = {
         Enter: "Enter",
         Backspace: "Delete",
         Escape: "Esc",
+        ArrowLeft: "Left arrow",
+        ArrowUp: "Up arrow",
+        ArrowDown: "Down arrow",
+        ArrowRight: "Right arrow",
       },
       unavailable: {
         reconnectingF: "Reconnecting…",

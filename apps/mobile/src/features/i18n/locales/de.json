@@ -1496,7 +1496,11 @@
         "Tab": "Tab",
         "Enter": "Eingabe",
         "Backspace": "Löschen",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Pfeil nach links",
+        "ArrowUp": "Pfeil nach oben",
+        "ArrowDown": "Pfeil nach unten",
+        "ArrowRight": "Pfeil nach rechts"
       },
       "unavailable": {
         "reconnectingF": "Verbindung wird wiederhergestellt…",

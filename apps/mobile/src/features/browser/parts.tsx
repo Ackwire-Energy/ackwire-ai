@@ -134,15 +134,18 @@ export function TypeBar({
   onText,
   onKey,
   autoFocus,
+  secret: startSecret = false,
 }: {
   onText: (text: string) => void;
   onKey: (key: LiveKey) => void;
   autoFocus?: boolean;
+  /** Opens in its password mode. */
+  secret?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
   const [text, setText] = useState("");
-  const [secret, setSecret] = useState(false);
+  const [secret, setSecret] = useState(startSecret);
   const [keys, setKeys] = useState(false);
   // The draft as typed, read by a held Backspace's repeats before the state catches up.
   const draft = useRef("");

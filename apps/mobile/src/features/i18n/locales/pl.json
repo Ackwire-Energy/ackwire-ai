@@ -1674,7 +1674,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Usuń",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Strzałka w lewo",
+        "ArrowUp": "Strzałka w górę",
+        "ArrowDown": "Strzałka w dół",
+        "ArrowRight": "Strzałka w prawo"
       },
       "unavailable": {
         "reconnectingF": "Ponowne łączenie…",

@@ -1407,7 +1407,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "削除",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "左矢印",
+        "ArrowUp": "上矢印",
+        "ArrowDown": "下矢印",
+        "ArrowRight": "右矢印"
       },
       "unavailable": {
         "reconnectingF": "再接続中…",

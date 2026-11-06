@@ -1585,7 +1585,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Borrar",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Flecha izquierda",
+        "ArrowUp": "Flecha arriba",
+        "ArrowDown": "Flecha abajo",
+        "ArrowRight": "Flecha derecha"
       },
       "unavailable": {
         "reconnectingF": "Reconectando…",

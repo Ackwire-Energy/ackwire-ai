@@ -1496,7 +1496,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Sil",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Sol ok",
+        "ArrowUp": "Yukarı ok",
+        "ArrowDown": "Aşağı ok",
+        "ArrowRight": "Sağ ok"
       },
       "unavailable": {
         "reconnectingF": "Yeniden bağlanıyor…",

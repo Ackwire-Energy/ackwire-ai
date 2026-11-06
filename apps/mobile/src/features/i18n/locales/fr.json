@@ -1585,7 +1585,11 @@
         "Tab": "Tabulation",
         "Enter": "Entrée",
         "Backspace": "Effacer",
-        "Escape": "Échap"
+        "Escape": "Échap",
+        "ArrowLeft": "Flèche gauche",
+        "ArrowUp": "Flèche haut",
+        "ArrowDown": "Flèche bas",
+        "ArrowRight": "Flèche droite"
       },
       "unavailable": {
         "reconnectingF": "Reconnexion…",

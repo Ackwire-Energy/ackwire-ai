@@ -1496,7 +1496,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Wissen",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Pijl naar links",
+        "ArrowUp": "Pijl omhoog",
+        "ArrowDown": "Pijl omlaag",
+        "ArrowRight": "Pijl naar rechts"
       },
       "unavailable": {
         "reconnectingF": "Opnieuw verbinden…",

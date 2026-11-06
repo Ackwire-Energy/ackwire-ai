@@ -128,6 +128,16 @@ export const followCursor = (camera: Point, s: number, cursor: Point, box: Size,
   return boundCamera(x, y, s, box, desk);
 };
 
+/**
+ * The box changed size under the same view (the keyboard came or went): the zoom the person had stays, as far as the
+ * new box allows, and the view moves only as much as keeps the cursor in sight.
+ */
+export const keepView = (camera: Point, s: number, cursor: Point, box: Size, desk: Size) => {
+  "worklet";
+  const next = clamp(s, fitScale(box, desk), MAX_SCALE);
+  return { s: next, camera: followCursor(camera, next, cursor, box, desk) };
+};
+
 /** How soon after a tap a touch that moves presses and drags: a trackpad's tap and drag. */
 export const TAP_DRAG_MS = 300;
 
