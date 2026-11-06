@@ -1,4 +1,5 @@
 import { everyoneWord, isEveryoneWord } from "@agenteschat/client/lib/everyone";
+import { linkPill } from "@agenteschat/client/lib/link-pills";
 import { parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { LinearGradient } from "expo-linear-gradient";
 import { type ComponentRef, useEffect, useRef, useState } from "react";
@@ -12,6 +13,7 @@ import { openPage } from "../ai/parts";
 import { useColors, useDirectory, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
+import { LinkPillText } from "./LinkPillText";
 import { type Block, type Inline, mentionTint, tableColumnWidths, tableHidden } from "./logic";
 import { MessageRefText } from "./MessageRefText";
 
@@ -24,6 +26,7 @@ export function Spans({
   channelRefs,
   everyone = false,
   ink,
+  live = false,
 }: {
   inline: Inline[];
   channelRefs?: Record<string, string>;
@@ -31,6 +34,8 @@ export function Spans({
   everyone?: boolean;
   /** Over a solid bubble: a mention's color and plate in place of its own. */
   ink?: string | undefined;
+  /** Still being written: an address would change pill at every letter, so it stays plain until it settles. */
+  live?: boolean;
 }) {
   const c = useColors();
   const myHandle = useMyHandle();
@@ -64,6 +69,9 @@ export function Spans({
             // A message here: its pill, opening it in the app.
             const message = parseMessageLink(s.href, [serverUrl()]);
             if (message) return <MessageRefText key={key} link={message} />;
+            // An address as written, whatever way: the words of a link written with its own stay.
+            const pill = !live && s.text === s.href ? linkPill(s.href) : null;
+            if (pill) return <LinkPillText key={key} href={s.href} pill={pill} />;
             // Opens in the in-app browser; a press on a link wins over the row's long press.
             return (
               <RNText key={key} accessibilityRole="link" onPress={() => openPage(s.href)} style={styles.link}>

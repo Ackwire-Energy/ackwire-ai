@@ -3167,6 +3167,55 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   color: var(--ink-muted);
   font-weight: 600;
 }
+/* A known service's address (LinkPill): the #channel pill, led by the service's logo. Its words wrap like the ones around
+   it, so a long repository or title never pushes past a narrow bubble; `break-word`, not `anywhere`, which would let a
+   table squeeze the column to a letter per line. The logo sits in the padding, not in the text: a picture in the text
+   could end a line alone, its words on the next. */
+.link-pill {
+  position: relative;
+  padding-left: calc(1em + 6px);
+  overflow-wrap: break-word;
+}
+.link-pill__mark {
+  position: absolute;
+  top: 0.27em;
+  left: 3px;
+  width: 1em;
+  height: 1em;
+  background: var(--connector-color, var(--ink));
+  -webkit-mask: var(--connector-icon) center / contain no-repeat;
+  mask: var(--connector-icon) center / contain no-repeat;
+}
+/* A deep brand color (Jira's blue) sinks into a dark plate. */
+[data-theme="dark"] .link-pill__mark {
+  background: color-mix(in srgb, var(--connector-color, var(--ink)) 75%, var(--ink));
+}
+.link-pill__ref {
+  white-space: nowrap;
+}
+.link-pill__ref .ac-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 1px;
+  vertical-align: -0.17em;
+  color: var(--ink-muted);
+}
+/* A long text an agent wrote, folded on a page (FoldedBody): the air between its blocks follows its smaller type. */
+.folded-body .md--message > * + * {
+  margin-top: 0.6em;
+}
+.folded-body__text[data-folded] {
+  max-height: 9em;
+  overflow: hidden;
+}
+.folded-body__text[data-cut] {
+  mask-image: linear-gradient(#000 60%, transparent);
+}
+.folded-body__more {
+  margin-top: 2px;
+  font-size: 13px;
+}
 .channel-card__head {
   display: flex;
   align-items: center;

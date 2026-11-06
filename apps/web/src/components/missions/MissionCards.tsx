@@ -31,6 +31,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { folderName } from "@agenteschat/client/lib/machines";
+import { plainInline } from "@agenteschat/client/lib/markdown";
 import {
   executorName,
   findingRefUrl,
@@ -66,6 +67,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { FoldedBody } from "@/chat/FoldedBody";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useChannelActions } from "@/components/channel-actions";
@@ -407,7 +409,9 @@ export function MissionFindings({ mission, agentName }: { mission: Mission; agen
         >
           <Icon name={FINDING_ICONS[f.kind]} size={16} label={t(`missions.findings.${f.kind}`)} />
           <span className="mi-finding__tx">
-            {f.kind === "decision" ? t("missions.findings.decisionText", { text: f.text }) : f.text}
+            {f.kind === "decision"
+              ? t("missions.findings.decisionText", { text: plainInline(f.text) })
+              : plainInline(f.text)}
             {f.refs?.map((ref) => {
               const url = findingRefUrl(ref, repo);
               return url ? (
@@ -801,7 +805,7 @@ export function MissionReviewCard({ message }: { message: Message }) {
     <div className="mi-card">
       <div className="mi-q">
         <h3>{t("missions.review.ready", { title: r.title })}</h3>
-        {r.summary && <p>{r.summary}</p>}
+        {r.summary && <FoldedBody body={r.summary} />}
       </div>
       {r.artifactIds.length > 0 && (
         <div className="artifact-cards">
@@ -978,11 +982,7 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
       </div>
       <div className="mi-q">
         <h3>{d.auto ? t("missions.delivery.allDone") : t("missions.delivery.title", { title: m.title })}</h3>
-        {d.auto ? (
-          <p>{t("missions.delivery.allDoneText")}</p>
-        ) : (
-          d.summary && <p className="mi-delivery__summary">{d.summary}</p>
-        )}
+        {d.auto ? <p>{t("missions.delivery.allDoneText")}</p> : d.summary && <FoldedBody body={d.summary} />}
       </div>
       {d.artifactIds.length > 0 && (
         <div className="artifact-cards">

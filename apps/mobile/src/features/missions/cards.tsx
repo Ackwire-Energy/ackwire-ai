@@ -12,6 +12,7 @@ import {
   useRetryMissionWorktree,
   useThreadMission,
 } from "@agenteschat/client";
+import { plainInline } from "@agenteschat/client/lib/markdown";
 import { lastLines } from "@agenteschat/client/lib/missions";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -29,6 +30,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { FoldedBody } from "../chat/FoldedBody";
 import { useCardTop } from "../chat/look";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -286,9 +288,9 @@ export function ReviewCardView({ review: r, mission }: { review: MissionReview; 
         {r.title}
       </Text>
       {r.summary ? (
-        <Text variant="small" tone="ink2" numberOfLines={6} style={styles.summary}>
-          {r.summary}
-        </Text>
+        <View style={styles.summary}>
+          <FoldedBody body={r.summary} />
+        </View>
       ) : null}
       {canAct ? (
         <View style={styles.acts}>
@@ -620,12 +622,12 @@ function Findings({ findings }: { findings: MissionFinding[] }) {
             key={`${f.kind}:${String(i)}`}
             style={styles.fdRow}
             accessible
-            accessibilityLabel={`${t(`missions.findings.${f.kind}`)}: ${f.text}`}
+            accessibilityLabel={`${t(`missions.findings.${f.kind}`)}: ${plainInline(f.text)}`}
           >
             <LineIcon name={FINDING_ICON[f.kind]} size={15} color={open ? colors.ink : colors.faint} variant="small" />
             <View style={styles.grow}>
               <Text variant="small" tone={open ? "ink" : "ink2"} style={open ? styles.bold : undefined}>
-                {f.text}
+                {plainInline(f.text)}
               </Text>
               {f.refs && f.refs.length > 0 ? (
                 <View style={styles.refs}>

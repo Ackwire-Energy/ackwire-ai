@@ -3220,6 +3220,24 @@
     "dmLabel": "Wiadomość od {{author}} w wiadomości bezpośredniej z {{name}}",
     "noAccess": "Wiadomość bez dostępu"
   },
+  "linkPills": {
+    "document": "Dokument",
+    "spreadsheet": "Arkusz",
+    "presentation": "Prezentacja",
+    "file": "Plik",
+    "folder": "Folder",
+    "customer": "Klient",
+    "payment": "Płatność",
+    "invoice": "Faktura",
+    "subscription": "Subskrypcja",
+    "pull": "Pull request",
+    "merge": "Merge request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Pokaż więcej",
+    "less": "Pokaż mniej"
+  },
   "secret": {
     "group": "Prośba o sekret od {{agent}}",
     "chip": "Czeka",

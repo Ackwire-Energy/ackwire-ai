@@ -25,6 +25,7 @@ export const MessageText = memo(function MessageText({
   channelRefs,
   everyone = false,
   ink,
+  small = false,
 }: {
   body: string;
   streaming?: boolean;
@@ -44,10 +45,17 @@ export const MessageText = memo(function MessageText({
   everyone?: boolean;
   /** Over a solid bubble: the words' color in place of the page's. */
   ink?: string;
+  /** On a page, under a title: a step smaller than a conversation's words. */
+  small?: boolean;
 }) {
   const c = useColors();
   const blocks = useMemo(() => parseBlocks(body), [body]);
   const inked = ink ? { color: ink } : undefined;
+  const variant = small ? "footnote" : "body";
+  const line = small ? undefined : styles.line;
+  const spans = (inline: Inline[]) => (
+    <Spans inline={inline} channelRefs={channelRefs} everyone={everyone} ink={ink} live={streaming} />
+  );
   const tone = muted ? "muted" : "ink";
   const last = blocks.length - 1;
   const caret =
@@ -84,8 +92,8 @@ export const MessageText = memo(function MessageText({
           case "heading":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone="ink" style={[styles.line, styles.heading, inked]}>
-                <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
+              <Text key={i} variant={variant} tone="ink" style={[line, styles.heading, inked]}>
+                {spans(b.inline)}
                 {end}
               </Text>
             );
@@ -93,11 +101,11 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={styles.bullet}>
-                <Text variant="body" tone="faint" style={[styles.line, styles.mark, inked]}>
+                <Text variant={variant} tone="faint" style={[line, styles.mark, inked]}>
                   {b.ordinal ? `${b.ordinal}.` : "•"}
                 </Text>
-                <Text variant="body" tone={tone} style={[styles.line, styles.flex, inked]}>
-                  <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
+                <Text variant={variant} tone={tone} style={[line, styles.flex, inked]}>
+                  {spans(b.inline)}
                   {end}
                 </Text>
               </View>
@@ -114,8 +122,8 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={[styles.quote, { borderLeftColor: ink ?? c.line2 ?? c.line }]}>
-                <Text variant="body" tone="muted" style={[styles.line, inked]}>
-                  <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
+                <Text variant={variant} tone="muted" style={[line, inked]}>
+                  {spans(b.inline)}
                   {end}
                 </Text>
               </View>
@@ -123,8 +131,8 @@ export const MessageText = memo(function MessageText({
           default:
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone={tone} style={[styles.line, inked]} selectable={selectable}>
-                <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
+              <Text key={i} variant={variant} tone={tone} style={[line, inked]} selectable={selectable}>
+                {spans(b.inline)}
                 {end}
               </Text>
             );

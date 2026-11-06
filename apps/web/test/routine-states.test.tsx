@@ -312,6 +312,54 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     expect(card("Avaliações").textContent).not.toContain("Every");
   });
 
+  test("a run's record reads as Markdown, folded when long, with the rest a click away", async () => {
+    const record = `Contou o que achou\n\n- **Verificado:** PRs abertos em \`agentes.chat\`\n- ${"Nada novo. ".repeat(40)}`;
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, value: 400 });
+    await open([routine({ id: "rt-md", name: "Revisar PRs" })], {
+      "rt-md": [routineRun({ at: ago(5), status: "silent", summary: record })],
+    });
+    const panel = await details("Revisar PRs");
+    await runsTab(panel);
+    const words = panel.querySelector(".routine-runs__words") as HTMLElement;
+    expect(words.querySelector("strong")?.textContent).toBe("Verificado:");
+    expect(words.querySelector("code")?.textContent).toBe("agentes.chat");
+    expect(words.textContent).not.toContain("**");
+    expect(words.querySelector("[data-folded]")).toBeTruthy();
+    await click(within(words).getByRole("button", { name: "Mostrar mais" }));
+    expect(words.querySelector("[data-folded]")).toBeNull();
+    expect(within(words).getByRole("button", { name: "Mostrar menos" })).toBeTruthy();
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollHeight");
+  });
+
+  test("a record's mentions say the name, as in a message", async () => {
+    await open([routine({ id: "rt-name", name: "Revisar PRs" })], {
+      "rt-name": [routineRun({ at: ago(5), status: "silent", summary: "Falei com @ada." })],
+    });
+    const panel = await details("Revisar PRs");
+    await runsTab(panel);
+    expect(panel.querySelector(".routine-runs__words")?.textContent).toContain("@Ada");
+  });
+
+  test("a long record that fits this width shows whole: no button, no fade", async () => {
+    await open([routine({ id: "rt-fits", name: "Revisar PRs" })], {
+      "rt-fits": [routineRun({ at: ago(5), status: "silent", summary: "Nada novo. ".repeat(40) })],
+    });
+    const panel = await details("Revisar PRs");
+    await runsTab(panel);
+    const words = panel.querySelector(".routine-runs__words") as HTMLElement;
+    expect(within(words).queryByRole("button")).toBeNull();
+    expect(words.querySelector("[data-cut]")).toBeNull();
+  });
+
+  test("a short record shows whole, with no button", async () => {
+    await open([routine({ id: "rt-short", name: "Revisar PRs" })], {
+      "rt-short": [routineRun({ at: ago(5), status: "silent", summary: "Nada novo." })],
+    });
+    const panel = await details("Revisar PRs");
+    await runsTab(panel);
+    expect(within(panel.querySelector(".routine-runs__words") as HTMLElement).queryByRole("button")).toBeNull();
+  });
+
   test("the strip's last runs read as sentences: each after the first starts with a capital", async () => {
     const now = routineRun({ at: ago(0.5), status: "reported" });
     const yesterday = routineRun({ at: ago(24 * 60), status: "silent" });

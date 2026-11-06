@@ -507,8 +507,8 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
       return {
         content:
           input.wake_me === true
-            ? "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked; nothing else is posted."
-            : `Posted.${note ? ` ${note}` : ""} Finish your work now and end with a short record of what you checked (it is not posted); nothing else is posted.`,
+            ? "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked: plain notes, no title or label. Nothing else is posted."
+            : `Posted.${note ? ` ${note}` : ""} Finish your work now and end with a short record of what you checked (it is not posted): plain notes, no title or label. Nothing else is posted.`,
         data: { handedOff: { messageId: handed.delivered.message.id } },
       };
     },

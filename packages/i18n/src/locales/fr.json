@@ -3124,6 +3124,24 @@
     "dmLabel": "Message de {{author}} en message direct avec {{name}}",
     "noAccess": "Message inaccessible"
   },
+  "linkPills": {
+    "document": "Document",
+    "spreadsheet": "Feuille de calcul",
+    "presentation": "Présentation",
+    "file": "Fichier",
+    "folder": "Dossier",
+    "customer": "Client",
+    "payment": "Paiement",
+    "invoice": "Facture",
+    "subscription": "Abonnement",
+    "pull": "Pull request",
+    "merge": "Merge request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Afficher plus",
+    "less": "Afficher moins"
+  },
   "secret": {
     "group": "Demande de secret de {{agent}}",
     "chip": "En attente",

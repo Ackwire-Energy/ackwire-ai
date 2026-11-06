@@ -10,6 +10,7 @@ import { trackInput } from "@agenteschat/ui";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
+import { copyPillAddresses } from "./chat/link-pill-copy";
 import { ErrorScreen } from "./components/ErrorScreen";
 import { withComposerDraftsSignOut } from "./hooks/useComposerDraft";
 import { loadI18n, savedLocale } from "./i18n";
@@ -148,6 +149,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") void checkAppVersion();
 });
 window.addEventListener("online", () => void checkAppVersion());
+document.addEventListener("copy", copyPillAddresses);
 setInterval(() => void checkAppVersion(), VERSION_CHECK_MS);
 
 // Back from a provider's sign-in that didn't connect (a connector, the GitHub App, a mailbox): why, once.

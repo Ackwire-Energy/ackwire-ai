@@ -825,7 +825,8 @@ a.mi-pr:hover {
   line-height: 1.3;
   letter-spacing: -0.015em;
 }
-.mi-q p {
+.mi-q p,
+.mi-q .folded-body {
   margin-top: 4px;
   font-size: 13.5px;
   color: var(--muted);
@@ -1610,9 +1611,6 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 }
 
 /* ── Delivery card: the mission's end (like an approval) ─────────────────── */
-.mi-delivery__summary {
-  white-space: pre-wrap;
-}
 .mi-delivery .artifact-cards {
   margin-top: 12px;
 }

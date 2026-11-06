@@ -3221,6 +3221,24 @@
     "dmLabel": "Сообщение от {{author}} в личных сообщениях с {{name}}",
     "noAccess": "Сообщение без доступа"
   },
+  "linkPills": {
+    "document": "Документ",
+    "spreadsheet": "Таблица",
+    "presentation": "Презентация",
+    "file": "Файл",
+    "folder": "Папка",
+    "customer": "Клиент",
+    "payment": "Платёж",
+    "invoice": "Счёт",
+    "subscription": "Подписка",
+    "pull": "Pull request",
+    "merge": "Merge request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Показать ещё",
+    "less": "Свернуть"
+  },
   "secret": {
     "group": "Запрос секрета от {{agent}}",
     "chip": "Ждёт",

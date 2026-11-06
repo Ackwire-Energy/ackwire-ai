@@ -802,6 +802,16 @@ describe("agent page: activity", () => {
     ...over,
   });
 
+  test("what started a run reads as words: no list or bold marks", async () => {
+    const state = seedState();
+    state.runs.push(extra({ id: "run-md", what: "- **Verificado:** o login\n- **Mudou:** nada" }));
+    await go("?tab=activity", state);
+    const runs = screen().getByRole("region", { name: "Execuções" });
+    expect(runs.textContent).toContain("Verificado: o login");
+    expect(runs.textContent).not.toContain("**");
+    expect(runs.textContent).not.toContain("- Verificado");
+  });
+
   test("by day, with tokens; filters for failures and waiting; search", async () => {
     const state = seedState();
     state.runs.push(
