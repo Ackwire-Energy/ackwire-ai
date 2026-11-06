@@ -3,9 +3,10 @@
  * owner pastes ("key accounts", ADR 0059). Pure data, read by the runner (where
  * a turn goes, which variable holds the key, what each model alias runs), the
  * engine and the apps (names, where the key is made, the model choices): it
- * imports nothing. The key travels sealed to the computer and stays there; our
- * server never holds or routes it, and the endpoint a turn uses comes from the
- * runner's own copy of this file.
+ * imports nothing. A plan with a `modelsUrl` goes by that list once the server
+ * has read it (`readPlanModels`), this table being its fallback. The key travels
+ * sealed to the computer and stays there; our server never holds or routes it,
+ * and the endpoint a turn uses comes from the runner's own copy of this file.
  *
  * Settings as each maker documents them for Claude Code (read 2026-10-24):
  * docs.z.ai/devpack/tool/claude, kimi.com/code/docs (third-party tools, Claude
@@ -32,8 +33,7 @@ export type PlanModelTag = "cheap" | "fast" | "smart";
 
 /**
  * What the plan's account must allow before a model answers, all under OpenCode's Settings › Privacy: `globalRegion`
- * its Global region, `paidTraining` paid models that train on what they're sent, `freeTraining` its free models
- * (which all train on it).
+ * its Global region, `paidTraining` paid models that train on what they're sent, `freeTraining` free ones that do.
  */
 export type PlanModelNeed = "globalRegion" | "paidTraining" | "freeTraining";
 
@@ -81,6 +81,11 @@ export interface CodingPlan {
     /** The maker's other documented settings. */
     env?: Readonly<Record<string, string>>;
   };
+  /**
+   * The maker's public list of the plan's models. The server reads it and its answer replaces `claudeCode.models`
+   * (`readPlanModels`, `planOf`), so what the maker adds shows up without a release; the table stays the fallback.
+   */
+  modelsUrl?: string;
   /** The maker's usage endpoint for the key (`apps/server/runner/plan-usage.ts` reads its answer). */
   usage?: { url: string; auth: "bearer" | "raw" };
   /**
@@ -159,11 +164,10 @@ export const CODING_PLANS = {
       // models answer only once the OpenCode workspace allows the Global region, the ones that train on what
       // they're sent only once it allows that (paid and free are separate switches); none has an alias, so
       // "Automático" never picks one.
-      // ponytail: hand-copied list, read the live list when OpenCode adds models faster than we copy them
-      // (opencode.ai/inference/go/v1/models: 28 on 2026-11-02, all of them here). Zen's own free models
-      // (`deepseek-v4.1-flash-free`, `glm-5.3-flash-free`, `big-pickle`…) aren't Go's: OpenCode serves its free
-      // tier only to the OpenCode CLI ("Free-tier chat models require OpenCode", opencode.ai/v2/docs/console/models,
-      // read 2026-11-02), so they can't answer through Claude Code.
+      // The fallback for `modelsUrl` (30 on 2026-11-06, all of them here), and what only we know of each model:
+      // its alias and tag. Zen's own free models (`deepseek-v4.1-flash-free`, `glm-5.3-flash-free`, `big-pickle`…)
+      // aren't Go's: OpenCode serves its free tier only to the OpenCode CLI ("Free-tier chat models require
+      // OpenCode", opencode.ai/v2/docs/console/models, read 2026-11-06), so they can't answer through Claude Code.
       models: [
         { id: "minimax-m3", label: "MiniMax M3", alias: "sonnet", maker: "minimax" },
         { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash", maker: "minimax" },
@@ -193,6 +197,7 @@ export const CODING_PLANS = {
         { id: "grok-4.7", label: "Grok 4.7", maker: "xAI" },
         { id: "longcat-2.0", label: "LongCat 2.0", tag: "cheap", maker: "Meituan" },
         { id: "hy3", label: "Hy3", tag: "cheap", maker: "Tencent" },
+        { id: "hy4", label: "Hy4", maker: "Tencent" },
         { id: "hy4-preview", label: "Hy4 Preview", maker: "Tencent" },
         { id: "step-5-preview", label: "Step 5 Preview", maker: "StepFun" },
         {
@@ -207,7 +212,8 @@ export const CODING_PLANS = {
           needs: "paidTraining",
           maker: "Meta",
         },
-        { id: "beam-free", label: "Beam Free", needs: "freeTraining", free: true, maker: "Reflection" },
+        { id: "beam-free", label: "Beam Free", free: true, maker: "Reflection" },
+        { id: "crouton-alpha-free", label: "Crouton Alpha Free", free: true, maker: "OpenCode" },
         {
           id: "iceman-contributor-free",
           label: "Iceman Contributor Free",
@@ -220,6 +226,7 @@ export const CODING_PLANS = {
       // it, reads no project config that could point it elsewhere.
       env: { CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: "1", OPENCODE_DISABLE_PROJECT_CONFIG: "1" },
     },
+    modelsUrl: "https://opencode.ai/inference/go/v1/models",
     usage: { url: "https://opencode.ai/zen/go/v1/usage", auth: "bearer" },
     // "Each model has the following usage limits: 5-hour, weekly, monthly" (opencode.ai/docs/go, read 2026-11-05).
     limitsPerModel: true,
@@ -251,7 +258,117 @@ export const speedFits = (o: { kind: string; provider?: string | null; model?: s
 export type PlanId = keyof typeof CODING_PLANS;
 export const PLAN_IDS = Object.keys(CODING_PLANS) as PlanId[];
 export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && Object.hasOwn(CODING_PLANS, v);
-export const planOf = (id: unknown): CodingPlan | undefined => (isPlanId(id) ? CODING_PLANS[id] : undefined);
+
+/** Each plan as its `modelsUrl` last said: per process, and empty until the list is read (always on a computer). */
+const learned = new Map<PlanId, CodingPlan>();
+
+export const planOf = (id: unknown): CodingPlan | undefined =>
+  isPlanId(id) ? (learned.get(id) ?? CODING_PLANS[id]) : undefined;
+
+/** Keeps the models a plan's list gave: on the server from `readPlanModels`, in the apps as the server sends them. */
+export function learnPlanModels(lists: Partial<Record<string, readonly PlanModel[]>>) {
+  for (const [id, models] of Object.entries(lists)) {
+    if (!isPlanId(id) || !models?.length || learned.get(id)?.claudeCode.models === models) continue;
+    const plan: CodingPlan = CODING_PLANS[id];
+    learned.set(id, { ...plan, claudeCode: { ...plan.claudeCode, models } });
+  }
+}
+
+/** What `learnPlanModels` holds, for the server to send on. */
+export const learnedPlanModels = (): Record<string, PlanModel[]> =>
+  Object.fromEntries([...learned].map(([id, plan]) => [id, [...plan.claudeCode.models]]));
+
+/** What a model id from a list may look like: it reaches Claude Code's `--model` and its environment. */
+const LISTED_MODEL_ID = /^[A-Za-z0-9][\w.-]{0,79}$/;
+
+/** Ids that already mean something, to the pickers (`auto`) or to Claude Code: never a list's model, whatever it says. */
+const TAKEN_MODEL_ID = /^(?:auto|default|opus|sonnet|haiku|fable)$/i;
+
+const isListedModelId = (v: unknown): v is string =>
+  typeof v === "string" && LISTED_MODEL_ID.test(v) && !TAKEN_MODEL_ID.test(v);
+
+/** Far above any plan's list: past it, the answer isn't one. */
+const MAX_LISTED_MODELS = 300;
+
+/** Makers by the first part of a list's `canonical_id` where they aren't its capitalized form: mostly an API provider's id. */
+const LISTED_MAKERS = new Map([
+  ["anthropic", "anthropic"],
+  ["deepseek", "deepseek"],
+  ["google", "gemini"],
+  ["minimax", "minimax"],
+  ["moonshotai", "moonshot"],
+  ["openai", "openai"],
+  ["stepfun", "StepFun"],
+  ["xai", "xAI"],
+  ["zhipuai", "zai"],
+]);
+
+function listedMaker(canonicalId: unknown, plan: CodingPlan) {
+  const prefix = typeof canonicalId === "string" ? (canonicalId.split("/")[0] ?? "") : "";
+  if (!/^[a-z][a-z0-9-]{0,39}$/i.test(prefix)) return plan.maker;
+  return LISTED_MAKERS.get(prefix) ?? prefix.charAt(0).toUpperCase() + prefix.slice(1);
+}
+
+/**
+ * The plan's models from its `modelsUrl`'s answer, none if it isn't one: names, makers and prices from the list, the
+ * table's alias and tag for what it knows, and what a model needs from what OpenCode documents for each kind
+ * (opencode.ai/v2/docs/console/go, read 2026-11-06): DeepSeek's the Global region, a "Contributor" model training
+ * allowed. Only chat models that call tools, which every turn does. A model the list drops goes, unless an alias
+ * runs it: the computers map the aliases from their own copy of the table.
+ */
+export function readPlanModels(plan: CodingPlan, body: unknown): PlanModel[] {
+  const data = (body as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data) || data.length > MAX_LISTED_MODELS) return [];
+  const table = plan.claudeCode.models;
+  const listed = new Map<string, PlanModel>();
+  for (const raw of data as ListedModel[]) {
+    const id = raw?.id;
+    if (!isListedModelId(id)) continue;
+    if (raw.type !== "chat" || raw.capabilities?.tools?.supported === false) continue;
+    const known = table.find((m) => m.id === id);
+    const maker = listedMaker(raw.canonical_id, plan);
+    const free = raw.cost?.text?.input?.price === 0 && raw.cost.text.output?.price === 0;
+    const trains = /contributor/i.test(id) ? (free ? "freeTraining" : "paidTraining") : undefined;
+    const needs = known?.needs ?? (maker === "deepseek" ? "globalRegion" : trains);
+    const name = typeof raw.name === "string" ? raw.name.trim() : "";
+    listed.set(id, {
+      id,
+      label: name && !/\p{C}/u.test(name) ? name.slice(0, 80) : id,
+      maker,
+      ...(known?.alias ? { alias: known.alias } : {}),
+      ...(known?.tag ? { tag: known.tag } : {}),
+      ...(needs ? { needs } : {}),
+      ...(free ? { free } : {}),
+    });
+  }
+  if (listed.size === 0) return [];
+  const models = [
+    ...table.flatMap((m) => listed.get(m.id) ?? (m.alias ? [m] : [])),
+    ...[...listed.values()].filter((m) => !table.some((t) => t.id === m.id)),
+  ];
+  return [...new Set(models.map((m) => m.maker))].flatMap((maker) => models.filter((m) => m.maker === maker));
+}
+
+/** The fields of a model in a `modelsUrl` answer that `readPlanModels` reads. */
+interface ListedModel {
+  id?: unknown;
+  name?: unknown;
+  canonical_id?: unknown;
+  type?: unknown;
+  capabilities?: { tools?: { supported?: unknown } };
+  cost?: { text?: { input?: { price?: unknown }; output?: { price?: unknown } } };
+}
+
+/**
+ * The plan for a turn on a computer, whose copy of the table may be older than the plan's list: the id the server
+ * chose from that list (`claudeCodeModel` there, which has already turned anything else into `sonnet`) counts as one
+ * of the plan's. Only a plan with a list, and only an id of a listed model's shape.
+ */
+export function planForTurn(plan: CodingPlan, value: unknown): CodingPlan {
+  const { models } = plan.claudeCode;
+  if (!plan.modelsUrl || !isListedModelId(value) || models.some((m) => m.id === value)) return plan;
+  return { ...plan, claudeCode: { ...plan.claudeCode, models: [...models, { id: value, label: value }] } };
+}
 
 const isAlias = (v: unknown): v is PlanAlias => PLAN_ALIASES.some((a) => a === v);
 
@@ -303,9 +420,7 @@ export function modelLimitOf(
 
 /** A coding plan's model by its id, whichever plan has it. */
 export const planModelById = (id: string): PlanModel | undefined =>
-  Object.values<CodingPlan>(CODING_PLANS)
-    .flatMap((p) => p.claudeCode.models)
-    .find((m) => m.id === id);
+  PLAN_IDS.flatMap((p) => planOf(p)?.claudeCode.models ?? []).find((m) => m.id === id);
 
 /** Every coding plan's model ids: what an agent on Claude Code may store besides Claude's own. */
 export const isPlanModelId = (v: string) => planModelById(v) !== undefined;

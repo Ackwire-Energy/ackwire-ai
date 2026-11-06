@@ -721,6 +721,18 @@ export const Usage = z
   })
   .openapi("AgentUsage");
 
+export const PlanModelOut = z
+  .object({
+    id: z.string(),
+    label: z.string(),
+    alias: z.enum(["opus", "sonnet", "haiku"]).optional(),
+    tag: z.enum(["cheap", "fast", "smart"]).optional(),
+    needs: z.enum(["globalRegion", "paidTraining", "freeTraining"]).optional(),
+    free: z.literal(true).optional(),
+    maker: z.string().optional(),
+  })
+  .openapi("PlanModel");
+
 export const Model = z
   .object({
     id: z.string(),

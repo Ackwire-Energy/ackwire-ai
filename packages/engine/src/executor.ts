@@ -70,6 +70,7 @@ import {
   notePlanLimit,
   recordRunBrain,
   refusalScope,
+  regionRefusal,
   resolveBrain,
   storedPlanUsage,
   UNAVAILABLE_CODES,
@@ -3937,6 +3938,7 @@ async function executeRunInner(
                   cacheWriteTokens: u.cacheWrite ?? 0,
                 }),
               ),
+            refusedByPlan: (message) => regionRefusal(turnPlan.account?.provider, turnPlan.model, message),
             onLimit: (resetsAt) => {
               turnLimited = true;
               const machineId = turnPlan.session?.machineId;
@@ -4984,6 +4986,8 @@ async function thinkOnce(
     onTaken?(): void | Promise<void>;
     /** Fast failed and the turn answered at standard speed. */
     onSpeedFallback?(message: string): void;
+    /** A failed turn that is the plan's refusal, though the CLI didn't call it a limit. */
+    refusedByPlan?(message: string): boolean;
   } = {},
 ): Promise<BrainStep> {
   let text: string | null = null;
@@ -5044,8 +5048,11 @@ async function thinkOnce(
         };
       }
     } else if (event.type === "error") {
-      // After a `limit`, whatever ended the turn was the plan's refusal.
-      if (limit) throw limitFailure(event.message, event.worked);
+      // After a `limit`, whatever ended the turn was the plan's refusal. Without one, only before anything ran: the
+      // words of a later failure can be a command's own.
+      const untouched = executedCount === 0 && toolCalls.length === 0;
+      if (limit || (event.code === "claude_failed" && untouched && hooks.refusedByPlan?.(event.message)))
+        throw limitFailure(event.message, event.worked);
       throw new BrainFailure(
         event.code,
         event.message,

@@ -259,13 +259,15 @@ const FREE_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/;
  * model name (a new one may come out before our catalog knows it); the model
  * brain none.
  */
-export function normalizeBrainModel(kind: BrainKind, value: unknown): string | null {
+export function normalizeBrainModel(kind: BrainKind, value: unknown, stored?: string | null): string | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value !== "string") throw new ValidationError("The model is a name", "brain.invalid_model");
   const v = value.trim();
   if (kind === "model") {
     throw new ValidationError("The API brain uses the agent's model", "brain.invalid_model");
   }
+  // The apps send the model with every save, and a plan's list may have dropped it since: repeating it is no new choice.
+  if (v === stored) return v;
   // "Automático": each run picks the tier (`auto-model.ts`).
   if (v.toLowerCase() === AUTO_MODEL) return AUTO_MODEL;
   if (kind === "claude_code") {
@@ -821,7 +823,7 @@ async function setPersonalBrain(
   const carried = isAutoModel(current?.brainModel) ? AUTO_MODEL : null;
   const model =
     input.model !== undefined
-      ? normalizeBrainModel(brain, input.model)
+      ? normalizeBrainModel(brain, input.model, kindChanged ? null : current?.brainModel)
       : kindChanged
         ? carried
         : (current?.brainModel ?? null);
@@ -1029,7 +1031,7 @@ export async function setAgentBrain(
   const carried = isAutoModel(agent.brainModel) ? AUTO_MODEL : null;
   const model =
     input.model !== undefined
-      ? normalizeBrainModel(brain, input.model)
+      ? normalizeBrainModel(brain, input.model, changed ? null : agent.brainModel)
       : brain === "model" || changed
         ? carried
         : agent.brainModel;
@@ -1540,7 +1542,7 @@ export async function setMissionBrain(
     input.model !== undefined
       ? effective === "model" && (input.model === null || input.model === "")
         ? null
-        : normalizeBrainModel(effective, input.model)
+        : normalizeBrainModel(effective, input.model, brainChanged ? null : mission.brainModel)
       : brainChanged
         ? null
         : mission.brainModel;

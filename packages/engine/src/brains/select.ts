@@ -174,6 +174,13 @@ const MODEL_WINDOW_WORDS: readonly [RegExp, "seven_day" | "monthly"][] = [
 export type RefusalScope = { scope: "account" } | { scope: "model" | "region"; resetsAt?: string };
 
 /**
+ * A plan refused a model that needs its Global region for that, whatever the status it came with. Only those: the
+ * models OpenCode sells in "limited regions" are closed by country, which that setting can't open.
+ */
+export const regionRefusal = (provider: string | null | undefined, model: string | null | undefined, message: string) =>
+  ownLimitsModel(provider, model)?.needs === "globalRegion" && /region/i.test(message);
+
+/**
  * Whose limit a plan's refusal (`message`, the CLI's words) is. On a plan whose models have limits of their own, the
  * model's, unless a window of the account is full (`usage`, the last reading): the region the model needs when its words
  * say region, else its own limit, back when the account's window its words name resets (a 5-hour one is the model's own
@@ -188,7 +195,7 @@ export function refusalScope(
 ): RefusalScope {
   const m = ownLimitsModel(provider, model);
   if (!m) return { scope: "account" };
-  if (m.needs === "globalRegion" && /region/i.test(message)) return { scope: "region" };
+  if (regionRefusal(provider, model, message)) return { scope: "region" };
   if (usage && planWindows(usage, now).some((w) => w.used >= 100)) return { scope: "account" };
   const kind = MODEL_WINDOW_WORDS.find(([words]) => words.test(message))?.[1];
   const at = kind ? usage?.windows.find((w) => w.kind === kind)?.resetsAt : undefined;

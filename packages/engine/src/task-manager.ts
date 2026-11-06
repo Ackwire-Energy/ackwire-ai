@@ -1,5 +1,5 @@
 import { and, type Database, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
-import { CODING_PLANS, planModel } from "@agenteschat/providers/plans";
+import { planOf as codingPlan, PLAN_IDS, planModel } from "@agenteschat/providers/plans";
 import { runAuthorityById } from "./authority";
 import { TtlCache } from "./cache";
 import { computerQueue as lineOfComputer, seesRunSql } from "./computer-queue";
@@ -419,7 +419,7 @@ function heldOf(r: Row): ManagedTask["held"] {
 /** The model of a wait on a model's own limit, by the name its plan gives it. */
 function waitModel(wait: StoredWait) {
   if (!wait.scope) return null;
-  const plan = Object.values(CODING_PLANS).find((p) => p.name === wait.plan);
+  const plan = PLAN_IDS.map(codingPlan).find((p) => p?.name === wait.plan);
   return plan ? planModel(plan, wait.model).label : (wait.model ?? null);
 }
 

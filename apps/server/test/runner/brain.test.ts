@@ -1441,9 +1441,24 @@ test.if(posix)(
       dirs.push(zai, kimi, signedIn);
       writeFileSync(path.join(zai, "provider.json"), JSON.stringify({ provider: "zai", key: KEY }), { mode: 0o600 });
       writeFileSync(path.join(kimi, "provider.json"), JSON.stringify({ provider: "kimi", key: KIMI }), { mode: 0o600 });
+      const go = tempDir("go-account-");
+      dirs.push(go);
+      writeFileSync(
+        path.join(go, "provider.json"),
+        JSON.stringify({ provider: "opencode", key: "oc_sk_fake-for-tests" }),
+        {
+          mode: 0o600,
+        },
+      );
       const KIMI_ACCOUNT = "0193ffff-0000-7000-8000-000000000002";
       const SIGNED_IN = "0193ffff-0000-7000-8000-000000000003";
-      const folders: Record<string, string> = { [ACCOUNT]: zai, [KIMI_ACCOUNT]: kimi, [SIGNED_IN]: signedIn };
+      const GO_ACCOUNT = "0193ffff-0000-7000-8000-000000000004";
+      const folders: Record<string, string> = {
+        [ACCOUNT]: zai,
+        [KIMI_ACCOUNT]: kimi,
+        [SIGNED_IN]: signedIn,
+        [GO_ACCOUNT]: go,
+      };
       const { spawns, turn } = setup({
         accounts: { accountDir: (kind, id) => (kind === "claude_code" ? (folders[id] ?? null) : null) },
       });
@@ -1553,6 +1568,13 @@ test.if(posix)(
       // Another plan's model runs the plan's own sonnet.
       await turn(7, "hi", { account: KIMI_ACCOUNT, model: "minimax-m3", session: { id: SESSION(7), resume: false } });
       expect(flag(runs()[7], "--model")).toBe("sonnet");
+      // A model the plan's list added after this runner was built: the server chose it, so it runs; the aliases keep theirs.
+      await turn(8, "hi", { account: GO_ACCOUNT, model: "glm-6", session: { id: SESSION(8), resume: false } });
+      expect(flag(runs()[8], "--model")).toBe("glm-6");
+      expect(runs()[8]?.settingsEnv).toMatchObject({
+        CLAUDE_CODE_SUBAGENT_MODEL: "glm-6",
+        ANTHROPIC_DEFAULT_SONNET_MODEL: "minimax-m3",
+      });
     } finally {
       for (const k of Object.keys(stray)) delete process.env[k];
     }
