@@ -13205,7 +13205,8 @@
     "stopFailed": "Impossible de l'arrêter. Seuls la personne qui a demandé, le propriétaire de l'agent ou un admin le peuvent.",
     "autoUpdate": "Toujours dessus ({{duration}}).",
     "autoUpdateNow": "En ce moment : {{now}}.",
-    "statusReply": "Je suis toujours dessus ({{duration}}). Je lis votre message après cette étape.",
+    "statusReply": "Je suis en pleine tâche ({{duration}}) et je ne peux pas encore répondre. Votre message est en attente et je le lis à la prochaine étape.",
+    "statusReplyTurn": "Je suis en pleine tâche ({{duration}}) et je ne peux pas encore répondre. Votre message est en attente et je le lis quand cette série de travail se termine.",
     "statusReplyQueued": "J'attends l'ordinateur ({{duration}}). Je lis votre message dès que c'est mon tour.",
     "statusReplyAway": "J'attends que mon ordinateur revienne. Je lis votre message dès son retour.",
     "status": {

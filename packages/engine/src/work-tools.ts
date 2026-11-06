@@ -154,7 +154,7 @@ export function createWorkToolSource(deps: { pubsub?: PubSub }): ToolSource {
   const steer: ToolDefinition = {
     name: STEER_WORK_TOOL,
     description:
-      'Pass the person\'s message on, unchanged, to your background work it is about (by its id in "# Your background work here"). That work reads it as their words. Then answer in one short line ("Passei isso para o trabalho em andamento") or say nothing.',
+      'Pass the person\'s message on, unchanged, to your background work it is about (by its id in "# Your background work here"). That work reads it as their words at its next step and keeps going. Then tell them so in one short line, in their language.',
     scope: "",
     inputSchema: {
       type: "object",

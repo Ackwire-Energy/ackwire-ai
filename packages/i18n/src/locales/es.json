@@ -13137,7 +13137,8 @@
     "stopFailed": "No se pudo detener. Solo pueden quien lo pidió, el responsable del agente o un admin.",
     "autoUpdate": "Sigo en ello ({{duration}}).",
     "autoUpdateNow": "Ahora: {{now}}.",
-    "statusReply": "Sigo con esto ({{duration}}). Leo tu mensaje después de este paso.",
+    "statusReply": "Estoy en medio de una tarea ({{duration}}) y todavía no puedo responder. Tu mensaje está en cola y lo leo en el próximo paso.",
+    "statusReplyTurn": "Estoy en medio de una tarea ({{duration}}) y todavía no puedo responder. Tu mensaje está en cola y lo leo cuando termine esta ronda de trabajo.",
     "statusReplyQueued": "Esperando la computadora ({{duration}}). Leo tu mensaje cuando llegue mi turno.",
     "statusReplyAway": "Esperando a que vuelva mi computadora. Leo tu mensaje en cuanto vuelva.",
     "status": {

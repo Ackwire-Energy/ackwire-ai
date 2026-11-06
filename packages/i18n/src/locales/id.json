@@ -12326,7 +12326,8 @@
     "stopFailed": "Tidak bisa dihentikan. Hanya yang meminta, pemilik agen, atau admin yang bisa.",
     "autoUpdate": "Masih dikerjakan ({{duration}}).",
     "autoUpdateNow": "Sekarang: {{now}}.",
-    "statusReply": "Masih mengerjakannya ({{duration}}). Saya baca pesan Anda setelah langkah ini.",
+    "statusReply": "Saya sedang di tengah tugas ({{duration}}) dan belum bisa menjawab. Pesan Anda sudah antre dan saya baca di langkah berikutnya.",
+    "statusReplyTurn": "Saya sedang di tengah tugas ({{duration}}) dan belum bisa menjawab. Pesan Anda sudah antre dan saya baca setelah putaran kerja ini selesai.",
     "statusReplyQueued": "Menunggu komputer ({{duration}}). Saya baca pesan Anda saat tiba giliran saya.",
     "statusReplyAway": "Menunggu komputer saya kembali. Saya baca pesan Anda begitu komputer kembali.",
     "status": {

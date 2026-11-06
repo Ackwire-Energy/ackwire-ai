@@ -12801,7 +12801,8 @@
     "stopFailed": "Kon het niet stoppen. Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dat.",
     "autoUpdate": "Nog mee bezig ({{duration}}).",
     "autoUpdateNow": "Nu: {{now}}.",
-    "statusReply": "Ik ben er nog mee bezig ({{duration}}). Ik lees je bericht na deze stap.",
+    "statusReply": "Ik zit midden in een taak ({{duration}}) en kan nog niet antwoorden. Je bericht staat in de wachtrij en ik lees het bij de volgende stap.",
+    "statusReplyTurn": "Ik zit midden in een taak ({{duration}}) en kan nog niet antwoorden. Je bericht staat in de wachtrij en ik lees het als deze werkronde klaar is.",
     "statusReplyQueued": "Ik wacht op de computer ({{duration}}). Ik lees je bericht zodra ik aan de beurt ben.",
     "statusReplyAway": "Ik wacht tot mijn computer terug is. Ik lees je bericht zodra hij terug is.",
     "status": {

@@ -1136,7 +1136,7 @@ test("Fast: the turn of a conversation asks for it; refused, the reply says it c
   expect((await timeline(f)).at(-1)?.meta.speedFallback).toBeUndefined();
 });
 
-test("a turn says a person waits on it only in the line's first rank: not for a routine, background work or an agent", async () => {
+test("a turn says a person waits on it only in the line's first rank: not for a routine, background work, an agent or a work", async () => {
   f = await setup();
   await computerAgent(f);
   const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Feito." }]);
@@ -1167,6 +1167,27 @@ test("a turn says a person waits on it only in the line's first rank: not for a 
   ).toBeUndefined();
   expect(await turnFor(setRun({ background: true }))).toBeUndefined();
   expect(await turnFor(setRun({ hop: 2 }))).toBeUndefined();
+  // A person's own work, once in the background, leaves the reserved slot to their reply turn beside it.
+  expect(
+    await turnFor(async (_, run) => {
+      const fx = f as Fixture;
+      const [work] = await fx.db
+        .insert(schema.agentWorks)
+        .values({
+          orgId: fx.org.id,
+          agentId: fx.agent.id,
+          channelId: fx.general.id,
+          anchorMessageId: Bun.randomUUIDv7(),
+          ownThread: true,
+          title: "QA do site",
+          status: "live",
+          how: "agent",
+          lastUpdateAt: new Date(),
+        })
+        .returning();
+      await fx.db.update(schema.agentRuns).set({ workId: work?.id }).where(eq(schema.agentRuns.id, run));
+    }),
+  ).toBeUndefined();
 });
 
 test("Fast stays out of every run nobody waits for", async () => {

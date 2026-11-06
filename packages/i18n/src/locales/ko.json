@@ -12264,7 +12264,8 @@
     "stopFailed": "중지하지 못했어요. 요청한 사람, 에이전트 소유자 또는 관리자만 할 수 있어요.",
     "autoUpdate": "아직 작업 중이에요({{duration}}).",
     "autoUpdateNow": "지금: {{now}}.",
-    "statusReply": "아직 작업 중입니다({{duration}}). 이 단계가 끝나면 메시지를 읽겠습니다.",
+    "statusReply": "작업하는 중이라({{duration}}) 아직 답할 수 없습니다. 메시지는 대기 중이며 다음 단계에서 읽겠습니다.",
+    "statusReplyTurn": "작업하는 중이라({{duration}}) 아직 답할 수 없습니다. 메시지는 대기 중이며 이번 작업 차례가 끝나면 읽겠습니다.",
     "statusReplyQueued": "컴퓨터를 기다리는 중입니다({{duration}}). 제 차례가 되면 메시지를 읽겠습니다.",
     "statusReplyAway": "컴퓨터가 돌아오기를 기다리는 중입니다. 돌아오는 대로 메시지를 읽겠습니다.",
     "status": {

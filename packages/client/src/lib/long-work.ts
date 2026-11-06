@@ -54,6 +54,8 @@ export interface WorkLineContext {
   nameOf?: (userId: string) => string | null;
   /** Who may stop it (`mayStopRun`: who asked, the agent's owner, an admin). */
   canStop: boolean;
+  /** Shown inside the thread its updates go to: they are read there, so the line doesn't repeat the last one. */
+  inUpdatesThread?: boolean;
 }
 
 /** The line under a work's anchor, in the reader's language. */
@@ -69,7 +71,7 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
   // Its card draws the Markdown; a line of plain text can't.
   const question = asked ? { ...asked, text: plainLines(asked.text).join(" ") || asked.text } : null;
   // The last update is news only while it works: once over, the report says where it ended.
-  const update = over || question ? null : (w.lastUpdate?.text ?? null);
+  const update = over || question || c.inUpdatesThread ? null : (w.lastUpdate?.text ?? null);
   const base = { task, stop, threadId: w.threadId, update, question };
   const took = workDuration(t, (w.finishedAt ? Date.parse(w.finishedAt) : now.getTime()) - since);
   if (w.status === "done")
@@ -204,8 +206,9 @@ export function autoUpdateText(t: TFunction, params: Record<string, unknown>): s
 }
 
 /**
- * The server's own status line for a working agent a person wrote to (ADR 0131 §2, `talker_status`): how long it has
- * worked, what it does now, and that it reads them after this step.
+ * The server's own status line for a working agent a person wrote to (ADR 0131 §2, `talker_status`): that it can't
+ * answer yet, how long it has worked, when it reads them (its next step, or `reads: "turn"`: when its computer's turn
+ * ends) and what it does now.
  */
 export function talkerStatusText(t: TFunction, params: Record<string, unknown>): string {
   const say = loose(t);
@@ -213,7 +216,9 @@ export function talkerStatusText(t: TFunction, params: Record<string, unknown>):
   // Waiting for its computer it isn't working: the minutes are the wait's, and away there is no telling how long.
   if (params.wait === "away") return say("work.statusReplyAway");
   if (params.wait === "queued") return say("work.statusReplyQueued", { duration: workDuration(t, minutes * 60_000) });
-  const head = say("work.statusReply", { duration: workDuration(t, minutes * 60_000) });
+  const head = say(params.reads === "turn" ? "work.statusReplyTurn" : "work.statusReply", {
+    duration: workDuration(t, minutes * 60_000),
+  });
   const kind = typeof params.kind === "string" ? params.kind : null;
   if (!kind) return head;
   const now = say(`presence.agent.${kind}`, { subject: typeof params.subject === "string" ? params.subject : "" });

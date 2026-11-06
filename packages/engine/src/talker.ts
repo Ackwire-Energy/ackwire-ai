@@ -263,7 +263,10 @@ export function createTalker(deps: TalkerDeps): Talker {
         if (answer === null && !endsAsking(message.body)) return decide("pass");
         // The cheap model couldn't answer (no API key, an outage, too slow): the server's own status line, so a
         // person asking a working agent always hears what it does (ADR 0131 §2).
-        const reply = typeof answer === "string" ? { text: answer, meta: {} } : await statusReply(deps.db, run, at);
+        // A computer brain's turn that didn't take the message live reads it only when that turn ends.
+        const turn = run.status === "running" && !live && runBrainOf(run, agent) !== "model";
+        const reply =
+          typeof answer === "string" ? { text: answer, meta: {} } : await statusReply(deps.db, run, at, { turn });
         const waits = run.status !== "running" || computerWaitOf(run) !== null;
         const posted = await postReply(deps, run, agent, message, reply.text, at, reply.meta, waits);
         decide(posted ?? "reply");
@@ -278,10 +281,11 @@ export function createTalker(deps: TalkerDeps): Talker {
 const FAILED = Symbol("failed");
 
 /**
- * The server's status line for a working run (ADR 0131 §2): how long it has worked, how many steps, and what it does
- * now (its automatic status line), worded by the apps (`talker_status`); the English is the fallback.
+ * The server's status line for a working run (ADR 0131 §2): that it can't answer yet, how long it has worked, how many
+ * steps, when it reads the message (its next step, or `turn`: when its computer's turn ends) and what it does now (its
+ * automatic status line), worded by the apps (`talker_status`); the English is the fallback.
  */
-export async function statusReply(db: Executor, run: AgentRun, now: Date) {
+export async function statusReply(db: Executor, run: AgentRun, now: Date, options: { turn?: boolean } = {}) {
   const wait = computerWaitOf(run);
   if (wait === "away") {
     return {
@@ -307,12 +311,13 @@ export async function statusReply(db: Executor, run: AgentRun, now: Date) {
   const steps = (run.transcript as { executedCalls?: unknown } | null)?.executedCalls;
   const count = typeof steps === "number" && steps > 0 ? steps : 0;
   return {
-    text: `Still on it (${minutes} min${count ? `, ${count} steps` : ""}). I'll read your message after this step.`,
+    text: `I'm in the middle of a task (${minutes} min${count ? `, ${count} steps` : ""}) and can't answer yet. Your message is queued and I'll read it ${options.turn ? "when this round of work ends" : "at my next step"}.`,
     meta: {
       bodyCode: "talker_status",
       bodyParams: {
         minutes: String(minutes),
         steps: String(count),
+        ...(options.turn ? { reads: "turn" } : {}),
         ...(line ? { kind: line.kind, subject: line.subject } : {}),
       },
     },

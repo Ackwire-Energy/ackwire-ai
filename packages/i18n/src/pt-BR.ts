@@ -12470,7 +12470,11 @@ export const ptBR = {
     autoUpdate: "Ainda trabalhando nisso ({{duration}}).",
     autoUpdateNow: "Agora: {{now}}.",
     /** A linha do próprio servidor quando uma pessoa escreve a um agente trabalhando e a resposta rápida não sai (ADR 0131). */
-    statusReply: "Ainda trabalhando nisso ({{duration}}). Leio sua mensagem depois deste passo.",
+    statusReply:
+      "Estou no meio de uma tarefa ({{duration}}) e ainda não consigo responder. Sua mensagem está na fila e eu leio no próximo passo.",
+    /** A mesma linha quando o computador do agente só lê a mensagem quando a rodada de trabalho atual terminar. */
+    statusReplyTurn:
+      "Estou no meio de uma tarefa ({{duration}}) e ainda não consigo responder. Sua mensagem está na fila e eu leio quando esta rodada de trabalho terminar.",
     statusReplyQueued: "Aguardando o computador ({{duration}}). Leio sua mensagem quando chegar minha vez.",
     statusReplyAway: "Aguardando meu computador voltar. Leio sua mensagem assim que ele voltar.",
     status: {

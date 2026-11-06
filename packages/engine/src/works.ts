@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, desc, type Executor, eq, gte, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
 import { runAuthority } from "./authority";
 import { getChannelCached } from "./context";
@@ -15,9 +15,10 @@ import { missionOfThread } from "./missions";
 import { enqueue } from "./outbox";
 import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, isTerminal, replyThreadOf, runErrorDetail } from "./runs";
+import { ago, stepLine } from "./talker-snapshot";
 import { maskCredentials } from "./tool-detail";
 
-const { agentQuestions, agentWorks, agentRuns, messages, threadFollows, users } = schema;
+const { agentQuestions, agentRunSteps, agentWorks, agentRuns, messages, threadFollows, users } = schema;
 
 export type WorkRow = typeof agentWorks.$inferSelect;
 export type WorkPlanItem = schema.WorkPlanItem;
@@ -1068,24 +1069,65 @@ export async function liveWorksHere(db: Executor, run: Pick<AgentRun, "orgId" | 
     .limit(5);
 }
 
-/** "# Your background work here" (§6): what a new run in the conversation knows of the agent's live works. */
+/** Of each live work, the latest steps and updates a reply turn reads: what it does and found so far. */
+const BRIEF_STEPS = 8;
+const BRIEF_UPDATES = 3;
+
+/**
+ * "# Your background work here" (§6): what a new run in the conversation knows of the agent's live works, enough to
+ * answer a person about one at once (its title, plan, updates and latest steps) and to pass a change on.
+ */
 export async function workBrief(db: Executor, run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "id">) {
   const list = await liveWorksHere(db, run);
   if (list.length === 0) return null;
-  const now = Date.now();
-  const lines = list.map((w) => {
-    const minutes = Math.max(0, Math.round((now - w.startedAt.getTime()) / 60_000));
-    const plan = w.plan.length
-      ? ` Plan: ${w.plan.map((p) => `[${p.state === "done" ? "x" : p.state === "doing" ? "~" : " "}] ${p.text}`).join("; ")}.`
-      : "";
-    const last = w.lastUpdateText ? ` Last update: ${w.lastUpdateText}` : "";
-    return `- work_id ${w.id}: "${w.title}" (${w.status === "queued" ? "waiting in line" : `${minutes} min in`}).${last}${plan}`;
-  });
+  const now = new Date();
+  const lines = await Promise.all(
+    list.map(async (w) => {
+      const minutes = Math.max(0, Math.round((now.getTime() - w.startedAt.getTime()) / 60_000));
+      const plan = w.plan.length
+        ? ` Plan: ${w.plan.map((p) => `[${p.state === "done" ? "x" : p.state === "doing" ? "~" : " "}] ${p.text}`).join("; ")}.`
+        : "";
+      const [updates, steps] = await Promise.all([
+        db
+          .select({ body: messages.body })
+          .from(messages)
+          .where(
+            and(
+              eq(messages.orgId, w.orgId),
+              eq(messages.channelId, w.channelId),
+              gte(messages.createdAt, w.startedAt),
+              sql`${messages.meta}->'workUpdate'->>'id' = ${w.id}`,
+            ),
+          )
+          .orderBy(desc(messages.createdAt))
+          .limit(BRIEF_UPDATES),
+        db
+          .select({ kind: agentRunSteps.kind, data: agentRunSteps.data, createdAt: agentRunSteps.createdAt })
+          .from(agentRunSteps)
+          .innerJoin(agentRuns, eq(agentRuns.id, agentRunSteps.runId))
+          .where(and(eq(agentRuns.workId, w.id), eq(agentRuns.orgId, w.orgId)))
+          .orderBy(desc(agentRunSteps.createdAt))
+          .limit(BRIEF_STEPS),
+      ]);
+      const told = updates.length
+        ? ` Updates so far: ${updates
+            .reverse()
+            .map((u) => `"${cutText(u.body, 300)}"`)
+            .join("; ")}.`
+        : "";
+      const lately = steps.reverse().flatMap((st) => {
+        const line = stepLine(st.kind, st.data);
+        return line ? [`${ago(now, st.createdAt)}: ${line}`] : [];
+      });
+      const doing = lately.length ? ` Latest steps: ${lately.join("; ")}.` : "";
+      return `- work_id ${w.id}: "${w.title}" (${w.status === "queued" ? "waiting in line" : `${minutes} min in`}).${plan}${told}${doing}`;
+    }),
+  );
   return [
     "# Your background work here",
     "You are already working on this in the background (each one reports here by itself when it ends):",
     ...lines,
-    `If the person's message is about one of these (a correction, more detail, a change of plan), pass it on with ${STEER_WORK_TOOL} and answer in one short line, or say nothing. To stop one, ${STOP_WORK_TOOL}. Anything else, answer it normally here. Never poll or wait for your own work.`,
+    `A person's message here comes to you, not to the work, which keeps running: answer it now. A question about the work (how it goes, what it covers, what it found): answer from the lines above, plainly, without starting that work again. If the message changes the work (a correction, a narrower or wider scope, more detail), pass it on with ${STEER_WORK_TOOL} and tell them in one short line that the work takes it at its next step. To stop one, ${STOP_WORK_TOOL}. Anything else, answer it normally here. Never poll or wait for your own work.`,
   ].join("\n");
 }
 

@@ -27073,11 +27073,11 @@
   "errors.issue.assigneeOutside": {
     "value": "This person can't see this task. Add them to who sees it first."
   },
-  "errors.issue.audienceEmpty": {
-    "value": "Choose who sees it."
-  },
   "errors.issue.deleteForbidden": {
     "value": "Only who created this task or an administrator can delete it."
+  },
+  "errors.issue.audienceEmpty": {
+    "value": "Choose who sees it."
   },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."
@@ -30976,7 +30976,10 @@
     "value": "Now: {{now}}."
   },
   "work.statusReply": {
-    "value": "Still on it ({{duration}}). I'll read your message after this step."
+    "value": "I'm in the middle of a task ({{duration}}) and can't answer yet. Your message is queued and I'll read it at my next step."
+  },
+  "work.statusReplyTurn": {
+    "value": "I'm in the middle of a task ({{duration}}) and can't answer yet. Your message is queued and I'll read it when this round of work ends."
   },
   "work.statusReplyQueued": {
     "value": "Waiting for the computer ({{duration}}). I'll read your message when my turn comes."

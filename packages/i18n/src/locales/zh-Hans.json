@@ -12327,7 +12327,8 @@
     "stopFailed": "无法停止。只有提出请求的人、智能体的负责人或管理员可以。",
     "autoUpdate": "仍在进行中（{{duration}}）。",
     "autoUpdateNow": "当前：{{now}}。",
-    "statusReply": "仍在处理中（{{duration}}）。完成这一步后我会读你的消息。",
+    "statusReply": "我正在处理一项任务（{{duration}}），暂时无法回复。你的消息已在队列中，我会在下一步读到。",
+    "statusReplyTurn": "我正在处理一项任务（{{duration}}），暂时无法回复。你的消息已在队列中，这一轮工作结束后我会读到。",
     "statusReplyQueued": "正在等待电脑（{{duration}}）。轮到我时我会读你的消息。",
     "statusReplyAway": "正在等我的电脑恢复。电脑一恢复我就读你的消息。",
     "status": {

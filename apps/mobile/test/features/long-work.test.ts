@@ -51,6 +51,10 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
     const live = workLine(t, work(), ctx);
     expect(live.text).toBe("Em segundo plano · 12 min · próximo update em ~8 min");
     expect(live.update).toBe("Esquema lido; migrando as tabelas.");
+    // Inside the thread its updates go to, they are the messages under it: the line doesn't repeat the last one.
+    const inThread = workLine(t, work(), { ...ctx, inUpdatesThread: true });
+    expect(inThread.update).toBeNull();
+    expect(inThread.text).toBe(live.text);
     expect(live.task?.label).toBe("Tarefa #42");
     expect(live.stop).toEqual({ runId: "r1" });
     expect(workLine(t, work(), { ...ctx, canStop: false }).stop).toBeNull();

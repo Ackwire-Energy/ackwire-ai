@@ -43,7 +43,7 @@ import { can } from "./organizations";
 import { maySql } from "./permissions";
 import { afterReplyAnswered } from "./questions";
 import { rightHandReaches } from "./right-hand";
-import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
+import { inChannelRun, waitsOnUsage, workKeepsThread, workTakesPersonMessage } from "./run-scope";
 import { computerWaitSql, KEPT_ON_HOLD, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
@@ -775,8 +775,23 @@ export async function insertMessageWithRuns(
             select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
               and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))
         returning q.id, q.run_id, q.agent_id
+      ), work_thread as (
+        -- A person's reply in the thread where an agent's background work posts (its anchor's, or the thread it was
+        -- asked in) is for that agent, as a reply in a thread an agent works in always was: a reply turn of its own
+        -- answers it now (ADR 0121 addendum 2026-11-06). In a DM the agent is addressed anyway.
+        select distinct w.agent_id from ${schema.agentWorks} w
+        join ${agents} wa on wa.id = w.agent_id
+        where ${startRuns}::boolean and ${threadId}::uuid is not null and not exists (select 1 from mentioned)
+          and w.org_id = ${input.orgId}::uuid and w.channel_id = ${input.channelId}::uuid
+          and w.status in ('live', 'queued')
+          and ((w.own_thread and w.anchor_message_id = ${threadId}::uuid)
+            or (not w.own_thread and w.home_thread_id = ${threadId}::uuid))
+          and exists (select 1 from ${channels} wc where wc.id = ${input.channelId}::uuid and wc.kind = 'channel')
+          and ${audienceSql("wa", sql`${userId}::text`, inChannel)}
       ), addressed as (
-        select a.id as agent_id, case when exists (select 1 from mentioned) then 'mention' else 'dm' end as trig,
+        select a.id as agent_id,
+          case when exists (select 1 from mentioned) or a.id in (select agent_id from work_thread) then 'mention'
+            else 'dm' end as trig,
           ${audienceSql("a", sql`${userId}::text`, inChannel)} as allowed
         from ${agents} a
         where ${startRuns}::boolean and a.org_id = ${input.orgId}::uuid and a.archived_at is null
@@ -785,7 +800,7 @@ export async function insertMessageWithRuns(
             or ${rightHandReaches(sql`a`, sql`${input.channelId}::uuid`)})
           and a.id not in (select agent_id from answered)
           and a.id <> all(${referenced}::uuid[])
-          and (a.id in (select id from mentioned)
+          and (a.id in (select id from mentioned) or a.id in (select agent_id from work_thread)
             or (not exists (select 1 from mentioned) and not exists (select 1 from answered) and exists (
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
       ), answering as (
@@ -827,8 +842,8 @@ export async function insertMessageWithRuns(
         where ${deliver}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running', 'waiting_input')
           and not r.background
-          -- Background work (ADR 0121) answers only in its own thread: in the conversation it left, the agent is free.
-          and ${workKeepsThread(sql`r`)}
+          -- Background work (ADR 0121) never holds a person's message while it works: a reply turn answers it.
+          and ${workTakesPersonMessage(sql`r`)}
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
@@ -893,6 +908,8 @@ export async function insertMessageWithRuns(
                 having count(*) > 0), '{}'::jsonb)
             || ${channelNames.length > 0 ? channelRefsSql(input.orgId, input.channelId, channelNames) : sql`'{}'::jsonb`}
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
+            -- For an agent's background work, answered by its own reply turn: nobody routes it again.
+            || coalesce((select jsonb_build_object('forWork', true) from work_thread limit 1), '{}'::jsonb)
             -- Delivered to a task in progress: nobody routes it again (no second run).
             || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(st.id)) from steered st
                 having count(*) > 0), '{}'::jsonb)

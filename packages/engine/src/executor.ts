@@ -3806,7 +3806,9 @@ async function executeRunInner(
        */
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
-        personWaiting = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
+        // Background work never holds a person's reserved slot: their reply turn beside it needs it (ADR 0032).
+        personWaiting =
+          !run.workId && (Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null));
         // A routine's run: a person scheduled it.
         transcript.roomAsked ??=
           !personWaiting && (run.background || (await personAskedLately(db, run.orgId, runStretchOf(run))));
