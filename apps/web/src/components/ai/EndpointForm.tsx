@@ -208,13 +208,15 @@ export function EndpointForm({
               !editing && (
                 <button
                   type="button"
-                  className="ac-link ac-link--muted small ac-iconline"
+                  className="ac-link ac-link--muted small"
                   aria-busy={list.isPending || undefined}
                   disabled={list.isPending || !endpointAddressLooksValid(draft.baseURL)}
                   onClick={fetchModels}
                 >
-                  {list.isPending && <Spinner size={12} />}
-                  {t("endpoint.fetch")}
+                  <span className="ac-iconline">
+                    {list.isPending && <Spinner size={12} />}
+                    {t("endpoint.fetch")}
+                  </span>
                 </button>
               )
             }

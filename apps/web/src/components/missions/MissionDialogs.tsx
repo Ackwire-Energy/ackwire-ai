@@ -165,6 +165,12 @@ export function NewMissionDialog({
       },
     );
   };
+  const approvalsNote = (
+    <span className="ac-iconline">
+      <Icon name="shield" size={14} />
+      <span>{t("missions.new.approvals")}</span>
+    </span>
+  );
   return (
     <Dialog
       open={open}
@@ -361,14 +367,7 @@ export function NewMissionDialog({
           )}
         </DialogBody>
       </Locked>
-      <DialogFooter
-        note={
-          <span className="ac-iconline">
-            <Icon name="shield" size={14} />
-            <span>{t("missions.new.approvals")}</span>
-          </span>
-        }
-      >
+      <DialogFooter note={approvalsNote}>
         <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
