@@ -22,6 +22,7 @@ import {
   diffLines,
   Field,
   Icon,
+  Locked,
   SearchField,
   Segmented,
   Textarea,
@@ -88,9 +89,11 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         <b>{t("proposals.why")}:</b> {proposal.why}
       </p>
       {editing ? (
-        <Field label={t("proposals.finalText")} id={`prop-edit-${proposal.id}`}>
-          <Textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} />
-        </Field>
+        <Locked when={decide.isPending || stale || proposal.stale}>
+          <Field label={t("proposals.finalText")} id={`prop-edit-${proposal.id}`}>
+            <Textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} />
+          </Field>
+        </Locked>
       ) : (
         <Diff
           aria-label={t("proposals.changeLabel")}
@@ -112,7 +115,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
             >
               {editing ? t("proposals.acceptEdited") : t("proposals.accept")}
             </Button>
-            <Button size="sm" icon="edit" onClick={() => setEditing((v) => !v)}>
+            <Button size="sm" icon="edit" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
               {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
             </Button>
             <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={refuse}>
@@ -187,9 +190,11 @@ function LearnedRow({ m }: { m: Memory }) {
           <span>{m.text}</span>
         )
       ) : (
-        <Field label={t("agentPage.memory.edit")} id={`learned-${m.id}`}>
-          <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} />
-        </Field>
+        <Locked when={act.isPending}>
+          <Field label={t("agentPage.memory.edit")} id={`learned-${m.id}`}>
+            <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          </Field>
+        </Locked>
       )}
       <span className="agp-chips">
         {m.howTo ? (
@@ -236,7 +241,7 @@ function LearnedRow({ m }: { m: Memory }) {
           </>
         ) : (
           <>
-            <Button size="sm" variant="primary" disabled={act.isPending || !draft.trim()} onClick={save}>
+            <Button size="sm" variant="primary" disabled={!draft.trim()} loading={act.isPending} onClick={save}>
               {t("agentPage.memory.save")}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>

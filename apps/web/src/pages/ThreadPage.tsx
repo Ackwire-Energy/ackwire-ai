@@ -24,6 +24,7 @@ export function ThreadPage({
   reply,
   focusMessageId,
   onClose,
+  onGone,
   onSeeInChannel,
 }: {
   threadId: string;
@@ -31,6 +32,8 @@ export function ThreadPage({
   /** Open at this message (a card someone was sent to). */
   focusMessageId?: string;
   onClose?: () => void;
+  /** In the panel: the thread doesn't exist or isn't mine to read (an old link), so the panel gives way. */
+  onGone?: () => void;
   /** In the panel: "Ver em #canal" jumps to this message in the channel beside it instead of navigating (false: not
    * that channel's thread). */
   onSeeInChannel?: (messageId: string, channelId: string) => boolean;
@@ -49,19 +52,23 @@ export function ThreadPage({
     const timer = setTimeout(() => document.getElementById(`composer-${threadId}`)?.focus(), 80);
     return () => clearTimeout(timer);
   }, [reply, loaded, threadId]);
+  const gone = info.error instanceof ApiError && (info.error.status === 404 || info.error.status === 403);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when found gone; the handler changes every render
+  useEffect(() => {
+    if (gone) onGone?.();
+  }, [gone]);
   // Not in any list this device holds yet (a link, a notification): the thread's own skeleton, once.
   if (info.isPending) return <ChannelSkeleton thread panel={Boolean(onClose)} />;
   if (!thread) {
-    const body =
-      info.error instanceof ApiError && (info.error.status === 404 || info.error.status === 403) ? (
-        <div className="page page--mid">
-          <EmptyState icon="thread" title={t("threads.view.notFoundTitle")}>
-            {t("threads.view.notFound")}
-          </EmptyState>
-        </div>
-      ) : (
-        <ErrorState error={info.error} onRetry={() => void info.refetch()} />
-      );
+    const body = gone ? (
+      <div className="page page--mid">
+        <EmptyState icon="thread" title={t("threads.view.notFoundTitle")}>
+          {t("threads.view.notFound")}
+        </EmptyState>
+      </div>
+    ) : (
+      <ErrorState error={info.error} onRetry={() => void info.refetch()} />
+    );
     return onClose ? <section className="thread-panel__missing">{body}</section> : <Main>{body}</Main>;
   }
   const archived = thread.state === "archived";

@@ -61,9 +61,9 @@ export interface MachineExecutors {
   desktopUse?: { available: boolean; reason?: string };
   /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
   mode?: "system";
-  /** `hello.claudeLoginMethods` (protocol 47): what a new Claude sign-in for all agents can use there; absent: older. */
+  /** `hello.claudeLoginMethods` (protocol 49): what a new Claude sign-in for all agents can use there; absent: older. */
   claudeLoginMethods?: ("cli_login" | "setup_token" | "api_key")[];
-  /** `hello.authEgressGroup` (protocol 47): root's Claude sign-in CLIs there run in the `agentes-auth` group. */
+  /** `hello.authEgressGroup` (protocol 49): root's Claude sign-in CLIs there run in the `agentes-auth` group. */
   authEgressGroup?: true;
   /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */
   ownUsage?: {
@@ -305,7 +305,7 @@ export const machineAccounts = pgTable(
      */
     shared: boolean().notNull().default(false),
     /**
-     * How it signs in (protocol 47): `cli_login`, `setup_token` or `api_key`. Set when its sign-in starts and from
+     * How it signs in (protocol 49): `cli_login`, `setup_token` or `api_key`. Set when its sign-in starts and from
      * what the runner reports, never cleared by a report that doesn't say; null: unknown.
      */
     authMethod: text(),
@@ -453,4 +453,27 @@ export const machineMcpCalls = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.machineId, t.callId] }), index().on(t.createdAt)],
+);
+
+/**
+ * A stored file one computer may fetch, once (`GET /api/machines/pulls/{id}`): the row is deleted by that fetch. Made
+ * after the read check of whoever asked; the id is all the computer holds, so what it gets is what the row names.
+ */
+export const machineFilePulls = pgTable(
+  "machine_file_pulls",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    machineId: uuid()
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    storageConfigId: uuid(),
+    blobKey: text().notNull(),
+    size: integer().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.machineId, t.expiresAt), index().on(t.orgId)],
 );

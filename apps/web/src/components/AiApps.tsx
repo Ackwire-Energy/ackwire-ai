@@ -17,6 +17,7 @@ import {
   Icon,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   OptionList,
@@ -640,43 +641,45 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
           );
         }}
       >
-        <DialogBody className="apps-token">
-          <Field label={t("apps.tokens.name")} id="apps-token-name">
-            <Input
-              value={name}
-              maxLength={60}
-              placeholder={t("apps.tokens.namePlaceholder")}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
-          <div className="apps-field" style={{ gap: 6 }}>
-            <span className="newag__label" id="apps-token-access">
-              {t("apps.tokens.access")}
-            </span>
-            <OptionList
-              aria-labelledby="apps-token-access"
-              value={access}
-              onValueChange={setAccess}
-              options={[
-                { value: "manage", title: t("apps.consent.manage"), description: t("apps.consent.manageHelp") },
-                { value: "write", title: t("apps.consent.write"), description: t("apps.consent.writeHelp") },
-                { value: "read", title: t("apps.consent.read"), description: t("apps.consent.readHelp") },
-              ]}
-            />
-          </div>
-          <Field label={t("apps.tokens.validity")} id="apps-token-validity">
-            <Select
-              value={validity}
-              onValueChange={(v) => {
-                setValidity(v as Validity);
-                setReauth(false);
-                setError(null);
-              }}
-              options={VALIDITIES.map((v) => ({ value: v, label: t(`apps.tokens.days.${v}`) }))}
-            />
-          </Field>
-          {error && <Alert>{error}</Alert>}
-        </DialogBody>
+        <Locked when={createToken.isPending}>
+          <DialogBody className="apps-token">
+            <Field label={t("apps.tokens.name")} id="apps-token-name">
+              <Input
+                value={name}
+                maxLength={60}
+                placeholder={t("apps.tokens.namePlaceholder")}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <div className="apps-field" style={{ gap: 6 }}>
+              <span className="newag__label" id="apps-token-access">
+                {t("apps.tokens.access")}
+              </span>
+              <OptionList
+                aria-labelledby="apps-token-access"
+                value={access}
+                onValueChange={setAccess}
+                options={[
+                  { value: "manage", title: t("apps.consent.manage"), description: t("apps.consent.manageHelp") },
+                  { value: "write", title: t("apps.consent.write"), description: t("apps.consent.writeHelp") },
+                  { value: "read", title: t("apps.consent.read"), description: t("apps.consent.readHelp") },
+                ]}
+              />
+            </div>
+            <Field label={t("apps.tokens.validity")} id="apps-token-validity">
+              <Select
+                value={validity}
+                onValueChange={(v) => {
+                  setValidity(v as Validity);
+                  setReauth(false);
+                  setError(null);
+                }}
+                options={VALIDITIES.map((v) => ({ value: v, label: t(`apps.tokens.days.${v}`) }))}
+              />
+            </Field>
+            {error && <Alert>{error}</Alert>}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}

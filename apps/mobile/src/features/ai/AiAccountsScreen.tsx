@@ -6,6 +6,7 @@ import {
   useApi,
   useCredentials,
   useMachines,
+  usePlatformKey,
   useSettings,
   useUpdateSettings,
 } from "@agenteschat/client";
@@ -14,12 +15,14 @@ import {
   agentsToGive,
   endsOnClaude,
   identityUnknown,
+  keyRemovalText,
   offersSignInAgain,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
   signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
+import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -38,7 +41,7 @@ import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
 import { openConnectAi } from "./NoAiCard";
-import { Note } from "./parts";
+import { alertKeyRefused, Note } from "./parts";
 
 /*
  * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", first the sign-ins of the
@@ -351,10 +354,13 @@ function KeysSection({ locale }: { locale: string }) {
   const update = useUpdateSettings(orgId);
   const live = (credentials.data ?? []).filter((k) => !k.revokedAt);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-  const failed = () => {
+  const failed = (error: unknown) => {
     errorHaptic();
-    toast({ title: t("agentPage.work.failed"), icon: "x" });
+    const refusal = keyRefusal(t, error);
+    if (refusal) alertKeyRefused(t, refusal);
+    else toast({ title: errorText(t, error), icon: "x" });
   };
+  const platform = usePlatformKey(orgId);
 
   const rotate = (k: Credential) => {
     if (Platform.OS !== "ios") return;
@@ -368,9 +374,15 @@ function KeysSection({ locale }: { locale: string }) {
           onPress: (value?: string) => {
             const apiKey = (value ?? "").trim();
             if (apiKey.length < 8) return;
-            api.agents.rotateCredential(orgId, k.id, { apiKey }).then(() => {
+            api.agents.rotateCredential(orgId, k.id, { apiKey }).then((saved) => {
               successHaptic();
-              toast({ title: t("settings.rotated"), icon: "check" });
+              toast({
+                title:
+                  saved.check === "unchecked"
+                    ? t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) })
+                    : t("settings.rotated"),
+                icon: "check",
+              });
               refetch();
             }, failed);
           },
@@ -380,15 +392,17 @@ function KeysSection({ locale }: { locale: string }) {
     );
   };
   const remove = (k: Credential) =>
-    Alert.alert(t("settings.removeTitle", { label: k.label }), t("settings.removeText"), [
+    Alert.alert(t("settings.removeTitle", { label: k.label }), keyRemovalText(t, k, live, platform.data === true), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("settings.remove"),
         style: "destructive",
         onPress: () =>
-          api.agents.removeCredential(orgId, k.id, true).then(() => {
+          api.agents.removeCredential(orgId, k.id, true, true).then(() => {
             successHaptic();
             refetch();
+            void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+            void qc.invalidateQueries({ queryKey: keys.agentPages(orgId) });
           }, failed),
       },
     ]);
@@ -400,7 +414,7 @@ function KeysSection({ locale }: { locale: string }) {
           ? []
           : [{ label: t("settings.makeDefault"), onPress: () => update.mutate({ defaultCredentialId: k.id }) }]),
         ...(Platform.OS === "ios" ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
-        ...(isDefault ? [] : [{ label: t("settings.remove"), destructive: true, onPress: () => remove(k) }]),
+        { label: t("settings.remove"), destructive: true, onPress: () => remove(k) },
       ],
       t("common.cancel"),
     );
@@ -442,11 +456,6 @@ function KeysSection({ locale }: { locale: string }) {
             );
           })}
         </GroupedList>
-      ) : null}
-      {live.some((k) => settings.data?.defaultCredentialId === k.id) ? (
-        <Text variant="small" tone="faint">
-          {t("settings.removeDefaultBlocked")}
-        </Text>
       ) : null}
       <View style={styles.start}>
         <Button

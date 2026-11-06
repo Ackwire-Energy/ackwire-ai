@@ -251,6 +251,16 @@ export const noContent = { 204: { description: "Done" } };
 
 export const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
+/** A person's key tests per hour: more than any real setup, too few to sort a list of stolen keys into live and dead. */
+const KEY_TESTS = { limit: 30, windowMs: 60 * 60_000 };
+
+/** The gateway that tests a key for this person now; none past `KEY_TESTS`, and the key then saves unchecked. */
+export async function keyTester(deps: AppDeps, userId: string) {
+  const gateway = deps.extras?.context?.gateway;
+  if (!gateway) return undefined;
+  return (await deps.adapters.rateLimiter.consume(`key-test:${userId}`, KEY_TESTS)).allowed ? gateway : undefined;
+}
+
 /** What the AI status reads (`ai-status.ts`): the gateway's key check and the computers' status. */
 export function aiStatusDeps(deps: AppDeps): AiStatusDeps {
   const gateway = deps.extras?.context?.gateway;

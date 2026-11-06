@@ -892,6 +892,22 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(within(box).queryByRole("switch", { name: "Atende outras pessoas" })).toBeNull();
   });
 
+  test("a stored key out of credit: the provider's reason and the page that fixes it, and she doesn't move to it", async () => {
+    const state = onClaudeCode(walters(withCard(), ADA_ID));
+    const { api, box, picker } = await connectAda(state, { brain: "claude_code" });
+    api.agents.checkCredential = async () => {
+      throw new ApiError(400, "provider_key_no_credit", "refused", {
+        provider: "Claude",
+        said: "Your credit balance is too low",
+      });
+    };
+    await click(within(picker).getByRole("button", { name: /^Claude da Acme/ }), 8);
+    expect(box.textContent).toContain("Your credit balance is too low");
+    expect(within(box).getByRole("link", { name: "platform.claude.com" })).toBeTruthy();
+    expect(calls(state, "agents.update")).toHaveLength(0);
+    expect(box.textContent).not.toContain("agora pensa com");
+  });
+
   test("someone else's agent: its owner's account shows, locked, his alone to pick; an admin may still give her a key", async () => {
     const joao = acct({
       id: "acct_joao",

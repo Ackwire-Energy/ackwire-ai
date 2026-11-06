@@ -73,22 +73,26 @@
     flex: none;
   }
 
-  /* The drawer: same sidebar, off-canvas. Hidden (and out of the tab order) while closed. */
+  /* The drawer: same sidebar, off-canvas. Hidden (and out of the tab order) while closed.
+     It floats 8px off the edges with round corners: in a phone's browser the strip
+     above the page (clock, battery) takes one colour across its whole width, the
+     scrim's, so a drawer flush with the top looked cut under it. Floating, that
+     strip reads as part of the dimmed page around the drawer. */
   .shell .sidebar {
     position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    left: calc(env(safe-area-inset-left, 0px) + 8px);
     z-index: var(--z-scrim);
     flex: none;
-    width: min(304px, calc(100vw - 48px));
+    width: min(304px, calc(100vw - 56px));
     min-width: 0;
     height: auto;
-    padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px calc(env(safe-area-inset-bottom, 0px) + 14px)
-      calc(env(safe-area-inset-left, 0px) + 12px);
+    padding: 14px 12px;
+    border-radius: var(--radius-section);
     box-shadow: var(--e3);
     overscroll-behavior: contain;
-    transform: translateX(-100%);
+    transform: translateX(calc(-100% - 8px - env(safe-area-inset-left, 0px)));
     visibility: hidden;
     transition:
       transform 0.24s var(--out),

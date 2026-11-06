@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, count, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
@@ -16,6 +16,7 @@ import type { AiStatusDeps } from "./ai-status";
 import { AGENT_LOOK, type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
 import { recordAudit } from "./audit";
 import { setAgentBrain } from "./brain-settings";
+import { invalidateOrg } from "./cache";
 import {
   addChannelMember,
   archiveChannel,
@@ -29,7 +30,7 @@ import type { ContextDeps } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { openPersonAgentDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated } from "./events";
+import { publishAgentsChanged, publishChannelEvent, publishMessageCreated } from "./events";
 import { setAgentComputerTarget } from "./machines";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
@@ -524,6 +525,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
   const admin = can(membership, "manage_agents");
   const skipped: TeamCreated["skipped"] = [];
   let made: Omit<TeamCreated, "noAi" | "skipped"> & { agents: Agent[] };
+  const events = holdEvents(deps.pubsub);
   try {
     made = await deps.db.transaction(async (raw) => {
       const tx = raw as unknown as Database;
@@ -540,15 +542,15 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
         channelPlaces(tx, orgId, userId, names),
       );
       if (blocked.length > 0) throw new StepError(channelStep, blockedError(blocked));
-      for (const id of outside) await stepped(channelStep, () => joinChannel(tx, userId, orgId, id, deps));
+      for (const id of outside) await stepped(channelStep, () => joinChannel(tx, userId, orgId, id, events));
       const channelOf = new Map(existing);
       const taken = await takenHandles(tx, orgId);
       for (const name of names) {
         if (channelOf.has(name)) continue;
         const back = archived.get(name);
         const id = await stepped(`#${name}`, async () => {
-          if (!back) return (await createChannel(tx, userId, orgId, { name })).id;
-          await unarchiveChannel(tx, userId, orgId, back);
+          if (!back) return (await createChannel(tx, userId, orgId, { name }, events)).id;
+          await unarchiveChannel(tx, userId, orgId, back, events);
           return back;
         });
         channelOf.set(name, id);
@@ -570,13 +572,13 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
             orgId,
             { name: a.name, handle: a.handle, role: a.role, instructions: a.instructions },
             NEW_AGENT_DEFAULTS,
-            { via: found.proposedBy },
+            { via: found.proposedBy, pubsub: events.pubsub },
           );
-          if (a.appearance) row = await setAgentAppearance(tx, userId, orgId, row.id, a.appearance);
+          if (a.appearance) row = await setAgentAppearance(tx, userId, orgId, row.id, a.appearance, events);
           const channelId = channelOf.get(a.channel) as string;
-          await addChannelMember(tx, userId, orgId, channelId, { agentId: row.id }, { pubsub: deps.pubsub });
+          await addChannelMember(tx, userId, orgId, channelId, { agentId: row.id }, events);
           for (const r of a.routines) {
-            const routine = await createRoutine({ db: tx, pubsub: deps.pubsub }, userId, orgId, {
+            const routine = await createRoutine({ db: tx, pubsub: events.pubsub }, userId, orgId, {
               name: r.name,
               agentId: row.id,
               prompt: r.prompt,
@@ -612,7 +614,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
         // savepoint keeps a refusal from aborting the rest.
         const weekly = await raw
           .transaction(async (sp) =>
-            createRoutine({ db: sp as unknown as Database, pubsub: deps.pubsub }, userId, orgId, {
+            createRoutine({ db: sp as unknown as Database, pubsub: events.pubsub }, userId, orgId, {
               name: w.name,
               agentId: found.proposedBy,
               prompt: w.prompt,
@@ -639,8 +641,12 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
     await writeCard(deps, message, back, "creating");
     return { card: back, noAi: [] as string[] };
   }
+  // Cleared inside the transaction too: a run reading in between may have cached the team as it was.
+  invalidateOrg(orgId);
+  await events.flush();
   // Its AI, one agent after the other: an account of the clicker's thinks for one agent at most.
   const noAi: string[] = [];
+  let thinking = false;
   for (const agent of made.agents) {
     const ai = await suggestAgentAi(deps, orgId, userId);
     if (ai.kind === "none") noAi.push(agent.id);
@@ -651,10 +657,12 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
         brain: ai.brain,
         account: ai.accountId,
       });
+      thinking = true;
     } catch {
       noAi.push(agent.id);
     }
   }
+  if (thinking) await publishAgentsChanged(deps.pubsub, orgId);
   const { agents: _agents, ...ids } = made;
   const done: TeamProposalCard = {
     ...card,
@@ -743,10 +751,11 @@ export async function undoTeam(deps: TeamDeps, userId: string, orgId: string, me
   if (!card.decidedAt || Date.parse(card.decidedAt) + TEAM_UNDO_MS <= Date.now()) {
     throw new ConflictError("It is too late to undo this team", "team_proposal.undo_expired");
   }
+  const events = holdEvents(deps.pubsub);
   await deps.db.transaction(async (raw) => {
     const tx = raw as unknown as Database;
     for (const id of made.routineIds) {
-      await deleteRoutine({ db: tx, pubsub: deps.pubsub }, userId, orgId, id).catch((e) => {
+      await deleteRoutine({ db: tx, pubsub: events.pubsub }, userId, orgId, id).catch((e) => {
         if (!(e instanceof NotFoundError)) throw e;
       });
     }
@@ -760,13 +769,15 @@ export async function undoTeam(deps: TeamDeps, userId: string, orgId: string, me
       .select({ id: agents.id })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), inArray(agents.id, made.agentIds), isNull(agents.archivedAt)));
-    for (const a of live) await archiveAgent(tx, userId, orgId, a.id, deps.pubsub, mine);
+    for (const a of live) await archiveAgent(tx, userId, orgId, a.id, events.pubsub, mine);
     for (const id of made.channelIds) {
-      await archiveChannel(tx, userId, orgId, id, { pubsub: deps.pubsub }).catch((e) => {
+      await archiveChannel(tx, userId, orgId, id, events).catch((e) => {
         if (!(e instanceof NotFoundError)) throw e;
       });
     }
   });
+  invalidateOrg(orgId);
+  await events.flush();
   const next: TeamProposalCard = { ...card, state: "undone", undoneAt: new Date().toISOString() };
   await writeCard(deps, message, next, "created");
   return { card: next };

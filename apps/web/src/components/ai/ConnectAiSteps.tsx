@@ -1,9 +1,10 @@
-import type { Credential, Edition, MachineAccount, MachineAccountKind } from "@agenteschat/client";
+import type { BrainScope, Credential, Edition, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import {
   keys,
   useAgentBrain,
   useAiAccounts,
   useApi,
+  useAuthConfig,
   useComputerSetup,
   useMachines,
   useModels,
@@ -26,7 +27,7 @@ import {
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
-import { holdText } from "@agenteschat/client/lib/errors";
+import { errorText, holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -52,6 +53,7 @@ import {
   planTitle,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
@@ -63,6 +65,7 @@ import {
   providerLabel,
   providerOf,
 } from "@agenteschat/client/lib/providers";
+import { rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import {
   type AgentAppearance,
   AvatarStack,
@@ -71,6 +74,7 @@ import {
   Icon,
   InfoHint,
   Input,
+  Locked,
   LogoMark,
   OptionCard,
   ProviderLogo,
@@ -84,8 +88,9 @@ import type { TFunction } from "i18next";
 import { Fragment, type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useOrg } from "@/components/org-context";
-import { KeyMismatch } from "@/components/ProviderKey";
+import { KeyMismatch, KeyRefused } from "@/components/ProviderKey";
 import { managedOf, SetupProgress, useSetupWait, useWaitReader } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { planWord } from "@/lib/plan-usage";
@@ -107,6 +112,7 @@ import { PlanReplies } from "./PlanReplies";
  */
 export function usePlanGates(orgId: string, agentId: string | undefined, poll: number | false = false) {
   const api = useApi();
+  const { org } = useOrg();
   const asks = agentId !== undefined;
   const brain = useAgentBrain(orgId, agentId ?? "", asks, poll);
   const ai = useAiAccounts(orgId, asks, poll);
@@ -155,6 +161,7 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
           caughtUp: caught,
+          standing: org.standing,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on. A read that failed with nothing to show
   // ends the panel's wait with Tentar de novo.
@@ -244,6 +251,8 @@ export interface ExistingUsed {
   onlyOwner: boolean;
   /** The team's right hand's own AI for the person (ADR 0137 §11): it serves them alone, so no switch. */
   personal?: boolean;
+  /** Which of the team's right hand's AIs moved: the words say whose it is. */
+  scope?: BrainScope;
 }
 
 /**
@@ -263,6 +272,7 @@ export function ExistingRows({
   toEveryone = false,
   onSignIn,
   onUsed,
+  onManageKeys,
 }: {
   /** The agent's own (`usePlanGates`): its accounts, and what each plan can do there. */
   gates: PlanGates;
@@ -278,6 +288,8 @@ export function ExistingRows({
   toEveryone?: boolean;
   onSignIn: (signIn: ExistingSignIn) => void;
   onUsed: (agentId: string, used: ExistingUsed) => void;
+  /** Where a key shown here is removed: Settings › AI accounts. */
+  onManageKeys?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -287,12 +299,14 @@ export function ExistingRows({
   const dir = useDirectory(org.id);
   const models = useModels();
   const [busy, setBusy] = useState(false);
+  const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const view = gates.view;
   if (!view || view.agentId !== agent.id) return null;
   const rows = existingAi(view, credentials);
   if (rows.length === 0 && !panel) return null;
   const save = async (run: () => Promise<ExistingUsed>) => {
     setBusy(true);
+    setRefused(null);
     try {
       const used = await run();
       for (const key of [
@@ -303,8 +317,10 @@ export function ExistingRows({
       ])
         void qc.invalidateQueries({ queryKey: key });
       onUsed(agent.id, used);
-    } catch {
-      toast.show(t("agentPage.work.failed"), "error");
+    } catch (error) {
+      const refusal = keyRefusal(t, error);
+      setRefused(refusal);
+      if (!refusal) toast.show(errorText(t, error), "error");
     } finally {
       setBusy(false);
     }
@@ -323,15 +339,24 @@ export function ExistingRows({
         account: a,
         onlyOwner: next.onlyOwner,
         personal: next.scope === "mine",
+        ...(next.scope ? { scope: next.scope } : {}),
       };
     });
   // The workspace's model on that key: the agent's model where the key runs it, else Automático, which follows the key.
+  // Tried first: a key kept earlier may have run out of credit, and "now thinks with it" has to be true.
   const pickKey = (key: Credential) =>
     save(async () => {
-      const fits = keyRuns(key, dir.agentById.get(agent.id)?.model, models.data?.models ?? []);
-      if (view.brain !== "model") await api.agents.setBrain(org.id, agent.id, { brain: "model" });
+      const { check } = await api.agents.checkCredential(org.id, key.id);
+      if (check === "unchecked")
+        toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(key.provider) }), "info");
+      const row = dir.agentById.get(agent.id);
       // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
-      if (view.scope === "mine") await api.agents.setBrain(org.id, agent.id, { scope: "workspace", brain: "model" });
+      if (view.scope === "mine" && row) {
+        await rightHandOnKey(api, org.id, row, key, models.data?.models ?? []);
+        return { label: key.label, choice: "key", onlyOwner: false, scope: "workspace" };
+      }
+      const fits = keyRuns(key, row?.model, models.data?.models ?? []);
+      if (view.brain !== "model") await api.agents.setBrain(org.id, agent.id, { brain: "model" });
       await api.agents.update(org.id, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
       return { label: key.label, choice: "key", onlyOwner: false };
     });
@@ -397,7 +422,15 @@ export function ExistingRows({
     <>
       <p className="ai-picker__or">{named ? t("connectAi.have.titleFor", g) : t("connectAi.have.title")}</p>
       {items}
+      {refused && <KeyRefused refusal={refused} />}
       {lends && <p className="ai-picker__or">{t("agentPage.work.brain.accountOthers")}</p>}
+      {onManageKeys && rows.some((r) => r.kind === "key") && (
+        <p className="ai-picker__or">
+          <button type="button" className="ac-link ac-link--muted" onClick={onManageKeys}>
+            {t("connectAi.have.manageKeys")}
+          </button>
+        </p>
+      )}
       <p className="ai-picker__or">{t("connectAi.have.other")}</p>
     </>
   );
@@ -433,7 +466,7 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
   return (
     <Card as="section" className="ai-panel ai-panel--plan" aria-label={used.label}>
       <SettingNote icon="check" live>
-        {t("aiAccounts.done.savedAgent", { agent: agent.name, label: used.label })}
+        {thinksWithLine(t, used.scope, agent.name, used.label)}
       </SettingNote>
       {a?.kind === "antigravity" && geminiPersonal(a) && (
         <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
@@ -538,13 +571,21 @@ export interface PlanPanelProps {
 
 /** `usePlanGates` for a person who owns no agent yet: each plan's gate on the computer it would sign in on. */
 export function useGatesWithoutAgent(orgId: string, on: boolean) {
+  const { org } = useOrg();
   const ai = useAiAccounts(orgId, on);
   const machines = useMachines(orgId, on);
   const setupQ = useComputerSetup(orgId);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const at = (choice: PlanChoice) =>
-    planGateWithoutAgent({ choice, edition, setup, computers: ai.data?.computers, machines: machines.data });
+    planGateWithoutAgent({
+      choice,
+      edition,
+      setup,
+      computers: ai.data?.computers,
+      machines: machines.data,
+      standing: org.standing,
+    });
   return { at, edition, accounts: ai.data?.accounts };
 }
 
@@ -921,7 +962,7 @@ function PlanSteps({
                 ),
                 label: account?.label ?? brand,
               })
-            : t("aiAccounts.done.savedAgent", { agent: agent.name, label: account?.label ?? "" })}
+            : thinksWithLine(t, view?.scope, agent.name, account?.label ?? "")}
         </SettingNote>
         {foot}
       </>
@@ -941,7 +982,7 @@ function PlanSteps({
                 ),
                 label,
               })
-            : t("aiAccounts.done.savedAgent", { agent: agent.name, label })}
+            : thinksWithLine(t, view?.scope, agent.name, label)}
         </SettingNote>
         {foot}
       </>
@@ -1197,11 +1238,29 @@ function GateWait({
     </p>
   );
   const hold = holdText(t, org.standing);
+  const billingUrl = useAuthConfig().data?.billingUrl;
+  const canPay = can(org, "manage_billing") && Boolean(billingUrl);
   // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself as events arrive).
   const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
-  else if (gate.state === "preparing") {
+  else if (gate.state === "billing") {
+    // A hold stops the Model Gateway too, so a key is no way out here: only the workspace's plan is.
+    wait = (
+      <>
+        <SettingNote icon="alert">{t("connectAi.billing")}</SettingNote>
+        {canPay ? (
+          <span>
+            <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+              {t(`standing.billing.cta.${gate.hold}`)}
+            </BillingLinkButton>
+          </span>
+        ) : (
+          <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>
+        )}
+      </>
+    );
+  } else if (gate.state === "preparing") {
     // The computer's wait in one well: how far it is and the time left, or why it waits (not where the rail beside it
     // already says so), then when the step under it turns on, said once (the owner's email line says it for them). A
     // hold decides when anything runs there: it speaks alone. The well's lines start on the panel's text edge, so none
@@ -1238,6 +1297,7 @@ function GateWait({
                     : "connectAi.wait.signIn",
               )}
             </p>
+            {preparing?.phase === "problem" && useKey}
           </>
         )}
       </div>
@@ -1296,6 +1356,8 @@ export function KeyPanel({
   platform,
   locked,
   saved,
+  savedNote,
+  refused,
   saving,
   onSave,
   endpoint,
@@ -1309,6 +1371,10 @@ export function KeyPanel({
   /** Only an admin adds an API key. */
   locked?: boolean;
   saved?: boolean;
+  /** Says what the save came to, in place of the usual line (a check that got no answer, the right hand's words). */
+  savedNote?: string;
+  /** The provider refused the key on its test call: nothing was kept. */
+  refused?: ReturnType<typeof keyRefusal>;
   saving?: boolean;
   onSave?: () => void;
 }) {
@@ -1334,33 +1400,35 @@ export function KeyPanel({
         <SettingNote icon="lock">{t("connectAi.keyLocked")}</SettingNote>
       ) : saved ? (
         <SettingNote icon="check" live>
-          {t("connectAi.key.saved")}
+          {savedNote ?? t("connectAi.key.saved")}
         </SettingNote>
       ) : (
         <>
-          {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-          <div className="grid-options grid-options--plans" role="group" aria-label={t("settings.provider")}>
-            {PROVIDERS.map((p) => (
-              <OptionCard key={p.id} pressed={provider === p.id} onClick={() => pick(p.id)}>
-                <ProviderLogo id={p.id} size="sm" />
-                <span className="ac-option__title">{p.label}</span>
-              </OptionCard>
-            ))}
-            {endpoint && (
-              <OptionCard pressed={provider === CUSTOM_PROVIDER} onClick={() => pick(CUSTOM_PROVIDER)}>
-                <ProviderLogo id={CUSTOM_PROVIDER} size="sm" />
-                <span className="ac-option__title">{t("endpoint.option")}</span>
-              </OptionCard>
-            )}
-            {platform && (
-              <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")} className="ai-key__ours">
-                <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
-                  <LogoMark />
-                </span>
-                <span className="ac-option__title">{t("connectAi.key.platform")}</span>
-              </OptionCard>
-            )}
-          </div>
+          <Locked when={Boolean(saving)}>
+            {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+            <div className="grid-options grid-options--plans" role="group" aria-label={t("settings.provider")}>
+              {PROVIDERS.map((p) => (
+                <OptionCard key={p.id} pressed={provider === p.id} onClick={() => pick(p.id)}>
+                  <ProviderLogo id={p.id} size="sm" />
+                  <span className="ac-option__title">{p.label}</span>
+                </OptionCard>
+              ))}
+              {endpoint && (
+                <OptionCard pressed={provider === CUSTOM_PROVIDER} onClick={() => pick(CUSTOM_PROVIDER)}>
+                  <ProviderLogo id={CUSTOM_PROVIDER} size="sm" />
+                  <span className="ac-option__title">{t("endpoint.option")}</span>
+                </OptionCard>
+              )}
+              {platform && (
+                <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")} className="ai-key__ours">
+                  <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
+                    <LogoMark />
+                  </span>
+                  <span className="ac-option__title">{t("connectAi.key.platform")}</span>
+                </OptionCard>
+              )}
+            </div>
+          </Locked>
           {provider === CUSTOM_PROVIDER ? (
             <>
               <p className="small muted" style={{ margin: 0 }}>
@@ -1388,23 +1456,25 @@ export function KeyPanel({
                   <b>{t("connectAi.key.paste")}</b>
                 </label>
                 <span className="agp-addacct__paste">
-                  <Input
-                    id={fieldId}
-                    type="password"
-                    autoComplete="off"
-                    spellCheck={false}
-                    placeholder={maker.placeholder}
-                    value={apiKey}
-                    invalid={wrong}
-                    onChange={(e) => onDraft({ provider, apiKey: e.target.value })}
-                    onBlur={() => setTouched(true)}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter" || !onSave) return;
-                      e.preventDefault();
-                      setTouched(true);
-                      if (valid) onSave();
-                    }}
-                  />
+                  <Locked when={Boolean(saving)}>
+                    <Input
+                      id={fieldId}
+                      type="password"
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder={maker.placeholder}
+                      value={apiKey}
+                      invalid={wrong}
+                      onChange={(e) => onDraft({ provider, apiKey: e.target.value })}
+                      onBlur={() => setTouched(true)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" || !onSave) return;
+                        e.preventDefault();
+                        setTouched(true);
+                        if (valid) onSave();
+                      }}
+                    />
+                  </Locked>
                   {onSave && (
                     <Button variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
                       {t("settings.saveKey")}
@@ -1416,6 +1486,7 @@ export function KeyPanel({
                     <KeyMismatch provider={keyOf} apiKey={apiKey} onPick={pick} />
                   </div>
                 )}
+                {refused && <KeyRefused refusal={refused} />}
               </Step>
               <SettingNote icon="agent">{t("connectAi.key.forAll")}</SettingNote>
             </>

@@ -11,6 +11,7 @@ import { recordAudit } from "../audit";
 import { UUID } from "../authority";
 import { ConflictError, NotFoundError, ValidationError } from "../errors";
 import { publishVaultChanged } from "../events";
+import { secretLabelOf } from "../secrets";
 import { cleanAccess } from "./access";
 import {
   assertRoom,
@@ -89,7 +90,7 @@ export async function saveSecretRequestToVault(
     value = cleanSecret(input.value, "key");
     existing = await keyWithName(db, orgId, ownerUserId, request.name);
     fields = {
-      title: request.name,
+      title: secretLabelOf(request).slice(0, VAULT_LIMITS.title),
       description: request.purpose.trim().slice(0, VAULT_LIMITS.description),
       website: null,
       username: null,
@@ -110,6 +111,7 @@ export async function saveSecretRequestToVault(
         .update(vaultItems)
         .set({
           ...sealed,
+          previousSecrets: [],
           ...(kind === "key" ? { keyHint } : {}),
           allAgents: item.allAgents || access.allAgents,
           agentIds,

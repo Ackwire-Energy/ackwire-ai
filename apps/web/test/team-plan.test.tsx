@@ -171,6 +171,17 @@ describe("the team card", () => {
     expect(calls(state, "chat.post")).toEqual([]);
   });
 
+  test("while the team is being made, Ajustar and Descartar are off and Ver como mapa stays to read", async () => {
+    const state = lodiDm();
+    const message = state.messages.find((m) => m.id === "m-team");
+    (message?.meta?.actionCard as TeamProposalCard).state = "creating";
+    await openDm(state);
+    expect((button("Ajustar Iara") as HTMLButtonElement).disabled).toBe(true);
+    expect((button("Descartar") as HTMLButtonElement).disabled).toBe(true);
+    const map = button("Ver como mapa") as HTMLButtonElement;
+    expect(map.disabled || map.closest("fieldset[disabled]") !== null).toBe(false);
+  });
+
   test("Ajustar edits one agent's draft on the card", async () => {
     const state = lodiDm();
     await openDm(state);

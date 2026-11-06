@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, type IconName, InfoHint, Text } from "@/ui";
+import { Button, type IconName, InfoHint, Locked, Text } from "@/ui";
 import { TextArea } from "./TextArea";
 
 /**
@@ -90,14 +90,17 @@ export function PromptForm({
           {intro}
         </Text>
       ) : null}
-      <TextArea value={text} onChangeText={setText} placeholder={placeholder} accessibilityLabel={title} autoFocus />
-      {children}
+      <Locked when={busy} style={styles.fields}>
+        <TextArea value={text} onChangeText={setText} placeholder={placeholder} accessibilityLabel={title} autoFocus />
+        {children}
+      </Locked>
       <Button
         variant="primary"
         wide
         {...(icon ? { icon } : {})}
         label={submitLabel}
-        disabled={busy || (!allowEmpty && !text.trim())}
+        loading={busy}
+        disabled={!allowEmpty && !text.trim()}
         onPress={() => void submit()}
       />
     </>
@@ -109,4 +112,5 @@ const styles = StyleSheet.create({
   // The hint opens under the title: the face stays on its first line.
   top: { alignItems: "flex-start" },
   grow: { flex: 1 },
+  fields: { gap: 12 },
 });

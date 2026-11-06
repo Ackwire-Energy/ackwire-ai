@@ -226,6 +226,10 @@ describe("the block's lines", () => {
     );
     expect(formatLineTime("pt-BR", 1200)).toBe("1,2 s");
     expect(formatLineTime("pt-BR", 760)).toBe("760 ms");
+    expect(formatLineTime("pt-BR", 59 * 60_000)).toBe("59 min");
+    // Past an hour minutes stop meaning anything to a person.
+    expect(formatLineTime("pt-BR", 90 * 60_000)).toBe("1,5 h");
+    expect(formatLineTime("pt-BR", 1446 * 60_000)).toBe("24 h");
   });
 
   test("a saved run: the label it was recorded with, why it failed, what it got and gave", () => {

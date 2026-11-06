@@ -17,7 +17,7 @@ import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { Button, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
 import { CoverBarBackdrop, useCoverScroll } from "@/ui/cover";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, goBack, PushedHeader, successHaptic, Tile } from "../shared/parts";
@@ -232,21 +232,23 @@ function RenameSheet({ item }: { item: ConnectedItem }) {
       <Text variant="small" tone="muted">
         {t("connectors.renameHelp")}
       </Text>
-      <TextInput
-        value={label}
-        onChangeText={(v) => {
-          setLabel(v);
-          setError(null);
-        }}
-        maxLength={80}
-        autoFocus
-        returnKeyType="done"
-        onSubmitEditing={save}
-        accessibilityLabel={t("connectFlow.name")}
-        style={[styles.field, { backgroundColor: c.raised, color: c.ink, borderColor: c.line }]}
-      />
+      <Locked when={rename.isPending}>
+        <TextInput
+          value={label}
+          onChangeText={(v) => {
+            setLabel(v);
+            setError(null);
+          }}
+          maxLength={80}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={save}
+          accessibilityLabel={t("connectFlow.name")}
+          style={[styles.field, { backgroundColor: c.raised, color: c.ink, borderColor: c.line }]}
+        />
+      </Locked>
       {error ? <Problem text={error} /> : null}
-      <Button variant="primary" wide label={t("common.save")} disabled={rename.isPending} onPress={save} />
+      <Button variant="primary" wide label={t("common.save")} loading={rename.isPending} onPress={save} />
     </View>
   );
 }

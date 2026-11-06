@@ -25,6 +25,7 @@ import {
   DialogBody,
   DialogFooter,
   Icon,
+  Locked,
   OptionList,
   type OptionListItem,
   ProviderLogo,
@@ -278,47 +279,49 @@ export function SwitchComputerDialog({
       width={520}
       className="outage-dialog"
     >
-      <DialogBody>
-        <p className="outage-dialog__h">{t("outage.dialog.where")}</p>
-        {options.length > 0 && (
-          <OptionList
-            aria-label={t("outage.dialog.whereLabel")}
-            value={value}
-            onValueChange={setTarget}
-            options={options}
-          />
-        )}
-        {!firstOpen && <p className="small muted outage-dialog__none">{t("outage.dialog.none")}</p>}
-        <p className="outage-dialog__h outage-dialog__h--gap">{t("outage.dialog.who")}</p>
-        <div className="outage-dialog__who">
-          {o.agents.map((a) => {
-            const check = `${id}-${a.agentId}`;
-            const waiting = waitingText(t, a.waiting);
-            return (
-              <label key={a.agentId} htmlFor={check} className="outage-dialog__agent">
-                <Checkbox
-                  id={check}
-                  aria-label={a.name}
-                  checked={picked.includes(a.agentId)}
-                  onCheckedChange={(on) =>
-                    setPicked((p) => (on ? [...p, a.agentId] : p.filter((x) => x !== a.agentId)))
-                  }
-                />
-                <AgentAvatar agentId={a.agentId} name={a.name} size="sm" state="idle" expression="closed" />
-                <span className="outage-dialog__name">{a.name}</span>
-                {waiting && <small>{waiting}</small>}
-              </label>
-            );
-          })}
-        </div>
-        <p className="outage-dialog__hint ac-iconline">
-          <Icon name="info" size={16} />
-          <span>{t("outage.dialog.hint", { name: o.name })}</span>
-        </p>
-      </DialogBody>
+      <Locked when={move.isPending}>
+        <DialogBody>
+          <p className="outage-dialog__h">{t("outage.dialog.where")}</p>
+          {options.length > 0 && (
+            <OptionList
+              aria-label={t("outage.dialog.whereLabel")}
+              value={value}
+              onValueChange={setTarget}
+              options={options}
+            />
+          )}
+          {!firstOpen && <p className="small muted outage-dialog__none">{t("outage.dialog.none")}</p>}
+          <p className="outage-dialog__h outage-dialog__h--gap">{t("outage.dialog.who")}</p>
+          <div className="outage-dialog__who">
+            {o.agents.map((a) => {
+              const check = `${id}-${a.agentId}`;
+              const waiting = waitingText(t, a.waiting);
+              return (
+                <label key={a.agentId} htmlFor={check} className="outage-dialog__agent">
+                  <Checkbox
+                    id={check}
+                    aria-label={a.name}
+                    checked={picked.includes(a.agentId)}
+                    onCheckedChange={(on) =>
+                      setPicked((p) => (on ? [...p, a.agentId] : p.filter((x) => x !== a.agentId)))
+                    }
+                  />
+                  <AgentAvatar agentId={a.agentId} name={a.name} size="sm" state="idle" expression="closed" />
+                  <span className="outage-dialog__name">{a.name}</span>
+                  {waiting && <small>{waiting}</small>}
+                </label>
+              );
+            })}
+          </div>
+          <p className="outage-dialog__hint ac-iconline">
+            <Icon name="info" size={16} />
+            <span>{t("outage.dialog.hint", { name: o.name })}</span>
+          </p>
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={t("outage.dialog.note", { name: o.name })}>
         <Button onClick={() => onOpenChange(false)}>{t("outage.dialog.cancel")}</Button>
-        <Button variant="primary" disabled={picked.length === 0 || !value || move.isPending} onClick={submit}>
+        <Button variant="primary" disabled={picked.length === 0 || !value} loading={move.isPending} onClick={submit}>
           {t("outage.dialog.submit", { count: picked.length })}
         </Button>
       </DialogFooter>

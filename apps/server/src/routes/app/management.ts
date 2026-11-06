@@ -80,7 +80,18 @@ import {
 } from "@agenteschat/engine";
 import { contextWindowOf, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
-import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  iso,
+  json,
+  keyTester,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
 import { credentialOut } from "./credential-view";
 import {
   AgentAppearance,
@@ -368,6 +379,7 @@ const Where = {
   channelId: z.uuid(),
   channelKind: z.enum(["channel", "dm"]),
   channelName: z.string().nullable().openapi({ description: "Null for a DM (and a routine's room)." }),
+  betweenAgents: z.boolean().openapi({ description: "A conversation only agents are in: nobody can open it." }),
   threadId: z.uuid().nullable().openapi({ description: "Null: the main timeline." }),
 };
 const Routine = z.object({ id: z.uuid(), name: z.string() }).nullable();
@@ -385,6 +397,21 @@ const ManagedTask = z
     routine: Routine,
     plan: z.object({ done: z.number().int(), total: z.number().int() }).nullable(),
     requester: z.object({ userId: z.string(), name: z.string() }).nullable(),
+    delegation: z
+      .object({
+        agentId: z.uuid(),
+        origin: z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("person"), userId: z.string(), name: z.string() }),
+          z.object({ kind: z.literal("routine"), name: z.string() }),
+          z.object({ kind: z.literal("agent") }),
+        ]),
+      })
+      .nullable()
+      .openapi({ description: "Another agent asked it: who, and what started the chain." }),
+    helpers: z
+      .number()
+      .int()
+      .openapi({ description: "What it asked of other agents and is still on or not started, all the way down." }),
     brain: z.string().nullable(),
     machine: z.object({ id: z.uuid(), name: z.string() }).nullable(),
     now: z
@@ -454,6 +481,13 @@ const TaskManagerView = z
   .object({
     tasks: z.array(ManagedTask),
     ended: z.array(EndedTask),
+    hidden: z
+      .object({
+        total: z.number().int(),
+        working: z.number().int(),
+        byAgent: z.record(z.string(), z.number().int()),
+      })
+      .openapi({ description: "The tasks still on you may not see: how many, never what." }),
     computers: z.array(
       z.object({ id: z.uuid(), name: z.string(), working: z.number().int(), inLine: z.number().int() }),
     ),
@@ -1208,7 +1242,7 @@ export function managementRoutes(deps: AppDeps) {
         orgId,
         credentialId,
         c.req.valid("json"),
-        { fetch: deps.extras?.http },
+        { fetch: deps.extras?.http, verify: (await keyTester(deps, c.get("user").id))?.verifyKey },
       );
       return c.json(credentialOut(row), 200);
     },
@@ -1524,6 +1558,10 @@ export function managementRoutes(deps: AppDeps) {
                 .max(STOP_REASON_MAX)
                 .optional()
                 .openapi({ description: "Why, in the person's words: the agent reads it." }),
+              chain: z
+                .boolean()
+                .optional()
+                .openapi({ description: "What it asked of other agents stops with it, all the way down." }),
             }),
           ),
           required: false,
@@ -1542,9 +1580,10 @@ export function managementRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, runId } = c.req.valid("param");
-      const reason = (c.req.valid("json") as { reason?: string } | undefined)?.reason;
+      const { reason, chain } = (c.req.valid("json") ?? {}) as { reason?: string; chain?: boolean };
       const result = await cancelRun({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, runId, {
         ...(reason ? { reason } : {}),
+        ...(chain ? { chain } : {}),
       });
       return c.json(
         {
@@ -1621,7 +1660,7 @@ export function managementRoutes(deps: AppDeps) {
       security,
       summary: "The task manager (ADR 0128): what the agents are doing now, what each uses, and what ended",
       description:
-        "Tasks in the conversations you are in (the `active-runs` rule), plus routines' background runs for admins and the agent's owner. No cost. `since` (default: the last 24 h) bounds `ended`.",
+        "Tasks in the conversations you are in (the `active-runs` rule), plus routines' background runs and agents' private conversations for admins and the agent's owner; the rest only as counts (`hidden`). No cost. `since` (default: the last 24 h) bounds `ended`.",
       request: { params: OrgParams, query: z.object({ since: z.iso.datetime().optional() }) },
       responses: { 200: json(TaskManagerView), ...errors },
     }),

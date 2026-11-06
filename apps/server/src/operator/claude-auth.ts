@@ -63,7 +63,7 @@ const OrgClaudeAuth = z
         protocol: z.number().int(),
         claudeLoginMethods: z.array(AuthMethod).openapi({
           description:
-            "What a new Claude sign-in for all agents can use there: what its runner said (protocol 47), else what older runners do.",
+            "What a new Claude sign-in for all agents can use there: what its runner said (protocol 49), else what older runners do.",
         }),
         supportsSelected: z.boolean().openapi({
           description: "It can use the method the policy gives it now; else such a sign-in there is refused.",

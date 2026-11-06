@@ -4,7 +4,7 @@ import { routineBriefOfRun } from "./background";
 import { deliverNotice, publishDelivery } from "./delivery";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
-import { insertMessage, type Message, unreachedAgents } from "./messages";
+import { insertMessage, type Message, unreachedAgents, unreachedNote } from "./messages";
 import { runReadOutsideById } from "./outside";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
@@ -87,7 +87,7 @@ export async function deliverRoutineReport(
   if (!open) return null;
   const relays = await runReadOutsideById(tx, run.orgId, run.id);
   if (!input.wake) {
-    // Agents it names outside that conversation: the routine hands it to them (`settleReach`).
+    // Agents it names outside that conversation: its mention reaches nobody, and the tool's result says so.
     const unreached = await unreachedAgents(tx, {
       orgId: run.orgId,
       channelId: brief.deliverTo.channelId,
@@ -404,7 +404,7 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
   const tool: ToolDefinition = {
     name: HAND_OFF_TOOL,
     description:
-      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. An agent it @mentions wakes and works on it (one outside that conversation gets it as a note). Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
+      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. An agent of that conversation it @mentions wakes and works on it; one outside it hears nothing (tell_agent reaches it). Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -456,11 +456,13 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
       });
       if ("refused" in handed) return { content: handed.refused ?? "", isError: true };
       await publishDelivery(deps.pubsub, handed.delivered);
+      const missed = handed.delivered.message.meta.unreachedAgents;
+      const note = Array.isArray(missed) ? unreachedNote(missed as string[], "that conversation", false) : "";
       return {
         content:
           input.wake_me === true
             ? "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked; nothing else is posted."
-            : "Posted. Finish your work now and end with a short record of what you checked (it is not posted); nothing else is posted.",
+            : `Posted.${note ? ` ${note}` : ""} Finish your work now and end with a short record of what you checked (it is not posted); nothing else is posted.`,
         data: { handedOff: { messageId: handed.delivered.message.id } },
       };
     },

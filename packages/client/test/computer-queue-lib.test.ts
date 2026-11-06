@@ -13,6 +13,8 @@ import {
   queueAllStartedText,
   queueButtonText,
   queuedNextText,
+  queueFillText,
+  queueLeftText,
   queueLiveText,
   queuePurposeText,
   queueStartText,
@@ -117,17 +119,13 @@ test("an agent's turn for a message: the run its receipt follows, else its one t
   expect(waitingFor(null, undefined, "theo", "c1")).toBeNull();
 });
 
-test("the agent's live row: next with an estimate, next once a turn ends, further back after the ones ahead", () => {
+test("the agent's live row: next with an estimate, next alone without one, further back after the ones ahead", () => {
   expect(queueLiveText(en, "en", queue, "q1", agentName, NOW)).toBe(
     "Waiting for the computer. Next up, in about 1 min",
   );
   const noEta = { ...queue, waiting: queue.waiting.map((w) => ({ ...w, estimatedStartAt: null })) };
-  expect(queueLiveText(en, "en", noEta, "q1", agentName, NOW)).toBe(
-    "Waiting for the computer. Next up, once Ada finishes",
-  );
-  expect(queueLiveText(pt, "pt-BR", noEta, "q1", agentName, NOW)).toBe(
-    "Aguardando o computador. É o próximo quando a Ada terminar",
-  );
+  expect(queueLiveText(en, "en", noEta, "q1", agentName, NOW)).toBe("Waiting for the computer. Next up");
+  expect(queueLiveText(pt, "pt-BR", noEta, "q1", agentName, NOW)).toBe("Aguardando o computador. É o próximo");
   expect(queueLiveText(en, "en", queue, "q4", agentName, NOW)).toBe("In line, 4th. After Theo, Kai, and Rio");
   expect(queueLiveText(pt, "pt-BR", queue, "q2", agentName, NOW)).toBe("Na fila, 2º. Depois de Theo");
   expect(queueLiveText(en, "en", queue, "elsewhere", agentName, NOW)).toBeNull();
@@ -146,12 +144,28 @@ test("rows: what each turn is for, never its content, where, and its estimate", 
   expect(queueWhereText(en, { kind: "dm", mine: true })).toBe("your DM");
   expect(queueWhereText(en, { kind: "dm", mine: false, withName: "Theo" })).toBe("DM with Theo");
   expect(queueWhereText(en, { kind: "hidden" })).toBe("a private conversation");
+  expect(queueWhereText(pt, { kind: "agents" })).toBe("uma conversa entre agentes");
+  const turn = queue.working[0] as NonNullable<(typeof queue.working)[0]>;
+  expect(queueLeftText(en, turn, NOW)).toBe("~1 min left");
+  // Past its typical length no estimate is honest, however it reads.
+  expect(queueLeftText(pt, { ...turn, estimatedEndAt: null, overdue: true }, NOW)).toBe("passou do normal");
+  expect(queueLeftText(en, { ...turn, estimatedEndAt: null }, NOW)).toBeNull();
+  // An estimate that passed while the dialog stayed open: nobody asked the line again.
+  expect(queueLeftText(pt, { ...turn, estimatedEndAt: new Date(NOW - 1).toISOString() }, NOW)).toBe("passou do normal");
   expect(queueStartText(en, queue.waiting[1] as never, agentName, NOW)).toBe("starts ~3 min");
   expect(queueStartText(pt, { ...queue.waiting[0], estimatedStartAt: null } as never, agentName, NOW)).toBe(
     "começa quando a Ada terminar",
   );
   expect(queueStartText(en, queue.waiting[3] as never, agentName, NOW)).toBeNull();
   expect(awayText(en, at(-3), NOW)).toBe("Away 3 min");
+});
+
+test("what fills the computer, by what each turn is for", () => {
+  const of = (...kinds: ("agent" | "routine" | "work")[]) =>
+    kinds.map((kind) => ({ purpose: kind === "agent" ? { kind, agentId: "ada" } : { kind } }));
+  expect(queueFillText(pt, of("agent", "agent", "routine"))).toBe("2 pedidas por agentes e 1 rotina");
+  expect(queueFillText(en, of("work"))).toBe("1 long job");
+  expect(queueFillText(en, [])).toBeNull();
 });
 
 test("ordinals by the language's own rule", () => {

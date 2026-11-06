@@ -164,6 +164,7 @@ export function NewCategoryScreen({ channelId }: { channelId?: string }) {
     <SettingsPage
       title={t("channelCategories.newCategory")}
       action={{ label: t("mobile.categories.create"), onPress: save, disabled: create.isPending || !name.trim() }}
+      locked={create.isPending}
     >
       <Gap />
       <GroupedList>
@@ -321,6 +322,7 @@ export function EditCategoryScreen({ categoryId }: { categoryId: string }) {
     <SettingsPage
       title={category?.name ?? t("mobile.categories.title")}
       action={{ label: t("channelCategories.save"), onPress: save, disabled: rename.isPending || !category }}
+      locked={rename.isPending}
     >
       <Gap />
       <GroupedList>

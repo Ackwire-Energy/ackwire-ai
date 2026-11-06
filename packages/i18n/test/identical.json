@@ -421,6 +421,7 @@
     "fr": [
       "deleteAccount.agentCount",
       "deleteAccount.messageCount",
+      "queue.fill.routine",
       "access.agentCol",
       "agent.builtinName",
       "agent.handleLabel",
@@ -1130,6 +1131,7 @@
       "agentPage.work.brain.speeds.standard"
     ],
     "it": [
+      "queue.fill.routine",
       "access.area.browser",
       "access.area.desktop",
       "access.cell",
@@ -1420,6 +1422,7 @@
     ],
     "nl": [
       "deleteAccount.agentCount",
+      "queue.fill.routine",
       "access.agentCol",
       "access.area.browser",
       "access.area.skills",

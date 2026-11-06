@@ -97,7 +97,7 @@ import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopUser, runnerUser, systemDesktopUser } from "./desktop-session";
 import { EgressObservation, probeEgress } from "./egress";
 import { NetworkChangingError, RUNNER_VERSION, RunnerError } from "./errors";
-import { cachedExecutors, type ExecutorRun } from "./executors";
+import { cachedExecutors, EXECUTORS_TTL_MS, type ExecutorRun } from "./executors";
 import { systemGitCache } from "./git";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
@@ -580,6 +580,10 @@ export class RunnerDaemon implements RequestObserver {
     const browsers = setInterval(() => this.browsersChanged(), BROWSER_STATE_POLL_MS);
     browsers.unref?.();
     this.timers.push(browsers);
+    // A CLI installed while the runner stays up: with no app asking for the status, nothing else looks again.
+    const clis = setInterval(() => this.executors(), EXECUTORS_TTL_MS);
+    clis.unref?.();
+    this.timers.push(clis);
     const sample = () => {
       const s = this.session;
       this.traffic.add((s?.supervisor ?? s?.browser)?.takeTraffic() ?? { up: 0, down: 0 });
@@ -1549,8 +1553,9 @@ export class RunnerDaemon implements RequestObserver {
 
   /** The coding CLIs for `hello`: the ones installed (whether each may run is `access.tools`). */
   private helloExecutors(): RunnerInfo["executors"] {
-    if (!this.executorsKnown()) return undefined;
+    // Asked first: asking is what starts a look, and a runner with no app has no other first one.
     const found = this.executors();
+    if (!this.executorsKnown()) return undefined;
     // Claude Code installed or logged in since the last look: the app shows it.
     const seen = JSON.stringify(found);
     if (seen !== this.lastExecutors) {
@@ -2188,6 +2193,7 @@ export class RunnerDaemon implements RequestObserver {
       case "read":
         return { kind: "read", summary: `read ${p(req.path)}` };
       case "write":
+      case "pull":
         return { kind: "write", summary: `wrote ${p(req.path)}` };
       case "list":
         return { kind: "list", summary: `looked at ${p(req.path)}` };

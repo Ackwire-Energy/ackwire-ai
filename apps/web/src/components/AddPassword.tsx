@@ -1,7 +1,7 @@
 import { keys, type Me } from "@agenteschat/client";
 import { errorCode, errorText, REAUTH_SIGN_IN } from "@agenteschat/client/lib/errors";
 import { passwordState } from "@agenteschat/client/lib/text";
-import { Alert, Button, Dialog, DialogBody, DialogFooter, Field, Input } from "@agenteschat/ui";
+import { Alert, Button, Dialog, DialogBody, DialogFooter, Field, Input, Locked } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -61,19 +61,21 @@ export function AddPasswordDialog({ open, onClose }: { open: boolean; onClose: (
           if (ok && !save.isPending) save.mutate();
         }}
       >
-        <DialogBody>
-          <Field label={t("shell.addPasswordLabel")} id="add-password">
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoFocus
-            />
-          </Field>
-          <PasswordHelp password={password} />
-          {error && <Alert>{error}</Alert>}
-        </DialogBody>
+        <Locked when={save.isPending}>
+          <DialogBody>
+            <Field label={t("shell.addPasswordLabel")} id="add-password">
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoFocus
+              />
+            </Field>
+            <PasswordHelp password={password} />
+            {error && <Alert>{error}</Alert>}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}

@@ -85,6 +85,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
     <SettingsPage
       title={t("mobile.vault.newItem")}
       action={{ label: t("common.save"), onPress: save, disabled: problem !== null || create.isPending }}
+      locked={create.isPending}
     >
       <GroupedHeader>{t("mobile.vault.kindTitle")}</GroupedHeader>
       <GroupedList>

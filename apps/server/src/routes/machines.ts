@@ -17,6 +17,7 @@ import {
   listMachines,
   moveAgentsFromMachine,
   NotFoundError,
+  openFilePull,
   PROVISIONING_REASONS,
   PROVISIONING_STATES,
   PROVISIONING_STEPS,
@@ -29,6 +30,7 @@ import {
   setAgentComputerTarget,
   startDeviceCode,
   syncHostComputer,
+  UUID,
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
@@ -331,7 +333,15 @@ const QueuePurpose = z
       "What the turn is for, never its content: answering a person, asked by another agent, a routine, or long work. Ids are null when the author is gone.",
   });
 
-const QueueWhere = z.object({ channelId: z.uuid(), threadId: z.uuid().nullable() });
+const QueueWhere = z.object({
+  channelId: z.uuid(),
+  threadId: z.uuid().nullable(),
+  agents: z.boolean().openapi({ description: "Two agents' private conversation, said only to who may see that work." }),
+});
+const QueueAccess = {
+  canOpen: z.boolean().openapi({ description: "You see this run in the task manager: the row opens it." }),
+  canStop: z.boolean().openapi({ description: "You may stop it." }),
+};
 
 const ComputerQueue = z
   .object({
@@ -346,8 +356,10 @@ const ComputerQueue = z
         startedAt: z.string().openapi({ description: "When this turn asked the computer." }),
         estimatedEndAt: z.string().nullable().openapi({
           description:
-            "Start plus the agent's median computer turn (else the workspace's), never sooner than 30 s from now; null with no basis.",
+            "Start plus the agent's median computer turn (else the workspace's), never sooner than 30 s from now; null with no basis, or past it.",
         }),
+        overdue: z.boolean().openapi({ description: "Past its typical turn: there is no honest end to give." }),
+        ...QueueAccess,
       }),
     ),
     waiting: z.array(
@@ -363,6 +375,7 @@ const ComputerQueue = z
           description:
             "Who it waits for: for the head, the running turn expected to end first; behind it, the agents ahead in line.",
         }),
+        ...QueueAccess,
       }),
     ),
   })
@@ -994,7 +1007,7 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       apiError(c, 413, "artifact.file_too_large", `The file is too large (max ${maxMb} MB)`, { maxMb });
     if (Number(c.req.header("content-length") ?? "0") > max) return tooLarge();
     const uploadId = c.req.param("uploadId");
-    if (!/^[0-9a-f-]{36}$/i.test(uploadId)) return apiError(c, 404, "upload.not_found", "Upload not found");
+    if (!UUID.test(uploadId)) return apiError(c, 404, "upload.not_found", "Upload not found");
     let name = "file";
     try {
       name = decodeURIComponent(c.req.header("x-agentes-file-name") ?? "") || "file";
@@ -1020,6 +1033,31 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
         },
       );
       return c.json({ ok: true, artifactId: artifact.id, version: artifact.shownVersion }, 200);
+    } catch (error) {
+      const mapped = domainErrorResponse(error, c);
+      if (mapped) return mapped;
+      throw error;
+    }
+  });
+
+  // The bytes of a file this machine was told to fetch (`pull`), straight from storage.
+  api.get("/machines/pulls/:pullId", async (c) => {
+    const auth = c.req.header("authorization") ?? "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const machine = token ? await authenticateMachine(db, token) : null;
+    if (!machine) return apiError(c, 401, "machine.unauthorized", "This computer's token is not valid");
+    const pullId = c.req.param("pullId");
+    if (!UUID.test(pullId)) return apiError(c, 404, "pull.not_found", "This file isn't waiting for this computer");
+    try {
+      const file = await openFilePull(deps.extras?.artifacts ?? missingArtifacts(), pullId, machine.id);
+      return new Response(file.body, {
+        status: 200,
+        headers: {
+          "content-type": "application/octet-stream",
+          "content-length": String(file.size),
+          "x-content-type-options": "nosniff",
+        },
+      });
     } catch (error) {
       const mapped = domainErrorResponse(error, c);
       if (mapped) return mapped;

@@ -1,7 +1,8 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, actWithUndo } from "./agent-actions";
 import { currentHandles } from "./agents";
+import { invalidateOrg } from "./cache";
 import { addChannelMember } from "./channels";
 import { getChannelCached } from "./context";
 import { personBehindCall } from "./requester";
@@ -99,9 +100,10 @@ export function createWorkspaceToolSource(deps: { pubsub?: PubSub }): ToolSource
             .where(and(eq(channelMembers.channelId, channel.id), eq(channelMembers.agentId, agent.id)));
           if (present) return { content: `@${agent.handle} is already in #${channel.name}.` };
           const autoReply = input.auto_reply !== false;
+          const events = holdEvents(deps.pubsub);
           await actWithUndo(
             ctx,
-            (db) => addChannelMember(db, requester, ctx.orgId, channel.id, { agentId: agent.id, autoReply }, deps),
+            (db) => addChannelMember(db, requester, ctx.orgId, channel.id, { agentId: agent.id, autoReply }, events),
             () => ({
               kind: "channel.agent_added",
               target: { type: "channel", id: channel.id, title: channel.name },
@@ -110,6 +112,9 @@ export function createWorkspaceToolSource(deps: { pubsub?: PubSub }): ToolSource
               after: { agentId: agent.id, autoReply },
             }),
           );
+          // Cleared inside the transaction too: a run reading in between may have cached the channel as it was.
+          invalidateOrg(ctx.orgId);
+          await events.flush();
           return { content: `Added @${agent.handle} to #${channel.name}.` };
         } catch (error) {
           return failed(error);

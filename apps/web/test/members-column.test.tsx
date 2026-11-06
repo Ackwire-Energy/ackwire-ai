@@ -182,6 +182,8 @@ describe("the members column", () => {
       (m) => m.id !== "a-lodi" && m.id !== "u-bia",
     );
     await channelEvent("channel.member_removed", { type: "agent", id: "a-lodi" });
+    // A second change to the same list this soon is read when the gap between two reads ends.
+    await act(() => new Promise((r) => setTimeout(r, 600)));
     await settle(4);
     expect(names()).not.toContain("Lodi");
     expect(names()).not.toContain("Bia");

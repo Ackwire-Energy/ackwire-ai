@@ -2712,7 +2712,7 @@
                   "items": {
                     "$ref": "#/components/schemas/OperatorAuthMethod"
                   },
-                  "description": "What a new Claude sign-in for all agents can use there: what its runner said (protocol 47), else what older runners do."
+                  "description": "What a new Claude sign-in for all agents can use there: what its runner said (protocol 49), else what older runners do."
                 },
                 "supportsSelected": {
                   "type": "boolean",

@@ -20,7 +20,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Count, Icon, Row, SearchField, Text, useToast, weights } from "@/ui";
+import { Button, Card, Count, Icon, Locked, Row, SearchField, Text, useToast, weights } from "@/ui";
 import { Face, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -392,22 +392,24 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
             : t("channelMembers.addEveryone", { org: org?.name ?? "", channel: channelName })}
         </Text>
       ) : (
-        <Card>
-          {rows.map((w) => {
-            const key = `${w.kind}:${w.id}`;
-            const on = selected.has(key);
-            return (
-              <Row
-                key={key}
-                leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} />}
-                title={w.name}
-                subtitle={w.line}
-                meta={<Icon name={on ? "checkc" : "circle"} size={20} color={on ? c.ink : c.faint} />}
-                onPress={() => toggle(key)}
-              />
-            );
-          })}
-        </Card>
+        <Locked when={add.isPending}>
+          <Card>
+            {rows.map((w) => {
+              const key = `${w.kind}:${w.id}`;
+              const on = selected.has(key);
+              return (
+                <Row
+                  key={key}
+                  leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} />}
+                  title={w.name}
+                  subtitle={w.line}
+                  meta={<Icon name={on ? "checkc" : "circle"} size={20} color={on ? c.ink : c.faint} />}
+                  onPress={() => toggle(key)}
+                />
+              );
+            })}
+          </Card>
+        </Locked>
       )}
       {elsewhere.length > 0 ? <ActionList items={elsewhere} /> : null}
       <View style={styles.actions}>
@@ -417,7 +419,8 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
             variant="primary"
             wide
             label={t("channelMembers.addConfirm", { count: selected.size })}
-            disabled={selected.size === 0 || add.isPending}
+            loading={add.isPending}
+            disabled={selected.size === 0}
             onPress={() => add.mutate()}
           />
         </View>

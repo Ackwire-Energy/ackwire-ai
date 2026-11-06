@@ -17,9 +17,16 @@ test("a message's words use the whole column; a code block or a table scrolls in
     expect(value(selector, "max-width")).toBeUndefined();
   expect(value(".ac-msg__text pre", "overflow")).toBe("auto hidden");
   expect(value(".md__table", "overflow")).toBe("auto");
-  // As wide as its columns, up to the column: a small table doesn't stretch across the whole message.
+  // Outside a message (a wiki page) as wide as its columns, up to the page's.
   expect(value(".md__table", "width")).toBe("fit-content");
   expect(value(".md__table", "max-width")).toBe("100%");
+  // In a message every table is the message's width, so tables one under another line up; a wide one scrolls
+  // inside its box, which fades on the side with more columns.
+  expect(value(".md--message .md__table", "width")).toBe("100%");
+  expect(value(".md__table-scroll", "overflow-x")).toBe("auto");
+  expect(value('.md__table[data-more="end"] > .md__table-scroll', "mask-image")).toContain("linear-gradient");
+  expect(value('.md__table[data-more="start"] > .md__table-scroll', "mask-image")).toContain("linear-gradient");
+  expect(value('.md__table[data-more="both"] > .md__table-scroll', "mask-image")).toContain("linear-gradient");
   expect(value(".code-card__code", "overflow-x")).toBe("auto");
 });
 

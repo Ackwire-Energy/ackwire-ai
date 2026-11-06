@@ -3,7 +3,7 @@ import { useApi } from "@agenteschat/client";
 import { type CostlyProposalCard, mayDecideCostly, mayRememberCostly } from "@agenteschat/client/lib/action-cards";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Icon } from "@agenteschat/ui";
+import { Button, Icon, Locked } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -51,24 +51,26 @@ export function CostlyProposalCardView({ message, card }: { message: Message; ca
           {t(`costlyCard.decided.${card.state === "open" ? "go" : card.state}`, { name: who })}
         </span>
       ) : may ? (
-        <span className="waitcard__acts">
-          <Button size="sm" variant="primary" loading={pending === "go"} onClick={() => decide("go")}>
-            {t("costlyCard.go")}
-          </Button>
-          {remembers && (
-            <Button size="sm" loading={pending === "always"} onClick={() => decide("always")}>
-              {t("costlyCard.always")}
+        <Locked when={pending !== null}>
+          <span className="waitcard__acts">
+            <Button size="sm" variant="primary" loading={pending === "go"} onClick={() => decide("go")}>
+              {t("costlyCard.go")}
             </Button>
-          )}
-          <Button size="sm" variant="ghost" loading={pending === "not_now"} onClick={() => decide("not_now")}>
-            {t("costlyCard.notNow")}
-          </Button>
-          {remembers && (
-            <Button size="sm" variant="ghost" loading={pending === "never"} onClick={() => decide("never")}>
-              {t("costlyCard.never")}
+            {remembers && (
+              <Button size="sm" loading={pending === "always"} onClick={() => decide("always")}>
+                {t("costlyCard.always")}
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" loading={pending === "not_now"} onClick={() => decide("not_now")}>
+              {t("costlyCard.notNow")}
             </Button>
-          )}
-        </span>
+            {remembers && (
+              <Button size="sm" variant="ghost" loading={pending === "never"} onClick={() => decide("never")}>
+                {t("costlyCard.never")}
+              </Button>
+            )}
+          </span>
+        </Locked>
       ) : (
         <span className="small muted">{t("costlyCard.waiting")}</span>
       )}

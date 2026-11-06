@@ -752,15 +752,17 @@ export async function applyImport(
         let agentId = item.targetId;
         if (!agentId) {
           const model = work.model ? { model: work.model } : {};
-          agentId = (await createAgent(db, actorId, orgId, { ...fields, ...model, handle: work.handle }, defaults)).id;
-        } else await updateAgent(db, actorId, orgId, agentId, fields);
+          const input = { ...fields, ...model, handle: work.handle };
+          agentId = (await createAgent(db, actorId, orgId, input, defaults, { pubsub })).id;
+        } else await updateAgent(db, actorId, orgId, agentId, fields, { pubsub });
         await remember(item, agentId);
-        if (work.look) await setAgentAppearance(db, actorId, orgId, agentId, work.look);
+        if (work.look) await setAgentAppearance(db, actorId, orgId, agentId, work.look, { pubsub });
         return;
       }
       case "channel": {
         const channelId =
-          item.targetId ?? (await createChannel(db, actorId, orgId, { name: work.name, topic: work.topic })).id;
+          item.targetId ??
+          (await createChannel(db, actorId, orgId, { name: work.name, topic: work.topic }, { pubsub })).id;
         await remember(item, channelId, work.adopt);
         for (const m of work.agents) {
           const agentId = ids.agent.get(m.key);

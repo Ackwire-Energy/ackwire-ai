@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client/lib/machines";
 import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
-import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
+import { Button, cx, Icon, InfoHint, Input, Locked, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -540,29 +540,31 @@ function AddAccountFlow({
   const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <span className="agp-addacct__paste">
-        <Input
-          ref={field}
-          id={codeId}
-          type={secret ? "password" : "text"}
-          value={code}
-          autoComplete="off"
-          spellCheck={false}
-          placeholder={placeholder}
-          aria-label={label}
-          aria-describedby={plan ? keyHintId : undefined}
-          onChange={(e) => take(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              if (valid && ready && !loading) void send();
-            }
-          }}
-        />
-        {!code.trim() && (
-          <Button icon="copy" onClick={() => void paste()}>
-            {t("aiAccounts.add.paste")}
-          </Button>
-        )}
+        <Locked when={loading}>
+          <Input
+            ref={field}
+            id={codeId}
+            type={secret ? "password" : "text"}
+            value={code}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={placeholder}
+            aria-label={label}
+            aria-describedby={plan ? keyHintId : undefined}
+            onChange={(e) => take(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (valid && ready && !loading) void send();
+              }
+            }}
+          />
+          {!code.trim() && (
+            <Button icon="copy" onClick={() => void paste()}>
+              {t("aiAccounts.add.paste")}
+            </Button>
+          )}
+        </Locked>
         <Button variant="primary" loading={loading} disabled={!valid || !ready} onClick={() => void send()}>
           {t("agentPage.work.brain.add.send", { computer })}
         </Button>

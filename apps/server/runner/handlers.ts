@@ -40,6 +40,7 @@ import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, hiddenIn, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
+import { pullFile } from "./pull";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
 import type { Spawn } from "./scope-gate";
@@ -47,7 +48,7 @@ import { agentSecrets, handleSecret } from "./secrets";
 import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
-import { openExecKeys, parseExecVault, runnerVault } from "./vault";
+import { openExecKeys, parseExecVault, runnerVault, sealMadePassword } from "./vault";
 
 /**
  * Requests one connection runs at once, whatever they are: a bound on a flood, far above what room allows
@@ -62,6 +63,21 @@ export const MAX_IN_FLIGHT = 128;
 export const TURNS_WITHOUT_MEMORY = 8;
 /** What a coding CLI grows to once it runs (measured: about 0.6 GB). */
 export const TURN_BYTES = 0.6e9;
+/**
+ * A locked-down turn (`permissions.mode` `chat`, the team's right hand) has no folders, no browser and no tools of its
+ * own, so it is at most one CLI: it needs room for that and a margin, not `MIN_FREE_BYTES`. A person asks it what
+ * filled the computer, so it runs while the rest waits, and only a computer about to run out turns it away.
+ */
+export const LOCKED_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.3e9;
+/** Where memory isn't known: how many locked-down turns may run past `TURNS_WITHOUT_MEMORY`. */
+export const LOCKED_TURNS_PAST_COUNT = 2;
+/**
+ * The floor of the slot held for a person's turn (`personWaiting`): one turn and a margin, so a nearly dead computer
+ * doesn't get worse. Agents' turns stop at `MIN_FREE_BYTES` and grow by `TURN_BYTES`, so a computer they filled sits
+ * just above this: the slot is there whenever only their turns filled it. The margin is over a locked-down turn's
+ * because this one has tools.
+ */
+export const PERSON_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.4e9;
 /** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
 export const TURN_SETTLE_MS = 30_000;
 /** How long a turn without room may wait while idle warm CLIs close for it, before `no_slot`. */
@@ -86,6 +102,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "write",
   "list",
   "push",
+  "pull",
   "task.start",
   "brain.turn",
   "brain.route",
@@ -101,6 +118,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "desktop.capture",
   "desktop.apps",
   "vault.key",
+  "vault.password",
 ]);
 
 /**
@@ -116,6 +134,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   write: "agent",
   list: "agent",
   push: "agent",
+  pull: "agent",
   // Keys and staged boxes stay in the root supervisor until DB-committed activation.
   secret: "machine",
   account: "machine",
@@ -155,6 +174,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.text": "agent",
   // ADR 0144: the key lives in the process that opens the values (the agent's worker), so root never holds one.
   "vault.key": "agent",
+  // The password is made and sealed where the Vault's values open: root relays only the box.
+  "vault.password": "agent",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -415,6 +436,26 @@ async function doRead(
   return { base64: data.toString("base64"), size: data.byteLength };
 }
 
+/** Where a file op may put `requested`, its parent folders made. */
+async function writeTarget(ctx: HandlerContext, requested: string) {
+  // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
+  // without the "commands" switch): never written by a file op (`git-guard.ts`).
+  const gitInternal = () =>
+    new RunnerError("bad_request", `${requested} is inside a .git folder. Files there can't be written this way.`);
+  if (isGitInternalPath(requested)) throw gitInternal();
+  const first = await resolvePath(ctx, requested);
+  if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");
+  if (touchesGitInternals(requested, first.abs)) throw gitInternal();
+  if (!first.exists) await mkdir(path.dirname(first.abs), { recursive: true });
+  // Check again now that the parents exist (nothing raced us outside).
+  const target = await resolvePath(ctx, requested);
+  if (touchesGitInternals(requested, target.abs)) throw gitInternal();
+  if (target.exists && (await stat(target.abs)).isDirectory()) {
+    throw new RunnerError("bad_request", `${requested} is a folder`);
+  }
+  return target;
+}
+
 async function doWrite(
   ctx: HandlerContext,
   req: Extract<MachineRequest, { op: "write" }>,
@@ -427,22 +468,7 @@ async function doWrite(
   if (data.byteLength > MAX_INLINE_FILE_BYTES) {
     throw new RunnerError("too_large", `Files sent inline are limited to ${MAX_INLINE_FILE_BYTES} bytes`);
   }
-  const requested = requireString(req.path, "path");
-  // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
-  // without the "commands" switch): never written by a file op (`git-guard.ts`).
-  const gitInternal = () =>
-    new RunnerError("bad_request", `${requested} is inside a .git folder. Files there can't be written this way.`);
-  if (isGitInternalPath(requested)) throw gitInternal();
-  const first = await resolvePath(ctx, requested);
-  if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");
-  if (touchesGitInternals(requested, first.abs)) throw gitInternal();
-  if (!first.exists) await mkdir(path.dirname(first.abs), { recursive: true });
-  // Check again now that the parents exist (nothing raced us outside).
-  const target = await resolvePath(ctx, req.path);
-  if (touchesGitInternals(requested, target.abs)) throw gitInternal();
-  if (target.exists && (await stat(target.abs)).isDirectory()) {
-    throw new RunnerError("bad_request", `${req.path} is a folder`);
-  }
+  const target = await writeTarget(ctx, requireString(req.path, "path"));
   await writeFile(target.abs, data);
   return { size: data.byteLength };
 }
@@ -566,6 +592,9 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
     }
     return { vaultKey: await runnerVault.issueKey(agentId) } satisfies MachineReplies["vault.key"];
   }
+  if (req.op === "vault.password") {
+    return { box: await sealMadePassword(req, req.agent?.id) } satisfies MachineReplies["vault.password"];
+  }
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
@@ -662,6 +691,18 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
         fetch: ctx.fetch,
         signal: scope.signal,
         resolve: (p) => resolveToRead(ctx, p),
+      });
+    case "pull":
+      return pullFile({
+        abs: (await writeTarget(ctx, requireString(req.path, "path"))).abs,
+        token: ctx.token,
+        ...(ctx.server ? { server: ctx.server } : {}),
+        url: requireString(req.url, "url"),
+        pullId: requireString(req.pullId, "pullId"),
+        size: clampInt(req.size, 0, Number.MAX_SAFE_INTEGER, 0),
+        ...(typeof req.sha256 === "string" ? { sha256: req.sha256 } : {}),
+        fetch: ctx.fetch,
+        signal: scope.signal,
       });
     default:
       throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
@@ -1276,6 +1317,7 @@ function describeOp(req: MachineRequest): string {
     case "write":
     case "list":
     case "push":
+    case "pull":
       return `${req.op} ${String(req.path ?? "") || "."}`;
     case "secret":
       // Never the value: the action and the name or request.
@@ -1384,6 +1426,10 @@ export class RequestRunner {
   private turns = 0;
   /** When brain turns were admitted, over the last `TURN_SETTLE_MS`. */
   private admitted: number[] = [];
+  /** When a person's turn was last admitted, by the floor or the slot. */
+  private lastPersonTurn = Number.NEGATIVE_INFINITY;
+  /** The request in the slot held for a person's turn (`reserve`). */
+  private reserved: string | null = null;
 
   constructor(
     private readonly ctx: HandlerContext,
@@ -1398,16 +1444,41 @@ export class RequestRunner {
    * Room for one more brain turn: `MemAvailable`, less what the turns admitted in the last
    * `TURN_SETTLE_MS` will still take, leaves `MIN_FREE_BYTES` (1.5 GiB, the floor desktops keep). The
    * floor is more than the biggest thing a turn grows into (a computer-use agent, about 1.4 GB with its screen
-   * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead.
+   * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead. `locked`:
+   * a locked-down turn, on its own floor and a little past the count. `person`: a person waits on it.
    */
-  private admit(): boolean {
+  private admit(locked: boolean, person: boolean): boolean {
     const now = (this.admission.now ?? Date.now)();
     this.admitted = this.admitted.filter((at) => now - at < TURN_SETTLE_MS);
     const free = this.memAvailable();
+    const floor = locked ? LOCKED_TURN_MIN_FREE_BYTES : MIN_FREE_BYTES;
     const room =
-      free === null ? this.turns < TURNS_WITHOUT_MEMORY : free - this.admitted.length * TURN_BYTES >= MIN_FREE_BYTES;
-    if (room) this.admitted.push(now);
+      free === null
+        ? this.turns < TURNS_WITHOUT_MEMORY + (locked ? LOCKED_TURNS_PAST_COUNT : 0)
+        : free - this.admitted.length * TURN_BYTES >= floor;
+    if (room) {
+      this.admitted.push(now);
+      if (person) this.lastPersonTurn = now;
+    }
     return room;
+  }
+
+  /**
+   * The floor turned away a turn a person waits on and closing idle CLIs didn't help: one such turn at a time goes
+   * ahead, down to `PERSON_TURN_MIN_FREE_BYTES`, if no person's turn was admitted in the last `TURN_SETTLE_MS` (the
+   * reading doesn't show that one yet). Agents' turns keep their floor, and what this one takes counts against it.
+   * Where memory isn't known there is no floor to keep, so no slot.
+   */
+  private reserve(id: string, person: boolean): boolean {
+    if (!person || this.reserved !== null) return false;
+    const now = (this.admission.now ?? Date.now)();
+    const free = this.memAvailable();
+    if (free === null || now - this.lastPersonTurn < TURN_SETTLE_MS) return false;
+    if (free - this.admitted.length * TURN_BYTES < PERSON_TURN_MIN_FREE_BYTES) return false;
+    this.admitted.push(now);
+    this.lastPersonTurn = now;
+    this.reserved = id;
+    return true;
   }
 
   private memAvailable() {
@@ -1418,11 +1489,16 @@ export class RequestRunner {
    * No room for a turn: idle warm CLIs close, one at a time, until there is, for up to `RECLAIM_MS`. Not where
    * memory isn't known: room there is a count of turns, which closing idle CLIs doesn't change.
    */
-  private async reclaim(close: () => Promise<boolean>, signal: AbortSignal): Promise<boolean> {
+  private async reclaim(
+    close: () => Promise<boolean>,
+    signal: AbortSignal,
+    locked: boolean,
+    person: boolean,
+  ): Promise<boolean> {
     const until = Date.now() + (this.admission.reclaimMs ?? RECLAIM_MS);
     while (!signal.aborted && Date.now() < until) {
       if (!(await close())) return false;
-      if (!signal.aborted && this.admit()) return true;
+      if (!signal.aborted && this.admit(locked, person)) return true;
     }
     return false;
   }
@@ -1443,10 +1519,13 @@ export class RequestRunner {
       return Promise.resolve();
     }
     const controller = new AbortController();
+    const locked = req.op === "brain.turn" && req.permissions?.mode === "chat";
+    const person = req.op === "brain.turn" && req.personWaiting === true;
     // A paused computer says so (the handler refuses new work), never that it is full.
-    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit()) {
+    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit(locked, person)) {
       const close = this.ctx.reclaimBrains;
       if (!close || this.memAvailable() === null) {
+        if (this.reserve(id, person)) return this.run(id, req, controller);
         this.full(id);
         return Promise.resolve();
       }
@@ -1454,8 +1533,9 @@ export class RequestRunner {
       this.inflight.set(id, controller);
       const session = (req as { session?: { id?: unknown } }).session?.id;
       const spare = brainKey(req.agent?.id ?? "", String(session ?? ""));
-      return this.reclaim(() => close(spare), controller.signal).then((room) => {
-        if (room && !this.closed) return this.run(id, req, controller);
+      return this.reclaim(() => close(spare), controller.signal, locked, person).then((room) => {
+        if (!this.closed && (room || (!controller.signal.aborted && this.reserve(id, person))))
+          return this.run(id, req, controller);
         this.inflight.delete(id);
         if (controller.signal.aborted) this.reply(id, { ok: false, error: { code: "internal", message: "Canceled" } });
         else this.full(id);
@@ -1534,6 +1614,7 @@ export class RequestRunner {
       .finally(() => {
         this.inflight.delete(id);
         if (turn) this.turns--;
+        if (this.reserved === id) this.reserved = null;
       });
   }
 

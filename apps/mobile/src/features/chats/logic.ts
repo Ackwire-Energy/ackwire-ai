@@ -11,6 +11,7 @@ import type {
 } from "@agenteschat/client";
 import { hiddenAgentIds, hiddenDm } from "@agenteschat/client/lib/audience";
 import type { FirstStepId } from "@agenteschat/client/lib/home";
+import { dmActivityAt } from "@agenteschat/client/lib/recent";
 import { looksUnread, unreadTotal } from "@agenteschat/client/lib/unread";
 import type { IconName } from "@/ui";
 import { previewOf } from "../shared/logic";
@@ -169,7 +170,7 @@ export function buildConversations(input: {
             ...(d.lastMessage.mediaKind ? { mediaKind: d.lastMessage.mediaKind } : {}),
           }
         : null,
-      at: d.lastMessage?.createdAt ?? null,
+      at: dmActivityAt(d),
       unread: Math.max(0, d.unread),
       working: d.with.type === "agent" && Boolean(input.workingChannels?.has(d.channelId)),
     });

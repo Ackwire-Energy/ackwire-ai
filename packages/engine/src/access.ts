@@ -84,6 +84,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "import_file",
     "run_skill_script",
     "computer_status",
+    "vault_make_password",
   ],
   [BROWSER_SCOPE]: [...BROWSER_TOOLS],
   [DESKTOP_SCOPE]: Object.keys(DESKTOP_TOOL_INFO),
@@ -249,6 +250,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   computer_status: {
     label: "Check the computer",
     description: "Says which computer it is and whether it's answering.",
+  },
+  vault_make_password: {
+    label: "Make a password",
+    description: "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it.",
   },
   ...BROWSER_TOOL_INFO,
   ...DESKTOP_TOOL_INFO,

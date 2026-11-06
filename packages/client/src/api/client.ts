@@ -659,8 +659,13 @@ export interface ApiClient {
       credentialId: string,
       input: { apiKey: string; label?: string },
     ): Promise<Credential>;
-    /** Revokes, or deletes for good with `purge` (refused while an agent uses it). */
-    removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
+    /**
+     * Revokes, or deletes for good with `purge`: refused while it's a default or an agent uses it, unless `release`
+     * says the person read what happens to them.
+     */
+    removeCredential(orgId: string, credentialId: string, purge?: boolean, release?: boolean): Promise<void>;
+    /** One cheap real call with a stored key, before an agent is pointed at it. A refusal comes as on saving one. */
+    checkCredential(orgId: string, credentialId: string): Promise<{ check: "ok" | "unchecked" }>;
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
     /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
@@ -709,9 +714,9 @@ export interface ApiClient {
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
     /**
      * "Parar": stops a run (the person who started it, the agent's owner, admins). The agent is told, with `reason`
-     * when given (ADR 0128).
+     * when given (ADR 0128). `chain`: what it asked of other agents stops with it, all the way down.
      */
-    cancelRun(orgId: string, runId: string, reason?: string): Promise<void>;
+    cancelRun(orgId: string, runId: string, reason?: string, chain?: boolean): Promise<void>;
     /** "Dizer por quê" after stopping a task (only who stopped it, once): the agent reads it. */
     stopReason?(orgId: string, runId: string, reason: string): Promise<void>;
     /**
@@ -1097,6 +1102,8 @@ export interface ApiClient {
   };
   /** Secrets agents ask for (ADR 0027): only the person asked answers; the value goes sealed. */
   secrets: {
+    /** The request as it stands now (only the person asked): what a refused answer reads to end its card. */
+    get(orgId: string, requestId: string): Promise<SecretRequest>;
     deliver(orgId: string, requestId: string, box: SecretBox): Promise<SecretRequest>;
     decline(orgId: string, requestId: string): Promise<SecretRequest>;
     /** Names on the agent's computers (its owner or an admin). */

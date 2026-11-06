@@ -426,7 +426,7 @@ const handlers: Record<string, Handler> = {
     if (!channel) throw new NotFoundError("The channel is gone", "action.target_gone");
     if (direction === "redo") {
       if (!channel.archivedAt) throw changedSince();
-      await unarchiveChannel(deps.db, userId, a.orgId, a.targetId);
+      await unarchiveChannel(deps.db, userId, a.orgId, a.targetId, { pubsub: deps.pubsub });
       return undefined;
     }
     if (channel.archivedAt) throw changedSince();

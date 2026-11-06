@@ -7,6 +7,7 @@ import { CONTROL_PROTOCOL_VERSION, type ControlEvent, type ControlOut } from "@a
 import { configPath, readStoredConfig, type StoredConfig, writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
 import { EXIT_LOCKED, type RunControlOptions, runControl } from "../../runner/control";
+import { RunnerDaemon } from "../../runner/daemon";
 import { RUNNER_VERSION } from "../../runner/errors";
 import { ORG_LOGO_MAX_BYTES, orgLogoPath } from "../../runner/org-logo";
 import type { FetchFn } from "../../runner/pairing";
@@ -281,6 +282,43 @@ test("a new install's hello leaves the CLIs out until the first look, then sends
   release();
   await waitFor(() => s.of("executors.changed").length === 1);
   expect(s.of("executors.changed")[0]).toEqual({ type: "executors.changed", executors: {} });
+});
+
+test("a service with no app still looks for the CLIs on a new install, and tells the server", async () => {
+  const { home } = pairedHome();
+  const sockets: FakeSocket[] = [];
+  const daemon = new RunnerDaemon({
+    home,
+    mode: "start",
+    log: () => {},
+    print: () => {},
+    watch: false,
+    self: SELF,
+    caffeinate: false,
+    dial: (_url, handlers) => {
+      const s = new FakeSocket(handlers);
+      sockets.push(s);
+      return s;
+    },
+    fetch: async () => new Response(null, { status: 404 }),
+    executorRun: async (command) =>
+      command === "codex"
+        ? { status: 0, stdout: "codex-cli 0.164.0\n" }
+        : { status: null, stdout: "", error: Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }) },
+  });
+  void daemon.runStart();
+  await waitFor(() => sockets.length === 1);
+  const s = sockets[0] as FakeSocket;
+  s.handlers.onOpen();
+  await waitFor(() => s.of("hello").length === 1);
+  expect(s.of("hello")[0]).not.toHaveProperty("executors");
+  s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+  await waitFor(() => s.of("executors.changed").length === 1);
+  expect(s.of("executors.changed")[0]).toEqual({
+    type: "executors.changed",
+    executors: { codex: { version: "codex-cli 0.164.0" } },
+  });
+  await daemon.stop();
 });
 
 test("reconnect from the app: the socket is dropped and dialed again at once, with a fresh hello", async () => {

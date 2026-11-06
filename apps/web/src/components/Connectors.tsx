@@ -43,6 +43,7 @@ import {
   Field,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   MenuSeparator,
@@ -523,24 +524,26 @@ function RenameDialog({ item, onClose }: { item: ConnectedItem | null; onClose: 
           submit();
         }}
       >
-        <DialogBody>
-          <Field
-            label={t("connectFlow.name")}
-            id="connector-rename"
-            help={t("connectors.renameHelp")}
-            error={error ?? undefined}
-          >
-            <Input
-              value={label}
-              maxLength={80}
-              autoFocus
-              onChange={(e) => {
-                setLabel(e.target.value);
-                setError(null);
-              }}
-            />
-          </Field>
-        </DialogBody>
+        <Locked when={rename.isPending}>
+          <DialogBody>
+            <Field
+              label={t("connectFlow.name")}
+              id="connector-rename"
+              help={t("connectors.renameHelp")}
+              error={error ?? undefined}
+            >
+              <Input
+                value={label}
+                maxLength={80}
+                autoFocus
+                onChange={(e) => {
+                  setLabel(e.target.value);
+                  setError(null);
+                }}
+              />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={onClose}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" disabled={rename.isPending} loading={rename.isPending}>

@@ -17,6 +17,7 @@ import {
   Field,
   Icon,
   Input,
+  Locked,
   Menu,
   MenuItem,
   MenuSeparator,
@@ -290,20 +291,22 @@ function RenameBody({ board, onClose }: { board: Dashboard; onClose: () => void 
         );
       }}
     >
-      <DialogBody className="db-dialog__body">
-        <Field label={t("dashboards.create.name")}>
-          <Input value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} />
-        </Field>
-        <Field label={t("dashboards.about")}>
-          <Textarea
-            rows={2}
-            value={about}
-            maxLength={280}
-            placeholder={t("dashboards.aboutPlaceholder")}
-            onChange={(e) => setAbout(e.target.value)}
-          />
-        </Field>
-      </DialogBody>
+      <Locked when={update.isPending}>
+        <DialogBody className="db-dialog__body">
+          <Field label={t("dashboards.create.name")}>
+            <Input value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          <Field label={t("dashboards.about")}>
+            <Textarea
+              rows={2}
+              value={about}
+              maxLength={280}
+              placeholder={t("dashboards.aboutPlaceholder")}
+              onChange={(e) => setAbout(e.target.value)}
+            />
+          </Field>
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>
           {t("common.cancel")}

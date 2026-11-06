@@ -1866,7 +1866,6 @@
       "as": "以 {{username}} 身份登录。",
       "saved": "已保存到 Vault",
       "notSaved": "已发送，但未保存到 Vault",
-      "codeLabel": "{{name}} 的验证码",
       "codeIncomplete": "请输入验证码的所有数字。",
       "codeNote": "加密后直接发送到电脑。验证码从不保存。"
     }

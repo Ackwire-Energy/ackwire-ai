@@ -166,11 +166,13 @@ export {
   Field,
   type FieldProps,
   Input,
+  Locked,
   PickerHeading,
   SearchInput,
   Textarea,
   useAutoGrow,
   useFieldControl,
+  useLocked,
 } from "./components/Field";
 export {
   FILTER_SEARCH_AFTER,
@@ -411,6 +413,7 @@ export {
   useHoverCard,
 } from "./hooks/useHoverCard";
 export { useNow } from "./hooks/useNow";
+export { type ScrollSides, useScrollSides } from "./hooks/useScrollSides";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
 export { driveFolder, initialsOf, isIdHandle } from "./names";
 export {

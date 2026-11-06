@@ -54,6 +54,7 @@ import {
   Icon,
   type IconName,
   isApple,
+  Locked,
   onScreenNow,
   PixelSpinner,
   SkyStrip,
@@ -116,6 +117,7 @@ const STEP_ICON = {
   browser_scroll: "chevronDown",
   browser_upload: "upload",
   browser_type_secret: "key",
+  browser_make_password: "key",
   browser_wait: "clock",
   browser_screenshot: "image",
   browser_ask_person: "person",
@@ -1373,33 +1375,35 @@ export function BrowserCard({
       {inControl &&
         (failing ? (
           <div className="brw-ac__foot brw-ac__fail">
-            <b>{t("browser.live.failTitle")}</b>
-            <span className="small muted">{t("browser.live.failHelp", g)}</span>
-            <div className="brw-reasons">
-              {FAIL_REASONS.map((r) => (
-                <FilterToggle key={r} pressed={reason === r} onPressedChange={(on) => setReason(on ? r : null)}>
-                  {t(`browser.live.failReasons.${r}`)}
-                </FilterToggle>
-              ))}
-            </div>
-            <Textarea
-              rows={1}
-              autoGrow
-              className="brw-ac__note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={t("browser.live.failPlaceholder")}
-              maxLength={FAIL_NOTE_MAX}
-            />
-            <div className="brw-ac__row">
-              <span className="brw-grow" />
-              <Button size="sm" variant="ghost" onClick={() => setFailing(false)}>
-                {t("browser.live.back")}
-              </Button>
-              <Button size="sm" variant="primary" loading={actions.failed.isPending} onClick={fail}>
-                {t("browser.live.failSend", g)}
-              </Button>
-            </div>
+            <Locked when={actions.failed.isPending}>
+              <b>{t("browser.live.failTitle")}</b>
+              <span className="small muted">{t("browser.live.failHelp", g)}</span>
+              <div className="brw-reasons">
+                {FAIL_REASONS.map((r) => (
+                  <FilterToggle key={r} pressed={reason === r} onPressedChange={(on) => setReason(on ? r : null)}>
+                    {t(`browser.live.failReasons.${r}`)}
+                  </FilterToggle>
+                ))}
+              </div>
+              <Textarea
+                rows={1}
+                autoGrow
+                className="brw-ac__note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t("browser.live.failPlaceholder")}
+                maxLength={FAIL_NOTE_MAX}
+              />
+              <div className="brw-ac__row">
+                <span className="brw-grow" />
+                <Button size="sm" variant="ghost" onClick={() => setFailing(false)}>
+                  {t("browser.live.back")}
+                </Button>
+                <Button size="sm" variant="primary" loading={actions.failed.isPending} onClick={fail}>
+                  {t("browser.live.failSend", g)}
+                </Button>
+              </div>
+            </Locked>
           </div>
         ) : touch ? (
           // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, a site, send.

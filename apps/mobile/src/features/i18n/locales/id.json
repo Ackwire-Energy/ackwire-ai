@@ -1866,7 +1866,6 @@
       "as": "Masuk sebagai {{username}}.",
       "saved": "Tersimpan di Vault",
       "notSaved": "Terkirim, tapi tidak disimpan ke Vault",
-      "codeLabel": "Kode untuk {{name}}",
       "codeIncomplete": "Ketik setiap digit kode.",
       "codeNote": "Dikirim terenkripsi langsung ke komputer. Kode tidak pernah disimpan."
     }

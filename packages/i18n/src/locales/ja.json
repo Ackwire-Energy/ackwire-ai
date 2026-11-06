@@ -1655,6 +1655,11 @@
     "linkCopied": "リンクをコピーしました。",
     "reply": "返信",
     "quoteOf": "{{name}}への返信: {{excerpt}}。メッセージを見る",
+    "quoteGone": "元のメッセージは削除されました",
+    "jumpTooFar": "このメッセージは古すぎるため、ここからは開けません。",
+    "quoteNoWords": "テキストなしのメッセージ",
+    "replyingTo": "{{name}} に返信中",
+    "cancelReply": "返信をキャンセル",
     "emoji": "絵文字",
     "uploading": "アップロード中…",
     "uploadFailed": "アップロードされませんでした",
@@ -1855,6 +1860,10 @@
       "configure": "設定",
       "nameStory": "名前の由来は lodestar、船乗りを導く星です。"
     },
+    "saved": {
+      "workspace": "{{name}}は、自分のプランがないすべての人に{{label}}で動くようになりました。",
+      "mine": "{{name}}とのあなたの会話は{{label}}で動くようになりました。あなたの会話だけです。"
+    },
     "settings": {
       "name": "名前と見た目",
       "nameHelp": "サイドバーでは常に「{{label}}」と表示されます。",
@@ -1875,6 +1884,8 @@
       "connectMine": "自分のプランを接続",
       "useWorkspace": "ワークスペースのものを使う",
       "fallbackKey": "自分のプランがなければ、ワークスペースのAPIキーを使います。",
+      "fallbackKeyOf": "自分のプランがなければ、ワークスペースのキーを使います: {{label}}。",
+      "fallbackNoKey": "ワークスペースにはまだAPIキーがないため、自分のプランがないとここでは誰も応答しません。",
       "fallbackPlan": "自分のプランがなければ、全員に応える{{owner}}のプランを使います。",
       "fallbackYours": "ほかのプランがなければ、あなたのものであるワークスペースのプランを使います。",
       "fallbackNone": "自分のプランがないと{{name}}は返信できません。ワークスペースのプランは{{owner}}にしか応えません。",
@@ -2122,8 +2133,11 @@
     "have": {
       "title": "接続済み",
       "titleFor": "接続済み（{{name}}用）",
-      "other": "または別のものを接続"
+      "other": "または別のものを接続",
+      "manageKeys": "キーを管理または削除"
     },
+    "billing": "プランはワークスペースのコンピューターにサインインします。そのコンピューターには有効なagentes.chatプランが必要です。",
+    "billingWeb": "Webのagentes.chatで選んでください。",
     "orPayGo": "または従量課金で",
     "plan": {
       "claude": {
@@ -2172,6 +2186,7 @@
       "paste": "ここに貼り付け",
       "forAll": "プランのないエージェントは、すべてこのキーで動きます。",
       "saved": "保存しました。プランのないエージェントは、すべてこのキーで動きます。",
+      "savedUnchecked": "保存しましたが、{{provider}}から応答がなく、キーを確認できませんでした。失敗したときは、会話に理由が表示されます。",
       "notPlan": "コーディングプランのキーは、上の専用の項目に入力してください。",
       "billing": "キーのプロジェクトで課金を有効にしてください。課金がないと、エージェントが送った内容をGoogleが利用する場合があります。",
       "privacy": "エージェントが送った内容をどのプロバイダーが保存できるかは、OpenRouterのプライバシー設定で決まります。",
@@ -2852,11 +2867,16 @@
   "secret": {
     "group": "{{agent}}からのシークレットのリクエスト",
     "chip": "待機中",
-    "targetEnv": "{{agent}}のコンピューターに変数{{name}}として設定されます。",
+    "targetEnv": "{{agent}}のコンピューターのコマンド用に送られます。",
     "targetFile": "{{agent}}のコンピューターのファイル{{path}}に保存されます。",
     "targetSite": "{{host}}で{{agent}}のブラウザだけが入力します。{{agent}}のコマンドには渡りません。",
     "replaces": "{{agent}}がこの名前ですでに持っているキーを置き換えます。",
-    "label": "{{name}}の値",
+    "labelPassword": "{{host}}のパスワード",
+    "labelCode": "{{host}}のコード",
+    "labelKey": "{{agent}}のコンピューター用のキー",
+    "labelFile": "ファイル {{path}}",
+    "placeholder": "ここに入力",
+    "account": "アカウント: {{username}}。",
     "private": "暗号化されてコンピューターに直接送られます。チャットには残らず、エージェントにも見えません。",
     "send": "送信",
     "decline": "断る",
@@ -2864,8 +2884,17 @@
     "waitingFor": "回答できるのは{{person}}だけです。",
     "outcomeBy": "{{person}}が送信しました",
     "outcomeByYou": "あなたが送信しました",
-    "outcomeWithdrawn": "不要になりました",
-    "alreadyAnswered": "このリクエストはすでに回答済みか、期限切れです。",
+    "outcomeWithdrawn": "{{agent}}はこれを必要としなくなりました。",
+    "endedDeclined": "断りました。{{agent}}はこれなしで続けます。",
+    "endedExpired": "時間内に誰も答えませんでした。{{agent}}はこれなしで続け、もう一度依頼できます。",
+    "endedRunStopped": "回答の前に{{agent}}のタスクが止まりました。まだ必要なら{{agent}}にもう一度頼んでください。",
+    "endedSuperseded": "{{agent}}が新しいリクエストで依頼し直しました。",
+    "endedComputer": "これはもう{{agent}}に届きません。依頼したコンピューターが変わりました。{{agent}}にもう一度依頼するよう頼んでください。",
+    "endedPersonLeft": "{{person}}は回答前にワークスペースを離れました。",
+    "endedClosed": "このリクエストは回答前に閉じました。まだ必要なら{{agent}}にもう一度頼んでください。",
+    "seeNewer": "新しいリクエストを見る",
+    "computerAway": "{{agent}}のコンピューターが今は応答していません。このリクエストは{{time}}まで開いています。少ししてからもう一度お試しください。",
+    "computerPaused": "{{agent}}のコンピューターは所有者が一時停止しています。このリクエストは{{time}}まで開いています。",
     "failed": "送信できませんでした。エージェントのコンピューターの電源は入っていますか？",
     "empty": "値を入力してください。",
     "tooLarge": "大きすぎます（最大16 KB）。"
@@ -5398,7 +5427,7 @@
     },
     "vault_write": {
       "label": "Vaultの連絡先を編集",
-      "description": "Vaultの連絡先を保存・更新し、保存済みログインのユーザー名や説明を変更し、自分が保存したものを削除します。"
+      "description": "Vaultの連絡先を保存・更新し、保存済みログインのユーザー名や説明を変更し、自分で作るアカウントのパスワードを作成し、自分が保存したものを削除します。"
     },
     "github_git_read": {
       "label": "リポジトリをクローン（git）",
@@ -7601,7 +7630,9 @@
         "runnerOld": "{{computer}}のagentes.chatプログラムが古く、アップデートを準備中です。終わりしだい自動で切り替わります。",
         "execOff": "{{computer}}はまだ{{program}}を実行できません。対応中で、自動で切り替わります。",
         "toolOff": "{{computer}}では{{program}}がまだ許可されていません。こちら側の問題です。後でもう一度お試しください。",
-        "preparing": "{{computer}}を準備中です。終わりしだい自動で切り替わります。"
+        "preparing": "{{computer}}を準備中です。終わりしだい自動で切り替わります。",
+        "stuck": "{{computer}}の{{program}}はまだ準備できておらず、自動では変わりません。今はAPIキーを使い、あとでこのプランをもう一度お試しください。",
+        "away": "{{computer}}は再起動にかかる時間より長く離れています。今はAPIキーを使い、あとでこのプランをもう一度お試しください。"
       }
     },
     "done": {
@@ -8592,6 +8623,14 @@
     "startsIn": "約{{n}}分後に開始",
     "startsAfter": "{{after}}が終わると開始",
     "left": "残り約{{n}}分",
+    "overdue": "いつもより長くかかっています",
+    "openTask": "タスクを開く",
+    "fill": {
+      "agent_other": "エージェントからの依頼{{count}}件",
+      "person_other": "人からの依頼{{count}}件",
+      "routine_other": "{{count}}件のルーティン",
+      "work_other": "長い作業{{count}}件"
+    },
     "who": "{{name}}",
     "away": "{{time}}離脱中",
     "purpose": {
@@ -8607,11 +8646,11 @@
       "yourDm": "あなたのDM",
       "dm": "{{name}}とのDM",
       "thread": "#{{name}}のスレッド",
+      "agents": "エージェント同士の会話",
       "private": "非公開の会話"
     },
     "live": {
       "nextEta": "コンピューター待ち。次の番です。約{{n}}分後",
-      "nextAfter": "コンピューター待ち。{{after}}が終わると次の番です",
       "next": "コンピューター待ち。次の番です",
       "waiting": "コンピューター待ち",
       "behind": "待ち行列の{{nth}}。{{names}}の後",
@@ -10539,6 +10578,7 @@
       "titleNoLetters": "タイトルには文字か数字が必要です。",
       "lockAdminsOnly": "ページをロックできるのは管理者だけです。"
     },
+    "replyGone": "返信先のメッセージはもうありません。",
     "media": {
       "off": "このワークスペースではGIFとステッカーがオフになっています。",
       "notFound": "そのGIFはもう利用できません。別のものを選んでください。",
@@ -11692,6 +11732,10 @@
     "keyValue": "APIキー",
     "keyInvalid": "APIキーを貼り付けてください（8文字以上）。",
     "keyRefused": "プロバイダーがこのキーを受け付けませんでした。",
+    "keyNoCredit": "{{provider}}によると、このキーにはクレジットがありません。そちらでクレジットを追加して、もう一度保存してください。何も保存されていません。",
+    "keyDenied": "{{provider}}はこのキーでの呼び出しを許可しませんでした。そちらで権限を確認して、もう一度保存してください。何も保存されていません。",
+    "keySaid": "{{provider}}の応答: {{said}}",
+    "keyInUse": "{{agents}}はまだこのキーで動いています。",
     "keyManagement": "これは管理用のキーです。通常のAPIキーを作成してください。",
     "autoModels": {
       "title": "「自動」で使うモデル",
@@ -11712,6 +11756,9 @@
     "remove": "削除",
     "removeTitle": "キー{{label}}を削除",
     "removeText": "キーは完全に削除されます。まだ使っているエージェントがあるとサーバーが拒否するため、先にそのエージェントのキーを変更してください。",
+    "removeUnused": "キーは完全に削除されます。このキーで動くエージェントはありません。",
+    "removeUsedOther_other": "{{agents}}はこのキーで動いています。削除すると別のキーに移るか、モデルに合うキーがなければAIを求めます。",
+    "removeUsedNone_other": "{{agents}}はこのキーで動いていて、ほかに何もありません。削除すると、別のAIを接続するまで応答しなくなります。",
     "noKeys": "まだキーがありません。",
     "platformAvailable": "このサーバーのClaudeキーも利用できます。",
     "usageTitle": "種類別のAPI支出",
@@ -12121,6 +12168,7 @@
       "waitingAgents": "{{name}}は一部を引き継ぎ、返事を待っています"
     },
     "consultPair": {
+      "took": "{{time}}かかりました",
       "asking": "質問中",
       "working": "作業中",
       "waitingApproval": "承認待ち",
@@ -12473,6 +12521,7 @@
       "usage_paused_budget": "{{agent}}がこの作業を一時停止しました · 月間予算 {{percent}}%",
       "work_auto_moved": "時間がかかりそうなので、バックグラウンドで続けます。ここに進捗を投稿します。次回は約{{minutes}}分後です。",
       "work_auto_movedOver": "時間がかかりそうなので、バックグラウンドで続けます。ここに進捗を投稿します。",
+      "moved_on": "続きは {{link}}",
       "work_end_done": "完了しました（{{minutes}}分）。",
       "work_end_failed": "このバックグラウンド作業は完了しませんでした（{{minutes}}分）。",
       "work_end_failedWhy": "このバックグラウンド作業は完了しませんでした（{{minutes}}分）: {{why}}。",
@@ -12750,6 +12799,10 @@
       "label": "スキルのスクリプトを実行",
       "description": "環境でスキルのスクリプトを実行します。"
     },
+    "vault_make_password": {
+      "label": "パスワードを作成",
+      "description": "自分のコンピューターで強力なパスワードを作り、見ることなくキーとしてVaultに保管します。"
+    },
     "computer_status": {
       "label": "コンピューターを確認",
       "description": "どのコンピューターか、応答しているかを伝えます。"
@@ -12805,6 +12858,10 @@
     "browser_type_secret": {
       "label": "パスワードを入力",
       "description": "渡されたパスワードを、中身を見ずにパスワードやコードの入力欄に入力します。"
+    },
+    "browser_make_password": {
+      "label": "パスワードを作成",
+      "description": "自分のコンピューターでサイト用の強力なパスワードを作り、見ることなくVaultに保管して入力します。"
     },
     "browser_wait": {
       "label": "ページを待つ",
@@ -13146,6 +13203,7 @@
         "browser_scroll": "ページをスクロールしました",
         "browser_upload": "ファイルをアップロードしました",
         "browser_type_secret": "パスワードを入力しました",
+        "browser_make_password": "パスワードを作成しました",
         "browser_wait": "ページを待ちました",
         "browser_screenshot": "スクリーンショットを撮りました",
         "browser_ask_person": "助けを求めました",
@@ -13653,6 +13711,15 @@
     "agentTasks": "{{name}}のタスク",
     "tasks_other": "{{count}}件のタスク",
     "free": "対応可能",
+    "hiddenTasks_other": "表示できないタスク{{count}}件",
+    "hiddenLine_other": "表示できない会話に、ほかに{{count}}件のタスクがあります。",
+    "helpers_other": "手伝い{{count}}件",
+    "delegated": {
+      "fromPerson": "{{name}}さんから始まりました",
+      "fromYou": "あなたから始まりました",
+      "fromRoutine": "ルーティン「{{name}}」から始まりました",
+      "stopNote": "止めると{{name}}に伝わり、自分からは依頼し直しません。"
+    },
     "columns": {
       "task": "タスク",
       "state": "状態",
@@ -13662,6 +13729,7 @@
     },
     "sections": {
       "asked": "人からの依頼",
+      "delegated": "エージェントの依頼",
       "background": "バックグラウンドのルーティン"
     },
     "state": {
@@ -13732,6 +13800,8 @@
       "openManager": "タスクマネージャーで開く"
     },
     "confirm": {
+      "chainTitle_other": "{{name}}と手伝い{{count}}件を止めますか？",
+      "chainBody": "終わった分は残り、全員に伝わります。",
       "title_other": "{{name}}の{{count}}件のタスクを停止しますか？",
       "body": "ここまでの作業は残ります。{{name}}には、あなたが停止したことが伝わります。",
       "short": "{{name}}には、あなたが停止したことが伝わります。",

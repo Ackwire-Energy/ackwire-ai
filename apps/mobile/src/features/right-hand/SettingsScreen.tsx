@@ -5,6 +5,7 @@ import {
   useAgentBrain,
   useApi,
   useModelLabel,
+  usePlatformKey,
   useRoles,
   useSetTeamWeekPrefs,
   useTeamWeekPrefs,
@@ -80,7 +81,10 @@ export function RightHandMine({ agent }: { agent: Agent }) {
   const kind = view && view.brain !== "model" ? view.brain : null;
   const signIn = view?.accounts.find((a) => a.id === view.account);
   const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0];
-  const fallback = view?.workspaceAi ? rightHandFallback(t, view.workspaceAi, meId ?? undefined, g, first) : "";
+  const platform = usePlatformKey(orgId).data === true;
+  const fallback = view?.workspaceAi
+    ? rightHandFallback(t, view.workspaceAi, meId ?? undefined, g, first, platform)
+    : "";
   const shared = signIn?.ownerId && signIn.ownerId !== meId ? first(signIn.ownerId) : undefined;
   const back = () =>
     void api.agents
@@ -238,6 +242,7 @@ function Form({ agent }: { agent: Agent }) {
   const modelLabel = useModelLabel();
   const dir = useDirectory();
   const planKind = agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null;
+  const key = useAgentBrain(orgId, agent.id, true, false, "workspace").data?.workspaceAi?.key;
   const roles = useRoles(orgId).data?.roles ?? [];
   const update = useUpdateAgent(orgId, agent.id);
   const [budget, setBudget] = useState(agent.monthlyBudgetUsd == null ? "" : String(agent.monthlyBudgetUsd));
@@ -289,6 +294,7 @@ function Form({ agent }: { agent: Agent }) {
             <GroupedRow
               icon="brain"
               label={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
+              {...(key ? { sub: key.label } : {})}
               chevron
               onPress={() => openAgentAi(agent.id)}
             />

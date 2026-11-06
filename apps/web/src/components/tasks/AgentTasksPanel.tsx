@@ -1,7 +1,9 @@
 import type { EndedTask, ManagedTask } from "@agenteschat/client";
 import { TASK_MANAGER_POLL_MS, useTaskSteps } from "@agenteschat/client";
 import {
+  agentCardLine,
   agentSummary,
+  helpersOf,
   linePlace,
   taskState,
   taskTitle,
@@ -63,6 +65,7 @@ export function AgentTasksPanel({
   channelId,
   tasks,
   ended,
+  hidden = 0,
   onClose,
 }: {
   agentId: string;
@@ -72,6 +75,8 @@ export function AgentTasksPanel({
   tasks: ManagedTask[];
   /** What ended today (the task manager's), for "Feitas hoje". */
   ended: EndedTask[];
+  /** Its tasks the viewer may not see: it isn't free. */
+  hidden?: number;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -137,7 +142,9 @@ export function AgentTasksPanel({
             ))}
           </dl>
           {tasks.length === 0 ? (
-            <p className="tm-panel__none">{t("taskManager.agentPanel.none", { name })}</p>
+            <p className="tm-panel__none">
+              {hidden > 0 ? agentCardLine(t, 0, hidden) : t("taskManager.agentPanel.none", { name })}
+            </p>
           ) : (
             <>
               <TaskWaitLines tasks={tasks} />
@@ -149,7 +156,7 @@ export function AgentTasksPanel({
                     here={task.channelId === channelId}
                     now={now}
                     stopping={stopping.has(task.runId)}
-                    onStop={() => stop([task.runId])}
+                    onStop={() => stop([task.runId], undefined, Boolean(task.helpers))}
                   />
                 ))}
               </ul>
@@ -162,10 +169,11 @@ export function AgentTasksPanel({
             <StopAllInline
               agentId={agentId}
               runIds={stoppable}
+              helpers={helpersOf(tasks.filter((task) => stoppable.includes(task.runId)))}
               onCancel={() => setConfirming(false)}
               onStop={(runIds, reason) => {
                 setConfirming(false);
-                stop(runIds, reason);
+                stop(runIds, reason, helpersOf(tasks) > 0);
               }}
             />
           ) : (

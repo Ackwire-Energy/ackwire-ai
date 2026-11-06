@@ -53,6 +53,7 @@ import {
   Chip,
   Icon,
   type IconName,
+  Locked,
   RadioCard,
   RadioGroup,
   Select,
@@ -317,10 +318,36 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
           </div>
         )}
       </div>
-      {investigated ? (
-        <>
-          {/* Start first, then Adjust: the plan's own card (below) and every request card lead with the main action. */}
-          <div className="mi-plan__foot mi-findings__foot">
+      <Locked when={control.isPending}>
+        {investigated ? (
+          <>
+            {/* Start first, then Adjust: the plan's own card (below) and every request card lead with the main action. */}
+            <div className="mi-plan__foot mi-findings__foot">
+              {m?.role === "owner" && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon="check"
+                  loading={control.isPending}
+                  disabled={waitPlan}
+                  onClick={start}
+                >
+                  {t("missions.findings.start")}
+                </Button>
+              )}
+              {adjust && (
+                <Button size="sm" icon="edit" onClick={adjust}>
+                  {t("missions.findings.adjust")}
+                </Button>
+              )}
+              {m && m.role !== "owner" && owner && (
+                <span className="mi-hint">{t("missions.plan.ownerStarts", { name: owner })}</span>
+              )}
+            </div>
+            <p className="mi-findings__note">{t("missions.findings.note")}</p>
+          </>
+        ) : (
+          <div className="mi-plan__foot">
             {m?.role === "owner" && (
               <Button
                 variant="primary"
@@ -330,49 +357,25 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
                 disabled={waitPlan}
                 onClick={start}
               >
-                {t("missions.findings.start")}
+                {t("missions.plan.start")}
               </Button>
             )}
-            {adjust && (
-              <Button size="sm" icon="edit" onClick={adjust}>
-                {t("missions.findings.adjust")}
+            {m?.canAct && actions?.replyToMission && (
+              <Button
+                size="sm"
+                icon="edit"
+                onClick={() => actions.replyToMission?.(meta.missionId, t("missions.plan.label"))}
+              >
+                {t("missions.plan.change")}
               </Button>
             )}
+            {m?.role === "owner" && waitPlan && <span className="mi-hint">{t("missions.plan.waitPlan")}</span>}
             {m && m.role !== "owner" && owner && (
               <span className="mi-hint">{t("missions.plan.ownerStarts", { name: owner })}</span>
             )}
           </div>
-          <p className="mi-findings__note">{t("missions.findings.note")}</p>
-        </>
-      ) : (
-        <div className="mi-plan__foot">
-          {m?.role === "owner" && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon="check"
-              loading={control.isPending}
-              disabled={waitPlan}
-              onClick={start}
-            >
-              {t("missions.plan.start")}
-            </Button>
-          )}
-          {m?.canAct && actions?.replyToMission && (
-            <Button
-              size="sm"
-              icon="edit"
-              onClick={() => actions.replyToMission?.(meta.missionId, t("missions.plan.label"))}
-            >
-              {t("missions.plan.change")}
-            </Button>
-          )}
-          {m?.role === "owner" && waitPlan && <span className="mi-hint">{t("missions.plan.waitPlan")}</span>}
-          {m && m.role !== "owner" && owner && (
-            <span className="mi-hint">{t("missions.plan.ownerStarts", { name: owner })}</span>
-          )}
-        </div>
-      )}
+        )}
+      </Locked>
       {stamp.node}
     </div>
   );
@@ -650,24 +653,26 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
       <div className="mi-q">
         <h3>{d.question}</h3>
       </div>
-      <RadioGroup className="mi-opts" value={pick ?? ""} onValueChange={(v) => setPick(v)} aria-label={d.question}>
-        {d.options.map((o, i) => (
-          <RadioCard
-            key={o}
-            value={o}
-            id={`decision-${d.id}-${i}`}
-            checked={pick === o}
-            disabled={!interactive}
-            title={o}
-            description={
-              opinionsFor(d, o).length > 0
-                ? t("missions.decision.prefers", { names: opinionsFor(d, o).map(name).join(", ") })
-                : undefined
-            }
-            aside={d.recommendation === o ? <Chip icon="bolt">{t("missions.decision.recommended")}</Chip> : undefined}
-          />
-        ))}
-      </RadioGroup>
+      <Locked when={choose.isPending || opine.isPending}>
+        <RadioGroup className="mi-opts" value={pick ?? ""} onValueChange={(v) => setPick(v)} aria-label={d.question}>
+          {d.options.map((o, i) => (
+            <RadioCard
+              key={o}
+              value={o}
+              id={`decision-${d.id}-${i}`}
+              checked={pick === o}
+              disabled={!interactive}
+              title={o}
+              description={
+                opinionsFor(d, o).length > 0
+                  ? t("missions.decision.prefers", { names: opinionsFor(d, o).map(name).join(", ") })
+                  : undefined
+              }
+              aside={d.recommendation === o ? <Chip icon="bolt">{t("missions.decision.recommended")}</Chip> : undefined}
+            />
+          ))}
+        </RadioGroup>
+      </Locked>
       {(d.why || d.impact) && (
         <div className="mi-why">
           {d.why && (
@@ -688,16 +693,25 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
         </div>
       )}
       <div className="mi-foot">
-        {canDecide && (
-          <Button variant="primary" size="sm" icon="check" disabled={!pick} loading={choose.isPending} onClick={submit}>
-            {pick ? t("missions.decision.decide", { option: pick }) : t("missions.decision.pick")}
-          </Button>
-        )}
-        {canOpine && (
-          <Button size="sm" icon="message" disabled={!pick} loading={opine.isPending} onClick={submit}>
-            {pick ? t("missions.decision.opine", { option: pick }) : t("missions.decision.pick")}
-          </Button>
-        )}
+        <Locked when={choose.isPending || opine.isPending}>
+          {canDecide && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon="check"
+              disabled={!pick}
+              loading={choose.isPending}
+              onClick={submit}
+            >
+              {pick ? t("missions.decision.decide", { option: pick }) : t("missions.decision.pick")}
+            </Button>
+          )}
+          {canOpine && (
+            <Button size="sm" icon="message" disabled={!pick} loading={opine.isPending} onClick={submit}>
+              {pick ? t("missions.decision.opine", { option: pick }) : t("missions.decision.pick")}
+            </Button>
+          )}
+        </Locked>
         {!interactive && <span className="mi-hint">{t("missions.decision.readOnly")}</span>}
         {mine && canOpine && (
           <span className="mi-hint">{t("missions.decision.yourOpinion", { option: mine.option })}</span>
@@ -804,58 +818,60 @@ export function MissionReviewCard({ message }: { message: Message }) {
           </a>
         </div>
       )}
-      {asking && (
-        <div className="mi-note">
-          <Textarea
-            value={note}
-            rows={3}
-            autoFocus
-            aria-label={t("missions.review.noteLabel")}
-            placeholder={t("missions.review.notePlaceholder")}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-      )}
-      {m.canAct ? (
-        <div className="mi-foot">
-          {asking ? (
-            <>
-              <Button
-                variant="primary"
-                size="sm"
-                icon="send"
-                disabled={!note.trim()}
-                loading={review.isPending}
-                onClick={() => send("changes")}
-              >
-                {t("missions.review.sendChanges")}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
-                {t("common.cancel")}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="primary"
-                size="sm"
-                icon="check"
-                loading={review.isPending}
-                onClick={() => send("approve")}
-              >
-                {t("missions.review.approve")}
-              </Button>
-              <Button size="sm" icon="edit" onClick={() => setAsking(true)}>
-                {t("missions.review.askChanges")}
-              </Button>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="mi-foot">
-          <span className="mi-hint">{t("missions.review.readOnly")}</span>
-        </div>
-      )}
+      <Locked when={review.isPending}>
+        {asking && (
+          <div className="mi-note">
+            <Textarea
+              value={note}
+              rows={3}
+              autoFocus
+              aria-label={t("missions.review.noteLabel")}
+              placeholder={t("missions.review.notePlaceholder")}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        )}
+        {m.canAct ? (
+          <div className="mi-foot">
+            {asking ? (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon="send"
+                  disabled={!note.trim()}
+                  loading={review.isPending}
+                  onClick={() => send("changes")}
+                >
+                  {t("missions.review.sendChanges")}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
+                  {t("common.cancel")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon="check"
+                  loading={review.isPending}
+                  onClick={() => send("approve")}
+                >
+                  {t("missions.review.approve")}
+                </Button>
+                <Button size="sm" icon="edit" onClick={() => setAsking(true)}>
+                  {t("missions.review.askChanges")}
+                </Button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="mi-foot">
+            <span className="mi-hint">{t("missions.review.readOnly")}</span>
+          </div>
+        )}
+      </Locked>
       {stamp.node}
     </div>
   );
@@ -1012,56 +1028,58 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
           </ul>
         </section>
       )}
-      {asking && (
-        <div className="mi-note">
-          <Textarea
-            value={note}
-            rows={3}
-            autoFocus
-            aria-label={t("missions.delivery.noteLabel")}
-            placeholder={t("missions.delivery.notePlaceholder")}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-      )}
-      {decide ? (
-        <div className="mi-foot">
-          {asking ? (
-            <>
-              <Button
-                variant="primary"
-                size="sm"
-                icon="send"
-                disabled={!note.trim()}
-                loading={changes.isPending}
-                onClick={ask}
-              >
-                {t("missions.delivery.sendChanges")}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
-                {t("common.cancel")}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="primary" size="sm" icon="check" loading={accept.isPending} onClick={finish}>
-                {t("missions.delivery.accept")}
-              </Button>
-              <Button size="sm" icon="edit" disabled={accept.isPending} onClick={() => setAsking(true)}>
-                {t("missions.delivery.askChanges")}
-              </Button>
-              <span className="mi-delivery__wiki">
-                <Switch id={`dl-wiki-${d.id}`} checked={wiki} onCheckedChange={setWiki} />
-                <label htmlFor={`dl-wiki-${d.id}`}>{t("missions.delivery.saveToWiki")}</label>
-              </span>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="mi-foot">
-          <span className="mi-hint">{t("missions.delivery.readOnly")}</span>
-        </div>
-      )}
+      <Locked when={changes.isPending || accept.isPending}>
+        {asking && (
+          <div className="mi-note">
+            <Textarea
+              value={note}
+              rows={3}
+              autoFocus
+              aria-label={t("missions.delivery.noteLabel")}
+              placeholder={t("missions.delivery.notePlaceholder")}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        )}
+        {decide ? (
+          <div className="mi-foot">
+            {asking ? (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon="send"
+                  disabled={!note.trim()}
+                  loading={changes.isPending}
+                  onClick={ask}
+                >
+                  {t("missions.delivery.sendChanges")}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
+                  {t("common.cancel")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="primary" size="sm" icon="check" loading={accept.isPending} onClick={finish}>
+                  {t("missions.delivery.accept")}
+                </Button>
+                <Button size="sm" icon="edit" onClick={() => setAsking(true)}>
+                  {t("missions.delivery.askChanges")}
+                </Button>
+                <span className="mi-delivery__wiki">
+                  <Switch id={`dl-wiki-${d.id}`} checked={wiki} onCheckedChange={setWiki} />
+                  <label htmlFor={`dl-wiki-${d.id}`}>{t("missions.delivery.saveToWiki")}</label>
+                </span>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="mi-foot">
+            <span className="mi-hint">{t("missions.delivery.readOnly")}</span>
+          </div>
+        )}
+      </Locked>
       {stamp.node}
     </section>
   );
@@ -1241,14 +1259,14 @@ export function MissionSuggestionBar({ message, suggestion }: { message: Message
         {t("missions.suggestion.pending")}
       </Chip>
       {m?.canAct ? (
-        <>
+        <Locked when={act.isPending}>
           <Button size="sm" icon="check" loading={act.isPending} onClick={() => answer("accept")}>
             {t("missions.suggestion.accept")}
           </Button>
           <Button size="sm" variant="ghost" icon="close" onClick={() => answer("decline")}>
             {t("missions.suggestion.decline")}
           </Button>
-        </>
+        </Locked>
       ) : (
         <span>{t("missions.suggestion.waits")}</span>
       )}

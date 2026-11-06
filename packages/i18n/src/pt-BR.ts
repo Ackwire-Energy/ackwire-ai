@@ -1694,6 +1694,11 @@ export const ptBR = {
     linkCopied: "Link copiado.",
     reply: "Responder",
     quoteOf: "Resposta a {{name}}: {{excerpt}}. Ver a mensagem",
+    quoteGone: "Mensagem original apagada",
+    jumpTooFar: "Essa mensagem está longe demais para abrir daqui.",
+    quoteNoWords: "Mensagem sem texto",
+    replyingTo: "Respondendo a {{name}}",
+    cancelReply: "Cancelar resposta",
     emoji: "Emoji",
     uploading: "enviando…",
     uploadFailed: "não foi enviado",
@@ -1931,6 +1936,12 @@ export const ptBR = {
       configure: "Configurar",
       nameStory: "O nome vem de lodestar, a estrela que guia os navegantes.",
     },
+    saved: {
+      workspace: "O {{name}} agora pensa com {{label}} para todo mundo sem plano próprio.",
+      workspace_female: "A {{name}} agora pensa com {{label}} para todo mundo sem plano próprio.",
+      mine: "Sua conversa com o {{name}} agora pensa com {{label}}, e só a sua.",
+      mine_female: "Sua conversa com a {{name}} agora pensa com {{label}}, e só a sua.",
+    },
     settings: {
       name: "Nome e visual",
       nameHelp: "Na barra lateral ele aparece sempre como “{{label}}”.",
@@ -1958,6 +1969,8 @@ export const ptBR = {
       connectMine: "Conectar meu plano",
       useWorkspace: "Usar a do workspace",
       fallbackKey: "Sem plano seu, ela usa a chave de API do workspace.",
+      fallbackKeyOf: "Sem plano seu, ela usa a chave do workspace: {{label}}.",
+      fallbackNoKey: "O workspace ainda não tem chave de API, então sem plano seu ninguém te responde aqui.",
       fallbackPlan: "Sem plano seu, ela usa o plano de {{owner}}, que atende todo mundo.",
       fallbackYours: "Sem outro plano, ela usa o do workspace, que é seu.",
       fallbackNone: "Sem plano seu, o {{name}} não te responde: o plano do workspace só atende {{owner}}.",
@@ -2258,7 +2271,10 @@ export const ptBR = {
       titleFor: "Já conectadas, para o {{name}}",
       titleFor_female: "Já conectadas, para a {{name}}",
       other: "Ou conecte outra",
+      manageKeys: "Gerenciar ou apagar chaves",
     },
+    billing: "Um plano entra no computador do workspace, e o computador vem com um plano ativo do agentes.chat.",
+    billingWeb: "Escolha um na web, em agentes.chat.",
     orPayGo: "Ou pague pelo uso",
     plan: {
       claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Ultra, Team ou Enterprise" },
@@ -2285,6 +2301,8 @@ export const ptBR = {
       paste: "Cole aqui",
       forAll: "Todo agente sem plano pensa com ela.",
       saved: "Salva. Todo agente sem plano pensa com ela.",
+      savedUnchecked:
+        "Salva, mas {{provider}} não respondeu e a chave não pôde ser testada. Se ela falhar, a conversa diz o motivo.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
       billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
       privacy:
@@ -3005,11 +3023,16 @@ export const ptBR = {
   secret: {
     group: "Pedido de segredo de {{agent}}",
     chip: "Esperando",
-    targetEnv: "Vai como a variável {{name}} no computador de {{agent}}.",
+    targetEnv: "Vai para o computador de {{agent}}, para os comandos.",
     targetFile: "Vai para o arquivo {{path}} no computador de {{agent}}.",
     targetSite: "Só o navegador de {{agent}} digita, em {{host}}. Fica fora dos comandos de {{agent}}.",
     replaces: "Substitui a chave com esse nome que {{agent}} já tem.",
-    label: "Valor de {{name}}",
+    labelPassword: "Senha de {{host}}",
+    labelCode: "Código de {{host}}",
+    labelKey: "Chave para o computador de {{agent}}",
+    labelFile: "O arquivo {{path}}",
+    placeholder: "Digite aqui",
+    account: "Conta: {{username}}.",
     private: "Vai cifrado direto para o computador. Não fica no chat nem com o agente.",
     send: "Enviar",
     decline: "Recusar",
@@ -3017,8 +3040,19 @@ export const ptBR = {
     waitingFor: "Só {{person}} pode responder.",
     outcomeBy: "Entregue por {{person}}",
     outcomeByYou: "Entregue por você",
-    outcomeWithdrawn: "Não precisa mais",
-    alreadyAnswered: "Esse pedido já foi respondido ou expirou.",
+    outcomeWithdrawn: "{{agent}} não precisa mais disso.",
+    endedDeclined: "Recusado. {{agent}} segue sem isso.",
+    endedExpired: "Ninguém respondeu a tempo. {{agent}} segue sem isso e pode pedir de novo.",
+    endedRunStopped: "A tarefa de {{agent}} parou antes da resposta. Peça de novo a {{agent}} se ainda precisar.",
+    endedSuperseded: "{{agent}} pediu de novo, num pedido mais novo.",
+    endedComputer:
+      "Isto não chega mais em {{agent}}: o computador que pediu mudou. Peça a {{agent}} para pedir de novo.",
+    endedPersonLeft: "{{person}} saiu do workspace antes de responder.",
+    endedClosed: "Este pedido fechou antes da resposta. Peça de novo a {{agent}} se ainda precisar.",
+    seeNewer: "Ver o pedido novo",
+    computerAway:
+      "O computador de {{agent}} não está respondendo agora. O pedido continua aberto até {{time}}. Tente de novo em instantes.",
+    computerPaused: "O dono pausou o computador de {{agent}}. O pedido continua aberto até {{time}}.",
     failed: "Não deu para entregar. O computador do agente está ligado?",
     empty: "Digite o valor.",
     tooLarge: "Grande demais (máximo de 16 KB).",
@@ -5688,7 +5722,7 @@ export const ptBR = {
     vault_write: {
       label: "Editar contatos do Cofre",
       description:
-        "Salvar e atualizar contatos no Cofre, mudar o usuário de um login salvo ou uma descrição, e apagar o que ele salvou.",
+        "Salvar e atualizar contatos no Cofre, mudar o usuário de um login salvo ou uma descrição, criar senhas para contas que ele abre, e apagar o que ele salvou.",
     },
     github_git_read: {
       label: "Clonar repositórios (git)",
@@ -7928,6 +7962,9 @@ export const ptBR = {
         toolOff:
           "O {{program}} ainda não está liberado no {{computer}}. Isso é do nosso lado: tente de novo mais tarde.",
         preparing: "O {{computer}} está ficando pronto. Isto muda sozinho quando terminar.",
+        stuck:
+          "O {{program}} ainda não está pronto no {{computer}}, e isto não vai mudar sozinho. Use uma chave de API por enquanto e tente este plano de novo mais tarde.",
+        away: "O {{computer}} está fora há mais tempo do que um reinício leva. Use uma chave de API por enquanto e tente este plano de novo mais tarde.",
       },
     },
     done: {
@@ -8967,6 +9004,21 @@ export const ptBR = {
     startsIn: "começa em ~{{n}} min",
     startsAfter: "começa quando {{after}} terminar",
     left: "faltam ~{{n}} min",
+    /** A turn past its typical length: no estimate is honest. */
+    overdue: "passou do normal",
+    /** A row of the line, for who sees that work. */
+    openTask: "Abrir tarefa",
+    /** What fills the computer now, joined into one line. */
+    fill: {
+      agent_one: "{{count}} pedida por agente",
+      agent_other: "{{count}} pedidas por agentes",
+      person_one: "{{count}} para uma pessoa",
+      person_other: "{{count}} para pessoas",
+      routine_one: "{{count}} rotina",
+      routine_other: "{{count}} rotinas",
+      work_one: "{{count}} trabalho longo",
+      work_other: "{{count}} trabalhos longos",
+    },
     who: "o {{name}}",
     who_female: "a {{name}}",
     away: "Fora há {{time}}",
@@ -8983,13 +9035,12 @@ export const ptBR = {
       yourDm: "sua DM",
       dm: "DM com {{name}}",
       thread: "uma thread em #{{name}}",
+      agents: "uma conversa entre agentes",
       private: "uma conversa privada",
     },
     live: {
       nextEta: "Aguardando o computador. É o próximo, em cerca de {{n}} min",
       nextEta_female: "Aguardando o computador. É a próxima, em cerca de {{n}} min",
-      nextAfter: "Aguardando o computador. É o próximo quando {{after}} terminar",
-      nextAfter_female: "Aguardando o computador. É a próxima quando {{after}} terminar",
       next: "Aguardando o computador. É o próximo",
       next_female: "Aguardando o computador. É a próxima",
       waiting: "Aguardando o computador",
@@ -10698,6 +10749,7 @@ export const ptBR = {
       titleNoLetters: "O título precisa de letras ou números.",
       lockAdminsOnly: "Só admins trancam páginas.",
     },
+    replyGone: "A mensagem que você estava respondendo não está mais aqui.",
     /** GIFs and stickers (ADR 0091). */
     media: {
       off: "GIFs e figurinhas estão desligados neste workspace.",
@@ -11897,6 +11949,12 @@ export const ptBR = {
     keyValue: "Chave da API",
     keyInvalid: "Cole a chave da API (pelo menos 8 caracteres).",
     keyRefused: "O provedor não aceitou esta chave.",
+    keyNoCredit:
+      "{{provider}} diz que esta chave está sem crédito. Coloque crédito lá e salve de novo. Nada foi salvo.",
+    keyDenied:
+      "{{provider}} não deixou esta chave fazer uma chamada. Veja as permissões dela lá e salve de novo. Nada foi salvo.",
+    keySaid: "{{provider}} disse: {{said}}",
+    keyInUse: "{{agents}} ainda pensam com esta chave.",
     keyManagement: "Esta é uma chave de gerenciamento. Crie uma chave de API comum.",
     autoModels: {
       title: "Modelos do Automático",
@@ -11918,6 +11976,15 @@ export const ptBR = {
     removeTitle: "Apagar a chave {{label}}",
     removeText:
       "A chave some de vez. Se algum agente ainda usa esta chave, o servidor recusa: troque a chave desses agentes antes.",
+    removeUnused: "A chave some de vez. Nenhum agente pensa com ela.",
+    removeUsedOther_one:
+      "{{agents}} pensa com esta chave. Sem ela, passa para outra chave, ou pede uma IA se nenhuma servir para o modelo.",
+    removeUsedOther_other:
+      "{{agents}} pensam com esta chave. Sem ela, passam para outra chave, ou pedem uma IA se nenhuma servir para o modelo.",
+    removeUsedNone_one:
+      "{{agents}} pensa com esta chave e não tem outra. Sem ela, para de responder até você conectar outra IA.",
+    removeUsedNone_other:
+      "{{agents}} pensam com esta chave e não têm outra. Sem ela, param de responder até você conectar outra IA.",
     noKeys: "Nenhuma chave ainda.",
     platformAvailable: "A chave do Claude deste servidor também está disponível.",
     usageTitle: "Gastos da API por tipo",
@@ -12318,6 +12385,8 @@ export const ptBR = {
      * names while a question is out or once it went unanswered, lowercase, then the time.
      */
     consultPair: {
+      /** The row of a closed ask: from the ask to what came back, waits included. */
+      took: "levou {{time}}",
       asking: "perguntando",
       /** Work handed off (`tell_agent`), still on it. */
       working: "trabalhando",
@@ -12711,6 +12780,7 @@ export const ptBR = {
         "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui. O próximo update deve sair em ~{{minutes}} min.",
       /** O mesmo depois que o trabalho acabou: a linha embaixo diz como terminou, então não sobra promessa (ADR 0121). */
       work_auto_movedOver: "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui.",
+      moved_on: "Continua em {{link}}",
       work_end_done: "Concluído ({{minutes}} min).",
       work_end_failed: "Esse trabalho em segundo plano não terminou ({{minutes}} min).",
       work_end_failedWhy: "Esse trabalho em segundo plano não terminou ({{minutes}} min): {{why}}.",
@@ -13004,6 +13074,10 @@ export const ptBR = {
       label: "Rodar script de skill",
       description: "Roda um script de uma skill no ambiente.",
     },
+    vault_make_password: {
+      label: "Criar uma senha",
+      description: "Cria uma senha forte no computador dele e guarda no Cofre como chave, sem ver o valor.",
+    },
     computer_status: {
       label: "Ver o computador",
       description: "Diz qual é o computador e se ele está respondendo.",
@@ -13059,6 +13133,10 @@ export const ptBR = {
     browser_type_secret: {
       label: "Digitar uma senha",
       description: "Digita uma senha que você deu num campo de senha ou código, sem ver o valor.",
+    },
+    browser_make_password: {
+      label: "Criar uma senha",
+      description: "Cria uma senha forte para um site no computador dele, guarda no Cofre e digita, sem ver o valor.",
     },
     browser_wait: {
       label: "Esperar a página",
@@ -13453,6 +13531,7 @@ export const ptBR = {
         browser_scroll: "Rolou a página",
         browser_upload: "Enviou um arquivo",
         browser_type_secret: "Digitou uma senha",
+        browser_make_password: "Criou uma senha",
         browser_wait: "Esperou a página",
         browser_screenshot: "Tirou um print",
         browser_ask_person: "Pediu ajuda",
@@ -14103,8 +14182,28 @@ export const ptBR = {
     tasks_one: "{{count}} tarefa",
     tasks_other: "{{count}} tarefas",
     free: "Livre",
+    /** An agent's card: its tasks the viewer may not see, counted. */
+    hiddenTasks_one: "{{count}} tarefa que você não vê",
+    hiddenTasks_other: "{{count}} tarefas que você não vê",
+    /** Under the title: what the viewer may not see, counted. */
+    hiddenLine_one: "Mais {{count}} tarefa em conversas que você não vê.",
+    hiddenLine_other: "Mais {{count}} tarefas em conversas que você não vê.",
+    /** A task that asked other agents, on its row. */
+    helpers_one: "{{count}} ajudante",
+    helpers_other: "{{count}} ajudantes",
+    /** Work one agent asked of another: what started the chain. */
+    delegated: {
+      fromPerson: "começou com {{name}}",
+      fromYou: "começou com você",
+      fromRoutine: "começou na rotina {{name}}",
+      stopNote: "Se parar, {{name}} fica sabendo que você parou e não pede de novo por conta própria.",
+    },
     columns: { task: "Tarefa", state: "Estado", using: "Usando agora", time: "Tempo", computer: "Onde roda" },
-    sections: { asked: "Pedidas por pessoas", background: "Rotinas em segundo plano" },
+    sections: {
+      asked: "Pedidas por pessoas",
+      delegated: "Pedidas por agentes",
+      background: "Rotinas em segundo plano",
+    },
     state: {
       working: "Trabalhando",
       ok: "Espera seu ok",
@@ -14175,6 +14274,10 @@ export const ptBR = {
       openManager: "Abrir no gerenciador",
     },
     confirm: {
+      /** One task and the agents it asked, stopped together. */
+      chainTitle_one: "Parar {{name}} e {{count}} ajudante?",
+      chainTitle_other: "Parar {{name}} e {{count}} ajudantes?",
+      chainBody: "O que já foi feito fica guardado, e todos ficam sabendo.",
       title_one: "Parar a tarefa de {{name}}?",
       title_other: "Parar as {{count}} tarefas de {{name}}?",
       body: "O que já foi feito fica guardado, e {{name}} fica sabendo que você parou.",

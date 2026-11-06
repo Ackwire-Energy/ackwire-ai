@@ -687,6 +687,7 @@ export function DesktopView({
           onNote={setBackNote}
           noteFirst={handoffWantsWords(handoff)}
           pending={actions.done.isPending}
+          locked={actions.failed.isPending}
           onBack={finish}
           other={
             asked && (

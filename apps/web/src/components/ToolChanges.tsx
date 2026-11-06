@@ -2,7 +2,7 @@ import type { ToolChange } from "@agenteschat/client";
 import { useAcceptConnectionToolChanges, useAcceptToolChange, useToolChanges } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { type ToolChangeDiff, toolChangeDiff, toolChangeSummary } from "@agenteschat/client/lib/tool-changes";
-import { Button, Diff, diffLines } from "@agenteschat/ui";
+import { Button, Diff, diffLines, Locked } from "@agenteschat/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
@@ -84,11 +84,13 @@ function ConnectionChanges({
           </Button>
         )}
       </div>
-      <ul className="tool-changes__tools">
-        {shown.map((c) => (
-          <ToolRow key={c.toolName} orgId={orgId} change={c} />
-        ))}
-      </ul>
+      <Locked when={acceptAll.isPending}>
+        <ul className="tool-changes__tools">
+          {shown.map((c) => (
+            <ToolRow key={c.toolName} orgId={orgId} change={c} />
+          ))}
+        </ul>
+      </Locked>
       {tools.length > FIRST_TOOLS && !all && (
         <Button size="sm" variant="ghost" className="tool-changes__more" onClick={() => setAll(true)}>
           {t("connectors.toolChanges.showAll", { total: tools.length })}

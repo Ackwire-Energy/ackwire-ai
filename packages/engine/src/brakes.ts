@@ -450,7 +450,8 @@ export const LOOP_WINDOW_MS = 24 * 3600_000;
 export const LOOP_MAX = 3;
 /**
  * A deferred wake looks again this often for an hour (`LATER_LOOKS`), then every `LATER_SLOW_LOOK_MS`; after a day
- * (`LATER_MAX_LOOKS`) it starts anyway. Work held only for room is never dropped, nor told apart as noise.
+ * (`LATER_MAX_LOOKS`) it starts anyway. Work held only for room is never dropped, nor told apart as noise; a note
+ * another agent waits on ends sooner, with why (`CONSULTATION_HUNG_MS`).
  */
 export const LATER_LOOK_MS = 2 * 60_000;
 export const LATER_LOOKS = 30;

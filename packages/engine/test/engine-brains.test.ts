@@ -1108,6 +1108,39 @@ test("Fast: the turn of a conversation asks for it; refused, the reply says it c
   expect((await timeline(f)).at(-1)?.meta.speedFallback).toBeUndefined();
 });
 
+test("a turn says a person waits on it only in the line's first rank: not for a routine, background work or an agent", async () => {
+  f = await setup();
+  await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Feito." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const turnFor = async (change?: (trigger: string, run: string) => Promise<unknown>) => {
+    const fx = f as Fixture;
+    const posted = await post(fx, "@dev oi");
+    const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, posted.id));
+    await change?.(posted.id, (run as { id: string }).id);
+    await drainOutbox(fx.db, handlers);
+    return seen.at(-1)?.personWaiting;
+  };
+  const setRun = (values: { background?: boolean; hop?: number }) => (_: string, run: string) =>
+    (f as Fixture).db.update(schema.agentRuns).set(values).where(eq(schema.agentRuns.id, run));
+
+  expect(await turnFor()).toBe(true);
+  expect(
+    await turnFor((trigger) =>
+      (f as Fixture).db
+        .update(schema.messages)
+        .set({ meta: { routine: { id: "11111111-1111-4111-8111-111111111111", name: "Resumo" } } })
+        .where(eq(schema.messages.id, trigger)),
+    ),
+  ).toBeUndefined();
+  expect(await turnFor(setRun({ background: true }))).toBeUndefined();
+  expect(await turnFor(setRun({ hop: 2 }))).toBeUndefined();
+});
+
 test("Fast stays out of every run nobody waits for", async () => {
   f = await setup({});
   await computerAgent(f, { brain: "codex", brainModel: "gpt-6.1-sol", brainSpeed: "fast" });
@@ -2594,6 +2627,57 @@ test("a computer brain that fails after a bridged pause: the run keeps waiting w
   expect(gh.executed).toEqual([{ tool: "github_merge_pr", input: { repo: "acme/app", pr: 42 } }]);
 });
 
+test("a short line before a bridged approval never shows live: the card says it, nothing is posted", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (_n, turn) {
+    yield { type: "text_delta", text: "Vou pedir a aprovação." };
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    await executeToolForRun(f.jobDeps, id, {
+      id: "call-1",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    });
+    yield { type: "done", text: "Vou pedir a aprovação." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const events = f.listen(f.general.id);
+  await post(f, "@dev faz o merge do PR 42");
+  await drainOutbox(f.db, handlers);
+
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_approval");
+  expect(events.some((e) => e.type === "agent.delta")).toBe(false);
+  expect((await timeline(f)).some((m) => m.body.includes("Vou pedir"))).toBe(false);
+});
+
+test("stopped between calls: the stopped reply keeps the stretch it was on, never the working text before a call", async () => {
+  f = await setup();
+  await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (_n, turn) {
+    yield { type: "text_delta", text: "I need the inbox id first." };
+    yield { type: "tool_call", id: "c1", name: "Bash", input: {}, executed: { content: "ok" } };
+    yield { type: "text_delta", text: "Resumo das lojas:" };
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, turn.runId);
+    yield { type: "error", code: "executor_crashed", message: "stopped" };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev resume as lojas");
+  await drainOutbox(f.db, handlers);
+
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("canceled");
+  expect((await timeline(f)).at(-1)?.body).toBe("Resumo das lojas:\n\n_Stopped by ana._");
+});
+
 test("two gated bridged calls in one turn both wait; a gated call for a run that isn't running posts nothing", async () => {
   const gh = fakeGithub();
   f = await setup({ toolSources: [gh.source] });
@@ -3335,14 +3419,94 @@ test("only the head of the computer's line asks it: an agent's run waits behind 
   expect(next).toHaveLength(1);
 });
 
+test("the right hand never waits behind the line: its turn goes to the computer past a person's run in it", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f, { builtin: "right_hand" });
+  // It thinks on the computer of the plan it was given.
+  const [plan] = await f.db
+    .insert(schema.machineAccounts)
+    .values({
+      id: Bun.randomUUIDv7(),
+      orgId: f.org.id,
+      machineId,
+      kind: "claude_code",
+      label: "plan",
+      status: "active",
+      createdBy: f.owner.id,
+      shared: true,
+    })
+    .returning();
+  await f.db.update(schema.agents).set({ brainAccountId: plan?.id }).where(eq(schema.agents.id, f.agent.id));
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Pronto." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { protocol: MACHINE_PROTOCOL_VERSION }) },
+  });
+  const other = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Rio", handle: "rio", role: "Dev", instructions: "You build.", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  const ahead = await personAhead(f, machineId, other.id);
+  await post(f, "@dev o que está rodando?");
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(1);
+  const own = (await f.db.select().from(schema.agentRuns)).find((r) => r.id !== ahead.id);
+  expect(own?.status).toBe("done");
+  expect(own?.transcript).not.toHaveProperty("waitingForBrain");
+});
+
+test("the right hand refused for room goes first in the line, past the people already in it", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f, { builtin: "right_hand" });
+  const [plan] = await f.db
+    .insert(schema.machineAccounts)
+    .values({
+      id: Bun.randomUUIDv7(),
+      orgId: f.org.id,
+      machineId,
+      kind: "claude_code",
+      label: "plan",
+      status: "active",
+      createdBy: f.owner.id,
+      shared: true,
+    })
+    .returning();
+  await f.db.update(schema.agents).set({ brainAccountId: plan?.id }).where(eq(schema.agents.id, f.agent.id));
+  const { brain } = scriptedComputerBrain(() => [
+    { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { protocol: MACHINE_PROTOCOL_VERSION }) },
+  });
+  const other = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Rio", handle: "rio", role: "Dev", instructions: "You build.", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  const ahead = await personAhead(f, machineId, other.id);
+  await post(f, "@dev o que está rodando?");
+  await drainOutbox(f.db, handlers);
+  const own = (await f.db.select().from(schema.agentRuns)).find((r) => r.id !== ahead.id);
+  expect(own?.transcript).toMatchObject({ waitingForBrain: { code: "busy" } });
+  expect((await roomHead(f.db, machineId))?.id).toBe(own?.id);
+});
+
 /** A person's run already waiting for room on this computer, ahead of anything that comes now. */
-async function personAhead(fx: Fixture, machineId: string) {
+async function personAhead(fx: Fixture, machineId: string, agentId = fx.agent.id) {
   const id = Bun.randomUUIDv7();
   const [run] = await fx.db
     .insert(schema.agentRuns)
     .values({
       orgId: fx.org.id,
-      agentId: fx.agent.id,
+      agentId,
       channelId: fx.general.id,
       threadRootId: id,
       triggerMessageId: id,

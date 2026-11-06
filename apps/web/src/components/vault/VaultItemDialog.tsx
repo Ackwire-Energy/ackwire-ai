@@ -23,6 +23,7 @@ import {
   Icon,
   type IconName,
   Input,
+  Locked,
   Segmented,
   SettingNote,
   Textarea,
@@ -550,79 +551,85 @@ function ItemDialog({
       }
     >
       <div className="issue-layout">
-        <div className="issue-layout__main vlt-details__main">
-          {external && editable && <SettingNote icon="plug">{t("vault.item.editIn", { source })}</SettingNote>}
-          {item.missing && <SettingNote icon="alert">{t("vault.item.missingText", { source })}</SettingNote>}
-          {unreadable && <SettingNote icon="alert">{t("vault.item.unreadable")}</SettingNote>}
-          {fieldsPending ? (
-            usesFailed ? (
-              <p className="vlt-uses__none">{t("common.loadFailed")}</p>
+        <Locked when={actions.updating}>
+          <div className="issue-layout__main vlt-details__main">
+            {external && editable && <SettingNote icon="plug">{t("vault.item.editIn", { source })}</SettingNote>}
+            {item.missing && <SettingNote icon="alert">{t("vault.item.missingText", { source })}</SettingNote>}
+            {unreadable && <SettingNote icon="alert">{t("vault.item.unreadable")}</SettingNote>}
+            {fieldsPending ? (
+              usesFailed ? (
+                <p className="vlt-uses__none">{t("common.loadFailed")}</p>
+              ) : (
+                <LoadingList count={3} />
+              )
             ) : (
-              <LoadingList count={3} />
-            )
-          ) : (
-            <ItemFields
-              kind={item.kind}
-              draft={draft}
-              onDraft={(p) => setDraft((d) => ({ ...d, ...p }))}
-              readOnly={!editable}
-              locked={external}
-              errors={errors}
-              secret={
-                item.kind === "contact" ? null : (
-                  <SecretValue
-                    item={item}
-                    canChange={editable && !external}
-                    value={secret}
-                    onValue={setSecret}
-                    error={errors.secret}
-                  />
-                )
-              }
-            />
-          )}
-        </div>
-        {/* The fields on the left; who has access and its recent uses beside them (ADR 0144 §7). */}
-        <aside className="issue-aside vlt-aside">
-          <DetailsSection title={t("vault.access.title")}>
-            <ScopeLine scope={item.scope} />
-            <AccessBlock
-              scope={item.scope}
-              access={item.access}
-              editable={editable && !item.accessFromConnection}
-              saving={actions.updating}
-              onChange={setAccess}
-            >
-              {external && editable && (
-                <div className="vlt-access__follow">
-                  <span className="small muted">
-                    {item.accessFromConnection
-                      ? t("vault.access.follows", { source })
-                      : t("vault.access.own", { source })}
-                  </span>
-                  <Button size="sm" disabled={actions.updating} onClick={() => void follow(!item.accessFromConnection)}>
-                    {item.accessFromConnection ? t("vault.access.changeHere") : t("vault.access.useConnection")}
-                  </Button>
-                </div>
-              )}
-            </AccessBlock>
-          </DetailsSection>
-          <DetailsSection title={t("vault.use.title")} count={uses?.length || undefined}>
-            {usesLoading && !uses ? (
-              <LoadingList count={2} />
-            ) : usesFailed && !uses ? (
-              <p className="vlt-uses__none">{t("common.loadFailed")}</p>
-            ) : uses && uses.length > 0 ? (
-              <ul className="vlt-uses">
-                {uses.map((u) => (
-                  <UseRow key={u.id} use={u} />
-                ))}
-              </ul>
-            ) : (
-              <p className="vlt-uses__none">{t("vault.use.none")}</p>
+              <ItemFields
+                kind={item.kind}
+                draft={draft}
+                onDraft={(p) => setDraft((d) => ({ ...d, ...p }))}
+                readOnly={!editable}
+                locked={external}
+                errors={errors}
+                secret={
+                  item.kind === "contact" ? null : (
+                    <SecretValue
+                      item={item}
+                      canChange={editable && !external}
+                      value={secret}
+                      onValue={setSecret}
+                      error={errors.secret}
+                    />
+                  )
+                }
+              />
             )}
-          </DetailsSection>
-        </aside>
+          </div>
+          {/* The fields on the left; who has access and its recent uses beside them (ADR 0144 §7). */}
+          <aside className="issue-aside vlt-aside">
+            <DetailsSection title={t("vault.access.title")}>
+              <ScopeLine scope={item.scope} />
+              <AccessBlock
+                scope={item.scope}
+                access={item.access}
+                editable={editable && !item.accessFromConnection}
+                saving={actions.updating}
+                onChange={setAccess}
+              >
+                {external && editable && (
+                  <div className="vlt-access__follow">
+                    <span className="small muted">
+                      {item.accessFromConnection
+                        ? t("vault.access.follows", { source })
+                        : t("vault.access.own", { source })}
+                    </span>
+                    <Button
+                      size="sm"
+                      disabled={actions.updating}
+                      onClick={() => void follow(!item.accessFromConnection)}
+                    >
+                      {item.accessFromConnection ? t("vault.access.changeHere") : t("vault.access.useConnection")}
+                    </Button>
+                  </div>
+                )}
+              </AccessBlock>
+            </DetailsSection>
+            <DetailsSection title={t("vault.use.title")} count={uses?.length || undefined}>
+              {usesLoading && !uses ? (
+                <LoadingList count={2} />
+              ) : usesFailed && !uses ? (
+                <p className="vlt-uses__none">{t("common.loadFailed")}</p>
+              ) : uses && uses.length > 0 ? (
+                <ul className="vlt-uses">
+                  {uses.map((u) => (
+                    <UseRow key={u.id} use={u} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="vlt-uses__none">{t("vault.use.none")}</p>
+              )}
+            </DetailsSection>
+          </aside>
+        </Locked>
       </div>
       <Dialog
         open={deleting}

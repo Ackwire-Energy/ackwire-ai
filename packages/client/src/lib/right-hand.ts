@@ -1,7 +1,9 @@
 import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
-import type { Agent, AgentBrain, DirectMessage } from "../api/types";
+import type { Agent, AgentBrain, BrainScope, Credential, DirectMessage, Model } from "../api/types";
+import { agentGrammar } from "./grammar";
 import { PRESETS } from "./onboarding";
+import { AUTO, keyRuns } from "./providers";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
@@ -26,11 +28,43 @@ export function rightHandFallback(
   meId: string | undefined,
   name: Record<string, unknown>,
   firstName: (userId: string) => string | undefined,
+  /** This server has a key of its own, which serves where the workspace has none. */
+  platform = false,
 ): string {
-  if (ai.brain === "model") return t("rightHand.settings.fallbackKey");
+  if (ai.brain === "model") {
+    if (ai.key) return t("rightHand.settings.fallbackKeyOf", { label: ai.key.label });
+    return t(ai.key === null && !platform ? "rightHand.settings.fallbackNoKey" : "rightHand.settings.fallbackKey");
+  }
   const owner = (ai.ownerId && firstName(ai.ownerId)) ?? "";
   if (!ai.servesYou) return t("rightHand.settings.fallbackNone", { ...name, owner });
   return ai.ownerId === meId ? t("rightHand.settings.fallbackYours") : t("rightHand.settings.fallbackPlan", { owner });
+}
+
+/**
+ * What a connect flow says once an AI is chosen. The team's right hand has two AIs, and the words say which moved:
+ * the workspace's (everyone without a plan of their own) or the person's alone. Any other agent has one.
+ */
+export const thinksWithLine = (t: TFunction, scope: BrainScope | undefined, agent: string, label: string) =>
+  scope
+    ? t(`rightHand.saved.${scope}`, { ...agentGrammar(agent), label })
+    : t("aiAccounts.done.savedAgent", { agent, label });
+
+/**
+ * The right hand on a workspace key, web and phone: the workspace's AI goes to its API key, the key is pinned, with
+ * Automático where the model chosen before can't run on it, and the person's own DM goes back to that AI. In that
+ * order: someone the workspace's AI refuses keeps their own as it was.
+ */
+export async function rightHandOnKey(
+  api: ApiClient,
+  orgId: string,
+  agent: Pick<Agent, "id" | "model">,
+  key: Pick<Credential, "id" | "provider">,
+  models: readonly Model[],
+) {
+  await api.agents.setBrain(orgId, agent.id, { scope: "workspace", brain: "model" });
+  const fits = keyRuns(key, agent.model, models);
+  await api.agents.update(orgId, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
+  await api.agents.setBrain(orgId, agent.id, { brain: "model" });
 }
 
 /** Its one-time "Novo" is per person and workspace (`seenList` entries), gone once its DM opened. */
