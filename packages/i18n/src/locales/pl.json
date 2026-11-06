@@ -1423,7 +1423,8 @@
       "toolsTitle": "Na górze",
       "order": "Kolejność sekcji",
       "orderHint": "Przeciągnij albo użyj strzałek. Na przykład agenci na początku.",
-      "drag": "Przeciągnij {{name}}"
+      "moveSection": "Przeciągnij, aby przenieść sekcję {{name}}, lub kliknij, aby zobaczyć opcje",
+      "moveTool": "Przeciągnij, aby przenieść: {{name}}"
     },
     "inviteHint": "Przez e-mail lub link",
     "profileHint": "Imię, zdjęcie i @",
@@ -1829,6 +1830,7 @@
     "linkCopied": "Skopiowano link.",
     "reply": "Odpowiedz",
     "quoteOf": "Odpowiedź do {{name}}: {{excerpt}}. Zobacz wiadomość",
+    "jumpMissing": "Nie udało się dotrzeć do tej wiadomości. Mogła zostać usunięta lub jest zbyt stara.",
     "emoji": "Emoji",
     "uploading": "przesyłanie…",
     "uploadFailed": "nie został przesłany",
@@ -7795,6 +7797,7 @@
       "in": "wątek na #{{channel}}",
       "dmWith": "Wiadomość bezpośrednia z {{name}}",
       "backTo": "Wróć do: {{where}}",
+      "backToResults": "Wróć do wyników",
       "back": "Wróć do #{{channel}}",
       "more": "Więcej akcji wątku",
       "rename": "Zmień nazwę",

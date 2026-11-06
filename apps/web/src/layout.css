@@ -5578,7 +5578,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
-.sidebar__row[data-acts]:has(> [data-status="active"]) > .sidebar__item {
+.sidebar:not([data-rail="true"]) .sidebar__row[data-acts]:has(> [data-status="active"]) > .sidebar__item {
   padding-right: var(--acts-room, 32px);
 }
 .sidebar__label {
@@ -11771,14 +11771,18 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
-.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
+.sidebar:not([data-rail="true"])
+  .sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
   > .sidebar__item
   > :is(.sidebar__item-meta, .sidebar__unread) {
   visibility: hidden;
 }
 /* The name and role run the row's width, so the buttons (`data-acts`: how many) get their own room instead of
-   covering their ends; on a two-line row they sit on the name's line, beside the face. */
-.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__item {
+   covering their ends; on a two-line row they sit on the name's line, beside the face. The rail has no such buttons:
+   room kept for them there would push the row's mark out of its 40px plate. */
+.sidebar:not([data-rail="true"])
+  .sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
+  > .sidebar__item {
   padding-right: var(--acts-room, 32px);
 }
 .sidebar__row[data-acts="2"] {
@@ -11948,7 +11952,10 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
   display: none;
 }
 /* A section of the sidebar in the person's order (SidebarOrder.tsx): its parts keep the list's spacing; a grip in the
-   gutter on hover drags it, and a line in the gap shows where it would land. The rail lays the parts out alone. */
+   gutter on hover drags it, and a line in the gap shows where it would land. The rail lays the parts out alone.
+   A grip sits on the row it moves and is that row's height, so its dots share the row's middle: a section's on its
+   header; the tools have none, so theirs is on their first row, which can't move alone, and every other tool shows
+   its own (`.sidebar__tool-grip`, ToolList). Pointing at a section's grip lights all that moves with it. */
 .sidebar__block {
   position: relative;
   display: flex;
@@ -11962,7 +11969,8 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
 .sidebar[data-rail="true"] .sidebar__block {
   display: contents;
 }
-.sidebar__grip {
+.sidebar__grip,
+.sidebar__tool-grip {
   position: absolute;
   z-index: 2;
   top: 0;
@@ -11970,7 +11978,6 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
   display: grid;
   place-items: center;
   width: 14px;
-  height: 28px;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -11982,18 +11989,42 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
     opacity 0.15s,
     color 0.15s;
 }
-.sidebar__block:has(> .sidebar__grip + :is(.sidebar__tools, .sidebar__group[role="group"])) > .sidebar__grip {
-  top: 6px;
+.sidebar__grip {
+  height: 28px;
 }
-.sidebar__block:hover > .sidebar__grip,
-.sidebar__grip:focus-visible {
+.sidebar__block[data-section="tools"] > .sidebar__grip {
+  height: 30px;
+}
+.sidebar__tools > .sidebar__item {
+  position: relative;
+}
+.sidebar__tool-grip {
+  bottom: 0;
+}
+.sidebar__block:not([data-section="tools"]):hover > .sidebar__grip,
+.sidebar__block[data-section="tools"]:has(> .sidebar__tools > :first-child:hover) > .sidebar__grip,
+.sidebar__grip:is(:hover, :focus-visible),
+.sidebar__item:hover > .sidebar__tool-grip {
   opacity: 1;
 }
-.sidebar__grip:hover {
+.sidebar__grip:hover,
+.sidebar__tool-grip:hover {
   color: var(--ink);
 }
-.sidebar__grip:active {
+.sidebar__grip:active,
+.sidebar__tool-grip:active {
   cursor: grabbing;
+}
+.sidebar__block:has(> .sidebar__grip:is(:hover, :focus-visible))::before {
+  content: "";
+  position: absolute;
+  z-index: var(--z-under);
+  inset: -2px -4px;
+  border-radius: var(--control-r-sm);
+  background: var(--side-hover);
+}
+.sidebar[data-rail="true"] .sidebar__tool-grip {
+  display: none;
 }
 html:not([data-pointer]) .sidebar__grip:focus-visible {
   outline: none;
@@ -12010,12 +12041,14 @@ html:not([data-pointer]) .sidebar__grip:focus-visible {
   bottom: -6px;
 }
 @media (pointer: coarse) {
-  .sidebar__grip {
+  .sidebar__grip,
+  .sidebar__tool-grip {
     display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sidebar__grip {
+  .sidebar__grip,
+  .sidebar__tool-grip {
     transition: none;
   }
 }
@@ -12125,6 +12158,12 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   .sidebar__section-head,
   .sidebar__section-toggle {
     min-height: var(--control-h-sm);
+  }
+  .sidebar__grip {
+    height: var(--control-h-sm);
+  }
+  .sidebar__block[data-section="tools"] > .sidebar__grip {
+    height: 36px;
   }
   .sidebar:not([data-rail="true"]) :is(.sidebar__jump, .sidebar__collapse.ac-btn) {
     height: var(--control-h-md);

@@ -1315,7 +1315,8 @@
       "toolsTitle": "위쪽",
       "order": "섹션 순서",
       "orderHint": "드래그하거나 화살표를 사용하세요. 예를 들어 에이전트를 맨 위로 올릴 수 있어요.",
-      "drag": "{{name}} 드래그"
+      "moveSection": "드래그하여 {{name}} 섹션을 옮기거나 클릭하여 옵션 보기",
+      "moveTool": "드래그하여 {{name}} 옮기기"
     },
     "inviteHint": "이메일 또는 링크로",
     "profileHint": "이름, 사진, @",
@@ -1655,6 +1656,7 @@
     "linkCopied": "링크를 복사했어요.",
     "reply": "답장",
     "quoteOf": "{{name}}에게 답장: {{excerpt}}. 메시지 보기",
+    "jumpMissing": "여기서는 그 메시지로 이동할 수 없습니다. 삭제되었거나 너무 오래된 메시지일 수 있습니다.",
     "emoji": "이모지",
     "uploading": "업로드 중…",
     "uploadFailed": "업로드되지 않았어요",
@@ -6931,6 +6933,7 @@
       "in": "#{{channel}}의 스레드",
       "dmWith": "{{name}}과(와)의 DM",
       "backTo": "{{where}}(으)로 돌아가기",
+      "backToResults": "결과로 돌아가기",
       "back": "#{{channel}}(으)로 돌아가기",
       "more": "스레드 작업 더 보기",
       "rename": "이름 변경",

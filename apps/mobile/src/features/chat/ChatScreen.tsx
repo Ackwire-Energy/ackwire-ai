@@ -1107,13 +1107,14 @@ function Chat({
     }
     if (isThread || olderDone || seekPages.current >= SEEK_MAX_PAGES) {
       setSeek(null);
+      toast({ title: t("channel.jumpMissing"), icon: "x" });
       return;
     }
     if (!loadingOlder) {
       seekPages.current += 1;
       loadOlder();
     }
-  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo]);
+  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo, toast, t]);
   useEffect(() => {
     if (!flashId) return;
     const timer = setTimeout(() => setFlashId(null), FLASH_MS);

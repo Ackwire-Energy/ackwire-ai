@@ -26,7 +26,7 @@ export interface ChannelActions {
   openThread?: (threadId: string, focusMessageId?: string) => void;
   /**
    * A question an agent asked another from here ("Theo ⇄ Iris" in the reply's block): what the two said for it, in
-   * the panel over the channel, read only (absent in a thread view: the block opens it in place).
+   * the panel beside the channel, read only (absent in a thread view: the block opens it in place).
    */
   openConsultation?: (consultationId: string) => void;
   /** "Pedir correção" after my 👎: my reply in the same conversation, quoting that message and mentioning its agent. */

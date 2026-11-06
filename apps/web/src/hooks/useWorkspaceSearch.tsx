@@ -161,9 +161,16 @@ export function useWorkspaceSearch(lazy = false) {
 
 export type WorkspaceSearch = ReturnType<typeof useWorkspaceSearch>;
 
+/** "Ir para" into another conversation: its results stay open there, a reply over them in its thread. */
+export interface CarriedSearch {
+  channelId: string;
+  thread?: { id: string; focus: string };
+}
+
 interface HeaderSearch extends WorkspaceSearch {
   /** "Filtros" in the results: back to the header's field with its menu open (the phone's sheet on a phone). */
   field: { current: { focus: () => void } | null };
+  carry: { current: CarriedSearch | null };
 }
 const HeaderSearchContext = createContext<HeaderSearch | null>(null);
 
@@ -171,7 +178,8 @@ const HeaderSearchContext = createContext<HeaderSearch | null>(null);
 export function HeaderSearchProvider({ children }: { children: ReactNode }) {
   const search = useWorkspaceSearch(true);
   const field = useRef<{ focus: () => void } | null>(null);
-  return <HeaderSearchContext.Provider value={{ ...search, field }}>{children}</HeaderSearchContext.Provider>;
+  const carry = useRef<CarriedSearch | null>(null);
+  return <HeaderSearchContext.Provider value={{ ...search, field, carry }}>{children}</HeaderSearchContext.Provider>;
 }
 
 /** Null outside a workspace's pages (the header shows no field there). */

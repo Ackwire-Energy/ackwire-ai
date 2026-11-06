@@ -41,7 +41,7 @@ import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
-import { AVAILABILITIES, clearsText, isOutOfOffice, presenceOfAvailability } from "@agenteschat/client/lib/presence";
+import { AVAILABILITIES, isOutOfOffice, presenceOfAvailability, statusEndNote } from "@agenteschat/client/lib/presence";
 import { recentDms } from "@agenteschat/client/lib/recent";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
@@ -1906,7 +1906,7 @@ function AccountMenu() {
             </span>
             <span>
               {line.text}
-              <small>{clearsText(t, i18n.language, shown.status.until)}</small>
+              <small>{statusEndNote(t, i18n.language, shown.status.until, true)}</small>
             </span>
           </div>
         )}

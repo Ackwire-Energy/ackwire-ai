@@ -1351,7 +1351,8 @@
       "toolsTitle": "Bovenaan",
       "order": "Volgorde van de onderdelen",
       "orderHint": "Sleep of gebruik de pijlen. Bijvoorbeeld agents eerst.",
-      "drag": "{{name}} slepen"
+      "moveSection": "Sleep om de sectie {{name}} te verplaatsen of klik voor opties",
+      "moveTool": "Sleep om {{name}} te verplaatsen"
     },
     "inviteHint": "Via e-mail of link",
     "profileHint": "Naam, foto en @",
@@ -1713,6 +1714,7 @@
     "linkCopied": "Link gekopieerd.",
     "reply": "Beantwoorden",
     "quoteOf": "Antwoord op {{name}}: {{excerpt}}. Bekijk het bericht",
+    "jumpMissing": "Dat bericht is hier niet te bereiken. Het is misschien verwijderd of te oud.",
     "emoji": "Emoji",
     "uploading": "uploaden…",
     "uploadFailed": "is niet geüpload",
@@ -7298,6 +7300,7 @@
       "in": "thread in #{{channel}}",
       "dmWith": "DM met {{name}}",
       "backTo": "Terug naar {{where}}",
+      "backToResults": "Terug naar de resultaten",
       "back": "Terug naar #{{channel}}",
       "more": "Meer threadacties",
       "rename": "Hernoemen",

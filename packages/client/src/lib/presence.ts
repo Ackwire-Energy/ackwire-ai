@@ -68,9 +68,8 @@ export function untilFor(choice: UntilChoice, now = new Date()): string | null {
   }
 }
 
-/** "Some às 15:00" today, "Some sexta" within the week, else the date; "Até você mudar" without an end. */
-export function clearsText(t: TFunction, language: string, until: string | null, now = new Date()): string {
-  if (!until) return t("presence.untilChanged");
+/** "Some às 15:00" today, "Some sexta" within the week, else the date. */
+export function clearsText(t: TFunction, language: string, until: string, now = new Date()): string {
   const at = new Date(until);
   if (at.toDateString() === now.toDateString()) {
     return t("presence.clearsAt", {
@@ -83,6 +82,15 @@ export function clearsText(t: TFunction, language: string, until: string | null,
       ? at.toLocaleDateString(language, { weekday: "long" })
       : at.toLocaleDateString(language, { day: "numeric", month: "short" });
   return t("presence.clearsOn", { when });
+}
+
+/**
+ * The line under a status: when it clears. With no end, "Até você mudar" talks to its owner about their own choice:
+ * for anyone else's status, nothing.
+ */
+export function statusEndNote(t: TFunction, language: string, until: string | null, own: boolean): string | null {
+  if (until) return clearsText(t, language, until);
+  return own ? t("presence.untilChanged") : null;
 }
 
 /** A person's line as one string: "📅 Em reunião". */

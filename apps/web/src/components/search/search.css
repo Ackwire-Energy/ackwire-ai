@@ -229,7 +229,7 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
-/* ── The header search's results, in the thread panel (SearchResultsPanel.tsx) ── */
+/* ── The header search's results, in the conversation's side pane (SearchResultsPanel.tsx) ── */
 [data-theme="light"] {
   /* A search hit: its own cool tint and underline, never the tan of a mention of you. */
   --search-hit: color-mix(in srgb, var(--info) 16%, transparent);
@@ -293,8 +293,11 @@ html:not([data-pointer]) .search-box__x:focus-visible {
 .search-result .ac-msg {
   --msg-inline: 12px;
 }
+/* Over the row, whose hover lifts it (`.ac-msg:hover`): at any less, it would show through the row and never get the
+   click. */
 .search-result__jump.ac-btn {
   position: absolute;
+  z-index: var(--z-lifted);
   top: 8px;
   right: 8px;
   opacity: 0;
@@ -317,6 +320,24 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   background: var(--search-hit);
   box-shadow: inset 0 -2px 0 var(--search-hit-line);
   color: inherit;
+}
+/* Narrow beside the conversation: the count keeps its line with the ×, the filters and the sort go under it. */
+@media (min-width: 761px) {
+  @container thread-dock (max-width: 479px) {
+    .search-panel__head > .thread-head__who {
+      align-self: center;
+    }
+    .search-panel__head > .thread-head__text {
+      flex: 1 1 calc(100% - 64px);
+    }
+    .search-panel__head > :last-child {
+      order: 1;
+    }
+    .search-panel__filters,
+    .search-panel__head > :nth-last-child(2) {
+      order: 2;
+    }
+  }
 }
 @media (max-width: 760px) {
   .search-panel__words {

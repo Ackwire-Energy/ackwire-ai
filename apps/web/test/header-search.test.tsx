@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -94,7 +94,7 @@ describe("the header search (Discord's)", () => {
     expect(screen().getByRole("option", { name: /^Ada/ })).toBeTruthy();
   });
 
-  test("Enter shows the results in the panel by place, words marked; Ir para here highlights the message", async () => {
+  test("Enter docks the results in the thread's place, words marked; Ir para highlights the message and they stay", async () => {
     const state = seeded();
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
@@ -102,46 +102,164 @@ describe("the header search (Discord's)", () => {
     expect(results()).toBeNull();
     await enter();
     const panel = results() as HTMLElement;
+    expect(panel.className).toContain("thread-panel--docked");
+    expect(panel.parentElement?.className).toBe("channel__body");
+    expect(document.querySelector(".thread-panel__scrim")).toBeNull();
+    expect(document.querySelector(".channel__col [id^='composer-']")).toBeTruthy();
     expect(within(panel).getByRole("heading", { level: 1 }).textContent).toBe("1 resultado");
     const group = within(panel).getByRole("region", { name: "eng" });
     expect([...group.querySelectorAll(".search-hit__mark")].map((m) => m.textContent)).toEqual(["Achei"]);
     await act(async () => fireEvent.click(within(group).getByRole("button", { name: "Ir para a mensagem de Ada" })));
     await settle(4);
-    expect(results()).toBeNull();
+    expect(results()).toBeTruthy();
     expect(row("m-2").classList.contains("ac-msg--focus")).toBe(true);
-    // The query stays: Enter brings the results back.
     expect(box().value).toBe("achei");
+  });
+
+  test("a message older than what's loaded: the conversation pages back to it, the buttons waiting meanwhile", async () => {
+    const state = seedState();
+    const at = Date.now() - 3_600_000;
+    for (let i = 0; i < 400; i++)
+      state.messages.push({
+        id: `h-${i}`,
+        channelId: GENERAL_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: i === 3 ? "a agulha no palheiro" : `Mensagem ${i}`,
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date(at + i * 1000).toISOString(),
+      });
+    const api = createFakeApi(state);
+    await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api });
+    await settle(6);
+    expect(row("h-3")).toBeNull();
+    await typeIn("agulha");
     await enter();
+    const jump = within(results() as HTMLElement).getByRole("button", { name: "Ir para a mensagem de Ada" });
+    const load = api.chat.messages.bind(api.chat);
+    let release = () => {};
+    const held = new Promise<void>((go) => {
+      release = go;
+    });
+    const pages = spyOn(api.chat, "messages").mockImplementation(async (...args) => {
+      await held;
+      return load(...args);
+    });
+    await act(async () => fireEvent.click(jump));
+    expect((jump as HTMLButtonElement).disabled).toBe(true);
+    release();
+    await settle(12);
+    expect(pages.mock.calls.at(-1)?.[2]?.limit).toBe(200);
+    expect(row("h-3").classList.contains("ac-msg--focus")).toBe(true);
+    expect((jump as HTMLButtonElement).disabled).toBe(false);
     expect(results()).toBeTruthy();
   });
 
-  test("a reply groups under its thread and opens it; another channel's message navigates there, the query kept", async () => {
-    const state = seeded();
-    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+  test("a message no longer there says so, and the results stay", async () => {
+    const api = createFakeApi(seeded());
+    const query = api.search.query.bind(api.search);
+    spyOn(api.search, "query").mockImplementation(async (...args) =>
+      (await query(...args)).map((h) => ({ ...h, messageId: "m-gone", sourceId: "m-gone" })),
+    );
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    await typeIn("achei");
+    await enter();
+    const panel = results() as HTMLElement;
+    await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    await settle(8);
+    expect(document.body.textContent).toContain("Não deu para chegar a essa mensagem aqui.");
+    expect(results()).toBeTruthy();
+  });
+
+  test("a reply opens its thread over the results: back keeps them, Esc too, the × closes both", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
     await typeIn("zebra");
     await enter();
-    const panel = results() as HTMLElement;
-    const thread = within(panel).getByRole("region", { name: /^@ada o login está devolvendo 401/ });
-    expect(thread.textContent).toContain("thread em #eng");
-    expect(within(panel).getByRole("region", { name: "general" })).toBeTruthy();
+    const thread = () => screen().queryByRole("complementary", { name: "Thread" });
+    const group = within(results() as HTMLElement).getByRole("region", { name: /^@ada o login está devolvendo 401/ });
+    expect(group.textContent).toContain("thread em #eng");
+    expect(within(results() as HTMLElement).getByRole("region", { name: "general" })).toBeTruthy();
+    const goToReply = async () => {
+      const panel = results() as HTMLElement;
+      const reply = within(panel).getByRole("region", { name: /^@ada o login está devolvendo 401/ });
+      await act(async () => fireEvent.click(within(reply).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+      await settle(6);
+    };
+    await goToReply();
+    expect(row("m-reply").classList.contains("ac-msg--focus")).toBe(true);
+    expect(within(thread() as HTMLElement).getByRole("heading", { level: 1 })).toBeTruthy();
 
-    await act(async () => fireEvent.click(within(thread).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    await act(async () =>
+      fireEvent.click(within(thread() as HTMLElement).getByRole("button", { name: "Voltar aos resultados" })),
+    );
+    await settle(2);
+    expect(thread()).toBeNull();
+    expect(results()).toBeTruthy();
+
+    await goToReply();
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
+    await settle(2);
+    expect(thread()).toBeNull();
+    expect(results()).toBeTruthy();
+
+    await goToReply();
+    const panes = thread() as HTMLElement;
+    await act(async () =>
+      fireEvent.click(
+        within(panes.querySelector("section:not([hidden]) .thread-head") as HTMLElement).getByRole("button", {
+          name: /^Fechar/,
+        }),
+      ),
+    );
+    await settle(2);
+    expect(thread()).toBeNull();
+    expect(results()).toBeNull();
+  });
+
+  test("a thread opened from the conversation replaces the results, and the results replace it", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
+    await settle(6);
+    await typeIn("achei");
+    await enter();
+    expect(results()).toBeTruthy();
+    const message = row("m-2");
+    await act(async () => fireEvent.click(within(message).getByRole("button", { name: "Responder" })));
     await settle(6);
     expect(results()).toBeNull();
     expect(screen().getByRole("complementary", { name: "Thread" })).toBeTruthy();
-
-    // One panel at a time: the results close the thread, as the thread closed the results.
+    expect(screen().queryByRole("button", { name: "Voltar aos resultados" })).toBeNull();
     await enter();
     expect(screen().queryByRole("complementary", { name: "Thread" })).toBeNull();
-    const again = results() as HTMLElement;
-    const general = within(again).getByRole("region", { name: "general" });
-    await act(async () => fireEvent.click(within(general).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    expect(results()).toBeTruthy();
+  });
+
+  test("another conversation's hit: there with the results still open, the query kept, ready for the next", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
+    await typeIn("zebra");
+    await enter();
+    const general = within(results() as HTMLElement).getByRole("region", { name: "general" });
+    await act(async () => fireEvent.click(within(general).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    await settle(8);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
     expect(router.state.location.search).toEqual({ m: "m-general" });
+    expect(row("m-general").classList.contains("ac-msg--focus")).toBe(true);
     expect(box().value).toBe("zebra");
+
+    // The next hit, a reply back in #eng: that channel with its thread over the results.
+    const reply = within(results() as HTMLElement).getByRole("region", { name: /^@ada o login está devolvendo 401/ });
+    await act(async () => fireEvent.click(within(reply).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(row("m-reply").classList.contains("ac-msg--focus")).toBe(true);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Voltar aos resultados" })));
+    await settle(2);
+    expect(results()).toBeTruthy();
 
     // Remembered: emptied, the box offers it under the recent searches.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Limpar busca" })));
@@ -151,6 +269,39 @@ describe("the header search (Discord's)", () => {
     // The trash forgets them.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Limpar buscas recentes" })));
     expect(screen().queryByRole("option", { name: "zebra" })).toBeNull();
+  });
+
+  test("a DM's hit: the search keeps its scope there, so the other hits stay; closed, the DM holds to itself again", async () => {
+    const state = seeded();
+    const dm = seedDm(state, { type: "agent", id: ADA_ID }, { body: "uma zebra na DM" });
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
+    await typeIn("zebra");
+    await enter();
+    const inDm = within(results() as HTMLElement).getByRole("region", { name: "DM com Ada" });
+    await act(async () => fireEvent.click(within(inDm).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
+    expect(row(`m-${dm}`).classList.contains("ac-msg--focus")).toBe(true);
+    const panel = results() as HTMLElement;
+    expect(within(panel).getByRole("region", { name: "general" })).toBeTruthy();
+    await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Fechar" })));
+    await settle(4);
+    expect(results()).toBeNull();
+  });
+
+  test("where the pane covers the conversation (a narrow window), Ir para closes it to show the message", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
+    await settle(6);
+    await typeIn("achei");
+    await enter();
+    const panel = results() as HTMLElement;
+    panel.style.position = "absolute";
+    await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    await settle(4);
+    expect(results()).toBeNull();
+    expect(row("m-2").classList.contains("ac-msg--focus")).toBe(true);
   });
 
   test("moving to another channel scopes an untouched search there; words typed keep the search as it is", async () => {

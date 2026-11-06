@@ -926,6 +926,9 @@ html:not([data-pointer]) .thread-line:focus-visible {
   height: 100%;
   min-height: 0;
 }
+.thread-panel__chat[hidden] {
+  display: none;
+}
 .thread-head--panel {
   padding-left: 18px;
 }
@@ -1064,10 +1067,10 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-panel--wide .agp-tabs .ac-tabs {
   padding-right: 48px;
 }
-/* Under a panel: the conversation dims like under a dialog (.ac-dialog__scrim, e.g. a routine's details),
-   and a click there closes the panel. */
+/* Under a panel that floats (not one docked in a conversation): the whole window dims like under a dialog
+   (.ac-dialog__scrim, e.g. a routine's details), the sidebar too, and a click there closes the panel. */
 .thread-panel__scrim {
-  position: absolute;
+  position: fixed;
   z-index: 29;
   inset: 0;
   padding: 0;

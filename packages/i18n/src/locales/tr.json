@@ -1351,7 +1351,8 @@
       "toolsTitle": "Üstte",
       "order": "Bölüm sırası",
       "orderHint": "Sürükleyin ya da okları kullanın. Örneğin önce ajanlar.",
-      "drag": "{{name}} öğesini sürükle"
+      "moveSection": "{{name}} bölümünü taşımak için sürükleyin veya seçenekler için tıklayın",
+      "moveTool": "{{name}} öğesini taşımak için sürükleyin"
     },
     "inviteHint": "E-posta veya bağlantıyla",
     "profileHint": "Ad, fotoğraf ve @",
@@ -1713,6 +1714,7 @@
     "linkCopied": "Bağlantı kopyalandı.",
     "reply": "Yanıtla",
     "quoteOf": "{{name}} kişisine yanıt: {{excerpt}}. Mesajı gör",
+    "jumpMissing": "Bu mesaja buradan ulaşılamadı. Silinmiş veya çok eski olabilir.",
     "emoji": "Emoji",
     "uploading": "yükleniyor…",
     "uploadFailed": "yüklenmedi",
@@ -7195,6 +7197,7 @@
       "in": "#{{channel}} kanalında ileti dizisi",
       "dmWith": "{{name}} ile DM",
       "backTo": "{{where}} konumuna dön",
+      "backToResults": "Sonuçlara dön",
       "back": "#{{channel}} kanalına dön",
       "more": "Diğer ileti dizisi eylemleri",
       "rename": "Yeniden adlandır",

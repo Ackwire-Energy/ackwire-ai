@@ -1351,7 +1351,8 @@
       "toolsTitle": "Oben",
       "order": "Reihenfolge der Bereiche",
       "orderHint": "Zieh oder nutze die Pfeile. Zum Beispiel Agenten zuerst.",
-      "drag": "{{name}} ziehen"
+      "moveSection": "Ziehen, um den Bereich {{name}} zu verschieben, oder klicken für Optionen",
+      "moveTool": "Ziehen, um {{name}} zu verschieben"
     },
     "inviteHint": "Per E-Mail oder Link",
     "profileHint": "Name, Foto und @",
@@ -1713,6 +1714,7 @@
     "linkCopied": "Link kopiert.",
     "reply": "Antworten",
     "quoteOf": "Antwort an {{name}}: {{excerpt}}. Nachricht ansehen",
+    "jumpMissing": "Diese Nachricht ist hier nicht erreichbar. Sie wurde vielleicht gelöscht oder liegt zu weit zurück.",
     "emoji": "Emoji",
     "uploading": "wird hochgeladen…",
     "uploadFailed": "wurde nicht hochgeladen",
@@ -7249,6 +7251,7 @@
       "in": "Thread in #{{channel}}",
       "dmWith": "Direktnachricht mit {{name}}",
       "backTo": "Zurück zu {{where}}",
+      "backToResults": "Zurück zu den Ergebnissen",
       "back": "Zurück zu #{{channel}}",
       "more": "Weitere Thread-Aktionen",
       "rename": "Umbenennen",

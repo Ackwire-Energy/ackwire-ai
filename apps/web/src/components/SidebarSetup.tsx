@@ -25,6 +25,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type ReactElement,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -79,9 +80,11 @@ const MOVE_KEYS = "Alt+Shift+ArrowUp Alt+Shift+ArrowDown";
 /**
  * The tools shown in the sidebar's list, in the person's order: each dragged onto another goes before or after it,
  * and Alt+Shift+↑/↓ on a focused one moves it past its neighbour (the setup dialog's arrows do it too). The rows stay
- * the links `row` makes, so the browser's own menu on them is kept.
+ * the links `row` makes, so the browser's own menu on them is kept. Each shows its own grip on hover: the row is what
+ * moves, so a mouse drags from anywhere on it and a click on the grip doesn't open the tool.
  */
 export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: SidebarItem) => ReactElement }) {
+  const { t } = useTranslation();
   const { org } = useOrg();
   const { order, put } = useToolOrder(org.id);
   const dragging = useRef<SidebarItem | null>(null);
@@ -91,8 +94,22 @@ export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: Sideb
     dragging.current = null;
     setMark(null);
   };
-  return shown.map((id) =>
-    cloneElement(row(id) as ReactElement<Record<string, unknown>>, {
+  return shown.map((id) => {
+    const link = row(id) as ReactElement<{ children?: ReactNode }>;
+    return cloneElement(link as ReactElement<Record<string, unknown>>, {
+      children: (
+        <>
+          {link.props.children}
+          <span
+            className="sidebar__tool-grip"
+            aria-hidden="true"
+            title={t("shell.sidebarSetup.moveTool", { name: t(`shell.${id}`) })}
+            onClick={(e) => e.preventDefault()}
+          >
+            <Icon name="grip" size={14} />
+          </span>
+        </>
+      ),
       draggable: true,
       "aria-keyshortcuts": MOVE_KEYS,
       "data-drop": mark?.id === id ? mark.where : undefined,
@@ -124,8 +141,8 @@ export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: Sideb
         put(placeTool(order, from, m.id, m.where));
       },
       onDragEnd: end,
-    }),
-  );
+    });
+  });
 }
 
 /**
