@@ -2071,6 +2071,7 @@ async function executeRunInner(
           runId: run.id,
           channelId: run.channelId,
           pageIds,
+          kind: "context",
         }),
       );
       system.push({

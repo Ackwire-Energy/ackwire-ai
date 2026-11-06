@@ -229,7 +229,7 @@ export async function searchVisible(
     kinds?: SearchKind[];
     limit?: number;
     match?: "all" | "any";
-  } & Pick<SearchQuery, "after" | "before" | "messages" | "sort">,
+  } & Pick<SearchQuery, "after" | "before" | "messages" | "sort" | "minTextRank">,
 ): Promise<SearchHit[]> {
   // A list by date ranks by no vector: no embedding to pay for.
   const embedded =
@@ -244,6 +244,7 @@ export async function searchVisible(
     kinds: input.kinds,
     limit: input.limit,
     match: input.match,
+    minTextRank: input.minTextRank,
     after: input.after,
     before: input.before,
     messages: input.messages,

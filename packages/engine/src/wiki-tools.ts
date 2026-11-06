@@ -130,6 +130,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             runId: ctx.runId,
             channelId: ctx.channelId,
             pageIds: [p.id],
+            kind: "opened",
           });
           const backlinks = p.backlinks.filter((b) => b.kind === "page").map((b) => `[[${b.title}]]`);
           return {

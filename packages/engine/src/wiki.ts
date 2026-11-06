@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { contentWords, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -15,6 +15,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
+import { ARTIFACT_TRASH_DAYS } from "./artifacts";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { requireChannelAccess } from "./channels";
@@ -105,6 +106,8 @@ export interface WikiPageSummary {
   locked: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned: boolean;
+  /** "Sempre no contexto dos agentes": in every run of an agent that reads it (at most `WIKI_CONTEXT_MAX`). */
+  agentContext: boolean;
   /** Who sees it besides owners; null = every member. */
   audience: WikiAudience | null;
   /** The agents that read it; null = every agent. */
@@ -119,7 +122,12 @@ export interface WikiPageSummary {
   excerpt: string;
   /** Where it came from: `obsidian` for an imported page, `message` for "Save to wiki". */
   sourceType: string | null;
+  /** An imported page: the vault's name, and the import that brought it (null for imports made before ids). */
+  sourceName: string | null;
+  importId: string | null;
   updatedAt: string;
+  /** In the trash since then; null for a live page. */
+  deletedAt: string | null;
   updatedBy: WikiAuthor;
 }
 
@@ -414,10 +422,10 @@ const sameAudience = (a: AudienceCols, b: AudienceCols) =>
   sameSet(a.editorUserIds, b.editorUserIds) &&
   sameSet(a.agentEditorIds, b.agentEditorIds);
 
-/** "A/B/C" → A/B/C, A/B, A: the folder and the ones above it, closest first. */
+/** "A/B/C" → A/B/C, A/B, A, "": the folder and the ones above it, closest first, ending with the wiki's root. */
 function folderChain(folder: string) {
   const parts = folder ? folder.split("/") : [];
-  return parts.map((_, i) => parts.slice(0, parts.length - i).join("/"));
+  return [...parts.map((_, i) => parts.slice(0, parts.length - i).join("/")), ""];
 }
 
 const closestRule = (rules: FolderRule[], folder: string) => {
@@ -430,7 +438,6 @@ const closestRule = (rules: FolderRule[], folder: string) => {
 
 async function ruleFor(db: Executor, orgId: string, folder: string) {
   const chain = folderChain(folder);
-  if (chain.length === 0) return null;
   const rules = await db
     .select()
     .from(wikiFolderAudiences)
@@ -599,7 +606,11 @@ async function summaries(db: Executor, rows: PageRow[]): Promise<WikiPageSummary
     audienceFolder: r.audienceFolder,
     excerpt: plainExcerpt(r.body, r.title),
     sourceType: r.source?.type ?? null,
+    sourceName: r.source?.type === "message" ? null : (r.source?.id ?? null),
+    importId: r.source?.importId ?? null,
+    agentContext: r.agentContext,
     updatedAt: r.updatedAt.toISOString(),
+    deletedAt: r.deletedAt?.toISOString() ?? null,
     updatedBy: {
       type: r.updatedByType as WikiAuthor["type"],
       id: r.updatedById,
@@ -820,12 +831,19 @@ async function pageReads(db: Executor, row: PageRow): Promise<WikiPageReads> {
 }
 
 /**
- * Agents used these pages (in the run's context or with `read_wiki_page`).
+ * Agents used these pages: in the run's context (`context`) or opened with `read_wiki_page` (`opened`, the default).
  * Best effort: never fails the run. Now and then drops reads older than 30 days.
  */
 export async function recordWikiReads(
   db: Executor,
-  input: { orgId: string; agentId: string; runId?: string | null; channelId?: string | null; pageIds: string[] },
+  input: {
+    orgId: string;
+    agentId: string;
+    runId?: string | null;
+    channelId?: string | null;
+    pageIds: string[];
+    kind?: "context" | "opened";
+  },
 ) {
   const ids = [...new Set(input.pageIds)];
   if (ids.length === 0) return;
@@ -837,6 +855,7 @@ export async function recordWikiReads(
         agentId: input.agentId,
         runId: input.runId ?? null,
         channelId: input.channelId ?? null,
+        kind: input.kind ?? "opened",
       })),
     );
     if (Math.random() < 0.02) {
@@ -849,7 +868,10 @@ export async function recordWikiReads(
   }
 }
 
-/** "What the agents read most": pages by uses in the last 7 days, with the agents that used each. */
+/**
+ * "What the agents read most": pages by how often agents opened them in the last 7 days, with the agents that did.
+ * A page that only went into a run's context isn't counted: that is the search's choice, not the agent's.
+ */
 export async function topWikiReads(db: Database, actor: WikiActor, orgId: string, limit = 8) {
   await requireReader(db, actor, orgId);
   const rows = await db
@@ -866,6 +888,7 @@ export async function topWikiReads(db: Database, actor: WikiActor, orgId: string
     .where(
       and(
         eq(wikiPageReads.orgId, orgId),
+        eq(wikiPageReads.kind, "opened"),
         gte(wikiPageReads.createdAt, since(READ_WINDOW_DAYS)),
         isNull(wikiPages.deletedAt),
         isNull(agents.archivedAt),
@@ -965,6 +988,7 @@ async function announce(
     | "pinned"
     | "unpinned"
     | "audience"
+    | "context"
     | "imported",
   extra: Record<string, unknown> = {},
 ) {
@@ -1095,6 +1119,8 @@ export interface WikiImportInput {
   folder?: string;
   /** A note named like a live page: a second page "Title (vault)", or leave it out. */
   onConflict: "keep_both" | "skip";
+  /** The same for every batch and retry of one import: its pages keep it, so the import can be deleted as one. */
+  importId?: string;
 }
 
 export const WIKI_IMPORT_MAX_NOTES = 500;
@@ -1111,7 +1137,8 @@ const importTitle = (name: string) =>
  * Imports notes (an Obsidian vault, read by the app) as pages: one version
  * each ("imported from …"), folders, tags and aliases kept, `[[links]]`
  * resolved among the new pages and the existing ones. Notes that can't be
- * pages (no usable title, too long) come back in `failed`.
+ * pages (no usable title, too long) come back in `failed` and the rest still
+ * go in; tags, aliases and attachment names past their limits are cut.
  */
 export async function importWikiPages(
   deps: WikiDeps,
@@ -1172,7 +1199,11 @@ export async function importWikiPages(
         0,
         20,
       );
-      const attachments = Object.fromEntries(Object.entries(n.attachments ?? {}).slice(0, 200));
+      const attachments = Object.fromEntries(
+        Object.entries(n.attachments ?? {})
+          .filter(([name]) => name.length <= 300)
+          .slice(0, 200),
+      );
       const [page] = await tx
         .insert(wikiPages)
         .values({
@@ -1187,6 +1218,7 @@ export async function importWikiPages(
           source: {
             type: input.source.type,
             id: sourceName,
+            ...(input.importId ? { importId: input.importId } : {}),
             ...(Object.keys(attachments).length ? { attachments } : {}),
           },
           createdByType: "person",
@@ -1211,6 +1243,7 @@ export async function importWikiPages(
       details: {
         source: input.source.type,
         name: sourceName,
+        importId: input.importId ?? null,
         created: made.length,
         skipped: skipped.length,
         failed: failed.length,
@@ -1605,6 +1638,277 @@ export async function restoreWikiPage(deps: WikiDeps, actor: WikiActor, orgId: s
   return view;
 }
 
+// ── Many pages at once, and the trash ────────────────────────────────────────
+
+/** Deleted pages stay in the trash this long, as the Drive's files do (ADR 0111); then they are gone for good. */
+export const WIKI_TRASH_DAYS = ARTIFACT_TRASH_DAYS;
+
+/** What "Apagar" reaches: chosen pages, a folder with its subfolders, or one import. */
+export type WikiBulkTarget =
+  | { ids: string[] }
+  | { folder: string }
+  | { importId: string }
+  /** An import made before imports had ids: every page from that vault without one. */
+  | { source: { type: string; name: string } };
+
+const inTrashWindow = () => sql`${wikiPages.deletedAt} > ${since(WIKI_TRASH_DAYS).toISOString()}::timestamptz`;
+
+function targetSql(target: WikiBulkTarget | { all: true }) {
+  if ("all" in target) return sql`true`;
+  if ("ids" in target) {
+    const ids = target.ids.filter((id) => UUID.test(id));
+    return ids.length ? inArray(wikiPages.id, ids) : sql`false`;
+  }
+  if ("folder" in target) {
+    const folder = cleanFolder(target.folder);
+    if (!folder) throw new ValidationError("Choose a folder", "wiki.folder_required");
+    return sql`(${wikiPages.folder} = ${folder} or starts_with(${wikiPages.folder}, ${`${folder}/`}))`;
+  }
+  if ("importId" in target) return sql`${wikiPages.source}->>'importId' = ${target.importId}`;
+  return sql`(${wikiPages.source}->>'type' = ${target.source.type} and ${wikiPages.source}->>'id' = ${target.source.name}
+    and ${wikiPages.source}->>'importId' is null)`;
+}
+
+/**
+ * The pages of `target` (live, or in the trash with `deleted`) that this person may delete or restore: pages they
+ * see, not locked unless they configure the workspace, and with them on the editors' list if it has one.
+ */
+async function pagesToChange(
+  db: Database,
+  userId: string,
+  orgId: string,
+  target: WikiBulkTarget | { all: true },
+  deleted: boolean,
+) {
+  const actor: WikiActor = { type: "person", userId };
+  const membership = await requireWriter(db, actor, orgId);
+  const rows = await db
+    .select()
+    .from(wikiPages)
+    .where(
+      and(
+        eq(wikiPages.orgId, orgId),
+        deleted ? inTrashWindow() : isNull(wikiPages.deletedAt),
+        targetSql(target),
+        visibleTo(actor),
+      ),
+    )
+    .limit(5000);
+  const admin = membership !== null && can(membership, "configure");
+  const mine: PageRow[] = [];
+  for (const row of rows) if ((!row.locked || admin) && (await edits(db, userId, row))) mine.push(row);
+  return { mine, kept: rows.length - mine.length };
+}
+
+/** One event for many pages: every member's app reads the wiki again (a page's title may be for some only). */
+async function announceMany(deps: WikiDeps, orgId: string, action: "deleted" | "restored" | "audience") {
+  caches.contextPresence.delete(`${orgId}:wiki`);
+  await publishOrgEvent(deps.pubsub, {
+    type: "org.broadcast",
+    orgId,
+    event: { type: "wiki.page.updated", action, page: { id: "", restricted: true } },
+  });
+}
+
+/**
+ * "Apagar" for many pages (a selection, a folder with its subfolders, or one import): they go to the trash together,
+ * as `deleteWikiPage` sends one. Pages this person may not delete stay where they are and are counted in `kept`.
+ */
+export async function deleteWikiPages(deps: WikiDeps, userId: string, orgId: string, target: WikiBulkTarget) {
+  const { db } = deps;
+  const { mine, kept } = await pagesToChange(db, userId, orgId, target, false);
+  if (mine.length === 0) return { deleted: 0, kept };
+  const ids = mine.map((p) => p.id);
+  await db.transaction(async (tx) => {
+    const now = new Date();
+    await tx.update(wikiPages).set({ deletedAt: now, updatedAt: now }).where(inArray(wikiPages.id, ids));
+    await tx.update(wikiLinks).set({ toPageId: null }).where(inArray(wikiLinks.toPageId, ids));
+    for (const id of ids) await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: id });
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "wiki.pages_deleted",
+      target: { type: "wiki", id: orgId },
+      details: { target, count: ids.length, slugs: mine.slice(0, 50).map((p) => p.slug) },
+    });
+  });
+  await announceMany(deps, orgId, "deleted");
+  return { deleted: ids.length, kept };
+}
+
+/**
+ * "Restaurar" for many pages of the trash. A page whose address a live page took since stays in the trash, in
+ * `failed` with `wiki.restore_slug_taken` (rename the live one first).
+ */
+export async function restoreWikiPages(deps: WikiDeps, userId: string, orgId: string, ids: string[]) {
+  const { db } = deps;
+  const { mine, kept } = await pagesToChange(db, userId, orgId, { ids }, true);
+  const failed: { id: string; title: string; code: string }[] = [];
+  let restored = 0;
+  await db.transaction(async (tx) => {
+    for (const page of mine) {
+      const [taken] = await tx
+        .select({ id: wikiPages.id })
+        .from(wikiPages)
+        .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.slug, page.slug), isNull(wikiPages.deletedAt)));
+      if (taken) {
+        failed.push({ id: page.id, title: page.title, code: "wiki.restore_slug_taken" });
+        continue;
+      }
+      const [row] = await tx
+        .update(wikiPages)
+        .set({ deletedAt: null, updatedAt: new Date() })
+        .where(and(eq(wikiPages.id, page.id), sql`${wikiPages.deletedAt} is not null`))
+        .returning();
+      if (!row) continue;
+      await claimLinks(tx, row);
+      await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: row.id });
+      restored++;
+    }
+    if (restored > 0)
+      await recordAudit(tx, {
+        orgId,
+        actor: { type: "person", id: userId },
+        action: "wiki.pages_restored",
+        target: { type: "wiki", id: orgId },
+        details: { count: restored },
+      });
+  });
+  if (restored > 0) await announceMany(deps, orgId, "restored");
+  return { restored, kept, failed };
+}
+
+/**
+ * "Apagar para sempre" (`ids`) or "Esvaziar lixeira" (none): pages in the trash are removed with their history now,
+ * as the purge would after `WIKI_TRASH_DAYS`. Only the pages this person could restore.
+ */
+export async function purgeWikiPages(deps: WikiDeps, userId: string, orgId: string, ids?: string[]) {
+  const { db } = deps;
+  const { mine, kept } = await pagesToChange(db, userId, orgId, ids ? { ids } : { all: true }, true);
+  if (mine.length === 0) return { purged: 0, kept };
+  await db.transaction(async (tx) => {
+    await tx.delete(wikiPages).where(
+      and(
+        inArray(
+          wikiPages.id,
+          mine.map((p) => p.id),
+        ),
+        sql`${wikiPages.deletedAt} is not null`,
+      ),
+    );
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "wiki.pages_purged",
+      target: { type: "wiki", id: orgId },
+      details: { count: mine.length, titles: mine.slice(0, 50).map((p) => p.title) },
+    });
+  });
+  return { purged: mine.length, kept };
+}
+
+/** Job: pages in the trash longer than `WIKI_TRASH_DAYS` are removed with their history. */
+export async function purgeDeletedWikiPages(db: Database, now = new Date()) {
+  const cutoff = new Date(now.getTime() - WIKI_TRASH_DAYS * 86_400_000).toISOString();
+  const gone = await db
+    .delete(wikiPages)
+    .where(
+      inArray(
+        wikiPages.id,
+        db
+          .select({ id: wikiPages.id })
+          .from(wikiPages)
+          .where(sql`${wikiPages.deletedAt} is not null and ${wikiPages.deletedAt} < ${cutoff}::timestamptz`)
+          .limit(500),
+      ),
+    )
+    .returning({ id: wikiPages.id });
+  return gone.length;
+}
+
+/**
+ * The agents' access for many pages at once (a selection of the root's pages, say): `agentIds` only those agents read
+ * them, null every agent. Who sees each page among people stays as it was. Pages this person may not change are in
+ * `failed` with the reason.
+ */
+export async function setWikiPagesAgents(
+  deps: WikiDeps,
+  userId: string,
+  orgId: string,
+  ids: string[],
+  agentIds: string[] | null,
+) {
+  const { db } = deps;
+  await requireAudienceChooser(db, userId, orgId);
+  const rows = await db
+    .select()
+    .from(wikiPages)
+    .where(
+      and(
+        eq(wikiPages.orgId, orgId),
+        isNull(wikiPages.deletedAt),
+        targetSql({ ids }),
+        visibleTo({ type: "person", userId }),
+      ),
+    );
+  let changed = 0;
+  const failed: { id: string; title: string; code: string }[] = [];
+  for (const row of rows) {
+    const people = row.restricted ? { roleIds: row.audienceRoleIds, userIds: row.audienceUserIds } : null;
+    try {
+      await setWikiPageAudience({ db }, userId, orgId, row.id, people, agentIds);
+      changed++;
+    } catch (e) {
+      failed.push({ id: row.id, title: row.title, code: (e as { code?: string }).code ?? "error" });
+    }
+  }
+  if (changed > 0) await announceMany(deps, orgId, "audience");
+  return { changed, failed };
+}
+
+/** At most this many pages are always in the agents' context: each takes up to `WIKI_PAGE_CHARS` of every run. */
+export const WIKI_CONTEXT_MAX = 3;
+
+/**
+ * "Sempre no contexto dos agentes": every run of an agent that reads the page gets it, within the wiki's budget, as
+ * if the message had named it. People who edit the page may set it; at most `WIKI_CONTEXT_MAX` per workspace.
+ */
+export async function setWikiPageAgentContext(deps: WikiDeps, userId: string, orgId: string, ref: string, on: boolean) {
+  const { db } = deps;
+  const actor: WikiActor = { type: "person", userId };
+  const page = await findPage(db, actor, orgId, ref);
+  await requireWriter(db, actor, orgId, page);
+  const row = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`wiki-context:${orgId}`}))`);
+    if (on && !page.agentContext) {
+      const [{ n } = { n: 0 }] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(wikiPages)
+        .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.agentContext, true), isNull(wikiPages.deletedAt)));
+      if (n >= WIKI_CONTEXT_MAX) {
+        throw new ValidationError(
+          `At most ${WIKI_CONTEXT_MAX} pages are always in the agents' context`,
+          "wiki.context_full",
+          { max: WIKI_CONTEXT_MAX },
+        );
+      }
+    }
+    const [updated] = await tx.update(wikiPages).set({ agentContext: on }).where(eq(wikiPages.id, page.id)).returning();
+    if (!updated) throw new NotFoundError("Page not found", "wiki.page_not_found");
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: on ? "wiki.page_in_context" : "wiki.page_out_of_context",
+      target: { type: "wiki_page", id: page.id },
+      details: { slug: page.slug },
+    });
+    return updated;
+  });
+  const view = await detail(db, actor, row);
+  await announce(deps, orgId, view, "context");
+  return view;
+}
+
 /** Admins lock (only admins edit) or unlock a page. */
 export async function setWikiPageLock(deps: WikiDeps, userId: string, orgId: string, ref: string, locked: boolean) {
   const { db } = deps;
@@ -1824,7 +2128,6 @@ export async function setWikiPageAudience(
 export async function getWikiFolderAudience(db: Database, userId: string, orgId: string, folder: string) {
   const membership = await requireAudienceChooser(db, userId, orgId);
   const path = cleanFolder(folder);
-  if (!path) throw new ValidationError("Choose a folder", "wiki.folder_required");
   const rules = await db
     .select()
     .from(wikiFolderAudiences)
@@ -1832,11 +2135,14 @@ export async function getWikiFolderAudience(db: Database, userId: string, orgId:
   await requireInsideRule(db, { userId, owner: membership.role === "owner" }, orgId, closestRule(rules, path));
   return {
     own: folderAudienceOf(rules.find((r) => r.folder === path) ?? null),
-    above: folderAudienceOf(closestRule(rules, parentFolder(path))),
+    above: folderAudienceOf(ruleAbove(rules, path)),
   };
 }
 
 const parentFolder = (folder: string) => folder.split("/").slice(0, -1).join("/");
+
+/** The closest rule above `folder`: the root ("") has none. */
+const ruleAbove = (rules: FolderRule[], folder: string) => (folder ? closestRule(rules, parentFolder(folder)) : null);
 
 const isLimited = (a: AudienceCols) => a.restricted || a.agentsLimited || a.editorsLimited || a.agentEditorsLimited;
 
@@ -1873,7 +2179,6 @@ export async function setWikiFolderAudience(
   const { db } = deps;
   const membership = await requireAudienceChooser(db, userId, orgId);
   const path = cleanFolder(folder);
-  if (!path) throw new ValidationError("Choose a folder", "wiki.folder_required");
   const chooser = { userId, owner: membership.role === "owner" };
   const cols = await audienceCols(db, orgId, chooser, audience, agents, edit, OPEN);
   const limited = isLimited(cols);
@@ -1882,7 +2187,7 @@ export async function setWikiFolderAudience(
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`wiki-folders:${orgId}`}))`);
     await requireInsideRule(tx, chooser, orgId, await ruleFor(tx, orgId, path));
     if (limited) {
-      await requireInsideFolder(tx, orgId, cols, await ruleFor(tx, orgId, parentFolder(path)));
+      if (path) await requireInsideFolder(tx, orgId, cols, await ruleFor(tx, orgId, parentFolder(path)));
       await tx
         .insert(wikiFolderAudiences)
         .values({ orgId, folder: path, ...cols, updatedById: userId })
@@ -1924,7 +2229,10 @@ export async function setWikiFolderAudience(
 
 /** After `path` changed: its subfolders' audiences and every page under it, deleted ones too, follow. */
 async function reapplyFolder(tx: Executor, orgId: string, path: string) {
-  const under = sql`(${wikiPages.folder} = ${path} or starts_with(${wikiPages.folder}, ${`${path}/`}))`;
+  // The root ("") holds every page and folder.
+  const under = path
+    ? sql`(${wikiPages.folder} = ${path} or starts_with(${wikiPages.folder}, ${`${path}/`}))`
+    : sql`true`;
   const rules = await tx.select().from(wikiFolderAudiences).where(eq(wikiFolderAudiences.orgId, orgId));
   const holders = new Map<string, { audience: Set<string>; editors: Set<string> }>();
   const heldBy = async (rule: FolderRule) => {
@@ -1936,10 +2244,10 @@ async function reapplyFolder(tx: Executor, orgId: string, path: string) {
   };
   // Closest to `path` first, so a subfolder is cut to its already-cut parent.
   const nested = rules
-    .filter((r) => r.folder.startsWith(`${path}/`))
+    .filter((r) => (path ? r.folder.startsWith(`${path}/`) : r.folder !== ""))
     .sort((a, b) => a.folder.split("/").length - b.folder.split("/").length);
   for (const rule of nested) {
-    const above = closestRule(rules, parentFolder(rule.folder));
+    const above = ruleAbove(rules, rule.folder);
     if (!above) continue;
     const kept = clampTo(rule, above, await heldBy(above));
     if (sameAudience(kept, rule)) continue;
@@ -2004,7 +2312,7 @@ export async function listWikiPages(
     .where(
       and(
         eq(wikiPages.orgId, orgId),
-        filters.deleted ? sql`${wikiPages.deletedAt} is not null` : isNull(wikiPages.deletedAt),
+        filters.deleted ? inTrashWindow() : isNull(wikiPages.deletedAt),
         folder !== undefined && folder !== ""
           ? or(eq(wikiPages.folder, folder), sql`${wikiPages.folder} like ${`${folder.replace(/[%_\\]/g, "\\$&")}/%`}`)
           : undefined,
@@ -2013,7 +2321,7 @@ export async function listWikiPages(
         visibleTo(actor),
       ),
     )
-    .orderBy(desc(wikiPages.updatedAt))
+    .orderBy(filters.deleted ? desc(wikiPages.deletedAt) : desc(wikiPages.updatedAt))
     .limit(Math.min(filters.limit ?? 2000, 5000));
   return summaries(db, rows);
 }
@@ -2278,12 +2586,17 @@ export async function searchWiki(deps: WikiDeps, actor: WikiActor, orgId: string
   return searchPages(deps, actor, orgId, text, limit);
 }
 
+/**
+ * With `minTextRank` (a run's context) only pages that pass it: the index's answer stands even when empty, and the
+ * word match below is only for when the index can't answer.
+ */
 async function searchPages(
   deps: WikiDeps,
   actor: WikiActor,
   orgId: string,
   text: string,
   limit: number,
+  minTextRank?: number,
 ): Promise<PageRow[]> {
   const q = text.trim();
   if (!q) return [];
@@ -2295,8 +2608,10 @@ async function searchPages(
       kinds: ["wiki"],
       limit,
       match: "any",
-    }).catch(() => []);
-    if (hits.length > 0) {
+      minTextRank,
+    }).catch(() => null);
+    if (hits && hits.length === 0 && minTextRank !== undefined) return [];
+    if (hits && hits.length > 0) {
       const rows = await deps.db
         .select()
         .from(wikiPages)
@@ -2315,7 +2630,7 @@ async function searchPages(
       return rows.sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99));
     }
   }
-  const words = [...new Set(q.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])].slice(0, 8);
+  const words = contentWords(q, 8);
   if (words.length === 0) return [];
   const match = or(
     ...words.map((w) => {
@@ -2411,27 +2726,38 @@ export async function createPageFromSource(
 
 /**
  * Wiki pages relevant to the trigger message, for the run's prompt (a trusted
- * source written by the team). Pages the message links with `[[…]]` come
- * first. An org without a wiki costs one cached lookup.
+ * source written by the team). Pages marked "Sempre no contexto" and the pages
+ * the message links with `[[…]]` come first, then the search's matches that
+ * pass `WIKI_MIN_RANK`. An org without a wiki costs one cached lookup.
  */
 export async function retrieveWikiForRun(
   deps: WikiDeps,
   input: { orgId: string; text: string; budgetChars?: number; reader: () => Promise<WikiActor> },
 ): Promise<{ text: string; pageIds: string[]; held: boolean }> {
   const { db } = deps;
-  const hasAny = (await caches.contextPresence.getOrLoad(`${input.orgId}:wiki`, async () => {
-    const [row] = await db
-      .select({ id: wikiPages.id })
-      .from(wikiPages)
-      .where(and(eq(wikiPages.orgId, input.orgId), isNull(wikiPages.deletedAt)))
-      .limit(1);
-    return Boolean(row);
-  })) as boolean;
-  if (!hasAny || !input.text.trim()) return { text: "", pageIds: [], held: false };
+  const known = (await caches.contextPresence.getOrLoad(`${input.orgId}:wiki`, async () => {
+    const [[row], always] = await Promise.all([
+      db
+        .select({ id: wikiPages.id })
+        .from(wikiPages)
+        .where(and(eq(wikiPages.orgId, input.orgId), isNull(wikiPages.deletedAt)))
+        .limit(1),
+      db
+        .select({ id: wikiPages.id })
+        .from(wikiPages)
+        .where(and(eq(wikiPages.orgId, input.orgId), eq(wikiPages.agentContext, true), isNull(wikiPages.deletedAt)))
+        .orderBy(asc(wikiPages.title))
+        .limit(WIKI_CONTEXT_MAX),
+    ]);
+    return { any: Boolean(row), always: always.map((r) => r.id) };
+  })) as { any: boolean; always: string[] };
+  if (!known.any || (!input.text.trim() && known.always.length === 0)) return { text: "", pageIds: [], held: false };
   const actor = await input.reader();
   const wide = withoutConversation(actor);
   const linked = parseWikiLinks(input.text);
-  const named = linked.length
+  // "Sempre no contexto" goes in as if the message named it.
+  const named = [...known.always];
+  const namedLinks = linked.length
     ? [
         ...(
           await pagesBySlug(
@@ -2442,17 +2768,24 @@ export async function retrieveWikiForRun(
         ).values(),
       ].map((p) => p.id)
     : [];
+  named.push(...namedLinks.filter((id) => !named.includes(id)));
   const namedRows = named.length
     ? await db
         .select()
         .from(wikiPages)
         .where(and(inArray(wikiPages.id, named), isNull(wikiPages.deletedAt), visibleTo(wide)))
     : [];
-  const hits = await searchPages(deps, wide, input.orgId, input.text, 5).catch(() => [] as PageRow[]);
+  const hits = await searchPages(deps, wide, input.orgId, input.text, 5, WIKI_MIN_RANK).catch(() => [] as PageRow[]);
   const seen = await visibleIds(db, actor, [...new Set([...namedRows, ...hits].map((p) => p.id))]);
-  // What the message names, or the best match, kept from this conversation only: it goes to the person's DM.
-  const held = [...namedRows, ...hits.slice(0, 1)].some((p) => !seen.has(p.id));
-  const namedSeen = namedRows.filter((p) => seen.has(p.id));
+  // What the message names, or the best match, kept from this conversation only: it goes to the person's DM. A page
+  // always in context that this conversation may not read just stays out.
+  const held = [...namedRows.filter((p) => namedLinks.includes(p.id)), ...hits.slice(0, 1)].some(
+    (p) => !seen.has(p.id),
+  );
+  const order = new Map(named.map((id, i) => [id, i]));
+  const namedSeen = namedRows
+    .filter((p) => seen.has(p.id))
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   const found = hits.filter((p) => seen.has(p.id));
   const budget = input.budgetChars ?? 6000;
   const lines: string[] = [];
@@ -2517,6 +2850,14 @@ export async function wikiHitsForAgent<T extends { kind: string; sourceId: strin
   const seen = await visibleIds(db, actor, ids);
   return hits.filter((h) => h.kind !== "wiki" || seen.has(h.sourceId));
 }
+
+/**
+ * A run's context takes a page only when its full-text rank (`SearchQuery.minTextRank`: density of the matches, plus
+ * up to 0.5 for words in its title) reaches this: about one match every 30 words, or a word of its title. A message
+ * that shares a word or two with a long page gets nothing.
+ */
+// ponytail: one fixed floor calibrated on pt/en pages; make it per-workspace if a wiki needs it looser.
+const WIKI_MIN_RANK = 0.004;
 
 /** A page the run's message names, or its best match, goes in up to this much (ADR 0043). */
 const WIKI_PAGE_CHARS = 1500;

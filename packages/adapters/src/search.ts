@@ -1,4 +1,5 @@
 import { and, asc, type Database, desc, eq, gte, inArray, lt, rowsOf, schema, sql } from "@agenteschat/db";
+import { contentWords } from "./stopwords";
 
 export type SearchKind = "message" | "context_item" | "issue" | "file" | "wiki" | "action";
 
@@ -27,8 +28,17 @@ export interface SearchQuery {
   visibleChannelIds: string[];
   kinds?: SearchKind[];
   limit?: number;
-  /** `all` (default): every word must match (websearch syntax). `any`: at least one word (retrieval). */
+  /**
+   * `all` (default): every word must match (websearch syntax). `any`: at least one word that says something (stopwords
+   * left out), ranked by how dense the matches are in the document, with a match in its title first (retrieval).
+   */
   match?: "all" | "any";
+  /**
+   * With `any`: full-text hits ranked below this are dropped before fusion, so a message that shares only a word or
+   * two with a long document gets nothing. The rank is the matches' density (`ts_rank_cd` normalization 2|32) plus
+   * up to 0.5 for words in the title.
+   */
+  minTextRank?: number;
   /** Vector hits farther than this cosine distance are dropped (default 0.75, i.e. similarity < 0.25). */
   maxDistance?: number;
   /** Only documents whose source was created at or after `after` and before `before` (ADR 0123). */
@@ -228,11 +238,15 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
                   where ${pins.channelId} = any(${uuids(q.visibleChannelIds)}) and ${pins.orgId} = ${orgId})`
               : undefined,
           );
-          const anyWords = [...new Set(text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])].slice(0, 30);
+          const anyWords = contentWords(text);
           const useAny = q.match === "any" && anyWords.length > 0;
           const tsQuery = useAny
             ? sql`to_tsquery('simple', ${anyWords.join(" | ")})`
             : sql`websearch_to_tsquery('simple', ${text})`;
+          // Retrieval: matches per word of the document (a long one mentioning a word in passing doesn't outrank a
+          // short one about it), and the title's words count most.
+          const anyRank = sql`(ts_rank_cd(${t.tsv}, ${tsQuery}, 2|32)
+            + ts_rank_cd(setweight(to_tsvector('simple', ${t.title}), 'A'), ${tsQuery}, 32))`;
           const toHit = (row: typeof t.$inferSelect, score: number): SearchHit => ({
             kind: row.kind as SearchKind,
             sourceId: row.sourceId,
@@ -268,8 +282,14 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
               ? db
                   .select()
                   .from(t)
-                  .where(and(scope, sql`${t.tsv} @@ ${tsQuery}`))
-                  .orderBy(desc(sql`ts_rank_cd(${t.tsv}, ${tsQuery})`), desc(t.sourceCreatedAt))
+                  .where(
+                    and(
+                      scope,
+                      sql`${t.tsv} @@ ${tsQuery}`,
+                      useAny && q.minTextRank ? sql`${anyRank} >= ${q.minTextRank}` : undefined,
+                    ),
+                  )
+                  .orderBy(desc(useAny ? anyRank : sql`ts_rank_cd(${t.tsv}, ${tsQuery})`), desc(t.sourceCreatedAt))
                   .limit(50)
               : Promise.resolve([]);
           const vectorRows = q.embedding

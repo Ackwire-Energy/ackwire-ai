@@ -3,6 +3,7 @@ import {
   createPageFromSource,
   createWikiPage,
   deleteWikiPage,
+  deleteWikiPages,
   diffWikiVersions,
   getWikiFolderAudience,
   getWikiPage,
@@ -12,18 +13,24 @@ import {
   listWikiVersions,
   moveWikiPage,
   parseWikiLinks,
+  purgeWikiPages,
   renameWikiPage,
   requirePermission,
   resolveWikiTargets,
   restoreWikiPage,
+  restoreWikiPages,
   setWikiFolderAudience,
+  setWikiPageAgentContext,
   setWikiPageAudience,
   setWikiPageLock,
   setWikiPagePinned,
+  setWikiPagesAgents,
   suggestWikiPages,
   topWikiReads,
   updateWikiPage,
+  WIKI_CONTEXT_MAX,
   WIKI_IMPORT_MAX_NOTES,
+  WIKI_TRASH_DAYS,
   type WikiActor,
   type WikiDeps,
   wikiGraph,
@@ -77,6 +84,9 @@ const Summary = z
     version: z.number(),
     locked: z.boolean().openapi({ description: "Only admins edit it." }),
     pinned: z.boolean().openapi({ description: "At the top of the wiki for everyone." }),
+    agentContext: z.boolean().openapi({
+      description: "In every run of an agent that reads it, within the wiki's budget (at most 3 per workspace).",
+    }),
     audience: Audience.nullable().openapi({
       description: "Limited to these roles and people (plus owners); null = every member.",
     }),
@@ -88,8 +98,14 @@ const Summary = z
     audienceFolder: z.string().nullable().openapi({ description: "The folder whose audience it follows." }),
     excerpt: z.string().openapi({ description: "The start of the text, plain." }),
     sourceType: z.string().nullable().openapi({ description: '"obsidian" for an imported page.' }),
+    sourceName: z.string().nullable().openapi({ description: "An imported page: the vault's name." }),
+    importId: z
+      .string()
+      .nullable()
+      .openapi({ description: "The import that brought it (null for pages imported before imports had ids)." }),
     updatedAt: z.string(),
     updatedBy: Author,
+    deletedAt: z.string().nullable().openapi({ description: "In the trash since then; null for a live page." }),
   })
   .openapi("WikiPageSummary");
 const Backlink = z
@@ -147,8 +163,7 @@ const Page = Summary.extend({
         at: z.string(),
       })
       .nullable(),
-  }).openapi({ description: "Agents that used the page in the last 7 days." }),
-  deletedAt: z.string().nullable(),
+  }).openapi({ description: "Agents that used the page in the last 7 days (in their context or opened)." }),
 }).openapi("WikiPage");
 const Version = z
   .object({
@@ -197,7 +212,12 @@ export function wikiRoutes(deps: AppDeps) {
           folder: z.string().max(200).optional(),
           tag: z.string().max(40).optional(),
           q: z.string().max(200).optional(),
-          deleted: z.stringbool().optional().openapi({ description: "The trash (deleted pages, to restore)." }),
+          deleted: z
+            .stringbool()
+            .optional()
+            .openapi({
+              description: `The trash: pages deleted in the last ${WIKI_TRASH_DAYS} days, to restore (then they are gone).`,
+            }),
         }),
       },
       responses: { 200: json(z.object({ pages: z.array(Summary) })), ...errors },
@@ -476,6 +496,109 @@ export function wikiRoutes(deps: AppDeps) {
     },
   );
 
+  const Ids = z.array(z.uuid()).max(5000);
+  const Failed = z.array(z.object({ id: z.string(), title: z.string(), code: z.string() }));
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/bulk/delete",
+      tags,
+      security,
+      summary: "Move many pages to the trash: chosen ones, a folder with its subfolders, or one import",
+      description:
+        "Give one of `ids`, `folder`, `importId` or `source` (an import made before imports had ids). Pages this person may not delete (locked, or off their editors) stay and are counted in `kept`. `wiki.folder_required`: an empty folder.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.union([
+            z.object({ ids: Ids }),
+            z.object({ folder: Folder }),
+            z.object({ importId: z.uuid() }),
+            z.object({ source: z.object({ type: z.string().max(40), name: z.string().max(200) }) }),
+          ]),
+        ),
+      },
+      responses: { 200: json(z.object({ deleted: z.number(), kept: z.number() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await deleteWikiPages(wiki(), c.get("user").id, orgId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/trash/restore",
+      tags,
+      security,
+      summary: "Bring pages back from the trash",
+      description:
+        "A page whose address a live page took since stays in the trash, in `failed` with `wiki.restore_slug_taken`.",
+      request: { params: OrgParams, body: body(z.object({ ids: Ids })) },
+      responses: {
+        200: json(z.object({ restored: z.number(), kept: z.number(), failed: Failed })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await restoreWikiPages(wiki(), c.get("user").id, orgId, c.req.valid("json").ids), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/trash/purge",
+      tags,
+      security,
+      summary: `Delete pages of the trash for good (\`ids\`), or empty it (no \`ids\`), before the ${WIKI_TRASH_DAYS} days`,
+      request: { params: OrgParams, body: body(z.object({ ids: Ids.optional() })) },
+      responses: { 200: json(z.object({ purged: z.number(), kept: z.number() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await purgeWikiPages(wiki(), c.get("user").id, orgId, c.req.valid("json").ids), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/wiki/bulk/agents",
+      tags,
+      security,
+      summary: "Choose which agents read many pages at once (`agentIds` null = every agent); who sees them stays",
+      description: "For people who edit the wiki and manage roles. Pages that can't change come back in `failed`.",
+      request: { params: OrgParams, body: body(z.object({ ids: Ids, agentIds: AgentIds.nullable() })) },
+      responses: { 200: json(z.object({ changed: z.number(), failed: Failed })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { ids, agentIds } = c.req.valid("json");
+      return c.json(await setWikiPagesAgents(wiki(), c.get("user").id, orgId, ids, agentIds), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/context",
+      tags,
+      security,
+      summary: `"Sempre no contexto dos agentes": the page goes into every run of an agent that reads it (at most ${WIKI_CONTEXT_MAX})`,
+      description: "`wiki.context_full`: the workspace already has the most pages always in context.",
+      request: { params: PageParams, body: body(z.object({ on: z.boolean() })) },
+      responses: { 200: json(Page), ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await setWikiPageAgentContext(wiki(), c.get("user").id, orgId, slug, c.req.valid("json").on), 200);
+    },
+  );
+
   app.openapi(
     createRoute({
       method: "post",
@@ -498,7 +621,7 @@ export function wikiRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/wiki/reads",
       tags,
       security,
-      summary: "What the agents read most in the last 7 days",
+      summary: "What the agents opened most in the last 7 days (pages that only went into a run's context don't count)",
       request: { params: OrgParams },
       responses: {
         200: json(z.array(AgentReads.extend({ slug: z.string(), title: z.string() })).openapi("WikiTopReads")),
@@ -515,7 +638,7 @@ export function wikiRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Import notes (an Obsidian vault read by the app) as pages",
-      description: `Up to ${WIKI_IMPORT_MAX_NOTES} notes per call; the app sends a big vault in batches. Attachments go to the Drive first (upload), and each note says which ones it embeds.`,
+      description: `Up to ${WIKI_IMPORT_MAX_NOTES} notes per call; the app sends a big vault in batches with one \`importId\`. Attachments go to the Drive first (upload), and each note says which ones it embeds. A note that can't be a page comes back in \`failed\` and the others still go in; tags, aliases and attachment names past their limits are cut.`,
       request: {
         params: OrgParams,
         body: body(
@@ -524,17 +647,20 @@ export function wikiRoutes(deps: AppDeps) {
             notes: z
               .array(
                 z.object({
-                  title: z.string().min(1).max(300),
-                  folder: z.string().max(500).optional(),
-                  body: z.string().max(400_000),
-                  tags: z.array(z.string().max(80)).max(100).optional(),
-                  aliases: z.array(z.string().max(300)).max(50).optional(),
-                  attachments: z.record(z.string().max(300), z.uuid()).optional(),
+                  title: z.string().max(1000),
+                  folder: z.string().max(1000).optional(),
+                  body: z.string().max(1_000_000),
+                  tags: z.array(z.string().max(1000)).max(200).optional(),
+                  aliases: z.array(z.string().max(1000)).max(200).optional(),
+                  attachments: z.record(z.string().max(1000), z.uuid()).optional(),
                 }),
               )
               .max(WIKI_IMPORT_MAX_NOTES),
             folder: Folder.optional().openapi({ description: "Put everything under this folder." }),
             onConflict: z.enum(["keep_both", "skip"]).default("keep_both"),
+            importId: z.uuid().optional().openapi({
+              description: "The same for every batch and retry of one import: its pages keep it (delete it as one).",
+            }),
           }),
         ),
       },
@@ -614,8 +740,8 @@ export function wikiRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/wiki/folder-audience",
       tags,
       security,
-      summary: "A folder's audience and the closest limited folder above it",
-      request: { params: OrgParams, query: z.object({ folder: z.string().min(1).max(200) }) },
+      summary: "A folder's audience and the closest limited folder above it (\"\" = the wiki's root)",
+      request: { params: OrgParams, query: z.object({ folder: z.string().max(200) }) },
       responses: {
         200: json(z.object({ own: FolderAudience.nullable(), above: FolderAudience.nullable() })),
         ...errors,
@@ -637,12 +763,12 @@ export function wikiRoutes(deps: AppDeps) {
       summary:
         "Limit a folder to roles, people and agents (both `null` opens it); for people who edit the wiki and manage roles",
       description:
-        "Reaches the pages in it and its subfolders, and a page created or moved in takes it. A page with its own narrower audience keeps it, cut to fit. Same errors as a page's audience; `wiki.folder_required`: no folder.",
+        "Reaches the pages in it and its subfolders, and a page created or moved in takes it. A page with its own narrower audience keeps it, cut to fit. `folder` \"\" is the wiki's root: every page. Same errors as a page's audience.",
       request: {
         params: OrgParams,
         body: body(
           z.object({
-            folder: z.string().min(1).max(200),
+            folder: z.string().max(200),
             audience: Audience.nullable(),
             agentIds: AgentIds.nullable(),
             editors: Audience.nullable().optional(),
