@@ -13,12 +13,15 @@ import {
   listApprovals,
   listIssueActivity,
   listIssues,
+  listMembers,
+  markThreadRead,
   moveIssueComments,
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   openTaskConversation,
   postPersonMessage,
   requireChannelAccess,
+  unreadTaskConversations,
   updateIssue,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -257,6 +260,48 @@ describe("a task's conversation (ADR 0145)", () => {
     await updateIssue(deps, person(bia.id), f.org.id, issue.id, { status: "done" });
     const told = await f.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "issue_status"));
     expect(told.map((x) => x.userId).sort()).toEqual([caio.id, f.owner.id].sort());
+  });
+
+  test("a mention there is unread for whoever sees the task until they read it; one who can't see it gets none", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    await listMembers(f.db, f.org.id); // assigns their handles
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secreto", visibility: "private" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { userId: bia.id });
+    const said = await postPersonMessage(deps, f.owner.id, f.org.id, secret.id, { body: "Checkout quebra" });
+    const issue = await issueFromMessage(deps, f.owner.id, f.org.id, said.id);
+    const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, issue.id);
+
+    // Nobody in a task's channel is a member: who sees the task and is named is mentioned all the same.
+    const asked = await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, {
+      body: "@bia e @caio, conferem?",
+      threadId: at.rootId,
+    });
+    expect(asked.mentionedUserIds).toEqual([bia.id]); // caio isn't in #secreto
+    expect(await unreadTaskConversations(f.db, bia.id, f.org.id)).toEqual([
+      { issueId: issue.id, unread: 1, mentions: 1 },
+    ]);
+    expect(await unreadTaskConversations(f.db, caio.id, f.org.id)).toEqual([]);
+    // My own message is never unread for me; the task's creator follows its conversation (its root is theirs).
+    expect(await unreadTaskConversations(f.db, f.owner.id, f.org.id)).toEqual([]);
+
+    // A plain reply after: Bia doesn't follow the conversation, so only the mention counts; the creator sees it.
+    await postPersonMessage(deps, bia.id, f.org.id, at.channelId, { body: "Confiro hoje", threadId: at.rootId });
+    expect(await unreadTaskConversations(f.db, f.owner.id, f.org.id)).toEqual([
+      { issueId: issue.id, unread: 1, mentions: 0 },
+    ]);
+
+    // Read there, it's gone.
+    await markThreadRead(deps, bia.id, f.org.id, at.rootId);
+    expect(await unreadTaskConversations(f.db, bia.id, f.org.id)).toEqual([]);
+
+    // Mentioned again, then out of #secreto: the task is out of her sight, so is the mention.
+    await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, { body: "@bia mais uma", threadId: at.rootId });
+    expect((await unreadTaskConversations(f.db, bia.id, f.org.id)).map((u) => u.mentions)).toEqual([1]);
+    await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, bia.id));
+    expect(await unreadTaskConversations(f.db, bia.id, f.org.id)).toEqual([]);
   });
 
   test("a task whose creator's account is gone still gets its conversation", async () => {

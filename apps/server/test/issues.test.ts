@@ -69,6 +69,10 @@ test("issues API: create, by number, patch, criteria, comments, activity, ask ag
   };
   expect(card.conversation).toMatchObject({ channelId: at.channelId, count: 4, working: false });
   expect(card.conversation.participants.map((p) => p.type)).toEqual(["person", "agent"]);
+  // The agent's reply is unread for the task's creator, who follows its conversation, until they read the thread.
+  expect(await (await api("/unread-tasks")).json()).toEqual({ tasks: [{ issueId: issue.id, unread: 1, mentions: 0 }] });
+  expect((await api(`/threads/${at.rootId}/read`, { json: {} })).status).toBe(204);
+  expect(await (await api("/unread-tasks")).json()).toEqual({ tasks: [] });
 
   const message = (await (
     await api(`/channels/${channelId}/messages`, { json: { body: "Bug no checkout" } })

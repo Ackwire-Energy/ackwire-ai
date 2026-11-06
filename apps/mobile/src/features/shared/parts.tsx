@@ -2,12 +2,14 @@ import { markTerms } from "@agenteschat/client/lib/search-filters";
 import * as Clipboard from "expo-clipboard";
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { needsHeaderBlur } from "@/lib/nav";
+import { needsHeaderBlur, TAB_BADGE } from "@/lib/nav";
 import {
   BarPressable,
   Button,
+  Count,
   coverBarOptions,
   fonts,
   GroupedList,
@@ -34,6 +36,17 @@ import { useColors } from "./hooks";
  * primitives: the icon tile, the action list of sheets, the bar of a pushed
  * screen, haptics and the clipboard.
  */
+
+/** Mentions of me not read yet: the tab bar's red badge, as a channel's on the web. Nothing at zero. */
+export function MentionCount({ count }: { count: number }) {
+  const { t } = useTranslation();
+  if (count <= 0) return null;
+  return (
+    <View accessible accessibilityLabel={t("shell.unreadMentions", { count })}>
+      <Count value={count} max={99} inverted fill={TAB_BADGE.background} color={TAB_BADGE.text} />
+    </View>
+  );
+}
 
 /** The rounded square with an icon (channels, threads, missions, sheet actions). */
 export function Tile({ icon, size = 36, children }: { icon?: IconName; size?: number; children?: ReactNode }) {

@@ -28,7 +28,7 @@ import { IssueCardWork } from "@/components/BackgroundWork";
 import { useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { TaskCardConversation } from "@/components/TaskConversation";
+import { TaskCardConversation, TaskMentions } from "@/components/TaskConversation";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
@@ -704,6 +704,7 @@ function IssueCard({
     >
       <span className="issue-card__title">
         <span className="issue-card__number tabular">#{i.number}</span> {i.title}
+        <TaskMentions issue={i} />
       </span>
       {((fields.label && i.labels[0]) ||
         (fields.priority && i.priority !== "normal") ||
@@ -877,6 +878,7 @@ function IssueRows({
               <span className="issue-list__num tabular">#{i.number}</span>
               <span className="issue-list__title">
                 <b>{i.title}</b>
+                <TaskMentions issue={i} />
                 {fields.priority && <PriorityChip issue={i} />}
               </span>
               <span className="issue-list__crit">{fields.criteria && <Criteria issue={i} />}</span>

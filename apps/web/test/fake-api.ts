@@ -93,6 +93,7 @@ import type {
   TaskSteps,
   TeamProposalCard,
   TeamTemplate,
+  UnreadTask,
   UsageQueue,
   WorkspaceLimits,
 } from "@agenteschat/client";
@@ -204,6 +205,8 @@ export interface FakeState {
   answerHold?: Promise<void>;
   /** Threads I follow with an unread reply (`reads.unreadThreads`). */
   unreadThreads?: number;
+  /** Tasks whose conversation has a reply I haven't read (`reads.unreadTasks`). */
+  unreadTasks?: UnreadTask[];
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
@@ -3325,6 +3328,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       markThreadRead: async (orgId, threadId) => log("reads.markThreadRead", orgId, threadId),
       unreadThreads: async () => state.unreadThreads ?? 0,
+      unreadTasks: async () => structuredClone(state.unreadTasks ?? []),
     },
     questions: {
       // Same rules as the server: the choice must be one of the options; answering twice is 409.

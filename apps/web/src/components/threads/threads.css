@@ -890,25 +890,29 @@ html:not([data-pointer]) .thread-line:focus-visible {
 }
 
 /*
- * The thread panel over a channel: a sheet floating on the right of the work area (the channel keeps
- * its full width under it); the thread view inside is the same as its page (header, messages,
- * composer). Phones: the whole screen.
+ * Every side pane (a thread, search, an agent's page, a task's conversation, Auditoria's details): flush with the area's
+ * top, right and bottom edges, a hairline on its left, docked (`.thread-panel--docked`) or over a scrim. Over a
+ * channel the channel keeps its full width under it; the thread view inside is the same as its page (header,
+ * messages, composer). Phones: the whole screen.
  */
 .thread-panel {
   position: absolute;
   z-index: 30;
-  top: 10px;
-  right: 10px;
-  bottom: 10px;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: min(640px, calc(100% - 20px));
   min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: var(--radius-section);
+  border-left: 1px solid var(--line);
   background: var(--pane);
-  box-shadow: var(--e3), var(--top);
+  box-shadow: var(--e3);
   animation: thread-panel-in 0.24s var(--out);
+}
+[data-theme="dark"] .thread-panel {
+  border-left-color: var(--line2);
 }
 @keyframes thread-panel-in {
   from {
@@ -946,7 +950,7 @@ html:not([data-pointer]) .thread-line:focus-visible {
     position: fixed;
     inset: 0;
     width: auto;
-    border-radius: 0;
+    border-left: 0;
     box-shadow: none;
   }
 }
@@ -967,13 +971,8 @@ html:not([data-pointer]) .thread-line:focus-visible {
     inset: auto;
     flex: none;
     width: clamp(360px, calc(100% - 400px), 640px);
-    border-radius: 0;
-    border-left: 1px solid var(--line);
     box-shadow: none;
     animation: ac-fade-in 160ms ease-out;
-  }
-  [data-theme="dark"] .thread-panel--docked {
-    border-left-color: var(--line2);
   }
   .channel__body:has(> .thread-panel--docked) {
     position: relative;

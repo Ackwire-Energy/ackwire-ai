@@ -1,4 +1,5 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
+import { useTaskUnread } from "@agenteschat/client";
 import { dueLabel } from "@agenteschat/client/lib/format";
 import { conversationLine, isWorking } from "@agenteschat/client/lib/issues";
 import { blockedText, workPlanProgress } from "@agenteschat/client/lib/long-work";
@@ -10,9 +11,9 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Chip, Icon, type IconName, LineIcon, PixelOrbit, Text } from "@/ui";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { Tile, useSurface } from "../shared/parts";
+import { MentionCount, Tile, useSurface } from "../shared/parts";
 import { criteriaProgress, currentStep, type IssueState, isLate, issueState, latestPr, listState } from "./logic";
 
 /** An agent's step in the person's words ("Mexeu nos arquivos do PC · trips.service.ts"), as the web says it. */
@@ -179,20 +180,30 @@ export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Is
   const step = state === "running" ? stepText(currentStep(i.work)) : "";
   const late = isLate(i);
   const due = i.dueDate && i.status !== "done" && i.status !== "canceled";
+  // Mentions of me not read in its conversation (ADR 0145), red as on the web's card.
+  const { mentions } = useTaskUnread(useOrgId(), i.id);
   return (
     <Pressable
       onPress={() => router.push(`/issues/${i.number}`)}
       accessibilityRole="button"
-      accessibilityLabel={t("issues.open", { number: i.number, title: i.title })}
+      accessibilityLabel={[
+        t("issues.open", { number: i.number, title: i.title }),
+        mentions > 0 ? t("shell.unreadMentions", { count: mentions }) : null,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
     >
       <StateLine issue={i} />
-      <Text variant="callout" numberOfLines={3} style={styles.title}>
-        <Text variant="callout" tone="faint" style={styles.number}>
-          #{i.number}
-        </Text>{" "}
-        {i.title}
-      </Text>
+      <View style={styles.head}>
+        <Text variant="callout" numberOfLines={3} style={[styles.title, styles.step]}>
+          <Text variant="callout" tone="faint" style={styles.number}>
+            #{i.number}
+          </Text>{" "}
+          {i.title}
+        </Text>
+        <MentionCount count={mentions} />
+      </View>
       {state === "running" ? (
         <View style={styles.inline}>
           <PixelOrbit color={color} size={12} />
@@ -261,6 +272,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
   pressed: { opacity: 0.85 },
   inline: { flexDirection: "row", alignItems: "center", gap: 6 },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   bold: { fontWeight: "600" },
   title: { fontWeight: "600" },
   number: { fontWeight: "500" },

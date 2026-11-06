@@ -292,6 +292,7 @@ import type {
   ToolDecision,
   TrashedArtifact,
   UndoAllResult,
+  UnreadTask,
   UsageQueue,
   UsageReport,
   WikiFolderAudience,
@@ -1577,6 +1578,8 @@ export interface ApiClient {
     markThreadRead(orgId: string, threadId: string): Promise<void>;
     /** How many threads I follow have a reply I haven't read (at most 100). */
     unreadThreads(orgId: string): Promise<number>;
+    /** The tasks whose conversation has a reply I haven't read, with the ones that mention me (ADR 0145). */
+    unreadTasks?(orgId: string): Promise<UnreadTask[]>;
   };
   /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
   working?: {

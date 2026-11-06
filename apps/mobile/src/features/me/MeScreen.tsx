@@ -34,6 +34,7 @@ import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { goBack, Tile } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
+import { useTaskMentionCount } from "../shared/queries";
 import { useMyPerson } from "../status/hooks";
 import { MyStatusRow } from "../status/MyStatusRow";
 import { PlanMeter } from "../usage/parts";
@@ -87,11 +88,12 @@ export function MeScreen() {
   const styleLabel = useSoundLabel();
   const startLabel = useStartLabel();
   const withMe = openIssuesWithMe(issues.data, meId);
+  const taskMentions = useTaskMentionCount();
   const version = Constants.expoConfig?.version ?? "";
 
   const myAgents = dir.agents.filter((a) => a.ownerUserId === meId);
   const headline = [mine?.handle ? `@${mine.handle}` : null, role, org.org?.name].filter(Boolean).join(" · ");
-  const workspaceRows: { icon: IconName; label: string; value?: string; href: string }[] = [
+  const workspaceRows: { icon: IconName; label: string; value?: string; mentions?: number; href: string }[] = [
     // Everyone's: who invites finds the requests there, and a member who may not suggests someone (ADR 0090).
     {
       icon: "members",
@@ -103,6 +105,7 @@ export function MeScreen() {
       icon: "checkc",
       label: t("mobile.me.issues"),
       ...(withMe > 0 ? { value: t("mobile.me.issuesWithMe", { count: withMe }) } : {}),
+      mentions: taskMentions,
       href: "/issues",
     },
     { icon: "clock", label: t("routines.title"), href: "/routines" },
@@ -318,6 +321,7 @@ export function MeScreen() {
           icon={r.icon}
           label={r.label}
           value={r.value}
+          mentions={r.mentions}
           divider={i > 0 || !!org.org}
           onPress={() => open(r.href)}
         />

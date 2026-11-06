@@ -5380,10 +5380,11 @@ function clearThreadUnread(qc: QueryClient, orgId: string, threadId: string) {
   qc.setQueryData<ThreadInfo>(keys.threadInfo(orgId, threadId), (t) => (t ? { ...t, unread: 0 } : t));
 }
 
-/** The thread lists, the Threads mark and the channels (a thread's replies count there too) read again. */
+/** The thread lists, the Threads mark, the channels (a thread's replies count there too) and the tasks read again. */
 function refreshThreadUnread(qc: QueryClient, orgId: string) {
   void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
   void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.unreadTasks(orgId) });
 }
 
 /** How many threads I follow have a reply I haven't read (the Threads entry's mark); live via `applyUnreadEvent`. */
@@ -5395,6 +5396,31 @@ export function useUnreadThreads(orgId: string) {
     enabled: Boolean(api.reads),
     staleTime: 30_000,
   });
+}
+
+/**
+ * The tasks whose conversation has a reply I haven't read (ADR 0145), with the ones that mention me. Under the tasks'
+ * key, so whatever reads the boards again reads it too; a notice about a task and my reads refresh it as well.
+ */
+export function useUnreadTasks(orgId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.unreadTasks(orgId),
+    queryFn: () => api.reads?.unreadTasks?.(orgId) ?? Promise.resolve([]),
+    enabled: Boolean(api.reads?.unreadTasks),
+    staleTime: 30_000,
+  });
+}
+
+/** One task's unread replies and mentions of me in its conversation; none: zeros. */
+export function useTaskUnread(orgId: string, issueId: string) {
+  const found = useUnreadTasks(orgId).data?.find((u) => u.issueId === issueId);
+  return { unread: found?.unread ?? 0, mentions: found?.mentions ?? 0 };
+}
+
+/** Every task's mentions of me not read yet: the Tarefas entry's number. */
+export function useTaskMentions(orgId: string) {
+  return (useUnreadTasks(orgId).data ?? []).reduce((n, u) => n + u.mentions, 0);
 }
 
 /**
@@ -5420,7 +5446,13 @@ function readOncePerBurst(key: string, read: () => void) {
 export function applyIssueEvent(qc: QueryClient, orgId: string, event: { type: string }) {
   if (event.type === "issue.created" || event.type === "issue.updated")
     readOncePerBurst(`${orgId}:issues`, () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }));
+  // A task's conversation has no members to hear `channel.activity`: a notice about the task is my news of it.
+  else if (event.type === "notification.upserted" && taskNoticeOf(event))
+    readOncePerBurst(`${orgId}:unread-tasks`, () => void qc.invalidateQueries({ queryKey: keys.unreadTasks(orgId) }));
 }
+
+const taskNoticeOf = (event: { type: string }) =>
+  Boolean((event as { notification?: { source?: { issueId?: unknown } } }).notification?.source?.issueId);
 
 /**
  * My own topic's unread marks, on the web and the phone: a message in a conversation I'm in has its list read again

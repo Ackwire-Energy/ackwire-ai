@@ -81,7 +81,10 @@ export function IssuePage({ number }: { number: number }) {
         {i && <IssueDetails issue={i} variant="page" onConversation={() => setTalk(true)} />}
       </div>
       {talk && i && (
-        <aside className="issue-page__talk" aria-label={t("issues.conversation.title")}>
+        <aside
+          className="thread-panel thread-panel--docked issue-page__talk"
+          aria-label={t("issues.conversation.title")}
+        >
           <TaskConversationPanel issue={i} focusMessageId={focus ?? undefined} onClose={() => setTalk(false)} />
         </aside>
       )}

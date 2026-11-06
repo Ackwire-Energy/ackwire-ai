@@ -167,6 +167,7 @@ export const keys = {
   threadInfo: (orgId: string, threadId: string) => ["org", orgId, "threads", "one", threadId] as const,
   /** How many threads I follow have an unread reply (the Threads entry's mark). */
   unreadThreads: (orgId: string) => ["org", orgId, "threads", "unread"] as const,
+  unreadTasks: (orgId: string) => ["org", orgId, "issues", "unread"] as const,
   channelThreads: (orgId: string, channelId: string, tab: string) =>
     ["org", orgId, "threads", "channel", channelId, tab] as const,
   /** The messages of a thread's context range (another channel's, or this one's). */

@@ -4746,6 +4746,14 @@ export interface ThreadContext {
   count: number;
 }
 
+/** A task's conversation with something I haven't read (`GET …/unread-tasks`, ADR 0145). */
+export interface UnreadTask {
+  issueId: string;
+  /** Replies I haven't read: every one where I follow the conversation, else only those that mention me. */
+  unread: number;
+  mentions: number;
+}
+
 export interface ThreadInfo {
   /** The root message id (what replies carry as `threadId`). */
   id: string;
