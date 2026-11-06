@@ -1298,6 +1298,7 @@ export const ptBR = {
     mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
   },
   shell: {
+    otherChannels: "Outros canais",
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Voltar", forward: "Avançar" },
     /** In place of a sidebar row (an agent, a person) that failed to draw. */
@@ -1738,6 +1739,7 @@ export const ptBR = {
     waitingApproval: "esperando aprovação",
     notMemberTitle: "Você não está neste canal",
     notMemberText: "Entre para ler as mensagens e conversar com as pessoas e os agentes daqui.",
+    adminReading: "Você não está neste canal. Administradores podem ler.",
     join: "Entrar no #{{channel}}",
     notFound: "Este canal não existe ou não está mais disponível.",
     loadOlder: "Carregar mensagens anteriores",
@@ -6005,7 +6007,6 @@ export const ptBR = {
     createdByShort: "Criada por {{name}}",
     fromMessage: "a partir de <0>uma mensagem no #{{channel}}</0>",
     fromAgent: "a partir de um pedido a um agente",
-    privateTask: "Só quem está nesta conversa vê esta tarefa.",
     subIssues_one: "Subtarefas · {{count}}",
     subIssues_other: "Subtarefas · {{count}}",
     fromWebhook: "a partir de um evento do {{provider}}",
@@ -6079,6 +6080,8 @@ export const ptBR = {
       work_update: "{{text}}",
       work_stopped: "parou o trabalho em segundo plano",
       shared_everyone: "mostrou o cartão para todo o workspace",
+      audience_everyone: "mostrou a tarefa para todos",
+      audience_people: "mudou quem vê a tarefa",
       created: "criou a tarefa",
       renamed: "renomeou a tarefa",
       description_changed: "editou a descrição",
@@ -10780,7 +10783,8 @@ export const ptBR = {
   },
   errors: {
     issue: {
-      assigneeOutside: "Essa pessoa não está nesta conversa, então não vê esta tarefa.",
+      assigneeOutside: "Essa pessoa não vê esta tarefa. Inclua ela em Quem vê primeiro.",
+      audienceEmpty: "Escolha quem vê.",
     },
     connector: {
       labelTaken: "Já existe um conector com esse nome.",
@@ -14918,6 +14922,24 @@ export const ptBR = {
     weekly: {
       name: "A semana do time",
     },
+  },
+  whoSees: {
+    label: "Quem vê",
+    everyone: "Todos no workspace",
+    me: "Só eu",
+    people: "Pessoas específicas",
+    only: "Só {{name}}",
+    more_one: "{{names}} e mais {{count}}",
+    more_other: "{{names}} e mais {{count}}",
+    some: "algumas pessoas",
+    taskTitle: "Quem vê esta tarefa",
+    pageTitle: "Quem vê esta página",
+    admins: "Administradores sempre veem.",
+    tied: "Segue quem está na conversa, até você mudar.",
+    search: "Buscar pessoa",
+    noMatch: "Ninguém com esse nome",
+    moreOptions: "Mais opções",
+    receipt: "Quem vê: {{who}}",
   },
   teamTemplates: {
     lead: "Um time para a {{org}}, cada agente no seu canal. Dá para ajustar antes de criar.",

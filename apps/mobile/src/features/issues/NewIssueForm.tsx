@@ -1,6 +1,7 @@
 import { type Actor, type Issue, type IssuePriority, useAiStatus, useIssueAction } from "@agenteschat/client";
 import { PRIORITIES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { EVERYONE } from "@agenteschat/client/lib/who-sees";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -10,9 +11,10 @@ import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
+import { useWhoSeesDraft, useWhoSeesLabel, WhoSeesRows } from "../shared/WhoSees";
 import { DUE_CHOICES, type DueChoice, dueDateOf } from "./logic";
 
-type Open = "who" | "priority" | "due" | null;
+type Open = "who" | "priority" | "due" | "sees" | null;
 
 const close = () => goBack("/issues");
 
@@ -37,7 +39,9 @@ export function NewIssueForm() {
   const [priority, setPriority] = useState<IssuePriority>("normal");
   const [due, setDue] = useState<DueChoice>("none");
   const [open, setOpen] = useState<Open>(null);
-  const ready = title.trim().length > 0 && !action.isPending;
+  const sees = useWhoSeesDraft(EVERYONE);
+  const seesLabel = useWhoSeesLabel();
+  const ready = title.trim().length > 0 && !action.isPending && sees.ready;
   const toggle = (o: Exclude<Open, null>) => setOpen((v) => (v === o ? null : o));
   const agents = dir.agents.filter((a) => a.canTalk !== false);
   const whoName = (a: Actor | null) =>
@@ -55,6 +59,7 @@ export function NewIssueForm() {
           assignee: who?.type === "person" ? who : null,
           priority,
           dueDate: dueDateOf(due),
+          audience: sees.choice,
         },
       },
       {
@@ -197,7 +202,20 @@ export function NewIssueForm() {
                   />
                 </View>
               ) : null}
+              <GroupedRow
+                icon={sees.choice.mode === "everyone" ? "globe" : "lock"}
+                label={t("whoSees.label")}
+                value={seesLabel(sees.choice)}
+                chevron
+                onPress={() => toggle("sees")}
+              />
             </GroupedList>
+            {open === "sees" ? (
+              <View style={styles.seesRows}>
+                <WhoSeesRows draft={sees} />
+                <GroupedFooter>{t("whoSees.admins")}</GroupedFooter>
+              </View>
+            ) : null}
           </View>
         </Locked>
       </ScrollView>
@@ -211,4 +229,5 @@ const styles = StyleSheet.create({
   in: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   fields: { gap: 12 },
   inline: { paddingVertical: 10, marginHorizontal: -2 },
+  seesRows: { gap: 12, marginTop: 12 },
 });

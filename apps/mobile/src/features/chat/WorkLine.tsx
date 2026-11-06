@@ -177,7 +177,7 @@ export function IssueWorkLine({ issue }: { issue: Issue }) {
   const c = useColors();
   const work = issue.backgroundWork;
   const blocked = blockedText(t, issue.blocked);
-  if (!work && !blocked) return <PrivateTaskLine issue={issue} />;
+  if (!work && !blocked) return null;
   const progress = work ? workPlanProgress(work) : null;
   return (
     <View style={styles.block}>
@@ -256,25 +256,7 @@ function ShareAction({ issue, work }: { issue: Issue; work?: WorkView }) {
   );
 }
 
-/** A task tied to a private conversation, with no work line to say so: who sees it, and how to show it to everyone. */
-function PrivateTaskLine({ issue }: { issue: Issue }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const channels = useChannels(useOrgId());
-  if (issue.backgroundWork || !heldBack(issue, channels.data)) return null;
-  return (
-    <View style={styles.privateTask}>
-      <Icon name="lock" size={14} color={c.muted} />
-      <Text variant="small" tone="muted" style={styles.grow}>
-        {t("issues.privateTask")}
-      </Text>
-      {issue.createdBy.type === "agent" ? <ShareAction issue={issue} /> : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  privateTask: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
   line: {
     flexDirection: "row",
     gap: 10,

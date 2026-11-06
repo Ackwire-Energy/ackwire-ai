@@ -34,10 +34,11 @@ import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
-import { IssueWorkBlock, PrivateTaskBlock } from "@/components/BackgroundWork";
+import { IssueWorkBlock } from "@/components/BackgroundWork";
 import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
+import { IssueWhoSeesDialog, WhoSeesButton } from "@/components/WhoSees";
 import { TaskConversationButton, TaskConversationPanel, TaskConversationSummary } from "@/components/TaskConversation";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import {
@@ -239,7 +240,6 @@ export function IssueDetails({
           <TabPanel value="details">
             <WorkBox issue={i} />
             <IssueWorkBlock issue={i} />
-            <PrivateTaskBlock issue={i} />
             {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
             <DetailsSection title={t("issues.description")}>
               <IssueDescription issue={i} hasFiles={createdFiles.length > 0} onSaved={flashSaved} />
@@ -749,6 +749,7 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
 function Details({ issue: i }: { issue: Issue }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const [choosing, setChoosing] = useState(false);
   const actors = useActors();
   const action = useIssueAction(org.id);
   const columns = useIssueColumns(org.id).data ?? [];
@@ -782,6 +783,10 @@ function Details({ issue: i }: { issue: Issue }) {
           onValueChange={(v) => action.mutate({ type: "update", id: i.id, patch: { assignee: actorFromKey(v) } })}
           options={actors.options(true, actorKey(i.assignee))}
         />
+      </Field>
+      <Field label={t("whoSees.label")} id={`is-who-sees-${i.id}`}>
+        <WhoSeesButton value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />
+        {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
       </Field>
       <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>
         <Select

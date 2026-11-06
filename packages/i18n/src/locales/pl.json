@@ -1385,6 +1385,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Inne kanały",
     "titleBar": {
       "back": "Wstecz",
       "forward": "Dalej"
@@ -1872,6 +1873,7 @@
     "waitingApproval": "czeka na zatwierdzenie",
     "notMemberTitle": "Nie należysz do tego kanału",
     "notMemberText": "Dołącz, żeby czytać wiadomości i rozmawiać z ludźmi i agentami w tym kanale.",
+    "adminReading": "Nie jesteś w tym kanale. Administratorzy mogą go czytać.",
     "join": "Dołącz do #{{channel}}",
     "notFound": "Ten kanał nie istnieje lub nie jest już dostępny.",
     "loadOlder": "Wczytaj wcześniejsze wiadomości",
@@ -6343,7 +6345,6 @@
     "createdByShort": "Utworzone przez: {{name}}",
     "fromMessage": "z <0>wiadomości na #{{channel}}</0>",
     "fromAgent": "z prośby do agenta",
-    "privateTask": "Tylko osoby w tej rozmowie widzą to zadanie.",
     "subIssues_one": "Podzadania · {{count}}",
     "subIssues_few": "Podzadania · {{count}}",
     "subIssues_many": "Podzadania · {{count}}",
@@ -6426,6 +6427,8 @@
       "work_update": "{{text}}",
       "work_stopped": "zatrzymał(a) pracę w tle",
       "shared_everyone": "pokazał(a) kartę całej przestrzeni roboczej",
+      "audience_everyone": "pokazał(a) zadanie wszystkim",
+      "audience_people": "zmienił(a), kto widzi zadanie",
       "created": "utworzył(a) zadanie",
       "renamed": "zmienił(a) nazwę zadania",
       "description_changed": "edytował(a) opis",
@@ -11858,7 +11861,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Tej osoby nie ma w tej rozmowie, więc nie widzi tego zadania."
+      "assigneeOutside": "Ta osoba nie widzi tego zadania. Najpierw dodaj ją do Kto to widzi.",
+      "audienceEmpty": "Wybierz, kto to widzi."
     },
     "connector": {
       "labelTaken": "Inny konektor ma już tę nazwę.",
@@ -15994,6 +15998,26 @@
     "weekly": {
       "name": "Tydzień zespołu"
     }
+  },
+  "whoSees": {
+    "label": "Kto to widzi",
+    "everyone": "Cała przestrzeń robocza",
+    "me": "Tylko ja",
+    "people": "Wybrane osoby",
+    "only": "Tylko {{name}}",
+    "more_one": "{{names}} i jeszcze {{count}}",
+    "more_few": "{{names}} i jeszcze {{count}}",
+    "more_many": "{{names}} i jeszcze {{count}}",
+    "more_other": "{{names}} i jeszcze {{count}}",
+    "some": "niektóre osoby",
+    "taskTitle": "Kto widzi to zadanie",
+    "pageTitle": "Kto widzi tę stronę",
+    "admins": "Administratorzy zawsze to widzą.",
+    "tied": "Podąża za osobami z rozmowy, dopóki tego nie zmienisz.",
+    "search": "Szukaj osoby",
+    "noMatch": "Nikt o takim imieniu",
+    "moreOptions": "Więcej opcji",
+    "receipt": "Kto to widzi: {{who}}"
   },
   "teamTemplates": {
     "lead": "Zespół dla {{org}}, każdy agent na własnym kanale. Możesz go dostosować przed utworzeniem.",

@@ -1313,6 +1313,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Diğer kanallar",
     "titleBar": {
       "back": "Geri",
       "forward": "İleri"
@@ -1756,6 +1757,7 @@
     "waitingApproval": "onay bekliyor",
     "notMemberTitle": "Bu kanalda değilsiniz",
     "notMemberText": "Mesajları okumak ve buradaki kişiler ve ajanlarla konuşmak için katılın.",
+    "adminReading": "Bu kanalda değilsiniz. Yöneticiler okuyabilir.",
     "join": "#{{channel}} kanalına katıl",
     "notFound": "Bu kanal yok veya artık kullanılamıyor.",
     "loadOlder": "Önceki mesajları yükle",
@@ -5895,7 +5897,6 @@
     "createdByShort": "Oluşturan: {{name}}",
     "fromMessage": "<0>#{{channel}} kanalındaki bir mesajdan</0>",
     "fromAgent": "bir ajana yapılan bir istekten",
-    "privateTask": "Bu görevi yalnızca bu konuşmadaki kişiler görür.",
     "subIssues_one": "Alt görevler · {{count}}",
     "subIssues_other": "Alt görevler · {{count}}",
     "fromWebhook": "bir {{provider}} olayından",
@@ -5972,6 +5973,8 @@
       "work_update": "{{text}}",
       "work_stopped": "arka plandaki çalışmayı durdurdu",
       "shared_everyone": "kartı tüm çalışma alanına gösterdi",
+      "audience_everyone": "görevi herkese gösterdi",
+      "audience_people": "görevi kimlerin göreceğini değiştirdi",
       "created": "görevi oluşturdu",
       "renamed": "görevi yeniden adlandırdı",
       "description_changed": "açıklamayı düzenledi",
@@ -10988,7 +10991,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Bu kişi bu konuşmada değil, bu yüzden bu görevi göremez."
+      "assigneeOutside": "Bu kişi bu görevi göremiyor. Önce onu Kimler görüyor listesine ekleyin.",
+      "audienceEmpty": "Kimlerin göreceğini seçin."
     },
     "connector": {
       "labelTaken": "Bu ad başka bir bağlayıcıda zaten var.",
@@ -14900,6 +14904,24 @@
     "weekly": {
       "name": "Ekibin haftası"
     }
+  },
+  "whoSees": {
+    "label": "Kimler görüyor",
+    "everyone": "Tüm çalışma alanı",
+    "me": "Yalnızca ben",
+    "people": "Belirli kişiler",
+    "only": "Yalnızca {{name}}",
+    "more_one": "{{names}} ve {{count}} kişi daha",
+    "more_other": "{{names}} ve {{count}} kişi daha",
+    "some": "bazı kişiler",
+    "taskTitle": "Bu görevi kimler görüyor",
+    "pageTitle": "Bu sayfayı kimler görüyor",
+    "admins": "Yöneticiler her zaman görür.",
+    "tied": "Siz değiştirene kadar konuşmadaki kişileri izler.",
+    "search": "Kişi ara",
+    "noMatch": "Bu adda kimse yok",
+    "moreOptions": "Diğer seçenekler",
+    "receipt": "Kimler görüyor: {{who}}"
   },
   "teamTemplates": {
     "lead": "{{org}} için bir ekip, her ajan kendi kanalında. Oluşturmadan önce ayarlayabilirsin.",

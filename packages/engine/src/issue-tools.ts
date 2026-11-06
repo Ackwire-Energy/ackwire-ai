@@ -245,7 +245,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
               params: {
                 number: created.number,
                 title: created.title,
-                ...(created.audience.mode === "people" ? { limited: true } : {}),
+                audience: created.audience.mode,
               },
               after: issueSnapshot(created),
             }),

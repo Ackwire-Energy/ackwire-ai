@@ -62,6 +62,7 @@ import {
   useSurface,
 } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { useWhoSeesLabel } from "../shared/WhoSees";
 import { IssueActivityFeed } from "./IssueActivity";
 import {
   columnChoices,
@@ -261,6 +262,7 @@ function Head({ issue: i }: { issue: Issue }) {
     i18n.language,
   );
   const assignee = i.assignee;
+  const whoSees = useWhoSeesLabel();
   return (
     <View style={styles.head}>
       <Text variant="display2" accessibilityRole="header" style={styles.bigTitle} maxFontSizeMultiplier={1.4}>
@@ -277,6 +279,7 @@ function Head({ issue: i }: { issue: Issue }) {
       <View style={styles.chips}>
         <StateChip issue={i} />
         {i.priority === "high" ? <Chip icon="flag" label={t("issues.priority.high")} /> : null}
+        {i.audience?.mode === "people" ? <Chip icon="lock" label={whoSees(i.audience)} /> : null}
         {assignee ? (
           <Chip label={dir.nameOf(assignee)} leading={<Face who={assignee} size={14} live={false} />} />
         ) : (
@@ -723,6 +726,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       );
     } else update({ type: "update", id: i.id, patch: { assignee: who } });
   };
+  const whoSees = useWhoSeesLabel();
   const same = (a: Actor | null, b: Actor | null) => (a?.type ?? null) === (b?.type ?? null) && a?.id === b?.id;
   const pick = (items: ActionItem[]) => sheet.open(<ActionList items={items} />);
   const statusItems = (): ActionItem[] =>
@@ -808,6 +812,16 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       label: t("mobile.issues.actions.assignee"),
       hint: i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody"),
       onPress: () => pick(assigneeItems()),
+    },
+    {
+      key: "audience",
+      icon: i.audience?.mode === "people" ? "lock" : "globe",
+      label: t("whoSees.label"),
+      hint: whoSees(i.audience ?? { mode: "everyone" }),
+      onPress: () => {
+        sheet.close();
+        router.push({ pathname: "/who-sees", params: { number: i.number } });
+      },
     },
   ];
   if (w?.state === "running" && w.runId) {

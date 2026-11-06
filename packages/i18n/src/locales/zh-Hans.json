@@ -1277,6 +1277,7 @@
     }
   },
   "shell": {
+    "otherChannels": "其他频道",
     "titleBar": {
       "back": "后退",
       "forward": "前进"
@@ -1698,6 +1699,7 @@
     "waitingApproval": "等待审批",
     "notMemberTitle": "你不在这个频道中",
     "notMemberText": "加入后即可阅读消息，并与这里的成员和智能体交流。",
+    "adminReading": "你不在这个频道中。管理员可以阅读。",
     "join": "加入 #{{channel}}",
     "notFound": "这个频道不存在或已不可用。",
     "loadOlder": "加载更早的消息",
@@ -5756,7 +5758,6 @@
     "createdByShort": "由 {{name}} 创建",
     "fromMessage": "来自<0>#{{channel}} 中的一条消息</0>",
     "fromAgent": "来自对智能体的一个请求",
-    "privateTask": "只有这段对话中的人能看到这个任务。",
     "subIssues_other": "子任务 · {{count}}",
     "fromWebhook": "来自一个 {{provider}} 事件",
     "description": "描述",
@@ -5833,6 +5834,8 @@
       "work_update": "{{text}}",
       "work_stopped": "停止了后台工作",
       "shared_everyone": "向整个工作区展示了卡片",
+      "audience_everyone": "向所有人展示了任务",
+      "audience_people": "更改了谁能看到任务",
       "created": "创建了任务",
       "renamed": "重命名了任务",
       "description_changed": "编辑了描述",
@@ -10674,7 +10677,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "这个人不在这段对话中，因此看不到这个任务。"
+      "assigneeOutside": "这个人看不到这个任务。请先把他加入“谁能看到”。",
+      "audienceEmpty": "请选择谁能看到。"
     },
     "connector": {
       "labelTaken": "已有其他连接器使用这个名称。",
@@ -14634,6 +14638,23 @@
     "weekly": {
       "name": "团队的一周"
     }
+  },
+  "whoSees": {
+    "label": "谁能看到",
+    "everyone": "整个工作区",
+    "me": "仅我自己",
+    "people": "指定的人",
+    "only": "仅 {{name}}",
+    "more_other": "{{names}} 等 {{count}} 人",
+    "some": "部分人",
+    "taskTitle": "谁能看到这个任务",
+    "pageTitle": "谁能看到这个页面",
+    "admins": "管理员始终可以看到。",
+    "tied": "在你更改之前，跟随对话中的成员。",
+    "search": "搜索成员",
+    "noMatch": "没有这个名字的人",
+    "moreOptions": "更多选项",
+    "receipt": "谁能看到：{{who}}"
   },
   "teamTemplates": {
     "lead": "为{{org}}准备的团队，每个智能体都有自己的频道。创建前可以调整。",

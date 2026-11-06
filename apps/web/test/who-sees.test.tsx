@@ -1,0 +1,73 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import type { Channel } from "@agenteschat/client";
+import { joinable } from "@agenteschat/client/lib/channel-access";
+import { audienceKind, audienceOfKind, whoSeesLabel } from "@agenteschat/client/lib/who-sees";
+import { act, cleanup } from "@testing-library/react";
+import type { TFunction } from "i18next";
+import { IssueWhoSeesDialog } from "@/components/WhoSees";
+import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { renderPage, settle } from "./render";
+
+afterEach(() => cleanup());
+
+const t = ((key: string, o?: Record<string, unknown>) =>
+  o ? `${key}:${JSON.stringify(o)}` : key) as unknown as TFunction;
+
+describe("the three options", () => {
+  test("only me is a list of one with me in it; anyone else's list is people", () => {
+    expect(audienceKind({ mode: "everyone" }, "me")).toBe("everyone");
+    expect(audienceKind({ mode: "people", userIds: ["me"] }, "me")).toBe("me");
+    expect(audienceKind({ mode: "people", userIds: ["ana"] }, "me")).toBe("people");
+    expect(audienceOfKind("me", ["ana"], "me")).toEqual({ mode: "people", userIds: ["me"] });
+    expect(audienceOfKind("everyone", ["ana"], "me")).toEqual({ mode: "everyone" });
+  });
+
+  test("the label names who it can, and says Specific people when it knows nobody", () => {
+    const names: Record<string, string> = { a: "Ana", b: "Bia", c: "Caio", d: "Dani" };
+    const label = (ids: string[]) => whoSeesLabel(t, { mode: "people", userIds: ids }, "me", (id) => names[id]);
+    expect(label(["a"])).toBe('whoSees.only:{"name":"Ana"}');
+    expect(label(["a", "b", "c", "d"])).toBe('whoSees.more:{"names":"Ana, Bia","count":2}');
+    expect(label(["gone"])).toBe("whoSees.people");
+  });
+
+  test("an administrator may join a channel listed only for them", () => {
+    const c = { visibility: "private", isMember: false } as Pick<Channel, "visibility" | "isMember">;
+    expect(joinable(c)).toBe(false);
+    expect(joinable({ ...c, seenAsAdmin: true })).toBe(true);
+  });
+});
+
+describe("Quem vê on a task", () => {
+  test("choosing Só eu saves a list of one, and the controls lock while it saves", async () => {
+    const api = createFakeApi(seedState());
+    const issue = await api.issues.create(ORG_ID, { title: "Plano" });
+    const saved: unknown[] = [];
+    let finish: () => void = () => {};
+    const real = api.issues.setAudience;
+    api.issues.setAudience = async (o, id, audience) => {
+      saved.push(audience);
+      await new Promise<void>((done) => {
+        finish = done;
+      });
+      return real(o, id, audience);
+    };
+    let closed = false;
+    await renderPage(<IssueWhoSeesDialog issue={issue} onClose={() => (closed = true)} />, { api, org: true });
+    await settle(3);
+    const button = (label: string) =>
+      [...document.querySelectorAll("button")].find((b) => b.textContent?.includes(label)) as HTMLButtonElement;
+    await act(async () => button("Só eu").click());
+    await act(async () => button("Salvar").click());
+    await settle(2);
+    expect(saved).toHaveLength(1);
+    expect((saved[0] as { mode: string; userIds: string[] }).userIds).toHaveLength(1);
+    expect(button("Cancelar").disabled).toBe(true);
+    await act(async () => finish());
+    await settle(3);
+    expect(closed).toBe(true);
+  });
+});

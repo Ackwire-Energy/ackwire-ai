@@ -358,6 +358,9 @@ function Chat({
   const wave = useRightHandWave(orgId, rightHand && dmAgent ? dmAgent.id : "");
   const waveFrom = useMemo(() => (wave ? frameClock.time() : undefined), [wave]);
   const member = dm ? true : (channel?.isMember ?? true);
+  // An administrator reads every channel without joining it (ADR 0150): only what needs being in it waits for Entrar.
+  const admin = can(useOrg().org, "administrator");
+  const readable = member || admin;
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
   // The computer this conversation's agents share, while turns wait for it: the bar's way into its line.
   const queueAgents = useMemo(
@@ -372,9 +375,9 @@ function Chat({
   const mentionMembers = useMentionMembers(channelId, !dm && Boolean(channel?.isMember));
 
   // ── Messages ──
-  const top = useMessages(orgId, channelId, member && !isThread);
-  const threadMessages = useThreadMessages(orgId, isThread && member ? channelId : undefined, threadId ?? "");
-  const channelThreads = useChannelThreads(orgId, channelId, "all", member && !isThread);
+  const top = useMessages(orgId, channelId, readable && !isThread);
+  const threadMessages = useThreadMessages(orgId, isThread && readable ? channelId : undefined, threadId ?? "");
+  const channelThreads = useChannelThreads(orgId, channelId, "all", readable && !isThread);
   // Every thread with replies is a link under its root (as on the web): agents asked in the
   // channel answer in the channel, so a thread is always a conversation of its own.
   const linkThreads = useMemo(
@@ -407,7 +410,7 @@ function Chat({
   const seenBy = seenId ? dm?.with.id : undefined;
 
   // ── Live ──
-  const live = useChatLive(orgId, channelId, member);
+  const live = useChatLive(orgId, channelId, readable);
   // People's messages loaded over HTTP start (or catch up) their agents' receipts, as on the web.
   const { seed: seedReceipts } = live;
   useEffect(() => {
@@ -2190,13 +2193,20 @@ function Chat({
                     voice={voice}
                   />
                 ) : (
-                  <Button
-                    variant="primary"
-                    wide
-                    label={t("mobile.chat.join")}
-                    disabled={join.isPending}
-                    onPress={() => join.mutate()}
-                  />
+                  <>
+                    {admin ? (
+                      <Text variant="footnote" tone="muted" style={styles.readOnly}>
+                        {t("channel.adminReading")}
+                      </Text>
+                    ) : null}
+                    <Button
+                      variant="primary"
+                      wide
+                      label={t("mobile.chat.join")}
+                      disabled={join.isPending}
+                      onPress={() => join.mutate()}
+                    />
+                  </>
                 )}
               </View>
             </KeyboardStickyView>

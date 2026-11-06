@@ -1,4 +1,4 @@
-import { keys, useChannelCategories } from "@agenteschat/client";
+import { keys, useChannelCategories, useChannels } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
@@ -9,12 +9,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, RefreshControl, StyleSheet } from "react-native";
 import { usePush } from "@/providers/push";
-import { LargeTitleScreen, Text } from "@/ui";
+import { GroupedRow, LargeTitleScreen, Text } from "@/ui";
 import { workByAgent } from "../agents/logic";
 import { useCategoryMenus } from "../categories/menus";
 import { SetupNotice } from "../computer/SetupWait";
 import { useOpenStart } from "../me/useStart";
 import { useOpenDm } from "../new/useOpenDm";
+import { chatHref } from "../links/logic";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { RightHandAsk } from "../right-hand/Pin";
@@ -62,6 +63,8 @@ export const openKindList = (kind: ListKind | `category-${string}`) => router.pu
  * first request to approve, while the phone wasn't asked yet (`@agenteschat/client/lib/push-offer`). When the server doesn't answer
  * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own.
  */
+const OTHER_CHANNELS = "otherChannels";
+
 export function ChatsScreen() {
   return (
     <SheetHostProvider>
@@ -86,6 +89,8 @@ function Home() {
   const waiting = useWaitingItems();
   const { collapsed, toggle } = useHomeCollapsed();
   const categories = useChannelCategories(orgId);
+  // An administrator reads every channel (ADR 0150): the ones they aren't in wait at the end of the home.
+  const others = (useChannels(orgId).data ?? []).filter((c) => c.seenAsAdmin);
   const menus = useCategoryMenus();
   const [waitOpen, setWaitOpen] = useState(false);
 
@@ -223,6 +228,18 @@ function Home() {
           );
         })
       )}
+      {others.length > 0 ? (
+        <CollapsibleSection
+          title={t("shell.otherChannels")}
+          count={others.length}
+          collapsed={collapsed.includes(OTHER_CHANNELS)}
+          onToggle={() => toggle(OTHER_CHANNELS)}
+        >
+          {others.map((o) => (
+            <GroupedRow key={o.id} icon="lock" label={`#${o.name}`} onPress={() => router.push(chatHref(o.id))} />
+          ))}
+        </CollapsibleSection>
+      ) : null}
     </LargeTitleScreen>
   );
 }

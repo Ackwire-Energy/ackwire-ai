@@ -1,6 +1,7 @@
 import type { WikiFolderAudience, WikiPage } from "@agenteschat/client";
 import { useRoles, useSetWikiFolderAudience, useWikiAction, useWikiFolderAudience } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { can } from "@agenteschat/client/lib/permissions";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
 import {
   OPEN_WIKI_ACCESS,
@@ -18,6 +19,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { WhoSeesDialog } from "@/components/WhoSees";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
@@ -46,6 +48,48 @@ export function WikiAudienceDialog({
   }
   if (!page) return null;
   return <PageForm page={page} onFolder={setOnFolder} onClose={onClose} />;
+}
+
+/**
+ * "Quem vê" on a page: the same three options as a task, for anyone who edits it. Roles already on it stay on a list.
+ * Who also manages roles has the whole dialog a click away (roles, agents and who edits).
+ */
+export function WikiWhoSeesDialog({ page, onClose }: { page: WikiPage; onClose: () => void }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const action = useWikiAction(org.id);
+  const [advanced, setAdvanced] = useState(false);
+  if (advanced) return <WikiAudienceDialog page={page} onClose={onClose} />;
+  const value = page.audience
+    ? { mode: "people" as const, userIds: page.audience.userIds }
+    : { mode: "everyone" as const };
+  return (
+    <WhoSeesDialog
+      title={t("whoSees.pageTitle")}
+      value={value}
+      saving={action.isPending}
+      extra={
+        can(org, "manage_roles") ? (
+          <Button variant="ghost" onClick={() => setAdvanced(true)}>
+            {t("whoSees.moreOptions")}
+          </Button>
+        ) : null
+      }
+      onClose={onClose}
+      onSave={(next) =>
+        action.mutate(
+          {
+            type: "who",
+            slug: page.slug,
+            audience:
+              next.mode === "everyone" ? null : { roleIds: page.audience?.roleIds ?? [], userIds: next.userIds },
+          },
+          { onSuccess: onClose, onError: (e) => toast.show(errorText(t, e, i18n.language), "error") },
+        )
+      }
+    />
+  );
 }
 
 function PageForm({

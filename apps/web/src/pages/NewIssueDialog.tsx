@@ -2,6 +2,7 @@ import type { Issue, IssueColumn, IssuePriority } from "@agenteschat/client";
 import { useIssueAction } from "@agenteschat/client";
 import { MAX_UPLOAD_MB } from "@agenteschat/client/lib/files";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees";
 import {
   Button,
   cx,
@@ -28,6 +29,7 @@ import { actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
 import { useFileDrop } from "@/components/drive/DriveUploads";
 import { PendingTile } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
+import { WhoSeesButton, WhoSeesDialog } from "@/components/WhoSees";
 import { useComposerFiles } from "@/hooks/useComposerFiles";
 import { columnIdOf, columnsOf, PRIORITIES, splitCriteria, useColumnTitle } from "@/lib/issues";
 import { useToast } from "@/lib/toast";
@@ -80,6 +82,8 @@ export function NewIssueDialog({
   const [priority, setPriority] = useState<IssuePriority>("normal");
   const [due, setDue] = useState<string | null>(null);
   const [another, setAnother] = useState(false);
+  const [audience, setAudience] = useState<AudienceChoice>(EVERYONE);
+  const [choosing, setChoosing] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
@@ -117,6 +121,7 @@ export function NewIssueDialog({
     if (!keepChoices) {
       setAssignee(NO_ACTOR);
       setPriority("normal");
+      setAudience(EVERYONE);
       setWide(false);
     }
   };
@@ -141,6 +146,7 @@ export function NewIssueDialog({
           assignee: chosen?.type === "person" ? chosen : null,
           priority,
           dueDate: due,
+          audience,
           ...(files.attached.length ? { attachmentIds: files.attached.map((f) => f.id) } : {}),
         },
       },
@@ -383,6 +389,9 @@ export function NewIssueDialog({
                     />
                   </Field>
                 )}
+                <Field label={t("whoSees.label")} id="ni-sees">
+                  <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />
+                </Field>
                 <Field label={t("issues.form.priority")} id="ni-pri">
                   <Select
                     size="sm"
@@ -472,6 +481,7 @@ export function NewIssueDialog({
                   ))}
                 </Menu>
                 <DueDate value={due} onChange={setDue} />
+                <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />
                 {todoColumns.length > 1 && chosenColumn && (
                   <Menu
                     label={t("issues.column")}
@@ -528,6 +538,17 @@ export function NewIssueDialog({
           {createButton}
         </DialogFooter>
       </form>
+      {choosing && (
+        <WhoSeesDialog
+          title={t("whoSees.taskTitle")}
+          value={audience}
+          onClose={() => setChoosing(false)}
+          onSave={(next) => {
+            setAudience(next);
+            setChoosing(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

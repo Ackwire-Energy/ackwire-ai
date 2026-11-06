@@ -1299,6 +1299,7 @@ export const en = {
     mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
   },
   shell: {
+    otherChannels: "Other channels",
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },
     unshown: "Couldn't be shown",
@@ -1745,6 +1746,7 @@ export const en = {
     waitingApproval: "waiting for approval",
     notMemberTitle: "You're not in this channel",
     notMemberText: "Join to read the messages and talk with the people and agents here.",
+    adminReading: "You're not in this channel. Administrators can read it.",
     join: "Join #{{channel}}",
     notFound: "This channel doesn't exist or is no longer available.",
     loadOlder: "Load earlier messages",
@@ -5920,7 +5922,6 @@ export const en = {
     createdByShort: "Created by {{name}}",
     fromMessage: "from <0>a message in #{{channel}}</0>",
     fromAgent: "from a request to an agent",
-    privateTask: "Only people in this conversation see this task.",
     subIssues_one: "Subtasks · {{count}}",
     subIssues_other: "Subtasks · {{count}}",
     fromWebhook: "from a {{provider}} event",
@@ -5995,6 +5996,8 @@ export const en = {
       work_update: "{{text}}",
       work_stopped: "stopped the background work",
       shared_everyone: "showed the card to the whole workspace",
+      audience_everyone: "showed the task to everyone",
+      audience_people: "changed who sees the task",
       created: "created the task",
       renamed: "renamed the task",
       description_changed: "edited the description",
@@ -10660,7 +10663,8 @@ export const en = {
   },
   errors: {
     issue: {
-      assigneeOutside: "This person isn't in this conversation, so they can't see this task.",
+      assigneeOutside: "This person can't see this task. Add them to who sees it first.",
+      audienceEmpty: "Choose who sees it.",
     },
     connector: {
       labelTaken: "Another connector already has this name.",
@@ -14677,6 +14681,24 @@ export const en = {
     weekly: {
       name: "The team's week",
     },
+  },
+  whoSees: {
+    label: "Who sees it",
+    everyone: "Everyone in the workspace",
+    me: "Only me",
+    people: "Specific people",
+    only: "Only {{name}}",
+    more_one: "{{names}} and {{count}} more",
+    more_other: "{{names}} and {{count}} more",
+    some: "some people",
+    taskTitle: "Who sees this task",
+    pageTitle: "Who sees this page",
+    admins: "Administrators always see it.",
+    tied: "It follows who's in the conversation until you change it.",
+    search: "Search people",
+    noMatch: "Nobody with that name",
+    moreOptions: "More options",
+    receipt: "Who sees it: {{who}}",
   },
   teamTemplates: {
     lead: "A team for {{org}}, each agent in its own channel. You can adjust it before creating.",

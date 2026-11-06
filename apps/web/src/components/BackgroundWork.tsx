@@ -2,7 +2,7 @@ import { type Issue, type Message, useChannels, type WorkView } from "@agentesch
 import { heldBack } from "@agenteschat/client/lib/issues";
 import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Icon, WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
+import { Icon, WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -108,39 +108,6 @@ export function IssueWorkBlock({ issue }: { issue: Issue }) {
   const work = issue.backgroundWork;
   if (!work) return null;
   return <CardBlock issue={issue} work={work} />;
-}
-
-/**
- * On a task tied to a private conversation, with no work line to say so: who sees it, and, for one an agent made there,
- * the way to show it to everyone.
- */
-export function PrivateTaskBlock({ issue }: { issue: Issue }) {
-  const { org } = useOrg();
-  const api = useApi();
-  const qc = useQueryClient();
-  const toast = useToast();
-  const { t } = useTranslation();
-  const channels = useChannels(org.id);
-  const share = useMutation({
-    mutationFn: () => api.issues.share(org.id, issue.id),
-    onSuccess: () => {
-      toast.show(t("work.shared"));
-      void qc.invalidateQueries({ queryKey: ["org", org.id, "issues"] });
-    },
-    onError: () => toast.show(t("work.shareFailed"), "error"),
-  });
-  if (issue.backgroundWork || !heldBack(issue, channels.data)) return null;
-  return (
-    <p className="issue-private">
-      <Icon name="lock" size={14} />
-      <span>{t("issues.privateTask")}</span>
-      {issue.createdBy.type === "agent" && (
-        <Button size="sm" loading={share.isPending} disabled={share.isPending} onClick={() => share.mutate()}>
-          {t("work.shareEveryone")}
-        </Button>
-      )}
-    </p>
-  );
 }
 
 function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {

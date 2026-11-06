@@ -246,6 +246,8 @@ export interface ChannelListItem {
   /** Order inside its category. */
   position: number;
   isMember: boolean;
+  /** Listed only because I'm an administrator (ADR 0150): the apps keep it off the sidebar until opened or joined. */
+  seenAsAdmin: boolean;
   /**
    * Messages since I last read it (from when I joined, if never), not mine;
    * a thread reply counts only in a thread I follow. At most
@@ -282,6 +284,7 @@ interface ChannelListRow {
   category_id: string | null;
   position: number | string;
   is_member: boolean;
+  seen_as_admin: boolean;
   unread_count: number | string | null;
   mention_count: number | string | null;
   last_read_at: Date | string | null;
@@ -325,7 +328,9 @@ export async function listChannels(db: Database, userId: string, orgId: string):
   const rows = rowsOf<ChannelListRow>(
     await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.audience_role_ids, c.created_by_user_id, c.created_at,
         c.category_id, c.position,
-        (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count, coalesce(un.m, 0) as mention_count,
+        (cm.id is not null) as is_member,
+        (cm.id is null and c.visibility <> 'public' and not ${channelAudienceSql("c", sql`${userId}`)}) as seen_as_admin,
+        coalesce(un.n, 0) as unread_count, coalesce(un.m, 0) as mention_count,
         coalesce(cr.muted, false) as muted, coalesce(cr.last_read_at, cm.created_at) as last_read_at,
         lm.id as last_id, lm.body as last_body, lm.meta as last_meta, lm.created_at as last_at, lm.author_type as last_author_type,
         lm.author_user_id as last_user_id, lm.author_agent_id as last_agent_id,
@@ -378,6 +383,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
       categoryId: r.category_id,
       position: Number(r.position),
       isMember: r.is_member === true,
+      seenAsAdmin: r.seen_as_admin === true,
       unreadCount: Number(r.unread_count ?? 0),
       mentionCount: Number(r.mention_count ?? 0),
       lastReadAt: r.last_read_at ? asDate(r.last_read_at) : null,

@@ -1,0 +1,42 @@
+/* "Quem vê" (ADR 0150): three options, and the people when it's some of them. */
+.who-sees__options {
+  display: grid;
+  gap: var(--space-2);
+}
+.who-sees__people {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.who-sees__person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.who-sees__person:hover {
+  background: var(--hover);
+}
+.who-sees__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.who-sees__note {
+  margin: var(--space-3) 0 0;
+}
+.who-sees__grow {
+  flex: 1;
+}
+
+/* An administrator reading a channel they aren't in: the words and the way in, where the composer goes. */
+.channel__admin-read {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}

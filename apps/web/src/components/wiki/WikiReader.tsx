@@ -1,3 +1,4 @@
+import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees";
 import type { WikiAuthor, WikiPage as WikiPageData, WikiPageSummary, WikiVersion } from "@agenteschat/client";
 import { ApiError, keys, useRoles, useWikiAction, useWikiHistory, useWikiPage } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -32,6 +33,7 @@ import { usePreviewUrl } from "@/components/artifacts/FileView";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { ErrorState, LoadingList, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { WhoSeesButton, WhoSeesDialog } from "@/components/WhoSees";
 import { WikiEditor } from "@/components/WikiEditor";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { readComposerDraft, writeComposerDraft } from "@/hooks/useComposerDraft";
@@ -45,7 +47,7 @@ import { useToast } from "@/lib/toast";
 import { retitled } from "@/lib/wiki-rich";
 import { ObsidianMark } from "./ObsidianMark";
 import { WikiAskDialog } from "./WikiAsk";
-import { WikiAudienceDialog } from "./WikiAudience";
+import { WikiWhoSeesDialog } from "./WikiAudience";
 import { WikiFolderPicker, WikiTagsEdit } from "./WikiProps";
 import { WikiRichEditor, type WikiRichEditorHandle } from "./WikiRichEditor";
 
@@ -653,8 +655,10 @@ export function WikiReader({
   // Who edits pages (and pins, moves and deletes them); a locked page, and locking it, only who configures.
   const writes = can(org, "edit_wiki") && p?.canEdit !== false;
   const admin = can(org, "configure");
-  // Who sees a page: people who write the wiki and manage roles (the server checks the same).
-  const choosesAudience = writes && can(org, "manage_roles");
+  // Who sees a page: anyone who edits it (the server checks the same); agents and editors, who manages roles too.
+  const choosesAudience = writes;
+  const [newAudience, setNewAudience] = useState<AudienceChoice>(EVERYONE);
+  const [choosingNew, setChoosingNew] = useState(false);
   const editing = draft !== null;
   const original = useMemo<Draft | null>(
     () =>
@@ -745,7 +749,7 @@ export function WikiReader({
     const tags = draft.tags;
     if (isNew) {
       action.mutate(
-        { type: "create", input: { title, folder: draft.folder.trim(), body, tags } },
+        { type: "create", input: { title, folder: draft.folder.trim(), body, tags, audience: newAudience } },
         {
           onSuccess: (created) => {
             toast.show(t("wiki.created"));
@@ -979,6 +983,7 @@ export function WikiReader({
                 onChange={(folder) => setDraft({ ...draft, folder })}
               />
               <WikiTagsEdit tags={draft.tags} onChange={(tags) => setDraft({ ...draft, tags })} />
+              {isNew && <WhoSeesButton value={newAudience} onClick={() => setChoosingNew(true)} />}
             </div>
             {mode === "visual" ? (
               <WikiRichEditor
@@ -1052,7 +1057,18 @@ export function WikiReader({
         />
       )}
       {p && <HistoryDialog page={p} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
-      {p && audienceOpen && <WikiAudienceDialog page={p} onClose={() => setAudienceOpen(false)} />}
+      {p && audienceOpen && <WikiWhoSeesDialog page={p} onClose={() => setAudienceOpen(false)} />}
+      {choosingNew && (
+        <WhoSeesDialog
+          title={t("whoSees.pageTitle")}
+          value={newAudience}
+          onClose={() => setChoosingNew(false)}
+          onSave={(next) => {
+            setNewAudience(next);
+            setChoosingNew(false);
+          }}
+        />
+      )}
       {p && confirmDelete && (
         <Dialog
           open

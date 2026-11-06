@@ -1349,6 +1349,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Autres canaux",
     "titleBar": {
       "back": "Retour",
       "forward": "Suivant"
@@ -1814,6 +1815,7 @@
     "waitingApproval": "en attente d'approbation",
     "notMemberTitle": "Vous ne faites pas partie de ce canal",
     "notMemberText": "Rejoignez-le pour lire les messages et parler avec les personnes et les agents présents.",
+    "adminReading": "Vous n'êtes pas dans ce canal. Les administrateurs peuvent le lire.",
     "join": "Rejoindre #{{channel}}",
     "notFound": "Ce canal n'existe pas ou n'est plus disponible.",
     "loadOlder": "Charger les messages précédents",
@@ -6153,7 +6155,6 @@
     "createdByShort": "Créée par {{name}}",
     "fromMessage": "depuis <0>un message dans #{{channel}}</0>",
     "fromAgent": "depuis une demande à un agent",
-    "privateTask": "Seules les personnes de cette conversation voient cette tâche.",
     "subIssues_one": "Sous-tâches · {{count}}",
     "subIssues_many": "Sous-tâches · {{count}}",
     "subIssues_other": "Sous-tâches · {{count}}",
@@ -6236,6 +6237,8 @@
       "work_update": "{{text}}",
       "work_stopped": "a arrêté le travail en arrière-plan",
       "shared_everyone": "a montré la carte à tout l'espace de travail",
+      "audience_everyone": "a montré la tâche à tout le monde",
+      "audience_people": "a changé qui voit la tâche",
       "created": "a créé la tâche",
       "renamed": "a renommé la tâche",
       "description_changed": "a modifié la description",
@@ -11476,7 +11479,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Cette personne n'est pas dans cette conversation, elle ne voit donc pas cette tâche."
+      "assigneeOutside": "Cette personne ne voit pas cette tâche. Ajoutez-la d'abord à Qui le voit.",
+      "audienceEmpty": "Choisissez qui le voit."
     },
     "connector": {
       "labelTaken": "Un autre connecteur porte déjà ce nom.",
@@ -15583,6 +15587,25 @@
     "weekly": {
       "name": "La semaine de l'équipe"
     }
+  },
+  "whoSees": {
+    "label": "Qui le voit",
+    "everyone": "Tout l'espace de travail",
+    "me": "Moi seulement",
+    "people": "Personnes précises",
+    "only": "Seulement {{name}}",
+    "more_one": "{{names}} et {{count}} de plus",
+    "more_many": "{{names}} et {{count}} de plus",
+    "more_other": "{{names}} et {{count}} de plus",
+    "some": "quelques personnes",
+    "taskTitle": "Qui voit cette tâche",
+    "pageTitle": "Qui voit cette page",
+    "admins": "Les administrateurs le voient toujours.",
+    "tied": "Suit les personnes de la conversation, jusqu'à ce que vous le changiez.",
+    "search": "Chercher une personne",
+    "noMatch": "Personne avec ce nom",
+    "moreOptions": "Plus d'options",
+    "receipt": "Qui le voit : {{who}}"
   },
   "teamTemplates": {
     "lead": "Une équipe pour {{org}}, chaque agent dans son canal. Tu peux l'ajuster avant de la créer.",

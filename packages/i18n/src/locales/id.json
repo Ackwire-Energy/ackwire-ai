@@ -1277,6 +1277,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Kanal lain",
     "titleBar": {
       "back": "Kembali",
       "forward": "Maju"
@@ -1698,6 +1699,7 @@
     "waitingApproval": "menunggu persetujuan",
     "notMemberTitle": "Kamu tidak ada di kanal ini",
     "notMemberText": "Bergabunglah untuk membaca pesan dan berbicara dengan orang dan agen di sini.",
+    "adminReading": "Kamu tidak ada di kanal ini. Administrator bisa membacanya.",
     "join": "Gabung ke #{{channel}}",
     "notFound": "Kanal ini tidak ada atau sudah tidak tersedia.",
     "loadOlder": "Muat pesan sebelumnya",
@@ -5744,7 +5746,6 @@
     "createdByShort": "Dibuat oleh {{name}}",
     "fromMessage": "dari <0>pesan di #{{channel}}</0>",
     "fromAgent": "dari permintaan ke agen",
-    "privateTask": "Hanya orang di percakapan ini yang melihat tugas ini.",
     "subIssues_other": "Subtugas · {{count}}",
     "fromWebhook": "dari event {{provider}}",
     "description": "Deskripsi",
@@ -5821,6 +5822,8 @@
       "work_update": "{{text}}",
       "work_stopped": "menghentikan pekerjaan di latar belakang",
       "shared_everyone": "menampilkan kartu ke seluruh ruang kerja",
+      "audience_everyone": "menampilkan tugas ke semua orang",
+      "audience_people": "mengubah siapa yang melihat tugas",
       "created": "membuat tugas",
       "renamed": "mengganti nama tugas",
       "description_changed": "mengedit deskripsi",
@@ -10667,7 +10670,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Orang ini tidak ada di percakapan ini, jadi tidak bisa melihat tugas ini."
+      "assigneeOutside": "Orang ini tidak bisa melihat tugas ini. Tambahkan dulu ke Siapa yang melihat.",
+      "audienceEmpty": "Pilih siapa yang melihat."
     },
     "connector": {
       "labelTaken": "Konektor lain sudah memakai nama ini.",
@@ -14561,6 +14565,23 @@
     "weekly": {
       "name": "Minggu tim"
     }
+  },
+  "whoSees": {
+    "label": "Siapa yang melihat",
+    "everyone": "Seluruh ruang kerja",
+    "me": "Hanya saya",
+    "people": "Orang tertentu",
+    "only": "Hanya {{name}}",
+    "more_other": "{{names}} dan {{count}} lainnya",
+    "some": "beberapa orang",
+    "taskTitle": "Siapa yang melihat tugas ini",
+    "pageTitle": "Siapa yang melihat halaman ini",
+    "admins": "Administrator selalu bisa melihat.",
+    "tied": "Mengikuti orang di percakapan, sampai kamu mengubahnya.",
+    "search": "Cari orang",
+    "noMatch": "Tidak ada orang dengan nama itu",
+    "moreOptions": "Opsi lainnya",
+    "receipt": "Siapa yang melihat: {{who}}"
   },
   "teamTemplates": {
     "lead": "Tim untuk {{org}}, tiap agen di kanalnya sendiri. Kamu bisa menyesuaikannya sebelum membuat.",

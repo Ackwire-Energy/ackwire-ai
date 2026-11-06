@@ -181,6 +181,7 @@ const KNOWN = {
   "org.not_restorable": "errors.org.notRestorable",
   "account.not_restorable": "errors.account.notRestorable",
   "issue.assignee_outside": "errors.issue.assigneeOutside",
+  "issue.audience_empty": "errors.issue.audienceEmpty",
   [REAUTH_PASSWORD]: "errors.reauth.password",
   [REAUTH_SIGN_IN]: "errors.reauth.signIn",
   EARLY_ACCESS_OTHER_EMAIL: "auth.earlyAccess.otherEmail",

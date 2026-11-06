@@ -756,8 +756,10 @@ function ChannelView({
   const dir = useDirectory(org.id);
   const rightHandLook = useRightHandLook();
   const isMember = channel.isMember;
-  const members = useChannelMembers(org.id, channel.id, isMember);
-  const channelMessages = useMessages(org.id, channel.id, isMember);
+  // An administrator reads every channel without joining it (ADR 0150): only what needs being in it waits for Entrar.
+  const readable = isMember || (!chrome && can(org, "administrator"));
+  const members = useChannelMembers(org.id, channel.id, readable);
+  const channelMessages = useMessages(org.id, channel.id, readable);
   // A DM with a person: their face on my latest message once they read it (live: `channel.read`).
   const reads = useDmReads(org.id, channel.id, Boolean(chrome?.dmPersonId) && isMember);
   const seenId = useMemo(
@@ -765,12 +767,12 @@ function ChannelView({
     [reads.data, channelMessages.data, me.user.id],
   );
   // Thread view: the thread's root and replies (the channel's page still holds my unsent replies).
-  const threadMessages = useThreadMessages(org.id, thread && isMember ? channel.id : undefined, thread?.id ?? "");
+  const threadMessages = useThreadMessages(org.id, thread && readable ? channel.id : undefined, thread?.id ?? "");
   const messages = thread ? threadMessages : channelMessages;
   // Read from the server (a thread's root the channel held stands in until then: its replies are still unknown).
   const serverRead = messages.isSuccess && !messages.isPlaceholderData;
   // The channel's threads: closed lines, context marks, markers (not in a thread view or while adjusting).
-  const listsThreads = isMember && !thread;
+  const listsThreads = readable && !thread;
   const openThreads = useChannelThreads(org.id, channel.id, "all", listsThreads);
   const archivedThreads = useChannelThreads(org.id, channel.id, "archived", listsThreads);
   const threadList = useMemo(
@@ -996,7 +998,7 @@ function ChannelView({
     }),
     [t],
   );
-  useChannelRealtime(org.id, channel.id, isMember);
+  useChannelRealtime(org.id, channel.id, readable);
   useNoAiAutoOpen(channel.id, isMember);
 
   const channelAgents = useMemo(
@@ -2278,7 +2280,7 @@ function ChannelView({
               ) : (
                 <ChannelHeader
                   channel={channel}
-                  isMember={isMember}
+                  isMember={readable}
                   queueMachine={queueMachine}
                   people={channelPeople}
                   agents={channelAgents}
@@ -2305,7 +2307,7 @@ function ChannelView({
                     <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
                   )}
 
-                  {!isMember ? (
+                  {!readable ? (
                     <div className="channel__empty">
                       <EmptyState
                         icon="channel"
@@ -2534,6 +2536,22 @@ function ChannelView({
                           <RangeBar adjust={adjust} />
                         ) : chrome?.composerReplacement ? (
                           chrome.composerReplacement
+                        ) : !isMember ? (
+                          <div className="channel__notice channel__readonly channel__admin-read" role="status">
+                            <span className="ac-iconline">
+                              <Icon name="eye" size={16} />
+                              <span>{t("channel.adminReading")}</span>
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              onClick={() => join.mutate()}
+                              disabled={join.isPending}
+                              loading={join.isPending}
+                            >
+                              {t("channel.join", { channel: channel.name })}
+                            </Button>
+                          </div>
                         ) : channel.can?.post === false ? (
                           // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
                           <p className="channel__notice channel__readonly ac-iconline" role="status">
@@ -2805,7 +2823,7 @@ function ChannelView({
             {!chrome && !profile && membersColumn.sheet && (
               <MembersSheet
                 channel={channel}
-                isMember={isMember}
+                isMember={readable}
                 people={channelPeople}
                 agents={channelAgents}
                 onDetails={() => {

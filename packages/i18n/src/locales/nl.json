@@ -1313,6 +1313,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Andere kanalen",
     "titleBar": {
       "back": "Terug",
       "forward": "Vooruit"
@@ -1756,6 +1757,7 @@
     "waitingApproval": "wacht op goedkeuring",
     "notMemberTitle": "Je zit niet in dit kanaal",
     "notMemberText": "Word lid om de berichten te lezen en te praten met de mensen en agents hier.",
+    "adminReading": "Je zit niet in dit kanaal. Beheerders kunnen het lezen.",
     "join": "Lid worden van #{{channel}}",
     "notFound": "Dit kanaal bestaat niet of is niet meer beschikbaar.",
     "loadOlder": "Eerdere berichten laden",
@@ -5981,7 +5983,6 @@
     "createdByShort": "Gemaakt door {{name}}",
     "fromMessage": "uit <0>een bericht in #{{channel}}</0>",
     "fromAgent": "uit een verzoek aan een agent",
-    "privateTask": "Alleen mensen in dit gesprek zien deze taak.",
     "subIssues_one": "Subtaken · {{count}}",
     "subIssues_other": "Subtaken · {{count}}",
     "fromWebhook": "uit een event van {{provider}}",
@@ -6061,6 +6062,8 @@
       "work_update": "{{text}}",
       "work_stopped": "heeft het werk op de achtergrond gestopt",
       "shared_everyone": "heeft de kaart aan de hele werkruimte laten zien",
+      "audience_everyone": "heeft de taak aan iedereen laten zien",
+      "audience_people": "heeft gewijzigd wie de taak ziet",
       "created": "heeft de taak gemaakt",
       "renamed": "heeft de taak hernoemd",
       "description_changed": "heeft de beschrijving bewerkt",
@@ -11113,7 +11116,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Deze persoon zit niet in dit gesprek en ziet deze taak dus niet."
+      "assigneeOutside": "Deze persoon ziet deze taak niet. Voeg die eerst toe bij Wie het ziet.",
+      "audienceEmpty": "Kies wie het ziet."
     },
     "connector": {
       "labelTaken": "Een andere connector heeft deze naam al.",
@@ -15145,6 +15149,24 @@
     "weekly": {
       "name": "De week van het team"
     }
+  },
+  "whoSees": {
+    "label": "Wie het ziet",
+    "everyone": "De hele werkruimte",
+    "me": "Alleen ik",
+    "people": "Bepaalde mensen",
+    "only": "Alleen {{name}}",
+    "more_one": "{{names}} en nog {{count}}",
+    "more_other": "{{names}} en nog {{count}}",
+    "some": "sommige mensen",
+    "taskTitle": "Wie deze taak ziet",
+    "pageTitle": "Wie deze pagina ziet",
+    "admins": "Beheerders zien het altijd.",
+    "tied": "Volgt wie er in het gesprek zit, tot je het wijzigt.",
+    "search": "Persoon zoeken",
+    "noMatch": "Niemand met die naam",
+    "moreOptions": "Meer opties",
+    "receipt": "Wie het ziet: {{who}}"
   },
   "teamTemplates": {
     "lead": "Een team voor {{org}}, elke agent in een eigen kanaal. Je kunt het aanpassen voordat je het maakt.",

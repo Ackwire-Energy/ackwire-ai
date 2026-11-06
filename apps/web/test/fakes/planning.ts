@@ -589,6 +589,15 @@ export function createMockPlanning(
         i.channelId = null;
         return clone(i);
       },
+      setAudience: async (orgId, id, audience) => {
+        const i = await findIssue(orgId, id);
+        i.channelId = null;
+        i.audience =
+          audience.mode === "everyone"
+            ? { mode: "everyone", userIds: [], channelId: null }
+            : { mode: "people", userIds: audience.userIds, channelId: null };
+        return clone(i);
+      },
       activity: async (orgId, id) => clone((await store(orgId)).activity.get(id) ?? []),
       comment: async (orgId, id, text, attachmentIds) =>
         clone(
