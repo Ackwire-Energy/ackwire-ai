@@ -44,6 +44,15 @@ const queue: ComputerQueue = {
 };
 
 describe("a shared computer's line on the phone", () => {
+  test("a row's press sits beside the agent's face, never around it: VoiceOver reaches both", async () => {
+    const sheet = await Bun.file(new URL("../../src/features/queue/QueueSheet.tsx", import.meta.url)).text();
+    const line = sheet.slice(sheet.indexOf("export function QueueLine"));
+    expect(line.indexOf("</OpensAgent>")).toBeLessThan(line.indexOf("<Pressable"));
+    expect(sheet.slice(sheet.indexOf("function ActiveLine"), sheet.indexOf("function WorkingRow"))).not.toContain(
+      "<Pressable",
+    );
+  });
+
   test("the computer the conversation's agents share: the first one that has one", () => {
     const machines = [
       { id: "m1", agents: [{ id: "nova" }, { id: "rio" }] },

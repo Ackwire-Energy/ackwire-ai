@@ -247,28 +247,20 @@ function GroupHead({ title, aside }: { title: string; aside?: string | null }) {
   );
 }
 
-/** A line of the sheet, opening its task where the viewer sees it, with its stop beside it. */
+/** A line of the sheet with its stop beside it. */
 function ActiveLine({
   row,
   act,
   children,
 }: {
-  row: { runId: string; canOpen?: boolean; canStop?: boolean };
+  row: { runId: string; canStop?: boolean };
   act: RowActions;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
     <View style={styles.active}>
-      <Pressable
-        onPress={() => act.open(row.runId)}
-        disabled={!row.canOpen}
-        accessibilityRole={row.canOpen ? "button" : undefined}
-        accessibilityHint={row.canOpen ? t("queue.openTask") : undefined}
-        style={styles.grow}
-      >
-        {children}
-      </Pressable>
+      <View style={styles.grow}>{children}</View>
       {row.canStop ? (
         <StopButton
           label={t("taskManager.actions.stop")}
@@ -302,6 +294,7 @@ function WorkingRow({
         line={`${words.line(w)} · ${elapsed}`}
         time={queueLeftText(t, w, now)}
         mine={w.mine}
+        onOpen={w.canOpen ? () => act.open(w.runId) : undefined}
       />
     </ActiveLine>
   );
@@ -329,6 +322,7 @@ function WaitingRow({
         time={queueStartText(t, w, words.names.agent, now)}
         mine={w.mine}
         first={w.mine && w.people}
+        onOpen={w.canOpen ? () => act.open(w.runId) : undefined}
       />
     </ActiveLine>
   );
@@ -346,6 +340,7 @@ export function QueueLine({
   time,
   mine,
   first = false,
+  onOpen,
 }: {
   agentId: string;
   position: number | null;
@@ -354,6 +349,8 @@ export function QueueLine({
   time: string | null;
   mine: boolean;
   first?: boolean;
+  /** The text opens the task. Beside the face, not around it: a press around it would hide its own from VoiceOver. */
+  onOpen?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
@@ -363,9 +360,12 @@ export function QueueLine({
       <OpensAgent agentId={agentId}>
         <AgentFace agentId={agentId} size={20} live={false} />
       </OpensAgent>
-      <View
+      <Pressable
         style={styles.text}
-        accessible
+        onPress={onOpen}
+        disabled={!onOpen}
+        accessibilityRole={onOpen ? "button" : undefined}
+        accessibilityHint={onOpen ? t("queue.openTask") : undefined}
         accessibilityLabel={[name, nth, line, first ? t("queue.youFirst") : null, time].filter(Boolean).join(", ")}
       >
         <View style={styles.l1}>
@@ -391,7 +391,7 @@ export function QueueLine({
             <Chip icon="person" label={t("queue.youFirst")} />
           </View>
         ) : null}
-      </View>
+      </Pressable>
     </View>
   );
 }
