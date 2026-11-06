@@ -220,7 +220,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Çalışma alanları adına işlenen Çalışma Alanı İçeriği",
         blocks: [
           "Çalışma Alanı İçeriği, kanallardaki, ileti dizilerindeki ve doğrudan mesajlardaki mesajları, Drive'daki dosyaları ve wiki sayfalarını kapsar. Ayrıca görevleri, rutinleri, takvim etkinliklerini ve onayları, ajanların talimatlarını, ayarlarını ve hafızasını, ajanların yazdıklarını ve yaptıklarını ve ajanların çalışma alanının bağladığı bağlayıcılar, veritabanları ve bilgisayarlar aracılığıyla okuduğu verileri de kapsar. Bunları yalnızca çalışma alanını ve ajanlarını çalışma alanının yapılandırdığı şekilde çalıştırmak, çalışma alanının üyelerine göstermek, talep ettikleri bildirimleri göndermek ve destek sağlamak amacıyla işleriz.",
-          "Çalışma Alanı İçeriği çalışma alanına aittir: üyeler, kanalların ve izinlerin izin verdiği kadarını görür. Sahipleri ve yöneticileri ise içeriği yönetir. Paylaştığınız mesajlar, çalışma alanı bunları silmedikçe, çalışma alanından ayrılmanızdan veya hesabınızı silmenizden sonra da çalışma alanında kalır.",
+          "Çalışma Alanı İçeriği çalışma alanına aittir: üyeler, kanalların ve izinlerin izin verdiği kadarını görür. Sahipleri ve yöneticileri ise içeriği yönetir. Çalışma alanının sahipleri ve yöneticileri, özel olanlar dahil tüm kanalları, görevleri ve wiki sayfalarını görebilir. Başka kişiler arasındaki doğrudan mesajları okuyamazlar. Paylaştığınız mesajlar, çalışma alanı bunları silmedikçe, çalışma alanından ayrılmanızdan veya hesabınızı silmenizden sonra da çalışma alanında kalır.",
         ],
       },
       {
