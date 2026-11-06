@@ -1571,7 +1571,11 @@
         "Tab": "Tab",
         "Enter": "Invio",
         "Backspace": "Canc",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Freccia sinistra",
+        "ArrowUp": "Freccia su",
+        "ArrowDown": "Freccia giù",
+        "ArrowRight": "Freccia destra"
       },
       "unavailable": {
         "reconnectingF": "Riconnessione…",

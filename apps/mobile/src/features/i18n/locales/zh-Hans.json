@@ -1393,7 +1393,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "删除",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "左箭头",
+        "ArrowUp": "上箭头",
+        "ArrowDown": "下箭头",
+        "ArrowRight": "右箭头"
       },
       "unavailable": {
         "reconnectingF": "正在重新连接…",

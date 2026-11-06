@@ -1487,6 +1487,10 @@ export const featureKeysPtBR = {
         Enter: "Enter",
         Backspace: "Apagar",
         Escape: "Esc",
+        ArrowLeft: "Seta para a esquerda",
+        ArrowUp: "Seta para cima",
+        ArrowDown: "Seta para baixo",
+        ArrowRight: "Seta para a direita",
       },
       unavailable: {
         reconnectingF: "Reconectando…",

@@ -1393,7 +1393,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Hapus",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Panah kiri",
+        "ArrowUp": "Panah atas",
+        "ArrowDown": "Panah bawah",
+        "ArrowRight": "Panah kanan"
       },
       "unavailable": {
         "reconnectingF": "Menghubungkan ulang…",

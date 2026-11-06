@@ -1393,7 +1393,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "삭제",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "왼쪽 화살표",
+        "ArrowUp": "위쪽 화살표",
+        "ArrowDown": "아래쪽 화살표",
+        "ArrowRight": "오른쪽 화살표"
       },
       "unavailable": {
         "reconnectingF": "다시 연결하는 중…",
