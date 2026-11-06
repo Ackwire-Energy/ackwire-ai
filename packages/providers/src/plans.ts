@@ -399,23 +399,50 @@ export function ownLimitsModel(provider: unknown, value: string | null | undefin
   return plan?.limitsPerModel && value ? planModel(plan, value) : null;
 }
 
-/** How long a model's own limit with no known reset (or the region it needs) holds once seen: then a turn asks again. */
+/** How long a model's own limit with no known reset (or the region it needs, or its refusal) holds once seen: then a turn asks again. */
 export const MODEL_LIMIT_HOLD_MS = 30 * 60_000;
 
 /**
  * The model's own limit in `models` (`PlanUsage.models`, kept by the server) that still holds: until its reset, else
- * `MODEL_LIMIT_HOLD_MS` after it was seen.
+ * `MODEL_LIMIT_HOLD_MS` after it was seen. `region`: it needs the account's Global region; `off`: the plan refused it
+ * for this key (the model or the account turned off there).
  */
 export function modelLimitOf(
-  models: Readonly<Record<string, { at: string; until?: string; region?: true }>> | undefined,
+  models: Readonly<Record<string, { at: string; until?: string; region?: true; off?: true }>> | undefined,
   id: string | null | undefined,
   now = Date.now(),
-): { until: number | null; region: boolean } | null {
+): { until: number | null; region: boolean; off: boolean } | null {
   const l = id ? models?.[id] : undefined;
   if (!l) return null;
   const until = l.until ? Date.parse(l.until) : Number.NaN;
-  if (until > now) return { until, region: false };
-  return !l.until && now - Date.parse(l.at) < MODEL_LIMIT_HOLD_MS ? { until: null, region: l.region === true } : null;
+  if (until > now) return { until, region: false, off: false };
+  return !l.until && now - Date.parse(l.at) < MODEL_LIMIT_HOLD_MS
+    ? { until: null, region: l.region === true, off: l.off === true }
+    : null;
+}
+
+/**
+ * Claude Code's words for a 403 from a plan's endpoint ("API Error: 403 {…}"): on a key, the plan refusing the model
+ * (switched off in its workspace, or the account itself), never the key, which a 401 refuses.
+ */
+export const PLAN_FORBIDDEN_TEXT = /\bAPI Error:? 403\b/i;
+
+/**
+ * What "Automático" runs for `value` (an alias, or `auto`) on a plan whose models have limits of their own: the model
+ * it maps to, unless that one is held now (`modelLimitOf`), then the model that last answered with this key
+ * (`answered`, kept by the server) while that one isn't. Anything else stays as it is.
+ */
+export function autoPlanModel(
+  provider: unknown,
+  value: string | undefined,
+  usage: { models?: Parameters<typeof modelLimitOf>[0]; answered?: string } | null | undefined,
+  now = Date.now(),
+): string | undefined {
+  const own = ownLimitsModel(provider, value);
+  const answered = usage?.answered;
+  if (!own || !answered || answered === own.id || !modelLimitOf(usage.models, own.id, now)) return value;
+  const known = planOf(provider)?.claudeCode.models.some((m) => m.id === answered);
+  return known && !modelLimitOf(usage.models, answered, now) ? answered : value;
 }
 
 /** A coding plan's model by its id, whichever plan has it. */

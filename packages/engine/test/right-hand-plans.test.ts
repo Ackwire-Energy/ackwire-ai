@@ -368,6 +368,7 @@ test("its DM's line names the real cause: a model's own limit or region, command
   expect(rightHandNoAiReason("plan_limit")).toBe("plan_limit");
   expect(rightHandNoAiReason("plan_limit", "model")).toBe("model_limit");
   expect(rightHandNoAiReason("plan_limit", "region")).toBe("model_region");
+  expect(rightHandNoAiReason("plan_limit", "off")).toBe("model_off");
   expect(rightHandNoAiReason("codex_too_old")).toBe("runner_outdated");
   expect(rightHandNoAiReason("exec_disabled")).toBe("commands_off");
   expect(rightHandNoAiReason("tool_off")).toBe("commands_off");

@@ -449,7 +449,7 @@ const ManagedTask = z
         key: z.string().nullable(),
         plan: z.string().nullable(),
         model: z.string().nullable(),
-        scope: z.enum(["model", "region"]).nullable(),
+        scope: z.enum(["model", "region", "off"]).nullable(),
         percent: z.number().int().nullable(),
         window: z.string().nullable(),
         resetsAt: z.string().nullable(),

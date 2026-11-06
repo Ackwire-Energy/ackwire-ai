@@ -2237,6 +2237,9 @@ export const en = {
       /** `model`: a model that needs a region setting on the plan's account; it doesn't come back by itself. */
       model_region:
         "{{name}} can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
+      /** `model`: a model the plan refused for its key (the model or the whole account switched off there). */
+      model_off:
+        "{{name}} can't answer: OpenCode refused {{model}} with this key. Turn the model or the account on in OpenCode, or choose another model.",
       commands_off:
         "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on.",
       useKey: "Use an API key",
@@ -8850,6 +8853,9 @@ export const en = {
     modelLimitUnknown: "{{model}} hit its own limit on this plan. The plan's other models keep working.",
     modelRegion:
       "{{model}} needs the Global region turned on in OpenCode (Settings\u00a0›\u00a0Privacy). The plan's other models keep working.",
+    /** OpenCode refused the agent's model for the key: the model or the whole account is switched off there. */
+    modelOff:
+      "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or choose another model.",
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion:
@@ -12703,6 +12709,9 @@ export const en = {
       /** The model answers only once the OpenCode account allows its Global region: no reset to wait for. */
       plan_model_region_wait:
         "This model ({{model}}) needs the Global region turned on in OpenCode (Settings\u00a0›\u00a0Privacy).",
+      /** OpenCode refused the model for the key (the model or the whole account switched off there): no reset to wait for. */
+      plan_model_off_wait:
+        "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or change {{agent}}'s model.",
       budget_wait: "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it.",
       usage_wait_canceled: "Canceled. It won't run when the limit is back.",
       usage_wait_archived: "It won't run: the agent was archived.",
@@ -12738,6 +12747,8 @@ export const en = {
       no_ai_model_limit: "I can't answer now: {{model}} reached its own limit on my plan.",
       no_ai_model_region:
         "I can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
+      no_ai_model_off:
+        "I can't answer: OpenCode refused {{model}} with my key. Turn the model or the account on in OpenCode, or change my model.",
       no_ai_commands_off: "I can't answer now: commands are turned off on my plan's computer.",
       no_ai_cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
       no_ai_no_computer: "I can't answer yet: my AI needs a computer and I have none.",
@@ -14056,6 +14067,8 @@ export const en = {
       modelLimit: "{{model}} at its limit",
       modelRegion: "{{model}} needs the Global region",
       modelRegionNext: "Turn it on in OpenCode (Settings\u00a0›\u00a0Privacy)",
+      modelOff: "OpenCode refused {{model}}",
+      modelOffNext: "Turn it on in OpenCode or choose another model",
       budgetOut: "This month's budget ran out",
       workLine: "In the agent's line of work",
       workLineNext: "Starts when other work ends",

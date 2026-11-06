@@ -1500,6 +1500,7 @@ test.if(posix)(
         ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-5.3[1m]",
         ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-5.3-flash[1m]",
         ANTHROPIC_DEFAULT_FABLE_MODEL: "glm-5.3[1m]",
+        ANTHROPIC_SMALL_FAST_MODEL: "glm-5.3-flash[1m]",
         CLAUDE_CODE_SUBAGENT_MODEL: "glm-5.3[1m]",
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
         API_TIMEOUT_MS: "3000000",
@@ -1568,13 +1569,43 @@ test.if(posix)(
       // Another plan's model runs the plan's own sonnet.
       await turn(7, "hi", { account: KIMI_ACCOUNT, model: "minimax-m3", session: { id: SESSION(7), resume: false } });
       expect(flag(runs()[7], "--model")).toBe("sonnet");
-      // A model the plan's list added after this runner was built: the server chose it, so it runs; the aliases keep theirs.
+      // A model the plan's list added after this runner was built: the server chose it, so it runs. On OpenCode Go,
+      // whose models are each switched on or off, every call of the turn runs it: no hidden MiniMax or Haiku call.
       await turn(8, "hi", { account: GO_ACCOUNT, model: "glm-6", session: { id: SESSION(8), resume: false } });
       expect(flag(runs()[8], "--model")).toBe("glm-6");
-      expect(runs()[8]?.settingsEnv).toMatchObject({
+      const onlyGlm6 = {
         CLAUDE_CODE_SUBAGENT_MODEL: "glm-6",
-        ANTHROPIC_DEFAULT_SONNET_MODEL: "minimax-m3",
+        ANTHROPIC_DEFAULT_OPUS_MODEL: "glm-6",
+        ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-6",
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-6",
+        ANTHROPIC_DEFAULT_FABLE_MODEL: "glm-6",
+        ANTHROPIC_SMALL_FAST_MODEL: "glm-6",
+      };
+      expect(runs()[8]?.settingsEnv).toMatchObject(onlyGlm6);
+      // The same for one of the table's models, and for an alias "Automático" picked: its model, everywhere.
+      await turn(10, "hi", {
+        account: GO_ACCOUNT,
+        model: "deepseek-v4.1-flash",
+        session: { id: SESSION(10), resume: false },
       });
+      expect(flag(runs().at(-1), "--model")).toBe("deepseek-v4.1-flash");
+      expect(runs().at(-1)?.settingsEnv).toMatchObject(
+        Object.fromEntries(Object.keys(onlyGlm6).map((k) => [k, "deepseek-v4.1-flash"])),
+      );
+      await turn(11, "hi", { account: GO_ACCOUNT, model: "haiku", session: { id: SESSION(11), resume: false } });
+      expect(flag(runs().at(-1), "--model")).toBe("haiku");
+      expect(runs().at(-1)?.settingsEnv).toMatchObject(
+        Object.fromEntries(Object.keys(onlyGlm6).map((k) => [k, "claude-haiku-5-5"])),
+      );
+      // A 403 is the plan refusing that model (switched off there, or the account): its words go to the engine, and
+      // the key stays signed in for the agents and models it still serves.
+      const forbidden = await turn(12, "KEY403", {
+        account: GO_ACCOUNT,
+        model: "minimax-m3",
+        session: { id: SESSION(12), resume: false },
+      });
+      expect(forbidden.final).toMatchObject({ type: "error", code: "claude_failed", retryable: false });
+      expect(JSON.stringify(forbidden.final)).toContain("Account.Disabled");
     } finally {
       for (const k of Object.keys(stray)) delete process.env[k];
     }

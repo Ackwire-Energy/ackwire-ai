@@ -696,16 +696,20 @@ export interface PlanUsage {
   at: string;
   /** Server side only: the models at a limit of their own (`PlanModelLimit`), by model id. */
   models?: Record<string, PlanModelLimit>;
+  /** Server side only, on a plan whose models have their own limits: the model that last answered with this key. */
+  answered?: string;
 }
 
 /**
  * A model's own limit on a plan whose models each have one (`limitsPerModel`), seen `at`: until `until` (absent: not
- * known), or `region` when the model answers only once the account allows the region it needs.
+ * known), `region` when the model answers only once the account allows the region it needs, or `off` when the plan
+ * refused it for the key (the model or the account switched off there).
  */
 export interface PlanModelLimit {
   at: string;
   until?: string;
   region?: true;
+  off?: true;
 }
 
 /** The computer's own sign-ins' usage (protocol 19), by brain. */
@@ -1302,6 +1306,11 @@ export interface TaskStart {
    * (`accounts/<kind>/<id>`), as `BrainTurnRequest.account`; absent: the computer's own sign-in.
    */
   account?: string;
+  /**
+   * `claude` on a coding plan's key: the model the agent thinks with there, as `BrainTurnRequest.model` (a runner
+   * that doesn't read it runs the plan's `sonnet`).
+   */
+  model?: string;
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */

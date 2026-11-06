@@ -10,7 +10,15 @@ import {
 } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
-import { claudeCodeModel, modelLimitOf, ownLimitsModel, planOf, speedFits } from "@agenteschat/providers/plans";
+import {
+  autoPlanModel,
+  claudeCodeModel,
+  modelLimitOf,
+  ownLimitsModel,
+  PLAN_FORBIDDEN_TEXT,
+  planOf,
+  speedFits,
+} from "@agenteschat/providers/plans";
 import { planState, planWindows } from "@agenteschat/ui/plan-state";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
@@ -171,7 +179,10 @@ const MODEL_WINDOW_WORDS: readonly [RegExp, "seven_day" | "monthly"][] = [
   [/month/i, "monthly"],
 ];
 
-export type RefusalScope = { scope: "account" } | { scope: "model" | "region"; resetsAt?: string };
+export type RefusalScope = { scope: "account" } | { scope: ModelScope; resetsAt?: string };
+
+/** Whose a plan's refusal is when it's one model's: its own limit, the region it needs, or switched off for the key. */
+export type ModelScope = "model" | "region" | "off";
 
 /**
  * A plan refused a model that needs its Global region for that, whatever the status it came with. Only those: the
@@ -179,6 +190,13 @@ export type RefusalScope = { scope: "account" } | { scope: "model" | "region"; r
  */
 export const regionRefusal = (provider: string | null | undefined, model: string | null | undefined, message: string) =>
   ownLimitsModel(provider, model)?.needs === "globalRegion" && /region/i.test(message);
+
+/**
+ * A plan whose models are each switched on or off refused this one for the key (a 403 that names no region, which a
+ * setting may not open): the model is off in its workspace, or the account. Never the key itself.
+ */
+export const offRefusal = (provider: string | null | undefined, model: string | null | undefined, message: string) =>
+  ownLimitsModel(provider, model) !== null && PLAN_FORBIDDEN_TEXT.test(message) && !/region/i.test(message);
 
 /**
  * Whose limit a plan's refusal (`message`, the CLI's words) is. On a plan whose models have limits of their own, the
@@ -196,6 +214,7 @@ export function refusalScope(
   const m = ownLimitsModel(provider, model);
   if (!m) return { scope: "account" };
   if (regionRefusal(provider, model, message)) return { scope: "region" };
+  if (offRefusal(provider, model, message)) return { scope: "off" };
   if (usage && planWindows(usage, now).some((w) => w.used >= 100)) return { scope: "account" };
   const kind = MODEL_WINDOW_WORDS.find(([words]) => words.test(message))?.[1];
   const at = kind ? usage?.windows.find((w) => w.kind === kind)?.resetsAt : undefined;
@@ -214,7 +233,7 @@ export async function noteModelLimit(
   orgId: string,
   accountId: string,
   model: string,
-  limit: { until?: string; region?: true },
+  limit: { until?: string; region?: true; off?: true },
   now = Date.now(),
 ) {
   const { machineAccounts } = schema;
@@ -228,6 +247,24 @@ export async function noteModelLimit(
         coalesce(${machineAccounts.usage}->'models', '{}'::jsonb) || ${entry}::jsonb)`,
     })
     .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, accountId)));
+}
+
+/** A turn on the model went through with the account's key: "Automático" stands in with it (`autoPlanModel`). */
+export async function noteAnswered(db: Executor, orgId: string, accountId: string, model: string) {
+  const { machineAccounts } = schema;
+  const empty = JSON.stringify({ windows: [], source: "turn", at: new Date().toISOString() });
+  await db
+    .update(machineAccounts)
+    .set({
+      usage: sql`jsonb_set(coalesce(${machineAccounts.usage}, ${empty}::jsonb), '{answered}', to_jsonb(${model}::text))`,
+    })
+    .where(
+      and(
+        eq(machineAccounts.orgId, orgId),
+        eq(machineAccounts.id, accountId),
+        sql`${machineAccounts.usage}->>'answered' is distinct from ${model}`,
+      ),
+    );
 }
 
 /** A turn on the model went through: its own limit no longer holds. True when there was one. */
@@ -278,8 +315,8 @@ export interface BrainUnavailability {
   code: string;
   message: string;
   resetsAt?: string;
-  /** A `plan_limit` that is the model's own or the region it needs (`refusalScope`), not the account's. */
-  scope?: "model" | "region";
+  /** A `plan_limit` that is one model's (`refusalScope`), not the account's. */
+  scope?: ModelScope;
 }
 
 /**
@@ -336,10 +373,12 @@ export function computerBrainUnavailable(
   if (own && modelLimit) {
     return {
       code: "plan_limit",
-      scope: modelLimit.region ? "region" : "model",
+      scope: modelLimit.region ? "region" : modelLimit.off ? "off" : "model",
       message: modelLimit.region
         ? `${own.label} needs the Global region on in OpenCode (Settings › Privacy).`
-        : `${own.label} reached its own limit on the ${name} account "${account?.label ?? ""}".`,
+        : modelLimit.off
+          ? `OpenCode refused ${own.label} with this key: the model or the account is turned off there.`
+          : `${own.label} reached its own limit on the ${name} account "${account?.label ?? ""}".`,
       ...(modelLimit.until !== null ? { resetsAt: new Date(modelLimit.until).toISOString() } : {}),
     };
   }
@@ -738,7 +777,8 @@ export async function resolveBrain(
           account,
           machineId ? await planIsOwners(deps.db, agent, machineId, account) : true,
           usage,
-          runs,
+          // "Automático" runs another model where the one it maps to is held (`autoPlanModel`).
+          isAutoModel(runs) ? autoPlanModel(account?.provider, runs, usage) : runs,
         ));
   // A mission's main session stays (its decisions, inbox and items point at it): `settingsChanged` brings the edit.
   const settingsChanged =

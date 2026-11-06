@@ -51,7 +51,7 @@ export interface NoAiCard {
    * there, a plan that answers only its owner, a runner to update there, the plan's CLI offering tools of its own).
    */
   planLine?: RightHandPlanLine;
-  /** With `model_limit` and `model_region`: the model's name. */
+  /** With `model_limit`, `model_region` and `model_off`: the model's name. */
   model?: string;
   /** Not "no AI": its computer has no such CLI installed, or it has no computer at all. */
   missing?: "cli_missing" | "no_computer";
@@ -64,6 +64,7 @@ export type RightHandPlanLine =
   | "plan_limit"
   | "model_limit"
   | "model_region"
+  | "model_off"
   | "commands_off"
   | "plan_not_shared"
   | "runner_outdated"
@@ -74,6 +75,7 @@ export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanL
   "plan_limit",
   "model_limit",
   "model_region",
+  "model_off",
   "commands_off",
   "plan_not_shared",
   "runner_outdated",

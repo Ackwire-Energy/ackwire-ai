@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MODEL_CATALOG } from "../src/catalog";
 import {
+  autoPlanModel,
   CODING_PLANS,
   claudeCodeModel,
   FAST_MODE_MODELS,
   isPlanModelId,
   learnedPlanModels,
   learnPlanModels,
+  modelLimitOf,
   PLAN_ALIASES,
+  PLAN_FORBIDDEN_TEXT,
   PLAN_IDS,
   type PlanId,
   type PlanModel,
@@ -309,5 +312,37 @@ describe("a plan's public list of models", () => {
     expect(turn("opus")).toBe("opus");
     // A plan without a list stays with its own models.
     expect(planForTurn(CODING_PLANS.kimi, "glm-6")).toBe(CODING_PLANS.kimi);
+  });
+});
+
+describe("a model OpenCode refused for the key, and what Automático runs instead", () => {
+  const now = Date.parse("2026-11-06T12:00:00Z");
+  const at = new Date(now - 60_000).toISOString();
+  const off = { "minimax-m3": { at, off: true as const } };
+
+  test("off holds like the region does, then a turn asks again", () => {
+    expect(modelLimitOf(off, "minimax-m3", now)).toEqual({ until: null, region: false, off: true });
+    expect(modelLimitOf(off, "minimax-m3", now + 31 * 60_000)).toBeNull();
+  });
+
+  test("a 403 in Claude Code's words, and nothing else, is the plan refusing", () => {
+    expect(PLAN_FORBIDDEN_TEXT.test('API Error: 403 {"error":{"message":"Account.Disabled"}}')).toBe(true);
+    expect(PLAN_FORBIDDEN_TEXT.test('API Error: 401 {"error":{"message":"Invalid credential"}}')).toBe(false);
+    expect(PLAN_FORBIDDEN_TEXT.test("exit 1: wrote 403 files")).toBe(false);
+  });
+
+  test("the alias's model while it answers, else the model that last answered with the key while that one does", () => {
+    const usage = { models: off, answered: "deepseek-v4.1-flash" };
+    expect(autoPlanModel("opencode", "sonnet", usage, now)).toBe("deepseek-v4.1-flash");
+    expect(autoPlanModel("opencode", "auto", usage, now)).toBe("deepseek-v4.1-flash");
+    // Its own model answers: it stays.
+    expect(autoPlanModel("opencode", "haiku", usage, now)).toBe("haiku");
+    // Nothing known to answer, or that one held too: it stays, for its refusal to say so.
+    expect(autoPlanModel("opencode", "sonnet", { models: off }, now)).toBe("sonnet");
+    const both = { ...off, "deepseek-v4.1-flash": { at, off: true as const } };
+    expect(autoPlanModel("opencode", "sonnet", { models: both, answered: "deepseek-v4.1-flash" }, now)).toBe("sonnet");
+    // A model no longer on the plan, and plans whose models share the account's limits, stay as they are.
+    expect(autoPlanModel("opencode", "sonnet", { models: off, answered: "gone-model" }, now)).toBe("sonnet");
+    expect(autoPlanModel("zai", "sonnet", usage, now)).toBe("sonnet");
   });
 });

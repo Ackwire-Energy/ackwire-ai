@@ -32,7 +32,7 @@ import {
   PERMISSION_WAIT_MS,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
-import { claudeCodeModel, type PlanId, planForTurn, planOf } from "@agenteschat/providers/plans";
+import { claudeCodeModel, PLAN_FORBIDDEN_TEXT, type PlanId, planForTurn, planOf } from "@agenteschat/providers/plans";
 import {
   ACCOUNT_MISSING_MESSAGE,
   ACCOUNT_SIGNED_OUT,
@@ -304,6 +304,11 @@ export class ClaudeStreamParser {
   compacted = false;
   /** Told at the compaction itself: a runner that dies before the turn ends still knows on its next start. */
   onCompacted?: () => void;
+  /**
+   * Thinks with a coding plan's key: a 403 is the plan refusing this model (switched off there, or the account), for
+   * the engine to read (`claude_failed`), never the key refused, which would sign out every agent on that key.
+   */
+  planKey = false;
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
@@ -346,7 +351,12 @@ export class ClaudeStreamParser {
     const main = ev.parent_tool_use_id === null || ev.parent_tool_use_id === undefined;
     switch (ev.type) {
       case "system": {
-        if (ev.subtype === "api_retry" && (ev.error === "authentication_failed" || ev.error_status === 401)) {
+        const forbidden = this.planKey && ev.error_status === 403;
+        if (
+          ev.subtype === "api_retry" &&
+          !forbidden &&
+          (ev.error === "authentication_failed" || ev.error_status === 401)
+        ) {
           this.authFailed = true;
           return { events: [], authRetry: true };
         }
@@ -500,7 +510,7 @@ export class ClaudeStreamParser {
           ...(this.rejected ? {} : { rateLimit: { status: "rejected" } }),
         };
       }
-      if (this.authFailed || AUTH_TEXT.test(text)) {
+      if ((this.authFailed || AUTH_TEXT.test(text)) && !(this.planKey && PLAN_FORBIDDEN_TEXT.test(text))) {
         return {
           events,
           final: {
@@ -1831,6 +1841,7 @@ export class BrainManager {
       ctx.oauthToken,
     );
     if (mode === "chat") proc.lock = chatToolsBreach;
+    proc.parser.planKey = Boolean(plan);
     const live: Live = {
       key,
       agentId: ctx.agent.id,

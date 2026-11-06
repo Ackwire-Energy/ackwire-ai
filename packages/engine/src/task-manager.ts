@@ -1,6 +1,7 @@
 import { and, type Database, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import { planOf as codingPlan, PLAN_IDS, planModel } from "@agenteschat/providers/plans";
 import { runAuthorityById } from "./authority";
+import type { ModelScope } from "./brains/select";
 import { TtlCache } from "./cache";
 import { computerQueue as lineOfComputer, seesRunSql } from "./computer-queue";
 import { isAgentOnlyDm } from "./dms";
@@ -63,9 +64,9 @@ export interface TaskWait {
   key: string | null;
   /** The plan in words ("Claude"); null for a budget. */
   plan: string | null;
-  /** A plan wait on a model's own limit or the region it needs: the model's name, and which. */
+  /** A plan wait on one model's refusal (its own limit, the region it needs, switched off): the model's name, and which. */
   model: string | null;
-  scope: "model" | "region" | null;
+  scope: ModelScope | null;
   /** Long work paused near a limit (`usage_pause`): how far along, and the plan's window. */
   percent: number | null;
   window: string | null;
@@ -237,7 +238,7 @@ interface StoredWait {
   source?: string;
   plan?: string;
   model?: string | null;
-  scope?: "model" | "region";
+  scope?: ModelScope;
   resetsAt?: string;
   waitKey?: string;
 }
