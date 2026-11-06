@@ -3,6 +3,7 @@ import type {
   AgentAccess,
   AgentForYouItem,
   AgentGroup,
+  AgentStatusLine,
   AgentUsage,
   Approval,
   DirectMessage,
@@ -14,6 +15,7 @@ import type {
 import { asksAt, levelOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { type WorkItem, workByAgent } from "@agenteschat/client/lib/working";
 import { daysAgo, previewOf } from "../shared/logic";
 
@@ -230,6 +232,21 @@ export function plainRole(instructions: string | null | undefined): string | nul
     return line.charAt(0).toUpperCase() + line.slice(1);
   }
   return null;
+}
+
+/**
+ * Whether the profile shows the agent's status card under what it is on now (ADR 0084), so each thing is said once:
+ * its own words always, and out of office always (it says when it is back); a line the server picked for its work
+ * only while no running job's row says it; a wait unless it is the request already shown as a card.
+ */
+export function statusCardShown(
+  line: Pick<AgentStatusLine, "by" | "kind"> | null | undefined,
+  now: { working: boolean; asking: boolean },
+): boolean {
+  if (!line) return false;
+  if (line.by === "self" || isOutOfOffice(line)) return true;
+  if (line.by === "wait") return !(now.asking && line.kind === "waiting_approval");
+  return !now.working;
 }
 
 /** Only the agent's owner or who reviews memory may correct or forget its memories (the server checks it again). */

@@ -1,10 +1,11 @@
 import type { ConnectorDef } from "@agenteschat/client";
+import { type AgentPresetColor, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { appHeaders, lastCookie } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
-import { Icon, type IconName, Text } from "@/ui";
+import { Icon, type IconName, Text, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { brandOf, iconUri, monogram, ownMarkUri, serverIconUri } from "./logic";
 
@@ -40,11 +41,23 @@ export function ConnectorIcon({
   const [failed, setFailed] = useState<string | null>(null);
   const tint = (def ? brandOf(def.brandColor) : null) ?? c.ink;
   const radius = Math.round(size * 0.3);
+  const { scheme } = useTheme();
+  // No logo: the first letter on a color of its own, picked by the name (the same server, the same color everywhere).
+  const lettered = !uri && !(own && own.uri !== failed);
+  const [light, deep] = gradientOf(monogramColor(label));
+  const tile = lettered ? mixHex(c.raised, light, scheme === "dark" ? 0.28 : 0.4) : c.raised;
+  const letter = scheme === "dark" ? light : deep;
   return (
     <View
       style={[
         styles.tile,
-        { width: size, height: size, borderRadius: radius, backgroundColor: c.raised, borderColor: c.line },
+        {
+          width: size,
+          height: size,
+          borderRadius: radius,
+          backgroundColor: tile,
+          borderColor: lettered ? "transparent" : c.line,
+        },
       ]}
       accessible={false}
     >
@@ -64,13 +77,14 @@ export function ConnectorIcon({
         />
       ) : (
         // Its line as tall as its letters: the body's taller line, in a small tile, set them low.
-        <Text variant="body" tone="muted" style={[styles.mono, monogramSize(size)]}>
+        <Text variant="body" style={[styles.mono, monogramSize(size), { color: letter }]}>
           {monogram(label)}
         </Text>
       )}
       {check ? (
         <View style={[styles.check, { backgroundColor: c.ok, borderColor: c.bg }]}>
-          <Icon name="check" size={10} color="#ffffff" />
+          {/* The ring's color for the mark too: white on dark's light green was hard to read. */}
+          <Icon name="check" size={12} color={c.bg} />
         </View>
       ) : null}
     </View>
@@ -100,6 +114,14 @@ export function IconTile({ name, size = 20 }: { name: IconName; size?: number })
 }
 
 /** A monogram's letters for a tile `size` wide, on a line just as tall, so they sit in the tile's middle. */
+const MONOGRAM_COLORS: AgentPresetColor[] = ["sky", "indigo", "violet", "rose", "amber", "green", "teal"];
+/** A lettered server's color, from its name: stable across screens and launches. */
+const monogramColor = (label: string): AgentPresetColor => {
+  let h = 0;
+  for (const ch of label) h = (h * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+  return MONOGRAM_COLORS[h % MONOGRAM_COLORS.length] ?? "sky";
+};
+
 const monogramSize = (size: number) => {
   const fontSize = Math.round(size * 0.36);
   return { fontSize, lineHeight: Math.round(fontSize * 1.2) };

@@ -1,4 +1,12 @@
-import { gradientOf, hexToHsv, hsvToHex, isHexColor, pickerStart } from "@agenteschat/ui/agent/engine";
+import {
+  BODY_CUT,
+  BODY_RADIUS,
+  gradientOf,
+  hexToHsv,
+  hsvToHex,
+  isHexColor,
+  pickerStart,
+} from "@agenteschat/ui/agent/engine";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -133,8 +141,12 @@ export function ColorSheet({
   );
 }
 
+/** The chosen color's tile, in the agent's own shape. */
+const TILE = 44;
+
 const styles = StyleSheet.create({
-  wrap: { gap: 14, padding: 18 },
+  // The sheet already gives its 18 pt sides: the color sheet's title and area line up with every other sheet's.
+  wrap: { gap: 14 },
   area: { height: 180, borderRadius: 14, overflow: "hidden" },
   thumb: {
     position: "absolute",
@@ -151,7 +163,7 @@ const styles = StyleSheet.create({
   bar: { height: 16, justifyContent: "center" },
   barTrack: { borderRadius: 999 },
   foot: { flexDirection: "row", alignItems: "center", gap: 12 },
-  // The agent's shape: 30% corners, the cut one at bottom-left.
-  tile: { width: 44, height: 44, borderRadius: 13, borderBottomLeftRadius: 4 },
+  // The agent's shape: its body's corners, the cut one at bottom-left.
+  tile: { width: TILE, height: TILE, borderRadius: TILE * BODY_RADIUS, borderBottomLeftRadius: TILE * BODY_CUT },
   hex: { flex: 1, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
 });

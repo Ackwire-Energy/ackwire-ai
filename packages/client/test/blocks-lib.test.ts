@@ -178,6 +178,63 @@ describe("one state for everyone (ADR 0113)", () => {
   });
 });
 
+/**
+ * The kit run with just enough of a page to start: what it posts is what the app would hear. No parts on it, so no
+ * DOM is needed.
+ */
+function startKit() {
+  const posts: { type: string; message?: string }[] = [];
+  const window: Record<string, unknown> = {
+    __block: { state: {} },
+    ReactNativeWebView: { postMessage: (data: string) => posts.push(JSON.parse(data)) },
+    localStorage: { length: 0 },
+    sessionStorage: { length: 0 },
+  };
+  const node = () => ({ dataset: {}, style: { setProperty() {} } });
+  const document = {
+    cookie: "",
+    documentElement: node(),
+    body: { getBoundingClientRect: () => ({ height: 10 }) },
+    querySelectorAll: () => [],
+  };
+  const run = new Function("window", "document", "customElements", "HTMLElement", "addEventListener", BLOCK_KIT_JS);
+  run(window, document, { define() {} }, class {}, () => {});
+  const agentes = window.agentes as {
+    set: (name: string, value: unknown) => void;
+    on: (f: (s: Record<string, number | undefined>) => void) => void;
+  };
+  const settled = () => new Promise((done) => setTimeout(done, 20));
+  return { agentes, settled, of: (type: string) => posts.filter((p) => p.type === type) };
+}
+
+describe("a page can't hang on its own redraws", () => {
+  test("setting what is already there changes nothing, so a handler that sets settles", async () => {
+    const kit = startKit();
+    kit.agentes.on(() => kit.agentes.set("top", 3));
+    await kit.settled();
+    expect(kit.of("state").length).toBeLessThanOrEqual(2);
+    expect(kit.of("error")).toEqual([]);
+  });
+
+  test("a handler that keeps changing the state stops after a bounded chain and says why", async () => {
+    const kit = startKit();
+    kit.agentes.on((s) => kit.agentes.set("n", (s.n ?? 0) + 1));
+    await kit.settled();
+    expect(kit.of("error")).toHaveLength(1);
+    expect(kit.of("error")[0]?.message).toContain("agentes.on");
+    expect(kit.of("state").length).toBeLessThanOrEqual(52);
+  });
+
+  test("the app hears the state only when it changed", async () => {
+    const kit = startKit();
+    kit.agentes.set("a", [1, 2]);
+    await kit.settled();
+    kit.agentes.set("a", [1, 2]);
+    await kit.settled();
+    expect(kit.of("state")).toHaveLength(1);
+  });
+});
+
 describe("polls", () => {
   const poll: Poll = {
     id: "p",

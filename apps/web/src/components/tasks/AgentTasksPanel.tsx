@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { QueueDialog } from "@/components/ComputerQueue";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { WaitMark } from "@/components/RequestCard";
 import { colorOf } from "@/components/Sky";
@@ -112,8 +113,10 @@ export function AgentTasksPanel({
       />
       <aside className="thread-panel tm-agentpanel" aria-label={title}>
         <header className="channel__header thread-head thread-head--panel">
-          <span className="thread-head__who" aria-hidden="true">
-            <AgentAvatar agentId={agentId} name={name} size="sm" />
+          <span className="thread-head__who">
+            <OpensAgent agentId={agentId}>
+              <AgentAvatar agentId={agentId} name={name} size="sm" />
+            </OpensAgent>
           </span>
           <div className="thread-head__text">
             <h2 className="channel__title thread-title">

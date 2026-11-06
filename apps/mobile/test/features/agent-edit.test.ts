@@ -19,7 +19,7 @@ import {
   sameLook,
   shuffleLook,
 } from "../../src/features/agents/edit";
-import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, stepBlocked } from "../../src/features/agents/new-agent";
+import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, roleLine, stepBlocked } from "../../src/features/agents/new-agent";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES, agentLook } from "../../src/features/shared/logic";
 import { translator } from "./fixtures";
 
@@ -207,6 +207,39 @@ describe("creating an agent on the phone", () => {
     ];
     expect(presetChannels("dev", channels)).toEqual(["1"]);
     expect(presetChannels("assistant", channels)).toEqual(["2"]);
+  });
+
+  test("a preset's line: what it does, then who it starts as, the agent's name kept as written", () => {
+    expect(roleLine("Programa, revisa PRs e investiga bugs.", "Começa como Ada", "Ada", "pt-BR")).toBe(
+      "Programa, revisa PRs e investiga bugs · começa como Ada",
+    );
+    // German nouns keep their capital; a line that starts with the name keeps it, and a full stop goes like a period.
+    expect(roleLine("Programmiert, prüft PRs und untersucht Bugs.", "Startet als Ada", "Ada", "de")).toBe(
+      "Programmiert, prüft PRs und untersucht Bugs · Startet als Ada",
+    );
+    expect(roleLine("コードを書き、PRをレビューし、バグを調査します。", "Adaとして開始", "Ada", "ja")).toBe(
+      "コードを書き、PRをレビューし、バグを調査します · Adaとして開始",
+    );
+  });
+
+  test("Create agent on the grouped gray: the step said once, presets as checked rows, a level picked from a list", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const read = (f: string) => Bun.file(new URL(`../../src/features/agents/${f}`, import.meta.url).pathname).text();
+    const [screen, look] = await Promise.all([read("NewAgentScreen.tsx"), read("LookPicker.tsx")]);
+    // Not in the header's subtitle: once, under the bar ("2 of 4 · Who it is").
+    expect(screen).not.toContain("newAgent.stepOf");
+    expect(screen).toContain('t("mobile.choices.step", { step: index + 1, total })');
+    // A role is a row with the check, never a ringed card; with none chosen yet there is no bar to press.
+    expect(screen).toContain("checked={role === id}");
+    expect(screen).not.toContain("RoleCard");
+    expect(screen).toContain("const footer = importing || backs || goes;");
+    // A proposal's levels come from the system's list of the three, never cycled by taps.
+    expect(screen).not.toContain("nextLevel");
+    expect(screen).toContain("const pickLevel = (title: string, choose: (level: Level) => void) =>");
+    expect(screen).toContain("pickLevel(app, (l) => setProposedLevels((p) => ({ ...p, [i.id]: l })))");
+    // The look in the list: swatches checked inside, the eyes and the accessory each in a sheet of checked rows.
+    expect(screen).toContain("<LookList look={look} onChange={setLook} />");
+    expect(look).toContain("checked={o.key === value}");
   });
 
   test("the custom color sheet: starts from the current color, applies it on done, keeps the drag from the scroll", async () => {

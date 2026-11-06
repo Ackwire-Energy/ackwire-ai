@@ -1222,7 +1222,7 @@ export class AccountManager {
     return this.authEgressSaid;
   }
 
-  /** Protocol 46 (`hello.authEgressGroup`): root's Claude CLIs on account folders run in the auth egress group. */
+  /** Protocol 47 (`hello.authEgressGroup`): root's Claude CLIs on account folders run in the auth egress group. */
   authEgressGroup(): boolean {
     return this.authPrefix() !== null;
   }
@@ -1258,7 +1258,7 @@ export class AccountManager {
     }
   }
 
-  /** The method root wrote beside the folder when its sign-in began (protocol 46); null for an older folder. */
+  /** The method root wrote beside the folder when its sign-in began (protocol 47); null for an older folder. */
   private keptMethod(kind: AccountKind, id: string): AuthMethod | null {
     try {
       const method = readFileSync(this.marker(kind, id, "method"), "utf8").trim();
@@ -1282,7 +1282,7 @@ export class AccountManager {
   }
 
   /**
-   * Protocol 46 (`hello`): what a new Claude sign-in for all agents uses here. In system mode the CLI's own sign-in
+   * Protocol 47 (`hello`): what a new Claude sign-in for all agents uses here. In system mode the CLI's own sign-in
    * would have to run as every agent's user with one credential file, which nothing here does.
    */
   claudeLoginMethods(): AuthMethod[] {
@@ -1316,7 +1316,7 @@ export class AccountManager {
    * system mode): a sign-in for every agent of its owner here, which root
    * keeps: Claude's through `claude setup-token` (no login hint there), a
    * plan's key as it is, ChatGPT's through `codex login` as root (`grant` hands its `auth.json` to each turn).
-   * `method` (protocol 46, a Claude subscription sign-in): the one to use, or a refusal; never another one. The method
+   * `method` (protocol 47, a Claude subscription sign-in): the one to use, or a refusal; never another one. The method
    * a sign-in uses is kept beside its folder (`<id>.method`), and signing in again another way is refused.
    */
   async begin(

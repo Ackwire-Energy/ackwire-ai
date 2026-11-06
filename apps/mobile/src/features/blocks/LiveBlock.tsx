@@ -85,6 +85,9 @@ function BlockWebView({
   const web = useRef<WebView<object>>(null);
   const [life, setLife] = useState(0);
   const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
+  // Until the page says it started, a spinner over it: a blank box reads as broken.
+  const [ready, setReady] = useState(false);
+  const c = useColors();
   const theme = scheme === "dark" ? "dark" : "light";
   const sharedRef = useRef(shared);
   sharedRef.current = shared;
@@ -119,49 +122,62 @@ function BlockWebView({
     if (sharedRef.current) web.current?.injectJavaScript(hostScript(sharedRef.current));
   }, [rev]);
 
-  const restart = () => setLife((n) => n + 1);
+  const restart = () => {
+    setReady(false);
+    setLife((n) => n + 1);
+  };
   return (
-    <WebView
-      key={life}
-      ref={web}
-      source={{ html: page }}
-      // Every address passes this list and is refused below: one that failed here would go to the system to open.
-      originWhitelist={["*"]}
-      onShouldStartLoadWithRequest={(request) => blockMayLoad(request.url)}
-      javaScriptEnabled
-      javaScriptCanOpenWindowsAutomatically={false}
-      setSupportMultipleWindows={false}
-      domStorageEnabled={false}
-      incognito
-      cacheEnabled={false}
-      sharedCookiesEnabled={false}
-      thirdPartyCookiesEnabled={false}
-      allowFileAccess={false}
-      allowFileAccessFromFileURLs={false}
-      allowUniversalAccessFromFileURLs={false}
-      geolocationEnabled={false}
-      mediaCapturePermissionGrantType="deny"
-      mediaPlaybackRequiresUserAction
-      scrollEnabled={scrolls}
-      nestedScrollEnabled={false}
-      bounces={false}
-      overScrollMode="never"
-      showsVerticalScrollIndicator={false}
-      style={[styles.web, !scrolls && { height: height || INLINE_HEIGHT }]}
-      onMessage={(e) => {
-        const event = blockEvent(e.nativeEvent.data);
-        if (!event) return;
-        if (event.type === "height") {
-          keptOf(blockKey).height = event.height;
-          setHeight(event.height);
-        }
-        // What moved while it was starting.
-        if (event.type === "ready" && sharedRef.current) web.current?.injectJavaScript(hostScript(sharedRef.current));
-        onEvent(event);
-      }}
-      onContentProcessDidTerminate={restart}
-      onRenderProcessGone={restart}
-    />
+    <View style={scrolls ? styles.fill : undefined}>
+      <WebView
+        key={life}
+        ref={web}
+        source={{ html: page }}
+        // Every address passes this list and is refused below: one that failed here would go to the system to open.
+        originWhitelist={["*"]}
+        onShouldStartLoadWithRequest={(request) => blockMayLoad(request.url)}
+        javaScriptEnabled
+        javaScriptCanOpenWindowsAutomatically={false}
+        setSupportMultipleWindows={false}
+        domStorageEnabled={false}
+        incognito
+        cacheEnabled={false}
+        sharedCookiesEnabled={false}
+        thirdPartyCookiesEnabled={false}
+        allowFileAccess={false}
+        allowFileAccessFromFileURLs={false}
+        allowUniversalAccessFromFileURLs={false}
+        geolocationEnabled={false}
+        mediaCapturePermissionGrantType="deny"
+        mediaPlaybackRequiresUserAction
+        scrollEnabled={scrolls}
+        nestedScrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
+        style={[styles.web, !scrolls && { height: height || INLINE_HEIGHT }]}
+        onMessage={(e) => {
+          const event = blockEvent(e.nativeEvent.data);
+          if (!event) return;
+          if (event.type === "height") {
+            keptOf(blockKey).height = event.height;
+            setHeight(event.height);
+          }
+          if (event.type === "ready") {
+            setReady(true);
+            // What moved while it was starting.
+            if (sharedRef.current) web.current?.injectJavaScript(hostScript(sharedRef.current));
+          }
+          onEvent(event);
+        }}
+        onContentProcessDidTerminate={restart}
+        onRenderProcessGone={restart}
+      />
+      {ready ? null : (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.asleep]}>
+          <ActivityIndicator color={c.faint} />
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -367,7 +383,9 @@ export function LiveBlockCard({ id, version }: { id: string; version?: number })
             </Text>
           ) : null}
         </View>
-        <IconButton icon="expand" label={t("mobile.blocks.openBig")} onPress={open} />
+        <View style={styles.headButton}>
+          <IconButton icon="expand" label={t("mobile.blocks.openBig")} onPress={open} />
+        </View>
       </View>
       <LiveBlock id={a.id} version={a.shownVersion} html={a.content.html} agentId={agentId} />
     </View>
@@ -435,6 +453,8 @@ const styles = StyleSheet.create({
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 8, opacity: 0.7 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 12 },
   titles: { flex: 1, minWidth: 0 },
+  // The 40-point button centred on the title's first line: its top sat level with the text, its middle a line lower.
+  headButton: { marginTop: -10 },
   bold: { fontWeight: "600" },
   web: { backgroundColor: "transparent" },
   fill: { flex: 1 },

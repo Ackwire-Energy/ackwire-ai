@@ -237,3 +237,18 @@ export function skillUpdateWords(t: TFunction, lang: string, s: SkillDetail) {
       : null,
   };
 }
+
+/** What removing a skill does: who loses it, that it leaves the workspace, and that there's no way back in the apps. */
+export function skillRemovalText(t: TFunction, users: readonly { name: string }[]) {
+  const who =
+    users.length > 0
+      ? t("skills.removeAgents", {
+          count: users.length,
+          names: joinNames(
+            users.map((a) => a.name),
+            t,
+          ),
+        })
+      : t("skills.removeNone");
+  return t("common.joinSentences", { a: who, b: t("skills.removeGone") });
+}

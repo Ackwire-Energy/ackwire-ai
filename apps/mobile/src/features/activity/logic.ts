@@ -3,7 +3,7 @@ import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { namesText } from "@agenteschat/client/lib/format";
 import { upcomingRoutines } from "@agenteschat/client/lib/home";
 import { mediaKindOf } from "@agenteschat/client/lib/media";
-import { askersOf, runFailedGroupOf } from "@agenteschat/client/lib/notifications";
+import { askersOf, oneToolChangePerServer, runFailedGroupOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import type { TFunction } from "i18next";
 import { daysAgo } from "../shared/logic";
@@ -44,27 +44,57 @@ export function dayGroupOf(iso: string, now = new Date()): DayGroup {
   return "older";
 }
 
-/** The screen's sections: waiting first, then the rest by day (empty groups left out). */
+/**
+ * The screen's sections: waiting first, then the rest by day (empty groups left out). A server's repeated "changed
+ * tools" notices are one card (`merged`: how many that left out), and one with nothing left to review leaves
+ * (`settled`, given `pendingTools`): the screen takes both from the server's waiting count.
+ */
 export function activitySections(
   items: AppNotification[],
   filter: ActivityFilter,
   now = new Date(),
-): { waiting: AppNotification[]; days: [DayGroup, AppNotification[]][] } {
+  pendingTools: PendingTools | null = null,
+): { waiting: AppNotification[]; days: [DayGroup, AppNotification[]][]; merged: number; settled: number } {
   if (filter === "done") {
     const done = items.filter((n) => n.doneAt);
-    return { waiting: [], days: byDay(done, (n) => n.doneAt ?? n.updatedAt, now) };
+    return { waiting: [], days: byDay(done, (n) => n.doneAt ?? n.updatedAt, now), merged: 0, settled: 0 };
   }
-  const visible = items.filter((n) => isVisible(n, now.getTime()));
+  const { items: one, merged } = oneToolChangePerServer(items.filter((n) => isVisible(n, now.getTime())));
+  const visible = one.filter((n) => !settledToolChange(n, pendingTools));
+  const settled = one.length - visible.length;
   const waiting = sortWaiting(visible.filter((n) => n.waiting));
-  if (filter === "waiting") return { waiting, days: [] };
+  if (filter === "waiting") return { waiting, days: [], merged, settled };
   return {
     waiting,
+    merged,
+    settled,
     days: byDay(
       visible.filter((x) => !x.waiting),
       (n) => n.updatedAt,
       now,
     ),
   };
+}
+
+/**
+ * The connections whose approved tools wait for a review (`useToolChanges`, connector admins): by id, and by name for
+ * notices from before they named their server.
+ */
+export interface PendingTools {
+  ids: Set<string>;
+  labels: Set<string>;
+}
+
+/**
+ * A server's "changed tools" notice with nothing left to review: every change was accepted (on the web, or before the
+ * notice was resolved on accepting). Its card would open an empty review, so it leaves. Unknown (`null`, not loaded
+ * or not an admin): it stays.
+ */
+function settledToolChange(n: AppNotification, pending: PendingTools | null): boolean {
+  if (!pending || n.kind !== "connector_tool_changed" || !n.waiting) return false;
+  const { connectionId, label } = n.source;
+  if (connectionId) return !pending.ids.has(connectionId);
+  return label ? !pending.labels.has(label) : false;
 }
 
 function byDay(list: AppNotification[], at: (n: AppNotification) => string, now: Date) {

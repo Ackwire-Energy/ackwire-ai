@@ -1209,10 +1209,10 @@ test.if(posix)(
   20_000,
 );
 
-// ── Protocol 46: how each account signs in ───────────────────────────────────
+// ── Protocol 47: how each account signs in ───────────────────────────────────
 
-test("protocol 46 on the wire: an account's method, an inconclusive status, Claude's organization, hello's methods, a turn error's cause", () => {
-  expect(CLAUDE_AUTH_PROTOCOL).toBe(46);
+test("protocol 47 on the wire: an account's method, an inconclusive status, Claude's organization, hello's methods, a turn error's cause", () => {
+  expect(CLAUDE_AUTH_PROTOCOL).toBe(47);
   expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(CLAUDE_AUTH_PROTOCOL);
   const frame = parseRunnerFrame(
     JSON.stringify({
@@ -1246,11 +1246,11 @@ test("protocol 46 on the wire: an account's method, an inconclusive status, Clau
   expect(frame.accounts[2]).toEqual({ id: LOGIN(92), kind: "claude_code", loggedIn: true });
 
   const hello = (claudeLoginMethods: unknown) =>
-    parseRunnerFrame(JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 46, claudeLoginMethods }));
+    parseRunnerFrame(JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 47, claudeLoginMethods }));
   expect(hello(["setup_token", "magic", "setup_token"])).toMatchObject({ claudeLoginMethods: ["setup_token"] });
   expect(hello("cli_login")).not.toHaveProperty("claudeLoginMethods");
   const egress = (authEgressGroup: unknown) =>
-    parseRunnerFrame(JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 46, authEgressGroup }));
+    parseRunnerFrame(JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 47, authEgressGroup }));
   expect(egress(true)).toMatchObject({ authEgressGroup: true });
   expect(egress("yes")).not.toHaveProperty("authEgressGroup");
   expect(egress(false)).not.toHaveProperty("authEgressGroup");

@@ -81,7 +81,7 @@ html:not([data-pointer]) .cq-link:focus-visible {
   padding: 8px;
   border-radius: 8px;
 }
-.cq__row > .ac-avatar {
+.cq__row .ac-avatar {
   margin: 1px;
 }
 .cq__row[data-mine] {
@@ -240,11 +240,7 @@ html:not([data-pointer]) .cq-link:focus-visible {
   }
 }
 
-/* An agent's usage line (UsageQueue.tsx): the row answering now, a row's "Não rodar", and "Não rodar nenhuma" asked in place. */
-.cq__time[data-now] {
-  color: var(--agent);
-  font-weight: 600;
-}
+/* An agent's usage line (UsageQueue.tsx): a row's "Não rodar", and "Não rodar nenhuma" asked in place. */
 .cq-confirm {
   display: flex;
   margin: 0;

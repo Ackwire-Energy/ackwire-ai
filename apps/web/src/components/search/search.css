@@ -48,6 +48,10 @@
 .search-box__input:focus {
   outline: none;
 }
+/* Our × clears the field and its filters: the engines' own × (WebKit's, Blink's) would sit beside it at the end. */
+.search-box__input::-webkit-search-cancel-button {
+  display: none;
+}
 .search-box__input::placeholder {
   color: var(--faint);
 }
@@ -98,6 +102,7 @@
 .search-results__bar > :first-child {
   margin-right: auto;
 }
+/* With a face, also an .ac-iconline: the face on the first line's capitals (who and when), the text under it. */
 .search-hit {
   display: flex;
   align-items: flex-start;

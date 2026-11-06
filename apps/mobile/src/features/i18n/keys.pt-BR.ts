@@ -332,6 +332,7 @@ export const featureKeysPtBR = {
     },
     steer: {
       waiting: "{{name}} lê na próxima pausa",
+      computer: "{{name}} lê quando conseguir o computador",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
       held: "{{name}} lê depois da sua decisão",
@@ -1007,8 +1008,6 @@ export const featureKeysPtBR = {
     },
   },
   delete: {
-    title: "Apagar sua conta",
-    intro: "Isso não tem volta.",
     goes: {
       account: "Sua conta, seus acessos e suas sessões somem.",
       orgs: "Workspaces em que só você está são apagados.",
@@ -1255,6 +1254,9 @@ export const featureKeysPtBR = {
     review: "Revisar",
     answer: "Responder",
     open: "Abrir",
+    toolsTitle: "Mudou ferramentas que você aprovou",
+    toolsWhy: "Os agentes seguem com a versão aprovada até você aceitar a nova.",
+    reviewChanges: "Rever as mudanças",
     clear: {
       title: "Nada esperando você",
       text: "Quando um agente precisar de você, aparece aqui primeiro.",

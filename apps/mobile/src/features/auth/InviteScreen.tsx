@@ -467,7 +467,12 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
 function NotYou() {
   const { t } = useTranslation();
   return (
-    <Pressable onPress={() => void signOut()} accessibilityRole="link" hitSlop={8}>
+    <Pressable
+      onPress={() => void signOut()}
+      accessibilityRole="link"
+      hitSlop={12}
+      style={({ pressed }) => (pressed ? styles.pressed : null)}
+    >
       <Text variant="subhead" style={styles.link}>
         {t("invite.ask.notYou")}
       </Text>
@@ -616,7 +621,11 @@ function EmailProof({
                   accessibilityState={press ? { disabled: off || sending, busy: sending } : undefined}
                   accessibilityElementsHidden={!shown}
                   importantForAccessibility={shown ? "auto" : "no-hide-descendants"}
-                  style={[styles.slotItem, shown ? null : styles.slotHidden]}
+                  style={({ pressed }) => [
+                    styles.slotItem,
+                    shown ? null : styles.slotHidden,
+                    pressed && press ? styles.pressed : null,
+                  ]}
                 >
                   {s === "verified" ? (
                     <Icon name="check" size={20} color={c.ok} />
@@ -675,6 +684,7 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   as: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", columnGap: 6, rowGap: 2 },
   link: { fontWeight: "600" },
+  pressed: { opacity: 0.6 },
   // Verify's slot sits inside the email's right edge, as the password's eye does.
   inside: { justifyContent: "center" },
   slot: { position: "absolute", right: 4, alignItems: "center" },

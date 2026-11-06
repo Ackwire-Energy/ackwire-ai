@@ -2515,6 +2515,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           // ADR 0041: another brain kind starts on the computer's own account.
           account: input.account !== undefined ? input.account : changed ? null : b.account,
           effort: input.effort !== undefined ? input.effort : b.effort,
+          speed: input.speed ?? b.speed,
           onlyOwner,
         };
         brains.set(agentId, next);
@@ -3903,6 +3904,7 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     canEdit: true,
     account: null,
     effort: null,
+    speed: "standard",
     accounts: [],
     canManageAccounts: true,
     accountsSupported: true,

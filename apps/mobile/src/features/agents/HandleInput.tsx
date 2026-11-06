@@ -1,22 +1,35 @@
 import { StyleSheet, TextInput, View } from "react-native";
-import { fieldText, Text } from "@/ui";
+import { fieldText, Icon, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 
-/** An agent's @ field (a new agent's, Editar's Menções): the @ drawn before what is typed. */
+/**
+ * An agent's @ field (a new agent's, Editar's Menções): the @ drawn before what is typed. `grouped`: a row of a
+ * grouped list, which draws the surface; `ok` checks a free @ at its end.
+ */
 export function HandleInput({
   value,
   onChangeText,
   label,
   placeholder,
+  grouped = false,
+  ok = false,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   label: string;
   placeholder?: string;
+  grouped?: boolean;
+  ok?: boolean;
 }) {
   const c = useColors();
   return (
-    <View style={[styles.affix, { backgroundColor: c.raised, borderColor: c.line }]}>
+    <View
+      style={
+        grouped
+          ? [styles.affix, styles.row]
+          : [styles.affix, styles.field, { backgroundColor: c.raised, borderColor: c.line }]
+      }
+    >
       <Text variant="body" tone="faint">
         @
       </Text>
@@ -31,6 +44,7 @@ export function HandleInput({
         accessibilityLabel={label}
         style={[styles.affixInput, fieldText("body"), { color: c.ink }]}
       />
+      {ok ? <Icon name="check" size={18} color={c.ok} /> : null}
     </View>
   );
 }
@@ -46,13 +60,8 @@ export function ErrorLine({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
-  affix: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-  },
+  affix: { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 14 },
+  field: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
+  row: { minHeight: 50 },
   affixInput: { flex: 1, paddingVertical: 12 },
 });

@@ -28,6 +28,7 @@ import { routineCreatorOf } from "../requester";
 import type { RoutineBrief } from "../routine-brief";
 import { addRunStep } from "../runs";
 import { describeWhen } from "../schedule";
+import { REQUEST_SECRET_TOOL } from "../secrets";
 import {
   callTargets,
   checkTeamAction,
@@ -41,6 +42,7 @@ import {
 import { carriesCredential, promptAnswer, toolCommand, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
+import { connectorFirst } from "./connector-first";
 import { type BlockedTool, compactSchema, presentTools, resolveCall } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
 import { missingPermissions, REQUEST_PERMISSION_TOOL } from "./permission";
@@ -239,6 +241,31 @@ export const CREDENTIAL_REFUSAL =
 const ASK_USER = "ask_user";
 
 const isBuiltIn = (tool: Pick<ToolDefinition, "scope" | "connectionId">) => tool.scope === "" && !tool.connectionId;
+
+/** `input` with the text under `from` moved to `to`; blank text stays, for the refusal to say `to` is missing. */
+function renamed(input: Record<string, unknown>, from: string, to: string) {
+  const { [from]: value, ...rest } = input;
+  return typeof value !== "string" || !value.trim() || to in input ? input : { ...rest, [to]: value };
+}
+
+/**
+ * The names models guess for a field of our tools when a computer brain's harness held the schema back. Only these:
+ * a call that also has the real field stays as it is, and any other mistake is refused with what the tool takes.
+ */
+const INPUT_ALIASES = new Map<string, (input: Record<string, unknown>) => Record<string, unknown>>([
+  ["offer_connect_app", (input) => renamed(input, "reason", "why")],
+  ["browser_ask_person", (input) => renamed(input, "message", "instructions")],
+  [
+    "browser_do",
+    (input) =>
+      Array.isArray(input.steps)
+        ? {
+            ...input,
+            steps: input.steps.map((s) => (s && typeof s === "object" ? renamed(s, "action", "do") : s)),
+          }
+        : input,
+  ],
+]);
 
 /** Whether a call of this tool waits for a person: an approval, or a built-in question. */
 const asksPerson = (tool: ToolDefinition, decision: PolicyDecision) =>
@@ -891,6 +918,8 @@ export function createToolGateway(deps: {
       const record: typeof addRunStep = (db, run, kind, data) =>
         ctx.runId ? addRunStep(db, run, kind, data) : Promise.resolve();
       let tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
+      const alias = tool && !tool.connectionId ? INPUT_ALIASES.get(tool.name) : undefined;
+      if (alias) call = { ...call, input: alias(call.input) };
       // What the live chip shows (the short label of a built-in tool, never a connector's input; the app and its
       // service): the chat's line of this call says the same after the run. A permission check also keeps its
       // command, masked, to open.
@@ -1012,6 +1041,17 @@ export function createToolGateway(deps: {
         const { why: given, ...rest } = call.input;
         repeatWhy = typeof given === "string" ? given : null;
         call = { ...call, input: rest };
+      }
+      // A key for a service we connect natively opens no card: the agent gets the way in. `person_said` is only ever
+      // offered by that answer, so the tool's schema doesn't carry it.
+      if (tool.name === REQUEST_SECRET_TOOL && !tool.connectionId) {
+        const { person_said: said, ...asked } = call.input;
+        call = { ...call, input: asked };
+        if (deps.catalog) {
+          const tools = { usable: await grantedFor(ctx, authority, all), all: [...all.values()] };
+          const way = await connectorFirst(ctx, deps.catalog, asked, String(said ?? ""), tools).catch(() => null);
+          if (way) return finish({ content: way, data: { code: "secret.connector_first" } });
+        }
       }
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) {

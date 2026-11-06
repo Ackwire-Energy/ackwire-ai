@@ -5,6 +5,7 @@
   "common": {
     "close": "Tutup",
     "joinSentences": "{{a}} {{b}}",
+    "cantUndo": "Ini tidak bisa diurungkan.",
     "removeName": "Hapus {{name}}",
     "about": "Tentang {{label}}",
     "previousMonth": "Bulan sebelumnya",
@@ -1327,6 +1328,7 @@
     "addPasswordReauth": "Masuk lagi untuk menambahkan kata sandi.",
     "yourWorkspaces": "Ruang kerjamu",
     "youAreHere": "Kamu di sini",
+    "createdOn": "Dibuat pada {{date}}",
     "newWorkspace": "Ruang kerja baru",
     "wiki": "Wiki",
     "settings": "Pengaturan",
@@ -4032,6 +4034,12 @@
           "high": "Berpikir lebih banyak untuk tugas sulit. Lebih lambat dan lebih mahal.",
           "max": "Berpikir semaksimal mungkin. Jauh lebih lambat dan lebih mahal."
         },
+        "speed": "Kecepatan",
+        "speeds": {
+          "standard": "Standar",
+          "fast": "Cepat"
+        },
+        "speedText": "Menjawab lebih cepat dalam percakapan dan menghabiskan paket 2,5× lebih cepat. Rutinitas dan tugas panjang tetap standar.",
         "modelLine": {
           "opus": "Paling mampu. Menghabiskan paket lebih cepat.",
           "sonnet": "Seimbang. Cocok untuk hampir semua hal.",
@@ -4054,10 +4062,13 @@
           "contents": {
             "model": "Jendela konteks",
             "auto": "Jendela konteks dan siapa yang dijawabnya",
-            "fixed": "Upaya, jendela konteks, dan siapa yang dijawabnya"
+            "fixed": "Upaya, jendela konteks, dan siapa yang dijawabnya",
+            "autoSpeed": "Kecepatan, jendela konteks, dan siapa yang dijawabnya",
+            "fixedSpeed": "Upaya, kecepatan, jendela konteks, dan siapa yang dijawabnya"
           },
           "allDefault": "Semua default",
           "effort": "Upaya: {{level}}",
+          "speed": "Kecepatan: cepat",
           "context": "Konteks: {{size}}",
           "sharing": "Menjawab orang lain",
           "waits": "Menunggu komputer"
@@ -4491,7 +4502,7 @@
       "audience": "Siapa yang bisa bicara",
       "channels": "Kanal",
       "computer": "Komputer",
-      "danger": "Arsipkan",
+      "danger": "Arsipkan atau hapus",
       "keySafe": "Kunci tetap terenkripsi di server. Tidak ada yang bisa melihatnya.",
       "spentOf": "terpakai di {{month}}, dari {{amount}}",
       "spentOfDefault": "terpakai di {{month}}, dari {{amount}} (default ruang kerja)",
@@ -5626,7 +5637,7 @@
     "agentRole": "Agen · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Buat satu, atau minta di chat: “Lia, buat tugas untuk error ini”.",
+    "empty": "Buat satu, atau minta agen di chat.",
     "noResults": "Tidak ada tugas yang cocok dengan filter ini.",
     "columnEmpty": "Tidak ada apa-apa di sini.",
     "form": {
@@ -7511,6 +7522,7 @@
     "removeTitle": "Hapus {{name}}?",
     "removeAgents_other": "{{names}} memakai skill ini dan akan kehilangan aksesnya.",
     "removeNone": "Tidak ada agen yang memakai skill ini.",
+    "removeGone": "Skill ini keluar dari ruang kerja dan tidak bisa diurungkan.",
     "removed": "{{name}} dihapus.",
     "agentTitle": "Skill",
     "agentSubtitle": "Yang bisa dibuka {{name}} saat dibutuhkan.",
@@ -8254,7 +8266,7 @@
     "noAccessText": "Halaman ini hanya untuk orang tertentu. Kalau kamu butuh, tanyakan ke pengurus wiki.",
     "delete": "Pindahkan ke sampah",
     "deleteTitle": "Pindahkan {{title}} ke sampah?",
-    "deleteText": "Tautan ke halaman ini menjadi “halaman untuk dibuat”. Kamu bisa memulihkannya nanti.",
+    "deleteText": "Tautan ke halaman ini menjadi “halaman untuk dibuat”. Untuk saat ini halaman tidak bisa dipulihkan dari aplikasi.",
     "deleted": "{{title}} dipindahkan ke sampah.",
     "noBacklinksHint": "Belum ada halaman yang menautkan ke sini. Tulis [[{{title}}]] di halaman lain.",
     "allVersions": "Lihat semua {{count}} versi",
@@ -8460,6 +8472,7 @@
     "stuck": "Dihentikan karena macet",
     "steer": {
       "waiting": "{{name}} membacanya di jeda berikutnya",
+      "computer": "{{name}} membacanya saat mendapat komputer",
       "now": "{{name}} berhenti untuk membacanya",
       "delivered": "{{name}} sudah menerimanya",
       "held": "{{name}} membacanya setelah kamu memutuskan",
@@ -8654,6 +8667,7 @@
       "nextEta": "Menunggu komputer. Giliran berikutnya, sekitar {{n}} mnt lagi",
       "nextAfter": "Menunggu komputer. Giliran berikutnya setelah {{after}} selesai",
       "next": "Menunggu komputer. Giliran berikutnya",
+      "waiting": "Menunggu komputer",
       "behind": "Dalam antrean, ke-{{nth}}. Setelah {{names}}",
       "position": "Dalam antrean, ke-{{nth}}"
     },
@@ -12088,6 +12102,8 @@
     "autoUpdate": "Masih dikerjakan ({{duration}}).",
     "autoUpdateNow": "Sekarang: {{now}}.",
     "statusReply": "Masih mengerjakannya ({{duration}}). Saya baca pesan Anda setelah langkah ini.",
+    "statusReplyQueued": "Menunggu komputer ({{duration}}). Saya baca pesan Anda saat tiba giliran saya.",
+    "statusReplyAway": "Menunggu komputer saya kembali. Saya baca pesan Anda begitu komputer kembali.",
     "status": {
       "one": "Sedang mengerjakan: {{subject}}",
       "oneUntitled": "Bekerja di latar belakang",
@@ -12118,6 +12134,10 @@
     "working": "Di latar belakang"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT menolak kecepatan Cepat untuk akun atau model ini, jadi jawaban ini memakai kecepatan standar.",
+      "action": "Buka agen"
+    },
     "usageWhen": {
       "at": "pukul {{time}}",
       "on": "{{day}} pukul {{time}}",
@@ -12211,7 +12231,9 @@
       "show": "Tampilkan",
       "hide": "Sembunyikan",
       "talker": "sambil bekerja",
-      "talkerTip": "Menjawab tanpa menghentikan tugas yang sedang berjalan."
+      "talkerTip": "Menjawab tanpa menghentikan tugas yang sedang berjalan.",
+      "talkerWaiting": "sambil menunggu",
+      "talkerWaitingTip": "Menjawab sementara tugasnya menunggu."
     },
     "joined": {
       "label": "ikut bergabung",
@@ -13133,6 +13155,8 @@
       "paste": "Tempel",
       "pasteHint": "Tempel yang kamu salin ke halaman",
       "pasteBlocked": "Browsermu tidak mengizinkan membaca yang kamu salin. Gunakan {{keys}} di halaman.",
+      "inputLost": "Itu tidak sampai ke halaman, jadi tidak ada yang diklik atau diketik. Coba lagi.",
+      "noField": "Tidak ada kolom yang dipilih di halaman, jadi itu tidak diketik. Pilih kolomnya lalu ketik lagi.",
       "goLabel": "Alamat situs",
       "goPlaceholder": "Ketik alamat, misalnya example.com",
       "go": "Buka",
@@ -13141,7 +13165,6 @@
       "goBadAddress": "Itu sepertinya bukan alamat. Coba example.com.",
       "goFailed": "Situs tidak terbuka. Periksa alamatnya.",
       "backTitle": "Kembalikan ke {{name}}",
-      "doneTitle": "Selesai. Ada catatan untuk {{name}}?",
       "backLabel": "Catatan untuk {{name}}",
       "backPlaceholder": "Opsional: ada yang perlu diketahui {{name}}?",
       "addNote": "Tinggalkan catatan"
@@ -13197,6 +13220,7 @@
     "suspendedFor": "Ruang kerja ini dibekukan: {{reason}}",
     "bannerSub": "Kamu tetap bisa membaca dan menulis di sini. Agen tidak menjawab atau bekerja selama ditangguhkan.",
     "label": "Status ruang kerja",
+    "row": "Tidak tersedia",
     "screen": {
       "title": "Ruang kerja ini tidak tersedia",
       "text": "Percakapan dan agennya ditutup untuk sementara.",
@@ -13284,8 +13308,11 @@
   },
   "deleting": {
     "title": "{{name}} sedang dihapus",
-    "text": "{{by}} menghapusnya pada {{date}}. Akan hilang selamanya pada {{due}}.",
-    "textLate": "{{by}} menghapusnya pada {{date}}.",
+    "text": "Ruang kerja ini sudah sedang dihapus. Kamu tidak perlu melakukan apa-apa, ruang kerja ini hilang pada {{date}}.",
+    "textLate": "Ruang kerja ini sudah sedang dihapus. Kamu tidak perlu melakukan apa-apa.",
+    "by": "{{by}} menghapusnya pada {{date}}.",
+    "row": "Sedang dihapus, hilang pada {{date}}",
+    "rowLate": "Sedang dihapus",
     "someone": "Seseorang",
     "restore": "Pulihkan ruang kerja",
     "membersOnly": "Hanya Pemilik yang bisa memulihkannya.",
@@ -13295,10 +13322,19 @@
     "menu": "Hapus akun",
     "card": {
       "text": "Kamu keluar dari semua ruang kerja dan akunmu dihapus selamanya.",
-      "button": "Hapus akun…"
+      "button": "Hapus akun…",
+      "oneWorkspace": "Mau menghapus ruang kerja ini saja? Ada di Umum.",
+      "leaveWorkspace": "Mau keluar dari ruang kerja ini saja? Ada di Anggota."
     },
-    "title": "Hapus akunmu?",
-    "closes_other": "{{names}} ditutup sekarang dan dihapus selamanya pada {{date}}. Hanya kamu yang ada di sana.",
+    "title": "Hapus seluruh akunmu?",
+    "intro": "Ini menghapus seluruh akunmu, bukan hanya satu ruang kerja. Ini tidak bisa diurungkan.",
+    "whole": "Seluruh akunmu",
+    "oneWorkspace": "Mau menghapus satu ruang kerja saja? Akunmu tetap ada.",
+    "closes": "{{name}} ditutup sekarang. Hanya kamu yang ada di sana, jadi dihapus selamanya pada {{date}}.",
+    "closesWith": "{{name}} ditutup sekarang, berisi {{what}}. Hanya kamu yang ada di sana, jadi dihapus selamanya pada {{date}}.",
+    "closesEmpty": "{{name}} ditutup sekarang, tanpa agen maupun pesan. Hanya kamu yang ada di sana, jadi dihapus selamanya pada {{date}}.",
+    "agentCount_other": "{{value}} agen",
+    "messageCount_other": "{{value}} pesan",
     "leaves": "Kamu keluar dari {{names}}.",
     "messages": "Pesanmu tetap ada di ruang kerja tanpa namamu.",
     "computers_other": "Komputermu yang terhubung ke {{name}} dilepas darinya: {{computers}}.",

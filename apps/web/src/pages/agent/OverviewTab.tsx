@@ -93,11 +93,13 @@ export function OverviewTab() {
                       {decides ? t("agentPage.overview.approvalsYou") : t("agentPage.overview.approvalsWait")}
                     </span>
                   </span>
-                  <Button asChild size="sm">
-                    <Link to="/org/$orgId/approvals" params={{ orgId: org.id }}>
-                      {t("agentPage.overview.seeApprovals")}
-                    </Link>
-                  </Button>
+                  <span className="agp-attn__tail ac-captop">
+                    <Button asChild size="sm">
+                      <Link to="/org/$orgId/approvals" params={{ orgId: org.id }}>
+                        {t("agentPage.overview.seeApprovals")}
+                      </Link>
+                    </Button>
+                  </span>
                 </div>
               )}
               {pending.map((p) => (
@@ -116,9 +118,11 @@ export function OverviewTab() {
                           : t("proposals.waitingAdmin")}
                     </span>
                   </span>
-                  <Button size="sm" onClick={() => goTo("memory")}>
-                    {t("agentPage.overview.review")}
-                  </Button>
+                  <span className="agp-attn__tail ac-captop">
+                    <Button size="sm" onClick={() => goTo("memory")}>
+                      {t("agentPage.overview.review")}
+                    </Button>
+                  </span>
                 </div>
               ))}
             </div>
@@ -182,7 +186,9 @@ export function OverviewTab() {
                         {r.repo ? ` · ${r.repo}` : ""}
                       </span>
                     </span>
-                    <span className="agp-li__when">{whenAt(t, locale, r.createdAt)}</span>
+                    <span className="agp-li__tail ac-captop">
+                      <span className="agp-li__when">{whenAt(t, locale, r.createdAt)}</span>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -307,7 +313,7 @@ export function OverviewTab() {
                 </span>
               )}
               <span className="agp-person__t">
-                <b>
+                <b className="ac-captop">
                   {owner
                     ? owner.userId === me.user.id
                       ? t("newAgent.you", { name: owner.name })

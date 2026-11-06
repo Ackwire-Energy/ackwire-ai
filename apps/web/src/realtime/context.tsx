@@ -758,6 +758,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     const resync = () => {
       void reconcileChannelRuns(api, streams, orgId, channelId);
       catchUpLists(api, qc, streams, orgId, channelId);
+      // The lines of its computers too: a `computer.queue` it missed leaves a wait's place unsaid.
+      void qc.invalidateQueries({ queryKey: [...keys.machines(orgId), "queue"] });
     };
     const offSubscribed = connection.onSubscribed((id) => {
       if (id === channelId) resync();
@@ -980,6 +982,8 @@ export interface BrowserLiveState {
   endedBy: { reason: "stopped" | "closed" | "error"; userId?: string; at?: string } | null;
   /** The last refusal (`not_in_control`, `forbidden`, …). */
   error: string | null;
+  /** How many came, for what says each one: the same refusal again leaves `error` as it was. */
+  errors: number;
 }
 
 const EMPTY_LIVE: BrowserLiveState = {
@@ -989,6 +993,7 @@ const EMPTY_LIVE: BrowserLiveState = {
   ended: false,
   endedBy: null,
   error: null,
+  errors: 0,
 };
 
 /**
@@ -1022,7 +1027,7 @@ export function useBrowserLive(agentId: string, enabled = true) {
           // A stop says who; a later "closed" from the same stop keeps it.
           endedBy: reason === "stopped" || s.endedBy?.reason !== "stopped" ? { reason, ...by } : s.endedBy,
         })),
-      onError: (code) => setState((s) => ({ ...s, error: code })),
+      onError: (code) => setState((s) => ({ ...s, error: code, errors: s.errors + 1 })),
     });
     liveRef.current = live;
     const off = connection.onBrowserFrame((frame) => live.handleMessage(frame));

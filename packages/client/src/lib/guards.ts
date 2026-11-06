@@ -1,4 +1,4 @@
-import type { Me, OrgSummary } from "../api/types";
+import type { Me } from "../api/types";
 
 const SAME_ORIGIN = "https://x.invalid";
 /** Control characters (browsers drop tabs and newlines, so `/\t/evil.com` becomes `//evil.com`) or a backslash. */
@@ -96,7 +96,8 @@ export function signInFor(
  * A workspace this person made and hasn't finished setting up: the apps open its onboarding, which resumes it,
  * instead of the workspace. Never one they were invited into.
  */
-export const settingUp = (org: OrgSummary) => org.role === "owner" && org.onboarding !== undefined;
+export const settingUp = <O extends { role?: string; onboarding?: unknown }>(org: O) =>
+  org.role === "owner" && org.onboarding !== undefined;
 
 /**
  * Where `/` sends a signed-in person: the last organization, or the first one, of those set up; with none, the

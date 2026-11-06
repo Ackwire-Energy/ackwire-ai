@@ -137,10 +137,11 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
 }
 
 /* ── Toolbar end: "Exibição" and "Mais opções" ──────────────────────────── */
+/* The toolbar's own gap between its buttons. */
 .issues-tools {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .issues-display__trigger.ac-btn {
   gap: 6px;
@@ -265,11 +266,99 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 
 /* ── Board ──────────────────────────────────────────────────────────────── */
 /* The board scrolls sideways inside its own box; the page never does. */
+/*
+ * A board wider than the page slides sideways with no scrollbar: the side with more columns fades out and an arrow
+ * floats there (`data-more` on the frame, kept by the board as it scrolls), as the kit's carousel does. On a touch
+ * screen a finger drags it and the arrows stay away. The card drag still scrolls `.issues-boardwrap` near its edges.
+ */
+/* A column of flex items, so the arrows' rail keeps both of its margins (an empty block's would fold into one). */
+.issues-boardframe {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 .issues-boardwrap {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   margin: 0 -6px;
   padding: 2px 6px 10px;
+  scrollbar-width: none;
+}
+.issues-boardwrap::-webkit-scrollbar {
+  display: none;
+}
+.issues-boardframe[data-more="end"] > .issues-boardwrap {
+  mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent);
+}
+.issues-boardframe[data-more="start"] > .issues-boardwrap {
+  mask-image: linear-gradient(to right, transparent, #000 72px);
+}
+.issues-boardframe[data-more="both"] > .issues-boardwrap {
+  mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
+}
+/* A rail of no height that sticks a little above the middle of the view while the board is on screen: on a long
+   board the arrows follow the page's scroll instead of staying by the column heads. */
+.issues-boardframe__rail {
+  position: sticky;
+  top: 45vh;
+  z-index: var(--z-raised);
+  height: 0;
+  /* Never by the stage and column heads (72px in at the top) nor past the cards (64px short of the bottom), even on a
+     short board; the board under it takes back that room, so nothing moves. */
+  margin: 72px 0 64px;
+}
+.issues-boardframe__rail + .issues-boardwrap {
+  margin-top: -136px;
+}
+.issues-boardframe__arrow {
+  position: absolute;
+  top: calc(var(--control-h-md) / -2);
+  z-index: var(--z-raised);
+  display: grid;
+  place-items: center;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+  color: var(--ink2);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    transform 0.2s var(--spring);
+}
+/* Only where there is more: its own `display` would otherwise win over `hidden`. */
+.issues-boardframe__arrow[hidden] {
+  display: none;
+}
+.issues-boardframe__arrow--start {
+  left: -4px;
+}
+.issues-boardframe__arrow--end {
+  right: -4px;
+}
+.issues-boardframe__arrow:hover {
+  color: var(--ink);
+}
+.issues-boardframe__arrow:active {
+  transform: scale(0.94);
+}
+html:not([data-pointer]) .issues-boardframe__arrow:focus-visible {
+  outline: none;
+  box-shadow: var(--e2), var(--focus-ring);
+}
+@media (hover: none) {
+  .issues-boardframe__arrow {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .issues-boardframe__arrow {
+    transition: none;
+  }
 }
 .issues-board {
   --cw: 248px;
@@ -473,13 +562,14 @@ html:not([data-pointer]) .issue-card:focus-visible {
   line-height: 1.4;
   color: var(--muted);
 }
+/* Neutral words with the tone on the icon only, as the card's other states; the icon stays on the first line. */
 .issue-card__blocked {
-  align-self: flex-start;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--warn-soft);
-  color: var(--warn);
+  gap: 6px;
+  color: var(--ink2);
   font-weight: 600;
+}
+.issue-card__blocked > .ac-icon {
+  color: var(--warn);
 }
 .issue-card__plan {
   display: flex;
@@ -660,7 +750,7 @@ html:not([data-pointer]) .issue-card:focus-visible {
 }
 html:not([data-pointer]) .issue-list__row:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .issue-list__num {
   font-size: 12.5px;
@@ -939,11 +1029,13 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   text-decoration: line-through;
   text-decoration-color: var(--line2);
 }
+/* On the criterion's first line (the row's 22px line), however many lines the criterion takes. */
 .issue-criterion__by {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   flex: none;
+  height: 22px;
   font-size: 11.5px;
   color: var(--faint);
 }
@@ -982,9 +1074,14 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   line-height: 28px;
   letter-spacing: -0.01em;
 }
+/* "Saved" on the title's first line (28px), not centred on a title that wraps. */
 .issue-bartitle__saved {
   flex: none;
-  align-self: center;
+  height: 28px;
+}
+/* The bar's buttons centre on that line too (the shared titled bar does the same). */
+.ac-details__bar:has(.issue-bartitle) > .ac-details__actions {
+  height: 28px;
 }
 /* "✓ Salvo" (SavedNote) at the end of the source line. */
 .issue-details__saved {
@@ -1054,13 +1151,26 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   top: 0;
 }
 .issue-layout {
+  container: issue-layout / inline-size;
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
   align-items: flex-start;
 }
+/* Never wider than its column: a long line inside (tabs, a link) wraps or ends in "…" instead of scrolling the task
+   sideways. */
 .issue-layout__main {
   flex: 999 1 520px;
+  min-width: 0;
+}
+/* Too narrow for the fields beside the task (the conversation open beside it, a small window): they go under it,
+   as wide as it, instead of a 320px card left alone on the left. */
+@container issue-layout (max-width: 803px) {
+  .issue-layout > .issue-aside {
+    flex-basis: 100%;
+    max-width: none;
+    position: static;
+  }
 }
 .issue-aside {
   flex: 1 1 260px;
@@ -1116,10 +1226,15 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   box-shadow: inset 0 0 0 1.5px var(--line2);
   padding-bottom: 12px;
 }
+/* The face and Stop on the title's first line (`.ac-iconline`), when the title wraps too. */
 .issue-work__head {
+  gap: 10px;
+}
+.issue-work__tail {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
+  height: 22px;
 }
 .issue-work__text {
   flex: 1;
@@ -1143,7 +1258,7 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-work__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .issue-work__steps {
   list-style: none;
@@ -1191,7 +1306,15 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 }
 .is-current .issue-work__dot {
   background: var(--agent);
-  color: #fff;
+  /* Dark's agent blue is light: its own ink, not white. */
+  color: var(--on-agent);
+}
+
+/* Background work in a task's details (IssueWorkBlock): its line starts on the panel's own gap and spans the
+   column as the sections do (in a conversation it keeps the message card's width and its air above). */
+.issue-work-block > .ac-workline {
+  margin-top: 0;
+  max-width: none;
 }
 
 /* "Pedir a um agente". */
@@ -1203,9 +1326,8 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   border-radius: 16px;
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
+/* The face on the title's first line (`.ac-iconline`). */
 .issue-ask__row {
-  display: flex;
-  align-items: flex-start;
   gap: 12px;
 }
 .issue-ask__text {
@@ -1219,16 +1341,17 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
+/* A compact control of the ruler (32px, its radius), beside the small button it follows. */
 .issue-ask__other {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: var(--control-h-sm);
   padding: 0 10px 0 6px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--control-r-sm);
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   color: var(--ink2);
@@ -1247,10 +1370,9 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
 }
 
 /* Activity events. */
-/* Events sit on the comments' avatar column: the icon centered under a 36px avatar, the words beside it. */
+/* Events sit on the comments' avatar column: the icon centered under a 36px avatar, the words beside it; the icon
+   stays on the first line when the words wrap (`.ac-iconline`). */
 .issue-event {
-  display: flex;
-  align-items: center;
   gap: 18px;
   padding: 4px 4px 4px 10px;
 }
@@ -1295,8 +1417,10 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   .issues-now__list::-webkit-scrollbar {
     display: none;
   }
+  /* Who works on it keeps a cap here too: as `auto`, an agent's live step line took its whole length before the
+     task's title got any. */
   .issue-list__row {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr) fit-content(40%);
     gap: 10px;
   }
   .issue-list__due {
@@ -1411,12 +1535,13 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   gap: 0;
   padding: 0;
 }
+/* The dialog's room on every side, so the hairline between the form and its fields has the same air on both. */
 .issue-new__main {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 0 24px 24px 20px;
+  padding: 0 var(--dialog-pad) var(--dialog-pad);
 }
 .issue-new__side {
   position: sticky;
@@ -1425,7 +1550,7 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 4px 20px 20px;
+  padding: 4px var(--dialog-pad) var(--dialog-pad);
   border-left: 1px solid var(--line);
 }
 .issue-new__editor {
@@ -1520,9 +1645,8 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   border-radius: 5px;
   box-shadow: inset 0 0 0 1.5px var(--line-strong);
 }
+/* The face on the sentence's first line (`.ac-iconline`). */
 .issue-new__who {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
   padding: 12px;
   border-radius: var(--radius-lg);
@@ -1716,6 +1840,10 @@ html:not([data-pointer]) .issue-files__add:focus-visible {
 .issue-files__row:last-child {
   border-bottom: 0;
 }
+/* Download reaches out by its plate: its icon ends on the hairline's edge, as the name starts on it. */
+.issue-files__row > .ac-btn--ghost:last-child {
+  margin-inline-end: calc(-1 * var(--ghost-plate));
+}
 .issue-files__open {
   display: flex;
   align-items: center;
@@ -1855,12 +1983,15 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   padding-top: 24px;
   padding-bottom: 24px;
 }
-/* Room for the cards' shadows and focus rings at the scrolling column's edges. */
+/* Room at the scrolling column's edges for what reaches past its content: the cards' shadows and focus rings, and the
+   hover plate and field of the title and the description, 10px out on each side (`.issue-inplace`), which 4px cut
+   flat at both ends. */
 .issue-page--talk > .issue-page__main {
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
-  margin: -4px;
-  padding: 4px;
+  margin: -10px;
+  padding: 10px;
 }
 .issue-page__talk {
   min-height: 0;

@@ -419,6 +419,8 @@
       "team.list.col.roles"
     ],
     "fr": [
+      "deleteAccount.agentCount",
+      "deleteAccount.messageCount",
       "access.agentCol",
       "agent.builtinName",
       "agent.handleLabel",
@@ -763,7 +765,8 @@
       "team.sectors.routines",
       "files.video.pause",
       "files.video.volume",
-      "taskManager.waitGroup.routines"
+      "taskManager.waitGroup.routines",
+      "agentPage.work.brain.speeds.standard"
     ],
     "de": [
       "access.agentCol",
@@ -1123,7 +1126,8 @@
       "team.list.col.agent",
       "team.list.col.person",
       "approvals.review.state",
-      "agentSide.label"
+      "agentSide.label",
+      "agentPage.work.brain.speeds.standard"
     ],
     "it": [
       "access.area.browser",
@@ -1411,9 +1415,11 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "files.video.volume",
-      "taskManager.waitGroup.routines"
+      "taskManager.waitGroup.routines",
+      "agentPage.work.brain.speeds.standard"
     ],
     "nl": [
+      "deleteAccount.agentCount",
       "access.agentCol",
       "access.area.browser",
       "access.area.skills",
@@ -2614,6 +2620,7 @@
       "teamTemplates.channels.ada"
     ],
     "pl": [
+      "deleteAccount.agentCount",
       "access.agentCol",
       "agent.builtinName",
       "agentPage.fields.model",

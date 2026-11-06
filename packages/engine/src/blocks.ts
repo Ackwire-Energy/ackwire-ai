@@ -76,7 +76,7 @@ Everyone in the conversation sees the same block: what one person sets reaches t
 
 Script:
 - agentes.compute(s => ({ ... })) derives values from the state s; they can be bound like inputs. It runs on every change.
-- agentes.on(s => { ... }) runs on every change, for your own drawing; it runs once at the start too.
+- agentes.on(s => { ... }) runs on every change, for your own drawing; it runs once at the start too. Never agentes.set in it: a value that follows from others is agentes.compute.
 - agentes.set(name, value) changes the state, for everyone.
 - agentes.draw(name, ["A", "B"]) draws one option at random on the server, for a draw, a wheel, dice or a shuffle: the pick reaches everyone as name in the state, the same for all. Never Math.random for anything people see: each would see a different result. Show the result from agentes.on when name changes (animate it there, so everyone sees it land).
 - agentes.who(name) is who set it last: {name, at, drawn}.

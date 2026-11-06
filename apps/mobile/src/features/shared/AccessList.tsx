@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { type IconName, SectionHeader, Text } from "@/ui";
+import { GroupedHeader, type IconName, Text } from "@/ui";
 import { ActionList } from "./parts";
 
 export interface AccessListRow<L extends string = string> {
@@ -30,24 +30,23 @@ export function AccessList<L extends string>({
 }) {
   if (rows.length === 0) return null;
   return (
-    <>
-      {title ? <SectionHeader title={title} /> : null}
-      <View style={{ paddingHorizontal: 16 }}>
-        <ActionList
-          items={rows.map((r) => ({
-            key: r.key,
-            icon: r.icon,
-            label: r.label,
-            ...(r.hint ? { hint: r.hint } : {}),
-            trailing: (
-              <Text variant="subhead" tone="faint">
-                {r.action ?? levelName(r.level)}
-              </Text>
-            ),
-            onPress: () => r.onChange(r.levels[(r.levels.indexOf(r.level) + 1) % r.levels.length] ?? r.level),
-          }))}
-        />
-      </View>
-    </>
+    // A settings group on the grouped gray: its header as every group's, then the rows.
+    <View style={{ paddingHorizontal: 16 }}>
+      {title ? <GroupedHeader>{title}</GroupedHeader> : null}
+      <ActionList
+        items={rows.map((r) => ({
+          key: r.key,
+          icon: r.icon,
+          label: r.label,
+          ...(r.hint ? { hint: r.hint } : {}),
+          trailing: (
+            <Text variant="subhead" tone="faint">
+              {r.action ?? levelName(r.level)}
+            </Text>
+          ),
+          onPress: () => r.onChange(r.levels[(r.levels.indexOf(r.level) + 1) % r.levels.length] ?? r.level),
+        }))}
+      />
+    </View>
   );
 }

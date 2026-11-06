@@ -21,6 +21,8 @@ export const MAX_SCALE = 2.4;
 
 /** In control, the view never starts smaller than this much over the whole screen: its targets need the room. */
 const CONTROL_ZOOM = 1.25;
+/** Upright the box is narrow: control starts this close, so the field it stopped at reads without a pinch. */
+const CONTROL_ZOOM_UPRIGHT = 2.2;
 
 /** How near an edge of the view the cursor goes before the view follows it, as a share of the view's short side. */
 const FOLLOW_MARGIN = 0.2;
@@ -51,7 +53,8 @@ export const fitScale = (box: Size, desk: Size) => {
 export const controlScale = (box: Size, desk: Size) => {
   "worklet";
   const fit = fitScale(box, desk);
-  return clamp(Math.max(box.width / desk.width, box.height / desk.height, fit * CONTROL_ZOOM), fit, MAX_SCALE);
+  const zoom = box.width / box.height < desk.width / desk.height ? CONTROL_ZOOM_UPRIGHT : CONTROL_ZOOM;
+  return clamp(Math.max(box.width / desk.width, box.height / desk.height, fit * zoom), fit, MAX_SCALE);
 };
 
 /** The camera's corner kept on the desktop, centered on any side the box is larger than it. */

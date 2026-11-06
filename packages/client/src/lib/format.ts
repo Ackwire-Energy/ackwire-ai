@@ -95,6 +95,9 @@ export const capitalize = (s: string, locale?: string) => s.charAt(0).toLocaleUp
  * A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). German keeps it: its
  * nouns are capitalized, so only a translator knows a lowercase form there. A name ("GitHub", "PDF") stays as it is.
  */
+/** A sentence's rest standing on its own line: "não conseguiu atualizar…" → "Não conseguiu atualizar…". */
+export const upperFirst = (s: string, locale?: string) => (s ? s.charAt(0).toLocaleUpperCase(locale) + s.slice(1) : s);
+
 export const lowerFirst = (s: string, locale?: string) =>
   !s || locale?.startsWith("de") || /^\p{Lu}\p{L}*\p{Lu}/u.test(s)
     ? s

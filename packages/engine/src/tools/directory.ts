@@ -27,6 +27,8 @@ export const FIND_DEFAULT = 8;
 export const FIND_MAX = 20;
 /** A match's input schema in the result, at most (characters). */
 const SCHEMA_CHARS = 1_500;
+/** Listed tools whose input an `EVERY_TOOL` search shows: the best matches only, so an answer stays small. */
+const EVERY_INPUTS = 3;
 
 /** The directory a listed tool stands for (only on the two directory tools). */
 export interface DirectoryRole {
@@ -538,6 +540,7 @@ function onDemandTools(
             : [];
           return turnMeans(names, teammates);
         })(),
+        every ? EVERY_INPUTS : 0,
       ),
     }),
   };
@@ -611,14 +614,14 @@ export function rankTools(tools: ToolDefinition[], prefix: string, query: string
     .map((s) => s.tool);
 }
 
-/** A tool's input schema, short enough for a search result. */
+/** A tool's input schema, short enough for a search result: `required` first, so the cut never takes it. */
 export function compactSchema(schema: JsonSchema) {
-  const text = JSON.stringify(schema);
+  const text = JSON.stringify({ required: schema.required, ...schema });
   return text.length > SCHEMA_CHARS ? `${cutText(text, SCHEMA_CHARS)}…` : text;
 }
 
 /** How a person gets a connector the agent lacks, in the app's words (and the Portuguese the app shows). */
-const HOW_TO_GET: Record<MissingConnector["state"], (label: string) => string> = {
+export const HOW_TO_GET: Record<MissingConnector["state"], (label: string) => string> = {
   not_connected: (label) =>
     `Not connected in this workspace: an admin connects it in Settings › Connectors and MCPs › Add connector › ${label} (in Portuguese, Configurações › Conectores e MCPs › Adicionar conector › ${label}).`,
   not_given: () =>
@@ -649,7 +652,8 @@ function connectorsToGet(query: string, connectors: MissingConnector[] = []) {
  * Those that outrank every other match open the answer, to call directly; any other keeps its rank, marked.
  * `blocked`: tools the agent may not use, in the same pass; those among the best `limit` close the answer in
  * sections of their own, never in a usable match's place. Last, the connectors the query names that the agent
- * lacks (`connectorsToGet`).
+ * lacks (`connectorsToGet`). `listedInputs`: how many of the best matches show their input even when listed: a
+ * computer brain's harness may hold a listed tool's schema back, leaving the model only its name (`EVERY_TOOL`).
  */
 function findTools(
   tools: ToolDefinition[],
@@ -662,6 +666,7 @@ function findTools(
   loaded: ToolDefinition[] = [],
   blocked: Awaited<ReturnType<BlockedTools>> = { tools: [], ask: null },
   means: string[] = [],
+  listedInputs = 0,
 ) {
   const query = typeof input.query === "string" ? input.query : "";
   const limit = Math.min(Math.max(Number(input.limit) || FIND_DEFAULT, 1), FIND_MAX);
@@ -684,8 +689,10 @@ function findTools(
   const ready = lead < 0 ? matches : matches.slice(0, lead);
   const more = matches.slice(ready.length);
   const parts: string[] = [];
+  const withInput = new Set(matches.slice(0, listedInputs));
+  const listedInput = (t: ToolDefinition) => (withInput.has(t) ? `\n  input: ${compactSchema(t.inputSchema)}` : "");
   if (ready.length > 0) {
-    const names = ready.map((t) => `- ${t.name}: ${cutText(t.description, 300)}`);
+    const names = ready.map((t) => `- ${t.name}: ${cutText(t.description, 300)}${listedInput(t)}`);
     // A computer brain's harness may still list what it had when it started: `use_tool` runs these too.
     const them = ready.length > 1 ? "them" : "it";
     parts.push(
@@ -695,7 +702,7 @@ function findTools(
   if (more.length > 0) {
     const lines = more.map((t) =>
       listed.has(t)
-        ? `- ${t.name} (already in your tool list: call it directly): ${cutText(t.description, 300)}`
+        ? `- ${t.name} (already in your tool list: call it directly): ${cutText(t.description, 300)}${listedInput(t)}`
         : `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${cutText(t.description, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
     );
     parts.push(`${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`);

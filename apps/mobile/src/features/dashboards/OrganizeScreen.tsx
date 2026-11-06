@@ -167,6 +167,7 @@ function Arrange({ board }: { board: Dashboard }) {
           onPress: () =>
             remove.mutate(item.id, {
               onSuccess: () => {
+                successHaptic();
                 setItems((list) => list.filter((x) => x.id !== item.id));
                 toast({ title: t("mobile.dashboards.widget.removed") });
               },
@@ -188,7 +189,7 @@ function Arrange({ board }: { board: Dashboard }) {
       <ScrollView
         scrollEnabled={lifted === null}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         <GroupedFooter>{t("mobile.dashboards.organize.hint")}</GroupedFooter>
         {widgets.length === 0 ? (
@@ -386,9 +387,9 @@ const styles = StyleSheet.create({
   empty: { textAlign: "center", paddingVertical: 32 },
   slot: { position: "absolute", top: 0, left: 0, right: 0 },
   row: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderBottomRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
     borderBottomLeftRadius: 6,
     paddingLeft: 12,
     paddingRight: 4,

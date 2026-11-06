@@ -21,6 +21,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { AnswerAnywayButton, DontRunButton, TextAction } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -119,12 +120,14 @@ export function UsageQueueDialog({
       }
       // Asleep while it waits on the limit, awake (its live state) once it picks up.
       leading={
-        <AgentAvatar
-          agentId={agentId}
-          name={agent}
-          size="sm"
-          state={queue?.reason && !usageQueueResuming(queue) ? "sleeping" : undefined}
-        />
+        <OpensAgent agentId={agentId} onOpen={leave}>
+          <AgentAvatar
+            agentId={agentId}
+            name={agent}
+            size="sm"
+            state={queue?.reason && !usageQueueResuming(queue) ? "sleeping" : undefined}
+          />
+        </OpensAgent>
       }
       closeLabel={t("common.close")}
       width={440}

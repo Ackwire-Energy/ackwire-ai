@@ -11,6 +11,7 @@ export const en = {
   common: {
     close: "Close",
     joinSentences: "{{a}} {{b}}",
+    cantUndo: "This can't be undone.",
     removeName: "Remove {{name}}",
     about: "About {{label}}",
     previousMonth: "Previous month",
@@ -1348,6 +1349,8 @@ export const en = {
     addPasswordReauth: "Sign in again to add a password.",
     yourWorkspaces: "Your workspaces",
     youAreHere: "You are here",
+    /** Beside a workspace's name, only when another of the person's has the same name. */
+    createdOn: "Created on {{date}}",
     newWorkspace: "New workspace",
     wiki: "Wiki",
     settings: "Settings",
@@ -4209,6 +4212,10 @@ export const en = {
           high: "Thinks more on hard tasks. Slower and costs more.",
           max: "Thinks as much as possible. Much slower and pricier.",
         },
+        speed: "Speed",
+        speeds: { standard: "Standard", fast: "Fast" },
+        speedText:
+          "Answers faster in conversations and uses the plan 2.5× as fast. Routines and long tasks stay at standard speed.",
         modelLine: {
           opus: "The most capable. Uses up the plan faster.",
           sonnet: "Balanced. Good for almost everything.",
@@ -4232,9 +4239,12 @@ export const en = {
             model: "Context window",
             auto: "Context window and who it answers",
             fixed: "Effort, context window and who it answers",
+            autoSpeed: "Speed, context window and who it answers",
+            fixedSpeed: "Effort, speed, context window and who it answers",
           },
           allDefault: "All defaults",
           effort: "Effort: {{level}}",
+          speed: "Fast speed",
           context: "Context: {{size}}",
           sharing: "Answers other people",
           waits: "Waits for the computer",
@@ -4698,7 +4708,7 @@ export const en = {
       audience: "Who can talk",
       channels: "Channels",
       computer: "Computer",
-      danger: "Archive",
+      danger: "Archive or delete",
       keySafe: "The key stays encrypted on the server. Nobody sees it.",
       spentOf: "spent in {{month}}, of {{amount}}",
       spentOfDefault: "spent in {{month}}, of {{amount}} (workspace default)",
@@ -5791,7 +5801,7 @@ export const en = {
     agentRole: "Agent · {{role}}",
     pr: "PR #{{number}}",
     open: "#{{number}} {{title}}",
-    empty: "Create one, or ask in the chat: “Lia, create a task for this error”.",
+    empty: "Create one, or ask an agent in a chat.",
     noResults: "No tasks match these filters.",
     columnEmpty: "Nothing here.",
     form: {
@@ -7655,6 +7665,7 @@ export const en = {
     removeAgents_one: "{{names}} uses this skill and loses access to it.",
     removeAgents_other: "{{names}} use this skill and lose access to it.",
     removeNone: "No agent uses this skill.",
+    removeGone: "It leaves the workspace and this can't be undone.",
     removed: "{{name}} removed.",
     agentTitle: "Skills",
     agentSubtitle: "What {{name}} can open when needed.",
@@ -8401,7 +8412,7 @@ export const en = {
     noAccessText: "It's for some people only. If you need it, ask whoever looks after the wiki.",
     delete: "Move to trash",
     deleteTitle: "Move {{title}} to the trash?",
-    deleteText: "Links to it become “page to create”. You can restore it later.",
+    deleteText: "Links to it become “page to create”. You can't restore it from the app yet.",
     deleted: "{{title}} moved to the trash.",
     noBacklinksHint: "No page links here yet. Write [[{{title}}]] in another one.",
     allVersions: "See all {{count}} versions",
@@ -8627,6 +8638,8 @@ export const en = {
     stuck: "Stopped because it got stuck",
     steer: {
       waiting: "{{name}} reads it at the next pause",
+      /** Sent to an agent waiting for its computer: it has no pause, it reads it once it gets the computer. */
+      computer: "{{name}} reads it when it gets the computer",
       now: "{{name}} stopped to read it",
       delivered: "{{name}} got it",
       held: "{{name}} reads it after your decision",
@@ -8836,6 +8849,8 @@ export const en = {
       nextEta: "Waiting for the computer. Next up, in about {{n}} min",
       nextAfter: "Waiting for the computer. Next up, once {{after}} finishes",
       next: "Waiting for the computer. Next up",
+      /** Before the line knows its turn, or while it can't say where it is. */
+      waiting: "Waiting for the computer",
       /** {{nth}} is the place in line (`queue.nth`), {{names}} the agents ahead. */
       behind: "In line, {{nth}}. After {{names}}",
       position: "In line, {{nth}}",
@@ -12074,6 +12089,10 @@ export const en = {
     autoUpdateNow: "Now: {{now}}.",
     /** The server's own line when a person writes to a working agent and the quick reply can't be written (ADR 0131). */
     statusReply: "Still on it ({{duration}}). I'll read your message after this step.",
+    /** The same line for an agent waiting in line for its computer: {{duration}} is how long it has waited. */
+    statusReplyQueued: "Waiting for the computer ({{duration}}). I'll read your message when my turn comes.",
+    /** The same line for an agent whose computer is away. */
+    statusReplyAway: "Waiting for my computer to come back. I'll read your message as soon as it's back.",
     status: {
       one: "Working on: {{subject}}",
       oneUntitled: "Working in the background",
@@ -12104,6 +12123,10 @@ export const en = {
     working: "In the background",
   },
   chat: {
+    speedFallback: {
+      text: "ChatGPT refused Fast speed on this account or model, so this reply came at standard speed.",
+      action: "Open agent",
+    },
     /** When a waiting agent goes on (`usageWhen`). */
     usageWhen: { at: "at {{time}}", on: "{{day}} at {{time}}", date: "on {{date}}" },
     doing_one: "{{names}} is {{doing}}",
@@ -12220,6 +12243,9 @@ export const en = {
       hide: "Hide",
       talker: "while working",
       talkerTip: "Answered without stopping the task in progress.",
+      /** Beside the name of a reply given while its task waits (its computer, a person), not while it works. */
+      talkerWaiting: "while waiting",
+      talkerWaitingTip: "Answered while its task waits.",
     },
     /** Next to the time on a reply of an agent nobody called. */
     joined: {
@@ -13179,6 +13205,8 @@ export const en = {
       pasteHint: "Paste what you copied into the page",
       /** `keys`: the paste shortcut, "⌘V" or "Ctrl+V". */
       pasteBlocked: "Your browser didn't let the page read what you copied. Use {{keys}} on the page.",
+      inputLost: "That didn't reach the page, so nothing was clicked or typed. Try again.",
+      noField: "No field is selected on the page, so that wasn't typed. Select the field and type again.",
       goLabel: "Site address",
       goPlaceholder: "Type an address, like example.com",
       go: "Open",
@@ -13187,7 +13215,6 @@ export const en = {
       goBadAddress: "That doesn't look like an address. Try example.com.",
       goFailed: "The site didn't open. Check the address.",
       backTitle: "Hand back to {{name}}",
-      doneTitle: "Done. A note for {{name}}?",
       backLabel: "Note for {{name}}",
       backPlaceholder: "Optional: anything {{name}} should know?",
       /** Handing back: opens the optional note. */
@@ -13246,6 +13273,8 @@ export const en = {
     suspendedFor: "This workspace is suspended: {{reason}}",
     bannerSub: "You can still read and write here. Agents don't answer or work while it's on hold.",
     label: "Workspace status",
+    /** Beside a suspended workspace's name in a list of workspaces. */
+    row: "Unavailable",
     screen: {
       title: "This workspace is unavailable",
       text: "Its conversations and agents are closed for now.",
@@ -13356,8 +13385,12 @@ export const en = {
   /** A workspace being deleted: the screen in its place until it goes. */
   deleting: {
     title: "{{name}} is being deleted",
-    text: "{{by}} deleted it on {{date}}. It goes for good on {{due}}.",
-    textLate: "{{by}} deleted it on {{date}}.",
+    text: "This workspace is already being deleted. There's nothing you need to do, it goes on {{date}}.",
+    textLate: "This workspace is already being deleted. There's nothing you need to do.",
+    by: "{{by}} deleted it on {{date}}.",
+    /** Beside its name in a list of workspaces. */
+    row: "Being deleted, goes on {{date}}",
+    rowLate: "Being deleted",
     /** `{{by}}` once the account that deleted it is gone. */
     someone: "Someone",
     restore: "Restore workspace",
@@ -13371,10 +13404,26 @@ export const en = {
     card: {
       text: "You leave every workspace and your account is deleted for good.",
       button: "Delete account…",
+      /** The link to Settings › General, for someone who only meant this workspace. */
+      oneWorkspace: "Want to delete just this workspace? It's in General.",
+      /** The link to Members, for someone who can't delete this workspace and only meant to leave it. */
+      leaveWorkspace: "Want to leave just this workspace? It's in Members.",
     },
-    title: "Delete your account?",
-    closes_one: "{{names}} closes now and is deleted for good on {{date}}. You're the only one there.",
-    closes_other: "{{names}} close now and are deleted for good on {{date}}. You're the only one there.",
+    title: "Delete your whole account?",
+    intro: "This deletes your whole account, not just one workspace. It can't be undone.",
+    /** The heading over deleting the account on a closed workspace's screen and on the onboarding. */
+    whole: "Your whole account",
+    /** Over links to delete a workspace instead. */
+    oneWorkspace: "Want to delete just one workspace? Your account stays.",
+    closes: "{{name}} closes now. You're the only one there, so it's deleted for good on {{date}}.",
+    /** `{{what}}`: "3 agents and 40 messages", from `agentCount` and `messageCount`. */
+    closesWith: "{{name}} closes now, with {{what}}. You're the only one there, so it's deleted for good on {{date}}.",
+    closesEmpty:
+      "{{name}} closes now, with no agents or messages. You're the only one there, so it's deleted for good on {{date}}.",
+    agentCount_one: "{{value}} agent",
+    agentCount_other: "{{value}} agents",
+    messageCount_one: "{{value}} message",
+    messageCount_other: "{{value}} messages",
     leaves: "You leave {{names}}.",
     messages: "Your messages stay in the workspaces without your name.",
     computers_one: "Your computer connected to {{name}} is removed from it: {{computers}}.",

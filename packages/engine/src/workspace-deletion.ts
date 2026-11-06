@@ -17,6 +17,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { orgMessageCount } from "./billing-link";
 import { caches } from "./cache";
 import { stopOrgWork } from "./cancel";
 import { type ConnectorDeps, revokeAtProvider } from "./connectors/connections";
@@ -66,6 +67,7 @@ import {
 } from "./standing";
 
 const {
+  agents,
   organizations,
   organizationMembers,
   organizationSettings,
@@ -900,6 +902,29 @@ export async function workspaceDeletions(db: Executor, orgIds: string[]) {
 }
 
 // ── Deleting an account ─────────────────────────────────────────────────────
+
+/**
+ * How many agents and messages each workspace holds, for the preflight to say what closes: agents as the workspace
+ * counts them, without the right hand every workspace has. Kept out of `accountDeletionPlan`, which `deleteAccount`
+ * runs under its locks.
+ */
+export async function workspaceContents(db: Executor, orgIds: string[]) {
+  const counted = await Promise.all(
+    orgIds.map(async (id) => {
+      const [row] = await db
+        .select({
+          agents: sql<number>`(select count(*) from ${agents} where ${agents.orgId} = ${id}
+            and ${agents.archivedAt} is null and ${agents.deletedAt} is null
+            and ${agents.builtin} is null)`.mapWith(Number),
+          messages: orgMessageCount(id),
+        })
+        .from(organizations)
+        .where(eq(organizations.id, id));
+      return [id, row ?? { agents: 0, messages: 0 }] as const;
+    }),
+  );
+  return new Map(counted);
+}
 
 /** What deleting an account does, workspace by workspace (`accountDeletionPlan`). */
 export interface AccountDeletionPlan {

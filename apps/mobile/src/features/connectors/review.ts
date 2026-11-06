@@ -23,7 +23,8 @@ export type Step = "about" | "connect" | "review" | "who";
 
 /** A catalog service starts with what agents could do there; a server by its address with connecting. */
 export const CATALOG_STEPS: Step[] = ["about", "connect", "review", "who"];
-export const ADDRESS_STEPS: Step[] = ["connect", "review", "who"];
+// A server's tools never hold its flow: what needs a decision waits on the connection's screen.
+export const ADDRESS_STEPS: Step[] = ["connect", "who"];
 
 /** Each step's name for the progress dashes (the web's step names; "about" is the phone's own). */
 export const STEP_KEYS: Record<Step, string> = {

@@ -55,7 +55,8 @@ import type { Spawn } from "./scope-gate";
  *   `thread/start` with the instructions (`developerInstructions`), always
  *   `cwd`, the profile's sandbox (`read-only` for `plan`, `workspace-write`
  *   for `work`, never the network), `approvalPolicy: "untrusted"` and the
- *   model. Each turn is `turn/start` with the prompt, the model and `effort`.
+ *   model. Each turn is `turn/start` with the prompt, the model, `effort` and
+ *   `serviceTier`, always: Codex keeps a thread's tier until told otherwise.
  * - Approvals (ADR 0053 §3): Codex asks before a command it doesn't trust or a
  *   change outside its sandbox (`item/commandExecution/requestApproval`,
  *   `item/fileChange/requestApproval`); the runner answers with the same
@@ -173,6 +174,8 @@ export function codexAppServerArgs(input: {
 }): string[] {
   return [
     "app-server",
+    "-c",
+    "features.fast_mode=true",
     ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
     ...codexContextOverride(input.contextTokens),
     ...(input.mcp ? codexBridgeOverrides({ runId: input.processId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
@@ -1030,6 +1033,7 @@ export class CodexAppServers implements CodexAppRunner {
     const overrides = {
       ...(input.model ? { model: input.model } : {}),
       ...(isBrainEffort(input.effort) ? { effort: codexEffort(input.effort) } : {}),
+      serviceTier: input.speed === "fast" ? "fast" : null,
     };
     return new Promise<AppOutcome>((resolve) => {
       let settled = false;

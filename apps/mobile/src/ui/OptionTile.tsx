@@ -43,7 +43,7 @@ export function OptionTile({
       {children}
       {pressed ? (
         <View style={[styles.check, { backgroundColor: colors.ink }]}>
-          <Icon name="check" size={11} color={colors.bg} />
+          <Icon name="check" size={12} color={colors.bg} />
         </View>
       ) : null}
     </Pressable>
@@ -51,7 +51,7 @@ export function OptionTile({
 }
 
 const styles = StyleSheet.create({
-  tile: { borderRadius: 16, padding: 12 },
+  tile: { borderRadius: 14, padding: 12 },
   down: { transform: [{ scale: 0.98 }] },
   check: {
     position: "absolute",

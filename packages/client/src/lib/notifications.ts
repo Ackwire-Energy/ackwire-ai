@@ -72,6 +72,30 @@ export function sortWaiting(list: AppNotification[]) {
   );
 }
 
+/**
+ * One waiting card per connected server whose approved tools changed (ADR 0117). A server now keeps one open notice,
+ * but rows from before that, or from a server not updated yet, repeat the same card; the newest stands for them all,
+ * since its review lists every pending change. `merged` is how many were left out, to take from the server's counts.
+ */
+export function oneToolChangePerServer<T extends Pick<AppNotification, "kind" | "waiting" | "source" | "updatedAt">>(
+  items: T[],
+): { items: T[]; merged: number } {
+  const keyOf = (n: T) =>
+    n.kind === "connector_tool_changed" && n.waiting ? (n.source.connectionId ?? n.source.label ?? "") : null;
+  const newest = new Map<string, T>();
+  for (const n of items) {
+    const key = keyOf(n);
+    if (key === null) continue;
+    const kept = newest.get(key);
+    if (!kept || n.updatedAt > kept.updatedAt) newest.set(key, n);
+  }
+  const kept = items.filter((n) => {
+    const key = keyOf(n);
+    return key === null || newest.get(key) === n;
+  });
+  return { items: kept, merged: items.length - kept.length };
+}
+
 /** How the counts move when one item changes from `before` to `after` (either may be missing). */
 export function countsDelta(
   counts: NotificationCounts,

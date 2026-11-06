@@ -11,6 +11,7 @@ export const ptBR = {
   common: {
     close: "Fechar",
     joinSentences: "{{a}} {{b}}",
+    cantUndo: "Não dá para desfazer.",
     removeName: "Remover {{name}}",
     /** The ⓘ hint's name beside a label: "Sobre Fuso horário". */
     about: "Sobre {{label}}",
@@ -1347,6 +1348,8 @@ export const ptBR = {
     addPasswordReauth: "Entre de novo para adicionar uma senha.",
     yourWorkspaces: "Seus workspaces",
     youAreHere: "Você está aqui",
+    /** Beside a workspace's name, only when another of the person's has the same name. */
+    createdOn: "Criado em {{date}}",
     newWorkspace: "Novo workspace",
     wiki: "Wiki",
     settings: "Configurações",
@@ -4239,6 +4242,11 @@ export const ptBR = {
           high: "Pensa mais em tarefas difíceis. Demora e gasta mais.",
           max: "Pensa o máximo que puder. Bem mais lento e caro.",
         },
+        /** Velocidade (ADR 0149): shown on a ChatGPT plan with a model that has Fast mode. `2,5×` is OpenAI's rate. */
+        speed: "Velocidade",
+        speeds: { standard: "Padrão", fast: "Rápida" },
+        speedText:
+          "Responde mais rápido nas conversas e gasta o plano 2,5× mais depressa. Rotinas e tarefas longas seguem no padrão.",
         /** The model picker's line under each Claude Code model (other models show their name only). */
         modelLine: {
           opus: "O mais capaz. Gasta o plano mais rápido.",
@@ -4266,10 +4274,13 @@ export const ptBR = {
             model: "Janela de contexto",
             auto: "Janela de contexto e quem atende",
             fixed: "Esforço, janela de contexto e quem atende",
+            autoSpeed: "Velocidade, janela de contexto e quem atende",
+            fixedSpeed: "Esforço, velocidade, janela de contexto e quem atende",
           },
           /** After a save: nothing changed from the defaults, else only what did. */
           allDefault: "Tudo no padrão",
           effort: "Esforço {{level}}",
+          speed: "Velocidade rápida",
           context: "Contexto de {{size}}",
           sharing: "Atende outras pessoas",
           waits: "Espera o computador voltar",
@@ -4743,7 +4754,7 @@ export const ptBR = {
       audience: "Quem pode falar",
       channels: "Canais",
       computer: "Computador",
-      danger: "Arquivar",
+      danger: "Arquivar ou apagar",
       keySafe: "A chave fica cifrada no servidor. Ninguém vê.",
       spentOf: "gastos em {{month}}, de {{amount}}",
       spentOfDefault: "gastos em {{month}}, de {{amount}} (padrão do workspace)",
@@ -5880,7 +5891,7 @@ export const ptBR = {
     agentRole: "Agente · {{role}}",
     pr: "PR #{{number}}",
     open: "#{{number}} {{title}}",
-    empty: "Crie uma, ou peça no chat: “Lia, cria uma tarefa para esse erro”.",
+    empty: "Crie uma, ou peça a um agente no chat.",
     noResults: "Nenhuma tarefa com esses filtros.",
     columnEmpty: "Nada aqui.",
     form: {
@@ -7758,6 +7769,7 @@ export const ptBR = {
     removeAgents_one: "{{names}} usa esta skill e deixa de ter acesso a ela.",
     removeAgents_other: "{{names}} usam esta skill e deixam de ter acesso a ela.",
     removeNone: "Nenhum agente usa esta skill.",
+    removeGone: "Ela sai do workspace e não dá para desfazer.",
     removed: "{{name}} removida.",
     agentTitle: "Skills",
     agentSubtitle: "O que {{name}} pode abrir quando precisar.",
@@ -8543,7 +8555,7 @@ export const ptBR = {
     noAccessText: "Ela é só para algumas pessoas. Se precisar, peça a quem cuida da wiki.",
     delete: "Mover para a lixeira",
     deleteTitle: "Mover {{title}} para a lixeira?",
-    deleteText: "Os links para ela viram “página para criar”. Dá para restaurar depois.",
+    deleteText: "Os links para ela viram “página para criar”. Ainda não dá para restaurar pelo app.",
     deleted: "{{title}} foi para a lixeira.",
     noBacklinksHint: "Nenhuma página aponta para esta ainda. Escreva [[{{title}}]] em outra.",
     allVersions: "Ver as {{count}} versões",
@@ -8771,6 +8783,7 @@ export const ptBR = {
     stuck: "Parou porque travou",
     steer: {
       waiting: "{{name}} lê na próxima pausa",
+      computer: "{{name}} lê quando conseguir o computador",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
       held: "{{name}} lê depois da sua decisão",
@@ -8979,6 +8992,7 @@ export const ptBR = {
       nextAfter_female: "Aguardando o computador. É a próxima quando {{after}} terminar",
       next: "Aguardando o computador. É o próximo",
       next_female: "Aguardando o computador. É a próxima",
+      waiting: "Aguardando o computador",
       behind: "Na fila, {{nth}}. Depois de {{names}}",
       position: "Na fila, {{nth}}",
     },
@@ -12211,6 +12225,8 @@ export const ptBR = {
     autoUpdateNow: "Agora: {{now}}.",
     /** A linha do próprio servidor quando uma pessoa escreve a um agente trabalhando e a resposta rápida não sai (ADR 0131). */
     statusReply: "Ainda trabalhando nisso ({{duration}}). Leio sua mensagem depois deste passo.",
+    statusReplyQueued: "Aguardando o computador ({{duration}}). Leio sua mensagem quando chegar minha vez.",
+    statusReplyAway: "Aguardando meu computador voltar. Leio sua mensagem assim que ele voltar.",
     status: {
       one: "Trabalhando em: {{subject}}",
       oneUntitled: "Trabalhando em segundo plano",
@@ -12241,6 +12257,11 @@ export const ptBR = {
     working: "Em segundo plano",
   },
   chat: {
+    /** Under a reply that came at standard speed because Fast was refused (`meta.speedFallback`, ADR 0149). */
+    speedFallback: {
+      text: "O ChatGPT recusou a velocidade Rápida nesta conta ou neste modelo, então esta resposta veio no padrão.",
+      action: "Abrir agente",
+    },
     /** When a waiting agent goes on (`usageWhen`). */
     usageWhen: { at: "às {{time}}", on: "{{day}} às {{time}}", date: "em {{date}}" },
     /** Typing bar: "{{names}} está {{doing}}" (agents' verbs come from their tool calls). */
@@ -12371,6 +12392,8 @@ export const ptBR = {
       hide: "Ocultar",
       talker: "enquanto trabalha",
       talkerTip: "Respondeu sem parar a tarefa em andamento.",
+      talkerWaiting: "enquanto espera",
+      talkerWaitingTip: "Respondeu enquanto a tarefa espera.",
     },
     /** Next to the time on a reply of an agent nobody called. */
     joined: {
@@ -13377,6 +13400,9 @@ export const ptBR = {
       paste: "Colar",
       pasteHint: "Colar na página o que você copiou",
       pasteBlocked: "O navegador não deixou ler o que você copiou. Use {{keys}} na página.",
+      inputLost: "Isso não chegou à página, então nada foi clicado nem digitado. Tente de novo.",
+      noField:
+        "Nenhum campo está selecionado na página, então isso não foi digitado. Selecione o campo e digite de novo.",
       goLabel: "Endereço do site",
       goPlaceholder: "Digite um endereço, como loja.com.br",
       go: "Abrir",
@@ -13387,8 +13413,6 @@ export const ptBR = {
       goFailed: "O site não abriu. Confira o endereço.",
       backTitle: "Devolver ao {{name}}",
       backTitle_female: "Devolver à {{name}}",
-      doneTitle: "Pronto. Algum recado para o {{name}}?",
-      doneTitle_female: "Pronto. Algum recado para a {{name}}?",
       backLabel: "Recado para o {{name}}",
       backLabel_female: "Recado para a {{name}}",
       backPlaceholder: "Opcional: o que o {{name}} precisa saber?",
@@ -13452,6 +13476,8 @@ export const ptBR = {
     bannerSub:
       "Dá para ler e escrever normalmente. Os agentes não respondem nem trabalham enquanto ele estiver em espera.",
     label: "Status do workspace",
+    /** Beside a suspended workspace's name in a list of workspaces. */
+    row: "Indisponível",
     screen: {
       title: "Este workspace está indisponível",
       text: "As conversas e os agentes dele estão fechados por enquanto.",
@@ -13563,8 +13589,12 @@ export const ptBR = {
   /** A workspace being deleted: the screen in its place until it goes. */
   deleting: {
     title: "{{name}} está sendo apagado",
-    text: "{{by}} apagou em {{date}}. Ele some de vez em {{due}}.",
-    textLate: "{{by}} apagou em {{date}}.",
+    text: "Este workspace já está sendo apagado. Não precisa fazer nada, ele some em {{date}}.",
+    textLate: "Este workspace já está sendo apagado. Não precisa fazer nada.",
+    by: "{{by}} apagou em {{date}}.",
+    /** Beside its name in a list of workspaces. */
+    row: "Sendo apagado, some em {{date}}",
+    rowLate: "Sendo apagado",
     /** `{{by}}` once the account that deleted it is gone. */
     someone: "Alguém",
     restore: "Restaurar workspace",
@@ -13577,10 +13607,26 @@ export const ptBR = {
     card: {
       text: "Você sai de todos os workspaces e a sua conta é apagada de vez.",
       button: "Apagar conta…",
+      /** The link to Configurações › Geral, for someone who only meant this workspace. */
+      oneWorkspace: "Quer apagar só este workspace? Fica em Geral.",
+      /** The link to Membros, for someone who can't delete this workspace and only meant to leave it. */
+      leaveWorkspace: "Quer sair só deste workspace? Fica em Membros.",
     },
-    title: "Apagar a sua conta?",
-    closes_one: "{{names}} fecha agora e é apagado de vez em {{date}}. Só você está lá.",
-    closes_other: "{{names}} fecham agora e são apagados de vez em {{date}}. Só você está lá.",
+    title: "Apagar a sua conta inteira?",
+    intro: "Isto apaga a sua conta inteira, não só um workspace. Não tem volta.",
+    /** The heading over deleting the account on a closed workspace's screen and on the onboarding. */
+    whole: "Sua conta inteira",
+    /** Over links to delete a workspace instead. */
+    oneWorkspace: "Quer apagar só um workspace? A sua conta continua.",
+    closes: "{{name}} fecha agora. Só você está lá, então ele é apagado de vez em {{date}}.",
+    /** `{{what}}`: "3 agentes e 40 mensagens", from `agentCount` and `messageCount`. */
+    closesWith: "{{name}} fecha agora, com {{what}}. Só você está lá, então ele é apagado de vez em {{date}}.",
+    closesEmpty:
+      "{{name}} fecha agora, sem agentes nem mensagens. Só você está lá, então ele é apagado de vez em {{date}}.",
+    agentCount_one: "{{value}} agente",
+    agentCount_other: "{{value}} agentes",
+    messageCount_one: "{{value}} mensagem",
+    messageCount_other: "{{value}} mensagens",
     leaves: "Você sai de {{names}}.",
     messages: "Suas mensagens ficam nos workspaces sem o seu nome.",
     computers_one: "Seu computador conectado a {{name}} sai de lá: {{computers}}.",

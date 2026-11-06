@@ -155,6 +155,13 @@ describe("a new workspace's first steps", () => {
       { id: "ask", done: false },
     ]);
   });
+  test("the right hand alone opens the steps after it, but doesn't make the first agent", () => {
+    expect(firstSteps({ ...none, agents: 1, made: 0 }).slice(0, 2)).toEqual([
+      { id: "agent", done: false },
+      { id: "ai", done: false },
+    ]);
+    expect(firstSteps({ ...none, agents: 2, made: 1 })[0]).toEqual({ id: "agent", done: true });
+  });
 
   test("none once every step shown is done", () => {
     expect(firstSteps({ agents: 2, hasAi: true, asked: true, people: 3, routines: 1, may })).toEqual([]);

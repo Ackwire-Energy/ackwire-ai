@@ -892,7 +892,6 @@ export function WikiReader({
           </span>
         )}
         <Button
-          size="sm"
           variant="ghost"
           icon="code"
           className="wiki-top__md"

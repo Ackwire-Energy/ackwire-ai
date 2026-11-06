@@ -42,7 +42,7 @@
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 html:not([data-pointer]) .roles-row:focus-visible {
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .roles-row > .ac-icon {
   flex: none;
@@ -79,7 +79,8 @@ html:not([data-pointer]) .roles-row:focus-visible {
   display: flex;
 }
 .roles-stack > .ac-avatar {
-  box-shadow: 0 0 0 2px var(--raised);
+  /* The card's own face (the kit's `--stack-ring`): inside the card `--raised` is a step up, a lighter ring in dark. */
+  box-shadow: 0 0 0 2px var(--stack-ring, var(--raised));
 }
 .roles-stack > .ac-avatar + .ac-avatar {
   margin-left: -6px;
@@ -395,8 +396,9 @@ html:not([data-pointer]) .roles-pick__row:focus-visible {
   cursor: pointer;
 }
 .roles-color[aria-checked="true"] {
+  /* The gap is the face it sits on (the kit's `--stack-ring` on a card or dialog), not a step up. */
   box-shadow:
-    0 0 0 2px var(--raised),
+    0 0 0 2px var(--stack-ring, var(--raised)),
     0 0 0 4px var(--ink);
 }
 html:not([data-pointer]) .roles-color:focus-visible {

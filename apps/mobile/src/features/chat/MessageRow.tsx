@@ -33,7 +33,7 @@ import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media
 import { memberRoleColor } from "@agenteschat/client/lib/member-groups";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
-import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
+import { isTalkerReply, routineReportText, talkerWaited } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { reachHandoffs } from "@agenteschat/client/lib/reach";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
@@ -46,12 +46,14 @@ import { router } from "expo-router";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import {
   CHROME_MAX_SCALE,
   Count,
   Icon,
   InkOrbit,
+  LineIcon,
   PixelStopped,
   PressScale,
   ProviderLogo,
@@ -93,6 +95,9 @@ import {
   consultationsOf,
   hangsUnder,
   hidesBody,
+  MSG_AVATAR,
+  MSG_GAP,
+  MSG_INSET,
   mayStopRun,
   missionCardRef,
   missionLinkOf,
@@ -108,6 +113,7 @@ import { MessageText } from "./MessageText";
 import { ReachLines } from "./ReachLines";
 import { Receipts } from "./Receipts";
 import { SecretCard } from "./SecretCard";
+import { SpeedFallbackLine } from "./StoppedLine";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
@@ -370,7 +376,13 @@ export const MessageRow = memo(function MessageRow({
       {m.local === "pending" || (m.local === "failed" && offline) ? (
         <Sending offline={offline} end={onRight} />
       ) : m.local === "failed" ? (
-        <Pressable onPress={() => onRetry?.(m)} accessibilityRole="button" hitSlop={8}>
+        // A 16-point caption: 14 of slop gives the retry its 44-point target.
+        <Pressable
+          onPress={() => onRetry?.(m)}
+          accessibilityRole="button"
+          hitSlop={14}
+          style={({ pressed }) => pressed && styles.pressedDim}
+        >
           <Text variant="caption" tone="danger" style={onRight ? styles.meStatus : undefined}>
             {t("mobile.chat.failed")}
           </Text>
@@ -522,8 +534,8 @@ export const MessageRow = memo(function MessageRow({
           onPress={() => setReportOpen((o) => !o)}
           accessibilityRole="button"
           accessibilityState={{ expanded: reportOpen }}
-          hitSlop={6}
-          style={styles.shrink}
+          hitSlop={NAME_LINE_SLOP}
+          style={({ pressed }) => [styles.shrink, pressed && styles.pressedDim]}
         >
           <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
             {reportOpen ? t("channel.routineReportHide") : t("channel.routineReport")}
@@ -536,9 +548,9 @@ export const MessageRow = memo(function MessageRow({
           tone="faint"
           numberOfLines={1}
           style={styles.shrink}
-          accessibilityHint={t("chat.notice.talkerTip")}
+          accessibilityHint={t(talkerWaited(meta) ? "chat.notice.talkerWaitingTip" : "chat.notice.talkerTip")}
         >
-          {t("chat.notice.talker")}
+          {t(talkerWaited(meta) ? "chat.notice.talkerWaiting" : "chat.notice.talker")}
         </Text>
       ) : null}
       {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}
@@ -621,7 +633,8 @@ export const MessageRow = memo(function MessageRow({
           bubbled && lookRows.bubblesRow,
           compact && lookRows.compactRow,
           grouped && styles.cont,
-          mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
+          // A mention of me: the row's tint says it, with round corners; no accent bar on its left edge.
+          mentionsMe && { backgroundColor: `${c.amber}17`, borderRadius: 14 },
           pressed && press && { backgroundColor: c.sunken },
         ]}
       >
@@ -675,10 +688,7 @@ export const MessageRow = memo(function MessageRow({
           )}
           {talk && !brainWait ? (
             <Pressable
-              onPress={() => {
-                tapHaptic();
-                router.push(chatHref(m.channelId, m.threadId ?? m.id));
-              }}
+              onPress={() => router.push(chatHref(m.channelId, m.threadId ?? m.id))}
               accessibilityRole="button"
               hitSlop={8}
               style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
@@ -689,11 +699,12 @@ export const MessageRow = memo(function MessageRow({
               <Text variant="footnote" tone="faint">
                 · {t("chat.talk.more", { count: talk.more })}
               </Text>
-              <Icon name="right" size={14} color={c.faint} />
+              <Icon name="right" size={13} color={c.faint} />
             </Pressable>
           ) : null}
           {media ? <ChatMedia media={media} liveId={m.id} /> : null}
           {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
+          {isAgent && meta?.speedFallback === true ? <SpeedFallbackLine message={m} /> : null}
           {(stopped || atLimit || providerCut) && m.agentRunId ? (
             <StoppedLine
               message={m}
@@ -884,6 +895,8 @@ function StoppedLine({
           <PressScale
             onPress={onContinue}
             accessibilityRole="button"
+            // 26 points tall in the line: the slop gives it the 44 a finger needs.
+            hitSlop={{ top: 9, bottom: 9, left: 4, right: 4 }}
             style={[styles.continue, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
           >
             <View style={styles.continueIn}>
@@ -904,7 +917,7 @@ function ChoiceReply({ text }: { text: string }) {
   const c = useColors();
   return (
     <View style={styles.choiceReply}>
-      <Icon name="check" size={13} color={c.muted} />
+      <LineIcon name="check" size={13} color={c.muted} variant="footnote" />
       <Text variant="footnote" tone="ink" style={[styles.medium, styles.shrink]}>
         {text}
       </Text>
@@ -933,7 +946,7 @@ function Tag({
   const c = useColors();
   const chip = (
     <View style={[styles.tag, { backgroundColor: c.sunken }]} accessibilityHint={onPress ? undefined : hint}>
-      {lead ?? <Icon name={icon} size={11} color={c.muted} />}
+      {lead ?? <Icon name={icon} size={12} color={c.muted} />}
       <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
         {label}
       </Text>
@@ -945,8 +958,8 @@ function Tag({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityHint={hint}
-      hitSlop={6}
-      style={styles.tagPress}
+      hitSlop={NAME_LINE_SLOP}
+      style={({ pressed }) => [styles.tagPress, pressed && styles.pressedDim]}
     >
       {chip}
     </Pressable>
@@ -970,8 +983,8 @@ function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultat
       <Pressable
         onPress={() => router.push(consultationHref(c.id, channelId))}
         accessibilityRole="button"
-        hitSlop={6}
-        style={styles.shrink}
+        hitSlop={NAME_LINE_SLOP}
+        style={({ pressed }) => [styles.shrink, pressed && styles.pressedDim]}
       >
         <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
           {t("chat.consultPanel.see")}
@@ -996,61 +1009,75 @@ function PinMark() {
 function Reactions({ message: m, meId }: { message: Message; meId: string | null }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const c = useColors();
+  const { colors: c, reducedMotion: reduced } = useTheme();
   const cached = useReactions(orgId, m.id, false);
   const toggle = useToggleReaction(orgId, m.id);
   const pills = reactionPills(cached.data ?? m.reactions, meId);
   // What an agent saved to memory from this message comes last in the row (the web's memory mark).
   const remembered = (m.memories?.length ?? 0) > 0;
-  if ((pills.length === 0 && !remembered) || m.local) return null;
+  const shown = (pills.length > 0 || remembered) && !m.local;
+  // A pill someone adds or takes back while the row shows fades and the others slide aside; those there when the row
+  // mounts (scrolling to it) just show, and none lingers when the row goes.
+  const motion = reduced ? {} : { entering: PILL_IN, exiting: PILL_OUT, layout: PILL_MOVE };
   return (
-    <View style={styles.reacts}>
-      {pills.flatMap((p) => [
-        ...(p.people > 0
-          ? [
-              <Pressable
-                key={`p:${p.reaction}`}
-                onPress={() => {
-                  tapHaptic();
-                  toggle.mutate({ reaction: p.reaction, on: !p.mine });
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t("mobile.chat.reactionLabel", { emoji: p.emoji, count: p.people })}
-                accessibilityState={{ selected: p.mine }}
-                style={[
-                  styles.react,
-                  { backgroundColor: c.sunken },
-                  p.mine && { borderWidth: 1.5, borderColor: c.ink2 },
-                ]}
+    <LayoutAnimationConfig skipEntering skipExiting>
+      {shown ? (
+        <View style={styles.reacts}>
+          {pills.flatMap((p) => [
+            ...(p.people > 0
+              ? [
+                  <Animated.View key={`p:${p.reaction}`} {...motion}>
+                    {/* The press's own light tap is the toggle's haptic. */}
+                    <PressScale
+                      onPress={() => toggle.mutate({ reaction: p.reaction, on: !p.mine })}
+                      fill={false}
+                      // 30 drawn, 44 to the finger; not sideways, where the next pill is 6 away.
+                      hitSlop={REACT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("mobile.chat.reactionLabel", { emoji: p.emoji, count: p.people })}
+                      accessibilityState={{ selected: p.mine }}
+                      contentStyle={[styles.react, { backgroundColor: c.sunken }, p.mine && { borderColor: c.ink2 }]}
+                    >
+                      <Text variant="subhead" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+                        {p.emoji}
+                      </Text>
+                      <Count value={p.people} size={14} />
+                    </PressScale>
+                  </Animated.View>,
+                ]
+              : []),
+            ...p.agentIds.map((agentId) => (
+              <Animated.View
+                key={`a:${p.reaction}:${agentId}`}
+                {...motion}
+                accessible
+                accessibilityLabel={t("mobile.chat.agentReacted", { emoji: p.emoji })}
+                style={[styles.react, { backgroundColor: c.sunken }]}
               >
-                <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoji}>
+                <Text variant="subhead" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
                   {p.emoji}
                 </Text>
-                <Count value={p.people} size={14} />
-              </Pressable>,
-            ]
-          : []),
-        ...p.agentIds.map((agentId) => (
-          <View
-            key={`a:${p.reaction}:${agentId}`}
-            accessible
-            accessibilityLabel={t("mobile.chat.agentReacted", { emoji: p.emoji })}
-            style={[styles.react, { backgroundColor: c.sunken }]}
-          >
-            <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoji}>
-              {p.emoji}
-            </Text>
-            <AgentFace agentId={agentId} size={16} live={false} />
-          </View>
-        )),
-      ])}
-      {remembered ? <MemoryMarks message={m} divided={pills.length > 0} /> : null}
-    </View>
+                <AgentFace agentId={agentId} size={16} live={false} />
+              </Animated.View>
+            )),
+          ])}
+          {remembered ? <MemoryMarks message={m} divided={pills.length > 0} /> : null}
+        </View>
+      ) : null}
+    </LayoutAnimationConfig>
   );
 }
 
+const REACT_SLOP = { top: 7, bottom: 7 };
+const PILL_IN = FadeIn.duration(160);
+const PILL_OUT = FadeOut.duration(120);
+const PILL_MOVE = LinearTransition;
+
 /** The turn's last corner, cut as a card's is, on the side my bubble stands. */
-const BUBBLE_CUT = 5;
+const BUBBLE_CUT = 6;
+
+/** Between the rows of a run of mine: one bubble under the other, close. */
+const RUN_GAP = 2;
 
 /** The bubble's corners by its place in a run of my rows: the sides it shares with its neighbours square off. */
 const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBottomRightRadius?: number }> = {
@@ -1073,13 +1100,21 @@ const ON_SOLID = "#ffffff";
 
 const styles = StyleSheet.create({
   // Readable turns: more room between turns, a quieter name and time.
-  msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
+  msg: {
+    flexDirection: "row",
+    gap: MSG_GAP,
+    paddingLeft: MSG_INSET,
+    paddingRight: 16,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
   cont: { paddingTop: 0, marginTop: 0 },
-  avslot: { width: 34, alignItems: "center", paddingTop: 2 },
+  avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  choiceReply: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2 },
+  // A long pick wraps: the check stays on its first line.
+  choiceReply: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingVertical: 2 },
   // Wraps on a narrow phone: a routine's tag and "Ver relatório" go to the next line instead of off the edge.
-  who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 3, marginBottom: 3 },
+  who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 4, marginBottom: 4 },
   // A person's name line keeps room at its end for the receipt's mark, with or without one, so a mark that comes
   // never wraps the line.
   whoRoom: { paddingRight: 40 },
@@ -1098,32 +1133,32 @@ const styles = StyleSheet.create({
   compactLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 6 },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
-  meCont: { paddingTop: 1, marginTop: 0 },
-  // A run of my rows sits 2px apart (1 under this one, 1 over the next).
-  meRunOn: { paddingBottom: 1 },
+  meCont: { paddingTop: RUN_GAP / 2, marginTop: 0 },
+  // A run of my rows sits RUN_GAP apart (half under this one, half over the next).
+  meRunOn: { paddingBottom: RUN_GAP / 2 },
   meTime: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 4, height: 16 },
   mePressed: { opacity: 0.7 },
   meEnd: { alignSelf: "flex-end" },
   bubble: {
     maxWidth: "100%",
     paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 18,
+    paddingHorizontal: 14,
+    borderRadius: 20,
   },
   meFiles: { alignSelf: "stretch" },
   meCards: { alignSelf: "stretch" },
   meStatus: { marginTop: 4, textAlign: "right" },
-  status: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4, minHeight: 18 },
+  status: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, minHeight: 18 },
   statusEnd: { alignSelf: "flex-end" },
   stopped: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 6 },
   continue: {
     minHeight: 26,
-    borderTopLeftRadius: 9,
-    borderTopRightRadius: 9,
-    borderBottomRightRadius: 9,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
     borderBottomLeftRadius: 3,
   },
-  continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
+  continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 8, paddingRight: 10 },
   medium: { fontWeight: "600" },
   talkMore: {
     flexDirection: "row",
@@ -1146,19 +1181,24 @@ const styles = StyleSheet.create({
     gap: 4,
     alignSelf: "center",
     flexShrink: 1,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
   },
   pinLine: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
   reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
+  // The outline is always there (clear unless it is mine), so a pill keeps its size when I add or take mine.
   react: {
     minHeight: 30,
     paddingHorizontal: 10,
     borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "transparent",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  emoji: { fontSize: 15 },
 });
+
+/** Taps on the name line's small words and chips (16 to 20 points tall) reach 44 points without spreading them. */
+const NAME_LINE_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };

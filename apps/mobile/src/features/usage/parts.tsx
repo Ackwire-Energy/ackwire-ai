@@ -21,7 +21,7 @@ import { Canvas, createPicture, Picture, Skia } from "@shopify/react-native-skia
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Icon, type IconName, ProviderLogo, Text, useTheme } from "@/ui";
+import { type IconName, LineIcon, ProviderLogo, Text, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /*
@@ -243,11 +243,13 @@ export function UsageCard({
   footer?: string;
   children: ReactNode;
 }) {
-  const c = useColors();
+  const { colors: c, shadows } = useTheme();
   return (
-    <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line }]}>
+    // The kit's card surface (e1 and the lit top edge), as the other cards on these screens.
+    <View style={[styles.card, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
       <View style={styles.cardHead}>
-        <Icon name={icon} size={16} color={c.muted} />
+        {/* On the title's line: a 16-point icon at the top of a 21-point line sat above its letters. */}
+        <LineIcon variant="callout" name={icon} size={16} color={c.muted} />
         <Text variant="callout" tone="ink" accessibilityRole="header" style={[styles.grow, styles.heavy]}>
           {title}
         </Text>
@@ -385,7 +387,7 @@ const styles = StyleSheet.create({
   acct: { flexDirection: "row", alignItems: "center", gap: 12 },
   acctName: { flexDirection: "row", alignItems: "center", gap: 7 },
   tag: { height: 19, paddingHorizontal: 6, borderRadius: 6, borderBottomLeftRadius: 2, justifyContent: "center" },
-  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16, gap: 14 },
+  card: { borderRadius: 20, padding: 16, gap: 14 },
   cardHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   cardFoot: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12 },
   days: { height: DAYS_HEIGHT + 4, paddingBottom: 4, borderBottomWidth: StyleSheet.hairlineWidth },

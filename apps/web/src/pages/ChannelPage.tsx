@@ -134,7 +134,7 @@ import {
   taskNoticeOf,
 } from "@agenteschat/client/lib/missions";
 import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
-import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
+import { isTalkerReply, noticeOf, routineReportText, talkerWaited } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { reachHandoffs } from "@agenteschat/client/lib/reach";
@@ -250,7 +250,14 @@ import { ChannelHeader } from "@/components/ChannelHeader";
 import { ChannelPermissions } from "@/components/ChannelPermissions";
 import { ChannelPinnedBar } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
-import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
+import {
+  AppViaTag,
+  NoticeLine,
+  RoutineReport,
+  RoutineTag,
+  SpeedFallbackLine,
+  UnshownLine,
+} from "@/components/ChatNotices";
 import { QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -305,6 +312,7 @@ import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { CHANNEL_NAME, ChannelAccessChoice, toChannelName } from "@/components/NewChannelDialog";
 import { FailedRunFix, KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
@@ -848,16 +856,18 @@ function ChannelView({
     },
     [profileKeeps],
   );
-  // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
+  // A sidebar row's settings button, an agent's picture: its page beside this conversation, or beside its own once it
+  // shows.
+  const shownAgent = profile?.agentId;
   useEffect(() => {
     if (chrome?.panel) return;
     const open = () => {
       const ask = takeAgentPanel();
-      if (ask) openAgentPanel(ask.agentId, ask.tab);
+      if (ask && !(ask.keep && ask.agentId === shownAgent)) openAgentPanel(ask.agentId, ask.tab);
     };
     open();
     return onAgentPanel(open);
-  }, [chrome?.panel, openAgentPanel]);
+  }, [chrome?.panel, openAgentPanel, shownAgent]);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
   // `/summary` and `/plan`: a card only I see, under the conversation.
@@ -1535,7 +1545,7 @@ function ChannelView({
         {missionReply && (
           <span className="ac-composer__pill composer-reply">
             <Icon name="message" size={14} />
-            {t("missions.reply.pill", { label: missionReply.label })}
+            <span className="ac-composer__pill-text">{t("missions.reply.pill", { label: missionReply.label })}</span>
             <button
               type="button"
               className="composer-reply__close"
@@ -1549,7 +1559,7 @@ function ChannelView({
         {pillAgents.map((a) => (
           <span key={a.id} className="ac-composer__agent">
             <AgentAvatar agentId={a.id} channelId={channel.id} name={a.name} size="xs" />
-            {a.name}
+            <span className="ac-composer__pill-text">{a.name}</span>
           </span>
         ))}
       </>
@@ -2601,7 +2611,7 @@ function ChannelView({
                 )}
               </div>
             </Tag>
-            {!chrome && membersColumn.sheet && (
+            {!chrome && !profile && membersColumn.sheet && (
               <MembersSheet
                 channel={channel}
                 isMember={isMember}
@@ -2846,6 +2856,7 @@ const Timeline = memo(function Timeline({
       }),
     [heldPlaces, channelId, runVisible, slots, lastByRun],
   );
+  const shownMessages = useMemo(() => items.flatMap((i) => (i.kind === "message" ? [i.message] : [])), [items]);
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
   for (const [at, item] of items.entries()) {
@@ -2909,10 +2920,8 @@ const Timeline = memo(function Timeline({
         />
       ),
     );
-    // Its agents in line for their computer: each one's turn right after it, where "thinking" shows otherwise.
-    if ((m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local)
-      rows.push(<QueueWaitTurns key={`queue-${item.key}`} message={m} />);
   }
+  rows.push(<QueueWaitTurns key="queue-waits" channelId={channelId} messages={shownMessages} />);
   drawn.forEach((slot) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
     rows.push(
@@ -4101,8 +4110,11 @@ export const TimelineMessage = memo(function TimelineMessage({
               )}
               {via && <AppViaTag via={via} person={name} />}
               {talker && (
-                <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
-                  {t("chat.notice.talker")}
+                <span
+                  className="msg-reminder msg-talker"
+                  title={t(talkerWaited(m.meta) ? "chat.notice.talkerWaitingTip" : "chat.notice.talkerTip")}
+                >
+                  {t(talkerWaited(m.meta) ? "chat.notice.talkerWaiting" : "chat.notice.talker")}
                 </span>
               )}
               {helping && <ConsultHelpingTag consultation={helping} />}
@@ -4225,7 +4237,7 @@ export const TimelineMessage = memo(function TimelineMessage({
               agentName={name}
               color={colorOf(agent)}
               steerNote={steerNote}
-              stopped={liveStopped}
+              stopped={liveStopped || liveFailed}
             />
             {/* Last, after its tools; also on a failed or stopped run, for the person still in control (they hand back from it). */}
             <RunBrowserCard run={live} name={name} />
@@ -4280,6 +4292,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             )}
             {media && <ChatMedia media={media} />}
             {voice && <ChatVoice message={m} voice={voice} />}
+            {m.author.type === "agent" && meta.speedFallback === true && <SpeedFallbackLine agent={agent} />}
             {(stopped.canceled || atLimit || providerCut) && (
               <StoppedLine
                 runId={m.agentRunId}
@@ -4694,6 +4707,11 @@ function ChannelDetails({
       api.chat.setAutoReply(org.id, channel.id, agentId, on),
     onSuccess: refresh,
   });
+  const leave = () => {
+    saveTopic();
+    saveName();
+    onOpenChange(false);
+  };
   const needle = q.trim().toLowerCase();
   const all = (roster.data ?? []).map((m) => ({
     key: `${m.type}-${m.id}`,
@@ -4732,7 +4750,9 @@ function ChannelDetails({
       {agents.length > 0 && group(t("channelMembers.agents"), agentCount)}
       {agents.map((r) => (
         <div key={r.key} className="member-row">
-          <ActorAvatar actor={{ type: "agent", id: r.id }} size="sm" name={r.name} />
+          <OpensAgent agentId={r.id} onOpen={leave}>
+            <ActorAvatar actor={{ type: "agent", id: r.id }} size="sm" name={r.name} />
+          </OpensAgent>
           <span className="list-col">
             <span style={{ fontWeight: 600 }}>{r.name}</span>
             <span className="small muted">
@@ -4845,13 +4865,7 @@ function ChannelDetails({
       <Dialog
         open={open && !adding && !removing && !goingPublic && !deleting}
         width={editable ? 760 : 600}
-        onOpenChange={(o) => {
-          if (!o) {
-            saveTopic();
-            saveName();
-          }
-          onOpenChange(o);
-        }}
+        onOpenChange={(o) => (o ? onOpenChange(o) : leave())}
         subtitle={t("channel.detailsSub", {
           category: categoryName,
           visibility: t(ACCESS_LABEL[accessOf(channel).mode]),

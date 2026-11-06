@@ -4,6 +4,7 @@ import i18next, { type TFunction } from "i18next";
 import type { ComputerQueue } from "../src/api/types";
 import {
   awayText,
+  conversationWaits,
   fanChipText,
   fanOutOf,
   fanOutText,
@@ -20,6 +21,7 @@ import {
   queueWhereText,
   waitingFor,
 } from "../src/lib/computer-queue";
+import { talkerStatusText } from "../src/lib/long-work";
 import type { MessageReceipt } from "../src/realtime/receipts";
 
 const tFor = (lng: string) => {
@@ -240,4 +242,52 @@ test("the fan-out strip: under an agent's message, once two called agents starte
     { ada: "r1", rio: "r2" },
   );
   expect(fanShows(agent, fanOutOf(done, queue), done)).toBe(false);
+});
+
+test("a conversation shows one wait per run, from the receipts alone, leaving a fan-out to its strip", () => {
+  const person = { type: "person", id: "u1" } as const;
+  const none = () => false;
+  const inLine = (runId: string, agentId = "ada"): MessageReceipt => ({
+    routed: true,
+    agents: [[agentId, "queued"]],
+    runs: [runId],
+    runOf: { [agentId]: runId },
+  });
+  const messages = [
+    { id: "m1", author: person },
+    { id: "m2", author: person },
+    { id: "m3", author: person },
+  ];
+  // Two messages went into one run; a third started a run of its own.
+  expect(conversationWaits(messages, { m1: inLine("r1"), m2: inLine("r1"), m3: inLine("r2", "kai") }, none)).toEqual([
+    { agentId: "ada", runId: "r1" },
+    { agentId: "kai", runId: "r2" },
+  ]);
+  // Started, or heard of with no run yet.
+  expect(conversationWaits(messages, { m1: { ...inLine("r1"), agents: [["ada", "claimed"]] } }, none)).toEqual([]);
+  expect(conversationWaits(messages, { m1: { routed: true, agents: [["ada", "queued"]] } }, none)).toEqual([
+    { agentId: "ada", runId: null },
+  ]);
+  const fan: MessageReceipt = {
+    routed: true,
+    agents: [
+      ["ada", "queued"],
+      ["kai", "queued"],
+    ],
+    runOf: { ada: "r1", kai: "r2" },
+  };
+  expect(conversationWaits([{ id: "m1", author: { type: "agent", id: "rio" } }], { m1: fan }, none)).toEqual([]);
+  // A live row says the run works: a receipt that missed it leaving the line is no second row.
+  expect(conversationWaits(messages, { m1: inLine("r1"), m2: inLine("r1") }, (id) => id === "r1")).toEqual([]);
+});
+
+test("the status note of an agent waiting for its computer says that, never that it works", () => {
+  const pt = tFor("pt-BR");
+  expect(talkerStatusText(pt, { minutes: "11", steps: "0", wait: "queued" })).toBe(
+    "Aguardando o computador (11 min). Leio sua mensagem quando chegar minha vez.",
+  );
+  expect(talkerStatusText(pt, { minutes: "0", steps: "0", wait: "away" })).toBe(
+    "Aguardando meu computador voltar. Leio sua mensagem assim que ele voltar.",
+  );
+  expect(talkerStatusText(en, { minutes: "11", steps: "3" })).toContain("Still on it (11 min)");
 });

@@ -575,9 +575,10 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline .agp-addacct__busy")).toContain(
       "margin-left: calc((var(--lead) - 14px) / 2 - var(--lead) - 12px)",
     );
-    // The head's hairline runs edge to edge, as the foot's does; for whom centres on the head's mark.
+    // The head's hairline runs edge to edge, as the foot's does; for whom centres on the name's line, risen with it.
     expect(ruleOf(layout, ".ai-panel__head")).toContain("margin-inline: calc(-1 * var(--card-pad))");
-    expect(ruleOf(layout, ".ai-panel__agent")).toContain("height: var(--mark)");
+    expect(ruleOf(layout, ".ai-panel__agent")).toContain("height: 20px");
+    expect(ruleOf(layout, ".ai-panel__agent")).toContain("margin-top: calc(var(--cap-top) * 15 / 13 - 10px)");
   });
 
   test("a step's button sits right under its words, on their column, at every width; a failure's note sits in its button's middle", async () => {

@@ -1781,9 +1781,9 @@ test("where each agent is its own OS user, a key's login made for one agent leav
   });
 });
 
-// ── How each connection signs in (protocol 46, ADR 0149) ────────────────────
+// ── How each connection signs in (protocol 47, ADR 0150) ────────────────────
 
-/** A computer where each agent is its own OS user, on `protocol`, its runner saying `methods` (protocol 46). */
+/** A computer where each agent is its own OS user, on `protocol`, its runner saying `methods` (protocol 47). */
 async function systemMachine(protocol = CLAUDE_AUTH_PROTOCOL, methods?: ("cli_login" | "setup_token")[]) {
   const paired = await ownedMachine(protocol);
   const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId));
@@ -1900,7 +1900,7 @@ test("a runner that can use Claude's own login for all agents gets it; an older 
   expect(runner.calls[0]).toMatchObject({ shared: true, method: "cli_login" });
   expect(await accountRow(login.loginId)).toMatchObject({ authMethod: "cli_login", status: "signing_in" });
 
-  // Below protocol 46 in system mode: setup-token is all it does, so the policy's own login is refused.
+  // Below protocol 47 in system mode: setup-token is all it does, so the policy's own login is refused.
   const { machineId: old } = await systemMachine(SHARED_ACCOUNTS_PROTOCOL, ["cli_login"]);
   const oldRunner = fakeHub(old, () => ({ url: "https://claude.ai/x" }), { protocol: SHARED_ACCOUNTS_PROTOCOL });
   await expect(beginAccountLogin(oldRunner.deps, f.owner.id, f.org.id, old, "claude_code")).rejects.toMatchObject({
@@ -2056,7 +2056,7 @@ test("one email in two of Claude's organizations is two accounts; a login that d
   expect(asBia.accounts.map((a) => a.providerOrgId)).toEqual([null, null, null, null]);
 });
 
-test("hello keeps what a new Claude sign-in for all agents can use on the computer (protocol 46)", async () => {
+test("hello keeps what a new Claude sign-in for all agents can use on the computer (protocol 47)", async () => {
   f = await setup();
   const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
   hubs.push(hub);

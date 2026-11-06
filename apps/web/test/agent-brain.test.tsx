@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import type {
+  Agent,
   AgentBrain,
   AiComputer,
   BrowserUnavailableReason,
@@ -2311,5 +2312,95 @@ describe("Usar em outros agentes (ADR 0094)", () => {
         .getByRole("checkbox", { name: /^Todos/ })
         .hasAttribute("disabled"),
     ).toBe(true);
+  });
+});
+
+describe("Velocidade (ADR 0149)", () => {
+  async function onChatGpt(patch: Partial<AgentBrain> = {}, line?: Partial<NonNullable<Agent["brain"]>>) {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada && line) ada.brain = { kind: "codex", model: "GPT-6 Sol", ...line };
+    api.agents.brain = async () =>
+      fakeAgentBrain(ADA_ID, { brain: "codex", effectiveModel: "gpt-6-sol", onlyOwner: true, ...patch });
+    return open(state, api);
+  }
+  const speed = (a: HTMLElement) => within(a).queryByRole("radiogroup", { name: "Velocidade" });
+
+  test("on a ChatGPT plan with a model that has it: Padrão first, Rápida saved with Usar, the help says what it costs", async () => {
+    const { state } = await onChatGpt();
+    const d = await brainDialog();
+    expect(within(d).getByRole("button", { name: /^Configuração avançada/ }).textContent).toContain(
+      "Esforço, velocidade, janela de contexto e quem atende",
+    );
+    const a = await advanced(d);
+    const group = speed(a) as HTMLElement;
+    const [standard, fast] = within(group).getAllByRole("radio");
+    expect(standard?.textContent).toBe("Padrão");
+    expect(standard?.getAttribute("aria-checked")).toBe("true");
+    expect(fast?.textContent).toBe("Rápida");
+    expect(a.textContent).toContain(
+      "Responde mais rápido nas conversas e gasta o plano 2,5× mais depressa. Rotinas e tarefas longas seguem no padrão.",
+    );
+    await click(fast as HTMLElement);
+    await done(a);
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ speed: "fast" });
+  });
+
+  test("Padrão left alone sends nothing; a saved Rápida shows chosen", async () => {
+    const { state } = await onChatGpt({ speed: "fast" });
+    const d = await brainDialog();
+    const a = await advanced(d);
+    expect(
+      within(speed(a) as HTMLElement)
+        .getByRole("radio", { name: "Rápida" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    await done(a);
+    expect(within(d).getByRole("button", { name: "Usar" }).hasAttribute("disabled")).toBe(true);
+    expect(brainCalls(state)).toEqual([]);
+  });
+
+  test("no control on a model without it or on Claude; a saved Rápida stays saved, and nothing says it", async () => {
+    await onChatGpt({ effectiveModel: "gpt-5.5", model: "gpt-5.5", speed: "fast" });
+    expect(brainCell().value).not.toContain("Rápida");
+    let d = await brainDialog();
+    let a = await advanced(d);
+    expect(speed(a)).toBeNull();
+    await done(a);
+    expect(within(d).getByRole("button", { name: "Usar" }).hasAttribute("disabled")).toBe(true);
+    cleanup();
+    await onChatGpt({ brain: "claude_code", effectiveModel: "sonnet" });
+    d = await brainDialog();
+    expect(within(d).getByRole("button", { name: /^Configuração avançada/ }).textContent).not.toContain("velocidade");
+    a = await advanced(d);
+    expect(speed(a)).toBeNull();
+  });
+
+  test("the cell says Rápida beside the model and the effort, where it applies", async () => {
+    await onChatGpt({ speed: "fast" }, { speed: "fast" });
+    expect(brainCell().value).toBe("GPT-6 Sol · esforço médio · Rápida");
+    cleanup();
+    await onChatGpt();
+    expect(brainCell().value).toBe("GPT-6 Sol · esforço médio");
+  });
+
+  test("a save that fails says so and leaves the choice in the open dialog", async () => {
+    const { api } = await onChatGpt();
+    api.agents.setBrain = async () => {
+      throw new Error("offline");
+    };
+    const d = await brainDialog();
+    const a = await advanced(d);
+    await click(within(speed(a) as HTMLElement).getByRole("radio", { name: "Rápida" }));
+    await done(a);
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(screen().getByText("Não deu para salvar. Tente de novo.")).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "Quem pensa" })).toBeTruthy();
   });
 });

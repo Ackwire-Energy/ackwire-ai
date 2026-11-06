@@ -13,7 +13,8 @@ export function Problem({ text }: { text: string }) {
       style={[styles.notice, { borderColor: colors.line }]}
     >
       <View style={[styles.badge, { backgroundColor: colors.danger }]}>
-        <Icon name="x" size={16} color="#ffffff" />
+        {/* The page's own color on the red: white on dark's light red was hard to read. */}
+        <Icon name="x" size={16} color={colors.bg} />
       </View>
       <Text variant="small" style={styles.grow}>
         {text}

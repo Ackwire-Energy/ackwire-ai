@@ -3,11 +3,10 @@ import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Icon, type IconName, RowAction, Text, useTheme } from "@/ui";
+import { type IconName, LineIcon, RowAction, Text, useTheme } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";
-import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
 
 const ICONS: Record<ReturnType<typeof targetKind>, IconName> = {
@@ -37,7 +36,7 @@ export function TeamChecks({ message: m }: { message: Message }) {
 
 function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
   const { t } = useTranslation();
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const match = check.matches[0];
   const target = check.targets[0] ?? "";
   if (!match) return null;
@@ -54,14 +53,14 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
   const channelId = match.channelId;
   return (
     <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
-      <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
-        <Icon name={ICONS[targetKind(target)]} size={16} color={colors.ink2} />
+      <View style={styles.tx}>
+        <LineIcon name={ICONS[targetKind(target)]} size={15} color={colors.muted} variant="small" />
       </View>
       <View style={[styles.grow, styles.tx]}>
-        <Text variant="small" tone="ink2" style={styles.oneText}>
+        <Text variant="small" tone="ink2">
           {runs.map((r, i) =>
             r.bold ? (
-              <Text key={String(i)} variant="small" tone="ink" style={[styles.oneText, styles.bold]}>
+              <Text key={String(i)} variant="small" tone="ink" style={styles.bold}>
                 {r.text}
               </Text>
             ) : (
@@ -79,10 +78,7 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
         <RowAction
           label={t("teamChecks.open")}
           accessibilityRole="link"
-          onPress={() => {
-            tapHaptic();
-            router.push(chatHref(channelId));
-          }}
+          onPress={() => router.push(chatHref(channelId))}
         />
       ) : null}
     </View>
@@ -93,23 +89,23 @@ const styles = StyleSheet.create({
   list: { marginTop: 12, gap: 8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  // The receipts' card: a hairline, the cut corner; the tile, the first line and the pill share one middle.
+  // The receipts' card: a hairline, the cut corner; the icon (as the conversation's event lines), the first line and
+  // the action (32, in a 50 row) share one middle.
   one: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
     minHeight: 50,
-    paddingVertical: 9,
+    paddingVertical: (50 - 32) / 2,
     paddingLeft: 12,
     paddingRight: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    borderBottomLeftRadius: 6,
   },
-  tx: { paddingTop: 6 },
-  oneText: { fontSize: 14.5, lineHeight: 19 },
+  // The "small" line (20) on the action's middle.
+  tx: { paddingTop: (32 - 20) / 2 },
   detail: { marginTop: 2 },
-  tile: { width: 24, height: 24, marginTop: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 });

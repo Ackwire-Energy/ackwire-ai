@@ -100,6 +100,9 @@ export function screenStepOf(v: unknown, verbs: readonly ScreenVerb[]): ScreenSt
   if (typeof s.do !== "string" || !(verbs as readonly string[]).includes(s.do)) return null;
   const out: ScreenStep = { do: s.do as ScreenVerb };
   for (const k of STEP_TEXT) if (typeof s[k] === "string") out[k] = s[k] as string;
+  // A model that only has the tool's name guesses which of the two a field or an option takes.
+  if (out.do === "fill" && out.value !== undefined) out.text ??= out.value;
+  if (out.do === "select" && out.text !== undefined) out.value ??= out.text;
   if (s.direction === "up" || s.direction === "down" || s.direction === "left" || s.direction === "right") {
     out.direction = s.direction;
   }

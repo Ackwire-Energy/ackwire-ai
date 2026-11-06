@@ -5,6 +5,7 @@
   "common": {
     "close": "Kapat",
     "joinSentences": "{{a}} {{b}}",
+    "cantUndo": "Bu işlem geri alınamaz.",
     "removeName": "Kaldır: {{name}}",
     "about": "Hakkında: {{label}}",
     "previousMonth": "Önceki ay",
@@ -1363,6 +1364,7 @@
     "addPasswordReauth": "Şifre eklemek için yeniden giriş yapın.",
     "yourWorkspaces": "Çalışma alanlarınız",
     "youAreHere": "Buradasınız",
+    "createdOn": "{{date}} tarihinde oluşturuldu",
     "newWorkspace": "Yeni çalışma alanı",
     "wiki": "Wiki",
     "settings": "Ayarlar",
@@ -4157,6 +4159,12 @@
           "high": "Zor görevlerde daha çok düşünür. Daha yavaş ve daha pahalıdır.",
           "max": "Olabildiğince çok düşünür. Çok daha yavaş ve daha pahalıdır."
         },
+        "speed": "Hız",
+        "speeds": {
+          "standard": "Standart",
+          "fast": "Hızlı"
+        },
+        "speedText": "Sohbetlerde daha hızlı yanıt verir ve planı 2,5× daha hızlı tüketir. Rutinler ve uzun görevler standart hızda kalır.",
         "modelLine": {
           "opus": "En yetenekli olanı. Planı daha hızlı tüketir.",
           "sonnet": "Dengeli. Neredeyse her şey için iyi.",
@@ -4179,10 +4187,13 @@
           "contents": {
             "model": "Bağlam penceresi",
             "auto": "Bağlam penceresi ve kime yanıt verdiği",
-            "fixed": "Çaba, bağlam penceresi ve kime yanıt verdiği"
+            "fixed": "Çaba, bağlam penceresi ve kime yanıt verdiği",
+            "autoSpeed": "Hız, bağlam penceresi ve kime yanıt verdiği",
+            "fixedSpeed": "Çaba, hız, bağlam penceresi ve kime yanıt verdiği"
           },
           "allDefault": "Tümü varsayılan",
           "effort": "Çaba: {{level}}",
+          "speed": "Hız: hızlı",
           "context": "Bağlam: {{size}}",
           "sharing": "Başka kişilere de yanıt verir",
           "waits": "Bilgisayarı bekler"
@@ -4638,7 +4649,7 @@
       "audience": "Kimler konuşabilir",
       "channels": "Kanallar",
       "computer": "Bilgisayar",
-      "danger": "Arşivle",
+      "danger": "Arşivle veya sil",
       "keySafe": "Anahtar sunucuda şifreli kalır. Kimse göremez.",
       "spentOf": "{{month}} ayında harcanan, toplam {{amount}}",
       "spentOfDefault": "{{month}} ayında harcanan, toplam {{amount}} (çalışma alanı varsayılanı)",
@@ -5777,7 +5788,7 @@
     "agentRole": "Ajan · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Bir tane oluşturun ya da sohbette isteyin: “Lia, bu hata için bir görev oluştur”.",
+    "empty": "Bir tane oluşturun ya da sohbette bir ajandan isteyin.",
     "noResults": "Bu filtrelerle eşleşen görev yok.",
     "columnEmpty": "Burada bir şey yok.",
     "form": {
@@ -7745,6 +7756,7 @@
     "removeAgents_one": "{{names}} bu beceriyi kullanıyor ve erişimini kaybeder.",
     "removeAgents_other": "{{names}} bu beceriyi kullanıyor ve erişimlerini kaybeder.",
     "removeNone": "Bu beceriyi kullanan ajan yok.",
+    "removeGone": "Çalışma alanından çıkar ve bu işlem geri alınamaz.",
     "removed": "{{name}} kaldırıldı.",
     "agentTitle": "Beceriler",
     "agentSubtitle": "{{name}} ajanının gerektiğinde açabilecekleri.",
@@ -8497,7 +8509,7 @@
     "noAccessText": "Yalnızca bazı kişiler için. Gerekiyorsa wiki ile ilgilenen kişiye sorun.",
     "delete": "Çöp kutusuna taşı",
     "deleteTitle": "{{title}} çöp kutusuna taşınsın mı?",
-    "deleteText": "Ona verilen bağlantılar “oluşturulacak sayfa” olur. Daha sonra geri yükleyebilirsiniz.",
+    "deleteText": "Ona verilen bağlantılar “oluşturulacak sayfa” olur. Şimdilik uygulamadan geri yüklenemez.",
     "deleted": "{{title}} çöp kutusuna taşındı.",
     "noBacklinksHint": "Henüz hiçbir sayfa buraya bağlantı vermiyor. Başka bir sayfaya [[{{title}}]] yazın.",
     "allVersions": "{{count}} sürümün tümünü gör",
@@ -8722,6 +8734,7 @@
     "stuck": "Takıldığı için durdu",
     "steer": {
       "waiting": "{{name}} bir sonraki arada okuyacak",
+      "computer": "{{name}} bilgisayarı alınca okuyacak",
       "now": "{{name}} okumak için durdu",
       "delivered": "{{name}} aldı",
       "held": "{{name}} kararınızdan sonra okuyacak",
@@ -8914,6 +8927,7 @@
       "nextEta": "Bilgisayarı bekliyor. Sıradaki o, yaklaşık {{n}} dk sonra",
       "nextAfter": "Bilgisayarı bekliyor. {{after}} bitince sıradaki o",
       "next": "Bilgisayarı bekliyor. Sıradaki o",
+      "waiting": "Bilgisayarı bekliyor",
       "behind": "Sırada, {{nth}}. {{names}} sonrasında",
       "position": "Sırada, {{nth}}"
     },
@@ -12430,6 +12444,8 @@
     "autoUpdate": "Hâlâ üzerinde çalışıyor ({{duration}}).",
     "autoUpdateNow": "Şimdi: {{now}}.",
     "statusReply": "Hâlâ üzerinde çalışıyorum ({{duration}}). Mesajını bu adımdan sonra okuyacağım.",
+    "statusReplyQueued": "Bilgisayarı bekliyorum ({{duration}}). Sıram gelince mesajını okuyacağım.",
+    "statusReplyAway": "Bilgisayarımın geri gelmesini bekliyorum. Geri gelir gelmez mesajını okuyacağım.",
     "status": {
       "one": "Üzerinde çalışıyor: {{subject}}",
       "oneUntitled": "Arka planda çalışıyor",
@@ -12460,6 +12476,10 @@
     "working": "Arka planda"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT bu hesap veya model için Hızlı hızı reddetti, bu yüzden bu yanıt standart hızda geldi.",
+      "action": "Ajanı aç"
+    },
     "usageWhen": {
       "at": "saat {{time}}",
       "on": "{{day}}, saat {{time}}",
@@ -12556,7 +12576,9 @@
       "show": "Göster",
       "hide": "Gizle",
       "talker": "çalışırken",
-      "talkerTip": "Süren görevi durdurmadan yanıt verdi."
+      "talkerTip": "Süren görevi durdurmadan yanıt verdi.",
+      "talkerWaiting": "beklerken",
+      "talkerWaitingTip": "Görev beklerken yanıt verdi."
     },
     "joined": {
       "label": "katıldı",
@@ -13487,6 +13509,8 @@
       "paste": "Yapıştır",
       "pasteHint": "Kopyaladığını sayfaya yapıştır",
       "pasteBlocked": "Tarayıcın kopyaladığını okumaya izin vermedi. Sayfada {{keys}} kullan.",
+      "inputLost": "Bu sayfaya ulaşmadı, bu yüzden hiçbir şey tıklanmadı veya yazılmadı. Tekrar dene.",
+      "noField": "Sayfada seçili bir alan yok, bu yüzden yazılmadı. Alanı seç ve tekrar yaz.",
       "goLabel": "Site adresi",
       "goPlaceholder": "ornek.com gibi bir adres yazın",
       "go": "Aç",
@@ -13495,7 +13519,6 @@
       "goBadAddress": "Bu bir adres gibi görünmüyor. ornek.com deneyin.",
       "goFailed": "Site açılmadı. Adresi kontrol edin.",
       "backTitle": "{{name}} ajanına geri ver",
-      "doneTitle": "Bitti. {{name}} için bir not?",
       "backLabel": "{{name}} için not",
       "backPlaceholder": "İsteğe bağlı: {{name}} ajanının bilmesi gereken bir şey var mı?",
       "addNote": "Not bırak"
@@ -13551,6 +13574,7 @@
     "suspendedFor": "Bu çalışma alanı askıya alındı: {{reason}}",
     "bannerSub": "Burada yine okuyup yazabilirsiniz. Beklemedeyken ajanlar yanıt vermez ve çalışmaz.",
     "label": "Çalışma alanı durumu",
+    "row": "Kullanılamıyor",
     "screen": {
       "title": "Bu çalışma alanı kullanılamıyor",
       "text": "Konuşmaları ve ajanları şimdilik kapalı.",
@@ -13638,8 +13662,11 @@
   },
   "deleting": {
     "title": "{{name}} siliniyor",
-    "text": "{{by}} onu {{date}} tarihinde sildi. {{due}} tarihinde kalıcı olarak gider.",
-    "textLate": "{{by}} onu {{date}} tarihinde sildi.",
+    "text": "Bu çalışma alanı zaten siliniyor. Bir şey yapmanız gerekmiyor, {{date}} tarihinde gider.",
+    "textLate": "Bu çalışma alanı zaten siliniyor. Bir şey yapmanız gerekmiyor.",
+    "by": "{{by}} onu {{date}} tarihinde sildi.",
+    "row": "Siliniyor, {{date}} tarihinde gider",
+    "rowLate": "Siliniyor",
     "someone": "Biri",
     "restore": "Çalışma alanını geri yükle",
     "membersOnly": "Onu yalnızca bir sahip geri yükleyebilir.",
@@ -13649,11 +13676,21 @@
     "menu": "Hesabı sil",
     "card": {
       "text": "Tüm çalışma alanlarından ayrılırsınız ve hesabınız kalıcı olarak silinir.",
-      "button": "Hesabı sil…"
+      "button": "Hesabı sil…",
+      "oneWorkspace": "Yalnızca bu çalışma alanını mı silmek istiyorsunuz? Genel bölümünde.",
+      "leaveWorkspace": "Yalnızca bu çalışma alanından mı ayrılmak istiyorsunuz? Üyeler bölümünde."
     },
-    "title": "Hesabınız silinsin mi?",
-    "closes_one": "{{names}} şimdi kapanır ve {{date}} tarihinde kalıcı olarak silinir. Orada yalnızca siz varsınız.",
-    "closes_other": "{{names}} şimdi kapanır ve {{date}} tarihinde kalıcı olarak silinir. Oralarda yalnızca siz varsınız.",
+    "title": "Hesabınızın tamamı silinsin mi?",
+    "intro": "Bu, tek bir çalışma alanını değil hesabınızın tamamını siler. Bu işlem geri alınamaz.",
+    "whole": "Hesabınızın tamamı",
+    "oneWorkspace": "Yalnızca bir çalışma alanını mı silmek istiyorsunuz? Hesabınız kalır.",
+    "closes": "{{name}} şimdi kapanır. Orada yalnızca siz varsınız, bu yüzden {{date}} tarihinde kalıcı olarak silinir.",
+    "closesWith": "{{name}} şimdi kapanır, içinde {{what}} var. Orada yalnızca siz varsınız, bu yüzden {{date}} tarihinde kalıcı olarak silinir.",
+    "closesEmpty": "{{name}} şimdi kapanır, içinde ajan veya mesaj yok. Orada yalnızca siz varsınız, bu yüzden {{date}} tarihinde kalıcı olarak silinir.",
+    "agentCount_one": "{{value}} ajan",
+    "agentCount_other": "{{value}} ajan",
+    "messageCount_one": "{{value}} mesaj",
+    "messageCount_other": "{{value}} mesaj",
     "leaves": "{{names}} çalışma alanından ayrılırsınız.",
     "messages": "Mesajlarınız çalışma alanlarında adınız olmadan kalır.",
     "computers_one": "{{name}} çalışma alanına bağlı bilgisayarınız oradan kaldırılır: {{computers}}.",

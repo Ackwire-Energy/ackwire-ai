@@ -1560,7 +1560,21 @@
       "idx": 224,
       "version": "7",
       "when": 1793983667011,
-      "tag": "0224_claude_auth",
+      "tag": "0224_one_tool_change_notice",
+      "breakpoints": true
+    },
+    {
+      "idx": 225,
+      "version": "7",
+      "when": 1793990000000,
+      "tag": "0225_agent_speed",
+      "breakpoints": true
+    },
+    {
+      "idx": 226,
+      "version": "7",
+      "when": 1794000000000,
+      "tag": "0226_claude_auth",
       "breakpoints": true
     }
   ]

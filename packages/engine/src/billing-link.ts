@@ -85,15 +85,21 @@ const placeIn = (orgId: string, returnTo: string | undefined) => {
 };
 
 /**
+ * A workspace's messages, those of every conversation a person can read (an agent-only room has no `u:` in its key, as
+ * `isAgentOnlyDm` reads it), counted per conversation on each month's `(channel_id, created_at)` index without reading
+ * a row: no index of `messages` starts with `org_id` (ADR 0009).
+ */
+export const orgMessageCount = (orgId: string) =>
+  sql<number>`(select coalesce(sum(per.n), 0) from ${channels} c,
+      lateral (select count(*) as n from ${messages} m where m.channel_id = c.id) per
+    where c.org_id = ${orgId} and (c.kind <> 'dm' or c.dm_key like '%u:%'))`.mapWith(Number);
+
+/**
  * What a workspace holds, for the billing service's pages (ADR 0079 §3): workspace-wide counts, never a name, a word of
- * content, or a figure per channel or person. Messages are those of every conversation a person can read (an
- * agent-only room has no `u:` in its key, as `isAgentOnlyDm` reads it), counted per conversation on each month's
- * `(channel_id, created_at)` index without reading a row: no index of `messages` starts with `org_id` (ADR 0009).
+ * content, or a figure per channel or person.
  */
 const totalsOf = (orgId: string) => ({
-  messages: sql<number>`(select coalesce(sum(per.n), 0) from ${channels} c,
-      lateral (select count(*) as n from ${messages} m where m.channel_id = c.id) per
-    where c.org_id = ${orgId} and (c.kind <> 'dm' or c.dm_key like '%u:%'))`.mapWith(Number),
+  messages: orgMessageCount(orgId),
   channels: sql<number>`(select count(*) from ${channels} where ${channels.orgId} = ${orgId}
     and ${channels.kind} = 'channel' and ${channels.archivedAt} is null)`.mapWith(Number),
   files: sql<number>`(select count(*) from ${artifacts} where ${artifacts.orgId} = ${orgId}

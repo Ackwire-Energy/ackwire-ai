@@ -12,6 +12,7 @@ import {
   postPersonMessage,
   queueOnRun,
   releaseHeldInbox,
+  statusReply,
   stopChecksSettled,
   TALKER_MIN_GAP_MS,
   TALKER_QUIET_MS,
@@ -20,6 +21,7 @@ import {
 } from "../src";
 import { afterSteered } from "../src/steering";
 import { answerSteering, type Fixture, setup } from "./fixtures";
+import { pairMachine, RUNNER } from "./machine-fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
 let f: Fixture;
@@ -260,6 +262,51 @@ describe("talker: fast replies while the task waits", () => {
     expect(meta.bodyCode).toBe("talker_status");
     expect(Number(meta.bodyParams?.minutes)).toBeGreaterThanOrEqual(1);
     expect(line?.body).toContain("Still on it");
+  });
+
+  test('an agent waiting for its computer says so: no "still on it", and the minutes are the wait\'s', async () => {
+    f = await setup();
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev analisa os logs",
+    });
+    const [run] = await f.db.select().from(schema.agentRuns);
+    if (!run) throw new Error("no run");
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, RUNNER);
+    const park = (status: "waiting_input" | "running", wait: Record<string, unknown>, machine: string | null) =>
+      f.db
+        .update(schema.agentRuns)
+        .set({
+          status,
+          startedAt: new Date(Date.now() - 40 * 60_000),
+          waitingMachineId: machine,
+          transcript: { ...wait, roomWaitSince: Date.now() - 11 * 60_000 },
+        })
+        .where(eq(schema.agentRuns.id, run.id));
+    const line = { waitingForBrain: { kind: "claude_code", machineId, code: "busy", waitId: "w1" } };
+
+    await park("waiting_input", line, machineId);
+    const [waiting] = await f.db.select().from(schema.agentRuns);
+    const inLine = await statusReply(f.db, waiting as NonNullable<typeof waiting>, new Date());
+    expect(inLine.text).not.toContain("Still on it");
+    expect(inLine.meta.bodyParams).toMatchObject({ minutes: "11", wait: "queued" });
+
+    // Asking again from the line, the row says `running` for a moment: the same wait.
+    await park("running", {}, machineId);
+    const [asking] = await f.db.select().from(schema.agentRuns);
+    expect((await statusReply(f.db, asking as NonNullable<typeof asking>, new Date())).meta.bodyParams).toMatchObject({
+      minutes: "11",
+      wait: "queued",
+    });
+
+    await park(
+      "waiting_input",
+      { waitingForBrain: { kind: "claude_code", machineId, code: "machine_offline" } },
+      machineId,
+    );
+    const [away] = await f.db.select().from(schema.agentRuns);
+    const gone = await statusReply(f.db, away as NonNullable<typeof away>, new Date());
+    expect(gone.text).not.toContain("Still on it");
+    expect(gone.meta.bodyParams).toMatchObject({ wait: "away" });
   });
 
   test("a model-brain run moving along reads the message itself: no model call", async () => {

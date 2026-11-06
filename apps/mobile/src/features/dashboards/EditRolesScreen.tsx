@@ -35,7 +35,7 @@ export function EditRolesScreen() {
       />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         {pick ? (
           <>

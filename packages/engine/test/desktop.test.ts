@@ -18,6 +18,7 @@ import {
   drainOutbox,
   ForbiddenError,
   formatUserCode,
+  fullMachinePath,
   getDeviceCode,
   grantScopes,
   listMachines,
@@ -28,6 +29,8 @@ import {
   machineAccessText,
   machinePause,
   NotFoundError,
+  notAllowedMessage,
+  pathInOwnFolder,
   pausedMessage,
   pollDeviceToken,
   postPersonMessage,
@@ -691,6 +694,95 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(later.some((m) => m.meta.bodyCode === "machine_access_expired")).toBe(true);
   });
 
+  test("the workspace's own computer: nobody to ask, and every refusal says what the agent can do", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["Ok"] }) });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pairMachine(deps(), f.owner.id, f.org.id, COMPUTER);
+    await f.db.update(schema.machines).set({ kind: "managed" }).where(eq(schema.machines.id, paired.machineId));
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    const answers: Record<string, { ok: false; code: string; message: string }> = {
+      "/etc/hosts": {
+        ok: false,
+        code: "not_allowed",
+        message:
+          "/etc/hosts is outside your folder and outside every folder allowed for you on this computer (ask for it with request_folder_access)",
+      },
+      "/home/ag-x/.ssh/id_rsa": { ok: false, code: "outside_workspace", message: "/home/ag-x/.ssh/id_rsa is hidden." },
+      "/home/ag-x/clips/take.mp4": {
+        ok: false,
+        code: "not_found",
+        message: "/home/ag-x/clips/take.mp4 doesn't exist. Your folder has clips/take.mp4: use that path.",
+      },
+      "big.mp4": { ok: false, code: "too_large", message: "The file has 90000000 bytes (max 52428800)" },
+      "gone.mp4": { ok: false, code: "upload_failed", message: "The upload failed: socket closed" },
+    };
+    const runner = fakeRunner(hub, (req) =>
+      req.op === "read" || req.op === "push" ? answers[String(req.path)] : undefined,
+    );
+    await runner.hello(paired.token, { access: { folders: [], tools: ACCESS.tools } });
+    const ctx = await runCtx();
+
+    const tools = await f.tools?.list(ctx);
+    expect(tools?.find((t) => t.name === "run_code")?.description).not.toContain("request_folder_access");
+    expect(tools?.find((t) => t.name === "request_folder_access")?.description).toContain("Nobody can allow folders");
+
+    const asked = await invoke(ctx, "request_folder_access", { path: "/srv/site", reason: "the site" });
+    expect(asked.isError).toBeFalsy();
+    expect(asked.content).toBe(
+      `Nobody can allow folders on ${COMPUTER.name}, the workspace's own computer: work in your folder, read from your home, or copy what you need into your folder with a command.`,
+    );
+    expect(runner.requests().filter((r) => r.op === "access.request")).toEqual([]);
+    expect(await f.db.select().from(schema.machineAccessRequests)).toEqual([]);
+    const notes = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(notes.some((m) => m.meta.bodyCode === "machine_access_requested")).toBe(false);
+
+    // An older runner's words point at the request: gone here, with what the agent can do instead.
+    const refused = await invoke(ctx, "read_file", { path: "/etc/hosts" });
+    expect(refused.content).not.toContain("request_folder_access");
+    expect(refused.content).toContain("Nobody can allow folders");
+    const hidden = await invoke(ctx, "read_file", { path: "/home/ag-x/.ssh/id_rsa" });
+    expect(hidden.content).toBe("Failed: /home/ag-x/.ssh/id_rsa is hidden.");
+    const elsewhere = await invoke(ctx, "read_file", { path: "/home/ag-x/clips/take.mp4" });
+    expect(elsewhere.content).toContain("Your folder has clips/take.mp4: use that path.");
+
+    const big = await invoke(ctx, "upload_file", { path: "big.mp4" });
+    expect(big.isError).toBe(true);
+    expect(big.content).toContain("big.mp4 is over the 50 MB the Drive takes per file");
+    expect(big.content).toContain("in parts under 50 MB");
+    expect(big.content).not.toContain("use upload_file");
+    const gone = await invoke(ctx, "upload_file", { path: "gone.mp4" });
+    expect(gone.content).toBe("Failed: gone.mp4 didn't reach the Drive. The upload failed: socket closed");
+  });
+
+  test("a secret's file is held back however its path is written", () => {
+    const id = "0193aaaa-bbbb-7ccc-8ddd-eeeeffff0000";
+    expect(pathInOwnFolder("/home/ag-0193aaaa/dev-0193aaaa/.env", id)).toBe(".env");
+    expect(pathInOwnFolder("~/dev-0193aaaa/./keys/a.pem", id)).toBe("keys/a.pem");
+    expect(pathInOwnFolder("/home/ag-0193aaaa/dev-0193aaaa", id)).toBe("");
+    expect(pathInOwnFolder("keys/a.pem", id)).toBe("keys/a.pem");
+    expect(pathInOwnFolder("/srv/site/.env", id)).toBe("/srv/site/.env");
+    // The home is named like the folder, and its files are not the folder's.
+    expect(pathInOwnFolder("/home/ag-0193aaaa/notes.txt", id)).toBe("/home/ag-0193aaaa/notes.txt");
+    expect(pathInOwnFolder("/home/ag-0193aaaa/ag-0193aaaa/notes.txt", id)).toBe("notes.txt");
+  });
+
+  test("a path written in full goes to the runner; /workspace and anything relative don't", () => {
+    expect(fullMachinePath(" /home/ag-x/a.png ")).toBe("/home/ag-x/a.png");
+    expect(fullMachinePath("~/a.png")).toBe("~/a.png");
+    expect(fullMachinePath("/workspace/a.png")).toBeNull();
+    expect(fullMachinePath("a.png")).toBeNull();
+    expect(() => fullMachinePath("/home/ag-x/../ag-y/a.png")).toThrow("invalid path");
+  });
+
+  test("the workspace's own computer: a folder refusal with no path at hand still says what the agent can do", () => {
+    const detail = "/srv is outside your folder (ask for it with request_folder_access)";
+    expect(notAllowedMessage("Box", detail, undefined, true)).toBe(
+      "/srv is outside your folder. Nobody can allow folders on Box, the workspace's own computer: work in your folder, read from your home, or copy what you need into your folder with a command.",
+    );
+    expect(notAllowedMessage("Box", "Grok is turned off", "/srv", true)).toBe("Grok is turned off. Tell the people.");
+  });
+
   test("what the agent reads: its folders, the tools that are off, and the outcome of a request", () => {
     const text = machineAccessText({
       name: "MacBook",
@@ -701,6 +793,15 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(text).toContain("- /Users/ana/Projects");
     expect(text).toContain("Turned off on that computer: shell commands, Codex.");
     expect(text).toContain("request_folder_access");
+    const own = { name: "Nuvem", managed: true, folders: [] };
+    const cloud = machineAccessText({ ...own, tools: { claude: true, codex: true, commands: true } });
+    expect(cloud).toContain("read and upload from your home");
+    expect(cloud).not.toContain("request_folder_access");
+    expect(cloud.length).toBeLessThan(
+      machineAccessText({ ...own, managed: false, tools: { claude: true, codex: true, commands: true } }).length,
+    );
+    const noCommands = machineAccessText({ ...own, tools: { claude: true, codex: true, commands: false } });
+    expect(noCommands).not.toContain("your home");
     const note = {
       body: "The owner allowed /x on MacBook.",
       meta: { machineAccess: { decision: "granted", path: "/x" } },

@@ -356,6 +356,7 @@ function Line({
   onToggle?: (open: boolean) => void;
 }) {
   const c = useColors();
+  const reduced = useReducedMotion();
   const [open, setOpen] = useState(line.defaultOpen === true);
   // Open while it runs (its code), it folds when the call ends; a tap opens it again.
   const running = useRef(line.state === "run");
@@ -427,7 +428,11 @@ function Line({
           {line.why}
         </Text>
       ) : null}
-      {open && opens ? <View style={styles.detail}>{line.detail}</View> : null}
+      {open && opens ? (
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.detail}>
+          {line.detail}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -830,7 +835,7 @@ function ReadWell({ now, quote, settled }: { now: boolean; quote: string; settle
       entering={reduced || settled ? undefined : FadeIn.duration(260)}
       style={[styles.well, { backgroundColor: c.sunken }]}
     >
-      <Icon name={now ? "bolt" : "eye"} size={13} color={c.muted} />
+      <Icon name={now ? "bolt" : "eye"} size={15} color={c.muted} />
       <Text variant="small" tone="ink2" style={styles.wellTitle} numberOfLines={1}>
         {t(now ? "mobile.chat.steer.wellNow" : "mobile.chat.steer.well")}
       </Text>
@@ -843,22 +848,38 @@ function ReadWell({ now, quote, settled }: { now: boolean; quote: string; settle
   );
 }
 
+/** A call's row: its side padding, the logo's column (and its first line's height) and the gap to the phrase. */
+const ROW_PAD = 8;
+const LOGO = 20;
+const ROW_GAP = 10;
+/** Where a call's phrase starts in the block: why it failed and what it said between calls line up there. */
+const PHRASE_AT = ROW_PAD + LOGO + ROW_GAP;
+
 const styles = StyleSheet.create({
   // Flat: a hairline and the cut corner (the app's "tato com canto"), no shadow.
   block: {
     marginTop: 6,
     marginBottom: 8,
     borderWidth: StyleSheet.hairlineWidth,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    borderBottomLeftRadius: 6,
     overflow: "hidden",
   },
-  head: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 42, paddingLeft: 12, paddingRight: 10 },
+  // The block opens from here, 44 tall (a finger's target); its logos and words in the rows' columns (the lines'
+  // 4 of padding and a row's own 8).
+  head: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ROW_GAP,
+    minHeight: 44,
+    paddingLeft: 4 + ROW_PAD,
+    paddingRight: 10,
+  },
   logos: { flexDirection: "row", alignItems: "center", flexShrink: 0 },
   stacked: { borderRadius: 7, borderWidth: 1.5 },
-  overlap: { marginLeft: -7 },
+  overlap: { marginLeft: -8 },
   grow: { flex: 1, minWidth: 0 },
   clip: { overflow: "hidden" },
   shrink: { flexShrink: 1 },
@@ -875,17 +896,17 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 9,
+    gap: ROW_GAP,
     minHeight: 40,
-    paddingHorizontal: 8,
+    paddingHorizontal: ROW_PAD,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  firstLine: { marginTop: 1 },
-  level: { marginTop: 2 },
+  firstLine: { marginTop: (LOGO - 18) / 2 },
+  level: { marginTop: (LOGO - 16) / 2 },
   one: { padding: 2 },
-  logo: { width: 20, alignItems: "center" },
-  why: { marginTop: -4, paddingLeft: 37, paddingRight: 8, paddingBottom: 8 },
+  logo: { width: LOGO, alignItems: "center" },
+  why: { marginTop: -4, paddingLeft: PHRASE_AT, paddingRight: 8, paddingBottom: 8 },
   detail: { marginHorizontal: 8, marginBottom: 8, gap: 8 },
   plate: {
     gap: 8,
@@ -897,7 +918,7 @@ const styles = StyleSheet.create({
   plateRow: { gap: 2 },
   mono: { fontFamily: MONO, fontSize: 12, lineHeight: 18 },
   // What it said between calls: under the phrases, muted.
-  note: { marginTop: 2, marginBottom: 4, marginLeft: 37, marginRight: 8 },
+  note: { marginTop: 2, marginBottom: 4, marginLeft: PHRASE_AT, marginRight: 8 },
   loading: { flexDirection: "row", alignItems: "center", gap: 8 },
   loose: { marginTop: 2, marginBottom: 4, gap: 2 },
   say: { marginVertical: 2 },
@@ -905,16 +926,16 @@ const styles = StyleSheet.create({
   well: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 6,
     alignSelf: "flex-start",
     maxWidth: "100%",
     marginVertical: 6,
     paddingVertical: 6,
     paddingLeft: 8,
     paddingRight: 10,
-    borderTopLeftRadius: 11,
-    borderTopRightRadius: 11,
-    borderBottomRightRadius: 11,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
     borderBottomLeftRadius: 3,
   },
   wellTitle: { fontWeight: "600", flexShrink: 0 },

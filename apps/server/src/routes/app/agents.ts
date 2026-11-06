@@ -99,6 +99,7 @@ import {
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
+  BrainSpeed,
   CommandApproval,
   ContextLimit,
   Credential,
@@ -1697,6 +1698,7 @@ export function agentRoutes(deps: AppDeps) {
             effort: BrainEffortSetting.nullable()
               .optional()
               .openapi({ description: "`auto` = picked per run; null = the CLI's default; omitted = keep." }),
+            speed: BrainSpeed.optional().openapi({ description: "Omitted = keep." }),
             contextTokens: ContextLimit.nullable().optional().openapi({
               description:
                 "The most context it reads, any brain (Claude Code and Codex compact there, the API brain drops old tool results); null = its model's window; omitted = keep.",

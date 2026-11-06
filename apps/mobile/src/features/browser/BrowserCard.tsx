@@ -44,8 +44,8 @@ const LOG_LINES = 3;
  * color on top, the site's letter and host, and what the agent does now. Open, the same card shows the page live with the last steps; Assumir (or Abrir on a request)
  * turns it into control right there: the request as the title, Pronto in the header, the app's own
  * field ("Digite aqui", Senha for saved passwords) and Não consegui; a take over ends with Devolver.
- * Pronto and Devolver take an optional note. Nothing leaves the conversation. The page streams only
- * while the card is open, the agent works or I'm in control; while someone else is, it stays theirs.
+ * Pronto and Devolver hand back at once, with a note if the person leaves one. Nothing leaves the conversation. The
+ * page streams only while the card is open, the agent works or I'm in control; while someone else is, it stays theirs.
  */
 export function BrowserCard({
   agentId,
@@ -146,6 +146,10 @@ export function BrowserCard({
     watching && live.online && !live.hidden && waitsForPage(live.unavailable) && !(live.frame && !live.unavailable);
   const stuck = useBrowserStuck(waitingForPage, attempt);
   const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: said each time, also when a try that failed fails again
+  useEffect(() => {
+    if (mine && live.lost) toast({ title: t(live.lost.words), icon: "x" });
+  }, [live.lost]);
   // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
   const hiddenNote = surface
     ? t("browser.inCard.hiddenHelp", agentGrammar(name))
@@ -164,8 +168,8 @@ export function BrowserCard({
   }, [claim, handoff, actions, onToggle]);
 
   const failedToast = () => toast({ title: t("mobile.app.failed"), icon: "x" });
+  // Its buttons give the press's own haptic (`Button`): none more here, or a press taps twice.
   const answer = async () => {
-    tapHaptic();
     setOpen(true);
     if (handoff?.status !== "pending") return;
     try {
@@ -175,7 +179,6 @@ export function BrowserCard({
     }
   };
   const takeover = async () => {
-    tapHaptic();
     setOpen(true);
     try {
       if (profile) {
@@ -197,7 +200,6 @@ export function BrowserCard({
   // A profile's control has no task to report on: Devolver just hands it back.
   const handBack = () => {
     if (!profile) return finishing.handBack();
-    tapHaptic();
     void profileActions.handback.mutateAsync(profile.id).then(successHaptic, failedToast);
   };
   const stop = () => {
@@ -214,7 +216,6 @@ export function BrowserCard({
   // Who may drive it restarts the browser, then watches again (this card's own watch may be what was refused);
   // someone who only watches watches again.
   const retry = () => {
-    tapHaptic();
     setAttempt((n) => n + 1);
     if (mayDrive && !profile) void actions.restart(agentId).catch(failedToast).finally(live.retry);
     else live.retry();
@@ -263,7 +264,7 @@ export function BrowserCard({
           accessibilityRole={surface ? undefined : "button"}
           accessibilityState={surface ? undefined : { expanded: open }}
           accessibilityLabel={surface ? title : `${title}. ${subtitle}`}
-          style={styles.head}
+          style={({ pressed }) => [styles.head, pressed && !surface && styles.pressed]}
         >
           {!open ? (
             // Closed: the page's small live picture.
@@ -301,7 +302,14 @@ export function BrowserCard({
             ) : null}
           </View>
           {mine && handoff ? (
-            <Button variant="secondary" size="sm" icon="check" label={doneLabel} onPress={handBack} />
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="check"
+              label={doneLabel}
+              loading={finishing.finishing}
+              onPress={handBack}
+            />
           ) : waiting ? (
             <Button variant="primary" size="sm" label={t("mobile.browser.card.open")} onPress={answer} />
           ) : (
@@ -322,7 +330,7 @@ export function BrowserCard({
                       accessibilityRole="button"
                       accessibilityLabel={t("mobile.browser.card.stop")}
                       hitSlop={8}
-                      style={styles.icon}
+                      style={({ pressed }) => [styles.icon, pressed && { backgroundColor: c.sunken }]}
                     >
                       <Icon name="stop" size={16} color={c.muted} />
                     </Pressable>
@@ -331,7 +339,7 @@ export function BrowserCard({
               ) : null}
               {surface ? null : (
                 <View style={open ? styles.flip : undefined}>
-                  <Icon name="chev" size={14} color={c.faint} />
+                  <Icon name="chev" size={13} color={c.faint} />
                 </View>
               )}
             </View>
@@ -396,14 +404,33 @@ export function BrowserCard({
                   toast({ title: t("desktop.clipboard.tooLong", agentGrammar(name)), icon: "x" }),
                 )}
               />
-              {/* A take over asked for nothing: it only hands back. */}
-              {handoff?.kind === "ask" ? (
-                <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={6} style={styles.couldnt}>
-                  <Text variant="small" tone="muted" style={styles.medium}>
-                    {t("mobile.browser.live.couldnt")}
-                  </Text>
-                </Pressable>
-              ) : null}
+              {/* A profile goes back to its agents, not to one. A take over asked for nothing: it only hands back. */}
+              <View style={styles.ways}>
+                {profile ? null : (
+                  <Pressable
+                    onPress={finishing.leaveNote}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.way, pressed && styles.pressedWord]}
+                  >
+                    <Text variant="small" tone="muted" style={styles.medium}>
+                      {t("browser.inCard.addNote")}
+                    </Text>
+                  </Pressable>
+                )}
+                {handoff?.kind === "ask" ? (
+                  <Pressable
+                    onPress={couldnt}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.way, pressed && styles.pressedWord]}
+                  >
+                    <Text variant="small" tone="muted" style={styles.medium}>
+                      {t("mobile.browser.live.couldnt")}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
           ) : helper ? (
             live.hidden ? null : (
@@ -459,14 +486,17 @@ export function BrowserRunCard({
   return <BrowserCard agentId={run.agentId} run={run} open={open} onToggle={onToggle} />;
 }
 
+/** The card's corners, and the page inside it 8 pt in, concentric with them. */
+const CARD = 20;
+const PAGE_INSET = 8;
+
 const styles = StyleSheet.create({
-  card: { marginTop: 12, borderRadius: 18, overflow: "hidden" },
+  card: { marginTop: 12, borderRadius: CARD, overflow: "hidden" },
   sky: { height: 6 },
   head: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
-  subRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
+  subRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   semibold: { fontWeight: "600" },
   medium: { fontWeight: "500" },
   acts: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -474,7 +504,7 @@ const styles = StyleSheet.create({
   thumb: {
     width: 96,
     height: 60,
-    borderRadius: 9,
+    borderRadius: 10,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
@@ -482,17 +512,20 @@ const styles = StyleSheet.create({
   },
   hint: { marginTop: 2 },
   flip: { transform: [{ rotate: "180deg" }] },
-  page: { aspectRatio: 16 / 10, marginHorizontal: 8, borderRadius: 12, overflow: "hidden" },
-  pageLast: { marginBottom: 8 },
+  page: { aspectRatio: 16 / 10, marginHorizontal: PAGE_INSET, borderRadius: CARD - PAGE_INSET, overflow: "hidden" },
+  pageLast: { marginBottom: PAGE_INSET },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 },
   lines: { alignItems: "center", gap: 8 },
   onSky: { alignItems: "center", gap: 4, maxWidth: 420, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
   centerText: { textAlign: "center" },
   overlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.35)" },
   control: { padding: 10, gap: 8 },
-  couldnt: { alignSelf: "center", paddingVertical: 4 },
+  ways: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 16 },
+  way: { paddingVertical: 4 },
   note: { paddingHorizontal: 12, paddingVertical: 10 },
   log: { paddingHorizontal: 12, paddingVertical: 6 },
   step: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
   fuse: { marginTop: 0 },
+  pressed: { opacity: 0.7 },
+  pressedWord: { opacity: 0.6 },
 });

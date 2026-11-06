@@ -126,6 +126,7 @@ A saved login is typed without a person's yes each time. The guards are elsewher
    the fill waits until Chrome acknowledged that on every page and frame, those opened since an earlier fill too
    (unconfirmed, or refused by one still open: nothing is typed); for 2 minutes then, a request whose URL carries
    the value (raw or encoded) is stopped, and the agent is told. A fill that was refused takes the guard back.
+   A dedicated worker has no `Fetch` of its own and its requests pause on its page's session, so it isn't asked.
 5. **Replies are redacted.** For 10 minutes the value is removed from every browser reply and error, browser
    profiles' included.
 6. **Chrome keeps nothing.** Its own password manager, sign-in and form autofill are off in every agent profile.

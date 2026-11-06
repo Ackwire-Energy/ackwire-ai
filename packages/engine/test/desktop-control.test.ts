@@ -676,6 +676,13 @@ describe("the browser and the desktop show one window", () => {
       code: "handoff.same_window",
     });
     expect((await waitIfPersonInControl(f.db, ctx, f.pubsub))?.data).toMatchObject({ handoffId: desktop.id });
+    // The one in control of that desktop sees the card in control too: what they do there reaches the page.
+    expect(await live.sendInput(f.owner.id, f.org.id, f.agent.id, [{ kind: "text", text: "a" }])).toMatchObject({
+      refused: false,
+    });
+    expect(await live.sendInput(bia.id, f.org.id, f.agent.id, [{ kind: "text", text: "a" }])).toMatchObject({
+      refused: true,
+    });
     await finishHandoff(deps(), f.owner.id, f.org.id, desktop.id, { result: "done" });
     await until(() => card.at(-1)?.type === "browser.status" && !(card.at(-1) as { hidden: boolean }).hidden);
     stopCard();

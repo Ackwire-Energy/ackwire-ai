@@ -1,10 +1,23 @@
-import { Children, Fragment, isValidElement, type ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Children, isValidElement, type ReactNode } from "react";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { useInfoHint } from "./InfoHint";
-import { Text } from "./Text";
+import { Text, textLineOf } from "./Text";
 import { ToggleSwitch } from "./Toggle";
 import { useTheme } from "./theme";
+import { leadBox } from "./type-scale";
+
+/** The leading column of a row with a face or a mark: whatever leads is centered in it. */
+const LEAD = 32;
+/** A row's icon tile; its corner is 30% of it, as every tile's. */
+const TILE = 28;
+
+/** A row that comes or goes while the list is on screen fades; what is around it slides into place. */
+const ROW_IN = FadeIn.duration(160);
+const ROW_OUT = FadeOut.duration(120);
+const SLIDE = LinearTransition.duration(220);
 
 /**
  * Settings as on the iPhone: grouped inset lists, radius 14, hairlines inset to
@@ -12,50 +25,68 @@ import { useTheme } from "./theme";
  * rows it draws nothing, never an empty card.
  */
 export function GroupedList({ children }: { children?: ReactNode }) {
-  const { colors: c, shadows } = useTheme();
+  const { colors: c, shadows, reducedMotion } = useTheme();
   const items = Children.toArray(children).filter(isValidElement);
   if (items.length === 0) return null;
   return (
-    <View style={[styles.list, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
-      {items.map((child, i) => (
-        <Fragment key={child.key ?? i}>
-          {i > 0 ? (
-            <View
-              style={[
-                styles.divider,
-                {
-                  backgroundColor: c.line2,
-                  marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon
-                    ? 54
-                    : (child.props as { leading?: unknown }).leading
-                      ? 58
-                      : 14,
-                },
-              ]}
-            />
-          ) : null}
-          {child}
-        </Fragment>
-      ))}
-    </View>
+    // The rows it opens with appear with the screen, and when the whole group goes its rows go with it: neither fades.
+    <LayoutAnimationConfig skipEntering skipExiting>
+      <Animated.View
+        layout={reducedMotion ? undefined : SLIDE}
+        style={[styles.list, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
+      >
+        {items.map((child, i) => (
+          <Animated.View
+            key={child.key ?? i}
+            entering={reducedMotion ? undefined : ROW_IN}
+            exiting={reducedMotion ? undefined : ROW_OUT}
+            layout={reducedMotion ? undefined : SLIDE}
+          >
+            {i > 0 ? (
+              <View
+                style={[
+                  styles.divider,
+                  {
+                    backgroundColor: c.line2,
+                    // A tile and a face share one leading column, so the text and its hairline start at one place.
+                    marginLeft:
+                      (child.props as { icon?: unknown; leading?: unknown }).icon ||
+                      (child.props as { leading?: unknown }).leading
+                        ? 14 + LEAD + 12
+                        : 14,
+                  },
+                ]}
+              />
+            ) : null}
+            {child}
+          </Animated.View>
+        ))}
+      </Animated.View>
+    </LayoutAnimationConfig>
   );
 }
 
-/** The small uppercase header of a group. */
+/** The small uppercase header of a group (it slides with the groups when one above grows or shrinks). */
 export function GroupedHeader({ children }: { children: string }) {
+  const { reducedMotion } = useTheme();
   return (
-    <Text variant="footnote" tone="faint" accessibilityRole="header" style={styles.header}>
-      {children.toLocaleUpperCase()}
-    </Text>
+    <Animated.View layout={reducedMotion ? undefined : SLIDE}>
+      <Text variant="footnote" tone="faint" accessibilityRole="header" style={styles.header}>
+        {children.toLocaleUpperCase()}
+      </Text>
+    </Animated.View>
   );
 }
 
 /** The faint explanation under a group. */
 export function GroupedFooter({ children }: { children: ReactNode }) {
+  const { reducedMotion } = useTheme();
   return (
-    <Text variant="footnote" tone="faint" style={styles.footer}>
-      {children}
-    </Text>
+    <Animated.View layout={reducedMotion ? undefined : SLIDE}>
+      <Text variant="footnote" tone="faint" style={styles.footer}>
+        {children}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -103,7 +134,8 @@ export function GroupedRow(props: GroupedRowProps) {
 
 /** VoiceOver merges a button inside the row's button into it: the row reads the note out with its label. */
 function HintedRow({ hint, ...props }: GroupedRowProps & { hint: { name: string; text: string } }) {
-  const info = useInfoHint(hint);
+  // On the label's line: in a row whose text wraps the ⓘ stays beside the label, not at the row's top edge.
+  const info = useInfoHint({ ...hint, variant: "body" });
   return (
     <View>
       <Row {...props} said={hint.text} after={info.button} />
@@ -135,10 +167,24 @@ function Row({
   after,
 }: Omit<GroupedRowProps, "hint"> & { said?: string; after?: ReactNode }) {
   const { colors: c } = useTheme();
+  const { fontScale } = useWindowDimensions();
   const tone = danger ? c.danger : faint ? c.faint : c.ink;
+  // A switch answers the finger as it flips, as `Toggle` does.
+  const press =
+    toggle !== undefined && onPress
+      ? () => {
+          haptics.selection();
+          onPress();
+        }
+      : onPress;
+  // Text that can take more than one line: the tile sits at the top and what is on the right stays on the
+  // label's line (centred on the whole row it floated between lines). One-line rows keep everything centred.
+  const tall = labelLines > 1 || subLines > 1 || Boolean(below) || Boolean(belowText);
+  const line = tall ? textLineOf("body", fontScale) : null;
+  const onLine = (size: number) => (line ? [leadBox(line, size), styles.onLine] : null);
   return (
     <Pressable
-      onPress={onPress}
+      onPress={press}
       disabled={disabled || !onPress}
       accessibilityRole={toggle !== undefined ? "switch" : "button"}
       accessibilityLabel={[label, belowText, said, value].filter(Boolean).join(", ")}
@@ -147,14 +193,22 @@ function Row({
         ...(toggle !== undefined ? { checked: toggle } : {}),
         ...(checked !== undefined ? { selected: checked } : {}),
       }}
-      style={({ pressed }) => [styles.row, pressed && onPress ? { backgroundColor: c.sunken } : null]}
+      style={({ pressed }) => [
+        styles.row,
+        tall ? styles.tall : null,
+        pressed && onPress ? { backgroundColor: c.sunken } : null,
+      ]}
     >
+      {/* One column for whatever leads (an icon's tile, a 26 to 36 face, a mark): the text, and the hairline above,
+          start at 58 in every row, so a list mixing tiles and faces reads as one column. */}
       {icon ? (
-        <View style={[styles.tile, { backgroundColor: danger ? c.plate : c.sunken }]}>
-          <Icon name={icon} size={16} color={danger ? c.danger : c.ink2} />
+        <View style={styles.lead}>
+          <View style={[styles.tile, { backgroundColor: danger ? c.plate : c.sunken }]}>
+            <Icon name={icon} size={16} color={danger ? c.danger : c.ink2} />
+          </View>
         </View>
       ) : null}
-      {leading}
+      {leading ? <View style={styles.lead}>{leading}</View> : null}
       <View style={styles.grow}>
         <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
           {label}
@@ -172,7 +226,7 @@ function Row({
         ) : null}
       </View>
       {valueLeading ? (
-        <View style={[styles.value, styles.valued]}>
+        <View style={[styles.value, styles.valued, line ? { minHeight: line.height } : null]}>
           {valueLeading}
           {value ? (
             <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
@@ -181,15 +235,33 @@ function Row({
           ) : null}
         </View>
       ) : value ? (
-        <Text variant="callout" tone="faint" numberOfLines={1} style={styles.value}>
-          {value}
-        </Text>
+        <View style={[styles.value, line ? { minHeight: line.height, justifyContent: "center" } : null]}>
+          <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
+            {value}
+          </Text>
+        </View>
       ) : null}
       {after}
-      {checked ? <Icon name="check" size={18} color={c.ink} /> : null}
-      {toggle !== undefined ? <ToggleSwitch value={toggle} /> : null}
-      {chevron ? <Icon name="right" size={15} color={c.faint} /> : null}
-      {more ? <Icon name="more" size={18} color={c.faint} /> : null}
+      {checked ? (
+        <View style={onLine(18)}>
+          <Icon name="check" size={18} color={c.ink} />
+        </View>
+      ) : null}
+      {toggle !== undefined ? (
+        <View style={onLine(28)}>
+          <ToggleSwitch value={toggle} />
+        </View>
+      ) : null}
+      {chevron ? (
+        <View style={onLine(15)}>
+          <Icon name="right" size={15} color={c.faint} />
+        </View>
+      ) : null}
+      {more ? (
+        <View style={onLine(18)}>
+          <Icon name="more" size={18} color={c.faint} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -285,8 +357,8 @@ function HintedField({ label, hint, children, onPress }: GroupedFieldProps & { h
 const styles = StyleSheet.create({
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
-  header: { paddingTop: 18, paddingBottom: 7, paddingHorizontal: 16, letterSpacing: 0.4 },
-  footer: { paddingTop: 7, paddingHorizontal: 16 },
+  header: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },
+  footer: { paddingTop: 8, paddingHorizontal: 16 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -295,7 +367,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  // Wrapping text starts where a one-line row's label does (its 22 points centred in 50), not 8 from the top.
+  tall: { alignItems: "flex-start", paddingVertical: 14 },
+  // A control taller than the label's line (the 28-point switch) is centred on it rather than pushed below it.
+  onLine: { justifyContent: "center" },
+  tile: {
+    width: TILE,
+    height: TILE,
+    borderRadius: Math.round(TILE * 0.3),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lead: { width: LEAD, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   value: { flexShrink: 1, maxWidth: "50%" },
   valued: { flexDirection: "row", alignItems: "center", gap: 6 },

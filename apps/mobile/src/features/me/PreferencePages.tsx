@@ -10,6 +10,7 @@ import {
   useSetShowActivity,
   useSetStart,
 } from "@agenteschat/client";
+import { workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { type AppLocale, readyLocales } from "@agenteschat/i18n/locale";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
 import { router, useFocusEffect } from "expo-router";
@@ -86,8 +87,9 @@ export function usePushSwitch() {
 
 /** Workspaces: the ones you are in; another one switches to it and goes home. */
 export function WorkspacesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const org = useOrg();
+  const notes = workspaceNotes(t, i18n.language, org.orgs);
   return (
     <Page title={t("mobile.me.workspaces")}>
       <GroupedHeader>{t("mobile.me.workspacesIn")}</GroupedHeader>
@@ -97,6 +99,7 @@ export function WorkspacesPage() {
             key={o.id}
             leading={<OrgAvatar logo={o.logo} />}
             label={o.name}
+            sub={notes.get(o.id)}
             checked={o.id === org.orgId}
             onPress={() => {
               if (o.id === org.orgId) return;

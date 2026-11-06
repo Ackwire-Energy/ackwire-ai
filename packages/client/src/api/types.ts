@@ -227,6 +227,8 @@ export interface OrgSummary {
   rank?: number | null;
   /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
   logo?: string | null;
+  /** From `GET /me`: when it was made. Absent from older servers. */
+  createdAt?: string;
   /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
   standing?: OrgStanding;
   /**
@@ -280,7 +282,14 @@ export interface AccountDeletionPlan {
    * Only I am in them: they close now and are deleted for good 7 days later. One being deleted already keeps its date
    * (`deletion.dueAt`, null once it passed).
    */
-  closes: { id: string; name: string; deletion?: { dueAt: string | null } }[];
+  closes: {
+    id: string;
+    name: string;
+    /** What it holds, unless it's being deleted already. Absent from older servers. */
+    agents?: number;
+    messages?: number;
+    deletion?: { dueAt: string | null };
+  }[];
   /** Others are in them: I leave. */
   leaves: { id: string; name: string; role: Role }[];
   /** I'm their only owner, others are in them and they aren't being deleted: the account can't go yet (`sole_owner`). */
@@ -738,6 +747,8 @@ export interface AgentBrainLine {
   account?: string;
   /** On a plan: that account's limits as last reported; absent: not known yet. */
   usage?: PlanUsage;
+  /** Set to Rápida where that applies to what it thinks with; absent: standard speed. */
+  speed?: "fast";
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -1397,6 +1408,8 @@ export type ChannelEvent =
       turn?: number;
       /** Where `text` starts in its turn's text: past what arrived here, a piece was missed. */
       at?: number;
+      /** Where its stretch starts in the turn's text (a stretch: the text between two calls of a computer brain). */
+      from?: number;
     }
   | {
       type: "agent.run";
@@ -5081,6 +5094,8 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
+  /** How fast it answers in conversations; kept whatever it thinks with, applied only where `speedFits`. */
+  speed: BrainSpeed;
   /** The most context it reads, in tokens (200K, 400K or 1M), any brain; null = its model's window. */
   contextTokens?: number | null;
   /**
@@ -5116,6 +5131,8 @@ export type BrainScope = "mine" | "workspace";
 export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** A level, or "Automático" (each run picks low, medium or high with the model). */
 export type BrainEffortSetting = BrainEffort | "auto";
+
+export type BrainSpeed = "standard" | "fast";
 
 export type MachineAccountKind = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
@@ -5231,6 +5248,7 @@ export interface AgentBrainInput {
   /** The account thinks for another agent: take it from that one. */
   moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
+  speed?: BrainSpeed;
   /** 200K, 400K or 1M tokens; null = the model's window; omitted = keep. */
   contextTokens?: number | null;
 }
@@ -5246,6 +5264,8 @@ export interface AgentSetup {
   machineId?: string | null;
   account?: string | null;
   effort?: BrainEffortSetting | null;
+  /** Omitted = each agent keeps its own. */
+  speed?: BrainSpeed;
   contextTokens?: number | null;
   fallback?: boolean;
   /** "Atende outras pessoas" off, for the agents that move onto the plan. */
@@ -5876,6 +5896,8 @@ export interface NotificationSource {
   dashboardId?: string;
   /** `widget_alert`, `widget_failed`: the widget. */
   widgetId?: string;
+  /** `connector_tool_changed`: the connected server whose approved tools changed (ADR 0117). */
+  connectionId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
@@ -6755,7 +6777,17 @@ export interface AppConsent {
     };
   };
   account: { name: string; email: string };
-  workspaces: { id: string; name: string; logo: string | null; paused: boolean; current: boolean }[];
+  workspaces: {
+    id: string;
+    name: string;
+    logo: string | null;
+    paused: boolean;
+    current: boolean;
+    /** Tells apart two with the same name. Absent from older servers. */
+    createdAt?: string;
+    /** While it's being deleted, when it goes. Absent from older servers. */
+    deletion?: { dueAt: string };
+  }[];
 }
 
 export interface AppConsentDecision {

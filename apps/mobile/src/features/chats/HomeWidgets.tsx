@@ -2,11 +2,12 @@ import { useHomeBoard, type Widget } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Icon, Text } from "@/ui";
+import { Icon, Text, useTheme } from "@/ui";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
 import { WidgetPeek } from "../dashboards/WidgetPeek";
 import { useColors, useOrgId } from "../shared/hooks";
+import { CollapsibleSection } from "./HomeSection";
 
 /** A widget's width on the strip: two and a bit show, so it reads as one that scrolls. */
 const STRIP_WIDGET = 156;
@@ -16,9 +17,10 @@ const STRIP_WIDGET = 156;
  * Home") and "See all", which pushes Dashboards; then its widgets small, side by side, on a strip that scrolls
  * sideways. Tapping one opens it. With none yet, one card asks for a widget (when the person edits that board).
  */
-export function HomeWidgets() {
+export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
+  const { shadows } = useTheme();
   const orgId = useOrgId();
   const home = useHomeBoard(orgId);
   if (home.loading && !home.board) return null;
@@ -27,26 +29,10 @@ export function HomeWidgets() {
   const widgets: Widget[] = board ? widgetsInOrder(board.widgets) : [];
   const canAdd = Boolean(board?.canEdit);
   const add = () => router.push(newWidgetHref(home.chosenId ?? HOME));
+  // A section of Conversas like the others: its header hides the widgets (remembered on this phone) and shows them.
   return (
-    <View>
-      <View style={styles.head}>
-        <Text variant="small" tone="ink" style={styles.title} accessibilityRole="header" numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={styles.grow} />
-        <Pressable
-          onPress={() => router.push("/dashboards")}
-          accessibilityRole="button"
-          hitSlop={8}
-          style={({ pressed }) => [styles.more, pressed && styles.pressed]}
-        >
-          <Text variant="small" tone="muted" style={styles.medium}>
-            {t("dashboards.seeAll")}
-          </Text>
-          <Icon name="right" size={15} color={c.muted} />
-        </Pressable>
-      </View>
-      {widgets.length > 0 ? (
+    <CollapsibleSection title={title} count={widgets.length} collapsed={collapsed} onToggle={onToggle}>
+      {widgets.length > 0 || !canAdd ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -64,6 +50,25 @@ export function HomeWidgets() {
               />
             </View>
           ))}
+          {/* "Ver todos" ends the strip, on no plate: a round button with the arrow, its words under it. */}
+          <Pressable
+            onPress={() => router.push("/dashboards")}
+            accessibilityRole="button"
+            accessibilityLabel={t("dashboards.seeAll")}
+            style={({ pressed }) => [styles.all, pressed && styles.pressed]}
+          >
+            <View
+              style={[
+                styles.allButton,
+                { backgroundColor: c.raised, boxShadow: `0px 0px 0px 0.5px ${c.line2}, ${shadows.e1}` },
+              ]}
+            >
+              <Icon name="right" size={20} color={c.ink2} />
+            </View>
+            <Text variant="footnote" tone="muted" style={styles.medium} numberOfLines={1}>
+              {t("dashboards.seeAll")}
+            </Text>
+          </Pressable>
         </ScrollView>
       ) : canAdd ? (
         <Pressable
@@ -81,20 +86,19 @@ export function HomeWidgets() {
           </Text>
         </Pressable>
       ) : null}
-    </View>
+    </CollapsibleSection>
   );
 }
 
 const GAP = 10;
 
 const styles = StyleSheet.create({
-  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 8 },
-  title: { fontWeight: "600", flexShrink: 1 },
-  grow: { flex: 1 },
-  more: { flexDirection: "row", alignItems: "center", gap: 2 },
-  pressed: { opacity: 0.6 },
   medium: { fontWeight: "500" },
-  strip: { paddingHorizontal: 16, gap: GAP, paddingBottom: 4 },
+  // Room above and below: the cards' hairline and shadow are never cut by the strip's edge.
+  strip: { paddingHorizontal: 16, gap: GAP, paddingTop: 4, paddingBottom: 6 },
+  all: { width: 84, alignItems: "center", justifyContent: "center", gap: 8 },
+  allButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  pressed: { opacity: 0.7 },
   item: { width: STRIP_WIDGET },
   empty: {
     flexDirection: "row",
@@ -102,8 +106,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     marginHorizontal: 16,
-    paddingVertical: 18,
-    borderRadius: 18,
+    paddingVertical: 20,
+    borderRadius: 20,
     borderWidth: 1.5,
     borderStyle: "dashed",
   },

@@ -366,8 +366,13 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
       {sheetTitle !== undefined ? (
         <SheetHeader title={title} icon={to ? "back" : "x"} {...(to ? { onPress: () => go(to) } : {})} />
       ) : to ? (
-        <Pressable onPress={() => go(to)} accessibilityRole="button" style={styles.backRow} hitSlop={8}>
-          <Icon name="back" size={16} color={c.muted} />
+        <Pressable
+          onPress={() => go(to)}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.backRow, pressed ? styles.pressed : null]}
+          hitSlop={12}
+        >
+          <Icon name="back" size={15} color={c.muted} />
           <Text variant="subhead" tone="muted" style={styles.bold}>
             {t("mobile.common.back")}
           </Text>
@@ -1093,7 +1098,6 @@ function GateWait({
  */
 function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveKey }: ConnectAiFlowProps) {
   const { t } = useTranslation();
-  const { colors: c } = useTheme();
   const { orgId } = useAiOrg();
   const [touched, setTouched] = useState(false);
   const [opened, setOpened] = useState(false);
@@ -1190,18 +1194,16 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
                       <Text variant="small" tone="faint">
                         {t("onboarding.keyFromOther")}
                       </Text>
+                      {/* Buttons, not tag pills: each one switches the key's provider. */}
                       {others.map((p) => (
-                        <Pressable
+                        <Button
                           key={p.id}
+                          variant="secondary"
+                          size="sm"
+                          leading={() => <ProviderLogo id={p.id} size="xs" />}
+                          label={p.label}
                           onPress={() => form.setProvider(p.id)}
-                          accessibilityRole="button"
-                          style={[styles.other, { backgroundColor: c.chip }]}
-                        >
-                          <ProviderLogo id={p.id} size="xs" />
-                          <Text variant="footnote" tone="ink" style={styles.bold}>
-                            {p.label}
-                          </Text>
-                        </Pressable>
+                        />
                       ))}
                     </>
                   ) : null}
@@ -1240,20 +1242,13 @@ const styles = StyleSheet.create({
   gap: { gap: 10 },
   loading: { marginTop: 16 },
   backRow: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginBottom: 4 },
+  pressed: { opacity: 0.6 },
   hero: { alignItems: "center", gap: 8, paddingTop: 6, paddingBottom: 4 },
-  done: { alignItems: "center", gap: 12, paddingVertical: 28, paddingHorizontal: 10 },
+  done: { alignItems: "center", gap: 12, paddingVertical: 24, paddingHorizontal: 10 },
   // The page's lists' width, under the centered words.
   doneReplies: { alignSelf: "stretch", marginHorizontal: -10, marginTop: 8 },
   info: { borderRadius: 14, padding: 14, gap: 10 },
   keySteps: { marginTop: 16, gap: 10 },
   others: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 6 },
-  other: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 30,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
   save: { marginTop: 6 },
 });

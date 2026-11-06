@@ -5,6 +5,7 @@
   "common": {
     "close": "Sluiten",
     "joinSentences": "{{a}} {{b}}",
+    "cantUndo": "Dit kan niet ongedaan worden gemaakt.",
     "removeName": "{{name}} verwijderen",
     "about": "Over {{label}}",
     "previousMonth": "Vorige maand",
@@ -1363,6 +1364,7 @@
     "addPasswordReauth": "Log opnieuw in om een wachtwoord toe te voegen.",
     "yourWorkspaces": "Je werkruimtes",
     "youAreHere": "Je bent hier",
+    "createdOn": "Gemaakt op {{date}}",
     "newWorkspace": "Nieuwe werkruimte",
     "wiki": "Wiki",
     "settings": "Instellingen",
@@ -4197,6 +4199,12 @@
           "high": "Denkt meer na bij moeilijke taken. Trager en duurder.",
           "max": "Denkt zoveel mogelijk na. Veel trager en duurder."
         },
+        "speed": "Snelheid",
+        "speeds": {
+          "standard": "Standaard",
+          "fast": "Snel"
+        },
+        "speedText": "Antwoordt sneller in gesprekken en verbruikt het abonnement 2,5× zo snel. Routines en lange taken blijven op standaard.",
         "modelLine": {
           "opus": "De krachtigste. Verbruikt het abonnement sneller.",
           "sonnet": "Gebalanceerd. Goed voor bijna alles.",
@@ -4219,10 +4227,13 @@
           "contents": {
             "model": "Contextvenster",
             "auto": "Contextvenster en wie het antwoordt",
-            "fixed": "Inspanning, contextvenster en wie het antwoordt"
+            "fixed": "Inspanning, contextvenster en wie het antwoordt",
+            "autoSpeed": "Snelheid, contextvenster en wie het antwoordt",
+            "fixedSpeed": "Inspanning, snelheid, contextvenster en wie het antwoordt"
           },
           "allDefault": "Alles standaard",
           "effort": "Inspanning: {{level}}",
+          "speed": "Snelheid: snel",
           "context": "Context: {{size}}",
           "sharing": "Antwoordt andere mensen",
           "waits": "Wacht op de computer"
@@ -4690,7 +4701,7 @@
       "audience": "Wie mag praten",
       "channels": "Kanalen",
       "computer": "Computer",
-      "danger": "Archiveren",
+      "danger": "Archiveren of verwijderen",
       "keySafe": "De sleutel blijft versleuteld op de server. Niemand ziet hem.",
       "spentOf": "uitgegeven in {{month}}, van {{amount}}",
       "spentOfDefault": "uitgegeven in {{month}}, van {{amount}} (standaard van de werkruimte)",
@@ -5864,7 +5875,7 @@
     "agentRole": "Agent · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Maak er een, of vraag het in de chat: “Lia, maak een taak voor deze fout”.",
+    "empty": "Maak er een, of vraag een agent erom in de chat.",
     "noResults": "Geen taken die bij deze filters passen.",
     "columnEmpty": "Niets hier.",
     "form": {
@@ -7848,6 +7859,7 @@
     "removeAgents_one": "{{names}} gebruikt deze skill en verliest de toegang ertoe.",
     "removeAgents_other": "{{names}} gebruiken deze skill en verliezen de toegang ertoe.",
     "removeNone": "Geen agent gebruikt deze skill.",
+    "removeGone": "Hij verlaat de werkruimte en dit kan niet ongedaan worden gemaakt.",
     "removed": "{{name}} verwijderd.",
     "agentTitle": "Skills",
     "agentSubtitle": "Wat {{name}} kan openen als het nodig is.",
@@ -8621,7 +8633,7 @@
     "noAccessText": "Hij is alleen voor bepaalde mensen. Heb je hem nodig, vraag het dan aan wie voor de wiki zorgt.",
     "delete": "Naar de prullenbak",
     "deleteTitle": "{{title}} naar de prullenbak verplaatsen?",
-    "deleteText": "Links ernaartoe worden “te maken pagina”. Je kunt hem later terugzetten.",
+    "deleteText": "Links ernaartoe worden “te maken pagina”. Je kunt hem nog niet terugzetten vanuit de app.",
     "deleted": "{{title}} is naar de prullenbak verplaatst.",
     "noBacklinksHint": "Nog geen pagina linkt hiernaartoe. Schrijf [[{{title}}]] in een andere.",
     "allVersions": "Alle {{count}} versies bekijken",
@@ -8846,6 +8858,7 @@
     "stuck": "Gestopt omdat hij vastliep",
     "steer": {
       "waiting": "{{name}} leest het bij de volgende pauze",
+      "computer": "{{name}} leest het zodra de computer vrij is",
       "now": "{{name}} stopte om het te lezen",
       "delivered": "{{name}} heeft het ontvangen",
       "held": "{{name}} leest het na jouw besluit",
@@ -9041,6 +9054,7 @@
       "nextEta": "Wacht op de computer. Is de volgende, over ongeveer {{n}} min",
       "nextAfter": "Wacht op de computer. Is de volgende zodra {{after}} klaar is",
       "next": "Wacht op de computer. Is de volgende",
+      "waiting": "Wacht op de computer",
       "behind": "In de wachtrij, {{nth}}. Na {{names}}",
       "position": "In de wachtrij, {{nth}}"
     },
@@ -12557,6 +12571,8 @@
     "autoUpdate": "Nog mee bezig ({{duration}}).",
     "autoUpdateNow": "Nu: {{now}}.",
     "statusReply": "Ik ben er nog mee bezig ({{duration}}). Ik lees je bericht na deze stap.",
+    "statusReplyQueued": "Ik wacht op de computer ({{duration}}). Ik lees je bericht zodra ik aan de beurt ben.",
+    "statusReplyAway": "Ik wacht tot mijn computer terug is. Ik lees je bericht zodra hij terug is.",
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",
@@ -12587,6 +12603,10 @@
     "working": "Op de achtergrond"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT weigerde de snelheid Snel voor dit account of model, dus dit antwoord kwam op standaardsnelheid.",
+      "action": "Agent openen"
+    },
     "usageWhen": {
       "at": "om {{time}}",
       "on": "{{day}} om {{time}}",
@@ -12694,7 +12714,9 @@
       "show": "Tonen",
       "hide": "Verbergen",
       "talker": "tijdens het werk",
-      "talkerTip": "Antwoordde zonder de lopende taak te stoppen."
+      "talkerTip": "Antwoordde zonder de lopende taak te stoppen.",
+      "talkerWaiting": "tijdens het wachten",
+      "talkerWaitingTip": "Antwoordde terwijl de taak wacht."
     },
     "joined": {
       "label": "deed mee",
@@ -13666,6 +13688,8 @@
       "paste": "Plakken",
       "pasteHint": "Plak wat je hebt gekopieerd in de pagina",
       "pasteBlocked": "Je browser liet niet lezen wat je hebt gekopieerd. Gebruik {{keys}} op de pagina.",
+      "inputLost": "Dat is niet bij de pagina aangekomen, dus er is niets geklikt of getypt. Probeer het opnieuw.",
+      "noField": "Er is geen veld geselecteerd op de pagina, dus dat is niet getypt. Selecteer het veld en typ opnieuw.",
       "goLabel": "Adres van de site",
       "goPlaceholder": "Typ een adres, zoals example.com",
       "go": "Openen",
@@ -13676,8 +13700,6 @@
       "goFailed": "De site ging niet open. Controleer het adres.",
       "backTitle": "Teruggeven aan {{name}}",
       "backTitle_female": "Teruggeven aan {{name}}",
-      "doneTitle": "Klaar. Een notitie voor {{name}}?",
-      "doneTitle_female": "Klaar. Een notitie voor {{name}}?",
       "backLabel": "Notitie voor {{name}}",
       "backLabel_female": "Notitie voor {{name}}",
       "backPlaceholder": "Optioneel: iets wat {{name}} moet weten?",
@@ -13737,6 +13759,7 @@
     "suspendedFor": "Deze werkruimte is geschorst: {{reason}}",
     "bannerSub": "Je kunt hier nog lezen en schrijven. Agents antwoorden en werken niet zolang hij in de wacht staat.",
     "label": "Status van de werkruimte",
+    "row": "Niet beschikbaar",
     "screen": {
       "title": "Deze werkruimte is niet beschikbaar",
       "text": "De gesprekken en agents zijn voorlopig gesloten.",
@@ -13824,8 +13847,11 @@
   },
   "deleting": {
     "title": "{{name}} wordt verwijderd",
-    "text": "{{by}} heeft hem op {{date}} verwijderd. Op {{due}} is hij definitief weg.",
-    "textLate": "{{by}} heeft hem op {{date}} verwijderd.",
+    "text": "Deze werkruimte wordt al verwijderd. Je hoeft niets te doen, hij verdwijnt op {{date}}.",
+    "textLate": "Deze werkruimte wordt al verwijderd. Je hoeft niets te doen.",
+    "by": "{{by}} heeft hem op {{date}} verwijderd.",
+    "row": "Wordt verwijderd, weg op {{date}}",
+    "rowLate": "Wordt verwijderd",
     "someone": "Iemand",
     "restore": "Werkruimte herstellen",
     "membersOnly": "Alleen een eigenaar kan hem herstellen.",
@@ -13835,11 +13861,21 @@
     "menu": "Account verwijderen",
     "card": {
       "text": "Je verlaat elke werkruimte en je account wordt definitief verwijderd.",
-      "button": "Account verwijderen…"
+      "button": "Account verwijderen…",
+      "oneWorkspace": "Wil je alleen deze werkruimte verwijderen? Dat kan bij Algemeen.",
+      "leaveWorkspace": "Wil je alleen deze werkruimte verlaten? Dat kan bij Leden."
     },
-    "title": "Je account verwijderen?",
-    "closes_one": "{{names}} sluit nu en wordt op {{date}} definitief verwijderd. Je bent daar de enige.",
-    "closes_other": "{{names}} sluiten nu en worden op {{date}} definitief verwijderd. Je bent daar de enige.",
+    "title": "Je hele account verwijderen?",
+    "intro": "Dit verwijdert je hele account, niet alleen één werkruimte. Dit kan niet ongedaan worden gemaakt.",
+    "whole": "Je hele account",
+    "oneWorkspace": "Wil je maar één werkruimte verwijderen? Je account blijft.",
+    "closes": "{{name}} sluit nu. Je bent daar de enige, dus hij wordt op {{date}} definitief verwijderd.",
+    "closesWith": "{{name}} sluit nu, met {{what}}. Je bent daar de enige, dus hij wordt op {{date}} definitief verwijderd.",
+    "closesEmpty": "{{name}} sluit nu, zonder agenten of berichten. Je bent daar de enige, dus hij wordt op {{date}} definitief verwijderd.",
+    "agentCount_one": "{{value}} agent",
+    "agentCount_other": "{{value}} agenten",
+    "messageCount_one": "{{value}} bericht",
+    "messageCount_other": "{{value}} berichten",
     "leaves": "Je verlaat {{names}}.",
     "messages": "Je berichten blijven in de werkruimtes staan, zonder je naam.",
     "computers_one": "Je computer die aan {{name}} gekoppeld is, wordt eruit verwijderd: {{computers}}.",

@@ -274,6 +274,7 @@ function cardOf(name: string) {
   const cards = [...document.querySelectorAll<HTMLElement>(".tm-card")];
   return cards.find((c) => c.querySelector(".tm-card__text b")?.textContent === name) as HTMLElement;
 }
+const cardPress = (name: string) => cardOf(name).querySelector(".tm-card__text") as HTMLElement;
 /** A waiting row's state cell: what holds it, then what comes next. */
 const stateOf = (row: HTMLElement) =>
   [...row.querySelectorAll(".tm-cell--state .tm-state__text > *")].map((el) => el.textContent);
@@ -295,7 +296,7 @@ describe("the task manager page", () => {
       "Atlas1 tarefa",
       "Ada3 tarefas",
     ]);
-    expect(cards[0]?.getAttribute("aria-pressed")).toBe("true");
+    expect(cards[0]?.querySelector(".tm-card__text")?.getAttribute("aria-pressed")).toBe("true");
     expect(cardOf("Ada").querySelector(".tm-card__wait")?.getAttribute("aria-label")).toBe("1 espera você");
     expect(cardOf("Ada").querySelector(".chart-spark")?.getAttribute("aria-label")).toBe(
       "O que Ada fez nos últimos 30 min",
@@ -330,6 +331,16 @@ describe("the task manager page", () => {
 
     // People stop work here; spend stays in Usage.
     expect(document.querySelector(".tm")?.textContent).not.toMatch(/US\$|R\$|\$/);
+  });
+
+  test("an agent's picture on its card goes to its page, no conversation beside it; the card's press still filters", async () => {
+    const state = seedState({ taskManager: busy() });
+    const { router } = await open(state, "task-manager");
+    await click(cardPress("Ada"));
+    expect(cardPress("Ada").getAttribute("aria-pressed")).toBe("true");
+    await click(within(cardOf("Ada")).getByRole("button", { name: "Perfil de Ada" }));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
   });
 
   test("a row picked: Parar tarefa stops it at once, and it ends today", async () => {
@@ -428,8 +439,8 @@ describe("the task manager page", () => {
   test("an agent's card shows only its tasks; Parar tudo asks first, with the reason the agent reads", async () => {
     const state = seedState({ taskManager: busy() });
     await open(state, "task-manager");
-    await click(cardOf("Ada"));
-    expect(cardOf("Ada").getAttribute("aria-pressed")).toBe("true");
+    await click(cardPress("Ada"));
+    expect(cardPress("Ada").getAttribute("aria-pressed")).toBe("true");
     expect(screen().getByRole("heading", { level: 2, name: "Tarefas de Ada" })).toBeTruthy();
     expect(screen().getByRole("button", { name: "Corrigir o link de cancelar" })).toBeTruthy();
     expect(screen().getByRole("button", { name: "Backups" })).toBeTruthy();

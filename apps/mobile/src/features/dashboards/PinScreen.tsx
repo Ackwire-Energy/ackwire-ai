@@ -78,7 +78,7 @@ export function PinScreen() {
       />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         {draft && chart ? (
           <>

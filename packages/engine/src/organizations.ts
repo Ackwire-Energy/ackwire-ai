@@ -91,6 +91,8 @@ export interface Membership {
   roleIds: string[];
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
+  /** When the workspace was made (listMemberships): tells apart two with the same name. */
+  orgCreatedAt?: Date;
   /** The workspace's standing (`standing.ts`). */
   standing?: WorkspaceStanding;
   /** What opens when the app starts here (listMemberships). */
@@ -150,6 +152,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       orgName: organizations.name,
       role: organizationMembers.role,
       orgLogo: organizations.logo,
+      orgCreatedAt: organizations.createdAt,
       standing: STANDING_COLUMNS,
       startPage: organizationMembers.startPage,
       startChannelId: organizationMembers.startChannelId,

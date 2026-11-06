@@ -1418,6 +1418,8 @@ export function consultationWait(run: {
 }): ConsultationWait | null {
   if (run.status === "waiting_approval") return "approval";
   if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : run.outage ? "outage" : "input";
+  // Asking its computer from the line it still waits (`computerWaitOf`).
+  if (run.status === "running" && run.waitingMachineId) return "computer";
   return run.handedOn && isTerminal(run.status as AgentRun["status"]) ? "agents" : null;
 }
 
@@ -1911,6 +1913,24 @@ export async function consultationOrigin(
   }
   if (origin && (await answersAgentsOnly(db, orgId, runId))) return null;
   return origin;
+}
+
+/** This run answers a question that began in a routine's or long work's run, through any chain of agents. */
+export async function consultedInBackground(db: Executor, orgId: string, runId: string): Promise<boolean> {
+  let current = runId;
+  for (let depth = 0; depth < MAX_HANDOFF_LINKS; depth++) {
+    const [asker] = await db
+      .select({ id: agentRuns.id, background: agentRuns.background, workId: agentRuns.workId })
+      .from(agentConsultations)
+      .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
+      .where(and(eq(agentConsultations.orgId, orgId), eq(agentConsultations.targetRunId, current)))
+      .orderBy(desc(agentConsultations.createdAt))
+      .limit(1);
+    if (!asker) return false;
+    if (asker.background || asker.workId) return true;
+    current = asker.id;
+  }
+  return false;
 }
 
 /**

@@ -8,6 +8,9 @@
   "common.joinSentences": {
     "value": "{{a}} {{b}}"
   },
+  "common.cantUndo": {
+    "value": "This can't be undone."
+  },
   "common.removeName": {
     "value": "Remove {{name}}"
   },
@@ -3301,6 +3304,9 @@
   },
   "shell.youAreHere": {
     "value": "You are here"
+  },
+  "shell.createdOn": {
+    "value": "Created on {{date}}"
   },
   "shell.newWorkspace": {
     "value": "New workspace"
@@ -10170,6 +10176,18 @@
   "agentPage.work.brain.effortText.max": {
     "value": "Thinks as much as possible. Much slower and pricier."
   },
+  "agentPage.work.brain.speed": {
+    "value": "Speed"
+  },
+  "agentPage.work.brain.speeds.standard": {
+    "value": "Standard"
+  },
+  "agentPage.work.brain.speeds.fast": {
+    "value": "Fast"
+  },
+  "agentPage.work.brain.speedText": {
+    "value": "Answers faster in conversations and uses the plan 2.5× as fast. Routines and long tasks stay at standard speed."
+  },
   "agentPage.work.brain.modelLine.opus": {
     "value": "The most capable. Uses up the plan faster."
   },
@@ -10221,11 +10239,20 @@
   "agentPage.work.brain.advanced.contents.fixed": {
     "value": "Effort, context window and who it answers"
   },
+  "agentPage.work.brain.advanced.contents.autoSpeed": {
+    "value": "Speed, context window and who it answers"
+  },
+  "agentPage.work.brain.advanced.contents.fixedSpeed": {
+    "value": "Effort, speed, context window and who it answers"
+  },
   "agentPage.work.brain.advanced.allDefault": {
     "value": "All defaults"
   },
   "agentPage.work.brain.advanced.effort": {
     "value": "Effort: {{level}}"
+  },
+  "agentPage.work.brain.advanced.speed": {
+    "value": "Fast speed"
   },
   "agentPage.work.brain.advanced.context": {
     "value": "Context: {{size}}"
@@ -11397,7 +11424,7 @@
     "value": "Computer"
   },
   "agentPage.settings.danger": {
-    "value": "Archive"
+    "value": "Archive or delete"
   },
   "agentPage.settings.keySafe": {
     "value": "The key stays encrypted on the server. Nobody sees it."
@@ -14021,7 +14048,7 @@
     "value": "#{{number}} {{title}}"
   },
   "issues.empty": {
-    "value": "Create one, or ask in the chat: “Lia, create a task for this error”."
+    "value": "Create one, or ask an agent in a chat."
   },
   "issues.noResults": {
     "value": "No tasks match these filters."
@@ -18961,6 +18988,9 @@
   "skills.removeNone": {
     "value": "No agent uses this skill."
   },
+  "skills.removeGone": {
+    "value": "It leaves the workspace and this can't be undone."
+  },
   "skills.removed": {
     "value": "{{name}} removed."
   },
@@ -20855,7 +20885,7 @@
     "value": "Move {{title}} to the trash?"
   },
   "wiki.deleteText": {
-    "value": "Links to it become “page to create”. You can restore it later."
+    "value": "Links to it become “page to create”. You can't restore it from the app yet."
   },
   "wiki.deleted": {
     "value": "{{title}} moved to the trash."
@@ -21448,6 +21478,9 @@
   "run.steer.waiting": {
     "value": "{{name}} reads it at the next pause"
   },
+  "run.steer.computer": {
+    "value": "{{name}} reads it when it gets the computer"
+  },
   "run.steer.now": {
     "value": "{{name}} stopped to read it"
   },
@@ -21897,6 +21930,9 @@
   },
   "queue.live.next": {
     "value": "Waiting for the computer. Next up"
+  },
+  "queue.live.waiting": {
+    "value": "Waiting for the computer"
   },
   "queue.live.behind": {
     "value": "In line, {{nth}}. After {{names}}"
@@ -30343,6 +30379,12 @@
   "work.statusReply": {
     "value": "Still on it ({{duration}}). I'll read your message after this step."
   },
+  "work.statusReplyQueued": {
+    "value": "Waiting for the computer ({{duration}}). I'll read your message when my turn comes."
+  },
+  "work.statusReplyAway": {
+    "value": "Waiting for my computer to come back. I'll read your message as soon as it's back."
+  },
   "work.status.one": {
     "value": "Working on: {{subject}}"
   },
@@ -30408,6 +30450,12 @@
   },
   "work.working": {
     "value": "In the background"
+  },
+  "chat.speedFallback.text": {
+    "value": "ChatGPT refused Fast speed on this account or model, so this reply came at standard speed."
+  },
+  "chat.speedFallback.action": {
+    "value": "Open agent"
   },
   "chat.usageWhen.at": {
     "value": "at {{time}}"
@@ -30648,6 +30696,12 @@
   },
   "chat.notice.talkerTip": {
     "value": "Answered without stopping the task in progress."
+  },
+  "chat.notice.talkerWaiting": {
+    "value": "while waiting"
+  },
+  "chat.notice.talkerWaitingTip": {
+    "value": "Answered while its task waits."
   },
   "chat.joined.label": {
     "value": "joined in"
@@ -32833,6 +32887,12 @@
   "browser.inCard.pasteBlocked": {
     "value": "Your browser didn't let the page read what you copied. Use {{keys}} on the page."
   },
+  "browser.inCard.inputLost": {
+    "value": "That didn't reach the page, so nothing was clicked or typed. Try again."
+  },
+  "browser.inCard.noField": {
+    "value": "No field is selected on the page, so that wasn't typed. Select the field and type again."
+  },
   "browser.inCard.goLabel": {
     "value": "Site address"
   },
@@ -32856,9 +32916,6 @@
   },
   "browser.inCard.backTitle": {
     "value": "Hand back to {{name}}"
-  },
-  "browser.inCard.doneTitle": {
-    "value": "Done. A note for {{name}}?"
   },
   "browser.inCard.backLabel": {
     "value": "Note for {{name}}"
@@ -32997,6 +33054,9 @@
   },
   "standing.label": {
     "value": "Workspace status"
+  },
+  "standing.row": {
+    "value": "Unavailable"
   },
   "standing.screen.title": {
     "value": "This workspace is unavailable"
@@ -33182,10 +33242,19 @@
     "value": "{{name}} is being deleted"
   },
   "deleting.text": {
-    "value": "{{by}} deleted it on {{date}}. It goes for good on {{due}}."
+    "value": "This workspace is already being deleted. There's nothing you need to do, it goes on {{date}}."
   },
   "deleting.textLate": {
+    "value": "This workspace is already being deleted. There's nothing you need to do."
+  },
+  "deleting.by": {
     "value": "{{by}} deleted it on {{date}}."
+  },
+  "deleting.row": {
+    "value": "Being deleted, goes on {{date}}"
+  },
+  "deleting.rowLate": {
+    "value": "Being deleted"
   },
   "deleting.someone": {
     "value": "Someone"
@@ -33208,13 +33277,43 @@
   "deleteAccount.card.button": {
     "value": "Delete account…"
   },
+  "deleteAccount.card.oneWorkspace": {
+    "value": "Want to delete just this workspace? It's in General."
+  },
+  "deleteAccount.card.leaveWorkspace": {
+    "value": "Want to leave just this workspace? It's in Members."
+  },
   "deleteAccount.title": {
-    "value": "Delete your account?"
+    "value": "Delete your whole account?"
+  },
+  "deleteAccount.intro": {
+    "value": "This deletes your whole account, not just one workspace. It can't be undone."
+  },
+  "deleteAccount.whole": {
+    "value": "Your whole account"
+  },
+  "deleteAccount.oneWorkspace": {
+    "value": "Want to delete just one workspace? Your account stays."
   },
   "deleteAccount.closes": {
+    "value": "{{name}} closes now. You're the only one there, so it's deleted for good on {{date}}."
+  },
+  "deleteAccount.closesWith": {
+    "value": "{{name}} closes now, with {{what}}. You're the only one there, so it's deleted for good on {{date}}."
+  },
+  "deleteAccount.closesEmpty": {
+    "value": "{{name}} closes now, with no agents or messages. You're the only one there, so it's deleted for good on {{date}}."
+  },
+  "deleteAccount.agentCount": {
     "value": {
-      "one": "{{names}} closes now and is deleted for good on {{date}}. You're the only one there.",
-      "other": "{{names}} close now and are deleted for good on {{date}}. You're the only one there."
+      "one": "{{value}} agent",
+      "other": "{{value}} agents"
+    }
+  },
+  "deleteAccount.messageCount": {
+    "value": {
+      "one": "{{value}} message",
+      "other": "{{value}} messages"
     }
   },
   "deleteAccount.leaves": {

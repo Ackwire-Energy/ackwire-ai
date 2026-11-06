@@ -335,6 +335,7 @@
     },
     "steer": {
       "waiting": "{{name}} le lira à la prochaine pause",
+      "computer": "{{name}} le lira dès qu'il aura l'ordinateur",
       "now": "{{name}} s'est arrêté pour le lire",
       "delivered": "{{name}} l'a reçu",
       "held": "{{name}} le lira après votre décision",
@@ -1054,8 +1055,6 @@
     }
   },
   "delete": {
-    "title": "Supprimer votre compte",
-    "intro": "C'est irréversible.",
     "goes": {
       "account": "Votre compte, vos accès et vos sessions disparaissent.",
       "orgs": "Les espaces de travail dont vous êtes le seul membre sont supprimés.",
@@ -1324,6 +1323,9 @@
     "review": "Examiner",
     "answer": "Répondre",
     "open": "Ouvrir",
+    "toolsTitle": "A modifié des outils que tu as approuvés",
+    "toolsWhy": "Les agents gardent la version approuvée jusqu'à ce que tu acceptes la nouvelle.",
+    "reviewChanges": "Revoir les changements",
     "clear": {
       "title": "Rien ne vous attend",
       "text": "Quand un agent a besoin de vous, ça apparaît d'abord ici."

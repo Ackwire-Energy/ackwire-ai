@@ -68,8 +68,13 @@ describe("dialog padding", () => {
       if (selector.includes(".is-screen-only")) continue;
       const pad = padding(body);
       for (const [part, sides, token] of EDGES) {
-        // The part is what the rule styles (its last compound), not an ancestor of it.
-        const last = selector.split(/[\s>+~]+/).pop() ?? "";
+        // The part is what the rule styles (its last compound), not an ancestor of it; a combinator inside `:has(…)` or
+        // `:not(…)` doesn't start a compound (`.ac-dialog__body:has(+ .ac-dialog__foot--bar)` styles the body).
+        const last =
+          selector
+            .replace(/\((?:[^()]|\([^()]*\))*\)/g, "()")
+            .split(/[\s>+~]+/)
+            .pop() ?? "";
         if (!part.test(last)) continue;
         for (const side of sides) {
           const value = pad[side];

@@ -8,7 +8,7 @@ import { router } from "expo-router";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Chip, Icon, type IconName, PixelOrbit, Text } from "@/ui";
+import { Chip, Icon, type IconName, LineIcon, PixelOrbit, Text } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -243,7 +243,7 @@ function CardConversation({ issue }: { issue: Issue }) {
       </Text>
       {working ? (
         <View style={styles.inline}>
-          <Icon name="bolt" size={12} color={c.agent} />
+          <Icon name="bolt" size={15} color={c.agent} />
           <Text variant="small" style={[styles.bold, { color: c.agent }]}>
             {t("threads.status.working")}
           </Text>
@@ -258,7 +258,7 @@ function CardConversation({ issue }: { issue: Issue }) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, paddingHorizontal: 13, paddingVertical: 12, gap: 8 },
+  card: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
   pressed: { opacity: 0.85 },
   inline: { flexDirection: "row", alignItems: "center", gap: 6 },
   bold: { fontWeight: "600" },
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   step: { flex: 1, minWidth: 0 },
   meta: { flexDirection: "row", alignItems: "center", columnGap: 8 },
   track: { flexDirection: "row", alignItems: "center", gap: 8 },
-  cells: { flex: 1, flexDirection: "row", gap: 3 },
+  cells: { flex: 1, flexDirection: "row", gap: 2 },
   cell: { flex: 1, height: 7 },
   column: {
     flexDirection: "row",
@@ -295,19 +295,23 @@ function BoardWork({ issue: i }: { issue: Issue }) {
   const doing = live ? work.plan.find((p) => p.state === "doing") : undefined;
   return (
     <View style={boardWork.box}>
+      {/* Icon and words in the warning color, as the card's state line: a tinted pill was a second surface. */}
       {blocked ? (
-        <Text variant="caption" style={[boardWork.badge, { backgroundColor: c.warnSoft, color: c.warn }]}>
-          {blocked}
-        </Text>
+        <View style={boardWork.blocked}>
+          <LineIcon name="wait" size={12} color={c.warn} variant="caption" />
+          <Text variant="caption" numberOfLines={2} style={[boardWork.blockedText, { color: c.warn }]}>
+            {blocked}
+          </Text>
+        </View>
       ) : null}
       {progress ? (
-        <Text variant="caption" tone="muted">
+        <Text variant="caption" tone="muted" numberOfLines={2}>
           {t("work.plan")} · {t("work.planProgress", progress)}
           {doing ? ` · ${doing.text}` : ""}
         </Text>
       ) : null}
       {live && work.lastUpdate ? (
-        <Text variant="caption" tone="muted">
+        <Text variant="caption" tone="muted" numberOfLines={2}>
           {t("work.lastUpdate")}: {work.lastUpdate.text}
         </Text>
       ) : null}
@@ -317,12 +321,7 @@ function BoardWork({ issue: i }: { issue: Issue }) {
 
 const boardWork = StyleSheet.create({
   box: { gap: 4 },
-  badge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-    borderRadius: 6,
-    overflow: "hidden",
-    fontWeight: "600",
-  },
+  // Top-aligned: the icon stays on the first line when the words wrap.
+  blocked: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  blockedText: { flexShrink: 1, fontWeight: "600" },
 });

@@ -226,6 +226,28 @@ export const CODING_PLANS = {
   },
 } as const satisfies Record<string, CodingPlan>;
 
+/**
+ * The models ChatGPT's Fast mode serves (developers.openai.com/api/docs/guides/fast-mode, ids as Codex lists them in
+ * its `service_tiers`, codex-cli 0.166.0). Codex drops the tier without a word for any other model.
+ */
+export const FAST_MODE_MODELS: readonly string[] = [
+  "gpt-6.1-sol",
+  "gpt-6.1-terra",
+  "gpt-6-astra",
+  "gpt-6-sol",
+  "gpt-6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+];
+
+/**
+ * Velocidade (ADR 0149) means something for this brain, sign-in and model: Codex on a ChatGPT sign-in (no key account
+ * of a coding plan), with a model on the list. None: Codex's default; `auto`: every model "Automático" picks is on it.
+ */
+export const speedFits = (o: { kind: string; provider?: string | null; model?: string | null }) =>
+  o.kind === "codex" && !o.provider && (!o.model || o.model === "auto" || FAST_MODE_MODELS.includes(o.model));
+
 export type PlanId = keyof typeof CODING_PLANS;
 export const PLAN_IDS = Object.keys(CODING_PLANS) as PlanId[];
 export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && Object.hasOwn(CODING_PLANS, v);

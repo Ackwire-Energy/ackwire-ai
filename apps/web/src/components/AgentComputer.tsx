@@ -19,7 +19,17 @@ import {
   machineTitle,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Card, ComputerIcon, ComputerPortrait, Icon, InfoHint, List, Select, type SelectOption } from "@agenteschat/ui";
+import {
+  Card,
+  CardHeader,
+  ComputerIcon,
+  ComputerPortrait,
+  Icon,
+  InfoHint,
+  List,
+  Select,
+  type SelectOption,
+} from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -231,9 +241,7 @@ export function AgentComputersCard() {
   const list = agents.data ?? [];
   return (
     <Card aria-labelledby="sec-agent-computers">
-      <h2 id="sec-agent-computers" className="ac-card__title">
-        {t("computers.agents.title")}
-      </h2>
+      <CardHeader id="sec-agent-computers" icon="agent" title={t("computers.agents.title")} />
       {agents.isLoading || machines.isLoading ? (
         <LoadingLine width={240} />
       ) : list.length === 0 ? (

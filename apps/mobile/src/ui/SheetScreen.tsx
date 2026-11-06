@@ -20,7 +20,7 @@ export function SheetScreen({ children, fit }: SheetScreenProps) {
   const insets = useSafeAreaInsets();
   if (fit) {
     // iOS already adds the bottom inset to a sheet that fits its content; Android doesn't.
-    const bottom = Platform.OS === "ios" ? 12 : 22 + insets.bottom;
+    const bottom = Platform.OS === "ios" ? 12 : 24 + insets.bottom;
     return (
       <SheetSurface>
         <View style={[styles.in, { paddingBottom: bottom }]}>{children}</View>
@@ -34,7 +34,7 @@ export function SheetScreen({ children, fit }: SheetScreenProps) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.in, { paddingBottom: 22 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         {children}
       </ScrollView>

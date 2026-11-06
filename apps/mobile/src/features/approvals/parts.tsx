@@ -4,10 +4,11 @@ import {
   useCancelApproval,
   useCatalog,
   useCustomServers,
+  useDecideApproval,
 } from "@agenteschat/client";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
-import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { alwaysRoutineName, approvalDoing, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -15,18 +16,21 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Fuse, Icon, LineIcon, Text, useToast } from "@/ui";
+import { Button, Chip, Fuse, LineIcon, Text, useToast } from "@/ui";
 import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
-import { useColors, useNow, useOrgId } from "../shared/hooks";
-import { fuseRemaining, minutesLeft } from "../shared/logic";
+import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
+import { fuseRemaining, genderOf, minutesLeft } from "../shared/logic";
+import { successHaptic } from "../shared/parts";
 import {
+  approvalRisk,
   approvalSaid,
   approvalTable,
   approvalTraits,
   approveAlwaysHint,
   approveAlwaysLabel,
   approveAlwaysOffered,
+  approveAlwaysToast,
 } from "./logic";
 
 /**
@@ -65,27 +69,29 @@ export function useOriginShort(a: Pick<Approval, "origin">) {
 }
 
 /**
- * The app a request goes through, as a mark on a tile: the connector's (a server connected by address goes by
- * its preset's mark), a mailbox for an email, our shield for our own tools. Its name is read aloud.
+ * The action as a card's title, in words and in the person's language: an email's and the app's own titles as
+ * `approvalTitle` says them; a connector's tool by what it does ("Gerar imagem", never the server's
+ * "mcp.higgsfield.ai: Generate image", which the details keep).
  */
-export function ApprovalMark({ approval: a, size = 20 }: { approval: Approval; size?: number }) {
+export function approvalHeadline(t: TFunction, a: Approval, locale: string) {
+  if (a.email || !a.connector) return approvalTitle(t, a);
+  const doing = approvalDoing(t, a, locale);
+  return doing.charAt(0).toLocaleUpperCase(locale) + doing.slice(1);
+}
+
+/**
+ * The app a request goes through: the connector (a server connected by address goes by its preset's mark and its
+ * own name), a mailbox for an email, our own tools otherwise. Its name heads the request's source line.
+ */
+export function useApprovalSource(a: Approval) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const catalog = useCatalog();
   const customId = a.connector?.startsWith("custom:") ? a.connector.slice("custom:".length) : null;
   const servers = useCustomServers(orgId, customId !== null);
-  if (a.email)
-    return (
-      <View accessible accessibilityLabel={a.email.mailbox}>
-        <IconTile name="mail" size={size} />
-      </View>
-    );
+  if (a.email) return { kind: "mail" as const, name: a.email.mailbox, def: null, image: undefined };
   if (!a.connector)
-    return (
-      <View accessible accessibilityLabel={t("approvals.panel.builtIn")}>
-        <IconTile name="shield" size={size} />
-      </View>
-    );
+    return { kind: "builtin" as const, name: t("approvals.panel.builtIn"), def: null, image: undefined };
   const server = customId ? servers.data?.find((s) => s.id === customId) : undefined;
   const custom = server ? fromServer(server, catalog.data?.connectors ?? []) : null;
   const def = custom ? custom.def : (catalog.data?.connectors.find((d) => d.id === a.connector) ?? null);
@@ -96,9 +102,60 @@ export function ApprovalMark({ approval: a, size = 20 }: { approval: Approval; s
       : def
         ? connectorName(t, def)
         : a.connector;
+  return { kind: "connector" as const, name, def, image: custom?.image };
+}
+
+/**
+ * Approving a request where it shows (the conversation's card, Atividade's): a success haptic unless it was held to
+ * approve (a high-risk one already buzzed), then a toast saying what follows (or that it failed); `onApproved` lets
+ * the card's place know it is settled.
+ */
+export function useApproveNow(a: Approval, onApproved?: () => void) {
+  const { t, i18n } = useTranslation();
+  const orgId = useOrgId();
+  const dir = useDirectory();
+  const toast = useToast();
+  const decide = useDecideApproval(orgId);
+  const name = dir.agentById.get(a.agentId)?.name ?? "";
+  const g = genderOf(name);
+  const high = approvalRisk(a) === "high";
+  const approve = (always = false) =>
+    decide.mutate(
+      { id: a.id, decision: "approve", always },
+      {
+        onSuccess: () => {
+          if (!high) successHaptic();
+          onApproved?.();
+          toast({
+            ...(always
+              ? approveAlwaysToast(t, name, alwaysRoutineName(t, a))
+              : {
+                  title: t("mobile.approval.approved"),
+                  subtitle: a.runAt
+                    ? t("mobile.approval.approvedAhead", { when: nextLabel(i18n.language, a.runAt) })
+                    : t(`mobile.approval.approvedSub${g}`, { name }),
+                }),
+            agentId: a.agentId,
+          });
+        },
+        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+      },
+    );
+  return { approve, pending: decide.isPending, high };
+}
+
+/** The app a request goes through, as a mark on a tile (`useApprovalSource`); its name is read aloud. */
+export function ApprovalMark({ approval: a, size = 20 }: { approval: Approval; size?: number }) {
+  const source = useApprovalSource(a);
   return (
-    <View accessible accessibilityLabel={name}>
-      <ConnectorIcon def={def} image={custom?.image} label={name} size={size} />
+    <View accessible accessibilityLabel={source.name}>
+      {source.kind === "mail" ? (
+        <IconTile name="mail" size={size} />
+      ) : source.kind === "builtin" ? (
+        <IconTile name="shield" size={size} />
+      ) : (
+        <ConnectorIcon def={source.def} image={source.image} label={source.name} size={size} />
+      )}
     </View>
   );
 }
@@ -157,7 +214,13 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
             {email.body}
           </Text>
           {!full && long ? (
-            <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setOpen((o) => !o)}>
+            // An 18-point line: 13 of slop around it gives the 44-point target.
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={13}
+              onPress={() => setOpen((o) => !o)}
+              style={({ pressed }) => (pressed ? styles.pressed : null)}
+            >
               <Text variant="footnote" tone="ink2" style={[styles.medium, styles.underline]}>
                 {open ? t("approval.email.less") : t("approval.email.more")}
               </Text>
@@ -167,7 +230,7 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
       ) : null}
       {answers ? (
         <View style={[styles.answers, { backgroundColor: c.sunken, borderTopColor: c.line2 }]}>
-          <Icon name="reply" size={13} color={c.muted} />
+          <LineIcon name="reply" size={13} color={c.muted} variant="footnote" />
           <Text variant="footnote" tone="muted" style={styles.grow}>
             {answers}
           </Text>
@@ -217,7 +280,7 @@ export function ApprovalTraits({ approval: a }: { approval: Approval }) {
 
 /**
  * Por onde, then the exact values (at most `max` rows; `long`: whole, every one), on a sunken plate.
- * `stacked`: each label above its value, for a narrow card where a label column squeezes the values.
+ * `stacked`: each label above its value and no plate, for a request card where a label column squeezes the values.
  */
 export function ApprovalDetails({
   approval: a,
@@ -255,7 +318,8 @@ export function ApprovalDetails({
   );
   if (rows.length === 0) return null;
   return (
-    <View style={[styles.facts, { backgroundColor: c.sunken }]}>
+    // Stacked it opens inside a request card: flat on it, divided by hairlines (never a plate in a card).
+    <View style={stacked ? undefined : [styles.facts, { backgroundColor: c.sunken }]}>
       {rows.map((r, i) => (
         <View
           key={r.label ?? "via"}
@@ -334,7 +398,7 @@ export function ApprovalAheadLine({
   if (aheadPhase(a) !== "asking" || !a.runAt) return null;
   return (
     <View style={styles.origin}>
-      <LineIcon name="clock" size={14} color={c.ink2} variant="small" />
+      <LineIcon name="clock" size={15} color={c.ink2} variant="small" />
       <Text variant="small" tone="ink" style={[styles.grow, styles.medium]}>
         {t("approval.ahead.line", { when: nextLabel(i18n.language, a.runAt) })}
       </Text>
@@ -435,8 +499,9 @@ export function ApprovalFuse({ approval: a }: { approval: Pick<Approval, "create
 const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   facts: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
-  fact: { flexDirection: "row", gap: 10, paddingVertical: 7 },
-  factStacked: { gap: 2, paddingVertical: 7 },
+  // With the box's 4, the first and last fact sit 10 from its edge, as the letter's head and body do.
+  fact: { flexDirection: "row", gap: 10, paddingVertical: 6 },
+  factStacked: { gap: 2, paddingVertical: 6 },
   wrapAnywhere: { flexShrink: 1 },
   factKey: { width: 92 },
   grow: { flex: 1, minWidth: 0 },
@@ -444,7 +509,7 @@ const styles = StyleSheet.create({
   why: { gap: 4 },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   fuse: { flexDirection: "row", alignItems: "center", gap: 10 },
-  letter: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, borderBottomLeftRadius: 4, overflow: "hidden" },
+  letter: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, borderBottomLeftRadius: 6, overflow: "hidden" },
   letterHead: { gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   letterBody: { gap: 6, paddingHorizontal: 12, paddingVertical: 10 },
   answers: {
@@ -457,6 +522,7 @@ const styles = StyleSheet.create({
   },
   medium: { fontWeight: "600" },
   underline: { textDecorationLine: "underline" },
+  pressed: { opacity: 0.6 },
   saidRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   expiry: { fontWeight: "500", fontVariant: ["tabular-nums"] },
   always: { gap: 4 },

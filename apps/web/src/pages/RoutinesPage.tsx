@@ -108,6 +108,7 @@ import {
   Tabs,
   Textarea,
   Toolbar,
+  useAutoGrow,
   zonedInstant,
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -373,7 +374,8 @@ export function RoutinesPage() {
             sky
             title={t("routines.emptyTitle")}
             actions={
-              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              // The page head has the one primary "New routine": here it is secondary.
+              <Button icon="plus" onClick={() => setCreating(true)}>
                 {t("routines.new")}
               </Button>
             }
@@ -946,7 +948,10 @@ function RoutineRow({
         open={deleting}
         onOpenChange={(o) => !o && setDeleting(false)}
         title={t("routines.deleteTitle", { name: title })}
-        description={running ? t("routines.deleteBodyRunning") : t("routines.deleteBody")}
+        description={t("common.joinSentences", {
+          a: running ? t("routines.deleteBodyRunning") : t("routines.deleteBody"),
+          b: t("common.cantUndo"),
+        })}
         closeLabel={t("common.close")}
         width={440}
       >
@@ -1355,7 +1360,7 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                             to="/org/$orgId/approvals"
                             params={{ orgId: org.id }}
                             search={{ open: a.id }}
-                            className="routine-ahead__title"
+                            className="routine-ahead__title ac-captop"
                           >
                             {approvalTitle(t, { ...a, email: null })}
                           </Link>
@@ -1366,7 +1371,7 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                           </small>
                         </span>
                         {a.canCancel && (
-                          <span className="ac-acts">
+                          <span className="ac-acts ac-captop">
                             <CancelAhead id={a.id} />
                           </span>
                         )}
@@ -1473,6 +1478,8 @@ function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () 
   const sent = useSent<string>(r.prompt ?? "");
   const prompt = sent.pending ?? r.prompt ?? "";
   const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
+  // As tall as its text where the engine can't size it from CSS (`field-sizing`, which the Mac app's WebKit lacks).
+  useAutoGrow(ref, draft ?? "", draft !== null);
   if (!r.canSeeDetails || r.prompt === null) return <p className="small muted">{t("routines.detailsHidden")}</p>;
   if (isWidgetRoutine(r))
     return (
@@ -2482,7 +2489,7 @@ function RoutineDialog({
                       <Icon name={p.icon} size={16} />
                     </span>
                     <span>
-                      <b>{t(`routines.presets.${p.key}.name`)}</b>
+                      <b className="ac-captop">{t(`routines.presets.${p.key}.name`)}</b>
                       <small>{t(`routines.presets.${p.key}.text`)}</small>
                     </span>
                   </button>

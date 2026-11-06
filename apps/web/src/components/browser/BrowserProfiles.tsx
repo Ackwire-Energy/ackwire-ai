@@ -214,7 +214,12 @@ function DeleteDialog({ profile, onClose }: { profile: BrowserProfile; onClose: 
       width={440}
     >
       <DialogBody>
-        <p>{count > 0 ? t("browser.profiles.deleteText", { count }) : t("browser.profiles.deleteTextNone")}</p>
+        <p>
+          {t("common.joinSentences", {
+            a: count > 0 ? t("browser.profiles.deleteText", { count }) : t("browser.profiles.deleteTextNone"),
+            b: t("common.cantUndo"),
+          })}
+        </p>
       </DialogBody>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
