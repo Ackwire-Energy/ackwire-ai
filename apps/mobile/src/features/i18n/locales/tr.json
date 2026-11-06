@@ -1678,11 +1678,8 @@
   },
   "ai": {
     "yourPlan": "Yapay zeka planınız",
-    "coding": "Kodlama planı",
-    "codingSub": "GLM, Kimi, MiniMax veya OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM ve diğerleri",
     "plansFoot": "Ajanlar planınızla düşünür, API anahtarı gerekmez. Plan, ajanın bilgisayarında oturum açar.",
-    "whichPlan": "Hangi plan",
-    "codingFoot": "Kodlama planı, ajanın bilgisayarında kendi anahtarıyla oturum açar.",
     "change": "Değiştir",
     "how": "Nasıl bağlanır",
     "whose": "Anahtar kimin",

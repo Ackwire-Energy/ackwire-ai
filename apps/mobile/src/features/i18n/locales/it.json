@@ -1769,11 +1769,8 @@
   },
   "ai": {
     "yourPlan": "Il tuo piano di IA",
-    "coding": "Piano per programmare",
-    "codingSub": "GLM, Kimi, MiniMax o OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM e altri",
     "plansFoot": "Gli agenti pensano con il tuo piano, senza bisogno di una chiave API. L'accesso avviene sul computer dell'agente.",
-    "whichPlan": "Quale piano",
-    "codingFoot": "Un piano per programmare accede con la propria chiave, sul computer dell'agente.",
     "change": "Cambia",
     "how": "Come collegare",
     "whose": "Di chi è la chiave",

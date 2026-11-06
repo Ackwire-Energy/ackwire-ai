@@ -2123,6 +2123,19 @@
       "other": "または別のものを接続"
     },
     "orPayGo": "または従量課金で",
+    "pay": {
+      "label": "支払い方法は？",
+      "plan": "プランで",
+      "key": "APIキーで"
+    },
+    "pick": {
+      "plan": "プラン",
+      "placeholder": "プランを選ぶ",
+      "search": "プロバイダーを検索",
+      "searchPlaceholder": "プロバイダー名",
+      "noResults": "プロバイダーが見つかりません",
+      "list": "プロバイダー"
+    },
     "plan": {
       "claude": {
         "title": "あなたのClaudeプラン",

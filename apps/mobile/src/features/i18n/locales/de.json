@@ -1678,11 +1678,8 @@
   },
   "ai": {
     "yourPlan": "Dein KI-Abo",
-    "coding": "Coding-Abo",
-    "codingSub": "GLM, Kimi, MiniMax oder OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM und andere",
     "plansFoot": "Agenten denken mit deinem Abo, ohne API-Schlüssel. Es meldet sich auf dem Computer des Agenten an.",
-    "whichPlan": "Welches Abo",
-    "codingFoot": "Ein Coding-Abo meldet sich mit seinem eigenen Schlüssel auf dem Computer des Agenten an.",
     "change": "Ändern",
     "how": "So verbindest du",
     "whose": "Wessen Schlüssel",

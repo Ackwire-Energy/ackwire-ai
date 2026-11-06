@@ -1,4 +1,5 @@
 import { type ConnectIntent, keys, useAiAccounts, useAiStatus, useApi } from "@agenteschat/client";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, choiceOfIntent, freePlanAccount, PLAN_CHOICES } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -25,6 +26,8 @@ export function useConnectKey(orgId: string, asked?: string) {
   const api = useApi();
   const qc = useQueryClient();
   const [provider, setProvider] = useState<ProviderId>(() => providerGuess(undefined, asked));
+  // "Outro provedor" (ADR 0146): its own form, saved by its own button (a sheet only: the first run saves a key).
+  const [custom, setCustom] = useState(asked === CUSTOM_PROVIDER);
   const [key, setKeyRaw] = useState("");
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -53,8 +56,19 @@ export function useConnectKey(orgId: string, asked?: string) {
       setSaving(false);
     }
   };
-  // `asked`: what opened the sheet, so "Outro provedor" (ADR 0146) opens on its own form.
-  return { provider, setProvider, key, setKey, looksRight, ready: clean.length > 0, saving, failed, save, asked };
+  return {
+    provider,
+    setProvider,
+    custom,
+    setCustom,
+    key,
+    setKey,
+    looksRight,
+    ready: clean.length > 0,
+    saving,
+    failed,
+    save,
+  };
 }
 
 export type ConnectKey = ReturnType<typeof useConnectKey>;

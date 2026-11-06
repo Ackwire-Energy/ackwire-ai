@@ -30,7 +30,6 @@ import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agente
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   keyLooksValid,
-  PROVIDERS,
   type ProviderId,
   providerGuess,
   providerLabel,
@@ -54,7 +53,6 @@ import {
   Meter,
   PageHeader,
   ProviderLogo,
-  Select,
   Switch,
   Textarea,
 } from "@agenteschat/ui";
@@ -85,7 +83,7 @@ import { useOrg } from "@/components/org-context";
 import { UsageTabs } from "@/components/PeopleUsage";
 import { PlanUsageCards } from "@/components/PlanUsage";
 import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
-import { KeyMismatch, KeySite } from "@/components/ProviderKey";
+import { KeyMismatch, KeySite, ProviderKeySelect } from "@/components/ProviderKey";
 import { RightHandSettingsSection } from "@/components/RightHandSettings";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
@@ -901,31 +899,13 @@ export function KeyDialog({
   const pending = add.isPending || rotate.isPending;
   const providerSelect = (
     <Field label={t("settings.provider")} id="key-provider">
-      <Select
+      <ProviderKeySelect
         value={custom ? CUSTOM_PROVIDER : provider}
-        onValueChange={(v) => {
+        disabled={pending}
+        onChange={(v) => {
           setCustom(v === CUSTOM_PROVIDER);
-          if (v !== CUSTOM_PROVIDER) setProvider(v as ProviderId);
+          if (v !== CUSTOM_PROVIDER) setProvider(v);
         }}
-        options={[
-          ...PROVIDERS.map((p) => ({
-            value: p.id as string,
-            label: p.label,
-            leading: <ProviderLogo id={p.id} size="xs" />,
-          })),
-          {
-            value: CUSTOM_PROVIDER,
-            label: t("endpoint.option"),
-            description: t("endpoint.optionSub"),
-            leading: <ProviderLogo id={CUSTOM_PROVIDER} size="xs" />,
-          },
-        ]}
-        renderValue={(o) => (
-          <span className="row">
-            {o.leading}
-            {o.label}
-          </span>
-        )}
       />
     </Field>
   );

@@ -2257,6 +2257,20 @@ export const ptBR = {
       other: "Ou conecte outra",
     },
     orPayGo: "Ou pague pelo uso",
+    /** The two ways to pay, on a control the width of a phone: keep them short. */
+    pay: {
+      label: "Como você paga?",
+      plan: "Com um plano",
+      key: "Com chave de API",
+    },
+    pick: {
+      plan: "Plano",
+      placeholder: "Escolha um plano",
+      search: "Buscar provedores",
+      searchPlaceholder: "Nome do provedor",
+      noResults: "Nenhum provedor encontrado",
+      list: "Provedores",
+    },
     plan: {
       claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Ultra, Team ou Enterprise" },
       chatgpt: { title: "Seu plano do ChatGPT", tiers: "Plus, Pro, Business ou Enterprise" },

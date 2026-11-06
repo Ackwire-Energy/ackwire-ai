@@ -1,6 +1,66 @@
-import { type ProviderId, providerOf, providersForKey } from "@agenteschat/client/lib/providers";
-import { Button, ProviderLogo } from "@agenteschat/ui";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
+import { PROVIDERS, type ProviderId, providerOf, providersForKey } from "@agenteschat/client/lib/providers";
+import { Button, ProviderLogo, SearchSelect, type SearchSelectProps } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
+
+/** One provider from a list, by its logo and name, with a search: every AI picker's select. */
+export function ProviderSelect<V extends string>(props: Omit<SearchSelectProps<V>, "labels" | "renderValue">) {
+  const { t } = useTranslation();
+  return (
+    <SearchSelect
+      {...props}
+      labels={{
+        search: t("connectAi.pick.search"),
+        searchPlaceholder: t("connectAi.pick.searchPlaceholder"),
+        noResults: t("connectAi.pick.noResults"),
+        list: t("connectAi.pick.list"),
+      }}
+      renderValue={(o) =>
+        o ? (
+          <span className="row">
+            {o.leading}
+            {o.label}
+          </span>
+        ) : (
+          props.placeholder
+        )
+      }
+    />
+  );
+}
+
+/** Whose API key: the makers, the most used first, then "Outro provedor" (ADR 0146). */
+export function ProviderKeySelect({
+  value,
+  onChange,
+  id,
+  disabled,
+}: {
+  value: ProviderId | typeof CUSTOM_PROVIDER;
+  onChange: (provider: ProviderId | typeof CUSTOM_PROVIDER) => void;
+  id?: string;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ProviderSelect<ProviderId | typeof CUSTOM_PROVIDER>
+      aria-label={t("settings.provider")}
+      value={value}
+      onValueChange={onChange}
+      {...(id ? { id } : {})}
+      {...(disabled ? { disabled } : {})}
+      options={[
+        ...PROVIDERS.map((p) => ({ value: p.id, label: p.label, leading: <ProviderLogo id={p.id} size="xs" /> })),
+        {
+          value: CUSTOM_PROVIDER,
+          label: t("endpoint.option"),
+          description: t("endpoint.optionSub"),
+          leading: <ProviderLogo id={CUSTOM_PROVIDER} size="xs" />,
+        },
+      ]}
+    />
+  );
+}
 
 /**
  * Under a key field: where to create the provider's key, then for one that also sells coding plans not to use

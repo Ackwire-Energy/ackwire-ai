@@ -2206,6 +2206,19 @@
       "other": "Ya da başka birini bağlayın"
     },
     "orPayGo": "Ya da kullandıkça ödeyin",
+    "pay": {
+      "label": "Nasıl ödersiniz?",
+      "plan": "Planla",
+      "key": "API anahtarıyla"
+    },
+    "pick": {
+      "plan": "Plan",
+      "placeholder": "Plan seçin",
+      "search": "Sağlayıcı ara",
+      "searchPlaceholder": "Sağlayıcı adı",
+      "noResults": "Sağlayıcı bulunamadı",
+      "list": "Sağlayıcılar"
+    },
     "plan": {
       "claude": {
         "title": "Claude planınız",

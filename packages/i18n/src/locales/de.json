@@ -2216,6 +2216,19 @@
       "other": "Oder eine andere verbinden"
     },
     "orPayGo": "Oder nach Verbrauch zahlen",
+    "pay": {
+      "label": "Wie zahlst du?",
+      "plan": "Mit einem Abo",
+      "key": "Mit API-Schlüssel"
+    },
+    "pick": {
+      "plan": "Abo",
+      "placeholder": "Abo auswählen",
+      "search": "Anbieter suchen",
+      "searchPlaceholder": "Name des Anbieters",
+      "noResults": "Kein Anbieter gefunden",
+      "list": "Anbieter"
+    },
     "plan": {
       "claude": {
         "title": "Dein Claude-Abo",

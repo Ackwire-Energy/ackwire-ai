@@ -85,8 +85,7 @@ describe("an agent's Connect card", () => {
     expect(row.textContent).not.toContain("Conectado");
     await click(within(row).getByRole("button", { name: "Conectar" }));
     const add = dialog("Conectar uma IA") as HTMLElement;
-    const makers = within(add).getByRole("group", { name: "Provedor" });
-    expect(within(makers).getByRole("button", { name: "OpenAI" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(add).getByRole("combobox", { name: "Provedor" }).textContent).toBe("OpenAI");
   });
 
   test("done from live data: 'Conectado' once its agents think (with that plan, for a plan's card)", async () => {

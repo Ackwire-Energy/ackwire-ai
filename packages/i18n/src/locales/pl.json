@@ -2383,6 +2383,19 @@
       "other": "Albo połącz inne"
     },
     "orPayGo": "Albo płać za użycie",
+    "pay": {
+      "label": "Jak płacisz?",
+      "plan": "Planem",
+      "key": "Kluczem API"
+    },
+    "pick": {
+      "plan": "Plan",
+      "placeholder": "Wybierz plan",
+      "search": "Szukaj dostawców",
+      "searchPlaceholder": "Nazwa dostawcy",
+      "noResults": "Nie znaleziono dostawcy",
+      "list": "Dostawcy"
+    },
     "plan": {
       "claude": {
         "title": "Twój plan Claude",

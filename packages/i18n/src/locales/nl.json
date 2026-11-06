@@ -2217,6 +2217,19 @@
       "other": "Of koppel een ander"
     },
     "orPayGo": "Of betaal per gebruik",
+    "pay": {
+      "label": "Hoe betaal je?",
+      "plan": "Met abonnement",
+      "key": "Met API-sleutel"
+    },
+    "pick": {
+      "plan": "Abonnement",
+      "placeholder": "Kies een abonnement",
+      "search": "Aanbieders zoeken",
+      "searchPlaceholder": "Naam van de aanbieder",
+      "noResults": "Geen aanbieder gevonden",
+      "list": "Aanbieders"
+    },
     "plan": {
       "claude": {
         "title": "Je Claude-abonnement",

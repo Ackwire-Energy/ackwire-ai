@@ -1685,11 +1685,8 @@ export const featureKeysPtBR = {
   },
   ai: {
     yourPlan: "Seu plano de IA",
-    coding: "Plano de código",
-    codingSub: "GLM, Kimi, MiniMax ou OpenCode",
+    plansSub: "Claude, ChatGPT, Gemini, GLM e outros",
     plansFoot: "Os agentes pensam com o seu plano, sem chave de API. Ele entra pelo computador do agente.",
-    whichPlan: "Qual plano",
-    codingFoot: "O plano de código entra com a chave dele, pelo computador do agente.",
     change: "Trocar",
     how: "Como conectar",
     whose: "De quem é a chave",

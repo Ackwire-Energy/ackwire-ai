@@ -35,6 +35,8 @@ import {
   KEY_MARKS,
   kindOf,
   ownSignInFor,
+  PLAN_CHOICES,
+  PLAN_MARKS,
   type PlanChoice,
   type PlanGate,
   planGate,
@@ -42,16 +44,10 @@ import {
   planLabel,
   planMark,
   planOfAccount,
+  planPickText,
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
-import {
-  geminiPersonal,
-  isPlanId,
-  PLAN_IDS,
-  planOf,
-  providerFitsChoice,
-  signInProviderOf,
-} from "@agenteschat/client/lib/plans";
+import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
   keyLooksValid,
@@ -83,6 +79,7 @@ import {
 import { SetupWait } from "../computer/SetupWait";
 import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";
+import { PickList } from "../shared/PickList";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { EndpointForm } from "./EndpointForm";
@@ -93,10 +90,10 @@ import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from 
 /*
  * "Conectar uma IA" on the phone: the web's content and rules
  * (ADR 0059, ADR 0061) in the app's own line. The first page is grouped lists like iOS Settings: what the person
- * already has (for an agent with no AI), your AI plan (Claude, ChatGPT, the coding plans in one row) and pay as you
- * go (the API key). Each row pushes its page inside
- * the sheet: a plan's mark, for which agent, and its numbered steps on the agent's computer (or why they wait); the
- * key's maker as a radio list, where its keys are made, and the key. A plan signs in on the agent's computer: with
+ * already has (for an agent with no AI), your AI plan and pay as you go (the API key), one row each. Each pushes its
+ * page inside the sheet: the plans with a search, then a plan's mark, for which agent, and its numbered steps on the
+ * agent's computer (or why they wait); the key's maker, chosen the same way, where its keys are made, and the key. A
+ * plan signs in on the agent's computer: with
  * none, "Conectar um computador", and the key stays one tap away.
  */
 
@@ -182,14 +179,17 @@ export function useGatesWithoutAgent(orgId: string, on: boolean) {
 
 type GatesWithoutAgent = ReturnType<typeof useGatesWithoutAgent>;
 
-/** Where the flow is: the first page, the coding plans, one plan's page, or the API key's. */
-export type FlowView = { page: "home" } | { page: "coding" } | { page: "plan"; choice: PlanChoice } | { page: "key" };
+/** Where the flow is: the first page, the plans, one plan's page, the API key's, or that key's makers. */
+export type FlowView =
+  | { page: "home" }
+  | { page: "plans" }
+  | { page: "plan"; choice: PlanChoice }
+  | { page: "key" }
+  | { page: "makers" };
 
 /** The page an intent opens on (a message that asked for a plan or a key). */
 export const viewOf = (choice: AiChoice | null): FlowView =>
   !choice ? { page: "home" } : choice === "key" ? { page: "key" } : { page: "plan", choice };
-
-const CODING_MARKS = ["zai", "kimi", "minimax", "opencode"] as const;
 
 export interface ConnectAiFlowProps {
   view: FlowView;
@@ -351,16 +351,17 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
       go({ page: "plan", choice });
     }
   };
-  const to: FlowView | null =
-    view.page === "home" ? null : view.page === "plan" && isPlanId(view.choice) ? { page: "coding" } : { page: "home" };
+  const to: FlowView | null = view.page === "home" ? null : view.page === "makers" ? { page: "key" } : { page: "home" };
   const title =
     view.page === "home"
       ? (sheetTitle ?? t("connectAi.title.any"))
-      : view.page === "coding"
-        ? t("mobile.ai.coding")
+      : view.page === "plans"
+        ? t("connectAi.pick.placeholder")
         : view.page === "key"
           ? t("connectAi.key.title")
-          : planLabel(t, view.choice);
+          : view.page === "makers"
+            ? t("mobile.ai.whose")
+            : planLabel(t, view.choice);
   return (
     <>
       {sheetTitle !== undefined ? (
@@ -385,8 +386,10 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
           busy={busy}
           onHave={pickHave}
         />
-      ) : view.page === "coding" ? (
-        <Coding onView={go} dims={dims} />
+      ) : view.page === "plans" ? (
+        <Plans onView={go} dims={dims} />
+      ) : view.page === "makers" ? (
+        <Makers form={props.keyForm} withEndpoint={props.keyButton !== false} onDone={() => go({ page: "key" })} />
       ) : view.page === "plan" ? (
         <PlanPage
           key={view.choice}
@@ -400,7 +403,7 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
           {...(login?.choice === view.choice ? { login } : {})}
         />
       ) : (
-        <KeyPage {...props} />
+        <KeyPage {...props} onMakers={() => go({ page: "makers" })} />
       )}
     </>
   );
@@ -451,22 +454,12 @@ function Home({
       ) : null}
       <GroupedHeader>{t("mobile.ai.yourPlan")}</GroupedHeader>
       <GroupedList>
-        {(["claude", "chatgpt", "grok", "gemini"] as const).map((c) => (
-          <GroupedRow
-            key={c}
-            leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
-            label={planLabel(t, c)}
-            sub={t(`connectAi.plan.${c}.tiers`)}
-            chevron
-            onPress={() => onView({ page: "plan", choice: c })}
-          />
-        ))}
         <GroupedRow
-          leading={<ProviderQuad ids={CODING_MARKS} off={PLAN_IDS.every(dims)} />}
-          label={t("mobile.ai.coding")}
-          sub={t("mobile.ai.codingSub")}
+          leading={<ProviderQuad ids={PLAN_MARKS} off={PLAN_CHOICES.every(dims)} />}
+          label={t("connectAi.pick.placeholder")}
+          sub={t("mobile.ai.plansSub")}
           chevron
-          onPress={() => onView({ page: "coding" })}
+          onPress={() => onView({ page: "plans" })}
         />
       </GroupedList>
       <GroupedFooter>{t("mobile.ai.plansFoot")}</GroupedFooter>
@@ -485,26 +478,58 @@ function Home({
   );
 }
 
-/** The four coding plans. */
-function Coding({ onView, dims }: { onView: (v: FlowView) => void; dims: (choice: PlanChoice) => boolean }) {
+/** The plans, the most used first, with a search: what each is sold as under its name. */
+function Plans({ onView, dims }: { onView: (v: FlowView) => void; dims: (choice: PlanChoice) => boolean }) {
   const { t } = useTranslation();
   return (
-    <View>
-      <GroupedHeader>{t("mobile.ai.whichPlan")}</GroupedHeader>
-      <GroupedList>
-        {PLAN_IDS.map((c) => (
-          <GroupedRow
-            key={c}
-            leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
-            label={planLabel(t, c)}
-            sub={t(`connectAi.plan.${c}.tiers`)}
-            chevron
-            onPress={() => onView({ page: "plan", choice: c })}
-          />
-        ))}
-      </GroupedList>
-      <GroupedFooter>{t("mobile.ai.codingFoot")}</GroupedFooter>
-    </View>
+    <PickList
+      options={PLAN_CHOICES.map((c) => ({
+        value: c,
+        label: planLabel(t, c),
+        description: t(`connectAi.plan.${c}.tiers`),
+        mark: planMark(c),
+        off: dims(c),
+        keywords: planPickText(t, c),
+      }))}
+      value={undefined}
+      onPick={(o) => onView({ page: "plan", choice: o.value })}
+      placeholder={t("connectAi.pick.searchPlaceholder")}
+      searchLabel={t("connectAi.pick.search")}
+      noResults={t("connectAi.pick.noResults")}
+    />
+  );
+}
+
+/** Whose API key: the makers, the most used first, with a search, then "Outro provedor" (a sheet only: `withEndpoint`). */
+function Makers({ form, withEndpoint, onDone }: { form: ConnectKey; withEndpoint: boolean; onDone: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <PickList
+      options={[
+        ...PROVIDERS.map((p) => ({ value: p.id as string, label: p.label, mark: p.id as string, keywords: "" })),
+        ...(withEndpoint
+          ? [
+              {
+                value: CUSTOM_PROVIDER as string,
+                label: t("endpoint.option"),
+                description: t("endpoint.optionSub"),
+                mark: CUSTOM_PROVIDER as string,
+                keywords: "",
+              },
+            ]
+          : []),
+      ]}
+      value={form.custom ? CUSTOM_PROVIDER : form.provider}
+      onPick={(o) => {
+        const maker = PROVIDERS.find((p) => p.id === o.value);
+        form.setCustom(!maker);
+        if (maker) form.setProvider(maker.id);
+        onDone();
+      }}
+      placeholder={t("connectAi.pick.searchPlaceholder")}
+      searchLabel={t("connectAi.pick.search")}
+      noResults={t("connectAi.pick.noResults")}
+    />
   );
 }
 
@@ -1088,16 +1113,22 @@ function GateWait({
 }
 
 /**
- * The API key's page: whose key (a radio list; paid per use, straight to its maker), then the web's two numbered
- * steps: create the key on the maker's page, paste it here. Saved by its button.
+ * The API key's page: whose key (one row that opens the makers; paid per use, straight to its maker), then the web's
+ * two numbered steps: create the key on the maker's page, paste it here. Saved by its button.
  */
-function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveKey }: ConnectAiFlowProps) {
+function KeyPage({
+  mayAddKey,
+  keyForm: form,
+  keyButton = true,
+  keySaved,
+  onSaveKey,
+  onMakers,
+}: ConnectAiFlowProps & { onMakers: () => void }) {
   const { t } = useTranslation();
   const { orgId } = useAiOrg();
   const [touched, setTouched] = useState(false);
   const [opened, setOpened] = useState(false);
-  // "Outro provedor" (ADR 0146): its own form, saved by its own button (a sheet only: the first run saves a key).
-  const [custom, setCustom] = useState(form.asked === CUSTOM_PROVIDER);
+  const { custom } = form;
   const [endpointSaved, setEndpointSaved] = useState(false);
   const maker = providerOf(form.provider);
   const hint = maker && keyStepHint(maker);
@@ -1121,27 +1152,13 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
     <View>
       <GroupedHeader>{t("mobile.ai.whose")}</GroupedHeader>
       <GroupedList>
-        {PROVIDERS.map((p) => (
-          <GroupedRow
-            key={p.id}
-            leading={<ProviderLogo id={p.id} size="sm" />}
-            label={p.label}
-            checked={!custom && form.provider === p.id}
-            onPress={() => {
-              setCustom(false);
-              form.setProvider(p.id);
-            }}
-          />
-        ))}
-        {keyButton ? (
-          <GroupedRow
-            leading={<ProviderLogo id={CUSTOM_PROVIDER} size="sm" />}
-            label={t("endpoint.option")}
-            sub={t("endpoint.optionSub")}
-            checked={custom}
-            onPress={() => setCustom(true)}
-          />
-        ) : null}
+        <GroupedRow
+          leading={<ProviderLogo id={custom ? CUSTOM_PROVIDER : form.provider} size="sm" />}
+          label={custom ? t("endpoint.option") : providerLabel(form.provider)}
+          chevron
+          disabled={form.saving}
+          onPress={onMakers}
+        />
       </GroupedList>
       <GroupedFooter>{t("connectAi.key.sub")}</GroupedFooter>
       {custom ? (

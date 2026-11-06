@@ -17,6 +17,7 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
+import { aiSelect, chooseAi, payWith } from "./ai-picker";
 import {
   createFakeApi,
   ENG_ID,
@@ -631,11 +632,7 @@ describe("Criar agente: what gets created", () => {
     await settle(6);
     const box = screen().getByRole("dialog", { name: "Conectar uma IA" });
     // A plan for the agent being made (never one of theirs): a computer to connect opens beside the draft.
-    await click(
-      within(within(box).getByRole("group", { name: "Qual IA eles vão usar?" })).getByRole("button", {
-        name: "Claude",
-      }),
-    );
+    await chooseAi(box, "Claude");
     const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
     const opened: unknown[][] = [];
     const realOpen = window.open;
@@ -649,7 +646,7 @@ describe("Criar agente: what gets created", () => {
       window.open = realOpen;
     }
     expect(opened).toEqual([[`/org/${ORG_ID}/settings/computers`, "_blank", "noopener"]]);
-    await click(within(box).getByRole("button", { name: /^Chave de API/ }));
+    await click(payWith(box, "Com chave de API"));
     await act(async () =>
       fireEvent.change(within(box).getByLabelText("Cole aqui"), {
         target: { value: "sk-ant-api03-abcdefghijklmnop1234" },
@@ -735,9 +732,8 @@ describe("Criar agente: what gets created", () => {
     await settle(6);
     const box = screen().getByRole("dialog", { name: "Conectar uma IA" });
     // The same choices as Settings › Contas de IA and the setup, for the agents they create.
-    const choices = within(box).getByRole("group", { name: "Qual IA eles vão usar?" });
-    expect(within(choices).getByRole("button", { name: "Claude" })).toBeTruthy();
-    expect(within(choices).getByRole("button", { name: /^Chave de API/ })).toBeTruthy();
+    expect(aiSelect(box).textContent).toBe("Claude");
+    expect(payWith(box, "Com chave de API")).toBeTruthy();
     const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Os agentes que você criar pensam com ele.");
     await act(async () => fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Escape" }));
@@ -1064,12 +1060,7 @@ describe("Criar agente: what gets created", () => {
     ]);
     // Nobody signed in to ChatGPT there: Connect an AI for Eva, on ChatGPT, over the moment she's created.
     const d = screen().getByRole("dialog", { name: /^Conectar uma IA para .*Eva$/ });
-    const picker = within(d).getByRole("group", { name: "Qual IA eles vão usar?" });
-    expect(
-      within(picker)
-        .getByRole("button", { name: /^ChatGPT$/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    expect(aiSelect(d).textContent).toBe("ChatGPT");
   });
 
   test("the last setup (ADR 0094): a plan of mine starts chosen, said on the model step, saved with all of it", async () => {

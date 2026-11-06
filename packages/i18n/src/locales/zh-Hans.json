@@ -2124,6 +2124,19 @@
       "other": "或连接其他"
     },
     "orPayGo": "或按量付费",
+    "pay": {
+      "label": "你怎么付费？",
+      "plan": "用套餐",
+      "key": "用 API 密钥"
+    },
+    "pick": {
+      "plan": "套餐",
+      "placeholder": "选择套餐",
+      "search": "搜索服务商",
+      "searchPlaceholder": "服务商名称",
+      "noResults": "没有找到服务商",
+      "list": "服务商"
+    },
     "plan": {
       "claude": {
         "title": "你的 Claude 套餐",

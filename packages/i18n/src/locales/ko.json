@@ -2121,6 +2121,19 @@
       "other": "또는 다른 것 연결"
     },
     "orPayGo": "또는 사용한 만큼 결제",
+    "pay": {
+      "label": "어떻게 결제하나요?",
+      "plan": "요금제로",
+      "key": "API 키로"
+    },
+    "pick": {
+      "plan": "요금제",
+      "placeholder": "요금제 선택",
+      "search": "제공업체 검색",
+      "searchPlaceholder": "제공업체 이름",
+      "noResults": "제공업체를 찾지 못했어요",
+      "list": "제공업체"
+    },
     "plan": {
       "claude": {
         "title": "내 Claude 요금제",

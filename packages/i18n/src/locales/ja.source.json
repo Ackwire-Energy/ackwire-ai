@@ -5377,6 +5377,33 @@
   "connectAi.orPayGo": {
     "value": "Or pay as you go"
   },
+  "connectAi.pay.label": {
+    "value": "How do you pay?"
+  },
+  "connectAi.pay.plan": {
+    "value": "With a plan"
+  },
+  "connectAi.pay.key": {
+    "value": "With an API key"
+  },
+  "connectAi.pick.plan": {
+    "value": "Plan"
+  },
+  "connectAi.pick.placeholder": {
+    "value": "Choose a plan"
+  },
+  "connectAi.pick.search": {
+    "value": "Search providers"
+  },
+  "connectAi.pick.searchPlaceholder": {
+    "value": "Provider name"
+  },
+  "connectAi.pick.noResults": {
+    "value": "No provider found"
+  },
+  "connectAi.pick.list": {
+    "value": "Providers"
+  },
   "connectAi.plan.claude.title": {
     "value": "Your Claude plan"
   },

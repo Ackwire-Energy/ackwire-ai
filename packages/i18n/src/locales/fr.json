@@ -2300,6 +2300,19 @@
       "other": "Ou en connecter un autre"
     },
     "orPayGo": "Ou payer à l'usage",
+    "pay": {
+      "label": "Comment payez-vous ?",
+      "plan": "Avec un abonnement",
+      "key": "Avec une clé API"
+    },
+    "pick": {
+      "plan": "Abonnement",
+      "placeholder": "Choisir un abonnement",
+      "search": "Chercher des fournisseurs",
+      "searchPlaceholder": "Nom du fournisseur",
+      "noResults": "Aucun fournisseur trouvé",
+      "list": "Fournisseurs"
+    },
     "plan": {
       "claude": {
         "title": "Votre abonnement Claude",

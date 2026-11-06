@@ -111,43 +111,43 @@ p {
 .grid-options--sm {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
-/* The AI picker's plans and the key's makers: three tiles in the setup's column and in the dialog, two at 390px
-   wide; each a mark and its name on one line, centred on the mark, chosen or not ("OpenCode Go" is the longest). */
-.grid-options--plans {
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+/* The AI picker: what the person already has, a plan or an API key, one select of whose, and the chosen one's panel. */
+.ai-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
 }
-.grid-options--plans > .ac-option {
-  align-items: center;
+.ai-picker > .ac-option {
   gap: 10px;
   padding-inline: 10px;
 }
-.grid-options--plans .ac-option__title {
+.ai-picker .ac-option__title {
   font-size: 14px;
 }
-/* A one-line tile's check sits in its middle, as its mark and its name do. */
-.grid-options--plans > .ac-option:not(.ai-picker__key)::after {
-  top: calc(50% - 9px);
+/* The two ways to pay share the width, each its half. */
+.ai-picker__pay.ac-seg {
+  display: flex;
 }
-/* The API key row's two lines: its check sits on the first, its name's (the padding, then half the line). */
-.grid-options--plans > .ac-option.ai-picker__key::after {
+.ai-picker__pay .ac-seg__item {
+  flex: 1 1 0;
+}
+/* A row's two lines: its check sits on the first, its name's (the padding, then half the line). */
+.ai-picker > .ac-option.ai-picker__key::after {
   /* Browsers without the lh unit: the page's 22px line. */
   top: calc(var(--space-3) + 11px - 9px);
 }
 /* Behind @supports: a declaration holding var() parses even where lh is unknown, so as a second `top` it would
    replace the fallback there and then compute to auto. */
 @supports (top: 1lh) {
-  .grid-options--plans > .ac-option.ai-picker__key::after {
+  .ai-picker > .ac-option.ai-picker__key::after {
     top: calc(var(--space-3) + 0.5lh - 9px);
   }
 }
-/* The chosen plan's panel right under the plans, on a row of its own and 12px under them, before the API key row:
-   nothing comes between an option and its steps. */
-.grid-options--plans > .ai-panel {
-  grid-column: 1 / -1;
+/* The chosen option's panel, 12px under the select: nothing comes between an option and its steps. */
+.ai-picker > .ai-panel {
   margin-top: 4px;
 }
 .ai-picker__or {
-  grid-column: 1 / -1;
   margin: 6px 0 -2px;
   font-size: 13px;
   line-height: 18px;
@@ -157,14 +157,9 @@ p {
 .ai-picker__or:first-child {
   margin-top: 0;
 }
-/* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
-.grid-options--plans > .ai-picker__key {
-  grid-column: 1 / -1;
+/* Its mark leads its first line (an `.ac-iconline`). */
+.ai-picker > .ai-picker__key {
   align-items: flex-start;
-}
-/* Our own key after the six makers: a row of its own, so its name keeps its line beside the check. */
-.grid-options--plans > .ai-key__ours {
-  grid-column: 1 / -1;
 }
 .grid-fields {
   display: grid;

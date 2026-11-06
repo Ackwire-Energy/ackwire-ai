@@ -20,7 +20,7 @@ interface ProviderEntry {
 }
 
 /**
- * Model providers the workspace can bring a key for, the same ids as the backend catalog
+ * Model providers the workspace can bring a key for, the most used first, the same ids as the backend catalog
  * (`packages/providers/src/catalog.ts`). The server validates keys for real.
  */
 export const PROVIDERS = [
@@ -48,6 +48,14 @@ export const PROVIDERS = [
     site: "aistudio.google.com/api-keys",
     masculine: true,
     billing: true,
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    placeholder: "sk-or-v1-…",
+    pattern: /^sk-or-v\d+-[A-Za-z0-9]{32,}$/,
+    site: "openrouter.ai/keys",
+    privacy: true,
   },
   {
     id: "deepseek",
@@ -78,14 +86,6 @@ export const PROVIDERS = [
     pattern: /^(?!sk-ant-|sk-cp-|sk-or-|AQ\.|AIza)[A-Za-z0-9._-]{16,}$/,
     site: "platform.minimax.io/user-center/basic-information/interface-key",
     plans: true,
-  },
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    placeholder: "sk-or-v1-…",
-    pattern: /^sk-or-v\d+-[A-Za-z0-9]{32,}$/,
-    site: "openrouter.ai/keys",
-    privacy: true,
   },
 ] as const satisfies readonly ProviderEntry[];
 

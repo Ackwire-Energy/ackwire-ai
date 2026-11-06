@@ -4102,20 +4102,11 @@
   "ai.yourPlan": {
     "value": "Your AI plan"
   },
-  "ai.coding": {
-    "value": "Coding plan"
-  },
-  "ai.codingSub": {
-    "value": "GLM, Kimi, MiniMax or OpenCode"
+  "ai.plansSub": {
+    "value": "Claude, ChatGPT, Gemini, GLM and others"
   },
   "ai.plansFoot": {
     "value": "Agents think with your plan, no API key needed. It signs in on the agent's computer."
-  },
-  "ai.whichPlan": {
-    "value": "Which plan"
-  },
-  "ai.codingFoot": {
-    "value": "A coding plan signs in with its own key, on the agent's computer."
   },
   "ai.change": {
     "value": "Change"

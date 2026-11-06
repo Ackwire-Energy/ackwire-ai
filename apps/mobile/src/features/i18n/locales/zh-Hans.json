@@ -1587,11 +1587,8 @@
   },
   "ai": {
     "yourPlan": "你的 AI 套餐",
-    "coding": "编程套餐",
-    "codingSub": "GLM、Kimi、MiniMax 或 OpenCode",
+    "plansSub": "Claude、ChatGPT、Gemini、GLM 等",
     "plansFoot": "智能体使用你的套餐思考，无需 API 密钥。套餐会在智能体的电脑上登录。",
-    "whichPlan": "哪个套餐",
-    "codingFoot": "编程套餐使用自己的密钥，在智能体的电脑上登录。",
     "change": "更改",
     "how": "如何连接",
     "whose": "谁的密钥",

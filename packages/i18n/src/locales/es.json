@@ -2297,6 +2297,19 @@
       "other": "O conecta otra"
     },
     "orPayGo": "O paga por uso",
+    "pay": {
+      "label": "¿Cómo pagas?",
+      "plan": "Con un plan",
+      "key": "Con clave de API"
+    },
+    "pick": {
+      "plan": "Plan",
+      "placeholder": "Elige un plan",
+      "search": "Buscar proveedores",
+      "searchPlaceholder": "Nombre del proveedor",
+      "noResults": "No se encontró ningún proveedor",
+      "list": "Proveedores"
+    },
     "plan": {
       "claude": {
         "title": "Tu plan de Claude",
