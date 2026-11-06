@@ -2523,6 +2523,57 @@ test("a computer brain that fails after a bridged pause: the run keeps waiting w
   expect(gh.executed).toEqual([{ tool: "github_merge_pr", input: { repo: "acme/app", pr: 42 } }]);
 });
 
+test("a short line before a bridged approval never shows live: the card says it, nothing is posted", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (_n, turn) {
+    yield { type: "text_delta", text: "Vou pedir a aprovação." };
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    await executeToolForRun(f.jobDeps, id, {
+      id: "call-1",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    });
+    yield { type: "done", text: "Vou pedir a aprovação." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const events = f.listen(f.general.id);
+  await post(f, "@dev faz o merge do PR 42");
+  await drainOutbox(f.db, handlers);
+
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_approval");
+  expect(events.some((e) => e.type === "agent.delta")).toBe(false);
+  expect((await timeline(f)).some((m) => m.body.includes("Vou pedir"))).toBe(false);
+});
+
+test("stopped between calls: the stopped reply keeps the stretch it was on, never the working text before a call", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (_n, turn) {
+    yield { type: "text_delta", text: "I need the inbox id first." };
+    yield { type: "tool_call", id: "c1", name: "Bash", input: {}, executed: { content: "ok" } };
+    yield { type: "text_delta", text: "Resumo das lojas:" };
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, turn.runId);
+    yield { type: "error", code: "executor_crashed", message: "stopped" };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev resume as lojas");
+  await drainOutbox(f.db, handlers);
+
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("canceled");
+  expect((await timeline(f)).at(-1)?.body).toBe("Resumo das lojas:\n\n_Stopped by ana._");
+});
+
 test("two gated bridged calls in one turn both wait; a gated call for a run that isn't running posts nothing", async () => {
   const gh = fakeGithub();
   f = await setup({ toolSources: [gh.source] });

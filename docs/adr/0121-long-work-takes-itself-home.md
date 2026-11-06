@@ -103,3 +103,7 @@ Migration `0174_background_work.sql`: `agent_works` (with `org_id`, `anchor_mess
 - Works for unattended runs and for missions (missions keep their own plan and progress).
 - A Bloqueado column: a badge for now; one enum value later if wanted.
 - "Continuar agora" on the paused line: the usage pause card in the work's thread has it.
+
+## Addendum 2026-11-05: moving a run out of its thread
+
+Asked inside a thread, a work kept the thread, and nothing could change that: `replyThreadOf` was fixed at the start and `post_message` refused the run's own channel. `post_message({ channel, text, move_here: true })` now posts at the top level of that channel (the thread's own, or another) and calls `moveRun` (`works.ts`): `agent_runs.channel_id` is the channel, `thread_root_id` the trigger (so `replyThreadOf` is null), and a work gets `channel_id`, `home_thread_id` null and `own_thread` false, so its updates and report land there too. Every later wake reads that row. A line stays where it was (`meta.movedOn`, `bodyCode` `moved_on`, the link as a message pill); it routes to nobody. The executor follows through `adoptWork`, which reads `channel_id` too, on the same `run-work` topic. `movableRun` holds what `workEligible` holds, minus the work checks: a person's run in a conversation people read, outside a mission's thread. A person writing in the old thread afterwards starts a new run there. A work's anchor stays where it was posted.

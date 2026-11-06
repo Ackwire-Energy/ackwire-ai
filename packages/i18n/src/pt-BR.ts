@@ -12757,6 +12757,7 @@ export const ptBR = {
         "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui. O próximo update deve sair em ~{{minutes}} min.",
       /** O mesmo depois que o trabalho acabou: a linha embaixo diz como terminou, então não sobra promessa (ADR 0121). */
       work_auto_movedOver: "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui.",
+      moved_on: "Continua em {{link}}",
       work_end_done: "Concluído ({{minutes}} min).",
       work_end_failed: "Esse trabalho em segundo plano não terminou ({{minutes}} min).",
       work_end_failedWhy: "Esse trabalho em segundo plano não terminou ({{minutes}} min): {{why}}.",

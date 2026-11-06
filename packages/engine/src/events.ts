@@ -147,21 +147,6 @@ export type ChannelEvent =
        */
       from?: number;
     }
-  /**
-   * The text the agent streamed before calling tools was progress narration
-   * ("Go isn't installed; I'll try…"), not the answer: show it as a step
-   * of the work and clear it from the live reply. The message holds only the
-   * final answer.
-   */
-  | {
-      type: "agent.narration";
-      channelId: string;
-      threadId: string | null;
-      runId: string;
-      agentId: string;
-      turn: number;
-      text: string;
-    }
   /** An agent run changed state (`running` = typing indicator). */
   | {
       type: "agent.run";

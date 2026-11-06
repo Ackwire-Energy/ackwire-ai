@@ -214,7 +214,6 @@ import { type OutsideMemo, personWords, runReadOutside } from "./outside";
 import { assertPersonUnderLimit } from "./person-usage";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
-import { reachWillHand } from "./reach";
 import {
   endsWithSentinel,
   isSentinelOnly,
@@ -1112,11 +1111,13 @@ async function executeRunInner(
   // Asked in the main timeline, the run answers there; asked in a thread, in that thread.
   // A top-level trigger is read here, together with the channel, and reused for the context below.
   const topLevel = run.threadRootId === run.triggerMessageId;
-  const [channelRow, topTrigger] = await Promise.all([
+  const [firstChannel, topTrigger] = await Promise.all([
     getChannelCached(db, run.orgId, run.channelId),
     topLevel ? getMessage(db, run.orgId, run.triggerMessageId) : Promise.resolve(null),
   ]);
-  // Where it answers. Long work (ADR 0121) moves it to its anchor's thread mid-run (`adoptWork`).
+  let channelRow = firstChannel;
+  // Where it answers. Long work (ADR 0121) moves it to its anchor's thread mid-run, a move a person asked for to
+  // another place (`adoptWork`).
   let replyThreadId = replyThreadOf(run);
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   // Background work (a routine's run, or long work) says so: the apps keep it out of the conversation's "working" row.
@@ -1438,24 +1439,29 @@ async function executeRunInner(
   // Back to its long work after a wait (a person, its plan, its computer): the promise starts over (ADR 0121 §3).
   if (backFromWait && run.workId) await resumeWorkTimer({ db, pubsub: deps.pubsub }, run).catch(() => {});
   /**
-   * The run moved to the background (its own tool, the bridge's on another replica, or the safety net): from now on it
-   * answers in the work's thread, outside the conversation's working row, and its report goes home.
+   * The run moved to the background (its own tool, the bridge's on another replica, or the safety net), or a person
+   * sent it elsewhere (`moveRun`): from now on it answers there, background work outside the conversation's working
+   * row, and its report goes home.
    */
   const adoptWork = async () => {
-    if (run.workId) return false;
     const [row] = await db
-      .select({ workId: agentRuns.workId, threadRootId: agentRuns.threadRootId })
+      .select({ workId: agentRuns.workId, threadRootId: agentRuns.threadRootId, channelId: agentRuns.channelId })
       .from(agentRuns)
       .where(eq(agentRuns.id, run.id));
-    if (!row?.workId) return false;
+    if (!row) return;
     run.workId = row.workId;
     run.threadRootId = row.threadRootId;
     ctx.threadRootId = row.threadRootId;
     replyThreadId = replyThreadOf(run);
     where.threadId = replyThreadId;
-    bg = { background: true };
+    if (row.channelId !== ctx.channelId) {
+      run.channelId = row.channelId;
+      ctx.channelId = row.channelId;
+      where.channelId = row.channelId;
+      channelRow = await getChannelCached(db, run.orgId, row.channelId);
+    }
+    if (row.workId) bg = { background: true };
     await loadWorkHome();
-    return true;
   };
   /** Where a closing message goes: a work's report home (where it was asked), else where the run answers. */
   const workThread = () => (workHome ? workHome.homeThreadId : replyThreadId);
@@ -2277,7 +2283,8 @@ async function executeRunInner(
    * wrote so far, nothing lost, with "Stopped by …", and tell the channel.
    * A background run posts nothing (ADR 0053 §5): its ledger says who stopped it.
    */
-  const stopCanceled = async (partial: string) => {
+  /** `partial` goes on the transcript ("Continuar" reads on from it); `said`, what of it the stopped reply shows. */
+  const stopCanceled = async (partial: string, said = partial) => {
     await deferred;
     const t = transcript as Transcript;
     const [row] = await db.select({ error: agentRuns.error }).from(agentRuns).where(eq(agentRuns.id, run.id));
@@ -2302,23 +2309,24 @@ async function executeRunInner(
     const wrote = [
       ...t.messages
         .slice(t.postedUpTo)
-        .filter((m) => m.role === "assistant")
+        // A step that called a tool wrote working text: it stays on the transcript and the run's activity.
+        .filter((m) => m.role === "assistant" && !hasToolUse(m))
         .map((m) => stripSentinel(textOf(m.content))),
-      stripSentinel(partial),
+      stripSentinel(said),
     ]
       .filter(Boolean)
       .join("\n\n");
     // The apps show `canceled.text`, not the body: the right hand's is scrubbed here, before both (ADR 0137 §4).
-    const said = isRightHand(agent) ? await scrubRightHandReply(db, run, wrote) : wrote;
+    const shown = isRightHand(agent) ? await scrubRightHandReply(db, run, wrote) : wrote;
     // Cut mid-stream: what it was writing stays in the transcript too ("Continuar" picks up from there).
     if (partial.trim() && t.messages.at(-1)?.role !== "assistant")
       t.messages.push({ role: "assistant", content: [{ type: "text", text: partial.trim() }] });
     const note = `_Stopped${person ? ` by ${person.name}` : ""}._`;
     const message = await db.transaction(async (tx) => {
-      const m = await post(tx, replyThreadId, said ? `${said}\n\n${note}` : note, {
+      const m = await post(tx, replyThreadId, shown ? `${shown}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
         // `text`: what the agent wrote; the app adds "Stopped by …" in the person's language.
-        canceled: { byUserId: by, text: said },
+        canceled: { byUserId: by, text: shown },
       });
       t.postedUpTo = t.messages.length;
       t.postedCount++;
@@ -2424,8 +2432,6 @@ async function executeRunInner(
       }),
     ]);
     if (counted[0]) run = counted[0];
-    if (said)
-      await publishChannelEvent(deps.pubsub, { type: "agent.narration", ...where, turn, text: cutText(said, 4000) });
   };
 
   /** Moves what a tool returned onto the transcript (cards for the next post) and tells the channel about memory. */
@@ -3763,25 +3769,17 @@ async function executeRunInner(
         }
       }
       const turn = run.turns + 1;
-      const deltas = createDeltaPublisher(
-        deps.pubsub,
-        run,
-        replyThreadId,
-        deps.deltaFlushMs ?? 50,
-        transcript.deltaSeq,
-        {
-          turn,
-          event: { type: "agent.typing", ...where },
-          onFirst: () => {
-            deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id });
-            if (admitted?.fromLine && !askingForRoom)
-              void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
-          },
-          quiet: run.background,
-          scrub: isRightHand(agent),
-          stretches: plan.kind === "claude_code",
+      const deltas = createDeltaPublisher(deps.pubsub, run, where, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
+        turn,
+        onFirst: () => {
+          deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id });
+          if (admitted?.fromLine && !askingForRoom)
+            void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
         },
-      );
+        quiet: run.background,
+        scrub: isRightHand(agent),
+        stretches: plan.kind === "claude_code",
+      });
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
       // message at once. Computer brains run tools inside their turn, so they read it at the next step.
       const turnAbort = plan.kind === "model" ? registerTurnAbort(run.id, (id) => readIds.has(id)) : null;
@@ -3986,7 +3984,7 @@ async function executeRunInner(
         await deltas.flush();
         await deferred;
         // Canceled mid-stream: the gateway recorded the usage so far; keep the text so far.
-        if (await isCanceled()) return stopCanceled(deltas.text());
+        if (await isCanceled()) return stopCanceled(deltas.text(), deltas.answer());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
         // Anything but "no room" means the computer took the turn: that wait for room is over.
@@ -4133,7 +4131,14 @@ async function executeRunInner(
           await publishQueueChanged(deps.pubsub, run.orgId, ranOn);
         }
       }
-      await deltas.flush();
+      // A bridged call paused the run in this turn: what it wrote leads to a card, or the card says it already.
+      const [now] =
+        turnPlan.kind === "model"
+          ? []
+          : await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
+      await deltas.flush(
+        result.toolCalls.length === 0 && now?.status !== "waiting_approval" && now?.status !== "waiting_input",
+      );
       const passedLine = transcript.outage?.line;
       delete transcript.outage;
       if (passedLine) {
@@ -4147,7 +4152,7 @@ async function executeRunInner(
       if (turnPlan.kind !== "model") mergeToolEffects(transcript, await takeBridgeEffects(db, run.id));
       // A computer brain's turn with nothing to say (its tools ran through the bridge) adds no empty message.
       if (result.content.length > 0) transcript.messages.push({ role: "assistant", content: result.content });
-      // Text before tool calls is narration of the work: kept on the model call's step, not part of the answer.
+      // Text before tool calls is narration of the work: kept on the model call's step for its activity, never live.
       const turnText = dropSquashedEcho(textOf(result.content).trim());
       const narration = result.stopReason === "tool_use" && turnText ? turnText : "";
       // The calls a computer turn ran itself (Codex's commands and edits, Claude Code's Bash, WebSearch…):
@@ -4195,15 +4200,6 @@ async function executeRunInner(
         await saveTranscript(db, transcript);
         return stopCanceled("");
       }
-      if (narration) {
-        await publishChannelEvent(deps.pubsub, {
-          type: "agent.narration",
-          ...where,
-          turn,
-          text: cutText(narration, 4000),
-        });
-      }
-
       const toolUses = result.toolCalls;
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
@@ -4537,17 +4533,8 @@ async function executeRunInner(
               handedTo: run.id,
             }).catch(() => [])
           : [];
-      // The ones the message's reach hands it to as a note (`settleReach`) are handed already.
-      const handedByReach =
-        channelRow && outside.length > 0
-          ? await reachWillHand(db, run, channelRow, outside).catch(() => [] as string[])
-          : [];
       const unreached = channelRow
-        ? unreachedNote(
-            outside.filter((h) => !handedByReach.includes(h)),
-            channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`,
-            channelRow.kind !== "dm",
-          )
+        ? unreachedNote(outside, channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`, channelRow.kind !== "dm")
         : "";
       const judging = evidenceFor(t);
       // Help it asked for in this run and stopped waiting on (a person wrote meanwhile): only then a lookup.
@@ -5177,6 +5164,9 @@ export async function executeToolForRun(
   return { ...result, isError: result.isError === true };
 }
 
+const hasToolUse = (m: Transcript["messages"][number]) =>
+  typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use");
+
 /**
  * When the final model call wrote nothing: the agent's last narration since
  * the last post ("Installed Go and built it."), else a plain "Done." when it
@@ -5189,7 +5179,7 @@ function closingSummary(t: Transcript, anythingPosted: boolean): string {
     .filter(Boolean)
     .at(-1);
   if (last) return last;
-  const usedTools = turns.some((m) => typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use"));
+  const usedTools = turns.some(hasToolUse);
   return usedTools && !anythingPosted ? DONE_TEXT : "";
 }
 
@@ -5234,22 +5224,30 @@ function postAgentMessage(
   });
 }
 
+/** Model text this long is read as the answer: what it writes before a tool call ("I need the inbox id") is shorter. */
+const WORKING_TEXT_MAX = 280;
+
 /**
  * Batches stream deltas so a fast model doesn't send one pub/sub message per
  * token (each is a NOTIFY on the Postgres adapter). Chunks stay well under the
  * NOTIFY payload limit. `seq` continues across the turns of a run. The silence
  * word (NO_REPLY) never shows live, on any run: what could still become it is
  * held, and it is cut when it shows up (`visibleText`, reply-policy.ts).
+ *
+ * People read a reply's answer, never its working text. No brain's stream says which is which until the next tool
+ * call or the turn's end, so each stretch is held until it ends the turn (`flush(true)`) or reaches `WORKING_TEXT_MAX`;
+ * a tool call drops what was held. The cost: a short answer arrives whole at the turn's end, and working text past
+ * that length still shows until its call.
  */
 function createDeltaPublisher(
   pubsub: PubSub,
   run: AgentRun,
-  threadId: string | null,
+  /** Where the run answers, read at each event: a computer brain's turn can move mid-way. */
+  where: { channelId: string; threadId: string | null; agentId: string; runId: string },
   flushMs: number,
   startSeq = 0,
   first: {
     turn: number;
-    event?: ChannelEvent;
     onFirst?: () => void;
     /** Background work (a routine's run): nothing of its text shows live in the conversation. */
     quiet?: boolean;
@@ -5267,6 +5265,13 @@ function createDeltaPublisher(
   let all = "";
   /** What was published so far (always a prefix of what may be shown). */
   let shown = "";
+  /** The stretches read as the answer so far, and where the current one starts in `all`. */
+  let kept = "";
+  let openAt = 0;
+  const showable = (final: boolean) => {
+    const open = all.slice(openAt);
+    return final || open.trim().length >= WORKING_TEXT_MAX ? kept + open : kept;
+  };
   const live: LiveTurn = { turn: first.turn, text: "", from: 0, stretches: first.stretches };
   /** Length of `all` at the last send. */
   let sentUpTo = 0;
@@ -5298,7 +5303,7 @@ function createDeltaPublisher(
     timer = null;
     sentUpTo = all.length;
     if (first.quiet) return;
-    const said = visibleText(all, final);
+    const said = visibleText(showable(final), final);
     const visible = first.scrub ? scrubSignIns(final ? said : said.slice(0, said.search(/\S*$/)), "••••").text : said;
     // A held piece turned out to be the word (now cut): nothing new to show.
     if (!visible.startsWith(shown)) return;
@@ -5314,8 +5319,8 @@ function createDeltaPublisher(
       rest = rest.slice(MAX_CHUNK);
       const evt: ChannelEvent = {
         type: "agent.delta",
-        channelId: run.channelId,
-        threadId,
+        channelId: where.channelId,
+        threadId: where.threadId,
         runId: run.id,
         agentId: run.agentId,
         seq: seq++,
@@ -5334,17 +5339,16 @@ function createDeltaPublisher(
         started = true;
         first.onFirst?.();
         // Published in order, before the first delta.
-        const typing = first.quiet ? undefined : first.event;
-        if (typing) pending = pending.then(() => publishChannelEvent(pubsub, typing));
+        if (!first.quiet) pending = pending.then(() => publishChannelEvent(pubsub, { type: "agent.typing", ...where }));
       }
       all += text;
       if (text) marks.push([Date.now(), all.length]);
       if (flushMs === 0 || all.length - sentUpTo >= MAX_CHUNK) send();
       else timer ??= setTimeout(() => send(), flushMs);
     },
-    async flush() {
-      // The turn's text is complete: what was held is shown now, unless it was the word.
-      send(true);
+    /** `answer`: the turn ended on this text, not on a tool call or a failure: what was held shows, unless it was the word. */
+    async flush(answer = false) {
+      send(answer);
       liveTurns.delete(run.id);
       await pending;
     },
@@ -5352,6 +5356,8 @@ function createDeltaPublisher(
     /** A call the brain ran inside its turn ended (through the bridge or on its own): later text is a new stretch. */
     toolEnded() {
       breaks.push([Date.now(), all.length]);
+      kept = showable(false);
+      openAt = all.length;
       if (!first.stretches) return;
       // The stretch is over, so what waited for its last word to grow is whole, and starts no later text.
       send(true);
@@ -5368,6 +5374,8 @@ function createDeltaPublisher(
      * calls set apart as paragraphs.
      */
     text: () => stretches().join("\n\n"),
+    /** What a stopped reply shows: the stretches read as the answer and the one it was on, none a call ended. */
+    answer: () => showable(true),
     /**
      * What the brain said after its last call, as its final answer is (the model brain's is its last call's text): the
      * stretches before it were said on the way, or dropped half-written for a call and written again after it.

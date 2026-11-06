@@ -102,7 +102,7 @@ describe('"Parar e mandar" (steer: "now")', () => {
     const events = f.listen(f.general.id);
     const question = await ask("@dev revisa o PR");
     let steeredId = "";
-    onFirst("agent.delta", () => {
+    onFirst("agent.typing", () => {
       const steer = async () => {
         try {
           steeredId = (await ask("na verdade, usa a branch dev", { threadId: question.id, steer: "now" })).id;
@@ -125,7 +125,6 @@ describe('"Parar e mandar" (steer: "now")', () => {
     expect(JSON.stringify(second.at(-1))).toContain("na verdade, usa a branch dev");
 
     expect(events.find((e) => e.type === "agent.run.steered")).toMatchObject({ messageId: steeredId, now: true });
-    expect(events.find((e) => e.type === "agent.narration")).toMatchObject({ turn: 1, text: "Começando pelo main." });
     expect(events.find((e) => e.type === "agent.run.read")).toMatchObject({ messageIds: [steeredId] });
     expect(events.some((e) => e.type === "run.canceled")).toBe(false);
     // The reply is in the main timeline, where it was asked; the message sent to it, in the thread.
@@ -246,7 +245,7 @@ describe('"Continuar" after a stop', () => {
       },
     });
     const question = await ask("@dev analisa os logs");
-    onFirst("agent.delta", (e) => {
+    onFirst("agent.typing", (e) => {
       void cancelRun(deps(), f.owner.id, f.org.id, String(e.runId)).finally(release);
     });
     await drainOutbox(f.db, f.handlers);
