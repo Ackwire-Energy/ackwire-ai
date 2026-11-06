@@ -13,6 +13,7 @@ import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
 import {
   browserGranted,
   cardStateOf,
+  framesWanted,
   hostOf,
   keyPastDraft,
   type PageGap,
@@ -115,6 +116,26 @@ describe("the browser card", () => {
     expect(siteLetter("www.loja.exemplo")).toBe("L");
     expect(siteLetter("dashboard.stripe.com")).toBe("D");
     expect(siteLetter("")).toBe("");
+  });
+});
+
+describe("the card's browser frames next to the agent's screen (ADR 0058 §7)", () => {
+  const base = { watching: true, profile: false, holding: false, settled: true, desktop: false };
+
+  test("watches the frames when the screen isn't shown", () => {
+    expect(framesWanted(base)).toBe(true);
+    expect(framesWanted({ ...base, watching: false })).toBe(false);
+    expect(framesWanted({ ...base, watching: false, profile: true })).toBe(true);
+  });
+
+  test("watches no frames while it shows the screen, nor before the screen's status answers", () => {
+    expect(framesWanted({ ...base, desktop: true })).toBe(false);
+    expect(framesWanted({ ...base, settled: false })).toBe(false);
+  });
+
+  test("whoever holds the browser always watches: their watch keeps their control", () => {
+    expect(framesWanted({ ...base, holding: true, desktop: true })).toBe(true);
+    expect(framesWanted({ ...base, holding: true, settled: false })).toBe(true);
   });
 });
 

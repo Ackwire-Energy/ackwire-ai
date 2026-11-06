@@ -17,6 +17,7 @@ import {
   type ExistingAi,
   existingAi,
   lendable,
+  ownSignInLower,
 } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts } from "@agenteschat/client/lib/brain-advanced";
@@ -226,7 +227,7 @@ export function accountSaved(
   if ("model" in input) return t("agentPage.work.saved.brain", { ...g, brain: thinksNow(t, saved) ?? "" });
   return a
     ? t("agentPage.work.saved.account", { ...g, account: a.label })
-    : t("aiAccounts.done.savedAgent", { agent: agentName, label: t("connectAi.own.sharedLower") });
+    : t("aiAccounts.done.savedAgent", { agent: agentName, label: ownSignInLower(t, saved.brain) });
 }
 
 /** What picking a model saves, as the web's dialog does: Automático picks the effort too; a fixed one after it, Médio. */

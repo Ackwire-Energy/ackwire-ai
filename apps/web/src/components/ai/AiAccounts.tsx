@@ -11,6 +11,7 @@ import {
   type PlanAccount,
   unusedCopies,
 } from "@agenteschat/client/lib/ai-accounts";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -205,7 +206,7 @@ export function AiAccountsSection() {
             const outFor = allOut ? [] : signedOut.flatMap((l) => l.usedBy);
             const facts = [
               a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
-              several ? t("aiAccounts.page.on", { computer: a.computer }) : null,
+              several ? t("aiAccounts.page.on", { computer: computerNameOf(t, org.name, a.computer) }) : null,
               usedBy.length > 0
                 ? t("aiAccounts.page.usedBy", { count: usedBy.length, agents: names(usedBy) })
                 : t("aiAccounts.page.noAgent"),

@@ -5,7 +5,7 @@ import type { AgentColor } from "@agenteschat/ui";
 import { Button } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Cover } from "../browser/BrowserCard";
+import { Cover } from "../browser/Cover";
 import { CommandBlock } from "../Machines";
 import { Egress } from "./Egress";
 

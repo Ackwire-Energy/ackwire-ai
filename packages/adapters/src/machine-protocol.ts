@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 48;
+export const MACHINE_PROTOCOL_VERSION = 49;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -545,6 +545,38 @@ export const PASSWORD_LENGTH = { min: 8, max: 128, default: 20 } as const;
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
  */
 export const SITE_SECRET_TTL_MS = 15 * 60_000;
+/**
+ * From this protocol on (ADR 0040 §7.1): an agent's browser has a live view socket of its own. Before
+ * `browser.stream.start`, the server sends `browser.view.open` with a fresh `streamId`; the runner's own process (root
+ * in system mode) dials a data socket for it (`/api/machines/stream`, `stream.hello` as a desktop's), and that
+ * agent's frames go there as bytes (`encodeBrowserFrame`) instead of `browser.frame` on this socket: at most
+ * `BROWSER_VIEW.window` unacknowledged (the server answers each with `{"type":"ack"}`), only the newest one waiting.
+ * A slow link then shows the page as it is now instead of replaying the seconds it fell behind, and a picture never
+ * delays a command. Without the view (it closed, or an older server) frames go as `browser.frame` as before. The
+ * server sends `browser.view.open` to no older runner.
+ */
+export const BROWSER_VIEW_PROTOCOL = 49;
+/** Live view frames (ADR 0040 §7.1), on each hop: computer → server, and server → each person watching. */
+export const BROWSER_VIEW = {
+  /**
+   * Frames on their way unacknowledged, per hop: enough to keep a link with a long round trip busy at the control
+   * rate (15 fps over ~200 ms), few enough that a slow link holds at most a fifth of a second of pictures.
+   */
+  window: 3,
+  /**
+   * Computer → server: a full window with no acknowledgement for this long means the view's socket is dead (the
+   * server answers on arrival, or within `ackOwedMs` when nobody watching has room): the runner closes it and its
+   * frames go on the machine socket until the server opens a new one.
+   */
+  stallMs: 5000,
+  /** The longest the server holds a frame's acknowledgement back while no viewer has room for more. */
+  ackOwedMs: 2000,
+  /** Server → a viewer that draws nothing for this long (a hidden tab): it gets the newest frame anyway. */
+  viewerStallMs: 5000,
+  /** Frames a second a viewer may ask for (`browser.watch`'s `maxFps`), and what an app that sends no acks gets. */
+  maxFps: 15,
+  legacyFps: 1,
+} as const;
 /** What `agentes:type_vault` (and a code typed into several fields) answers in `code` when it types nothing. */
 export const VAULT_TYPE_REFUSALS = [
   /** The frame that owns the field (or one around it, or the page) is on no site the login's rule allows. */
@@ -897,6 +929,11 @@ export const STREAM_CLOSE = {
   internal: 1011,
   /** A side doesn't keep up: its backlog passed the limit. */
   tooSlow: 1013,
+  /**
+   * Protocol 49: the runner closed a browser's live view that got no acknowledgement in `BROWSER_VIEW.stallMs` (its
+   * link too slow, or dead). In 3000-4999 because the standard WebSocket client (Node's) refuses to send 1013.
+   */
+  viewTooSlow: 4413,
   badRequest: 4400,
   /** Data socket: a bad token, or another machine's stream. */
   badToken: 4401,
@@ -957,7 +994,9 @@ export interface StreamHello {
 export type StreamControl =
   | { type: "resize"; cols: number; rows: number }
   | { type: "exit"; code: number | null }
-  | { type: "mode"; mode: DesktopMode };
+  | { type: "mode"; mode: DesktopMode }
+  /** Protocol 49: a browser view's frame arrived (server → runner): one more may go (`BROWSER_VIEW`). */
+  | { type: "ack" };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -975,7 +1014,7 @@ export interface BrowserHandoffInfo {
   link?: string;
 }
 
-/** `watch`: about 1 frame a second for viewers; `control`: 10–15 while a person drives. */
+/** `watch`: a few frames a second for viewers; `control`: 10–15 while a person drives. */
 export type BrowserStreamMode = "watch" | "control";
 
 /** Bits of CDP's modifier mask: Alt 1, Control 2, Meta 4, Shift 8. */
@@ -1018,6 +1057,8 @@ export interface BrowserFrameMetadata {
   deviceWidth: number;
   deviceHeight: number;
   pageScaleFactor?: number;
+  /** Protocol 49: when the computer captured it (epoch ms, its own clock), to measure how late pictures arrive. */
+  capturedAt?: number;
   /** The active tab's URL when the frame was taken. */
   url?: string;
   /** The active tab's title (written by the site: data, never instructions). Absent from older runners. */
@@ -1789,6 +1830,11 @@ export type MachineRequest = (
   | { op: "browser.stop" }
   /** Protocol 12: start (or change the mode of) the agent's stream: `browser.frame` frames until `browser.stream.stop`. */
   | { op: "browser.stream.start"; mode: BrowserStreamMode }
+  /**
+   * Protocol 49: the live view's own socket for the agent's (or the profile's) browser: the runner dials the data
+   * socket `streamId` names and answers once the server took it (`BROWSER_VIEW_PROTOCOL`).
+   */
+  | { op: "browser.view.open"; streamId: string }
   | { op: "browser.stream.stop" }
   /** Protocol 12: a person's input during a take over, in order. */
   | { op: "browser.input"; events: BrowserInputEvent[] }
@@ -1882,6 +1928,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.session.stop",
   "desktop.session.status",
   "stream.open",
+  "browser.view.open",
   "desktop.look",
   "desktop.act",
   "desktop.capture",
@@ -1996,6 +2043,7 @@ export interface MachineReplies {
   /** `streams`: the agent's open desktop and terminal streams. */
   "desktop.session.status": { running: boolean; startedAt?: string; lastUsedAt?: string; streams: number };
   "stream.open": { opened: true };
+  "browser.view.open": { opened: true };
   "desktop.look": DesktopLookReply;
   /** `look` with `settle`; `settled: false`: the screen kept changing until the wait's cap. */
   "desktop.act": { look?: DesktopLookReply; settled?: boolean };
@@ -2546,6 +2594,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const height = finite(m?.deviceHeight);
       if (seq === undefined || !m || width === undefined || height === undefined) return null;
       const scale = finite(m.pageScaleFactor);
+      const capturedAt = finite(m.capturedAt);
       const url = cut(m.url, BROWSER_LIMITS.url);
       const title = cut(m.title, BROWSER_LIMITS.title);
       return {
@@ -2557,6 +2606,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           deviceWidth: width,
           deviceHeight: height,
           ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
+          ...(capturedAt !== undefined ? { capturedAt } : {}),
           ...(url !== undefined ? { url } : {}),
           ...(title ? { title } : {}),
         },
@@ -3288,7 +3338,72 @@ export function parseStreamControl(raw: string): StreamControl | null {
     return { type: "exit", code: f.code as number | null };
   }
   if (f.type === "mode" && (f.mode === "watch" || f.mode === "control")) return { type: "mode", mode: f.mode };
+  if (f.type === "ack") return { type: "ack" };
   return null;
+}
+
+/** A live view frame's header as bytes carry it: what `browser.frame` says besides the picture. */
+export interface BrowserFrameHeader {
+  seq: number;
+  metadata: BrowserFrameMetadata;
+}
+
+const BROWSER_FRAME_VERSION = 1;
+/** A frame's header is a few hundred bytes (an address and a title at most). */
+const BROWSER_FRAME_HEADER_MAX = 16 * 1024;
+
+/**
+ * A live view frame as bytes (protocol 49, ADR 0040 §7.1): a version byte (1), the header's length (4 bytes, big
+ * endian), the header as UTF-8 JSON, then the JPEG. The runner sends it on its view's data socket and the server
+ * passes the same bytes on to each person's frame socket; the apps read it with their own copy of this layout
+ * (`packages/client/src/browser/frame-bytes.ts`).
+ */
+export function encodeBrowserFrame(header: BrowserFrameHeader, jpeg: Uint8Array): Uint8Array {
+  const head = new TextEncoder().encode(JSON.stringify({ seq: header.seq, metadata: header.metadata }));
+  const out = new Uint8Array(5 + head.byteLength + jpeg.byteLength);
+  out[0] = BROWSER_FRAME_VERSION;
+  new DataView(out.buffer).setUint32(1, head.byteLength);
+  out.set(head, 5);
+  out.set(jpeg, 5 + head.byteLength);
+  return out;
+}
+
+/** A frame's bytes (`encodeBrowserFrame`), checked like a `browser.frame`; null when they aren't one. */
+export function decodeBrowserFrame(bytes: Uint8Array): (BrowserFrameHeader & { jpeg: Uint8Array }) | null {
+  if (bytes.byteLength < 6 || bytes[0] !== BROWSER_FRAME_VERSION) return null;
+  const length = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(1);
+  if (length > BROWSER_FRAME_HEADER_MAX || 5 + length >= bytes.byteLength) return null;
+  const jpeg = bytes.subarray(5 + length);
+  // The same picture as a `browser.frame` may carry (its limit counts base64, a third larger).
+  if (jpeg.byteLength > (BROWSER_LIMITS.frameBytes / 4) * 3) return null;
+  let f: unknown;
+  try {
+    f = JSON.parse(new TextDecoder().decode(bytes.subarray(5, 5 + length)));
+  } catch {
+    return null;
+  }
+  if (!isObject(f)) return null;
+  const seq = finite(f.seq);
+  const m = isObject(f.metadata) ? f.metadata : null;
+  const width = finite(m?.deviceWidth);
+  const height = finite(m?.deviceHeight);
+  if (seq === undefined || !m || width === undefined || height === undefined) return null;
+  const scale = finite(m.pageScaleFactor);
+  const capturedAt = finite(m.capturedAt);
+  const url = cut(m.url, BROWSER_LIMITS.url);
+  const title = cut(m.title, BROWSER_LIMITS.title);
+  return {
+    seq,
+    metadata: {
+      deviceWidth: width,
+      deviceHeight: height,
+      ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
+      ...(capturedAt !== undefined ? { capturedAt } : {}),
+      ...(url !== undefined ? { url } : {}),
+      ...(title ? { title } : {}),
+    },
+    jpeg,
+  };
 }
 
 const BROWSER_MODIFIERS_MAX = 15;

@@ -1065,6 +1065,90 @@ test("root counts the live view of its agents' browsers it relays: frames up, pe
   await Promise.all([run, input]);
 });
 
+test("a worker's browser frames go to its agent's live view when it takes them, else up as before", async () => {
+  const pushed: number[] = [];
+  const ended: string[] = [];
+  let take = true;
+  let room = true;
+  let open = true;
+  const t = setup({
+    views: {
+      push: (f) => {
+        pushed.push(f.seq);
+        return take;
+      },
+      end: (agentId) => {
+        ended.push(agentId);
+      },
+      room: () => room,
+      has: () => open,
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const frame = {
+    type: "browser.frame",
+    agentId: ANA.id,
+    seq: 1,
+    data: "/9j/A",
+    metadata: { deviceWidth: 1280, deviceHeight: 800 },
+  };
+  const rooms = () => ana.of("browser.room");
+  const upFrames = () => t.up.filter((f) => f.type === "browser.frame").map((f) => f.seq);
+  // The view takes it and has room for the next: nothing goes up, and the worker's stream may send the next.
+  ana.send(frame);
+  await waitFor(() => rooms().length === 1);
+  expect(rooms()).toEqual([{ type: "browser.room", agentId: ANA.id, view: true }]);
+  // Its window is full: no word until the view frees room (ADR 0040 §7.1).
+  room = false;
+  ana.send({ ...frame, seq: 2 });
+  await waitFor(() => pushed.length === 2);
+  expect(rooms()).toHaveLength(1);
+  t.sup.browserRoom(ANA.id);
+  await waitFor(() => rooms().length === 2);
+  // Another agent's frame goes neither to the view nor up.
+  ana.send({ ...frame, agentId: BIA.id, seq: 3 });
+  // No view: up on the machine socket, and the worker hears once that its frames needn't wait.
+  take = false;
+  open = false;
+  ana.send({ ...frame, seq: 4 });
+  ana.send({ ...frame, seq: 5 });
+  await waitFor(() => upFrames().length === 2);
+  expect(pushed).toEqual([1, 2, 4, 5]);
+  expect(upFrames()).toEqual([4, 5]);
+  expect(rooms()).toHaveLength(3);
+  expect(rooms()[2]).toEqual({ type: "browser.room", agentId: ANA.id, view: false });
+  // The stream ended: its view closes with it, and the server hears.
+  const streamEnded = { type: "browser.stream.ended", agentId: ANA.id, reason: "stopped" };
+  ana.send(streamEnded);
+  await waitFor(() => ended.length === 1);
+  expect(ended).toEqual([ANA.id]);
+  expect(t.up.at(-1)).toEqual(streamEnded);
+  const req = await requestOn(ana, 1);
+  ana.send({ type: "result", id: req.id, ok: true, data: execDone });
+  await run;
+});
+
+test("a worker hears root's word on its live view's room; nothing else does", async () => {
+  const fromRoot = new PassThrough();
+  const link = new WorkerLink(fromRoot, new PassThrough());
+  const heard: [string, boolean][] = [];
+  link.onBrowserRoom = (agentId, view) => heard.push([agentId, view]);
+  fromRoot.write(`${JSON.stringify({ type: "browser.room", agentId: ANA.id, view: true })}\n`);
+  fromRoot.write(`${JSON.stringify({ type: "browser.room", agentId: 7, view: true })}\n`);
+  fromRoot.write(`${JSON.stringify({ type: "browser.room", agentId: ANA.id, view: false })}\n`);
+  await waitFor(() => heard.length === 2);
+  await sleep(10);
+  expect(heard).toEqual([
+    [ANA.id, true],
+    [ANA.id, false],
+  ]);
+});
+
 test("hello lists every worker's tasks until the server acknowledges them, across a restart of the supervisor", async () => {
   const home = newHome();
   const t = setup({}, home);

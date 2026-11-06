@@ -2321,6 +2321,8 @@
     "own": {
       "shared": "Het account dat je agents delen",
       "sharedLower": "het account dat je agents delen",
+      "free": "Gratis modellen van OpenCode",
+      "freeLower": "de gratis modellen van OpenCode",
       "one": "Een account alleen voor {{name}}",
       "one_female": "Een account alleen voor {{name}}",
       "each": "Een account alleen voor hen"

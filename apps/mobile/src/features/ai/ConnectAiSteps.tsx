@@ -1060,7 +1060,7 @@ function PlanSteps({
         <GroupedList>
           {ownable ? (
             <GroupedRow
-              label={t("connectAi.own.shared")}
+              label={kind === "opencode" ? t("connectAi.own.free") : t("connectAi.own.shared")}
               {...(ownPlan ? { sub: `${planLabel(t, choice)} ${ownPlan}` } : {})}
               onPress={() => void saveOwn()}
             />

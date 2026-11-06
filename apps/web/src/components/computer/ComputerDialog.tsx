@@ -40,7 +40,7 @@ import { SetupWait, useWaitReader } from "../WorkspaceComputer";
 import { CantShowCover, ScreenNotice, Stage } from "./covers";
 import { type AgentComputerView, useAgentComputer } from "./facts";
 import { DialogHead, DialogHeadContext, type DialogHeadSlots, type KeptPicture } from "./head";
-import { OpenComputerContext, useOpenComputer } from "./open";
+import { OpenComputerContext, OpenedComputerContext, useOpenComputer } from "./open";
 import "./computer.css";
 
 /**
@@ -708,7 +708,7 @@ export function ComputerDialogProvider({ children }: { children: ReactNode }) {
   const close = useCallback(() => setAgentId(null), []);
   return (
     <OpenComputerContext.Provider value={setAgentId}>
-      {children}
+      <OpenedComputerContext.Provider value={agent ? agent.id : null}>{children}</OpenedComputerContext.Provider>
       {agent && <ComputerDialog key={agent.id} agent={agent} open onClose={close} />}
     </OpenComputerContext.Provider>
   );

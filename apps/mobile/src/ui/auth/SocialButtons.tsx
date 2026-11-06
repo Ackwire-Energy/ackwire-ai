@@ -161,7 +161,7 @@ function LastUsed() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "center", marginTop: 6 }}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "center", marginTop: 2 }}>
       <Icon name="clock" size={12} color={colors.muted} />
       <Text variant="caption" tone="muted">
         {t("auth.lastUsed")}

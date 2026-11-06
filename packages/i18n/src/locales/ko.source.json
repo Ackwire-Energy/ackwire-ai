@@ -5590,6 +5590,12 @@
   "connectAi.own.sharedLower": {
     "value": "the account your agents share"
   },
+  "connectAi.own.free": {
+    "value": "OpenCode's free models"
+  },
+  "connectAi.own.freeLower": {
+    "value": "OpenCode's free models"
+  },
   "connectAi.own.one": {
     "value": "An account just for {{name}}"
   },

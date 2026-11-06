@@ -3,18 +3,28 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-/** noVNC as the screen drives it, connected to nothing. */
-mock.module("@novnc/novnc", () => ({
-  default: class {
-    addEventListener() {}
-    sendKey() {}
-    clipboardPasteFrom() {}
-    focus() {}
-    disconnect() {}
-  },
-}));
+/** noVNC as the screen drives it, connected to nothing: `emit` plays its events. */
+class FakeRfb {
+  static all: FakeRfb[] = [];
+  viewOnly = false;
+  private listeners = new Map<string, (() => void)[]>();
+  constructor() {
+    FakeRfb.all.push(this);
+  }
+  addEventListener(type: string, fn: () => void) {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
+  }
+  emit(type: string) {
+    for (const fn of this.listeners.get(type) ?? []) fn();
+  }
+  sendKey() {}
+  clipboardPasteFrom() {}
+  focus() {}
+  disconnect() {}
+}
+mock.module("@novnc/novnc", () => ({ default: FakeRfb }));
 
-import { BROWSER_STUCK_MS, type BrowserHandoff, type SocketFactory } from "@agenteschat/client";
+import { BROWSER_STUCK_MS, type BrowserHandoff, type DesktopStatus, type SocketFactory } from "@agenteschat/client";
 import { icons, isApple } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { useState } from "react";
@@ -897,8 +907,19 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     await act(async () =>
       socket.push({ type: "browser.status", agentId: ADA_ID, mode: "watch", controllerUserId: null, handoff: null }),
     );
-    await act(async () => socket.push(page()));
+    // A server that paces the view asks for answers (`ack: true`): it takes rate changes too.
+    await act(async () => socket.push({ ...page(), ack: true }));
     expect(card.querySelector(".brw-dim")).toBeNull();
+    // In the conversation and full screen alike the page gets the stream's own rate (ADR 0040 §7.1): no limit asked,
+    // and going full screen changes nothing, never a new watch, which would restart the view.
+    const asked = socket.sent.filter((f) => (f as { type: string }).type === "browser.watch");
+    expect(asked.every((f) => (f as { maxFps?: number }).maxFps === undefined)).toBe(true);
+    const watched = watches(socket);
+    const rates = () => socket.sent.filter((f) => (f as { type: string }).type === "browser.fps");
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tela cheia" })));
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Sair da tela cheia" })));
+    expect(rates()).toHaveLength(0);
+    expect(watches(socket)).toBe(watched);
     // Closed, nothing waiting: the cover says so plainly, and the logins sentence once, not under the title too.
     await act(async () => socket.push({ type: "browser.unavailable", agentId: ADA_ID, reason: "closed" }));
     expect(cover()).toContain("O navegador da Ada está fechado.");
@@ -954,5 +975,152 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     );
     await act(async () => socket.push(page()));
     expect(card.querySelector(".brw-dim")).toBeNull();
+  });
+});
+
+/** A person's socket to the agent's screen: the server side closes it with a code. */
+class ScreenSocket {
+  binaryType = "blob";
+  readyState = 1;
+  closed = false;
+  private listeners = new Map<string, ((e: unknown) => void)[]>();
+  constructor(readonly url: string) {}
+  addEventListener(type: string, fn: (e: unknown) => void) {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
+  }
+  send() {}
+  close() {
+    this.closed = true;
+  }
+  serverClose(code: number, reason = "") {
+    this.closed = true;
+    for (const fn of this.listeners.get("close") ?? []) fn({ code, reason });
+  }
+}
+
+describe("its browser on the agent's screen: the card shows the whole screen (ADR 0058 §7)", () => {
+  let offScreen = () => {};
+  afterEach(() => {
+    offScreen();
+    offScreen = () => {};
+    FakeRfb.all = [];
+  });
+
+  const watches = (socket: { sent: unknown[] }) =>
+    socket.sent.filter((f) => (f as { type: string }).type === "browser.watch").length;
+
+  /** Ada works in her browser, which runs on her screen; her run's card in #eng, on screen. */
+  async function working(desktop: Partial<DesktopStatus> = {}) {
+    offScreen = onScreen(".brw-ac");
+    const state = seedState();
+    const api = createFakeApi(state);
+    const fake = fakeBrowserOf.get(api);
+    fake?.desktops.set(ADA_ID, { available: true, reason: null, running: true, canControl: true, ...desktop });
+    fake?.sameWindow.add(ADA_ID);
+    const realtime = fakeSockets();
+    const screens: ScreenSocket[] = [];
+    const createSocket: SocketFactory = (url) => {
+      if (!url.includes("/api/desktop")) return realtime.factory(url);
+      const s = new ScreenSocket(url);
+      screens.push(s);
+      return s as unknown as ReturnType<SocketFactory>;
+    };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api, createSocket });
+    await settle(5);
+    const socket = realtime.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-screen", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(6);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    return { state, socket, screens, card };
+  }
+
+  test("the screen in the card, watching only, on a card's own socket; no frames watched meanwhile", async () => {
+    const { socket, screens, card } = await working();
+    expect(screens).toHaveLength(1);
+    expect(screens[0]?.url).toContain("preview=1&mode=watch");
+    expect(screens[0]?.url).not.toContain("switch=1");
+    expect(watches(socket)).toBe(0);
+    expect(card.querySelector(".brw-ac__stage > .dsk.dsk--card")).not.toBeNull();
+    expect(card.querySelector(".brw-ac__page")).toBeNull();
+    // Take over and Stop go over it once it shows.
+    expect(card.querySelector(".brw-mf__over")).toBeNull();
+    await act(async () => FakeRfb.all.at(-1)?.emit("connect"));
+    await settle(3);
+    const over = card.querySelector(".brw-mf__over") as HTMLElement;
+    expect(within(over).getByRole("button", { name: "Assumir" })).toBeTruthy();
+    expect(within(over).getByRole("button", { name: "Parar" })).toBeTruthy();
+    expect(FakeRfb.all.at(-1)?.viewOnly).toBe(true);
+    expect(watches(socket)).toBe(0);
+  });
+
+  test("a screen that can't show (not available, not running): the browser's frames, never its socket", async () => {
+    for (const desktop of [{ available: false, reason: "offline" }, { running: false }]) {
+      const { socket, screens, card } = await working(desktop);
+      expect(screens).toHaveLength(0);
+      expect(watches(socket)).toBeGreaterThan(0);
+      expect(card.querySelector(".dsk--card")).toBeNull();
+      cleanup();
+      offScreen();
+    }
+  });
+
+  test("its view refused (a person opening the screen took its place): back to the browser's frames at once", async () => {
+    const { socket, screens, card } = await working();
+    await act(async () => FakeRfb.all.at(-1)?.emit("connect"));
+    await settle(3);
+    await act(async () => screens[0]?.serverClose(4429, "preview_yield"));
+    await settle(6);
+    expect(card.querySelector(".dsk--card")).toBeNull();
+    expect(watches(socket)).toBeGreaterThan(0);
+    // No new socket to the screen by itself.
+    expect(screens).toHaveLength(1);
+  });
+
+  test("Assumir: the person drives the browser on its frames, watched again to keep their control", async () => {
+    const { state, socket, card } = await working();
+    await act(async () => FakeRfb.all.at(-1)?.emit("connect"));
+    await settle(3);
+    const over = card.querySelector(".brw-mf__over") as HTMLElement;
+    await act(async () => fireEvent.click(within(over).getByRole("button", { name: "Assumir" })));
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "browser.takeover").map((c) => c.args)).toEqual([
+      [ORG_ID, ADA_ID, "r-screen"],
+    ]);
+    expect(card.classList.contains("is-control")).toBe(true);
+    expect(card.querySelector(".dsk--card")).toBeNull();
+    expect(watches(socket)).toBeGreaterThan(0);
+  });
+
+  test("a shared profile's card never shows the screen", async () => {
+    offScreen = onScreen(".brw-ac");
+    const state = seedState();
+    const api = createFakeApi(state);
+    const fake = fakeBrowserOf.get(api);
+    fake?.desktops.set(ADA_ID, { available: true, reason: null, running: true, canControl: true });
+    fake?.sameWindow.add(ADA_ID);
+    const screens: string[] = [];
+    const realtime = fakeSockets();
+    const createSocket: SocketFactory = (url) => {
+      if (!url.includes("/api/desktop")) return realtime.factory(url);
+      screens.push(url);
+      return new ScreenSocket(url) as unknown as ReturnType<SocketFactory>;
+    };
+    await renderPage(
+      <BrowserCard
+        agentId={ADA_ID}
+        name="Loja"
+        profile={{ id: "p-loja", name: "Loja", agentIds: [ADA_ID], canDrive: true }}
+      />,
+      { api, org: true, createSocket },
+    );
+    await settle(6);
+    expect(screens).toEqual([]);
+    expect(document.querySelector(".dsk--card")).toBeNull();
+    expect(state.calls.some((c) => c.method === "desktop.status")).toBe(false);
   });
 });

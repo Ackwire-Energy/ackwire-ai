@@ -23,7 +23,7 @@ import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import * as Clipboard from "expo-clipboard";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, Keyboard, type LayoutChangeEvent, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Keyboard, type LayoutChangeEvent, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import {
   GestureDetector,
   useLongPressGesture,
@@ -49,6 +49,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { lastCookie } from "@/lib/auth";
 import { useServer } from "@/lib/server";
 import { readValue, STORED, writeValue } from "@/lib/storage";
+import { useAppActive } from "@/lib/useAppActive";
 import { useOrg } from "@/providers/org";
 import { rgba } from "@/sky/math";
 import { TRACKPAD_SHADER } from "@/sky/shaders";
@@ -169,15 +170,6 @@ function trackpadEffect() {
     }
   }
   return padEffect;
-}
-
-function useAppActive() {
-  const [active, setActive] = useState(AppState.currentState === "active");
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (s) => setActive(s === "active"));
-    return () => sub.remove();
-  }, []);
-  return active;
 }
 
 /**

@@ -15,3 +15,8 @@ function subscribe(changed: () => void) {
 
 /** The person is on this tab now: it shows, and its window has the focus. */
 export const useWindowActive = () => useSyncExternalStore(subscribe, active);
+
+const pageShown = () => document.visibilityState !== "hidden";
+
+/** This tab shows (focused or not): a hidden tab keeps no stream of a screen open (ADR 0058 §7). */
+export const usePageVisible = () => useSyncExternalStore(subscribe, pageShown);

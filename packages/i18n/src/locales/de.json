@@ -2320,6 +2320,8 @@
     "own": {
       "shared": "Das Konto, das deine Agenten teilen",
       "sharedLower": "das Konto, das deine Agenten teilen",
+      "free": "Die kostenlosen Modelle von OpenCode",
+      "freeLower": "die kostenlosen Modelle von OpenCode",
       "one": "Ein Konto nur für {{name}}",
       "each": "Ein eigenes Konto für jeden"
     },

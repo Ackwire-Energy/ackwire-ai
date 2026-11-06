@@ -8,6 +8,7 @@ import {
   useUsageReport,
 } from "@agenteschat/client";
 import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatShortDate, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { accountShares, noWindowsText, planMeterText, splitUsage } from "@agenteschat/client/lib/plan-usage";
@@ -107,7 +108,7 @@ export function UsageScreen() {
                         <View style={styles.machineName}>
                           <Icon name="laptop" size={12} color={c.faint} />
                           <Text variant="caption" tone="faint" style={[styles.caps, styles.shrink]}>
-                            {list[0]?.machineName.toLocaleUpperCase()}
+                            {computerNameOf(t, org?.name ?? "", list[0]?.machineName ?? "").toLocaleUpperCase()}
                           </Text>
                         </View>
                         {list.map((a, i) => (

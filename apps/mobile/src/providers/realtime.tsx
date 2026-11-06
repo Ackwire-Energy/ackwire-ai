@@ -47,6 +47,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       const c = new RealtimeConnection({
         url: realtimeUrl(serverUrl(), orgId),
         createSocket: createSocketFactory(lastCookie),
+        // The agent's browser stays base64 on this socket (ADR 0040 §7.1): React Native hands a binary message to JS
+        // as base64 decoded in JS, and the image view takes the server's base64 as a data: URL with no pass of its own.
+        browserFrameSockets: false,
       });
       connection = c;
       offs.push(c.onStatus((status) => setState({ connection: c, status })));

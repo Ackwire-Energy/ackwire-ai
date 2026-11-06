@@ -74,6 +74,7 @@ import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
+import { BrowserViews } from "./browser-views";
 import {
   accessToStore,
   configPath,
@@ -969,10 +970,23 @@ export class RunnerDaemon implements RequestObserver {
     const daemon = this;
     // Frames go out on whatever connection this session has at the time (it reconnects by itself).
     let live: RunnerConnection | null = null;
+    // The live views of the agents' browsers (ADR 0040 §7.1): a viewed agent's frames go on a socket of their own.
+    const views = new BrowserViews({
+      dial: (streamId) => streams.dial(streamId, "browserView"),
+      fallback: (frame) => void live?.send(frame),
+      log,
+    });
+    const toServer = (frame: RunnerFrame): boolean => {
+      if (frame.type === "browser.frame" && views.push(frame)) return true;
+      if (frame.type === "browser.stream.ended") views.end(frame.agentId);
+      return live?.send(frame) ?? false;
+    };
     const browser = new BrowserManager({
       home,
       log,
-      send: (frame) => live?.send(frame) ?? false,
+      send: toServer,
+      // Chrome's next picture comes once this one's view has room (`pacing=ack`).
+      frameRoom: (agentId) => views.room(agentId),
       secret: (agent, name) => secretValue(secretsDir, agent, name),
       onChange: () => queueMicrotask(() => this.browsersChanged()),
       desktops: this.desktops,
@@ -1127,11 +1141,17 @@ export class RunnerDaemon implements RequestObserver {
         token: config.token,
         server: config.server,
         send: (frame) => live?.send(frame) ?? false,
+        views,
         state: () => this.workerState(),
         relayed: this.relayed,
         log,
       });
     }
+    // A view with room again, or ended: the agent's stream sends its next frame, here or from its worker.
+    views.onRoom = (agentId) => {
+      browser.room(agentId);
+      supervisor?.browserRoom(agentId);
+    };
     // Agents working as this runner's user: what their browsers' first command would install is installed now (in
     // system mode, the installer shares it with every agent).
     if (!supervisor && this.access().tools.browser === true) void browser.prepareInBackground();
@@ -1165,6 +1185,7 @@ export class RunnerDaemon implements RequestObserver {
       desktops: this.desktops,
       terminals: this.terminals,
       streams,
+      browserViews: views,
       desktopUse,
       desktopTaken: (agentId) => {
         if (supervisor) supervisor.desktopTaken(agentId);
@@ -1216,6 +1237,7 @@ export class RunnerDaemon implements RequestObserver {
         if (state !== "online") {
           this.observeEgress = false;
           browser.stopStreams();
+          views.closeAll();
           // What it said about people's turns is stale; it says again on reconnect.
           browser.clearHandoffs();
         }

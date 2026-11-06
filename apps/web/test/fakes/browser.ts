@@ -33,6 +33,7 @@ const NO_DESKTOP: DesktopStatus = {
   viewers: 0,
   canControl: false,
   held: false,
+  browserOnDesktop: false,
 };
 
 const NONE: AgentBrowserSettings = {
@@ -167,6 +168,8 @@ export function createFakeBrowser(
       const open = openOn(agentId, "desktop") ?? (sameWindow.has(agentId) ? openOn(agentId, "browser") : null);
       return {
         ...NO_DESKTOP,
+        // Its browser card shows the screen (ADR 0058 §7); a test may say otherwise in `desktops`.
+        browserOnDesktop: sameWindow.has(agentId),
         ...desktops.get(agentId),
         ...(open ? { handoff: open, controllerUserId: open.status === "active" ? open.controllerUserId : null } : {}),
       };
