@@ -26,6 +26,7 @@ import {
   useBrowserProfileMutations,
   useBrowserProfiles,
   useComputer,
+  useComputerSetup,
   useCredentials,
   useMachines,
   useModels,
@@ -66,8 +67,9 @@ import {
   SPEEDS,
 } from "@agenteschat/client/lib/brain-advanced";
 import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
-import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
+import { keyRefusal } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
 import {
   allowsInApp,
@@ -85,6 +87,7 @@ import {
   planLabel,
   planMark,
   planOfAccount,
+  unsupportedGate,
 } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
@@ -687,6 +690,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const edition = useComputerEdition(org.id);
+  const setupQ = useComputerSetup(org.id);
+  const computerSetup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const api = useApi();
   const toast = useToast();
   const refresh = useRefresh();
@@ -940,6 +945,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         });
       }
       if (model !== saved.model || key !== (saved.key ?? DEFAULT_KEY)) {
+        // A key kept earlier may have run out of credit: "now thinks with it" has to be true. Whoever may not try keys
+        // (no `manage_credentials`) gets no answer here, and the run says it if it fails.
+        if (key !== DEFAULT_KEY && key !== saved.key)
+          await api.agents.checkCredential(org.id, key).catch((e) => {
+            if (keyRefusal(t, e)) throw e;
+          });
         await update.mutateAsync({
           ...(model !== saved.model ? { model } : {}),
           ...(key !== (saved.key ?? DEFAULT_KEY) ? { credentialId: key === DEFAULT_KEY ? null : key } : {}),
@@ -1031,8 +1042,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   }),
         );
       onClose();
-    } catch {
-      toast.show(t("agentPage.work.failed"), "error");
+    } catch (e) {
+      toast.show(keyRefusal(t, e)?.text ?? t("agentPage.work.failed"), "error");
       refresh();
     } finally {
       setBusy(false);
@@ -1140,7 +1151,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // The card names the plan: the line names the program on the computer that can't run it, as the plan's panel.
     return (
       gateLine(t, {
-        gate: { state: "unsupported", reason: o.reason },
+        gate: unsupportedGate(o.reason, edition, computerSetup),
         edition,
         kind: k,
         computer: view.computer?.name ?? "",

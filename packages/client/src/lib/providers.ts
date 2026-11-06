@@ -9,6 +9,8 @@ interface ProviderEntry {
   pattern: RegExp;
   /** Where the provider hands out keys. */
   site: string;
+  /** Where credit is added at the provider, where it has a page of its own for that. */
+  credit?: string;
   /** It also sells coding plans, whose keys only work in coding tools. */
   plans?: boolean;
   /** Its name is masculine in Portuguese ("do Claude", "do Gemini"); the others are feminine ("da OpenAI"). */
@@ -30,6 +32,7 @@ export const PROVIDERS = [
     placeholder: "sk-ant-…",
     pattern: /^sk-ant-[A-Za-z0-9_-]{16,}$/,
     site: "platform.claude.com/settings/keys",
+    credit: "platform.claude.com/settings/billing",
     masculine: true,
   },
   {
@@ -38,6 +41,7 @@ export const PROVIDERS = [
     placeholder: "sk-…",
     pattern: /^sk-(?!ant-|or-)[A-Za-z0-9_-]{16,}$/,
     site: "platform.openai.com/api-keys",
+    credit: "platform.openai.com/settings/organization/billing/overview",
   },
   {
     id: "gemini",
@@ -55,6 +59,7 @@ export const PROVIDERS = [
     placeholder: "sk-…",
     pattern: /^sk-[A-Za-z0-9]{16,}$/,
     site: "platform.deepseek.com/api_keys",
+    credit: "platform.deepseek.com/top_up",
   },
   {
     id: "moonshot",
@@ -85,6 +90,7 @@ export const PROVIDERS = [
     placeholder: "sk-or-v1-…",
     pattern: /^sk-or-v\d+-[A-Za-z0-9]{32,}$/,
     site: "openrouter.ai/keys",
+    credit: "openrouter.ai/settings/credits",
     privacy: true,
   },
 ] as const satisfies readonly ProviderEntry[];

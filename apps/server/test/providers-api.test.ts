@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { enableOpenRouterModels, setOpenRouterModels } from "@agenteschat/providers";
+import { enableOpenRouterModels, ProviderError, setOpenRouterModels } from "@agenteschat/providers";
 import fixture from "../../../packages/providers/test/fixtures/openrouter-models.json";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -175,4 +175,68 @@ test("an OpenRouter key: checked before it is stored, then its models listed, th
     openrouter: { large: "anthropic/claude-sonnet-5.5" },
   });
   // About 2.5 s alone (a server, a sign-up's password hash, a dozen requests); past bun's 5 s default under a full run.
+}, 20_000);
+
+test("a key with no credit isn't stored, and the answer carries the provider's name and words", async () => {
+  t = await createTestServer({
+    reply: () =>
+      new ProviderError("no prepaid credit left at the provider (429 insufficient_quota): Add credit.", false, 429),
+  });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const before = ((await (await api("/credentials")).json()) as { credentials: unknown[] }).credentials.length;
+  const refused = await api("/credentials", {
+    json: { provider: "openai", label: "OpenAI", apiKey: "sk-proj-abcdefgh" },
+  });
+  expect(refused.status).toBe(400);
+  expect(((await refused.json()) as { error: object }).error).toMatchObject({
+    code: "provider_key_no_credit",
+    params: { provider: "OpenAI", said: "Add credit." },
+  });
+  const after = ((await (await api("/credentials")).json()) as { credentials: unknown[] }).credentials.length;
+  expect(after).toBe(before);
+});
+
+test("a key saved says it passed; it can be tried again; with `release` it goes though it's the default", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const created = await api("/credentials", {
+    json: { provider: "openai", label: "OpenAI", apiKey: "sk-proj-abcdefgh", makeDefault: true },
+  });
+  const key = (await created.json()) as { id: string; check: string };
+  expect(key.check).toBe("ok");
+  const again = await api(`/credentials/${key.id}/check`, { json: {} });
+  expect((await again.json()) as object).toEqual({ check: "ok" });
+  const refused = await api(`/credentials/${key.id}?purge=true`, { method: "DELETE" });
+  expect(refused.status).toBe(409);
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("credential.default");
+  expect((await api(`/credentials/${key.id}?purge=true&release=true`, { method: "DELETE" })).status).toBe(204);
+});
+
+test("past a person's hourly key tests a key saves unchecked: no one sorts stolen keys through this server", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const created = await api("/credentials", {
+    json: { provider: "openai", label: "OpenAI", apiKey: "sk-proj-abcdefgh" },
+  });
+  const key = (await created.json()) as { id: string; check: string };
+  expect(key.check).toBe("ok");
+  const checks: string[] = [];
+  for (let i = 0; i < 30; i++) {
+    const res = await api(`/credentials/${key.id}/check`, { json: {} });
+    checks.push(((await res.json()) as { check: string }).check);
+  }
+  expect(checks.at(0)).toBe("ok");
+  expect(checks.at(-1)).toBe("unchecked");
 }, 20_000);

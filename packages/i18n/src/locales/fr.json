@@ -2009,6 +2009,10 @@
       "configure": "Configurer",
       "nameStory": "Le nom vient de lodestar, l'étoile qui guide les marins."
     },
+    "saved": {
+      "workspace": "{{name}} réfléchit maintenant avec {{label}} pour tous ceux qui n'ont pas de forfait à eux.",
+      "mine": "Votre conversation avec {{name}} réfléchit maintenant avec {{label}}. La vôtre seulement."
+    },
     "settings": {
       "name": "Nom et apparence",
       "nameHelp": "Dans la barre latérale, il apparaît toujours comme « {{label}} ».",
@@ -2029,6 +2033,8 @@
       "connectMine": "Connecter mon forfait",
       "useWorkspace": "Utiliser celle du workspace",
       "fallbackKey": "Sans forfait à vous, elle utilise la clé API du workspace.",
+      "fallbackKeyOf": "Sans forfait à vous, elle utilise la clé du workspace : {{label}}.",
+      "fallbackNoKey": "Le workspace n'a pas encore de clé API, donc sans forfait à vous personne ne vous répond ici.",
       "fallbackPlan": "Sans forfait à vous, elle utilise le forfait de {{owner}}, qui répond à tout le monde.",
       "fallbackYours": "Sans autre forfait, elle utilise celui du workspace, qui est le vôtre.",
       "fallbackNone": "Sans forfait à vous, {{name}} ne peut pas vous répondre : le forfait du workspace ne répond qu'à {{owner}}.",
@@ -2304,8 +2310,11 @@
       "title": "Déjà connecté",
       "titleFor": "Déjà connecté, pour {{name}}",
       "titleFor_female": "Déjà connecté, pour {{name}}",
-      "other": "Ou en connecter un autre"
+      "other": "Ou en connecter un autre",
+      "manageKeys": "Gérer ou supprimer les clés"
     },
+    "billing": "Un forfait se connecte sur l'ordinateur du workspace, et l'ordinateur vient avec un forfait agentes.chat actif.",
+    "billingWeb": "Choisissez-en un sur le web, sur agentes.chat.",
     "orPayGo": "Ou payer à l'usage",
     "plan": {
       "claude": {
@@ -2354,6 +2363,7 @@
       "paste": "Collez-la ici",
       "forAll": "Tous les agents sans abonnement réfléchissent avec elle.",
       "saved": "Enregistrée. Tous les agents sans abonnement réfléchissent avec elle.",
+      "savedUnchecked": "Enregistrée, mais {{provider}} n'a pas répondu et la clé n'a pas pu être vérifiée. Si elle échoue, la conversation dit pourquoi.",
       "notPlan": "La clé d'un abonnement de code va dans sa propre option ci-dessus.",
       "billing": "Activez la facturation pour le projet de la clé. Sans facturation, Google peut utiliser ce que vos agents envoient.",
       "privacy": "Vos paramètres de confidentialité OpenRouter décident quels fournisseurs peuvent conserver ce que vos agents envoient.",
@@ -8263,7 +8273,9 @@
         "runnerOld": "Le programme agentes.chat sur {{computer}} n'est pas à jour et la mise à jour est en route. Ceci change tout seul une fois terminé.",
         "execOff": "{{computer}} ne peut pas encore lancer {{program}}. On s'en occupe, et ceci change tout seul.",
         "toolOff": "{{program}} n'est pas encore autorisé sur {{computer}}. Cela vient de nous : réessayez plus tard.",
-        "preparing": "{{computer}} se prépare. Ceci change tout seul une fois terminé."
+        "preparing": "{{computer}} se prépare. Ceci change tout seul une fois terminé.",
+        "stuck": "{{program}} n'est toujours pas prêt sur {{computer}}, et cela ne changera pas tout seul. Utilisez une clé API pour l'instant et réessayez ce forfait plus tard.",
+        "away": "{{computer}} est absent depuis plus longtemps qu'un redémarrage. Utilisez une clé API pour l'instant et réessayez ce forfait plus tard."
       }
     },
     "done": {
@@ -12611,6 +12623,10 @@
     "keyValue": "Clé API",
     "keyInvalid": "Collez la clé API (au moins 8 caractères).",
     "keyRefused": "Le fournisseur n'a pas accepté cette clé.",
+    "keyNoCredit": "{{provider}} indique que cette clé n'a pas de crédit. Ajoutez du crédit là-bas et enregistrez-la à nouveau. Rien n'a été enregistré.",
+    "keyDenied": "{{provider}} n'a pas laissé cette clé faire un appel. Vérifiez ses autorisations là-bas et enregistrez-la à nouveau. Rien n'a été enregistré.",
+    "keySaid": "{{provider}} a dit : {{said}}",
+    "keyInUse": "{{agents}} réfléchissent encore avec cette clé.",
     "keyManagement": "C'est une clé de gestion. Créez une clé API normale.",
     "autoModels": {
       "title": "Modèles pour Automatique",
@@ -12631,6 +12647,13 @@
     "remove": "Supprimer",
     "removeTitle": "Supprimer la clé {{label}}",
     "removeText": "La clé disparaît définitivement. Si un agent l'utilise encore, le serveur refuse : changez d'abord la clé de ces agents.",
+    "removeUnused": "La clé disparaît pour de bon. Aucun agent ne réfléchit avec elle.",
+    "removeUsedOther_one": "{{agents}} réfléchit avec cette clé. Sans elle, il passe à une autre clé, ou demande une IA si aucune ne convient à son modèle.",
+    "removeUsedOther_many": "{{agents}} réfléchissent avec cette clé. Sans elle, ils passent à une autre clé, ou demandent une IA si aucune ne convient à leur modèle.",
+    "removeUsedOther_other": "{{agents}} réfléchissent avec cette clé. Sans elle, ils passent à une autre clé, ou demandent une IA si aucune ne convient à leur modèle.",
+    "removeUsedNone_one": "{{agents}} réfléchit avec cette clé et n'a rien d'autre. Sans elle, il ne répond plus jusqu'à ce que vous connectiez une autre IA.",
+    "removeUsedNone_many": "{{agents}} réfléchissent avec cette clé et n'ont rien d'autre. Sans elle, ils ne répondent plus jusqu'à ce que vous connectiez une autre IA.",
+    "removeUsedNone_other": "{{agents}} réfléchissent avec cette clé et n'ont rien d'autre. Sans elle, ils ne répondent plus jusqu'à ce que vous connectiez une autre IA.",
     "noKeys": "Aucune clé pour l'instant.",
     "platformAvailable": "La clé Claude de ce serveur est aussi disponible.",
     "usageTitle": "Dépenses d'API par type",

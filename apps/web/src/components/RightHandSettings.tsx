@@ -30,6 +30,7 @@ import {
   DialogFooter,
   InfoHint,
   Input,
+  ProviderLogo,
   Select,
   Switch,
 } from "@agenteschat/ui";
@@ -115,7 +116,8 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   const first = (id: string | null | undefined) => (id ? dir.memberById.get(id)?.name.split(" ")[0] : undefined);
   const ws = view?.workspaceAi;
   const wsKind = planKind(ws?.brain);
-  const fallback = ws ? rightHandFallback(t, ws, me.user.id, g, (id) => first(id)) : null;
+  const platform = usePlatformKey(org.id).data === true;
+  const fallback = ws ? rightHandFallback(t, ws, me.user.id, g, (id) => first(id), platform) : null;
   const back = () =>
     void api.agents
       .setBrain(org.id, agent.id, { scope: "mine", brain: "model" })
@@ -187,6 +189,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const kind = planKind(agent.brain?.kind);
   const view = useAgentBrain(org.id, agent.id, true, false, "workspace").data;
   const signIn = view?.accounts.find((a) => a.id === view.account);
+  const key = view?.workspaceAi?.key;
   const ownerId = signIn?.ownerId;
   const planOwner = ownerId ? dir.memberById.get(ownerId)?.name.split(" ")[0] : undefined;
   const save = (patch: Parameters<typeof update.mutate>[0], onSuccess?: () => void) =>
@@ -259,8 +262,15 @@ function RightHandForm({ agent }: { agent: Agent }) {
             help={
               <>
                 <span>{t(kind ? "rightHand.settings.planHelp" : "rightHand.settings.workspaceHelp", g)}</span>
-                {kind && (
+                {kind ? (
                   <PlanLine kind={kind} label={signIn?.label} owner={ownerId !== me.user.id ? planOwner : undefined} />
+                ) : (
+                  key && (
+                    <span className="rh-set__planline">
+                      <ProviderLogo id={key.provider} size="sm" />
+                      <b>{key.label}</b>
+                    </span>
+                  )
                 )}
               </>
             }

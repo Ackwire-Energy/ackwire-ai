@@ -1860,6 +1860,10 @@
       "configure": "설정",
       "nameStory": "이름은 뱃사람의 길잡이 별, lodestar에서 왔어요."
     },
+    "saved": {
+      "workspace": "이제 {{name}}은(는) 자기 플랜이 없는 모두를 위해 {{label}}(으)로 생각해요.",
+      "mine": "{{name}}와(과) 나누는 내 대화는 이제 {{label}}(으)로 생각해요. 내 대화만요."
+    },
     "settings": {
       "name": "이름과 모습",
       "nameHelp": "사이드바에서는 항상 “{{label}}”(으)로 보여요.",
@@ -1880,6 +1884,8 @@
       "connectMine": "내 플랜 연결",
       "useWorkspace": "워크스페이스 것 사용",
       "fallbackKey": "내 플랜이 없으면 워크스페이스의 API 키를 사용해요.",
+      "fallbackKeyOf": "내 플랜이 없으면 워크스페이스의 키를 사용해요: {{label}}.",
+      "fallbackNoKey": "워크스페이스에 아직 API 키가 없어서, 내 플랜이 없으면 여기서는 아무도 답하지 않아요.",
       "fallbackPlan": "내 플랜이 없으면 모두에게 답하는 {{owner}}의 플랜을 사용해요.",
       "fallbackYours": "다른 플랜이 없으면 내 것인 워크스페이스 플랜을 사용해요.",
       "fallbackNone": "내 플랜이 없으면 {{name}}이(가) 답할 수 없어요. 워크스페이스 플랜은 {{owner}}에게만 답해요.",
@@ -2125,8 +2131,11 @@
     "have": {
       "title": "이미 연결됨",
       "titleFor": "{{name}}에 이미 연결됨",
-      "other": "또는 다른 것 연결"
+      "other": "또는 다른 것 연결",
+      "manageKeys": "키 관리 또는 삭제"
     },
+    "billing": "플랜은 워크스페이스의 컴퓨터에 로그인하고, 그 컴퓨터는 활성 agentes.chat 요금제와 함께 제공돼요.",
+    "billingWeb": "웹의 agentes.chat에서 하나를 선택하세요.",
     "orPayGo": "또는 사용한 만큼 결제",
     "plan": {
       "claude": {
@@ -2175,6 +2184,7 @@
       "paste": "여기에 붙여넣기",
       "forAll": "요금제가 없는 모든 에이전트가 이 키로 생각해요.",
       "saved": "저장했어요. 요금제가 없는 모든 에이전트가 이 키로 생각해요.",
+      "savedUnchecked": "저장했지만 {{provider}}에서 응답이 없어 키를 확인하지 못했어요. 실패하면 대화에서 이유를 알려드려요.",
       "notPlan": "코딩 요금제 키는 위에 있는 전용 옵션에 넣으세요.",
       "billing": "키 프로젝트의 결제를 켜세요. 결제가 꺼져 있으면 Google이 에이전트가 보낸 내용을 사용할 수 있어요.",
       "privacy": "에이전트가 보낸 내용을 어떤 제공업체가 보관할 수 있는지는 OpenRouter 개인정보 설정에서 정해져요.",
@@ -7598,7 +7608,9 @@
         "runnerOld": "{{computer}}의 agentes.chat 프로그램이 오래되어 업데이트가 오고 있어요. 끝나면 저절로 바뀌어요.",
         "execOff": "{{computer}}이(가) 아직 {{program}}을(를) 실행할 수 없어요. 해결 중이고, 저절로 바뀌어요.",
         "toolOff": "{{computer}}에서 {{program}}이(가) 아직 허용되지 않았어요. 저희 쪽 문제예요. 나중에 다시 시도하세요.",
-        "preparing": "{{computer}}을(를) 준비하는 중이에요. 끝나면 저절로 바뀌어요."
+        "preparing": "{{computer}}을(를) 준비하는 중이에요. 끝나면 저절로 바뀌어요.",
+        "stuck": "{{computer}}에서 {{program}}이(가) 아직 준비되지 않았고, 저절로 바뀌지 않아요. 지금은 API 키를 쓰고 나중에 이 플랜을 다시 시도하세요.",
+        "away": "{{computer}}이(가) 재시작에 걸리는 시간보다 오래 자리를 비웠어요. 지금은 API 키를 쓰고 나중에 이 플랜을 다시 시도하세요."
       }
     },
     "done": {
@@ -11691,6 +11703,10 @@
     "keyValue": "API 키",
     "keyInvalid": "API 키를 붙여넣으세요(최소 8자).",
     "keyRefused": "제공업체가 이 키를 받아들이지 않았어요.",
+    "keyNoCredit": "{{provider}}에서 이 키에 크레딧이 없다고 해요. 그곳에서 크레딧을 추가하고 다시 저장하세요. 아무것도 저장되지 않았어요.",
+    "keyDenied": "{{provider}}에서 이 키의 호출을 허용하지 않았어요. 그곳에서 권한을 확인하고 다시 저장하세요. 아무것도 저장되지 않았어요.",
+    "keySaid": "{{provider}}의 답변: {{said}}",
+    "keyInUse": "{{agents}}은(는) 아직 이 키로 생각해요.",
     "keyManagement": "관리용 키예요. 일반 API 키를 만드세요.",
     "autoModels": {
       "title": "자동 모드에 쓸 모델",
@@ -11711,6 +11727,9 @@
     "remove": "삭제",
     "removeTitle": "{{label}} 키 삭제",
     "removeText": "키가 영구적으로 삭제돼요. 아직 이 키를 쓰는 에이전트가 있으면 서버가 거부하니, 먼저 해당 에이전트의 키를 바꾸세요.",
+    "removeUnused": "키가 완전히 사라져요. 이 키로 생각하는 에이전트는 없어요.",
+    "removeUsedOther_other": "{{agents}}은(는) 이 키로 생각해요. 키가 사라지면 다른 키로 옮기거나, 모델에 맞는 키가 없으면 AI를 요청해요.",
+    "removeUsedNone_other": "{{agents}}은(는) 이 키로 생각하고 다른 것이 없어요. 키가 사라지면 다른 AI를 연결할 때까지 답하지 않아요.",
     "noKeys": "아직 키가 없어요.",
     "platformAvailable": "이 서버의 Claude 키도 사용할 수 있어요.",
     "usageTitle": "유형별 API 지출",

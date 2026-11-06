@@ -186,6 +186,14 @@ import { askVerdict, handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { type Judge, judgeCallOf } from "./judge";
+import {
+  KEY_LINE_PERSON_MINUTES,
+  type KeyLinePlace,
+  keyLineGate,
+  keyLineOf,
+  kickKeyLine,
+  rateLimited,
+} from "./key-line";
 import { answerNoTurn, deliverLive, listenLiveSteering, renderSteered } from "./live-steer";
 import { publishAccountsChanged, touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
@@ -592,9 +600,9 @@ export interface Transcript {
   /**
    * The provider failed every attempt with a retryable error (I5): the run is parked on `OUTAGE_PARK`'s ladder
    * (`waitId`: the job that resumes it) since `since` (ms), `n` times so far. Cleared by the next model call that
-   * answers.
+   * answers. On a rate limit it also waits in its key's line (`key-line.ts`).
    */
-  outage?: { since: number; n: number; waitId: string };
+  outage?: { since: number; n: number; waitId: string } & KeyLinePlace;
   /**
    * When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else.
    * A blip (a deploy dropping the computer for seconds, within the outage grace) keeps its place; a real outage doesn't.
@@ -931,10 +939,28 @@ async function executeRunInner(
           string | null
         >`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'since', ${agentRuns.transcript}->'usageWait'->>'since')`,
         busyRetries: sql<number | null>`(${agentRuns.transcript}->'catchUpTriage'->>'busyRetries')::int`,
+        keyLine: sql<string | null>`${agentRuns.transcript}->'outage'->>'line'`,
+        outageWait: sql<string | null>`${agentRuns.transcript}->'outage'->>'waitId'`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
+    // Only the head of its key's line tries the provider again; the others look later, without claiming. A wake for
+    // another wait (its budget, once back from the park) isn't this line's to hold.
+    if (row.keyLine && row.outageWait === options.wait) {
+      const behind = await keyLineGate(db, { id: runId, orgId: row.orgId }, row.keyLine);
+      if (behind) {
+        await enqueue(db, {
+          orgId: row.orgId,
+          kind: "agent_run.execute",
+          payload: { runId, wait: options.wait },
+          dedupeKey: `agent_run.execute:${runId}:key-line:${options.wait}:${behind.retryAt}`,
+          runAt: new Date(behind.retryAt),
+          maxAttempts: 4,
+        });
+        return;
+      }
+    }
     // A catch-up about to be checked while another agent still answers in its conversation: it waits for that answer
     // (60 s at a time, `BUSY_RETRIES` times), so the check reads it whole instead of half of it. Its place holds.
     const busyTries = row.busyRetries ?? 0;
@@ -2091,13 +2117,17 @@ async function executeRunInner(
    * resumes the same turn, nothing repeated. Past `OUTAGE_PARK.maxMs` it fails for good, and the failure is
    * reported (`reportRunFailure`). False when it can't park anymore.
    */
-  const parkOutage = async (message: string): Promise<boolean> => {
+  const parkOutage = async (message: string, line?: string): Promise<boolean> => {
     const t = transcript as Transcript;
     const since = t.outage?.since ?? Date.now();
     const n = t.outage?.n ?? 0;
     if (Date.now() - since >= OUTAGE_PARK.maxMs) return false;
     const waitId = Bun.randomUUIDv7();
-    t.outage = { since, n: n + 1, waitId };
+    const people = Boolean(t.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
+    const step = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
+    const minutes = line && people ? Math.min(step, KEY_LINE_PERSON_MINUTES) : step;
+    const at = Date.now() + minutes * 60_000;
+    t.outage = { since, n: n + 1, waitId, ...(line ? { line, at, people } : {}) };
     await deferred;
     await addRunStep(db, run, "error", { reason: "provider_outage", message, parked: n + 1 });
     // Said once where it answers, so the wait reads as the provider's, not as a question to a person.
@@ -2121,13 +2151,12 @@ async function executeRunInner(
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
     }
-    const minutes = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
     await enqueue(db, {
       orgId: run.orgId,
       kind: "agent_run.execute",
       payload: { runId: run.id, wait: waitId },
       dedupeKey: `agent_run.execute:${run.id}:outage:${waitId}`,
-      runAt: new Date(Date.now() + minutes * 60_000),
+      runAt: new Date(at),
       maxAttempts: 4,
     });
     if (!(await transitionRun(db, run.id, "running", "waiting_input", { transcript: storedTranscript(t) })))
@@ -4085,9 +4114,11 @@ async function executeRunInner(
           if (error instanceof ProviderError && !ACCOUNT_REFUSALS.has(error.status ?? 0)) options.failed?.(error);
           return fail(reason);
         }
-        if (options.finalAttempt) {
+        // Back from a park and refused again: one try per wake, or a line's head would hit the limit on every job retry.
+        if (options.finalAttempt || (transcript.outage && retryableOutage(error))) {
           const message = error instanceof Error ? error.message : String(error);
-          if (retryableOutage(error) && (await parkOutage(message))) return;
+          const line = rateLimited(error) ? keyLineOf(thinker) : undefined;
+          if (retryableOutage(error) && (await parkOutage(message, line))) return;
           options.failed?.(error);
           return fail(`gave_up: ${message}`);
         }
@@ -4103,7 +4134,12 @@ async function executeRunInner(
         }
       }
       await deltas.flush();
+      const passedLine = transcript.outage?.line;
       delete transcript.outage;
+      if (passedLine) {
+        await saveTranscript(db, transcript);
+        await kickKeyLine(db, run.orgId, passedLine);
+      }
       prof.mark(`model#${run.turns + 1}`);
       await deferred;
       transcript.deltaSeq = deltas.seq();

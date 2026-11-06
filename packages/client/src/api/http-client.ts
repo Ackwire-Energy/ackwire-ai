@@ -760,11 +760,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       rotateCredential: (orgId, id, input) =>
         request<Credential>(`${org(orgId)}/credentials/${enc(id)}/rotate`, { json: input }),
-      removeCredential: (orgId, id, purge) =>
+      removeCredential: (orgId, id, purge, release) =>
         request<void>(`${org(orgId)}/credentials/${enc(id)}`, {
           method: "DELETE",
-          query: { purge: purge ? "true" : undefined },
+          query: { purge: purge ? "true" : undefined, release: release ? "true" : undefined },
         }),
+      checkCredential: (orgId, id) =>
+        request<{ check: "ok" | "unchecked" }>(`${org(orgId)}/credentials/${enc(id)}/check`, { json: {} }),
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
       aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),

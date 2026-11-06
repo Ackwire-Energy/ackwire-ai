@@ -1,4 +1,4 @@
-import type { Edition, MachineAccount, MachineAccountKind } from "@agenteschat/client";
+import type { BrainScope, Edition, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import {
   keys,
   useAgentBrain,
@@ -20,7 +20,7 @@ import {
 } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
-import { holdText } from "@agenteschat/client/lib/errors";
+import { errorText, holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -62,7 +62,9 @@ import {
   providerOf,
   providersForKey,
 } from "@agenteschat/client/lib/providers";
+import { rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -89,7 +91,7 @@ import type { ConnectKey } from "./ConnectAi";
 import { EndpointForm } from "./EndpointForm";
 import { existingRows, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
 import { useAiOrg } from "./org";
-import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
+import { AiRow, alertKeyRefused, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
 
 /*
  * "Conectar uma IA" on the phone: the web's content and rules
@@ -108,6 +110,7 @@ import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from 
  */
 export function usePlanGates(orgId: string, agentId: string | undefined, poll: number | false = false) {
   const api = useApi();
+  const { org } = useAiOrg();
   const asks = agentId !== undefined;
   const brain = useAgentBrain(orgId, agentId ?? "", asks, poll);
   const ai = useAiAccounts(orgId, asks, poll);
@@ -156,6 +159,7 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
           caughtUp: caught,
+          standing: org?.standing,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on. A read that failed with nothing to show
   // ends the page's wait with Tentar de novo.
@@ -171,13 +175,21 @@ export type PlanGates = ReturnType<typeof usePlanGates>;
 
 /** `usePlanGates` for a person who owns no agent yet: each plan's gate on the computer it would sign in on. */
 export function useGatesWithoutAgent(orgId: string, on: boolean) {
+  const { org } = useAiOrg();
   const ai = useAiAccounts(orgId, on);
   const machines = useMachines(orgId, on);
   const setupQ = useComputerSetup(orgId, on);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const at = (choice: PlanChoice) =>
-    planGateWithoutAgent({ choice, edition, setup, computers: ai.data?.computers, machines: machines.data });
+    planGateWithoutAgent({
+      choice,
+      edition,
+      setup,
+      computers: ai.data?.computers,
+      machines: machines.data,
+      standing: org?.standing,
+    });
   return { at, edition, accounts: ai.data?.accounts };
 }
 
@@ -288,7 +300,12 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
     onView(next);
   };
   // A row of what the person already has, used in one tap: the agent thinks with it, said in a toast.
-  const save = async (to: { id: string; name: string }, label: string, run: () => Promise<unknown>) => {
+  const save = async (
+    to: { id: string; name: string },
+    label: string,
+    run: () => Promise<unknown>,
+    scope?: BrainScope,
+  ) => {
     setBusy(true);
     try {
       await run();
@@ -299,10 +316,12 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
         keys.aiStatus(orgId),
       ])
         void qc.invalidateQueries({ queryKey: key });
-      toast({ title: t("aiAccounts.done.savedAgent", { agent: to.name, label }), icon: "check" });
+      toast({ title: thinksWithLine(t, scope, to.name, label), icon: "check" });
       props.onPlanDone(to.id);
-    } catch {
-      toast({ title: t("agentPage.work.failed"), icon: "x" });
+    } catch (error) {
+      const refusal = keyRefusal(t, error);
+      if (refusal) alertKeyRefused(t, refusal);
+      else toast({ title: errorText(t, error), icon: "x" });
     } finally {
       setBusy(false);
     }
@@ -313,26 +332,38 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
     if (row.kind === "key") {
       const k = row.key;
       // The workspace's model on that key: the agent's model where the key runs it, else Automático.
-      const model = agentRows.data?.find((a) => a.id === forAgent.id)?.model;
-      const fits = keyRuns(k, model, models.data?.models ?? []);
-      return void save(forAgent, k.label, async () => {
-        if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });
-        // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
-        if (gates.view?.scope === "mine") {
-          await api.agents.setBrain(orgId, forAgent.id, { scope: "workspace", brain: "model" });
-        }
-        await api.agents.update(orgId, forAgent.id, { credentialId: k.id, ...(fits ? {} : { model: AUTO }) });
-      });
+      // Tried first: a key kept earlier may have run out of credit, and "now thinks with it" has to be true.
+      const agentRow = agentRows.data?.find((a) => a.id === forAgent.id);
+      const fits = keyRuns(k, agentRow?.model, models.data?.models ?? []);
+      const rightHand = gates.view?.scope === "mine" && agentRow;
+      return void save(
+        forAgent,
+        k.label,
+        async () => {
+          const { check } = await api.agents.checkCredential(orgId, k.id);
+          if (check === "unchecked")
+            toast({ title: t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) }), icon: "check" });
+          // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
+          if (rightHand) return rightHandOnKey(api, orgId, rightHand, k, models.data?.models ?? []);
+          if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });
+          await api.agents.update(orgId, forAgent.id, { credentialId: k.id, ...(fits ? {} : { model: AUTO }) });
+        },
+        rightHand ? "workspace" : undefined,
+      );
     }
     const a = row.choice.login;
     const choice = planOfAccount(a);
     const take = (moveAccount: boolean) =>
-      void save(forAgent, a.label, () =>
-        api.agents.setBrain(orgId, forAgent.id, {
-          brain: a.kind,
-          account: a.id,
-          ...(moveAccount ? { moveAccount } : {}),
-        }),
+      void save(
+        forAgent,
+        a.label,
+        () =>
+          api.agents.setBrain(orgId, forAgent.id, {
+            brain: a.kind,
+            account: a.id,
+            ...(moveAccount ? { moveAccount } : {}),
+          }),
+        gates.view?.scope,
       );
     if (row.act === "use") return take(false);
     if (row.act === "move") {
@@ -452,6 +483,14 @@ function Home({
                 onPress={() => onHave(r.row)}
               />
             ))}
+            {have.some((r) => r.row.kind === "key") ? (
+              <GroupedRow
+                icon="key"
+                label={t("connectAi.have.manageKeys")}
+                chevron
+                onPress={() => router.push("/ai-accounts" as never)}
+              />
+            ) : null}
           </GroupedList>
         </>
       ) : null}
@@ -1051,7 +1090,14 @@ function GateWait({
   const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
-  else if (gate.state === "preparing") {
+  else if (gate.state === "billing") {
+    // A hold stops the Model Gateway too, so a key is no way out here. Paying happens on the web.
+    wait = (
+      <InfoCard icon="pause">
+        {t("common.joinSentences", { a: t("connectAi.billing"), b: t("connectAi.billingWeb") })}
+      </InfoCard>
+    );
+  } else if (gate.state === "preparing") {
     const setup = gate.view;
     // A hold decides when anything runs there: it speaks alone. The wait is the app's own (its steps, the time left,
     // who hears when it's ready), for the workspace these pages connect for: the first run's too.
@@ -1117,7 +1163,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
       <View style={styles.done}>
         <ProviderLogo id={endpointSaved ? CUSTOM_PROVIDER : form.provider} size="hero" />
         <Text variant="title2" tone="ink" style={styles.center}>
-          {t("connectAi.key.saved")}
+          {(!endpointSaved && form.savedNote) || t("connectAi.key.saved")}
         </Text>
       </View>
     );
@@ -1216,7 +1262,14 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
               ) : null}
             </Step>
           </StepsCard>
-          {form.failed ? (
+          {form.refused ? (
+            <>
+              <Note icon="x" live>
+                {form.refused.text}
+              </Note>
+              {form.refused.href ? <OpenPage href={form.refused.href} label={form.refused.site} /> : null}
+            </>
+          ) : form.failed ? (
             <Note icon="x" live>
               {t("mobile.ai.failed")}
             </Note>

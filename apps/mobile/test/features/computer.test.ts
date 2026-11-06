@@ -338,6 +338,8 @@ describe("the workspace's computer on its way, on Conversas", () => {
     }
     // Ready, its agent getting it at the next refresh: seconds, nothing to offer.
     expect(offersKeyNow({ state: "preparing", view: null }, false)).toBe(false);
+    // A billing hold stops every model call, a key's too: only the workspace's plan is a way out.
+    expect(offersKeyNow({ state: "billing", hold: "payment" }, true)).toBe(false);
     // Where the plan can't sign in there: as before.
     expect(offersKeyNow({ state: "offline" }, false)).toBe(true);
     expect(offersKeyNow({ state: "missing" }, false)).toBe(true);

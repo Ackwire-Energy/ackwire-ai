@@ -1860,6 +1860,10 @@
       "configure": "Atur",
       "nameStory": "Namanya berasal dari lodestar, bintang penunjuk arah para pelaut."
     },
+    "saved": {
+      "workspace": "{{name}} sekarang berpikir dengan {{label}} untuk semua orang tanpa paket sendiri.",
+      "mine": "Percakapanmu dengan {{name}} sekarang berpikir dengan {{label}}. Hanya percakapanmu."
+    },
     "settings": {
       "name": "Nama dan tampilan",
       "nameHelp": "Di bilah samping selalu tampil sebagai “{{label}}”.",
@@ -1880,6 +1884,8 @@
       "connectMine": "Hubungkan paket saya",
       "useWorkspace": "Pakai milik workspace",
       "fallbackKey": "Tanpa paket sendiri, ia memakai kunci API workspace.",
+      "fallbackKeyOf": "Tanpa paket sendiri, ia memakai kunci workspace: {{label}}.",
+      "fallbackNoKey": "Workspace belum punya kunci API, jadi tanpa paket sendiri tidak ada yang menjawabmu di sini.",
       "fallbackPlan": "Tanpa paket sendiri, ia memakai paket {{owner}}, yang menjawab semua orang.",
       "fallbackYours": "Tanpa paket lain, ia memakai paket workspace, yang milikmu.",
       "fallbackNone": "Tanpa paket sendiri, {{name}} tidak bisa menjawabmu: paket workspace hanya menjawab {{owner}}.",
@@ -2135,8 +2141,11 @@
       "title": "Sudah terhubung",
       "titleFor": "Sudah terhubung, untuk {{name}}",
       "titleFor_female": "Sudah terhubung, untuk {{name}}",
-      "other": "Atau hubungkan yang lain"
+      "other": "Atau hubungkan yang lain",
+      "manageKeys": "Kelola atau hapus kunci"
     },
+    "billing": "Paket masuk di komputer workspace, dan komputer itu datang dengan paket agentes.chat yang aktif.",
+    "billingWeb": "Pilih satu di web, di agentes.chat.",
     "orPayGo": "Atau bayar sesuai pemakaian",
     "plan": {
       "claude": {
@@ -2185,6 +2194,7 @@
       "paste": "Tempel di sini",
       "forAll": "Semua agen tanpa paket berpikir dengan kunci ini.",
       "saved": "Tersimpan. Semua agen tanpa paket berpikir dengan kunci ini.",
+      "savedUnchecked": "Tersimpan, tetapi {{provider}} tidak menjawab, jadi kunci tidak bisa diperiksa. Jika gagal, percakapan memberi tahu alasannya.",
       "notPlan": "Kunci paket coding dimasukkan di opsinya sendiri di atas.",
       "billing": "Aktifkan penagihan untuk proyek kunci ini. Tanpa penagihan, Google bisa memakai apa yang dikirim agenmu.",
       "privacy": "Pengaturan privasi OpenRouter-mu menentukan penyedia mana yang boleh menyimpan apa yang dikirim agenmu.",
@@ -7654,7 +7664,9 @@
         "runnerOld": "Program agentes.chat di {{computer}} sudah usang dan pembaruannya sedang dalam perjalanan. Ini berubah sendiri setelah selesai.",
         "execOff": "{{computer}} belum bisa menjalankan {{program}}. Kami sedang menanganinya, dan ini berubah sendiri.",
         "toolOff": "{{program}} belum diizinkan di {{computer}}. Itu urusan kami: coba lagi nanti.",
-        "preparing": "{{computer}} sedang disiapkan. Ini berubah sendiri setelah selesai."
+        "preparing": "{{computer}} sedang disiapkan. Ini berubah sendiri setelah selesai.",
+        "stuck": "{{program}} masih belum siap di {{computer}}, dan ini tidak akan berubah sendiri. Pakai kunci API untuk sementara dan coba paket ini lagi nanti.",
+        "away": "{{computer}} sudah pergi lebih lama dari waktu mulai ulang. Pakai kunci API untuk sementara dan coba paket ini lagi nanti."
       }
     },
     "done": {
@@ -11754,6 +11766,10 @@
     "keyValue": "Kunci API",
     "keyInvalid": "Tempel kunci API (minimal 8 karakter).",
     "keyRefused": "Penyedia tidak menerima kunci ini.",
+    "keyNoCredit": "{{provider}} mengatakan kunci ini tidak punya kredit. Tambahkan kredit di sana lalu simpan lagi. Tidak ada yang disimpan.",
+    "keyDenied": "{{provider}} tidak mengizinkan kunci ini melakukan panggilan. Periksa izinnya di sana lalu simpan lagi. Tidak ada yang disimpan.",
+    "keySaid": "{{provider}} berkata: {{said}}",
+    "keyInUse": "{{agents}} masih berpikir dengan kunci ini.",
     "keyManagement": "Ini kunci manajemen. Buat kunci API biasa.",
     "autoModels": {
       "title": "Model untuk Otomatis",
@@ -11774,6 +11790,9 @@
     "remove": "Hapus",
     "removeTitle": "Hapus kunci {{label}}",
     "removeText": "Kunci ini hilang selamanya. Kalau masih ada agen yang memakainya, server akan menolak: ganti dulu kunci agen-agen itu.",
+    "removeUnused": "Kunci hilang untuk selamanya. Tidak ada agen yang berpikir dengannya.",
+    "removeUsedOther_other": "{{agents}} berpikir dengan kunci ini. Setelah kunci hilang, mereka pindah ke kunci lain, atau meminta AI jika tidak ada yang cocok dengan modelnya.",
+    "removeUsedNone_other": "{{agents}} berpikir dengan kunci ini dan tidak punya yang lain. Setelah kunci hilang, mereka berhenti menjawab sampai kamu menghubungkan AI lain.",
     "noKeys": "Belum ada kunci.",
     "platformAvailable": "Kunci Claude server ini juga tersedia.",
     "usageTitle": "Pengeluaran API per jenis",

@@ -534,6 +534,10 @@ export interface Credential {
   workspaceIdHint?: string | null;
   /** `custom` (ADR 0146): the endpoint's address, API and models. */
   endpoint?: { style: EndpointStyle; baseURL: string; models: EndpointModel[] };
+  /** The agents that think with it, in a list of keys: what removing it would change. */
+  usedBy?: { id: string; name: string }[];
+  /** On a key just saved: `ok` a real call passed, `unchecked` the provider didn't say. */
+  check?: "ok" | "unchecked";
   createdAt: string;
   revokedAt: string | null;
 }
@@ -5092,7 +5096,13 @@ export interface AgentBrain {
    */
   scope?: BrainScope;
   /** With `mine`: the workspace's AI (`model`: an API key), and whether it thinks for the viewer. */
-  workspaceAi?: { brain: BrainKind; ownerId: string | null; servesYou: boolean };
+  workspaceAi?: {
+    brain: BrainKind;
+    ownerId: string | null;
+    servesYou: boolean;
+    /** On a key: the workspace's key it thinks with; null with none (the server's own key may serve). */
+    key?: { provider: string; label: string } | null;
+  };
   brain: BrainKind;
   /** As stored; null = the brain's default. */
   model: string | null;
