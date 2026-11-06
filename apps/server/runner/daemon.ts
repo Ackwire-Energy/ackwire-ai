@@ -563,7 +563,12 @@ export class RunnerDaemon implements RequestObserver {
     }
     if (verdict) this.opts.log(`Claude's own login for all agents: ${verdict}`);
     this.keepHosted(this.agents);
-    if (verdict !== before) this.session?.connection.reconnect();
+    if (verdict !== before) {
+      // A look taken before this answer couldn't ask the sign-ins' CLIs (status unknown) and would stand for the
+      // list's whole TTL.
+      this.accounts.invalidate();
+      this.session?.connection.reconnect();
+    }
   }
 
   /**

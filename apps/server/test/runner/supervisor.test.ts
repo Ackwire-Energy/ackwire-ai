@@ -18,7 +18,7 @@ import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
 import { AccountBrains, type AccountBrainsOptions, SHARED_LOGIN_OFF } from "../../runner/account-brains";
-import type { AccountManager } from "../../runner/accounts";
+import { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser, systemLauncher } from "../../runner/agent-users";
 import { BrainManager, PERSONAL_MCP_REFUSED } from "../../runner/brain";
 import { BrowserManager } from "../../runner/browser";
@@ -2830,13 +2830,17 @@ test.if(posix)(
   async () => {
     const d = sharedLoginDaemon();
     const keep = spyOn(BrainManager.prototype, "keepAccount");
+    const invalidate = spyOn(AccountManager.prototype, "invalidate");
     const { config, claudeSharedLogin, home, daemon, checks } = d;
     const methods = () => daemon.accounts.claudeLoginMethods();
     daemon.start();
     try {
       await waitFor(() => checks.length === 1);
+      expect(invalidate).not.toHaveBeenCalled();
       checks[0]?.(null);
       await d.lists(true);
+      // The looks before the pass said "status unknown" for every Claude login: the next list asks again.
+      expect(invalidate).toHaveBeenCalledTimes(1);
       d.online().frame({ type: "agents", agents: [{ ...ANA, account: SHARED_LOGIN }] });
       expect(keep).toHaveBeenLastCalledWith(SHARED_LOGIN, undefined, ANA.id);
 
@@ -2871,6 +2875,7 @@ test.if(posix)(
       expect(keep).toHaveBeenLastCalledWith(null, [], ANA.id);
     } finally {
       keep.mockRestore();
+      invalidate.mockRestore();
       await daemon.stop();
     }
   },
