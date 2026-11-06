@@ -3079,11 +3079,16 @@
   "secret": {
     "group": "Richiesta di un segreto da {{agent}}",
     "chip": "In attesa",
-    "targetEnv": "Entra come variabile {{name}} sul computer di {{agent}}.",
+    "targetEnv": "Va sul computer di {{agent}}, per i suoi comandi.",
     "targetFile": "Va nel file {{path}} sul computer di {{agent}}.",
     "targetSite": "Lo digita solo il browser di {{agent}}, su {{host}}. Resta fuori dai comandi di {{agent}}.",
     "replaces": "Sostituisce la chiave che {{agent}} ha già con questo nome.",
-    "label": "Valore di {{name}}",
+    "labelPassword": "Password di {{host}}",
+    "labelCode": "Codice di {{host}}",
+    "labelKey": "Una chiave per il computer di {{agent}}",
+    "labelFile": "Il file {{path}}",
+    "placeholder": "Scrivilo qui",
+    "account": "Utente: {{username}}.",
     "private": "Inviato cifrato direttamente al computer. Resta fuori dalla chat e lontano dall'agente.",
     "send": "Invia",
     "decline": "Rifiuta",
@@ -3091,8 +3096,17 @@
     "waitingFor": "Solo {{person}} può rispondere.",
     "outcomeBy": "Consegnato da {{person}}",
     "outcomeByYou": "Consegnato da te",
-    "outcomeWithdrawn": "Non serve più",
-    "alreadyAnswered": "Questa richiesta ha già avuto risposta o è scaduta.",
+    "outcomeWithdrawn": "{{agent}} non ne ha più bisogno.",
+    "endedDeclined": "Rifiutato. {{agent}} va avanti senza.",
+    "endedExpired": "Nessuno ha risposto in tempo. {{agent}} va avanti senza e può chiederlo di nuovo.",
+    "endedRunStopped": "L'attività di {{agent}} si è fermata prima della risposta. Chiedi di nuovo a {{agent}} se ti serve ancora.",
+    "endedSuperseded": "{{agent}} ha chiesto di nuovo in una richiesta più recente.",
+    "endedComputer": "Questo non arriva più a {{agent}}: il computer che l'ha chiesto è cambiato. Chiedi a {{agent}} di chiederlo di nuovo.",
+    "endedPersonLeft": "{{person}} ha lasciato il workspace prima di rispondere.",
+    "endedClosed": "Questa richiesta si è chiusa prima di una risposta. Chiedi di nuovo a {{agent}} se ti serve ancora.",
+    "seeNewer": "Vedi la richiesta più recente",
+    "computerAway": "Il computer di {{agent}} non risponde in questo momento. Questa richiesta resta aperta fino alle {{time}}. Riprova tra un attimo.",
+    "computerPaused": "Il computer di {{agent}} è in pausa per scelta del proprietario. Questa richiesta resta aperta fino alle {{time}}.",
     "failed": "Non è stato possibile consegnarlo. Il computer dell'agente è acceso?",
     "empty": "Scrivi il valore.",
     "tooLarge": "Troppo grande (massimo 16 KB)."
@@ -5846,7 +5860,7 @@
     },
     "vault_write": {
       "label": "Modificare i contatti del Vault",
-      "description": "Salvare e aggiornare i contatti nel Vault, cambiare il nome utente di un login salvato o una descrizione, ed eliminare ciò che ha salvato."
+      "description": "Salvare e aggiornare i contatti nel Vault, cambiare il nome utente di un login salvato o una descrizione, creare password per gli account che apre, ed eliminare ciò che ha salvato."
     },
     "github_git_read": {
       "label": "Clonare repository (git)",
@@ -13744,6 +13758,10 @@
       "label": "Esegui script della skill",
       "description": "Esegue lo script di una skill nell'ambiente."
     },
+    "vault_make_password": {
+      "label": "Crea una password",
+      "description": "Crea una password forte sul suo computer e la conserva nel Vault come chiave, senza vederla."
+    },
     "computer_status": {
       "label": "Controlla il computer",
       "description": "Dice qual è il computer e se risponde."
@@ -13799,6 +13817,10 @@
     "browser_type_secret": {
       "label": "Inserisci una password",
       "description": "Inserisce una password che gli hai dato in un campo password o codice, senza vederla."
+    },
+    "browser_make_password": {
+      "label": "Crea una password",
+      "description": "Crea una password forte per un sito sul suo computer, la conserva nel Vault e la inserisce, senza vederla."
     },
     "browser_wait": {
       "label": "Aspetta la pagina",
@@ -14192,6 +14214,7 @@
         "browser_scroll": "Ha scorso la pagina",
         "browser_upload": "Ha caricato un file",
         "browser_type_secret": "Ha inserito una password",
+        "browser_make_password": "Ha creato una password",
         "browser_wait": "Ha aspettato la pagina",
         "browser_screenshot": "Ha fatto uno screenshot",
         "browser_ask_person": "Ha chiesto aiuto",

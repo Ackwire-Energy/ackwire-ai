@@ -3,11 +3,18 @@ import {
   type ExecRequest,
   type ExecResult,
   FILE_PULL_PROTOCOL,
+  generateSecretKeyPair,
   MAX_INLINE_FILE_BYTES,
+  madePasswordAad,
+  openSecret,
+  PASSWORD_CLASSES,
+  PASSWORD_LENGTH,
+  type PasswordClass,
   policyRefusal,
   type SandboxProvider,
   SECRET_ACTIVATE_PROTOCOL,
   SECRETS_PROTOCOL,
+  VAULT_PASSWORD_PROTOCOL,
   VAULT_PROTOCOL,
 } from "@agenteschat/adapters";
 import { ARTIFACT_LIMITS } from "./artifacts";
@@ -85,6 +92,46 @@ function explain(error: unknown, name: string, path?: string, managed = false, t
       return error;
     default:
       return said(`The computer ${name} failed: ${error.message}`);
+  }
+}
+
+/** A tool's `length` and `classes`, what a site's rules asked for; anything left out, the strong default. */
+function passwordRules(input: { length?: unknown; classes?: unknown }) {
+  const length = typeof input.length === "number" ? input.length : PASSWORD_LENGTH.default;
+  const given = Array.isArray(input.classes)
+    ? PASSWORD_CLASSES.filter((c) => (input.classes as unknown[]).includes(c))
+    : [];
+  return { length, classes: (given.length > 0 ? given : [...PASSWORD_CLASSES]) as PasswordClass[] };
+}
+
+/**
+ * A new password made on the agent's computer (ADR 0144 §8): it comes back sealed to a key pair made for this one
+ * call, whose private half never leaves this function, so everything between (the hub, a relay, root in system mode)
+ * only ever holds a box. Opened here for the caller to seal into the Vault at once.
+ */
+export async function requestMadePassword(
+  hub: MachineCaller,
+  machineId: string,
+  agent: AgentScope,
+  input: { length?: unknown; classes?: unknown },
+  signal?: AbortSignal,
+): Promise<string> {
+  const status = await hub.status(machineId);
+  const name = status?.name ?? "computer";
+  if (!status || status.protocol < VAULT_PASSWORD_PROTOCOL) throw new Error(vaultUpdateText(name, "make passwords"));
+  const pair = await generateSecretKeyPair();
+  const requestId = crypto.randomUUID();
+  try {
+    const reply = await hub.call<"vault.password">(
+      machineId,
+      { agent, op: "vault.password", requestId, publicKey: pair.publicKey, rules: passwordRules(input) },
+      { signal, timeoutMs: 30_000 },
+    );
+    return await openSecret(pair.privateKey, reply.box, madePasswordAad({ requestId, agentId: String(agent.id) }));
+  } catch (error) {
+    if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
+    if (error instanceof MachineRequestError) throw explain(error, name);
+    throw new Error(`The password from the computer ${name} didn't open. Nothing was saved. Try again.`);
   }
 }
 
@@ -184,7 +231,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       } catch (error) {
         // The runner's own words ("This request's key is gone…"), not the file-tool wording.
         if (error instanceof MachineRequestError && error.code !== "timeout" && error.code !== "canceled") {
-          throw new Error(error.message);
+          throw new Error(error.message, { cause: error });
         }
         throw error;
       }

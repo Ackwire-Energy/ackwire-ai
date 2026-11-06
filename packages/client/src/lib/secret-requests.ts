@@ -17,12 +17,28 @@ export function siteHost(site: string): string {
 }
 
 /**
- * Where the value goes, in the person's words: a variable in the agent's commands, a file in its folder, or only its
- * browser's typing on one site; and, while it is asked, that it replaces the key the agent holds under that name.
+ * What people read for a request: the agent's label, else a plain one from its kind and site. Its `name` is the
+ * agent's own (`LIA_GOOGLE_PASSWORD`) and shows nowhere.
+ */
+export function secretLabel(
+  t: TFunction,
+  r: Pick<SecretRequest, "label" | "target" | "site" | "codeDigits">,
+  agent: string,
+): string {
+  if (r.label) return r.label;
+  const target = r.target;
+  const host = r.site ? siteHost(r.site) : target.kind === "site" ? siteHost(target.site) : null;
+  if (host) return t(r.codeDigits ? "secret.labelCode" : "secret.labelPassword", { host });
+  return target.kind === "file" ? t("secret.labelFile", { path: target.path }) : t("secret.labelKey", { agent });
+}
+
+/**
+ * Where the value goes, in the person's words: into the agent's commands, a file in its folder, or only its browser's
+ * typing on one site; and, while it is asked, that it replaces the key the agent holds under that name.
  */
 export function secretWhere(
   t: TFunction,
-  r: Pick<SecretRequest, "name" | "target" | "replaces" | "status">,
+  r: Pick<SecretRequest, "target" | "replaces" | "status">,
   agent: string,
 ): string {
   const target = r.target;
@@ -31,12 +47,34 @@ export function secretWhere(
       ? t("secret.targetFile", { path: target.path, agent })
       : target.kind === "site"
         ? t("secret.targetSite", { host: siteHost(target.site), agent })
-        : t("secret.targetEnv", { name: r.name, agent });
+        : t("secret.targetEnv", { agent });
   // Only while it is asked: once it is answered or closed, nothing is replacing anything.
   return r.replaces && r.status === "pending" ? `${where} ${t("secret.replaces", { agent })}` : where;
 }
 
-/** A request's notification (`secret_request`) in one line, as its card says it: the secret's name, what it is for. */
+/**
+ * The newest word on a request: an event and a message's copy can each lag the other (a socket that dropped, a page
+ * that loaded later), and a closed request never reopens, so a closed copy beats an open one.
+ */
+export function latestSecret(live: SecretRequest | undefined, message: SecretRequest): SecretRequest {
+  if (!live) return message;
+  return live.status === "pending" && message.status !== "pending" ? message : live;
+}
+
+/**
+ * Why sending was refused while the request itself may still be open: its computer can't take it now (the request
+ * waits, and the person can send again), as the i18n key that says so. Null: the request ended.
+ */
+export function secretRefusalKey(error: unknown): "secret.computerAway" | "secret.computerPaused" | null {
+  const code = (error as { code?: string }).code;
+  return code === "machine.offline"
+    ? "secret.computerAway"
+    : code === "machine.paused"
+      ? "secret.computerPaused"
+      : null;
+}
+
+/** A request's notification (`secret_request`) in one line, as its card says it: its label, what it is for. */
 export const secretNoticeLine = (n: Pick<AppNotification, "latest">) =>
   [n.latest.title, n.latest.text].filter(Boolean).join(" · ");
 

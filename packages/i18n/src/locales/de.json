@@ -2977,11 +2977,16 @@
   "secret": {
     "group": "Secret-Anfrage von {{agent}}",
     "chip": "Wartet",
-    "targetEnv": "Kommt als Variable {{name}} auf den Computer von {{agent}}.",
+    "targetEnv": "Geht an den Computer von {{agent}}, für seine Befehle.",
     "targetFile": "Kommt in die Datei {{path}} auf dem Computer von {{agent}}.",
     "targetSite": "Nur der Browser von {{agent}} gibt es ein, auf {{host}}. Es bleibt aus den Befehlen von {{agent}} heraus.",
     "replaces": "Ersetzt den Schlüssel, den {{agent}} unter diesem Namen schon hat.",
-    "label": "Wert von {{name}}",
+    "labelPassword": "Passwort für {{host}}",
+    "labelCode": "Code für {{host}}",
+    "labelKey": "Ein Schlüssel für den Computer von {{agent}}",
+    "labelFile": "Die Datei {{path}}",
+    "placeholder": "Hier eingeben",
+    "account": "Konto: {{username}}.",
     "private": "Wird verschlüsselt direkt an den Computer gesendet. Es bleibt aus dem Chat heraus und vom Agenten fern.",
     "send": "Senden",
     "decline": "Ablehnen",
@@ -2989,8 +2994,17 @@
     "waitingFor": "Nur {{person}} kann antworten.",
     "outcomeBy": "Übermittelt von {{person}}",
     "outcomeByYou": "Von dir übermittelt",
-    "outcomeWithdrawn": "Nicht mehr nötig",
-    "alreadyAnswered": "Diese Anfrage wurde schon beantwortet oder ist abgelaufen.",
+    "outcomeWithdrawn": "{{agent}} braucht das nicht mehr.",
+    "endedDeclined": "Abgelehnt. {{agent}} macht ohne das weiter.",
+    "endedExpired": "Niemand hat rechtzeitig geantwortet. {{agent}} macht ohne das weiter und kann erneut fragen.",
+    "endedRunStopped": "Die Aufgabe von {{agent}} wurde vor der Antwort beendet. Bitte {{agent}} erneut, falls du es noch brauchst.",
+    "endedSuperseded": "{{agent}} hat in einer neueren Anfrage erneut gefragt.",
+    "endedComputer": "Das erreicht {{agent}} nicht mehr: Der Computer, der gefragt hat, hat sich geändert. Bitte {{agent}}, erneut zu fragen.",
+    "endedPersonLeft": "{{person}} hat den Workspace vor der Antwort verlassen.",
+    "endedClosed": "Diese Anfrage wurde vor einer Antwort geschlossen. Bitte {{agent}} erneut, falls du es noch brauchst.",
+    "seeNewer": "Neuere Anfrage ansehen",
+    "computerAway": "Der Computer von {{agent}} antwortet gerade nicht. Diese Anfrage bleibt bis {{time}} offen. Versuche es gleich noch einmal.",
+    "computerPaused": "Der Computer von {{agent}} wurde von seinem Besitzer pausiert. Diese Anfrage bleibt bis {{time}} offen.",
     "failed": "Konnte es nicht übermitteln. Ist der Computer des Agenten eingeschaltet?",
     "empty": "Gib den Wert ein.",
     "tooLarge": "Zu groß (höchstens 16 KB)."
@@ -5630,7 +5644,7 @@
     },
     "vault_write": {
       "label": "Vault-Kontakte bearbeiten",
-      "description": "Kontaktdaten im Vault speichern und aktualisieren, den Benutzernamen eines gespeicherten Logins oder eine Beschreibung ändern und löschen, was er gespeichert hat."
+      "description": "Kontaktdaten im Vault speichern und aktualisieren, den Benutzernamen eines gespeicherten Logins oder eine Beschreibung ändern, Passwörter für selbst angelegte Konten erstellen und löschen, was er gespeichert hat."
     },
     "github_git_read": {
       "label": "Repositorys klonen (git)",
@@ -13260,6 +13274,10 @@
       "label": "Skill-Skript ausführen",
       "description": "Führt das Skript eines Skills in der Umgebung aus."
     },
+    "vault_make_password": {
+      "label": "Passwort erstellen",
+      "description": "Erstellt auf seinem Computer ein starkes Passwort und bewahrt es als Schlüssel im Vault auf, ohne es zu sehen."
+    },
     "computer_status": {
       "label": "Computer prüfen",
       "description": "Sagt, welcher Computer es ist und ob er antwortet."
@@ -13315,6 +13333,10 @@
     "browser_type_secret": {
       "label": "Passwort eingeben",
       "description": "Gibt ein Passwort, das du ihm gegeben hast, in ein Passwort- oder Codefeld ein, ohne es zu sehen."
+    },
+    "browser_make_password": {
+      "label": "Passwort erstellen",
+      "description": "Erstellt auf seinem Computer ein starkes Passwort für eine Website, bewahrt es im Vault auf und gibt es ein, ohne es zu sehen."
     },
     "browser_wait": {
       "label": "Auf die Seite warten",
@@ -13659,6 +13681,7 @@
         "browser_scroll": "Die Seite gescrollt",
         "browser_upload": "Eine Datei hochgeladen",
         "browser_type_secret": "Ein Passwort eingegeben",
+        "browser_make_password": "Ein Passwort erstellt",
         "browser_wait": "Auf die Seite gewartet",
         "browser_screenshot": "Einen Screenshot gemacht",
         "browser_ask_person": "Um Hilfe gebeten",

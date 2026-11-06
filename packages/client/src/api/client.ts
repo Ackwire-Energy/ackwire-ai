@@ -1102,6 +1102,8 @@ export interface ApiClient {
   };
   /** Secrets agents ask for (ADR 0027): only the person asked answers; the value goes sealed. */
   secrets: {
+    /** The request as it stands now (only the person asked): what a refused answer reads to end its card. */
+    get(orgId: string, requestId: string): Promise<SecretRequest>;
     deliver(orgId: string, requestId: string, box: SecretBox): Promise<SecretRequest>;
     decline(orgId: string, requestId: string): Promise<SecretRequest>;
     /** Names on the agent's computers (its owner or an admin). */

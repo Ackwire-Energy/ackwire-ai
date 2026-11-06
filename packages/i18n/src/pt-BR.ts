@@ -3023,11 +3023,16 @@ export const ptBR = {
   secret: {
     group: "Pedido de segredo de {{agent}}",
     chip: "Esperando",
-    targetEnv: "Vai como a variável {{name}} no computador de {{agent}}.",
+    targetEnv: "Vai para o computador de {{agent}}, para os comandos.",
     targetFile: "Vai para o arquivo {{path}} no computador de {{agent}}.",
     targetSite: "Só o navegador de {{agent}} digita, em {{host}}. Fica fora dos comandos de {{agent}}.",
     replaces: "Substitui a chave com esse nome que {{agent}} já tem.",
-    label: "Valor de {{name}}",
+    labelPassword: "Senha de {{host}}",
+    labelCode: "Código de {{host}}",
+    labelKey: "Chave para o computador de {{agent}}",
+    labelFile: "O arquivo {{path}}",
+    placeholder: "Digite aqui",
+    account: "Conta: {{username}}.",
     private: "Vai cifrado direto para o computador. Não fica no chat nem com o agente.",
     send: "Enviar",
     decline: "Recusar",
@@ -3035,8 +3040,19 @@ export const ptBR = {
     waitingFor: "Só {{person}} pode responder.",
     outcomeBy: "Entregue por {{person}}",
     outcomeByYou: "Entregue por você",
-    outcomeWithdrawn: "Não precisa mais",
-    alreadyAnswered: "Esse pedido já foi respondido ou expirou.",
+    outcomeWithdrawn: "{{agent}} não precisa mais disso.",
+    endedDeclined: "Recusado. {{agent}} segue sem isso.",
+    endedExpired: "Ninguém respondeu a tempo. {{agent}} segue sem isso e pode pedir de novo.",
+    endedRunStopped: "A tarefa de {{agent}} parou antes da resposta. Peça de novo a {{agent}} se ainda precisar.",
+    endedSuperseded: "{{agent}} pediu de novo, num pedido mais novo.",
+    endedComputer:
+      "Isto não chega mais em {{agent}}: o computador que pediu mudou. Peça a {{agent}} para pedir de novo.",
+    endedPersonLeft: "{{person}} saiu do workspace antes de responder.",
+    endedClosed: "Este pedido fechou antes da resposta. Peça de novo a {{agent}} se ainda precisar.",
+    seeNewer: "Ver o pedido novo",
+    computerAway:
+      "O computador de {{agent}} não está respondendo agora. O pedido continua aberto até {{time}}. Tente de novo em instantes.",
+    computerPaused: "O dono pausou o computador de {{agent}}. O pedido continua aberto até {{time}}.",
     failed: "Não deu para entregar. O computador do agente está ligado?",
     empty: "Digite o valor.",
     tooLarge: "Grande demais (máximo de 16 KB).",
@@ -5705,7 +5721,7 @@ export const ptBR = {
     vault_write: {
       label: "Editar contatos do Cofre",
       description:
-        "Salvar e atualizar contatos no Cofre, mudar o usuário de um login salvo ou uma descrição, e apagar o que ele salvou.",
+        "Salvar e atualizar contatos no Cofre, mudar o usuário de um login salvo ou uma descrição, criar senhas para contas que ele abre, e apagar o que ele salvou.",
     },
     github_git_read: {
       label: "Clonar repositórios (git)",
@@ -13051,6 +13067,10 @@ export const ptBR = {
       label: "Rodar script de skill",
       description: "Roda um script de uma skill no ambiente.",
     },
+    vault_make_password: {
+      label: "Criar uma senha",
+      description: "Cria uma senha forte no computador dele e guarda no Cofre como chave, sem ver o valor.",
+    },
     computer_status: {
       label: "Ver o computador",
       description: "Diz qual é o computador e se ele está respondendo.",
@@ -13106,6 +13126,10 @@ export const ptBR = {
     browser_type_secret: {
       label: "Digitar uma senha",
       description: "Digita uma senha que você deu num campo de senha ou código, sem ver o valor.",
+    },
+    browser_make_password: {
+      label: "Criar uma senha",
+      description: "Cria uma senha forte para um site no computador dele, guarda no Cofre e digita, sem ver o valor.",
     },
     browser_wait: {
       label: "Esperar a página",
@@ -13500,6 +13524,7 @@ export const ptBR = {
         browser_scroll: "Rolou a página",
         browser_upload: "Enviou um arquivo",
         browser_type_secret: "Digitou uma senha",
+        browser_make_password: "Criou uma senha",
         browser_wait: "Esperou a página",
         browser_screenshot: "Tirou um print",
         browser_ask_person: "Pediu ajuda",

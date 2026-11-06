@@ -275,3 +275,28 @@ describe("an approval card's layout", () => {
       expect([piece, group.includes(piece)]).toEqual([piece, true]);
   });
 });
+
+describe("the secret card on the phone", () => {
+  const card = source("SecretCard.tsx");
+
+  test("people read its label: its internal name only binds the box", () => {
+    expect(card.match(/\br\.name\b/g)).toHaveLength(1);
+    expect(card).toContain("secretAad({ requestId: r.id, orgId, name: r.name, target: r.target })");
+    expect(card).toContain("title: label");
+    expect(card).toContain("accessibilityLabel={label}");
+  });
+
+  test("a refused send ends the card with the real reason and clears what was typed, unless only the computer is away", () => {
+    const failed = card.slice(card.indexOf("const failed = async"), card.indexOf("const showNewer"));
+    expect(failed.indexOf("secretRefusalKey(err)")).toBeLessThan(failed.indexOf("api.secrets.get(orgId, r.id)"));
+    expect(failed).toContain("done(");
+    expect(card).toContain('if (!pending) setValue("");');
+    expect(card).toContain('t("secret.seeNewer")');
+  });
+
+  test("where it goes and whose account wrap: only a well with a way to read the rest is cut", () => {
+    const asks = source("asks.tsx");
+    expect(asks).toContain("numberOfLines={well.more ? (open ? 3 : 1) : undefined}");
+    expect(asks).toContain("numberOfLines={well && !well.more ? undefined : 4}");
+  });
+});

@@ -3359,6 +3359,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("secrets.saveToVault", orgId, requestId, input);
         return {} as never;
       },
+      get: async (_orgId, requestId) => {
+        const msg = state.messages.find((m) => (m.meta?.secretRequest as SecretRequest | undefined)?.id === requestId);
+        const r = msg?.meta?.secretRequest as SecretRequest | undefined;
+        if (!r) throw new ApiError(404, "not_found", "Secret request not found");
+        return structuredClone(r);
+      },
       // Like the server: only the person asked answers, once; the fake keeps the box to check it was sealed.
       deliver: async (orgId, requestId, box) => {
         log("secrets.deliver", orgId, requestId, box);

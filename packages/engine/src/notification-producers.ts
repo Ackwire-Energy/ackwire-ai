@@ -21,6 +21,7 @@ import {
   retargetNotifications,
 } from "./notifications";
 import { maySql, type RolePermission } from "./permissions";
+import { secretLabelOf } from "./secrets";
 import { stretchCardOf } from "./stretch";
 import { teamWeekCardOf } from "./team-week";
 
@@ -437,7 +438,7 @@ export async function notifySecretRequest(deps: NotificationDeps, r: typeof sche
       ...(channel?.kind === "dm" ? { dmId: r.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
     },
-    latest: { title: r.name, text: notificationSnippet(r.purpose), expiresAt: r.expiresAt.toISOString() },
+    latest: { title: secretLabelOf(r), text: notificationSnippet(r.purpose), expiresAt: r.expiresAt.toISOString() },
   });
 }
 

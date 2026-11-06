@@ -1,10 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
+import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation, SecretRequest } from "@agenteschat/client";
 import { activitySentence, barElapsed, barFaces, barWords, entriesOffScreen } from "@agenteschat/client/lib/activity";
 import { runAround, runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
+import {
+  latestSecret,
+  secretLabel,
+  secretRefusalKey,
+  secretRequestOf,
+  secretValueProblem,
+  secretWhere,
+} from "@agenteschat/client/lib/secret-requests";
+import { secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
   AGENT_WORDS_MIN,
@@ -1352,7 +1360,7 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
       "Só o navegador de Theo digita, em shop.example.com. Fica fora dos comandos de Theo.",
     );
     expect(secretWhere(en, { ...request, name: "NPM_TOKEN", target: { kind: "env" } }, "Theo")).toBe(
-      "Goes in as the variable NPM_TOKEN on Theo's computer.",
+      "Goes to Theo's computer, for its commands.",
     );
     expect(secretWhere(pt, { ...request, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
       "Vai para o arquivo .npmrc no computador de Theo.",
@@ -1360,17 +1368,58 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     // Asked again under a name the agent holds (a key that was refused): the card says it replaces that one.
     const again = { ...request, name: "TYPESAFE_API_KEY", target: { kind: "env" as const }, replaces: true };
     expect(secretWhere(pt, again, "Theo")).toBe(
-      "Vai como a variável TYPESAFE_API_KEY no computador de Theo. Substitui a chave com esse nome que Theo já tem.",
+      "Vai para o computador de Theo, para os comandos. Substitui a chave com esse nome que Theo já tem.",
     );
     expect(secretWhere(en, again, "Theo")).toBe(
-      "Goes in as the variable TYPESAFE_API_KEY on Theo's computer. Replaces the key Theo already has under this name.",
+      "Goes to Theo's computer, for its commands. Replaces the key Theo already has under this name.",
     );
     // Answered or closed, nothing is being replaced: the details say only where it goes.
     for (const status of ["delivered", "declined", "expired"] as const) {
-      expect(secretWhere(pt, { ...again, status }, "Theo")).toBe(
-        "Vai como a variável TYPESAFE_API_KEY no computador de Theo.",
-      );
+      expect(secretWhere(pt, { ...again, status }, "Theo")).toBe("Vai para o computador de Theo, para os comandos.");
     }
+  });
+
+  test("people read a label, never the agent's own name for it", async () => {
+    const pt = await translator("pt-BR");
+    expect(secretLabel(pt, { ...request, label: "Senha da Conta Google" }, "Theo")).toBe("Senha da Conta Google");
+    expect(secretLabel(pt, request, "Theo")).toBe("Senha de shop.example.com");
+    expect(secretLabel(pt, { ...request, codeDigits: 6 }, "Theo")).toBe("Código de shop.example.com");
+    expect(secretLabel(pt, { ...request, site: null, target: { kind: "env" } }, "Theo")).toBe(
+      "Chave para o computador de Theo",
+    );
+    expect(secretLabel(pt, { ...request, site: null, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
+      "O arquivo .npmrc",
+    );
+  });
+
+  test("an ended request says what happened and what's next, for each way it ends", async () => {
+    const pt = await translator("pt-BR");
+    const said = (r: Partial<SecretRequest>) => secretOutcome(pt, { ...request, ...r }, true, "Ana", "Theo");
+    expect(said({ status: "delivered" })).toBe("Entregue por você");
+    expect(said({ status: "declined" })).toBe("Recusado. Theo segue sem isso.");
+    expect(said({ status: "expired" })).toContain("Ninguém respondeu a tempo.");
+    // Past its deadline before any event: the same words.
+    expect(said({ status: "pending" })).toContain("Ninguém respondeu a tempo.");
+    expect(said({ status: "canceled", endReason: "run_stopped" })).toContain("A tarefa de Theo parou");
+    expect(said({ status: "canceled", endReason: "superseded" })).toContain("num pedido mais novo");
+    // Its run stopped and the agent asked again: the newer one is what's next.
+    expect(said({ status: "canceled", endReason: "run_stopped", supersededBy: "r2" })).toContain(
+      "num pedido mais novo",
+    );
+    expect(said({ status: "canceled", endReason: "computer_changed" })).toContain("o computador que pediu mudou");
+    expect(said({ status: "canceled", endReason: "person_left" })).toContain("Ana saiu do workspace");
+    expect(said({ status: "canceled", withdrawn: true })).toBe("Theo não precisa mais disso.");
+    expect(said({ status: "canceled" })).toContain("Este pedido fechou antes da resposta.");
+  });
+
+  test("a closed copy beats an open one, and only a computer that can't take it keeps the card open", () => {
+    const closed = { ...request, status: "canceled" as const };
+    expect(latestSecret(request, closed)).toBe(closed);
+    expect(latestSecret(closed, request)).toBe(closed);
+    expect(latestSecret(undefined, request)).toBe(request);
+    expect(secretRefusalKey({ code: "machine.offline" })).toBe("secret.computerAway");
+    expect(secretRefusalKey({ code: "machine.paused" })).toBe("secret.computerPaused");
+    expect(secretRefusalKey({ code: "secret.closed" })).toBeNull();
   });
 
   test("an empty or too large value is caught before it is sealed", async () => {

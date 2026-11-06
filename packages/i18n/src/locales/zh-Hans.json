@@ -2868,11 +2868,16 @@
   "secret": {
     "group": "来自 {{agent}} 的密钥请求",
     "chip": "等待中",
-    "targetEnv": "将作为 {{agent}} 电脑上的变量 {{name}} 使用。",
+    "targetEnv": "发送到 {{agent}} 的电脑，供其命令使用。",
     "targetFile": "将写入 {{agent}} 电脑上的文件 {{path}}。",
     "targetSite": "只有 {{agent}} 的浏览器会在 {{host}} 上输入它。它不会出现在 {{agent}} 的命令中。",
     "replaces": "替换 {{agent}} 在此名称下已有的密钥。",
-    "label": "{{name}} 的值",
+    "labelPassword": "{{host}} 的密码",
+    "labelCode": "{{host}} 的验证码",
+    "labelKey": "{{agent}} 电脑的密钥",
+    "labelFile": "文件 {{path}}",
+    "placeholder": "在此输入",
+    "account": "账号：{{username}}。",
     "private": "加密后直接发送到电脑。不会出现在聊天中，智能体也看不到。",
     "send": "发送",
     "decline": "拒绝",
@@ -2880,8 +2885,17 @@
     "waitingFor": "只有 {{person}} 可以回答。",
     "outcomeBy": "由 {{person}} 提供",
     "outcomeByYou": "由你提供",
-    "outcomeWithdrawn": "已不再需要",
-    "alreadyAnswered": "这个请求已被回答或已过期。",
+    "outcomeWithdrawn": "{{agent}} 不再需要这个了。",
+    "endedDeclined": "已拒绝。{{agent}} 会在没有它的情况下继续。",
+    "endedExpired": "没有人及时回复。{{agent}} 会在没有它的情况下继续，也可以再次请求。",
+    "endedRunStopped": "{{agent}} 的任务在回复前已停止。如果仍然需要，请再次让 {{agent}} 请求。",
+    "endedSuperseded": "{{agent}} 在一个更新的请求中再次提出了请求。",
+    "endedComputer": "这已无法送达 {{agent}}：发出请求的电脑已更换。请让 {{agent}} 重新请求。",
+    "endedPersonLeft": "{{person}} 在回复前离开了工作区。",
+    "endedClosed": "此请求在有人回复前已关闭。如果仍然需要，请再次让 {{agent}} 请求。",
+    "seeNewer": "查看更新的请求",
+    "computerAway": "{{agent}} 的电脑目前没有响应。此请求在 {{time}} 前保持开放。请稍后重试。",
+    "computerPaused": "{{agent}} 的电脑已被所有者暂停。此请求在 {{time}} 前保持开放。",
     "failed": "无法送达。智能体的电脑开着吗？",
     "empty": "请输入值。",
     "tooLarge": "太大了（最多 16 KB）。"
@@ -5454,7 +5468,7 @@
     },
     "vault_write": {
       "label": "编辑 Vault 联系信息",
-      "description": "在 Vault 中保存和更新联系信息，修改已保存登录信息的用户名或描述，并删除它自己保存的内容。"
+      "description": "在 Vault 中保存和更新联系信息，修改已保存登录信息的用户名或描述，为它创建的账号生成密码，并删除它自己保存的内容。"
     },
     "github_git_read": {
       "label": "克隆仓库（git）",
@@ -12848,6 +12862,10 @@
       "label": "运行技能脚本",
       "description": "在环境中运行技能的脚本。"
     },
+    "vault_make_password": {
+      "label": "生成密码",
+      "description": "在它的电脑上生成强密码，并在不查看的情况下作为密钥保存到 Vault。"
+    },
     "computer_status": {
       "label": "检查电脑",
       "description": "说明是哪台电脑，以及它是否有响应。"
@@ -12903,6 +12921,10 @@
     "browser_type_secret": {
       "label": "输入密码",
       "description": "在不查看的情况下，把你提供的密码输入到密码或验证码字段中。"
+    },
+    "browser_make_password": {
+      "label": "生成密码",
+      "description": "在它的电脑上为网站生成强密码，在不查看的情况下保存到 Vault 并输入。"
     },
     "browser_wait": {
       "label": "等待页面",
@@ -13290,6 +13312,7 @@
         "browser_scroll": "滚动了页面",
         "browser_upload": "上传了一个文件",
         "browser_type_secret": "输入了密码",
+        "browser_make_password": "生成了密码",
         "browser_wait": "等待页面加载",
         "browser_screenshot": "截取了屏幕",
         "browser_ask_person": "请求了帮助",

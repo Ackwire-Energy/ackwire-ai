@@ -91,6 +91,14 @@ export const vaultItems = pgTable(
     kekId: text(),
     /** Bumped on every new value: part of what the seal is bound to. */
     secretVersion: integer().notNull().default(0),
+    /**
+     * The values an agent's own `make password` replaced, oldest first, each still sealed as its version: a site that
+     * turned the new one down leaves the old one in force, so it can come back. A person's new value clears them.
+     */
+    previousSecrets: jsonb()
+      .$type<{ secretCiphertext: string; wrappedDataKey: string; kekId: string; secretVersion: number }[]>()
+      .notNull()
+      .default([]),
     /** External items follow their connection's access until someone sets theirs. */
     accessFromConnection: boolean().notNull().default(false),
     audienceEveryone: boolean().notNull().default(false),

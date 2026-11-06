@@ -2867,11 +2867,16 @@
   "secret": {
     "group": "{{agent}}からのシークレットのリクエスト",
     "chip": "待機中",
-    "targetEnv": "{{agent}}のコンピューターに変数{{name}}として設定されます。",
+    "targetEnv": "{{agent}}のコンピューターのコマンド用に送られます。",
     "targetFile": "{{agent}}のコンピューターのファイル{{path}}に保存されます。",
     "targetSite": "{{host}}で{{agent}}のブラウザだけが入力します。{{agent}}のコマンドには渡りません。",
     "replaces": "{{agent}}がこの名前ですでに持っているキーを置き換えます。",
-    "label": "{{name}}の値",
+    "labelPassword": "{{host}}のパスワード",
+    "labelCode": "{{host}}のコード",
+    "labelKey": "{{agent}}のコンピューター用のキー",
+    "labelFile": "ファイル {{path}}",
+    "placeholder": "ここに入力",
+    "account": "アカウント: {{username}}。",
     "private": "暗号化されてコンピューターに直接送られます。チャットには残らず、エージェントにも見えません。",
     "send": "送信",
     "decline": "断る",
@@ -2879,8 +2884,17 @@
     "waitingFor": "回答できるのは{{person}}だけです。",
     "outcomeBy": "{{person}}が送信しました",
     "outcomeByYou": "あなたが送信しました",
-    "outcomeWithdrawn": "不要になりました",
-    "alreadyAnswered": "このリクエストはすでに回答済みか、期限切れです。",
+    "outcomeWithdrawn": "{{agent}}はこれを必要としなくなりました。",
+    "endedDeclined": "断りました。{{agent}}はこれなしで続けます。",
+    "endedExpired": "時間内に誰も答えませんでした。{{agent}}はこれなしで続け、もう一度依頼できます。",
+    "endedRunStopped": "回答の前に{{agent}}のタスクが止まりました。まだ必要なら{{agent}}にもう一度頼んでください。",
+    "endedSuperseded": "{{agent}}が新しいリクエストで依頼し直しました。",
+    "endedComputer": "これはもう{{agent}}に届きません。依頼したコンピューターが変わりました。{{agent}}にもう一度依頼するよう頼んでください。",
+    "endedPersonLeft": "{{person}}は回答前にワークスペースを離れました。",
+    "endedClosed": "このリクエストは回答前に閉じました。まだ必要なら{{agent}}にもう一度頼んでください。",
+    "seeNewer": "新しいリクエストを見る",
+    "computerAway": "{{agent}}のコンピューターが今は応答していません。このリクエストは{{time}}まで開いています。少ししてからもう一度お試しください。",
+    "computerPaused": "{{agent}}のコンピューターは所有者が一時停止しています。このリクエストは{{time}}まで開いています。",
     "failed": "送信できませんでした。エージェントのコンピューターの電源は入っていますか？",
     "empty": "値を入力してください。",
     "tooLarge": "大きすぎます（最大16 KB）。"
@@ -5412,7 +5426,7 @@
     },
     "vault_write": {
       "label": "Vaultの連絡先を編集",
-      "description": "Vaultの連絡先を保存・更新し、保存済みログインのユーザー名や説明を変更し、自分が保存したものを削除します。"
+      "description": "Vaultの連絡先を保存・更新し、保存済みログインのユーザー名や説明を変更し、自分で作るアカウントのパスワードを作成し、自分が保存したものを削除します。"
     },
     "github_git_read": {
       "label": "リポジトリをクローン（git）",
@@ -12779,6 +12793,10 @@
       "label": "スキルのスクリプトを実行",
       "description": "環境でスキルのスクリプトを実行します。"
     },
+    "vault_make_password": {
+      "label": "パスワードを作成",
+      "description": "自分のコンピューターで強力なパスワードを作り、見ることなくキーとしてVaultに保管します。"
+    },
     "computer_status": {
       "label": "コンピューターを確認",
       "description": "どのコンピューターか、応答しているかを伝えます。"
@@ -12834,6 +12852,10 @@
     "browser_type_secret": {
       "label": "パスワードを入力",
       "description": "渡されたパスワードを、中身を見ずにパスワードやコードの入力欄に入力します。"
+    },
+    "browser_make_password": {
+      "label": "パスワードを作成",
+      "description": "自分のコンピューターでサイト用の強力なパスワードを作り、見ることなくVaultに保管して入力します。"
     },
     "browser_wait": {
       "label": "ページを待つ",
@@ -13175,6 +13197,7 @@
         "browser_scroll": "ページをスクロールしました",
         "browser_upload": "ファイルをアップロードしました",
         "browser_type_secret": "パスワードを入力しました",
+        "browser_make_password": "パスワードを作成しました",
         "browser_wait": "ページを待ちました",
         "browser_screenshot": "スクリーンショットを撮りました",
         "browser_ask_person": "助けを求めました",

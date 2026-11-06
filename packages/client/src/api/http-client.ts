@@ -1621,6 +1621,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/dismiss`, { json: {} }),
     },
     secrets: {
+      get: (orgId, requestId) => request<SecretRequest>(`${org(orgId)}/secret-requests/${enc(requestId)}`),
       deliver: (orgId, requestId, box) =>
         request<SecretRequest>(`${org(orgId)}/secret-requests/${enc(requestId)}/deliver`, { json: { box } }),
       decline: (orgId, requestId) =>

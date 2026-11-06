@@ -4,6 +4,8 @@ import {
   type ExecResult,
   isReservedSecretName,
   MAX_INLINE_FILE_BYTES,
+  PASSWORD_CLASSES,
+  PASSWORD_LENGTH,
   type PubSub,
   policyRefusal,
   SECRET_NAME,
@@ -39,7 +41,13 @@ import { cutText, formatBytes, textOfBytes } from "./format";
 import { mergeReposOfCall } from "./git/repos";
 import { fullMachinePath, pathInOwnFolder, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
-import { foldersFixedMessage, notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
+import {
+  foldersFixedMessage,
+  notAllowedMessage,
+  requestMadePassword,
+  requestVaultKey,
+  vaultUpdateText,
+} from "./machine-provider";
 import {
   enqueueWake,
   formatDuration,
@@ -77,8 +85,8 @@ import {
   truncateOutput,
   withSandbox,
 } from "./sandbox";
-import { requestSecretTool } from "./secret-request-tool";
-import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
+import { friendlyLabel, requestSecretTool } from "./secret-request-tool";
+import { MAKE_KEY_TOOL, REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
 import { agentSkillByName, type SkillDeps, skillFilesOf, skillFilesOver, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { MAX_RESULT_CHARS } from "./tools/gateway";
@@ -91,16 +99,36 @@ import {
   toolAllowScope,
   VAULT_LIST_TOOL,
   VAULT_READ_SCOPE,
+  VAULT_SAVE_TOOL,
+  VAULT_WRITE_SCOPE,
 } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 import { uploadedFile, uploadFromComputer } from "./uploads";
-import { recordVaultUse, releaseVaultKeys, type VaultDeps, VaultRefusal, vaultRefusalOutput } from "./vault";
+import {
+  recordVaultUse,
+  releaseVaultKeys,
+  restoreMadePassword,
+  saveMadePassword,
+  undoneText,
+  type VaultDeps,
+  VaultRefusal,
+  vaultItemName,
+  vaultRefusalOutput,
+} from "./vault";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /** Tools that change the computer (or start work on it); the rest only read. */
-const WRITE_TOOLS = new Set(["run_code", "write_file", "start_task", "run_skill_script", "import_file", "cancel_task"]);
+const WRITE_TOOLS = new Set([
+  "run_code",
+  "write_file",
+  "start_task",
+  "run_skill_script",
+  "import_file",
+  "cancel_task",
+  MAKE_KEY_TOOL,
+]);
 
 const READ_ONLY_COMMANDS = new Set([
   "ls",
@@ -645,6 +673,69 @@ export function createSandboxToolSource(
     };
   };
 
+  /**
+   * The computer's side of a made password (ADR 0144 §8): the same box from the agent's own process to the Vault, kept
+   * as a key, since a command takes it by name. For what the agent sets up itself, as a database's user.
+   */
+  const makeKeyTool = (vault: VaultDeps): ToolDefinition => ({
+    name: MAKE_KEY_TOOL,
+    description:
+      "For something you are setting up yourself on your computer (a database user, a service's admin): makes a strong password there and keeps it in the Vault as a key. You never see it: commands get it as $NAME through run_code's `keys`. Never ask a person to invent one.",
+    scope: SANDBOX_SCOPE,
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
+        label: { type: "string", maxLength: 80, description: "What people read in the Vault (`Postgres admin`)." },
+        length: { type: "integer", minimum: PASSWORD_LENGTH.min, maximum: PASSWORD_LENGTH.max },
+        classes: { type: "array", items: { enum: [...PASSWORD_CLASSES] } },
+        undo: { type: "string", maxLength: 64, description: "A key's id: back to the value it had before." },
+      },
+      additionalProperties: false,
+    },
+    describe: () => ({ title: "Make a password" }),
+    async execute(input, ctx) {
+      const hub = deps.machines?.hub;
+      if (!hub) return { content: "Connected computers are not available on this server.", isError: true };
+      const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+      if (!isAllowed(toolAccess(granted, { name: VAULT_SAVE_TOOL, scope: VAULT_WRITE_SCOPE }))) {
+        return {
+          content:
+            'You may not keep passwords in the Vault ("Edit Vault contacts" is off for you). Ask for it with request_permission.',
+          isError: true,
+        };
+      }
+      const runIds = { orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId };
+      try {
+        const undo = str(input.undo).trim();
+        if (undo) {
+          const { item, kept } = await restoreMadePassword(vault, runIds, undo);
+          return { content: undoneText(vaultItemName(item), kept) };
+        }
+        const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+        const scope = {
+          id: ctx.agentId,
+          handle: agent?.handle ?? "agent",
+          ...(agent?.name ? { name: agent.name } : {}),
+        };
+        const value = await run(ctx, (computer) =>
+          requestMadePassword(hub, computer.machineId, scope, input, ctx.signal),
+        );
+        const saved = await saveMadePassword(
+          vault,
+          runIds,
+          { keyName: str(input.name), title: friendlyLabel(input.label) ?? "" },
+          value,
+        );
+        return {
+          content: `Made it: ${vaultItemName(saved.item)} is in the Vault${saved.outcome === "updated" ? ", in place of the value it had (`undo` with its id brings that back)" : ""}. Give its name to run_code's \`keys\`.`,
+        };
+      } catch (error) {
+        return vaultRefusalOutput(error) ?? failed(error);
+      }
+    },
+  });
+
   /** `machine.exec` in the audit log: what ran on a connected machine (command head and exit code). */
   const auditMachineExec = async (
     ctx: ToolContext,
@@ -756,10 +847,12 @@ export function createSandboxToolSource(
         }
       },
     },
+    ...(deps.vault ? [makeKeyTool(deps.vault)] : []),
     requestSecretTool({
       scope: SANDBOX_SCOPE,
       browserOnly: false,
       toolPath: (raw) => toolPath(raw, computerInfo),
+      ...(deps.pubsub ? { pubsub: deps.pubsub } : {}),
       onComputer: (ctx, fn) => run(ctx, fn),
     }),
     {
@@ -1468,6 +1561,7 @@ export function createSandboxToolSource(
           "upload_file",
           "import_file",
           "computer_status",
+          MAKE_KEY_TOOL,
           REQUEST_SECRET_TOOL,
           "start_task",
           "list_tasks",
