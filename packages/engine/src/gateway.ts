@@ -139,16 +139,21 @@ const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
 /**
  * A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked,
- * and who answered, on whose key.
+ * and who answered, on whose key. The key it ran on goes by its value: not every provider's has a shape we know.
  */
-const masked = (error: unknown, provider: string, key: { credentialId: string | null; endpoint?: Endpoint }) => {
+const masked = (
+  error: unknown,
+  provider: string,
+  key: { apiKey: string; credentialId: string | null; endpoint?: Endpoint },
+) => {
   if (!(error instanceof ProviderError)) return error;
+  const clean = (text: string) => redactCredentials(key.apiKey ? text.replaceAll(key.apiKey, "••••") : text);
   const out = new ProviderError(
-    redactCredentials(error.message),
+    clean(error.message),
     error.retryable,
     error.status,
     error.partial,
-    error.said && redactCredentials(error.said),
+    error.said && clean(error.said),
   );
   // A workspace's own endpoint has no name of its own: people know it by its address.
   out.provider = key.endpoint
@@ -300,7 +305,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     if (info) return info;
     if (!isOpenRouterModel(model)) throw new ValidationError(`Model ${model} is not in the catalog`);
     // Without its list no call can be priced: like an outage, the run tries again later.
-    if (!openRouterListed()) throw new ProviderError("could not reach provider", true);
+    if (!openRouterListed()) {
+      const outage = new ProviderError("could not reach provider", true);
+      outage.provider = label("openrouter");
+      throw outage;
+    }
     throw new ValidationError(`OpenRouter doesn't list ${model} anymore. Pick another model in the agent's settings.`);
   }
 

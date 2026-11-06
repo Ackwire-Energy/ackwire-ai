@@ -784,11 +784,9 @@ const userFacing = (error: unknown): string | null => {
   return null;
 };
 
-/** The run's error when a failure outlasted every retry. */
-const gaveUp = (error: unknown) =>
-  error instanceof ProviderError
-    ? providerFailureText("gave_up", error)
-    : `gave_up: ${error instanceof Error ? error.message : String(error)}`;
+/** The run's error when a provider's or a computer's failure outlasted every retry. */
+const gaveUp = (error: ProviderError | BrainFailure) =>
+  error instanceof ProviderError ? providerFailureText("gave_up", error) : `gave_up: ${error.message}`;
 
 /** A provider (or brain) failure that may pass by itself: the run waits it out (`OUTAGE_PARK`), anything else fails. */
 const retryableOutage = (error: unknown) =>
@@ -4027,13 +4025,17 @@ async function executeRunInner(
         if (paused) return fail(paused.message);
         const reason = userFacing(error);
         if (reason) {
-          if (error instanceof ProviderError && !ACCOUNT_REFUSALS.has(error.status ?? 0)) options.failed?.(error);
+          // Refused on the server's own key, the account is ours: nobody else will tell us.
+          if (error instanceof ProviderError && (error.platformKey || !ACCOUNT_REFUSALS.has(error.status ?? 0)))
+            options.failed?.(error);
           return fail(reason);
         }
         if (options.finalAttempt) {
           if (retryableOutage(error) && (await parkOutage(error))) return;
           options.failed?.(error);
-          return fail(gaveUp(error));
+          if (error instanceof ProviderError || error instanceof BrainFailure) return fail(gaveUp(error));
+          // Neither the provider's nor the computer's: the run's catch words it as ours.
+          throw error;
         }
         await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });
         throw error;

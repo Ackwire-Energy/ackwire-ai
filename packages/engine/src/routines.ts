@@ -90,6 +90,7 @@ import {
   ruleToCron,
   type ScheduleRule,
 } from "./rrule";
+import { providerFailure } from "./runs";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 import { standingRefusal } from "./standing";
 import { alwaysAsks } from "./tools/gateway";
@@ -653,13 +654,17 @@ function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRu
   const by = stopper ? details.names.get(stopper) : undefined;
   const link = detailed && run.messageId ? details.links.get(run.messageId) : undefined;
   const approvalId = detailed && run.agentRunId ? (details.approvals.get(run.agentRunId) ?? null) : null;
+  // A provider's failure says its cause and its words, for who reads the records: the code alone says only "an error".
+  const failure = detailed && status === "failed" ? providerFailure(agentRun?.error) : null;
+  const cause = failure?.errorParams?.provider ? failure : null;
   return {
     id: run.id,
     at: run.at.toISOString(),
     status,
     // Waiting for its computer, not for a person: the app says which.
-    code:
-      status !== "waiting"
+    code: cause
+      ? cause.errorCode.replace(/^run\./, "")
+      : status !== "waiting"
         ? run.code
         : agentAway(agentRun)
           ? "waiting_computer"
@@ -668,7 +673,7 @@ function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRu
               ? "waiting_budget"
               : "waiting_plan"
             : run.code,
-    ...(by ? { codeParams: { by } } : {}),
+    ...(by ? { codeParams: { by } } : cause ? { codeParams: cause.errorParams } : {}),
     summary: detailed && run.status !== "canceled" ? replyExcerpt(run.summary, RECORD_EXCERPT) : "",
     brain: run.brain,
     link: link && run.messageId ? { ...link, messageId: run.messageId } : null,

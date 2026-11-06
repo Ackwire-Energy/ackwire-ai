@@ -240,7 +240,7 @@ export type ProviderCause =
   | "unreachable";
 
 const NO_CREDIT =
-  /no prepaid credit|insufficient[ _](?:credits?|quota|balance|funds)|credit balance|requires more credits|exceeded your current quota|key limit exceeded/i;
+  /no prepaid credit|insufficient[ _](?:credits?|quota|balance|funds)|credit balance|requires more credits|exceeded your current quota|key limit exceeded|quota used up|api usage limits|billing (?:hard )?limit/i;
 const BAD_KEY = /invalid (?:x-)?(?:provider )?api[ _-]?key|incorrect api key|api key not valid/i;
 const NO_MODEL =
   /not a valid model|model[_ ]not[_ ]found|no endpoints found|no allowed providers|model .{0,80}does not exist/i;
@@ -255,7 +255,8 @@ export function providerCause(error: Pick<ProviderError, "status" | "message" | 
   if (status === 402 || NO_CREDIT.test(words)) return "no_credit";
   if (status === 401 || BAD_KEY.test(words)) return "invalid_key";
   if (status === 404 || NO_MODEL.test(words)) return "model_unavailable";
-  if (status === 403) return "no_access";
+  // OpenRouter's 403 is also its moderation refusing the text: no key fixes that, its words say why.
+  if (status === 403) return /moderation|flagged/i.test(words) ? null : "no_access";
   if (status === 429 || /rate.?limit|too many requests/i.test(words)) return "rate_limit";
   if (status === 408 || status === 504 || status === 524 || /timed? ?out/i.test(words)) return "timeout";
   if (status >= 500 || /overloaded/i.test(words)) return "down";

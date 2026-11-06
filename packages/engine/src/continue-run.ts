@@ -13,7 +13,7 @@ import { getMessage } from "./messages";
 import { requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
 import { ACTIVE_RUN_STATUSES, takeInbox } from "./run-inbox";
-import { runErrorDetail } from "./runs";
+import { providerFailure } from "./runs";
 import { announceWork, reopenWork, updatesThreadOf } from "./works";
 
 const { agentRuns, agents, messages, channels, users } = schema;
@@ -65,7 +65,7 @@ export async function continueRun(
   const notContinuable = () => new ConflictError("This task can't be continued", "run.not_continuable");
   const byPerson = stopped.status === "canceled" && Boolean(canceledBy(stopped.error));
   // Long work its AI provider cut off (ADR 0121): its end, posted home, is where it goes on from.
-  const providerCut = stopped.status === "failed" && Boolean(stopped.workId) && providerFailure(stopped.error);
+  const providerCut = stopped.status === "failed" && Boolean(stopped.workId) && Boolean(providerFailure(stopped.error));
   if (!(byPerson || providerCut || stopped.status === "done") || !stopped.transcript) throw notContinuable();
   const [work] = stopped.workId
     ? await db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, stopped.workId))
@@ -251,10 +251,6 @@ async function answerAnywayText(
     anyway,
   }).catch(() => anyway);
 }
-
-/** A run error its AI provider caused (an error it returned, or no answer after the retries): worth another try. */
-export const providerFailure = (error: string | null) =>
-  runErrorDetail(error)?.errorCode.startsWith("run.provider_") === true;
 
 /** The stop-and-send message left the stopped run's inbox before the restart (handed on already). */
 class AlreadyHandedOn extends Error {}

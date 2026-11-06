@@ -321,6 +321,9 @@ describe("openAIError", () => {
 
   test("a refusal keeps the API's words, and a timeout is told from a connection that failed", () => {
     expect(openAIError(generated(400, { message: "tools: too many" }))).toMatchObject({ said: "tools: too many" });
+    expect(openAIError(generated(403, { message: "Country not supported" }))).toMatchObject({
+      said: "Country not supported",
+    });
     expect(openAIError(new OpenAI.APIConnectionTimeoutError())).toMatchObject({ message: "provider timed out" });
     expect(openAIError(new OpenAI.APIConnectionError({ message: "x" }))).toMatchObject({
       message: "could not reach provider",

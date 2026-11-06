@@ -1,7 +1,14 @@
-import { afterEach, expect } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import { ProviderError } from "@agenteschat/providers";
-import { consultationWait, getMessage, loadAgentStatuses, outageParkedSql, receiptsFor } from "../../src";
+import {
+  consultationWait,
+  getMessage,
+  loadAgentStatuses,
+  outageParkedSql,
+  receiptsFor,
+  runErrorDetail,
+} from "../../src";
 import { closeWorlds, world } from "./harness";
 import { assertInvariants } from "./invariants";
 import { scenario } from "./known";
@@ -9,6 +16,20 @@ import { scenario } from "./known";
 // I5 (failures reach someone, and work resumes): no failure ends with only a `run.finished` event.
 
 afterEach(closeWorlds);
+
+test("an error of ours at the last try doesn't read as the provider's, and its raw words aren't shown", async () => {
+  const w = await world({
+    agents: ["otto"],
+    script: { otto: () => ({ error: new Error('relation "usage_records" does not exist') }) },
+  });
+  await w.say("@otto o build passou?");
+  await w.settle();
+  await w.advance(2);
+  const [run] = await w.runs("otto");
+  expect(run?.status).toBe("failed");
+  expect(runErrorDetail(run?.error)).toEqual({ errorCode: "run.our_error" });
+  expect(run?.error).not.toContain("usage_records");
+});
 
 scenario("S29", "a provider outage parks the run, which finishes when the provider is back", async () => {
   let down = true;

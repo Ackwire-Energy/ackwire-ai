@@ -159,7 +159,7 @@ export function runErrorDetail(error: string | null | undefined): {
   if (coded) {
     const [, cause, provider = "", detail = ""] = coded;
     return cause === "ours"
-      ? { errorCode: "run.our_error" }
+      ? { errorCode: "run.our_error", errorParams: { provider } }
       : { errorCode: `run.provider_${cause}`, errorParams: { provider, detail } };
   }
   if (error.startsWith("provider_error:")) {
@@ -204,6 +204,15 @@ export function runErrorDetail(error: string | null | undefined): {
   const unlisted = /^OpenRouter doesn't list (.+) anymore\./.exec(error);
   if (unlisted) return { errorCode: "run.model_unlisted", errorParams: { model: unlisted[1] as string } };
   return { errorCode: "run.failed", errorParams: { detail: error.slice(0, 300) } };
+}
+
+/** The detail of a run error its AI provider caused, on the person's key or the server's: worth another try. */
+export function providerFailure(error: string | null | undefined) {
+  const detail = runErrorDetail(error);
+  const provider =
+    detail?.errorCode.startsWith("run.provider_") ||
+    (detail?.errorCode === "run.our_error" && detail.errorParams?.provider);
+  return provider ? detail : null;
 }
 
 export const isTerminal = (status: RunStatus) => RUN_TRANSITIONS[status].length === 0;

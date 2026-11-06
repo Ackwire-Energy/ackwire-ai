@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { ProviderError } from "@agenteschat/providers";
 import { routineFailureCode } from "../src/routine-ledger";
-import { providerFailureOf, providerFailureText, runErrorDetail } from "../src/runs";
+import { OUR_ERROR, providerFailure, providerFailureOf, providerFailureText, runErrorDetail } from "../src/runs";
 
 test("a failed run's reason: a CLI's failed turn is the computer's, a missing account and our own error say so", () => {
   for (const code of ["codex_failed", "opencode_failed", "antigravity_failed", "brain_failed"]) {
@@ -68,7 +68,11 @@ test("an unknown refusal shows the provider's own words, cut, with no key in the
 
 test("on the server's own key the person's account isn't what failed: it reads as ours", () => {
   const stored = providerFailureText("provider_error", failure("invalid provider API key", 401, undefined, true));
-  expect(runErrorDetail(stored)).toEqual({ errorCode: "run.our_error" });
+  expect(runErrorDetail(stored)).toEqual({ errorCode: "run.our_error", errorParams: { provider: "OpenRouter" } });
+  // Still a provider's failure for what follows: long work it cut off goes on (Continuar).
+  expect(providerFailure(stored)).toBeTruthy();
+  expect(providerFailure(`${OUR_ERROR} that kept repeating.`)).toBeNull();
+  expect(providerFailure("Add an API key for Claude in the workspace settings")).toBeNull();
   // Their key or ours, a provider that is down is the provider's.
   const down = failure("provider error", 503, undefined, true);
   expect(providerFailureOf(down).cause).toBe("down");

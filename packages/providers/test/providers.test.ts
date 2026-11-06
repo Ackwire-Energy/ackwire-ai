@@ -269,7 +269,7 @@ describe("providerCause", () => {
     [502, "provider error", "Provider returned error", "down"],
     [503, "provider error", "No provider available", "down"],
     [408, "provider error", "Timeout", "timeout"],
-    [403, "provider denied access", "Your input was flagged", "no_access"],
+    [403, "provider denied access", "Your input was flagged by moderation", null],
     // OpenAI
     [429, "no prepaid credit left at the provider", "You exceeded your current quota", "no_credit"],
     [401, "invalid provider API key", "Incorrect API key provided", "invalid_key"],
@@ -280,9 +280,12 @@ describe("providerCause", () => {
     [undefined, "could not reach provider", undefined, "unreachable"],
     // Claude
     [400, "provider rejected the request (400 invalid_request_error)", "Your credit balance is too low", "no_credit"],
+    [400, "provider rejected the request (400)", "You have reached your specified API usage limits", "no_credit"],
     [404, "provider rejected the request (404 not_found_error)", "model: claude-x", "model_unavailable"],
     [529, "provider error", undefined, "down"],
     [504, "provider error", undefined, "timeout"],
+    // Gemini: over for the day, nothing a wait in this conversation fixes
+    [429, "daily quota used up at the provider", undefined, "no_credit"],
   ] as const)("%s %s (%s) is %s", (status, message, said, expected) => {
     expect(cause(status, message, said)).toBe(expected);
   });

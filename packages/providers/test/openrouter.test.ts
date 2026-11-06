@@ -503,6 +503,12 @@ describe("OpenRouter adapter (Chat Completions, scripted transport)", () => {
     expect(e).toMatchObject({ said: "x/y is temporarily rate-limited upstream" });
     e = await failure(call({}, scripted(upstream('{"error":{"message":"busy\\n"}}')).fetcher).result);
     expect((e as ProviderError).said).toContain("busy");
+    // A body that echoes the request is never shown: only its message is, else OpenRouter's words.
+    const echoed = '{"detail":[{"msg":"Field required","input":{"role":"system","content":"private instructions"}}]}';
+    e = await failure(call({}, scripted(upstream(echoed)).fetcher).result);
+    expect(e).toMatchObject({ said: "Provider returned error" });
+    e = await failure(call({}, scripted(upstream("<html>502 Bad Gateway</html>")).fetcher).result);
+    expect(e).toMatchObject({ said: "Provider returned error" });
 
     // HTTP 200 already sent: the failure arrives as a chunk, its code the status it stands for.
     const broken = (code: unknown) =>

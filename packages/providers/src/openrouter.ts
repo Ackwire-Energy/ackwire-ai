@@ -489,7 +489,13 @@ function routerError(error: unknown, compatible: boolean): ProviderError {
     mapped.said = saidIn(error);
     // A workspace's own endpoint: its admin reads the server's words to fix it (a model name, a missing feature).
     return compatible && error.message
-      ? new ProviderError(`${mapped.message}: ${error.message.slice(0, 300)}`, mapped.retryable, mapped.status)
+      ? new ProviderError(
+          `${mapped.message}: ${error.message.slice(0, 300)}`,
+          mapped.retryable,
+          mapped.status,
+          undefined,
+          mapped.said,
+        )
       : mapped;
   }
   return openAIError(error);

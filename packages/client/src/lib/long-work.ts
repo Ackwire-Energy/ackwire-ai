@@ -142,8 +142,12 @@ export function workAnchorBody(t: TFunction, body: string, meta: Record<string, 
  * Null for any other message or once it was continued.
  */
 export function workContinuable(meta: Record<string, unknown> | undefined): { continuedRunId: string | null } | null {
-  const end = meta?.workEnd as { status?: unknown; errorCode?: unknown; continuedRunId?: unknown } | undefined;
-  if (end?.status !== "failed" || typeof end.errorCode !== "string" || !end.errorCode.startsWith("run.provider_"))
+  const end = meta?.workEnd as
+    | { status?: unknown; errorCode?: unknown; errorParams?: { provider?: unknown }; continuedRunId?: unknown }
+    | undefined;
+  if (end?.status !== "failed" || typeof end.errorCode !== "string") return null;
+  // `run.our_error` with a provider: it failed there on the server's own key (`providerFailure` in the engine).
+  if (!end.errorCode.startsWith("run.provider_") && !(end.errorCode === "run.our_error" && end.errorParams?.provider))
     return null;
   return { continuedRunId: typeof end.continuedRunId === "string" ? end.continuedRunId : null };
 }
