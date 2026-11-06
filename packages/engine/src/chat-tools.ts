@@ -1,4 +1,4 @@
-import type { GifProvider, PubSub } from "@agenteschat/adapters";
+import type { PubSub } from "@agenteschat/adapters";
 import { and, count, desc, eq, isNull, or, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, shareArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
@@ -7,8 +7,8 @@ import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/
 import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
 import { cutText } from "./format";
-import { type GifMedia, mediaSettings } from "./media";
-import { agentGifSearch, findGif, gifSearchOf } from "./media-tools";
+import type { GifMedia } from "./media";
+import type { AgentGifPoster } from "./media-tools";
 import { messageLink } from "./message-links";
 import { insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
@@ -51,7 +51,7 @@ const origin = (ctx: ToolContext, requester: string | null) => ({
 /** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
 
-/** `post_message`'s GIF, listed only when the agent may send one (`agentGifSearch`), never to background work. */
+/** `post_message`'s GIF, listed only when the agent may send one (`AgentGifPoster.offered`), never to background work. */
 const GIF_PROPERTY = {
   type: "string",
   maxLength: 100,
@@ -66,22 +66,25 @@ const GIF_HELP =
  * finds one. Looked up before anything is posted or copied, so a failed search leaves nothing behind.
  */
 async function gifToPost(
-  gifs: GifProvider | null | undefined,
+  poster: AgentGifPoster | undefined,
   ctx: ToolContext,
-  input: { search: string; requester: string | null; channelId: string },
+  input: { search: unknown; requester: string | null; channelId: string },
 ): Promise<{ gif: GifMedia } | { error: string }> {
   if (!input.requester || ctx.background) return { error: "Only a person's request posts a GIF: post the text alone." };
-  const search = await agentGifSearch(gifs, ctx);
-  if (!search) return { error: "GIFs are off here: post the text alone, without `gif`." };
-  const { gifRating } = await mediaSettings(ctx.db, ctx.orgId);
-  const seed = `${ctx.runId}:${input.channelId}:${input.search}`;
-  // Undefined: the provider didn't answer (an outage, a limit, too slow).
-  const gif = await findGif(search, { query: input.search, rating: gifRating, seed }).catch(() => undefined);
-  if (gif === undefined) return { error: "GIF search isn't answering right now: try again, or post without `gif`." };
-  if (!gif) {
-    return { error: `No GIF found for "${input.search}". Try other words in English, or post without \`gif\`.` };
+  const found = poster
+    ? await poster.find(ctx, input.search, `${ctx.runId}:${input.channelId}`)
+    : { none: "off" as const };
+  if ("gif" in found) return found;
+  switch (found.none) {
+    case "off":
+      return { error: "GIFs are off here: post the text alone, without `gif`." };
+    case "empty":
+      return { error: 'Say what the GIF shows in a few English words, e.g. "good night".' };
+    case "down":
+      return { error: "GIF search isn't answering right now: try again, or post without `gif`." };
+    case "not_found":
+      return { error: `No GIF found for "${found.query}". Try other words in English, or post without \`gif\`.` };
   }
-  return { gif };
 }
 
 /** For matching what someone typed against names: lower case, no accents, no leading @. */
@@ -131,8 +134,8 @@ export async function findMember(ctx: Pick<ToolContext, "db" | "orgId">, who: st
 export function createChatToolSource(deps: {
   pubsub?: PubSub;
   artifacts: ArtifactDeps;
-  /** The server's GIF search (`Adapters.gifs`); null or absent: `post_message` has no `gif`. */
-  gifs?: GifProvider | null;
+  /** `post_message`'s GIF (`createAgentGifPoster`); absent: it has no `gif`. */
+  gif?: AgentGifPoster;
 }): ToolSource {
   const tools: ToolDefinition[] = [
     {
@@ -211,13 +214,13 @@ export function createChatToolSource(deps: {
           }
           const text = str(input.text).trim();
           const ids = [...new Set((Array.isArray(input.artifact_ids) ? input.artifact_ids : []).map(String))];
-          const gifSearch = gifSearchOf(input.gif);
-          if (!text && ids.length === 0 && !gifSearch) {
+          const gifAsked = str(input.gif).trim() !== "";
+          if (!text && ids.length === 0 && !gifAsked) {
             return { content: "Give a text, files or a GIF to post.", isError: true };
           }
           let gif: GifMedia | null = null;
-          if (gifSearch) {
-            const found = await gifToPost(deps.gifs, ctx, { search: gifSearch, requester, channelId: channel.id });
+          if (gifAsked) {
+            const found = await gifToPost(deps.gif, ctx, { search: input.gif, requester, channelId: channel.id });
             if ("error" in found) return { content: found.error, isError: true };
             gif = found.gif;
           }
@@ -445,7 +448,7 @@ export function createChatToolSource(deps: {
   return {
     name: "chat",
     tools: async (ctx) => {
-      const gif = !ctx.background && ctx.runId ? await agentGifSearch(deps.gifs, ctx) : null;
+      const gif = !ctx.background && ctx.runId && deps.gif ? await deps.gif.offered(ctx) : false;
       return [gif ? postWithGif : postMessage, ...others];
     },
   };

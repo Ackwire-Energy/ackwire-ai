@@ -20,6 +20,7 @@ import {
   addChannelMember,
   type ContextDeps,
   createAgent,
+  createAgentGifPoster,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
@@ -346,7 +347,7 @@ export async function setup(
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.blockTools ? [createBlockToolSource(artifactDeps)] : []),
     ...(options.chatTools
-      ? [createChatToolSource({ pubsub, artifacts: artifactDeps, gifs: options.gifs ?? null })]
+      ? [createChatToolSource({ pubsub, artifacts: artifactDeps, gif: createAgentGifPoster(options.gifs) })]
       : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),

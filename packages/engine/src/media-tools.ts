@@ -109,6 +109,39 @@ export async function agentGifSearch(
   return settings.gifs && agent && !agent.archivedAt && agent.mediaReplies ? gifs : null;
 }
 
+/** What `AgentGifPoster.find` found: the GIF, or why none goes (`query`: the search as the provider got it). */
+export type GifToPost = { gif: GifMedia } | { none: "off" } | { none: "empty" | "down" | "not_found"; query: string };
+
+/**
+ * `post_message`'s GIF (ADR 0091 addendum 2026-11-05), handed to the chat tools by whoever builds them, so
+ * `chat-tools.ts` never imports this file (its imports would close a cycle through `context.ts`).
+ */
+export interface AgentGifPoster {
+  /** Whether the calling agent may send a GIF now (`agentGifSearch`). */
+  offered(ctx: ToolContext): Promise<boolean>;
+  /** A GIF for the model's `search`, found as `send_gif` finds one (the workspace's rating, fixed by `seed`). */
+  find(ctx: ToolContext, search: unknown, seed: string): Promise<GifToPost>;
+}
+
+export function createAgentGifPoster(gifs: GifProvider | null | undefined): AgentGifPoster {
+  return {
+    offered: async (ctx) => (await agentGifSearch(gifs, ctx)) !== null,
+    async find(ctx, search, seed) {
+      const provider = await agentGifSearch(gifs, ctx);
+      if (!provider) return { none: "off" };
+      const query = gifSearchOf(search);
+      if (!query) return { none: "empty", query };
+      const { gifRating } = await mediaSettings(ctx.db, ctx.orgId);
+      // Undefined: the provider didn't answer (an outage, a limit, too slow).
+      const gif = await findGif(provider, { query, rating: gifRating, seed: `${seed}:${query}` }).catch(
+        () => undefined,
+      );
+      if (gif === undefined) return { none: "down", query };
+      return gif ? { gif } : { none: "not_found", query };
+    },
+  };
+}
+
 type RunRow = { hop: number; createdAt: Date };
 
 /** The run's hop (its messages carry it) and start (its own messages are read from there). */

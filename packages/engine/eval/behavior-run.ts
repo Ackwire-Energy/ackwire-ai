@@ -25,6 +25,7 @@ import {
   addChannelMember,
   type ContextDeps,
   createAgent,
+  createAgentGifPoster,
   createAgentRuns,
   createArtifactToolSource,
   createAskAgentToolSource,
@@ -451,7 +452,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         ? [
             createChatToolSource({
               pubsub,
-              gifs: c.noGifs ? null : createFakeGifs(),
+              gif: createAgentGifPoster(c.noGifs ? null : createFakeGifs()),
               artifacts: {
                 db,
                 blobs: createBlobStoreResolver({ db, keyWrappers: [keyWrapper], platform: createMemoryBlobStore() }),
