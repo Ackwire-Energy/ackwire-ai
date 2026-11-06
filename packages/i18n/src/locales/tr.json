@@ -8,6 +8,7 @@
     "cantUndo": "Bu işlem geri alınamaz.",
     "removeName": "Kaldır: {{name}}",
     "about": "Hakkında: {{label}}",
+    "askAgent": "{{name}} ile konuş",
     "previousMonth": "Önceki ay",
     "nextMonth": "Sonraki ay",
     "chooseDate": "Bir tarih seçin",
@@ -1530,8 +1531,10 @@
     "workingNow": "Şu anda çalışıyor",
     "available": "Müsait",
     "archived": "Arşivlenenler",
-    "emptyTitle": "Henüz ajan yok",
-    "empty": "Ekibi kurmak için ilk ajanı oluşturun.",
+    "emptyTitle": "Ajan ekibinizi kurun",
+    "empty": "Her ajanın bir rolü vardır ve kişilerle aynı kanallarda birlikte çalışır.",
+    "emptyViewerTitle": "Ajan ekibiniz burada görünür",
+    "emptyViewer": "Ajan oluşturabilen kişi ekibi kurar ve her ajan burada görünür.",
     "list": {
       "agents": "Ajanlar",
       "people": "Kişiler",
@@ -1584,7 +1587,10 @@
       "waiting_other": "{{count}} istek onay bekliyor",
       "moreRoutines_one": "ve {{count}} rutin daha",
       "moreRoutines_other": "ve {{count}} rutin daha",
-      "empty": "Henüz hiçbir ajan bir kanalda değil.",
+      "empty": "Bir ajanı bir kanala ekleyin, ajan burada ilgilenen kişiyle birlikte görünsün.",
+      "emptyTitle": "Her ajanın nerede çalıştığını görün",
+      "emptyAction": "Kanala ekle",
+      "emptyViewer": "Ajanları yöneten kişi onları kanallara ekler ve harita burada görünür.",
       "others": "Diğer kanallar"
     },
     "sectors": {
@@ -2996,9 +3002,9 @@
       "noMatch": "Burada bu aramayla eşleşen bir şey yok.",
       "clearFilters": "Aramayı temizle",
       "personalNote": "Bu öğeleri yalnızca siz görürsünüz. Ajanlarınız bunları yalnızca siz istediğinizde kullanır.",
-      "personalEmpty": "Henüz kayıtlı bir şey yok",
+      "personalEmpty": "Girişlerinizi ve anahtarlarınızı güvende tutun",
       "personalEmptyText": "Bu öğeleri yalnızca siz görürsünüz. Ajanlarınız bunları yalnızca siz istediğinizde kullanır.",
-      "teamEmpty": "Henüz ekiple paylaşılan bir şey yok",
+      "teamEmpty": "Bir kez kaydedin, ajanlar kullanabilsin",
       "teamEmptyText": "Bir giriş bilgisini, anahtarı ya da iletişim bilgilerini bir kez kaydedin ve hangi ajanların kullanabileceğini seçin.",
       "sharedEmpty": "Henüz sizinle paylaşılan bir şey yok",
       "sharedEmptyText": "Biri sizinle ekibin bir giriş bilgisini ya da anahtarını paylaştığında burada görünür."
@@ -4532,7 +4538,8 @@
       "decides": "{{who}} karar verir.",
       "adminDecides": "Bir yönetici karar verir.",
       "learned": "Öğrendikleri",
-      "learnedEmpty": "Henüz kendi kendine öğrendiği bir şey yok. Düzeltmeler, tercihler ve bulduğu çalışma yolları burada görünür.",
+      "learnedEmpty": "Keşfettiği düzeltmeler, tercihler ve çalışma biçimleri burada görünür.",
+      "learnedEmptyTitle": "Kendi başına keşfettikleri burada kalır",
       "howTo": "Nasıl yapılır",
       "disputed": "Tartışmalı",
       "edit": "Düzenle",
@@ -4588,6 +4595,8 @@
       },
       "noneFilter": "Bu filtreyle bir şey yok.",
       "clear": "Başka bir kelime deneyin veya filtreyi temizleyin.",
+      "emptyTitle": "Her iş burada kayıt altındadır",
+      "emptyText": "{{name}} adlı ajanın her işinin adımları ve maliyeti burada görünür.",
       "showing": "{{total}} içinden {{shown}} gösteriliyor.",
       "more": "Daha fazla yükle",
       "direct": "Doğrudan mesaj",
@@ -4695,8 +4704,10 @@
       "search": "Dosya veya kanal ara",
       "all": "Tümü",
       "changedOther": "{{owner}} kişisinin dosyası, {{name}} değiştirdi",
-      "empty": "{{name}} henüz hiç dosya oluşturmadı",
-      "emptyText": "{{name}} bir sohbette dosya teslim ettiğinde burada görünür.",
+      "empty": "Bir rapor, tablo veya belge isteyin",
+      "emptyText": "{{name}} bir sohbette ne teslim ederse burada saklanır.",
+      "ask": "Dosya iste",
+      "askText": "Çalışmanızın özetini bir dosyaya çıkarın.",
       "note": "Yalnızca görebildiğiniz sohbetlerdeki dosyalar."
     },
     "panel": {
@@ -4755,6 +4766,8 @@
     "archive": "Arşivle",
     "restore": "Geri yükle",
     "emptySearch": "“{{q}}” için hiçbir şey bulunamadı.",
+    "emptyTitle": "{{name}} belleği burada başlar",
+    "emptyText": "Her sohbet, ekibin çalışma şekli hakkında yeni bir şey öğretir.",
     "empty": "Burada henüz bir şey yok. {{name}}, ekip onunla konuştukça öğrenir.",
     "empty_female": "Burada henüz bir şey yok. {{name}}, ekip onunla konuştukça öğrenir.",
     "how": "Bellek nasıl çalışır",
@@ -4822,7 +4835,8 @@
     "refuseNote": "Reddetmek, {{name}} ajanına bunu bir daha önermemeyi öğretir.",
     "added": "Eklendi:",
     "removed": "Kaldırıldı:",
-    "empty": "Henüz öneri yok. Biri bir ajandan değişiklik istediğinde ya da bir ders tekrarlandığında burada görünür.",
+    "empty": "Biri bir ajandan değişiklik istediğinde veya bir ders tekrarlandığında öneri burada görünür.",
+    "emptyTitle": "İncelenecek bir şey yok",
     "titleInstructions": "{{name}} talimatlarını güncelle",
     "titleRole": "{{name}} rolünü değiştir",
     "titleAccess": "{{name}} erişimini değiştir",
@@ -5610,7 +5624,7 @@
     "filters": "Görevleri filtrele",
     "unassigned_one": "{{count}} atanmamış",
     "unassigned_other": "{{count}} atanmamış",
-    "emptyTitle": "Henüz görev yok",
+    "emptyTitle": "İşe bir sorumlu ve tarih verin",
     "panelLabel": "Görev #{{number}}",
     "openPage": "Görevin sayfasını aç",
     "close": "Kapat",
@@ -5789,7 +5803,9 @@
     "agentRole": "Ajan · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Bir tane oluşturun ya da sohbette bir ajandan isteyin.",
+    "empty": "Görev, kişi ya da ajan, kimin neyi yaptığını ve işin nerede olduğunu gösterir.",
+    "emptyViewerTitle": "Kimin ne yaptığını görün",
+    "emptyViewer": "Çalışma alanına yazabilen kişi görev oluşturur ve burada görünürler.",
     "noResults": "Bu filtrelerle eşleşen görev yok.",
     "columnEmpty": "Burada bir şey yok.",
     "form": {
@@ -5845,7 +5861,7 @@
       "hint": "Alandan çıktığınızda veya Esc'ye bastığınızda kaydedilir."
     },
     "askTitle": "Bu görevi {{name}} ajanından isteyin",
-    "askText": "{{name}} ihtiyaç duyduğu şeyleri okur, planı buraya yorum olarak yazar ve uygular. Yayınlamak gibi hassas her şey onayınızı ister.",
+    "askText": "Ekibin ilk görevlerini oluşturmama yardım edin.",
     "askText_female": "{{name}} ihtiyaç duyduğu şeyleri okur, planı buraya yorum olarak yazar ve uygular. Yayınlamak gibi hassas her şey onayınızı ister.",
     "askButton": "{{name}} ajanına sor",
     "askSection": "Bir ajana sorun",
@@ -6040,7 +6056,11 @@
     "groupLive": "Yayında",
     "groupPaused": "Duraklatılmış",
     "noResults": "Bu filtrelere uyan rutin yok.",
-    "emptyTitle": "Henüz rutin yok",
+    "emptyTitle": "Tekrarlanan işleri ajanlarınıza bırakın",
+    "empty": "Rutin belirlenen saatte kendiliğinden çalışır ve istediğiniz yere teslim eder.",
+    "emptyViewerTitle": "Kendiliğinden çalışanları görün",
+    "emptyViewer": "Ajanlarla ilgilenen kişi rutinleri oluşturur ve burada görünürler.",
+    "askText": "Bir rutin oluşturmama yardım edin.",
     "runningNow": "Şu anda çalışıyor…",
     "neverRan": "Henüz çalışmadı",
     "silentOf": "{{total}} çalıştırmanın {{count}} tanesinde sessiz",
@@ -6845,7 +6865,8 @@
       "openThread": "İleti dizisini aç"
     },
     "empty": {
-      "title": "Henüz misyon yok"
+      "title": "Bir hedef belirleyin ve ajanı izleyin",
+      "viewer": "Ajanlara iş verebilen kişi misyon açar ve burada görünürler."
     },
     "new": {
       "noEligibleTitle": "Henüz hiçbir ajan sizin için misyon yürütemiyor",
@@ -7111,8 +7132,8 @@
     "empty": {
       "missionsTitle": "Henüz misyon yok",
       "missions": "Misyon, bir planı, kararları ve bir ajanın bilgisayarındaki çalışmasını içeren bir ileti dizisidir.",
-      "allTitle": "Henüz ileti dizisi yok",
-      "all": "İleti dizisi açmak için bir mesajı yanıtlayın.",
+      "allTitle": "Her konu kendi sohbetinde",
+      "all": "Bir ileti dizisi açmak için bir mesajı yanıtlayın, kanal düzenli kalır.",
       "workingTitle": "Şu anda çalışan ajan yok",
       "closedTitle": "Burada kapalı bir şey yok",
       "archivedTitle": "Arşivlenmiş ileti dizisi yok",
@@ -7549,7 +7570,8 @@
     "lastResult": "son: {{result}}",
     "upcomingMeta": "{{day}} · {{time}}",
     "emptyHint": "Planlanmış bir şey yok. Oluşturmak için sürükleyin veya N'ye basın",
-    "agendaEmpty": "Önümüzdeki 30 günde bir şey yok.",
+    "agendaEmpty": "Önümüzdeki 30 günün etkinlikleri ve rutinleri burada görünür.",
+    "agendaEmptyTitle": "Önümüzdeki 30 günü görün",
     "more": "+{{count}} daha",
     "allDay": "Tüm gün",
     "now": "Şimdi",
@@ -7606,6 +7628,8 @@
     "installed": "{{name}} yüklendi.",
     "unavailable": "Beceriler bu sunucuda henüz kullanılamıyor.",
     "empty": "Henüz beceri yok.",
+    "emptyTitle": "Bir kez öğretin, her ajan bilsin",
+    "emptyText": "Beceri, iş gerektirdiğinde ajanların izlediği bir çalışma biçimidir.",
     "seeAll": "{{count}} becerinin tümünü gör",
     "search": "Beceri ara",
     "noResults": "“{{q}}” ile eşleşen beceri yok.",
@@ -7896,7 +7920,9 @@
     "page": {
       "title": "Planlarınız",
       "hint": "Her plan bağlandığı bilgisayarda kalır ve o bilgisayarı kullanan kişi ona erişebilir. agentes.chat yalnızca adını, e-postasını ve kullanımını saklar.",
-      "empty": "Henüz plan yok.",
+      "empty": "Hesabınızla giriş yapın, ajanlar onunla düşünsün.",
+      "emptyTitle": "Zaten ödediğiniz yapay zeka planını kullanın",
+      "emptyViewer": "Çalışma alanının yapay zekasıyla ilgilenen kişi bir plan bağlar ve burada görünür.",
       "connect": "Yapay zeka bağla",
       "keyEnds": "anahtar …{{hint}}",
       "on": "{{computer}} üzerinde",
@@ -8345,8 +8371,9 @@
     "noMatch": "Bu adla bir sayfa yok.",
     "tags": "Etiketler",
     "recent": "Son düzenlenenler",
-    "emptyTitle": "Wiki boş",
+    "emptyTitle": "Ekibin bildikleri tek yerde",
     "emptyText": "Bir sayfayla başlayın. Genelde işe yarayan bir yapı:",
+    "emptyViewer": "Wiki'yi düzenleyen kişi sayfaları oluşturur ve burada görünürler.",
     "createFirst": "İlk sayfayı oluştur",
     "useStarter": "Önerilen yapıyı kullan",
     "starter": "Önerilen yapı",
@@ -8364,6 +8391,7 @@
     "byFor": "{{name}} tarafından, {{person}} isteğiyle",
     "missingTitle": "Bu sayfa henüz yok",
     "missingText": "Biri ona bağlantı verdi. Oluşturun ve eksik olanı yazın.",
+    "missingViewer": "Biri buna bağlantı verdi. Wiki'yi düzenleyen kişi oluşturabilir.",
     "missingHint": "{{title}} henüz yok: oluşturmak için tıklayın",
     "previewOf": "{{title}} önizlemesi",
     "createPage": "Sayfa oluştur",
@@ -8981,8 +9009,12 @@
     "noTools": "Henüz araç yok.",
     "toolsMore_one": "{{tools}} ve {{count}} tane daha",
     "toolsMore_other": "{{tools}} ve {{count}} tane daha",
-    "noAgents": "Henüz ajan yok. Bağlayıcılara erişim vermek için bir ajan oluşturun.",
-    "noConnectors": "{{org}} henüz hiçbir hizmet bağlamadı.",
+    "noAgents": "Hangi uygulamaları kullanacağına ve her birinde ne yapacağına karar vermek için bir ajan oluşturun.",
+    "noAgentsTitle": "Her ajanın nelere erişeceğini seçin",
+    "noConnectors": "Çalışma alanının uygulamalarını bir kez bağlayın ve her ajanın neleri kullanabileceğini seçin.",
+    "noConnectorsTitle": "Ajanlara gerçek araçlar verin",
+    "noConnectorsViewerTitle": "Ajanların neleri kullanabileceğini görün",
+    "noConnectorsViewer": "Bağlayıcıları yöneten kişi uygulamaları ekler ve burada görünürler.",
     "unavailable": "Erişim denetimi bu sunucuda henüz kullanılamıyor.",
     "area": {
       "context": "Bağlam ve bellek",
@@ -9202,8 +9234,9 @@
     "by": "Oluşturan",
     "where": "Konum",
     "when": "Güncellenme",
-    "emptyTitle": "Henüz dosya yok",
-    "emptyText": "Yüklemek için dosyaları buraya sürükleyin.",
+    "emptyTitle": "Ekibin ürettiği her şey tek yerde",
+    "emptyText": "Ajanların ve kişilerin dosyaları burada durur. Kendi dosyalarınızı yükleyin veya bu sayfaya sürükleyin.",
+    "emptyViewer": "Ajanların ve kişilerin sohbetlerde ürettikleri burada saklanır.",
     "noResults": "Bu filtrelerle eşleşen dosya yok.",
     "clear": "Filtreleri temizle",
     "noResultsHint": "Başka bir arama deneyin ya da filtreleri temizleyin.",
@@ -9495,7 +9528,8 @@
     "searchPlaceholder": "Ada veya ne yaptığına göre arayın",
     "empty": "“{{q}}” ile eşleşen bağlayıcı yok",
     "emptyText": "Herhangi bir hizmeti adresiyle bağlayabilirsiniz.",
-    "none": "Henüz bağlayıcı yok.",
+    "none": "Ajanlar, yalnızca izin verdiğiniz erişimle araçlarınızda çalışmaya başlar.",
+    "noneTitle": "Ekibinizin uygulamalarını bağlayın",
     "connectedFilter": "Bağlı",
     "suggested": "{{org}} için önerilenler",
     "more": "Diğer hizmetler",
@@ -11362,7 +11396,10 @@
     "other": {
       "title": "Diğer bilgisayarlar",
       "text": "Evdeki bir Mac mini ya da başka bir sunucu gibi, bir kodla bağlanır. Her birinin neye izin verdiği o bilgisayarda ayarlanır.",
-      "emptyTitle": "Henüz başka bilgisayar yok"
+      "emptyTitle": "Ajanları herhangi bir bilgisayarda çalıştırın",
+      "emptyText": "Evdeki bir Mac mini'yi veya başka bir sunucuyu kodla bağlayın, ajanlar orada çalışsın.",
+      "emptyViewerTitle": "Ekibin bilgisayarları burada görünür",
+      "emptyViewer": "Bilgisayar bağlayabilen kişi bir tane ekler ve burada görünür."
     }
   },
   "outage": {
@@ -11473,7 +11510,8 @@
     "server": "Sunucu adresi",
     "serverHelp": "Bağladığınız uygulamaya yapıştırın.",
     "serverCopied": "Adres kopyalandı",
-    "empty": "Bağlı uygulama yok. Ajanlardan görev istemek için uygulamadan çıkmadan Claude'u veya başka bir uygulamayı bağlayın.",
+    "empty": "Claude'u veya başka bir uygulamayı bağlayın, oradan çıkmadan ajanlardan görev isteyin.",
+    "emptyTitle": "Ajanlarınıza zaten çalıştığınız yerden ulaşın",
     "connected": "Bağlı",
     "onThisComputer": "bu bilgisayarda",
     "access": {
@@ -11732,7 +11770,8 @@
     },
     "agent": "Ajan",
     "anyAgent": "Tüm ajanlar",
-    "empty": "Burada henüz bir şey yok. Bir ajan sohbet dışında bir şey yaptığında burada görünür.",
+    "empty": "Bir ajan sohbet dışında bir şey yaptığında burada görünür.",
+    "emptyTitle": "Ajanların yaptığı her şey kayıt altındadır",
     "emptyFiltered": "Bu filtreyle bir şey yok.",
     "loadMore": "Daha fazla yükle",
     "outcome": {
@@ -12102,7 +12141,8 @@
     "remove": "Sil",
     "removeTitle": "{{label}} anahtarını silin",
     "removeText": "Anahtar kalıcı olarak silinir. Hâlâ onu kullanan bir ajan varsa sunucu reddeder: önce o ajanların anahtarını değiştirin.",
-    "noKeys": "Henüz anahtar yok.",
+    "noKeys": "API anahtarıyla doğrudan sağlayıcıya ödeme yapar ve modelleri seçersiniz.",
+    "noKeysTitle": "Kendi yapay zeka anahtarınızı getirin",
     "platformAvailable": "Bu sunucunun Claude anahtarı da kullanılabilir.",
     "usageTitle": "Türe göre API harcaması",
     "usageAgentLine": "{{spent}} / {{budget}}",
@@ -12218,7 +12258,8 @@
     },
     "export": "CSV dışa aktar",
     "limitsHint": "Limitler bölümünde kişi başına limit belirle",
-    "empty": "Bu ay henüz kimse ajan kullanmadı.",
+    "empty": "Biri bir ajanla konuştuğunda bu ayın kullanımı burada görünür.",
+    "emptyTitle": "Her kişinin ajanlarla neler yaptığını görün",
     "owner": "Sahip",
     "member": "Üye",
     "columns": {
@@ -12340,7 +12381,7 @@
     "estimate": "Planlar yalnızca hesabın tamamının ne kadar kullandığını söyler. Her ajanın payı, her birinin harcadığına göre bir tahmindir.",
     "accounts": {
       "title": "Plan hesapları",
-      "empty": "Henüz hiçbir ajan bir planla düşünmüyor."
+      "empty": "Bir plan bağlayın ve her ajanın ne kadar kullandığını buradan izleyin."
     },
     "api": {
       "title": "Çalışma alanı API'si"
@@ -12782,6 +12823,7 @@
     "sayHiAgent": "{{name}} ajanına merhaba deyin",
     "sayHiPerson": "{{name}} kişisine merhaba deyin",
     "sayHiChannel": "#{{channel}} kanalında merhaba deyin",
+    "sayHiText": "Bir ajandan @ ile bahsedin, sohbete katılsın.",
     "suggestions": "Başlamak için öneriler",
     "suggest": {
       "dev1": "Son dağıtımdan beri ne bozuldu?",
@@ -13270,6 +13312,8 @@
       "title": "Tarayıcı profilleri",
       "sub": "Sitelere bir kez giriş yapın ve her profili hangi ajanların kullanacağını seçin.",
       "empty": "Bir profil oluşturun, sitelerine bir kez giriş yapın ve hangi ajanların kullanabileceğini seçin. Her ajan kendi tarayıcısını korur.",
+      "emptyTitle": "Yalnızca bir kez giriş yapın",
+      "emptyViewer": "Bu bilgisayarla ilgilenen kişi profilleri oluşturur ve burada görünürler.",
       "new": "Yeni profil",
       "free": "Boşta",
       "inUse": "Kullanan: <who/>",
@@ -14509,8 +14553,9 @@
       "kept": "“{{title}}” panosunu yalnızca siz görüyorsunuz"
     },
     "empty": {
-      "title": "Boş pano",
-      "text": "Widget ekleyin: bir ajandan isteyin ya da sohbetten bir blok sabitleyin."
+      "title": "Rakamlarınız tek yerde",
+      "text": "Bir ajandan widget isteyin veya sohbetten bir bloğu sabitleyin, burada güncel kalsın.",
+      "viewer": "Bu panoyu düzenleyen kişi widget ekler ve burada görünürler."
     },
     "onlyHome": "“Yeni pano” ile çalışma alanı ya da bazı roller için bir pano oluşturun.",
     "create": {

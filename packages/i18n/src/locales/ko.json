@@ -8,6 +8,7 @@
     "cantUndo": "되돌릴 수 없어요.",
     "removeName": "{{name}} 삭제",
     "about": "{{label}} 정보",
+    "askAgent": "{{name}}에게 요청",
     "previousMonth": "이전 달",
     "nextMonth": "다음 달",
     "chooseDate": "날짜 선택",
@@ -1480,8 +1481,10 @@
     "workingNow": "지금 작업 중",
     "available": "대기 중",
     "archived": "보관됨",
-    "emptyTitle": "아직 에이전트가 없어요",
-    "empty": "첫 에이전트를 만들어 팀을 꾸려 보세요.",
+    "emptyTitle": "에이전트 팀을 꾸려 보세요",
+    "empty": "에이전트마다 역할이 있고, 같은 채널에서 사람과 함께 일해요.",
+    "emptyViewerTitle": "에이전트 팀이 여기에 표시돼요",
+    "emptyViewer": "에이전트를 만들 수 있는 사람이 팀을 꾸리면 여기에 표시돼요.",
     "list": {
       "agents": "에이전트",
       "people": "사람",
@@ -1532,7 +1535,10 @@
       "reasonJoin": "팀 지도에서: {{agent}}을(를) #{{to}}에 추가해요.",
       "waiting_other": "요청 {{count}}개가 승인을 기다려요",
       "moreRoutines_other": "외 루틴 {{count}}개",
-      "empty": "아직 채널에 있는 에이전트가 없어요.",
+      "empty": "에이전트를 채널에 추가하면 담당자와 함께 여기에 표시돼요.",
+      "emptyTitle": "에이전트가 어디서 일하는지 볼 수 있어요",
+      "emptyAction": "채널에 추가",
+      "emptyViewer": "에이전트 관리자가 채널에 추가하면 여기에 지도가 표시돼요.",
       "others": "다른 채널"
     },
     "sectors": {
@@ -2897,9 +2903,9 @@
       "noMatch": "이 검색에 맞는 항목이 없어요.",
       "clearFilters": "검색 지우기",
       "personalNote": "이 항목은 나만 볼 수 있어요. 내가 부탁할 때만 에이전트가 사용해요.",
-      "personalEmpty": "아직 저장한 항목이 없어요",
+      "personalEmpty": "로그인 정보와 키를 안전하게 보관해요",
       "personalEmptyText": "이 항목은 나만 볼 수 있어요. 내가 부탁할 때만 에이전트가 사용해요.",
-      "teamEmpty": "아직 팀과 공유한 항목이 없어요",
+      "teamEmpty": "한 번 저장하면 에이전트가 쓸 수 있어요",
       "teamEmptyText": "로그인, 키, 연락처를 한 번 저장하고, 사용할 수 있는 에이전트를 고르세요.",
       "sharedEmpty": "아직 나와 공유된 항목이 없어요",
       "sharedEmptyText": "누군가 팀의 로그인이나 키를 나와 공유하면 여기에 보여요."
@@ -4372,7 +4378,8 @@
       "decides": "{{who}}님이 결정해요.",
       "adminDecides": "관리자가 결정해요.",
       "learned": "배운 것",
-      "learnedEmpty": "아직 스스로 배운 게 없어요. 정정, 선호, 효과적인 방법이 여기에 표시돼요.",
+      "learnedEmpty": "알아낸 수정 사항, 선호, 일하는 방식이 여기에 표시돼요.",
+      "learnedEmptyTitle": "스스로 알아낸 것은 여기에 남아요",
       "howTo": "방법",
       "disputed": "이견 있음",
       "edit": "편집",
@@ -4424,6 +4431,8 @@
       },
       "noneFilter": "이 필터에 해당하는 항목이 없어요.",
       "clear": "다른 단어를 입력하거나 필터를 지우세요.",
+      "emptyTitle": "모든 작업이 여기에 기록돼요",
+      "emptyText": "{{name}}의 작업별 단계와 비용이 여기에 표시돼요.",
       "showing": "{{total}}개 중 {{shown}}개 표시 중.",
       "more": "더 불러오기",
       "direct": "다이렉트 메시지",
@@ -4530,8 +4539,10 @@
       "search": "파일이나 채널 검색",
       "all": "전체",
       "changedOther": "{{owner}}님의 파일, {{name}}이(가) 변경함",
-      "empty": "{{name}}이(가) 아직 파일을 만들지 않았어요",
-      "emptyText": "{{name}}이(가) 대화에서 파일을 전달하면 여기에 표시돼요.",
+      "empty": "보고서, 표, 문서를 요청해 보세요",
+      "emptyText": "{{name}}이(가) 대화에서 전달한 것은 모두 여기에 보관돼요.",
+      "ask": "파일 요청",
+      "askText": "지금까지 한 일을 파일 하나로 요약해 주세요.",
       "note": "내가 볼 수 있는 대화의 파일만 표시돼요."
     },
     "panel": {
@@ -4588,6 +4599,8 @@
     "archive": "보관",
     "restore": "복원",
     "emptySearch": "“{{q}}”에 대한 결과가 없어요.",
+    "emptyTitle": "{{name}}의 메모리는 여기서 시작돼요",
+    "emptyText": "대화할 때마다 팀이 일하는 방식을 새로 배워요.",
     "empty": "아직 아무것도 없어요. {{name}}은(는) 팀과 대화하면서 배워요.",
     "how": "메모리 작동 방식",
     "editTitle": "{{kind}} 수정",
@@ -4657,7 +4670,8 @@
     "refuseNote_female": "거절하면 {{name}}이(가) 같은 제안을 다시 하지 않도록 배워요.",
     "added": "추가됨: ",
     "removed": "삭제됨: ",
-    "empty": "아직 제안이 없어요. 누군가 에이전트에게 변경을 요청하거나 같은 교훈이 반복되면 여기에 표시돼요.",
+    "empty": "누군가 에이전트에게 변경을 요청하거나 같은 교훈이 반복되면 제안이 여기에 표시돼요.",
+    "emptyTitle": "검토할 항목이 없어요",
     "titleInstructions": "{{name}}의 지침 업데이트",
     "titleInstructions_female": "{{name}}의 지침 업데이트",
     "titleRole": "{{name}}의 역할 변경",
@@ -5426,7 +5440,7 @@
     "new": "새 작업",
     "filters": "작업 필터",
     "unassigned_other": "담당자 없음 {{count}}개",
-    "emptyTitle": "아직 작업이 없어요",
+    "emptyTitle": "일에 담당자와 날짜를 정해 보세요",
     "panelLabel": "작업 #{{number}}",
     "openPage": "작업 페이지 열기",
     "close": "닫기",
@@ -5601,7 +5615,9 @@
     "agentRole": "에이전트 · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "작업을 만들거나 채팅에서 에이전트에게 요청하세요.",
+    "empty": "작업은 사람이든 에이전트든 누가 무엇을 하는지, 어디까지 왔는지 보여 줘요.",
+    "emptyViewerTitle": "누가 무엇을 하는지 볼 수 있어요",
+    "emptyViewer": "워크스페이스에 글을 쓸 수 있는 사람이 작업을 만들면 여기에 표시돼요.",
     "noResults": "이 필터와 일치하는 작업이 없어요.",
     "columnEmpty": "비어 있어요.",
     "form": {
@@ -5655,7 +5671,7 @@
       "hint": "칸을 벗어나거나 Esc를 누르면 저장돼요."
     },
     "askTitle": "{{name}}에게 이 작업 맡기기",
-    "askText": "{{name}}이(가) 필요한 내용을 읽고, 여기에 계획을 댓글로 남긴 뒤 진행해요. 게시처럼 민감한 작업은 승인을 요청해요.",
+    "askText": "팀의 첫 작업을 만드는 걸 도와주세요.",
     "askText_female": "{{name}}이(가) 필요한 내용을 읽고, 여기에 계획을 댓글로 남긴 뒤 진행해요. 게시처럼 민감한 작업은 승인을 요청해요.",
     "askButton": "{{name}}에게 맡기기",
     "askSection": "에이전트에게 맡기기",
@@ -5849,7 +5865,11 @@
     "groupLive": "실행 중",
     "groupPaused": "일시 중지됨",
     "noResults": "이 필터에 맞는 루틴이 없어요.",
-    "emptyTitle": "아직 루틴이 없어요",
+    "emptyTitle": "반복되는 일은 에이전트에게 맡겨 보세요",
+    "empty": "루틴은 정한 시간에 알아서 실행되고 원하는 곳에 결과를 전달해요.",
+    "emptyViewerTitle": "알아서 실행되는 일을 볼 수 있어요",
+    "emptyViewer": "에이전트 담당자가 루틴을 만들면 여기에 표시돼요.",
+    "askText": "루틴 만드는 걸 도와주세요.",
     "runningNow": "지금 실행 중…",
     "neverRan": "아직 실행한 적 없음",
     "silentOf": "{{total}}번 중 {{count}}번 조용히 지나감",
@@ -6601,7 +6621,8 @@
       "openThread": "스레드 열기"
     },
     "empty": {
-      "title": "아직 미션이 없어요"
+      "title": "목표를 정하고 에이전트의 작업을 지켜보세요",
+      "viewer": "에이전트에게 일을 맡길 수 있는 사람이 미션을 열면 여기에 표시돼요."
     },
     "new": {
       "noEligibleTitle": "아직 나를 위해 미션을 실행할 수 있는 에이전트가 없어요",
@@ -6860,8 +6881,8 @@
     "empty": {
       "missionsTitle": "아직 미션이 없어요",
       "missions": "미션은 계획, 결정 사항, 에이전트가 컴퓨터에서 하는 작업이 담긴 스레드예요.",
-      "allTitle": "아직 스레드가 없어요",
-      "all": "메시지에 답하면 스레드가 열려요.",
+      "allTitle": "주제마다 따로 대화해요",
+      "all": "메시지에 답장하면 스레드가 열리고 채널은 깔끔하게 유지돼요.",
       "workingTitle": "지금 작업 중인 에이전트가 없어요",
       "closedTitle": "닫힌 항목이 없어요",
       "archivedTitle": "보관된 스레드가 없어요",
@@ -7264,7 +7285,8 @@
     "lastResult": "최근: {{result}}",
     "upcomingMeta": "{{day}} · {{time}}",
     "emptyHint": "예약된 일정이 없어요. 드래그하거나 N을 눌러 만드세요",
-    "agendaEmpty": "앞으로 30일 동안 일정이 없어요.",
+    "agendaEmpty": "앞으로 30일의 일정과 루틴이 여기에 표시돼요.",
+    "agendaEmptyTitle": "앞으로 30일을 한눈에 보세요",
     "more": "+{{count}}개 더",
     "allDay": "종일",
     "now": "지금",
@@ -7321,6 +7343,8 @@
     "installed": "{{name}}을(를) 설치했어요.",
     "unavailable": "이 서버에서는 아직 스킬을 사용할 수 없어요.",
     "empty": "아직 스킬이 없어요.",
+    "emptyTitle": "한 번 가르치면 모든 에이전트가 알아요",
+    "emptyText": "스킬은 일이 필요로 할 때 에이전트가 따르는 방식이에요.",
     "seeAll": "스킬 {{count}}개 모두 보기",
     "search": "스킬 검색",
     "noResults": "“{{q}}”와 일치하는 스킬이 없어요.",
@@ -7605,7 +7629,9 @@
     "page": {
       "title": "내 요금제",
       "hint": "각 요금제는 연결한 컴퓨터에 남고, 그 컴퓨터를 운영하는 사람이 접근할 수 있어요. agentes.chat은 이름, 이메일, 사용량만 보관해요.",
-      "empty": "아직 요금제가 없어요.",
+      "empty": "계정으로 로그인하면 에이전트가 그 계정으로 생각해요.",
+      "emptyTitle": "이미 결제 중인 AI 요금제를 쓸 수 있어요",
+      "emptyViewer": "워크스페이스의 AI 담당자가 요금제를 연결하면 여기에 표시돼요.",
       "connect": "AI 연결",
       "keyEnds": "키 …{{hint}}",
       "on": "{{computer}}에서",
@@ -8044,8 +8070,9 @@
     "noMatch": "그런 이름의 페이지가 없어요.",
     "tags": "태그",
     "recent": "최근 편집",
-    "emptyTitle": "Wiki가 비어 있어요",
+    "emptyTitle": "팀이 아는 것을 한곳에",
     "emptyText": "페이지 하나로 시작해 보세요. 이런 구조가 대체로 잘 맞아요:",
+    "emptyViewer": "Wiki를 편집하는 사람이 페이지를 만들면 여기에 표시돼요.",
     "createFirst": "첫 페이지 만들기",
     "useStarter": "추천 구조 사용",
     "starter": "추천 구조",
@@ -8063,6 +8090,7 @@
     "byFor": "작성: {{name}}, 요청: {{person}}",
     "missingTitle": "아직 없는 페이지예요",
     "missingText": "누군가 이 페이지에 링크를 걸었어요. 페이지를 만들고 빠진 내용을 적어 주세요.",
+    "missingViewer": "누군가 링크를 걸었어요. Wiki를 편집하는 사람이 만들 수 있어요.",
     "missingHint": "{{title}}은(는) 아직 없어요. 클릭해서 만드세요",
     "previewOf": "{{title}} 미리보기",
     "createPage": "페이지 만들기",
@@ -8653,8 +8681,12 @@
     "customText": "도구별로 허용돼 있어요. 수준을 고르면 간단해져요.",
     "noTools": "아직 도구가 없어요.",
     "toolsMore_other": "{{tools}} 외 {{count}}개",
-    "noAgents": "아직 에이전트가 없어요. 에이전트를 만들어 커넥터 접근 권한을 주세요.",
-    "noConnectors": "{{org}}에 아직 연결된 서비스가 없어요.",
+    "noAgents": "에이전트를 만들면 쓸 앱과 앱별로 할 일을 정할 수 있어요.",
+    "noAgentsTitle": "에이전트별 접근 범위를 정해요",
+    "noConnectors": "워크스페이스의 앱을 한 번 연결하고 에이전트별로 쓸 수 있는 것을 골라요.",
+    "noConnectorsTitle": "에이전트에게 진짜 도구를 주세요",
+    "noConnectorsViewerTitle": "에이전트가 쓸 수 있는 것을 볼 수 있어요",
+    "noConnectorsViewer": "커넥터 관리자가 앱을 추가하면 여기에 표시돼요.",
     "unavailable": "이 서버에서는 아직 접근 제어를 사용할 수 없어요.",
     "area": {
       "context": "컨텍스트와 메모리",
@@ -8868,8 +8900,9 @@
     "by": "만든 사람",
     "where": "위치",
     "when": "업데이트",
-    "emptyTitle": "아직 파일이 없어요",
-    "emptyText": "파일을 여기로 끌어 와서 업로드하세요.",
+    "emptyTitle": "팀이 만든 모든 것을 한곳에",
+    "emptyText": "에이전트와 사람이 만든 파일이 여기에 모여요. 파일을 올리거나 이 페이지로 끌어다 놓으세요.",
+    "emptyViewer": "대화에서 에이전트와 사람이 만든 것이 여기에 보관돼요.",
     "noResults": "이 필터와 일치하는 파일이 없어요.",
     "clear": "필터 지우기",
     "noResultsHint": "다른 검색어를 쓰거나 필터를 지워 보세요.",
@@ -9155,7 +9188,8 @@
     "searchPlaceholder": "이름이나 기능으로 검색",
     "empty": "“{{q}}”와(과) 일치하는 커넥터가 없어요",
     "emptyText": "주소만 있으면 어떤 서비스든 연결할 수 있어요.",
-    "none": "아직 커넥터가 없어요.",
+    "none": "에이전트가 내가 허용한 권한만으로 내 도구에서 일해요.",
+    "noneTitle": "팀의 앱을 연결해 보세요",
     "connectedFilter": "연결됨",
     "suggested": "{{org}}에 추천",
     "more": "더 많은 서비스",
@@ -10981,7 +11015,10 @@
     "other": {
       "title": "다른 컴퓨터",
       "text": "집에 있는 Mac mini나 다른 서버처럼 코드로 연결한 컴퓨터예요. 각 컴퓨터에서 무엇을 허용할지는 그 컴퓨터에서 정해요.",
-      "emptyTitle": "아직 다른 컴퓨터가 없어요"
+      "emptyTitle": "어떤 컴퓨터에서든 에이전트를 실행해요",
+      "emptyText": "집의 Mac mini나 다른 서버를 코드로 연결하면 에이전트가 거기서 일해요.",
+      "emptyViewerTitle": "팀의 컴퓨터가 여기에 표시돼요",
+      "emptyViewer": "컴퓨터를 연결할 수 있는 사람이 추가하면 여기에 표시돼요."
     }
   },
   "outage": {
@@ -11083,7 +11120,8 @@
     "server": "서버 주소",
     "serverHelp": "연결할 앱에 붙여넣으세요.",
     "serverCopied": "주소를 복사했어요",
-    "empty": "연결된 앱이 없어요. Claude나 다른 앱을 연결하면 앱을 떠나지 않고 에이전트에게 작업을 요청할 수 있어요.",
+    "empty": "Claude나 다른 앱을 연결하면 앱을 떠나지 않고 에이전트에게 작업을 요청할 수 있어요.",
+    "emptyTitle": "지금 일하는 곳에서 에이전트를 불러요",
     "connected": "연결됨",
     "onThisComputer": "이 컴퓨터에서",
     "access": {
@@ -11337,7 +11375,8 @@
     },
     "agent": "에이전트",
     "anyAgent": "모든 에이전트",
-    "empty": "아직 아무것도 없어요. 에이전트가 대화 밖에서 무언가를 하면 여기에 표시돼요.",
+    "empty": "에이전트가 대화 밖에서 무언가를 하면 여기에 표시돼요.",
+    "emptyTitle": "에이전트가 한 일은 모두 기록돼요",
     "emptyFiltered": "이 필터에 해당하는 항목이 없어요.",
     "loadMore": "더 불러오기",
     "outcome": {
@@ -11699,7 +11738,8 @@
     "remove": "삭제",
     "removeTitle": "{{label}} 키 삭제",
     "removeText": "키가 영구적으로 삭제돼요. 아직 이 키를 쓰는 에이전트가 있으면 서버가 거부하니, 먼저 해당 에이전트의 키를 바꾸세요.",
-    "noKeys": "아직 키가 없어요.",
+    "noKeys": "API 키를 쓰면 제공업체에 직접 결제하고 모델을 고를 수 있어요.",
+    "noKeysTitle": "내 AI 키를 쓸 수 있어요",
     "platformAvailable": "이 서버의 Claude 키도 사용할 수 있어요.",
     "usageTitle": "유형별 API 지출",
     "usageAgentLine": "{{budget}} 중 {{spent}}",
@@ -11813,7 +11853,8 @@
     },
     "export": "CSV 내보내기",
     "limitsHint": "한도에서 사람별 한도를 정하세요",
-    "empty": "이번 달에는 아직 아무도 에이전트를 쓰지 않았어요.",
+    "empty": "누군가 에이전트와 대화하면 이번 달 사용량이 여기에 표시돼요.",
+    "emptyTitle": "사람마다 에이전트를 어떻게 쓰는지 볼 수 있어요",
     "owner": "소유자",
     "member": "멤버",
     "columns": {
@@ -11933,7 +11974,7 @@
     "estimate": "요금제는 계정 전체 사용량만 알려줘요. 에이전트별 사용량은 각 에이전트가 쓴 양으로 추정한 값이에요.",
     "accounts": {
       "title": "요금제 계정",
-      "empty": "아직 요금제로 생각하는 에이전트가 없어요."
+      "empty": "요금제를 연결하면 에이전트별 사용량을 여기서 볼 수 있어요."
     },
     "api": {
       "title": "워크스페이스 API"
@@ -12372,6 +12413,7 @@
     "sayHiAgent": "{{name}}에게 인사하기",
     "sayHiPerson": "{{name}}님에게 인사하기",
     "sayHiChannel": "#{{channel}}에서 인사하기",
+    "sayHiText": "@로 에이전트를 멘션하면 대화에 참여해요.",
     "suggestions": "시작하기 좋은 질문",
     "suggest": {
       "dev1": "지난 배포 이후 무엇이 망가졌나요?",
@@ -12856,6 +12898,8 @@
       "title": "브라우저 프로필",
       "sub": "사이트에 한 번 로그인하고, 프로필마다 사용할 에이전트를 고르세요.",
       "empty": "프로필을 만들고 사이트에 한 번 로그인한 다음, 사용할 수 있는 에이전트를 고르세요. 에이전트는 각자 자기 브라우저를 유지해요.",
+      "emptyTitle": "로그인은 한 번만",
+      "emptyViewer": "이 컴퓨터의 담당자가 프로필을 만들면 여기에 표시돼요.",
       "new": "새 프로필",
       "free": "비어 있음",
       "inUse": "<who/> 사용 중",
@@ -14072,8 +14116,9 @@
       "kept": "이제 나만 “{{title}}”을(를) 볼 수 있어요"
     },
     "empty": {
-      "title": "빈 대시보드",
-      "text": "위젯을 추가하세요. 에이전트에게 요청하거나 채팅의 블록을 고정하면 돼요."
+      "title": "내 숫자를 한곳에",
+      "text": "에이전트에게 위젯을 요청하거나 채팅의 블록을 고정하면 여기서 계속 업데이트돼요.",
+      "viewer": "이 대시보드를 편집하는 사람이 위젯을 추가하면 여기에 표시돼요."
     },
     "onlyHome": "“새 대시보드”로 워크스페이스나 일부 역할을 위한 대시보드를 만들 수 있어요.",
     "create": {

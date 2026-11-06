@@ -8,6 +8,7 @@
     "cantUndo": "Das lässt sich nicht rückgängig machen.",
     "removeName": "{{name}} entfernen",
     "about": "Über {{label}}",
+    "askAgent": "{{name}} fragen",
     "previousMonth": "Vorheriger Monat",
     "nextMonth": "Nächster Monat",
     "chooseDate": "Datum wählen",
@@ -1530,8 +1531,10 @@
     "workingNow": "Arbeitet gerade",
     "available": "Verfügbar",
     "archived": "Archiviert",
-    "emptyTitle": "Noch keine Agenten",
-    "empty": "Erstelle den ersten Agenten, um das Team aufzubauen.",
+    "emptyTitle": "Stell dein Team aus Agenten zusammen",
+    "empty": "Jeder Agent hat eine Rolle und arbeitet mit den Personen zusammen, in denselben Kanälen.",
+    "emptyViewerTitle": "Dein Team aus Agenten erscheint hier",
+    "emptyViewer": "Wer Agenten erstellen darf, baut das Team auf, und jeder erscheint hier.",
     "list": {
       "agents": "Agenten",
       "people": "Personen",
@@ -1584,7 +1587,10 @@
       "waiting_other": "{{count}} Anfragen warten auf Freigabe",
       "moreRoutines_one": "und {{count}} weitere Routine",
       "moreRoutines_other": "und {{count}} weitere Routinen",
-      "empty": "Noch ist kein Agent in einem Kanal.",
+      "empty": "Füge einen Agenten zu einem Kanal hinzu, dann erscheint er hier, zusammen mit der Person, die sich um ihn kümmert.",
+      "emptyTitle": "Sieh, wo jeder Agent arbeitet",
+      "emptyAction": "Zu einem Kanal hinzufügen",
+      "emptyViewer": "Wer die Agenten verwaltet, fügt sie zu Kanälen hinzu, und die Karte erscheint hier.",
       "others": "Andere Kanäle"
     },
     "sectors": {
@@ -3009,9 +3015,9 @@
       "noMatch": "Nichts hier passt zu dieser Suche.",
       "clearFilters": "Suche löschen",
       "personalNote": "Nur du siehst diese Einträge. Deine Agenten verwenden sie nur, wenn du sie darum bittest.",
-      "personalEmpty": "Noch nichts gespeichert",
+      "personalEmpty": "Bewahre deine Logins und Schlüssel sicher auf",
       "personalEmptyText": "Nur du siehst diese Einträge. Deine Agenten verwenden sie nur, wenn du sie darum bittest.",
-      "teamEmpty": "Noch nichts mit dem Team geteilt",
+      "teamEmpty": "Einmal speichern, und Agenten können es nutzen",
       "teamEmptyText": "Speichere ein Login, einen Schlüssel oder Kontaktdaten einmal und wähle, welche Agenten es verwenden dürfen.",
       "sharedEmpty": "Noch nichts mit dir geteilt",
       "sharedEmptyText": "Wenn jemand ein Login oder einen Schlüssel des Teams mit dir teilt, erscheint es hier."
@@ -4548,7 +4554,8 @@
       "decides": "{{who}} entscheidet.",
       "adminDecides": "Ein Admin entscheidet.",
       "learned": "Was er gelernt hat",
-      "learnedEmpty": "Noch nichts selbst gelernt. Korrekturen, Vorlieben und Arbeitsweisen, die er herausfindet, erscheinen hier.",
+      "learnedEmpty": "Korrekturen, Vorlieben und Arbeitsweisen, die er findet, erscheinen hier.",
+      "learnedEmptyTitle": "Was er selbst herausfindet, bleibt hier",
       "howTo": "Anleitung",
       "disputed": "Umstritten",
       "edit": "Bearbeiten",
@@ -4604,6 +4611,8 @@
       },
       "noneFilter": "Nichts mit diesem Filter.",
       "clear": "Versuch ein anderes Wort oder lösche den Filter.",
+      "emptyTitle": "Jede Arbeit wird hier festgehalten",
+      "emptyText": "Die Schritte und Kosten jeder Arbeit von {{name}} erscheinen hier.",
       "showing": "{{shown}} von {{total}} angezeigt.",
       "more": "Mehr laden",
       "direct": "Direktnachricht",
@@ -4711,8 +4720,10 @@
       "search": "Datei oder Kanal suchen",
       "all": "Alle",
       "changedOther": "Datei von {{owner}}, geändert von {{name}}",
-      "empty": "{{name}} hat noch keine Dateien erstellt",
-      "emptyText": "Wenn {{name}} in einer Unterhaltung eine Datei liefert, erscheint sie hier.",
+      "empty": "Bitte um einen Bericht, eine Tabelle oder ein Dokument",
+      "emptyText": "Alles, was {{name}} in einer Unterhaltung liefert, wird hier aufbewahrt.",
+      "ask": "Datei anfragen",
+      "askText": "Fasse deine Arbeit in einer Datei zusammen.",
       "note": "Nur Dateien aus Unterhaltungen, die du sehen kannst."
     },
     "panel": {
@@ -4775,6 +4786,8 @@
     "archive": "Archivieren",
     "restore": "Wiederherstellen",
     "emptySearch": "Nichts gefunden für „{{q}}“.",
+    "emptyTitle": "Das Gedächtnis von {{name}} beginnt hier",
+    "emptyText": "Jede Unterhaltung zeigt etwas Neues darüber, wie das Team arbeitet.",
     "empty": "Noch nichts hier. {{name}} lernt, während das Team mit ihm spricht.",
     "empty_female": "Noch nichts hier. {{name}} lernt, während das Team mit ihr spricht.",
     "how": "So funktioniert das Gedächtnis",
@@ -4847,7 +4860,8 @@
     "refuseNote_female": "Wenn du ablehnst, lernt {{name}}, das nicht noch einmal vorzuschlagen.",
     "added": "Hinzugefügt: ",
     "removed": "Entfernt: ",
-    "empty": "Noch keine Vorschläge. Wenn jemand einen Agenten um eine Änderung bittet oder sich eine Lektion wiederholt, erscheint sie hier.",
+    "empty": "Wenn jemand einen Agenten um eine Änderung bittet oder sich eine Lektion wiederholt, erscheint der Vorschlag hier.",
+    "emptyTitle": "Nichts zu prüfen",
     "titleInstructions": "Anweisungen von {{name}} aktualisieren",
     "titleInstructions_female": "Anweisungen von {{name}} aktualisieren",
     "titleRole": "Rolle von {{name}} ändern",
@@ -5649,7 +5663,7 @@
     "filters": "Aufgaben filtern",
     "unassigned_one": "{{count}} nicht zugewiesen",
     "unassigned_other": "{{count}} nicht zugewiesen",
-    "emptyTitle": "Noch keine Aufgaben",
+    "emptyTitle": "Gib der Arbeit eine Zuständigkeit und ein Datum",
     "panelLabel": "Aufgabe #{{number}}",
     "openPage": "Seite der Aufgabe öffnen",
     "close": "Schließen",
@@ -5828,7 +5842,9 @@
     "agentRole": "Agent · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Erstell eine, oder bitte einen Agenten im Chat darum.",
+    "empty": "Eine Aufgabe sagt, wer was macht, Person oder Agent, und zeigt den Stand.",
+    "emptyViewerTitle": "Sieh, wer was macht",
+    "emptyViewer": "Wer im Workspace schreiben darf, erstellt Aufgaben, und sie erscheinen hier.",
     "noResults": "Keine Aufgaben passen zu diesen Filtern.",
     "columnEmpty": "Hier ist nichts.",
     "form": {
@@ -5884,7 +5900,7 @@
       "hint": "Wird gespeichert, wenn du das Feld verlässt oder Esc drückst."
     },
     "askTitle": "{{name}} bitten, diese Aufgabe zu erledigen",
-    "askText": "{{name}} liest, was er braucht, kommentiert hier den Plan und setzt ihn um. Alles Sensible, etwa Veröffentlichen, fragt nach deiner Freigabe.",
+    "askText": "Hilf mir, die ersten Aufgaben des Teams zu erstellen.",
     "askText_female": "{{name}} liest, was sie braucht, kommentiert hier den Plan und setzt ihn um. Alles Sensible, etwa Veröffentlichen, fragt nach deiner Freigabe.",
     "askButton": "{{name}} fragen",
     "askSection": "Einen Agent fragen",
@@ -6080,7 +6096,11 @@
     "groupLive": "Aktiv",
     "groupPaused": "Pausiert",
     "noResults": "Keine Routinen passen zu diesen Filtern.",
-    "emptyTitle": "Noch keine Routinen",
+    "emptyTitle": "Überlass wiederkehrende Arbeit deinen Agenten",
+    "empty": "Eine Routine läuft von selbst zur festgelegten Zeit und liefert dorthin, wo du es möchtest.",
+    "emptyViewerTitle": "Sieh, was von selbst läuft",
+    "emptyViewer": "Wer sich um die Agenten kümmert, erstellt Routinen, und sie erscheinen hier.",
+    "askText": "Hilf mir, eine Routine einzurichten.",
     "runningNow": "Läuft gerade…",
     "neverRan": "Ist noch nicht gelaufen",
     "silentOf": "Still in {{count}} von {{total}}",
@@ -6893,7 +6913,8 @@
       "openThread": "Thread öffnen"
     },
     "empty": {
-      "title": "Noch keine Missionen"
+      "title": "Setze ein Ziel und verfolge den Agenten",
+      "viewer": "Wer Agenten Arbeit zuweisen darf, startet Missionen, und sie erscheinen hier."
     },
     "new": {
       "noEligibleTitle": "Noch kann kein Agent eine Mission für dich ausführen",
@@ -7165,8 +7186,8 @@
     "empty": {
       "missionsTitle": "Noch keine Missionen",
       "missions": "Eine Mission ist ein Thread mit einem Plan, Entscheidungen und der Arbeit eines Agenten auf seinem Computer.",
-      "allTitle": "Noch keine Threads",
-      "all": "Antworte auf eine Nachricht, um einen Thread zu öffnen.",
+      "allTitle": "Jedes Thema in seiner eigenen Unterhaltung",
+      "all": "Antworte auf eine Nachricht, um einen Thread zu öffnen, und der Kanal bleibt übersichtlich.",
       "workingTitle": "Gerade arbeitet kein Agent",
       "closedTitle": "Hier ist nichts geschlossen",
       "archivedTitle": "Keine archivierten Threads",
@@ -7603,7 +7624,8 @@
     "lastResult": "zuletzt: {{result}}",
     "upcomingMeta": "{{day}} · {{time}}",
     "emptyHint": "Nichts geplant. Zum Erstellen ziehen oder N drücken",
-    "agendaEmpty": "Nichts in den nächsten 30 Tagen.",
+    "agendaEmpty": "Termine und Routinen der nächsten 30 Tage erscheinen hier.",
+    "agendaEmptyTitle": "Behalte die nächsten 30 Tage im Blick",
     "more": "+{{count}} weitere",
     "allDay": "Ganztägig",
     "now": "Jetzt",
@@ -7660,6 +7682,8 @@
     "installed": "{{name}} installiert.",
     "unavailable": "Skills sind auf diesem Server noch nicht verfügbar.",
     "empty": "Noch keine Skills.",
+    "emptyTitle": "Einmal beibringen, und jeder Agent weiß es",
+    "emptyText": "Ein Skill ist eine Arbeitsweise, der Agenten folgen, wann immer die Arbeit sie braucht.",
     "seeAll": "Alle {{count}} Skills ansehen",
     "search": "Skills suchen",
     "noResults": "Kein Skill passt zu „{{q}}“.",
@@ -7951,7 +7975,9 @@
     "page": {
       "title": "Deine Abos",
       "hint": "Jedes Abo bleibt auf dem Computer, auf dem es verbunden wurde, und wer diesen Computer betreibt, kommt daran. agentes.chat speichert nur Name, E-Mail und Nutzung.",
-      "empty": "Noch keine Abos.",
+      "empty": "Melde dich mit deinem Konto an, und die Agenten denken damit.",
+      "emptyTitle": "Nutze das KI-Abo, das du schon bezahlst",
+      "emptyViewer": "Wer sich um die KI des Workspace kümmert, verbindet ein Abo, und es erscheint hier.",
       "connect": "KI verbinden",
       "keyEnds": "Schlüssel …{{hint}}",
       "on": "auf {{computer}}",
@@ -8401,8 +8427,9 @@
     "noMatch": "Keine Seite mit diesem Namen.",
     "tags": "Tags",
     "recent": "Kürzlich bearbeitet",
-    "emptyTitle": "Das Wiki ist leer",
+    "emptyTitle": "Was das Team weiß, an einem Ort",
     "emptyText": "Fang mit einer Seite an. Eine Struktur, die meist gut funktioniert:",
+    "emptyViewer": "Wer das Wiki bearbeitet, erstellt Seiten, und sie erscheinen hier.",
     "createFirst": "Erste Seite erstellen",
     "useStarter": "Vorgeschlagene Struktur verwenden",
     "starter": "Vorgeschlagene Struktur",
@@ -8420,6 +8447,7 @@
     "byFor": "von {{name}}, auf Wunsch von {{person}}",
     "missingTitle": "Diese Seite gibt es noch nicht",
     "missingText": "Jemand hat sie verlinkt. Erstelle sie und schreib, was fehlt.",
+    "missingViewer": "Jemand hat darauf verlinkt. Wer das Wiki bearbeitet, kann sie erstellen.",
     "missingHint": "{{title}} gibt es noch nicht: Klick, um sie zu erstellen",
     "previewOf": "Vorschau von {{title}}",
     "createPage": "Seite erstellen",
@@ -9041,8 +9069,12 @@
     "noTools": "Noch keine Tools.",
     "toolsMore_one": "{{tools}} und {{count}} weiteres",
     "toolsMore_other": "{{tools}} und {{count}} weitere",
-    "noAgents": "Noch keine Agenten. Erstelle einen Agenten, um ihm Zugriff auf Konnektoren zu geben.",
-    "noConnectors": "{{org}} hat noch keinen Dienst verbunden.",
+    "noAgents": "Erstelle einen Agenten, um zu entscheiden, welche Apps er nutzt und was er darin tut.",
+    "noAgentsTitle": "Wähle, worauf jeder Agent zugreift",
+    "noConnectors": "Verbinde die Apps des Workspace einmal und wähle, was jeder Agent nutzen darf.",
+    "noConnectorsTitle": "Gib den Agenten echte Werkzeuge",
+    "noConnectorsViewerTitle": "Sieh, was Agenten nutzen können",
+    "noConnectorsViewer": "Wer die Konnektoren verwaltet, fügt die Apps hinzu, und sie erscheinen hier.",
     "unavailable": "Die Zugriffssteuerung ist auf diesem Server noch nicht verfügbar.",
     "area": {
       "context": "Kontext und Gedächtnis",
@@ -9262,8 +9294,9 @@
     "by": "Erstellt von",
     "where": "Wo",
     "when": "Aktualisiert",
-    "emptyTitle": "Noch keine Dateien",
-    "emptyText": "Zieh Dateien hierher, um sie hochzuladen.",
+    "emptyTitle": "Alles, was das Team erstellt, an einem Ort",
+    "emptyText": "Dateien von Agenten und Personen liegen hier. Lade deine hoch oder zieh sie auf diese Seite.",
+    "emptyViewer": "Was Agenten und Personen in Unterhaltungen erstellen, wird hier aufbewahrt.",
     "noResults": "Keine Dateien passen zu diesen Filtern.",
     "clear": "Filter zurücksetzen",
     "noResultsHint": "Versuch eine andere Suche oder setz die Filter zurück.",
@@ -9559,7 +9592,8 @@
     "searchPlaceholder": "Nach Name oder Funktion suchen",
     "empty": "Kein Konnektor passt zu „{{q}}“",
     "emptyText": "Du kannst jeden Dienst über seine Adresse verbinden.",
-    "none": "Noch keine Konnektoren.",
+    "none": "Agenten arbeiten dann in deinen Tools, nur mit dem Zugriff, den du erlaubst.",
+    "noneTitle": "Verbinde die Apps deines Teams",
     "connectedFilter": "Verbunden",
     "suggested": "Vorschläge für {{org}}",
     "more": "Weitere Dienste",
@@ -11426,7 +11460,10 @@
     "other": {
       "title": "Andere Computer",
       "text": "Mit einem Code verbunden, etwa ein Mac mini zu Hause oder ein anderer Server. Was jeder erlaubt, wird auf dem jeweiligen Computer festgelegt.",
-      "emptyTitle": "Noch kein anderer Computer"
+      "emptyTitle": "Lass Agenten auf jedem Computer laufen",
+      "emptyText": "Verbinde einen Mac mini zu Hause oder einen anderen Server mit einem Code, und Agenten arbeiten darauf.",
+      "emptyViewerTitle": "Die Computer des Teams erscheinen hier",
+      "emptyViewer": "Wer Computer verbinden darf, fügt einen hinzu, und er erscheint hier."
     }
   },
   "outage": {
@@ -11537,7 +11574,8 @@
     "server": "Serveradresse",
     "serverHelp": "Füge sie in die App ein, die du verbindest.",
     "serverCopied": "Adresse kopiert",
-    "empty": "Keine Apps verbunden. Verbinde Claude oder eine andere App, um Agenten Aufgaben zu geben, ohne sie zu verlassen.",
+    "empty": "Verbinde Claude oder eine andere App und bitte Agenten um Aufgaben, ohne sie zu verlassen.",
+    "emptyTitle": "Erreiche deine Agenten dort, wo du schon arbeitest",
     "connected": "Verbunden",
     "onThisComputer": "auf diesem Computer",
     "access": {
@@ -11796,7 +11834,8 @@
     },
     "agent": "Agent",
     "anyAgent": "Alle Agenten",
-    "empty": "Hier ist noch nichts. Wenn ein Agent außerhalb der Unterhaltung etwas tut, erscheint es hier.",
+    "empty": "Wenn ein Agent außerhalb einer Unterhaltung etwas tut, erscheint es hier.",
+    "emptyTitle": "Alles, was Agenten tun, wird festgehalten",
     "emptyFiltered": "Nichts mit diesem Filter.",
     "loadMore": "Mehr laden",
     "outcome": {
@@ -12166,7 +12205,8 @@
     "remove": "Löschen",
     "removeTitle": "Schlüssel {{label}} löschen",
     "removeText": "Der Schlüssel ist endgültig weg. Wenn ein Agent ihn noch nutzt, lehnt der Server ab: Ändere zuerst den Schlüssel dieser Agenten.",
-    "noKeys": "Noch keine Schlüssel.",
+    "noKeys": "Mit einem API-Schlüssel zahlst du direkt beim Anbieter und wählst die Modelle.",
+    "noKeysTitle": "Bring deinen eigenen KI-Schlüssel mit",
     "platformAvailable": "Der Claude-Schlüssel dieses Servers ist auch verfügbar.",
     "usageTitle": "API-Ausgaben nach Art",
     "usageAgentLine": "{{spent}} von {{budget}}",
@@ -12282,7 +12322,8 @@
     },
     "export": "CSV exportieren",
     "limitsHint": "Lege unter Limits ein Limit pro Person fest",
-    "empty": "Diesen Monat hat noch niemand Agenten genutzt.",
+    "empty": "Sobald jemand mit einem Agenten spricht, erscheint hier die Nutzung dieses Monats.",
+    "emptyTitle": "Sieh, was jede Person mit den Agenten macht",
     "owner": "Inhaber",
     "member": "Mitglied",
     "columns": {
@@ -12404,7 +12445,7 @@
     "estimate": "Abos zeigen nur, wie viel das ganze Konto verbraucht hat. Der Anteil jedes Agenten ist eine Schätzung, basierend auf dem, was er darüber verbraucht hat.",
     "accounts": {
       "title": "Abo-Konten",
-      "empty": "Noch denkt kein Agent mit einem Abo."
+      "empty": "Verbinde ein Abo und verfolge hier, wie viel jeder Agent davon nutzt."
     },
     "api": {
       "title": "Workspace-API"
@@ -12852,6 +12893,7 @@
     "sayHiAgent": "Sag {{name}} Hallo",
     "sayHiPerson": "Sag {{name}} Hallo",
     "sayHiChannel": "Sag Hallo in #{{channel}}",
+    "sayHiText": "Erwähne einen Agenten mit @, und er steigt ein.",
     "suggestions": "Vorschläge für den Start",
     "suggest": {
       "dev1": "Was ist seit dem letzten Deploy kaputtgegangen?",
@@ -13340,6 +13382,8 @@
       "title": "Browserprofile",
       "sub": "Melde dich einmal bei Websites an und wähle, welche Agenten welches Profil nutzen.",
       "empty": "Erstelle ein Profil, melde dich einmal bei seinen Websites an und wähle, welche Agenten es nutzen dürfen. Jeder Agent behält seinen eigenen Browser.",
+      "emptyTitle": "Melde dich nur einmal an",
+      "emptyViewer": "Wer sich um diesen Computer kümmert, erstellt Profile, und sie erscheinen hier.",
       "new": "Neues Profil",
       "free": "Frei",
       "inUse": "Genutzt von <who/>",
@@ -14579,8 +14623,9 @@
       "kept": "Nur du siehst „{{title}}“"
     },
     "empty": {
-      "title": "Leeres Dashboard",
-      "text": "Füge Widgets hinzu: Bitte einen Agenten darum oder hefte einen Block aus dem Chat an."
+      "title": "Deine Zahlen an einem Ort",
+      "text": "Bitte einen Agenten um ein Widget oder pinne einen Block aus dem Chat, und es bleibt hier aktuell.",
+      "viewer": "Wer dieses Dashboard bearbeitet, fügt Widgets hinzu, und sie erscheinen hier."
     },
     "onlyHome": "Erstelle mit „Neues Dashboard“ ein Dashboard für den Workspace oder einige Rollen.",
     "create": {
