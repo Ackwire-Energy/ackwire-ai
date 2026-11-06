@@ -3,8 +3,11 @@ import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Card, Icon, Sky, Text, WorkspaceSky } from "@/ui";
+import { mayCreate } from "../new/logic";
 import { AgentFace } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory } from "../shared/hooks";
 import { firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
@@ -142,14 +145,16 @@ function Faces({ ids, mode }: { ids: readonly string[]; mode: "run" | "rest" }) 
 /**
  * Conversas with nothing in it yet: the sky with an agent about to
  * be born, one primary "Criar meu primeiro agente", and examples of what an agent can do (each opens "Novo
- * agente" with "o que faz" filled in).
+ * agente" with "o que faz" filled in). Who can't create agents gets the place's line instead.
  */
 export function FirstAgentEmpty() {
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
+  const { org } = useOrg();
   const newAgent = (what?: string) =>
     router.push(what ? { pathname: "/new-agent", params: { what } } : { pathname: "/new-agent" });
+  if (!mayCreate(org, "agent")) return <FirstUse place="agents" acts={false} />;
   return (
     <View>
       <View style={[styles.empty, surface]}>

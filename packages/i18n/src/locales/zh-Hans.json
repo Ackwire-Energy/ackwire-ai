@@ -8,6 +8,7 @@
     "cantUndo": "此操作无法撤销。",
     "removeName": "移除 {{name}}",
     "about": "关于“{{label}}”",
+    "askAgent": "让 {{name}} 来做",
     "previousMonth": "上个月",
     "nextMonth": "下个月",
     "chooseDate": "选择日期",
@@ -1480,8 +1481,10 @@
     "workingNow": "正在工作",
     "available": "空闲",
     "archived": "已归档",
-    "emptyTitle": "还没有智能体",
-    "empty": "创建第一个智能体，组建你的团队。",
+    "emptyTitle": "组建你的智能体团队",
+    "empty": "每个智能体都有自己的角色，和成员在同一个频道里一起工作。",
+    "emptyViewerTitle": "你的智能体团队会显示在这里",
+    "emptyViewer": "能创建智能体的成员组建团队后，每个智能体都会显示在这里。",
     "list": {
       "agents": "智能体",
       "people": "成员",
@@ -1532,7 +1535,10 @@
       "reasonJoin": "从团队地图：把 {{agent}} 加入 #{{to}}。",
       "waiting_other": "{{count}} 个请求等待审批",
       "moreRoutines_other": "另有 {{count}} 项例行工作",
-      "empty": "还没有智能体在频道中。",
+      "empty": "把智能体加入频道后，它会和负责人一起显示在这里。",
+      "emptyTitle": "查看每个智能体在哪里工作",
+      "emptyAction": "加入频道",
+      "emptyViewer": "管理智能体的成员把它们加入频道后，地图会显示在这里。",
       "others": "其他频道"
     },
     "sectors": {
@@ -1554,8 +1560,10 @@
         "noLead": "还没有负责人。请选择负责这个部门的人。",
         "noBackup": "没有替补。负责人不在时，没人接手。"
       },
-      "emptyTitle": "还没有部门",
-      "empty": "部门按领域整理智能体，比如销售或支持。它们会作为分区显示在每个人的列表中。"
+      "emptyTitle": "按领域整理团队",
+      "empty": "每个部门都有负责人，大家都能看到谁负责什么。",
+      "emptyViewerTitle": "看看谁负责什么",
+      "emptyViewer": "管理智能体的人创建部门后，部门会显示在这里。"
     },
     "usage": {
       "lead": "本月每个人使用智能体的情况，以及上限。",
@@ -2942,9 +2950,9 @@
       "noMatch": "这里没有与此搜索匹配的内容。",
       "clearFilters": "清除搜索",
       "personalNote": "只有你能看到这些项目。你的智能体只在你要求时使用它们。",
-      "personalEmpty": "还没有保存任何内容",
+      "personalEmpty": "安全保存你的登录信息和密钥",
       "personalEmptyText": "只有你能看到这些项目。你的智能体只在你要求时使用它们。",
-      "teamEmpty": "还没有与团队共享任何内容",
+      "teamEmpty": "共享登录信息，不用到处传密码",
       "teamEmptyText": "只需保存一次登录信息、密钥或联系信息，然后选择哪些智能体可以使用。",
       "sharedEmpty": "还没有与你共享的内容",
       "sharedEmptyText": "有人与你共享团队的登录信息或密钥时，会显示在这里。"
@@ -4423,7 +4431,6 @@
       "builtinHelp": "Drive、任务、记忆等",
       "noMatch": "没有与“{{q}}”匹配的内容",
       "noneHere": "此筛选下没有内容",
-      "clear": "清除搜索或筛选。",
       "library": "技能库",
       "fineTune": "逐个工具的精细设置在连接器中进行。这里是每个应用一个级别。",
       "always": {
@@ -4451,7 +4458,8 @@
       "decides": "由 {{who}} 决定。",
       "adminDecides": "由管理员决定。",
       "learned": "它学到的内容",
-      "learnedEmpty": "还没有自己学到的内容。纠正、偏好和摸索出的做法会显示在这里。",
+      "learnedEmpty": "它发现的更正、偏好和做事方式会显示在这里。",
+      "learnedEmptyTitle": "从每次修正中学习",
       "howTo": "操作方法",
       "disputed": "有争议",
       "edit": "编辑",
@@ -4503,7 +4511,8 @@
         "routines": "例行工作"
       },
       "noneFilter": "此筛选下没有内容。",
-      "clear": "换个词试试，或清除筛选。",
+      "emptyTitle": "查看每项工作",
+      "emptyText": "{{name}} 每项工作的步骤和费用都会显示在这里。",
       "showing": "显示 {{shown}} / {{total}}。",
       "more": "加载更多",
       "direct": "私信",
@@ -4630,10 +4639,10 @@
       "all": "全部",
       "changedOther": "{{owner}} 的文件，由 {{name}} 修改",
       "changedOther_female": "{{owner}} 的文件，由 {{name}} 修改",
-      "empty": "{{name}} 还没有创建任何文件",
-      "empty_female": "{{name}} 还没有创建任何文件",
-      "emptyText": "{{name}} 在对话中交付文件后，会显示在这里。",
-      "emptyText_female": "{{name}} 在对话中交付文件后，会显示在这里。",
+      "empty": "可以让它做报告、表格或文档",
+      "emptyText": "{{name}} 在对话中交付的内容都保存在这里。",
+      "ask": "请它做文件",
+      "askText": "把你的工作总结成一个文件。",
       "note": "只显示你能看到的对话中的文件。"
     },
     "panel": {
@@ -4691,8 +4700,9 @@
     "archive": "归档",
     "restore": "恢复",
     "emptySearch": "没有找到与“{{q}}”相关的内容。",
-    "empty": "这里还什么都没有。{{name}} 会在团队和他交流时学习。",
-    "empty_female": "这里还什么都没有。{{name}} 会在团队和她交流时学习。",
+    "emptyTab": "这里暂时没有内容。",
+    "emptyTitle": "{{name}} 的记忆从这里开始",
+    "emptyText": "每次对话都能学到团队工作方式的新内容。",
     "how": "记忆如何运作",
     "editTitle": "编辑{{kind}}",
     "text": "内容",
@@ -4756,7 +4766,8 @@
     "refuseNote": "拒绝后，{{name}} 就不会再提这条建议。",
     "added": "新增：",
     "removed": "删除：",
-    "empty": "还没有建议。当有人要求智能体做出修改，或同一经验反复出现时，建议会显示在这里。",
+    "empty": "有人请智能体做出改变，或某条经验反复出现时，建议会显示在这里。",
+    "emptyTitle": "没有待审核的内容",
     "titleInstructions": "更新 {{name}} 的指令",
     "titleRole": "更改 {{name}} 的角色",
     "titleAccess": "更改 {{name}} 的访问权限",
@@ -5523,7 +5534,7 @@
     "new": "新建任务",
     "filters": "筛选任务",
     "unassigned_other": "{{count}} 个未分配",
-    "emptyTitle": "还没有任务",
+    "emptyTitle": "为工作指定负责人和日期",
     "panelLabel": "任务 #{{number}}",
     "openPage": "打开任务页面",
     "close": "关闭",
@@ -5703,7 +5714,9 @@
     "agentRole": "智能体 · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "新建一个，或在聊天中请智能体创建。",
+    "empty": "任务说明谁做什么，无论是成员还是智能体，也能看到进度。",
+    "emptyViewerTitle": "查看谁在做什么",
+    "emptyViewer": "能在工作区发言的成员创建任务后，任务会显示在这里。",
     "noResults": "没有符合这些筛选条件的任务。",
     "columnEmpty": "这里什么都没有。",
     "form": {
@@ -5762,6 +5775,7 @@
     "askTitle_female": "请 {{name}} 完成这个任务",
     "askText": "{{name}} 会阅读所需内容，在这里评论计划并完成它。任何敏感操作（比如发布）都会先请你审批。",
     "askText_female": "{{name}} 会阅读所需内容，在这里评论计划并完成它。任何敏感操作（比如发布）都会先请你审批。",
+    "askFirst": "帮我创建团队的第一批任务。",
     "askButton": "请 {{name}} 处理",
     "askButton_female": "请 {{name}} 处理",
     "askSection": "询问智能体",
@@ -5955,7 +5969,11 @@
     "groupLive": "运行中",
     "groupPaused": "已暂停",
     "noResults": "没有符合筛选条件的例行工作。",
-    "emptyTitle": "还没有例行工作",
+    "emptyTitle": "把重复的工作交给智能体",
+    "empty": "例行工作会在设定时间自动运行，并把结果送到你指定的地方。",
+    "emptyViewerTitle": "查看自动运行的工作",
+    "emptyViewer": "负责智能体的成员创建例行工作后，它们会显示在这里。",
+    "askText": "帮我创建一个例行工作。",
     "runningNow": "正在运行…",
     "neverRan": "还没有运行过",
     "silentOf": "{{total}} 次中有 {{count}} 次保持安静",
@@ -6706,7 +6724,8 @@
       "openThread": "打开话题"
     },
     "empty": {
-      "title": "还没有专项任务"
+      "title": "设定目标，跟进智能体的工作",
+      "viewer": "能给智能体分配工作的成员开启专项任务后，它们会显示在这里。"
     },
     "new": {
       "noEligibleTitle": "还没有智能体能为你运行专项任务",
@@ -6967,8 +6986,8 @@
     "empty": {
       "missionsTitle": "还没有专项任务",
       "missions": "专项任务是一个带有计划、决定以及智能体在其电脑上所做工作的话题。",
-      "allTitle": "还没有话题",
-      "all": "回复一条消息即可开启话题。",
+      "allTitle": "每个主题都有自己的对话",
+      "all": "回复一条消息即可开启话题，频道保持清爽。",
       "workingTitle": "目前没有智能体在工作",
       "closedTitle": "这里没有已关闭的内容",
       "archivedTitle": "没有已归档的话题",
@@ -7372,7 +7391,9 @@
     "lastResult": "上次：{{result}}",
     "upcomingMeta": "{{day}} · {{time}}",
     "emptyHint": "没有安排。拖动即可创建，或按 N",
-    "agendaEmpty": "未来 30 天没有安排。",
+    "agendaEmpty": "接下来 30 天的日程和例行工作会显示在这里。",
+    "agendaEmptyTitle": "未来 30 天日程空闲",
+    "noResults": "此筛选下没有内容。",
     "more": "还有 {{count}} 项",
     "allDay": "全天",
     "now": "现在",
@@ -7428,7 +7449,8 @@
     "installSubmit": "安装",
     "installed": "已安装 {{name}}。",
     "unavailable": "此服务器暂不支持技能。",
-    "empty": "还没有技能。",
+    "emptyTitle": "教一次，每个智能体都会",
+    "emptyText": "技能是智能体在工作需要时遵循的做事方式。",
     "seeAll": "查看全部 {{count}} 个技能",
     "search": "搜索技能",
     "noResults": "没有与“{{q}}”匹配的技能。",
@@ -7723,7 +7745,9 @@
     "page": {
       "title": "你的套餐",
       "hint": "每个套餐都保存在连接它的那台电脑上，管理那台电脑的人可以访问它。agentes.chat 只保存它的名称、邮箱和用量。",
-      "empty": "还没有套餐。",
+      "empty": "用你的账号登录，智能体就能用它来思考。",
+      "emptyTitle": "使用你已付费的 AI 套餐",
+      "emptyViewer": "负责工作区 AI 的成员连接套餐后，它会显示在这里。",
       "connect": "连接 AI",
       "keyEnds": "密钥 …{{hint}}",
       "on": "在 {{computer}} 上",
@@ -8174,8 +8198,9 @@
     "noMatch": "没有这个名称的页面。",
     "tags": "标签",
     "recent": "最近编辑",
-    "emptyTitle": "Wiki 是空的",
+    "emptyTitle": "留下团队需要知道的内容",
     "emptyText": "从一个页面开始。一个通常好用的结构：",
+    "emptyViewer": "能编辑 Wiki 的成员创建页面后，页面会显示在这里。",
     "createFirst": "创建第一个页面",
     "useStarter": "使用推荐的结构",
     "starter": "推荐的结构",
@@ -8193,6 +8218,7 @@
     "byFor": "由 {{name}} 撰写，应 {{person}} 的要求",
     "missingTitle": "这个页面还不存在",
     "missingText": "有人链接到了它。创建它并补充缺少的内容吧。",
+    "missingViewer": "有人链接到了这里。能编辑 Wiki 的成员可以创建它。",
     "missingHint": "{{title}} 还不存在：点击创建",
     "previewOf": "{{title}} 的预览",
     "createPage": "创建页面",
@@ -8791,8 +8817,12 @@
     "customText": "已逐个工具授权。选择一个级别即可简化。",
     "noTools": "还没有工具。",
     "toolsMore_other": "{{tools}} 等另外 {{count}} 项",
-    "noAgents": "还没有智能体。创建一个智能体，再为它开通连接器权限。",
-    "noConnectors": "{{org}} 还没有连接任何服务。",
+    "noAgents": "创建智能体后，就能决定它用哪些应用以及在其中做什么。",
+    "noAgentsTitle": "为每个智能体设置合适的权限",
+    "noConnectors": "连接一次工作区的应用，然后在这里设置每个智能体的访问权限。",
+    "noConnectorsTitle": "选择每个智能体能使用什么",
+    "noConnectorsViewerTitle": "查看智能体可以使用什么",
+    "noConnectorsViewer": "管理连接器的成员添加应用后，它们会显示在这里。",
     "unavailable": "此服务器暂不支持权限控制。",
     "area": {
       "context": "上下文和记忆",
@@ -9006,8 +9036,9 @@
     "by": "创建者",
     "where": "位置",
     "when": "更新时间",
-    "emptyTitle": "还没有文件",
-    "emptyText": "把文件拖到这里即可上传。",
+    "emptyTitle": "团队创建的一切，都在这里",
+    "emptyText": "智能体和成员的文件都在这里。上传你的文件，或把文件拖到此页面。",
+    "emptyViewer": "智能体和成员在对话中创建的内容都保存在这里。",
     "noResults": "没有符合这些筛选条件的文件。",
     "clear": "清除筛选",
     "noResultsHint": "换个搜索词，或清除筛选条件。",
@@ -9289,7 +9320,8 @@
     "searchPlaceholder": "按名称或功能搜索",
     "empty": "没有与“{{q}}”匹配的连接器",
     "emptyText": "你可以通过地址连接任意服务。",
-    "none": "还没有连接器。",
+    "none": "智能体会在你的工具里工作，只使用你允许的权限。",
+    "noneTitle": "连接团队的应用",
     "connectedFilter": "已连接",
     "suggested": "为 {{org}} 推荐",
     "more": "更多服务",
@@ -11122,7 +11154,10 @@
     "other": {
       "title": "其他电脑",
       "text": "通过代码连接，比如家里的 Mac mini 或另一台服务器。每台电脑允许做什么，在那台电脑上设置。",
-      "emptyTitle": "还没有其他电脑"
+      "emptyTitle": "在任何电脑上运行智能体",
+      "emptyText": "用代码连接家里的 Mac mini 或其他服务器，智能体就能在上面工作。",
+      "emptyViewerTitle": "团队的电脑会显示在这里",
+      "emptyViewer": "能连接电脑的成员添加后，电脑会显示在这里。"
     }
   },
   "outage": {
@@ -11224,7 +11259,8 @@
     "server": "服务器地址",
     "serverHelp": "把它粘贴到你要连接的应用中。",
     "serverCopied": "地址已复制",
-    "empty": "还没有连接应用。连接 Claude 或其他应用，无需离开就能向智能体布置任务。",
+    "empty": "连接 Claude 或其他应用，无需离开就能请智能体做任务。",
+    "emptyTitle": "在你常用的地方调用智能体",
     "connected": "已连接",
     "onThisComputer": "在这台电脑上",
     "access": {
@@ -11478,7 +11514,8 @@
     },
     "agent": "智能体",
     "anyAgent": "所有智能体",
-    "empty": "这里还没有内容。智能体在对话之外做的事会显示在这里。",
+    "empty": "智能体在对话之外做的事会显示在这里。",
+    "emptyTitle": "智能体做的每件事都有记录",
     "emptyFiltered": "此筛选下没有内容。",
     "loadMore": "加载更多",
     "outcome": {
@@ -11847,7 +11884,8 @@
     "removeUnused": "密钥将被永久删除。没有智能体在用它思考。",
     "removeUsedOther_other": "{{agents}} 正在用这个密钥思考。删除后会改用其他密钥。如果没有适合其模型的密钥，则会请求连接 AI。",
     "removeUsedNone_other": "{{agents}} 正在用这个密钥思考，且没有其他方式。删除后将停止回复，直到你连接其他 AI。",
-    "noKeys": "还没有密钥。",
+    "noKeys": "使用 API 密钥，你直接向提供商付费并自选模型。",
+    "noKeysTitle": "使用你自己的 AI 密钥",
     "platformAvailable": "也可以使用此服务器的 Claude 密钥。",
     "usageTitle": "按类型划分的 API 花费",
     "usageAgentLine": "{{spent}} / {{budget}}",
@@ -11961,7 +11999,8 @@
     },
     "export": "导出 CSV",
     "limitsHint": "在额度中为每个人设定额度",
-    "empty": "本月还没有人使用智能体。",
+    "empty": "有人和智能体对话后，本月用量会显示在这里。",
+    "emptyTitle": "查看每位成员如何使用智能体",
     "owner": "所有者",
     "member": "成员",
     "columns": {
@@ -12081,7 +12120,7 @@
     "estimate": "套餐只显示整个账号的用量。每个智能体的部分是根据各自的花费估算的。",
     "accounts": {
       "title": "套餐账号",
-      "empty": "还没有智能体使用套餐思考。"
+      "empty": "连接套餐后，可以在这里查看每个智能体的用量。"
     },
     "api": {
       "title": "工作区 API"
@@ -12527,6 +12566,8 @@
     "sayHiAgent_female": "跟 {{name}} 打个招呼",
     "sayHiPerson": "跟 {{name}} 打个招呼",
     "sayHiChannel": "在 #{{channel}} 打个招呼",
+    "sayHiText": "用 @ 提及智能体，它就会加入对话。",
+    "readOnlyEmpty": "消息会显示在这里",
     "suggestions": "开始的建议",
     "suggest": {
       "dev1": "上次部署以来有什么出问题了？",
@@ -13030,6 +13071,8 @@
       "title": "浏览器配置文件",
       "sub": "在网站上登录一次，然后选择哪些智能体使用每个配置文件。",
       "empty": "创建一个配置文件，在它的网站上登录一次，然后选择哪些智能体可以使用它。每个智能体都保留自己的浏览器。",
+      "emptyTitle": "只需登录一次",
+      "emptyViewer": "负责这台电脑的成员创建配置文件后，它们会显示在这里。",
       "new": "新建配置文件",
       "free": "空闲",
       "inUse": "<who/> 正在使用",
@@ -14374,8 +14417,9 @@
       "kept": "现在只有你能看到“{{title}}”"
     },
     "empty": {
-      "title": "空仪表盘",
-      "text": "添加小组件：请智能体创建，或从聊天中固定一个区块。"
+      "title": "随时掌握你的数据",
+      "text": "请智能体做一个小组件，或固定聊天里的区块，它会在这里保持更新。",
+      "viewer": "能编辑此仪表盘的成员添加小组件后，它们会显示在这里。"
     },
     "onlyHome": "用“新建仪表盘”为工作区或部分角色创建仪表盘。",
     "create": {

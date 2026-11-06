@@ -3,15 +3,27 @@ import { useApi, useModels, usePlanUsage } from "@agenteschat/client";
 import { formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { planName } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf } from "@agenteschat/client/lib/providers";
-import { agentGradient, Card, CardHeader, Icon, Meter, PlanMeter, ProviderLogo } from "@agenteschat/ui";
+import {
+  agentGradient,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Icon,
+  Meter,
+  PlanMeter,
+  ProviderLogo,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useConnectAi, useMayConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { accountName, accountShares, brandOf, noWindowsText, planMeterText, splitUsage } from "@/lib/plan-usage";
 import "./plan-usage.css";
 
@@ -50,6 +62,9 @@ export function PlanUsageCards() {
   const { org } = useOrg();
   const api = useApi();
   const usage = usePlanUsage(org.id);
+  const look = useRightHandLook();
+  const connectAi = useConnectAi();
+  const mayConnect = useMayConnectAi();
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -81,7 +96,21 @@ export function PlanUsageCards() {
           hint={{ name: t("common.about", { label: t("usageViews.accounts.title") }), text: t("usageViews.estimate") }}
         />
         {data.accounts.length === 0 ? (
-          <p className="plan-empty">{t("usageViews.accounts.empty")}</p>
+          <EmptyState
+            size="panel"
+            agent={look}
+            title={t("aiAccounts.page.emptyTitle")}
+            actions={
+              connectAi &&
+              mayConnect && (
+                <Button variant="primary" icon="plus" onClick={() => connectAi.open({})}>
+                  {t("aiAccounts.page.connect")}
+                </Button>
+              )
+            }
+          >
+            {t(mayConnect ? "usageViews.accounts.empty" : "aiAccounts.page.emptyViewer")}
+          </EmptyState>
         ) : (
           <div className="plan-machines">
             {[...machines].map(([machineId, list]) => (

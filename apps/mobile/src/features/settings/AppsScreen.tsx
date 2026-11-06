@@ -8,6 +8,7 @@ import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, ProviderLogo, useToast } from "@/ui";
 import { Note, openPage } from "../ai/parts";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors } from "../shared/hooks";
 import { errorHaptic, Loaded, successHaptic } from "../shared/parts";
 import { CommandBlock, chooseAction, confirmAction, Gap, SettingsPage } from "./parts";
@@ -81,11 +82,16 @@ export function AppsScreen() {
         <GroupedFooter>{t("settings.sectionText.apps")}</GroupedFooter>
         <GroupedHeader>{t("apps.server")}</GroupedHeader>
         <CommandBlock command={data.serverUrl} copiedTitle={t("apps.serverCopied")} />
-        <Gap />
-        <GroupedList>
-          <GroupedRow icon="plus" label={t("apps.connect")} chevron onPress={connect} />
-        </GroupedList>
-        {isAppsEmpty(data) ? <GroupedFooter>{t("apps.empty")}</GroupedFooter> : null}
+        {isAppsEmpty(data) ? (
+          <FirstUse place="apps" size="panel" acts label={t("apps.connect")} onPress={connect} />
+        ) : (
+          <>
+            <Gap />
+            <GroupedList>
+              <GroupedRow icon="plus" label={t("apps.connect")} chevron onPress={connect} />
+            </GroupedList>
+          </>
+        )}
         {data.apps.length > 0 ? (
           <>
             <GroupedHeader>{t("apps.connected")}</GroupedHeader>

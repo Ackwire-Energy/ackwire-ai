@@ -162,10 +162,6 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   color: var(--muted);
 }
 
-.home-calm {
-  margin-bottom: 0;
-}
-
 /* The mural's head: its title and count, Organize and + at its end. */
 .home-sec__acts {
   display: flex;
@@ -176,13 +172,6 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
 .home-sec__acts .home-sec__more {
   margin-left: 0;
   margin-right: 8px;
-}
-/* A fixed tile: its rows from edge to edge; the calm card fills it without a frame of its own (no card in a card). */
-.home-mural .wg--fixed .home-calm {
-  margin: 0 16px 8px;
-  border: 0;
-  border-radius: 0;
-  background: none;
 }
 .home-mural .wg--fixed .wg__head .home-sec__more {
   margin-right: 6px;

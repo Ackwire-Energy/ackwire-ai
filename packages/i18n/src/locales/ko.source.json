@@ -17,6 +17,9 @@
   "common.about": {
     "value": "About {{label}}"
   },
+  "common.askAgent": {
+    "value": "Ask {{name}}"
+  },
   "common.previousMonth": {
     "value": "Previous month"
   },
@@ -3756,10 +3759,16 @@
     "value": "Archived"
   },
   "team.emptyTitle": {
-    "value": "No agents yet"
+    "value": "Build your team of agents"
   },
   "team.empty": {
-    "value": "Create the first agent to build the team."
+    "value": "Each agent has a role and works alongside people, in the same channels."
+  },
+  "team.emptyViewerTitle": {
+    "value": "Your team of agents shows up here"
+  },
+  "team.emptyViewer": {
+    "value": "Whoever can create agents builds the team, and each one shows up here."
   },
   "team.list.agents": {
     "value": "Agents"
@@ -3885,7 +3894,16 @@
     }
   },
   "team.map.empty": {
-    "value": "No agent is in a channel yet."
+    "value": "Add an agent to a channel and it shows up here, with who looks after it."
+  },
+  "team.map.emptyTitle": {
+    "value": "See where each agent works"
+  },
+  "team.map.emptyAction": {
+    "value": "Add to a channel"
+  },
+  "team.map.emptyViewer": {
+    "value": "Whoever manages the agents adds them to channels, and the map shows up here."
   },
   "team.map.others": {
     "value": "Other channels"
@@ -3939,10 +3957,16 @@
     "value": "No substitute. If the lead is away, nobody covers."
   },
   "team.sectors.emptyTitle": {
-    "value": "No departments yet"
+    "value": "Organize the team by area"
   },
   "team.sectors.empty": {
-    "value": "Departments organize the agents by area, like Sales or Support. They show as sections in everyone's lists."
+    "value": "Each department has a lead, so everyone can see who looks after what."
+  },
+  "team.sectors.emptyViewerTitle": {
+    "value": "See who looks after what"
+  },
+  "team.sectors.emptyViewer": {
+    "value": "Whoever manages the agents creates departments, and they show up here."
   },
   "team.usage.lead": {
     "value": "What each person uses of the agents this month, and the limits."
@@ -7351,13 +7375,13 @@
     "value": "Only you see these. Your agents use them only when you ask."
   },
   "vault.list.personalEmpty": {
-    "value": "Nothing saved yet"
+    "value": "Keep your logins and keys safe"
   },
   "vault.list.personalEmptyText": {
     "value": "Only you see these. Your agents use them only when you ask."
   },
   "vault.list.teamEmpty": {
-    "value": "Nothing shared with the team yet"
+    "value": "Share logins without passing passwords around"
   },
   "vault.list.teamEmptyText": {
     "value": "Save a login, a key or contact details once, and choose which agents may use it."
@@ -11090,9 +11114,6 @@
   "agentPage.access.noneHere": {
     "value": "Nothing in this filter"
   },
-  "agentPage.access.clear": {
-    "value": "Clear the search or the filter."
-  },
   "agentPage.access.library": {
     "value": "Skills library"
   },
@@ -11166,7 +11187,10 @@
     "value": "What it learned"
   },
   "agentPage.memory.learnedEmpty": {
-    "value": "Nothing learned on its own yet. Corrections, preferences and ways it works out show up here."
+    "value": "Corrections, preferences and ways of working it finds show up here."
+  },
+  "agentPage.memory.learnedEmptyTitle": {
+    "value": "Learns from every correction"
   },
   "agentPage.memory.howTo": {
     "value": "How-to"
@@ -11319,8 +11343,11 @@
   "agentPage.activity.noneFilter": {
     "value": "Nothing with this filter."
   },
-  "agentPage.activity.clear": {
-    "value": "Try another word or clear the filter."
+  "agentPage.activity.emptyTitle": {
+    "value": "Follow every job"
+  },
+  "agentPage.activity.emptyText": {
+    "value": "The steps and cost of each job {{name}} does show up here."
   },
   "agentPage.activity.showing": {
     "value": "Showing {{shown}} of {{total}}."
@@ -11625,10 +11652,16 @@
     "value": "{{owner}}'s file, {{name}} changed it"
   },
   "agentPage.files.empty": {
-    "value": "{{name}} hasn't made any files yet"
+    "value": "Ask for a report, a table or a document"
   },
   "agentPage.files.emptyText": {
-    "value": "When {{name}} delivers a file in a conversation, it shows up here."
+    "value": "Everything {{name}} delivers in a conversation is kept here."
+  },
+  "agentPage.files.ask": {
+    "value": "Ask for a file"
+  },
+  "agentPage.files.askText": {
+    "value": "Put a summary of your work in a file."
   },
   "agentPage.files.note": {
     "value": "Only files from conversations you can see."
@@ -11766,9 +11799,14 @@
   "memory.emptySearch": {
     "value": "Nothing found for “{{q}}”."
   },
-  "memory.empty": {
-    "value": "Nothing here yet. {{name}} learns as the team talks with him.",
-    "female": "Nothing here yet. {{name}} learns as the team talks with her."
+  "memory.emptyTab": {
+    "value": "Nothing here for now."
+  },
+  "memory.emptyTitle": {
+    "value": "{{name}}'s memory starts here"
+  },
+  "memory.emptyText": {
+    "value": "Every conversation teaches something new about how the team works."
   },
   "memory.how": {
     "value": "How memory works"
@@ -11954,7 +11992,10 @@
     "value": "Removed: "
   },
   "proposals.empty": {
-    "value": "No proposals yet. When someone asks an agent for a change, or a lesson repeats, it shows up here."
+    "value": "When someone asks an agent for a change, or a lesson repeats, the proposal shows up here."
+  },
+  "proposals.emptyTitle": {
+    "value": "Nothing to review"
   },
   "proposals.titleInstructions": {
     "value": "Update {{name}}'s instructions"
@@ -13705,7 +13746,7 @@
     }
   },
   "issues.emptyTitle": {
-    "value": "No tasks yet"
+    "value": "Give the work an owner and a date"
   },
   "issues.panelLabel": {
     "value": "Task #{{number}}"
@@ -14138,7 +14179,13 @@
     "value": "#{{number}} {{title}}"
   },
   "issues.empty": {
-    "value": "Create one, or ask an agent in a chat."
+    "value": "A task says who does what, person or agent, and shows where it stands."
+  },
+  "issues.emptyViewerTitle": {
+    "value": "See who does what"
+  },
+  "issues.emptyViewer": {
+    "value": "Whoever can post in the workspace creates tasks, and they show up here."
   },
   "issues.noResults": {
     "value": "No tasks match these filters."
@@ -14299,6 +14346,9 @@
   "issues.askText": {
     "value": "{{name}} reads what he needs, comments the plan here and does it. Anything sensitive, like publishing, asks for your approval.",
     "female": "{{name}} reads what she needs, comments the plan here and does it. Anything sensitive, like publishing, asks for your approval."
+  },
+  "issues.askFirst": {
+    "value": "Help me create the team's first tasks."
   },
   "issues.askButton": {
     "value": "Ask {{name}}"
@@ -14814,7 +14864,19 @@
     "value": "No routines match these filters."
   },
   "routines.emptyTitle": {
-    "value": "No routines yet"
+    "value": "Hand repeat work to your agents"
+  },
+  "routines.empty": {
+    "value": "A routine runs on its own at the set time and delivers where you ask."
+  },
+  "routines.emptyViewerTitle": {
+    "value": "See what runs on its own"
+  },
+  "routines.emptyViewer": {
+    "value": "Whoever looks after the agents creates routines, and they show up here."
+  },
+  "routines.askText": {
+    "value": "Help me set up a routine."
   },
   "routines.runningNow": {
     "value": "Running now…"
@@ -16802,7 +16864,10 @@
     "value": "Open thread"
   },
   "missions.empty.title": {
-    "value": "No missions yet"
+    "value": "Set a goal and follow the agent"
+  },
+  "missions.empty.viewer": {
+    "value": "Whoever can assign work to agents opens missions, and they show up here."
   },
   "missions.new.noEligibleTitle": {
     "value": "No agent can run a mission for you yet"
@@ -17464,10 +17529,10 @@
     "value": "A mission is a thread with a plan, decisions and an agent's work on its computer."
   },
   "threads.empty.allTitle": {
-    "value": "No threads yet"
+    "value": "Every topic in its own conversation"
   },
   "threads.empty.all": {
-    "value": "Reply to a message to open a thread."
+    "value": "Reply to a message to open a thread, and the channel stays clear."
   },
   "threads.empty.workingTitle": {
     "value": "No agent working right now"
@@ -18544,7 +18609,13 @@
     "value": "Nothing scheduled. Drag to create or press N"
   },
   "calendar.agendaEmpty": {
-    "value": "Nothing in the next 30 days."
+    "value": "Events and routines in the next 30 days show up here."
+  },
+  "calendar.agendaEmptyTitle": {
+    "value": "A clear calendar for the next 30 days"
+  },
+  "calendar.noResults": {
+    "value": "Nothing with this filter."
   },
   "calendar.more": {
     "value": "+{{count}} more"
@@ -18687,8 +18758,11 @@
   "skills.unavailable": {
     "value": "Skills aren't available on this server yet."
   },
-  "skills.empty": {
-    "value": "No skills yet."
+  "skills.emptyTitle": {
+    "value": "Teach it once, and every agent knows"
+  },
+  "skills.emptyText": {
+    "value": "A skill is a way of working agents follow whenever the job calls for it."
   },
   "skills.seeAll": {
     "value": "See all {{count}} skills"
@@ -19396,7 +19470,13 @@
     "value": "Each plan stays on the computer it was connected on, and whoever runs that computer can reach it. agentes.chat keeps only its name, email and usage."
   },
   "aiAccounts.page.empty": {
-    "value": "No plans yet."
+    "value": "Sign in with your account and agents think with it."
+  },
+  "aiAccounts.page.emptyTitle": {
+    "value": "Use the AI plan you already pay for"
+  },
+  "aiAccounts.page.emptyViewer": {
+    "value": "Whoever looks after the workspace's AI connects a plan, and it shows up here."
   },
   "aiAccounts.page.connect": {
     "value": "Connect an AI"
@@ -20522,10 +20602,13 @@
     "value": "Recently edited"
   },
   "wiki.emptyTitle": {
-    "value": "The wiki is empty"
+    "value": "Keep what the team needs to know"
   },
   "wiki.emptyText": {
     "value": "Start with one page. A structure that tends to work:"
+  },
+  "wiki.emptyViewer": {
+    "value": "Whoever edits the wiki creates pages, and they show up here."
   },
   "wiki.createFirst": {
     "value": "Create the first page"
@@ -20571,6 +20654,9 @@
   },
   "wiki.missingText": {
     "value": "Someone linked to it. Create it and write what's missing."
+  },
+  "wiki.missingViewer": {
+    "value": "Someone linked to it. Whoever edits the wiki can create it."
   },
   "wiki.missingHint": {
     "value": "{{title}} doesn't exist yet: click to create it"
@@ -22187,10 +22273,22 @@
     }
   },
   "access.noAgents": {
-    "value": "No agents yet. Create an agent to give it access to connectors."
+    "value": "Create an agent to decide which apps it uses and what it does in each."
+  },
+  "access.noAgentsTitle": {
+    "value": "Give each agent the right access"
   },
   "access.noConnectors": {
-    "value": "{{org}} hasn't connected any service yet."
+    "value": "Connect the workspace's apps once and set each agent's access here."
+  },
+  "access.noConnectorsTitle": {
+    "value": "Choose what each agent can use"
+  },
+  "access.noConnectorsViewerTitle": {
+    "value": "See what agents can use"
+  },
+  "access.noConnectorsViewer": {
+    "value": "Whoever manages connectors adds the apps, and they show up here."
   },
   "access.unavailable": {
     "value": "Access control isn't available on this server yet."
@@ -22730,10 +22828,13 @@
     "value": "Updated"
   },
   "drive.emptyTitle": {
-    "value": "No files yet"
+    "value": "Everything the team makes, in one place"
   },
   "drive.emptyText": {
-    "value": "Drag files here to upload them."
+    "value": "Files from agents and people live here. Upload yours or drag them onto this page."
+  },
+  "drive.emptyViewer": {
+    "value": "What agents and people make in conversations is kept here."
   },
   "drive.noResults": {
     "value": "No files match these filters."
@@ -23511,7 +23612,10 @@
     "value": "You can connect any service by its address."
   },
   "connectors.none": {
-    "value": "No connectors yet."
+    "value": "Agents start working in your tools, with only the access you allow."
+  },
+  "connectors.noneTitle": {
+    "value": "Connect your team's apps"
   },
   "connectors.connectedFilter": {
     "value": "Connected"
@@ -27848,7 +27952,16 @@
     "value": "Connected with a code, like a Mac mini at home or another server. What each one allows is set on that computer."
   },
   "computers.other.emptyTitle": {
-    "value": "No other computer yet"
+    "value": "Run agents on any computer"
+  },
+  "computers.other.emptyText": {
+    "value": "Connect a Mac mini at home or another server with a code, and agents work on it."
+  },
+  "computers.other.emptyViewerTitle": {
+    "value": "The team's computers show up here"
+  },
+  "computers.other.emptyViewer": {
+    "value": "Whoever can connect computers adds one, and it shows up here."
   },
   "outage.region": {
     "value": "Offline computers"
@@ -28112,7 +28225,10 @@
     "value": "Address copied"
   },
   "apps.empty": {
-    "value": "No apps connected. Connect Claude or another app to ask agents for tasks without leaving it."
+    "value": "Connect Claude or another app and ask agents for tasks without leaving it."
+  },
+  "apps.emptyTitle": {
+    "value": "Reach your agents from where you already work"
   },
   "apps.connected": {
     "value": "Connected"
@@ -28745,7 +28861,10 @@
     "value": "All agents"
   },
   "audit.empty": {
-    "value": "Nothing here yet. When an agent does something outside the conversation, it shows up here."
+    "value": "When an agent does something outside a conversation, it shows up here."
+  },
+  "audit.emptyTitle": {
+    "value": "Everything agents do is on record"
   },
   "audit.emptyFiltered": {
     "value": "Nothing with this filter."
@@ -29732,7 +29851,10 @@
     }
   },
   "settings.noKeys": {
-    "value": "No keys yet."
+    "value": "With an API key, you pay the provider directly and choose the models."
+  },
+  "settings.noKeysTitle": {
+    "value": "Bring your own AI key"
   },
   "settings.platformAvailable": {
     "value": "This server's Claude key is also available."
@@ -29990,7 +30112,10 @@
     "value": "Set a limit per person in Limits"
   },
   "peopleUsage.empty": {
-    "value": "Nobody has used agents this month yet."
+    "value": "When someone talks to an agent, this month's usage shows up here."
+  },
+  "peopleUsage.emptyTitle": {
+    "value": "See what each person does with the agents"
   },
   "peopleUsage.owner": {
     "value": "Owner"
@@ -30287,7 +30412,7 @@
     "value": "Plan accounts"
   },
   "usageViews.accounts.empty": {
-    "value": "No agent thinks with a plan yet."
+    "value": "Connect a plan and follow here how much each agent uses."
   },
   "usageViews.api.title": {
     "value": "Workspace API"
@@ -31446,6 +31571,12 @@
   "chat.sayHiChannel": {
     "value": "Say hi in #{{channel}}"
   },
+  "chat.sayHiText": {
+    "value": "Mention an agent with @ and it joins in."
+  },
+  "chat.readOnlyEmpty": {
+    "value": "Messages show up here"
+  },
   "chat.suggestions": {
     "value": "Suggestions to start"
   },
@@ -32412,6 +32543,12 @@
   },
   "browser.profiles.empty": {
     "value": "Create a profile, sign in to its sites once and choose which agents may use it. Each agent keeps its own browser."
+  },
+  "browser.profiles.emptyTitle": {
+    "value": "Sign in just once"
+  },
+  "browser.profiles.emptyViewer": {
+    "value": "Whoever looks after this computer creates profiles, and they show up here."
   },
   "browser.profiles.new": {
     "value": "New profile"
@@ -35445,10 +35582,13 @@
     "value": "Only you see “{{title}}”"
   },
   "dashboards.empty.title": {
-    "value": "Empty dashboard"
+    "value": "Track your numbers"
   },
   "dashboards.empty.text": {
-    "value": "Add widgets: ask an agent or pin a block from the chat."
+    "value": "Ask an agent for a widget or pin a block from the chat, and it stays up to date here."
+  },
+  "dashboards.empty.viewer": {
+    "value": "Whoever edits this dashboard adds widgets, and they show up here."
   },
   "dashboards.onlyHome": {
     "value": "Make a dashboard for the workspace or some roles with “New dashboard”."

@@ -20,6 +20,7 @@ import {
   Chip,
   Diff,
   diffLines,
+  EmptyState,
   Field,
   Icon,
   Locked,
@@ -31,11 +32,20 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
-import { LoadingLine } from "@/components/Loading";
+import { ErrorState, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
-import { filterMemories, KIND_ICON, type MemoryTab as Kind, memorySource, usageLabel } from "@/pages/MemoryPage";
+import {
+  filterMemories,
+  KIND_ICON,
+  type MemoryTab as Kind,
+  memorySource,
+  NoMemories,
+  usageLabel,
+} from "@/pages/MemoryPage";
 import { CardHead, useAgentEdit } from "./context";
 import { Cell } from "./Work";
 
@@ -384,9 +394,14 @@ function LearnedList({ list }: { list: Memory[] }) {
   const skills = useLearnedSkills(org.id, agent.id).data ?? [];
   if (list.length === 0 && skills.length === 0)
     return (
-      <div className="agp-empty">
-        <b>{t("agentPage.memory.learnedEmpty")}</b>
-      </div>
+      <EmptyState
+        size="panel"
+        agent={lookOf(agent) ?? true}
+        title={t("agentPage.memory.learnedEmptyTitle")}
+        actions={<AskAgentButton agent={agent} variant="primary" />}
+      >
+        {t("agentPage.memory.learnedEmpty")}
+      </EmptyState>
     );
   const people = list.filter((m) => !m.playbook);
   const playbook = list.filter((m) => m.playbook);
@@ -532,12 +547,12 @@ export function MemoryTab() {
             </Toolbar>
             {memory.isLoading ? (
               <LoadingLine width={260} />
+            ) : memory.isError && !memory.data ? (
+              <ErrorState error={memory.error} onRetry={() => void memory.refetch()} />
             ) : kind === "learned" ? (
               <LearnedList list={learned} />
             ) : shown.length === 0 ? (
-              <div className="agp-empty">
-                <b>{q.trim() ? t("memory.emptySearch", { q }) : t("memory.empty", g)}</b>
-              </div>
+              <NoMemories agent={agent} q={q} none={list.length === 0} onClear={() => setQ("")} />
             ) : (
               <ul className="agp-list agp-mems">
                 {shown.map((m) => (

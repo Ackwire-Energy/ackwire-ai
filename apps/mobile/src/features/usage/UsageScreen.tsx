@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, Icon, Segmented, Text, useTheme, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Loaded, PushedHeader } from "../shared/parts";
@@ -89,9 +90,13 @@ export function UsageScreen() {
                   footer={data.accounts.length > 0 ? t("usageViews.estimate") : undefined}
                 >
                   {data.accounts.length === 0 ? (
-                    <Text variant="small" tone="muted">
-                      {t("usageViews.accounts.empty")}
-                    </Text>
+                    <FirstUse
+                      place="ai"
+                      size="inline"
+                      acts
+                      label={t("aiAccounts.page.connect")}
+                      onPress={() => router.push("/ai-accounts")}
+                    />
                   ) : (
                     [...machines].map(([machineId, list]) => (
                       <View key={machineId} style={styles.machine}>

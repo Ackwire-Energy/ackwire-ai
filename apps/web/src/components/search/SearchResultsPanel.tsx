@@ -225,13 +225,19 @@ export function SearchResultsPanel({
         />
       </header>
       <div className="search-panel__list">
-        {!ws.active && <EmptyState icon="search">{t("searchPage.hint")}</EmptyState>}
+        {!ws.active && (
+          <EmptyState size="panel" icon="search">
+            {t("searchPage.hint")}
+          </EmptyState>
+        )}
         {ws.active && search.isLoading && <LoadingList count={4} avatar={false} />}
         {ws.active && search.isError && !search.data && (
           <ErrorState error={search.error} onRetry={() => void search.refetch()} />
         )}
         {ws.active && search.isSuccess && hits.length === 0 && (
-          <EmptyState icon="search">{t("searchPage.empty", { q: what })}</EmptyState>
+          <EmptyState size="panel" actions={<Button onClick={ws.clear}>{t("filters.clearSearch")}</Button>}>
+            {t("searchPage.empty", { q: what })}
+          </EmptyState>
         )}
         {groupHits(hits).map(([kind, list]) =>
           kind === "message" ? (

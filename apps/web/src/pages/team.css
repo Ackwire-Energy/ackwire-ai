@@ -3,11 +3,6 @@
   max-width: none;
   gap: 20px;
 }
-.team-empty {
-  margin: 0;
-  padding: 16px;
-  color: var(--muted);
-}
 .team-eyebrow {
   font-size: 11px;
   font-weight: 600;

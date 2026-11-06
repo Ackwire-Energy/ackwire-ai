@@ -225,6 +225,8 @@ describe("the other places a plan is chosen", () => {
     expect(buttonNamed(card, PAY)).not.toBeNull();
     await click(buttonNamed(card, KEY) as HTMLElement);
     expect(shownText(screen().getByRole("dialog", { name: /Conectar uma IA/ }))).toContain(HELD);
+    // No plan yet: the hold's lines stand alone, no invitation to connect one.
+    expect(screen().queryByText("Use o plano de IA que você já paga")).toBeNull();
   });
 
   test("Contas de IA, with the plan in force or self-hosted: nothing of it", async () => {

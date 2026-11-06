@@ -42,6 +42,7 @@ import {
 import { CollapsibleSection } from "../chats/HomeSection";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";
+import { useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
@@ -98,6 +99,7 @@ function TaskManager() {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
+  const look = useEmptyLook();
   const meId = useMeId();
   const tasks = useTasksToday();
   const pull = usePullRefresh(tasks.refetch);
@@ -168,8 +170,9 @@ function TaskManager() {
               </View>
             ) : (
               <EmptyState
-                sky
-                crew={dir.agents.slice(0, 3).map((a) => ({ ...agentLook(a), id: a.id }))}
+                size="panel"
+                agent={look}
+                mood="deal"
                 title={t("taskManager.empty.title")}
                 subtitle={t("taskManager.empty.body")}
               />

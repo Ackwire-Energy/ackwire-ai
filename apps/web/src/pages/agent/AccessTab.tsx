@@ -1,12 +1,13 @@
 import { useAgentSkills } from "@agenteschat/client";
 import { type AccessResource, asksAt, type Level } from "@agenteschat/client/lib/access-levels";
-import { Button, Card, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
+import { Button, Card, Chip, EmptyState, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   LevelRow,
   levelText,
+  NoConnectors,
   ResourceIcon,
   resourceName,
   toolLabel,
@@ -15,6 +16,7 @@ import {
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { SkillPicker } from "@/components/Skills";
+import { lookOf } from "@/lib/look";
 import { ApprovalRulesCard } from "./ApprovalRulesCard";
 import { CardHead, ChangedTag, useAgentEdit, WasLine } from "./context";
 import { DatabaseAccessCard } from "./DatabaseAccess";
@@ -50,6 +52,7 @@ export function AccessTab() {
     ask: resources.filter((r) => asksOf(r).length > 0).length,
   };
   const connectors = shown.filter((r) => r.kind === "connector");
+  const noConnectors = resources.every((r) => r.kind !== "connector");
   const builtins = shown.filter((r) => r.kind === "builtin");
   const row = (r: AccessResource) => {
     const name = resourceName(t, r, items);
@@ -80,10 +83,22 @@ export function AccessTab() {
     );
   };
   const empty = (
-    <div className="agp-empty">
-      <b>{needle ? t("agentPage.access.noMatch", { q }) : t("agentPage.access.noneHere")}</b>
-      <span className="small muted">{t("agentPage.access.clear")}</span>
-    </div>
+    <EmptyState
+      size="inline"
+      actions={
+        <Button
+          size="sm"
+          onClick={() => {
+            setQ("");
+            setFilter("all");
+          }}
+        >
+          {t("filters.clearAll")}
+        </Button>
+      }
+    >
+      {needle ? t("agentPage.access.noMatch", { q }) : t("agentPage.access.noneHere")}
+    </EmptyState>
   );
   const allConnectors = (l: Level) => {
     for (const r of resources) if (r.kind === "connector" && r.levels.includes(l)) setLevel(r.id, l);
@@ -154,8 +169,8 @@ export function AccessTab() {
                   title={t("agentPage.access.connectors", { org: org.name })}
                   action={<span className="small muted">{t("agentPage.access.oneLevel")}</span>}
                 />
-                {resources.every((r) => r.kind !== "connector") ? (
-                  <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
+                {noConnectors ? (
+                  <NoConnectors look={lookOf(agent) ?? true} />
                 ) : connectors.length ? (
                   <ul className="level-list" aria-label={t("access.kind.connectors")}>
                     {connectors.map(row)}
@@ -163,7 +178,7 @@ export function AccessTab() {
                 ) : (
                   empty
                 )}
-                {viewer === "admin" && !needle && (
+                {viewer === "admin" && !needle && !noConnectors && (
                   <Link
                     className="newag__addrow"
                     to="/org/$orgId/settings/$section"
@@ -225,7 +240,22 @@ export function AccessTab() {
             ) : skills.isError ? (
               <span className="muted">{t("skills.unavailable")}</span>
             ) : library.length === 0 ? (
-              <span className="small muted">{t("skills.empty")}</span>
+              <EmptyState
+                size="panel"
+                agent={lookOf(agent) ?? true}
+                title={t("skills.emptyTitle")}
+                actions={
+                  viewer === "admin" && (
+                    <Button asChild variant="primary" icon="plus">
+                      <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "skills" }}>
+                        {t("skills.install")}
+                      </Link>
+                    </Button>
+                  )
+                }
+              >
+                {t("skills.emptyText")}
+              </EmptyState>
             ) : skillsEditable ? (
               <SkillPicker
                 skills={library}
@@ -247,7 +277,7 @@ export function AccessTab() {
               <span className="small muted">{t("skills.agentEmpty", { name: agent.name })}</span>
             )}
             <WasLine changeKey="skills" />
-            {viewer === "admin" && (
+            {viewer === "admin" && library.length > 0 && (
               <Link
                 className="agp-more"
                 to="/org/$orgId/settings/$section"

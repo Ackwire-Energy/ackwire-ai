@@ -2,6 +2,7 @@ import type { Actor, Issue, IssueColumn, IssuePriority, IssueStatus, IssuesView 
 import { useIssueColumns, useIssues, useIssuesView, useSetIssuesView } from "@agenteschat/client";
 import { dueLabel, relativeTime, toYmd } from "@agenteschat/client/lib/format";
 import { ISSUES_VIEW_DEFAULT, PRIORITY_ORDER, sortIssues } from "@agenteschat/client/lib/issues-view";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Chip,
@@ -21,12 +22,14 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useDeferredValue, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { actorFromKey, actorKey, NO_ACTOR, useActors } from "@/components/actors";
 import { IssueCardWork } from "@/components/BackgroundWork";
 import { useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { TaskCardConversation } from "@/components/TaskConversation";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import {
@@ -95,6 +98,9 @@ export function IssuesPage() {
       (view.assignees.length === 0 || view.assignees.includes(actorKey(i.assignee))) &&
       (view.priorities.length === 0 || view.priorities.includes(i.priority)),
   );
+  const noIssues = issues.isSuccess && all.length === 0 && !search;
+  const look = useRightHandLook();
+  const posts = can(org, "post");
   const open = all.filter(isOpen);
   const opened = all.find((i) => i.number === openNumber) ?? null;
   const toggle = (n: number) => setOpenParam(openNumber === n ? null : n);
@@ -108,7 +114,7 @@ export function IssuesPage() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.toLowerCase() === "n") {
         e.preventDefault();
-        setCreating({ columnId: null });
+        if (posts) setCreating({ columnId: null });
       } else if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
@@ -116,7 +122,7 @@ export function IssuesPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [posts]);
   return (
     <div className="page issues">
       <div className="issues__main">
@@ -137,9 +143,13 @@ export function IssuesPage() {
             </>
           }
           actions={
-            <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
-              {t("issues.new")}
-            </Button>
+            // The empty state takes over this button: one way in, in the middle of the page.
+            !noIssues &&
+            posts && (
+              <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
+                {t("issues.new")}
+              </Button>
+            )
           }
         />
         <WorkingNow issues={all} onOpen={toggle} />
@@ -192,22 +202,41 @@ export function IssuesPage() {
             <LoadingList count={5} avatar={false} trailing />
           ))}
         {issues.isError && !issues.data && <ErrorState error={issues.error} onRetry={() => void issues.refetch()} />}
-        {issues.isSuccess && all.length === 0 && !search && (
+        {noIssues && (
           <EmptyState
-            sky
-            title={t("issues.emptyTitle")}
+            size="page"
+            agent={look}
+            title={t(posts ? "issues.emptyTitle" : "issues.emptyViewerTitle")}
             actions={
-              // The page head has the one primary "New task": here it is secondary.
-              <Button icon="plus" onClick={() => setCreating({ columnId: null })}>
-                {t("issues.new")}
-              </Button>
+              posts && (
+                <>
+                  <Button variant="primary" icon="plus" onClick={() => setCreating({ columnId: null })}>
+                    {t("issues.new")}
+                  </Button>
+                  <AskAgentButton draft={t("issues.askFirst")} />
+                </>
+              )
             }
           >
-            {t("issues.empty")}
+            {t(posts ? "issues.empty" : "issues.emptyViewer")}
           </EmptyState>
         )}
         {issues.isSuccess && filtered.length === 0 && (all.length > 0 || search) && (
-          <EmptyState icon="search">{t("issues.noResults")}</EmptyState>
+          <EmptyState
+            size="panel"
+            actions={
+              <Button
+                onClick={() => {
+                  setQ("");
+                  changeView({ assignees: [], priorities: [] });
+                }}
+              >
+                {copy.clearAll}
+              </Button>
+            }
+          >
+            {t("issues.noResults")}
+          </EmptyState>
         )}
         {columnsQuery.isError && !columns && (
           <ErrorState error={columnsQuery.error} onRetry={() => void columnsQuery.refetch()} />

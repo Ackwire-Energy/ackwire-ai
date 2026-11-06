@@ -86,6 +86,7 @@ function AppStack() {
       <Stack.Screen name="conversations/[kind]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="sector-new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-categories" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="mission/[id]" options={{ ...pushed, ...scrollUnder }} />

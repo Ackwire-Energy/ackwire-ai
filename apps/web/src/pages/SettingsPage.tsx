@@ -48,6 +48,7 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EmptyState,
   Field,
   Icon,
   InfoHint,
@@ -98,6 +99,7 @@ import { VaultSection } from "@/components/vault/VaultSection";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
 import { workspaceUsesApi } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -723,8 +725,10 @@ function KeysSection() {
     | { type: "remove"; cred: Credential }
     | { type: "models"; cred: Credential }
   >(null);
+  const look = useRightHandLook();
   if (!allowed) return null;
   const live = (credentials.data ?? []).filter((c) => !c.revokedAt);
+  const noKeys = credentials.isSuccess && live.length === 0;
   return (
     <Card aria-labelledby="sec-keys">
       <CardHeader
@@ -733,14 +737,29 @@ function KeysSection() {
         title={t("settings.keysTitle")}
         hint={{ name: t("common.about", { label: t("settings.keysTitle") }), text: t("settings.keysSubtitle") }}
         action={
-          <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
-            {t("settings.addKey")}
-          </Button>
+          !noKeys && (
+            <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
+              {t("settings.addKey")}
+            </Button>
+          )
         }
       />
       {platform.data && <p className="small muted">{t("settings.platformAvailable")}</p>}
       {credentials.isLoading && <LoadingList count={2} avatar={false} trailing />}
-      {credentials.isSuccess && live.length === 0 && <p className="small muted">{t("settings.noKeys")}</p>}
+      {noKeys && (
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t("settings.noKeysTitle")}
+          actions={
+            <Button variant="primary" icon="plus" onClick={() => setDialog({ type: "add" })}>
+              {t("settings.addKey")}
+            </Button>
+          }
+        >
+          {t("settings.noKeys")}
+        </EmptyState>
+      )}
       {live.length > 0 && (
         <List>
           {live.map((c) => {

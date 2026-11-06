@@ -284,8 +284,8 @@ describe("Configurações → Computadores", () => {
     expect(screen().queryByRole("region", { name: "Onde os agentes trabalham" })).toBeNull();
     expect(body.textContent).not.toMatch(/Na nuvem|No seu computador|Computador na nuvem/);
     expect(screen().getByRole("region", { name: "Outros computadores" })).toBeTruthy();
-    // The empty state is its title: how to connect one is the card right under it.
-    expect(screen().getByText("Nenhum outro computador ainda")).toBeTruthy();
+    // How to connect one is the card right under it: the empty state's button goes there.
+    expect(screen().getByText("Rode agentes em qualquer computador")).toBeTruthy();
     expect(body.textContent).not.toContain("Conecte um Mac pelo app agentes");
     expect(screen().getByRole("region", { name: "Conectar outro computador" })).toBeTruthy();
     // Never internal names in the UI.
