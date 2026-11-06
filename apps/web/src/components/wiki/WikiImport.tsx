@@ -247,6 +247,7 @@ type ImportDone = {
   importId: string;
   name: string;
   folder?: string;
+  onConflict: "keep_both" | "skip";
 };
 
 const titlesOf = (titles: string[]) => `${titles.slice(0, 6).join(", ")}${titles.length > 6 ? " …" : ""}`;
@@ -434,6 +435,7 @@ export function WikiImportDialog({
         importId: result.importId,
         name: report.name,
         folder: dest === "folder" ? into.trim() || undefined : undefined,
+        onConflict: conflict,
       });
     } catch (e) {
       toast.show(errorText(t, e, i18n.language), "error");
@@ -444,7 +446,10 @@ export function WikiImportDialog({
     }
   };
 
-  /** "Tentar de novo": only the batches that failed, with `skip`, so a batch that went in after all isn't doubled. */
+  /**
+   * "Tentar de novo": only the batches that failed, with the same import id, so a note of a batch that went in after
+   * all comes back as in, not doubled.
+   */
   const retry = async () => {
     if (!done || done.retry.length === 0) return;
     stop.current = false;
@@ -453,14 +458,20 @@ export function WikiImportDialog({
       const again = await sendVaultNotes(
         api,
         org.id,
-        { name: done.name, folder: done.folder, onConflict: "skip", importId: done.importId, notes: done.retry },
+        {
+          name: done.name,
+          folder: done.folder,
+          onConflict: done.onConflict,
+          importId: done.importId,
+          notes: done.retry,
+        },
         (d, total) => setImporting({ step: "pages", done: d, total }),
         () => stop.current,
       );
       setDone({
         ...done,
-        // Skipped on a retry: already in the wiki (its batch went in after all, or a page has the name).
-        count: done.count + again.created.length + again.skipped.length,
+        count: done.count + again.created.length,
+        skipped: [...done.skipped, ...again.skipped],
         failures: [...done.failures.filter((f) => f.reason !== "batch" && f.reason !== "stopped"), ...again.failures],
         retry: again.retry,
       });
@@ -503,7 +514,7 @@ export function WikiImportDialog({
               failed: done.total - done.count,
             })}
           </b>
-          <span>{t("wiki.import.partialText")}</span>
+          {done.count > 0 && <span>{t("wiki.import.partialText")}</span>}
         </div>
         <section className="vault-block" aria-label={t("wiki.import.whyTitle")}>
           <header>

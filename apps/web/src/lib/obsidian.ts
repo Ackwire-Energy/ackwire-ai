@@ -370,9 +370,9 @@ export function vaultBatches(inputs: WikiImportNote[]): WikiImportNote[][] {
 const wait = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
 /**
- * Sends notes in batches, each tried again twice before it counts as failed; every batch carries `importId`. The
- * batches that still fail come back in `retry`, for "Tentar de novo" (which sends them with `skip`, so a batch that
- * went in after all isn't doubled).
+ * Sends notes in batches, each tried again twice before it counts as failed. Every batch carries `importId`, so the
+ * server answers a batch that went in after all (its answer lost) with the pages it already made instead of doubling
+ * them. The batches that still fail come back in `retry`, for "Tentar de novo".
  */
 export async function sendVaultNotes(
   api: ApiClient,

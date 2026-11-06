@@ -1138,7 +1138,9 @@ const importTitle = (name: string) =>
  * each ("imported from …"), folders, tags and aliases kept, `[[links]]`
  * resolved among the new pages and the existing ones. Notes that can't be
  * pages (no usable title, too long) come back in `failed` and the rest still
- * go in; tags, aliases and attachment names past their limits are cut.
+ * go in; tags, aliases and attachment names past their limits are cut. With
+ * `importId`, a note that import already brought (same folder and title) isn't
+ * made again: it comes back in `created`, so sending a batch twice is safe.
  */
 export async function importWikiPages(
   deps: WikiDeps,
@@ -1165,6 +1167,22 @@ export async function importWikiPages(
   const note = `imported from "${sourceName}"`;
   const rows = await db.transaction(async (tx) => {
     const made: PageRow[] = [];
+    // A batch sent again (its answer was lost, or "Tentar de novo") finds its notes already in: they count as in, once.
+    const mine = input.importId
+      ? await tx
+          .select()
+          .from(wikiPages)
+          .where(
+            and(
+              eq(wikiPages.orgId, orgId),
+              isNull(wikiPages.deletedAt),
+              eq(wikiPages.createdById, userId),
+              sql`${wikiPages.source}->>'importId' = ${input.importId}`,
+            ),
+          )
+      : [];
+    const already = new Map(mine.map((p) => [`${p.folder}\n${p.title}`, p]));
+    const again: PageRow[] = [];
     const rules = await tx.select().from(wikiFolderAudiences).where(eq(wikiFolderAudiences.orgId, orgId));
     for (const n of input.notes) {
       const raw = importTitle(n.title);
@@ -1182,6 +1200,12 @@ export async function importWikiPages(
         folder = cleanFolder([base, n.folder ?? ""].filter(Boolean).join("/"));
       } catch {
         folder = base;
+      }
+      const sent =
+        already.get(`${folder}\n${raw}`) ?? already.get(`${folder}\n${importTitle(`${raw} (${sourceName})`)}`);
+      if (sent) {
+        if (!again.includes(sent)) again.push(sent);
+        continue;
       }
       const taken = (await pagesBySlug(tx, orgId, [wanted])).get(wanted);
       const before = taken && !made.some((m) => m.id === taken.id);
@@ -1245,11 +1269,12 @@ export async function importWikiPages(
         name: sourceName,
         importId: input.importId ?? null,
         created: made.length,
+        alreadyIn: again.length,
         skipped: skipped.length,
         failed: failed.length,
       },
     });
-    return made;
+    return [...made, ...again];
   });
   const created = await summaries(db, rows);
   const first = created[0];
@@ -1579,7 +1604,10 @@ export async function moveWikiPage(deps: WikiDeps, actor: WikiActor, orgId: stri
   return view;
 }
 
-/** Soft delete: links to it show as missing; restore brings it back. */
+/**
+ * Soft delete: links to it show as missing; restore brings it back. It leaves the agents' context for good, so a
+ * restore never pushes the workspace past `WIKI_CONTEXT_MAX`.
+ */
 export async function deleteWikiPage(deps: WikiDeps, actor: WikiActor, orgId: string, ref: string) {
   const { db } = deps;
   const page = await findPage(db, actor, orgId, ref);
@@ -1587,7 +1615,7 @@ export async function deleteWikiPage(deps: WikiDeps, actor: WikiActor, orgId: st
   const row = await db.transaction(async (tx) => {
     const [deleted] = await tx
       .update(wikiPages)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .set({ deletedAt: new Date(), updatedAt: new Date(), agentContext: false })
       .where(eq(wikiPages.id, page.id))
       .returning();
     await tx.update(wikiLinks).set({ toPageId: null }).where(eq(wikiLinks.toPageId, page.id));
@@ -1721,7 +1749,10 @@ export async function deleteWikiPages(deps: WikiDeps, userId: string, orgId: str
   const ids = mine.map((p) => p.id);
   await db.transaction(async (tx) => {
     const now = new Date();
-    await tx.update(wikiPages).set({ deletedAt: now, updatedAt: now }).where(inArray(wikiPages.id, ids));
+    await tx
+      .update(wikiPages)
+      .set({ deletedAt: now, updatedAt: now, agentContext: false })
+      .where(inArray(wikiPages.id, ids));
     await tx.update(wikiLinks).set({ toPageId: null }).where(inArray(wikiLinks.toPageId, ids));
     for (const id of ids) await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: id });
     await recordAudit(tx, {
@@ -1729,7 +1760,11 @@ export async function deleteWikiPages(deps: WikiDeps, userId: string, orgId: str
       actor: { type: "person", id: userId },
       action: "wiki.pages_deleted",
       target: { type: "wiki", id: orgId },
-      details: { target, count: ids.length, slugs: mine.slice(0, 50).map((p) => p.slug) },
+      details: {
+        target: "ids" in target ? { ids: target.ids.length } : target,
+        count: ids.length,
+        slugs: mine.slice(0, 50).map((p) => p.slug),
+      },
     });
   });
   await announceMany(deps, orgId, "deleted");
@@ -2587,8 +2622,8 @@ export async function searchWiki(deps: WikiDeps, actor: WikiActor, orgId: string
 }
 
 /**
- * With `minTextRank` (a run's context) only pages that pass it: the index's answer stands even when empty, and the
- * word match below is only for when the index can't answer.
+ * With `minTextRank` (a run's context) only pages that pass it: the index's answer stands even when empty or failed.
+ * Otherwise the word match below answers when the index can't.
  */
 async function searchPages(
   deps: WikiDeps,
@@ -2610,7 +2645,7 @@ async function searchPages(
       match: "any",
       minTextRank,
     }).catch(() => null);
-    if (hits && hits.length === 0 && minTextRank !== undefined) return [];
+    if (minTextRank !== undefined && !hits?.length) return [];
     if (hits && hits.length > 0) {
       const rows = await deps.db
         .select()
@@ -2630,6 +2665,8 @@ async function searchPages(
       return rows.sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99));
     }
   }
+  // Without the index nothing measures relevance: a run's context gets no page rather than any page with a word.
+  if (minTextRank !== undefined) return [];
   const words = contentWords(q, 8);
   if (words.length === 0) return [];
   const match = or(
@@ -2755,8 +2792,6 @@ export async function retrieveWikiForRun(
   const actor = await input.reader();
   const wide = withoutConversation(actor);
   const linked = parseWikiLinks(input.text);
-  // "Sempre no contexto" goes in as if the message named it.
-  const named = [...known.always];
   const namedLinks = linked.length
     ? [
         ...(
@@ -2768,7 +2803,8 @@ export async function retrieveWikiForRun(
         ).values(),
       ].map((p) => p.id)
     : [];
-  named.push(...namedLinks.filter((id) => !named.includes(id)));
+  // "Sempre no contexto" goes in as if the message named it, after the pages it names: those come first in the budget.
+  const named = [...namedLinks, ...known.always.filter((id) => !namedLinks.includes(id))];
   const namedRows = named.length
     ? await db
         .select()
@@ -2852,12 +2888,13 @@ export async function wikiHitsForAgent<T extends { kind: string; sourceId: strin
 }
 
 /**
- * A run's context takes a page only when its full-text rank (`SearchQuery.minTextRank`: density of the matches, plus
- * up to 0.5 for words in its title) reaches this: about one match every 30 words, or a word of its title. A message
- * that shares a word or two with a long page gets nothing.
+ * A run's context takes a page only when its matches' density (`SearchQuery.minTextRank`) reaches this, and it matches
+ * two of the message's words or one in its title: about one match every 40 words. Measured on a 200-page pt-BR vault
+ * (`test/wiki-corpus.ts`): pages about the question pass at 0.003 and up, long pages that mention it in passing stay
+ * under 0.002, and a message that shares one word with a page gets nothing.
  */
 // ponytail: one fixed floor calibrated on pt/en pages; make it per-workspace if a wiki needs it looser.
-const WIKI_MIN_RANK = 0.004;
+const WIKI_MIN_RANK = 0.0025;
 
 /** A page the run's message names, or its best match, goes in up to this much (ADR 0043). */
 const WIKI_PAGE_CHARS = 1500;

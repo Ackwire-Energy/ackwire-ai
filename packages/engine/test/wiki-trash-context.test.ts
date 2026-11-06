@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import {
   createWikiPage,
   deleteWikiPage,
@@ -16,12 +16,14 @@ import {
   retrieveWikiForRun,
   setWikiFolderAudience,
   setWikiPageAgentContext,
+  setWikiPageAudience,
   setWikiPageLock,
   setWikiPagesAgents,
   topWikiReads,
   type WikiActor,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { wikiCorpus } from "./wiki-corpus";
 
 let f: Fixture;
 afterEach(async () => {
@@ -92,6 +94,42 @@ describe("deleting many pages", () => {
     await setWikiPageLock(deps(), f.owner.id, f.org.id, "trancada", true);
     expect(await deleteWikiPages(deps(), bia.id, f.org.id, { folder: "Docs" })).toEqual({ deleted: 1, kept: 1 });
     expect(await live()).toEqual(["Trancada"]);
+  });
+});
+
+describe("deleting many pages, by people who see less", () => {
+  test("a folder with a page someone can't see: it stays, uncounted, and out of their trash", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await page("Aberta", "Docs");
+    const secret = await page("Segredo", "Docs");
+    await setWikiPageAudience(deps(), f.owner.id, f.org.id, secret.id, { roleIds: [], userIds: [f.owner.id] });
+    expect(await deleteWikiPages(deps(), bia.id, f.org.id, { folder: "Docs" })).toEqual({ deleted: 1, kept: 0 });
+    expect(await live()).toEqual(["Segredo"]);
+    expect((await listWikiPages(f.db, person(bia.id), f.org.id, { deleted: true })).map((p) => p.title)).toEqual([
+      "Aberta",
+    ]);
+    // Nor can they restore or purge it by id.
+    expect(await purgeWikiPages(deps(), bia.id, f.org.id, [secret.id])).toEqual({ purged: 0, kept: 0 });
+  });
+
+  test("a member who doesn't edit the wiki deletes, restores and empties nothing", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const a = await page("A", "Docs");
+    const [everyone] = await f.db
+      .select()
+      .from(schema.orgRoles)
+      .where(and(eq(schema.orgRoles.orgId, f.org.id), eq(schema.orgRoles.kind, "everyone")));
+    await f.db
+      .update(schema.orgRoles)
+      .set({ permissions: (everyone?.permissions ?? []).filter((k) => k !== "edit_wiki") })
+      .where(eq(schema.orgRoles.id, everyone?.id ?? ""));
+    expect(code(await deleteWikiPages(deps(), bia.id, f.org.id, { folder: "Docs" }).catch((e) => e))).toBe("forbidden");
+    await deleteWikiPage(deps(), person(f.owner.id), f.org.id, a.id);
+    expect(code(await restoreWikiPages(deps(), bia.id, f.org.id, [a.id]).catch((e) => e))).toBe("forbidden");
+    expect(code(await purgeWikiPages(deps(), bia.id, f.org.id).catch((e) => e))).toBe("forbidden");
+    expect(await trash()).toEqual(["A"]);
   });
 });
 
@@ -250,6 +288,110 @@ describe("what goes into a run's context", () => {
   });
 });
 
+describe("what goes into a run's context, on a 200-page vault", () => {
+  test("each question gets its page first, small talk and other subjects get nothing, long pages never lead", async () => {
+    f = await setup();
+    const titles = new Map<string, string>();
+    for (const p of wikiCorpus()) titles.set((await page(p.title, p.folder, p.body)).id, p.title);
+    await drainOutbox(f.db, f.handlers);
+    const ask = async (text: string) =>
+      (
+        await retrieveWikiForRun(deps(), {
+          orgId: f.org.id,
+          text,
+          reader: async () => ({ type: "agent", agentId: f.agent.id, requestedByUserId: f.owner.id }),
+        })
+      ).pageIds.map((id) => titles.get(id));
+    const related: [string, string][] = [
+      ["como funciona o reembolso de uma assinatura anual?", "Política de reembolso"],
+      ["o cliente pediu reembolso, o que faço?", "Política de reembolso"],
+      ["quanto tempo leva o estorno no cartão?", "Política de reembolso"],
+      ["como faço o deploy do backend?", "Guia de deploy"],
+      ["posso fazer rollback de uma versão?", "Guia de deploy"],
+      // "empresa" is in the title of every long "Manual da empresa": it doesn't lift them over the price page.
+      ["quanto custa o plano empresa?", "Preços dos planos"],
+      ["qual o desconto do pagamento anual?", "Preços dos planos"],
+      ["qual o SLA dos chamados urgentes?", "SLA de atendimento"],
+      ["onde ficam as senhas?", "Senhas e acessos"],
+      // The title's first word right after its folder ("Pessoas/Férias") counts.
+      ["como marco minhas férias?", "Férias e folgas"],
+      ["quando sai a nota fiscal?", "Notas fiscais"],
+      ["o backup do banco roda que horas?", "Backup do banco de dados"],
+      ["como funciona o kickoff com cliente novo?", "Onboarding de clientes"],
+      ["quais as cores oficiais da marca?", "Guia da marca"],
+    ];
+    for (const [text, want] of related) {
+      const got = await ask(text);
+      expect({ text, first: got[0] }).toEqual({ text, first: want });
+      expect(
+        got.some((t) => /^(Manual da empresa|Wiki antiga|Planejamento 2026|Histórico de decisões)/.test(t ?? "")),
+      ).toBe(false);
+    }
+    for (const text of [
+      "bom dia, tudo bem?",
+      "oi",
+      "pode revisar o PR 42 do app?",
+      "qual a previsão do tempo amanhã em Lisboa?",
+      "me lembra de ligar pro fornecedor de café às 15h",
+      "escreve um poema sobre o mar",
+      "valeu, obrigado pela ajuda!",
+      "traduz esse texto para o inglês",
+      "what do you think about the new logo?",
+      "vamos almoçar hoje?",
+    ]) {
+      expect({ text, got: await ask(text) }).toEqual({ text, got: [] });
+    }
+  }, 120_000);
+
+  test("without the search index a run gets no page rather than any page sharing a word", async () => {
+    f = await setup();
+    await page("Política de reembolso", "", "Clientes podem pedir reembolso em até 7 dias.");
+    const run = await retrieveWikiForRun(
+      { db: f.db, pubsub: f.pubsub },
+      {
+        orgId: f.org.id,
+        text: "o cliente pediu reembolso",
+        reader: async () => ({ type: "agent", agentId: f.agent.id, requestedByUserId: f.owner.id }),
+      },
+    );
+    expect(run.pageIds).toEqual([]);
+  });
+
+  test("a page always in context that the agent may not read stays out; pages the message names come first", async () => {
+    f = await setup();
+    const closed = await page("Fechada", "", "Só para outro agente.");
+    const open = await page("Regras", "", "r".repeat(3000));
+    const named = await page("Contrato", "", "c".repeat(3000));
+    for (const p of [closed, open]) await setWikiPageAgentContext(deps(), f.owner.id, f.org.id, p.id, true);
+    await setWikiPagesAgents(deps(), f.owner.id, f.org.id, [closed.id], []);
+    const run = await retrieveWikiForRun(deps(), {
+      orgId: f.org.id,
+      text: "veja o [[Contrato]]",
+      budgetChars: 1800,
+      reader: async () => ({ type: "agent", agentId: f.agent.id, requestedByUserId: f.owner.id }),
+    });
+    expect(run.held).toBe(false);
+    // The page the message names takes the budget first; the closed one never goes in.
+    expect(run.pageIds[0]).toBe(named.id);
+    expect(run.pageIds).not.toContain(closed.id);
+    expect(run.text.indexOf("[[Contrato]]")).toBeLessThan(run.text.indexOf("[[Regras]]"));
+  });
+
+  test("deleting a page takes it out of the context, so a restore never passes the most", async () => {
+    f = await setup();
+    const pages = [];
+    for (const t of ["A", "B", "C", "D"]) pages.push(await page(t));
+    for (const p of pages.slice(0, 3)) await setWikiPageAgentContext(deps(), f.owner.id, f.org.id, p.id, true);
+    const first = pages[0];
+    if (!first) throw new Error("no page");
+    await deleteWikiPage(deps(), person(f.owner.id), f.org.id, first.id);
+    await setWikiPageAgentContext(deps(), f.owner.id, f.org.id, "d", true);
+    await restoreWikiPages(deps(), f.owner.id, f.org.id, [first.id]);
+    const on = (await listWikiPages(f.db, person(f.owner.id), f.org.id)).filter((p) => p.agentContext);
+    expect(on.map((p) => p.title).sort()).toEqual(["B", "C", "D"]);
+  });
+});
+
 describe("what the agents read most", () => {
   test("counts pages agents opened, not pages that only went into their context", async () => {
     f = await setup();
@@ -281,13 +423,40 @@ describe("importing in batches", () => {
     expect(result.created.map((p) => p.title)).toEqual(["Tags longas", "Anexo", "Boa"]);
     expect(result.failed).toEqual([{ title: "Enorme", reason: "too_long" }]);
     expect(result.created.every((p) => p.importId === IMPORT)).toBe(true);
-    // A retry with "skip" doesn't duplicate what came in.
+    // A retry doesn't duplicate what came in: the note comes back as in.
     const again = await importWikiPages(deps(), f.owner.id, f.org.id, {
       source: { type: "obsidian", name: "Vault" },
       onConflict: "skip",
       importId: IMPORT,
       notes: [{ title: "Boa", body: "ok" }],
     });
-    expect(again).toMatchObject({ created: [], skipped: ["Boa"] });
+    expect(again).toMatchObject({ created: [{ title: "Boa", importId: IMPORT }], skipped: [] });
+    expect((await live()).filter((t) => t === "Boa")).toHaveLength(1);
+  });
+
+  test("a batch sent twice (its answer lost) isn't doubled, even keeping both on a clash", async () => {
+    f = await setup();
+    await page("Glossário");
+    const batch = {
+      source: { type: "obsidian" as const, name: "Vault" },
+      onConflict: "keep_both" as const,
+      importId: IMPORT,
+      notes: [
+        { title: "Glossário", body: "termos" },
+        { title: "Nota", folder: "A", body: "a" },
+        { title: "Nota", folder: "B", body: "b" },
+      ],
+    };
+    const first = await importWikiPages(deps(), f.owner.id, f.org.id, batch);
+    const again = await importWikiPages(deps(), f.owner.id, f.org.id, batch);
+    expect(again.created.map((p) => p.id).sort()).toEqual(first.created.map((p) => p.id).sort());
+    expect((await live()).sort()).toEqual(["Glossário", "Glossário (Vault)", "Nota", "Nota"]);
+    // Someone else reusing the id gets their own pages, not a claim on these.
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const other = await importWikiPages(deps(), bia.id, f.org.id, {
+      ...batch,
+      notes: [{ title: "Nota", folder: "A", body: "x" }],
+    });
+    expect(other.created[0]?.id).not.toBe(first.created[1]?.id);
   });
 });

@@ -34,9 +34,9 @@ export interface SearchQuery {
    */
   match?: "all" | "any";
   /**
-   * With `any`: full-text hits ranked below this are dropped before fusion, so a message that shares only a word or
-   * two with a long document gets nothing. The rank is the matches' density (`ts_rank_cd` normalization 2|32) plus
-   * up to 0.5 for words in the title.
+   * With `any`, for retrieval that must say nothing when nothing fits (a run's context): a full-text hit is kept only
+   * when its matches' density (`ts_rank_cd` normalization 2|32) reaches this and it matches two of the words or one in
+   * its title. Vector hits then only reorder those: alone they bring nothing.
    */
   minTextRank?: number;
   /** Vector hits farther than this cosine distance are dropped (default 0.75, i.e. similarity < 0.25). */
@@ -244,9 +244,19 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
             ? sql`to_tsquery('simple', ${anyWords.join(" | ")})`
             : sql`websearch_to_tsquery('simple', ${text})`;
           // Retrieval: matches per word of the document (a long one mentioning a word in passing doesn't outrank a
-          // short one about it), and the title's words count most.
-          const anyRank = sql`(ts_rank_cd(${t.tsv}, ${tsQuery}, 2|32)
-            + ts_rank_cd(setweight(to_tsvector('simple', ${t.title}), 'A'), ${tsQuery}, 32))`;
+          // short one about it), doubled when the title has one. The title only multiplies: a common word in many
+          // titles ("empresa") doesn't lift a page that barely mentions it.
+          const density = sql`ts_rank_cd(${t.tsv}, ${tsQuery}, 2|32)`;
+          // "Pasta/Título" would parse as one path token: the slash goes, so the title's first word counts.
+          const inTitle = sql`(to_tsvector('simple', replace(${t.title}, '/', ' ')) @@ ${tsQuery})`;
+          const anyRank = sql`(${density} * (1 + ${inTitle}::int))`;
+          const relevant =
+            useAny && q.minTextRank
+              ? sql`(${density} >= ${q.minTextRank} and (${inTitle} or (${sql.join(
+                  anyWords.map((w) => sql`(${t.tsv} @@ to_tsquery('simple', ${w}))::int`),
+                  sql` + `,
+                )}) >= 2))`
+              : undefined;
           const toHit = (row: typeof t.$inferSelect, score: number): SearchHit => ({
             kind: row.kind as SearchKind,
             sourceId: row.sourceId,
@@ -282,13 +292,7 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
               ? db
                   .select()
                   .from(t)
-                  .where(
-                    and(
-                      scope,
-                      sql`${t.tsv} @@ ${tsQuery}`,
-                      useAny && q.minTextRank ? sql`${anyRank} >= ${q.minTextRank}` : undefined,
-                    ),
-                  )
+                  .where(and(scope, sql`${t.tsv} @@ ${tsQuery}`, relevant))
                   .orderBy(desc(useAny ? anyRank : sql`ts_rank_cd(${t.tsv}, ${tsQuery})`), desc(t.sourceCreatedAt))
                   .limit(50)
               : Promise.resolve([]);
@@ -310,7 +314,8 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
             : Promise.resolve([]);
           const [byText, byVector] = await Promise.all([textRows, vectorRows]);
           add(byText);
-          add(byVector);
+          const passed = new Set(byText.map((r) => r.id));
+          add(q.minTextRank ? byVector.filter((r) => passed.has(r.id)) : byVector);
           const now = Date.now();
           return [...ranks.values()]
             .map(({ score, row }) => {
