@@ -2311,7 +2311,6 @@
       "forAll": "Jeder Agent ohne Abo denkt damit.",
       "saved": "Gespeichert. Jeder Agent ohne Abo denkt damit.",
       "savedUnchecked": "Gespeichert, aber {{provider}} hat nicht geantwortet, der Schlüssel konnte also nicht geprüft werden. Wenn er fehlschlägt, steht der Grund im Chat.",
-      "held": "Agenten nutzen ihn, sobald das agentes.chat-Abo des Workspace aktiv ist.",
       "closed": "API-Schlüssel gibt es mit dem agentes.chat-Tarif des Workspace.",
       "notPlan": "Der Schlüssel eines Coding-Abos gehört in seine eigene Option oben.",
       "billing": "Aktiviere die Abrechnung für das Projekt des Schlüssels. Ohne Abrechnung darf Google nutzen, was deine Agenten senden.",

@@ -323,7 +323,7 @@ export function AiAccountsScreen() {
             )}
           </View>
         ) : null}
-        {none ? null : (
+        {none || hold ? null : (
           <View style={styles.start}>
             <Button
               size="sm"
@@ -413,7 +413,7 @@ function KeysSection({ locale }: { locale: string }) {
         ...(isDefault
           ? []
           : [{ label: t("settings.makeDefault"), onPress: () => update.mutate({ defaultCredentialId: k.id }) }]),
-        ...(Platform.OS === "ios" ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
+        ...(Platform.OS === "ios" && !held ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
         { label: t("settings.remove"), destructive: true, onPress: () => remove(k) },
       ],
       t("common.cancel"),

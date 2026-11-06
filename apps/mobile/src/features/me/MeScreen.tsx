@@ -27,6 +27,7 @@ import {
   WithPresence,
 } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
+import { usePlanHold } from "../ai/parts";
 import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
@@ -68,6 +69,7 @@ export function MeScreen() {
   const own = ownSignIns(ai.data);
   const accounts = groupPlans(ai.data?.accounts ?? []);
   const plans = own.length + accounts.length;
+  const held = usePlanHold(org.orgId, org.org) !== null;
   // On which computer, as "Contas de IA" says it: only where the accounts sit on more than one.
   const several = onSeveralComputers(ai.data?.accounts ?? []);
   const c = useColors();
@@ -292,7 +294,7 @@ export function MeScreen() {
           />
         );
       })}
-      {plans === 0 ? (
+      {plans === 0 && !held ? (
         <PageRow icon="plus" label={t("aiAccounts.page.connect")} onPress={() => openConnectAi()} />
       ) : null}
 

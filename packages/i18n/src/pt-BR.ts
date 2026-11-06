@@ -2336,7 +2336,6 @@ export const ptBR = {
       saved: "Salva. Todo agente sem plano pensa com ela.",
       savedUnchecked:
         "Salva, mas {{provider}} não respondeu e a chave não pôde ser testada. Se ela falhar, a conversa diz o motivo.",
-      held: "Os agentes usam a chave quando o plano do agentes.chat do workspace estiver ativo.",
       closed: "As chaves de API abrem com o plano do agentes.chat do workspace.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
       billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",

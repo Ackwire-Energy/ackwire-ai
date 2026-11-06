@@ -2301,7 +2301,6 @@
       "forAll": "Planı olmayan her ajan bununla düşünür.",
       "saved": "Kaydedildi. Planı olmayan her ajan bununla düşünür.",
       "savedUnchecked": "Kaydedildi, ama {{provider}} yanıt vermedi, bu yüzden anahtar kontrol edilemedi. Başarısız olursa nedenini sohbet söyler.",
-      "held": "Çalışma alanının agentes.chat planı etkin olduğunda ajanlar bunu kullanır.",
       "closed": "API anahtarları çalışma alanının agentes.chat planıyla açılır.",
       "notPlan": "Bir kodlama planının anahtarı yukarıdaki kendi seçeneğine girilir.",
       "billing": "Anahtarın projesi için faturalandırmayı açın. Faturalandırma olmadan Google, ajanlarınızın gönderdiklerini kullanabilir.",

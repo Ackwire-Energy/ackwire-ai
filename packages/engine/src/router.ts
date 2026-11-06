@@ -37,7 +37,7 @@ import { PLATFORM_CAP } from "./limits";
 import type { MachineCaller } from "./machine-hub";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage, type Message, type ReplyRef } from "./messages";
 import { ACTIVE_RUN_STATUSES } from "./run-inbox";
-import { type AgentRun, NO_AI } from "./runs";
+import { type AgentRun, KEPT_ON_HOLD, NO_AI } from "./runs";
 import { billingHold, OrgDeletingError, standingRefusal } from "./standing";
 
 const {
@@ -845,14 +845,17 @@ export async function routeMessage(
   }
   if (candidates.length === 0) return waitsForPlan ? paused : { runs: [], skipped: "no_candidates" };
   // Routed to nobody without asking the strategy, and why (the receipts say it).
-  const unrouted = async (reason: typeof NO_AI | typeof PLATFORM_CAP): Promise<RouteResult> => {
+  const unrouted = async (
+    reason: typeof NO_AI | typeof PLATFORM_CAP,
+    strategy: string = NO_AI,
+  ): Promise<RouteResult> => {
     const stored = await db
       .insert(routingDecisions)
       .values({
         orgId: message.orgId,
         channelId: message.channelId,
         messageId: message.id,
-        strategy: NO_AI,
+        strategy,
         candidates: [],
         error: reason,
       })
@@ -862,7 +865,7 @@ export async function routeMessage(
   };
   // No AI anywhere in the organization: nobody could answer, whatever the strategy (Jev only scores, so it
   // never misses a key). Stored as `no_ai`, which "Responder agora" routes again once an AI is connected.
-  if (waitsForPlan) return { ...(await unrouted(NO_AI)), held: true };
+  if (waitsForPlan) return { ...(await unrouted(NO_AI, KEPT_ON_HOLD)), held: true };
   if (deps.hasAi && !(await deps.hasAi(message.orgId))) return unrouted(NO_AI);
   if (await deps.platformCapReached?.(message.orgId)) return unrouted(PLATFORM_CAP);
   const quietMs = byAgent ? 0 : (deps.quietMs ?? 0);

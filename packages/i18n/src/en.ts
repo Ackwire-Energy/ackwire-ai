@@ -2328,8 +2328,6 @@ export const en = {
       /** Saved, though the provider gave no answer about the key: it may still fail. */
       savedUnchecked:
         "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why.",
-      /** On a billing hold no model runs, so a key waits for the plan as well (`connectAi.billing`). */
-      held: "Agents use it once the workspace's agentes.chat plan is active.",
       /** On a billing hold, in place of any way to add a key. */
       closed: "API keys open with the workspace's agentes.chat plan.",
       notPlan: "A coding plan's key goes in its own option above.",

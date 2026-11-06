@@ -1430,9 +1430,16 @@ async function executeRunInner(
 
   // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
   // before it starts anything.
-  // A billing hold keeps the message for after the plan: the agent's card says so, and it can be answered then.
+  // A billing hold keeps a person's message for after the plan: the agent's card says so, and it can be answered then.
+  // Background work and an agent's call have nobody's message to keep: they end saying why.
   const refusal = await standingRefusal(db, run.orgId, run.agentId);
-  if (refusal) return (await billingHold(db, run.orgId)) ? failNoAi("plan_hold") : fail(refusal.message);
+  if (refusal) {
+    const kept =
+      !run.background &&
+      (await billingHold(db, run.orgId)) !== null &&
+      (await getMessage(db, run.orgId, run.triggerMessageId))?.authorType === "person";
+    return kept ? failNoAi("plan_hold") : fail(refusal.message);
+  }
 
   const ctx: ToolContext = {
     db,

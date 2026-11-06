@@ -2395,7 +2395,6 @@
       "forAll": "Tous les agents sans abonnement réfléchissent avec elle.",
       "saved": "Enregistrée. Tous les agents sans abonnement réfléchissent avec elle.",
       "savedUnchecked": "Enregistrée, mais {{provider}} n'a pas répondu et la clé n'a pas pu être vérifiée. Si elle échoue, la conversation dit pourquoi.",
-      "held": "Les agents l'utilisent dès que le forfait agentes.chat du workspace est actif.",
       "closed": "Les clés API s'ouvrent avec l'abonnement agentes.chat du workspace.",
       "notPlan": "La clé d'un abonnement de code va dans sa propre option ci-dessus.",
       "billing": "Activez la facturation pour le projet de la clé. Sans facturation, Google peut utiliser ce que vos agents envoient.",

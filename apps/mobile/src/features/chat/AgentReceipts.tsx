@@ -3,6 +3,8 @@ import {
   type Message,
   type MessageReceipt,
   receiptView,
+  useAiStatus,
+  useApi,
   useReactions,
   useSteerState,
 } from "@agenteschat/client";
@@ -12,7 +14,7 @@ import { mayConnectAi } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { helpUrl } from "@agenteschat/client/lib/server";
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -186,10 +188,30 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
           }
         />
       ) : null}
+      {mine && !held && receipt?.noAi && receipt.server?.kept ? <KeptAnswer messageId={m.id} /> : null}
     </Animated.View>
   );
   return plain;
 });
+
+/** What this run of the app already asked to be answered (`KeptAnswer`). */
+const keptAsked = new Set<string>();
+
+/**
+ * A channel message kept on a hold, once the plan and an AI are here: its author opening the conversation routes it,
+ * as on the web. Until then the line above says what's left.
+ */
+function KeptAnswer({ messageId }: { messageId: string }) {
+  const api = useApi();
+  const orgId = useOrgId();
+  const ready = useAiStatus(orgId).data?.any === true;
+  useEffect(() => {
+    if (!ready || keptAsked.has(messageId)) return;
+    keptAsked.add(messageId);
+    api.chat.answerNow(orgId, messageId).catch(() => undefined);
+  }, [api, orgId, ready, messageId]);
+  return null;
+}
 
 /**
  * A person's message's receipt in a line its row already has, never one of its own (`markOf`): after the time under

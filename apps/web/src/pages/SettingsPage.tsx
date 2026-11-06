@@ -802,9 +802,11 @@ function KeysSection() {
                     </Button>
                   )}
                   <div className="row" style={{ gap: 4 }}>
-                    <Button variant="ghost" size="sm" onClick={() => setDialog({ type: "rotate", cred: c })}>
-                      {t("settings.rotate")}
-                    </Button>
+                    {!hold && (
+                      <Button variant="ghost" size="sm" onClick={() => setDialog({ type: "rotate", cred: c })}>
+                        {t("settings.rotate")}
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"

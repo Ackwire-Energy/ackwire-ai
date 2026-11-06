@@ -4,6 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { AiStatus, Message, OrgStanding, TeamProposalCard } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
+import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
   ADA_ID,
@@ -141,6 +143,62 @@ describe("after the plan", () => {
     expect(card().textContent).toContain("Ada está respondendo…");
   });
 
+  test("a start that was refused never reads as answering: the button is there", async () => {
+    const state = seedState({ aiStatus: ready(ADA_ID) });
+    state.answerNowError = new ApiError(403, "No", "forbidden");
+    state.messages.push(wall());
+    await open(state);
+    expect(card().textContent).not.toContain("Ada está respondendo…");
+    expect(within(card()).getByRole("button", { name: "Responder agora" })).toBeTruthy();
+  });
+
+  test("someone else's kept message promises nothing and starts nothing", async () => {
+    const state = held(seedState({ aiStatus: ready(ADA_ID) }), null, "member");
+    state.messages.push({
+      ...wall(),
+      meta: {
+        bodyCode: "no_ai",
+        noAi: { agentId: ADA_ID, forUserId: "u-other", reason: "plan_hold", intent: "task", runId: "r" },
+      },
+    });
+    await open(state);
+    expect(calls(state, "chat.answerNow")).toHaveLength(0);
+    expect(card().textContent).not.toContain("Ada está respondendo…");
+  });
+
+  const keptHere = (author: string): Message => ({
+    id: "m-mine",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "person", id: author },
+    body: "alguém aí?",
+    mentionedAgentIds: [],
+    agentRunId: null,
+    meta: {},
+    createdAt: NOW.toISOString(),
+    receipts: { seenBy: [], pickedBy: [], handled: [], blocked: [], noAi: true, kept: true },
+  });
+
+  test("a channel message kept on the hold: its author opening the conversation routes it, once", async () => {
+    const state = seedState({ aiStatus: ready(ADA_ID) });
+    state.messages.push(keptHere("u-walter"));
+    await open(state);
+    expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-mine"]]);
+  });
+
+  test("anyone else's, or with no AI yet, stays the line with Conectar", async () => {
+    const other = seedState({ aiStatus: ready(ADA_ID) });
+    other.messages.push(keptHere("u-other"));
+    await open(other);
+    expect(calls(other, "chat.answerNow")).toHaveLength(0);
+    cleanup();
+    sessionStorage.clear();
+    const none = seedState({ aiStatus: noAi(ADA_ID) });
+    none.messages.push(keptHere("u-walter"));
+    await open(none);
+    expect(calls(none, "chat.answerNow")).toHaveLength(0);
+  });
+
   test("already answered: nothing starts again", async () => {
     const state = seedState({ aiStatus: ready(ADA_ID) });
     const later = {
@@ -154,6 +212,34 @@ describe("after the plan", () => {
     await open(state);
     expect(calls(state, "chat.answerNow")).toHaveLength(0);
   });
+});
+
+describe("what stays out of reach on a hold", () => {
+  test("a saved key can't be changed, only removed", async () => {
+    await open(held(seedState()), "settings/keys");
+    expect(screen().queryByRole("button", { name: "Trocar a chave" })).toBeNull();
+    expect(screen().getByRole("button", { name: "Apagar" })).toBeTruthy();
+    expect(document.body.textContent).toContain("As chaves de API abrem com o plano do agentes.chat");
+  });
+
+  test("Membros offers no invitation link that would open on a refusal", async () => {
+    await open(held(seedState()), "members");
+    expect(screen().queryByRole("button", { name: "Copiar link de convite" })).toBeNull();
+  });
+
+  test("an agent's page says neither Sem IA nor Conectar", async () => {
+    await open(held(seedState({ aiStatus: noAi(ADA_ID) })), `agents/${ADA_ID}`);
+    expect(document.body.textContent).not.toContain("Sem IA");
+  });
+});
+
+test("a first task opens with the caret at its blank, in the box", async () => {
+  setDraftFor(`agent:${ADA_ID}`, "Escreva uma resposta para esta mensagem de cliente: ");
+  await open(held(seedState()), `dm/agent/${ADA_ID}`);
+  const box = screen().getByRole("combobox", { name: /Mensagem para/ }) as HTMLTextAreaElement;
+  expect(document.activeElement).toBe(box);
+  expect(box.selectionStart).toBe(box.value.length);
+  expect(box.value.endsWith(": ")).toBe(true);
 });
 
 describe("Lodi's DM on a hold", () => {

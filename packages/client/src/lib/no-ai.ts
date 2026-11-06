@@ -290,11 +290,14 @@ export const planPickText = (t: TFunction, choice: PlanChoice) =>
 export const PLAN_MARKS = ["claude", "openai", "zai", "kimi"] as const;
 export const KEY_MARKS = ["claude", "openai", "gemini", "openrouter"] as const;
 
-/** The billing hold that stops a plan: only the Cloud has an agentes.chat plan, so a self-hosted server never has one. */
+/**
+ * The billing hold that stops a plan: only the Cloud has an agentes.chat plan, so a self-hosted server never has one.
+ * Not known yet (`edition` null) it counts: no moment of Connect or "Plano ativo" on a workspace on hold.
+ */
 export const planHoldOf = (
   edition: Edition | null,
   standing: Pick<OrgStanding, "state" | "reason"> | null | undefined,
-) => (edition === "cloud" ? billingHoldOf(standing) : null);
+) => (edition === "selfhost" ? null : billingHoldOf(standing));
 
 /** What a plan's panel can do now for one agent: sign in, or why not yet. */
 export type PlanGate =

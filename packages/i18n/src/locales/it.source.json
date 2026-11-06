@@ -5569,9 +5569,6 @@
   "connectAi.key.savedUnchecked": {
     "value": "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why."
   },
-  "connectAi.key.held": {
-    "value": "Agents use it once the workspace's agentes.chat plan is active."
-  },
   "connectAi.key.closed": {
     "value": "API keys open with the workspace's agentes.chat plan."
   },

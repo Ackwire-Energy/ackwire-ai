@@ -2478,7 +2478,6 @@
       "forAll": "Myślą z nim wszyscy agenci bez planu.",
       "saved": "Zapisano. Myślą z nim wszyscy agenci bez planu.",
       "savedUnchecked": "Zapisano, ale {{provider}} nie odpowiedział, więc nie udało się sprawdzić klucza. Jeśli zawiedzie, rozmowa powie dlaczego.",
-      "held": "Agenci użyją go, gdy plan agentes.chat workspace'u będzie aktywny.",
       "closed": "Klucze API otwierają się z planem agentes.chat workspace'u.",
       "notPlan": "Klucz planu do kodowania wpisz w jego własnej opcji powyżej.",
       "billing": "Włącz rozliczenia dla projektu tego klucza. Bez rozliczeń Google może wykorzystywać to, co wysyłają twoi agenci.",

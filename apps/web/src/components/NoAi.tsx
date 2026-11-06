@@ -1,5 +1,5 @@
 import type { Message } from "@agenteschat/client";
-import { useAiStatus, useAuthConfig, useMessages } from "@agenteschat/client";
+import { useAiStatus, useAuthConfig, useMessages, useThreadMessages } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
 import type { BillingHold } from "@agenteschat/client/lib/billing";
 import { failedRunFix } from "@agenteschat/client/lib/errors";
@@ -181,7 +181,10 @@ function KeptCard({ message, card, hold }: { message: Message; card: NoAiCardMet
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connect = useConnectAi();
-  const messages = useMessages(org.id, message.channelId).data;
+  // A card in a thread is answered there.
+  const channel = useMessages(org.id, message.channelId, !message.threadId).data;
+  const thread = useThreadMessages(org.id, message.threadId ? message.channelId : undefined, message.threadId ?? "");
+  const messages = message.threadId ? thread.data : channel;
   const billingUrl = useAuthConfig().data?.billingUrl;
   const paid = usePaidReturn(org.id, hold !== null);
   const [templates, setTemplates] = useState(false);
@@ -194,22 +197,33 @@ function KeptCard({ message, card, hold }: { message: Message; card: NoAiCardMet
   const replied = messages?.some(
     (m) => m.author.id === card.agentId && m.createdAt > message.createdAt && !noAiCardOf(m.meta),
   );
-  const starts = state === "answer" && mayAnswer && replied === false && !answer && connect !== null;
+  const asked = `${STORAGE_KEYS.noAiOpened}.answer.${message.id}`;
+  const starts =
+    state === "answer" && mayAnswer && replied === false && !answer && connect !== null && !sessionStore.get(asked);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `connect` changes with each answer; once per card here
   useEffect(() => {
     if (!starts) return;
-    const key = `${STORAGE_KEYS.noAiOpened}.answer.${message.id}`;
-    if (sessionStore.get(key)) return;
-    sessionStore.set(key, "1");
+    sessionStore.set(asked, "1");
     void connect?.answer(message.id);
   }, [starts, message.id]);
+  // Not known yet: no moment of "Plano ativo" on a card an AI has long answered.
+  if (state === "connect" && !status.data) return null;
   if (state === "answer") {
+    const answering = !replied && (starts || answer === "answering" || answer === "pending");
     return (
       <div className="waitcard" data-done>
         <span className="waitcard__top ac-iconline">
           <Icon name="check" size={16} />
-          <span>{t(replied ? "noAi.card.connected" : "noAi.card.answering", { name })}</span>
+          <span>{t(answering ? "noAi.card.answering" : "noAi.card.connected", { name })}</span>
         </span>
+        {/* The start refused, or it isn't this person's to start: never a promise with nothing behind it. */}
+        {!answering && !replied && mayAnswer && connect && (
+          <span className="waitcard__acts">
+            <Button size="sm" variant="primary" onClick={() => connect.answer(message.id)}>
+              {t("noAi.card.answerNow")}
+            </Button>
+          </span>
+        )}
       </div>
     );
   }

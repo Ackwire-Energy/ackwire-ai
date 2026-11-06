@@ -2312,7 +2312,6 @@
       "forAll": "Elke agent zonder abonnement denkt ermee.",
       "saved": "Opgeslagen. Elke agent zonder abonnement denkt ermee.",
       "savedUnchecked": "Opgeslagen, maar {{provider}} gaf geen antwoord, dus de sleutel kon niet worden gecontroleerd. Als hij faalt, staat de reden in het gesprek.",
-      "held": "Agents gebruiken hem zodra het agentes.chat-abonnement van de workspace actief is.",
       "closed": "API-sleutels gaan open met het agentes.chat-abonnement van de workspace.",
       "notPlan": "De sleutel van een codeerabonnement hoort bij die eigen optie hierboven.",
       "billing": "Zet facturering aan voor het project van de sleutel. Zonder facturering mag Google gebruiken wat je agents versturen.",

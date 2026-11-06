@@ -581,7 +581,9 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         : ["create", ...(t.needsAi ? (["ai"] as const) : [])];
       // `url` is the workspace in every job, however old: the button's address follows its step.
       const home = t.url.replace(/[?#].*$/, "").replace(/\/$/, "");
-      const url = { ai: `${t.keptUrl ?? home}?connect=ai`, task: home, create: `${home}/agents/new` }[first];
+      const url = { ai: `${t.keptUrl ?? home}?connect=ai`, task: t.keptUrl ?? home, create: `${home}/agents/new` }[
+        first
+      ];
       const num = (v: number) => v.toLocaleString(lang, { maximumFractionDigits: 1 });
       return doc(
         c.subject,

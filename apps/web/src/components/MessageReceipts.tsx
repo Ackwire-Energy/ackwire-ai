@@ -6,6 +6,7 @@ import {
   receiptTicks,
   receiptView,
   steerWords,
+  useAiStatus,
   useApi,
   useReactions,
   useSteerState,
@@ -17,7 +18,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, PixelSpinner, Popover } from "@agenteschat/ui";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
@@ -26,6 +27,7 @@ import { FanOutStrip, QueuedWords } from "@/components/ComputerQueue";
 import { useConnectAi } from "@/components/ConnectAi";
 import { HelpLink } from "@/components/HelpLink";
 import { useDirectory } from "@/hooks/useDirectory";
+import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import { useLive } from "@/realtime/context";
 import { CallAgentMenu, useChannelActions } from "./channel-actions";
@@ -71,6 +73,40 @@ function ReceiptPlanAction() {
         {t("standing.billing.cta.payment")}
       </button>
     </ReceiptAction>
+  );
+}
+
+/**
+ * A channel message kept on a hold, once the plan and an AI are here: its author opening the conversation routes it,
+ * once per tab, with "Responder agora" if that was refused. Until then, or anyone else's, the line as usual.
+ */
+function KeptAnswer({ message, kept, children }: { message: Message; kept: boolean; children: ReactNode }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const connect = useConnectAi();
+  const ready = useAiStatus(org.id).data?.any === true;
+  const starts = kept && ready && connect !== null && message.author.id === me.user.id;
+  const answer = connect?.answered[message.id];
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `connect` changes with each answer; once per message here
+  useEffect(() => {
+    if (!starts) return;
+    const key = `${STORAGE_KEYS.noAiOpened}.answer.${message.id}`;
+    if (sessionStore.get(key)) return;
+    sessionStore.set(key, "1");
+    void connect?.answer(message.id);
+  }, [starts, message.id]);
+  if (!starts) return children;
+  return (
+    <span className="ac-receipt__words">
+      <span>{t("receipts.picking")}</span>
+      {answer !== "pending" && answer !== "answering" && (
+        <ReceiptAction>
+          <button type="button" className="ac-receipt__action" onClick={() => void connect?.answer(message.id)}>
+            {t("noAi.card.answerNow")}
+          </button>
+        </ReceiptAction>
+      )}
+    </span>
   );
 }
 
@@ -320,27 +356,29 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         </span>
       )}
       {status?.kind === "no_ai" && !held && (
-        <span className="ac-receipt__words">
-          <span>{t("noAi.receipt")}</span>
-          {connect && mayConnect && (
-            <ReceiptAction>
-              <button
-                type="button"
-                className="ac-receipt__action"
-                onClick={() =>
-                  connect.open({
-                    intent: receipt?.noAi?.intent,
-                    provider: receipt?.noAi?.provider,
-                    agentId: status.agents.length === 1 ? status.agents[0] : undefined,
-                    from: message.id,
-                  })
-                }
-              >
-                {t("noAi.action")}
-              </button>
-            </ReceiptAction>
-          )}
-        </span>
+        <KeptAnswer message={message} kept={receipt?.server?.kept === true}>
+          <span className="ac-receipt__words">
+            <span>{t("noAi.receipt")}</span>
+            {connect && mayConnect && (
+              <ReceiptAction>
+                <button
+                  type="button"
+                  className="ac-receipt__action"
+                  onClick={() =>
+                    connect.open({
+                      intent: receipt?.noAi?.intent,
+                      provider: receipt?.noAi?.provider,
+                      agentId: status.agents.length === 1 ? status.agents[0] : undefined,
+                      from: message.id,
+                    })
+                  }
+                >
+                  {t("noAi.action")}
+                </button>
+              </ReceiptAction>
+            )}
+          </span>
+        </KeptAnswer>
       )}
     </div>
   );

@@ -50,6 +50,7 @@ import {
   PLAN_WAITING_JOB,
   queuePlanLent,
   queuePlanOpenedEmail,
+  queuePlanWaiting,
   sendPlanWaitingEmail,
   sendQueuedEmail,
 } from "./email";
@@ -740,6 +741,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (res.skipped === "already_routed" || res.skipped === "continued") return;
       // Nobody can think: what the person asks for may be to connect an AI (Jev reads it), for the Connect step.
       if (res.reason === NO_AI) {
+        if (res.held) await queuePlanWaiting(deps.db, message.orgId);
         const intent = res.held
           ? undefined
           : await aiConnectIntent(deps.context?.judge, { orgId: message.orgId, text: message.body });

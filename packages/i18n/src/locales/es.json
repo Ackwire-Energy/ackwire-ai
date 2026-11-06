@@ -2392,7 +2392,6 @@
       "forAll": "Todos los agentes sin plan piensan con ella.",
       "saved": "Guardada. Todos los agentes sin plan piensan con ella.",
       "savedUnchecked": "Guardada, pero {{provider}} no respondió y la clave no se pudo comprobar. Si falla, la conversación dice por qué.",
-      "held": "Los agentes la usan en cuanto el plan de agentes.chat del workspace esté activo.",
       "closed": "Las claves de API se abren con el plan de agentes.chat del workspace.",
       "notPlan": "La clave de un plan de programación va en su propia opción, arriba.",
       "billing": "Activa la facturación del proyecto de la clave. Sin facturación, Google puede usar lo que envían tus agentes.",

@@ -276,6 +276,9 @@ describe("the Cloud's plan gate tells the truth", () => {
     expect(planHoldOf("selfhost", { state: "hold", reason: "payment" })).toBeNull();
     expect(planHoldOf("cloud", { state: "hold", reason: "ended" })).toBe("ended");
     expect(planHoldOf("cloud", { state: "active", reason: null })).toBeNull();
+    // Before the edition is known a hold counts: no moment of Connect, and no answer started on a saved key.
+    expect(planHoldOf(null, { state: "hold", reason: "payment" })).toBe("payment");
+    expect(planHoldOf(null, { state: "active", reason: null })).toBeNull();
   });
 
   test("the phone's words for a hold: where to pay for whoever pays, who can for anyone else, never a link", () => {

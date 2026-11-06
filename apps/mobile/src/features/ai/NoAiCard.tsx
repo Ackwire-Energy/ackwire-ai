@@ -1,4 +1,4 @@
-import { type Message, useAiStatus, useApi, useMessages } from "@agenteschat/client";
+import { type Message, useAiStatus, useApi, useMessages, useThreadMessages } from "@agenteschat/client";
 import type { BillingHold } from "@agenteschat/client/lib/billing";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -176,9 +176,12 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
   const { colors } = useTheme();
   const status = useAiStatus(orgId);
   const meId = useMeId();
-  const messages = useMessages(orgId, m.channelId).data;
+  // A card in a thread is answered there.
+  const channel = useMessages(orgId, m.channelId, !m.threadId).data;
+  const thread = useThreadMessages(orgId, m.threadId ? m.channelId : undefined, m.threadId ?? "");
+  const messages = m.threadId ? thread.data : channel;
   const started = useRef(false);
-  const [answering, setAnswering] = useState(false);
+  const [answer, setAnswer] = useState<Answer | null>(null);
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const ai = aiStateOf(status.data, card.agentId);
@@ -188,22 +191,29 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
   const replied = messages?.some(
     (x) => x.author.id === card.agentId && x.createdAt > m.createdAt && !noAiCardOf(x.meta),
   );
+  const start = () => {
+    setAnswer("pending");
+    api.chat.answerNow(orgId, m.id).then(
+      () => setAnswer("answering"),
+      () => setAnswer(null),
+    );
+  };
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per card here
   useEffect(() => {
     if (state !== "answer" || !mayAnswer || replied !== false || started.current) return;
     started.current = true;
-    void api.chat.answerNow(orgId, m.id).then(
-      () => setAnswering(true),
-      () => undefined,
-    );
+    start();
   }, [state, mayAnswer, replied]);
+  const answering = !replied && answer !== null;
+  // Not known yet: no moment of "Plano ativo" on a card an AI has long answered.
+  if (state === "connect" && !status.data) return null;
   const code = hold ?? "payment";
   const title =
     state === "held" || state === "paid"
       ? t("noAi.kept.title")
       : state === "connect"
         ? t("noAi.kept.active", { name })
-        : t(replied || !answering ? "noAi.card.connected" : "noAi.card.answering", { name });
+        : t(answering ? "noAi.card.answering" : "noAi.card.connected", { name });
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.top}>
@@ -226,8 +236,17 @@ function KeptCard({ message: m, card, hold }: { message: Message; card: NoAiCard
             {t(can(org, "manage_billing") ? "connectAi.billingWeb" : "standing.billing.askAdmin")}
           </Text>
         </>
-      ) : state === "connect" && mayConnectAi(agent, meId, org) ? (
-        <Button variant="primary" size="sm" label={t("noAi.action")} onPress={() => openConnectAi({ from: m.id })} />
+      ) : state === "connect" ? (
+        mayConnectAi(agent, meId, org) ? (
+          <Button variant="primary" size="sm" label={t("noAi.action")} onPress={() => openConnectAi({ from: m.id })} />
+        ) : (
+          <Text variant="footnote" tone="muted">
+            {t("noAi.lockedAdmins")}
+          </Text>
+        )
+      ) : !answering && !replied && mayAnswer ? (
+        // The start refused: never a promise with nothing behind it.
+        <Button variant="primary" size="sm" label={t("noAi.card.answerNow")} onPress={start} />
       ) : null}
     </View>
   );

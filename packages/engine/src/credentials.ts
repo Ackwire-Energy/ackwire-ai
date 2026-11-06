@@ -171,6 +171,13 @@ function passedCheck(providerId: string, result: KeyCheck | undefined) {
   return result?.state === "ok" ? result : null;
 }
 
+/** A key is no way around a billing hold: it would only sit there reading as ready. */
+async function assertKeysOpen(db: Database, orgId: string) {
+  if (await billingHold(db, orgId)) {
+    throw new ForbiddenError("API keys open with the workspace's agentes.chat plan", "credentials.plan_hold");
+  }
+}
+
 /** Stores an org's provider API key, encrypted (envelope encryption). */
 export async function createCredential(
   db: Database,
@@ -194,10 +201,7 @@ export async function createCredential(
   opts: { fetch?: typeof fetch; net?: EndpointNet; verify?: KeyVerifier } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
-  // A key is no way around a billing hold: it would only sit there reading as ready.
-  if (await billingHold(db, orgId)) {
-    throw new ForbiddenError("API keys open with the workspace's agentes.chat plan", "credentials.plan_hold");
-  }
+  await assertKeysOpen(db, orgId);
   if (!isKnownProvider(input.provider)) throw new ValidationError(`Unknown provider ${input.provider}`);
   const custom = input.provider === "custom";
   if (custom !== Boolean(input.endpoint))
@@ -508,6 +512,7 @@ export async function rotateCredential(
   opts: { fetch?: typeof fetch; verify?: KeyVerifier } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
+  await assertKeysOpen(db, orgId);
   const apiKey = input.apiKey.trim();
   if (apiKey.length < 8) throw new ValidationError("apiKey looks too short");
   // The values are checked before the credential is read: a bad one is refused whatever the credential.

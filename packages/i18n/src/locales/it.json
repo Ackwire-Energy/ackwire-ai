@@ -2397,7 +2397,6 @@
       "forAll": "Ogni agente senza un piano ragiona con questa.",
       "saved": "Salvata. Ogni agente senza un piano ragiona con questa.",
       "savedUnchecked": "Salvata, ma {{provider}} non ha risposto e la chiave non è stata verificata. Se fallisce, la conversazione dice perché.",
-      "held": "Gli agenti la usano appena il piano agentes.chat del workspace è attivo.",
       "closed": "Le chiavi API si aprono con il piano agentes.chat del workspace.",
       "notPlan": "La chiave di un piano di coding va nella sua opzione qui sopra.",
       "billing": "Attiva la fatturazione per il progetto della chiave. Senza fatturazione, Google può usare quello che inviano i tuoi agenti.",

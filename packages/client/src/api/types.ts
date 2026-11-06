@@ -1192,6 +1192,8 @@ export interface MessageReceipts {
   referenced?: string[];
   /** Nobody was asked: the organization has no AI connected. */
   noAi?: boolean;
+  /** With `noAi`: it came in on a billing hold, to be answered after the plan. */
+  kept?: boolean;
   /** Nobody was asked: the workspace used up its platform AI for the month, so only @mentions start agents. */
   platformCap?: boolean;
   /** Who picked the agents for it (ADR 0074); absent on a decision from before. */

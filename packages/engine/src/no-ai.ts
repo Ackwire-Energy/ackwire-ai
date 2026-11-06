@@ -164,16 +164,19 @@ type Answering = { agentId: string; runId: string }[];
 
 /**
  * The runs a "Responder agora" is about: for a card, its agent's newest run in that conversation; for a
- * person's message, the runs it started.
+ * person's message, the runs it started. A kept message's card: every run that message started.
  */
 async function answeringRuns(db: Database, message: Message, card: NoAiCard | null) {
-  const query = db
-    .select({ run: agentRuns, agent: agents, requester: runRequester })
-    .from(agentRuns)
-    .innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .leftJoin(messages, and(eq(messages.id, agentRuns.triggerMessageId), eq(messages.orgId, agentRuns.orgId)));
-  if (!card) return query.where(and(eq(agentRuns.orgId, message.orgId), eq(agentRuns.triggerMessageId, message.id)));
-  return query
+  const runs = () =>
+    db
+      .select({ run: agentRuns, agent: agents, requester: runRequester })
+      .from(agentRuns)
+      .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+      .leftJoin(messages, and(eq(messages.id, agentRuns.triggerMessageId), eq(messages.orgId, agentRuns.orgId)));
+  const started = (triggerId: string) =>
+    runs().where(and(eq(agentRuns.orgId, message.orgId), eq(agentRuns.triggerMessageId, triggerId)));
+  if (!card) return started(message.id);
+  const newest = await runs()
     .where(
       and(
         eq(agentRuns.orgId, message.orgId),
@@ -188,6 +191,8 @@ async function answeringRuns(db: Database, message: Message, card: NoAiCard | nu
     )
     .orderBy(desc(agentRuns.createdAt))
     .limit(1);
+  // A kept message's agents share one card (`postNoAiCard`): every one of them was asked, and answers after the plan.
+  return card.reason === "plan_hold" && newest[0] ? started(newest[0].run.triggerMessageId) : newest;
 }
 
 type AnsweringRun = Awaited<ReturnType<typeof answeringRuns>>[number];
