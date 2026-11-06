@@ -43,7 +43,7 @@ import {
 } from "./permissions";
 import { refuseRightHand } from "./right-hand";
 import { accountInUse, closedRefusal, STANDING_COLUMNS } from "./standing";
-import { taskReaderSql } from "./task-access";
+import { adminChannelSql, taskReaderSql } from "./task-access";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
 
@@ -306,7 +306,7 @@ const uuidArray = (v: string[] | string | null) =>
 
 /**
  * Channels the user can see: every public channel, private ones they
- * belong to and those limited to a role they hold (ADR 0125), in sidebar order (then by name), with their unread count and last message, in one
+ * belong to and those limited to a role they hold (ADR 0125), and for an administrator all of them (ADR 0150), in sidebar order (then by name), with their unread count and last message, in one
  * query (a lateral read per channel on `(channel_id, created_at)`).
  */
 export async function listChannels(db: Database, userId: string, orgId: string): Promise<ChannelListItem[]> {
@@ -359,7 +359,8 @@ export async function listChannels(db: Database, userId: string, orgId: string):
             where ${unread} and ${userId} = any(u.mentioned_user_ids) limit ${MAX_CHANNEL_UNREAD}) y) as m
       ) un on true
       where c.org_id = ${orgId}::uuid and c.archived_at is null and c.kind = 'channel'
-        and (c.visibility = 'public' or cm.id is not null or ${channelAudienceSql("c", sql`${userId}`)})
+        and (c.visibility = 'public' or cm.id is not null or ${channelAudienceSql("c", sql`${userId}`)}
+          or ${maySql(sql`${orgId}::uuid`, sql`${userId}::text`, "administrator")})
       order by c.position asc, c.name asc`),
   );
   return rows.map((r) => {
@@ -416,7 +417,7 @@ export interface ChannelCard {
 }
 
 /**
- * The card of a channel I can see: public, private and mine, or limited to a role I hold; archived ones too. Any other id (a private
+ * The card of a channel I can see: public, private and mine, limited to a role I hold, or any for an administrator; archived ones too. Any other id (a private
  * channel I'm not in, a DM, another organization's) is "not found", so a link tells nothing about it.
  */
 export async function channelCard(
@@ -435,11 +436,13 @@ export async function channelCard(
     archived: boolean;
     is_member: boolean;
     by_role: boolean;
+    admin: boolean;
     people: number | string;
     agents: number | string;
   }>(
     await db.execute(sql`select c.id, c.name, c.topic, c.visibility, c.audience_role_ids,
         (c.archived_at is not null) as archived, ${channelAudienceSql("c", sql`${userId}`)} as by_role,
+        ${maySql(sql`${orgId}::uuid`, sql`${userId}::text`, "administrator")} as admin,
         exists (select 1 from ${channelMembers} m where m.channel_id = c.id and m.user_id = ${userId}) as is_member,
         (select count(*) from ${channelMembers} m where m.channel_id = c.id and m.user_id is not null) as people,
         (select count(*) from ${channelMembers} m join ${agents} a on a.id = m.agent_id
@@ -447,7 +450,7 @@ export async function channelCard(
       from ${channels} c
       where c.id = ${channelId}::uuid and c.org_id = ${orgId}::uuid and c.kind = 'channel'`),
   );
-  if (!row || (row.visibility === "private" && row.is_member !== true && row.by_role !== true))
+  if (!row || (row.visibility === "private" && row.is_member !== true && row.by_role !== true && row.admin !== true))
     throw new NotFoundError("Channel not found");
   return {
     id: row.id,
@@ -485,8 +488,8 @@ export async function peopleAllIn(db: Executor, orgId: string, hereId: string, t
 }
 
 /**
- * Which of `channelIds` a person reads, by the rule of `requireChannelAccess`: a member, or a task's reader;
- * archived channels left out. For screens that quote a conversation outside it (run history).
+ * Which of `channelIds` a person reads, by the rule of `requireChannelAccess`: a member, an administrator in a channel,
+ * or a task's reader; archived channels left out. For screens that quote a conversation outside it (run history).
  */
 export async function readableChannelIds(
   db: Database,
@@ -515,6 +518,7 @@ export async function readableChannelIds(
         or(
           isNotNull(channelMembers.id),
           and(eq(channels.kind, "task"), taskReaderSql(sql`${channels.id}`, sql`${userId}::text`)),
+          adminChannelSql(sql`${orgId}::uuid`, sql`${userId}::text`),
         ),
       ),
     );
@@ -525,7 +529,8 @@ export async function readableChannelIds(
  * The single authorization check for reading a channel (HTTP and WebSocket):
  * the user belongs to the organization (a blocked account belongs nowhere,
  * as in `getMembership`), the channel belongs to that organization, and the
- * user is a member of the channel.
+ * user is a member of the channel or an administrator, who reads every channel
+ * without joining it but never someone else's DM (ADR 0150).
  */
 export async function requireChannelAccess(db: Database, userId: string, orgId: string, channelId: string) {
   // One round trip: membership of the org, the channel, and membership of the channel.
@@ -556,14 +561,16 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   if (closed) throw closed;
   const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
+  const permissions = resolvePermissions(row.role === "owner", row.keys);
+  const reads = row.memberId || (channel.kind === "channel" && permissions.has("administrator"));
   // A task's conversation is read by whoever sees the task (ADR 0145), always checked again: people are never its members.
-  if (channel.kind === "task" ? !(row.taskReader === true || String(row.taskReader) === "t") : !row.memberId)
+  if (channel.kind === "task" ? !(row.taskReader === true || String(row.taskReader) === "t") : !reads)
     throw new ForbiddenError("Join this channel first");
   const workspace: Membership = {
     orgId,
     orgName: row.orgName,
     role: row.role,
-    permissions: resolvePermissions(row.role === "owner", row.keys),
+    permissions,
     rank: row.rank,
     roleIds: row.roleIds,
     standing: row.standing,
@@ -583,8 +590,8 @@ export const postRefusal = (workspace: Membership) =>
     : new ForbiddenError();
 
 /**
- * Joins a public channel, or a private one limited to a role the person holds (ADR 0125). Other private channels
- * need an invitation from a member.
+ * Joins a public channel, or a private one limited to a role the person holds (ADR 0125), or any channel for an
+ * administrator (ADR 0150). Other private channels need an invitation from a member.
  */
 export async function joinChannel(
   db: Database,
@@ -593,7 +600,8 @@ export async function joinChannel(
   channelId: string,
   options: { pubsub?: PubSub } = {},
 ) {
-  await requirePermission(db, userId, orgId, "read");
+  const membership = await requirePermission(db, userId, orgId, "read");
+  const admin = can(membership, "administrator");
   const [channel] = await db
     .select({
       kind: channels.kind,
@@ -603,7 +611,7 @@ export async function joinChannel(
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.kind === "dm" || (channel.visibility !== "public" && channel.byRole !== true))
+  if (channel.kind === "dm" || (channel.visibility !== "public" && channel.byRole !== true && !admin))
     throw new ForbiddenError("This channel is private");
   // The channel's members column shows them at once (a join from a channel's preview or the browser).
   const joined = async () => {
@@ -615,7 +623,7 @@ export async function joinChannel(
     });
     await publishChannelsChanged(options.pubsub, orgId);
   };
-  if (channel.visibility === "public") {
+  if (channel.visibility === "public" || admin) {
     await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
     await joined();
     return;

@@ -17,6 +17,7 @@ import {
   type WorkActor,
 } from "./issues";
 import { listMembers } from "./organizations";
+import { chosenAudience, visibleToField } from "./requester";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 
@@ -159,6 +160,10 @@ const assigneeField = {
 const STATUSES = ["todo", "in_progress", "in_review", "done", "canceled"];
 const PRIORITIES = ["low", "normal", "high"];
 
+/** What the agent tells the person after making a task: they change it on the task, in one click. */
+const whoSees = (i: IssueView) =>
+  `Who sees it: ${i.audience.mode === "everyone" ? "everyone in the workspace" : i.audience.channelId ? "the people in this conversation" : `${i.audience.userIds.length} chosen ${i.audience.userIds.length === 1 ? "person" : "people"}`}, and administrators. Say so in your reply; they can change it on the task.`;
+
 /**
  * Issue tools through the Tool Gateway: `list_issues` (`issues:read`),
  * `create_issue`, `update_issue`, `comment_issue` (`issues:write`). Agents
@@ -200,7 +205,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     {
       name: "create_issue",
       description:
-        "Create a task on this workspace's board: task, tarefa or backlog mean this board, never GitHub or another tool unless the person names it (criar tarefa no backlog). It takes a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo. Made in a DM or a private channel, only people in that conversation see it.",
+        "Create a task on this workspace's board: task, tarefa or backlog mean this board, never GitHub or another tool unless the person names it (criar tarefa no backlog). It takes a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
@@ -212,6 +217,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           labels: { type: "array", items: { type: "string", maxLength: 40 }, maxItems: 10 },
           assignee: assigneeField,
           due_date: { type: "string", maxLength: 10, description: "Due date as YYYY-MM-DD" },
+          visible_to: visibleToField,
         },
         required: ["title"],
         additionalProperties: false,
@@ -219,6 +225,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
       async execute(input, ctx) {
         try {
           const assignee = str(input.assignee) ? await assigneeOf(deps, ctx, str(input.assignee)) : undefined;
+          const audience = await chosenAudience(ctx, input.visible_to);
           const i = await actWithUndo(
             ctx,
             (db) =>
@@ -230,15 +237,23 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
                 labels: Array.isArray(input.labels) ? input.labels.map(String) : undefined,
                 ...(assignee !== undefined ? { assignee } : {}),
                 ...(str(input.due_date) ? { dueDate: str(input.due_date) } : {}),
+                ...(audience ? { audience } : {}),
               }),
             (created) => ({
               kind: "issue.created",
               target: { type: "issue", id: created.id, number: created.number, title: created.title },
-              params: { number: created.number, title: created.title },
+              params: {
+                number: created.number,
+                title: created.title,
+                ...(created.audience.mode === "people" ? { limited: true } : {}),
+              },
               after: issueSnapshot(created),
             }),
           );
-          return { content: `Created ${await lineOf(deps, ctx, i)}`, data: { issue: { id: i.id, number: i.number } } };
+          return {
+            content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i)}`,
+            data: { issue: { id: i.id, number: i.number } },
+          };
         } catch (error) {
           return failed(error);
         }
@@ -316,7 +331,10 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             },
             (i, db) => issueChange({ ...deps, db }, ctx, before, i),
           );
-          return { content: `Updated ${await lineOf(deps, ctx, latest)}` };
+          return {
+            content: `Updated ${await lineOf(deps, ctx, latest)}`,
+            data: { issue: { id: latest.id, number: latest.number } },
+          };
         } catch (error) {
           return failed(error);
         }

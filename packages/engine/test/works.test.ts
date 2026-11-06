@@ -606,26 +606,6 @@ test("card_issue: only a card the asker reads, here or workspace-wide; elsewhere
   expect(card).toMatchObject({ title: "Migrar a cobrança", channelId: dm.id });
 });
 
-test("Mostrar para todos: only a work's card, by who asked for it, its creator or an admin", async () => {
-  f = await setup();
-  const owner = { type: "person" as const, userId: f.owner.id };
-  const { shareIssueWithEveryone } = await import("../src");
-  const plain = await createIssue(deps(), owner, f.org.id, { title: "Confidencial", channelId: f.general.id });
-  await expect(shareIssueWithEveryone(deps(), owner, f.org.id, plain.id)).rejects.toThrow();
-  const run = await working("@dev monta o relatório");
-  const made = await moved(run, { card: true, title: "Relatório" });
-  const [w] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, made.work.id));
-  const bia = await addMember(f.db, f.org.id, "member", "bia");
-  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
-  await expect(
-    shareIssueWithEveryone(deps(), { type: "person", userId: bia.id }, f.org.id, w?.issueId ?? ""),
-  ).rejects.toThrow();
-  const shared = await shareIssueWithEveryone(deps(), owner, f.org.id, w?.issueId ?? "");
-  expect(shared.channelId).toBeNull();
-  const activity = await f.db.select().from(schema.issueActivity);
-  expect(activity.some((a) => a.event === "shared_everyone")).toBe(true);
-});
-
 test("caps: an agent's 4th work waits in line, with its place, and starts when one ends", async () => {
   f = await setup();
   const out = [];
@@ -805,7 +785,7 @@ test("a work's card from a DM stays with who reads the DM until someone shows it
     (await listIssues(f.db, { type: "person", userId }, f.org.id)).some((i) => i.id === w?.issueId);
   expect(await seen(f.owner.id)).toBe(true);
   expect(await seen(bia.id)).toBe(false);
-  const { shareIssueWithEveryone } = await import("../src");
+  const { setIssueAudience } = await import("../src");
   const runId = (await runs()).find((r) => r.workId === made.work.id)?.id as string;
   await f.db.insert(schema.agentQuestions).values({
     orgId: f.org.id,
@@ -820,8 +800,11 @@ test("a work's card from a DM stays with who reads the DM until someone shows it
   const card = async (userId: string) =>
     (await listIssues(f.db, { type: "person", userId }, f.org.id)).find((i) => i.id === w?.issueId);
   expect((await card(f.owner.id))?.backgroundWork?.question?.text).toContain("salário");
-  await shareIssueWithEveryone(deps(), { type: "person", userId: f.owner.id }, f.org.id, w?.issueId ?? "");
+  const owner = { type: "person" as const, userId: f.owner.id };
+  const shared = await setIssueAudience(deps(), owner, f.org.id, w?.issueId ?? "", { mode: "everyone" });
+  expect(shared).toMatchObject({ channelId: null, audience: { mode: "everyone" } });
   expect(await seen(bia.id)).toBe(true);
+  expect((await f.db.select().from(schema.issueActivity)).some((a) => a.event === "audience_changed")).toBe(true);
   // The card shows to everyone; what its work asks in the DM stays with who reads the DM.
   expect((await card(bia.id))?.backgroundWork).toMatchObject({ state: "waiting_input", question: null });
 });

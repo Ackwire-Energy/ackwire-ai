@@ -92,6 +92,12 @@ export const issues = pgTable(
     /** `{ type: "manual" | "message" | "agent" | "webhook", … }`. */
     source: jsonb().$type<Record<string, unknown>>().notNull().default({ type: "manual" }),
     channelId: uuid(),
+    /**
+     * Limited to `audienceUserIds` (ADR 0150), with no `channelId`: who sees it is that list, and administrators always.
+     * Not limited: the workspace, or the people of the conversation in `channelId`.
+     */
+    restricted: boolean().notNull().default(false),
+    audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
     /** A sub-issue of this one (a step of a plan). */
     parentIssueId: uuid().references((): AnyPgColumn => issues.id, { onDelete: "set null" }),
     /** `[{ number, url, openedBy }]`. */

@@ -1,5 +1,6 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
 import { caches, cachesEnabled } from "./cache";
+import { getMembership } from "./organizations";
 import { type RoutineBrief, routineBriefOf } from "./routine-brief";
 
 const { agentRuns, messages, routineRuns } = schema;
@@ -212,6 +213,15 @@ export async function runChain(
 export async function personOfMessage(db: Executor, orgId: string, messageId: string): Promise<string | null> {
   const root = await messageRoot(db, orgId, messageId);
   return root.kind === "person" ? root.personId : null;
+}
+
+/**
+ * The person an agent's run works for, while they still belong to the workspace (a run stays its message's author's for
+ * good): an agent working for someone reaches what they reach (ADR 0150).
+ */
+export async function runPerson(db: Executor, orgId: string, runId: string | undefined) {
+  const person = runId ? (await runAuthorityById(db, orgId, runId)).personId : null;
+  return person && (await getMembership(db, person, orgId)) ? person : null;
 }
 
 /** The run fields the gate reads. */

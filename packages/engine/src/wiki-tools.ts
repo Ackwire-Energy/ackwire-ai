@@ -1,6 +1,7 @@
 import { type ActionRecord, actWithUndo } from "./agent-actions";
 import { cutText } from "./format";
-import { personBehindCall, wikiActorOfCall } from "./requester";
+import { chosenAudience, personBehindCall, visibleToField, wikiActorOfCall } from "./requester";
+import { audienceOfConversation } from "./task-access";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
   appendToWikiPage,
@@ -160,6 +161,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
           folder: { type: "string", maxLength: 200, description: 'e.g. "Engenharia/Backend"' },
           tags: { type: "array", items: { type: "string", maxLength: 40 }, maxItems: 20 },
           note: { type: "string", maxLength: 300, description: "What and why (shown in the history)" },
+          visible_to: visibleToField,
         },
         required: ["title", "body"],
         additionalProperties: false,
@@ -168,10 +170,13 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
         const actor = await writer(ctx);
         if (!actor) return { content: WIKI_WRITE_REFUSAL, isError: true };
         try {
+          const audience =
+            (await chosenAudience(ctx, input.visible_to)) ?? (await audienceOfConversation(ctx.db, ctx.channelId));
           const p = await actWithUndo(
             ctx,
             (db) =>
               createWikiPage({ ...wiki(ctx), db }, actor, ctx.orgId, {
+                audience,
                 title: str(input.title),
                 body: str(input.body),
                 folder: str(input.folder) || undefined,
@@ -186,7 +191,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             }),
           );
           return {
-            content: `Created [[${p.title}]] (slug ${p.slug}, version 1). Link it in your reply as [[${p.title}]].`,
+            content: `Created [[${p.title}]] (slug ${p.slug}, version 1). Link it in your reply as [[${p.title}]]. Who sees it: ${p.audience ? "only the people chosen" : "everyone in the workspace"}, and administrators. Say so in your reply; they can change it on the page.`,
             data: { wikiPageId: p.id, slug: p.slug },
           };
         } catch (error) {

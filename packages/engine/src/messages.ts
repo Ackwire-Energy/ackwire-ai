@@ -741,9 +741,13 @@ export async function insertMessageWithRuns(
         select id from named union all select id from everyone_agents
       ), mentioned_people as (
         select om.user_id from ${schema.organizationMembers} om
-        join ${channelMembers} pcm on pcm.user_id = om.user_id and pcm.channel_id = ${input.channelId}::uuid
+        left join ${channelMembers} pcm on pcm.user_id = om.user_id and pcm.channel_id = ${input.channelId}::uuid
         where om.org_id = ${input.orgId}::uuid and om.user_id is distinct from ${userId}
-          and (om.handle = any(${handles}::text[]) or exists (select 1 from everyone))
+          and ((pcm.id is not null and (om.handle = any(${handles}::text[]) or exists (select 1 from everyone)))
+            -- Named, an administrator hears it from a channel they read without being in it (ADR 0150).
+            or (om.handle = any(${handles}::text[])
+              and exists (select 1 from ${channels} mc where mc.id = ${input.channelId}::uuid and mc.kind = 'channel')
+              and ${maySql(sql`om.org_id`, sql`om.user_id`, "administrator")}))
       ), answered as (
         -- A person's reply where an agent asked something (same channel and thread) answers it.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},

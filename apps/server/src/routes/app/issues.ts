@@ -12,13 +12,13 @@ import {
   listIssues,
   openTaskConversation,
   setCriterion,
-  shareIssueWithEveryone,
+  setIssueAudience,
   updateIssue,
   updateIssueColumn,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
-import { WorkView } from "./schemas";
+import { AudienceChoice, WorkView } from "./schemas";
 
 const tags = ["Issues"];
 const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string() });
@@ -59,6 +59,15 @@ const Issue = z
     createdBy: Actor,
     source: z.record(z.string(), z.unknown()),
     channelId: z.uuid().nullable(),
+    audience: z
+      .object({
+        mode: z.enum(["everyone", "people"]),
+        userIds: z.array(z.string()),
+        channelId: z.uuid().nullable().openapi({
+          description: "Those people are whoever is in this conversation now, a DM or a private channel.",
+        }),
+      })
+      .openapi({ description: "Who sees it besides administrators (ADR 0150)." }),
     parentIssueId: z.uuid().nullable().openapi({ description: "The issue this one is a sub-issue of." }),
     pullRequests: z.array(z.object({ number: z.number(), url: z.string(), openedBy: Actor.nullable() })),
     artifacts: z.array(z.object({ id: z.uuid(), title: z.string(), createdBy: Actor })),
@@ -229,6 +238,9 @@ export function issueRoutes(deps: AppDeps) {
               .max(10)
               .optional()
               .openapi({ description: "Drive files uploaded from the new-issue box (linked to the issue)." }),
+            audience: AudienceChoice.optional().openapi({
+              description: "Who sees it. A sub-issue follows its parent. Left out: the whole workspace.",
+            }),
           }),
         ),
       },
@@ -395,14 +407,33 @@ export function issueRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Show a card to the whole workspace (Mostrar para todos)",
-      description:
-        "A card made from a conversation (an agent's background work, ADR 0121) is seen by who reads that conversation; anyone who can see it may share it with everyone in the workspace.",
+      description: "`PUT …/audience` with `everyone`, for apps from before it.",
       request: { params: IssueParams },
       responses: { 200: json(Issue), ...errors },
     }),
     async (c) => {
       const { orgId, issueId } = c.req.valid("param");
-      return c.json(await shareIssueWithEveryone(issues, person(c.get("user").id), orgId, issueId), 200);
+      const everyone = { mode: "everyone" as const };
+      return c.json(await setIssueAudience(issues, person(c.get("user").id), orgId, issueId, everyone), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/issues/{issueId}/audience",
+      tags,
+      security,
+      summary: "Change who sees a task",
+      description:
+        "Anyone who sees the task. Limited, its sub-issues go with it; to everyone, they stay as they are. Whoever changes it stays in the list unless they're an administrator, and so does a person assigned to it. `issue.audience_empty`: nobody chosen.",
+      request: { params: IssueParams, body: body(AudienceChoice) },
+      responses: { 200: json(Issue), ...errors },
+    }),
+    async (c) => {
+      const { orgId, issueId } = c.req.valid("param");
+      const audience = c.req.valid("json");
+      return c.json(await setIssueAudience(issues, person(c.get("user").id), orgId, issueId, audience), 200);
     },
   );
 

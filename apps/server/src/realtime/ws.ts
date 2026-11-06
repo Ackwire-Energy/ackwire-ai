@@ -28,6 +28,7 @@ import {
   requireChannelAccess,
   requireProfileWatcher,
   taskReaderSql,
+  adminChannelSql,
   touchLastSeen,
 } from "@agenteschat/engine";
 import type { Auth, SessionUser } from "../auth";
@@ -226,6 +227,7 @@ export async function currentSubscriptions(
           isNotNull(schema.channelMembers.id),
           // A task's conversation: whoever sees the task (ADR 0145).
           and(eq(schema.channels.kind, "task"), taskReaderSql(sql`${schema.channels.id}`, sql`${userId}::text`)),
+          adminChannelSql(sql`${orgId}::uuid`, sql`${userId}::text`),
         ),
       ),
     );

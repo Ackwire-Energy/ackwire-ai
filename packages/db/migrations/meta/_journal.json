@@ -1604,6 +1604,13 @@
       "when": 1794030000000,
       "tag": "0230_account_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 240,
+      "version": "7",
+      "when": 1794140000000,
+      "tag": "0240_task_audience",
+      "breakpoints": true
     }
   ]
 }

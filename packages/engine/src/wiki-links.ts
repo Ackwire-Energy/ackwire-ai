@@ -1,4 +1,5 @@
 import { and, type Executor, eq, inArray, isNull, or, type SQL, schema, sql } from "@agenteschat/db";
+import { maySql } from "./permissions";
 
 const { wikiPages, wikiLinks, channels, channelMembers, organizationMembers } = schema;
 
@@ -29,14 +30,13 @@ export interface ResolvedWikiLink {
 }
 
 /**
- * Whether the person `userId` sees a wiki page, as a condition over `wiki_pages` (ADR 0023 addendum): an open page,
- * or a restricted one they own the workspace of, hold one of its audience roles or are named in. `userId` may be a
- * column, to ask it for every row of another table.
+ * Whether the person `userId` sees a wiki page, as a condition over `wiki_pages` (ADR 0023 addendum, ADR 0150): an open
+ * page, or a restricted one they administer the workspace of, hold one of its audience roles or are named in. `userId`
+ * may be a column, to ask it for every row of another table.
  */
 export function wikiPageVisibleSql(userId: string | SQL) {
   return sql<boolean>`(not ${wikiPages.restricted} or ${userId} = any(${wikiPages.audienceUserIds})
-    or exists (select 1 from organization_members vm
-      where vm.org_id = ${wikiPages.orgId} and vm.user_id = ${userId} and vm.role = 'owner')
+    or ${maySql(wikiPages.orgId, userId, "administrator")}
     or exists (select 1 from organization_member_roles vr
       where vr.org_id = ${wikiPages.orgId} and vr.user_id = ${userId} and vr.role_id = any(${wikiPages.audienceRoleIds})))`;
 }
