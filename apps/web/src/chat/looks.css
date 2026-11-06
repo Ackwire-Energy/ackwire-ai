@@ -223,10 +223,19 @@
   font-size: inherit;
   color: inherit;
 }
+/* The details over a bubble's time: as wide as their words, wrapping only past 300px. Anchored on the 30px time, a
+   shrink-to-fit width would break the date after every letter. */
 .ac-msg__stamp .ac-msg__tip {
   left: auto;
   right: 0;
+  width: max-content;
+  max-width: min(300px, var(--tip-room, 80vw));
   white-space: normal;
+}
+/* No room on the left (a short bubble on the left, `placeStampTip`): to the right. */
+.ac-msg__stamp[data-tip="start"] .ac-msg__tip {
+  left: 0;
+  right: auto;
 }
 .ac-msg__stamp .ac-msg__aside {
   height: 14px;
