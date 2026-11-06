@@ -1106,6 +1106,39 @@ test("Fast: the turn of a conversation asks for it; refused, the reply says it c
   expect((await timeline(f)).at(-1)?.meta.speedFallback).toBeUndefined();
 });
 
+test("a turn says a person waits on it only in the line's first rank: not for a routine, background work or an agent", async () => {
+  f = await setup();
+  await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Feito." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const turnFor = async (change?: (trigger: string, run: string) => Promise<unknown>) => {
+    const fx = f as Fixture;
+    const posted = await post(fx, "@dev oi");
+    const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, posted.id));
+    await change?.(posted.id, (run as { id: string }).id);
+    await drainOutbox(fx.db, handlers);
+    return seen.at(-1)?.personWaiting;
+  };
+  const setRun = (values: { background?: boolean; hop?: number }) => (_: string, run: string) =>
+    (f as Fixture).db.update(schema.agentRuns).set(values).where(eq(schema.agentRuns.id, run));
+
+  expect(await turnFor()).toBe(true);
+  expect(
+    await turnFor((trigger) =>
+      (f as Fixture).db
+        .update(schema.messages)
+        .set({ meta: { routine: { id: "11111111-1111-4111-8111-111111111111", name: "Resumo" } } })
+        .where(eq(schema.messages.id, trigger)),
+    ),
+  ).toBeUndefined();
+  expect(await turnFor(setRun({ background: true }))).toBeUndefined();
+  expect(await turnFor(setRun({ hop: 2 }))).toBeUndefined();
+});
+
 test("Fast stays out of every run nobody waits for", async () => {
   f = await setup({});
   await computerAgent(f, { brain: "codex", brainModel: "gpt-6.1-sol", brainSpeed: "fast" });

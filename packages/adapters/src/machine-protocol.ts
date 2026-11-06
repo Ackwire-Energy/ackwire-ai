@@ -1393,6 +1393,11 @@ export interface BrainTurnRequest {
   freeTier?: boolean;
   /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
   contextTokens?: number;
+  /**
+   * A person waits on this turn (first rank of the computer's line): it may take the runner's reserved slot
+   * (`PERSON_TURN_MIN_FREE_BYTES`). No protocol step: a runner that doesn't read it admits the turn like any other.
+   */
+  personWaiting?: boolean;
 }
 
 /** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */

@@ -70,6 +70,13 @@ export const TURN_BYTES = 0.6e9;
 export const LOCKED_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.3e9;
 /** Where memory isn't known: how many locked-down turns may run past `TURNS_WITHOUT_MEMORY`. */
 export const LOCKED_TURNS_PAST_COUNT = 2;
+/**
+ * The floor of the slot held for a person's turn (`personWaiting`): one turn and a margin, so a nearly dead computer
+ * doesn't get worse. Agents' turns stop at `MIN_FREE_BYTES` and grow by `TURN_BYTES`, so a computer they filled sits
+ * just above this: the slot is there whenever only their turns filled it. The margin is over a locked-down turn's
+ * because this one has tools.
+ */
+export const PERSON_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.4e9;
 /** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
 export const TURN_SETTLE_MS = 30_000;
 /** How long a turn without room may wait while idle warm CLIs close for it, before `no_slot`. */
@@ -1391,6 +1398,10 @@ export class RequestRunner {
   private turns = 0;
   /** When brain turns were admitted, over the last `TURN_SETTLE_MS`. */
   private admitted: number[] = [];
+  /** When a person's turn was last admitted, by the floor or the slot. */
+  private lastPersonTurn = Number.NEGATIVE_INFINITY;
+  /** The request in the slot held for a person's turn (`reserve`). */
+  private reserved: string | null = null;
 
   constructor(
     private readonly ctx: HandlerContext,
@@ -1406,9 +1417,9 @@ export class RequestRunner {
    * `TURN_SETTLE_MS` will still take, leaves `MIN_FREE_BYTES` (1.5 GiB, the floor desktops keep). The
    * floor is more than the biggest thing a turn grows into (a computer-use agent, about 1.4 GB with its screen
    * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead. `locked`:
-   * a locked-down turn, on its own floor and a little past the count.
+   * a locked-down turn, on its own floor and a little past the count. `person`: a person waits on it.
    */
-  private admit(locked = false): boolean {
+  private admit(locked: boolean, person: boolean): boolean {
     const now = (this.admission.now ?? Date.now)();
     this.admitted = this.admitted.filter((at) => now - at < TURN_SETTLE_MS);
     const free = this.memAvailable();
@@ -1417,8 +1428,29 @@ export class RequestRunner {
       free === null
         ? this.turns < TURNS_WITHOUT_MEMORY + (locked ? LOCKED_TURNS_PAST_COUNT : 0)
         : free - this.admitted.length * TURN_BYTES >= floor;
-    if (room) this.admitted.push(now);
+    if (room) {
+      this.admitted.push(now);
+      if (person) this.lastPersonTurn = now;
+    }
     return room;
+  }
+
+  /**
+   * The floor turned away a turn a person waits on and closing idle CLIs didn't help: one such turn at a time goes
+   * ahead, down to `PERSON_TURN_MIN_FREE_BYTES`, if no person's turn was admitted in the last `TURN_SETTLE_MS` (the
+   * reading doesn't show that one yet). Agents' turns keep their floor, and what this one takes counts against it.
+   * Where memory isn't known there is no floor to keep, so no slot.
+   */
+  private reserve(id: string, person: boolean): boolean {
+    if (!person || this.reserved !== null) return false;
+    const now = (this.admission.now ?? Date.now)();
+    const free = this.memAvailable();
+    if (free === null || now - this.lastPersonTurn < TURN_SETTLE_MS) return false;
+    if (free - this.admitted.length * TURN_BYTES < PERSON_TURN_MIN_FREE_BYTES) return false;
+    this.admitted.push(now);
+    this.lastPersonTurn = now;
+    this.reserved = id;
+    return true;
   }
 
   private memAvailable() {
@@ -1429,11 +1461,16 @@ export class RequestRunner {
    * No room for a turn: idle warm CLIs close, one at a time, until there is, for up to `RECLAIM_MS`. Not where
    * memory isn't known: room there is a count of turns, which closing idle CLIs doesn't change.
    */
-  private async reclaim(close: () => Promise<boolean>, signal: AbortSignal, locked: boolean): Promise<boolean> {
+  private async reclaim(
+    close: () => Promise<boolean>,
+    signal: AbortSignal,
+    locked: boolean,
+    person: boolean,
+  ): Promise<boolean> {
     const until = Date.now() + (this.admission.reclaimMs ?? RECLAIM_MS);
     while (!signal.aborted && Date.now() < until) {
       if (!(await close())) return false;
-      if (!signal.aborted && this.admit(locked)) return true;
+      if (!signal.aborted && this.admit(locked, person)) return true;
     }
     return false;
   }
@@ -1455,10 +1492,12 @@ export class RequestRunner {
     }
     const controller = new AbortController();
     const locked = req.op === "brain.turn" && req.permissions?.mode === "chat";
+    const person = req.op === "brain.turn" && req.personWaiting === true;
     // A paused computer says so (the handler refuses new work), never that it is full.
-    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit(locked)) {
+    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit(locked, person)) {
       const close = this.ctx.reclaimBrains;
       if (!close || this.memAvailable() === null) {
+        if (this.reserve(id, person)) return this.run(id, req, controller);
         this.full(id);
         return Promise.resolve();
       }
@@ -1466,8 +1505,9 @@ export class RequestRunner {
       this.inflight.set(id, controller);
       const session = (req as { session?: { id?: unknown } }).session?.id;
       const spare = brainKey(req.agent?.id ?? "", String(session ?? ""));
-      return this.reclaim(() => close(spare), controller.signal, locked).then((room) => {
-        if (room && !this.closed) return this.run(id, req, controller);
+      return this.reclaim(() => close(spare), controller.signal, locked, person).then((room) => {
+        if (!this.closed && (room || (!controller.signal.aborted && this.reserve(id, person))))
+          return this.run(id, req, controller);
         this.inflight.delete(id);
         if (controller.signal.aborted) this.reply(id, { ok: false, error: { code: "internal", message: "Canceled" } });
         else this.full(id);
@@ -1546,6 +1586,7 @@ export class RequestRunner {
       .finally(() => {
         this.inflight.delete(id);
         if (turn) this.turns--;
+        if (this.reserved === id) this.reserved = null;
       });
   }
 

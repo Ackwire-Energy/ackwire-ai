@@ -101,6 +101,8 @@ export interface BrainTurn {
   speed?: BrainSpeed;
   /** Computer brains: the agent's context limit in tokens (`agents.context_tokens`); absent: the model's window. */
   contextTokens?: number;
+  /** Computer brains: a person waits on this turn (the line's first rank); the runner holds a slot for one. */
+  personWaiting?: boolean;
   /** The text the person/system sent that starts this turn (also the last user message). */
   trigger: string;
   /**

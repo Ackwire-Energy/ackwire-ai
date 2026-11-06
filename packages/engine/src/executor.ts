@@ -2531,6 +2531,8 @@ async function executeRunInner(
   // Read once: a later pause of this run resumes with its own text.
   delete transcript.continued;
   let computerTurns = 0;
+  /** This run ranks first in its computer's line, a person waiting on it: every computer turn of the claim says so. */
+  let personWaiting = false;
   /** The plan said "limit" during the current computer turn (`onLimit`): a turn that went on anyway proves no room. */
   let turnLimited = false;
   // Brought in without being named: another agent may have answered the same message since (the context
@@ -3700,17 +3702,17 @@ async function executeRunInner(
        */
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
-        const people = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
+        personWaiting = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
         // A routine's run: a person scheduled it.
         transcript.roomAsked ??=
-          !people && (run.background || (await personAskedLately(db, run.orgId, runStretchOf(run))));
+          !personWaiting && (run.background || (await personAskedLately(db, run.orgId, runStretchOf(run))));
         if (options.lineSince) transcript.roomOrderSince ??= options.lineSince;
         // The right hand is how people find out what the line is doing: it never waits behind it. Its turn is
         // locked down, so the runner lets it in on a lower floor (`admit`).
         const behind = isRightHand(agent)
           ? null
           : await roomGate(db, run, roomMachine, {
-              rank: people ? 0 : transcript.roomAsked ? 1 : 2,
+              rank: personWaiting ? 0 : transcript.roomAsked ? 1 : 2,
               since: transcript.roomOrderSince ?? transcript.roomWaitSince ?? Date.now(),
             });
         if (behind) {
@@ -3835,6 +3837,7 @@ async function executeRunInner(
             unattended,
             found: computerTurns === 0 || !turnPlan.session?.resume,
             personId,
+            personWaiting,
             // Synced during the quiet window for this very turn; where it starts is picked again from its words now
             // (what came in meanwhile may name another repository).
             ...(earlyCode?.plan === turnPlan && computerTurns === 0
@@ -4765,7 +4768,13 @@ function brainTurnOf(
   tools: ToolDefinition[],
   trigger: string,
   plan: BrainPlan,
-  options: { found?: boolean; code?: Promise<CodeSetup | null>; personId?: string | null; unattended?: boolean } = {},
+  options: {
+    found?: boolean;
+    code?: Promise<CodeSetup | null>;
+    personId?: string | null;
+    personWaiting?: boolean;
+    unattended?: boolean;
+  } = {},
 ): ComputerTurn {
   const model = plan.kind === "model" ? agent.model : plan.model;
   // Refused once in this run, its other turns don't ask again.
@@ -4825,6 +4834,7 @@ function brainTurnOf(
     trigger,
     ...(options.code ? { code: options.code } : {}),
     ...(options.personId ? { personId: options.personId } : {}),
+    ...(options.personWaiting ? { personWaiting: true } : {}),
   };
 }
 
