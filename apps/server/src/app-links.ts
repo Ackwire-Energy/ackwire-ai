@@ -12,7 +12,7 @@ import type { Context } from "hono";
  * iOS reads the paths from here (`*` is any text); Android from the app's build (`APP_LINK_PATTERNS` in
  * apps/mobile/app.config.ts, kept equal by a test). The app maps each one to its screen
  * (apps/mobile/src/features/links/app-links.ts). The API, sign-in callbacks, billing and the pages the app lacks
- * (calendar, proposals, team, the settings sections not listed) are left out: they open the website.
+ * (calendar, team, the settings sections not listed) are left out: they open the website.
  */
 export const APP_LINK_PATHS = [
   "/invite/*",
