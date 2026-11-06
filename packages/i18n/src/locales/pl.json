@@ -4739,7 +4739,12 @@
       "files": "Pliki",
       "usage": "Użycie",
       "activity": "Aktywność",
-      "settings": "Ustawienia"
+      "settings": "Ustawienia",
+      "more": "Więcej"
+    },
+    "ficha": {
+      "with": "Z kim",
+      "computer": "Komputer"
     },
     "changed": "Zmieniono",
     "undo": "Cofnij",

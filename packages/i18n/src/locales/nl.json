@@ -4450,7 +4450,12 @@
       "files": "Bestanden",
       "usage": "Gebruik",
       "activity": "Activiteit",
-      "settings": "Instellingen"
+      "settings": "Instellingen",
+      "more": "Meer"
+    },
+    "ficha": {
+      "with": "Met wie",
+      "computer": "Computer"
     },
     "changed": "Gewijzigd",
     "undo": "Ongedaan maken",

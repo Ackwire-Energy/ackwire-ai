@@ -259,7 +259,7 @@
     text-overflow: ellipsis;
   }
 }
-/* Agent page: one column below the desktop (AgentPage moves "Como trabalha" under the name there). */
+/* Agent page: one column below the desktop (the public card's cards; the overview is one column already). */
 @media (max-width: 1100px) {
   .agp-cols {
     grid-template-columns: minmax(0, 1fr);
@@ -298,17 +298,6 @@
   }
 }
 @media (max-width: 640px) {
-  .agp-cover {
-    height: 120px;
-  }
-  .agp-face {
-    width: 88px;
-    height: 88px;
-    margin-top: -44px;
-  }
-  .agp-name {
-    font-size: 32px;
-  }
   .agp-cells {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -406,17 +395,6 @@
   }
 }
 @container agp-side (max-width: 640px) {
-  .agp-cover {
-    height: 120px;
-  }
-  .agp-face {
-    width: 88px;
-    height: 88px;
-    margin-top: -44px;
-  }
-  .agp-name {
-    font-size: 32px;
-  }
   .agp-cells {
     grid-template-columns: minmax(0, 1fr);
   }

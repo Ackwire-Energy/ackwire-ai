@@ -4420,7 +4420,12 @@
       "files": "Dateien",
       "usage": "Nutzung",
       "activity": "Aktivität",
-      "settings": "Einstellungen"
+      "settings": "Einstellungen",
+      "more": "Mehr"
+    },
+    "ficha": {
+      "with": "Mit wem",
+      "computer": "Computer"
     },
     "changed": "Geändert",
     "undo": "Rückgängig",

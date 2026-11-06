@@ -4259,7 +4259,12 @@
       "files": "ファイル",
       "usage": "使用量",
       "activity": "アクティビティ",
-      "settings": "設定"
+      "settings": "設定",
+      "more": "その他"
+    },
+    "ficha": {
+      "with": "一緒に働く人",
+      "computer": "コンピューター"
     },
     "changed": "変更済み",
     "undo": "元に戻す",

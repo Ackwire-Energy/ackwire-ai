@@ -32,6 +32,9 @@ import {
   DialogFooter,
   EmptyState,
   Icon,
+  type IconName,
+  Menu,
+  MenuItem,
   normalizeAppearance,
   PageHeader,
   TabPanel,
@@ -51,7 +54,6 @@ import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
 import { RightHandMineRow, RightHandSettingsSection } from "@/components/RightHandSettings";
 import { useDirectory } from "@/hooks/useDirectory";
-import { useMatchMedia } from "@/hooks/useMatchMedia";
 import {
   AGENT_TABS,
   type AgentSection,
@@ -91,6 +93,16 @@ import { UsageTab } from "./agent/UsageTab";
 import { type WorkDialog, WorkDialogs } from "./agent/Work";
 
 const sortIds = (ids: string[]) => [...ids].sort();
+
+/** The tabs always in the bar; the rest live in its "More" menu, and the one open from there shows in the bar. */
+const MAIN_TABS: AgentTab[] = ["overview", "instructions", "memory", "activity"];
+const MORE_TABS = AGENT_TABS.filter((id) => !MAIN_TABS.includes(id));
+const MORE_ICON: Partial<Record<AgentTab, IconName>> = {
+  access: "plug",
+  files: "file",
+  usage: "clock",
+  settings: "settings",
+};
 
 export interface AgentPageProps {
   agentId: string;
@@ -428,13 +440,14 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
 
   /* ---------- Saving ---------- */
 
-  const save = async () => {
-    if (saving || !dirty) return;
+  const save = async (): Promise<boolean> => {
+    if (saving) return false;
+    if (!dirty) return true;
     if (problem) {
       toast.show(problem, "error");
-      return;
+      return false;
     }
-    if (fields.has("audience") && !(await asks.ask(draft.audience)([]))) return;
+    if (fields.has("audience") && !(await asks.ask(draft.audience)([]))) return false;
     setSaving(true);
     const done: Field[] = [];
     let failed = false;
@@ -558,6 +571,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     setEdits((e) => dropFields(e, done));
     setSaving(false);
     if (!failed) toast.show(t("agent.savedToast", agentGrammar(draft.name.trim() || agent.name)));
+    return !failed;
   };
 
   // ⌘/Ctrl+S saves.
@@ -588,8 +602,6 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   // Closing the panel with unsaved changes asks first, like leaving the page.
   const [closing, setClosing] = useState(false);
   const close = onClose && (() => (dirtyRef.current ? setClosing(true) : onClose()));
-  // The wide full page puts "Como trabalha" in the overview's side column (responsive.css: one column at 1100).
-  const wide = useMatchMedia("(min-width: 1101px)");
   const closeRef = useRef(close);
   closeRef.current = close;
   useEffect(() => {
@@ -654,6 +666,9 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     );
   };
 
+  // Unsaved changes on a tab inside "More": its trigger counts them.
+  const moreChanges = changes.filter((c) => MORE_TABS.includes(c.tab) && c.tab !== tab).length;
+
   const value: AgentEdit = {
     agent,
     viewer,
@@ -677,7 +692,9 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     },
     ownerFirst,
     openWork: setWork,
-    workInAside: wide && !onClose,
+    workOpen: work,
+    save,
+    saving,
   };
 
   return (
@@ -701,7 +718,37 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
             label={t("agentPage.tabsLabel", g)}
             value={tab}
             onValueChange={(next) => goTo(next)}
-            items={AGENT_TABS.map((id) => ({ value: id, label: tabLabel(id) }))}
+            items={[...MAIN_TABS, ...(MORE_TABS.includes(tab) ? [tab] : [])].map((id) => ({
+              value: id,
+              label: tabLabel(id),
+            }))}
+            after={
+              <Menu
+                align="end"
+                label={t("agentPage.tabs.more")}
+                trigger={
+                  <button type="button" className="ac-tab agp-more">
+                    {t("agentPage.tabs.more")}
+                    {moreChanges > 0 && (
+                      <span
+                        className="agp-badge agp-badge--edit ac-num"
+                        title={t("agentPage.changesCount", { count: moreChanges })}
+                      >
+                        <Icon name="edit" size={14} />
+                        {moreChanges}
+                      </span>
+                    )}
+                    <Icon name="chevronDown" size={14} />
+                  </button>
+                }
+              >
+                {MORE_TABS.filter((id) => id !== tab).map((id) => (
+                  <MenuItem key={id} icon={MORE_ICON[id]} onSelect={() => goTo(id)}>
+                    {tabLabel(id)}
+                  </MenuItem>
+                ))}
+              </Menu>
+            }
           >
             <TabPanel value={tab}>
               <div className="agp-view" key={tab}>

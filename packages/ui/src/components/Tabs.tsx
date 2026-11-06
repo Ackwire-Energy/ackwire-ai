@@ -18,6 +18,7 @@ export function Tabs<V extends string>({
   items,
   label,
   variant = "line",
+  after,
   children,
 }: {
   value: V;
@@ -25,6 +26,8 @@ export function Tabs<V extends string>({
   items: TabItem<V>[];
   label: string;
   variant?: "line" | "segmented";
+  /** At the end of the list, after the tabs: a menu of the tabs that don't fit ("More"). */
+  after?: ReactNode;
   children: ReactNode;
 }) {
   const seg = variant === "segmented";
@@ -78,6 +81,7 @@ export function Tabs<V extends string>({
             )}
           </RTabs.Trigger>
         ))}
+        {after}
       </RTabs.List>
       {children}
     </RTabs.Root>

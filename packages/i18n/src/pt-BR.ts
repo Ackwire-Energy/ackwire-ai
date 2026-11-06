@@ -4517,6 +4517,12 @@ export const ptBR = {
       usage: "Uso",
       activity: "Atividade",
       settings: "Configurações",
+      more: "Mais",
+    },
+    /** The overview's two lists of rows: how it works, then who it works with. */
+    ficha: {
+      with: "Com quem",
+      computer: "Computador",
     },
     changed: "Alterado",
     undo: "Desfazer",
