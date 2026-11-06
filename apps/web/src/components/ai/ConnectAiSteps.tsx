@@ -1404,29 +1404,31 @@ export function KeyPanel({
         </SettingNote>
       ) : (
         <>
-          {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-          <div className="grid-options grid-options--plans" role="group" aria-label={t("settings.provider")}>
-            {PROVIDERS.map((p) => (
-              <OptionCard key={p.id} pressed={provider === p.id} onClick={() => pick(p.id)}>
-                <ProviderLogo id={p.id} size="sm" />
-                <span className="ac-option__title">{p.label}</span>
-              </OptionCard>
-            ))}
-            {endpoint && (
-              <OptionCard pressed={provider === CUSTOM_PROVIDER} onClick={() => pick(CUSTOM_PROVIDER)}>
-                <ProviderLogo id={CUSTOM_PROVIDER} size="sm" />
-                <span className="ac-option__title">{t("endpoint.option")}</span>
-              </OptionCard>
-            )}
-            {platform && (
-              <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")} className="ai-key__ours">
-                <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
-                  <LogoMark />
-                </span>
-                <span className="ac-option__title">{t("connectAi.key.platform")}</span>
-              </OptionCard>
-            )}
-          </div>
+          <Locked when={Boolean(saving)}>
+            {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+            <div className="grid-options grid-options--plans" role="group" aria-label={t("settings.provider")}>
+              {PROVIDERS.map((p) => (
+                <OptionCard key={p.id} pressed={provider === p.id} onClick={() => pick(p.id)}>
+                  <ProviderLogo id={p.id} size="sm" />
+                  <span className="ac-option__title">{p.label}</span>
+                </OptionCard>
+              ))}
+              {endpoint && (
+                <OptionCard pressed={provider === CUSTOM_PROVIDER} onClick={() => pick(CUSTOM_PROVIDER)}>
+                  <ProviderLogo id={CUSTOM_PROVIDER} size="sm" />
+                  <span className="ac-option__title">{t("endpoint.option")}</span>
+                </OptionCard>
+              )}
+              {platform && (
+                <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")} className="ai-key__ours">
+                  <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
+                    <LogoMark />
+                  </span>
+                  <span className="ac-option__title">{t("connectAi.key.platform")}</span>
+                </OptionCard>
+              )}
+            </div>
+          </Locked>
           {provider === CUSTOM_PROVIDER ? (
             <>
               <p className="small muted" style={{ margin: 0 }}>

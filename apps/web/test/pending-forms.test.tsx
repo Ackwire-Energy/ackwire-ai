@@ -4,7 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { NetworkError, type SignInOptions } from "@agenteschat/client";
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
+import { KeyPanel } from "../src/components/ai/ConnectAiSteps";
 import { createFakeApi, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -40,6 +41,24 @@ describe("a form whose action is on its way", () => {
     await settle(3);
     expect(off(email)).toBe(false);
     expect(email.value).toBe("ada@acme.com");
+  });
+
+  test("a key being tried: its field and every provider are off, so what is saved stays what the person sees", () => {
+    const panel = (saving: boolean) => (
+      <KeyPanel
+        draft={{ provider: "anthropic", apiKey: "sk-ant-api03-abcdefghijklmnop" }}
+        onDraft={() => {}}
+        platform
+        saving={saving}
+        onSave={() => {}}
+      />
+    );
+    const { container, rerender } = render(panel(true));
+    const controls = [...container.querySelectorAll(".ac-option, input")];
+    expect(controls.length).toBeGreaterThan(2);
+    expect(controls.filter((el) => !off(el))).toEqual([]);
+    rerender(panel(false));
+    expect(controls.filter(off)).toEqual([]);
   });
 
   test("a dialog: its fields are off, Cancelar and × stay, and a failure gives them back", async () => {
