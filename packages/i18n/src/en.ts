@@ -3070,6 +3070,7 @@ export const en = {
       "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment.",
     computerPaused: "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}.",
     failed: "Couldn't deliver it. Is the agent's computer on?",
+    changed: "This request changed while you answered. Nothing was sent. Send it again.",
     empty: "Type the value.",
     tooLarge: "Too large (16 KB at most).",
   },

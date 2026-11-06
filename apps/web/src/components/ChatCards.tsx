@@ -30,6 +30,7 @@ import {
 import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
 import {
   latestSecret,
+  secretClosedBy,
   secretLabel,
   secretRefusalKey,
   secretValueProblem,
@@ -800,9 +801,10 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     if (away) return setError(t(away, { agent: agentName, time: formatTime(i18n.language, current.expiresAt) }));
     if ((err as { status?: number }).status !== 409) return setError(t("secret.failed"));
     const fresh = await api.secrets.get(org.id, current.id).catch(() => null);
-    live.secretAnswered(
-      fresh && fresh.status !== "pending" ? fresh : { ...current, status: "canceled", publicKey: null },
-    );
+    const closed = secretClosedBy(err, current, fresh);
+    if (closed) return live.secretAnswered(closed);
+    if (fresh) live.secretAnswered(fresh);
+    setError(t(fresh ? "secret.changed" : "secret.failed"));
   };
   // The newer card, when this conversation shows it; else where it is.
   const showNewer = async () => {

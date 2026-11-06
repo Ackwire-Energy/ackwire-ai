@@ -289,7 +289,9 @@ describe("the secret card on the phone", () => {
   test("a refused send ends the card with the real reason and clears what was typed, unless only the computer is away", () => {
     const failed = card.slice(card.indexOf("const failed = async"), card.indexOf("const showNewer"));
     expect(failed.indexOf("secretRefusalKey(err)")).toBeLessThan(failed.indexOf("api.secrets.get(orgId, r.id)"));
-    expect(failed).toContain("done(");
+    expect(failed).toContain("secretClosedBy(err, r, fresh)");
+    expect(failed).toContain("done(closed)");
+    expect(failed).toContain('t(fresh ? "secret.changed" : "secret.failed")');
     expect(card).toContain('if (!pending) setValue("");');
     expect(card).toContain('t("secret.seeNewer")');
   });
