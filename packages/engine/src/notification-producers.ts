@@ -380,9 +380,10 @@ export async function notifyReaction(
 
 // ── Agent questions ───────────────────────────────────────────────────────────
 
-/** An agent asked (`ask_user`) and waits: the person behind the run (else the agent's owner). */
+/** An agent asked (`ask_user`) and waits: the person it is for, else the person behind the run, else the agent's owner. */
 export async function notifyQuestion(deps: NotificationDeps, q: QuestionRow) {
-  const to = (await requesterOfRun(deps, q.orgId, q.runId)) ?? (await agentOwner(deps, q.agentId));
+  const to =
+    q.requestedForUserId ?? (await requesterOfRun(deps, q.orgId, q.runId)) ?? (await agentOwner(deps, q.agentId));
   if (!to) return;
   const [channel] = await deps.db
     .select({ kind: channels.kind, name: channels.name })

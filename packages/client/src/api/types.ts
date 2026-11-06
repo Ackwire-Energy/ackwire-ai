@@ -2218,8 +2218,8 @@ export interface WorkView {
   finishedAt: string | null;
   nextUpdateAt: string | null;
   lastUpdate: { text: string; at: string; seq: number } | null;
-  /** Waiting on an answer: what its run asked, and the message that holds the card. */
-  question?: { text: string; messageId: string | null } | null;
+  /** Waiting on an answer: what its run asked, the message that holds the card, and who it is for. */
+  question?: { text: string; messageId: string | null; requestedForUserId?: string | null } | null;
   plan: { id: string; text: string; state: "todo" | "doing" | "done" }[];
   issue: { id: string; number: number } | null;
   resultMessageId: string | null;
@@ -2859,7 +2859,7 @@ export interface AgentQuestion {
   id: string;
   agentId: string;
   channelId: string;
-  /** The person message the agent's run answers (receipts: "esperando sua resposta"). */
+  /** The person message the agent's run answers (receipts: "esperando uma resposta"). */
   threadId: string | null;
   messageId: string | null;
   /** The run that asked: the receipt finds the message it answers (a channel question has no thread). */
@@ -2867,6 +2867,8 @@ export interface AgentQuestion {
   text: string;
   /** Buttons to answer with; null = free answer in the composer. */
   choices: string[] | null;
+  /** The one person who may answer it; null or absent (an older server): anyone in the conversation. */
+  requestedForUserId?: string | null;
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;

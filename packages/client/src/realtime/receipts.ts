@@ -417,7 +417,7 @@ export function applyReceiptEvent(
         event.status === "waiting_approval",
       );
     case "question.asked":
-      // The agent waits for the person: "Theo está esperando sua resposta" (on the message its run answers).
+      // The agent waits for a person: "Theo está esperando uma resposta" (on the message its run answers).
       return setForRun(state, event.question.runId, event.threadId, event.question.agentId, "asking", true);
     case "question.answered":
       return setForRun(state, event.question.runId, event.threadId, event.question.agentId, "claimed", true);

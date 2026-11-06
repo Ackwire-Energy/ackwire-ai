@@ -902,6 +902,34 @@ test("a question asked through the bridge: the text written before it comes firs
   expect(main.some((m) => m.body.includes("você me passa a ida e a volta"))).toBe(false);
 });
 
+test("a question for one person, through the bridge: it is theirs alone", async () => {
+  f = await setup({ askUser: true });
+  const machineId = await computerAgent(f);
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const { brain } = scriptedComputerBrain(async function* (n, turn) {
+    if (n > 0) return;
+    const why = "I need a person's answer before I go on: this decides what I change next.";
+    const input = { why, question: "Qual foi o combinado?", person: "bia" };
+    const call = { id: "ask-1", name: "ask_user", input };
+    const result = await executeToolForRun(
+      f.jobDeps,
+      { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+      call,
+    );
+    yield { type: "tool_call", id: "ask-1", name: "ask_user", input: {}, executed: result };
+    yield { type: "done", text: "" };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev o que foi o combinado com a bia?");
+  await drainOutbox(f.db, handlers);
+  expect((await f.db.select().from(schema.agentQuestions))[0]?.requestedForUserId).toBe(bia.id);
+});
+
 test("a question asked after the brain dropped a draft for a call: only the text written after that call leads the card", async () => {
   f = await setup({ askUser: true });
   const machineId = await computerAgent(f);

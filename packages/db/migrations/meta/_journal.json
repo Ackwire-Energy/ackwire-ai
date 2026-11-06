@@ -1604,6 +1604,13 @@
       "when": 1794030000000,
       "tag": "0230_account_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 280,
+      "version": "7",
+      "when": 1794280000000,
+      "tag": "0280_question_for_person",
+      "breakpoints": true
     }
   ]
 }

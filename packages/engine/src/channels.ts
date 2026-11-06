@@ -489,7 +489,7 @@ export async function peopleAllIn(db: Executor, orgId: string, hereId: string, t
  * archived channels left out. For screens that quote a conversation outside it (run history).
  */
 export async function readableChannelIds(
-  db: Database,
+  db: Executor,
   orgId: string,
   userId: string,
   channelIds: readonly string[],

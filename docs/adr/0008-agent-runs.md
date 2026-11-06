@@ -63,3 +63,13 @@ free again.
   it: else 409 `agent.handle_taken` with the first free one (`ada-2`), which the apps say under "Menções" before
   saving. A new agent can't take another's old handle either, nor can a person take an active agent's.
 - **Git** (ADR 0024): branches under an old handle (`agentes/ada/…`) stay the agent's own in the proxy.
+
+## Addendum (2026-11-06): a question for one person
+
+`ask_user` takes an optional `person` (name or @handle): `agent_questions.requested_for_user_id`. Null keeps the old
+rule, anyone who reads the conversation answers. Set, only that person answers or skips it (by card, API or reply), the
+notification and `needsYou` are theirs, and everyone else's card says who it waits for, with no actions. Admins are no
+exception: a secret request works the same way, and the question closes by itself after 24 hours. When the agent
+doesn't say and the text names the person behind the run and nobody else in the conversation, it is theirs
+(`impliedAddressee`), on every path through `postPauseCards`. A name alone is no proof, so a question naming someone
+else stays with the room.

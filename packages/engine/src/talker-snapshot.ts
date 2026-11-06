@@ -99,8 +99,9 @@ async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
   if (run.status !== "waiting_input") return out;
   const [questions, handoffs, consults] = await Promise.all([
     db
-      .select({ text: agentQuestions.text })
+      .select({ text: agentQuestions.text, person: users.name })
       .from(agentQuestions)
+      .leftJoin(users, eq(users.id, agentQuestions.requestedForUserId))
       .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open"))),
     db
       .select({ instructions: browserHandoffs.instructions, status: browserHandoffs.status })
@@ -112,7 +113,8 @@ async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
       .innerJoin(agents, eq(agents.id, agentConsultations.targetAgentId))
       .where(and(eq(agentConsultations.askerRunId, run.id), eq(agentConsultations.status, "open"))),
   ]);
-  for (const q of questions) out.push(`an answer to its question "${clip(q.text, 200)}"`);
+  for (const q of questions)
+    out.push(`an answer${q.person ? ` from ${q.person}` : ""} to its question "${clip(q.text, 200)}"`);
   for (const h of handoffs) {
     out.push(
       `a person to help in its browser: "${clip(h.instructions, 200)}" (${h.status === "active" ? "a person has control now" : "nobody opened it yet"})`,

@@ -92,6 +92,14 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
     expect(workLine(t, work({ state: "waiting_input", question: marked }), ctx).question?.text).toBe(
       "Envio agora ou espero?",
     );
+    // For one person: it waits on them, whoever asked for the work.
+    const forThem = (requestedForUserId: string) => ({ ...question, requestedForUserId });
+    expect(workLine(t, work({ state: "waiting_input", question: forThem("bia") }), ctx).text).toBe(
+      "Aguardando resposta",
+    );
+    expect(workLine(t, work({ state: "waiting_input", question: forThem("me") }), ctx).text).toBe(
+      "Aguardando sua resposta",
+    );
     // Nothing to quote (a secret, a hand-off): the line alone, with its last update.
     expect(workLine(t, work({ state: "waiting_input" }), ctx).question).toBeNull();
   });

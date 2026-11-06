@@ -14,6 +14,7 @@ import {
 } from "@agenteschat/client";
 import { agentProposalOf, proposalStatus } from "@agenteschat/client/lib/action-cards";
 import { entriesOffScreen } from "@agenteschat/client/lib/activity";
+import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOpen, messageProposalCards, proposalTarget, proposerOf } from "@agenteschat/client/lib/proposals";
@@ -135,6 +136,7 @@ export function AskProbes({ messages }: { messages: Message[] }) {
 }
 
 const AskProbe = memo(function AskProbe({ message: m, order }: { message: Message; order: number }) {
+  const meId = useMeId();
   const approvalId = approvalIdOf(m.meta);
   const question = questionOf(m.meta);
   const secret = secretRequestOf(m.meta);
@@ -142,7 +144,7 @@ const AskProbe = memo(function AskProbe({ message: m, order }: { message: Messag
   const proposal = agentProposalOf(m.meta);
   const changes = messageProposalCards(m.meta);
   const asked: PendingAsk | null =
-    question?.status === "open"
+    question?.status === "open" && questionWaitsOn(question, meId)
       ? { id: question.id, kind: "question", agentId: question.agentId, what: question.text, messageId: m.id, order }
       : null;
   return (
