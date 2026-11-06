@@ -17,7 +17,7 @@ import {
 } from "@agenteschat/db";
 import { type AgentsDmReads, agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { recordAudit } from "./audit";
-import { runAuthorityById, UUID } from "./authority";
+import { runAuthorityById, runPerson, UUID } from "./authority";
 import { routineBriefOfRun } from "./background";
 import { answersAgentsOnly, peopleSee } from "./consultations";
 import { isAgentOnlyDm, openDm } from "./dms";
@@ -32,7 +32,7 @@ import { markdownToPdf } from "./pdf";
 import { routineCreatorOf } from "./requester";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 import { accountInUse } from "./standing";
-import { taskReaderSql } from "./task-access";
+import { adminChannelSql, taskReaderSql } from "./task-access";
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
 
@@ -526,16 +526,22 @@ async function personCanRead(db: Database, userId: string, orgId: string, a: Pic
       memberId: channelMembers.id,
       // A task's conversation: whoever sees the task (ADR 0145).
       taskReader: taskReaderSql(sql`${channels.id}`, sql`${userId}::text`),
+      admin: sql<boolean>`${adminChannelSql(sql`${orgId}::uuid`, sql`${userId}::text`)}`,
     })
     .from(channels)
     .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId)))
     .where(and(eq(channels.id, a.channelId), eq(channels.orgId, orgId)));
   if (!row) return false;
   if (row.kind === "task") return row.taskReader === true || String(row.taskReader) === "t";
-  return row.memberId !== null || (row.visibility === "public" && row.kind === "channel");
+  return (
+    row.memberId !== null ||
+    (row.visibility === "public" && row.kind === "channel") ||
+    row.admin === true ||
+    String(row.admin) === "t"
+  );
 }
 
-/** The channels whose files this person may read: those they belong to, public channels, tasks they see. */
+/** The channels whose files this person may read: those they belong to, public channels, tasks they see, and for an administrator every channel. */
 async function personReadableChannels(db: Database, userId: string, orgId: string): Promise<string[]> {
   const member = and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId));
   const open = and(eq(channels.visibility, "public"), eq(channels.kind, "channel"));
@@ -550,19 +556,11 @@ async function personReadableChannels(db: Database, userId: string, orgId: strin
           sql`${channelMembers.id} is not null`,
           open,
           and(eq(channels.kind, "task"), taskReaderSql(sql`${channels.id}`, sql`${userId}::text`)),
+          adminChannelSql(sql`${orgId}::uuid`, sql`${userId}::text`),
         ),
       ),
     );
   return rows.map((r) => r.id);
-}
-
-/**
- * The person behind an agent's run (`authority.ts`), or null: whose conversations it may also read files of. A run
- * stays its message's author's for good, so someone who left or was blocked counts as nobody.
- */
-async function personOfActor(db: Database, orgId: string, actor: Extract<ArtifactActor, { type: "agent" }>) {
-  const person = actor.runId ? (await runAuthorityById(db, orgId, actor.runId)).personId : null;
-  return person && (await getMembership(db, person, orgId)) ? person : null;
 }
 
 /** Whether every version of an artifact in the agents' DM was made by a run for the same person (`agentsDmReads`). */
@@ -623,7 +621,7 @@ async function agentReaches(
 ) {
   if (!a.channelId) return true;
   if (!(await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(a.channelId)) {
-    const person = await personOfActor(db, orgId, actor);
+    const person = await runPerson(db, orgId, actor.runId ?? undefined);
     if (person !== null && (await requesterSharedChannels(db, orgId, actor.agentId, person)).includes(a.channelId))
       return true;
     return ownRoomFile(db, actor, orgId, a.id);
@@ -640,7 +638,7 @@ async function agentReaches(
 async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pick<ArtifactRow, "id" | "channelId">) {
   if (actor.type === "person") return personCanRead(db, actor.userId, orgId, a);
   if (await agentReaches(db, actor, orgId, a)) return true;
-  const person = await personOfActor(db, orgId, actor);
+  const person = await runPerson(db, orgId, actor.runId ?? undefined);
   if (person === null) return false;
   if (await personCanRead(db, person, orgId, a)) return true;
   const dm = await agentsDmReads(db, orgId, a.channelId as string, () => Promise.resolve(person));
@@ -703,7 +701,7 @@ async function agentRefusal(db: Database, actor: Extract<ArtifactActor, { type: 
       "File not found: it was deleted. Say so: a person can restore it from the Drive's trash (Lixeira).",
     );
   }
-  const nobody = (await personOfActor(db, orgId, actor))
+  const nobody = (await runPerson(db, orgId, actor.runId ?? undefined))
     ? ""
     : " Nobody is behind this run, so you only reach this conversation, public channels you are in and the Drive.";
   return new NotFoundError(

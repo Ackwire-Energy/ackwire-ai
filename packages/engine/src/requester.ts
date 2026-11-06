@@ -1,5 +1,6 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
 import { fedByRoutine, personOfMessage, type RunAuthority, runAuthority, runAuthorityById } from "./authority";
+import type { Audience } from "./task-access";
 import type { ToolContext } from "./tools/types";
 import type { WikiActor } from "./wiki";
 
@@ -28,6 +29,26 @@ export async function personBehindCall(
     : [];
   if (run) return (await runAuthority(ctx.db, run)).personId;
   return ctx.triggerMessageId ? personOfMessage(ctx.db, ctx.orgId, ctx.triggerMessageId) : null;
+}
+
+/** `visible_to` of the tools that make something people read (ADR 0150). */
+export const visibleToField = {
+  enum: ["conversation", "requester", "everyone"],
+  description:
+    "Who sees it. Default conversation: the workspace from a public channel, the people here from a DM or private channel. requester: only who asked. everyone: when they want the whole team to see it.",
+};
+
+/**
+ * `visible_to` as the tool's write takes it; undefined leaves it to the conversation. With nobody behind the run,
+ * nobody asked for it to reach further than where it was made.
+ */
+export async function chosenAudience(
+  ctx: Pick<ToolContext, "orgId" | "runId" | "triggerMessageId"> & { db: Executor },
+  choice: unknown,
+): Promise<Audience | undefined> {
+  const person = choice === "requester" || choice === "everyone" ? await personBehindCall(ctx) : null;
+  if (!person) return undefined;
+  return choice === "everyone" ? { mode: "everyone" } : { mode: "people", userIds: [person] };
 }
 
 /** The person behind a message (`personOfMessage`): its author, or the person behind the run that wrote it. */

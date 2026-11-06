@@ -1618,6 +1618,13 @@
       "when": 1794380000000,
       "tag": "0232_refusal_proposals",
       "breakpoints": true
+    },
+    {
+      "idx": 233,
+      "version": "7",
+      "when": 1794480000000,
+      "tag": "0233_task_audience",
+      "breakpoints": true
     }
   ]
 }

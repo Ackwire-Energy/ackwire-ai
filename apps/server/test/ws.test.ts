@@ -318,6 +318,43 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   c.ws.close();
 });
 
+test("someone taken off a task's list loses its conversation's socket at once", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const { url } = (await (
+    await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
+  ).json()) as { url: string };
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  await ana(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  const anaId = (await meId(ana)) ?? "";
+  const ownerId = (await meId(owner)) ?? "";
+  const api = `/api/app/organizations/${orgId}/issues`;
+  const issue = (await (
+    await owner(api, { json: { title: "Plano", audience: { mode: "people", userIds: [ownerId, anaId] } } })
+  ).json()) as { id: string };
+  const { channelId } = (await (await ana(`${api}/${issue.id}/conversation`, { method: "POST", json: {} })).json()) as {
+    channelId: string;
+  };
+
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  await a.opened;
+  a.send({ type: "subscribe", channelId });
+  await a.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  const changed = await owner(`${api}/${issue.id}/audience`, {
+    method: "PUT",
+    json: { mode: "people", userIds: [ownerId] },
+  });
+  expect(changed.status).toBe(200);
+  expect(await a.next((f) => f.type === "unsubscribed" && f.channelId === channelId)).toEqual({
+    type: "unsubscribed",
+    channelId,
+    reason: "revoked",
+  });
+  a.ws.close();
+});
+
 test("membership changes drop live subscriptions at once (channel, then organization)", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");

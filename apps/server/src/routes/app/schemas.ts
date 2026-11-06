@@ -12,6 +12,14 @@ import {
 import { CONTEXT_LIMITS, ENDPOINT_STYLES, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
+/** Who a task or a wiki page is for (ADR 0150): "only me" is a list of one. Administrators always see it. */
+export const AudienceChoice = z
+  .discriminatedUnion("mode", [
+    z.object({ mode: z.literal("everyone") }),
+    z.object({ mode: z.literal("people"), userIds: z.array(z.string().min(1).max(200)).max(200) }),
+  ])
+  .openapi("AudienceChoice");
+
 /** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
 export const MediaKind = z.enum(["gif", "sticker", "voice"]).nullable().openapi({
   description:
@@ -425,6 +433,9 @@ export const Channel = z
       description: "Private and limited to these roles (departments, ADR 0125); empty: public or invite only.",
     }),
     isMember: z.boolean(),
+    seenAsAdmin: z.boolean().optional().openapi({
+      description: "Listed only because you're an administrator (ADR 0150): off the sidebar until opened or joined.",
+    }),
     createdByUserId: z
       .string()
       .nullable()

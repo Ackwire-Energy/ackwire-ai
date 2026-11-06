@@ -1318,6 +1318,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       update: (orgId, id, patch) => request<Issue>(`${org(orgId)}/issues/${enc(id)}`, { method: "PATCH", json: patch }),
       delete: (orgId, id) => request<void>(`${org(orgId)}/issues/${enc(id)}`, { method: "DELETE" }),
       share: (orgId, id) => request<Issue>(`${org(orgId)}/issues/${enc(id)}/share`, { method: "POST" }),
+      setAudience: (orgId, id, audience) =>
+        request<Issue>(`${org(orgId)}/issues/${enc(id)}/audience`, { method: "PUT", json: audience }),
       setCriterion: (orgId, id, criterionId, done) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/criteria/${enc(criterionId)}`, {
           method: "PUT",

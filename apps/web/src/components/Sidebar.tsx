@@ -1003,7 +1003,7 @@ const CATEGORY_KEY = "category:";
  * dragging, from its right click ("Mover para…") or in its details.
  */
 function SidebarChannels({
-  channels,
+  channels: all,
   loading,
   sections,
   onNewChannel,
@@ -1039,6 +1039,10 @@ function SidebarChannels({
   const removeCategory = useDeleteChannelCategory(orgId);
   const recreate = useCreateChannelCategory(orgId);
   const manages = can(org, "manage_channels");
+  // An administrator reads every channel (ADR 0150): the ones they aren't in wait under one row, not in the list.
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const channels = all.filter((c) => !c.seenAsAdmin || path.endsWith(`/c/${c.id}`));
+  const others = all.filter((c) => !channels.includes(c));
   const mayCreate = can(org, "create_channels");
   const mayChange = (c: Channel) => managesChannel(c, me.user.id, org);
   const [renaming, setRenaming] = useState<ChannelCategory | null>(null);
@@ -1342,6 +1346,28 @@ function SidebarChannels({
         {pinnedChannels.map((c) => row(c, true))}
         {pinnedChannels.length > 0 && (loose.length > 0 || shown.length > 0) && <hr className="sidebar__pins-end" />}
         {loose.map((c) => row(c))}
+        {others.length > 0 && (
+          <Menu
+            label={t("shell.otherChannels")}
+            trigger={
+              <button type="button" className="sidebar__item" data-kind="channel">
+                <Icon name="lock" />
+                <span className="sidebar__item-label">{t("shell.otherChannels")}</span>
+                <CountChip className="sidebar__count">{others.length}</CountChip>
+              </button>
+            }
+          >
+            {others.map((c) => (
+              <MenuItem
+                key={c.id}
+                icon="lock"
+                onSelect={() => void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } })}
+              >
+                {c.name}
+              </MenuItem>
+            ))}
+          </Menu>
+        )}
       </SidebarSection>
       {shown.map((category) => {
         const actions = categoryActions(category);

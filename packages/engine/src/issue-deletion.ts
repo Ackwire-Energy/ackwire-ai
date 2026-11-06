@@ -38,7 +38,7 @@ async function visibleSteps(deps: AgentDeletionDeps, userId: string, root: Issue
     const seen = new Set([root.id, ...found.map((r) => r.id)]);
     const next: IssueRow[] = [];
     for (const r of rows)
-      if (!seen.has(r.id) && (await canSee(deps.db, { type: "person", userId }, r.orgId, r.channelId))) next.push(r);
+      if (!seen.has(r.id) && (await canSee(deps.db, { type: "person", userId }, r.orgId, r))) next.push(r);
     found.push(...next);
     parents = next.map((r) => r.id);
   }

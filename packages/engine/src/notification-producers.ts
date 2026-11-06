@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, inArray, isNotNull, isNull, ne, rowsOf, schema, sql } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { autonomyNoteFor, proposalCardOf } from "./brakes";
@@ -23,6 +23,7 @@ import {
 import { maySql, type RolePermission } from "./permissions";
 import { secretLabelOf } from "./secrets";
 import { stretchCardOf } from "./stretch";
+import { adminChannelSql, taskReadersAmong } from "./task-access";
 import { teamWeekCardOf } from "./team-week";
 
 /**
@@ -67,15 +68,16 @@ function handlesIn(text: string): string[] {
   return [...found];
 }
 
-/** The people among `userIds` who are members of the channel (private channels and DMs stay private). */
+/** The people among `userIds` who read the channel: its members and, in a channel, administrators. A DM stays its own. */
 async function inChannel(deps: NotificationDeps, channelId: string, userIds: string[]) {
   const ids = [...new Set(userIds.filter(Boolean))];
   if (ids.length === 0) return [];
-  const rows = await deps.db
-    .select({ userId: channelMembers.userId })
-    .from(channelMembers)
-    .where(and(eq(channelMembers.channelId, channelId), inArray(channelMembers.userId, ids)));
-  return rows.flatMap((r) => (r.userId ? [r.userId] : []));
+  const rows = rowsOf<{ id: string }>(
+    await deps.db.execute(sql`select u.id from ${schema.users} u join ${channels} on ${channels.id} = ${channelId}::uuid
+      where u.id = any(${`{${ids.join(",")}}`}::text[]) and (exists (select 1 from ${channelMembers} m
+        where m.channel_id = ${channels.id} and m.user_id = u.id) or ${adminChannelSql(sql`${channels.orgId}`, sql`u.id`)})`),
+  );
+  return rows.map((r) => r.id);
 }
 
 /**
@@ -598,12 +600,7 @@ async function issueFollowers(deps: NotificationDeps, issue: IssueRow) {
   const ids = new Set<string>([...acted.map((a) => a.userId), ...wrote.flatMap((w) => (w.userId ? [w.userId] : []))]);
   if (issue.createdByType === "person") ids.add(issue.createdById);
   if (issue.assigneeType === "person" && issue.assigneeId) ids.add(issue.assigneeId);
-  return visibleOnIssue(deps, issue, [...ids]);
-}
-
-/** An issue of a channel is seen by its members only; an org-wide one by everyone in the org. */
-async function visibleOnIssue(deps: NotificationDeps, issue: IssueRow, userIds: string[]) {
-  return issue.channelId ? inChannel(deps, issue.channelId, userIds) : userIds;
+  return taskReadersAmong(deps.db, issue.id, [...ids]);
 }
 
 const issueSource = (issue: IssueRow): NotificationSource => ({
@@ -639,7 +636,7 @@ export async function notifyIssueChanged(
   if (nowPerson && nowPerson !== prevPerson) {
     await notify(deps, {
       orgId: issue.orgId,
-      userIds: await visibleOnIssue(deps, issue, [nowPerson]),
+      userIds: await taskReadersAmong(deps.db, issue.id, [nowPerson]),
       kind: "issue_assigned",
       groupKey: `issue_assigned:${issue.id}:${at}`,
       actor: issueActor(actor),
@@ -684,9 +681,9 @@ export async function notifyIssueComment(
         .from(organizationMembers)
         .where(and(eq(organizationMembers.orgId, issue.orgId), inArray(organizationMembers.handle, handles)))
     : [];
-  const mentioned = await visibleOnIssue(
-    deps,
-    issue,
+  const mentioned = await taskReadersAmong(
+    deps.db,
+    issue.id,
     named.map((n) => n.userId),
   );
   const self = actor.type === "person" ? actor.id : null;

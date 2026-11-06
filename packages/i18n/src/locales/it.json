@@ -1349,6 +1349,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Altri canali",
     "titleBar": {
       "back": "Indietro",
       "forward": "Avanti"
@@ -1822,6 +1823,7 @@
     "waitingApproval": "in attesa di approvazione",
     "notMemberTitle": "Non fai parte di questo canale",
     "notMemberText": "Entra per leggere i messaggi e parlare con le persone e gli agenti che ci sono.",
+    "adminReading": "Non sei in questo canale. Gli amministratori possono leggerlo.",
     "join": "Entra in #{{channel}}",
     "notFound": "Questo canale non esiste o non è più disponibile.",
     "loadOlder": "Carica i messaggi precedenti",
@@ -6195,7 +6197,6 @@
     "createdByShort": "Creata da {{name}}",
     "fromMessage": "da <0>un messaggio in #{{channel}}</0>",
     "fromAgent": "da una richiesta a un agente",
-    "privateTask": "Solo le persone in questa conversazione vedono questa attività.",
     "subIssues_one": "Sottoattività · {{count}}",
     "subIssues_many": "Sottoattività · {{count}}",
     "subIssues_other": "Sottoattività · {{count}}",
@@ -6284,6 +6285,8 @@
       "work_update": "{{text}}",
       "work_stopped": "ha fermato il lavoro in background",
       "shared_everyone": "ha mostrato la scheda a tutto lo spazio di lavoro",
+      "audience_everyone": "ha mostrato l'attività a tutti",
+      "audience_people": "ha cambiato chi vede l'attività",
       "created": "ha creato l'attività",
       "renamed": "ha rinominato l'attività",
       "description_changed": "ha modificato la descrizione",
@@ -9008,14 +9011,14 @@
     "lockedDone": "Bloccata. Ora la modificano solo gli admin.",
     "unlockedDone": "Sbloccata. I membri possono di nuovo modificarla.",
     "restricted": "Riservata",
-    "restrictedHint": "Solo i proprietari e le persone scelte vedono questa pagina.",
+    "restrictedHint": "Solo gli amministratori e le persone scelte vedono questa pagina.",
     "audience": "Accesso",
     "audienceTitle": "Accesso a {{title}}",
-    "audienceText": "I proprietari hanno sempre accesso. Chi non ce l'ha non troverà la pagina negli elenchi, nella ricerca o nei link.",
+    "audienceText": "Gli amministratori hanno sempre accesso. Chi non ce l'ha non troverà la pagina negli elenchi, nella ricerca o nei link.",
     "audienceEveryone": "Tutti nello spazio di lavoro",
     "audienceEveryoneText": "Qualsiasi membro",
     "audienceFolderTitle": "Accesso alla cartella {{folder}}",
-    "audienceFolderText": "Vale per le pagine di questa cartella e delle sue sottocartelle, comprese quelle aggiunte in seguito. I proprietari hanno sempre accesso.",
+    "audienceFolderText": "Vale per le pagine di questa cartella e delle sue sottocartelle, comprese quelle aggiunte in seguito. Gli amministratori hanno sempre accesso.",
     "audienceAgents": "Agenti",
     "audienceAgentsAll": "Tutti gli agenti",
     "audienceAgentsAllText": "Qualsiasi agente con accesso al wiki",
@@ -9073,7 +9076,7 @@
       "everyoneHint": "Qualsiasi membro e qualsiasi agente con accesso al wiki leggono questa pagina.",
       "peopleAnd": "Tutte le persone e {{agents}}",
       "peopleOnly": "Tutte le persone, nessun agente",
-      "ownersOnly": "Solo i proprietari",
+      "ownersOnly": "Solo gli amministratori",
       "withAllAgents": "{{names}} e tutti gli agenti",
       "more_one": "altri {{count}}",
       "more_many": "altri {{count}}",
@@ -11539,8 +11542,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Questa persona non è in questa conversazione, quindi non vede questa attività.",
-      "deleteForbidden": "Solo chi ha creato questa attività o un amministratore può eliminarla."
+      "assigneeOutside": "Questa persona non vede questa attività. Aggiungila prima a Chi lo vede.",
+      "deleteForbidden": "Solo chi ha creato questa attività o un amministratore può eliminarla.",
+      "audienceEmpty": "Scegli chi lo vede."
     },
     "connector": {
       "labelTaken": "Un altro connettore ha già questo nome.",
@@ -15637,6 +15641,27 @@
     "weekly": {
       "name": "La settimana del team"
     }
+  },
+  "whoSees": {
+    "label": "Chi lo vede",
+    "everyone": "Tutto lo spazio di lavoro",
+    "me": "Solo io",
+    "people": "Persone specifiche",
+    "only": "Solo {{name}}",
+    "more_one": "{{names}} e altri {{count}}",
+    "more_many": "{{names}} e altri {{count}}",
+    "more_other": "{{names}} e altri {{count}}",
+    "some": "alcune persone",
+    "taskTitle": "Chi vede questa attività",
+    "pageTitle": "Chi vede questa pagina",
+    "admins": "Gli amministratori lo vedono sempre.",
+    "tied": "Segue chi è nella conversazione, finché non lo cambi.",
+    "search": "Cerca una persona",
+    "noMatch": "Nessuno con questo nome",
+    "moreOptions": "Altre opzioni",
+    "receipt": "Chi lo vede: {{who}}",
+    "limited": "accesso limitato",
+    "rolesToo": "I ruoli già su questa pagina continuano a vederla."
   },
   "teamTemplates": {
     "lead": "Un team per {{org}}, ogni agente nel suo canale. Puoi modificarlo prima di crearlo.",

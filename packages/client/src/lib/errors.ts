@@ -182,6 +182,7 @@ const KNOWN = {
   "account.not_restorable": "errors.account.notRestorable",
   "issue.assignee_outside": "errors.issue.assigneeOutside",
   "issue.delete_forbidden": "errors.issue.deleteForbidden",
+  "issue.audience_empty": "errors.issue.audienceEmpty",
   [REAUTH_PASSWORD]: "errors.reauth.password",
   [REAUTH_SIGN_IN]: "errors.reauth.signIn",
   EARLY_ACCESS_OTHER_EMAIL: "auth.earlyAccess.otherEmail",

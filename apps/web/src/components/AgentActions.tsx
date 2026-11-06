@@ -1,5 +1,5 @@
 import type { AgentAction, Message } from "@agenteschat/client";
-import { ApiError, useAgentActions, useApi } from "@agenteschat/client";
+import { ApiError, useAgentActions, useApi, useIssue } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import {
   actionErrorKey,
@@ -31,6 +31,7 @@ import { fromApiRule, ruleSentence } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
 import { DetailsLink } from "./details-link";
 import { useOrg } from "./org-context";
+import { IssueWhoSeesDialog } from "./WhoSees";
 import "./agent-actions.css";
 
 /**
@@ -286,6 +287,7 @@ function Receipt({
           </span>
         )}
         {undoneBy && <span className="ag-rc__by">{t("agentActions.undoneBy", { name: undoneBy })}</span>}
+        {a.kind === "issue.created" && !struck && <ReceiptWhoSees action={a} />}
         <CopyHookButton action={a} />
       </span>
       {hadButton.current && (
@@ -302,6 +304,25 @@ function Receipt({
         </span>
       )}
     </div>
+  );
+}
+
+/** Who sees the task the agent just made, and the way to change it in place (ADR 0150). */
+function ReceiptWhoSees({ action: a }: { action: AgentAction }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const [open, setOpen] = useState(false);
+  const number = typeof a.params.number === "number" ? a.params.number : 0;
+  const issue = useIssue(org.id, number, open);
+  const mode = a.params.audience;
+  if (mode !== "everyone" && mode !== "people") return null;
+  return (
+    <span className="ag-rc__by">
+      <button type="button" className="ac-link" onClick={() => setOpen(true)}>
+        {t("whoSees.receipt", { who: t(mode === "everyone" ? "whoSees.everyone" : "whoSees.some") })}
+      </button>
+      {open && issue.data && <IssueWhoSeesDialog issue={issue.data} onClose={() => setOpen(false)} />}
+    </span>
   );
 }
 

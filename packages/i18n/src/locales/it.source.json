@@ -3176,6 +3176,9 @@
   "webPushAsk.mention.body": {
     "value": "Can you take a look when you have a minute?"
   },
+  "shell.otherChannels": {
+    "value": "Other channels"
+  },
   "shell.titleBar.back": {
     "value": "Back"
   },
@@ -4309,6 +4312,9 @@
   },
   "channel.notMemberText": {
     "value": "Join to read the messages and talk with the people and agents here."
+  },
+  "channel.adminReading": {
+    "value": "You're not in this channel. Administrators can read it."
   },
   "channel.join": {
     "value": "Join #{{channel}}"
@@ -14427,9 +14433,6 @@
   "issues.fromAgent": {
     "value": "from a request to an agent"
   },
-  "issues.privateTask": {
-    "value": "Only people in this conversation see this task."
-  },
   "issues.subIssues": {
     "value": {
       "one": "Subtasks · {{count}}",
@@ -14634,6 +14637,12 @@
   },
   "issues.event.shared_everyone": {
     "value": "showed the card to the whole workspace"
+  },
+  "issues.event.audience_everyone": {
+    "value": "showed the task to everyone"
+  },
+  "issues.event.audience_people": {
+    "value": "changed who sees the task"
   },
   "issues.event.created": {
     "value": "created the task"
@@ -21094,7 +21103,7 @@
     "value": "Restricted"
   },
   "wiki.restrictedHint": {
-    "value": "Only owners and the people chosen see this page."
+    "value": "Only administrators and the people chosen see this page."
   },
   "wiki.audience": {
     "value": "Access"
@@ -21103,7 +21112,7 @@
     "value": "Access to {{title}}"
   },
   "wiki.audienceText": {
-    "value": "Owners always have access. Anyone without it won't find the page in lists, search or links."
+    "value": "Administrators always have access. Anyone without it won't find the page in lists, search or links."
   },
   "wiki.audienceEveryone": {
     "value": "Everyone in the workspace"
@@ -21115,7 +21124,7 @@
     "value": "Access to the folder {{folder}}"
   },
   "wiki.audienceFolderText": {
-    "value": "It reaches the pages in this folder and its subfolders, and the ones added later. Owners always have access."
+    "value": "It reaches the pages in this folder and its subfolders, and the ones added later. Administrators always have access."
   },
   "wiki.audienceAgents": {
     "value": "Agents"
@@ -21274,7 +21283,7 @@
     "value": "Everyone, no agents"
   },
   "wiki.access.ownersOnly": {
-    "value": "Owners only"
+    "value": "Administrators only"
   },
   "wiki.access.withAllAgents": {
     "value": "{{names}} and every agent"
@@ -26954,7 +26963,10 @@
     "value": "Drag to move around. Tap to fit it back"
   },
   "errors.issue.assigneeOutside": {
-    "value": "This person isn't in this conversation, so they can't see this task."
+    "value": "This person can't see this task. Add them to who sees it first."
+  },
+  "errors.issue.audienceEmpty": {
+    "value": "Choose who sees it."
   },
   "errors.issue.deleteForbidden": {
     "value": "Only who created this task or an administrator can delete it."
@@ -36318,6 +36330,60 @@
   },
   "teamPlan.weekly.name": {
     "value": "The team's week"
+  },
+  "whoSees.label": {
+    "value": "Who sees it"
+  },
+  "whoSees.everyone": {
+    "value": "Everyone in the workspace"
+  },
+  "whoSees.me": {
+    "value": "Only me"
+  },
+  "whoSees.people": {
+    "value": "Specific people"
+  },
+  "whoSees.only": {
+    "value": "Only {{name}}"
+  },
+  "whoSees.more": {
+    "value": {
+      "one": "{{names}} and {{count}} more",
+      "other": "{{names}} and {{count}} more"
+    }
+  },
+  "whoSees.some": {
+    "value": "some people"
+  },
+  "whoSees.taskTitle": {
+    "value": "Who sees this task"
+  },
+  "whoSees.pageTitle": {
+    "value": "Who sees this page"
+  },
+  "whoSees.admins": {
+    "value": "Administrators always see it."
+  },
+  "whoSees.tied": {
+    "value": "It follows who's in the conversation until you change it."
+  },
+  "whoSees.search": {
+    "value": "Search people"
+  },
+  "whoSees.noMatch": {
+    "value": "Nobody with that name"
+  },
+  "whoSees.moreOptions": {
+    "value": "More options"
+  },
+  "whoSees.receipt": {
+    "value": "Who sees it: {{who}}"
+  },
+  "whoSees.limited": {
+    "value": "limited access"
+  },
+  "whoSees.rolesToo": {
+    "value": "The roles already on this page keep seeing it."
   },
   "teamTemplates.lead": {
     "value": "A team for {{org}}, each agent in its own channel. You can adjust it before creating."

@@ -1313,6 +1313,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Diğer kanallar",
     "titleBar": {
       "back": "Geri",
       "forward": "İleri"
@@ -1763,6 +1764,7 @@
     "waitingApproval": "onay bekliyor",
     "notMemberTitle": "Bu kanalda değilsiniz",
     "notMemberText": "Mesajları okumak ve buradaki kişiler ve ajanlarla konuşmak için katılın.",
+    "adminReading": "Bu kanalda değilsiniz. Yöneticiler okuyabilir.",
     "join": "#{{channel}} kanalına katıl",
     "notFound": "Bu kanal yok veya artık kullanılamıyor.",
     "loadOlder": "Önceki mesajları yükle",
@@ -5928,7 +5930,6 @@
     "createdByShort": "Oluşturan: {{name}}",
     "fromMessage": "<0>#{{channel}} kanalındaki bir mesajdan</0>",
     "fromAgent": "bir ajana yapılan bir istekten",
-    "privateTask": "Bu görevi yalnızca bu konuşmadaki kişiler görür.",
     "subIssues_one": "Alt görevler · {{count}}",
     "subIssues_other": "Alt görevler · {{count}}",
     "fromWebhook": "bir {{provider}} olayından",
@@ -6011,6 +6012,8 @@
       "work_update": "{{text}}",
       "work_stopped": "arka plandaki çalışmayı durdurdu",
       "shared_everyone": "kartı tüm çalışma alanına gösterdi",
+      "audience_everyone": "görevi herkese gösterdi",
+      "audience_people": "görevi kimlerin göreceğini değiştirdi",
       "created": "görevi oluşturdu",
       "renamed": "görevi yeniden adlandırdı",
       "description_changed": "açıklamayı düzenledi",
@@ -8592,14 +8595,14 @@
     "lockedDone": "Kilitlendi. Artık yalnızca yöneticiler düzenler.",
     "unlockedDone": "Kilit açıldı. Üyeler yeniden düzenleyebilir.",
     "restricted": "Kısıtlı",
-    "restrictedHint": "Bu sayfayı yalnızca sahipler ve seçilen kişiler görür.",
+    "restrictedHint": "Bu sayfayı yalnızca yöneticiler ve seçilen kişiler görür.",
     "audience": "Erişim",
     "audienceTitle": "{{title}} erişimi",
-    "audienceText": "Sahiplerin her zaman erişimi vardır. Erişimi olmayanlar sayfayı listelerde, aramada ya da bağlantılarda bulamaz.",
+    "audienceText": "Yöneticilerin her zaman erişimi vardır. Erişimi olmayanlar sayfayı listelerde, aramada ya da bağlantılarda bulamaz.",
     "audienceEveryone": "Çalışma alanındaki herkes",
     "audienceEveryoneText": "Herhangi bir üye",
     "audienceFolderTitle": "{{folder}} klasörüne erişim",
-    "audienceFolderText": "Bu klasördeki ve alt klasörlerindeki sayfaları ve sonradan eklenenleri kapsar. Sahiplerin her zaman erişimi vardır.",
+    "audienceFolderText": "Bu klasördeki ve alt klasörlerindeki sayfaları ve sonradan eklenenleri kapsar. Yöneticilerin her zaman erişimi vardır.",
     "audienceAgents": "Ajanlar",
     "audienceAgentsAll": "Tüm ajanlar",
     "audienceAgentsAllText": "Wiki'ye erişimi olan her ajan",
@@ -8655,7 +8658,7 @@
       "everyoneHint": "Wiki erişimi olan her üye ve her ajan bu sayfayı okur.",
       "peopleAnd": "Herkes ve {{agents}}",
       "peopleOnly": "Herkes, ajanlar hariç",
-      "ownersOnly": "Yalnızca sahipler",
+      "ownersOnly": "Yalnızca yöneticiler",
       "withAllAgents": "{{names}} ve tüm ajanlar",
       "more_one": "{{count}} kişi daha",
       "more_other": "{{count}} kişi daha"
@@ -11039,8 +11042,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Bu kişi bu konuşmada değil, bu yüzden bu görevi göremez.",
-      "deleteForbidden": "Bu görevi yalnızca oluşturan kişi veya bir yönetici silebilir."
+      "assigneeOutside": "Bu kişi bu görevi göremiyor. Önce onu Kimler görüyor listesine ekleyin.",
+      "deleteForbidden": "Bu görevi yalnızca oluşturan kişi veya bir yönetici silebilir.",
+      "audienceEmpty": "Kimlerin göreceğini seçin."
     },
     "connector": {
       "labelTaken": "Bu ad başka bir bağlayıcıda zaten var.",
@@ -14948,6 +14952,26 @@
     "weekly": {
       "name": "Ekibin haftası"
     }
+  },
+  "whoSees": {
+    "label": "Kimler görüyor",
+    "everyone": "Tüm çalışma alanı",
+    "me": "Yalnızca ben",
+    "people": "Belirli kişiler",
+    "only": "Yalnızca {{name}}",
+    "more_one": "{{names}} ve {{count}} kişi daha",
+    "more_other": "{{names}} ve {{count}} kişi daha",
+    "some": "bazı kişiler",
+    "taskTitle": "Bu görevi kimler görüyor",
+    "pageTitle": "Bu sayfayı kimler görüyor",
+    "admins": "Yöneticiler her zaman görür.",
+    "tied": "Siz değiştirene kadar konuşmadaki kişileri izler.",
+    "search": "Kişi ara",
+    "noMatch": "Bu adda kimse yok",
+    "moreOptions": "Diğer seçenekler",
+    "receipt": "Kimler görüyor: {{who}}",
+    "limited": "sınırlı erişim",
+    "rolesToo": "Bu sayfada zaten olan roller onu görmeye devam eder."
   },
   "teamTemplates": {
     "lead": "{{org}} için bir ekip, her ajan kendi kanalında. Oluşturmadan önce ayarlayabilirsin.",

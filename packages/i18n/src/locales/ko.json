@@ -1277,6 +1277,7 @@
     }
   },
   "shell": {
+    "otherChannels": "다른 채널",
     "titleBar": {
       "back": "뒤로",
       "forward": "앞으로"
@@ -1704,6 +1705,7 @@
     "waitingApproval": "승인 대기 중",
     "notMemberTitle": "이 채널의 멤버가 아니에요",
     "notMemberText": "참여하면 메시지를 읽고 이곳의 사람 및 에이전트와 대화할 수 있어요.",
+    "adminReading": "이 채널에 참여하지 않았어요. 관리자는 읽을 수 있어요.",
     "join": "#{{channel}} 참여",
     "notFound": "이 채널은 존재하지 않거나 더 이상 사용할 수 없어요.",
     "loadOlder": "이전 메시지 불러오기",
@@ -5738,7 +5740,6 @@
     "createdByShort": "{{name}}이(가) 만듦",
     "fromMessage": "<0>#{{channel}}의 메시지</0>에서",
     "fromAgent": "에이전트에게 보낸 요청에서",
-    "privateTask": "이 대화에 있는 사람만 이 작업을 볼 수 있어요.",
     "subIssues_other": "하위 작업 · {{count}}",
     "fromWebhook": "{{provider}} 이벤트에서",
     "description": "설명",
@@ -5818,6 +5819,8 @@
       "work_update": "{{text}}",
       "work_stopped": "백그라운드 작업을 중지했어요",
       "shared_everyone": "워크스페이스 전체에 카드를 보여 줬어요",
+      "audience_everyone": "작업을 모두에게 보여 줬어요",
+      "audience_people": "작업을 볼 수 있는 사람을 바꿨어요",
       "created": "작업을 만들었어요",
       "renamed": "작업 이름을 바꿨어요",
       "description_changed": "설명을 편집했어요",
@@ -8288,14 +8291,14 @@
     "lockedDone": "잠갔어요. 이제 관리자만 편집할 수 있어요.",
     "unlockedDone": "잠금을 해제했어요. 멤버가 다시 편집할 수 있어요.",
     "restricted": "제한됨",
-    "restrictedHint": "소유자와 선택한 사람만 이 페이지를 볼 수 있어요.",
+    "restrictedHint": "관리자와 선택한 사람만 이 페이지를 볼 수 있어요.",
     "audience": "접근 권한",
     "audienceTitle": "{{title}} 접근 권한",
-    "audienceText": "소유자는 항상 접근할 수 있어요. 권한이 없는 사람은 목록, 검색, 링크에서 이 페이지를 찾을 수 없어요.",
+    "audienceText": "관리자는 항상 접근할 수 있어요. 권한이 없는 사람은 목록, 검색, 링크에서 이 페이지를 찾을 수 없어요.",
     "audienceEveryone": "워크스페이스의 모든 사람",
     "audienceEveryoneText": "모든 멤버",
     "audienceFolderTitle": "{{folder}} 폴더 접근 권한",
-    "audienceFolderText": "이 폴더와 하위 폴더의 페이지, 그리고 나중에 추가될 페이지에도 적용돼요. 소유자는 항상 접근할 수 있어요.",
+    "audienceFolderText": "이 폴더와 하위 폴더의 페이지, 그리고 나중에 추가될 페이지에도 적용돼요. 관리자는 항상 접근할 수 있어요.",
     "audienceAgents": "에이전트",
     "audienceAgentsAll": "모든 에이전트",
     "audienceAgentsAllText": "Wiki에 접근할 수 있는 모든 에이전트",
@@ -8349,7 +8352,7 @@
       "everyoneHint": "Wiki에 접근할 수 있는 모든 멤버와 에이전트가 이 페이지를 읽습니다.",
       "peopleAnd": "모든 사람과 {{agents}}",
       "peopleOnly": "모든 사람, 에이전트 없음",
-      "ownersOnly": "소유자만",
+      "ownersOnly": "관리자만",
       "withAllAgents": "{{names}} 및 모든 에이전트",
       "more_other": "외 {{count}}"
     },
@@ -10656,8 +10659,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "이 사람은 이 대화에 없어서 이 작업을 볼 수 없어요.",
-      "deleteForbidden": "이 작업은 만든 사람이나 관리자만 삭제할 수 있어요."
+      "assigneeOutside": "이 사람은 이 작업을 볼 수 없어요. 먼저 볼 수 있는 사람에 추가하세요.",
+      "deleteForbidden": "이 작업은 만든 사람이나 관리자만 삭제할 수 있어요.",
+      "audienceEmpty": "볼 수 있는 사람을 선택하세요."
     },
     "connector": {
       "labelTaken": "이미 같은 이름의 커넥터가 있어요.",
@@ -14497,6 +14501,25 @@
     "weekly": {
       "name": "팀의 한 주"
     }
+  },
+  "whoSees": {
+    "label": "볼 수 있는 사람",
+    "everyone": "워크스페이스 전체",
+    "me": "나만",
+    "people": "특정 사람",
+    "only": "{{name}}만",
+    "more_other": "{{names}} 외 {{count}}명",
+    "some": "일부 사람",
+    "taskTitle": "이 작업을 볼 수 있는 사람",
+    "pageTitle": "이 페이지를 볼 수 있는 사람",
+    "admins": "관리자는 항상 볼 수 있어요.",
+    "tied": "바꾸기 전까지 대화에 있는 사람을 따라가요.",
+    "search": "사람 검색",
+    "noMatch": "그 이름을 가진 사람이 없어요",
+    "moreOptions": "옵션 더 보기",
+    "receipt": "볼 수 있는 사람: {{who}}",
+    "limited": "제한된 접근",
+    "rolesToo": "이 페이지에 이미 있는 역할은 계속 볼 수 있습니다."
   },
   "teamTemplates": {
     "lead": "{{org}}를 위한 팀, 에이전트마다 자기 채널이 있어요. 만들기 전에 조정할 수 있어요.",

@@ -1313,6 +1313,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Andere kanalen",
     "titleBar": {
       "back": "Terug",
       "forward": "Vooruit"
@@ -1763,6 +1764,7 @@
     "waitingApproval": "wacht op goedkeuring",
     "notMemberTitle": "Je zit niet in dit kanaal",
     "notMemberText": "Word lid om de berichten te lezen en te praten met de mensen en agents hier.",
+    "adminReading": "Je zit niet in dit kanaal. Beheerders kunnen het lezen.",
     "join": "Lid worden van #{{channel}}",
     "notFound": "Dit kanaal bestaat niet of is niet meer beschikbaar.",
     "loadOlder": "Eerdere berichten laden",
@@ -6014,7 +6016,6 @@
     "createdByShort": "Gemaakt door {{name}}",
     "fromMessage": "uit <0>een bericht in #{{channel}}</0>",
     "fromAgent": "uit een verzoek aan een agent",
-    "privateTask": "Alleen mensen in dit gesprek zien deze taak.",
     "subIssues_one": "Subtaken · {{count}}",
     "subIssues_other": "Subtaken · {{count}}",
     "fromWebhook": "uit een event van {{provider}}",
@@ -6100,6 +6101,8 @@
       "work_update": "{{text}}",
       "work_stopped": "heeft het werk op de achtergrond gestopt",
       "shared_everyone": "heeft de kaart aan de hele werkruimte laten zien",
+      "audience_everyone": "heeft de taak aan iedereen laten zien",
+      "audience_people": "heeft gewijzigd wie de taak ziet",
       "created": "heeft de taak gemaakt",
       "renamed": "heeft de taak hernoemd",
       "description_changed": "heeft de beschrijving bewerkt",
@@ -8714,14 +8717,14 @@
     "lockedDone": "Vergrendeld. Alleen beheerders kunnen hem nu bewerken.",
     "unlockedDone": "Ontgrendeld. Leden kunnen weer bewerken.",
     "restricted": "Beperkt",
-    "restrictedHint": "Alleen eigenaren en de gekozen mensen zien deze pagina.",
+    "restrictedHint": "Alleen beheerders en de gekozen mensen zien deze pagina.",
     "audience": "Toegang",
     "audienceTitle": "Toegang tot {{title}}",
-    "audienceText": "Eigenaren hebben altijd toegang. Wie geen toegang heeft, vindt de pagina niet in lijsten, zoekresultaten of links.",
+    "audienceText": "Beheerders hebben altijd toegang. Wie geen toegang heeft, vindt de pagina niet in lijsten, zoekresultaten of links.",
     "audienceEveryone": "Iedereen in de werkruimte",
     "audienceEveryoneText": "Elk lid",
     "audienceFolderTitle": "Toegang tot de map {{folder}}",
-    "audienceFolderText": "Geldt voor de pagina's in deze map en de submappen, en voor pagina's die later worden toegevoegd. Eigenaren hebben altijd toegang.",
+    "audienceFolderText": "Geldt voor de pagina's in deze map en de submappen, en voor pagina's die later worden toegevoegd. Beheerders hebben altijd toegang.",
     "audienceAgents": "Agents",
     "audienceAgentsAll": "Alle agents",
     "audienceAgentsAllText": "Elke agent met toegang tot de wiki",
@@ -8777,7 +8780,7 @@
       "everyoneHint": "Elk lid en elke agent met toegang tot de wiki leest deze pagina.",
       "peopleAnd": "Iedereen en {{agents}}",
       "peopleOnly": "Iedereen, geen agents",
-      "ownersOnly": "Alleen eigenaren",
+      "ownersOnly": "Alleen beheerders",
       "withAllAgents": "{{names}} en alle agents",
       "more_one": "nog {{count}}",
       "more_other": "nog {{count}}"
@@ -11164,8 +11167,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Deze persoon zit niet in dit gesprek en ziet deze taak dus niet.",
-      "deleteForbidden": "Alleen wie deze taak heeft gemaakt of een beheerder kan hem verwijderen."
+      "assigneeOutside": "Deze persoon ziet deze taak niet. Voeg die eerst toe bij Wie het ziet.",
+      "deleteForbidden": "Alleen wie deze taak heeft gemaakt of een beheerder kan hem verwijderen.",
+      "audienceEmpty": "Kies wie het ziet."
     },
     "connector": {
       "labelTaken": "Een andere connector heeft deze naam al.",
@@ -15193,6 +15197,26 @@
     "weekly": {
       "name": "De week van het team"
     }
+  },
+  "whoSees": {
+    "label": "Wie het ziet",
+    "everyone": "De hele werkruimte",
+    "me": "Alleen ik",
+    "people": "Bepaalde mensen",
+    "only": "Alleen {{name}}",
+    "more_one": "{{names}} en nog {{count}}",
+    "more_other": "{{names}} en nog {{count}}",
+    "some": "sommige mensen",
+    "taskTitle": "Wie deze taak ziet",
+    "pageTitle": "Wie deze pagina ziet",
+    "admins": "Beheerders zien het altijd.",
+    "tied": "Volgt wie er in het gesprek zit, tot je het wijzigt.",
+    "search": "Persoon zoeken",
+    "noMatch": "Niemand met die naam",
+    "moreOptions": "Meer opties",
+    "receipt": "Wie het ziet: {{who}}",
+    "limited": "beperkte toegang",
+    "rolesToo": "De rollen die al op deze pagina staan, blijven haar zien."
   },
   "teamTemplates": {
     "lead": "Een team voor {{org}}, elke agent in een eigen kanaal. Je kunt het aanpassen voordat je het maakt.",

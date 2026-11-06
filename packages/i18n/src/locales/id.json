@@ -1277,6 +1277,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Kanal lain",
     "titleBar": {
       "back": "Kembali",
       "forward": "Maju"
@@ -1704,6 +1705,7 @@
     "waitingApproval": "menunggu persetujuan",
     "notMemberTitle": "Kamu tidak ada di kanal ini",
     "notMemberText": "Bergabunglah untuk membaca pesan dan berbicara dengan orang dan agen di sini.",
+    "adminReading": "Kamu tidak ada di kanal ini. Administrator bisa membacanya.",
     "join": "Gabung ke #{{channel}}",
     "notFound": "Kanal ini tidak ada atau sudah tidak tersedia.",
     "loadOlder": "Muat pesan sebelumnya",
@@ -5775,7 +5777,6 @@
     "createdByShort": "Dibuat oleh {{name}}",
     "fromMessage": "dari <0>pesan di #{{channel}}</0>",
     "fromAgent": "dari permintaan ke agen",
-    "privateTask": "Hanya orang di percakapan ini yang melihat tugas ini.",
     "subIssues_other": "Subtugas · {{count}}",
     "fromWebhook": "dari event {{provider}}",
     "description": "Deskripsi",
@@ -5858,6 +5859,8 @@
       "work_update": "{{text}}",
       "work_stopped": "menghentikan pekerjaan di latar belakang",
       "shared_everyone": "menampilkan kartu ke seluruh ruang kerja",
+      "audience_everyone": "menampilkan tugas ke semua orang",
+      "audience_people": "mengubah siapa yang melihat tugas",
       "created": "membuat tugas",
       "renamed": "mengganti nama tugas",
       "description_changed": "mengedit deskripsi",
@@ -8347,14 +8350,14 @@
     "lockedDone": "Dikunci. Sekarang hanya admin yang bisa mengeditnya.",
     "unlockedDone": "Kunci dibuka. Anggota bisa mengedit lagi.",
     "restricted": "Terbatas",
-    "restrictedHint": "Hanya pemilik dan orang yang dipilih yang bisa melihat halaman ini.",
+    "restrictedHint": "Hanya administrator dan orang yang dipilih yang bisa melihat halaman ini.",
     "audience": "Akses",
     "audienceTitle": "Akses ke {{title}}",
-    "audienceText": "Pemilik selalu punya akses. Siapa pun yang tidak punya akses tidak akan menemukan halaman ini di daftar, pencarian, atau tautan.",
+    "audienceText": "Administrator selalu punya akses. Siapa pun yang tidak punya akses tidak akan menemukan halaman ini di daftar, pencarian, atau tautan.",
     "audienceEveryone": "Semua orang di ruang kerja",
     "audienceEveryoneText": "Anggota mana pun",
     "audienceFolderTitle": "Akses ke folder {{folder}}",
-    "audienceFolderText": "Berlaku untuk halaman di folder ini dan subfoldernya, juga yang ditambahkan nanti. Pemilik selalu punya akses.",
+    "audienceFolderText": "Berlaku untuk halaman di folder ini dan subfoldernya, juga yang ditambahkan nanti. Administrator selalu punya akses.",
     "audienceAgents": "Agen",
     "audienceAgentsAll": "Semua agen",
     "audienceAgentsAllText": "Agen mana pun yang punya akses ke wiki",
@@ -8408,7 +8411,7 @@
       "everyoneHint": "Setiap anggota dan setiap agen dengan akses ke wiki membaca halaman ini.",
       "peopleAnd": "Semua orang dan {{agents}}",
       "peopleOnly": "Semua orang, tanpa agen",
-      "ownersOnly": "Hanya pemilik",
+      "ownersOnly": "Hanya administrator",
       "withAllAgents": "{{names}} dan semua agen",
       "more_other": "{{count}} lagi"
     },
@@ -10716,8 +10719,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Orang ini tidak ada di percakapan ini, jadi tidak bisa melihat tugas ini.",
-      "deleteForbidden": "Hanya pembuat tugas ini atau administrator yang bisa menghapusnya."
+      "assigneeOutside": "Orang ini tidak bisa melihat tugas ini. Tambahkan dulu ke Siapa yang melihat.",
+      "deleteForbidden": "Hanya pembuat tugas ini atau administrator yang bisa menghapusnya.",
+      "audienceEmpty": "Pilih siapa yang melihat."
     },
     "connector": {
       "labelTaken": "Konektor lain sudah memakai nama ini.",
@@ -14607,6 +14611,25 @@
     "weekly": {
       "name": "Minggu tim"
     }
+  },
+  "whoSees": {
+    "label": "Siapa yang melihat",
+    "everyone": "Seluruh ruang kerja",
+    "me": "Hanya saya",
+    "people": "Orang tertentu",
+    "only": "Hanya {{name}}",
+    "more_other": "{{names}} dan {{count}} lainnya",
+    "some": "beberapa orang",
+    "taskTitle": "Siapa yang melihat tugas ini",
+    "pageTitle": "Siapa yang melihat halaman ini",
+    "admins": "Administrator selalu bisa melihat.",
+    "tied": "Mengikuti orang di percakapan, sampai kamu mengubahnya.",
+    "search": "Cari orang",
+    "noMatch": "Tidak ada orang dengan nama itu",
+    "moreOptions": "Opsi lainnya",
+    "receipt": "Siapa yang melihat: {{who}}",
+    "limited": "akses terbatas",
+    "rolesToo": "Peran yang sudah ada di halaman ini tetap melihatnya."
   },
   "teamTemplates": {
     "lead": "Tim untuk {{org}}, tiap agen di kanalnya sendiri. Kamu bisa menyesuaikannya sebelum membuat.",

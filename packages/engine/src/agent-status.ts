@@ -503,7 +503,7 @@ export async function statusCandidates(
   const [issue, mission, trigger] = await Promise.all([
     run.issueId
       ? db
-          .select({ title: issues.title, channelId: issues.channelId })
+          .select({ title: issues.title, channelId: issues.channelId, restricted: issues.restricted })
           .from(issues)
           .where(and(eq(issues.orgId, run.orgId), eq(issues.id, run.issueId)))
           .then((r) => r[0] ?? null)
@@ -536,7 +536,7 @@ export async function statusCandidates(
   );
   const here = publicChannels.get(run.channelId);
   const out: Omit<StatusCandidate, "key">[] = [];
-  if (issue && (!issue.channelId || publicChannels.has(issue.channelId))) {
+  if (issue && !issue.restricted && (!issue.channelId || publicChannels.has(issue.channelId))) {
     out.push({ kind: "task", subject: issue.title, text: `Working on the task "${issue.title}"` });
   }
   if (mission && mission.agentId === run.agentId && publicChannels.has(mission.channelId)) {

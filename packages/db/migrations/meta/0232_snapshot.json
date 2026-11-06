@@ -1,6 +1,6 @@
 {
   "id": "321e1311-6a6e-4929-a796-be84f7e8e212",
-  "prevId": "ef18325d-7e8e-4a7d-86a5-330671c6cb63",
+  "prevId": "fdaa981e-e157-4e38-ac96-98e6e1fe7d6d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -24316,6 +24316,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'[]'::jsonb"
+        },
+        "github_url": {
+          "name": "github_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "artifact_ids": {
           "name": "artifact_ids",

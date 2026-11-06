@@ -1349,6 +1349,7 @@
     }
   },
   "shell": {
+    "otherChannels": "Otros canales",
     "titleBar": {
       "back": "Atrás",
       "forward": "Adelante"
@@ -1822,6 +1823,7 @@
     "waitingApproval": "esperando aprobación",
     "notMemberTitle": "No estás en este canal",
     "notMemberText": "Únete para leer los mensajes y hablar con las personas y los agentes de aquí.",
+    "adminReading": "No estás en este canal. Los administradores pueden leerlo.",
     "join": "Unirse a #{{channel}}",
     "notFound": "Este canal no existe o ya no está disponible.",
     "loadOlder": "Cargar mensajes anteriores",
@@ -6137,7 +6139,6 @@
     "createdByShort": "Creada por {{name}}",
     "fromMessage": "desde <0>un mensaje en #{{channel}}</0>",
     "fromAgent": "desde un pedido a un agente",
-    "privateTask": "Solo las personas de esta conversación ven esta tarea.",
     "subIssues_one": "Subtareas · {{count}}",
     "subIssues_many": "Subtareas · {{count}}",
     "subIssues_other": "Subtareas · {{count}}",
@@ -6226,6 +6227,8 @@
       "work_update": "{{text}}",
       "work_stopped": "detuvo el trabajo en segundo plano",
       "shared_everyone": "mostró la tarjeta a todo el espacio de trabajo",
+      "audience_everyone": "mostró la tarea a todos",
+      "audience_people": "cambió quién ve la tarea",
       "created": "creó la tarea",
       "renamed": "renombró la tarea",
       "description_changed": "editó la descripción",
@@ -8924,14 +8927,14 @@
     "lockedDone": "Bloqueada. Ahora solo la editan los admins.",
     "unlockedDone": "Desbloqueada. Los miembros pueden volver a editarla.",
     "restricted": "Restringida",
-    "restrictedHint": "Solo los propietarios y las personas elegidas ven esta página.",
+    "restrictedHint": "Solo los administradores y las personas elegidas ven esta página.",
     "audience": "Acceso",
     "audienceTitle": "Acceso a {{title}}",
-    "audienceText": "Los propietarios siempre tienen acceso. Quien no lo tenga no encontrará la página en listas, búsquedas ni enlaces.",
+    "audienceText": "Los administradores siempre tienen acceso. Quien no lo tenga no encontrará la página en listas, búsquedas ni enlaces.",
     "audienceEveryone": "Todos en el espacio de trabajo",
     "audienceEveryoneText": "Cualquier miembro",
     "audienceFolderTitle": "Acceso a la carpeta {{folder}}",
-    "audienceFolderText": "Llega a las páginas de esta carpeta y sus subcarpetas, y a las que se agreguen después. Los propietarios siempre tienen acceso.",
+    "audienceFolderText": "Llega a las páginas de esta carpeta y sus subcarpetas, y a las que se agreguen después. Los administradores siempre tienen acceso.",
     "audienceAgents": "Agentes",
     "audienceAgentsAll": "Todos los agentes",
     "audienceAgentsAllText": "Cualquier agente con acceso a la wiki",
@@ -8989,7 +8992,7 @@
       "everyoneHint": "Cualquier miembro y cualquier agente con acceso a la wiki leen esta página.",
       "peopleAnd": "Todas las personas y {{agents}}",
       "peopleOnly": "Todas las personas, sin agentes",
-      "ownersOnly": "Solo los propietarios",
+      "ownersOnly": "Solo los administradores",
       "withAllAgents": "{{names}} y todos los agentes",
       "more_one": "{{count}} más",
       "more_many": "{{count}} más",
@@ -11461,8 +11464,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Esta persona no está en esta conversación, así que no ve esta tarea.",
-      "deleteForbidden": "Solo quien creó esta tarea o un administrador puede eliminarla."
+      "assigneeOutside": "Esta persona no ve esta tarea. Agrégala primero a Quién lo ve.",
+      "deleteForbidden": "Solo quien creó esta tarea o un administrador puede eliminarla.",
+      "audienceEmpty": "Elige quién lo ve."
     },
     "connector": {
       "labelTaken": "Otro conector ya tiene este nombre.",
@@ -15493,6 +15497,27 @@
     "weekly": {
       "name": "La semana del equipo"
     }
+  },
+  "whoSees": {
+    "label": "Quién lo ve",
+    "everyone": "Todo el espacio de trabajo",
+    "me": "Solo yo",
+    "people": "Personas específicas",
+    "only": "Solo {{name}}",
+    "more_one": "{{names}} y {{count}} más",
+    "more_many": "{{names}} y {{count}} más",
+    "more_other": "{{names}} y {{count}} más",
+    "some": "algunas personas",
+    "taskTitle": "Quién ve esta tarea",
+    "pageTitle": "Quién ve esta página",
+    "admins": "Los administradores siempre lo ven.",
+    "tied": "Sigue a quienes están en la conversación, hasta que lo cambies.",
+    "search": "Buscar persona",
+    "noMatch": "Nadie con ese nombre",
+    "moreOptions": "Más opciones",
+    "receipt": "Quién lo ve: {{who}}",
+    "limited": "acceso limitado",
+    "rolesToo": "Los roles que ya están en esta página la siguen viendo."
   },
   "teamTemplates": {
     "lead": "Un equipo para {{org}}, cada agente en su canal. Puedes ajustarlo antes de crearlo.",

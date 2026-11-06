@@ -3,6 +3,7 @@ import type { DashboardsApi } from "../dashboards/api";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
+import type { AudienceChoice } from "../lib/who-sees";
 import type { WikiAccess } from "../lib/wiki";
 import type {
   SecretToVaultInput,
@@ -1131,6 +1132,8 @@ export interface ApiClient {
     setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
     /** "Mostrar para todos" (ADR 0121): a card from a conversation, shared with the whole workspace. */
     share(orgId: string, id: string): Promise<Issue>;
+    /** Who sees it (ADR 0150): anyone who can edit it changes it. */
+    setAudience(orgId: string, id: string, audience: AudienceChoice): Promise<Issue>;
     activity(orgId: string, id: string): Promise<IssueActivity[]>;
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts its work in the task's conversation. */
@@ -1360,7 +1363,12 @@ export interface ApiClient {
     /** "Fixadas": at the top of the wiki for everyone. */
     pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
     /** Who sees it (null = every member); for people who edit the wiki and manage roles. */
-    audience(orgId: string, slug: string, access: WikiAccess): Promise<WikiPage>;
+    /** `audience` alone is for anyone who edits the page; the rest takes managing roles. */
+    audience(
+      orgId: string,
+      slug: string,
+      access: Partial<WikiAccess> & Pick<WikiAccess, "audience">,
+    ): Promise<WikiPage>;
     /** A folder's audience, and the closest limited folder above it. */
     folderAudience(
       orgId: string,

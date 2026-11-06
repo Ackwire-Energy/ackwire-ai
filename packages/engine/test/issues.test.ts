@@ -739,6 +739,12 @@ describe("issues", () => {
     });
     const ctx = { ...(await runContext(f)), agentId };
     await f.db.update(schema.agentRuns).set({ agentId }).where(eq(schema.agentRuns.id, ctx.runId));
+    // Someone who is no administrator asked: an administrator's run reaches what they reach.
+    const plain = await addMember(f.db, f.org.id, "member", "plain");
+    await f.db
+      .update(schema.messages)
+      .set({ authorUserId: plain.id })
+      .where(eq(schema.messages.id, ctx.triggerMessageId ?? ""));
     const call = (name: string, input: Record<string, unknown>) =>
       f.tools?.invoke(ctx, { toolUseId: crypto.randomUUID(), name, input });
 

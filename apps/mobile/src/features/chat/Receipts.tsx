@@ -139,7 +139,7 @@ function ReceiptList({
         <View style={[styles.grow, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
           <OwnActions action={a} />
-          {a.undoneAt ? <UndoneBy action={a} /> : <CopyHook action={a} />}
+          {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}
         </View>
         <RowButton view={v} big onUndo={() => undo(a)} onRedo={() => redo(a)} />
       </View>
@@ -176,7 +176,7 @@ function ReceiptList({
           <View style={styles.grow}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
             <OwnActions action={a} />
-            {a.undoneAt ? <UndoneBy action={a} /> : <CopyHook action={a} />}
+            {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}
           </View>
           <RowButton view={v} onUndo={() => undo(a)} onRedo={() => redo(a)} />
         </View>
@@ -267,6 +267,37 @@ function CopyHook({ action: a }: { action: AgentAction }) {
     >
       <Text variant="footnote" tone="ink" style={styles.bold}>
         {t("agentActions.copyWebhook")}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** What a receipt offers under its sentence. */
+const HandyLines = ({ action }: { action: AgentAction }) => (
+  <>
+    <WhoSeesLine action={action} />
+    <CopyHook action={action} />
+  </>
+);
+
+/** Under a task the agent made: who sees it, and the way to change it (ADR 0150). */
+function WhoSeesLine({ action: a }: { action: AgentAction }) {
+  const { t } = useTranslation();
+  const mode = a.params.audience;
+  if (a.kind !== "issue.created" || a.undoneAt || (mode !== "everyone" && mode !== "people")) return null;
+  const number = Number(a.params.number);
+  return (
+    <Pressable
+      onPress={() => {
+        tapHaptic();
+        router.push({ pathname: "/who-sees", params: { number } });
+      }}
+      accessibilityRole="button"
+      hitSlop={12}
+      style={({ pressed }) => [styles.copyHook, pressed && styles.pressed]}
+    >
+      <Text variant="footnote" tone="muted">
+        {t("whoSees.receipt", { who: t(mode === "everyone" ? "whoSees.everyone" : "whoSees.some") })}
       </Text>
     </Pressable>
   );

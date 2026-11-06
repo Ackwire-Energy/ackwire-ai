@@ -109,7 +109,11 @@ export function actionTextValues(
     case "issue.created":
     case "issue.updated":
     case "issue.assigned": {
-      const v: Record<string, string> = { number: str(p.number) || str(a.target.number), title };
+      // No title: a limited task, named where not everyone sees it (ADR 0150).
+      const v: Record<string, string> = {
+        number: str(p.number) || str(a.target.number),
+        title: title || t("whoSees.limited"),
+      };
       if (a.kind === "issue.updated") {
         v.fields = fieldWords("issueFields");
         if (fields.length === 1 && fields[0] === "status" && p.status) {

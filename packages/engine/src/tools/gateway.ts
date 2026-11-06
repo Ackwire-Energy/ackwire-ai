@@ -1,6 +1,6 @@
 import { ASK_AGAIN, commandKind, loneMerge, type MergeDone, PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
-import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
+import { auditsCall, callSubject, callTitle, recordToolCall, type ToolCallSubject } from "../agent-audit";
 import {
   COMMAND_RULE_TOOL,
   coveringRules,
@@ -957,7 +957,12 @@ export function createToolGateway(deps: {
         authority?.kind === "routine" ? (authority.brief?.deliverTo.channelId ?? ctx.channelId) : ctx.channelId;
       const audit = (
         outcome: AuditOutcome,
-        extra: { reason?: string | null; approvalId?: string; secretRequestId?: string } = {},
+        extra: {
+          reason?: string | null;
+          approvalId?: string;
+          secretRequestId?: string;
+          about?: ToolCallSubject | null;
+        } = {},
       ) => {
         if (!tool) return Promise.resolve();
         const kind = toolKind(tool).kind;
@@ -997,7 +1002,8 @@ export function createToolGateway(deps: {
           ...(data ? { data } : {}),
           ...(autoApproved ? { autoApproved } : {}),
         });
-        if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });
+        if (outcome)
+          await audit(outcome, outcome === "done" ? { about: callSubject(output) } : { reason: shown(output.content) });
         return { type: "result" as const, output, ...(autoApproved ? { autoApproved } : {}) };
       };
 

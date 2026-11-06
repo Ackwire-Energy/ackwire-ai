@@ -1277,6 +1277,7 @@
     }
   },
   "shell": {
+    "otherChannels": "その他のチャンネル",
     "titleBar": {
       "back": "戻る",
       "forward": "進む"
@@ -1704,6 +1705,7 @@
     "waitingApproval": "承認待ち",
     "notMemberTitle": "このチャンネルに参加していません",
     "notMemberText": "参加すると、メッセージを読んだり、ここにいる人やエージェントと話したりできます。",
+    "adminReading": "このチャンネルには参加していません。管理者は閲覧できます。",
     "join": "#{{channel}}に参加",
     "notFound": "このチャンネルは存在しないか、利用できなくなっています。",
     "loadOlder": "以前のメッセージを読み込む",
@@ -5741,7 +5743,6 @@
     "createdByShort": "作成者: {{name}}",
     "fromMessage": "<0>#{{channel}}のメッセージ</0>から",
     "fromAgent": "エージェントへの依頼から",
-    "privateTask": "このタスクは、この会話の参加者だけに表示されます。",
     "subIssues_other": "サブタスク · {{count}}",
     "fromWebhook": "{{provider}}のイベントから",
     "description": "説明",
@@ -5821,6 +5822,8 @@
       "work_update": "{{text}}",
       "work_stopped": "バックグラウンドの作業を停止しました",
       "shared_everyone": "カードをワークスペース全体に表示しました",
+      "audience_everyone": "タスクを全員に表示しました",
+      "audience_people": "タスクを閲覧できる人を変更しました",
       "created": "タスクを作成しました",
       "renamed": "タスクの名前を変更しました",
       "description_changed": "説明を編集しました",
@@ -8294,14 +8297,14 @@
     "lockedDone": "ロックしました。今後は管理者だけが編集できます。",
     "unlockedDone": "ロックを解除しました。メンバーが再び編集できます。",
     "restricted": "制限付き",
-    "restrictedHint": "このページを見られるのは、オーナーと選ばれた人だけです。",
+    "restrictedHint": "このページを見られるのは、管理者と選ばれた人だけです。",
     "audience": "アクセス",
     "audienceTitle": "{{title}}へのアクセス",
-    "audienceText": "オーナーは常にアクセスできます。アクセス権のない人には、リスト、検索、リンクでこのページが表示されません。",
+    "audienceText": "管理者は常にアクセスできます。アクセス権のない人には、リスト、検索、リンクでこのページが表示されません。",
     "audienceEveryone": "ワークスペースの全員",
     "audienceEveryoneText": "すべてのメンバー",
     "audienceFolderTitle": "フォルダ{{folder}}へのアクセス",
-    "audienceFolderText": "このフォルダとサブフォルダのページ、今後追加されるページにも適用されます。オーナーは常にアクセスできます。",
+    "audienceFolderText": "このフォルダとサブフォルダのページ、今後追加されるページにも適用されます。管理者は常にアクセスできます。",
     "audienceAgents": "エージェント",
     "audienceAgentsAll": "すべてのエージェント",
     "audienceAgentsAllText": "Wikiにアクセスできるすべてのエージェント",
@@ -8355,7 +8358,7 @@
       "everyoneHint": "Wikiにアクセスできるメンバーとエージェントは全員このページを読めます。",
       "peopleAnd": "全員と{{agents}}",
       "peopleOnly": "全員（エージェントなし）",
-      "ownersOnly": "オーナーのみ",
+      "ownersOnly": "管理者のみ",
       "withAllAgents": "{{names}}とすべてのエージェント",
       "more_other": "ほか{{count}}"
     },
@@ -10662,8 +10665,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "この人はこの会話に参加していないため、このタスクを見ることができません。",
-      "deleteForbidden": "このタスクを削除できるのは作成者か管理者だけです。"
+      "assigneeOutside": "この人はこのタスクを見ることができません。先に閲覧できる人に追加してください。",
+      "deleteForbidden": "このタスクを削除できるのは作成者か管理者だけです。",
+      "audienceEmpty": "閲覧できる人を選んでください。"
     },
     "connector": {
       "labelTaken": "この名前はすでに別のコネクタで使われています。",
@@ -14505,6 +14509,25 @@
     "weekly": {
       "name": "チームの1週間"
     }
+  },
+  "whoSees": {
+    "label": "閲覧できる人",
+    "everyone": "ワークスペース全体",
+    "me": "自分のみ",
+    "people": "特定の人",
+    "only": "{{name}}のみ",
+    "more_other": "{{names}}ほか{{count}}人",
+    "some": "一部の人",
+    "taskTitle": "このタスクを閲覧できる人",
+    "pageTitle": "このページを閲覧できる人",
+    "admins": "管理者は常に閲覧できます。",
+    "tied": "変更するまで、会話の参加者に合わせて変わります。",
+    "search": "人を検索",
+    "noMatch": "その名前の人はいません",
+    "moreOptions": "その他のオプション",
+    "receipt": "閲覧できる人：{{who}}",
+    "limited": "アクセス制限あり",
+    "rolesToo": "このページにすでに設定されているロールは引き続き閲覧できます。"
   },
   "teamTemplates": {
     "lead": "{{org}}のチーム。エージェントはそれぞれ自分のチャンネルにいます。作成前に調整できます。",

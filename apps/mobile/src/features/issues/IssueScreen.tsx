@@ -1,5 +1,6 @@
 import {
   type Actor,
+  ApiError,
   type Issue,
   type IssueColumn,
   type IssuePriority,
@@ -76,6 +77,7 @@ import {
 } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
+import { useWhoSeesLabel } from "../shared/WhoSees";
 import { IssueActivityFeed } from "./IssueActivity";
 import {
   columnChoices,
@@ -118,7 +120,8 @@ function IssueView({ number, focusId }: { number: number; focusId: string | null
     ]),
   );
   const sheet = useSheet();
-  const i = issue.data;
+  // Out of reach since it opened (someone changed who sees it): what's on screen goes.
+  const i = issue.error instanceof ApiError && issue.error.status === 404 ? undefined : issue.data;
   const openConversation = useOpenConversation();
   // A notice or a link named a message of its conversation: straight there, once.
   const focused = useRef(false);
@@ -275,6 +278,7 @@ function Head({ issue: i }: { issue: Issue }) {
     i18n.language,
   );
   const assignee = i.assignee;
+  const whoSees = useWhoSeesLabel();
   return (
     <View style={styles.head}>
       <Text variant="display2" accessibilityRole="header" style={styles.bigTitle} maxFontSizeMultiplier={1.4}>
@@ -291,6 +295,7 @@ function Head({ issue: i }: { issue: Issue }) {
       <View style={styles.chips}>
         <StateChip issue={i} />
         {i.priority === "high" ? <Chip icon="flag" label={t("issues.priority.high")} /> : null}
+        {i.audience?.mode === "people" ? <Chip icon="lock" label={whoSees(i.audience)} /> : null}
         {assignee ? (
           <Chip label={dir.nameOf(assignee)} leading={<Face who={assignee} size={14} live={false} />} />
         ) : (
@@ -816,6 +821,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       );
     } else update({ type: "update", id: i.id, patch: { assignee: who } });
   };
+  const whoSees = useWhoSeesLabel();
   const same = (a: Actor | null, b: Actor | null) => (a?.type ?? null) === (b?.type ?? null) && a?.id === b?.id;
   const pick = (items: ActionItem[]) => sheet.open(<ActionList items={items} />);
   const statusItems = (): ActionItem[] =>
@@ -908,6 +914,16 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       label: t("issues.github.label"),
       ...(i.githubUrl ? { hint: githubLinkLabel(i.githubUrl) } : {}),
       onPress: () => sheet.open(<GithubLinkForm issue={i} />),
+    },
+    {
+      key: "audience",
+      icon: i.audience?.mode === "people" ? "lock" : "globe",
+      label: t("whoSees.label"),
+      hint: whoSees(i.audience ?? { mode: "everyone" }),
+      onPress: () => {
+        sheet.close();
+        router.push({ pathname: "/who-sees", params: { number: i.number } });
+      },
     },
   ];
   if (w?.state === "running" && w.runId) {

@@ -12,11 +12,13 @@ import {
   type IssueStatus,
   type IssueView,
   listIssues,
+  nameableIn,
   setCriterion,
   updateIssue,
   type WorkActor,
 } from "./issues";
 import { listMembers } from "./organizations";
+import { chosenAudience, visibleToField } from "./requester";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 
@@ -130,7 +132,8 @@ async function issueChange(
   if (diff.fields.length === 0) return null;
   const assignee = i.assignee;
   const name = assignee ? (await assigneeNames(deps, ctx, [i])).get(assignee.id)?.replace(" (you)", "") : undefined;
-  const params: AgentActionParams = { number: i.number, title: i.title, fields: diff.fields };
+  const title = (await nameableIn(deps.db, ctx.channelId, i)) ? i.title : "";
+  const params: AgentActionParams = { number: i.number, title, fields: diff.fields };
   if (diff.fields.includes("status")) params.status = i.status;
   if (diff.fields.includes("priority")) params.priority = i.priority;
   if (diff.fields.includes("dueDate")) params.dueDate = i.dueDate;
@@ -149,7 +152,7 @@ async function issueChange(
       diff.fields.every((f) => f === "assignee" || (f === "status" && i.status === "in_progress"))
         ? "issue.assigned"
         : "issue.updated",
-    target: { type: "issue", id: i.id, number: i.number, title: i.title },
+    target: { type: "issue", id: i.id, number: i.number, title },
     params,
     before: diff.before,
     after: diff.after,
@@ -165,6 +168,19 @@ const assigneeField = {
 
 const STATUSES = ["todo", "in_progress", "in_review", "done", "canceled"];
 const PRIORITIES = ["low", "normal", "high"];
+
+/** What the agent tells the person after making a task: they change it on the task, in one click. */
+function whoSees(i: IssueView, nameable: boolean) {
+  const { mode, channelId, userIds } = i.audience;
+  const who =
+    mode === "everyone"
+      ? "everyone in the workspace"
+      : channelId
+        ? "the people in this conversation"
+        : `${userIds.length} chosen ${userIds.length === 1 ? "person" : "people"}`;
+  const told = `Who sees it: ${who}, and administrators. Say so in your reply; they can change it on the task.`;
+  return nameable ? told : `${told} Others read this conversation: don't repeat what the task says here.`;
+}
 
 /**
  * Issue tools through the Tool Gateway: `list_issues` (`issues:read`),
@@ -207,7 +223,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     {
       name: "create_issue",
       description:
-        "Create a task on this workspace's board: task, tarefa or backlog mean this board, never GitHub or another tool unless the person names it (criar tarefa no backlog). It takes a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo. Made in a DM or a private channel, only people in that conversation see it.",
+        "Create a task on this workspace's board: task, tarefa or backlog mean this board, never GitHub or another tool unless the person names it (criar tarefa no backlog). It takes a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
@@ -220,6 +236,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           assignee: assigneeField,
           due_date: { type: "string", maxLength: 10, description: "Due date as YYYY-MM-DD" },
           github_url: GITHUB_URL_FIELD,
+          visible_to: visibleToField,
         },
         required: ["title"],
         additionalProperties: false,
@@ -227,6 +244,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
       async execute(input, ctx) {
         try {
           const assignee = str(input.assignee) ? await assigneeOf(deps, ctx, str(input.assignee)) : undefined;
+          const audience = await chosenAudience(ctx, input.visible_to);
           const i = await actWithUndo(
             ctx,
             (db) =>
@@ -239,15 +257,23 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
                 ...(assignee !== undefined ? { assignee } : {}),
                 ...(str(input.due_date) ? { dueDate: str(input.due_date) } : {}),
                 ...(str(input.github_url) ? { githubUrl: str(input.github_url) } : {}),
+                ...(audience ? { audience } : {}),
               }),
-            (created) => ({
-              kind: "issue.created",
-              target: { type: "issue", id: created.id, number: created.number, title: created.title },
-              params: { number: created.number, title: created.title },
-              after: issueSnapshot(created),
-            }),
+            async (created, db) => {
+              const title = (await nameableIn(db, ctx.channelId, created)) ? created.title : "";
+              return {
+                kind: "issue.created",
+                target: { type: "issue", id: created.id, number: created.number, title },
+                params: { number: created.number, title, audience: created.audience.mode },
+                after: issueSnapshot(created),
+              };
+            },
           );
-          return { content: `Created ${await lineOf(deps, ctx, i)}`, data: { issue: { id: i.id, number: i.number } } };
+          const nameable = await nameableIn(deps.db, ctx.channelId, i);
+          return {
+            content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i, nameable)}`,
+            data: { issue: { id: i.id, number: i.number } },
+          };
         } catch (error) {
           return failed(error);
         }
@@ -327,7 +353,10 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             },
             (i, db) => issueChange({ ...deps, db }, ctx, before, i),
           );
-          return { content: `Updated ${await lineOf(deps, ctx, latest)}` };
+          return {
+            content: `Updated ${await lineOf(deps, ctx, latest)}`,
+            data: { issue: { id: latest.id, number: latest.number } },
+          };
         } catch (error) {
           return failed(error);
         }
@@ -347,7 +376,10 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
         try {
           const current = await find(deps, ctx, str(input.issue));
           await commentIssue(deps, actorOf(ctx), ctx.orgId, current.id, str(input.text));
-          return { content: `Commented on #${current.number}.` };
+          return {
+            content: `Commented on #${current.number}.`,
+            data: { issue: { id: current.id, number: current.number } },
+          };
         } catch (error) {
           return failed(error);
         }
