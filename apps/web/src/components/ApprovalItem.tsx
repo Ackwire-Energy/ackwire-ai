@@ -278,12 +278,11 @@ export function InlineApproval({
           : aheadEndLine(t, approval);
     const summary = approvalSummary(approval, i18n.language);
     const requester = requesterDecidesLine(t, approval);
-    // What was decided (so several requests for one tool are told apart), who asked and why: behind "Ver detalhes".
-    const details = [
-      summary,
-      requester,
-      approval.reason ? t("approval.reasonLine", { reason: approval.reason }) : "",
-    ].filter(Boolean);
+    // What was decided stays in the words, so several requests for one tool are told apart; who asked and why sit
+    // behind "See details".
+    const details = [requester, approval.reason ? t("approval.reasonLine", { reason: approval.reason }) : ""].filter(
+      Boolean,
+    );
     return (
       <RequestDone
         done={approval.status === "approved"}
@@ -301,6 +300,7 @@ export function InlineApproval({
         action={ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} pill />}
       >
         {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}: <b>{approvalTitle(t, approval)}</b>
+        {summary && ` · ${summary}`}
       </RequestDone>
     );
   }

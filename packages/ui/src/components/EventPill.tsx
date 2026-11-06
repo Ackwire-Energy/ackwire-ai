@@ -83,7 +83,7 @@ export function EventPillMore({
   return (
     <EventPillAction aria-expanded={open} className={cx("ac-eventpill__more", className)} {...rest}>
       {children}
-      <Icon name="chevronRight" size={12} className="ac-eventpill__chev" />
+      <Icon name="chevronRight" size={14} className="ac-eventpill__chev" />
     </EventPillAction>
   );
 }

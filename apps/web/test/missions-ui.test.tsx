@@ -73,10 +73,9 @@ describe("Missões", () => {
       const view = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
       await settle(8);
       const line = document.querySelector('[data-message-id="m-task"]') as HTMLElement;
-      expect(line.textContent).toStartWith(
-        computers.length > 1
-          ? "“Rodar os testes” terminou em 2 min no MacBook ·"
-          : "“Rodar os testes” terminou em 2 min ·",
+      // The pill's words, its time in a slot of its own.
+      expect(line.querySelector(".ac-eventpill__text")?.textContent).toBe(
+        computers.length > 1 ? "“Rodar os testes” terminou em 2 min no MacBook" : "“Rodar os testes” terminou em 2 min",
       );
       view.unmount();
     }
