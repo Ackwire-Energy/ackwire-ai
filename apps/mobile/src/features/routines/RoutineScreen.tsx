@@ -642,7 +642,8 @@ function RunItem({ run: x, routine: r, last }: { run: RoutineRun; routine: Routi
         </Pressable>
         {words ? <FoldedBody body={words} muted /> : null}
         {link && !approval ? (
-          <Pressable onPress={go} accessibilityRole="button" hitSlop={13}>
+          // Nothing added above: that is where its words' "Mostrar mais" is.
+          <Pressable onPress={go} accessibilityRole="button" hitSlop={{ bottom: 13, left: 13, right: 13 }}>
             <Text variant="footnote" tone="muted" style={styles.open}>
               {t("routines.openInChat")}
             </Text>

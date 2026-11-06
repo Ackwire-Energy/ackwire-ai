@@ -251,7 +251,7 @@ export interface RoutineRunView {
   /** The coded reason of a skip, miss, failure or stop (the app translates it); `stopped` carries `by`. */
   code: string | null;
   codeParams?: Record<string, string>;
-  /** Its record or report, cut; '' when the viewer may not see what routines read. */
+  /** Its record or report, cut in `recentRuns`; '' when the viewer may not see what routines read. */
   summary: string;
   /** Recent runs only: its cost (tokens on a plan) relative to the priciest of them (0–1). A share, never money. */
   weight?: number;

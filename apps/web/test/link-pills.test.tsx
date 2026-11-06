@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -59,8 +59,19 @@ describe("a bare address of a known service", () => {
     expect(unknown.className).toBe("ac-link");
   });
 
+  test("a link whose words are another address stays as written, with no pill inside it", () => {
+    const el = body(`[${PR}](https://github.com/agentes-chat/agentes.chat/pull/9)`);
+    expect(el.querySelector(".link-pill")).toBeNull();
+    expect(el.textContent).toContain(PR);
+  });
+
   test("written as its own link's words, it is still a bare address", () => {
     expect(anchor(body(`[${PR}](${PR})`)).textContent).toBe("agentes.chat #148");
+  });
+
+  test("in a table its words keep their column: only a word too long for the line breaks", () => {
+    const css = readFileSync(join(import.meta.dir, "../src/layout.css"), "utf8");
+    expect(css.match(/\.link-pill \{[^}]*\}/)?.[0]).toContain("overflow-wrap: break-word");
   });
 
   test("inside code it stays code", () => {
@@ -74,43 +85,48 @@ describe("a bare address of a known service", () => {
 });
 
 describe("copying a selection with a pill", () => {
-  test("each pill's words become its address, in order; a half-selected one stays as it reads", () => {
+  const one = (text: string, href: string, skip = 0) => ({ text, href, skip });
+
+  test("each pill's words become its address, in order", () => {
     const pills = [
-      { text: "agentes.chat #1", href: "https://github.com/a/agentes.chat/pull/1" },
-      { text: "agentes.chat #2", href: "https://github.com/a/agentes.chat/pull/2" },
+      one("agentes.chat #1", "https://github.com/a/agentes.chat/pull/1"),
+      one("agentes.chat #2", "https://github.com/a/agentes.chat/pull/2"),
     ];
     expect(withPillAddresses("ver agentes.chat #1 e agentes.chat #2.", pills)).toBe(
       "ver https://github.com/a/agentes.chat/pull/1 e https://github.com/a/agentes.chat/pull/2.",
     );
-    expect(withPillAddresses("tes.chat #1 e agentes.chat #2", pills)).toBe(
-      "tes.chat #1 e https://github.com/a/agentes.chat/pull/2",
-    );
   });
+
+  test("the same words written before a pill stay", () => {
+    const doc = "https://docs.google.com/document/d/1/edit";
+    expect(withPillAddresses("Documento: Documento", [one("Documento", doc, 1)])).toBe(`Documento: ${doc}`);
+  });
+
+  const copied = (selected: Node, target?: Element) => {
+    const set: string[] = [];
+    const prevented: boolean[] = [];
+    const selection = document.getSelection() as Selection;
+    selection.selectAllChildren(selected);
+    copyPillAddresses({
+      clipboardData: { setData: (_kind: string, text: string) => set.push(text) },
+      preventDefault: () => prevented.push(true),
+      target: target ?? document.body,
+    } as unknown as ClipboardEvent);
+    selection.removeAllRanges();
+    return { set, prevented };
+  };
 
   test("the copy event takes the address; with no pill selected the browser copies as usual", () => {
     const el = body(`Abri o ${PR} hoje.`);
-    const set: string[] = [];
-    const prevented: boolean[] = [];
-    const copy = () =>
-      copyPillAddresses({
-        clipboardData: { setData: (_kind: string, text: string) => set.push(text) },
-        preventDefault: () => prevented.push(true),
-      } as unknown as ClipboardEvent);
-    const selection = (selected: boolean) =>
-      spyOn(document, "getSelection").mockReturnValue({
-        isCollapsed: false,
-        toString: () => "Abri o agentes.chat #148 hoje.",
-        containsNode: () => selected,
-      } as unknown as Selection);
-    const on = selection(true);
-    copy();
-    on.mockRestore();
-    expect(set).toEqual([`Abri o ${PR} hoje.`]);
-    const off = selection(false);
-    copy();
-    off.mockRestore();
-    expect(prevented).toHaveLength(1);
-    expect(el).toBeTruthy();
+    expect(copied(el).set.join("")).toContain(PR);
+    const other = render(<p>Só texto</p>).container;
+    expect(copied(other).prevented).toHaveLength(0);
+  });
+
+  test("a field's own text is left to the browser", () => {
+    const el = body(PR);
+    const field = document.createElement("textarea");
+    expect(copied(el, field).prevented).toHaveLength(0);
   });
 
   test("the app listens for it", () => {

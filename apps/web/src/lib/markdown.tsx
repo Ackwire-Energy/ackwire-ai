@@ -105,13 +105,13 @@ export function renderInline(
   /** Each plain word in its own `.ac-word` span (a streaming answer's words fade in). */
   words?: boolean,
   channel?: ChannelRenderer,
+  /** Bare addresses as pills. Off while being written, which would change pill at every letter, and in a link's words. */
+  pills = !words,
 ): ReactNode[] {
   const out: ReactNode[] = [];
   let rest = text;
   let n = 0;
-  // An address still being written would change pill at every letter (`…/pull/1`, `…/pull/14`): plain until it settles.
-  const pills = !words;
-  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words, channel);
+  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words, channel, pills);
   while (rest) {
     const m = rest.match(INLINE);
     if (!m || m.index === undefined) {
@@ -140,9 +140,8 @@ export function renderInline(
       const parts = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
       const href = parts?.[2] ?? "";
       const label = parts?.[1] ?? "";
-      out.push(
-        SAFE_URL.test(href) ? link(href, k, renderInline(label, k, mention, wiki), pills && label === href) : tok,
-      );
+      const own = renderInline(label, k, mention, wiki, undefined, undefined, undefined, false);
+      out.push(SAFE_URL.test(href) ? link(href, k, own, pills && label === href) : tok);
     } else if (m[6]) {
       const { title, label } = parseWikiToken(tok);
       out.push(

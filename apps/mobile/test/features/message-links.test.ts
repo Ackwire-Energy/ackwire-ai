@@ -63,4 +63,14 @@ describe("a link pill on the phone (`Spans`: a link whose words are its address)
   test("a link with its own words stays as written", () => {
     expect(bare(`[o PR de ontem](${PR})`)).toEqual([]);
   });
+
+  test("under bold or italic it is still an address, as on the web", () => {
+    expect(bare(`**${PR}**`)).toEqual(["#148"]);
+    expect(bare(`*${PR}*`)).toEqual(["#148"]);
+    expect(parseInline(`**Veja ${PR}, hoje**`)).toEqual([
+      { kind: "bold", text: "Veja " },
+      { kind: "link", text: PR, href: PR },
+      { kind: "bold", text: ", hoje" },
+    ]);
+  });
 });

@@ -67,7 +67,10 @@ const STRIPE_WORDS: Record<string, LinkPillWord> = {
 };
 /** github.com's own pages at two segments, which read like `owner/repo`. */
 const GITHUB_PAGES =
-  "apps|collections|customer-stories|enterprise|explore|features|marketplace|notifications|orgs|organizations|pricing|security|settings|sponsors|topics|trending|users";
+  "about|account|apps|codespaces|collections|contact|copilot|customer-stories|dashboard|enterprise|explore|features|issues|join|login|marketplace|mobile|new|notifications|open-source|orgs|organizations|pricing|pulls|readme|resources|search|security|sessions|settings|site|solutions|sponsors|stars|team|topics|trending|users|watching";
+
+/** A project under any number of groups, by whole segments: anything looser takes seconds on a long address. */
+const GITLAB_PROJECT = String.raw`\/(?:[^/]+\/)*([\w.-]+)`;
 
 /**
  * Every service whose addresses have a fixed shape. A path that fits no rule stays a plain link, so a page of a
@@ -89,7 +92,7 @@ const SERVICES: readonly Service[] = [
       [/^\/[\w.-]+\/([\w.-]+)\/releases\/tag\/([^/]+)\/?$/, ([repo, tag]) => ({ name: repo, ref: decoded(tag ?? "") })],
       [/^\/[\w.-]+\/([\w.-]+)\/blob\/.*\/([^/]+)$/, ([repo, file]) => ({ name: repo, ref: decoded(file ?? "") })],
       [
-        new RegExp(String.raw`^\/((?!(?:${GITHUB_PAGES})\/)[\w.-]+\/[\w.-]+)\/?$`),
+        new RegExp(String.raw`^\/((?!(?:${GITHUB_PAGES})\/)[\w.-]+\/[\w.-]+)(?<!\.git)\/?$`),
         ([repo]) => ({ name: repo as string }),
       ],
     ],
@@ -100,9 +103,18 @@ const SERVICES: readonly Service[] = [
     mark: "gitlab",
     color: "#FC6D26",
     rules: [
-      [/^\/.*?([\w.-]+)\/-\/merge_requests\/(\d+)(?:\/|$)/, ([p, n]) => ({ name: p, ref: `!${n}`, kind: "merge" })],
-      [/^\/.*?([\w.-]+)\/-\/issues\/(\d+)(?:\/|$)/, ([p, n]) => ({ name: p, ref: `#${n}`, kind: "issue" })],
-      [/^\/.*?([\w.-]+)\/-\/commit\/([0-9a-f]{7,40})(?:\/|$)/, ([p, sha]) => ({ name: p, ref: shortSha(sha ?? "") })],
+      [
+        new RegExp(String.raw`^${GITLAB_PROJECT}\/-\/merge_requests\/(\d+)(?:\/|$)`),
+        ([p, n]) => ({ name: p, ref: `!${n}`, kind: "merge" }),
+      ],
+      [
+        new RegExp(String.raw`^${GITLAB_PROJECT}\/-\/issues\/(\d+)(?:\/|$)`),
+        ([p, n]) => ({ name: p, ref: `#${n}`, kind: "issue" }),
+      ],
+      [
+        new RegExp(String.raw`^${GITLAB_PROJECT}\/-\/commit\/([0-9a-f]{7,40})(?:\/|$)`),
+        ([p, sha]) => ({ name: p, ref: shortSha(sha ?? "") }),
+      ],
     ],
   },
   {
@@ -191,15 +203,17 @@ const SERVICES: readonly Service[] = [
 
 /** Parsed by hand, not with `URL`: this runs on the phone too, whose `URL` is partial. */
 const ADDRESS = /^https?:\/\/([^/?#]+)(\/[^?#]*)?/i;
+/** What a browser resolves before leaving: `/document/d/x/../../../url` opens `/url`, so the shape it shows isn't where it goes. */
+const REWRITTEN = /\\|(?:^|\/)(?:\.|%2e){1,2}(?:\/|$)/i;
 
 /**
  * The pill of a bare address, or null when it stays a plain link. Only from the address: nothing is fetched. Only
  * the exact host earns a logo (`github.com.evil.example`, `evil.example/github.com` don't), and an address with a
- * user name or a port keeps showing them.
+ * user name or a port keeps showing them, and a path that a browser rewrites keeps showing where it really goes.
  */
 export function linkPill(href: string): LinkPill | null {
   const [, authority, pathname = "/"] = href.match(ADDRESS) ?? [];
-  if (!authority) return null;
+  if (!authority || REWRITTEN.test(pathname)) return null;
   const host = authority.toLowerCase().replace(/^www\./, "");
   for (const s of SERVICES) {
     if (!s.host.test(host)) continue;

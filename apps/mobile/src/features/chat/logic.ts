@@ -725,6 +725,16 @@ function trimUrl(url: string) {
   return url.slice(0, end);
 }
 
+/** Words under a mark, with their bare addresses still links (`**https://…**`), as on the web. */
+function marked(text: string, out: Inline[], kind: "bold" | "italic") {
+  const parts = text.split(/(\bhttps?:\/\/[^\s<>`]+)/);
+  for (const [i, part] of parts.entries()) {
+    const url = i % 2 ? trimUrl(part) : "";
+    if (url) out.push({ kind: "link", text: url, href: url });
+    mentions(part.slice(url.length), out, kind);
+  }
+}
+
 /** Inline marks: `code`, [links](https://…) and bare https:// addresses, **bold**, *italic* / _italic_, @mentions. */
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
@@ -744,8 +754,8 @@ export function parseInline(text: string): Inline[] {
       if (!tok.startsWith("!") && SAFE_HREF.test(href)) out.push({ kind: "link", text: label || href, href });
       else mentions(label, out, "text");
     } else if (m[5]) out.push({ kind: "link", text: tok, href: tok });
-    else if (m[6]) mentions(tok.slice(2, -2), out, "bold");
-    else mentions(tok.slice(1, -1), out, "italic");
+    else if (m[6]) marked(tok.slice(2, -2), out, "bold");
+    else marked(tok.slice(1, -1), out, "italic");
     last = at + tok.length;
   }
   if (last < text.length) mentions(text.slice(last), out, "text");

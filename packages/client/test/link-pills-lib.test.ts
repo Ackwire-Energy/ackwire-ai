@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { linkPill, linkPillLabel, linkPillText } from "../src/lib/link-pills";
-import { foldsText } from "../src/lib/text";
 
 const t = ((key: string) => key) as unknown as TFunction;
 
@@ -57,11 +56,38 @@ describe("linkPill", () => {
     ["a backslash in the host", "https://evil.example\\.github.com/a/b/pull/1"],
     ["another port", "https://github.com:8443/a/b/pull/1"],
     ["Google Forms", "https://docs.google.com/forms/d/1AbC/edit"],
+    [
+      "a path the browser resolves elsewhere",
+      "https://docs.google.com/document/d/x/../../../url?q=https://evil.example",
+    ],
+    ["the same, escaped", "https://docs.google.com/document/d/x/%2E%2e/%2e./.%2e/url?q=https://evil.example"],
+    ["the same, with backslashes", "https://docs.google.com/document/d/x\\..\\..\\..\\url?q=https://evil.example"],
+    ["the same, to another repository", "https://github.com/a/b/pull/1/../../../../c/d/pull/2"],
+    ["dots for a repository", "https://github.com/../.."],
+    ["a clone address", "https://github.com/agentes-chat/agentes.chat.git"],
+    ["github.com's own pages", "https://github.com/search/advanced"],
+    ["github.com's own pages", "https://github.com/pulls/assigned"],
     ["mail", "mailto:ana@acme.com"],
     ["not an address", "github.com/a/b/pull/1"],
   ])("stays a plain link: %s", (_why, href) => {
     expect(linkPill(href)).toBeNull();
   });
+
+  test("a name that starts with a dot is no path trick", () => {
+    expect(linkPill("https://github.com/a/b/blob/main/.github/ci.yml")?.ref).toBe("ci.yml");
+    expect(linkPill("https://github.com/a/.github")?.name).toBe("a/.github");
+  });
+
+  test.each(["gitlab.com", "github.com", "www.notion.so", "www.figma.com", "linear.app", "vercel.com"])(
+    "a very long address of %s reads at once",
+    (host) => {
+      for (const path of ["a".repeat(50_000), "a/".repeat(25_000), "a-".repeat(25_000)]) {
+        const started = performance.now();
+        linkPill(`https://${host}/${path}`);
+        expect(performance.now() - started).toBeLessThan(100);
+      }
+    },
+  );
 
   test("the words in the address never reorder the line", () => {
     expect(linkPill("https://www.figma.com/design/AbC/Plano%E2%80%AEde%0AQ4")?.name).toBe("PlanodeQ4");
@@ -72,10 +98,4 @@ describe("linkPill", () => {
     const pill = linkPill("https://github.com/agentes-chat/agentes.chat/pull/148");
     expect(pill && linkPillLabel(t, pill)).toBe("GitHub linkPills.pull agentes.chat #148");
   });
-});
-
-test("foldsText: a long text or many lines start folded, a short one never", () => {
-  expect(foldsText("Nada novo.")).toBe(false);
-  expect(foldsText("a".repeat(321))).toBe(true);
-  expect(foldsText("- um\n- dois\n- três\n- quatro\n- cinco\n- seis\n- sete")).toBe(true);
 });

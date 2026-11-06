@@ -9,7 +9,6 @@ import {
 } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
-import { plainInline } from "@agenteschat/client/lib/markdown";
 import { proposalTitle } from "@agenteschat/client/lib/proposals";
 import { excerpt } from "@agenteschat/client/lib/text";
 import { Avatar, Button, Card, Chip, Icon, Meter, PlanMeter } from "@agenteschat/ui";
@@ -182,7 +181,7 @@ export function OverviewTab() {
                     <RunIcon run={r} />
                     <span className="agp-li__t">
                       <b className="ac-captop">
-                        {r.private ? t("agent.runPrivate") : plainInline(r.what) || t("agent.runNoText")}
+                        {r.private ? t("agent.runPrivate") : excerpt(r.what, 200) || t("agent.runNoText")}
                       </b>
                       <span>
                         {runWhere(t, r, channels.data ?? [])}

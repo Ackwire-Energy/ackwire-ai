@@ -424,7 +424,7 @@ function HistoryRow({ update, name, now }: { update: WidgetUpdate; name: string;
 
 const historyFailure = (t: TFunction, u: WidgetUpdate, name: string) =>
   u.failureCode === "agent_reported" && u.summary
-    ? u.summary
+    ? plainInline(u.summary)
     : failureText(t, { code: u.failureCode ?? "error", detail: u.summary || null }, name);
 
 /** "Ask for a change": the words go to the agent, who redoes the widget with them. */
