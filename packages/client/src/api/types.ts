@@ -166,6 +166,8 @@ export interface Instance {
   minApi: number;
   /** The server's own address (`PUBLIC_URL`), the only one its realtime accepts. */
   url: string;
+  /** Where to get the server's source code (AGPL-3.0 section 13; absent: an older server). */
+  sourceUrl?: string;
   signIn: { email: boolean; google: boolean; github: boolean; apple: boolean };
   signup: "open" | "invite";
   /** No account yet, and the first one only through the owner link the setup printed (absent: false). */

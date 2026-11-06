@@ -11724,7 +11724,8 @@
       "media": "GIF dan stiker",
       "voice": "Suara",
       "apps": "Aplikasi AI",
-      "approvals": "Persetujuan"
+      "approvals": "Persetujuan",
+      "about": "Tentang agentes.chat"
     },
     "sectionText": {
       "account": "Profilmu dan tampilan aplikasi untukmu.",
@@ -11746,7 +11747,15 @@
       "media": "Apa yang bisa dikirim di percakapan, serta GIF dan stiker agen.",
       "voice": "Pesan suara di percakapan, dan siapa yang mengubah suara menjadi teks.",
       "apps": "Minta tugas ke agen dari Claude, Cursor, dan aplikasi lain.",
-      "approvals": "Siapa yang memutuskan untukmu saat agen meminta persetujuanmu."
+      "approvals": "Siapa yang memutuskan untukmu saat agen meminta persetujuanmu.",
+      "about": "Siapa pembuatnya, lisensinya, dan letak kode sumbernya."
+    },
+    "about": {
+      "basedOn": "Berdasarkan <site>agentes.chat</site> oleh Codari Global, LLC",
+      "version": "Versi",
+      "license": "Perangkat lunak bebas di bawah <license>GNU Affero General Public License v3</license>, tanpa jaminan.",
+      "source": "Kode sumber",
+      "copyright": "Copyright © 2026 Codari Global, LLC dan para kontributor"
     },
     "title": "Pengaturan",
     "account": {

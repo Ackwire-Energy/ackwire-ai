@@ -12563,7 +12563,8 @@
       "media": "GIF et stickers",
       "voice": "Voix",
       "apps": "Applications d'IA",
-      "approvals": "Approbations"
+      "approvals": "Approbations",
+      "about": "À propos d’agentes.chat"
     },
     "sectionText": {
       "account": "Votre profil et l'apparence de l'app pour vous.",
@@ -12585,7 +12586,15 @@
       "media": "Ce qu'on peut envoyer dans une conversation, et les GIF et stickers des agents.",
       "voice": "Les messages vocaux dans les conversations, et qui transforme la voix en texte.",
       "apps": "Confiez des tâches aux agents depuis Claude, Cursor et d'autres apps.",
-      "approvals": "Qui décide pour vous quand un agent demande votre approbation."
+      "approvals": "Qui décide pour vous quand un agent demande votre approbation.",
+      "about": "Qui le fait, sa licence et où trouver son code source."
+    },
+    "about": {
+      "basedOn": "Basé sur <site>agentes.chat</site> de Codari Global, LLC",
+      "version": "Version",
+      "license": "Logiciel libre sous la <license>GNU Affero General Public License v3</license>, sans garantie.",
+      "source": "Code source",
+      "copyright": "Copyright © 2026 Codari Global, LLC et contributeurs"
     },
     "title": "Paramètres",
     "account": {

@@ -11662,7 +11662,8 @@
       "media": "GIF와 스티커",
       "voice": "음성",
       "apps": "AI 앱",
-      "approvals": "승인"
+      "approvals": "승인",
+      "about": "agentes.chat 정보"
     },
     "sectionText": {
       "account": "내 프로필과 앱이 보이는 방식이에요.",
@@ -11684,7 +11685,15 @@
       "media": "대화에서 보낼 수 있는 것과 에이전트의 GIF, 스티커예요.",
       "voice": "대화의 음성 메시지와, 음성을 텍스트로 바꾸는 곳.",
       "apps": "Claude, Cursor 같은 앱에서 에이전트에게 작업을 맡겨요.",
-      "approvals": "에이전트가 승인을 요청할 때 대신 결정하는 사람이에요."
+      "approvals": "에이전트가 승인을 요청할 때 대신 결정하는 사람이에요.",
+      "about": "만든 곳, 라이선스, 소스 코드 위치."
+    },
+    "about": {
+      "basedOn": "Codari Global, LLC의 <site>agentes.chat</site> 기반",
+      "version": "버전",
+      "license": "<license>GNU Affero General Public License v3</license>에 따른 자유 소프트웨어이며 보증은 없습니다.",
+      "source": "소스 코드",
+      "copyright": "Copyright © 2026 Codari Global, LLC 및 기여자"
     },
     "title": "설정",
     "account": {

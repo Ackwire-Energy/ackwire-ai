@@ -12185,7 +12185,8 @@
       "media": "GIF's en stickers",
       "voice": "Spraak",
       "apps": "AI-apps",
-      "approvals": "Goedkeuringen"
+      "approvals": "Goedkeuringen",
+      "about": "Over agentes.chat"
     },
     "sectionText": {
       "account": "Je profiel en hoe de app er voor jou uitziet.",
@@ -12207,7 +12208,15 @@
       "media": "Wat je in een gesprek kunt sturen, en de gifs en stickers van de agents.",
       "voice": "Spraakberichten in gesprekken, en wie spraak omzet in tekst.",
       "apps": "Geef de agents taken vanuit Claude, Cursor en andere apps.",
-      "approvals": "Wie voor je beslist als een agent om je goedkeuring vraagt."
+      "approvals": "Wie voor je beslist als een agent om je goedkeuring vraagt.",
+      "about": "Wie het maakt, de licentie en waar de broncode staat."
+    },
+    "about": {
+      "basedOn": "Gebaseerd op <site>agentes.chat</site> van Codari Global, LLC",
+      "version": "Versie",
+      "license": "Vrije software onder de <license>GNU Affero General Public License v3</license>, zonder garantie.",
+      "source": "Broncode",
+      "copyright": "Copyright © 2026 Codari Global, LLC en bijdragers"
     },
     "title": "Instellingen",
     "account": {

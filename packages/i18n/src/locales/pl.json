@@ -12961,7 +12961,8 @@
       "media": "GIF-y i naklejki",
       "voice": "Głos",
       "apps": "Aplikacje AI",
-      "approvals": "Zatwierdzenia"
+      "approvals": "Zatwierdzenia",
+      "about": "O agentes.chat"
     },
     "sectionText": {
       "account": "Twój profil i wygląd aplikacji dla ciebie.",
@@ -12983,7 +12984,15 @@
       "media": "Co można wysłać w rozmowie, oraz GIF-y i naklejki agentów.",
       "voice": "Wiadomości głosowe w rozmowach i to, kto zamienia głos na tekst.",
       "apps": "Zlecaj zadania agentom z Claude, Cursor i innych aplikacji.",
-      "approvals": "Kto decyduje za ciebie, gdy agent prosi o twoją zgodę."
+      "approvals": "Kto decyduje za ciebie, gdy agent prosi o twoją zgodę.",
+      "about": "Kto go tworzy, jego licencja i gdzie jest kod źródłowy."
+    },
+    "about": {
+      "basedOn": "Oparte na <site>agentes.chat</site> od Codari Global, LLC",
+      "version": "Wersja",
+      "license": "Wolne oprogramowanie na licencji <license>GNU Affero General Public License v3</license>, bez gwarancji.",
+      "source": "Kod źródłowy",
+      "copyright": "Copyright © 2026 Codari Global, LLC i współtwórcy"
     },
     "title": "Ustawienia",
     "account": {

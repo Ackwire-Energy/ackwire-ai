@@ -11759,6 +11759,7 @@ export const en = {
       voice: "Voice",
       apps: "AI apps",
       approvals: "Approvals",
+      about: "About agentes.chat",
     },
     sectionText: {
       account: "Your profile and how the app looks for you.",
@@ -11781,6 +11782,18 @@ export const en = {
       voice: "Voice messages in conversations, and who turns voice into text.",
       apps: "Ask the agents for tasks from Claude, Cursor and other apps.",
       approvals: "Who decides for you when an agent asks for your approval.",
+      about: "Who makes it, its license and where its source code is.",
+    },
+    /**
+     * The license's required attribution (AGPL-3.0 section 7(b), see LICENSE): translate it, but keep
+     * "agentes.chat" and "Codari Global, LLC" and its meaning.
+     */
+    about: {
+      basedOn: "Based on <site>agentes.chat</site> by Codari Global, LLC",
+      version: "Version",
+      license: "Free software under the <license>GNU Affero General Public License v3</license>, with no warranty.",
+      source: "Source code",
+      copyright: "Copyright © 2026 Codari Global, LLC and contributors",
     },
     title: "Settings",
     account: {

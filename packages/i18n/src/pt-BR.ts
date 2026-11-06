@@ -11871,6 +11871,7 @@ export const ptBR = {
       voice: "Voz",
       apps: "Apps de IA",
       approvals: "Aprovações",
+      about: "Sobre o agentes.chat",
     },
     sectionText: {
       account: "Seu perfil e como o app fica para você.",
@@ -11893,6 +11894,14 @@ export const ptBR = {
       voice: "Mensagens de voz nas conversas, e quem transforma a voz em texto.",
       apps: "Peça tarefas aos agentes pelo Claude, Cursor e outros apps.",
       approvals: "Quem decide por você quando um agente pede a sua aprovação.",
+      about: "Quem faz, a licença e onde está o código-fonte.",
+    },
+    about: {
+      basedOn: "Baseado no <site>agentes.chat</site> da Codari Global, LLC",
+      version: "Versão",
+      license: "Software livre sob a <license>GNU Affero General Public License v3</license>, sem garantia.",
+      source: "Código-fonte",
+      copyright: "Copyright © 2026 Codari Global, LLC e colaboradores",
     },
     title: "Configurações",
     account: {
