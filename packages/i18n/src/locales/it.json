@@ -6485,17 +6485,144 @@
     },
     "presets": {
       "title": "Parti da un modello",
+      "placeholder": "Scegli un modello",
+      "search": "Cerca modelli",
+      "searchPlaceholder": "Nome, area o app",
+      "noResults": "Nessun modello trovato",
+      "list": "Modelli",
+      "needsApp": "Serve questa app: {{app}}",
+      "needsApps": "Serve una di queste app: {{apps}}",
+      "needsMailbox": "Serve una casella email collegata",
+      "connectFirst": "Collegala perché la routine funzioni.",
+      "areas": {
+        "team": "Team e routine del giorno",
+        "sales": "Vendite e clienti",
+        "support": "Assistenza clienti",
+        "marketing": "Marketing e contenuti",
+        "finance": "Finanza",
+        "ops": "Operazioni",
+        "people": "Persone e HR",
+        "tech": "Tecnologia"
+      },
+      "dayPlan": {
+        "name": "Piano del giorno",
+        "text": "Nei giorni feriali alle 8:30, attività e riunioni di oggi.",
+        "prompt": "Elenca le attività aperte in scadenza oggi e le riunioni del giorno. Di' cosa richiede attenzione per primo."
+      },
+      "late": {
+        "name": "Attività in ritardo",
+        "text": "Nei giorni feriali alle 10, ciò che ha superato la scadenza.",
+        "prompt": "Cerca le attività aperte con la scadenza passata. Per ognuna, di' chi ne è responsabile e di quanti giorni è in ritardo."
+      },
+      "unanswered": {
+        "name": "Domande senza risposta",
+        "text": "Nei giorni feriali alle 16, ciò a cui nessuno ha risposto oggi.",
+        "prompt": "Cerca nel canale le domande e le richieste di oggi rimaste senza risposta. Elenca ognuna con chi l'ha fatta."
+      },
+      "leads": {
+        "name": "Nuovi contatti del CRM",
+        "text": "Nei giorni feriali alle 9, chi è arrivato e da chi partire.",
+        "prompt": "Guarda nel CRM i contatti arrivati da ieri. Di' chi sembra più promettente e suggerisci il prossimo passo per ognuno."
+      },
+      "stalled": {
+        "name": "Trattative ferme",
+        "text": "Il lunedì alle 9, trattative senza attività recente.",
+        "prompt": "Guarda nel CRM le trattative aperte senza attività da più di 7 giorni. Suggerisci il prossimo passo per ognuna."
+      },
+      "prospects": {
+        "name": "Trovare nuovi clienti",
+        "text": "Il lunedì alle 8, cinque aziende da contattare.",
+        "prompt": "Cerca sul web 5 aziende in linea con il nostro cliente ideale. Per ognuna, di' di cosa si occupa e perché vale la pena contattarla."
+      },
+      "newEmail": {
+        "name": "Preparare risposte alle email",
+        "text": "Quando arriva un'email, l'agente prepara la risposta.",
+        "prompt": "Leggi l'email arrivata e di' di cosa parla e quanto è urgente. Scrivi una proposta di risposta, senza inviarla."
+      },
+      "tickets": {
+        "name": "Ticket senza risposta",
+        "text": "Nei giorni feriali alle 9 e alle 14, chi sta ancora aspettando.",
+        "prompt": "Guarda i ticket aperti senza risposta da più di 4 ore. Elenca prima i più urgenti e suggerisci una risposta per ognuno."
+      },
+      "themes": {
+        "name": "Richieste più frequenti",
+        "text": "Il venerdì alle 16, cosa hanno chiesto di più i clienti.",
+        "prompt": "Leggi i ticket della settimana e raggruppali per argomento. Di' i 5 più comuni e cosa eviterebbe ognuno."
+      },
+      "mentions": {
+        "name": "Menzioni dell'azienda",
+        "text": "Nei giorni feriali alle 9, cosa si dice di noi.",
+        "prompt": "Cerca sul web notizie e menzioni recenti della nostra azienda. Di' dove è uscita, se è positiva o negativa e se richiede una risposta."
+      },
+      "rivals": {
+        "name": "Tenere d'occhio la concorrenza",
+        "text": "Il lunedì alle 9, cosa hanno cambiato i concorrenti.",
+        "prompt": "Cerca cosa hanno lanciato o cambiato i nostri concorrenti la settimana scorsa, come prezzi, prodotti e campagne. Di' cosa conta per noi."
+      },
+      "ideas": {
+        "name": "Idee per i contenuti",
+        "text": "Il lunedì alle 10, cinque idee per la settimana.",
+        "prompt": "Suggerisci 5 idee di contenuto per questa settimana, in base a cosa chiedono i clienti e a cosa succede nel nostro mercato. Dai a ognuna un titolo e un formato."
+      },
+      "traffic": {
+        "name": "Numeri del sito",
+        "text": "Il lunedì alle 8:30, la settimana rispetto alla precedente.",
+        "prompt": "Guarda i numeri della settimana scorsa: visite, iscrizioni e pagine più viste. Confrontali con la settimana prima e di' cosa è cambiato."
+      },
+      "revenue": {
+        "name": "Vendite di ieri",
+        "text": "Nei giorni feriali alle 8, le vendite rispetto alla media settimanale.",
+        "prompt": "Guarda quanto abbiamo venduto ieri e confrontalo con la media degli ultimi 7 giorni. Di' se qualcosa è fuori dal normale."
+      },
+      "failed": {
+        "name": "Problemi di pagamento",
+        "text": "Nei giorni feriali alle 10, rifiuti e contestazioni.",
+        "prompt": "Guarda i pagamenti rifiutati, i rimborsi e le contestazioni da ieri. Elenca ognuno con l'importo e il cliente."
+      },
+      "monthClose": {
+        "name": "Chiusura del mese",
+        "text": "Il giorno 1 alle 9, i soldi del mese scorso.",
+        "prompt": "Prepara un riepilogo del mese scorso: ricavi, rimborsi e contestazioni. Confrontalo con il mese precedente."
+      },
+      "sheet": {
+        "name": "Controllare un foglio di calcolo",
+        "text": "Nei giorni feriali alle 11, vuoti e numeri strani.",
+        "prompt": "Controlla questo foglio di calcolo: (di' quale). Segnala campi vuoti, valori fuori dal normale e cosa è cambiato da ieri."
+      },
+      "page": {
+        "name": "Tenere d'occhio una pagina",
+        "text": "Ogni giorno alle 9, solo quando cambia.",
+        "prompt": "Apri questa pagina: (incolla qui l'indirizzo). Se qualcosa di importante è cambiato dall'ultima volta, di' cosa."
+      },
+      "newTask": {
+        "name": "Sistemare le nuove attività",
+        "text": "Quando viene creata un'attività, l'agente la controlla.",
+        "prompt": "Leggi la nuova attività. Di' cosa manca per iniziare e suggerisci un responsabile e una scadenza."
+      },
+      "pulse": {
+        "name": "Domanda della settimana",
+        "text": "Il giovedì alle 16, una domanda per il team.",
+        "prompt": "Riassumi le risposte alla domanda della settimana scorsa, senza fare nomi. Poi pubblica nel canale una breve domanda su com'è andata la settimana."
+      },
+      "away": {
+        "name": "Chi è fuori questa settimana",
+        "text": "Il lunedì alle 8:30, permessi e viaggi.",
+        "prompt": "Guarda nel calendario i permessi e i viaggi di questa settimana. Elencali per giorno e di' cosa va coperto."
+      },
+      "deploy": {
+        "name": "Controllare ogni deploy",
+        "text": "Quando finisce un deploy, un riepilogo in parole semplici.",
+        "prompt": "Leggi cosa è entrato in questo deploy. Riassumilo per il team in parole semplici e di' cosa testare."
+      },
       "digest": {
         "name": "Riepilogo giornaliero del canale",
         "text": "Nei giorni feriali alle 9, cosa è successo ieri.",
-        "prompt": "Riassumi cosa è successo ieri nel canale: richieste, cosa è stato risolto e cosa è rimasto senza risposta.",
-        "phrase": "nei giorni feriali alle 9"
+        "prompt": "Riassumi cosa è successo ieri nel canale: richieste, cosa è stato risolto e cosa è rimasto senza risposta."
       },
       "errors": {
         "name": "Tieni d'occhio i nuovi errori",
         "text": "Ogni ora, solo quando c'è un errore nuovo.",
-        "prompt": "Controlla i nuovi errori di Sentry dall'ultima esecuzione. Se ce ne sono, riassumili e indica in quale punto del codice si verificano. Se non c'è niente di nuovo, non inviare messaggi.",
-        "phrase": "ogni ora"
+        "prompt": "Controlla i nuovi errori di Sentry dall'ultima esecuzione. Se ce ne sono, riassumili e indica in quale punto del codice si verificano. Se non c'è niente di nuovo, non inviare messaggi."
       },
       "prs": {
         "name": "Rivedi le nuove PR",
@@ -6505,8 +6632,7 @@
       "week": {
         "name": "Bilancio della settimana",
         "text": "Venerdì alle 17: decisioni e punti aperti.",
-        "prompt": "Riassumi la settimana: decisioni, attività chiuse e cosa è ancora aperto.",
-        "phrase": "ogni venerdì alle 17"
+        "prompt": "Riassumi la settimana: decisioni, attività chiuse e cosa è ancora aperto."
       }
     },
     "close": "Chiudi",

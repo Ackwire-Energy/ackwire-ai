@@ -6481,17 +6481,144 @@
     },
     "presets": {
       "title": "Partir d'un modèle",
+      "placeholder": "Choisir un modèle",
+      "search": "Rechercher des modèles",
+      "searchPlaceholder": "Nom, domaine ou app",
+      "noResults": "Aucun modèle trouvé",
+      "list": "Modèles",
+      "needsApp": "Nécessite cette app : {{app}}",
+      "needsApps": "Nécessite une de ces apps : {{apps}}",
+      "needsMailbox": "Nécessite une boîte mail connectée",
+      "connectFirst": "Connectez-la pour que la routine fonctionne.",
+      "areas": {
+        "team": "Équipe et routine du jour",
+        "sales": "Ventes et clients",
+        "support": "Service client",
+        "marketing": "Marketing et contenu",
+        "finance": "Finances",
+        "ops": "Opérations",
+        "people": "Personnes et RH",
+        "tech": "Technologie"
+      },
+      "dayPlan": {
+        "name": "Plan de la journée",
+        "text": "Les jours ouvrés à 8 h 30, tâches et réunions du jour.",
+        "prompt": "Listez les tâches ouvertes à faire aujourd'hui et les réunions du jour. Dites ce qui demande de l'attention en premier."
+      },
+      "late": {
+        "name": "Tâches en retard",
+        "text": "Les jours ouvrés à 10 h, ce qui a dépassé son échéance.",
+        "prompt": "Cherchez les tâches ouvertes dont l'échéance est passée. Pour chacune, dites qui en est responsable et combien de jours de retard elle a."
+      },
+      "unanswered": {
+        "name": "Questions sans réponse",
+        "text": "Les jours ouvrés à 16 h, ce que personne n'a traité aujourd'hui.",
+        "prompt": "Cherchez dans le canal les questions et demandes du jour restées sans réponse. Listez chacune avec son auteur."
+      },
+      "leads": {
+        "name": "Nouveaux contacts du CRM",
+        "text": "Les jours ouvrés à 9 h, qui est arrivé et par qui commencer.",
+        "prompt": "Regardez dans le CRM les contacts arrivés depuis hier. Dites lesquels semblent les plus prometteurs et proposez la prochaine étape pour chacun."
+      },
+      "stalled": {
+        "name": "Affaires à l'arrêt",
+        "text": "Le lundi à 9 h, les affaires sans activité récente.",
+        "prompt": "Regardez dans le CRM les affaires ouvertes sans activité depuis plus de 7 jours. Proposez la prochaine étape pour chacune."
+      },
+      "prospects": {
+        "name": "Trouver de nouveaux clients",
+        "text": "Le lundi à 8 h, cinq entreprises à contacter.",
+        "prompt": "Cherchez sur le web 5 entreprises qui correspondent à notre client idéal. Pour chacune, dites ce qu'elle fait et pourquoi elle vaut le contact."
+      },
+      "newEmail": {
+        "name": "Préparer les réponses aux e-mails",
+        "text": "À l'arrivée d'un e-mail, l'agent prépare la réponse.",
+        "prompt": "Lisez l'e-mail reçu et dites de quoi il s'agit et à quel point c'est urgent. Rédigez une proposition de réponse, sans l'envoyer."
+      },
+      "tickets": {
+        "name": "Tickets sans réponse",
+        "text": "Les jours ouvrés à 9 h et 14 h, qui attend encore.",
+        "prompt": "Regardez les tickets ouverts sans réponse depuis plus de 4 heures. Listez d'abord les plus urgents et proposez une réponse pour chacun."
+      },
+      "themes": {
+        "name": "Demandes les plus fréquentes",
+        "text": "Le vendredi à 16 h, ce que les clients ont le plus demandé.",
+        "prompt": "Lisez les tickets de la semaine et groupez-les par sujet. Dites quels sont les 5 plus fréquents et ce qui éviterait chacun."
+      },
+      "mentions": {
+        "name": "Mentions de l'entreprise",
+        "text": "Les jours ouvrés à 9 h, ce qui se dit sur nous.",
+        "prompt": "Cherchez sur le web les actualités et mentions récentes de notre entreprise. Dites où c'est paru, si c'est positif ou négatif et s'il faut répondre."
+      },
+      "rivals": {
+        "name": "Surveiller la concurrence",
+        "text": "Le lundi à 9 h, ce que les concurrents ont changé.",
+        "prompt": "Cherchez ce que nos concurrents ont lancé ou changé la semaine dernière : prix, produits et campagnes. Dites ce qui compte pour nous."
+      },
+      "ideas": {
+        "name": "Idées de contenu",
+        "text": "Le lundi à 10 h, cinq idées pour la semaine.",
+        "prompt": "Proposez 5 idées de contenu pour cette semaine, d'après ce que demandent les clients et ce qui se passe sur notre marché. Donnez à chacune un titre et un format."
+      },
+      "traffic": {
+        "name": "Chiffres du site",
+        "text": "Le lundi à 8 h 30, la semaine face à la précédente.",
+        "prompt": "Regardez les chiffres de la semaine dernière : visites, inscriptions et pages les plus vues. Comparez-les à la semaine d'avant et dites ce qui a changé."
+      },
+      "revenue": {
+        "name": "Ventes d'hier",
+        "text": "Les jours ouvrés à 8 h, les ventes face à la moyenne de la semaine.",
+        "prompt": "Regardez combien nous avons vendu hier et comparez à la moyenne des 7 derniers jours. Dites si quelque chose sort de l'ordinaire."
+      },
+      "failed": {
+        "name": "Problèmes de paiement",
+        "text": "Les jours ouvrés à 10 h, refus et litiges.",
+        "prompt": "Regardez les paiements refusés, les remboursements et les litiges depuis hier. Listez chacun avec le montant et le client."
+      },
+      "monthClose": {
+        "name": "Clôture du mois",
+        "text": "Le 1er à 9 h, l'argent du mois dernier.",
+        "prompt": "Préparez un résumé du mois dernier : revenus, remboursements et litiges. Comparez au mois d'avant."
+      },
+      "sheet": {
+        "name": "Vérifier un tableur",
+        "text": "Les jours ouvrés à 11 h, les trous et les chiffres étranges.",
+        "prompt": "Vérifiez ce tableur : (dites lequel). Signalez les champs vides, les valeurs inhabituelles et ce qui a changé depuis hier."
+      },
+      "page": {
+        "name": "Surveiller une page",
+        "text": "Tous les jours à 9 h, seulement si elle change.",
+        "prompt": "Ouvrez cette page : (collez l'adresse ici). Si quelque chose d'important a changé depuis la dernière fois, dites quoi."
+      },
+      "newTask": {
+        "name": "Trier les nouvelles tâches",
+        "text": "À la création d'une tâche, l'agent la vérifie.",
+        "prompt": "Lisez la nouvelle tâche. Dites ce qu'il manque pour la commencer et proposez un responsable et une échéance."
+      },
+      "pulse": {
+        "name": "Question de la semaine",
+        "text": "Le jeudi à 16 h, une question pour l'équipe.",
+        "prompt": "Résumez les réponses à la question de la semaine dernière, sans citer de noms. Puis publiez dans le canal une courte question sur le déroulement de la semaine."
+      },
+      "away": {
+        "name": "Qui est absent cette semaine",
+        "text": "Le lundi à 8 h 30, congés et déplacements.",
+        "prompt": "Regardez dans le calendrier les congés et déplacements de cette semaine. Listez-les par jour et dites ce qui doit être couvert."
+      },
+      "deploy": {
+        "name": "Vérifier chaque déploiement",
+        "text": "À la fin d'un déploiement, un résumé en mots simples.",
+        "prompt": "Lisez ce qui est entré dans ce déploiement. Résumez-le pour l'équipe en mots simples et dites quoi tester."
+      },
       "digest": {
         "name": "Résumé quotidien du canal",
         "text": "Les jours ouvrés à 9 h, ce qui s'est passé la veille.",
-        "prompt": "Résume ce qui s'est passé hier dans le canal : les demandes, ce qui a été résolu et ce qui est resté sans réponse.",
-        "phrase": "les jours ouvrés à 9 h"
+        "prompt": "Résume ce qui s'est passé hier dans le canal : les demandes, ce qui a été résolu et ce qui est resté sans réponse."
       },
       "errors": {
         "name": "Surveiller les nouvelles erreurs",
         "text": "Toutes les heures, seulement s'il y a une nouvelle erreur.",
-        "prompt": "Vérifie les nouvelles erreurs Sentry depuis la dernière exécution. S'il y en a, résume-les et indique où elles se produisent dans le code. S'il n'y a rien de nouveau, n'envoie pas de message.",
-        "phrase": "toutes les heures"
+        "prompt": "Vérifie les nouvelles erreurs Sentry depuis la dernière exécution. S'il y en a, résume-les et indique où elles se produisent dans le code. S'il n'y a rien de nouveau, n'envoie pas de message."
       },
       "prs": {
         "name": "Relire les nouvelles PR",
@@ -6501,8 +6628,7 @@
       "week": {
         "name": "Bilan de la semaine",
         "text": "Le vendredi à 17 h : décisions et points ouverts.",
-        "prompt": "Résume la semaine : décisions, tâches terminées et ce qui reste ouvert.",
-        "phrase": "tous les vendredis à 17 h"
+        "prompt": "Résume la semaine : décisions, tâches terminées et ce qui reste ouvert."
       }
     },
     "close": "Fermer",

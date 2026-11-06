@@ -745,70 +745,36 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 }
 
 /* ── "Nova rotina": templates ───────────────────────────────────────────── */
-.routine-presets {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* A row runs to three lines: its mark starts with the first. */
+.ac-tz__option:has(.routine-template__text) > :is(.ac-menu__leading, .ac-menu__label) {
+  align-self: flex-start;
 }
-.routine-presets legend {
-  padding: 0;
-  margin-bottom: 8px;
-}
-.routine-presets__list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.routine-preset {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    transform 0.2s var(--spring),
-    box-shadow 0.2s var(--out);
-}
-.routine-preset:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--e2), var(--top);
-}
-html:not([data-pointer]) .routine-preset:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.routine-preset b {
+.routine-template__text,
+.routine-template__needs {
   display: block;
-  font-size: 13.5px;
-  font-weight: 600;
 }
-.routine-preset small {
-  display: block;
-  margin-top: 1px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.routine-preset__icon {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: var(--sunken);
+.routine-template__needs {
+  margin-top: 2px;
   color: var(--ink2);
+}
+.routine-needs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink2);
+}
+.routine-needs > .connector-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+}
+.routine-needs > span:last-child {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.routine-needs__connect {
+  display: block;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
@@ -843,13 +809,6 @@ html:not([data-pointer]) .routine-preset:focus-visible {
   }
   .routines-horizon {
     padding: 12px 12px 0;
-  }
-  .routine-presets legend {
-    padding: 0;
-    margin-bottom: 8px;
-  }
-  .routine-presets__list {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 

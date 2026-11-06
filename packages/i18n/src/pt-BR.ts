@@ -6309,18 +6309,161 @@ export const ptBR = {
     },
     presets: {
       title: "Começar de um modelo",
+      placeholder: "Escolher um modelo",
+      search: "Buscar modelos",
+      searchPlaceholder: "Nome, área ou app",
+      noResults: "Nenhum modelo encontrado",
+      list: "Modelos",
+      needsApp: "Precisa deste app: {{app}}",
+      needsApps: "Precisa de um destes apps: {{apps}}",
+      needsMailbox: "Precisa de uma caixa de email conectada",
+      connectFirst: "Conecte para a rotina funcionar.",
+      /** The select's sections, by work rather than by tool. */
+      areas: {
+        team: "Equipe e rotina do dia",
+        sales: "Vendas e clientes",
+        support: "Atendimento",
+        marketing: "Marketing e conteúdo",
+        finance: "Financeiro",
+        ops: "Operações",
+        people: "Pessoas e RH",
+        tech: "Tecnologia",
+      },
+      dayPlan: {
+        name: "Plano do dia",
+        text: "Dias úteis às 8h30, tarefas e reuniões de hoje.",
+        prompt:
+          "Liste as tarefas abertas com prazo para hoje e as reuniões do dia. Diga o que precisa de atenção primeiro.",
+      },
+      late: {
+        name: "Tarefas atrasadas",
+        text: "Dias úteis às 10h, o que passou do prazo.",
+        prompt:
+          "Procure as tarefas abertas com prazo vencido. Para cada uma, diga quem é responsável e há quantos dias está atrasada.",
+      },
+      unanswered: {
+        name: "Perguntas sem resposta",
+        text: "Dias úteis às 16h, o que ninguém respondeu hoje.",
+        prompt:
+          "Procure no canal as perguntas e os pedidos de hoje que ficaram sem resposta. Liste cada um com quem perguntou.",
+      },
+      leads: {
+        name: "Novos contatos do CRM",
+        text: "Dias úteis às 9h, quem chegou e por quem começar.",
+        prompt:
+          "Veja no CRM os contatos que entraram desde ontem. Diga quem parece mais promissor e sugira o próximo passo de cada um.",
+      },
+      stalled: {
+        name: "Negócios parados",
+        text: "Segunda às 9h, negócios sem atividade recente.",
+        prompt: "Veja no CRM os negócios abertos sem atividade há mais de 7 dias. Sugira o próximo passo de cada um.",
+      },
+      prospects: {
+        name: "Buscar novos clientes",
+        text: "Segunda às 8h, cinco empresas para contatar.",
+        prompt:
+          "Pesquise na internet 5 empresas que combinam com o nosso cliente ideal. Para cada uma, diga o que ela faz e por que vale o contato.",
+      },
+      newEmail: {
+        name: "Preparar respostas de email",
+        text: "Quando chegar um email, o agente prepara a resposta.",
+        prompt:
+          "Leia o email que chegou e diga do que se trata e o quanto é urgente. Escreva uma sugestão de resposta, sem enviar.",
+      },
+      tickets: {
+        name: "Chamados sem resposta",
+        text: "Dias úteis às 9h e às 14h, quem ainda espera.",
+        prompt:
+          "Veja os chamados abertos sem resposta há mais de 4 horas. Liste os mais urgentes primeiro e sugira uma resposta para cada um.",
+      },
+      themes: {
+        name: "Assuntos mais pedidos",
+        text: "Sexta às 16h, o que os clientes mais pediram.",
+        prompt: "Leia os chamados da semana e agrupe por assunto. Diga os 5 mais comuns e o que evitaria cada um.",
+      },
+      mentions: {
+        name: "Menções à empresa",
+        text: "Dias úteis às 9h, o que estão falando de nós.",
+        prompt:
+          "Pesquise na internet notícias e menções recentes à nossa empresa. Diga onde saiu, se é positivo ou negativo e se pede resposta.",
+      },
+      rivals: {
+        name: "De olho na concorrência",
+        text: "Segunda às 9h, o que os concorrentes mudaram.",
+        prompt:
+          "Pesquise o que os nossos concorrentes lançaram ou mudaram na última semana, como preços, produtos e campanhas. Diga o que importa para nós.",
+      },
+      ideas: {
+        name: "Ideias de conteúdo",
+        text: "Segunda às 10h, cinco ideias para a semana.",
+        prompt:
+          "Sugira 5 ideias de conteúdo para esta semana, com base no que os clientes perguntam e no que acontece no nosso mercado. Dê a cada uma um título e um formato.",
+      },
+      traffic: {
+        name: "Números do site",
+        text: "Segunda às 8h30, a semana contra a anterior.",
+        prompt:
+          "Veja os números da última semana: visitas, cadastros e páginas mais vistas. Compare com a semana anterior e diga o que mudou.",
+      },
+      revenue: {
+        name: "Vendas de ontem",
+        text: "Dias úteis às 8h, as vendas contra a média da semana.",
+        prompt: "Veja quanto vendemos ontem e compare com a média dos últimos 7 dias. Diga se algo saiu do normal.",
+      },
+      failed: {
+        name: "Pagamentos com problema",
+        text: "Dias úteis às 10h, recusas e contestações.",
+        prompt:
+          "Veja os pagamentos recusados, os reembolsos e as contestações desde ontem. Liste cada um com o valor e o cliente.",
+      },
+      monthClose: {
+        name: "Fechamento do mês",
+        text: "Dia 1 às 9h, o dinheiro do mês passado.",
+        prompt: "Monte um resumo do mês passado: receita, reembolsos e contestações. Compare com o mês anterior.",
+      },
+      sheet: {
+        name: "Conferir uma planilha",
+        text: "Dias úteis às 11h, lacunas e números estranhos.",
+        prompt:
+          "Confira esta planilha: (diga qual). Aponte campos vazios, valores fora do normal e o que mudou desde ontem.",
+      },
+      page: {
+        name: "Vigiar uma página",
+        text: "Todo dia às 9h, só quando ela mudar.",
+        prompt:
+          "Abra esta página: (cole o endereço aqui). Se algo importante mudou desde a última vez, diga o que mudou.",
+      },
+      newTask: {
+        name: "Organizar tarefas novas",
+        text: "Quando criarem uma tarefa, o agente confere.",
+        prompt: "Leia a tarefa nova. Diga o que falta para começar e sugira um responsável e um prazo.",
+      },
+      pulse: {
+        name: "Pergunta da semana",
+        text: "Quinta às 16h, uma pergunta para a equipe.",
+        prompt:
+          "Resuma as respostas da pergunta da semana passada, sem citar nomes. Depois poste no canal uma pergunta curta sobre como foi a semana.",
+      },
+      away: {
+        name: "Quem está fora esta semana",
+        text: "Segunda às 8h30, folgas e viagens.",
+        prompt: "Veja na agenda as folgas e viagens desta semana. Liste por dia e diga o que precisa de cobertura.",
+      },
+      deploy: {
+        name: "Conferir cada deploy",
+        text: "Quando um deploy terminar, um resumo em palavras simples.",
+        prompt: "Leia o que entrou neste deploy. Resuma para a equipe em palavras simples e diga o que testar.",
+      },
       digest: {
         name: "Resumo diário de um canal",
         text: "Dias úteis às 9h, o que aconteceu ontem.",
         prompt: "Resuma o que aconteceu ontem no canal: pedidos, o que foi resolvido e o que ficou sem resposta.",
-        phrase: "dias úteis às 9h",
       },
       errors: {
         name: "Vigiar erros novos",
         text: "A cada hora, só se houver erro novo.",
         prompt:
           "Olhe os erros novos do Sentry desde a última execução. Se houver, resuma e diga onde no código acontecem. Se não houver nada novo, não mande mensagem.",
-        phrase: "a cada hora",
       },
       prs: {
         name: "Revisar PRs novos",
@@ -6331,7 +6474,6 @@ export const ptBR = {
         name: "Fechamento da semana",
         text: "Sexta às 17h: decisões e pendências.",
         prompt: "Resuma a semana: decisões, tarefas fechadas e o que ficou pendente.",
-        phrase: "toda sexta às 17h",
       },
     },
     close: "Fechar",

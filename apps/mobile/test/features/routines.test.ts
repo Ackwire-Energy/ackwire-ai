@@ -543,3 +543,16 @@ describe("the rule in words (the web's sentence, on the phone)", () => {
     expect(onceAt(one)).toBe("2026-11-02T12:00:00.000Z");
   });
 });
+
+test("Nova rotina's templates: one row opens the search, by area, and picking one fills the draft", async () => {
+  // The screens are components the tests can't render: what they wire in, as text.
+  const read = (f: string) => Bun.file(new URL(`../../src/features/routines/${f}`, import.meta.url).pathname).text();
+  const [form, picker] = await Promise.all([read("RoutineForm.tsx"), read("TemplatePicker.tsx")]);
+  expect(form).toContain("<TemplatePicker value={template} onPick={applyTemplate} />");
+  expect(form).toContain("rule: templateRule(picked, x.rule)");
+  expect(form).not.toContain("PRESETS");
+  expect(picker).toContain("routineTemplateOptions(t, catalog)");
+  expect(picker).toContain("<PickList");
+  // An app not connected yet has its way there, as a mailbox does.
+  expect(picker).toContain('router.push("/connectors")');
+});

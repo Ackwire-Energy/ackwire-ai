@@ -43,6 +43,7 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
+import { type RoutineTemplateOption, templateRule } from "@agenteschat/client/lib/routine-templates";
 import {
   busyOnComputer,
   healthWords,
@@ -138,6 +139,7 @@ import { SwitchComputerDialog } from "@/components/MachineOutages";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { RoutineReachWarnings } from "@/components/RoutineReachWarnings";
+import { RoutineTemplateSelect } from "@/components/RoutineTemplates";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -2132,14 +2134,6 @@ function HookCallItem({ call: c, run }: { call: RoutineHookCall; run: RoutineRun
   );
 }
 
-/** Starting points for "Nova rotina" (the words come from i18n; the phrase is read by the server). */
-const PRESETS = [
-  { key: "digest", icon: "file", kind: "schedule" },
-  { key: "errors", icon: "alert", kind: "schedule" },
-  { key: "prs", icon: "bolt", kind: "event", event: "github.pr_opened" },
-  { key: "week", icon: "calendar", kind: "schedule" },
-] as const satisfies readonly { key: string; icon: IconName; kind: "schedule" | "event"; event?: RoutineEvent }[];
-
 const TARGET_DM = "dm";
 const TARGET_ARTIFACT = "artifact";
 /** Editing a routine made in the chat (a thread or DM): keep where it delivers. */
@@ -2233,6 +2227,8 @@ function RoutineDialog({
   const [target, setTarget] = useState(targetChoice(routine?.target));
   const [prompt, setPrompt] = useState(routine?.prompt ?? "");
   const [name, setName] = useState(routine?.name ?? "");
+  // The starting point picked, by its key.
+  const [template, setTemplate] = useState<string>();
   const [kind, setKind] = useState<"schedule" | "event" | "email" | "webhook" | "connector">(
     routine?.trigger.type === "event" ||
       routine?.trigger.type === "email" ||
@@ -2418,13 +2414,15 @@ function RoutineDialog({
     }
     return undefined;
   };
-  /** A starting point: what to do, a name and when (the phrase is read by the server, like a typed one). */
-  const applyPreset = (p: (typeof PRESETS)[number]) => {
-    setPrompt(t(`routines.presets.${p.key}.prompt`));
-    setName(t(`routines.presets.${p.key}.name`));
-    setKind(p.kind);
-    if (p.kind === "event") setEvent(p.event);
-    else typePhrase(t(`routines.presets.${p.key}.phrase`));
+  /** A starting point fills the form; everything in it stays the person's to change. */
+  const applyTemplate = (o: RoutineTemplateOption) => {
+    setTemplate(o.value);
+    setPrompt(o.prompt);
+    setName(o.label);
+    setReport(o.report);
+    setKind(o.template.kind);
+    if (o.template.kind === "event") setEvent(o.template.event);
+    if (o.template.kind === "schedule") pickRule(templateRule(o.template, rule));
   };
   const becameWebhook = (saved: Routine | undefined) => {
     if (saved?.trigger.type === "webhook") onWebhook?.(saved);
@@ -2475,6 +2473,7 @@ function RoutineDialog({
       {
         onSuccess: (created) => {
           toast.show(t("routines.form.created"));
+          setTemplate(undefined);
           setPrompt("");
           setName("");
           setTouched(false);
@@ -2516,24 +2515,7 @@ function RoutineDialog({
         <Locked when={action.isPending}>
           <DialogBody>
             {!part && agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
-            {!editing && !prompt.trim() && (
-              <fieldset className="routine-presets">
-                <legend className="ac-eyebrow">{t("routines.presets.title")}</legend>
-                <div className="routine-presets__list">
-                  {PRESETS.map((p) => (
-                    <button key={p.key} type="button" className="routine-preset" onClick={() => applyPreset(p)}>
-                      <span className="routine-preset__icon" aria-hidden="true">
-                        <Icon name={p.icon} size={16} />
-                      </span>
-                      <span>
-                        <b className="ac-captop">{t(`routines.presets.${p.key}.name`)}</b>
-                        <small>{t(`routines.presets.${p.key}.text`)}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-            )}
+            {!editing && <RoutineTemplateSelect value={template} onPick={applyTemplate} />}
             {!part ? (
               <div className="grid-fields">
                 <Field label={t("routines.form.agent")} id="nr-agent">

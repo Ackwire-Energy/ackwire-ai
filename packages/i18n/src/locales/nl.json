@@ -6301,17 +6301,144 @@
     },
     "presets": {
       "title": "Beginnen met een sjabloon",
+      "placeholder": "Kies een sjabloon",
+      "search": "Sjablonen zoeken",
+      "searchPlaceholder": "Naam, gebied of app",
+      "noResults": "Geen sjabloon gevonden",
+      "list": "Sjablonen",
+      "needsApp": "Heeft deze app nodig: {{app}}",
+      "needsApps": "Heeft een van deze apps nodig: {{apps}}",
+      "needsMailbox": "Heeft een gekoppelde mailbox nodig",
+      "connectFirst": "Koppel hem zodat de routine werkt.",
+      "areas": {
+        "team": "Team en dagritme",
+        "sales": "Verkoop en klanten",
+        "support": "Klantenservice",
+        "marketing": "Marketing en content",
+        "finance": "Financiën",
+        "ops": "Operatie",
+        "people": "Mensen en HR",
+        "tech": "Technologie"
+      },
+      "dayPlan": {
+        "name": "Dagplan",
+        "text": "Werkdagen om 8:30, taken en vergaderingen van vandaag.",
+        "prompt": "Noem de open taken die vandaag af moeten en de vergaderingen van de dag. Zeg wat als eerste aandacht nodig heeft."
+      },
+      "late": {
+        "name": "Te late taken",
+        "text": "Werkdagen om 10:00, wat over de deadline is.",
+        "prompt": "Zoek open taken waarvan de deadline voorbij is. Zeg per taak wie verantwoordelijk is en hoeveel dagen die te laat is."
+      },
+      "unanswered": {
+        "name": "Onbeantwoorde vragen",
+        "text": "Werkdagen om 16:00, waar niemand vandaag op reageerde.",
+        "prompt": "Zoek in het kanaal de vragen en verzoeken van vandaag die geen antwoord kregen. Noem ze met wie het vroeg."
+      },
+      "leads": {
+        "name": "Nieuwe CRM-contacten",
+        "text": "Werkdagen om 9:00, wie er binnenkwam en met wie je begint.",
+        "prompt": "Bekijk in het CRM de contacten die sinds gisteren zijn binnengekomen. Zeg wie het meest belooft en stel per contact de volgende stap voor."
+      },
+      "stalled": {
+        "name": "Stilstaande deals",
+        "text": "Maandag om 9:00, deals zonder recente activiteit.",
+        "prompt": "Bekijk in het CRM de open deals zonder activiteit in de afgelopen 7 dagen. Stel per deal de volgende stap voor."
+      },
+      "prospects": {
+        "name": "Nieuwe klanten vinden",
+        "text": "Maandag om 8:00, vijf bedrijven om te benaderen.",
+        "prompt": "Zoek op internet 5 bedrijven die bij onze ideale klant passen. Zeg per bedrijf wat het doet en waarom contact de moeite waard is."
+      },
+      "newEmail": {
+        "name": "E-mailantwoorden voorbereiden",
+        "text": "Als er een e-mail binnenkomt, maakt de agent een antwoord klaar.",
+        "prompt": "Lees de binnengekomen e-mail en zeg waar die over gaat en hoe dringend die is. Schrijf een voorstel voor een antwoord, zonder het te versturen."
+      },
+      "tickets": {
+        "name": "Onbeantwoorde tickets",
+        "text": "Werkdagen om 9:00 en 14:00, wie nog wacht.",
+        "prompt": "Bekijk de open tickets die al meer dan 4 uur geen antwoord hebben. Noem de dringendste eerst en stel per ticket een antwoord voor."
+      },
+      "themes": {
+        "name": "Meest gevraagde onderwerpen",
+        "text": "Vrijdag om 16:00, wat klanten het meest vroegen.",
+        "prompt": "Lees de tickets van deze week en groepeer ze op onderwerp. Noem de 5 meest voorkomende en wat elk zou voorkomen."
+      },
+      "mentions": {
+        "name": "Vermeldingen van het bedrijf",
+        "text": "Werkdagen om 9:00, wat er over ons wordt gezegd.",
+        "prompt": "Zoek op internet recent nieuws en vermeldingen van ons bedrijf. Zeg waar het verscheen, of het positief of negatief is en of het een reactie vraagt."
+      },
+      "rivals": {
+        "name": "Concurrentie in de gaten",
+        "text": "Maandag om 9:00, wat concurrenten veranderden.",
+        "prompt": "Zoek uit wat onze concurrenten vorige week lanceerden of veranderden, zoals prijzen, producten en campagnes. Zeg wat voor ons belangrijk is."
+      },
+      "ideas": {
+        "name": "Content-ideeën",
+        "text": "Maandag om 10:00, vijf ideeën voor de week.",
+        "prompt": "Stel 5 content-ideeën voor deze week voor, op basis van wat klanten vragen en wat er in onze markt gebeurt. Geef elk een titel en een vorm."
+      },
+      "traffic": {
+        "name": "Cijfers van de site",
+        "text": "Maandag om 8:30, de week tegenover de vorige.",
+        "prompt": "Bekijk de cijfers van vorige week: bezoeken, aanmeldingen en meest bekeken pagina's. Vergelijk ze met de week ervoor en zeg wat er veranderde."
+      },
+      "revenue": {
+        "name": "Verkoop van gisteren",
+        "text": "Werkdagen om 8:00, de verkoop tegenover het weekgemiddelde.",
+        "prompt": "Bekijk hoeveel we gisteren verkochten en vergelijk dat met het gemiddelde van de afgelopen 7 dagen. Zeg of iets afwijkt."
+      },
+      "failed": {
+        "name": "Betaalproblemen",
+        "text": "Werkdagen om 10:00, weigeringen en geschillen.",
+        "prompt": "Bekijk geweigerde betalingen, terugbetalingen en geschillen sinds gisteren. Noem ze met het bedrag en de klant."
+      },
+      "monthClose": {
+        "name": "Maandafsluiting",
+        "text": "Op de 1e om 9:00, het geld van vorige maand.",
+        "prompt": "Maak een samenvatting van vorige maand: omzet, terugbetalingen en geschillen. Vergelijk die met de maand ervoor."
+      },
+      "sheet": {
+        "name": "Spreadsheet controleren",
+        "text": "Werkdagen om 11:00, gaten en vreemde cijfers.",
+        "prompt": "Controleer deze spreadsheet: (zeg welke). Wijs op lege velden, afwijkende waarden en wat er sinds gisteren veranderde."
+      },
+      "page": {
+        "name": "Pagina in de gaten houden",
+        "text": "Elke dag om 9:00, alleen als die verandert.",
+        "prompt": "Open deze pagina: (plak het adres hier). Als er sinds de vorige keer iets belangrijks veranderde, zeg dan wat."
+      },
+      "newTask": {
+        "name": "Nieuwe taken ordenen",
+        "text": "Als er een taak wordt gemaakt, bekijkt de agent die.",
+        "prompt": "Lees de nieuwe taak. Zeg wat er nodig is om te beginnen en stel iemand verantwoordelijk en een deadline voor."
+      },
+      "pulse": {
+        "name": "Vraag van de week",
+        "text": "Donderdag om 16:00, één vraag aan het team.",
+        "prompt": "Vat de antwoorden op de vraag van vorige week samen, zonder namen te noemen. Plaats daarna in het kanaal een korte nieuwe vraag over hoe de week ging."
+      },
+      "away": {
+        "name": "Wie er deze week weg is",
+        "text": "Maandag om 8:30, vrije dagen en reizen.",
+        "prompt": "Bekijk in de agenda de vrije dagen en reizen van deze week. Noem ze per dag en zeg wat waargenomen moet worden."
+      },
+      "deploy": {
+        "name": "Elke deploy nakijken",
+        "text": "Als een deploy klaar is, een samenvatting in gewone woorden.",
+        "prompt": "Lees wat er in deze deploy zit. Vat het voor het team in gewone woorden samen en zeg wat er getest moet worden."
+      },
       "digest": {
         "name": "Dagelijkse samenvatting van het kanaal",
         "text": "Op werkdagen om 9:00, wat er gisteren gebeurde.",
-        "prompt": "Vat samen wat er gisteren in het kanaal gebeurde: verzoeken, wat is opgelost en wat onbeantwoord bleef.",
-        "phrase": "op werkdagen om 9:00"
+        "prompt": "Vat samen wat er gisteren in het kanaal gebeurde: verzoeken, wat is opgelost en wat onbeantwoord bleef."
       },
       "errors": {
         "name": "Nieuwe fouten in de gaten houden",
         "text": "Elk uur, alleen als er een nieuwe fout is.",
-        "prompt": "Bekijk de nieuwe Sentry-fouten sinds de vorige run. Zijn er nieuwe, vat ze dan samen en zeg waar in de code ze optreden. Is er niets nieuws, stuur dan geen bericht.",
-        "phrase": "elk uur"
+        "prompt": "Bekijk de nieuwe Sentry-fouten sinds de vorige run. Zijn er nieuwe, vat ze dan samen en zeg waar in de code ze optreden. Is er niets nieuws, stuur dan geen bericht."
       },
       "prs": {
         "name": "Nieuwe PR's reviewen",
@@ -6321,8 +6448,7 @@
       "week": {
         "name": "Weekafsluiting",
         "text": "Vrijdag om 17:00: besluiten en open punten.",
-        "prompt": "Vat de week samen: besluiten, afgeronde taken en wat nog open staat.",
-        "phrase": "elke vrijdag om 17:00"
+        "prompt": "Vat de week samen: besluiten, afgeronde taken en wat nog open staat."
       }
     },
     "close": "Sluiten",

@@ -6670,17 +6670,144 @@
     },
     "presets": {
       "title": "Zacznij od szablonu",
+      "placeholder": "Wybierz szablon",
+      "search": "Szukaj szablonów",
+      "searchPlaceholder": "Nazwa, obszar lub aplikacja",
+      "noResults": "Nie znaleziono szablonu",
+      "list": "Szablony",
+      "needsApp": "Wymaga tej aplikacji: {{app}}",
+      "needsApps": "Wymaga jednej z tych aplikacji: {{apps}}",
+      "needsMailbox": "Wymaga połączonej skrzynki e-mail",
+      "connectFirst": "Połącz ją, aby rutyna działała.",
+      "areas": {
+        "team": "Zespół i rytm dnia",
+        "sales": "Sprzedaż i klienci",
+        "support": "Obsługa klienta",
+        "marketing": "Marketing i treści",
+        "finance": "Finanse",
+        "ops": "Operacje",
+        "people": "Ludzie i HR",
+        "tech": "Technologia"
+      },
+      "dayPlan": {
+        "name": "Plan dnia",
+        "text": "W dni robocze o 8:30, dzisiejsze zadania i spotkania.",
+        "prompt": "Wypisz otwarte zadania z terminem na dziś i dzisiejsze spotkania. Powiedz, co wymaga uwagi w pierwszej kolejności."
+      },
+      "late": {
+        "name": "Zadania po terminie",
+        "text": "W dni robocze o 10:00, co przekroczyło termin.",
+        "prompt": "Znajdź otwarte zadania po terminie. Przy każdym podaj, kto za nie odpowiada i ile dni jest spóźnione."
+      },
+      "unanswered": {
+        "name": "Pytania bez odpowiedzi",
+        "text": "W dni robocze o 16:00, na co dziś nikt nie odpowiedział.",
+        "prompt": "Znajdź na kanale dzisiejsze pytania i prośby bez odpowiedzi. Wypisz każde z osobą, która pytała."
+      },
+      "leads": {
+        "name": "Nowe kontakty w CRM",
+        "text": "W dni robocze o 9:00, kto doszedł i od kogo zacząć.",
+        "prompt": "Sprawdź w CRM kontakty dodane od wczoraj. Powiedz, kto wygląda najbardziej obiecująco, i zaproponuj następny krok dla każdego."
+      },
+      "stalled": {
+        "name": "Zastoje w transakcjach",
+        "text": "W poniedziałki o 9:00, transakcje bez ostatniej aktywności.",
+        "prompt": "Sprawdź w CRM otwarte transakcje bez aktywności od ponad 7 dni. Zaproponuj następny krok dla każdej."
+      },
+      "prospects": {
+        "name": "Szukanie nowych klientów",
+        "text": "W poniedziałki o 8:00, pięć firm do kontaktu.",
+        "prompt": "Znajdź w internecie 5 firm pasujących do naszego idealnego klienta. Przy każdej powiedz, czym się zajmuje i dlaczego warto się odezwać."
+      },
+      "newEmail": {
+        "name": "Przygotowanie odpowiedzi na e-maile",
+        "text": "Gdy przyjdzie e-mail, agent przygotowuje odpowiedź.",
+        "prompt": "Przeczytaj e-mail, który przyszedł, i powiedz, czego dotyczy i jak jest pilny. Napisz propozycję odpowiedzi, ale jej nie wysyłaj."
+      },
+      "tickets": {
+        "name": "Zgłoszenia bez odpowiedzi",
+        "text": "W dni robocze o 9:00 i 14:00, kto wciąż czeka.",
+        "prompt": "Sprawdź otwarte zgłoszenia bez odpowiedzi od ponad 4 godzin. Wypisz najpierw najpilniejsze i zaproponuj odpowiedź na każde."
+      },
+      "themes": {
+        "name": "Najczęstsze prośby",
+        "text": "W piątki o 16:00, o co klienci prosili najczęściej.",
+        "prompt": "Przeczytaj zgłoszenia z tego tygodnia i pogrupuj je tematycznie. Podaj 5 najczęstszych i co zapobiegłoby każdemu."
+      },
+      "mentions": {
+        "name": "Wzmianki o firmie",
+        "text": "W dni robocze o 9:00, co się o nas mówi.",
+        "prompt": "Poszukaj w internecie najnowszych informacji i wzmianek o naszej firmie. Powiedz, gdzie się pojawiły, czy są pozytywne czy negatywne i czy wymagają odpowiedzi."
+      },
+      "rivals": {
+        "name": "Obserwacja konkurencji",
+        "text": "W poniedziałki o 9:00, co zmieniła konkurencja.",
+        "prompt": "Sprawdź, co nasi konkurenci uruchomili lub zmienili w zeszłym tygodniu, na przykład ceny, produkty i kampanie. Powiedz, co ma dla nas znaczenie."
+      },
+      "ideas": {
+        "name": "Pomysły na treści",
+        "text": "W poniedziałki o 10:00, pięć pomysłów na tydzień.",
+        "prompt": "Zaproponuj 5 pomysłów na treści na ten tydzień na podstawie tego, o co pytają klienci, i tego, co dzieje się na naszym rynku. Każdemu nadaj tytuł i format."
+      },
+      "traffic": {
+        "name": "Liczby ze strony",
+        "text": "W poniedziałki o 8:30, tydzień na tle poprzedniego.",
+        "prompt": "Sprawdź liczby z zeszłego tygodnia: wizyty, rejestracje i najczęściej oglądane strony. Porównaj je z tygodniem wcześniej i powiedz, co się zmieniło."
+      },
+      "revenue": {
+        "name": "Wczorajsza sprzedaż",
+        "text": "W dni robocze o 8:00, sprzedaż na tle średniej tygodnia.",
+        "prompt": "Sprawdź, ile sprzedaliśmy wczoraj, i porównaj to ze średnią z ostatnich 7 dni. Powiedz, czy coś odbiega od normy."
+      },
+      "failed": {
+        "name": "Problemy z płatnościami",
+        "text": "W dni robocze o 10:00, odmowy i spory.",
+        "prompt": "Sprawdź odrzucone płatności, zwroty i spory od wczoraj. Wypisz każdą pozycję z kwotą i klientem."
+      },
+      "monthClose": {
+        "name": "Zamknięcie miesiąca",
+        "text": "Pierwszego dnia miesiąca o 9:00, pieniądze z zeszłego miesiąca.",
+        "prompt": "Przygotuj podsumowanie zeszłego miesiąca: przychody, zwroty i spory. Porównaj je z miesiącem wcześniej."
+      },
+      "sheet": {
+        "name": "Sprawdzenie arkusza",
+        "text": "W dni robocze o 11:00, braki i dziwne liczby.",
+        "prompt": "Sprawdź ten arkusz: (powiedz który). Wskaż puste pola, nietypowe wartości i to, co zmieniło się od wczoraj."
+      },
+      "page": {
+        "name": "Obserwacja strony",
+        "text": "Codziennie o 9:00, tylko gdy się zmieni.",
+        "prompt": "Otwórz tę stronę: (wklej tu adres). Jeśli od ostatniego razu zmieniło się coś ważnego, powiedz co."
+      },
+      "newTask": {
+        "name": "Porządkowanie nowych zadań",
+        "text": "Gdy powstanie zadanie, agent je sprawdza.",
+        "prompt": "Przeczytaj nowe zadanie. Powiedz, czego brakuje, by zacząć, i zaproponuj osobę odpowiedzialną oraz termin."
+      },
+      "pulse": {
+        "name": "Pytanie tygodnia",
+        "text": "W czwartki o 16:00, jedno pytanie do zespołu.",
+        "prompt": "Podsumuj odpowiedzi na pytanie z zeszłego tygodnia bez podawania nazwisk. Potem opublikuj na kanale krótkie nowe pytanie o to, jak minął tydzień."
+      },
+      "away": {
+        "name": "Kogo nie ma w tym tygodniu",
+        "text": "W poniedziałki o 8:30, wolne dni i wyjazdy.",
+        "prompt": "Sprawdź w kalendarzu wolne dni i wyjazdy w tym tygodniu. Wypisz je według dni i powiedz, co wymaga zastępstwa."
+      },
+      "deploy": {
+        "name": "Sprawdzanie każdego wdrożenia",
+        "text": "Gdy wdrożenie się skończy, podsumowanie prostymi słowami.",
+        "prompt": "Przeczytaj, co weszło do tego wdrożenia. Podsumuj to dla zespołu prostymi słowami i powiedz, co przetestować."
+      },
       "digest": {
         "name": "Codzienne podsumowanie kanału",
         "text": "W dni robocze o 9:00, co wydarzyło się wczoraj.",
-        "prompt": "Podsumuj, co wydarzyło się wczoraj na kanale: prośby, co zostało rozwiązane i co zostało bez odpowiedzi.",
-        "phrase": "w dni robocze o 9:00"
+        "prompt": "Podsumuj, co wydarzyło się wczoraj na kanale: prośby, co zostało rozwiązane i co zostało bez odpowiedzi."
       },
       "errors": {
         "name": "Pilnuj nowych błędów",
         "text": "Co godzinę, tylko gdy pojawi się nowy błąd.",
-        "prompt": "Sprawdź nowe błędy w Sentry od ostatniego uruchomienia. Jeśli są, podsumuj je i wskaż, w którym miejscu kodu występują. Jeśli nie ma nic nowego, nie wysyłaj wiadomości.",
-        "phrase": "co godzinę"
+        "prompt": "Sprawdź nowe błędy w Sentry od ostatniego uruchomienia. Jeśli są, podsumuj je i wskaż, w którym miejscu kodu występują. Jeśli nie ma nic nowego, nie wysyłaj wiadomości."
       },
       "prs": {
         "name": "Przeglądaj nowe PR",
@@ -6690,8 +6817,7 @@
       "week": {
         "name": "Podsumowanie tygodnia",
         "text": "Piątek o 17:00: decyzje i otwarte sprawy.",
-        "prompt": "Podsumuj tydzień: decyzje, zamknięte zadania i to, co wciąż otwarte.",
-        "phrase": "w każdy piątek o 17:00"
+        "prompt": "Podsumuj tydzień: decyzje, zamknięte zadania i to, co wciąż otwarte."
       }
     },
     "close": "Zamknij",
