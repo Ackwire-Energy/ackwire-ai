@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { compare, coverage, edgesOf, keyOf } from "./check";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { compare, coverage, edgesOf, keyOf, playwrightChromes } from "./check";
 
 describe("geometry check", () => {
   test("a new offender is new at its width, and words or size never make one", () => {
@@ -19,6 +22,22 @@ describe("geometry check", () => {
 
   test("only what the baseline doesn't know fails; what got fixed is listed", () => {
     expect(compare(["a", "b", "b"], ["b", "c"])).toEqual({ fresh: ["a"], gone: ["c"] });
+  });
+
+  test("with no Chrome installed, Playwright's newest Chromium will do", () => {
+    const home = mkdtempSync(join(tmpdir(), "geometry-home-"));
+    for (const v of ["1200", "1248"]) {
+      const dir = join(home, ".cache/ms-playwright", `chromium-${v}`, "chrome-linux");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "chrome"), "#!/bin/sh\n");
+    }
+    const was = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      expect(playwrightChromes()[0]).toBe(join(home, ".cache/ms-playwright/chromium-1248/chrome-linux/chrome"));
+    } finally {
+      process.env.HOME = was;
+    }
   });
 
   test("a pair is a parent and a child with their classes, void tags closing themselves", () => {

@@ -75,6 +75,24 @@ export function coverage(names: string[], read: (name: string) => string) {
   });
 }
 
+/** A Chromium Playwright installed, newest first: a Mac without Chrome may still have one. */
+export function playwrightChromes() {
+  const home = process.env.HOME ?? "";
+  return [join(home, "Library/Caches/ms-playwright"), join(home, ".cache/ms-playwright")].flatMap((dir) => {
+    try {
+      const found = ["chromium-*/chrome-*/*.app/Contents/MacOS/*", "chromium-*/chrome-*/chrome"].flatMap((p) => [
+        ...new Bun.Glob(p).scanSync({ cwd: dir, onlyFiles: true }),
+      ]);
+      return found
+        .sort()
+        .reverse()
+        .map((f) => join(dir, f));
+    } catch {
+      return [];
+    }
+  });
+}
+
 export function findChrome() {
   const known = [
     process.env.CHROME_BIN,
@@ -83,6 +101,7 @@ export function findChrome() {
     Bun.which("google-chrome-stable"),
     Bun.which("chromium"),
     Bun.which("chromium-browser"),
+    ...playwrightChromes(),
   ];
   const bin = known.find((p) => p && Bun.file(p).size > 0);
   if (!bin) throw new Error("No Chrome found: set CHROME_BIN");
