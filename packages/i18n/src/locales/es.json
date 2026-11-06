@@ -1357,6 +1357,7 @@
     "more": "Más",
     "moreWhat": {
       "approvals": "Lo que los agentes te piden permitir",
+      "proposals": "Lo que los agentes proponen cambiar",
       "threads": "Conversaciones que se ramifican, y misiones",
       "issues": "El trabajo del equipo, para personas y agentes",
       "wiki": "Lo que sabe el equipo, escrito para todos",
@@ -1430,6 +1431,7 @@
     "summary_many": "{{people}} miembros · {{agents}} agentes",
     "summary_other": "{{people}} miembros · {{agents}} agentes",
     "approvals": "Aprobaciones",
+    "proposals": "Propuestas de mejora",
     "issues": "Tareas",
     "missionsWaiting_one": "{{count}} misión te espera",
     "missionsWaiting_many": "{{count}} misiones te esperan",
@@ -1474,6 +1476,9 @@
     "pendingApprovals_one": "{{count}} aprobación pendiente",
     "pendingApprovals_many": "{{count}} aprobaciones pendientes",
     "pendingApprovals_other": "{{count}} aprobaciones pendientes",
+    "pendingProposals_one": "{{count}} propuesta te espera",
+    "pendingProposals_many": "{{count}} propuestas te esperan",
+    "pendingProposals_other": "{{count}} propuestas te esperan",
     "home": "Inicio",
     "notifications": "Notificaciones",
     "unreadMark": "No leído",
@@ -3913,6 +3918,7 @@
       "joinRequestMany": "<b>{{names}}</b> piden unirse",
       "joinSuggestion": "<b>{{by}}</b> sugirió a <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> pide un cambio en <b>{{agent}}</b>",
+      "proposalWaiting": "Propuestas de mejora de <b>{{names}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> pide un agente nuevo: <b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b> te eligió en Quién aprueba por mí",
       "approvalCoverDeclined": "<b>{{name}}</b> ya no aprobará por ti",
@@ -4047,6 +4053,9 @@
   },
   "approvals": {
     "title": "Aprobaciones",
+    "tabs": {
+      "requests": "Solicitudes"
+    },
     "groupHead_one": "<b>{{name}}</b> pidió {{count}} cosa de una vez",
     "groupHead_many": "<b>{{name}}</b> pidió {{count}} cosas de una vez",
     "groupHead_other": "<b>{{name}}</b> pidió {{count}} cosas de una vez",
@@ -4940,6 +4949,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "No volver a proponer: {{text}}",
+    "fromCorrection": "Una persona corrigió: {{text}}",
     "back": "{{name}}",
     "title": "Lo que sabe {{name}}",
     "subtitle": "Lo que {{name}} aprendió de las conversaciones y de las correcciones del equipo.",
@@ -5005,6 +5016,15 @@
   },
   "proposals": {
     "title": "Propuestas de mejora",
+    "whyCode": {
+      "refused": "Una persona rechazó: {{text}}",
+      "corrected": "Una persona corrigió: {{text}}",
+      "seen": "El agente notó esto más de una vez.",
+      "skill": "Surgió al usar esta skill.",
+      "asked": "Pedido en una conversación.",
+      "budget": "Se detuvo esta semana al llegar a su presupuesto mensual.",
+      "noChannel": "No está en ningún canal."
+    },
     "subtitle": "Cambios que proponen los agentes. Nada cambia hasta que alguien acepta.",
     "list": "Propuestas",
     "proposes": "<b>{{agent}}</b> propone · {{target}}",

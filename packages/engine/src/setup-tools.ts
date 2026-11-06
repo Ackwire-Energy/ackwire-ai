@@ -91,6 +91,7 @@ export const APP_PAGES = {
   right_hand: "Your own settings (name, AI, budget, who may use you)",
   import: "Importing agents",
   approvals: "Approvals, waiting and decided",
+  proposals: "Proposed changes to agents and the workspace context, waiting and decided (a tab of Approvals)",
   routines: "Routines",
   drive: "Drive (files)",
   wiki: "Wiki",

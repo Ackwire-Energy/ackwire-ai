@@ -131,6 +131,19 @@ describe("the top of Lodi's DM", () => {
     expect(screen().queryByText("Conectar uma IA para o time")).toBeNull();
   });
 
+  test("the other ways in are text links: a wrapped line starts on the row's edge, with no padding of a button", async () => {
+    await openDm(fresh());
+    const foot = document.querySelector(".tp-start__foot") as HTMLElement;
+    const links = [...foot.querySelectorAll("button")];
+    expect(links.map((b) => b.textContent)).toEqual([
+      "Ver modelos de time",
+      "Agentes prontos",
+      "Importar meus agentes",
+      "Preencher o formulário",
+    ]);
+    for (const link of links) expect(link.className).toBe("ac-link");
+  });
+
   test("a business type is my own message to Lodi, and the card reads answered with it checked", async () => {
     const state = fresh();
     await openDm(state);

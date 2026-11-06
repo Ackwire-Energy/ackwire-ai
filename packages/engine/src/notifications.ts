@@ -200,6 +200,11 @@ export const NOTIFICATION_KINDS = [
    */
   "change_request",
   /**
+   * Proposals wait on this person (`proposals-waiting`, one row per person): the agents that made them as actors.
+   * Waiting; done once none is left for them to decide.
+   */
+  "proposal_waiting",
+  /**
    * A person's monthly AI limit (ADR 0141), `source.userId` the person, `latest.statusTo` what happened: `warning`
    * (the person, at 80%), `reached` (who decides, with `limitUsd`, `limitFrom`, `runs` and the agent most used in
    * `title` with its `share`; `reached_notify` to the person when the limit only notifies), `request` (who decides,
@@ -392,6 +397,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   "catch_up_closed",
   // The day's decisions the right hand made for the person, one row while unread.
   "right_hand_decided",
+  // One per person, read or not, until nothing waits on them.
+  "proposal_waiting",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];
@@ -562,7 +569,7 @@ async function upsertOne(deps: NotificationDeps, input: NotifyInput, userId: str
         and(
           sameGroup,
           isNull(notifications.doneAt),
-          input.kind === "approval"
+          input.kind === "approval" || input.kind === "proposal_waiting"
             ? undefined
             : reaction
               ? or(

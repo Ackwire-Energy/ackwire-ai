@@ -6,8 +6,13 @@ const order: SidebarItem[] = [...SIDEBAR_ITEMS];
 
 describe("the tools' order", () => {
   test("a tool dropped before or after another takes that place; on itself or an unknown one, nothing moves", () => {
-    expect(placeTool(order, "drive", "threads", "before").slice(0, 3)).toEqual(["approvals", "drive", "threads"]);
-    expect(placeTool(order, "approvals", "issues", "after").slice(0, 3)).toEqual(["threads", "issues", "approvals"]);
+    expect(placeTool(order, "drive", "threads", "before").slice(0, 3)).toEqual(["approvals", "proposals", "drive"]);
+    expect(placeTool(order, "approvals", "issues", "after").slice(0, 4)).toEqual([
+      "proposals",
+      "threads",
+      "issues",
+      "approvals",
+    ]);
     expect(placeTool(order, "drive", "drive", "after")).toEqual(order);
     expect(placeTool(order, "drive", "nope" as SidebarItem, "after")).toEqual(order);
     expect(new Set(placeTool(order, "calendar", "approvals", "before")).size).toBe(order.length);
@@ -33,7 +38,7 @@ describe("the tools' order", () => {
   });
 
   test("the setup dialog moves a tool one place in the whole order", () => {
-    expect(moveSection(order, "issues", -1).slice(0, 3)).toEqual(["approvals", "issues", "threads"]);
+    expect(moveSection(order, "issues", -1).slice(0, 4)).toEqual(["approvals", "proposals", "issues", "threads"]);
     expect(moveSection(order, "taskManager", 1)).toEqual(order);
   });
 });

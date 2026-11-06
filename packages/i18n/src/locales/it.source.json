@@ -3191,6 +3191,9 @@
   "shell.moreWhat.approvals": {
     "value": "What agents ask you to allow"
   },
+  "shell.moreWhat.proposals": {
+    "value": "What agents propose to change"
+  },
   "shell.moreWhat.threads": {
     "value": "Conversations that branch off, and missions"
   },
@@ -3392,6 +3395,9 @@
   "shell.approvals": {
     "value": "Approvals"
   },
+  "shell.proposals": {
+    "value": "Improvement proposals"
+  },
   "shell.issues": {
     "value": "Tasks"
   },
@@ -3513,6 +3519,12 @@
     "value": {
       "one": "{{count}} pending approval",
       "other": "{{count}} pending approvals"
+    }
+  },
+  "shell.pendingProposals": {
+    "value": {
+      "one": "{{count}} proposal waiting for you",
+      "other": "{{count}} proposals waiting for you"
     }
   },
   "shell.home": {
@@ -9204,6 +9216,9 @@
   "notifications.what.changeRequest": {
     "value": "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>"
   },
+  "notifications.what.proposalWaiting": {
+    "value": "Improvement proposals from <b>{{names}}</b>"
+  },
   "notifications.what.changeRequestAgent": {
     "value": "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>"
   },
@@ -9539,6 +9554,9 @@
   },
   "approvals.title": {
     "value": "Approvals"
+  },
+  "approvals.tabs.requests": {
+    "value": "Requests"
   },
   "approvals.groupHead": {
     "value": {
@@ -11744,6 +11762,12 @@
   "agentPage.saveBar.andMore": {
     "value": "{{names}} and more"
   },
+  "memory.fromRefusal": {
+    "value": "Not to propose again: {{text}}"
+  },
+  "memory.fromCorrection": {
+    "value": "A person corrected: {{text}}"
+  },
   "memory.back": {
     "value": "{{name}}"
   },
@@ -11903,6 +11927,27 @@
   },
   "proposals.title": {
     "value": "Improvement proposals"
+  },
+  "proposals.whyCode.refused": {
+    "value": "A person refused: {{text}}"
+  },
+  "proposals.whyCode.corrected": {
+    "value": "A person corrected: {{text}}"
+  },
+  "proposals.whyCode.seen": {
+    "value": "The agent noticed this more than once."
+  },
+  "proposals.whyCode.skill": {
+    "value": "It came from using this skill."
+  },
+  "proposals.whyCode.asked": {
+    "value": "Asked for in a conversation."
+  },
+  "proposals.whyCode.budget": {
+    "value": "It stopped at its monthly budget this week."
+  },
+  "proposals.whyCode.noChannel": {
+    "value": "It is in no channel."
   },
   "proposals.subtitle": {
     "value": "Changes the agents propose. Nothing changes until someone accepts."

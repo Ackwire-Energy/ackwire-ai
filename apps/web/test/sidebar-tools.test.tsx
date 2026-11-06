@@ -57,6 +57,7 @@ const sent = (state: State) =>
 const noneWaiting = () => {
   const state = seedState();
   for (const a of state.approvals) a.status = "approved";
+  for (const p of state.proposals) p.status = "accepted";
   return state;
 };
 
@@ -115,7 +116,14 @@ describe("the tools on top", () => {
     expect(rows()).not.toContain("Painéis");
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive", "Equipe"]);
     const more = await openMore();
-    expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Painéis", "Gerenciador de tarefas"]);
+    expect(inMore(more)).toEqual([
+      "Propostas de melhoria",
+      "Wiki",
+      "Rotinas",
+      "Calendário",
+      "Painéis",
+      "Gerenciador de tarefas",
+    ]);
     expect(
       within(more)
         .getByRole("link", { name: /Painéis/ })
@@ -132,6 +140,7 @@ describe("the tools on top", () => {
     expect(listed()).toEqual(["Threads", "Tarefas", "Drive", "Equipe"]);
     expect(inMore(await openMore())).toEqual([
       "Aprovações",
+      "Propostas de melhoria",
       "Wiki",
       "Rotinas",
       "Calendário",
@@ -225,11 +234,38 @@ describe("the tools on top", () => {
     expect(listed()).toEqual(["Threads", "Tarefas", "Wiki", "Rotinas", "Equipe"]);
   });
 
+  test("proposals waiting count on Aprovações, and on their own row once a person gives them one", async () => {
+    const waiting = () => {
+      const state = noneWaiting();
+      for (const p of state.proposals) Object.assign(p, { status: "pending", canDecide: true });
+      return state;
+    };
+    await go(waiting());
+    const row = (name: string) =>
+      [...nav().querySelectorAll(".sidebar__tools > a.sidebar__item")].find(
+        (a) => a.querySelector(".sidebar__item-label")?.textContent === name,
+      );
+    expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive", "Equipe"]);
+    expect(row("Aprovações")?.textContent).toContain("2");
+    cleanup();
+    await go({ ...waiting(), sidebarItems: { proposals: "auto" } });
+    expect(listed()).toEqual(["Propostas de melhoria", "Threads", "Tarefas", "Drive", "Equipe"]);
+    expect(row("Propostas de melhoria")?.textContent).toContain("2");
+    expect(row("Propostas de melhoria")?.getAttribute("href")).toBe(`/org/${ORG_ID}/proposals`);
+    cleanup();
+    // A tab of Aprovações: its row is the one lit, with no second row for the page.
+    await renderApp(`/org/${ORG_ID}/proposals`, { api: createFakeApi(waiting()) });
+    await settle(10);
+    expect(row("Aprovações")?.getAttribute("data-status")).toBe("active");
+    expect(nav().querySelector(`.sidebar__more-active a[href$="/proposals"]`)).toBeNull();
+  });
+
   test("the choices are the server's: the same sidebar on every device", async () => {
     await go(seedState({ sidebarItems: { drive: "more", routines: "always", approvals: "more" } }));
     expect(listed()).toEqual(["Threads", "Tarefas", "Rotinas", "Equipe"]);
     expect(inMore(await openMore())).toEqual([
       "Aprovações",
+      "Propostas de melhoria",
       "Wiki",
       "Drive",
       "Calendário",
@@ -305,6 +341,7 @@ describe("the tools on top", () => {
       expect(toolOrder(state)).toEqual([
         [
           "approvals",
+          "proposals",
           "threads",
           "drive",
           "issues",
@@ -347,6 +384,7 @@ describe("the tools on top", () => {
       // Wiki stays where the steps left it, in More: the order is Drive's own spot now, not the default's.
       expect(toolOrder(state).at(-1)).toEqual([
         "approvals",
+        "proposals",
         "threads",
         "issues",
         "drive",
@@ -364,14 +402,15 @@ describe("the tools on top", () => {
       const dialog = await openSetup();
       const names = () =>
         [...dialog.querySelectorAll(".sidebar-setup__row .sidebar-setup__name")].map((n) => n.textContent);
-      expect(names().slice(0, 3)).toEqual(["Aprovações", "Threads", "Tarefas"]);
+      expect(names().slice(0, 3)).toEqual(["Aprovações", "Propostas de melhoria", "Threads"]);
       expect(
         (within(dialog).getByRole("button", { name: "Mover para cima: Aprovações" }) as HTMLButtonElement).disabled,
       ).toBe(true);
       await click(within(dialog).getByRole("button", { name: "Mover para cima: Drive" }));
       await click(within(dialog).getByRole("button", { name: "Mover para cima: Drive" }));
-      expect(names().slice(0, 4)).toEqual(["Aprovações", "Threads", "Drive", "Tarefas"]);
+      expect(names().slice(0, 5)).toEqual(["Aprovações", "Propostas de melhoria", "Threads", "Drive", "Tarefas"]);
       // At the top its up arrow turns off: the focus goes to the row's down arrow, not out of the dialog.
+      await click(within(dialog).getByRole("button", { name: "Mover para cima: Threads" }));
       await click(within(dialog).getByRole("button", { name: "Mover para cima: Threads" }));
       expect(document.activeElement === within(dialog).getByRole("button", { name: "Mover para baixo: Threads" })).toBe(
         true,

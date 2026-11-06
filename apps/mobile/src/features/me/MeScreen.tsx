@@ -1,4 +1,4 @@
-import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
+import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe, useOverview } from "@agenteschat/client";
 import {
   accountTitle,
   groupPlans,
@@ -73,6 +73,7 @@ export function MeScreen() {
   const c = useColors();
   const requests = useJoinRequests(org.orgId, can(org.org, "invite_people"));
   const waiting = requests.data?.length ?? 0;
+  const proposals = useOverview(org.orgId).data?.proposalsWaitingForMe ?? 0;
   const push = usePushSwitch().on;
 
   const mine = meId ? dir.memberById.get(meId) : undefined;
@@ -103,6 +104,12 @@ export function MeScreen() {
       label: t("mobile.me.issues"),
       ...(withMe > 0 ? { value: t("mobile.me.issuesWithMe", { count: withMe }) } : {}),
       href: "/issues",
+    },
+    {
+      icon: "flag",
+      label: t("shell.proposals"),
+      ...(proposals > 0 ? { value: t("mobile.me.proposalsWaiting", { count: proposals }) } : {}),
+      href: "/proposals",
     },
     { icon: "clock", label: t("routines.title"), href: "/routines" },
     { icon: "file", label: t("wiki.title"), href: "/wiki" },

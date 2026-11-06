@@ -28,6 +28,32 @@ const { agentActions, agents, contextItems } = schema;
 
 export type ContextItem = typeof contextItems.$inferSelect;
 export type ContextKind = ContextItem["kind"];
+
+/** A refused proposal in its agent's memory (`recordRefusal`): English, for the agent. */
+export const REFUSED_CHANGE = "A person refused this change; don't propose it again: ";
+const REFUSED_CHANGE_MARKS = new RegExp(
+  `^(?:(?:## Learned|-)\\s+|${REFUSED_CHANGE}|(?:role|access|settings|skill [^:]*): )+`,
+);
+const REFUSED_APPROVAL = /^"(.*)" was refused(?:: (.*)| by a person\.)$/s;
+const CORRECTION = /^A person corrected ".*?": (.*)$/s;
+
+/**
+ * What a person reads of a lesson the server wrote for its agent (`recordRefusal`, `learnFromRefusal`,
+ * `correctAgentMessage`): the words it is about, and how they came for the apps to say in the person's language. The
+ * template around them is for the agent's prompt only.
+ */
+export function itemWords({ content }: Pick<ContextItem, "content">): {
+  text: string;
+  how: "refused" | "corrected" | null;
+} {
+  if (content.startsWith(REFUSED_CHANGE))
+    return { text: content.replace(REFUSED_CHANGE_MARKS, "").replace(/^removing "(.*)"$/s, "$1"), how: "refused" };
+  const approval = REFUSED_APPROVAL.exec(content);
+  if (approval) return { text: [approval[1], approval[2]].filter(Boolean).join(": "), how: "refused" };
+  const correction = CORRECTION.exec(content);
+  if (correction) return { text: correction[1] ?? "", how: "corrected" };
+  return { text: content, how: null };
+}
 export type Evidence = ContextItem["evidence"][number];
 
 // ── Guardrails ───────────────────────────────────────────────────────────────
@@ -141,7 +167,7 @@ export const learnedQuietly = (i: Pick<ContextItem, "kind" | "agentId" | "scopeT
  */
 export const receiptLine = (
   i: Pick<ContextItem, "title" | "content" | "kind" | "agentId" | "scopeType" | "createdByKind" | "evidence">,
-) => (learnedQuietly(i) ? "" : i.title.trim() || (i.createdByKind === "person" ? i.content : ""));
+) => (learnedQuietly(i) ? "" : i.title.trim() || (i.createdByKind === "person" ? itemWords(i).text : ""));
 /**
  * The receipt line for a write, "" for none. A quiet write that replaces or disputes what a person said, or what a
  * person wrote (an app's import has no human evidence), still gets one: a person's memory never changes unseen.

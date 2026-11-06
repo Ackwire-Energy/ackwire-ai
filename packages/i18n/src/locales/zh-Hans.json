@@ -1285,6 +1285,7 @@
     "more": "更多",
     "moreWhat": {
       "approvals": "智能体请求你允许的事",
+      "proposals": "智能体提议更改的内容",
       "threads": "分支出去的对话和专项任务",
       "issues": "团队的工作，成员和智能体都有",
       "wiki": "团队知道的事，写给所有人看",
@@ -1356,6 +1357,7 @@
     "searchWorkspace": "搜索工作区",
     "summary_other": "{{people}} 位成员 · {{agents}} 个智能体",
     "approvals": "审批",
+    "proposals": "改进建议",
     "issues": "任务",
     "missionsWaiting_other": "{{count}} 个专项任务在等你",
     "threads": "话题",
@@ -1394,6 +1396,7 @@
     "gallery": "组件库",
     "unread_other": "{{count}} 条未读消息",
     "pendingApprovals_other": "{{count}} 个待审批",
+    "pendingProposals_other": "{{count}} 条提议等你处理",
     "home": "首页",
     "notifications": "通知",
     "unreadMark": "未读",
@@ -3658,6 +3661,7 @@
       "joinRequestMany": "<b>{{names}}</b> 申请加入",
       "joinSuggestion": "<b>{{by}}</b> 推荐了 <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> 请求更改 <b>{{agent}}</b>",
+      "proposalWaiting": "来自 <b>{{names}}</b> 的改进提议",
       "changeRequestAgent": "<b>{{name}}</b> 请求新的智能体：<b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b> 在“谁替我审批”中选了你",
       "approvalCoverDeclined": "<b>{{name}}</b> 不再替你审批",
@@ -3778,6 +3782,9 @@
   },
   "approvals": {
     "title": "审批",
+    "tabs": {
+      "requests": "请求"
+    },
     "groupHead_other": "<b>{{name}}</b> 一次请求了 {{count}} 项",
     "readsOnly": "只读",
     "technical": "技术细节",
@@ -4662,6 +4669,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "不再提议：{{text}}",
+    "fromCorrection": "有人更正：{{text}}",
     "back": "{{name}}",
     "title": "{{name}} 知道的事",
     "subtitle": "{{name}} 从对话和团队的纠正中学到的内容。",
@@ -4723,6 +4732,15 @@
   },
   "proposals": {
     "title": "改进建议",
+    "whyCode": {
+      "refused": "有人拒绝：{{text}}",
+      "corrected": "有人更正：{{text}}",
+      "seen": "智能体多次注意到这一点。",
+      "skill": "来自使用这个技能。",
+      "asked": "在对话中提出。",
+      "budget": "本周已达到每月预算并停止。",
+      "noChannel": "不在任何频道中。"
+    },
     "subtitle": "智能体提议的更改。有人接受之前，什么都不会变。",
     "list": "建议",
     "proposes": "<b>{{agent}}</b> 提议 · {{target}}",

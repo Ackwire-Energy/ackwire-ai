@@ -240,34 +240,40 @@ function StartCard({
         actions={
           <span className="tp-start__foot">
             <span className="small muted">{t("teamPlan.start.footer")}</span>
-            <Button size="sm" onClick={() => setTemplates(true)}>
+            <button type="button" className="ac-link" onClick={() => setTemplates(true)}>
               {t("teamPlan.start.templates")}
-            </Button>
+            </button>
             {presetsOpen ? (
-              <Button size="sm" variant="ghost" loading={create.isPending} onClick={() => create.mutate(left)}>
+              <button
+                type="button"
+                className="ac-link"
+                disabled={create.isPending}
+                aria-busy={create.isPending}
+                onClick={() => create.mutate(left)}
+              >
                 {t("rightHand.intro.start.team")}
-              </Button>
+              </button>
             ) : (
-              <Button size="sm" variant="ghost" onClick={() => setPresetsOpen(true)}>
+              <button type="button" className="ac-link" onClick={() => setPresetsOpen(true)}>
                 {t("teamPlan.start.presets")}
-              </Button>
+              </button>
             )}
-            <Button
-              size="sm"
-              variant="ghost"
+            <button
+              type="button"
+              className="ac-link"
               onClick={() =>
                 void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "import" } })
               }
             >
               {t("rightHand.intro.start.import")}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
+            </button>
+            <button
+              type="button"
+              className="ac-link"
               onClick={() => void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id } })}
             >
               {t("rightHand.intro.start.form")}
-            </Button>
+            </button>
           </span>
         }
       />

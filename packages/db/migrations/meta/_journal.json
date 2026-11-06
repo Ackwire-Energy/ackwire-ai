@@ -1611,6 +1611,13 @@
       "when": 1794280000000,
       "tag": "0231_task_github_url",
       "breakpoints": true
+    },
+    {
+      "idx": 232,
+      "version": "7",
+      "when": 1794380000000,
+      "tag": "0232_refusal_proposals",
+      "breakpoints": true
     }
   ]
 }

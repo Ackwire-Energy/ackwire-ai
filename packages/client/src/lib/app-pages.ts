@@ -71,6 +71,7 @@ export const APP_PAGES = {
     label: "settings.section.import",
   },
   approvals: { web: "/approvals", phone: null, may: null, label: "shell.approvals" },
+  proposals: { web: "/proposals", phone: "/proposals", may: null, label: "shell.proposals" },
   routines: { web: "/routines", phone: "/routines", may: null, label: "shell.routines" },
   drive: { web: "/drive", phone: "/drive", may: null, label: "shell.drive" },
   wiki: { web: "/wiki", phone: "/wiki", may: null, label: "shell.wiki" },

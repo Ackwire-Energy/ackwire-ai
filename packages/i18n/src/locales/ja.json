@@ -1285,6 +1285,7 @@
     "more": "その他",
     "moreWhat": {
       "approvals": "エージェントからの許可のお願い",
+      "proposals": "エージェントが変更を提案している内容",
       "threads": "枝分かれした会話とミッション",
       "issues": "人とエージェントのためのチームの作業",
       "wiki": "チームの知識を全員向けにまとめたもの",
@@ -1356,6 +1357,7 @@
     "searchWorkspace": "ワークスペースを検索",
     "summary_other": "メンバー{{people}}人 · エージェント{{agents}}体",
     "approvals": "承認",
+    "proposals": "改善提案",
     "issues": "タスク",
     "missionsWaiting_other": "{{count}}件のミッションがあなたを待っています",
     "threads": "スレッド",
@@ -1394,6 +1396,7 @@
     "gallery": "コンポーネントギャラリー",
     "unread_other": "{{count}}件の未読メッセージ",
     "pendingApprovals_other": "{{count}}件の承認待ち",
+    "pendingProposals_other": "{{count}} 件の提案があなたを待っています",
     "home": "ホーム",
     "notifications": "通知",
     "unreadMark": "未読",
@@ -3655,6 +3658,7 @@
       "joinRequestMany": "<b>{{names}}</b>が参加をリクエストしています",
       "joinSuggestion": "<b>{{by}}</b>が<b>{{name}}</b>を提案しました",
       "changeRequest": "<b>{{name}}</b>が<b>{{agent}}</b>の変更を依頼しています",
+      "proposalWaiting": "<b>{{names}}</b> からの改善提案",
       "changeRequestAgent": "<b>{{name}}</b>が新しいエージェントを依頼しています：<b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b>が「代わりに承認する人」にあなたを選びました",
       "approvalCoverDeclined": "<b>{{name}}</b>はあなたの代わりに承認しなくなりました",
@@ -3775,6 +3779,9 @@
   },
   "approvals": {
     "title": "承認",
+    "tabs": {
+      "requests": "リクエスト"
+    },
     "groupHead_other": "<b>{{name}}</b>が{{count}}件をまとめて依頼しました",
     "readsOnly": "読み取りのみ",
     "technical": "技術的な詳細",
@@ -4614,6 +4621,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "再度提案しない: {{text}}",
+    "fromCorrection": "修正されました: {{text}}",
     "back": "{{name}}",
     "title": "{{name}}が知っていること",
     "subtitle": "{{name}}が会話やチームの訂正から学んだことです。",
@@ -4675,6 +4684,15 @@
   },
   "proposals": {
     "title": "改善提案",
+    "whyCode": {
+      "refused": "拒否されました: {{text}}",
+      "corrected": "修正されました: {{text}}",
+      "seen": "エージェントがこれを複数回確認しました。",
+      "skill": "このスキルの利用から生まれました。",
+      "asked": "会話の中で依頼されました。",
+      "budget": "今週、月間予算に達して停止しました。",
+      "noChannel": "どのチャンネルにも入っていません。"
+    },
     "subtitle": "エージェントが提案する変更。誰かが承認するまで何も変わりません。",
     "list": "提案",
     "proposes": "<b>{{agent}}</b>からの提案 · {{target}}",

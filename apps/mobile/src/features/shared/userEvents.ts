@@ -11,6 +11,7 @@ import {
   isNotificationEvent,
   keys,
   refreshMission,
+  refreshProposals,
   type ThreadFollowEvent,
   type ThreadInfo,
 } from "@agenteschat/client";
@@ -75,8 +76,9 @@ export function useUserEvents() {
       if (event.type === "issue.columns") void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
       applyIssueEvent(qc, orgId, event);
       // A change I asked the right hand for was decided by someone else (ADR 0137): "Aplicado por …" on my card.
+      if (event.type === "proposal.created") void refreshProposals(qc, orgId);
       if (event.type === "proposal.decided") {
-        void qc.invalidateQueries({ queryKey: keys.proposals(orgId) });
+        void refreshProposals(qc, orgId);
         void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       }
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string")

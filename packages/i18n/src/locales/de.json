@@ -1321,6 +1321,7 @@
     "more": "Mehr",
     "moreWhat": {
       "approvals": "Was Agenten dich erlauben lassen wollen",
+      "proposals": "Was Agenten ändern möchten",
       "threads": "Abzweigende Unterhaltungen und Missionen",
       "issues": "Die Arbeit des Teams, für Personen und Agenten",
       "wiki": "Was das Team weiß, für alle aufgeschrieben",
@@ -1393,6 +1394,7 @@
     "summary_one": "{{people}} Mitglied · {{agents}} Agenten",
     "summary_other": "{{people}} Mitglieder · {{agents}} Agenten",
     "approvals": "Freigaben",
+    "proposals": "Verbesserungsvorschläge",
     "issues": "Aufgaben",
     "missionsWaiting_one": "{{count}} Mission wartet auf dich",
     "missionsWaiting_other": "{{count}} Missionen warten auf dich",
@@ -1434,6 +1436,8 @@
     "unread_other": "{{count}} ungelesene Nachrichten",
     "pendingApprovals_one": "{{count}} offene Freigabe",
     "pendingApprovals_other": "{{count}} offene Freigaben",
+    "pendingProposals_one": "{{count}} Vorschlag wartet auf dich",
+    "pendingProposals_other": "{{count}} Vorschläge warten auf dich",
     "home": "Start",
     "notifications": "Benachrichtigungen",
     "unreadMark": "Ungelesen",
@@ -3799,6 +3803,7 @@
       "joinRequestMany": "<b>{{names}}</b> möchten beitreten",
       "joinSuggestion": "<b>{{by}}</b> hat <b>{{name}}</b> vorgeschlagen",
       "changeRequest": "<b>{{name}}</b> bittet um eine Änderung an <b>{{agent}}</b>",
+      "proposalWaiting": "Verbesserungsvorschläge von <b>{{names}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> bittet um einen neuen Agenten: <b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b> hat dich bei Wer für mich freigibt gewählt",
       "approvalCoverDeclined": "<b>{{name}}</b> gibt nicht mehr für dich frei",
@@ -3927,6 +3932,9 @@
   },
   "approvals": {
     "title": "Freigaben",
+    "tabs": {
+      "requests": "Anfragen"
+    },
     "groupHead_one": "<b>{{name}}</b> hat um {{count}} Sache auf einmal gebeten",
     "groupHead_other": "<b>{{name}}</b> hat um {{count}} Sachen auf einmal gebeten",
     "readsOnly": "Nur lesen",
@@ -4793,6 +4801,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "Nicht erneut vorschlagen: {{text}}",
+    "fromCorrection": "Eine Person hat korrigiert: {{text}}",
     "back": "{{name}}",
     "title": "Was {{name}} weiß",
     "title_female": "Was {{name}} weiß",
@@ -4860,6 +4870,15 @@
   },
   "proposals": {
     "title": "Verbesserungsvorschläge",
+    "whyCode": {
+      "refused": "Eine Person hat abgelehnt: {{text}}",
+      "corrected": "Eine Person hat korrigiert: {{text}}",
+      "seen": "Der Agent hat das mehr als einmal bemerkt.",
+      "skill": "Das kam aus der Nutzung dieses Skills.",
+      "asked": "In einem Gespräch gewünscht.",
+      "budget": "Hat diese Woche das Monatsbudget erreicht und angehalten.",
+      "noChannel": "Ist in keinem Kanal."
+    },
     "subtitle": "Änderungen, die die Agenten vorschlagen. Nichts ändert sich ohne Zustimmung.",
     "list": "Vorschläge",
     "proposes": "<b>{{agent}}</b> schlägt vor · {{target}}",

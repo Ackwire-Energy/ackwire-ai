@@ -57,14 +57,13 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   font-size: 13px;
   color: var(--muted);
 }
+/* Text links, no padding of their own: a wrapped line starts at the same left edge as the first. */
 .tp-start__foot {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-}
-.tp-start__foot > .small {
-  margin-right: 4px;
+  align-items: baseline;
+  gap: 8px 16px;
+  font-size: 14px;
 }
 
 .tp-body {

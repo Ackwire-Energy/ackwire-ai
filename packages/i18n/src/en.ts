@@ -1305,6 +1305,7 @@ export const en = {
     more: "More",
     moreWhat: {
       approvals: "What agents ask you to allow",
+      proposals: "What agents propose to change",
       threads: "Conversations that branch off, and missions",
       issues: "The team's work, for people and agents",
       wiki: "What the team knows, written for everyone",
@@ -1379,6 +1380,7 @@ export const en = {
     summary_one: "{{people}} member · {{agents}} agents",
     summary_other: "{{people}} members · {{agents}} agents",
     approvals: "Approvals",
+    proposals: "Improvement proposals",
     issues: "Tasks",
     missionsWaiting_one: "{{count}} mission waiting for you",
     missionsWaiting_other: "{{count}} missions waiting for you",
@@ -1422,6 +1424,8 @@ export const en = {
     unread_other: "{{count}} unread messages",
     pendingApprovals_one: "{{count}} pending approval",
     pendingApprovals_other: "{{count}} pending approvals",
+    pendingProposals_one: "{{count}} proposal waiting for you",
+    pendingProposals_other: "{{count}} proposals waiting for you",
     home: "Home",
     notifications: "Notifications",
     /** Read by screen readers on an unread channel with no number (the pill at its edge). */
@@ -3847,6 +3851,8 @@ export const en = {
       joinSuggestion: "<b>{{by}}</b> suggested <b>{{name}}</b>",
       /** ADR 0137: someone sent a change they can't make to the people who may ("Pedir a um admin"). */
       changeRequest: "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>",
+      /** Proposals wait on this person: `names`, the agents that made them. */
+      proposalWaiting: "Improvement proposals from <b>{{names}}</b>",
       changeRequestAgent: "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>",
       approvalCover: "<b>{{name}}</b> picked you in Who approves for me",
       approvalCoverDeclined: "<b>{{name}}</b> won't approve for you any more",
@@ -3976,6 +3982,8 @@ export const en = {
   },
   approvals: {
     title: "Approvals",
+    /** Beside `proposals.title`: what agents ask to do now, and what they propose to change. */
+    tabs: { requests: "Requests" },
     /** Requests sharing one card in the conversation, together here too. */
     groupHead_one: "<b>{{name}}</b> asked for {{count}} thing in one go",
     groupHead_other: "<b>{{name}}</b> asked for {{count}} things in one go",
@@ -4846,6 +4854,9 @@ export const en = {
     },
   },
   memory: {
+    /** A lesson from a refused change: what it was. */
+    fromRefusal: "Not to propose again: {{text}}",
+    fromCorrection: "A person corrected: {{text}}",
     back: "{{name}}",
     title: "What {{name}} knows",
     subtitle: "What {{name}} learned from conversations and the team's corrections.",
@@ -4894,6 +4905,16 @@ export const en = {
   },
   proposals: {
     title: "Improvement proposals",
+    /** Why it is proposed, when the server gave a code and not an agent's words. */
+    whyCode: {
+      refused: "A person refused: {{text}}",
+      corrected: "A person corrected: {{text}}",
+      seen: "The agent noticed this more than once.",
+      skill: "It came from using this skill.",
+      asked: "Asked for in a conversation.",
+      budget: "It stopped at its monthly budget this week.",
+      noChannel: "It is in no channel.",
+    },
     subtitle: "Changes the agents propose. Nothing changes until someone accepts.",
     list: "Proposals",
     proposes: "<b>{{agent}}</b> proposes · {{target}}",

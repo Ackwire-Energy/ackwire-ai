@@ -26,6 +26,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planMeterText, usageShown } from "@agenteschat/client/lib/plan-usage";
+import { memoryLine } from "@agenteschat/client/lib/proposals";
 import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { planLine } from "@agenteschat/ui/plan-state";
@@ -286,7 +287,7 @@ function Profile({ id }: { id: string }) {
     <GroupedRow
       key={m.id}
       icon="brain"
-      label={m.summary ?? m.text}
+      label={m.summary ?? memoryLine(t, m)}
       labelLines={2}
       sub={originText(m)}
       {...(editable ? { chevron: true, onPress: () => fix(m) } : {})}

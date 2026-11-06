@@ -664,6 +664,10 @@
     "freeSection": "Vrij",
     "noGroupSection": "Geen afdeling"
   },
+  "team": {
+    "entry": "Lijst, organogram en kaart",
+    "mapHint": "Om een agent naar een ander kanaal te verplaatsen, gebruik je de kaart op het web of praat je met {{name}}."
+  },
   "agentEdit": {
     "missing": "Deze agent bestaat niet meer.",
     "saved": "Wijzigingen opgeslagen",
@@ -735,6 +739,8 @@
       "older": "Ouder"
     },
     "kind": {
+      "proposal_waiting_one": "{{names}} stelt een verbetering voor",
+      "proposal_waiting_other": "{{names}} stellen verbeteringen voor",
       "mention_one": "{{names}} heeft je vermeld",
       "mention_other": "{{names}} hebben je vermeld",
       "thread_reply_one": "{{names}} heeft in de thread geantwoord",
@@ -819,6 +825,10 @@
       "desktop_taken_other": "{{names}} hebben het scherm van de computer van {{agent}} overgenomen",
       "desktop_taken_female_one": "{{names}} heeft het scherm van de computer van {{agent}} overgenomen",
       "desktop_taken_female_other": "{{names}} hebben het scherm van de computer van {{agent}} overgenomen",
+      "plan_lent_one": "{{names}} heeft je {{plan}}-abonnement aan {{agent}} gekoppeld",
+      "plan_lent_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
+      "plan_lent_female_one": "{{names}} heeft je {{plan}}-abonnement aan {{agent}} gekoppeld",
+      "plan_lent_female_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
       "connector_tool_changed_one": "Een gekoppelde server heeft tools gewijzigd die je hebt goedgekeurd",
       "connector_tool_changed_other": "Gekoppelde servers hebben tools gewijzigd die je hebt goedgekeurd",
       "computer_disk_full_one": "De schijf van een computer is bijna vol",
@@ -826,11 +836,7 @@
       "computer_no_chrome_one": "Een computer heeft Google Chrome nodig. Download het op google.com/chrome",
       "computer_no_chrome_other": "Computers hebben Google Chrome nodig. Download het op google.com/chrome",
       "app_created_one": "Een AI-app heeft dingen voor je aangemaakt",
-      "app_created_other": "AI-apps hebben dingen voor je aangemaakt",
-      "plan_lent_one": "{{names}} heeft je {{plan}}-abonnement aan {{agent}} gekoppeld",
-      "plan_lent_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
-      "plan_lent_female_one": "{{names}} heeft je {{plan}}-abonnement aan {{agent}} gekoppeld",
-      "plan_lent_female_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld"
+      "app_created_other": "AI-apps hebben dingen voor je aangemaakt"
     },
     "markRead": "Markeren als gelezen",
     "markUnread": "Markeren als ongelezen",
@@ -920,6 +926,8 @@
     "issues": "Taken",
     "issuesWithMe_one": "{{count}} bij jou",
     "issuesWithMe_other": "{{count}} bij jou",
+    "proposalsWaiting_one": "{{count}} wacht",
+    "proposalsWaiting_other": "{{count}} wachten",
     "drive": "Drive",
     "connectors": "Connectors en MCP's",
     "usage": "Gebruik",
@@ -2021,10 +2029,6 @@
         "proposal": "Dashboard"
       }
     }
-  },
-  "team": {
-    "entry": "Lijst, organogram en kaart",
-    "mapHint": "Om een agent naar een ander kanaal te verplaatsen, gebruik je de kaart op het web of praat je met {{name}}."
   },
   "empty": {
     "agents": {
