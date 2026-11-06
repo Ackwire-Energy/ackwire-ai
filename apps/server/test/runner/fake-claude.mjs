@@ -13,7 +13,8 @@
 // the OAuth token it holds (as an agent's shell could print them), "ECHOSPLIT" with that token in two
 // deltas, each 150 ms before the next line, "KEY401" is refused by the endpoint and retries for good
 // (as Claude Code 2.1.310 does, ten times with backoff), "ASKCONTROL" asks for an elicitation on stdout and answers
-// with what it got back, "ECHOSHAPE" prints a token-shaped text in two deltas. Control requests: `initialize`, and `get_usage`
+// with what it got back, "ECHOSHAPE" prints a token-shaped text in two deltas, "ECHOLONGSHAPE" one that goes on over
+// three after its prefix. Control requests: `initialize`, and `get_usage`
 // as $FAKE_CLAUDE_USAGE says ("" a Max plan's windows, "signed_out", "error",
 // "hang": never).
 // With `--json-schema` it is a route (`brain.route`): the prompt on stdin, one JSON result whose
@@ -382,14 +383,16 @@ async function answer(line) {
         ? [`token ${heldToken?.slice(0, half)}`, `${heldToken?.slice(half)} printed`]
         : prompt.includes("ECHOSHAPE")
           ? ["token sk-ant-o", "at01-fakefakefake1234 printed"]
-          : ["Hello ", "world"];
+          : prompt.includes("ECHOLONGSHAPE")
+            ? ["token sk-ant-oat01-fake", "fakefake", "fake1234 printed"]
+            : ["Hello ", "world"];
   for (const text of said) {
     out({
       type: "stream_event",
       event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
       parent_tool_use_id: null,
     });
-    if (prompt.includes("ECHOSPLIT") || prompt.includes("ECHOSHAPE")) await sleep(150);
+    if (/ECHOSPLIT|ECHOSHAPE|ECHOLONGSHAPE/.test(prompt)) await sleep(150);
   }
   out({ type: "assistant", message: { content: [{ type: "text", text: "Hello world" }] }, parent_tool_use_id: null });
   if (prompt.includes("PWTOOL")) {
@@ -438,7 +441,8 @@ async function answer(line) {
       prompt.includes("ECHOKEY") ||
       prompt.includes("ECHOTOKEN") ||
       prompt.includes("ECHOSPLIT") ||
-      prompt.includes("ECHOSHAPE")
+      prompt.includes("ECHOSHAPE") ||
+      prompt.includes("ECHOLONGSHAPE")
         ? said.join("")
         : prompt.includes("ASKCONTROL")
           ? `control ${controlAnswer?.subtype}: ${controlAnswer?.error}`

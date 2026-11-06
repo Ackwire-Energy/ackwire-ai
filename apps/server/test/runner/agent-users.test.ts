@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { writeAgents } from "../../runner/access";
 import { accountSelfCheck, type SelfCheck } from "../../runner/account-check";
@@ -642,6 +642,7 @@ test("the account launcher: the agent's cli slice, the view, its network hook, t
     TMPDIR: "/tmp",
     CLAUDE_CONFIG_DIR: `${store}/config`,
     CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+    CLAUDE_CODE_DISABLE_FILE_MENTIONS: "1",
     DISABLE_AUTOUPDATER: "1",
   });
 });
@@ -793,6 +794,35 @@ test("an agent that left: its rooms and transcripts go from every sign-in, a sha
   }
 });
 
+test("a session moves to another folder's project as the sign-in's user, following no link", () => {
+  const calls: string[][] = [];
+  const accounts = new AccountUsers({
+    home: "/nowhere",
+    root: "/nowhere",
+    run: (file, args) => {
+      calls.push([file, ...args]);
+      return { code: 0, output: "" };
+    },
+  });
+  accounts.carry(AGC, "/s/config/projects/a/x.jsonl", "/s/config/projects/b/x.jsonl");
+  expect(calls).toHaveLength(1);
+  const call = calls[0] as string[];
+  expect(call.slice(0, 5)).toEqual([
+    "/usr/bin/setpriv",
+    "--reuid=30000",
+    `--regid=${AUTH_GID}`,
+    "--clear-groups",
+    "--",
+  ]);
+  expect(call[7]).toContain("--no-dereference");
+  expect(call.slice(8)).toEqual([
+    "sh",
+    "/s/config/projects/b",
+    "/s/config/projects/a/x.jsonl",
+    "/s/config/projects/b/x.jsonl",
+  ]);
+});
+
 // ── The self-check ────────────────────────────────────────────────────────────
 
 const FAKE_CLAUDE = path.join(import.meta.dir, "fake-claude.mjs");
@@ -826,7 +856,7 @@ function selfCheck(over: Partial<SelfCheck> = {}, os: Partial<Record<string, { c
       room: (_u, room) => void rooms.push(room as number),
     },
     home,
-    relay: process.execPath,
+    relay: [process.execPath],
     cli: ["/usr/bin/env", process.execPath, FAKE_CLAUDE],
     systemd: true,
     run,
@@ -876,6 +906,31 @@ test("the self-check says why: off, no systemd, an untrusted path, a version nob
   expect(await accountSelfCheck(newer.check)).toContain("2.1.321");
   expect(await accountSelfCheck(selfCheck({}, { version: { code: 127, output: "" } }).check)).toContain("no version");
 });
+
+test.if(process.platform !== "win32")(
+  "the self-check holds the relay's script to what it holds its runtime",
+  async () => {
+    const script = realpathSync(FAKE_CLAUDE);
+    const withScript = (info: object) =>
+      selfCheck({
+        relay: [process.execPath, script],
+        stat: ((file: string) =>
+          file === script
+            ? { ...(rootOwned as unknown as () => object)(), ...info }
+            : rootOwned(file)) as SelfCheck["stat"],
+      }).check;
+    expect(await accountSelfCheck(withScript({ mode: 0o644 }))).toBeNull();
+    expect(await accountSelfCheck(withScript({ uid: 1000, mode: 0o644 }))).toContain("runner");
+    expect(await accountSelfCheck(withScript({ mode: 0o664 }))).toContain("runner");
+    const noExec = selfCheck({
+      stat: ((file: string) =>
+        file === realpathSync(process.execPath)
+          ? { ...(rootOwned as unknown as () => object)(), mode: 0o644 }
+          : rootOwned(file)) as SelfCheck["stat"],
+    });
+    expect(await accountSelfCheck(noExec.check)).toContain("runner");
+  },
+);
 
 test.if(process.platform !== "win32")(
   "the self-check fails on a built-in tool the CLI keeps, a process it can't find, or an agent that reached anything",

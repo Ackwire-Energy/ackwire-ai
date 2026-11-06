@@ -267,7 +267,7 @@ export type WorkerLinkFrame =
   /** To the worker: a line of the CLI of a task root hosts, for that task's logs. */
   | { type: "task.out"; taskId: string; stream: "stdout" | "stderr"; line: string }
   /** To the worker: how that CLI ended. */
-  | ({ type: "task.exit"; taskId: string } & HostedExit)
+  | ({ type: "task.exit"; taskId: string; session: string } & HostedExit)
   /** From the worker: that CLI stops. */
   | { type: "task.stop"; taskId: string }
   /** To the worker: the commands in progress in a delegated session answer now and go on in the background. */
@@ -428,6 +428,8 @@ interface Worker {
   reclaims: Map<string, (reply: BrainReclaimed) => void>;
   /** Turns root hosts for its agent: its network waits for them, and the end of its session fails them. */
   hosted: Set<(err: RunnerError) => void>;
+  /** Tasks root hosts for it: only the worker's own end fails them, as its session's end leaves any other task running. */
+  hostedTasks: Set<(err: RunnerError) => void>;
   /** What root asked it for such a turn, in order, by what the answer names. */
   asks: Map<string, Ask[]>;
 }
@@ -604,16 +606,18 @@ export class Supervisor {
     if (typeof f.error === "string") throw new RunnerError("internal", f.error.slice(0, 500));
   }
 
+  /** Between two of its sessions too: what a hosted task prints and how it ends can't wait for the server. */
   tell(agentId: string, frame: WorkerLinkFrame) {
     const w = this.workers.get(agentId);
-    if (w) this.send(w, frame);
+    if (w) this.write(w, frame);
   }
 
-  /** While the returned call isn't made, a turn root hosts for this agent runs (`Worker.hosted`). */
-  hold(agentId: string, dropped: (err: RunnerError) => void): () => void {
+  /** While the returned call isn't made, a turn root hosts for this agent runs (`Worker.hosted`, `task`: `hostedTasks`). */
+  hold(agentId: string, dropped: (err: RunnerError) => void, task = false): () => void {
     const w = this.workers.get(agentId);
-    w?.hosted.add(dropped);
-    return () => w?.hosted.delete(dropped);
+    const held = task ? w?.hostedTasks : w?.hosted;
+    held?.add(dropped);
+    return () => held?.delete(dropped);
   }
 
   private ask(
@@ -883,7 +887,7 @@ export class Supervisor {
     w.networkRetiring = true;
     w.ready = false;
     this.opts.stopAccountScopes?.(w.user.uid);
-    this.endSession(w, why);
+    this.endSession(w, why, true);
     this.endShows(w, why);
     for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", why));
     proc.stdin.end();
@@ -958,7 +962,7 @@ export class Supervisor {
       w.timer = null;
       for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", STOPPING));
       w.ready = false;
-      this.endSession(w, STOPPING);
+      this.endSession(w, STOPPING, true);
       this.endShows(w, STOPPING);
       if (!w.proc) continue;
       w.proc.stdin.end();
@@ -1032,6 +1036,7 @@ export class Supervisor {
         slots: new Map(),
         reclaims: new Map(),
         hosted: new Set(),
+        hostedTasks: new Set(),
         asks: new Map(),
       };
       this.workers.set(user.id, w);
@@ -1145,6 +1150,7 @@ export class Supervisor {
     this.endSession(
       w,
       "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
+      true,
     );
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
     for (const slot of w.slots.values()) slot.release?.();
@@ -1160,15 +1166,16 @@ export class Supervisor {
 
   /**
    * Whatever the worker's last session ran is gone: its requests fail, its calls go nowhere. `dropped`: the
-   * server waits for the computer and resumes an agent's turn instead of failing it.
+   * server waits for the computer and resumes an agent's turn instead of failing it. `workerGone`: the worker itself
+   * goes, with what its hosted tasks stand on.
    */
-  private endSession(w: Worker, message: string) {
+  private endSession(w: Worker, message: string, workerGone = false) {
     for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("dropped", message) });
     for (const install of [...w.installs.values()]) install.settle(new RunnerError("internal", message));
     for (const [callId, caller] of this.calls) if (caller === w) this.calls.delete(callId);
     const gone = new RunnerError("dropped", message);
     for (const ask of [...w.asks.values()].flat()) ask.fail(gone);
-    for (const dropped of [...w.hosted]) dropped(gone);
+    for (const dropped of [...w.hosted, ...(workerGone ? w.hostedTasks : [])]) dropped(gone);
   }
 
   /** The worker is gone: the clicks it was answering fail. Not with its session, which follows the server's. */

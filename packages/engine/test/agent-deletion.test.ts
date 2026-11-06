@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { channelTopic } from "@agenteschat/adapters";
+import { CLAUDE_SHARED_PROTOCOL, channelTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
@@ -8,6 +8,7 @@ import {
   archiveAgent,
   createAgent,
   deleteAgent,
+  deletedAgentIds,
   drainOutbox,
   exportBundle,
   ForbiddenError,
@@ -424,6 +425,23 @@ describe("deleting an agent", () => {
     const [account] = await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, accountId));
     expect(account?.status).toBe("active");
     expect((await agentRow())?.brainAccountId).toBeNull();
+  });
+
+  test("a computer hears an agent is deleted, not that it was archived, and an older runner hears nothing", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "on", ...RUNNER });
+    const told = async (protocol = RUNNER.protocol) => {
+      const runner = fakeRunner(hub);
+      await runner.hello(paired.token, { protocol });
+      return runner.sent.find((frame) => frame.type === "agents");
+    };
+    await archiveAgent(f.db, f.owner.id, f.org.id, f.agent.id);
+    expect(await told()).not.toHaveProperty("deleted");
+    await remove();
+    expect(await told()).toMatchObject({ deleted: [f.agent.id] });
+    expect(await told(CLAUDE_SHARED_PROTOCOL - 1)).not.toHaveProperty("deleted");
+    expect(await deletedAgentIds(f.db, crypto.randomUUID())).toEqual([]);
   });
 
   test("the secrets people gave it leave the computers that answer; an offline one keeps its row open", async () => {

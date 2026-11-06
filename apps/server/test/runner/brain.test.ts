@@ -1,6 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
@@ -40,6 +50,7 @@ import {
   PERSONAL_MCP_REFUSED,
   redactTokenShapes,
   SESSION_SYSTEM_KEEP_MS,
+  SHELLS_KEPT,
   STEER_CAPABILITY,
   STEER_NOW_CAPABILITY,
   steerSupport,
@@ -2305,6 +2316,7 @@ function delegatedSetup(over: Partial<DelegatedTurn> = {}) {
       env: { ...fakeEnv(), PATH: process.env.PATH, CLAUDE_CONFIG_DIR: configDir },
       cwd: room,
     }),
+    carry: () => {},
     bridge: async (f) => void frames.push(f),
     cancel: (session) => void canceled.push(session),
     detach: (session) => void detached.push(session),
@@ -2390,7 +2402,7 @@ test.if(posix)("delegated: root reads nothing of the folder; what it writes come
   const system = (s.spawns()[0] as unknown as { system: string }).system;
   expect(system).toContain("# From the worker");
   expect(system).not.toContain("planted");
-  expect(system).toContain("read @\u200b/etc/passwd");
+  expect(system).toContain("read \u200b@/etc/passwd");
   // A kept session whose text has no heading for the folder's files: an older one would read them as root here.
   s.m.close();
   const resumed = delegatedSetup({ where: async () => ({ folder, cwd: folder }), text: async () => "" });
@@ -2505,20 +2517,30 @@ test("delegated: what the CLI would act on in a message itself goes in as text",
   expect(neutralizeCliInput("  /login")).toBe(`  ${ZW}/login`);
   expect(neutralizeCliInput("# remember this")).toBe(`${ZW}# remember this`);
   expect(neutralizeCliInput("@/var/lib/agentes-claude/a/config/.credentials.json")).toBe(
-    `@${ZW}/var/lib/agentes-claude/a/config/.credentials.json`,
+    `${ZW}@/var/lib/agentes-claude/a/config/.credentials.json`,
   );
   expect(neutralizeCliInput('see @~/.claude.json and\n@"a b" and @./x')).toBe(
-    `see @${ZW}~/.claude.json and\n@${ZW}"a b" and @${ZW}./x`,
+    `see ${ZW}@~/.claude.json and\n${ZW}@"a b" and ${ZW}@./x`,
   );
+  // Climbing out of the folder: the mention itself goes, or a `..` undoes whatever it was marked with.
+  for (const climb of ["@x/../../config/.credentials.json", "@../../config/a", "@~/../../config/a", "@a\\..\\b"]) {
+    expect(neutralizeCliInput(`read ${climb}`)).toBe(`read ${ZW}${climb}`);
+  }
+  // The CLI ends a word at this punctuation too.
+  for (const mark of ["。", "、", "？", "！"]) {
+    expect(neutralizeCliInput(`x${mark}@~/../../config/a`)).toBe(`x${mark}${ZW}@~/../../config/a`);
+    expect(neutralizeCliInput(`x${mark}@"/etc/passwd"`)).toBe(`x${mark}${ZW}@"/etc/passwd"`);
+  }
+  expect(neutralizeCliInput("@@/etc/passwd")).toBe(`${ZW}@@/etc/passwd`);
   // A person's name and an address are nothing of the CLI's.
   expect(neutralizeCliInput("ask @lia or ada@example.com about 1/2")).toBe("ask @lia or ada@example.com about 1/2");
-  expect(neutralizeFileMentions("# heading @/etc/x")).toBe(`# heading @${ZW}/etc/x`);
+  expect(neutralizeFileMentions("# heading @/etc/x")).toBe(`# heading ${ZW}@/etc/x`);
 });
 
 test.if(posix)("delegated: prompts and messages mid-turn reach the CLI neutralized", async () => {
   const { turn, m } = delegatedSetup();
   const r = await turn(1, "!cat @/etc/passwd");
-  expect(r.final).toMatchObject({ type: "done", text: "echo 1: \u200b!cat @\u200b/etc/passwd" });
+  expect(r.final).toMatchObject({ type: "done", text: "echo 1: \u200b!cat \u200b@/etc/passwd" });
   await withCli(NOW_CLI, async () => {
     const p = turn(2, "STEER go", { session: { id: SESSION(2), resume: false } });
     const messages = [{ uuid: U(1), text: "/login now" }];
@@ -2548,6 +2570,50 @@ test.if(posix)("delegated: a token the model prints never leaves, even split bet
   expect(streamed).toBe("token [REDACTED] printed");
   expect(JSON.stringify(r.events)).not.toContain("fakefake");
 });
+
+test.if(posix)("delegated: a token that goes on over later deltas stays back whole", async () => {
+  const { turn } = delegatedSetup();
+  const r = await turn(1, "ECHOLONGSHAPE");
+  const streamed = r.events.flatMap((e) => (e.type === "text_delta" ? [e.text] : []));
+  expect(streamed.join("")).toBe("token [REDACTED] printed");
+  expect(JSON.stringify(r.events)).not.toContain("fakefake");
+});
+
+test.if(posix)(
+  "delegated: a conversation that moves to another folder keeps its session, by the sign-in's user",
+  async () => {
+    const session = SESSION(1);
+    const moved: string[][] = [];
+    const s = delegatedSetup({
+      carry: (from, to) => {
+        moved.push([from, to]);
+        mkdirSync(path.dirname(to), { recursive: true });
+        copyFileSync(from, to);
+      },
+    });
+    const there = path.join(s.ws, "repos", "acme", "web");
+    const before = claudeSessionFile(s.configDir, s.ws, session);
+    mkdirSync(there, { recursive: true });
+    mkdirSync(path.dirname(before), { recursive: true });
+    await s.turn(1, "hi", { session: { id: session, resume: false } });
+    writeFileSync(before, "transcript\n");
+    await s.turn(1, "more", { session: { id: session, resume: true }, cwd: there });
+    const after = claudeSessionFile(s.configDir, there, session);
+    expect(moved).toEqual([[before, after]]);
+    expect(readFileSync(after, "utf8")).toBe("transcript\n");
+    expect(s.spawns().at(-1)?.args.at(-2)).toBe("--resume");
+
+    // A link where the transcript should be is no transcript: nothing follows it.
+    const third = path.join(s.ws, "repos", "acme", "app");
+    mkdirSync(third, { recursive: true });
+    rmSync(before);
+    rmSync(after);
+    symlinkSync(path.join(s.home, "elsewhere"), after);
+    await s.turn(1, "again", { session: { id: session, resume: true }, cwd: third });
+    expect(moved).toHaveLength(1);
+    expect(s.spawns().at(-1)?.args.at(-2)).toBe("--session-id");
+  },
+);
 
 test.if(posix)(
   "delegated: the worker has the bridge before the CLI starts, each turn its run, and its end",
@@ -2689,6 +2755,31 @@ test("link frames: only what fits comes in from a worker", () => {
   expect(parseToolNotice({ ...notice, session: "" })).toBeNull();
   expect(parseToolNotice({ ...notice, exitCode: 1.5 })).toEqual({ ...shell("running"), status: "completed" });
 });
+
+test.if(posix)("tool.notice: a worker can't grow root's list of shells past what it could run", async () => {
+  const s = delegatedSetup();
+  await s.turn(1, "hi");
+  for (let i = 0; i < SHELLS_KEPT + 5; i++) s.m.toolNotice(AGENT.id, { ...shell("running"), shellId: `b${i}` });
+  const proc = s.m.process(AGENT.id, SESSION(1)) as unknown as { backgroundTasks: Set<string> };
+  expect(proc.backgroundTasks.size).toBe(SHELLS_KEPT);
+  s.m.toolNotice(AGENT.id, { ...shell("running"), shellId: "b0", moved: true });
+  expect(proc.backgroundTasks.size).toBe(SHELLS_KEPT);
+});
+
+test.if(posix)(
+  "keepAccount of nothing: a warm CLI goes even with work in the background, and hears no notice",
+  async () => {
+    const s = delegatedSetup();
+    await s.turn(1, "hi");
+    s.m.toolNotice(AGENT.id, shell("running"));
+    expect(s.m.process(AGENT.id, SESSION(1))?.holdsWork).toBe(true);
+    s.m.keepAccount(null, [], AGENT.id);
+    expect(s.m.process(AGENT.id, SESSION(1))).toBeUndefined();
+    s.m.toolNotice(AGENT.id, shell("completed"));
+    const held = (s.m as unknown as { notices: Map<string, unknown[]> }).notices;
+    expect(held.get(brainKey(AGENT.id, SESSION(1)))).toHaveLength(1);
+  },
+);
 
 test("tool.notice: what waits for a next turn stays bounded", () => {
   const { m } = setup();

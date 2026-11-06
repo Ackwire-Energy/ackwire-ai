@@ -1378,14 +1378,14 @@ test("the worker link hears root's frames and says its own", async () => {
   await waitFor(() => heard.length === 3);
   expect(heard).toEqual(["proc-0001", "cancel s1", "detach s1"]);
   link.onTaskOut = (taskId, stream, said) => heard.push([taskId, stream, said]);
-  link.onTaskExit = (taskId, exit) => heard.push([taskId, exit]);
+  link.onTaskExit = (taskId, session, exit) => heard.push([taskId, session, exit]);
   line({ type: "task.out", taskId: 1, line: "x" });
   line({ type: "task.out", taskId: "t1", stream: "stderr", line: "why" });
-  line({ type: "task.exit", taskId: "t1", exitCode: 0, signal: null, reason: null });
+  line({ type: "task.exit", taskId: "t1", session: "s1", exitCode: 0, signal: null, reason: null });
   await waitFor(() => heard.length === 5);
   expect(heard.slice(3)).toEqual([
     ["t1", "stderr", "why"],
-    ["t1", { exitCode: 0, signal: null, reason: null }],
+    ["t1", "s1", { exitCode: 0, signal: null, reason: null }],
   ]);
   link.bridgeReady("proc-0001");
   const notice = { session: "s1", shellId: "b1", status: "running" as const, summary: "x", outputFile: "/t" };

@@ -48,8 +48,8 @@ export interface SelfCheck {
   config: StoredConfig;
   users: Pick<AccountUsers, "ensure" | "room">;
   home: string;
-  /** The runner's own binary: the relay the CLI starts. */
-  relay: string;
+  /** The runner's own command, a runtime and its script unless compiled: the relay the CLI starts, all of it as its user. */
+  relay: string[];
   /** Tests. */
   cli?: string[];
   systemd?: boolean;
@@ -88,7 +88,7 @@ export async function accountSelfCheck(c: SelfCheck): Promise<string | null> {
   const cli = c.cli ? file : realpathSync(file);
   try {
     trustedRootFile(cli, "Claude CLI", c.stat);
-    trustedRootFile(realpathSync(c.relay), "runner", c.stat);
+    for (const [i, part] of c.relay.entries()) trustedRootFile(realpathSync(part), "runner", c.stat, i > 0);
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
   }

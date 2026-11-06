@@ -89,8 +89,11 @@ export interface AgentWorkers {
   turnContext(agent: AgentScope, ask: { cwd?: string; text?: boolean }, signal: AbortSignal): Promise<TurnContext>;
   bridge(bridge: DelegatedBridge): Promise<void>;
   tell(agentId: string, frame: WorkerLinkFrame): void;
-  /** Until the returned call, the agent's network waits for this turn; `dropped` hears its worker's session ended. */
-  hold(agentId: string, dropped: (err: RunnerError) => void): () => void;
+  /**
+   * Until the returned call, the agent's network waits for this turn; `dropped` hears its worker's session ended. A
+   * `task` doesn't live on that session, so it hears only of the worker's own end.
+   */
+  hold(agentId: string, dropped: (err: RunnerError) => void, task?: boolean): () => void;
   reclaimBrains(spare?: string): Promise<boolean>;
 }
 
@@ -98,7 +101,7 @@ export interface AccountBrainsOptions {
   /** `<runner home>/account-brains`: the system text each session began with. */
   root: string;
   accounts: Pick<AccountManager, "isCliShared" | "cliSharedState" | "sharedCommand" | "noteRateLimit">;
-  users: Pick<AccountUsers, "ensure" | "room" | "bridge">;
+  users: Pick<AccountUsers, "ensure" | "room" | "bridge" | "carry">;
   workers: AgentWorkers;
   /** The folders the agent may use besides its own: root's own word, what a turn's cwd is checked against. */
   grants: (agentId: string) => Promise<string[]>;
@@ -118,6 +121,8 @@ export class AccountBrains {
   readonly brains: BrainManager;
   /** Tasks whose CLI runs now. */
   private readonly tasks = new Map<string, { agentId: string; stop: AbortController }>();
+  /** What ends each turn on purpose (`dropTurns`). */
+  private readonly turns = new Set<{ agentId: string; drop: (err: RunnerError) => void }>();
 
   constructor(private readonly o: AccountBrainsOptions) {
     this.brains = new BrainManager({
@@ -151,6 +156,14 @@ export class AccountBrains {
     this.brains.toolNotice(agentId, notice);
   }
 
+  /**
+   * The running turns of an agent, or of all, end now as `err`. Call it before stopping their scopes: a CLI that just
+   * dies is a crash to its turn, which starts it again.
+   */
+  dropTurns(err: RunnerError, agentId?: string) {
+    for (const t of [...this.turns]) if (agentId === undefined || t.agentId === agentId) t.drop(err);
+  }
+
   /** The computer is short of memory: an idle CLI closes, here or a worker's, the waiting turn's own (`spare`) last. */
   async reclaim(spare: string) {
     const idle = this.brains.idleCandidate(spare);
@@ -182,10 +195,13 @@ export class AccountBrains {
     scope.signal.addEventListener("abort", cancel, { once: true });
     if (scope.signal.aborted) cancel();
     let dropped: RunnerError | undefined;
-    const release = this.o.workers.hold(agent.id, (err) => {
+    const drop = (err: RunnerError) => {
       dropped = err;
       stop.abort();
-    });
+    };
+    const release = this.o.workers.hold(agent.id, drop, task !== undefined);
+    const held = { agentId: agent.id, drop };
+    this.turns.add(held);
     try {
       const final = await this.brains.turn(req, {
         agent,
@@ -199,6 +215,7 @@ export class AccountBrains {
       if (dropped) throw dropped;
       return final;
     } finally {
+      this.turns.delete(held);
       release();
       scope.signal.removeEventListener("abort", cancel);
     }
@@ -246,9 +263,10 @@ export class AccountBrains {
       this.o.workers.tell(agent.id, { type: "task.out", taskId, stream, line });
     const stopped = (): HostedExit | null =>
       stop.signal.aborted ? { exitCode: null, signal: "SIGTERM", reason: timedOut ? "timeout" : "canceled" } : null;
+    const turn = taskTurn(req, host);
     let exit: HostedExit;
     try {
-      const final = await this.turn(taskTurn(req, host), agent, { signal: stop.signal }, () => {}, {
+      const final = await this.turn(turn, agent, { signal: stop.signal }, () => {}, {
         kind: req.mission ? "mission" : "local",
         line: (line) => {
           // Partial messages say nothing a task reads, and are most of what the CLI prints.
@@ -265,7 +283,7 @@ export class AccountBrains {
     }
     clearTimeout(limit);
     this.tasks.delete(taskId);
-    this.o.workers.tell(agent.id, { type: "task.exit", taskId, ...exit });
+    this.o.workers.tell(agent.id, { type: "task.exit", taskId, session: turn.session.id, ...exit });
   }
 
   /** `brain.route`: the prompt carries other people's messages, and the CLI runs with no tool and nothing of anyone's. */
@@ -318,6 +336,7 @@ export class AccountBrains {
         const l = (this.o.launcher ?? accountLauncher)(signIn, user, cwd, grants);
         return { command: accounts.sharedCommand(l.prefix), env: l.env, cwd: l.home };
       },
+      carry: (from, to) => users.carry(signIn, from, to),
       bridge: (frame: DelegatedFrame) => workers.bridge({ ...frame, agent, socketPath }),
       cancel: (session) => workers.tell(agent.id, { type: "turn.cancel", session }),
       detach: (session) => workers.tell(agent.id, { type: "turn.detach", session }),

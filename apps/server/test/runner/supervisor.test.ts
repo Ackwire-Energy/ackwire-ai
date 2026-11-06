@@ -20,7 +20,7 @@ import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-bo
 import { AccountBrains, type AccountBrainsOptions, SHARED_LOGIN_OFF } from "../../runner/account-brains";
 import type { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser, systemLauncher } from "../../runner/agent-users";
-import { PERSONAL_MCP_REFUSED } from "../../runner/brain";
+import { BrainManager, PERSONAL_MCP_REFUSED } from "../../runner/brain";
 import { BrowserManager } from "../../runner/browser";
 import { type StoredConfig, writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
@@ -2492,6 +2492,7 @@ test.if(posix)(
           },
           room: () => {},
           bridge: () => "",
+          carry: () => {},
         },
         selfCheck: async () => {
           checks++;
@@ -2528,6 +2529,161 @@ test.if(posix)(
     await waitFor(() => hellos(failed.sockets).at(-1)?.claudeLoginBlocked !== undefined, 8000);
     expect(hellos(failed.sockets).at(-1)?.claudeLoginBlocked).toContain("Bash");
     await failed.daemon.stop();
+  },
+  20_000,
+);
+
+/** A system-mode daemon of Ana's with the login's switch on, its self-check answered by the test. */
+function sharedLoginDaemon() {
+  const home = newHome();
+  const ws = tempDir("root-ws-");
+  dirs.push(ws);
+  const ana = userOf(ANA);
+  writeFileSync(path.join(home, AGENT_USERS_FILE), JSON.stringify([ana]));
+  const config = {
+    server: "https://agentes.test",
+    machineId: "m1",
+    name: "box",
+    token: "agm_machine_token_never_shown_123456",
+    workspace: ws,
+    mode: "system",
+    agentUidRange: [21000, 21099],
+    access: STATE.access,
+  } as StoredConfig;
+  const claudeSharedLogin = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" as const };
+  writeConfig({ ...config, claudeSharedLogin }, home);
+  const sockets: FakeSocket[] = [];
+  const events: string[] = [];
+  const checks: ((verdict: string | null) => void)[] = [];
+  const daemon = new RunnerDaemon({
+    probeEgress: async () => null,
+    home,
+    mode: "start",
+    log: () => {},
+    executors: () => ({}),
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    caffeinate: false,
+    dial: (_url, handlers) => {
+      const s = new FakeSocket(handlers);
+      sockets.push(s);
+      queueMicrotask(() => handlers.onOpen());
+      return s;
+    },
+    workers: { user: userOf, start: (user) => new FakeWorker(user) },
+    accountUsers: {
+      sweep: () => {},
+      stopScopes: () => void events.push("stop"),
+      sweepAgent: () => void events.push("sweep"),
+      launcher: () => ({ prefix: [], env: {}, home }),
+      remove: () => {},
+      ensure: () => {
+        throw new Error("no user here");
+      },
+      room: () => {},
+      bridge: () => "",
+      carry: () => {},
+    },
+    selfCheck: () => new Promise((resolve) => checks.push(resolve)),
+  });
+  const hellos = () => sockets.flatMap((s) => s.of("hello")) as { claudeLoginMethods?: string[] }[];
+  const lists = (method: boolean) =>
+    waitFor(() => hellos().at(-1)?.claudeLoginMethods?.includes("cli_login") === method, 8000);
+  /** The connection that has the daemon's session, welcomed. */
+  const online = () => {
+    const s = sockets.at(-1) as FakeSocket;
+    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+    return s;
+  };
+  return { home, config, claudeSharedLogin, daemon, sockets, events, checks, lists, online };
+}
+
+test.if(posix)(
+  "a change to the login's switch asks the self-check again, and the server hears of it",
+  async () => {
+    const d = sharedLoginDaemon();
+    const keep = spyOn(BrainManager.prototype, "keepAccount");
+    const { config, claudeSharedLogin, home, daemon, checks } = d;
+    const methods = () => daemon.accounts.claudeLoginMethods();
+    daemon.start();
+    try {
+      await waitFor(() => checks.length === 1);
+      checks[0]?.(null);
+      await d.lists(true);
+      d.online().frame({ type: "agents", agents: [{ ...ANA, account: SHARED_LOGIN }] });
+      expect(keep).toHaveBeenLastCalledWith(SHARED_LOGIN, undefined, ANA.id);
+
+      // A narrower range: the pass was for the last one, and nothing runs on it until this one's answer.
+      const narrow = { ...claudeSharedLogin, maxVersion: "2.1.305" };
+      writeConfig({ ...config, claudeSharedLogin: narrow }, home);
+      await waitFor(() => checks.length === 2, 5000);
+      expect(methods()).toEqual(["setup_token"]);
+      expect(keep).toHaveBeenLastCalledWith(null, [], ANA.id);
+      await d.lists(false);
+      checks[1]?.(null);
+      await d.lists(true);
+      expect(methods()).toEqual(["setup_token", "cli_login"]);
+      expect(keep).toHaveBeenLastCalledWith(SHARED_LOGIN, undefined, ANA.id);
+
+      // Off, the method leaves at once; the next on starts from nothing, and no answer from before counts.
+      writeConfig(config, home);
+      await d.lists(false);
+      expect(checks).toHaveLength(2);
+      writeConfig({ ...config, claudeSharedLogin }, home);
+      await waitFor(() => checks.length === 3, 5000);
+      expect(methods()).toEqual(["setup_token"]);
+      writeConfig({ ...config, claudeSharedLogin: narrow }, home);
+      await waitFor(() => checks.length === 4, 5000);
+      checks[2]?.(null);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(methods()).toEqual(["setup_token"]);
+
+      // A failed check closes what is idle on the store too.
+      checks[3]?.("An agent's user reached the sign-in's folders");
+      await new Promise((r) => setTimeout(r, 20));
+      expect(keep).toHaveBeenLastCalledWith(null, [], ANA.id);
+    } finally {
+      keep.mockRestore();
+      await daemon.stop();
+    }
+  },
+  30_000,
+);
+
+test.if(posix)(
+  "an agent leaving its computer keeps what its sign-ins hold; only a deleted one is cleared",
+  async () => {
+    const d = sharedLoginDaemon();
+    const { daemon, events, checks } = d;
+    const drop = spyOn(AccountBrains.prototype, "dropTurns").mockImplementation((err, agentId) => {
+      events.push(`drop ${err.code} ${agentId ?? "all"}`);
+    });
+    daemon.start();
+    try {
+      await waitFor(() => checks.length === 1);
+      checks[0]?.(null);
+      await d.lists(true);
+      const s = d.online();
+      s.frame({ type: "agents", agents: [ANA] });
+      expect(events).toEqual([]);
+      // Archived or moved: its CLIs stop, turn first; its transcripts wait for it.
+      s.frame({ type: "agents", agents: [] });
+      expect(events).toEqual([`drop dropped ${ANA.id}`, "stop"]);
+      events.length = 0;
+      s.frame({ type: "agents", agents: [ANA] });
+      s.frame({ type: "agents", agents: [ANA], deleted: [ANA.id] });
+      expect(events).toEqual([]);
+      s.frame({ type: "agents", agents: [], deleted: [ANA.id] });
+      expect(events).toEqual([`drop dropped ${ANA.id}`, "sweep"]);
+      events.length = 0;
+      s.frame({ type: "agents", agents: [], deleted: [ANA.id] });
+      expect(events).toEqual([]);
+
+      daemon.pause(null);
+      expect(events).toEqual(["drop dropped all", "stop"]);
+    } finally {
+      drop.mockRestore();
+      await daemon.stop();
+    }
   },
   20_000,
 );
@@ -2571,6 +2727,7 @@ test.if(posix)("the login switch going away stops that login's running CLIs, and
       },
       room: () => {},
       bridge: () => "",
+      carry: () => {},
     },
     selfCheck: async () => null,
   });
@@ -2645,6 +2802,7 @@ test.if(posix)(
         ensure: (id) => ({ id, user: "agc-0193ffff", uid: 30000, gid: 998 }),
         room: () => {},
         bridge: () => "/run/agentes-bridge/21000/mcp.sock",
+        carry: () => {},
       },
       selfCheck: async () => null,
     });
@@ -3677,6 +3835,7 @@ function hosted(t: ReturnType<typeof setup>, over: Partial<AccountBrainsOptions>
       ensure: (id) => ({ id, user: "agc-0193ffff", uid: 30000, gid: 998 }),
       room: (_user, room) => void mkdirSync(path.join(store, "run", String(room)), { recursive: true }),
       bridge: () => "/run/agentes-bridge/21000/mcp.sock",
+      carry: () => {},
     },
     workers: t.sup,
     grants: async () => [],
@@ -3828,6 +3987,33 @@ test.if(posix)("a worker that goes away under a hosted turn drops it, so the ser
   expect(await errorCode(() => run)).toBe("dropped");
   stop();
   expect(s.emitted.flatMap((f) => (f.type === "brain.event" ? [f.event.type] : []))).not.toContain("error");
+  expect(s.emitted.some((f) => f.type === "brain.done")).toBe(false);
+});
+
+test.if(posix)("a turn dropped on purpose ends now: its CLI isn't taken for crashed and started again", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const s = scope();
+  const run = handleRequest(h.ctx, hostedTurn({ prompt: "SLOW wait" }), s.scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, "/home/ag-a1b2c3d4/ana-a1b2c3d4");
+  await waitFor(() => h.brains.brains.hosts("run-00000001"));
+  await waitFor(() => existsSync(h.log));
+  h.brains.dropTurns(new RunnerError("dropped", "Not this agent."), BIA.id);
+  expect(h.brains.brains.hosts("run-00000001")).toBe(true);
+  h.brains.dropTurns(new RunnerError("dropped", "This computer was paused."));
+  expect(await errorCode(() => run)).toBe("dropped");
+  await sleep(100);
+  stop();
+  const started = readFileSync(h.log, "utf8")
+    .trim()
+    .split("\n")
+    .filter((l) => JSON.parse(l).args);
+  expect(started).toHaveLength(1);
   expect(s.emitted.some((f) => f.type === "brain.done")).toBe(false);
 });
 
@@ -4008,7 +4194,7 @@ test.if(posix)("a route on a shared CLI login runs in root, with no tools and an
   expect(start.cwd.endsWith(path.join("run", "21000"))).toBe(true);
   expect(said.system).toBe("You route messages.");
   // The CLI would read that file itself, as the sign-in's user.
-  expect(said.prompt).not.toContain("@/var/lib");
+  expect(said.prompt).toStartWith("\u200b@/var/lib");
   expect(said.prompt).toContain("who answers?");
   // What the route wrote for the CLI goes with it.
   expect(readdirSync(path.join(h.store, "run", "21000")).filter((f) => f.startsWith("route-"))).toEqual([]);
@@ -4149,6 +4335,35 @@ test.if(posix)("refresh mode B: a CLI starts only once the lock's name is gone",
   stop();
   expect(existsSync(h.log)).toBe(true);
   h.brains.brains.close();
+});
+
+test.if(posix)(
+  "a task on a shared CLI login outlives a dropped connection, and its end reaches its worker",
+  async () => {
+    const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+    await waitFor(() => existsSync(s.h.log));
+    s.t.sup.detach();
+    expect(s.ana.of("worker.close")).toHaveLength(1);
+    const exit = await s.done();
+    expect(exit).toMatchObject({ exitCode: 0, signal: null, reason: null, session: HOSTED_SESSION });
+  },
+);
+
+test.if(posix)("a task on a shared CLI login outlives its worker's new session, not the worker", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+  await waitFor(() => existsSync(s.h.log));
+  s.t.sup.detach();
+  s.t.sup.attach();
+  s.ana.hello();
+  expect(await s.done()).toMatchObject({ exitCode: 0, reason: null });
+
+  const gone = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+  await waitFor(() => existsSync(gone.h.log));
+  gone.t.sup.retireNetworkAgent(ANA.id, "network changed");
+  await sleep(50);
+  // Nothing hears it there: the worker's next one finds no CLI, and the server resumes the task.
+  expect(gone.h.brains.brains.hosts(HOSTED_TASK)).toBe(false);
+  gone.h.brains.brains.close();
 });
 
 test("a worker's word to stop a task reaches root as that agent's", async () => {

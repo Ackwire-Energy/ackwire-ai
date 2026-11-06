@@ -121,7 +121,7 @@ export interface ConnectionOptions {
   /** Called after each `welcome` (frames sent from here on reach the server). */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number; observeEgress: boolean }) => void;
   /** Protocol 9: the server's `agents` frame (the agents that use this machine). */
-  onAgents?: (agents: unknown) => void;
+  onAgents?: (agents: unknown, deleted: unknown) => void;
   /** Protocol 12: a person's turn in an agent's browser started, changed or ended (`browser.handoff`). */
   onBrowserHandoff?: (frame: Extract<ServerFrame, { type: "browser.handoff" }>) => void;
   /** The socket's state: dialing, welcomed, or down (reconnecting). */
@@ -314,7 +314,7 @@ export class RunnerConnection {
             return;
           }
           case "agents":
-            opts.onAgents?.(frame.agents);
+            opts.onAgents?.(frame.agents, frame.deleted);
             return;
           case "browser.handoff":
             opts.onBrowserHandoff?.(frame);

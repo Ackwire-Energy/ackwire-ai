@@ -350,7 +350,7 @@ export interface DaemonOptions {
   /** Tests (system mode): the sign-ins' users, and the self-check that opens Claude's own login for all agents. */
   accountUsers?: Pick<
     AccountUsers,
-    "sweep" | "stopScopes" | "sweepAgent" | "launcher" | "remove" | "ensure" | "room" | "bridge"
+    "sweep" | "stopScopes" | "sweepAgent" | "launcher" | "remove" | "ensure" | "room" | "bridge" | "carry"
   >;
   selfCheck?: () => Promise<string | null>;
 }
@@ -424,6 +424,8 @@ export class RunnerDaemon implements RequestObserver {
   private readonly accountUsers: NonNullable<DaemonOptions["accountUsers"]> | null;
   /** The self-check's last answer: null passed, a string why not. Undefined until it ran; only with the switch on. */
   private sharedLoginBlocked: string | null | undefined;
+  /** Deleted agents cleared from the sign-ins by this process: each frame lists them all again. */
+  private readonly swept = new Set<string>();
   /** The agents' desktops (ADR 0058): they outlive sessions and this process. */
   readonly desktops: DesktopSessions;
   /** Terminals people open as an agent (ADR 0058 §6). */
@@ -467,7 +469,7 @@ export class RunnerDaemon implements RequestObserver {
       ...(accountUsers
         ? {
             sharedLogin: {
-              ready: () => this.sharedLoginBlocked === null && this.stored?.claudeSharedLogin !== undefined,
+              ready: () => this.sharedLoginReady,
               launcher: (id: string) => accountUsers.launcher(id),
               remove: (id: string) => accountUsers.remove(id),
             },
@@ -517,6 +519,18 @@ export class RunnerDaemon implements RequestObserver {
     return systemDesktopUser(systemLauncher(u), { uid: u.uid, gid: agentGid(u.user) });
   }
 
+  /** Its switch is on, and the last check made under that switch passed. */
+  private get sharedLoginReady() {
+    return this.sharedLoginBlocked === null && this.stored?.claudeSharedLogin !== undefined;
+  }
+
+  /** Who stays on which sign-in: nobody while that login may not run, so no idle CLI is left on its store. */
+  private keepHosted(agents: readonly MachineAgent[]) {
+    const ready = this.sharedLoginReady;
+    const hosted = this.session?.accountBrains?.brains;
+    for (const a of agents) hosted?.keepAccount(ready ? (a.account ?? null) : null, ready ? a.accounts : [], a.id);
+  }
+
   /**
    * Claude's own login for all agents is offered only while this says so. `hello` carries the answer, so a new one
    * reaches the server with a new connection; with the switch on it changes rarely, and turns resume from there.
@@ -525,13 +539,16 @@ export class RunnerDaemon implements RequestObserver {
     const users = this.accountUsers;
     const config = this.stored;
     if (!users || !config?.claudeSharedLogin) return;
-    const before = this.sharedLoginBlocked;
-    this.sharedLoginBlocked = await (
-      this.opts.selfCheck?.() ??
-      accountSelfCheck({ config, users, home: this.opts.home, relay: this.self.command[0] ?? "" })
+    const verdict = await (
+      this.opts.selfCheck?.() ?? accountSelfCheck({ config, users, home: this.opts.home, relay: this.self.command })
     ).catch((err: unknown) => (err instanceof Error ? err.message : String(err)));
-    if (this.sharedLoginBlocked) this.opts.log(`Claude's own login for all agents: ${this.sharedLoginBlocked}`);
-    if (this.sharedLoginBlocked !== before) this.session?.connection.reconnect();
+    // A pass holds for what it checked; the config that replaced this one asked again (`applyStored`).
+    if (JSON.stringify(this.stored?.claudeSharedLogin) !== JSON.stringify(config.claudeSharedLogin)) return;
+    const before = this.sharedLoginBlocked;
+    this.sharedLoginBlocked = verdict;
+    if (verdict) this.opts.log(`Claude's own login for all agents: ${verdict}`);
+    this.keepHosted(this.agents);
+    if (verdict !== before) this.session?.connection.reconnect();
   }
 
   /**
@@ -761,6 +778,7 @@ export class RunnerDaemon implements RequestObserver {
 
   private applyStored(next: StoredConfig | null, text: string | null, initial: boolean) {
     const prev = this.stored;
+    const loginMethods = this.accounts.claudeLoginMethods();
     this.stored = next;
     this.lastText = text;
     let paired: RunnerConfig | null = null;
@@ -777,7 +795,7 @@ export class RunnerDaemon implements RequestObserver {
     const nextPause = pauseOf(next, this.now());
     if (!initial && JSON.stringify(prev?.paused ?? null) !== JSON.stringify(next?.paused ?? null)) {
       this.send({ type: "runner.state", paused: nextPause });
-      if (nextPause.paused) for (const u of readAgentUsers(this.opts.home)) this.accountUsers?.stopScopes(u.uid);
+      if (nextPause.paused) this.stopHosted("This computer was paused.");
       this.record({
         kind: "pause",
         summary: nextPause.paused
@@ -791,7 +809,14 @@ export class RunnerDaemon implements RequestObserver {
     this.armResume();
     // The switch goes with its route, so a CLI left running would go out directly.
     if (!initial && prev?.claudeSharedLogin && !next?.claudeSharedLogin) {
-      for (const u of readAgentUsers(this.opts.home)) this.accountUsers?.stopScopes(u.uid);
+      this.stopHosted("This computer's Claude login for all agents was turned off.");
+    }
+    if (!initial && JSON.stringify(prev?.claudeSharedLogin) !== JSON.stringify(next?.claudeSharedLogin)) {
+      this.sharedLoginBlocked = undefined;
+      this.keepHosted(this.agents);
+      const methods = this.accounts.claudeLoginMethods();
+      if (JSON.stringify(methods) !== JSON.stringify(loginMethods)) this.session?.connection.reconnect();
+      void this.checkSharedLogin();
     }
 
     const prevAccess = withShared(effectiveAccess(prev), this.shared);
@@ -834,6 +859,12 @@ export class RunnerDaemon implements RequestObserver {
     }
     this.queueStatus();
     void this.reconcile();
+  }
+
+  /** Every CLI root hosts stops, its turn first. */
+  private stopHosted(why: string) {
+    this.session?.accountBrains?.dropTurns(new RunnerError("dropped", why));
+    for (const u of readAgentUsers(this.opts.home)) this.accountUsers?.stopScopes(u.uid);
   }
 
   /** System mode: what each agent's worker must know about this computer. */
@@ -1295,7 +1326,7 @@ export class RunnerDaemon implements RequestObserver {
       ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),
       log,
       observer: this,
-      onAgents: (raw) => this.setAgents(raw),
+      onAgents: (raw, deleted) => this.setAgents(raw, deleted),
       onBrowserHandoff: (frame) =>
         supervisor ? supervisor.handoff(frame) : browser.setHandoff(frame.agentId, frame.handoff),
       onState: (state) => {
@@ -1728,11 +1759,12 @@ export class RunnerDaemon implements RequestObserver {
     return { logo: this.config ? logoDataUrl(this.logo) : null };
   }
 
-  private setAgents(raw: unknown) {
+  private setAgents(raw: unknown, deletedIds?: unknown) {
     const list = parseAgents(raw);
     // System mode: an account folder stays with an agent's user only while that agent thinks with it.
     if (this.stored?.mode === "system") {
-      const uids = new Map(readAgentUsers(this.opts.home).map((u) => [u.id, u.uid]));
+      const users = readAgentUsers(this.opts.home);
+      const uids = new Map(users.map((u) => [u.id, u.uid]));
       const lent = new Map<string, number>();
       for (const a of list) {
         const uid = uids.get(a.id);
@@ -1742,11 +1774,20 @@ export class RunnerDaemon implements RequestObserver {
       void this.accounts.keepLent(lent).catch(() => undefined);
       const here = new Set(list.map((a) => a.id));
       const gone = this.agents.filter((a) => !here.has(a.id)).map((a) => a.id);
-      const hosted = this.session?.accountBrains?.brains;
-      for (const a of list) hosted?.keepAccount(a.account ?? null, a.accounts, a.id);
-      for (const id of gone) hosted?.keepAccount(null, [], id);
-      for (const u of readAgentUsers(this.opts.home)) {
-        if (!gone.includes(u.id)) continue;
+      const deleted = new Set(Array.isArray(deletedIds) ? deletedIds : []);
+      const hosted = this.session?.accountBrains;
+      this.keepHosted(list);
+      for (const id of gone) hosted?.brains.keepAccount(null, [], id);
+      for (const u of users) {
+        const clear = deleted.has(u.id) && !here.has(u.id) && !this.swept.has(u.id);
+        if (!clear && !gone.includes(u.id)) continue;
+        hosted?.dropTurns(new RunnerError("dropped", "The agent left this computer."), u.id);
+        // Archived or moved, it may come back: what the sign-ins hold for it stays until it is deleted.
+        if (!clear) {
+          this.accountUsers?.stopScopes(u.uid);
+          continue;
+        }
+        this.swept.add(u.id);
         try {
           this.accountUsers?.sweepAgent(u);
         } catch (err) {

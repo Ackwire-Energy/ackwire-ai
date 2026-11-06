@@ -368,8 +368,8 @@ export function systemLauncher(
 export const trustedNetworkLauncher = (file: string, stat = lstatSync) =>
   trustedRootFile(file, "network launcher", stat);
 
-/** `file` when it and every folder above it are root's alone, none of them a link. */
-export function trustedRootFile(file: string, what: string, stat = lstatSync): string[] {
+/** `file` when it and every folder above it are root's alone, none of them a link. A `script` needs no exec bit. */
+export function trustedRootFile(file: string, what: string, stat = lstatSync, script = false): string[] {
   if (!path.isAbsolute(file) || file.includes("\0")) throw new Error(`The ${what} must be an absolute path`);
   let current = path.resolve(file);
   while (true) {
@@ -378,7 +378,7 @@ export function trustedRootFile(file: string, what: string, stat = lstatSync): s
       info.uid !== 0 ||
       (info.mode & 0o022) !== 0 ||
       info.isSymbolicLink() ||
-      (current === path.resolve(file) ? !info.isFile() || (info.mode & 0o111) === 0 : !info.isDirectory())
+      (current === path.resolve(file) ? !info.isFile() || (!script && (info.mode & 0o111) === 0) : !info.isDirectory())
     ) {
       throw new Error(`The ${what} and its parent directories must be owned and writable only by root`);
     }
@@ -442,6 +442,8 @@ export function ensureGitCacheUser(run: RunCommand = runSync): { uid: number; gi
  */
 export const AUTH_EGRESS_GROUP = "agentes-auth";
 const SETPRIV = "/usr/bin/setpriv";
+/** `$1` the new project, `$2` the transcript, `$3` its copy: a link stays a link, which then resumes nothing. */
+const CARRY_SESSION = 'umask 077 && mkdir -p -- "$1" && exec cp --no-dereference --remove-destination -- "$2" "$3"';
 
 /** That group's id, the group made the first time; null when it can't be. */
 function authEgressGid(run: RunCommand): number | null {
@@ -635,6 +637,8 @@ export function accountLauncher(
       TMPDIR: "/tmp",
       CLAUDE_CONFIG_DIR: path.join(store, "config"),
       CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+      // Undocumented, so also what `neutralizeFileMentions` is there for: validated per CLI version.
+      CLAUDE_CODE_DISABLE_FILE_MENTIONS: "1",
       DISABLE_AUTOUPDATER: "1",
     },
     home: run,
@@ -770,13 +774,19 @@ export class AccountUsers {
     for (const { uid } of readAccountUsers(this.opts.home)) this.kill(uid);
   }
 
+  /** A session's transcript into another folder's project, as the sign-in's user: only it and root write there. */
+  carry(user: AccountUser, from: string, to: string) {
+    const id = [`--reuid=${user.uid}`, `--regid=${user.gid}`, "--clear-groups", "--"];
+    this.run(SETPRIV, [...id, "/bin/sh", "-c", CARRY_SESSION, "sh", path.dirname(to), from, to]);
+  }
+
   /** The agent's CLIs on every sign-in stop (`stopAccountScopes`); nothing runs where there are no sign-ins. */
   stopScopes(uid: number) {
     if (readAccountUsers(this.opts.home).length > 0) stopAccountScopes(uid, this.opts.run);
   }
 
   /**
-   * The agent left this computer: what every sign-in holds for it goes. Its transcripts are the `projects/` folders
+   * The agent was deleted: what every sign-in holds for it goes. Its transcripts are the `projects/` folders
    * named after a path with its user in it; one on a path it shared stays. Only root and the sign-in's user write
    * in these folders, and `rmSync` follows no link.
    */

@@ -640,8 +640,13 @@ export function turnPrompt(
 /** Invisible to whoever reads the text; enough for the CLI not to take what follows as its own syntax. */
 const ZERO_WIDTH = "\u200b";
 
-/** `@/path`, `@~/path`, `@./path`, `@"path"`: a file the CLI itself would read, as the sign-in's user. `@lia` is a person. */
-export const neutralizeFileMentions = (text: string) => text.replace(/(^|\s)@(?=["'~./\\])/g, `$1@${ZERO_WIDTH}`);
+/**
+ * `@/path`, `@~/path`, `@a/../b`, `@"path"`: a file the CLI itself would read, as the sign-in's user, also right after
+ * the punctuation it takes as a word's end. The mark goes before the `@`: after it, a `..` would just cancel it as one
+ * more folder. `@lia` is a person, and alone it could only name a file in the CLI's empty folder.
+ */
+export const neutralizeFileMentions = (text: string) =>
+  text.replace(/(^|[\s。、？！])@(?=["'~./\\]|\S*[/\\])/g, `$1${ZERO_WIDTH}@`);
 
 /** Whatever the CLI would act on in a user message itself rather than hand to the model (`!`, `#`, `/` up front). */
 export const neutralizeCliInput = (text: string) =>
@@ -652,6 +657,9 @@ const TOKEN_SHAPE = /sk-ant-o[ar]t01-[A-Za-z0-9_-]+/g;
 export const redactTokenShapes = (text: string) => text.replace(TOKEN_SHAPE, "[REDACTED]");
 /** Where a token may be starting at the end of streamed text: what is kept back from there on. */
 export const tokenShapeTail = (text: string) => /s(?:k(?:-[A-Za-z0-9_-]*)?)?$/.exec(text)?.index ?? text.length;
+
+/** An agent's own `TasksMax`: no honest worker has more shells, so a notice past it is forged and root keeps nothing. */
+export const SHELLS_KEPT = 4096;
 
 const REFUSED_CONTROL = "Not allowed with this sign-in.";
 export const PERSONAL_MCP_REFUSED =
@@ -1089,6 +1097,7 @@ export class ClaudeProcess {
    */
   toolNotice(n: ToolNotice) {
     const over = n.status !== "running";
+    if (!over && this.backgroundTasks.size >= SHELLS_KEPT && !this.backgroundTasks.has(n.shellId)) return;
     if (over) this.backgroundTasks.delete(n.shellId);
     else this.backgroundTasks.add(n.shellId);
     this.turn?.task(over ? { id: n.shellId, ended: true } : { id: n.shellId, started: !n.moved, backgrounded: true });
@@ -1352,10 +1361,18 @@ export function runTurnOnProcess(
       if (timer) clearTimeout(timer);
       timer = null;
       if (!buf && !(whole && tail)) return;
-      // Redacted before cutting: the tail kept for next time can't split a value that was caught.
-      const out = redact(tail + buf);
+      const text = tail + buf;
       buf = "";
-      const cut = whole ? out.length : Math.min(Math.max(0, out.length - hold), opts.redactTail?.(out) ?? out.length);
+      // A shape is cut on the text as it came: once masked it looks finished, and the rest of it would go out plain.
+      if (opts.redactTail) {
+        const cut = whole ? text.length : opts.redactTail(text);
+        tail = text.slice(cut);
+        if (cut > 0) opts.emit({ type: "text_delta", text: redact(text.slice(0, cut)) });
+        return;
+      }
+      // Redacted before cutting: the tail kept for next time can't split a value that was caught.
+      const out = redact(text);
+      const cut = whole ? out.length : Math.max(0, out.length - hold);
       tail = out.slice(cut);
       if (cut > 0) opts.emit({ type: "text_delta", text: out.slice(0, cut) });
     };
@@ -1569,6 +1586,8 @@ export interface DelegatedTurn {
   text(cwd: string): Promise<string>;
   /** How the CLI starts at `cwd`: command, the whole environment and spawn's own folder. */
   launch(cwd: string): Promise<{ command: string[]; env: NodeJS.ProcessEnv; cwd: string }>;
+  /** A transcript into another folder's project (`carryClaudeSession`), by the sign-in's user: root opens none. */
+  carry(from: string, to: string): void;
   /** Opens or updates the process's bridge; resolves once the worker has it. A null `token` closes it. */
   bridge(frame: DelegatedFrame): Promise<void>;
   cancel(session: string): void;
@@ -1609,25 +1628,31 @@ const ranKeyOf = (req: BrainTurnRequest, session: string) =>
  * of the session is copied there first. Best effort.
  */
 export function carryClaudeSession(claudeHome: string, cwd: string, session: string) {
-  const projects = path.join(claudeHome, "projects");
   const target = claudeSessionFile(claudeHome, cwd, session);
+  const newest = newestClaudeSession(claudeHome, session, statSync);
+  if (!newest || newest === target) return;
+  try {
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(newest, target);
+  } catch {
+    // unreadable: Claude Code decides as before
+  }
+}
+
+/** The session's most recently written transcript in any of the home's projects. */
+function newestClaudeSession(claudeHome: string, session: string, look: typeof lstatSync) {
+  const projects = path.join(claudeHome, "projects");
   let newest: { file: string; mtime: number } | null = null;
   try {
     for (const dir of readdirSync(projects)) {
       const file = path.join(projects, dir, `${session}.jsonl`);
-      try {
-        const mtime = statSync(file).mtimeMs;
-        if (!newest || mtime > newest.mtime) newest = { file, mtime };
-      } catch {
-        // not in this project
-      }
+      const st = look(file, { throwIfNoEntry: false });
+      if (st?.isFile() && (!newest || st.mtimeMs > newest.mtime)) newest = { file, mtime: st.mtimeMs };
     }
-    if (!newest || newest.file === target) return;
-    mkdirSync(path.dirname(target), { recursive: true });
-    copyFileSync(newest.file, target);
   } catch {
-    // no projects folder, or unreadable: Claude Code decides as before
+    // no projects folder, or unreadable
   }
+  return newest?.file ?? null;
 }
 
 /** What a turn says when its account's token is refused. */
@@ -1930,6 +1955,14 @@ export class BrainManager {
       const owner = sessionOwner(ctx.delegated.room, session);
       if (owner?.agent !== ctx.agent.id || owner.account !== req.account) return false;
       const file = claudeSessionFile(ctx.accountHome, cwd, session);
+      const newest = newestClaudeSession(ctx.accountHome, session, lstatSync);
+      if (newest && newest !== file) {
+        try {
+          ctx.delegated.carry(newest, file);
+        } catch (err) {
+          this.log(`[${ctx.agent.handle}] session ${session.slice(0, 8)} stayed in its folder: ${String(err)}`);
+        }
+      }
       return lstatSync(file, { throwIfNoEntry: false })?.isFile() === true;
     }
     const home =
@@ -2183,6 +2216,7 @@ export class BrainManager {
         allow,
         ...(mode === "chat" ? { chat: true } : {}),
         ...(delegated.task ? { task: delegated.task.kind } : {}),
+        ...(persistent ? {} : { oneShot: true as const }),
       };
       this.bridge.set(id, { token, cwd, folder: ctx.folder, runId: null, runToken: null });
       bridged = { frame, to: delegated };

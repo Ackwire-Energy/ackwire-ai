@@ -148,7 +148,7 @@ export class WorkerLink {
     throw new RunnerError("not_allowed", "This worker serves no turn of root's");
   };
   onTaskOut: (taskId: string, stream: "stdout" | "stderr", line: string) => void = () => {};
-  onTaskExit: (taskId: string, exit: HostedExit) => void = () => {};
+  onTaskExit: (taskId: string, session: string, exit: HostedExit) => void = () => {};
   onTurnCancel: (session: string) => void = () => {};
   onTurnDetach: (session: string) => void = () => {};
   /** The supervisor is gone (stdin closed). */
@@ -288,7 +288,8 @@ export class WorkerLink {
       case "task.exit":
         if (typeof f.taskId === "string") {
           const { exitCode, signal, reason, error } = f as unknown as HostedExit;
-          this.onTaskExit(f.taskId, { exitCode, signal, reason, ...(error ? { error } : {}) });
+          const session = typeof f.session === "string" ? f.session : "";
+          this.onTaskExit(f.taskId, session, { exitCode, signal, reason, ...(error ? { error } : {}) });
         }
         return;
       case "turn.cancel":
@@ -523,7 +524,6 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     hostedStop: (taskId) => link.taskStop(taskId),
   });
   link.onTaskOut = (taskId, stream, line) => tasks.hostedOutput(taskId, stream, line);
-  link.onTaskExit = (taskId, exit) => tasks.hostedExit(taskId, exit);
   await tasks.init();
   const brainLimits = () => ({
     idleMs: state.limits.brainIdleMinutes * 60_000,
@@ -591,6 +591,10 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
       realFoldersFor(state.access, o.agentId),
     ]);
     return turnContext({ folder, grants, ...(cwd ? { cwd } : {}), text });
+  };
+  link.onTaskExit = (taskId, session, exit) => {
+    tasks.hostedExit(taskId, exit);
+    delegated.endSession(session);
   };
   link.onTurnCancel = (session) => delegated.cancel(session);
   link.onTurnDetach = (session) => delegated.detach(session);
