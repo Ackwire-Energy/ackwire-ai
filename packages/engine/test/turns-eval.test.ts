@@ -103,7 +103,7 @@ const size = (r: ModelRequest) =>
  * stopped repeating others, and 45,669 with a send to someone else settled from the conversation before it goes
  * (no assumption on what can't be undone), nothing offered or promised beyond the list and files on `send_dm`, 45,475
  * with `request_permission` down to one reason (`why`) and the task board on by default, 45,803 with `ask_user`'s
- * `person` and the rule that what is said in a DM stays there, 45,156 with the `ask_user` rule leaving to its
+ * `person` and the rule that what is said in a DM stays there, 45,216 with the `ask_user` rule leaving to its
  * description what that says already; the ceiling leaves a little room. Where each workspace gets its own computer,
  * `workspaceComputerText` adds its 441 to that.
  */

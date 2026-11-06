@@ -922,7 +922,7 @@ export async function buildRunContext(
             ? `- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request. ${ASK_APPROVALS_TOGETHER} ${REQUEST_APPROVAL_LINE}`
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
           options.askUser
-            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait."
+            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Like an approval, it posts only the text of that same turn."
             : "",
           options.react
             ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with an empty reply: no text at all, not even the emoji again. Never react and also reply; if something still needs saying, just reply.'
