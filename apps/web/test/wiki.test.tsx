@@ -495,6 +495,8 @@ describe("links everywhere", () => {
     expect(document.activeElement === box).toBe(true);
     // Focus a script hands back (a panel closing) opens nothing; the keys' does.
     trackInput();
+    // Other test files in the same process may have pressed keys: start from a press, as a page load with the mouse would.
+    fireEvent.pointerDown(document.body, { pointerType: "mouse" });
     await act(async () => link.focus());
     await settle(2);
     expect(preview()).toBeNull();
