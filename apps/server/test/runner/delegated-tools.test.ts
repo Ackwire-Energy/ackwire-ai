@@ -1151,6 +1151,8 @@ test("a bridge frame is read field by field", () => {
     serverToken: "agr_x",
   });
   expect(parseBridge({ ...bridgeFrame, token: null })?.token).toBeNull();
+  expect(parseBridge({ ...bridgeFrame, task: "local" })?.task).toBe("local");
+  expect(parseBridge({ ...bridgeFrame, task: "anything" })?.task).toBeUndefined();
   expect(parseBridge({ ...bridgeFrame, profile: "anything" })?.profile).toBe("work");
   for (const bad of [{ process: 1 }, { token: 3 }, { agent: {} }, { session: 2 }, { cwd: "relative" }]) {
     expect(parseBridge({ ...bridgeFrame, ...bad })).toBeNull();
@@ -1198,10 +1200,51 @@ test("the worker link hears root's frames and says its own", async () => {
   line({ type: "turn.detach", session: "s1" });
   await waitFor(() => heard.length === 3);
   expect(heard).toEqual(["proc-0001", "cancel s1", "detach s1"]);
+  link.onTaskOut = (taskId, stream, said) => heard.push([taskId, stream, said]);
+  link.onTaskExit = (taskId, exit) => heard.push([taskId, exit]);
+  line({ type: "task.out", taskId: 1, line: "x" });
+  line({ type: "task.out", taskId: "t1", stream: "stderr", line: "why" });
+  line({ type: "task.exit", taskId: "t1", exitCode: 0, signal: null, reason: null });
+  await waitFor(() => heard.length === 5);
+  expect(heard.slice(3)).toEqual([
+    ["t1", "stderr", "why"],
+    ["t1", { exitCode: 0, signal: null, reason: null }],
+  ]);
   link.bridgeReady("proc-0001");
   const notice = { session: "s1", shellId: "b1", status: "running" as const, summary: "x", outputFile: "/t" };
   link.toolNotice(notice);
   await waitFor(() => said.length === 2);
   expect(JSON.parse(said[0] as string)).toEqual({ type: "bridge.ready", process: "proc-0001" });
   expect(JSON.parse(said[1] as string)).toEqual({ type: "tool.notice", ...notice });
+});
+
+test("a local task's CLI hears its tools are there, though none of the server's are", async () => {
+  const { surface, ask } = setup({ task: "local" });
+  const answer = await handleMcpMessage(
+    { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+    ask,
+    surface.scope,
+    async () => [],
+    "work",
+    { task: true, local: true, delegated: surface },
+  );
+  expect((answer?.result as { instructions: string }).instructions).toStartWith("Claude Code's tools");
+});
+
+test("in a background task, a refused call says so and is listed; a turn's isn't", async () => {
+  const denied: unknown[][] = [];
+  const onDenied = (session: string, tool: string, input: Record<string, unknown>) =>
+    void denied.push([session, tool, input.command]);
+  const task = setup({ task: "local" }, { onDenied });
+  expect(task.surface).toMatchObject({ task: true, local: true });
+  const refused = await task.call("Bash", { command: "curl -X POST https://example.com/deploy" });
+  expect(refused.isError).toBe(true);
+  expect(denied).toEqual([["s1", "Bash", "curl -X POST https://example.com/deploy"]]);
+  denied.length = 0;
+  const mission = setup({ task: "mission" }, { onDenied });
+  expect(mission.surface).toMatchObject({ task: true });
+  expect(mission.surface.local).toBeUndefined();
+  const turn = setup({}, { onDenied });
+  await turn.call("Bash", { command: "curl -X POST https://example.com/deploy" });
+  expect(denied).toEqual([]);
 });

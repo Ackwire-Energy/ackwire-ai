@@ -824,3 +824,102 @@ test.skipIf(!posix)(
   },
   20_000,
 );
+
+// ── A Claude sign-in several agents share: root runs the CLI, the task stays here ──────────────────────────────────
+
+const SHARED = "0193ffff-0000-7000-8000-000000000002";
+const hostedStart = (n: number) => ({ taskId: id(n), executor: "claude" as const, prompt: "fix it", account: SHARED });
+const HOSTED: { kind: "hosted" } = { kind: "hosted" };
+
+test.skipIf(!posix)("a hosted task starts no wrapper, says where it runs, and ends as root says", async () => {
+  const s = setup();
+  s.tasks.attach(s.send);
+  await s.tasks.init();
+  const reply = (await s.tasks.start(AGENT, hostedStart(1), undefined, HOSTED)) as { host?: unknown; pid: number };
+  expect(reply.pid).toBe(process.pid);
+  expect(reply.host).toMatchObject({ where: "", git: false });
+  const dir = path.join(s.home, "tasks", id(1));
+  expect(existsSync(path.join(dir, "spec.json"))).toBe(false);
+  expect(existsSync(path.join(dir, "stdin.txt"))).toBe(false);
+  expect(s.tasks.list()[0]).toMatchObject({ taskId: id(1), status: "running" });
+
+  const assistant = {
+    type: "assistant",
+    session_id: "s",
+    message: {
+      content: [{ type: "tool_use", name: "mcp__agentes__Edit", input: { file_path: "app.ts", old_string: "a" } }],
+    },
+  };
+  s.tasks.hostedOutput(id(1), "stdout", JSON.stringify(assistant));
+  s.tasks.hostedOutput(id(1), "stdout", JSON.stringify({ type: "result", session_id: "s", result: "all done" }));
+  s.tasks.hostedExit(id(1), { exitCode: 0, signal: null, reason: null });
+  await waitFor(() => s.done(id(1)) !== undefined);
+  expect(s.done(id(1))).toMatchObject({ exitCode: 0, result: "all done", files: ["app.ts"], session: "s" });
+  // Nothing more lands for a task that ended.
+  s.tasks.hostedOutput(id(1), "stdout", "late");
+  expect(readFileSync(path.join(dir, "stdout.log"), "utf8")).not.toContain("late");
+});
+
+test.skipIf(!posix)("a hosted task's cancel asks root, and never signals the worker it runs beside", async () => {
+  const stops: string[] = [];
+  const s = setup({ hostedStop: (taskId) => stops.push(taskId) });
+  s.tasks.attach(s.send);
+  await s.tasks.init();
+  await s.tasks.start(AGENT, hostedStart(2), undefined, HOSTED);
+  const kill = process.kill;
+  const killed: unknown[] = [];
+  process.kill = ((pid: number, signal?: string | number) => {
+    if (signal === "SIGKILL") killed.push(pid);
+    return kill.call(process, pid, signal);
+  }) as typeof process.kill;
+  try {
+    expect(s.tasks.cancel(AGENT, id(2))).toEqual({ canceled: true });
+    expect(stops).toEqual([id(2)]);
+    (s.tasks as unknown as { hardKill(t: unknown, dir: string): void }).hardKill(
+      { hosted: true, pid: process.pid },
+      s.home,
+    );
+    expect(killed).toEqual([]);
+  } finally {
+    process.kill = kill;
+  }
+  s.tasks.hostedExit(id(2), { exitCode: null, signal: "SIGTERM", reason: "canceled" });
+  await waitFor(() => s.done(id(2)) !== undefined);
+  expect(s.done(id(2))).toMatchObject({ canceled: true });
+});
+
+test.skipIf(!posix)("a hosted task's CLI doesn't outlive the runner: the next one reads it as interrupted", async () => {
+  const s = setup();
+  await s.tasks.init();
+  await s.tasks.start(AGENT, hostedStart(3), undefined, HOSTED);
+  s.tasks.close();
+  const next = s.make();
+  next.attach(s.send);
+  await next.init();
+  await waitFor(() => s.done(id(3)) !== undefined);
+  expect(s.done(id(3))).toMatchObject({ interrupted: true });
+});
+
+test.skipIf(!posix)("a hosted task's commands refused with nobody to ask go with its end", async () => {
+  const s = setup();
+  s.tasks.attach(s.send);
+  await s.tasks.init();
+  await s.tasks.start(AGENT, { ...hostedStart(4), session: "0193aaaa-0000-7000-8000-000000000044" }, undefined, HOSTED);
+  s.tasks.hostedDenial("0193aaaa-0000-7000-8000-000000000044", "Bash", { command: "git push" });
+  s.tasks.hostedDenial("0193aaaa-0000-7000-8000-000000000044", "Bash", { command: "git push" });
+  s.tasks.hostedDenial("another-session", "Bash", { command: "rm -rf x" });
+  s.tasks.hostedExit(id(4), { exitCode: 1, signal: null, reason: null });
+  await waitFor(() => s.done(id(4)) !== undefined);
+  expect(s.done(id(4))?.denials).toEqual([{ tool: "Bash", command: "git push" }]);
+});
+
+test("a tool of Claude Code's served by the bridge reads as itself; the server's keep their names", () => {
+  const line = (name: string) =>
+    parseOutputLine(
+      JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name, input: { command: "ls" } }] } }),
+      "claude",
+      "/w",
+    ).line;
+  expect(line("mcp__agentes__Bash")).toBe("Running: ls");
+  expect(line("mcp__agentes__update_plan")).toBe("Using mcp__agentes__update_plan");
+});

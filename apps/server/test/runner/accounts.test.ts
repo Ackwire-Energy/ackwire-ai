@@ -1594,8 +1594,13 @@ test.if(posix)("whether a turn may run on a shared CLI login, from root's marker
   expect(m.isCliShared("claude_code", ACCOUNT_ID)).toBe(true);
   expect(m.isCliShared("claude_code", "../../etc/passwd")).toBe(false);
   expect(m.cliSharedState(ACCOUNT_ID)).toBe("ready");
+  writeFileSync(marker("shared"), "");
+  // A worker gets only the word that its task's CLI is root's: no token, no folder.
+  expect(await m.grant("claude_code", ACCOUNT_ID)).toEqual({ kind: "hosted" });
+  expect(grantOf({ kind: "hosted" })).toEqual({ kind: "hosted" });
   writeFileSync(marker("invalid"), "");
   expect(m.cliSharedState(ACCOUNT_ID)).toBe("signed_out");
+  expect(await m.grant("claude_code", ACCOUNT_ID)).toEqual({ kind: "none" });
   state.ready = false;
   expect(m.cliSharedState(ACCOUNT_ID)).toBe("off");
   expect(m.sharedCommand(["/usr/bin/env"]).length).toBeGreaterThan(0);
@@ -1630,7 +1635,7 @@ test.if(posix)(
     expect(existsSync(path.join(dir, `${id}.shared`))).toBe(true);
     // The store is the CLI's: root's folder holds nothing to sign in with, and no turn gets a token from it.
     expect(readdirSync(path.join(dir, id))).toEqual([]);
-    expect(await m.grant("claude_code", id)).toEqual({ kind: "none" });
+    expect(await m.grant("claude_code", id)).toEqual({ kind: "hosted" });
     expect(await m.lendTo("claude_code", id, 21000)).toBe(false);
     m.invalidate();
     expect(await m.list()).toEqual([account] as never);

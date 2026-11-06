@@ -1,21 +1,34 @@
-import { existsSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
-import type {
-  AgentScope,
-  BrainTurnRequest,
-  MachineRequest,
-  ToolNotice,
-  TurnContext,
-  WireBrainEvent,
+import {
+  type AgentScope,
+  type BrainRouteRequest,
+  type BrainTurnRequest,
+  type MachineRequest,
+  MISSION_RULES_NO_GIT,
+  type TaskStart,
+  type ToolNotice,
+  type TurnContext,
+  type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
 import { ACCOUNT_SIGNED_OUT, type AccountManager } from "./accounts";
 import { ACCOUNT_STORES, type AccountUsers, type AgentUser, accountLauncher } from "./agent-users";
-import { BrainManager, type DelegatedFrame, type DelegatedTurn } from "./brain";
+import {
+  BrainManager,
+  type DelegatedFrame,
+  type DelegatedTurn,
+  neutralizeCliInput,
+  redactTokenShapes,
+} from "./brain";
+import { routeWithPlan } from "./brain-route";
 import type { ClaudeSharedLogin } from "./config";
 import type { DelegatedBridge } from "./delegated-tools";
 import { RunnerError } from "./errors";
 import type { RequestScope } from "./handlers";
-import { accountOf } from "./supervisor";
+import { cleanRules, missionBranchPrefix, redactDeep } from "./mcp";
+import { accountOf, type WorkerLinkFrame } from "./supervisor";
+import { type HostedExit, type HostedTask, TASK_MAX_SECONDS_CAP } from "./tasks";
 
 /**
  * Root's side of a Claude sign-in several agents share (`AccountManager.isCliShared`). Its CLIs are the only processes
@@ -23,7 +36,9 @@ import { accountOf } from "./supervisor";
  * agent's code can ptrace, and whoever holds a CLI's stdin can make it add a server that reads the store. The rest of
  * the turn is that worker's: where it runs, what its folder says, and every tool (`delegated-tools.ts`).
  *
- * Not yet here: tasks and routes. Nothing runs them on such a sign-in (`refusesHere`).
+ * A background task is such a turn too, one-shot and on the task's own rules: its worker keeps the task (folder, branch,
+ * journal, commit) and gets the CLI's lines. A route needs no tools at all, so only the CLI is here, in the agent's
+ * network and an empty folder.
  */
 
 /** How often a refresh's lock is looked for, and how long a spawn waits for it to go (a stale one must not stop turns). */
@@ -31,8 +46,47 @@ const REFRESH_POLL_MS = 200;
 const REFRESH_WAIT_MS = 30_000;
 
 export const SHARED_LOGIN_OFF =
-  "This computer can't run this Claude sign-in right now. Sign in with a setup token in AI accounts, or try again later.";
-const NOT_YET = "This Claude sign-in can't run background tasks or pick who answers yet.";
+  "This computer can't run this Claude sign-in right now. Try again later, or remove it in AI accounts and connect Claude again.";
+/** Past this a line is lost, as in a task's own watcher. */
+const TASK_LINE_MAX = 1024 * 1024;
+
+type TaskRequest = TaskStart & { agent?: AgentScope };
+
+const hostOf = (v: unknown): HostedTask | null => {
+  const h = v as Partial<HostedTask> | null | undefined;
+  return typeof h?.cwd === "string" &&
+    typeof h.where === "string" &&
+    typeof h.git === "boolean" &&
+    typeof h.maxSeconds === "number"
+    ? { cwd: h.cwd, where: h.where, git: h.git, maxSeconds: h.maxSeconds }
+    : null;
+};
+
+/** The turn a task's CLI runs: from the request root has, but where it runs and what its folder is. */
+function taskTurn(req: TaskRequest, host: HostedTask): BrainTurnRequest {
+  const { mission } = req;
+  const rules = mission?.rules && !host.git ? MISSION_RULES_NO_GIT : (mission?.rules ?? "");
+  const allow = Array.isArray(mission?.allow) ? mission.allow.filter((r) => typeof r === "string") : [];
+  const prompt = String(req.prompt ?? "");
+  return {
+    runId: req.taskId,
+    kind: "claude_code",
+    session: {
+      id: typeof req.session === "string" && /^[a-fA-F0-9-]{36}$/.test(req.session) ? req.session : randomUUID(),
+      resume: req.resume === true,
+    },
+    cwd: host.cwd,
+    system: cleanRules(rules),
+    prompt: host.where ? `${host.where}\n\n${prompt}` : prompt,
+    mcp: { token: typeof mission?.mcpToken === "string" ? mission.mcpToken : "" },
+    keepAlive: false,
+    account: String(req.account),
+    permissions: {
+      mode: mission?.mode === "plan" ? "plan" : "work",
+      ...(mission ? { branchPrefix: missionBranchPrefix(String(mission.id), mission.branchPrefix), allow } : {}),
+    },
+  };
+}
 
 /** What it needs of the agents' workers (`Supervisor`). */
 export interface AgentWorkers {
@@ -40,7 +94,7 @@ export interface AgentWorkers {
   agentReady(agent: AgentScope, signal: AbortSignal): Promise<AgentUser>;
   turnContext(agent: AgentScope, ask: { cwd?: string; text?: boolean }, signal: AbortSignal): Promise<TurnContext>;
   bridge(bridge: DelegatedBridge): Promise<void>;
-  tell(agentId: string, frame: { type: "turn.cancel" | "turn.detach"; session: string }): void;
+  tell(agentId: string, frame: WorkerLinkFrame): void;
   /** Until the returned call, the agent's network waits for this turn; `dropped` hears its worker's session ended. */
   hold(agentId: string, dropped: (err: RunnerError) => void): () => void;
   reclaimBrains(spare?: string): Promise<boolean>;
@@ -68,6 +122,8 @@ export interface AccountBrainsOptions {
 
 export class AccountBrains {
   readonly brains: BrainManager;
+  /** Tasks whose CLI runs now. */
+  private readonly tasks = new Map<string, { agentId: string; stop: AbortController }>();
 
   constructor(private readonly o: AccountBrainsOptions) {
     this.brains = new BrainManager({
@@ -85,16 +141,16 @@ export class AccountBrains {
     return req.op === "brain.turn" && this.onSharedLogin(req);
   }
 
-  /** What no worker can do on such a sign-in and nothing here does yet. */
-  refusesHere(req: MachineRequest) {
-    if ((req.op === "brain.route" || req.op === "task.start") && this.onSharedLogin(req)) {
-      throw new RunnerError("unsupported", NOT_YET);
-    }
-  }
-
-  private onSharedLogin(req: MachineRequest) {
+  /** Whether the CLI of this request is such a sign-in's, so no worker can start it. */
+  onSharedLogin(req: MachineRequest) {
     const signIn = accountOf(req);
     return signIn?.kind === "claude_code" && this.o.accounts.isCliShared("claude_code", signIn.account);
+  }
+
+  private mustBeReady(account: string) {
+    const state = this.o.accounts.cliSharedState(account);
+    if (state === "off") throw new RunnerError("unsupported", SHARED_LOGIN_OFF);
+    if (state === "signed_out") throw new RunnerError("not_found", ACCOUNT_SIGNED_OUT);
   }
 
   toolNotice(agentId: string, notice: ToolNotice) {
@@ -110,10 +166,11 @@ export class AccountBrains {
 
   /** One turn. A worker that goes away under it fails it as `dropped`, so the server resumes it as any agent's turn. */
   async turn(
-    req: Extract<MachineRequest, { op: "brain.turn" }>,
+    req: BrainTurnRequest,
     agent: AgentScope,
     scope: Pick<RequestScope, "signal">,
     emit: (e: WireBrainEvent) => void,
+    task?: DelegatedTurn["task"],
   ): Promise<WireBrainEvent> {
     const account = String(req.account);
     const state = this.o.accounts.cliSharedState(account);
@@ -136,20 +193,113 @@ export class AccountBrains {
       stop.abort();
     });
     try {
-      const final = await this.brains.turn(req as BrainTurnRequest, {
+      const final = await this.brains.turn(req, {
         agent,
         folder: "",
         signal: stop.signal,
         emit: (e) => {
           if (!dropped) emit(e);
         },
-        delegated: await this.delegated(account, agent, user, stop.signal),
+        delegated: { ...(await this.delegated(account, agent, user, stop.signal)), ...(task ? { task } : {}) },
       });
       if (dropped) throw dropped;
       return final;
     } finally {
       release();
       scope.signal.removeEventListener("abort", cancel);
+    }
+  }
+
+  /**
+   * `task.start`. Its worker prepares the task first, so a refusal there (no such folder, the branch taken) is the
+   * request's answer; the CLI then runs here, and the server hears of it as of any task, from the worker.
+   */
+  async startTask(
+    req: TaskRequest,
+    agent: AgentScope,
+    prepare: () => Promise<unknown>,
+    signedOut: (final: WireBrainEvent) => void,
+  ) {
+    this.mustBeReady(String(req.account));
+    const { host, ...reply } = (await prepare()) as Record<string, unknown> & { host?: unknown };
+    const hosted = hostOf(host);
+    if (!hosted) throw new RunnerError("internal", "The agent's worker said nothing usable about this task");
+    void this.runTask(req, agent, hosted, signedOut);
+    return reply;
+  }
+
+  /** The worker of its task asked for its end (`task.stop`). */
+  stopTask(agentId: string, taskId: string) {
+    const task = this.tasks.get(taskId);
+    if (task?.agentId === agentId) task.stop.abort();
+  }
+
+  private async runTask(
+    req: TaskRequest,
+    agent: AgentScope,
+    host: HostedTask,
+    signedOut: (final: WireBrainEvent) => void,
+  ) {
+    const { taskId } = req;
+    const stop = new AbortController();
+    this.tasks.set(taskId, { agentId: agent.id, stop });
+    let timedOut = false;
+    const limit = setTimeout(
+      () => {
+        timedOut = true;
+        stop.abort();
+      },
+      Math.min(host.maxSeconds, TASK_MAX_SECONDS_CAP) * 1000,
+    );
+    const say = (stream: "stdout" | "stderr", line: string) =>
+      this.o.workers.tell(agent.id, { type: "task.out", taskId, stream, line });
+    const stopped = (): HostedExit | null =>
+      stop.signal.aborted ? { exitCode: null, signal: "SIGTERM", reason: timedOut ? "timeout" : "canceled" } : null;
+    let exit: HostedExit;
+    try {
+      const final = await this.turn(taskTurn(req, host), agent, { signal: stop.signal }, () => {}, {
+        kind: req.mission ? "mission" : "local",
+        line: (line) => {
+          // Partial messages say nothing a task reads, and are most of what the CLI prints.
+          if (line.startsWith('{"type":"stream_event"') || line.length > TASK_LINE_MAX) return;
+          say("stdout", redactTokenShapes(line));
+        },
+      });
+      signedOut(final);
+      if (final.type === "error") say("stderr", final.message.replace(/\s+/g, " "));
+      exit = stopped() ?? { exitCode: final.type === "done" ? 0 : 1, signal: null, reason: null };
+    } catch (err) {
+      // Its worker went away: the next one finds the task with no CLI, and the server resumes it.
+      exit = stopped() ?? { exitCode: null, signal: null, reason: "interrupted", error: String(err) };
+    }
+    clearTimeout(limit);
+    this.tasks.delete(taskId);
+    this.o.workers.tell(agent.id, { type: "task.exit", taskId, ...exit });
+  }
+
+  /** `brain.route`: the prompt carries other people's messages, and the CLI runs with no tool and nothing of anyone's. */
+  async route(req: BrainRouteRequest, agent: AgentScope, scope: Pick<RequestScope, "signal">) {
+    const account = String(req.account);
+    this.mustBeReady(account);
+    const user = await this.o.workers.agentReady(agent, scope.signal);
+    const stop = new AbortController();
+    const signal = AbortSignal.any([scope.signal, stop.signal]);
+    const release = this.o.workers.hold(agent.id, () => stop.abort());
+    let room: string | undefined;
+    try {
+      const d = await this.delegated(account, agent, user, signal);
+      const at = await d.where();
+      room = mkdtempSync(path.join(d.room, "route-"));
+      // Read by the sign-in's user through the default ACL on its room, which this mode unmasks.
+      chmodSync(room, 0o750);
+      const reply = await routeWithPlan(
+        { ...req, prompt: neutralizeCliInput(req.prompt) },
+        { brains: this.brains, signal, shared: { home: d.configDir, dir: room, launch: () => d.launch(at.cwd) } },
+      );
+      return redactDeep(reply, redactTokenShapes) as typeof reply;
+    } finally {
+      release();
+      if (room) rmSync(room, { recursive: true, force: true });
     }
   }
 

@@ -1175,6 +1175,7 @@ export class RunnerDaemon implements RequestObserver {
             }),
         stopAccountScopes: (uid) => this.accountUsers?.stopScopes(uid),
         toolNotice: (agentId, notice) => accountBrains?.toolNotice(agentId, notice),
+        taskStop: (agentId, taskId) => accountBrains?.stopTask(agentId, taskId),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         grant: (kind, accountId) => this.accounts.grant(kind, accountId),
         usage: (kind, accountId, info) =>

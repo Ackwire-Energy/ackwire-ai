@@ -65,6 +65,7 @@ import {
 } from "./secrets";
 import { agentCategorySlice, agentSlice, scopeOomPolicy } from "./service";
 import type { RelayCount } from "./streams";
+import type { HostedExit } from "./tasks";
 
 /**
  * System mode (`install.sh --system`): this root process keeps the server's
@@ -259,6 +260,12 @@ export type WorkerLinkFrame =
     } & Partial<TurnContext>)
   /** To the worker: the calls in progress in a delegated session end, their process groups with them. */
   | { type: "turn.cancel"; session: string }
+  /** To the worker: a line of the CLI of a task root hosts, for that task's logs. */
+  | { type: "task.out"; taskId: string; stream: "stdout" | "stderr"; line: string }
+  /** To the worker: how that CLI ended. */
+  | ({ type: "task.exit"; taskId: string } & HostedExit)
+  /** From the worker: that CLI stops. */
+  | { type: "task.stop"; taskId: string }
   /** To the worker: the commands in progress in a delegated session answer now and go on in the background. */
   | { type: "turn.detach"; session: string }
   /** From the worker: a delegated session's background shell started or ended. */
@@ -344,6 +351,8 @@ export interface SupervisorOptions {
   codexAuth?: (accountId: string, auth: unknown) => void;
   /** A background shell of a session root hosts (`AccountBrains.toolNotice`). */
   toolNotice?: (agentId: string, notice: ToolNotice) => void;
+  /** The worker asked to stop the CLI of its task root hosts (`AccountBrains.stopTask`). */
+  taskStop?: (agentId: string, taskId: string) => void;
   /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
   desktop?: (agent: AgentScope, use: WorkerDesktopUse) => Promise<WorkerDesktop>;
   /** How many people watch or control the agent's desktop (`DesktopSessions.status`). */
@@ -1438,6 +1447,10 @@ export class Supervisor {
     if (f?.type === "tool.notice") {
       const notice = parseToolNotice(f);
       if (notice) this.opts.toolNotice?.(w.user.id, notice);
+      return;
+    }
+    if (f?.type === "task.stop") {
+      if (typeof f.taskId === "string") this.opts.taskStop?.(w.user.id, f.taskId);
       return;
     }
     if (f?.type !== "upload.chunk" && f?.type !== "upload.end") return;

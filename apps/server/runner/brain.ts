@@ -1239,6 +1239,8 @@ export function runTurnOnProcess(
     redactHold?: number;
     /** Streamed text also holds back from this index on (what a pattern may still match, `tokenShapeTail`). */
     redactTail?: (text: string) => number;
+    /** Every line the CLI prints during the turn, as it printed it. */
+    onRawLine?: (line: string) => void;
     /** What every user message goes through before the CLI reads it (`neutralizeCliInput`). */
     input?: (text: string) => string;
     /** The turn is canceled: what the CLI's tools run elsewhere stops too. */
@@ -1384,6 +1386,7 @@ export function runTurnOnProcess(
     };
     proc.onLine((line) => {
       if (settled) return;
+      opts.onRawLine?.(line);
       if (followUp) clearTimeout(followUp);
       followUp = null;
       const parsed = proc.parser.push(line);
@@ -1570,6 +1573,8 @@ export interface DelegatedTurn {
   bridge(frame: DelegatedFrame): Promise<void>;
   cancel(session: string): void;
   detach(session: string): void;
+  /** A background task's CLI: what its tools are told, and each line it prints, for the task's logs. */
+  task?: { kind: "mission" | "local"; line(line: string): void };
 }
 
 export interface BrainTurnContext {
@@ -1978,6 +1983,7 @@ export class BrainManager {
               input: neutralizeCliInput,
               onCancel: () => delegated.cancel(session),
               onUrgent: () => delegated.detach(session),
+              ...(delegated.task ? { onRawLine: delegated.task.line } : {}),
             }
           : {}),
         endInput: !live.persistent,
@@ -2175,6 +2181,7 @@ export class BrainManager {
         branches: [...branches],
         allow,
         ...(mode === "chat" ? { chat: true } : {}),
+        ...(delegated.task ? { task: delegated.task.kind } : {}),
       };
       this.bridge.set(id, { token, cwd, folder: ctx.folder, runId: null, runToken: null });
       bridged = { frame, to: delegated };

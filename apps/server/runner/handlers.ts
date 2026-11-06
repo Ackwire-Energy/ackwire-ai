@@ -521,7 +521,22 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
     if (req.op === "brain.steer" && hosted?.brains.hosts(String(req.runId))) {
       return doBrainSteer({ ...ctx, brains: hosted.brains }, req);
     }
-    hosted?.refusesHere(req);
+    if (hosted?.onSharedLogin(req) && req.agent) {
+      const { agent } = req;
+      if (req.op === "brain.route") {
+        requireTool(ctx, "claude");
+        return hosted.route(req, agent, scope);
+      }
+      if (req.op === "task.start") {
+        const { workers } = ctx;
+        return hosted.startTask(
+          req,
+          agent,
+          () => workers.run(req, scope),
+          (final) => signedOut(ctx, req, final),
+        );
+      }
+    }
     const out = await ctx.workers.run(req, scope);
     // The account's folder is root's to mark: what the worker's turn found out is told here.
     if (req.op === "brain.turn") signedOut(ctx, req, (out as Partial<MachineReplies["brain.turn"]> | null)?.final);

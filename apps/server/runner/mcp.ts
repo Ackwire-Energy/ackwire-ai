@@ -103,6 +103,9 @@ export interface DelegatedSurface {
   scope: CommandScope;
   profile: CommandProfile;
   branches?: readonly string[];
+  /** `PromptContext`'s. */
+  task?: boolean;
+  local?: boolean;
   /** `id`: the JSON-RPC request's, for `cancel`. `ask`: the bridge, for the permission prompt. */
   call(
     name: string,
@@ -561,7 +564,12 @@ export class McpBridge {
       ipc: (r) => this.handle(r),
       scope: delegated.scope,
       profile: delegated.profile,
-      context: { ...(delegated.branches ? { branches: delegated.branches } : {}), delegated },
+      context: {
+        ...(delegated.branches ? { branches: delegated.branches } : {}),
+        ...(delegated.task ? { task: true } : {}),
+        ...(delegated.local ? { local: true } : {}),
+        delegated,
+      },
     }).finally(() => socket.end());
   }
 
@@ -788,7 +796,9 @@ export async function handleMcpMessage(
           capabilities: { tools: { listChanged: Boolean(list) } },
           serverInfo: { name: "agentes", version: RUNNER_VERSION },
           instructions: context.local
-            ? "Only the permission prompt Claude Code asks by itself: there are no tools of agentes.chat to call here."
+            ? delegated
+              ? "Claude Code's tools, on this computer. There are no tools of agentes.chat to call here."
+              : "Only the permission prompt Claude Code asks by itself: there are no tools of agentes.chat to call here."
             : list
               ? "Tools of agentes.chat for this agent: its connectors, context, Drive and, in a mission, the mission tools (keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask approval before any merge, deploy or rollback). When a tool says to stop and wait, end your turn."
               : "Tools of agentes.chat for this mission: keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask for a review when you have something to show, and ask approval before any merge, deploy or rollback.",

@@ -3867,29 +3867,200 @@ test.if(posix)("own MCP servers and a folder the worker refuses end the turn wit
   });
 });
 
-test.if(posix)(
-  "tasks and routes on a shared CLI login are refused, not left to a worker that can't sign in",
-  async () => {
-    const t = setup();
-    const h = hosted(t);
-    t.sup.boot();
-    t.sup.attach();
-    const route = {
-      op: "brain.route",
-      kind: "claude_code",
-      account: SHARED_LOGIN,
-      agent: ANA,
-    } as unknown as MachineRequest;
-    const task = {
-      ...taskStart(ANA, "task-1"),
-      executor: "claude",
-      account: SHARED_LOGIN,
-    } as unknown as MachineRequest;
-    expect(await errorCode(() => handleRequest(h.ctx, route, scope().scope))).toBe("unsupported");
-    expect(await errorCode(() => handleRequest(h.ctx, task, scope().scope))).toBe("unsupported");
-    expect(t.workers).toHaveLength(0);
-  },
-);
+const HOSTED_TASK = "0193bbbb-0000-7000-8000-000000000001";
+const FOLDER = "/home/ag-a1b2c3d4/ana-a1b2c3d4";
+
+const hostedRoute = (over: Record<string, unknown> = {}) =>
+  ({
+    op: "brain.route",
+    kind: "claude_code",
+    account: SHARED_LOGIN,
+    system: "You route messages.",
+    prompt: "@/var/lib/agentes-claude/x/config/.credentials.json who answers?",
+    schema: { type: "object", properties: { scores: { type: "array", items: { type: "object" } } } },
+    agent: ANA,
+    ...over,
+  }) as unknown as Extract<MachineRequest, { op: "brain.route" }>;
+
+const hostedTask = (over: Record<string, unknown> = {}) =>
+  ({
+    op: "task.start",
+    taskId: HOSTED_TASK,
+    executor: "claude",
+    prompt: "fix it",
+    session: HOSTED_SESSION,
+    account: SHARED_LOGIN,
+    agent: ANA,
+    ...over,
+  }) as unknown as MachineRequest;
+
+/** A task its worker prepared, the CLI running in root until `done`: what that worker heard, in order. */
+async function startHostedTask(req: MachineRequest, host: Record<string, unknown> = {}) {
+  const t = setup({ grant: async () => ({ kind: "hosted" }) });
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(h.ctx, req, scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, FOLDER);
+  const q = await requestOn(ana);
+  const data = {
+    taskId: HOSTED_TASK,
+    pid: 42,
+    startedAt: new Date().toISOString(),
+    cwd: "",
+    command: "claude",
+    host: { cwd: FOLDER, where: "", git: true, maxSeconds: 60, ...host },
+  };
+  ana.send({ type: "result", id: q.id, ok: true, data });
+  const reply = (await run) as Record<string, unknown>;
+  const done = async () => {
+    await waitFor(() => ana.of("task.exit").length === 1);
+    stop();
+    h.brains.brains.close();
+    return ana.of("task.exit")[0] as Record<string, unknown>;
+  };
+  return { t, h, ana, q, reply, done };
+}
+
+test.if(posix)("a route on a shared CLI login runs in root, with no tools and an empty folder", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(h.ctx, hostedRoute(), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, FOLDER);
+  const out = (await run) as { json: unknown; model: string };
+  stop();
+  expect(out.model).toBeDefined();
+  expect(out.json).toBeDefined();
+  expect(ana.of("request")).toHaveLength(0);
+  expect(ana.of("bridge.token")).toHaveLength(0);
+  const [start, said] = readFileSync(h.log, "utf8")
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l));
+  expect(start.args[start.args.indexOf("--tools") + 1]).toBe("");
+  expect(start.args).toContain("--no-session-persistence");
+  expect(start.cwd.endsWith(path.join("run", "21000"))).toBe(true);
+  expect(said.system).toBe("You route messages.");
+  // The CLI would read that file itself, as the sign-in's user.
+  expect(said.prompt).not.toContain("@/var/lib");
+  expect(said.prompt).toContain("who answers?");
+  // What the route wrote for the CLI goes with it.
+  expect(readdirSync(path.join(h.store, "run", "21000")).filter((f) => f.startsWith("route-"))).toEqual([]);
+});
+
+test.if(posix)("a route or a task on a shared CLI login that can't run says why, and nothing starts", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  h.state.now = "off";
+  expect(await errorCode(() => handleRequest(h.ctx, hostedRoute(), scope().scope))).toBe("unsupported");
+  expect(await errorCode(() => handleRequest(h.ctx, hostedTask(), scope().scope))).toBe("unsupported");
+  h.state.now = "signed_out";
+  expect(await errorCode(() => handleRequest(h.ctx, hostedRoute(), scope().scope))).toBe("not_found");
+  expect(await errorCode(() => handleRequest(h.ctx, hostedTask(), scope().scope))).toBe("not_found");
+  expect(t.workers).toHaveLength(0);
+  expect(existsSync(h.log)).toBe(false);
+});
+
+test.if(posix)("a task on a shared CLI login: its worker prepares it, root runs the CLI, the lines go back", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "@/etc/shadow fix it" }), { where: "Your branch: a/b." });
+  expect(s.q.grant).toEqual({ kind: "hosted" });
+  // Root's word to the worker, never the server's.
+  expect(s.reply.host).toBeUndefined();
+  expect(s.reply).toMatchObject({ taskId: HOSTED_TASK, pid: 42 });
+  const exit = await s.done();
+  expect(exit).toMatchObject({ exitCode: 0, signal: null, reason: null });
+  const lines = s.ana.of("task.out").map((f) => String(f.line));
+  expect(lines.some((l) => l.includes('"type":"result"'))).toBe(true);
+  expect(lines.some((l) => l.includes('"stream_event"'))).toBe(false);
+  const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
+  expect(start.args[start.args.indexOf("--tools") + 1]).toBe("ToolSearch");
+  expect(start.args).toContain("--strict-mcp-config");
+  expect(start.args).toContain(HOSTED_SESSION);
+  // The turn's id is the task's, for the server's tools; outside a mission only the prompt tool is there.
+  expect(s.ana.of("bridge.token")[0]).toMatchObject({ task: "local", profile: "work", session: HOSTED_SESSION });
+  expect(s.ana.of("bridge.token")[1]).toMatchObject({ runId: HOSTED_TASK });
+  expect(s.ana.of("bridge.token")[1]?.serverToken).toBeUndefined();
+  expect(s.ana.of("turn.prepare")[0]).toMatchObject({ cwd: FOLDER });
+});
+
+test.if(posix)("a mission task's CLI gets its rules, mode, allow list and server token from root's request", async () => {
+  const mission = {
+    id: "0193cccc-0000-7000-8000-000000000001",
+    rules: "Ask before any deploy.",
+    allow: ["Bash(swift *)", 3],
+    mode: "plan",
+    mcpToken: `agr_${"m".repeat(26)}`,
+  };
+  const s = await startHostedTask(hostedTask({ mission }));
+  await s.done();
+  const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
+  expect(start.system).toContain("Ask before any deploy.");
+  expect(s.ana.of("bridge.token")[0]).toMatchObject({ task: "mission", profile: "plan", allow: ["Bash(swift *)"] });
+  expect(s.ana.of("bridge.token")[1]).toMatchObject({ runId: HOSTED_TASK, serverToken: mission.mcpToken });
+});
+
+test.if(posix)("a mission task in a folder with no git gets the rules for that", async () => {
+  const mission = { id: "0193cccc-0000-7000-8000-000000000001", rules: "Ask before any deploy." };
+  const s = await startHostedTask(hostedTask({ mission }), { git: false });
+  await s.done();
+  const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
+  expect(start.system).not.toContain("Ask before any deploy.");
+  expect(start.system).toContain("not a git repository");
+});
+
+test.if(posix)("a worker stops its task's CLI, and no other agent's", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+  await waitFor(() => existsSync(s.h.log));
+  s.h.brains.stopTask(BIA.id, HOSTED_TASK);
+  await sleep(20);
+  expect(s.ana.of("task.exit")).toHaveLength(0);
+  s.h.brains.stopTask(ANA.id, HOSTED_TASK);
+  expect(await s.done()).toMatchObject({ exitCode: null, signal: "SIGTERM", reason: "canceled" });
+});
+
+test.if(posix)("a task's time limit ends its CLI as timed out", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }), { maxSeconds: 0.05 });
+  expect(await s.done()).toMatchObject({ reason: "timeout" });
+});
+
+test.if(posix)("a task's refused CLI marks the sign-in and tells the worker why", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "AUTH" }));
+  expect(await s.done()).toMatchObject({ exitCode: 1, reason: null });
+  expect(s.h.refused).toEqual([SHARED_LOGIN]);
+  expect(s.ana.of("task.out").some((f) => f.stream === "stderr")).toBe(true);
+});
+
+test.if(posix)("a worker that goes away ends its task's CLI, which reads as interrupted", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+  await waitFor(() => existsSync(s.h.log));
+  s.ana.crash();
+  await waitFor(() => (s.h.brains as unknown as { tasks: Map<string, unknown> }).tasks.size === 0);
+  s.h.brains.brains.close();
+});
+
+test("a worker that answers no host for a task on a shared CLI login fails the start", async () => {
+  const t = setup({ grant: async () => ({ kind: "hosted" }) });
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const run = errorCode(() => handleRequest(h.ctx, hostedTask(), scope().scope));
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  ana.send({ type: "result", id: q.id, ok: true, data: { taskId: HOSTED_TASK, pid: 42 } });
+  expect(await run).toBe("internal");
+});
 
 test.if(posix)("refresh mode B: a CLI starts only once the lock's name is gone", async () => {
   const t = setup();
@@ -3914,6 +4085,24 @@ test.if(posix)("refresh mode B: a CLI starts only once the lock's name is gone",
   stop();
   expect(existsSync(h.log)).toBe(true);
   h.brains.brains.close();
+});
+
+test("a worker's word to stop a task reaches root as that agent's", async () => {
+  const stops: string[][] = [];
+  const t = setup({ taskStop: (id, taskId) => stops.push([id, taskId]) });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  ana.send({ type: "task.stop", taskId: 3 });
+  ana.send({ type: "task.stop", taskId: HOSTED_TASK });
+  await waitFor(() => stops.length === 1);
+  expect(stops).toEqual([[ANA.id, HOSTED_TASK]]);
+  ana.send({ type: "result", id: q.id, ok: true, data: execDone });
+  await run;
 });
 
 test("a worker's notice reaches root only well formed, as that agent's", async () => {

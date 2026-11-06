@@ -45,7 +45,7 @@ import {
   type WorkerLinkFrame,
   type WorkerState,
 } from "./supervisor";
-import { TaskManager } from "./tasks";
+import { type HostedExit, TaskManager } from "./tasks";
 
 /**
  * System mode: one agent's runner (`agentes-runner worker --agent <id>`),
@@ -137,6 +137,8 @@ export class WorkerLink {
   onTurnPrepare: (ask: { agent: AgentScope; cwd?: string; text: boolean }) => Promise<TurnContext> = async () => {
     throw new RunnerError("not_allowed", "This worker serves no turn of root's");
   };
+  onTaskOut: (taskId: string, stream: "stdout" | "stderr", line: string) => void = () => {};
+  onTaskExit: (taskId: string, exit: HostedExit) => void = () => {};
   onTurnCancel: (session: string) => void = () => {};
   onTurnDetach: (session: string) => void = () => {};
   /** The supervisor is gone (stdin closed). */
@@ -265,6 +267,17 @@ export class WorkerLink {
         );
         return;
       }
+      case "task.out":
+        if (typeof f.taskId === "string" && typeof f.line === "string") {
+          this.onTaskOut(f.taskId, f.stream === "stderr" ? "stderr" : "stdout", f.line);
+        }
+        return;
+      case "task.exit":
+        if (typeof f.taskId === "string") {
+          const { exitCode, signal, reason, error } = f as unknown as HostedExit;
+          this.onTaskExit(f.taskId, { exitCode, signal, reason, ...(error ? { error } : {}) });
+        }
+        return;
       case "turn.cancel":
         if (typeof f.session === "string") this.onTurnCancel(f.session);
         return;
@@ -291,6 +304,10 @@ export class WorkerLink {
 
   toolNotice(notice: ToolNotice) {
     this.write(JSON.stringify({ type: "tool.notice", ...notice } satisfies WorkerLinkFrame));
+  }
+
+  taskStop(taskId: string) {
+    this.write(JSON.stringify({ type: "task.stop", taskId } satisfies WorkerLinkFrame));
   }
 
   /** `agent-browser` downloads first, for that click. */
@@ -490,7 +507,10 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     accounts,
     ...(self.compiled ? { wrapperCommand: [...self.command, "task-wrapper"] } : {}),
     ...(cli ? { spawnCli: cli } : {}),
+    hostedStop: (taskId) => link.taskStop(taskId),
   });
+  link.onTaskOut = (taskId, stream, line) => tasks.hostedOutput(taskId, stream, line);
+  link.onTaskExit = (taskId, exit) => tasks.hostedExit(taskId, exit);
   await tasks.init();
   const brainLimits = () => ({
     idleMs: state.limits.brainIdleMinutes * 60_000,
@@ -520,6 +540,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const delegated = new DelegatedTools({
     secrets: () => agentSecrets(secretsDir, { id: o.agentId, handle: "agent" }),
     onNotice: (notice) => link.toolNotice(notice),
+    onDenied: (session, tool, input) => tasks.hostedDenial(session, tool, input),
     ...(cli ? { spawn: cli } : {}),
     log,
   });

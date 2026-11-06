@@ -28,7 +28,7 @@ Signing in again uses the connection's method. A `begin` with `again` that names
 
 ### 3. Capability negotiation, never a fallback
 
-`hello.claudeLoginMethods` says which methods a new Claude sign-in for all agents can use on that computer: `["cli_login"]` where agents are the runner's own user, `["setup_token"]` where each is its own OS user (§Not done). A runner older than 46 says nothing and is read as what it did (`claudeLoginMethodsOf`). When the effective method is one the runner can't use, `beginAccountLogin` refuses with `account.method_unsupported` (409) before any row is made; it never falls back to the other method. A runner that gets `method: "cli_login"` for a shared sign-in in system mode refuses it too (`unsupported`), and `setup_token` outside system mode or without `shared` is `bad_request`. `method` goes only to protocol 46 runners, and only for a Claude subscription (no `provider`).
+`hello.claudeLoginMethods` says which methods a new Claude sign-in for all agents can use on that computer: `["cli_login"]` where agents are the runner's own user, `["setup_token"]` where each is its own OS user, plus `cli_login` once the isolated execution is on and its self-check passes (§Not done). A runner older than 46 says nothing and is read as what it did (`claudeLoginMethodsOf`). When the effective method is one the runner can't use, `beginAccountLogin` refuses with `account.method_unsupported` (409) before any row is made; it never falls back to the other method. A runner that gets `method: "cli_login"` for a shared sign-in in system mode with that off refuses it too (`unsupported`), and `setup_token` outside system mode or without `shared` is `bad_request`. `method` goes only to protocol 46 runners, and only for a Claude subscription (no `provider`).
 
 ### 4. An unchecked status is not a signed-out one
 
@@ -54,7 +54,20 @@ The policy is the switch: `setup_token` (or no workspaces listed) makes every ne
 
 ## Not done
 
-Claude's own login for a sign-in made for all agents where each agent is its own OS user stays unavailable until an isolated execution design ships: the CLI would have to run as the user that owns its credential file, while the agent's own tools must not run with that user's access to it, and nothing in the runner provides that boundary today. Until then such a runner never advertises `cli_login` in `claudeLoginMethods`, the server refuses a new sign-in there whose effective method would need it (`account.method_unsupported`), and the one-agent sign-in lent to that agent's user stays as it is.
+Claude's own login for a sign-in made for all agents where each agent is its own OS user is built and stays off: nothing validated it on a real machine yet, so no runner lists it unless told to. Its runner config switch (`claudeSharedLogin`: the CLI versions that passed, and the refresh mode) has no default, and with it set `hello.claudeLoginMethods` gains `cli_login` only while a self-check passes, at start and every 6 hours (`account-check.ts`). Without that the server refuses a new sign-in whose effective method would need it (`account.method_unsupported`), and the one-agent sign-in lent to that agent's user stays as it is.
+
+What exists, behind that switch (runner protocol 47, `CLAUDE_SHARED_PROTOCOL`):
+
+- **The boundary.** Each such sign-in has a system user of its own (`agc-<id8>`, primary group `agentes-auth`, uids 30000–30998) that owns the one `CLAUDE_CONFIG_DIR`. Sign-in, status, usage and sign-out run as that user. Root never opens the store, and no agent code ever runs as that user.
+- **The CLI.** Every CLI on such a sign-in is root's child, as that user, in a mount view that hides every agent's data and in its agent's network and slice (`accountLauncher`): turns (`account-brains.ts`), background tasks and routes alike. Root alone writes its stdin, refuses its `control_request`s, neutralizes what it would act on in a message, masks token shapes in what leaves, and resumes only sessions it recorded for that agent.
+- **The tools.** The CLI keeps `ToolSearch` alone. Bash, Read, Edit, Write, Glob and Grep are served by the agent's worker over the bridge, as the agent's own user (`delegated-tools.ts`).
+- **Tasks.** The worker keeps the task (folder, branch, journal, commit at its end) and root runs its CLI as a one-shot turn, sending the lines back into the task's logs (`task.out`, `task.exit`, `task.stop`). Such a CLI dies with the runner, unlike any other task's: the task ends as interrupted and the server resumes it.
+- **Routes.** Root runs the CLI with no tools in an empty folder, in the agent's network. As on any sign-in, an open process makes a route `busy`, so a sign-in in steady use rarely routes.
+- **Signed out, or off.** A refused turn marks that sign-in `.invalid`, and only that one. With the switch off or the self-check failing, a connection reports its status as unchecked, its turns and tasks are refused as `unsupported`, and its user and store stay, so turning it back on needs no new sign-in.
+
+What the people connecting see doesn't change: Connect Claude, authorize, connected. The method stays the operator's (§2), never a choice in the apps.
+
+What still needs a real Linux machine (Debian 13, the guard in namespace mode and in host mode), before any runner config sets the switch: the CLI's refresh under concurrent processes on one store, and whether its version needs refresh mode B; that no probe through a delegated tool, a prompt or a planted file reaches the store; the mount view with each CLI version; fidelity of the delegated tools against the native ones over real coding tasks; urgent steering and interrupts on long commands; and egress of the CLI through the auth route inside an agent's network namespace, which needs the guard to route `agentes-auth` there first. Until those pass, setup-token stays the method everywhere.
 
 ## Consequences
 

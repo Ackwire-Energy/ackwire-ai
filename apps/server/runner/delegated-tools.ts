@@ -293,6 +293,8 @@ export interface DelegatedScope {
   runnerHome?: string;
   /** A `chat` turn: none of these tools, only the server's. */
   chat?: boolean;
+  /** A background task's CLI: a mission's, or one outside a mission (`local`), as `claudeMcpConfig`'s `task`. */
+  task?: "mission" | "local";
 }
 
 /** `agentSecrets`' answer: what commands get, and what no result may show. */
@@ -307,6 +309,8 @@ export interface DelegatedToolsOptions {
   secrets: () => Promise<Secrets>;
   /** `tool.notice`, to root. */
   onNotice?: (notice: ToolNotice) => void;
+  /** A background task's call was refused with nobody to approve it: its task lists it when it ends. */
+  onDenied?: (session: string, tool: string, input: Record<string, unknown>) => void;
   /** How commands start: through the agent's cli scope in system mode (`spawnGated`). */
   spawn?: Spawn;
   /** Where command output is kept: never under the runner's home, which no tool may read. */
@@ -466,6 +470,11 @@ const relativeTo = (cwd: string, file: string) => {
 const bareDot = (line: string) => line.replace(/^\.\//, "");
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
+const taskContext = (task: DelegatedScope["task"]) => ({
+  ...(task ? { task: true } : {}),
+  ...(task === "local" ? { local: true } : {}),
+});
+
 /** One worker's delegated tools: its sessions and their background shells. */
 export class DelegatedTools {
   private readonly sessions = new Map<string, Session>();
@@ -497,6 +506,7 @@ export class DelegatedTools {
       scope: this.commandScope(s),
       profile: scope.profile,
       ...(scope.branches?.length ? { branches: scope.branches } : {}),
+      ...taskContext(scope.task),
       call: (name, args, ctx) => this.call(s, name, args, ctx),
       cancel: (id) => this.stopCalls(s, id),
     };
@@ -652,9 +662,12 @@ export class DelegatedTools {
         scope,
         profile,
         ...(s.scope.branches?.length ? { branches: s.scope.branches } : {}),
+        ...taskContext(s.scope.task),
       }),
     );
-    return answer.behavior === "allow" ? null : answer.message;
+    if (answer.behavior === "allow") return null;
+    if (s.scope.task) this.opts.onDenied?.(s.scope.session, tool, input);
+    return answer.message;
   }
 
   /** An allow rule for each part of a command it can follow, or an edit inside the turn's folders. */
@@ -1323,6 +1336,8 @@ export interface DelegatedBridge {
   socketPath?: string;
   /** A `chat` turn (`DelegatedScope.chat`). */
   chat?: true;
+  /** `DelegatedScope.task`. */
+  task?: "mission" | "local";
 }
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined);
@@ -1349,6 +1364,7 @@ export function parseBridge(f: Record<string, unknown>): DelegatedBridge | null 
     ...(typeof f.serverToken === "string" ? { serverToken: f.serverToken } : {}),
     ...(typeof f.socketPath === "string" && path.isAbsolute(f.socketPath) ? { socketPath: f.socketPath } : {}),
     ...(f.chat === true ? { chat: true as const } : {}),
+    ...(f.task === "mission" || f.task === "local" ? { task: f.task } : {}),
   };
 }
 
@@ -1378,6 +1394,7 @@ export function delegatedTask(
       ...(bridge.allow ? { allow: bridge.allow } : {}),
       ...(runnerHome ? { runnerHome } : {}),
       ...(bridge.chat ? { chat: true } : {}),
+      ...(bridge.task ? { task: bridge.task } : {}),
     }),
   };
 }

@@ -525,7 +525,8 @@ export const CLAUDE_AUTH_PROTOCOL = 46;
  * From this protocol on: a system-mode runner may list `cli_login` in `claudeLoginMethods`. Its turns on such a sign-in
  * run in root, as the sign-in's own OS user, with no tool of the CLI's that touches files or runs code; each agent's
  * worker serves those tools over its bridge. Root and worker speak of them on their link: `bridge.token`, `turn.cancel`
- * and `turn.detach` from root, `turn.context` (`TurnContext`) and `tool.notice` (`ToolNotice`) from the worker. Nothing
+ * and `turn.detach` from root, `turn.context` (`TurnContext`) and `tool.notice` (`ToolNotice`) from the worker; a
+ * background task's CLI is root's too, its worker hearing `task.out` and `task.exit` and asking `task.stop`. Nothing
  * changes on the server's side of the wire: an older runner just never lists the method.
  */
 export const CLAUDE_SHARED_PROTOCOL = 47;

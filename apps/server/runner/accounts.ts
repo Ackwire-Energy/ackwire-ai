@@ -392,12 +392,15 @@ export type AccountGrant =
   | { kind: "key"; provider: PlanId; key: string }
   /** A ChatGPT sign-in for all agents: root's newest `auth.json`, refreshed copies coming back (`watchCodexAuth`). */
   | { kind: "codex_auth"; auth: string }
+  /** A Claude sign-in several agents share: its CLI is root's, so a task only prepares here (`tasks.ts`). */
+  | { kind: "hosted" }
   | { kind: "none" };
 
 /** A grant as the worker reads it off root's request frame; null when there is none or it isn't one. */
 export function grantOf(v: unknown): AccountGrant | null {
   const g = v as Record<string, unknown> | null | undefined;
   if (g?.kind === "none") return { kind: "none" };
+  if (g?.kind === "hosted") return { kind: "hosted" };
   if (g?.kind === "token" && typeof g.token === "string" && WHOLE_OAUTH_TOKEN.test(g.token)) {
     return { kind: "token", token: g.token };
   }
@@ -2273,6 +2276,7 @@ export class AccountManager {
     if (!isAccountKind(kind) || !isAccountId(id) || !this.isShared(kind, id)) return null;
     // Signing in again keeps what it has until the new one is kept: only a refusal, or nothing kept, is signed out.
     if (existsSync(this.marker(kind, id, "invalid"))) return { kind: "none" };
+    if (this.isCliShared(kind, id)) return { kind: "hosted" };
     const dir = this.dirOf(kind, id);
     if (kind === "codex") return this.codexGrant(id, dir);
     const plan = await planKeyOf(dir);
