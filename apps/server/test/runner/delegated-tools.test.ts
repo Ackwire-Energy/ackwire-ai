@@ -848,7 +848,7 @@ function fakeRg(out: string, code = 0) {
   writeFileSync(path.join(dir, "out"), out);
   writeFileSync(
     file,
-    `#!/bin/sh\npwd -P > "${dir}/cwd"\nfor a in "$@"; do echo "$a"; done > "${dir}/args"\ncat "${dir}/out"\n[ ${code} = 2 ] && echo boom >&2\nexit ${code}\n`,
+    `#!/bin/sh\npwd -P > "${dir}/cwd"\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${dir}/args"\ncat "${dir}/out"\n[ ${code} = 2 ] && echo boom >&2\nexit ${code}\n`,
   );
   chmodSync(file, 0o755);
   return {
