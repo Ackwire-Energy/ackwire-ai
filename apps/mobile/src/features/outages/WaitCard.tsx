@@ -4,7 +4,8 @@ import { brainUnavailableOf, waitCardState, waitsForComputer } from "@agentescha
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, LineIcon, ProviderLogo, Text } from "@/ui";
+import { EventPillAction, EventPillText, LineIcon, ProviderLogo, Text } from "@/ui";
+import { AskDone, AskWaiting } from "../chat/asks";
 import { useColors, useEdition, useNow, useOrgId } from "../shared/hooks";
 import { waitCardText } from "./logic";
 import { openSwitchComputer } from "./OutageNotice";
@@ -61,56 +62,49 @@ export function AwayPill({ message: m }: { message: Pick<Message, "meta" | "auth
 }
 
 /**
- * The agent's one card while it waits: "Esperando o MacBook Air voltar",
- * "O Claude Code roda nele. Sigo daqui assim que ele voltar · 2 rotinas esperando" and, on a self-host,
- * "Trocar computador"; by itself it turns into "O MacBook Air voltou" (or "Troquei de computador") with no button.
+ * The agent's note while it waits, as a waiting pill: it waits for a computer, not for the viewer, so a quiet clock,
+ * "Waiting for the MacBook Air to come back", the brain that runs there and what waits under it and, on a self-host,
+ * "Switch computer"; by itself it turns into a decided request's pill ("The MacBook Air is back", or that it moved).
  */
 function WaitCard({ card }: { card: NonNullable<ReturnType<typeof useBrainWait>> }) {
   const { t } = useTranslation();
-  const c = useColors();
   // Only where people connect their own computers: a Cloud workspace has one, and nothing while that isn't known.
   const switches = useEdition() === "selfhost";
+  if (card.done) return <AskDone done words={card.title} />;
   return (
-    <View style={[styles.card, { backgroundColor: c.sunken }]}>
-      <View style={styles.top} accessible accessibilityLabel={`${card.title}. ${card.body}`}>
-        <LineIcon name={card.done ? "check" : "clock"} variant="callout" size={16} color={card.done ? c.ok : c.amber} />
-        <Text variant="callout" tone="ink" style={styles.title} numberOfLines={2}>
-          {card.title}
-        </Text>
-      </View>
-      <View style={styles.body}>
-        {/* Waiting, the line names the brain that runs there. */}
-        {card.done ? null : (
-          <LineIcon variant="small" size={14}>
-            <ProviderLogo id={card.brain} size="xs" />
-          </LineIcon>
-        )}
-        <Text variant="small" tone="muted" importantForAccessibility="no" style={styles.grow}>
-          {card.body}
-        </Text>
-      </View>
-      {card.done || !switches ? null : (
-        <View style={styles.acts}>
-          <Button
-            variant="secondary"
-            size="sm"
+    <AskWaiting
+      forMe={false}
+      mark="clock"
+      words={card.title}
+      actions={
+        switches ? (
+          <EventPillAction
+            key="switch"
             label={t("mobile.outage.switch")}
             onPress={() => openSwitchComputer(card.machineId)}
           />
-        </View>
-      )}
-    </View>
+        ) : null
+      }
+      below={
+        <EventPillText>
+          {/* The line names the brain that runs there. */}
+          <View style={styles.body}>
+            <LineIcon variant="small" size={14}>
+              <ProviderLogo id={card.brain} size="xs" />
+            </LineIcon>
+            <Text variant="small" tone="muted" style={styles.grow}>
+              {card.body}
+            </Text>
+          </View>
+        </EventPillText>
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, marginTop: 4, maxWidth: 520 },
-  // A title on two lines keeps the icon on its first.
-  top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  title: { flex: 1, minWidth: 0, fontWeight: "600" },
   body: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   grow: { flex: 1, minWidth: 0 },
-  acts: { flexDirection: "row" },
   // Never wraps: on a full name line it moves whole to the next.
   pill: { flexShrink: 0, alignSelf: "center", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
   pillText: { fontWeight: "600" },

@@ -641,18 +641,68 @@ export function AskDone({
           ) : null
         }
       >
-        {markedParts(words).map((p, i) =>
-          p.bold ? (
-            // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
-            <RNText key={i} style={[styles.semibold, { color: c.ink2 }]}>
-              {p.text}
-            </RNText>
-          ) : (
-            p.text
-          ),
-        )}
+        {pillWords(words, c.ink2)}
       </EventPill>
     </Animated.View>
+  );
+}
+
+/**
+ * A request still waiting for someone, as one pill like the decided ones (`AskDone`), never a card: its sentence in
+ * ink. Waiting for the viewer (`forMe`), the breathing square as its mark and what it asks for as an
+ * `EventPillAction primary` ("Connect", "Continue now"), the other actions plain; for someone else, `mark` quiet and no
+ * main action. What the sentence leaves out (the agent's why, an address, a command, who may press) goes `below`, in
+ * `EventPillText`.
+ */
+export function AskWaiting({
+  forMe,
+  mark,
+  words,
+  actions,
+  below,
+}: {
+  forMe: boolean;
+  /** The quiet icon while it waits for someone else ("pause", "shield"). */
+  mark: IconName;
+  words: string;
+  actions?: ReactNode;
+  below?: ReactNode;
+}) {
+  const c = useColors();
+  const reduced = useReducedMotion();
+  return (
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.done}>
+      <EventPill
+        waiting
+        mark={
+          forMe ? (
+            <View style={styles.waitMark}>
+              <WaitMark />
+            </View>
+          ) : (
+            mark
+          )
+        }
+        actions={actions}
+        below={below}
+      >
+        {pillWords(words, c.ink)}
+      </EventPill>
+    </Animated.View>
+  );
+}
+
+/** A pill's sentence: what `markName` wraps in bold, in `color`. */
+function pillWords(words: string, color: string) {
+  return markedParts(words).map((p, i) =>
+    p.bold ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+      <RNText key={i} style={[styles.semibold, { color }]}>
+        {p.text}
+      </RNText>
+    ) : (
+      p.text
+    ),
   );
 }
 
@@ -808,6 +858,8 @@ const styles = StyleSheet.create({
   expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
   // A decided request: its pill on the conversation itself, from where the message's text starts.
   done: { alignSelf: "stretch", marginTop: 8 },
+  // The breathing square centered in the pill's 14-point mark.
+  waitMark: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
   // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.
   dock: { paddingHorizontal: 4, paddingBottom: 6 },
   pill: {

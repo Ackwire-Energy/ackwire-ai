@@ -201,15 +201,19 @@ describe("a shared approval card with actions approved ahead", () => {
   });
 });
 
-describe("a stretch's pause card on the phone (ADR 0089)", () => {
-  test("once someone let them go on, one quiet line: who and when, no card and no Continuar", () => {
+describe("a stretch's pause on the phone (ADR 0089)", () => {
+  test("waiting, a waiting pill with Continue tinted; once someone let them go on, a decided pill: who and when", () => {
     const card = source("../ai/StretchCard.tsx");
-    const [doneAt, cardAt] = at(card, ["if (continued) {", "<View style={[styles.card"]);
-    const done = card.slice(doneAt, cardAt);
+    const [doneAt, waitAt] = at(card, ["if (continued) {", "<AskWaiting"]);
+    const done = card.slice(doneAt, waitAt);
     expect(done).toContain("<AskDone");
     expect(done).toContain('t("stretchCard.continuedByYou", { time })');
-    expect(done).not.toContain("<Button");
-    expect(card.slice(cardAt)).not.toContain("continued");
+    expect(done).not.toContain("EventPillAction");
+    const waiting = card.slice(waitAt);
+    expect(waiting).not.toContain("continued");
+    expect(waiting).toContain("forMe={may}");
+    expect(waiting).toMatch(/<EventPillAction\s+key="continue"\s+primary/);
+    expect(card).not.toContain("<Button");
   });
 });
 

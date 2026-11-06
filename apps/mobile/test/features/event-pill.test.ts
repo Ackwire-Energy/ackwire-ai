@@ -93,3 +93,47 @@ describe("the event pill", () => {
     expect(done).toContain("approvalSummary(a, i18n.language)");
   });
 });
+
+describe("a request still waiting, as a pill", () => {
+  test("waiting: the words in ink, the frame's hairline kept (no attention border); primary: a soft attention tint", () => {
+    const pill = src("ui/EventPill.tsx");
+    expect(pill).toContain('tone={waiting ? "ink" : "ink2"}');
+    expect(pill).toContain("borderColor: c.line2");
+    expect(pill).not.toContain("borderColor: c.amber");
+    expect(pill).toContain("withAlpha(c.amber, pressed ? 0.18 : 0.1)");
+    expect(pill).toContain('tone={primary ? "ink" : "ink2"}');
+  });
+
+  test("for the viewer, the breathing square the requests already use; for someone else, a quiet icon", () => {
+    const asks = src("features/chat/asks.tsx");
+    const start = asks.indexOf("export function AskWaiting(");
+    const waiting = asks.slice(start, asks.indexOf("\nfunction ", start));
+    expect(waiting).toContain("<EventPill\n        waiting");
+    expect(waiting).toContain("<WaitMark />");
+    expect(waiting).toMatch(/forMe \? \([\s\S]*<WaitMark \/>[\s\S]*\) : \(\s*mark\s*\)/);
+  });
+
+  test("the cards that waited in a box with a button are waiting pills now, the main action tinted", () => {
+    for (const file of [
+      "features/ai/NoAiCard.tsx",
+      "features/ai/StretchCard.tsx",
+      "features/ai/OfferCard.tsx",
+      "features/ai/CostlyProposalCard.tsx",
+      "features/ai/UsagePauseCard.tsx",
+      "features/usage/people.tsx",
+      "features/outages/WaitCard.tsx",
+      "features/right-hand/Intro.tsx",
+    ]) {
+      const text = src(file);
+      expect([file, text.includes("<AskWaiting")]).toEqual([file, true]);
+      expect([file, text.includes("<AskDone")]).toEqual([file, !file.endsWith("Intro.tsx")]);
+    }
+    // A computer coming back waits for no one here: never the viewer's mark, never a tinted action.
+    const outage = src("features/outages/WaitCard.tsx");
+    expect(outage).toContain("forMe={false}");
+    expect(outage).not.toContain("primary");
+    // No box with a button left in them.
+    for (const file of ["features/ai/StretchCard.tsx", "features/ai/CostlyProposalCard.tsx"])
+      expect([file, src(file).includes("<Button")]).toEqual([file, false]);
+  });
+});

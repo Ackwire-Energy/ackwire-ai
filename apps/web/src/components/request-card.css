@@ -304,6 +304,39 @@ html:not([data-pointer]) .rq__more:focus-visible {
   white-space: pre-line;
 }
 
+/*
+ * A request still waiting (RequestOpen): the same pill, its words in ink and what it asks for in a soft tint. Its why,
+ * what it gives or a command sit under the frame, quiet, as plain lines (never a card).
+ */
+.rq-open {
+  max-width: var(--msg-card-w);
+  margin-top: 2px;
+}
+.ac-msg__head + .rq-open {
+  margin-top: -4px;
+}
+.rq-open .rq__details {
+  align-self: stretch;
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+.rq-open__below {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 2px;
+  font-size: 13px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+.rq-open__below p {
+  margin: 0;
+}
+.rq-open__below code {
+  white-space: pre-wrap;
+}
+
 /* Waiting for you: a pixel square outline in the warning tone, pulsing. */
 .rq-wait {
   flex: none;

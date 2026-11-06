@@ -3,6 +3,8 @@ import { cx } from "../cx";
 import { Icon } from "../icons/Icon";
 
 export interface EventPillProps extends Omit<HTMLAttributes<HTMLDivElement>, "children"> {
+  /** A request waiting for someone: its words in ink (the pulsing mark and a `primary` action say the rest). */
+  waiting?: boolean;
   /** The event's mark (an `Icon`, `PixelStop`), quiet. */
   mark: ReactNode;
   /** One sentence: what happened ("You stopped Ada", "Routine «Sentry» delivered a report"). */
@@ -19,9 +21,18 @@ export interface EventPillProps extends Omit<HTMLAttributes<HTMLDivElement>, "ch
  * frame holding the sentence and what can be done about it, aligned with the messages' text. Never a voice, never a
  * card: no fill, one hairline.
  */
-export function EventPill({ mark, children, time, actions, below, className, ...rest }: EventPillProps) {
+export function EventPill({
+  mark,
+  children,
+  time,
+  actions,
+  below,
+  waiting = false,
+  className,
+  ...rest
+}: EventPillProps) {
   return (
-    <div className={cx("ac-eventpill", className)} {...rest}>
+    <div className={cx("ac-eventpill", waiting && "ac-eventpill--waiting", className)} {...rest}>
       <span className="ac-eventpill__frame">
         <span className="ac-eventpill__main">
           <span className="ac-eventpill__mark">{mark}</span>
@@ -37,12 +48,25 @@ export function EventPill({ mark, children, time, actions, below, className, ...
 
 export interface EventPillActionProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   lead?: ReactNode;
+  /** What a request waiting for the viewer asks for ("Connect", "Continue now"): a soft tint, no border. */
+  primary?: boolean;
 }
 
 /** One action inside an `EventPill` ("Continue", "Add a reason", "Cancel"), split from the next by a hairline. */
-export function EventPillAction({ lead, className, children, type = "button", ...rest }: EventPillActionProps) {
+export function EventPillAction({
+  lead,
+  primary = false,
+  className,
+  children,
+  type = "button",
+  ...rest
+}: EventPillActionProps) {
   return (
-    <button type={type} className={cx("ac-eventpill__action", className)} {...rest}>
+    <button
+      type={type}
+      className={cx("ac-eventpill__action", primary && "ac-eventpill__action--primary", className)}
+      {...rest}
+    >
       {lead}
       {children}
     </button>

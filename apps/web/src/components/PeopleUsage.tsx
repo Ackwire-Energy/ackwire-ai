@@ -51,6 +51,7 @@ import {
   Dialog,
   DialogBody,
   EmptyState,
+  EventPillAction,
   Icon,
   InfoHint,
   Input,
@@ -76,6 +77,7 @@ import { AskAgentButton } from "@/components/AskAgentButton";
 import { fileSaver } from "@/components/artifacts/fileSaver";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { RequestDone, RequestOpen } from "@/components/RequestCard";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
@@ -1027,8 +1029,9 @@ export function MyUsage() {
 }
 
 /**
- * The card an agent posts in place of an answer when the person behind its run is at their monthly limit: for that
- * person, Pedir mais and Ver meu uso; anyone else reads who reached it. A raise or a refusal moves it.
+ * The waiting pill an agent posts in place of an answer when the person behind its run is at their monthly limit: for
+ * that person, "Ask for more" (primary) and "See my usage", when it renews under it; anyone else reads who reached it,
+ * quiet. A raise turns it into a decided pill; a refusal says so under it.
  */
 export function PersonLimitCardView({ card }: { message: Message; card: PersonLimitCard }) {
   const { t, i18n } = useTranslation();
@@ -1056,47 +1059,50 @@ export function PersonLimitCardView({ card }: { message: Message; card: PersonLi
     }
   };
   if (card.state === "raised") {
+    const text = mine ? t("peopleUsage.card.raised", { name: by }) : t("peopleUsage.card.raisedOther", { name: by });
     return (
-      <div className="waitcard" data-done>
-        <span className="waitcard__top ac-iconline">
-          <Icon name="check" size={16} />
-          <span>
-            {mine ? t("peopleUsage.card.raised", { name: by }) : t("peopleUsage.card.raisedOther", { name: by })}
-          </span>
-        </span>
-      </div>
+      <RequestDone done label={text}>
+        {text}
+      </RequestDone>
     );
   }
+  const title = mine ? t("peopleUsage.card.title") : t("peopleUsage.card.other", { name: who });
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        <Icon name="pause" size={16} />
-        <span>{mine ? t("peopleUsage.card.title") : t("peopleUsage.card.other", { name: who })}</span>
-      </span>
-      {mine && (
-        <>
-          <span className="small muted">
+    <RequestOpen
+      mine={mine && card.state !== "refused"}
+      icon="pause"
+      label={title}
+      action={
+        mine ? (
+          <>
+            {card.state !== "refused" && (
+              <EventPillAction primary disabled={pending || asked} onClick={ask}>
+                {asked ? t("peopleUsage.card.asked") : t("peopleUsage.card.ask")}
+              </EventPillAction>
+            )}
+            {/* A link (it opens in a new tab too), drawn as the pill's action. */}
+            <Link
+              to="/org/$orgId/settings/$section"
+              params={{ orgId: org.id, section: "usage" }}
+              className="ac-eventpill__action"
+            >
+              {t("peopleUsage.card.see")}
+            </Link>
+          </>
+        ) : undefined
+      }
+      below={
+        mine ? (
+          <span>
             {card.state === "refused"
               ? t("peopleUsage.card.refused", { name: by, date })
               : t("peopleUsage.card.text", { date })}
           </span>
-          <span className="waitcard__acts">
-            {card.state !== "refused" && (
-              <Button size="sm" variant="primary" icon="arrowUp" loading={pending} disabled={asked} onClick={ask}>
-                {asked ? t("peopleUsage.card.asked") : t("peopleUsage.card.ask")}
-              </Button>
-            )}
-            <Link
-              to="/org/$orgId/settings/$section"
-              params={{ orgId: org.id, section: "usage" }}
-              className="ac-btn ac-btn--sm"
-            >
-              {t("peopleUsage.card.see")}
-            </Link>
-          </span>
-        </>
-      )}
-    </div>
+        ) : undefined
+      }
+    >
+      {title}
+    </RequestOpen>
   );
 }
 

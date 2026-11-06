@@ -11,6 +11,7 @@ import {
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { LineIcon } from "./LineIcon";
+import { withAlpha } from "./palette";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE } from "./type-scale";
@@ -37,6 +38,11 @@ export interface EventPillProps {
   actions?: ReactNode;
   /** Under the frame, never inside it: the opened text (`EventPillText`), a reason's field. */
   below?: ReactNode;
+  /**
+   * A request still waiting for someone: its sentence in ink (the breathing mark and a `primary` action say the rest).
+   * The frame keeps its hairline, never a colored border.
+   */
+  waiting?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -46,7 +52,7 @@ export interface EventPillProps {
  * card: no fill, one hairline, the small controls' corner cut at the bottom left; left aligned where the caller puts
  * it (the messages' text column). What opens text is an action like the others, with a chevron that turns.
  */
-export function EventPill({ mark, markColor, children, time, actions, below, style }: EventPillProps) {
+export function EventPill({ mark, markColor, children, time, actions, below, waiting = false, style }: EventPillProps) {
   const { colors: c } = useTheme();
   // On a phone two actions beside a sentence leave it no room: then they go on a row of their own, in the frame.
   const [room, setRoom] = useState(0);
@@ -66,7 +72,7 @@ export function EventPill({ mark, markColor, children, time, actions, below, sty
       <View style={[styles.frame, stacked ? styles.frameStacked : null, { borderColor: c.line2 }]}>
         <View style={[styles.main, stacked ? null : styles.mainBeside]}>
           {markNode}
-          <Text variant="small" tone="ink2" style={[WORDS, styles.words]}>
+          <Text variant="small" tone={waiting ? "ink" : "ink2"} style={[WORDS, styles.words]}>
             {children}
           </Text>
           {time ? (
@@ -78,17 +84,18 @@ export function EventPill({ mark, markColor, children, time, actions, below, sty
         {list.length > 0 ? (
           <View style={stacked ? [styles.under, { borderTopColor: c.line }] : styles.beside}>
             <View
-              style={styles.actions}
+              // Under the sentence, more actions than a phone's width (a request's four answers) wrap to a new line.
+              style={[styles.actions, stacked ? styles.actionsWrap : null]}
               // Its own width, beside the sentence or under it: the measure that decides where it goes.
               onLayout={(e: LayoutChangeEvent) => setActionsWidth(e.nativeEvent.layout.width)}
             >
               {list.map((action, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: the actions in order, each after its hairline
-                <Fragment key={i}>
+                <View key={i} style={styles.slot}>
                   {/* A hairline before each; under the sentence, the first starts at the frame's edge. */}
                   {stacked && i === 0 ? null : <View style={[styles.rule, { backgroundColor: c.line }]} />}
                   {action}
-                </Fragment>
+                </View>
               ))}
             </View>
           </View>
@@ -116,6 +123,11 @@ export interface EventPillActionProps {
   loading?: boolean;
   /** It opens text under the pill ("Show", "See details"): a chevron after the label, turned while open. */
   expanded?: boolean;
+  /**
+   * What a request waiting for the viewer asks for ("Connect", "Continue now"): a soft attention tint behind the label
+   * in ink, no border.
+   */
+  primary?: boolean;
   accessibilityHint?: string;
 }
 
@@ -127,10 +139,13 @@ export function EventPillAction({
   disabled = false,
   loading = false,
   expanded,
+  primary = false,
   accessibilityHint,
 }: EventPillActionProps) {
   const { colors: c } = useTheme();
   const opens = expanded !== undefined;
+  // The attention color at 10%, 18% while pressed: the web's `--attention` mixed into nothing.
+  const tint = (pressed: boolean) => withAlpha(c.amber, pressed ? 0.18 : 0.1);
   return (
     <Pressable
       onPress={() => {
@@ -146,18 +161,18 @@ export function EventPillAction({
       hitSlop={{ top: 6, bottom: 6 }}
       style={({ pressed }) => [
         styles.action,
-        pressed ? { backgroundColor: c.plate } : null,
+        primary ? { backgroundColor: tint(pressed) } : pressed ? { backgroundColor: c.plate } : null,
         disabled || loading ? styles.dim : null,
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={c.ink2} style={styles.spinner} />
+        <ActivityIndicator size="small" color={primary ? c.ink : c.ink2} style={styles.spinner} />
       ) : lead ? (
-        <Icon name={lead} size={12} color={c.ink2} />
+        <Icon name={lead} size={12} color={primary ? c.ink : c.ink2} />
       ) : null}
       <Text
         variant="footnote"
-        tone="ink2"
+        tone={primary ? "ink" : "ink2"}
         numberOfLines={1}
         maxFontSizeMultiplier={CHROME_MAX_SCALE}
         style={styles.label}
@@ -212,6 +227,9 @@ const styles = StyleSheet.create({
   // Under the sentence: a hairline across the frame, the actions from its left.
   under: { borderTopWidth: 1, alignItems: "flex-start" },
   actions: { flexDirection: "row", alignItems: "stretch", minHeight: 30 },
+  actionsWrap: { flexWrap: "wrap" },
+  // An action with the hairline before it: one piece, so a wrap never leaves a hairline alone at a line's end.
+  slot: { flexDirection: "row", alignItems: "stretch", minHeight: 30 },
   rule: { width: 1 },
   action: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12 },
   label: { fontSize: 13, fontWeight: "600" },

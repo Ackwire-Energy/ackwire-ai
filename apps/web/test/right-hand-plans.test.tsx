@@ -44,7 +44,7 @@ const lodiOnPlan = (reason: string) => {
 test("its plan's computer away: one plain line in its DM, and Usar uma chave de API opens Connect on the key", async () => {
   await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api: createFakeApi(lodiOnPlan("computer_away")) });
   await settle(8);
-  const card = document.querySelector(".waitcard") as HTMLElement;
+  const card = document.querySelector(".rq-open") as HTMLElement;
   expect(card.textContent).toContain("Lodi não consegue responder agora: o computador do plano está fora do ar.");
   // Never a spinner, never "Conectar" as if it had no AI.
   expect(card.querySelector(".ac-spinner")).toBeNull();
@@ -62,7 +62,7 @@ test("its plan's computer away: one plain line in its DM, and Usar uma chave de 
 test("the workspace's plan serves only its owner: the line says so, and Conectar meu plano opens Connect", async () => {
   await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api: createFakeApi(lodiOnPlan("plan_not_shared")) });
   await settle(8);
-  const card = document.querySelector(".waitcard") as HTMLElement;
+  const card = document.querySelector(".rq-open") as HTMLElement;
   expect(card.textContent).toContain(
     "Conecte o seu plano para conversar com Lodi: o plano do workspace só atende o próprio dono.",
   );
@@ -75,7 +75,7 @@ test("the workspace's plan serves only its owner: the line says so, and Conectar
 test("its computer's runner too old: the line says to update it, never that it has no AI", async () => {
   await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api: createFakeApi(lodiOnPlan("runner_outdated")) });
   await settle(8);
-  const card = document.querySelector(".waitcard") as HTMLElement;
+  const card = document.querySelector(".rq-open") as HTMLElement;
   expect(card.textContent).toContain(
     "Lodi não consegue responder agora: o programa no computador do plano precisa ser atualizado.",
   );
@@ -149,7 +149,7 @@ test("Connect for it, with a ChatGPT plan another agent already thinks with: tha
     });
   await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api });
   await settle(8);
-  const card = [...document.querySelectorAll<HTMLElement>(".waitcard")].find((c) =>
+  const card = [...document.querySelectorAll<HTMLElement>(".rq-open")].find((c) =>
     c.textContent?.includes("Conectar uma IA para o time"),
   ) as HTMLElement;
   await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Conectar" })));

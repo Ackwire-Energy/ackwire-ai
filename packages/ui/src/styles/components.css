@@ -1600,6 +1600,17 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   background: var(--plate);
   color: var(--ink);
 }
+/* A request waiting for someone: its words in ink, what it asks for in a soft tint (no colored border). */
+.ac-eventpill--waiting .ac-eventpill__text {
+  color: var(--ink);
+}
+.ac-eventpill__action--primary {
+  background: color-mix(in srgb, var(--attention) 10%, transparent);
+  color: var(--ink);
+}
+.ac-eventpill__action--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--attention) 18%, transparent);
+}
 .ac-eventpill__action:disabled {
   cursor: progress;
   opacity: 0.6;

@@ -6,22 +6,22 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, Text, useTheme } from "@/ui";
-import { AskDone } from "../chat/asks";
+import { EventPillAction } from "@/ui";
+import { AskDone, AskWaiting } from "../chat/asks";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
 
 /**
- * The web's pause card of a stretch (ADR 0089) in place of its text: the agents did what they may do on their own
- * since a person last acted, and wait. Continuar lets them go on (who asked, the agents' owners or an admin); then the
- * card folds to one quiet line: who did, and when. The phone says the budget share as a percentage only.
+ * The web's pause of a stretch (ADR 0089) in place of its text, as a waiting pill: the agents did what they may do on
+ * their own since a person last acted, and wait. "Continue" (tinted) lets them go on, for who asked, the agents' owners
+ * or an admin; then it is a decided request's pill: who did, and when. The phone says the budget share as a percentage
+ * only.
  */
 export function StretchCard({ message: m }: { message: Message }) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const { orgId, org } = useOrg();
   const dir = useDirectory();
-  const { colors } = useTheme();
   const meId = useMeId();
   const failed = useFailed();
   const [pending, setPending] = useState(false);
@@ -60,23 +60,25 @@ export function StretchCard({ message: m }: { message: Message }) {
     );
   }
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
-      <View style={styles.row}>
-        <LineIcon name="pause" variant="subhead" size={16} color={colors.ink2} />
-        <Text variant="subhead" style={styles.title}>
-          {stretchCardText(t, card, names)}
-        </Text>
-      </View>
-      {may ? (
-        <Button variant="primary" size="sm" label={t("run.continueRun")} disabled={pending} onPress={() => void go()} />
-      ) : null}
-    </View>
+    <AskWaiting
+      forMe={may}
+      mark="pause"
+      words={stretchCardText(t, card, names)}
+      actions={
+        may ? (
+          <EventPillAction
+            key="continue"
+            primary
+            label={t("run.continueRun")}
+            loading={pending}
+            onPress={() => void go()}
+          />
+        ) : null
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
   done: { marginTop: 6 },
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  title: { flex: 1, fontWeight: "600" },
 });

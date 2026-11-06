@@ -56,7 +56,7 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { DeleteAgentsDialog } from "@/components/DeleteAgentDialog";
 import { useOrg } from "@/components/org-context";
 import { RemoveMemberDialog } from "@/components/RemoveMember";
-import { RequestCard, RequestDone } from "@/components/RequestCard";
+import { RequestCard, RequestDone, RequestOpen } from "@/components/RequestCard";
 import { DelegateNote, DelegateUndo, useDelegateLine } from "@/components/RightHandDelegate";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -668,9 +668,9 @@ function MemberChanges({ message, card }: { message: Message; card: MemberChange
 }
 
 /**
- * The right hand's "Abrir" card (`offer_open_page`): the screen's name, its line, and Abrir, which goes there; the screen
- * asks what it always asks (a deletion's code and typed name, Stripe, our key dialogs) and checks who may. Who can't
- * reads it.
+ * The right hand's "Open" offer (`offer_open_page`) as a pill: the screen's name, its line under it, and "Open", which
+ * goes there; the screen asks what it always asks (a deletion's code and typed name, Stripe, our key dialogs) and
+ * checks who may. Who can't reads it under the pill.
  */
 export function OpenPageCardView({ card }: { card: OpenPageCard }) {
   const { t } = useTranslation();
@@ -693,22 +693,30 @@ export function OpenPageCardView({ card }: { card: OpenPageCard }) {
   const allowed = section
     ? section.allowed(org, server) && (!page.may || can(org, page.may))
     : !page.may || can(org, page.may);
+  const go = allowed && path ? () => void navigate({ href: `/org/${org.id}${path}` }) : null;
+  // An offer to go somewhere, not a decision: it never pulses, its "Open" is the soft primary.
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        <Icon name="external" size={16} />
-        <span>{title}</span>
-      </span>
-      {card.why && <p>{card.why}</p>}
-      <span className="waitcard__acts">
-        {allowed && path ? (
-          <Button size="sm" onClick={() => void navigate({ href: `/org/${org.id}${path}` })}>
+    <RequestOpen
+      mine={false}
+      icon="external"
+      label={title}
+      action={
+        go ? (
+          <EventPillAction primary onClick={go}>
             {t("rightHand.open.open")}
-          </Button>
-        ) : (
-          <span className="small muted">{t("rightHand.open.notAllowed")}</span>
-        )}
-      </span>
-    </div>
+          </EventPillAction>
+        ) : undefined
+      }
+      below={
+        card.why || !go ? (
+          <>
+            {card.why && <p>{card.why}</p>}
+            {!go && <p>{t("rightHand.open.notAllowed")}</p>}
+          </>
+        ) : undefined
+      }
+    >
+      {title}
+    </RequestOpen>
   );
 }

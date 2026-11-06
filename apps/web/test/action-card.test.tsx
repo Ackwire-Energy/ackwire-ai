@@ -36,11 +36,11 @@ const click = async (el: HTMLElement, rounds = 6) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
 };
-/** The message with this card: a card while it can be acted on, one line once done. */
+/** The message with this card: a waiting pill while it can be acted on, a decided one once done. */
 const cardRow = (title: string) =>
   screen()
     .getAllByRole("article")
-    .find((a) => a.querySelector(".waitcard, .rq-done")?.textContent?.includes(title)) as HTMLElement;
+    .find((a) => a.querySelector(".rq-open, .rq-done")?.textContent?.includes(title)) as HTMLElement;
 const dialog = (name: string) => screen().queryByRole("dialog", { name });
 const withBrain = (state: State, agentId: string, kind: NonNullable<Agent["brain"]>["kind"]) => {
   const agent = state.agents.find((a) => a.id === agentId);
@@ -108,8 +108,8 @@ describe("an agent's Connect card", () => {
     const claude = cardRow("Conectar o plano do Claude para Ada");
     expect(within(claude).queryByRole("button", { name: "Conectar" })).toBeNull();
     expect(claude.textContent).toContain("Conectado");
-    // One line, no card.
-    expect(claude.querySelector(".waitcard")).toBeNull();
+    // A decided pill, no longer waiting.
+    expect(claude.querySelector(".rq-open")).toBeNull();
     expect(claude.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
     // Ada thinks, but not with a ChatGPT plan; Atlas has no AI yet.
     for (const title of ["Conectar o plano do ChatGPT para Ada", "Conectar uma IA para Atlas"]) {
@@ -149,7 +149,7 @@ describe("an agent's card to connect an app or an MCP server, and to invite peop
     await type(within(flow).getByLabelText("Nome"), "Acme");
     await click(within(flow).getByRole("button", { name: "Conectar" }), 8);
     const done = cardRow("Conectar oauth.acme.example.com");
-    expect(done.querySelector(".waitcard")).toBeNull();
+    expect(done.querySelector(".rq-open")).toBeNull();
     expect(done.textContent).toContain("Conectado");
   });
 
@@ -194,7 +194,7 @@ describe("an agent's card to connect an app or an MCP server, and to invite peop
     });
     await open(sent);
     const done = cardRow("ana@example.com");
-    expect(done.querySelector(".waitcard")).toBeNull();
+    expect(done.querySelector(".rq-open")).toBeNull();
     expect(done.textContent).toContain("Convite enviado: ana@example.com");
   });
 });
@@ -253,7 +253,7 @@ describe("a stretch's pause card (ADR 0089)", () => {
     expect(within(spend).getByRole("button", { name: "Continuar" })).toBeTruthy();
     const done = cardRow("Você deixou continuar");
     // The card folds: who let them go on and when, the pause itself only as the line's name.
-    expect(done.querySelector(".waitcard")).toBeNull();
+    expect(done.querySelector(".rq-open")).toBeNull();
     expect(
       within(done).getByRole("group", { name: "Atlas parou para checar com você antes de continuar" }),
     ).toBeTruthy();
@@ -620,7 +620,7 @@ describe("what waits on a plan's limit: Não rodar", () => {
     await open(state);
     const cards = screen()
       .getAllByRole("article")
-      .filter((a) => a.querySelector(".waitcard"));
+      .filter((a) => a.querySelector(".rq-open, .rq-done"));
     const paused = cards.find((a) => within(a).queryByRole("button", { name: "Continuar agora" })) as HTMLElement;
     await click(within(paused).getByRole("button", { name: "Não rodar" }));
     expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-u-open")).toBe(true);
@@ -634,7 +634,7 @@ describe("what waits on a plan's limit: Não rodar", () => {
     await settle(5);
     const waiting = screen()
       .getAllByRole("article")
-      .find((a) => a.querySelector(".waitcard") && within(a).queryByRole("button", { name: "Continuar agora" }));
+      .find((a) => a.querySelector(".rq-open") && within(a).queryByRole("button", { name: "Continuar agora" }));
     await click(within(waiting as HTMLElement).getByRole("button", { name: "Não rodar" }));
     const go = within(waiting as HTMLElement).getByRole("button", { name: "Continuar agora" });
     expect(go.closest("fieldset[disabled]")).not.toBeNull();

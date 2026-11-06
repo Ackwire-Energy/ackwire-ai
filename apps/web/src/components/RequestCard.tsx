@@ -1,6 +1,15 @@
 import type { Agent } from "@agenteschat/client";
-import { EventPill, EventPillMore, ExpiryFuse, Locked } from "@agenteschat/ui";
-import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { EventPill, EventPillMore, ExpiryFuse, Icon, type IconName, Locked } from "@agenteschat/ui";
+import {
+  createContext,
+  type FormEvent,
+  type HTMLAttributes,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { CardSky, colorOf } from "./Sky";
 import "./request-card.css";
@@ -320,6 +329,78 @@ export function RequestDone({
       below={open && more ? <div className="rq__details">{more.content}</div> : undefined}
     >
       <span className="rq-done__text">{children}</span>
+    </EventPill>
+  );
+}
+
+/**
+ * A request still waiting, as the same event pill it becomes once decided (`RequestDone`): its words in ink, and
+ * - waiting for the viewer (`mine`): the pulsing pixel square (`WaitMark`) and what it asks for as the `primary`
+ *   `EventPillAction` ("Connect", "Continue now"), the other actions plain after it;
+ * - waiting for someone else (or for something, a computer): a quiet icon and no primary action.
+ * Its words stay one sentence: a why, what a proposal gives or a command go under the frame (`below`), or behind
+ * "See details" (`more`). Never a card inside it.
+ */
+export function RequestOpen({
+  mine,
+  icon = "clock",
+  label,
+  action,
+  more,
+  below,
+  time,
+  children,
+  className,
+  ...rest
+}: Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
+  /** It waits for the viewer: the pulsing mark, and its main action is `primary`. */
+  mine: boolean;
+  /** The quiet mark while it waits for someone else. */
+  icon?: IconName;
+  /** The group's accessible name (its sentence when that is plain text). */
+  label?: string;
+  /** Its `EventPillAction`s, the main one first. */
+  action?: ReactNode;
+  /** What the pill leaves out, and the action that opens it. */
+  more?: { label: string; content: ReactNode };
+  /** Always under the frame: the why, what it gives, who may decide. */
+  below?: ReactNode;
+  time?: string;
+  /** The one sentence: what it asks. */
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const actions =
+    action || more ? (
+      <>
+        {action}
+        {more && (
+          <EventPillMore open={open} onClick={() => setOpen((v) => !v)}>
+            {more.label}
+          </EventPillMore>
+        )}
+      </>
+    ) : undefined;
+  const under =
+    below || (open && more) ? (
+      <>
+        {open && more && <div className="rq__details">{more.content}</div>}
+        {below && <div className="rq-open__below">{below}</div>}
+      </>
+    ) : undefined;
+  return (
+    <EventPill
+      waiting
+      className={className ? `rq-open ${className}` : "rq-open"}
+      role="group"
+      aria-label={label ?? (typeof children === "string" ? children : undefined)}
+      mark={mine ? <WaitMark /> : <Icon name={icon} size={14} />}
+      time={time}
+      actions={actions}
+      below={under}
+      {...rest}
+    >
+      {children}
     </EventPill>
   );
 }

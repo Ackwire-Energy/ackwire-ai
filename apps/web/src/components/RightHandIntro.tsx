@@ -17,7 +17,15 @@ import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/cli
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
 import { answerAfter, BUSINESS_TYPES, startCardPassed } from "@agenteschat/client/lib/team-plan";
-import { AgentSticker, Button, Icon, Message, MessageText, normalizeAppearance, WAVE_SECONDS } from "@agenteschat/ui";
+import {
+  AgentSticker,
+  Button,
+  EventPillAction,
+  Message,
+  MessageText,
+  normalizeAppearance,
+  WAVE_SECONDS,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -31,7 +39,7 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
-import { RequestCard } from "@/components/RequestCard";
+import { RequestCard, RequestOpen } from "@/components/RequestCard";
 import { AnswerChips, TeamTemplatesDialog } from "@/components/TeamPlan";
 import { TextAction } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -40,9 +48,9 @@ import { useToast } from "@/lib/toast";
 
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
- * any AI is connected: its greeting, then the first card the workspace needs. No AI yet: Connect AI. An AI and no
- * agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A team and
- * nobody else here yet: inviting people and the first task. Last, until the person picks, how agents talk to them
+ * any AI is connected: its greeting, then the first card the workspace needs. No AI yet: a waiting pill with "Connect
+ * AI". An AI and no agent besides it: how to start (the ready-made agents, describing the need, an import or the
+ * form). A team and nobody else here yet: inviting people and the first task. Last, until the person picks, how agents talk to them
  * (ADR 0147). Once the start card has stopped asking, a line to build the team with it, at any time. On the person's
  * first visit, its waving sticker under the greeting, drawn as a sticker message is and decorative (the greeting
  * already says hello). Its face and name open the profile card, as on any message.
@@ -108,18 +116,17 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
         />
       )}
       {cards.includes("connect") && connect && (
-        <div className="waitcard">
-          <span className="waitcard__top ac-iconline">
-            <Icon name="plug" size={16} />
-            <span>{t("rightHand.intro.connect.title")}</span>
-          </span>
-          <p>{t("rightHand.intro.connect.text")}</p>
-          <span className="waitcard__acts">
-            <Button size="sm" variant="primary" onClick={() => connect.open({ agentId: agent.id })}>
+        <RequestOpen
+          mine
+          action={
+            <EventPillAction primary onClick={() => connect.open({ agentId: agent.id })}>
               {t("rightHand.intro.connect.action")}
-            </Button>
-          </span>
-        </div>
+            </EventPillAction>
+          }
+          below={<p>{t("rightHand.intro.connect.text")}</p>}
+        >
+          {t("rightHand.intro.connect.title")}
+        </RequestOpen>
       )}
       {cards.includes("start") && (
         <StartCard agent={agent} left={presetsLeft(teamHandles)} first={team.length === 0} channelId={channelId} />
