@@ -3266,8 +3266,11 @@
   "shell.sidebarSetup.orderHint": {
     "value": "Drag or use the arrows. Agents first, for example."
   },
-  "shell.sidebarSetup.drag": {
-    "value": "Drag {{name}}"
+  "shell.sidebarSetup.moveSection": {
+    "value": "Drag to move the {{name}} section, or click for options"
+  },
+  "shell.sidebarSetup.moveTool": {
+    "value": "Drag to move {{name}}"
   },
   "shell.inviteHint": {
     "value": "By email or link"
@@ -4171,6 +4174,9 @@
   },
   "channel.cancelReply": {
     "value": "Cancel reply"
+  },
+  "channel.jumpMissing": {
+    "value": "Couldn't reach that message here. It may be deleted or too far back."
   },
   "channel.emoji": {
     "value": "Emoji"
@@ -17657,6 +17663,9 @@
   },
   "threads.view.backTo": {
     "value": "Back to {{where}}"
+  },
+  "threads.view.backToResults": {
+    "value": "Back to results"
   },
   "threads.view.back": {
     "value": "Back to #{{channel}}"

@@ -108,90 +108,81 @@ export function AgentTasksPanel({
   ];
 
   return (
-    <>
-      <button
-        type="button"
-        className="thread-panel__scrim"
-        tabIndex={-1}
-        aria-label={t("common.close")}
-        onClick={onClose}
-      />
-      <aside className="thread-panel tm-agentpanel" aria-label={title}>
-        <header className="channel__header thread-head thread-head--panel">
-          <span className="thread-head__who">
-            <OpensAgent agentId={agentId}>
-              <AgentAvatar agentId={agentId} name={name} size="sm" />
-            </OpensAgent>
-          </span>
-          <div className="thread-head__text">
-            <h2 className="channel__title thread-title">
-              <span className="thread-title__text">{title}</span>
-            </h2>
-            <span className="channel__topic thread-head__meta">{meta}</span>
-          </div>
-          <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
-        </header>
-
-        <div className="thread-panel__page tm-panel__body">
-          <dl className="tm-panel__facts tm-agentpanel__wells">
-            {wells.map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd className="ac-num">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          {tasks.length === 0 ? (
-            <p className="tm-panel__none">
-              {hidden > 0 ? agentCardLine(t, 0, hidden) : t("taskManager.agentPanel.none", { name })}
-            </p>
-          ) : (
-            <>
-              <TaskWaitLines tasks={tasks} />
-              <ul className="tm-agentpanel__list">
-                {tasks.map((task) => (
-                  <TaskCard
-                    key={task.runId}
-                    task={task}
-                    here={task.channelId === channelId}
-                    now={now}
-                    stopping={stopping.has(task.runId)}
-                    onStop={() => stop([task.runId], undefined, Boolean(task.helpers))}
-                  />
-                ))}
-              </ul>
-            </>
-          )}
+    <aside className="thread-panel thread-panel--docked tm-agentpanel" aria-label={title}>
+      <header className="channel__header thread-head thread-head--panel">
+        <span className="thread-head__who">
+          <OpensAgent agentId={agentId}>
+            <AgentAvatar agentId={agentId} name={name} size="sm" />
+          </OpensAgent>
+        </span>
+        <div className="thread-head__text">
+          <h2 className="channel__title thread-title">
+            <span className="thread-title__text">{title}</span>
+          </h2>
+          <span className="channel__topic thread-head__meta">{meta}</span>
         </div>
+        <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
+      </header>
 
-        <footer className="tm-panel__foot">
-          {confirming ? (
-            <StopAllInline
-              agentId={agentId}
-              runIds={stoppable}
-              helpers={helpersOf(tasks.filter((task) => stoppable.includes(task.runId)))}
-              onCancel={() => setConfirming(false)}
-              onStop={(runIds, reason) => {
-                setConfirming(false);
-                stop(runIds, reason, helpersOf(tasks) > 0);
-              }}
-            />
-          ) : (
-            <>
-              <Button size="sm" variant="ghost" onClick={openManager}>
-                {t("taskManager.actions.openManager")}
+      <div className="thread-panel__page tm-panel__body">
+        <dl className="tm-panel__facts tm-agentpanel__wells">
+          {wells.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd className="ac-num">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        {tasks.length === 0 ? (
+          <p className="tm-panel__none">
+            {hidden > 0 ? agentCardLine(t, 0, hidden) : t("taskManager.agentPanel.none", { name })}
+          </p>
+        ) : (
+          <>
+            <TaskWaitLines tasks={tasks} />
+            <ul className="tm-agentpanel__list">
+              {tasks.map((task) => (
+                <TaskCard
+                  key={task.runId}
+                  task={task}
+                  here={task.channelId === channelId}
+                  now={now}
+                  stopping={stopping.has(task.runId)}
+                  onStop={() => stop([task.runId], undefined, Boolean(task.helpers))}
+                />
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
+      <footer className="tm-panel__foot">
+        {confirming ? (
+          <StopAllInline
+            agentId={agentId}
+            runIds={stoppable}
+            helpers={helpersOf(tasks.filter((task) => stoppable.includes(task.runId)))}
+            onCancel={() => setConfirming(false)}
+            onStop={(runIds, reason) => {
+              setConfirming(false);
+              stop(runIds, reason, helpersOf(tasks) > 0);
+            }}
+          />
+        ) : (
+          <>
+            <Button size="sm" variant="ghost" onClick={openManager}>
+              {t("taskManager.actions.openManager")}
+            </Button>
+            {stoppable.length > 1 && (
+              <Button size="sm" className="tm-panel__stop" onClick={() => setConfirming(true)}>
+                <PixelStop size={12} />
+                {t("taskManager.actions.stopAll")}
               </Button>
-              {stoppable.length > 1 && (
-                <Button size="sm" className="tm-panel__stop" onClick={() => setConfirming(true)}>
-                  <PixelStop size={12} />
-                  {t("taskManager.actions.stopAll")}
-                </Button>
-              )}
-            </>
-          )}
-        </footer>
-      </aside>
-    </>
+            )}
+          </>
+        )}
+      </footer>
+    </aside>
   );
 }
 

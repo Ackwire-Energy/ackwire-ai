@@ -1386,7 +1386,8 @@
       "toolsTitle": "In alto",
       "order": "Ordine delle sezioni",
       "orderHint": "Trascina o usa le frecce. Ad esempio, prima gli agenti.",
-      "drag": "Trascina {{name}}"
+      "moveSection": "Trascina per spostare la sezione {{name}} o fai clic per le opzioni",
+      "moveTool": "Trascina per spostare {{name}}"
     },
     "inviteHint": "Per email o link",
     "profileHint": "Nome, foto e @",
@@ -1775,6 +1776,7 @@
     "quoteNoWords": "Messaggio senza testo",
     "replyingTo": "Risposta a {{name}}",
     "cancelReply": "Annulla risposta",
+    "jumpMissing": "Non è stato possibile raggiungere quel messaggio qui. Potrebbe essere stato eliminato o essere troppo indietro.",
     "emoji": "Emoji",
     "uploading": "caricamento…",
     "uploadFailed": "non è stato caricato",
@@ -7603,6 +7605,7 @@
       "in": "thread in #{{channel}}",
       "dmWith": "Messaggio diretto con {{name}}",
       "backTo": "Torna a {{where}}",
+      "backToResults": "Torna ai risultati",
       "back": "Torna a #{{channel}}",
       "more": "Altre azioni del thread",
       "rename": "Rinomina",

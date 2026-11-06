@@ -200,7 +200,11 @@ describe("the sidebar's sections, in my order", () => {
   test("the default order; Mover para baixo on Canais saves the new one; Restaurar ordem padrão goes back", async () => {
     const { state } = await go();
     expect(blocks()).toEqual(["tools", "channels", "agents", "people"]);
-    await act(async () => fireEvent.click(within(nav()).getByRole("button", { name: "Arrastar Canais" })));
+    await act(async () =>
+      fireEvent.click(
+        within(nav()).getByRole("button", { name: "Arraste para mover a seção Canais ou clique para ver as opções" }),
+      ),
+    );
     await settle(2);
     expect(within(menu()).getByRole("menuitem", { name: "Mover para cima" }).getAttribute("aria-disabled")).toBe(null);
     await pick("Mover para baixo");
@@ -224,20 +228,28 @@ describe("the sidebar's sections, in my order", () => {
 });
 
 describe("dragging in the sidebar", () => {
-  test("a section's ghost is its header row, not the whole section over the others", async () => {
+  test("a section's ghost is its header row, not a long list over the others", async () => {
     await go();
     const images: Element[] = [];
     const dataTransfer = { setData: () => {}, setDragImage: (el: Element) => void images.push(el) };
-    const grip = within(nav()).getByRole("button", { name: "Arrastar Canais" });
+    const grip = within(nav()).getByRole("button", {
+      name: "Arraste para mover a seção Canais ou clique para ver as opções",
+    });
     await act(async () => fireEvent.dragStart(grip, { dataTransfer }));
     expect(images).toHaveLength(1);
     expect(images[0]?.classList.contains("sidebar__section-head")).toBe(true);
     expect(images[0]?.textContent).toContain("Canais");
     await act(async () => fireEvent.dragEnd(grip, { dataTransfer }));
     await act(async () =>
-      fireEvent.dragStart(within(nav()).getByRole("button", { name: "Arrastar Ferramentas" }), { dataTransfer }),
+      fireEvent.dragStart(
+        within(nav()).getByRole("button", {
+          name: "Arraste para mover a seção Ferramentas ou clique para ver as opções",
+        }),
+        { dataTransfer },
+      ),
     );
-    expect(images[1]?.classList.contains("sidebar__item")).toBe(true);
+    // The tools have no header: the ghost is all of them, which is what moves.
+    expect(images[1]?.classList.contains("sidebar__tools")).toBe(true);
   });
 
   test("one mark where a drag lands, the same for sections, channels, categories and agents", () => {

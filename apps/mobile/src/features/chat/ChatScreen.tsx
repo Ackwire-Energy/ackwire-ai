@@ -1126,6 +1126,7 @@ function Chat({
   const seekPages = useRef(0);
   const seekPressed = useRef(false);
   const seekReady = isThread ? threadMessages.isSuccess && !threadMessages.isPlaceholderData : top.isSuccess;
+  const seekRefreshing = isThread ? threadMessages.isFetching : top.isFetching;
   useEffect(() => {
     if (!seek || !seekReady) return;
     const index = shownRows.findIndex((r) => r.kind === "message" && r.message.id === seek);
@@ -1138,8 +1139,11 @@ function Chat({
       return;
     }
     if (isThread || olderDone || seekPages.current >= SEEK_MAX_PAGES) {
+      // A cached page refreshing may still bring it.
+      if (seekRefreshing) return;
       setSeek(null);
       if (seekPressed.current) toast({ title: t("channel.jumpTooFar") });
+      else toast({ title: t("channel.jumpMissing"), icon: "x" });
       seekPressed.current = false;
       return;
     }
@@ -1147,7 +1151,7 @@ function Chat({
       seekPages.current += 1;
       loadOlder();
     }
-  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo, t, toast]);
+  }, [seek, seekReady, seekRefreshing, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo, t, toast]);
   useEffect(() => {
     if (!flashId) return;
     const timer = setTimeout(() => setFlashId(null), FLASH_MS);

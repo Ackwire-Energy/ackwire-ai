@@ -1314,7 +1314,8 @@
       "toolsTitle": "顶部",
       "order": "分区顺序",
       "orderHint": "拖动或使用箭头调整。比如把智能体放在最前面。",
-      "drag": "拖动 {{name}}"
+      "moveSection": "拖动以移动“{{name}}”分区，或点击查看选项",
+      "moveTool": "拖动以移动“{{name}}”"
     },
     "inviteHint": "通过邮件或链接",
     "profileHint": "名称、照片和 @",
@@ -1659,6 +1660,7 @@
     "quoteNoWords": "无文字消息",
     "replyingTo": "正在回复 {{name}}",
     "cancelReply": "取消回复",
+    "jumpMissing": "无法在此处跳转到该消息。它可能已被删除或过于久远。",
     "emoji": "表情",
     "uploading": "上传中…",
     "uploadFailed": "未上传",
@@ -7037,6 +7039,7 @@
       "in": "#{{channel}} 中的话题",
       "dmWith": "与 {{name}} 的私信",
       "backTo": "返回{{where}}",
+      "backToResults": "返回结果",
       "back": "返回 #{{channel}}",
       "more": "更多话题操作",
       "rename": "重命名",

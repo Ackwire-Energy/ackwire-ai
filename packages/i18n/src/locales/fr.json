@@ -1386,7 +1386,8 @@
       "toolsTitle": "En haut",
       "order": "Ordre des sections",
       "orderHint": "Faites glisser ou utilisez les flèches. Les agents d'abord, par exemple.",
-      "drag": "Faire glisser {{name}}"
+      "moveSection": "Faites glisser pour déplacer la section {{name}} ou cliquez pour voir les options",
+      "moveTool": "Faites glisser pour déplacer {{name}}"
     },
     "inviteHint": "Par e-mail ou lien",
     "profileHint": "Nom, photo et @",
@@ -1775,6 +1776,7 @@
     "quoteNoWords": "Message sans texte",
     "replyingTo": "Réponse à {{name}}",
     "cancelReply": "Annuler la réponse",
+    "jumpMissing": "Impossible d'atteindre ce message ici. Il a peut-être été supprimé ou il est trop ancien.",
     "emoji": "Emoji",
     "uploading": "envoi…",
     "uploadFailed": "n'a pas été envoyé",
@@ -7587,6 +7589,7 @@
       "in": "fil dans #{{channel}}",
       "dmWith": "Message direct avec {{name}}",
       "backTo": "Retour à {{where}}",
+      "backToResults": "Retour aux résultats",
       "back": "Retour à #{{channel}}",
       "more": "Plus d'actions sur le fil",
       "rename": "Renommer",

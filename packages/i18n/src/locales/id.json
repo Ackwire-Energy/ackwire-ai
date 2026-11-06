@@ -1314,7 +1314,8 @@
       "toolsTitle": "Di atas",
       "order": "Urutan bagian",
       "orderHint": "Seret atau pakai tanda panah. Misalnya, Agen di urutan pertama.",
-      "drag": "Seret {{name}}"
+      "moveSection": "Seret untuk memindahkan bagian {{name}}, atau klik untuk melihat opsi",
+      "moveTool": "Seret untuk memindahkan {{name}}"
     },
     "inviteHint": "Lewat email atau tautan",
     "profileHint": "Nama, foto, dan @",
@@ -1659,6 +1660,7 @@
     "quoteNoWords": "Pesan tanpa teks",
     "replyingTo": "Membalas {{name}}",
     "cancelReply": "Batalkan balasan",
+    "jumpMissing": "Pesan itu tidak bisa dijangkau di sini. Mungkin sudah dihapus atau terlalu jauh ke belakang.",
     "emoji": "Emoji",
     "uploading": "mengunggah…",
     "uploadFailed": "tidak terunggah",
@@ -7038,6 +7040,7 @@
       "in": "utas di #{{channel}}",
       "dmWith": "DM dengan {{name}}",
       "backTo": "Kembali ke {{where}}",
+      "backToResults": "Kembali ke hasil",
       "back": "Kembali ke #{{channel}}",
       "more": "Tindakan utas lainnya",
       "rename": "Ganti nama",

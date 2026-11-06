@@ -1386,7 +1386,8 @@
       "toolsTitle": "Arriba",
       "order": "Orden de las secciones",
       "orderHint": "Arrastra o usa las flechas. Agentes primero, por ejemplo.",
-      "drag": "Arrastrar {{name}}"
+      "moveSection": "Arrastra para mover la sección {{name}} o haz clic para ver opciones",
+      "moveTool": "Arrastra para mover {{name}}"
     },
     "inviteHint": "Por correo o enlace",
     "profileHint": "Nombre, foto y @",
@@ -1775,6 +1776,7 @@
     "quoteNoWords": "Mensaje sin texto",
     "replyingTo": "Respondiendo a {{name}}",
     "cancelReply": "Cancelar respuesta",
+    "jumpMissing": "No se pudo llegar a ese mensaje aquí. Puede que se haya borrado o esté demasiado atrás.",
     "emoji": "Emoji",
     "uploading": "subiendo…",
     "uploadFailed": "no se subió",
@@ -7534,6 +7536,7 @@
       "in": "hilo en #{{channel}}",
       "dmWith": "MD con {{name}}",
       "backTo": "Volver a {{where}}",
+      "backToResults": "Volver a los resultados",
       "back": "Volver a #{{channel}}",
       "more": "Más acciones del hilo",
       "rename": "Renombrar",

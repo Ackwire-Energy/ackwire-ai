@@ -25,6 +25,7 @@ export function ThreadPage({
   focusMessageId,
   onClose,
   onGone,
+  onBack,
   onSeeInChannel,
 }: {
   threadId: string;
@@ -34,13 +35,15 @@ export function ThreadPage({
   onClose?: () => void;
   /** In the panel: the thread doesn't exist or isn't mine to read (an old link), so the panel gives way. */
   onGone?: () => void;
+  /** In the panel, opened from the search's results: back to them (Esc too). */
+  onBack?: () => void;
   /** In the panel: "Ver em #canal" jumps to this message in the channel beside it instead of navigating (false: not
    * that channel's thread). */
   onSeeInChannel?: (messageId: string, channelId: string) => boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  useEscClose(onClose);
+  useEscClose(onBack ?? onClose);
   const info = useThreadInfo(org.id, threadId);
   const thread = info.data;
   // A thread with a mission (ADR 0029): the mission header; who only reads gets a note.
@@ -95,7 +98,7 @@ export function ThreadPage({
         ) : mission && !onClose ? (
           <MissionThreadHeader thread={thread} mission={mission} />
         ) : (
-          <ThreadHeader thread={thread} onClose={onClose} onSeeInChannel={onSeeInChannel} />
+          <ThreadHeader thread={thread} onClose={onClose} onBack={onBack} onSeeInChannel={onSeeInChannel} />
         ),
         top: (
           <>

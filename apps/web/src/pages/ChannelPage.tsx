@@ -358,6 +358,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useDmSidebar, useMembersColumn } from "@/hooks/useMembersColumn";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
+import { useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 import { TYPED_VALUES } from "@/i18n";
 import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
@@ -366,6 +367,7 @@ import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { holdOnScreen } from "@/lib/island";
 import { threadSearch, useThreadPanel } from "@/lib/open-param";
 import { reportPainted } from "@/lib/perf";
+import { coversConversation } from "@/lib/side-pane";
 import { useToast } from "@/lib/toast";
 import {
   reconcileChannelRuns,
@@ -466,8 +468,9 @@ export interface ChannelChrome {
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
 const sameList = <T,>(a: T[], b: T[]) => a.length === b.length && a.every((r, i) => r === b[i]);
 
-/** `?m=`: how many older pages to look through for the message, and how long it stays highlighted. */
-const FOCUS_MAX_PAGES = 10;
+/** Going to a message: how many older pages to look through (the server's largest), and how long it stays lit. */
+const FOCUS_MAX_PAGES = 25;
+const FOCUS_PAGE = 200;
 const HIGHLIGHT_MS = 2400;
 /** A scroll within this long after a wheel/touch/key/pointer counts as the person's. */
 const GESTURE_MS = 1500;
@@ -830,6 +833,12 @@ function ChannelView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+  // "Ir para" from another conversation's results: they stay open here.
+  const headerSearch = useHeaderSearch();
+  const [carried] = useState(() => {
+    const search = headerSearch?.carry.current;
+    return search?.channelId === channel.id && !thread ? search : null;
+  });
   // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
   const [panel, setPanel] = useThreadPanel(!thread);
   // "Responder" in a thread view: the next message from here answers this one (`meta.replyTo`).
@@ -847,8 +856,18 @@ function ChannelView({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [quote]);
-  // The header search's results, in the same panel (one panel at a time).
-  const [searchOpen, setSearchOpen] = useState(false);
+  // The header search's results, in the same panel (one panel at a time; a thread a hit opened goes over them).
+  const [searchOpen, setSearchOpen] = useState(Boolean(carried));
+  // The thread a hit opened: it goes over the results, where any other thread takes their place.
+  const hitThread = useRef(carried?.thread);
+  const sidePane = useRef<HTMLElement>(null);
+  const carry = headerSearch?.carry;
+  useEffect(() => {
+    if (!searchOpen || !carry) return;
+    return () => {
+      if (carry.current?.channelId === channel.id) carry.current = null;
+    };
+  }, [searchOpen, carry, channel.id]);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
   // (its memory); one panel at a time. Its opener again closes it (`close`, counted, so unsaved edits ask first).
   const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab; close?: number } | null>(null);
@@ -877,7 +896,7 @@ function ChannelView({
     if (!panelId || profileKeeps()) return;
     setProfile(null);
     setConsultId(null);
-    setSearchOpen(false);
+    if (panelId !== hitThread.current) setSearchOpen(false);
   }, [panelId]);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
@@ -1110,7 +1129,7 @@ function ChannelView({
     qc.getQueryData<OlderPages>(olderKey)?.done ? "done" : "idle",
   );
   const anchor = useRef<{ height: number; top: number } | null>(null);
-  const loadOlder = () => {
+  const loadOlder = (limit = OLDER_PAGE) => {
     // A thread view loads its whole conversation at once.
     if (thread || olderState !== "idle" || !messages.data) return;
     const oldest = older[0] ?? messages.data[0];
@@ -1120,7 +1139,7 @@ function ChannelView({
     }
     setOlderState("loading");
     api.chat
-      .messages(org.id, channel.id, { before: oldest.createdAt, limit: OLDER_PAGE })
+      .messages(org.id, channel.id, { before: oldest.createdAt, limit })
       .then((page) => {
         // Keep what's on screen where it is: remember the distance from the bottom.
         const el = scroller.current;
@@ -1128,10 +1147,10 @@ function ChannelView({
         setOlder((prev) => {
           const known = new Set(prev.map((m) => m.id));
           const next = [...page.filter((m) => !known.has(m.id)), ...prev];
-          qc.setQueryData<OlderPages>(olderKey, { pages: next, done: page.length < OLDER_PAGE });
+          qc.setQueryData<OlderPages>(olderKey, { pages: next, done: page.length < limit });
           return next;
         });
-        setOlderState(page.length < OLDER_PAGE ? "done" : "idle");
+        setOlderState(page.length < limit ? "done" : "idle");
       })
       .catch(() => setOlderState("idle"));
   };
@@ -1765,23 +1784,28 @@ function ChannelView({
     }
     // A thread view holds all it can show: nothing to page in.
     if (thread || olderState === "done" || focusPages.current >= FOCUS_MAX_PAGES) {
+      // A cached page refreshing may still bring it.
+      if (messages.isFetching) return;
       setFocusDone(true);
       // Pressed from here: the person stays where they were.
       if (jumping.current) {
         jumping.current = false;
-        toast.show(t("channel.jumpTooFar"));
+        // A quote's original that's gone already says so: only a search hit may be gone by now.
+        if (searchOpen) toast.show(t("channel.jumpMissing"), "error");
+        else toast.show(t("channel.jumpTooFar"));
         return;
       }
-      // Not here (or too far back): stay at the bottom as usual.
+      // Not here (or too far back): said, and at the bottom as usual.
       stick.current = true;
       toBottom();
+      toast.show(t("channel.jumpMissing"), "error");
       return;
     }
     if (olderState === "idle") {
       focusPages.current += 1;
-      loadOlder();
+      loadOlder(FOCUS_PAGE);
     }
-  }, [found, focusDone, focusTarget, serverRead, olderState, older.length]);
+  }, [found, focusDone, focusTarget, serverRead, olderState, older.length, messages.isFetching]);
   /** A quote was clicked: the original on screen, or paged in like `?m=`. */
   const jumpTo = (messageId: string) => {
     if (highlightMessage(scroller.current, messageId)) {
@@ -2204,19 +2228,23 @@ function ChannelView({
     setConsultId(null);
     setSearchOpen(true);
   };
-  // A thread or an agent's page in the column's place: its toggle closes that and shows the column.
+  // Anything open in the column's place: its toggle closes that and shows the column.
+  const paneOpen = Boolean(panel || profile || searchOpen || consultId || tasksOpen);
   const toggleColumn = (column: { open: boolean; toggle: () => void }) => {
-    if (!panel && !profile) return column.toggle();
+    if (!paneOpen) return column.toggle();
     if (profileKeeps()) return;
     setPanel(null);
     setProfile(null);
+    setSearchOpen(false);
+    setConsultId(null);
+    setTasksOpen(false);
     if (!column.open) column.toggle();
   };
   const side: DmSideControl | null =
     agentDm && dmAgent
       ? {
-          open: !panel && !profile && dmSidebar.open,
-          docked: !panel && !profile && dmSidebar.column,
+          open: !paneOpen && dmSidebar.open,
+          docked: !paneOpen && dmSidebar.column,
           toggle: () => toggleColumn(dmSidebar),
         }
       : null;
@@ -2251,7 +2279,7 @@ function ChannelView({
                   queueMachine={queueMachine}
                   people={channelPeople}
                   agents={channelAgents}
-                  membersOpen={!panel && !profile && membersColumn.open}
+                  membersOpen={!paneOpen && membersColumn.open}
                   onMembers={() => toggleColumn(membersColumn)}
                   onDetails={() => setDetailsOpen(true)}
                   onSearch={openSearch}
@@ -2650,8 +2678,8 @@ function ChannelView({
                     />
                   )}
                 </div>
-                {/* A thread or an agent's page opens in the members' place, wider, and gives it back when it closes; the
-                  channel stays in use beside it (a phone: a sheet over it). */}
+                {/* A thread, the search's results or an agent's page opens in the members' place, wider, and gives it
+                  back when it closes; the channel stays in use beside it (a phone: a sheet over it). */}
                 {profile ? (
                   <AgentPanel
                     key={`${profile.agentId}:${profile.tab ?? ""}`}
@@ -2660,25 +2688,90 @@ function ChannelView({
                     closeRequest={profile.close}
                     onClose={closeProfile}
                   />
-                ) : panel ? (
-                  <aside className="thread-panel thread-panel--docked" aria-label={t("threads.side.label")}>
-                    <ThreadPage
-                      key={`${panel.id}:${panel.focus ?? ""}`}
-                      threadId={panel.id}
-                      reply={panel.reply}
-                      focusMessageId={panel.focus}
-                      onClose={() => setPanel(null)}
-                      onGone={() => {
-                        setPanel(null, { replace: true });
-                        toast.show(t("threads.view.notFoundTitle"));
+                ) : consultId ? (
+                  /* Rows from more than the two people of a DM: they keep their names there too. */
+                  <MessageLookContext.Provider value={namedLook}>
+                    <ConsultationPanel
+                      key={consultId}
+                      channelId={channel.id}
+                      channelName={chrome?.composerTarget ? null : channel.name}
+                      consultationId={consultId}
+                      onClose={() => setConsultId(null)}
+                      onTalk={(handle) => {
+                        setConsultId(null);
+                        actions.insertMention(handle);
                       }}
-                      onSeeInChannel={(messageId, channelId) => {
-                        if (channelId !== channel.id) return false;
-                        setPanel(null);
-                        jumpTo(messageId);
-                        return true;
+                      onAnswer={() => {
+                        setConsultId(null);
+                        actions.focusComposer();
                       }}
+                      renderMessage={(m, grouped) => (
+                        <ErrorBoundary resetKey={m} fallback={unshownLine}>
+                          <TimelineMessage
+                            message={m}
+                            grouped={grouped}
+                            entering={false}
+                            modelLabels={NO_LABELS}
+                            readOnly
+                          />
+                        </ErrorBoundary>
+                      )}
                     />
+                  </MessageLookContext.Provider>
+                ) : tasksOpen && tasksAgentId ? (
+                  <AgentTasksPanel
+                    agentId={tasksAgentId}
+                    channelId={channel.id}
+                    tasks={agentTasks}
+                    ended={taskView.data?.ended ?? []}
+                    hidden={hiddenCount(taskView.data?.hidden, tasksAgentId)}
+                    onClose={() => setTasksOpen(false)}
+                  />
+                ) : panel || searchOpen ? (
+                  <aside
+                    ref={sidePane}
+                    className="thread-panel thread-panel--docked"
+                    aria-label={t(panel ? "threads.side.label" : "searchPage.panel.label")}
+                  >
+                    {searchOpen && (
+                      <MessageLookContext.Provider value={namedLook}>
+                        <SearchResultsPanel
+                          channelId={channel.id}
+                          hidden={Boolean(panel)}
+                          jumping={focusDone ? undefined : focusTarget}
+                          onClose={() => setSearchOpen(false)}
+                          onOpenThread={(id, focus) => {
+                            hitThread.current = id;
+                            setPanel({ id, reply: false, focus });
+                          }}
+                        />
+                      </MessageLookContext.Provider>
+                    )}
+                    {panel && (
+                      <ThreadPage
+                        key={`${panel.id}:${panel.focus ?? ""}`}
+                        threadId={panel.id}
+                        reply={panel.reply}
+                        focusMessageId={panel.focus}
+                        onClose={() => {
+                          setPanel(null);
+                          setSearchOpen(false);
+                        }}
+                        {...(searchOpen ? { onBack: () => setPanel(null) } : {})}
+                        onGone={() => {
+                          setPanel(null, { replace: true });
+                          toast.show(t("threads.view.notFoundTitle"));
+                        }}
+                        onSeeInChannel={(messageId, channelId) => {
+                          if (channelId !== channel.id) return false;
+                          setPanel(null);
+                          // Results under the thread would come back over the message.
+                          if (coversConversation(sidePane.current)) setSearchOpen(false);
+                          jumpTo(messageId);
+                          return true;
+                        }}
+                      />
+                    )}
                   </aside>
                 ) : side && dmAgent && (side.docked || dmSidebar.sheet) ? (
                   <AgentSidebar agent={dmAgent} onClose={dmSidebar.sheet ? dmSidebar.closeSheet : undefined} />
@@ -2714,48 +2807,6 @@ function ChannelView({
                     }
                   : {})}
                 onClose={membersColumn.closeSheet}
-              />
-            )}
-            {/* Rows from more than the two people of a DM: they keep their names there too. */}
-            <MessageLookContext.Provider value={namedLook}>
-              {searchOpen && <SearchResultsPanel channelId={channel.id} onClose={() => setSearchOpen(false)} />}
-              {consultId && (
-                <ConsultationPanel
-                  key={consultId}
-                  channelId={channel.id}
-                  channelName={chrome?.composerTarget ? null : channel.name}
-                  consultationId={consultId}
-                  onClose={() => setConsultId(null)}
-                  onTalk={(handle) => {
-                    setConsultId(null);
-                    actions.insertMention(handle);
-                  }}
-                  onAnswer={() => {
-                    setConsultId(null);
-                    actions.focusComposer();
-                  }}
-                  renderMessage={(m, grouped) => (
-                    <ErrorBoundary resetKey={m} fallback={unshownLine}>
-                      <TimelineMessage
-                        message={m}
-                        grouped={grouped}
-                        entering={false}
-                        modelLabels={NO_LABELS}
-                        readOnly
-                      />
-                    </ErrorBoundary>
-                  )}
-                />
-              )}
-            </MessageLookContext.Provider>
-            {tasksOpen && tasksAgentId && (
-              <AgentTasksPanel
-                agentId={tasksAgentId}
-                channelId={channel.id}
-                tasks={agentTasks}
-                ended={taskView.data?.ended ?? []}
-                hidden={hiddenCount(taskView.data?.hidden, tasksAgentId)}
-                onClose={() => setTasksOpen(false)}
               />
             )}
           </ChannelThreadsContext.Provider>

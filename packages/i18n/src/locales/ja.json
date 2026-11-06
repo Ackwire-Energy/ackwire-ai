@@ -1314,7 +1314,8 @@
       "toolsTitle": "上部",
       "order": "セクションの順序",
       "orderHint": "ドラッグするか矢印を使ってください。たとえばエージェントを先頭にできます。",
-      "drag": "{{name}}をドラッグ"
+      "moveSection": "ドラッグして{{name}}セクションを移動、クリックでオプションを表示",
+      "moveTool": "ドラッグして{{name}}を移動"
     },
     "inviteHint": "メールまたはリンクで",
     "profileHint": "名前、写真、@",
@@ -1659,6 +1660,7 @@
     "quoteNoWords": "テキストなしのメッセージ",
     "replyingTo": "{{name}} に返信中",
     "cancelReply": "返信をキャンセル",
+    "jumpMissing": "ここではそのメッセージまで移動できません。削除されたか、古すぎる可能性があります。",
     "emoji": "絵文字",
     "uploading": "アップロード中…",
     "uploadFailed": "アップロードされませんでした",
@@ -6989,6 +6991,7 @@
       "in": "#{{channel}}のスレッド",
       "dmWith": "{{name}}とのDM",
       "backTo": "{{where}}に戻る",
+      "backToResults": "結果に戻る",
       "back": "#{{channel}}に戻る",
       "more": "スレッドのその他のアクション",
       "rename": "名前を変更",
