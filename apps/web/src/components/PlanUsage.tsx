@@ -1,5 +1,6 @@
 import type { OrgPlanUsage, PlanAccountInfo, PlanAccountUsage } from "@agenteschat/client";
 import { useApi, useModels, usePlanUsage } from "@agenteschat/client";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { planName } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf } from "@agenteschat/client/lib/providers";
@@ -122,7 +123,7 @@ export function PlanUsageCards() {
               <div key={machineId} className="plan-machine">
                 <div className="plan-machine__name">
                   <Icon name="computer" size={14} />
-                  {list[0]?.machineName}
+                  {computerNameOf(t, org.name, list[0]?.machineName ?? "")}
                 </div>
                 {list.map((a) => (
                   <AccountBlock key={a.key} account={a} money={data.money} />

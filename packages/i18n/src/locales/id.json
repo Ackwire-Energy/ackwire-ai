@@ -2235,6 +2235,8 @@
     "own": {
       "shared": "Akun yang dipakai bersama agenmu",
       "sharedLower": "akun yang dipakai bersama agenmu",
+      "free": "Model gratis OpenCode",
+      "freeLower": "model gratis OpenCode",
       "one": "Akun khusus untuk {{name}}",
       "one_female": "Akun khusus untuk {{name}}",
       "each": "Akun khusus untuk mereka"
