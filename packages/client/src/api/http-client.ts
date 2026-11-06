@@ -512,6 +512,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       deletionPlan: () => request<AccountDeletionPlan>("/api/app/account/deletion"),
       deletionCode: () => request<CodeSent>("/api/app/account/deletion/code", { json: {} }),
       delete: (input = {}) => request<void>("/api/app/account", { method: "DELETE", json: input }),
+      restore: () => request<void>("/api/app/account/deletion", { method: "DELETE" }),
     },
     push: {
       webKey: async () =>

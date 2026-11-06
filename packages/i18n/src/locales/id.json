@@ -5665,6 +5665,7 @@
     "createdByShort": "Dibuat oleh {{name}}",
     "fromMessage": "dari <0>pesan di #{{channel}}</0>",
     "fromAgent": "dari permintaan ke agen",
+    "privateTask": "Hanya orang di percakapan ini yang melihat tugas ini.",
     "subIssues_other": "Subtugas · {{count}}",
     "fromWebhook": "dari event {{provider}}",
     "description": "Deskripsi",
@@ -10552,6 +10553,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Orang ini tidak ada di percakapan ini, jadi tidak bisa melihat tugas ini."
+    },
     "connector": {
       "labelTaken": "Konektor lain sudah memakai nama ini.",
       "labelInvalid": "Nama harus terdiri dari 1 sampai 80 karakter.",
@@ -10776,6 +10780,7 @@
       "undoForbidden": "Hanya orang yang dibantu agen, pemiliknya, atau Admin yang bisa membatalkan ini."
     },
     "account": {
+      "notRestorable": "Akun ini sudah tidak bisa dipulihkan.",
       "notOwner": "Hanya orang yang menghubungkan akun atau paket ini yang bisa melakukan ini."
     },
     "channel": {
@@ -13285,13 +13290,23 @@
     "membersOnly": "Hanya Pemilik yang bisa memulihkannya.",
     "restored": "{{name}} sudah kembali"
   },
+  "accountDeleting": {
+    "title": "Akunmu sedang dihapus",
+    "text": "Akun ini hilang selamanya pada {{due}}, bersama ruang kerja yang hanya berisi kamu.",
+    "textLate": "Akun ini akan hilang sebentar lagi.",
+    "what": "Sampai saat itu tidak ada yang bisa menghubungimu di sini dan kamu tidak menerima notifikasi. Kalau dipulihkan, semuanya kembali seperti semula.",
+    "plans": "Paket yang kamu bayar tetap tidak diperpanjang. Tidak ada tagihan sampai kamu mengaktifkan satu lagi.",
+    "restore": "Pulihkan akun",
+    "restored": "Akunmu sudah kembali"
+  },
   "deleteAccount": {
     "menu": "Hapus akun",
     "card": {
-      "text": "Kamu keluar dari semua ruang kerja dan akunmu dihapus selamanya.",
+      "text": "Kamu keluar dari semua ruang kerja dan akunmu dihapus selamanya 7 hari kemudian. Sampai saat itu kamu bisa memulihkannya.",
       "button": "Hapus akun…"
     },
     "title": "Hapus akunmu?",
+    "when": "Akunmu hilang selamanya pada {{date}}. Sampai saat itu, masuk untuk memulihkannya.",
     "closes_other": "{{names}} ditutup sekarang dan dihapus selamanya pada {{date}}. Hanya kamu yang ada di sana.",
     "leaves": "Kamu keluar dari {{names}}.",
     "messages": "Pesanmu tetap ada di ruang kerja tanpa namamu.",
@@ -13309,7 +13324,7 @@
     "finishSetup": "Selesaikan penyiapan",
     "deleteOrg": "Hapus {{name}}",
     "submit": "Hapus akun",
-    "deleted": "Akun dihapus"
+    "deleted": "Akunmu hilang selamanya pada {{date}}. Masuk sebelum itu untuk memulihkannya."
   },
   "billing": {
     "open": "Buka paket dan tagihan",

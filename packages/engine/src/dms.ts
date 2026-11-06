@@ -28,9 +28,7 @@ async function presentPeople(db: Executor, orgId: string, userIds: string[]) {
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
     .innerJoin(users, eq(users.id, organizationMembers.userId))
-    .where(
-      and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, userIds), accountInUse),
-    );
+    .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, userIds), accountInUse));
   return rows.map((r) => r.userId);
 }
 

@@ -178,6 +178,8 @@ const KNOWN = {
   "invitation.ask_to_join": "errors.invitation.askToJoin",
   "org.create_invite_only": "errors.org.createInviteOnly",
   "org.not_restorable": "errors.org.notRestorable",
+  "account.not_restorable": "errors.account.notRestorable",
+  "issue.assignee_outside": "errors.issue.assigneeOutside",
   [REAUTH_PASSWORD]: "errors.reauth.password",
   [REAUTH_SIGN_IN]: "errors.reauth.signIn",
   EARLY_ACCESS_OTHER_EMAIL: "auth.earlyAccess.otherEmail",

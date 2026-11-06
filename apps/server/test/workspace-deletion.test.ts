@@ -369,7 +369,10 @@ describe("deleting an account", () => {
     await t.drain();
     expect(revoked).toEqual([]);
     await pastDue(biaId);
-    await t.db.update(schema.outbox).set({ nextAttemptAt: new Date(0) }).where(eq(schema.outbox.kind, "account.delete"));
+    await t.db
+      .update(schema.outbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(schema.outbox.kind, "account.delete"));
     await t.drain();
     expect(revoked).toEqual([{ value: "refresh-bia", hint: "refresh_token" }]);
     expect(await t.db.select().from(schema.users).where(eq(schema.users.id, biaId))).toEqual([]);
@@ -386,7 +389,10 @@ describe("deleting an account", () => {
 
     expect((await deleteAccount(owner, { code: await deletionCode(t, owner, null) })).status).toBe(204);
     await pastDue((await meOf(other)).user.id);
-    await t.db.update(schema.outbox).set({ nextAttemptAt: new Date(0) }).where(eq(schema.outbox.kind, "account.delete"));
+    await t.db
+      .update(schema.outbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(schema.outbox.kind, "account.delete"));
     await t.drain();
     const me = await other("/api/app/me");
     expect(me.status).toBe(401);
@@ -453,7 +459,10 @@ describe("deleting an account", () => {
       "account.not_restorable",
     ]);
     // Its job comes and finds nothing to do.
-    await t.db.update(schema.outbox).set({ nextAttemptAt: new Date(0) }).where(eq(schema.outbox.kind, "account.delete"));
+    await t.db
+      .update(schema.outbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(schema.outbox.kind, "account.delete"));
     await t.drain();
     expect((await back("/api/app/me")).status).toBe(200);
   });

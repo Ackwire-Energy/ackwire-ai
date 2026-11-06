@@ -1056,6 +1056,7 @@
   "delete": {
     "title": "Eliminar tu cuenta",
     "intro": "No se puede deshacer.",
+    "introGrace": "Tienes 7 días para cambiar de opinión.",
     "goes": {
       "account": "Tu cuenta, tu acceso y tus sesiones desaparecen.",
       "orgs": "Se eliminan los espacios de trabajo donde eres el único miembro.",

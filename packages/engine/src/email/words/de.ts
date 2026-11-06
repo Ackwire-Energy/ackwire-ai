@@ -295,7 +295,11 @@ export const words: EmailWords = {
     subject: (day) => `Dein agentes.chat-Konto wird am ${day} gelöscht`,
     preheader: "Du hast 7 Tage Zeit, es dir anders zu überlegen.",
     headline: "Dein Konto wird gelöscht",
-    body: (email, day, time) => ["Wir löschen das Konto ", { b: email }, ` am ${day} um ${time}. Es ist überall abgemeldet, und niemand erreicht dich hier, bis du zurück bist.`],
+    body: (email, day, time) => [
+      "Wir löschen das Konto ",
+      { b: email },
+      ` am ${day} um ${time}. Es ist überall abgemeldet, und niemand erreicht dich hier, bis du zurück bist.`,
+    ],
     closes: (count, names) => [
       plural("de", count, {
         one: "Der Workspace, in dem nur du warst, ist jetzt geschlossen und verschwindet am selben Tag: ",

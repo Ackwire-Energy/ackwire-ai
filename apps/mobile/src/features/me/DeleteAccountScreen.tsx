@@ -3,12 +3,13 @@ import { formatTimeLeft } from "@agenteschat/client/lib/actions";
 import {
   type AccountDeletionLine,
   accountDeletionLines,
+  deletionDueFrom,
   deletionProof,
   proofToSend,
   soleOwnerWaysOut,
 } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { formatShortDate, joinNames } from "@agenteschat/client/lib/format";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { typedCode } from "@agenteschat/client/lib/join-requests";
 import { useRef, useState } from "react";
@@ -26,6 +27,7 @@ import { PushedHeader } from "../shared/parts";
 import { preflightMissing } from "./logic";
 
 const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
+  when: "clock",
   closes: "x",
   leaves: "out",
   computers: "laptop",
@@ -36,8 +38,8 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
 };
 
 /**
- * Apagar conta (App Store 5.1.1(v)): what goes and what stays, from the preflight (what closes, what they leave, the
- * computers removed, what stays behind with where to disconnect it on the website, and where plans are billed that
+ * Apagar conta (App Store 5.1.1(v)): when it goes, 7 days out with a way back until then, and what goes and what stays,
+ * from the preflight (what closes, what they leave, the computers removed, what stays behind with where to disconnect it on the website, and where plans are billed that
  * theirs stop renewing), then a hold. A workspace that
  * still needs this person as its only owner comes first, with its two ways out on the website (People, or deleting
  * it; its onboarding, while it's still being set up). Then the proof that it's them (ADR 0088 §2): a code emailed to
@@ -116,8 +118,9 @@ export function DeleteAccountScreen() {
     }
     const result = await deleteAccount(toSend?.input);
     setBusy(false);
-    // Deleted: the session ends and the gate shows sign-in.
-    if (result.ok) toast({ title: t("mobile.account.deleted") });
+    // Scheduled: the session ends and the gate shows sign-in, which comes back to the waiting screen.
+    if (result.ok)
+      toast({ title: t("mobile.account.deleted", { date: formatShortDate(i18n.language, deletionDueFrom()) }) });
     else if (result.reason === "sole_owner") {
       if (legacy) setBlockedBy(result.organizations);
       else void plan.refetch();
@@ -166,7 +169,7 @@ export function DeleteAccountScreen() {
       >
         <Text variant="display">{t("mobile.delete.title")}</Text>
         <Text variant="body" tone="muted">
-          {t("mobile.delete.intro")}
+          {t(legacy ? "mobile.delete.intro" : "mobile.delete.introGrace")}
         </Text>
         <Card>
           <View style={styles.list}>

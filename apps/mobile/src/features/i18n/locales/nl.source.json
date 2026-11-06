@@ -2424,6 +2424,9 @@
   "delete.intro": {
     "value": "There's no undo."
   },
+  "delete.introGrace": {
+    "value": "You have 7 days to change your mind."
+  },
   "delete.goes.account": {
     "value": "Your account, your access and your sessions are gone."
   },

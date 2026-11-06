@@ -71,7 +71,7 @@
   },
   "account": {
     "deleteFailed": "Je account kan nu niet worden verwijderd. Probeer het opnieuw.",
-    "deleted": "Je account is verwijderd.",
+    "deleted": "Je account verdwijnt op {{date}} definitief. Log daarvoor in om het te herstellen.",
     "signedOut": "Je bent uitgelogd."
   },
   "theme": {

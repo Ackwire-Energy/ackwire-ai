@@ -5924,6 +5924,7 @@ export const ptBR = {
     createdByShort: "Criada por {{name}}",
     fromMessage: "a partir de <0>uma mensagem no #{{channel}}</0>",
     fromAgent: "a partir de um pedido a um agente",
+    privateTask: "Só quem está nesta conversa vê esta tarefa.",
     subIssues_one: "Subtarefas · {{count}}",
     subIssues_other: "Subtarefas · {{count}}",
     fromWebhook: "a partir de um evento do {{provider}}",
@@ -10656,6 +10657,9 @@ export const ptBR = {
     },
   },
   errors: {
+    issue: {
+      assigneeOutside: "Essa pessoa não está nesta conversa, então não vê esta tarefa.",
+    },
     connector: {
       labelTaken: "Já existe um conector com esse nome.",
       labelInvalid: "O nome precisa ter de 1 a 80 letras.",
@@ -10892,6 +10896,7 @@ export const ptBR = {
       undoForbidden: "Só a pessoa para quem o agente trabalhou, o dono dele ou um admin pode desfazer isso.",
     },
     account: {
+      notRestorable: "Esta conta não pode mais ser restaurada.",
       notOwner: "Só quem conectou esta conta ou plano pode fazer isso.",
     },
     channel: {
@@ -13564,14 +13569,26 @@ export const ptBR = {
     membersOnly: "Só um dono pode restaurar.",
     restored: "{{name}} voltou",
   },
+  /** The screen an account waiting for its deletion sees in place of the app: `text` while its date is ahead. */
+  accountDeleting: {
+    title: "Sua conta está sendo apagada",
+    text: "Ela some de vez em {{due}}, com os workspaces em que só você está.",
+    textLate: "Ela some em instantes.",
+    what: "Até lá ninguém fala com você aqui e você não recebe avisos. Se restaurar, tudo volta como estava.",
+    /** Only where plans are billed. */
+    plans: "Os planos que você paga continuam sem renovar. Nada é cobrado até você reativar um.",
+    restore: "Restaurar conta",
+    restored: "Sua conta voltou",
+  },
   /** Deleting your account (Configurações › Sua conta): what goes, what stays, and what has to happen first. */
   deleteAccount: {
     menu: "Apagar conta",
     card: {
-      text: "Você sai de todos os workspaces e a sua conta é apagada de vez.",
+      text: "Você sai de todos os workspaces e a sua conta é apagada de vez 7 dias depois. Até lá, dá para restaurar.",
       button: "Apagar conta…",
     },
     title: "Apagar a sua conta?",
+    when: "Sua conta some de vez em {{date}}. Até lá, entre de novo para restaurar.",
     closes_one: "{{names}} fecha agora e é apagado de vez em {{date}}. Só você está lá.",
     closes_other: "{{names}} fecham agora e são apagados de vez em {{date}}. Só você está lá.",
     leaves: "Você sai de {{names}}.",
@@ -13592,7 +13609,7 @@ export const ptBR = {
     finishSetup: "Terminar a configuração",
     deleteOrg: "Apagar {{name}}",
     submit: "Apagar conta",
-    deleted: "Conta apagada",
+    deleted: "Sua conta some de vez em {{date}}. Entre antes disso para restaurar.",
   },
   /** The billing service (ADR 0079): this server shows no plan, price or currency, only the way there. */
   billing: {

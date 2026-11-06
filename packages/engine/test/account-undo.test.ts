@@ -96,7 +96,9 @@ describe("scheduling", () => {
     await expect(openDm(f.db, f.owner.id, f.org.id, { userId: bia.id })).rejects.toThrow();
     expect(heard.some((e) => e.type === "membership.revoked")).toBe(true);
 
-    expect(await registerPushDevice(f.db, bia.id, { token: "ExponentPushToken[bia-0002]", platform: "ios", locale: "en" })).toBe(false);
+    expect(
+      await registerPushDevice(f.db, bia.id, { token: "ExponentPushToken[bia-0002]", platform: "ios", locale: "en" }),
+    ).toBe(false);
     expect((await feedOf("user.deletion_requested")).map((e) => e.userId)).toEqual([bia.id]);
     expect(await feedOf("user.deleted")).toEqual([]);
     expect(await emailsTo(bia.email)).toEqual(["account_deleting"]);
@@ -180,7 +182,7 @@ describe("restoring", () => {
   test("a suspended workspace stays closed; the account still comes back", async () => {
     const { bia, own } = await aMemberWithTheirOwn();
     await scheduleAccountDeletion(deps(), bia.id);
-    await setOrgStanding({ db: f.db }, own.id, { state: "suspended", reason: null });
+    await setOrgStanding({ db: f.db }, own.id, { state: "suspended", reason: null, notice: "silent" });
     await restoreAccount(deps(), bia.id);
     expect((await userRow(bia.id))?.deletionDueAt).toBeNull();
     expect((await orgRow(own.id))?.deletionDueAt).not.toBeNull();

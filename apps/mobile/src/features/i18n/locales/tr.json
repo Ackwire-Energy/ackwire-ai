@@ -985,6 +985,7 @@
   "delete": {
     "title": "Hesabınızı silin",
     "intro": "Bunun geri dönüşü yok.",
+    "introGrace": "Fikrinizi değiştirmek için 7 gününüz var.",
     "goes": {
       "account": "Hesabınız, erişimleriniz ve oturumlarınız silinir.",
       "orgs": "Tek üyesi olduğunuz çalışma alanları silinir.",

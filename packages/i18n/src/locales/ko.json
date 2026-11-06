@@ -5627,6 +5627,7 @@
     "createdByShort": "{{name}}이(가) 만듦",
     "fromMessage": "<0>#{{channel}}의 메시지</0>에서",
     "fromAgent": "에이전트에게 보낸 요청에서",
+    "privateTask": "이 대화에 있는 사람만 이 작업을 볼 수 있어요.",
     "subIssues_other": "하위 작업 · {{count}}",
     "fromWebhook": "{{provider}} 이벤트에서",
     "description": "설명",
@@ -10491,6 +10492,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "이 사람은 이 대화에 없어서 이 작업을 볼 수 없어요."
+    },
     "connector": {
       "labelTaken": "이미 같은 이름의 커넥터가 있어요.",
       "labelInvalid": "이름은 1~80자여야 해요.",
@@ -10715,6 +10719,7 @@
       "undoForbidden": "에이전트가 도와준 사람, 에이전트 소유자 또는 관리자만 되돌릴 수 있어요."
     },
     "account": {
+      "notRestorable": "이 계정은 더 이상 복원할 수 없어요.",
       "notOwner": "이 계정이나 요금제를 연결한 사람만 할 수 있어요."
     },
     "channel": {
@@ -13222,13 +13227,23 @@
     "membersOnly": "소유자만 복원할 수 있어요.",
     "restored": "{{name}}이(가) 복원됐어요"
   },
+  "accountDeleting": {
+    "title": "계정을 삭제하는 중이에요",
+    "text": "{{due}}에 나만 있는 워크스페이스와 함께 영구적으로 사라져요.",
+    "textLate": "곧 사라져요.",
+    "what": "그때까지 여기서 아무도 연락할 수 없고 알림도 받지 않아요. 복원하면 모든 것이 그대로 돌아와요.",
+    "plans": "내가 결제하는 요금제는 계속 갱신되지 않아요. 다시 켜기 전까지 청구되지 않아요.",
+    "restore": "계정 복원",
+    "restored": "계정이 돌아왔어요"
+  },
   "deleteAccount": {
     "menu": "계정 삭제",
     "card": {
-      "text": "모든 워크스페이스에서 나가고 계정이 영구적으로 삭제돼요.",
+      "text": "모든 워크스페이스에서 나가고 계정은 7일 후 영구적으로 삭제돼요. 그때까지 복원할 수 있어요.",
       "button": "계정 삭제…"
     },
     "title": "계정을 삭제할까요?",
+    "when": "계정은 {{date}}에 영구적으로 사라져요. 그때까지 로그인하면 복원할 수 있어요.",
     "closes_other": "{{names}}은(는) 지금 닫히고 {{date}}에 영구적으로 삭제돼요. 그곳에는 나 혼자만 있어요.",
     "leaves": "{{names}}에서 나가요.",
     "messages": "내 메시지는 이름 없이 워크스페이스에 남아요.",
@@ -13246,7 +13261,7 @@
     "finishSetup": "설정 마치기",
     "deleteOrg": "{{name}} 삭제",
     "submit": "계정 삭제",
-    "deleted": "계정을 삭제했어요"
+    "deleted": "계정은 {{date}}에 영구적으로 사라져요. 그 전에 로그인하면 복원할 수 있어요."
   },
   "billing": {
     "open": "요금제 및 결제 열기",

@@ -56,7 +56,7 @@ import {
 } from "./organizations";
 import { enqueue } from "./outbox";
 import { givableRoleIds } from "./roles";
-import { closedOrg, accountInUse } from "./standing";
+import { accountInUse, closedOrg } from "./standing";
 
 const {
   accounts,

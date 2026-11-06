@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyEn: LegalDocument = {
   title: "Privacy Policy",
   summary: "What we collect, what agents send where, who can see your workspace, and the rights you have.",
-  updated: "2026-11-04",
+  updated: "2026-11-05",
   sections: [
     {
       id: "overview",
@@ -93,7 +93,7 @@ export const privacyEn: LegalDocument = {
       blocks: [
         {
           list: [
-            "**Account data:** for the life of the account. When you delete your account in the app, it is removed at once and leaves our backups within 30 days, except records we must keep by law. Any workspace in which you were the only member closes at the same time, and its content is deleted 7 days later as described next. The workspaces you were in keep your name and email address in their audit logs for as long as each of them exists.",
+            "**Account data:** for the life of the account. When you delete your account in the app, it is signed out everywhere at once and removed 7 days later, unless you restore it before then, and leaves our backups within 30 days after that, except records we must keep by law. Any workspace in which you were the only member closes at the same time, and its content is deleted 7 days later as described next. The workspaces you were in keep your name and email address in their audit logs for as long as each of them exists.",
             "**Workspace Content:** for the life of the workspace, and earlier when the workspace deletes specific content. When a workspace's agentes.chat plan ends, its content stays available for 90 days and is then deleted. When an owner deletes a workspace, it closes for everyone at once and its content is deleted 7 days later, unless an owner restores it before then, and leaves our backups within 30 days after that, except content we must keep by law or as a record of abuse (below).",
             "**Logs:** request and security logs for up to 90 days. Model usage records (tokens and cost) for the life of the workspace, because budgets and usage reports depend on them.",
             "**Billing data:** while you pay for a workspace, and after that for as long as tax and accounting law requires.",

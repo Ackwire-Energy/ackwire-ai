@@ -1009,6 +1009,7 @@ export const featureKeysPtBR = {
   delete: {
     title: "Apagar sua conta",
     intro: "Isso não tem volta.",
+    introGrace: "Você tem 7 dias para mudar de ideia.",
     goes: {
       account: "Sua conta, seus acessos e suas sessões somem.",
       orgs: "Workspaces em que só você está são apagados.",

@@ -297,7 +297,10 @@ export const words: EmailWords = {
     subject: (day) => `agentes.chat hesabınız ${day} tarihinde silinecek`,
     preheader: "Fikrinizi değiştirmek için 7 gününüz var.",
     headline: "Hesabınız siliniyor",
-    body: (email, day, time) => [{ b: email }, ` hesabını ${day} ${time} tarihinde sileceğiz. Her yerde oturumu kapatıldı ve siz dönene kadar burada kimse size ulaşamaz.`],
+    body: (email, day, time) => [
+      { b: email },
+      ` hesabını ${day} ${time} tarihinde sileceğiz. Her yerde oturumu kapatıldı ve siz dönene kadar burada kimse size ulaşamaz.`,
+    ],
     closes: (count, names) => [
       plural("tr", count, {
         one: "Yalnızca sizin bulunduğunuz çalışma alanı şimdi kapandı ve aynı tarihte silinecek: ",

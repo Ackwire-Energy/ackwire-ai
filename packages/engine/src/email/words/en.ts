@@ -307,7 +307,11 @@ export const en = {
     subject: (day: string) => `Your agentes.chat account will be deleted on ${day}`,
     preheader: "You have 7 days to change your mind.",
     headline: "Your account is being deleted",
-    body: (email: string, day: string, time: string): Text => ["We will delete the account ", { b: email }, ` on ${day} at ${time}. It's signed out everywhere, and nobody can reach you here until you're back.`],
+    body: (email: string, day: string, time: string): Text => [
+      "We will delete the account ",
+      { b: email },
+      ` on ${day} at ${time}. It's signed out everywhere, and nobody can reach you here until you're back.`,
+    ],
     closes: (count: number, names: Inline[]): Text => [
       plural("en", count, {
         one: "The workspace only you were in closed now and goes on the same date: ",

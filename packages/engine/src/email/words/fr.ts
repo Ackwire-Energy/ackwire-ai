@@ -303,11 +303,16 @@ export const words: EmailWords = {
     subject: (day) => `Votre compte agentes.chat sera supprimé le ${day}`,
     preheader: "Vous avez 7 jours pour changer d’avis.",
     headline: "Votre compte est en cours de suppression",
-    body: (email, day, time) => ["Nous supprimerons le compte ", { b: email }, ` le ${day} à ${time}. Il est déconnecté partout, et personne ne peut vous joindre ici jusqu’à votre retour.`],
+    body: (email, day, time) => [
+      "Nous supprimerons le compte ",
+      { b: email },
+      ` le ${day} à ${time}. Il est déconnecté partout, et personne ne peut vous joindre ici jusqu’à votre retour.`,
+    ],
     closes: (count, names) => [
       plural("fr", count, {
         one: "L’espace de travail dont vous étiez le seul membre vient de fermer et disparaît à la même date : ",
-        other: "Les espaces de travail dont vous étiez le seul membre viennent de fermer et disparaissent à la même date : ",
+        other:
+          "Les espaces de travail dont vous étiez le seul membre viennent de fermer et disparaissent à la même date : ",
       }),
       ...names,
       ".",

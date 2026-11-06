@@ -5904,6 +5904,7 @@
     "createdByShort": "Gemaakt door {{name}}",
     "fromMessage": "uit <0>een bericht in #{{channel}}</0>",
     "fromAgent": "uit een verzoek aan een agent",
+    "privateTask": "Alleen mensen in dit gesprek zien deze taak.",
     "subIssues_one": "Subtaken · {{count}}",
     "subIssues_other": "Subtaken · {{count}}",
     "fromWebhook": "uit een event van {{provider}}",
@@ -10996,6 +10997,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Deze persoon zit niet in dit gesprek en ziet deze taak dus niet."
+    },
     "connector": {
       "labelTaken": "Een andere connector heeft deze naam al.",
       "labelInvalid": "De naam moet 1 tot 80 tekens hebben.",
@@ -11221,6 +11225,7 @@
       "undoForbidden": "Alleen de persoon voor wie de agent werkte, zijn eigenaar of een beheerder kan dit ongedaan maken."
     },
     "account": {
+      "notRestorable": "Dit account kan niet meer hersteld worden.",
       "notOwner": "Alleen wie dit account of abonnement heeft gekoppeld, kan dit doen."
     },
     "channel": {
@@ -13825,13 +13830,23 @@
     "membersOnly": "Alleen een eigenaar kan hem herstellen.",
     "restored": "{{name}} is terug"
   },
+  "accountDeleting": {
+    "title": "Je account wordt verwijderd",
+    "text": "Het verdwijnt op {{due}} definitief, samen met de werkruimtes waar alleen jij in zit.",
+    "textLate": "Het verdwijnt zo.",
+    "what": "Tot die tijd kan niemand je hier bereiken en krijg je geen meldingen. Herstel je het, dan is alles weer zoals het was.",
+    "plans": "De abonnementen die je betaalt, blijven zonder verlenging. Er wordt niets in rekening gebracht tot je er een weer aanzet.",
+    "restore": "Account herstellen",
+    "restored": "Je account is terug"
+  },
   "deleteAccount": {
     "menu": "Account verwijderen",
     "card": {
-      "text": "Je verlaat elke werkruimte en je account wordt definitief verwijderd.",
+      "text": "Je verlaat elke werkruimte en je account wordt 7 dagen later definitief verwijderd. Tot die tijd kun je het herstellen.",
       "button": "Account verwijderen…"
     },
     "title": "Je account verwijderen?",
+    "when": "Je account verdwijnt op {{date}} definitief. Log tot die tijd in om het te herstellen.",
     "closes_one": "{{names}} sluit nu en wordt op {{date}} definitief verwijderd. Je bent daar de enige.",
     "closes_other": "{{names}} sluiten nu en worden op {{date}} definitief verwijderd. Je bent daar de enige.",
     "leaves": "Je verlaat {{names}}.",
@@ -13851,7 +13866,7 @@
     "finishSetup": "Inrichting afronden",
     "deleteOrg": "{{name}} verwijderen",
     "submit": "Account verwijderen",
-    "deleted": "Account verwijderd"
+    "deleted": "Je account verdwijnt op {{date}} definitief. Log daarvoor in om het te herstellen."
   },
   "billing": {
     "open": "Abonnement en facturatie openen",

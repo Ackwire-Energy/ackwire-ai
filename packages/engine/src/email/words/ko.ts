@@ -280,7 +280,11 @@ export const words: EmailWords = {
     subject: (day) => `agentes.chat 계정이 ${day}에 삭제돼요`,
     preheader: "마음을 바꿀 수 있는 시간은 7일이에요.",
     headline: "계정을 삭제하고 있어요",
-    body: (email, day, time) => ["계정 ", { b: email }, ` 을(를) ${day} ${time}에 삭제해요. 모든 기기에서 로그아웃됐고, 돌아올 때까지 여기서 아무도 연락할 수 없어요.`],
+    body: (email, day, time) => [
+      "계정 ",
+      { b: email },
+      ` 을(를) ${day} ${time}에 삭제해요. 모든 기기에서 로그아웃됐고, 돌아올 때까지 여기서 아무도 연락할 수 없어요.`,
+    ],
     closes: (_count, names) => ["나만 있던 워크스페이스는 지금 닫혔고 같은 날 삭제돼요: ", ...names, "."],
     undo: "마음이 바뀌었나요? 그 전에 로그인해서 복원을 누르세요.",
     button: "로그인해서 복원",

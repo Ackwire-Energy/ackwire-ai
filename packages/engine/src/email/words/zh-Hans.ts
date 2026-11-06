@@ -258,7 +258,11 @@ export const words: EmailWords = {
     subject: (day) => `你的 agentes.chat 账号将于 ${day} 删除`,
     preheader: "你有 7 天时间改变主意。",
     headline: "你的账号正在删除",
-    body: (email, day, time) => ["我们将删除账号 ", { b: email }, `，时间是 ${day} ${time}。它已在所有设备上退出登录，在你回来之前，这里没有人能联系到你。`],
+    body: (email, day, time) => [
+      "我们将删除账号 ",
+      { b: email },
+      `，时间是 ${day} ${time}。它已在所有设备上退出登录，在你回来之前，这里没有人能联系到你。`,
+    ],
     closes: (_count, names) => ["只有你一人的工作区现已关闭，并在同一天删除：", ...names, "。"],
     undo: "改变主意了？在那之前登录并点击“恢复”。",
     button: "登录并恢复",

@@ -41,14 +41,14 @@ import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } fro
 import { ensureRightHand, followOwner } from "./right-hand";
 import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere, stillGivableRoleIds } from "./roles";
 import {
+  accountClosed,
+  accountInUse,
   assertCanWork,
   type BillingHold,
   closedOrg,
   closedRefusal,
   cloudNotice,
-  accountClosed,
   isUserBlocked,
-  accountInUse,
   openOrg,
   refusesNewWorkspace,
   STANDING_COLUMNS,

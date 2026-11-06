@@ -233,7 +233,7 @@ async function conversationOf(db: Database, orgId: string, channelId: string) {
     .leftJoin(issues, eq(issues.conversationChannelId, channels.id))
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (row?.kind === "task") return { task: true, tiedTo: row.taskChannelId };
-  const open = !row || !row.people || (row.kind === "channel" && row.visibility === "public");
+  const open = !row?.people || (row.kind === "channel" && row.visibility === "public");
   return { task: false, tiedTo: open ? null : channelId };
 }
 

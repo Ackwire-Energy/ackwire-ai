@@ -71,7 +71,7 @@
   },
   "account": {
     "deleteFailed": "Belum bisa menghapus akunmu sekarang. Coba lagi.",
-    "deleted": "Akunmu sudah dihapus.",
+    "deleted": "Akunmu hilang selamanya pada {{date}}. Masuk sebelum itu untuk memulihkannya.",
     "signedOut": "Kamu sudah keluar."
   },
   "theme": {

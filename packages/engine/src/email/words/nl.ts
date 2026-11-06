@@ -296,7 +296,11 @@ export const words: EmailWords = {
     subject: (day) => `Je agentes.chat-account wordt op ${day} verwijderd`,
     preheader: "Je hebt 7 dagen om van gedachten te veranderen.",
     headline: "Je account wordt verwijderd",
-    body: (email, day, time) => ["We verwijderen het account ", { b: email }, ` op ${day} om ${time}. Het is overal uitgelogd en niemand kan je hier bereiken tot je terug bent.`],
+    body: (email, day, time) => [
+      "We verwijderen het account ",
+      { b: email },
+      ` op ${day} om ${time}. Het is overal uitgelogd en niemand kan je hier bereiken tot je terug bent.`,
+    ],
     closes: (count, names) => [
       plural("nl", count, {
         one: "De werkruimte waar alleen jij in zat is nu gesloten en verdwijnt op dezelfde datum: ",

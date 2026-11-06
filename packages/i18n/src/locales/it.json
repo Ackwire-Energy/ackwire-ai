@@ -6083,6 +6083,7 @@
     "createdByShort": "Creata da {{name}}",
     "fromMessage": "da <0>un messaggio in #{{channel}}</0>",
     "fromAgent": "da una richiesta a un agente",
+    "privateTask": "Solo le persone in questa conversazione vedono questa attività.",
     "subIssues_one": "Sottoattività · {{count}}",
     "subIssues_many": "Sottoattività · {{count}}",
     "subIssues_other": "Sottoattività · {{count}}",
@@ -11365,6 +11366,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Questa persona non è in questa conversazione, quindi non vede questa attività."
+    },
     "connector": {
       "labelTaken": "Un altro connettore ha già questo nome.",
       "labelInvalid": "Il nome deve avere da 1 a 80 caratteri.",
@@ -11591,6 +11595,7 @@
       "undoForbidden": "Solo la persona per cui l'agente ha lavorato, il suo responsabile o un admin può annullarlo."
     },
     "account": {
+      "notRestorable": "Questo account non si può più ripristinare.",
       "notOwner": "Solo chi ha collegato questo account o piano può farlo."
     },
     "channel": {
@@ -14237,13 +14242,23 @@
     "membersOnly": "Solo un Proprietario può ripristinarlo.",
     "restored": "{{name}} è tornato"
   },
+  "accountDeleting": {
+    "title": "Il tuo account è in eliminazione",
+    "text": "Sparisce per sempre il {{due}}, con gli spazi di lavoro in cui ci sei solo tu.",
+    "textLate": "Sparirà tra un attimo.",
+    "what": "Fino ad allora nessuno può raggiungerti qui e non ricevi notifiche. Se lo ripristini, tutto torna com'era.",
+    "plans": "I piani che paghi restano senza rinnovo. Non viene addebitato nulla finché non ne riattivi uno.",
+    "restore": "Ripristina account",
+    "restored": "Il tuo account è tornato"
+  },
   "deleteAccount": {
     "menu": "Elimina account",
     "card": {
-      "text": "Esci da tutti gli spazi di lavoro e il tuo account viene eliminato per sempre.",
+      "text": "Esci da tutti gli spazi di lavoro e il tuo account viene eliminato per sempre 7 giorni dopo. Fino ad allora puoi ripristinarlo.",
       "button": "Elimina account…"
     },
     "title": "Eliminare il tuo account?",
+    "when": "Il tuo account sparisce per sempre il {{date}}. Fino ad allora, accedi per ripristinarlo.",
     "closes_one": "{{names}} chiude ora e viene eliminato per sempre il {{date}}. Ci sei solo tu.",
     "closes_many": "{{names}} chiudono ora e vengono eliminati per sempre il {{date}}. Ci sei solo tu.",
     "closes_other": "{{names}} chiudono ora e vengono eliminati per sempre il {{date}}. Ci sei solo tu.",
@@ -14265,7 +14280,7 @@
     "finishSetup": "Completa la configurazione",
     "deleteOrg": "Elimina {{name}}",
     "submit": "Elimina account",
-    "deleted": "Account eliminato"
+    "deleted": "Il tuo account sparisce per sempre il {{date}}. Accedi prima di allora per ripristinarlo."
   },
   "billing": {
     "open": "Apri piano e fatturazione",

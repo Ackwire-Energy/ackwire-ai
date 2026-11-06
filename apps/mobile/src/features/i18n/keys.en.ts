@@ -1002,6 +1002,7 @@ export const featureKeysEn = {
   delete: {
     title: "Delete your account",
     intro: "There's no undo.",
+    introGrace: "You have 7 days to change your mind.",
     goes: {
       account: "Your account, your access and your sessions are gone.",
       /** A server from before the preflight, which says what it closes. */

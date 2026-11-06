@@ -6023,6 +6023,7 @@
     "createdByShort": "Creada por {{name}}",
     "fromMessage": "desde <0>un mensaje en #{{channel}}</0>",
     "fromAgent": "desde un pedido a un agente",
+    "privateTask": "Solo las personas de esta conversación ven esta tarea.",
     "subIssues_one": "Subtareas · {{count}}",
     "subIssues_many": "Subtareas · {{count}}",
     "subIssues_other": "Subtareas · {{count}}",
@@ -11285,6 +11286,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Esta persona no está en esta conversación, así que no ve esta tarea."
+    },
     "connector": {
       "labelTaken": "Otro conector ya tiene este nombre.",
       "labelInvalid": "El nombre necesita de 1 a 80 caracteres.",
@@ -11511,6 +11515,7 @@
       "undoForbidden": "Solo la persona para quien trabajó el agente, su dueño o un admin puede deshacer esto."
     },
     "account": {
+      "notRestorable": "Esta cuenta ya no se puede restaurar.",
       "notOwner": "Solo quien conectó esta cuenta o plan puede hacer esto."
     },
     "channel": {
@@ -14104,13 +14109,23 @@
     "membersOnly": "Solo un propietario puede restaurarlo.",
     "restored": "{{name}} está de vuelta"
   },
+  "accountDeleting": {
+    "title": "Tu cuenta se está eliminando",
+    "text": "Desaparece para siempre el {{due}}, junto con los espacios de trabajo donde solo estás tú.",
+    "textLate": "Desaparecerá en un momento.",
+    "what": "Hasta entonces nadie puede contactarte aquí y no recibes avisos. Si la restauras, todo vuelve a estar como antes.",
+    "plans": "Los planes que pagas siguen sin renovarse. No se cobra nada hasta que reactives uno.",
+    "restore": "Restaurar cuenta",
+    "restored": "Tu cuenta ha vuelto"
+  },
   "deleteAccount": {
     "menu": "Eliminar cuenta",
     "card": {
-      "text": "Sales de todos los espacios de trabajo y tu cuenta se elimina para siempre.",
+      "text": "Sales de todos los espacios de trabajo y tu cuenta se elimina para siempre 7 días después. Hasta entonces puedes restaurarla.",
       "button": "Eliminar cuenta…"
     },
     "title": "¿Eliminar tu cuenta?",
+    "when": "Tu cuenta desaparece para siempre el {{date}}. Hasta entonces, inicia sesión para restaurarla.",
     "closes_one": "{{names}} se cierra ahora y se elimina para siempre el {{date}}. Eres la única persona ahí.",
     "closes_many": "{{names}} se cierran ahora y se eliminan para siempre el {{date}}. Eres la única persona ahí.",
     "closes_other": "{{names}} se cierran ahora y se eliminan para siempre el {{date}}. Eres la única persona ahí.",
@@ -14132,7 +14147,7 @@
     "finishSetup": "Terminar la configuración",
     "deleteOrg": "Eliminar {{name}}",
     "submit": "Eliminar cuenta",
-    "deleted": "Cuenta eliminada"
+    "deleted": "Tu cuenta desaparece para siempre el {{date}}. Inicia sesión antes para restaurarla."
   },
   "billing": {
     "open": "Abrir plan y facturación",

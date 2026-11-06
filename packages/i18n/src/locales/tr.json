@@ -5816,6 +5816,7 @@
     "createdByShort": "Oluşturan: {{name}}",
     "fromMessage": "<0>#{{channel}} kanalındaki bir mesajdan</0>",
     "fromAgent": "bir ajana yapılan bir istekten",
+    "privateTask": "Bu görevi yalnızca bu konuşmadaki kişiler görür.",
     "subIssues_one": "Alt görevler · {{count}}",
     "subIssues_other": "Alt görevler · {{count}}",
     "fromWebhook": "bir {{provider}} olayından",
@@ -10869,6 +10870,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Bu kişi bu konuşmada değil, bu yüzden bu görevi göremez."
+    },
     "connector": {
       "labelTaken": "Bu ad başka bir bağlayıcıda zaten var.",
       "labelInvalid": "Ad 1 ile 80 karakter arasında olmalı.",
@@ -11094,6 +11098,7 @@
       "undoForbidden": "Bunu yalnızca ajanın çalıştığı kişi, sahibi veya bir yönetici geri alabilir."
     },
     "account": {
+      "notRestorable": "Bu hesap artık geri yüklenemez.",
       "notOwner": "Bunu yalnızca bu hesabı veya planı bağlayan kişi yapabilir."
     },
     "channel": {
@@ -13639,13 +13644,23 @@
     "membersOnly": "Onu yalnızca bir sahip geri yükleyebilir.",
     "restored": "{{name}} geri döndü"
   },
+  "accountDeleting": {
+    "title": "Hesabınız siliniyor",
+    "text": "{{due}} tarihinde, yalnızca sizin bulunduğunuz çalışma alanlarıyla birlikte kalıcı olarak kaybolur.",
+    "textLate": "Birazdan kaybolacak.",
+    "what": "O zamana kadar burada kimse size ulaşamaz ve bildirim almazsınız. Geri yüklerseniz her şey eskisi gibi olur.",
+    "plans": "Ödediğiniz planlar yenilenmemeye devam eder. Birini yeniden açana kadar ücret alınmaz.",
+    "restore": "Hesabı geri yükle",
+    "restored": "Hesabınız geri geldi"
+  },
   "deleteAccount": {
     "menu": "Hesabı sil",
     "card": {
-      "text": "Tüm çalışma alanlarından ayrılırsınız ve hesabınız kalıcı olarak silinir.",
+      "text": "Tüm çalışma alanlarından ayrılırsınız ve hesabınız 7 gün sonra kalıcı olarak silinir. O zamana kadar geri yükleyebilirsiniz.",
       "button": "Hesabı sil…"
     },
     "title": "Hesabınız silinsin mi?",
+    "when": "Hesabınız {{date}} tarihinde kalıcı olarak kaybolur. O zamana kadar geri yüklemek için giriş yapın.",
     "closes_one": "{{names}} şimdi kapanır ve {{date}} tarihinde kalıcı olarak silinir. Orada yalnızca siz varsınız.",
     "closes_other": "{{names}} şimdi kapanır ve {{date}} tarihinde kalıcı olarak silinir. Oralarda yalnızca siz varsınız.",
     "leaves": "{{names}} çalışma alanından ayrılırsınız.",
@@ -13665,7 +13680,7 @@
     "finishSetup": "Kurulumu tamamla",
     "deleteOrg": "Sil: {{name}}",
     "submit": "Hesabı sil",
-    "deleted": "Hesap silindi"
+    "deleted": "Hesabınız {{date}} tarihinde kalıcı olarak kaybolur. Geri yüklemek için bundan önce giriş yapın."
   },
   "billing": {
     "open": "Plan ve faturalandırmayı aç",

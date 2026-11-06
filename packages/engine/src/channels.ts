@@ -42,7 +42,7 @@ import {
   resolvePermissions,
 } from "./permissions";
 import { refuseRightHand } from "./right-hand";
-import { closedRefusal, accountInUse, STANDING_COLUMNS } from "./standing";
+import { accountInUse, closedRefusal, STANDING_COLUMNS } from "./standing";
 import { taskReaderSql } from "./task-access";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;

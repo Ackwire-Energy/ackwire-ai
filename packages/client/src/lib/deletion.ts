@@ -24,6 +24,13 @@ export function deletingText(t: TFunction, locale: string, deletion: OrgDeletion
     : t("deleting.textLate", { by, date });
 }
 
+/** The waiting screen's line: when the account goes for good, while that's still ahead. */
+export function accountDeletingText(t: TFunction, locale: string, dueAt: string | null, now = Date.now()) {
+  return dueAt && Date.parse(dueAt) > now
+    ? t("accountDeleting.text", { due: formatShortDate(locale, dueAt) })
+    : t("accountDeleting.textLate");
+}
+
 /** What proves it's the person before deleting: a code emailed to them, their password, or a password added first. */
 export type DeletionProof = "code" | "password" | "addPassword";
 
@@ -47,7 +54,7 @@ export function proofToSend(kind: DeletionProof, typed: { sent: boolean; code: s
 
 /** One line of what deleting the account does, by what it is about (the apps pick an icon for each). */
 export interface AccountDeletionLine {
-  kind: "closes" | "leaves" | "computers" | "staysBehind" | "plan" | "messages" | "serverOwner";
+  kind: "when" | "closes" | "leaves" | "computers" | "staysBehind" | "plan" | "messages" | "serverOwner";
   text: string;
   /** What stays behind (`staysBehind`), each with the settings section of its workspace where it is disconnected. */
   links?: { label: string; orgId: string; section: "keys" | "connectors" }[];
@@ -68,7 +75,8 @@ export const soleOwnerWaysOut = (orgId: string, settingUp: boolean) =>
     : { people: `/org/${orgId}/settings/members`, delete: `/org/${orgId}/settings/general?delete=1` };
 
 /**
- * What deleting the account does, in the person's words, from its preflight: the workspaces that close with it (one
+ * What deleting the account does, in the person's words, from its preflight: when it goes and how to come back before
+ * that, the workspaces that close with it (one
  * being deleted already on its own date) and those they leave, per workspace the computers removed and what stays
  * behind with where to disconnect each, where plans are billed (`billing`) that those they pay for stop renewing with
  * nothing refunded, that their messages stay, and, on a self-hosted server they set up, that its settings lose their
@@ -91,10 +99,10 @@ export function accountDeletionLines(
     for (const item of items) groups.set(item.orgId, [...(groups.get(item.orgId) ?? []), item]);
     return [...groups];
   };
-  const lines: AccountDeletionLine[] = [];
+  const date = formatShortDate(locale, deletionDueFrom(now));
+  const lines: AccountDeletionLine[] = [{ kind: "when", text: t("deleteAccount.when", { date }) }];
   const closing = plan.closes.filter((o) => !o.deletion);
   if (closing.length > 0) {
-    const date = formatShortDate(locale, deletionDueFrom(now));
     const text = t("deleteAccount.closes", { count: closing.length, names: names(closing), date });
     lines.push({ kind: "closes", text });
   }

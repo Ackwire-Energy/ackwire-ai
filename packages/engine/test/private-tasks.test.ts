@@ -79,9 +79,9 @@ describe("a task made in a private conversation stays there", () => {
     await expect(getIssueDetail(f.db, person(admin.id), f.org.id, { number: task.number })).rejects.toBeInstanceOf(
       NotFoundError,
     );
-    await expect(
-      updateIssue(deps(), person(admin.id), f.org.id, task.id, { status: "done" }),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(updateIssue(deps(), person(admin.id), f.org.id, task.id, { status: "done" })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
     await expect(commentIssue(deps(), person(admin.id), f.org.id, task.id, "oi")).rejects.toBeInstanceOf(NotFoundError);
     await expect(openTaskConversation(f.db, person(admin.id), f.org.id, task.id)).rejects.toBeInstanceOf(NotFoundError);
 
@@ -160,7 +160,10 @@ describe("a task made in a private conversation stays there", () => {
   test("a step of a private task, and a task made in its own conversation, stay with it", async () => {
     const { admin, call, dm } = await inDm();
     const parent = await made(call, "Fechar a folha");
-    const step = await createIssue(deps(), person(f.owner.id), f.org.id, { title: "Holerites", parentIssueId: parent.id });
+    const step = await createIssue(deps(), person(f.owner.id), f.org.id, {
+      title: "Holerites",
+      parentIssueId: parent.id,
+    });
     expect(step.channelId).toBe(dm.id);
     await expect(
       createIssue(deps(), person(admin.id), f.org.id, { title: "Olhar", parentIssueId: parent.id }),
@@ -205,7 +208,12 @@ describe("Mostrar para todos", () => {
     await shareIssueWithEveryone(deps(), person(f.owner.id), f.org.id, task.id);
     expect((await listIssues(f.db, person(admin.id), f.org.id)).map((i) => i.id)).toEqual([task.id]);
     await drainOutbox(f.db, f.handlers);
-    const hits = await searchVisible(f.context, { orgId: f.org.id, text: "folha", visibleChannelIds: [], kinds: ["issue"] });
+    const hits = await searchVisible(f.context, {
+      orgId: f.org.id,
+      text: "folha",
+      visibleChannelIds: [],
+      kinds: ["issue"],
+    });
     expect(hits.map((h) => h.sourceId)).toEqual([task.id]);
   });
 

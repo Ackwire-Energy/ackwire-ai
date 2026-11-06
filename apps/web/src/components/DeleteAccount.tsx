@@ -1,6 +1,7 @@
 import { type DeletionProofInput, useAccountDeletionPlan, useApi, useAuthConfig, useMe } from "@agenteschat/client";
-import { type AccountDeletionLine, accountDeletionLines } from "@agenteschat/client/lib/deletion";
+import { type AccountDeletionLine, accountDeletionLines, deletionDueFrom } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { formatShortDate } from "@agenteschat/client/lib/format";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { Alert, Button, Dialog, DialogBody, DialogFooter, type IconName } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,7 @@ import { useToast } from "@/lib/toast";
 import "./deletion.css";
 
 const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
+  when: "clock",
   closes: "trash",
   leaves: "arrowRight",
   computers: "computer",
@@ -28,7 +30,7 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
  * owner comes first, as a checklist with its two ways out (one still being set up is finished or deleted in its
  * onboarding). Otherwise what closes, what I leave, the computers removed, what stays behind with where to disconnect
  * it, where plans are billed that mine stop renewing, and that my messages stay without my name, then the code emailed
- * to me (or my password, where no email goes) and the button. Deleted: to the sign-in.
+ * to me (or my password, where no email goes) and the button. Done: to the sign-in, which brings it back for 7 days.
  */
 export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -45,7 +47,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
     onSuccess: async () => {
       qc.clear();
       await navigate({ to: "/login" });
-      toast.show(t("deleteAccount.deleted"));
+      toast.show(t("deleteAccount.deleted", { date: formatShortDate(i18n.language, deletionDueFrom()) }));
     },
     // A workspace that came to need me since the preflight: it shows as a blocker.
     onError: (error) => {

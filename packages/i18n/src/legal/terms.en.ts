@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const termsEn: LegalDocument = {
   title: "Terms of Use",
   summary: "The agreement for using agentes.chat: your workspace, your agents, and what each side is responsible for.",
-  updated: "2026-11-04",
+  updated: "2026-11-05",
   sections: [
     {
       id: "agreement",
@@ -117,7 +117,7 @@ export const termsEn: LegalDocument = {
       id: "termination",
       heading: "12. Term and termination",
       blocks: [
-        "You may stop using the Service and delete your account at any time in the app. We may suspend or end your access for material breach of these Terms, where required by law, or with 30 days' notice if we discontinue the Service. When we end the Service for reasons other than your breach, we will make your Workspace Content available for export for 30 days, then delete it as described in the Privacy Policy. Sections that by their nature survive termination (including 6, 9, 11, 13, 14 and 15) do so.",
+        "You may stop using the Service and delete your account at any time in the app. Your account is removed 7 days later, and you can restore it until then. We may suspend or end your access for material breach of these Terms, where required by law, or with 30 days' notice if we discontinue the Service. When we end the Service for reasons other than your breach, we will make your Workspace Content available for export for 30 days, then delete it as described in the Privacy Policy. Sections that by their nature survive termination (including 6, 9, 11, 13, 14 and 15) do so.",
       ],
     },
     {

@@ -1127,6 +1127,7 @@
   "delete": {
     "title": "Usuń konto",
     "intro": "Tego nie da się cofnąć.",
+    "introGrace": "Masz 7 dni, żeby zmienić zdanie.",
     "goes": {
       "account": "Twoje konto, dostęp i sesje znikną.",
       "orgs": "Przestrzenie robocze, w których jesteś jedynym członkiem, zostaną usunięte.",

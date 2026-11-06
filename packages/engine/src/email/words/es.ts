@@ -288,7 +288,11 @@ export const words: EmailWords = {
     subject: (day) => `Tu cuenta de agentes.chat se eliminará el ${day}`,
     preheader: "Tienes 7 días para cambiar de opinión.",
     headline: "Tu cuenta se está eliminando",
-    body: (email, day, time) => ["Eliminaremos la cuenta ", { b: email }, ` el ${day} a las ${time}. Se cerró la sesión en todas partes y nadie puede contactarte aquí hasta que vuelvas.`],
+    body: (email, day, time) => [
+      "Eliminaremos la cuenta ",
+      { b: email },
+      ` el ${day} a las ${time}. Se cerró la sesión en todas partes y nadie puede contactarte aquí hasta que vuelvas.`,
+    ],
     closes: (count, names) => [
       plural("es", count, {
         one: "El espacio de trabajo donde solo estabas tú se cerró ahora y se elimina en la misma fecha: ",
