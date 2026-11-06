@@ -25,7 +25,7 @@ import {
   type ToolNotice,
 } from "@agenteschat/adapters/machine-protocol";
 import { exitCodeOf, formatBytes, killTree, runCommand } from "./exec";
-import { resolveCommand } from "./executors";
+import { isExecutable, resolveCommand } from "./executors";
 import { touchesGitInternals } from "./git-guard";
 import { fileLines } from "./lines";
 import {
@@ -1204,11 +1204,12 @@ export class DelegatedTools {
   private rg() {
     if (this.opts.rg) return this.opts.rg;
     if (this.rgCommand) return this.rgCommand;
+    // With a shared `bin/`, `resolveCommand` answers a path for what isn't there too.
     const onPath = resolveCommand("rg");
     const claude = resolveCommand("claude");
-    this.rgCommand = onPath.includes("/")
+    this.rgCommand = isExecutable(onPath)
       ? [onPath]
-      : claude.includes("/")
+      : isExecutable(claude)
         ? ["/bin/bash", "-c", RG_IN_CLAUDE, claude]
         : ["rg"];
     return this.rgCommand;

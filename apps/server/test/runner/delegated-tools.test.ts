@@ -890,6 +890,24 @@ test("Glob stops at a hundred files, and finds none with an empty answer", async
   expect(textOf(await none.call("Glob", { pattern: "*" }))).toBe("No files found");
 });
 
+test("no rg on the PATH: the CLI's own, with a shared bin folder too, where a missing command still resolves to a path", async () => {
+  const bin = tempDir("rg-in-claude-");
+  dirs.push(bin);
+  writeFileSync(path.join(bin, "claude"), "#!/bin/sh\nexit 1\n");
+  chmodSync(path.join(bin, "claude"), 0o755);
+  const { PATH, AGENTES_SHARED_BIN } = process.env;
+  process.env.PATH = bin;
+  process.env.AGENTES_SHARED_BIN = "/home/ag-test/shared/bin";
+  try {
+    const { call } = setup();
+    expect(textOf(await call("Glob", { pattern: "*.ts" }))).not.toContain("ripgrep is not on this computer");
+  } finally {
+    process.env.PATH = PATH;
+    if (AGENTES_SHARED_BIN === undefined) delete process.env.AGENTES_SHARED_BIN;
+    else process.env.AGENTES_SHARED_BIN = AGENTES_SHARED_BIN;
+  }
+});
+
 test("Grep lists files, the newest first, the secrets' files out of the search, whatever the caller's glob", async () => {
   const fake = fakeRg("./old.ts\n./new.ts\n");
   const { call, folder } = setup({}, { rg: fake.rg, secrets: async () => ({ ...SECRETS, files: ["keys/ada.pem"] }) });
