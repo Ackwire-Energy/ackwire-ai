@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SidebarItem } from "../src/api/types";
-import { moveSection, moveShownTool, placeTool, SIDEBAR_ITEMS } from "../src/lib/sidebar-items";
+import { knownToolOrder, moveSection, moveShownTool, placeTool, SIDEBAR_ITEMS } from "../src/lib/sidebar-items";
 
 const order: SidebarItem[] = [...SIDEBAR_ITEMS];
 
@@ -22,6 +22,14 @@ describe("the tools' order", () => {
     expect(down.filter((x) => shown.includes(x))).toEqual(["issues", "threads", "drive"]);
     expect(moveShownTool(order, shown, "threads", -1)).toEqual(order);
     expect(moveShownTool(order, shown, "drive", 1)).toEqual(order);
+  });
+
+  test("a tool this build has no page for is dropped, one the saved order lacks comes last", () => {
+    const saved = ["drive", "from_a_newer_server", "threads"] as SidebarItem[];
+    const known = knownToolOrder(saved);
+    expect(known.slice(0, 2)).toEqual(["drive", "threads"]);
+    expect([...known].sort()).toEqual([...SIDEBAR_ITEMS].sort());
+    expect(knownToolOrder([])).toEqual(order);
   });
 
   test("the setup dialog moves a tool one place in the whole order", () => {

@@ -114,10 +114,12 @@ export function createAnthropicProvider(
             ]
           : []),
       ];
+      const forced = Boolean(answerSchema && compat?.toolChoiceAny);
       // `none`: thinking off where the model allows it, `low` elsewhere. With thinking off a compatible
-      // endpoint gets no effort: MiniMax takes one only on the model that always thinks.
-      const thinkingOff = request.effort === "none" && info?.leastThinking === "off";
-      const asked = request.effort === "none" ? (thinkingOff && compat ? undefined : "low") : request.effort;
+      // endpoint gets no effort: MiniMax takes one only on the model that always thinks. A forced tool is refused
+      // while the model thinks, so that answer goes without thinking, or unforced on a model that always thinks.
+      const thinkingOff = (request.effort === "none" || forced) && info?.leastThinking === "off";
+      const asked = thinkingOff && compat ? undefined : request.effort === "none" ? "low" : request.effort;
       const effort = compat && asked === "medium" ? "high" : asked;
       const partial: PartialUsage = {
         inputTokens: null,
@@ -146,7 +148,7 @@ export function createAnthropicProvider(
           ),
           ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
           ...(tools.length > 0 ? { tools } : {}),
-          ...(answerSchema && compat?.toolChoiceAny ? { tool_choice: { type: "any" as const } } : {}),
+          ...(forced && thinkingOff ? { tool_choice: { type: "any" as const } } : {}),
           ...(thinkingOff
             ? { thinking: { type: "disabled" as const } }
             : bind
@@ -456,6 +458,8 @@ function toProviderError(error: unknown): ProviderError {
   if (error instanceof Anthropic.APIError) {
     const status = error.status;
     const said = saidIn(error);
+    // Failed mid-stream with no words: the request was taken, so nothing says it was refused.
+    if (status === undefined && !said && !error.type) return new ProviderError("provider error", true);
     const what = [status ?? "?", error.type].filter(Boolean).join(" ");
     return new ProviderError(
       `provider rejected the request (${what})${said ? `: ${said}` : ""}`,
