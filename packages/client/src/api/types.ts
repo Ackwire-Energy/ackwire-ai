@@ -3237,6 +3237,8 @@ export interface Issue {
   /** The channel it lives in (from a message, or chosen). */
   channelId: string | null;
   pullRequests: { number: number; url: string; openedBy: Actor | null }[];
+  /** The GitHub issue or pull request it is about: only a link, nothing syncs. */
+  githubUrl: string | null;
   artifacts: { id: string; title: string; createdBy: Actor }[];
   work?: IssueWork | null;
   /** Background work stopped on something (ADR 0121): a badge, the card stays in its stage. */
@@ -3294,12 +3296,16 @@ export interface IssueInput {
   priority?: IssuePriority;
   dueDate?: string | null;
   labels?: string[];
+  githubUrl?: string | null;
   /** Drive files uploaded from the new-issue box (only on create): linked to the issue. */
   attachmentIds?: string[];
 }
 
 export type IssuePatch = Partial<
-  Pick<Issue, "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "labels" | "boardRank">
+  Pick<
+    Issue,
+    "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "labels" | "boardRank" | "githubUrl"
+  >
 > & {
   /** Move to a board column: the issue takes that column's stage. */
   columnId?: string;

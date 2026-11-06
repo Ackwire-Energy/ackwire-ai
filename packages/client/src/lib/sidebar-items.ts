@@ -44,6 +44,14 @@ export function moveSection<T extends string>(order: readonly T[], section: T, b
   return next;
 }
 
+/**
+ * The saved order as this build can show it: only the tools it knows, then any the order lacks. A tab left open across
+ * a deploy reads a newer server's tools, and a tool it has no page for would break the sidebar.
+ */
+export const knownToolOrder = (saved: readonly SidebarItem[]): SidebarItem[] => [
+  ...new Set([...saved.filter((id) => SIDEBAR_ITEMS.includes(id)), ...SIDEBAR_ITEMS]),
+];
+
 export const sameOrder = (a: readonly string[], b: readonly string[]) => a.join() === b.join();
 
 /** `order` with `item` put just before or after `target`; the same order when either isn't in it or they're one. */

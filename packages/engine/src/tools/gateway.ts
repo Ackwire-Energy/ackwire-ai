@@ -847,7 +847,7 @@ export function createToolGateway(deps: {
       .update(approvals)
       .set({ result: { content: shown(output.content), isError: output.isError === true } })
       .where(sql`${approvals.id} = ${approval.id}`);
-    recordRead(ctx.runId, approval.tool, output.content);
+    recordRead(ctx.runId, approval.tool, output.content, output.data, approval.params);
     await addRunStep(ctx.db, { id: ctx.runId, orgId: ctx.orgId }, "tool_result", {
       toolUseId,
       name: approval.tool,
@@ -986,7 +986,7 @@ export function createToolGateway(deps: {
         // A result read from outside marks the run (`runReadOutside`, ADR 0117), an error too: its text came from there.
         const outside = ran && tool && readsOutsideText(tool, output) ? { outside: true } : null;
         const data = output.data || outside ? { ...output.data, ...outside } : null;
-        recordRead(ctx.runId, call.name, output.content);
+        recordRead(ctx.runId, call.name, output.content, output.data, call.input);
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,

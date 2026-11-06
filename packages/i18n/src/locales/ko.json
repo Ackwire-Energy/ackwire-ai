@@ -2570,6 +2570,7 @@
       "assignee": "담당자",
       "labels": "라벨",
       "dueDate": "마감일",
+      "githubUrl": "GitHub 링크",
       "criteria": "기준"
     },
     "routineFields": {
@@ -2920,6 +2921,7 @@
     "computerAway": "{{agent}}의 컴퓨터가 지금 응답하지 않아요. 이 요청은 {{time}}까지 열려 있어요. 잠시 후 다시 시도하세요.",
     "computerPaused": "소유자가 {{agent}}의 컴퓨터를 일시 중지했어요. 이 요청은 {{time}}까지 열려 있어요.",
     "failed": "전달하지 못했어요. 에이전트의 컴퓨터가 켜져 있나요?",
+    "changed": "답하는 동안 이 요청이 바뀌었어요. 아무것도 보내지 않았어요. 다시 보내 주세요.",
     "empty": "값을 입력하세요.",
     "tooLarge": "너무 커요(최대 16KB)."
   },
@@ -5766,6 +5768,12 @@
     "prBy": "PR #{{number}} · {{name}}이(가) 엶",
     "artifactBy": "{{title}}({{name}})",
     "noLinks": "아직 연결된 항목이 없어요.",
+    "github": {
+      "label": "GitHub 링크",
+      "placeholder": "이슈 또는 PR 링크",
+      "invalid": "GitHub 이슈나 풀 리퀘스트 링크가 아니에요.",
+      "remove": "GitHub 링크 삭제"
+    },
     "openConversation": "대화 보기",
     "labels": "라벨",
     "tabs": {
@@ -5803,6 +5811,8 @@
       "due_date_set": "마감일을 {{date}}(으)로 정했어요",
       "due_date_removed": "마감일을 없앴어요",
       "pr_linked": "PR #{{number}}을(를) 연결했어요",
+      "github_linked": "GitHub에 연결했습니다",
+      "github_unlinked": "GitHub 링크를 삭제했습니다",
       "artifact_linked": "파일을 첨부했어요",
       "criterion_checked": "조건 \"{{text}}\"을(를) 체크했어요",
       "criterion_unchecked": "조건 \"{{text}}\"의 체크를 해제했어요",

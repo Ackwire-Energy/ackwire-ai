@@ -2766,6 +2766,7 @@
       "assignee": "l'assegnatario",
       "labels": "le etichette",
       "dueDate": "la scadenza",
+      "githubUrl": "il link GitHub",
       "criteria": "i criteri"
     },
     "routineFields": {
@@ -3134,6 +3135,7 @@
     "computerAway": "Il computer di {{agent}} non risponde in questo momento. Questa richiesta resta aperta fino alle {{time}}. Riprova tra un attimo.",
     "computerPaused": "Il computer di {{agent}} è in pausa per scelta del proprietario. Questa richiesta resta aperta fino alle {{time}}.",
     "failed": "Non è stato possibile consegnarlo. Il computer dell'agente è acceso?",
+    "changed": "Questa richiesta è cambiata mentre rispondevi. Non è stato inviato nulla. Inviala di nuovo.",
     "empty": "Scrivi il valore.",
     "tooLarge": "Troppo grande (massimo 16 KB)."
   },
@@ -6230,6 +6232,12 @@
     "prBy": "PR #{{number}} · aperta da {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Ancora niente di collegato.",
+    "github": {
+      "label": "Link GitHub",
+      "placeholder": "Link di issue o PR",
+      "invalid": "Questo non è il link di una issue o pull request di GitHub.",
+      "remove": "Rimuovi il link GitHub"
+    },
     "openConversation": "Vedi conversazione",
     "labels": "Etichette",
     "tabs": {
@@ -6267,6 +6275,8 @@
       "due_date_set": "ha impostato la scadenza al {{date}}",
       "due_date_removed": "ha rimosso la scadenza",
       "pr_linked": "ha collegato la PR #{{number}}",
+      "github_linked": "l'ha collegata a GitHub",
+      "github_unlinked": "ha rimosso il link GitHub",
       "artifact_linked": "ha allegato un file",
       "criterion_checked": "ha spuntato il criterio \"{{text}}\"",
       "criterion_unchecked": "ha tolto la spunta al criterio \"{{text}}\"",

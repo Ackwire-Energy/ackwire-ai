@@ -22,6 +22,12 @@ import { untrustedBlock } from "./untrusted";
 
 export const UPDATE_ISSUE_TOOL = "update_issue";
 
+const GITHUB_URL_FIELD = {
+  type: "string",
+  maxLength: 500,
+  description: 'Link of the GitHub issue or PR this is about; "" removes it',
+};
+
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const actorOf = (ctx: ToolContext): IssueActor => ({
   type: "agent",
@@ -71,6 +77,7 @@ async function describeIssue(deps: IssueDeps, ctx: ToolContext, i: IssueView) {
       : "",
     criteria ? `Acceptance criteria:\n${criteria}` : "",
     i.pullRequests.length ? `PRs: ${i.pullRequests.map((p) => p.url).join(", ")}` : "",
+    i.githubUrl ? `GitHub: ${i.githubUrl}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -212,6 +219,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           labels: { type: "array", items: { type: "string", maxLength: 40 }, maxItems: 10 },
           assignee: assigneeField,
           due_date: { type: "string", maxLength: 10, description: "Due date as YYYY-MM-DD" },
+          github_url: GITHUB_URL_FIELD,
         },
         required: ["title"],
         additionalProperties: false,
@@ -230,6 +238,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
                 labels: Array.isArray(input.labels) ? input.labels.map(String) : undefined,
                 ...(assignee !== undefined ? { assignee } : {}),
                 ...(str(input.due_date) ? { dueDate: str(input.due_date) } : {}),
+                ...(str(input.github_url) ? { githubUrl: str(input.github_url) } : {}),
               }),
             (created) => ({
               kind: "issue.created",
@@ -269,6 +278,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             maxLength: 10,
             description: 'Due date as YYYY-MM-DD; "" removes it',
           },
+          github_url: GITHUB_URL_FIELD,
           pull_request_url: { type: "string", maxLength: 500 },
           pull_request_number: { type: "integer", minimum: 1 },
           done_criteria: {
@@ -304,6 +314,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
                 ...(assignee !== undefined ? { assignee } : {}),
                 ...(Array.isArray(input.labels) ? { labels: input.labels.map(String) } : {}),
                 ...(due !== undefined ? { dueDate: due || null } : {}),
+                ...(typeof input.github_url === "string" ? { githubUrl: input.github_url } : {}),
                 ...(url && prNumber ? { addPullRequest: { number: prNumber, url } } : {}),
               });
               const done = Array.isArray(input.done_criteria) ? input.done_criteria.map(Number) : [];

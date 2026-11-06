@@ -6,6 +6,7 @@ import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/c
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import {
   latestSecret,
+  secretClosedBy,
   secretLabel,
   secretRefusalKey,
   secretRequestOf,
@@ -1420,6 +1421,20 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     expect(secretRefusalKey({ code: "machine.offline" })).toBe("secret.computerAway");
     expect(secretRefusalKey({ code: "machine.paused" })).toBe("secret.computerPaused");
     expect(secretRefusalKey({ code: "secret.closed" })).toBeNull();
+  });
+
+  test("a 409 ends the card as the request really ended, and an open one stays open", () => {
+    const r = request as SecretRequest;
+    const refusal = (params?: object) => ({ code: "secret.closed", status: 409, params });
+    const ended = { ...r, status: "declined" as const };
+    expect(secretClosedBy(refusal(), r, ended)).toBe(ended);
+    // Reading it again failed: the refusal itself says how it ended.
+    const changed = secretClosedBy(refusal({ status: "canceled", endReason: "computer_changed" }), r, null);
+    expect(changed).toMatchObject({ status: "canceled", endReason: "computer_changed", publicKey: null });
+    expect(secretClosedBy(refusal({ status: "expired" }), r, null)?.status).toBe("expired");
+    // Still open: nothing says it ended, so the card doesn't either.
+    expect(secretClosedBy({ code: "conflict", status: 409 }, r, r)).toBeNull();
+    expect(secretClosedBy(refusal(), r, null)).toBeNull();
   });
 
   test("an empty or too large value is caught before it is sealed", async () => {

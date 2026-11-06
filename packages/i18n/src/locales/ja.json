@@ -2572,6 +2572,7 @@
       "assignee": "担当者",
       "labels": "ラベル",
       "dueDate": "期日",
+      "githubUrl": "GitHub リンク",
       "criteria": "完了条件"
     },
     "routineFields": {
@@ -2922,6 +2923,7 @@
     "computerAway": "{{agent}}のコンピューターが今は応答していません。このリクエストは{{time}}まで開いています。少ししてからもう一度お試しください。",
     "computerPaused": "{{agent}}のコンピューターは所有者が一時停止しています。このリクエストは{{time}}まで開いています。",
     "failed": "送信できませんでした。エージェントのコンピューターの電源は入っていますか？",
+    "changed": "回答中にこのリクエストが変更されました。何も送信されていません。もう一度送信してください。",
     "empty": "値を入力してください。",
     "tooLarge": "大きすぎます（最大16 KB）。"
   },
@@ -5769,6 +5771,12 @@
     "prBy": "PR #{{number}} · 作成者: {{name}}",
     "artifactBy": "{{title}}（{{name}}）",
     "noLinks": "リンクされたものはまだありません。",
+    "github": {
+      "label": "GitHub リンク",
+      "placeholder": "Issue または PR のリンク",
+      "invalid": "GitHub の Issue または Pull Request のリンクではありません。",
+      "remove": "GitHub リンクを削除"
+    },
     "openConversation": "会話を見る",
     "labels": "ラベル",
     "tabs": {
@@ -5806,6 +5814,8 @@
       "due_date_set": "期日を{{date}}に設定しました",
       "due_date_removed": "期日を削除しました",
       "pr_linked": "PR #{{number}}をリンクしました",
+      "github_linked": "GitHub にリンクしました",
+      "github_unlinked": "GitHub リンクを削除しました",
       "artifact_linked": "ファイルを添付しました",
       "criterion_checked": "条件「{{text}}」にチェックを入れました",
       "criterion_unchecked": "条件「{{text}}」のチェックを外しました",

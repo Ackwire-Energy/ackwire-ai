@@ -2673,6 +2673,7 @@
       "assignee": "die zuständige Person",
       "labels": "die Labels",
       "dueDate": "das Fälligkeitsdatum",
+      "githubUrl": "den GitHub-Link",
       "criteria": "die Kriterien"
     },
     "routineFields": {
@@ -3032,6 +3033,7 @@
     "computerAway": "Der Computer von {{agent}} antwortet gerade nicht. Diese Anfrage bleibt bis {{time}} offen. Versuche es gleich noch einmal.",
     "computerPaused": "Der Computer von {{agent}} wurde von seinem Besitzer pausiert. Diese Anfrage bleibt bis {{time}} offen.",
     "failed": "Konnte es nicht übermitteln. Ist der Computer des Agenten eingeschaltet?",
+    "changed": "Diese Anfrage hat sich geändert, während du geantwortet hast. Nichts wurde gesendet. Sende sie noch einmal.",
     "empty": "Gib den Wert ein.",
     "tooLarge": "Zu groß (höchstens 16 KB)."
   },
@@ -5997,6 +5999,12 @@
     "prBy": "PR #{{number}} · geöffnet von {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Noch nichts verknüpft.",
+    "github": {
+      "label": "GitHub-Link",
+      "placeholder": "Issue- oder PR-Link",
+      "invalid": "Das ist kein Link zu einem GitHub-Issue oder Pull Request.",
+      "remove": "GitHub-Link entfernen"
+    },
     "openConversation": "Unterhaltung ansehen",
     "labels": "Labels",
     "tabs": {
@@ -6034,6 +6042,8 @@
       "due_date_set": "hat das Fälligkeitsdatum auf {{date}} gesetzt",
       "due_date_removed": "hat das Fälligkeitsdatum entfernt",
       "pr_linked": "hat PR #{{number}} verknüpft",
+      "github_linked": "hat es mit GitHub verknüpft",
+      "github_unlinked": "hat den GitHub-Link entfernt",
       "artifact_linked": "hat eine Datei angehängt",
       "criterion_checked": "hat das Kriterium „{{text}}“ abgehakt",
       "criterion_unchecked": "hat das Kriterium „{{text}}“ wieder geöffnet",

@@ -37,7 +37,13 @@ import { replyOf } from "../lib/reply";
 import { firstVisitOf } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
-import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
+import {
+  knownToolOrder,
+  SIDEBAR_DEFAULTS,
+  SIDEBAR_ITEMS,
+  SIDEBAR_SECTIONS,
+  withSidebarPlace,
+} from "../lib/sidebar-items";
 import { SIDEBAR_VIEW_DEFAULT } from "../lib/sidebar-view";
 import { playSound } from "../lib/sounds";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
@@ -5095,7 +5101,7 @@ export const useSidebarToolOrder = (orgId: string): SidebarItem[] => {
     queryFn: () => api.orgs.sidebarToolOrder(orgId),
     staleTime: 60_000,
   }).data;
-  return saved ? [...new Set([...saved, ...SIDEBAR_ITEMS])] : [...SIDEBAR_ITEMS];
+  return knownToolOrder(saved ?? []);
 };
 
 /** Saves my order of the tools (`null`: the default): the sidebar changes at once and goes back if the server refuses. */

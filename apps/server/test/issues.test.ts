@@ -24,6 +24,13 @@ test("issues API: create, by number, patch, criteria, comments, activity, ask ag
   ).toMatchObject({
     status: "in_progress",
   });
+  const githubUrl = "https://github.com/acme/app/issues/12";
+  const linked = await api(`/issues/${issue.id}`, { method: "PATCH", json: { githubUrl } });
+  expect(await linked.json()).toMatchObject({ githubUrl });
+  const notGithub = { githubUrl: "https://example.org/a/b/issues/1" };
+  expect((await api(`/issues/${issue.id}`, { method: "PATCH", json: notGithub })).status).toBe(400);
+  const unlinked = await api(`/issues/${issue.id}`, { method: "PATCH", json: { githubUrl: null } });
+  expect(await unlinked.json()).toMatchObject({ githubUrl: null });
   const criterion = await api(`/issues/${issue.id}/criteria/${issue.criteria[0]?.id}`, {
     method: "PUT",
     json: { done: true },
@@ -41,6 +48,8 @@ test("issues API: create, by number, patch, criteria, comments, activity, ask ag
   expect(activity.activity.map((a) => a.event ?? a.kind)).toEqual([
     "created",
     "status_changed",
+    "github_link",
+    "github_link",
     "criterion_checked",
     "assigned",
     "agent_asked",

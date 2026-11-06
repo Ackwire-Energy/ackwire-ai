@@ -2583,6 +2583,7 @@
       "assignee": "penanggung jawab",
       "labels": "label",
       "dueDate": "tenggat",
+      "githubUrl": "tautan GitHub",
       "criteria": "kriteria"
     },
     "routineFields": {
@@ -2933,6 +2934,7 @@
     "computerAway": "Komputer {{agent}} tidak merespons saat ini. Permintaan ini tetap terbuka sampai {{time}}. Coba lagi sebentar lagi.",
     "computerPaused": "Komputer {{agent}} dijeda oleh pemiliknya. Permintaan ini tetap terbuka sampai {{time}}.",
     "failed": "Tidak bisa dikirim. Apakah komputer agen menyala?",
+    "changed": "Permintaan ini berubah saat kamu menjawab. Tidak ada yang terkirim. Kirim lagi.",
     "empty": "Ketik nilainya.",
     "tooLarge": "Terlalu besar (maks. 16 KB)."
   },
@@ -5806,6 +5808,12 @@
     "prBy": "PR #{{number}} · dibuka oleh {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Belum ada yang ditautkan.",
+    "github": {
+      "label": "Tautan GitHub",
+      "placeholder": "Tautan issue atau PR",
+      "invalid": "Itu bukan tautan issue atau pull request GitHub.",
+      "remove": "Hapus tautan GitHub"
+    },
     "openConversation": "Lihat percakapan",
     "labels": "Label",
     "tabs": {
@@ -5843,6 +5851,8 @@
       "due_date_set": "mengatur tenggat ke {{date}}",
       "due_date_removed": "menghapus tenggat",
       "pr_linked": "menautkan PR #{{number}}",
+      "github_linked": "menautkannya ke GitHub",
+      "github_unlinked": "menghapus tautan GitHub",
       "artifact_linked": "melampirkan file",
       "criterion_checked": "mencentang kriteria \"{{text}}\"",
       "criterion_unchecked": "menghapus centang kriteria \"{{text}}\"",

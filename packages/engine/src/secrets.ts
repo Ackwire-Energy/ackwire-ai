@@ -261,8 +261,21 @@ const deliveryOrder = (row: SecretRequestRow) => {
   return `${row.deliveredAt.toISOString()}|${row.id}`;
 };
 
-/** A request that ended (`secret.closed`): a computer that can't take it now answers its own code, and it stays open. */
-const closedRequest = () => new ConflictError("This request was already answered or expired", "secret.closed");
+/**
+ * A request that ended (`secret.closed`), with how it ended so the card can say it even if it can't read the request
+ * again. A computer that can't take it now answers its own code, and it stays open.
+ */
+const closedRequest = (row: SecretRequestRow) =>
+  new ConflictError("This request was already answered or expired", "secret.closed", {
+    status: statusOf(row),
+    endReason: row.endReason,
+  });
+
+/** `closedRequest` as the request stands now: what ended it happened after `row` was read. */
+async function closedNow(db: Database, row: SecretRequestRow) {
+  const [current] = await db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
+  return closedRequest(current ?? row);
+}
 
 /** The computer that made the request's key is no longer the agent's, was removed, or no longer has the key. */
 const keyIsGone = (error: unknown) =>
@@ -498,7 +511,7 @@ export async function deliverSecret(
   rawBox: unknown,
 ): Promise<SecretRequestView> {
   const row = await loadForRequester(deps.db, actorId, orgId, requestId);
-  if (statusOf(row) !== "pending") throw closedRequest();
+  if (statusOf(row) !== "pending") throw closedRequest(row);
   const box = parseSecretBox(rawBox);
   if (!box) throw new ValidationError("Invalid secret box");
   const target = targetOf(row);
@@ -509,7 +522,7 @@ export async function deliverSecret(
     // No computer can open this box anymore: the request ends here, or its card would go on taking values for nothing.
     if (!keyIsGone(error)) throw error;
     await closeRequest(deps, row, "computer_changed");
-    throw closedRequest();
+    throw await closedNow(deps.db, row);
   });
   let delivered: SecretRequestRow | null;
   try {
@@ -568,7 +581,7 @@ export async function deliverSecret(
   if (!delivered) {
     const recovered = await reconcileStagedDelivery(deps, row);
     if (recovered) return recovered;
-    throw closedRequest();
+    throw await closedNow(deps.db, row);
   }
   try {
     await activateDeliveredSecret(deps, orgId, row.id);
@@ -716,7 +729,7 @@ export async function declineSecret(
     });
     return updated;
   });
-  if (!declined) throw closedRequest();
+  if (!declined) throw await closedNow(deps.db, row);
   await publishSecret(deps, declined, "secret.updated");
   const sandbox = deps.sandbox;
   if (sandbox) {

@@ -6406,6 +6406,9 @@
   "agentActions.issueFields.dueDate": {
     "value": "the due date"
   },
+  "agentActions.issueFields.githubUrl": {
+    "value": "the GitHub link"
+  },
   "agentActions.issueFields.criteria": {
     "value": "the criteria"
   },
@@ -7361,6 +7364,9 @@
   },
   "secret.failed": {
     "value": "Couldn't deliver it. Is the agent's computer on?"
+  },
+  "secret.changed": {
+    "value": "This request changed while you answered. Nothing was sent. Send it again."
   },
   "secret.empty": {
     "value": "Type the value."
@@ -14515,6 +14521,18 @@
   "issues.noLinks": {
     "value": "Nothing linked yet."
   },
+  "issues.github.label": {
+    "value": "GitHub link"
+  },
+  "issues.github.placeholder": {
+    "value": "Issue or PR link"
+  },
+  "issues.github.invalid": {
+    "value": "That isn't the link of a GitHub issue or pull request."
+  },
+  "issues.github.remove": {
+    "value": "Remove the GitHub link"
+  },
   "issues.openConversation": {
     "value": "View conversation"
   },
@@ -14604,6 +14622,12 @@
   },
   "issues.event.pr_linked": {
     "value": "linked PR #{{number}}"
+  },
+  "issues.event.github_linked": {
+    "value": "linked it to GitHub"
+  },
+  "issues.event.github_unlinked": {
+    "value": "removed the GitHub link"
   },
   "issues.event.artifact_linked": {
     "value": "attached a file"

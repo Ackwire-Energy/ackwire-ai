@@ -1720,6 +1720,11 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   align-items: center;
   min-width: 0;
 }
+.ac-select__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .ac-select__trigger[data-placeholder] .ac-select__value {
   color: var(--ink-muted);
 }

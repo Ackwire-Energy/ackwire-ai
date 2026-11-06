@@ -2061,7 +2061,7 @@ export async function suggestWikiPages(db: Database, actor: WikiActor, orgId: st
       ),
     )
     .orderBy(
-      q ? sql`case when ${wikiPages.title} ilike ${`${esc}%`} then 0 else 1 end` : sql`0`,
+      ...(q ? [sql`case when ${wikiPages.title} ilike ${`${esc}%`} then 0 else 1 end`] : []),
       desc(wikiPages.updatedAt),
     )
     .limit(Math.min(limit, 50));

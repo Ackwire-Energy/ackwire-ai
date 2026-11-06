@@ -248,6 +248,36 @@ describe("secret requests (ADR 0027)", () => {
     expect(screen().queryByDisplayValue("npm_live_abc123")).toBeNull();
   });
 
+  test("the request can't be read again: the 409 itself says how it ended", async () => {
+    const pair = await generateSecretKeyPair();
+    const { api } = await withRequest("u-walter", pair.publicKey);
+    api.secrets.deliver = () =>
+      Promise.reject(
+        new ApiError(409, "secret.closed", "closed", { status: "canceled", endReason: "computer_changed" }),
+      );
+    api.secrets.get = () => Promise.reject(new TypeError("Failed to fetch"));
+    const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    await type(within(card).getByLabelText(KEY_LABEL), "npm_live_abc123");
+    await click(within(card).getByRole("button", { name: "Enviar" }));
+    await settle(6);
+    const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    expect(done.textContent).toContain("o computador que pediu mudou");
+    expect(done.textContent).not.toContain("fechou antes da resposta");
+  });
+
+  test("a 409 on a request still open keeps it open and says to send again, never that it closed", async () => {
+    const pair = await generateSecretKeyPair();
+    const { api } = await withRequest("u-walter", pair.publicKey);
+    api.secrets.deliver = () => Promise.reject(new ApiError(409, "conflict", "conflict"));
+    const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    const field = within(card).getByLabelText(KEY_LABEL) as HTMLInputElement;
+    await type(field, "npm_live_abc123");
+    await click(within(card).getByRole("button", { name: "Enviar" }));
+    await settle(6);
+    expect(card.textContent).toContain("Este pedido mudou enquanto você respondia.");
+    expect(field.value).toBe("npm_live_abc123");
+  });
+
   test("its computer is away: the request stays open and says so, with the typed value kept to send again", async () => {
     const pair = await generateSecretKeyPair();
     const { api } = await withRequest("u-walter", pair.publicKey);

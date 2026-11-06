@@ -24,8 +24,8 @@ export interface ProviderInfo {
   baseURL?: string;
   /**
    * Another company's Anthropic-compatible endpoint, sent only what it takes
-   * (`createAnthropicProvider`). `toolChoiceAny`: it honors `tool_choice: any`,
-   * so structured output can force its tool.
+   * (`createAnthropicProvider`). `toolChoiceAny`: it honors `tool_choice: any`
+   * with thinking off, so structured output can force its tool.
    */
   compat?: { toolChoiceAny: boolean };
 }

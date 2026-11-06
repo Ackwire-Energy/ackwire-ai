@@ -4,6 +4,7 @@ import { type ReactNode, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { GitHubMark } from "./GitHubMark";
 
 const BRAND: Record<SignInProvider, ReactNode> = {
   google: (
@@ -23,11 +24,7 @@ const BRAND: Record<SignInProvider, ReactNode> = {
       />
     </svg>
   ),
-  github: (
-    <svg className="auth-social__mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 1.5a10.5 10.5 0 0 0-3.3 20.5c.5.1.7-.2.7-.5v-1.8c-2.9.6-3.5-1.4-3.5-1.4-.5-1.2-1.2-1.5-1.2-1.5-.9-.7.1-.6.1-.6 1 .1 1.6 1.1 1.6 1.1.9 1.6 2.5 1.1 3.1.9.1-.7.4-1.1.7-1.4-2.3-.3-4.8-1.2-4.8-5.2 0-1.1.4-2.1 1.1-2.8-.1-.3-.5-1.4.1-2.8 0 0 .9-.3 2.9 1.1a10 10 0 0 1 5.2 0c2-1.4 2.9-1.1 2.9-1.1.6 1.4.2 2.5.1 2.8.7.7 1.1 1.7 1.1 2.8 0 4-2.5 4.9-4.8 5.2.4.3.7 1 .7 2v2.9c0 .3.2.6.7.5A10.5 10.5 0 0 0 12 1.5Z" />
-    </svg>
-  ),
+  github: <GitHubMark className="auth-social__mark" />,
   apple: (
     <svg className="auth-social__mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9a5 5 0 0 0-4.2 2.6c-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.5 1.3 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.5a10 10 0 0 0 1.4-2.8c-.1 0-2.6-1-2.6-4.1ZM13.9 5c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4Z" />

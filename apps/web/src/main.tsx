@@ -23,6 +23,7 @@ import {
   VERSION_CHECK_MS,
 } from "./lib/app-version";
 import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
+import { tolerateForeignDomEdits } from "./lib/dom-guard";
 import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { catchEarlyErrors, reportError, setErrorScope, startErrorReports } from "./lib/error-reports";
 import { pageScrollReset } from "./lib/page-scroll";
@@ -37,6 +38,7 @@ import { routeTree } from "./routeTree.gen";
 // Errors from the very start wait for the server to say where reports go (ADR 0104), asked before anything that can
 // fail to load (the locale's chunk): a boot that breaks is reported too.
 catchEarlyErrors();
+tolerateForeignDomEdits();
 const api = createApiClient();
 const authConfig = api.account.authConfig();
 void authConfig.then(

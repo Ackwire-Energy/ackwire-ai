@@ -1,6 +1,7 @@
 import type { Actor, Issue, IssueColumn, IssuePriority, IssueStatus, IssuesView } from "@agenteschat/client";
 import { useIssueColumns, useIssues, useIssuesView, useSetIssuesView } from "@agenteschat/client";
 import { dueLabel, relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { githubLinkLabel } from "@agenteschat/client/lib/github-link";
 import { ISSUES_VIEW_DEFAULT, PRIORITY_ORDER, sortIssues } from "@agenteschat/client/lib/issues-view";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -26,6 +27,7 @@ import { AskAgentButton } from "@/components/AskAgentButton";
 import { actorFromKey, actorKey, NO_ACTOR, useActors } from "@/components/actors";
 import { IssueCardWork } from "@/components/BackgroundWork";
 import { useFilterCopy } from "@/components/filters";
+import { GitHubMark } from "@/components/GitHubMark";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { TaskCardConversation } from "@/components/TaskConversation";
@@ -686,6 +688,15 @@ function withMenuKeys(menu: ReturnType<ReturnType<typeof useIssueMenu>>, drag: C
   };
 }
 
+/** The task's GitHub link on its row: the row opens the task, the page opens the link. */
+function GithubChip({ url }: { url: string }) {
+  return (
+    <Chip lead={<GitHubMark />} className="issue-card__pr" title={url}>
+      {githubLinkLabel(url)}
+    </Chip>
+  );
+}
+
 function IssueCard({
   issue: i,
   selected,
@@ -705,6 +716,7 @@ function IssueCard({
   const { org } = useOrg();
   const color = useAssigneeColor();
   const pr = fields.pullRequest ? i.pullRequests.at(-1) : undefined;
+  const github = fields.pullRequest ? i.githubUrl : null;
   const menu = useIssueMenu()(i, () => !selected && onOpen());
   return (
     <Link
@@ -739,10 +751,11 @@ function IssueCard({
       )}
       {fields.criteria && <Criteria issue={i} />}
       <IssueCardWork issue={i} />
-      {(fields.assignee || pr) && (
+      {(fields.assignee || pr || github) && (
         <span className="issue-card__foot">
           {fields.assignee && <WhoLine issue={i} />}
           <span className="issue-card__grow" />
+          {github && <GithubChip url={github} />}
           {pr && (
             <Chip icon="pullRequest" className="issue-card__pr">
               {t("issues.pr", { number: pr.number })}
@@ -900,6 +913,7 @@ function IssueRows({
               <span className="issue-list__title">
                 <b>{i.title}</b>
                 {fields.priority && <PriorityChip issue={i} />}
+                {fields.pullRequest && i.githubUrl && <GithubChip url={i.githubUrl} />}
               </span>
               <span className="issue-list__crit">{fields.criteria && <Criteria issue={i} />}</span>
               <span className="issue-list__who">{fields.assignee && <WhoLine issue={i} />}</span>

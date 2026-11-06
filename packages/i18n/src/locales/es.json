@@ -2762,6 +2762,7 @@
       "assignee": "el responsable",
       "labels": "las etiquetas",
       "dueDate": "la fecha de entrega",
+      "githubUrl": "el enlace de GitHub",
       "criteria": "los criterios"
     },
     "routineFields": {
@@ -3130,6 +3131,7 @@
     "computerAway": "La computadora de {{agent}} no responde ahora. Esta solicitud sigue abierta hasta las {{time}}. Inténtalo de nuevo en un momento.",
     "computerPaused": "Su dueño pausó la computadora de {{agent}}. Esta solicitud sigue abierta hasta las {{time}}.",
     "failed": "No se pudo entregar. ¿La computadora del agente está encendida?",
+    "changed": "Esta solicitud cambió mientras respondías. No se envió nada. Envíala de nuevo.",
     "empty": "Escribe el valor.",
     "tooLarge": "Demasiado grande (16 KB como máximo)."
   },
@@ -6172,6 +6174,12 @@
     "prBy": "PR #{{number}} · abierto por {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Todavía no hay nada vinculado.",
+    "github": {
+      "label": "Enlace de GitHub",
+      "placeholder": "Enlace del issue o PR",
+      "invalid": "Ese no es el enlace de un issue o pull request de GitHub.",
+      "remove": "Quitar el enlace de GitHub"
+    },
     "openConversation": "Ver conversación",
     "labels": "Etiquetas",
     "tabs": {
@@ -6209,6 +6217,8 @@
       "due_date_set": "puso la fecha límite el {{date}}",
       "due_date_removed": "quitó la fecha límite",
       "pr_linked": "vinculó el PR #{{number}}",
+      "github_linked": "lo enlazó a GitHub",
+      "github_unlinked": "quitó el enlace de GitHub",
       "artifact_linked": "adjuntó un archivo",
       "criterion_checked": "marcó el criterio \"{{text}}\"",
       "criterion_unchecked": "desmarcó el criterio \"{{text}}\"",

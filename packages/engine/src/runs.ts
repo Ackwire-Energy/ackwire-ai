@@ -295,18 +295,33 @@ export async function releaseProfileTurns(db: Executor, runId: string) {
 
 export type StepKind = (typeof schema.agentRunStepKindEnum.enumValues)[number];
 
-/** Appends a step to a run's trail (numbered in order). */
+/** Tries for a free number: tool calls that run side by side each lose at most to the others. */
+const STEP_TRIES = 20;
+
+/**
+ * Appends a step to a run's trail (numbered in order). Two at once read the same last number, and the unique
+ * `(run_id, seq)` would fail the whole run: the loser takes the next one.
+ */
 export async function addRunStep(
   db: Executor,
   run: Pick<AgentRun, "id" | "orgId">,
   kind: StepKind,
   data: Record<string, unknown>,
 ) {
-  await db.insert(agentRunSteps).values({
-    orgId: run.orgId,
-    runId: run.id,
-    kind,
-    data: pgSafeJson(data),
-    seq: sql`(select coalesce(max(${agentRunSteps.seq}), 0) + 1 from ${agentRunSteps} where ${agentRunSteps.runId} = ${run.id})`,
-  });
+  const safe = pgSafeJson(data);
+  for (let i = 0; i < STEP_TRIES; i++) {
+    const added = await db
+      .insert(agentRunSteps)
+      .values({
+        orgId: run.orgId,
+        runId: run.id,
+        kind,
+        data: safe,
+        seq: sql`(select coalesce(max(${agentRunSteps.seq}), 0) + 1 from ${agentRunSteps} where ${agentRunSteps.runId} = ${run.id})`,
+      })
+      .onConflictDoNothing()
+      .returning({ id: agentRunSteps.id });
+    if (added.length > 0) return;
+  }
+  throw new Error(`No free step number on run ${run.id}`);
 }

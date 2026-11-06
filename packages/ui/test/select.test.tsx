@@ -138,3 +138,16 @@ test("a list mixing two-line options and one-line actions gives every row the sa
   const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url)).text();
   expect(css).toContain(".ac-menu:has(.ac-menu__desc) .ac-menu__item {\n  padding-block: var(--menu-item-px);\n}");
 });
+
+test("a browser translating the trigger's text doesn't break it: the words sit in an element of ours", () => {
+  const { container, rerender, unmount } = render(<Select value="member" onValueChange={() => {}} options={roles} />);
+  const value = container.querySelector(".ac-select__text") as HTMLElement;
+  expect(value.textContent).toBe("Membro");
+  // What Google Translate does: the text node goes, a <font> holding the new words takes its place.
+  const font = document.createElement("font");
+  font.textContent = "Member";
+  value.replaceChild(font, value.firstChild as Text);
+  rerender(<Select value="admin" onValueChange={() => {}} options={roles} />);
+  expect(container.querySelector(".ac-select__value")?.textContent).toBe("Admin");
+  expect(() => unmount()).not.toThrow();
+});

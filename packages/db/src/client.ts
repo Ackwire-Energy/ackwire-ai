@@ -59,6 +59,7 @@ export function createDatabase(options: DatabaseOptions): DatabaseHandle {
     onnotice: () => {},
   });
   const db = drizzle(client, { schema, casing: "snake_case", logger: tracingLogger });
+  serializeDates(client);
   return {
     db: db as unknown as Database,
     client,
@@ -71,6 +72,16 @@ export function createDatabase(options: DatabaseOptions): DatabaseHandle {
     },
     close: () => client.end({ timeout: 5 }),
   };
+}
+
+/**
+ * Drizzle leaves the date types to its columns' encoders, which give strings, and postgres.js then sends a value as it
+ * is. A `Date` beside a raw `sql` expression has no encoder and would throw while binding; PGlite takes one, so only a
+ * real server shows it. Runs after `drizzle()`, which sets these serializers.
+ */
+export function serializeDates(client: postgres.Sql) {
+  const text = (value: unknown) => (value instanceof Date ? value.toISOString() : value);
+  for (const type of ["1082", "1114", "1184"]) client.options.serializers[type as unknown as number] = text;
 }
 
 function createPgliteDatabase(folder: string): DatabaseHandle {

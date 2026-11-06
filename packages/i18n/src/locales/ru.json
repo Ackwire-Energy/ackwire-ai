@@ -2852,6 +2852,7 @@
       "assignee": "исполнитель",
       "labels": "метки",
       "dueDate": "срок",
+      "githubUrl": "ссылку на GitHub",
       "criteria": "критерии"
     },
     "routineFields": {
@@ -3229,6 +3230,7 @@
     "computerAway": "Компьютер {{agent}} сейчас не отвечает. Этот запрос открыт до {{time}}. Повторите через минуту.",
     "computerPaused": "Владелец приостановил компьютер {{agent}}. Этот запрос открыт до {{time}}.",
     "failed": "Не удалось передать. Компьютер агента включён?",
+    "changed": "Этот запрос изменился, пока вы отвечали. Ничего не отправлено. Отправьте ещё раз.",
     "empty": "Введите значение.",
     "tooLarge": "Слишком большой (не больше 16 КБ)."
   },
@@ -6381,6 +6383,12 @@
     "prBy": "PR #{{number}} · открыл(а) {{name}}",
     "artifactBy": "{{title}} ({{name}})",
     "noLinks": "Пока ничего не связано.",
+    "github": {
+      "label": "Ссылка на GitHub",
+      "placeholder": "Ссылка на issue или PR",
+      "invalid": "Это не ссылка на issue или pull request в GitHub.",
+      "remove": "Убрать ссылку на GitHub"
+    },
     "openConversation": "Открыть переписку",
     "labels": "Метки",
     "tabs": {
@@ -6418,6 +6426,8 @@
       "due_date_set": "установил(а) срок {{date}}",
       "due_date_removed": "убрал(а) срок",
       "pr_linked": "привязал(а) PR #{{number}}",
+      "github_linked": "связал с GitHub",
+      "github_unlinked": "убрал ссылку на GitHub",
       "artifact_linked": "прикрепил(а) файл",
       "criterion_checked": "отметил(а) критерий «{{text}}»",
       "criterion_unchecked": "снял(а) отметку с критерия «{{text}}»",

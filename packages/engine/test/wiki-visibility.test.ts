@@ -98,6 +98,8 @@ describe("restricted wiki pages", () => {
     expect(await titles(ana.id)).toEqual(["Margens", "Processos"]);
     expect(await titles(bia.id)).toEqual(["Processos"]);
     expect((await suggestWikiPages(f.db, person(bia.id), f.org.id, "Marg")).length).toBe(0);
+    // `[[` before any letter: the latest pages, not an error.
+    expect((await suggestWikiPages(f.db, person(f.owner.id), f.org.id, "")).length).toBeGreaterThan(0);
     const graph = await wikiGraph(f.db, person(bia.id), f.org.id);
     expect(graph.nodes.map((n) => n.title)).toEqual(["Processos"]);
     expect(graph.unresolved).toEqual([]);

@@ -1,5 +1,6 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
 import { dueLabel } from "@agenteschat/client/lib/format";
+import { githubLinkLabel } from "@agenteschat/client/lib/github-link";
 import { conversationLine, isWorking } from "@agenteschat/client/lib/issues";
 import { blockedText, workPlanProgress } from "@agenteschat/client/lib/long-work";
 import { stepPhrase } from "@agenteschat/client/lib/work";
@@ -9,6 +10,7 @@ import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Chip, Icon, type IconName, LineIcon, PixelOrbit, Text } from "@/ui";
+import { SocialMark } from "@/ui/auth/SocialMarks";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -135,6 +137,12 @@ export function AssigneeFace({ issue, size, live }: { issue: Issue; size: number
   );
 }
 
+/** The task's GitHub link as a chip: `repo#12`, with GitHub's mark. */
+export function GithubChip({ url }: { url: string }) {
+  const c = useColors();
+  return <Chip label={githubLinkLabel(url)} leading={<SocialMark provider="github" color={c.muted} size={12} />} />;
+}
+
 /** A row's state, only when the section doesn't say it already: icon and words, no pill, on the text's edge. */
 function StateLine({ issue }: { issue: Issue }) {
   const { t } = useTranslation();
@@ -210,6 +218,7 @@ export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Is
             {t("mobile.issues.until", { date: dueLabel(t, i18n.language, i.dueDate as string) })}
           </Text>
         ) : null}
+        {i.githubUrl ? <GithubChip url={i.githubUrl} /> : null}
         <View style={styles.step} />
         <AssigneeFace issue={i} size={26} live={live} />
       </View>
