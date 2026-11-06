@@ -1454,7 +1454,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 .mi-blocked {
   display: grid;
   gap: 8px;
-  margin: 12px 0 0;
+  margin: 0;
   padding: 10px 12px;
   border-radius: 14px;
   background: var(--sunken);
