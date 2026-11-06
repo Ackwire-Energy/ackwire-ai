@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import { AskAgentButton } from "@/components/AskAgentButton";
 import { useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { DrivePreview } from "@/components/drive/DrivePreview";
-import { LoadingLine } from "@/components/Loading";
+import { ErrorState, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { lookOf } from "@/lib/look";
 import { CardHead, useAgentEdit } from "./context";
@@ -106,6 +106,8 @@ export function FilesTab() {
       )}
       {files.isLoading ? (
         <LoadingLine width={260} />
+      ) : files.isError && !files.data ? (
+        <ErrorState error={files.error} onRetry={() => void files.refetch()} />
       ) : list.length === 0 ? (
         <EmptyState
           size="panel"

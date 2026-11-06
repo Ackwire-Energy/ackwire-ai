@@ -2315,9 +2315,13 @@ function ChannelView({
                                       ? undefined
                                       : (lookOf(dir.agentById.get(chrome?.dmAgentId ?? "")) ?? rightHandLook)
                                   }
-                                  title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
+                                  title={
+                                    channel.can?.post === false
+                                      ? t("chat.readOnlyEmpty")
+                                      : (chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name }))
+                                  }
                                   actions={
-                                    emptySuggestions.length > 0 ? (
+                                    emptySuggestions.length > 0 && channel.can?.post !== false ? (
                                       <fieldset className="channel__suggestions">
                                         <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
                                         {emptySuggestions.map((s) => (
@@ -2336,7 +2340,9 @@ function ChannelView({
                                     ) : undefined
                                   }
                                 >
-                                  {chrome?.emptyText ?? (chrome?.dmPersonId ? undefined : t("chat.sayHiText"))}
+                                  {channel.can?.post === false
+                                    ? undefined
+                                    : (chrome?.emptyText ?? (chrome?.dmPersonId ? undefined : t("chat.sayHiText")))}
                                 </EmptyState>
                               </div>
                             )}

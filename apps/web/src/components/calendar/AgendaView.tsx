@@ -20,6 +20,7 @@ export function AgendaView({
   onOpenKey,
   details,
   onNew,
+  onClearFilters,
 }: {
   days: Date[];
   items: CalItem[];
@@ -29,6 +30,8 @@ export function AgendaView({
   details: (item: CalItem) => ReactNode;
   /** Absent for who can't post: creating an event is posting. */
   onNew?: (() => void) | undefined;
+  /** With a source filtered out: nothing here says little about the days, the way out is the filter. */
+  onClearFilters?: (() => void) | undefined;
 }) {
   const { t, i18n } = useTranslation();
   const look = useRightHandLook();
@@ -41,6 +44,12 @@ export function AgendaView({
       runs: dayRuns(items, d),
     }))
     .filter((g) => g.list.length > 0 || g.runs.length > 0);
+  if (groups.length === 0 && onClearFilters)
+    return (
+      <EmptyState size="panel" actions={<Button onClick={onClearFilters}>{t("filters.clearAll")}</Button>}>
+        {t("calendar.noResults")}
+      </EmptyState>
+    );
   if (groups.length === 0)
     return (
       <EmptyState

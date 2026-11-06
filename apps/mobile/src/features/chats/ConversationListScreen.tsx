@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Text } from "@/ui";
 import { mayCreate } from "../new/logic";
-import { FirstUse } from "../shared/FirstUse";
+import { FirstUse, LoadFailed } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { FocusLive, PushedHeader } from "../shared/parts";
 import { useConversations, useWorkingNow } from "../shared/queries";
@@ -76,6 +76,8 @@ export function ConversationListScreen({ kind, categoryId }: { kind: ListKind; c
             <Text tone="faint" style={styles.center}>
               {t("mobile.common.loading")}
             </Text>
+          ) : list.failed && rows.length === 0 ? (
+            <LoadFailed onRetry={() => void list.refetch()} />
           ) : rows.length === 0 ? (
             <FirstUse {...firstStep} />
           ) : (

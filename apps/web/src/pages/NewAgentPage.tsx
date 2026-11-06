@@ -1229,7 +1229,7 @@ function NewAgentFlow({
               </ul>
             </>
           ) : (
-            <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
+            <p className="small muted">{t(managesAgents ? "access.noConnectors" : "access.noConnectorsViewer")}</p>
           )}
           {managesAgents && (
             <Link

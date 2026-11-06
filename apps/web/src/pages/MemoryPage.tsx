@@ -25,7 +25,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
-import { LoadingPage } from "@/components/Loading";
+import { ErrorState, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
@@ -101,8 +101,21 @@ export function MemoryPage({ agentId }: { agentId: string }) {
   return <MemoryView agent={agent} />;
 }
 
-/** Nothing in an agent's memory: its own face and a way to teach it, or a way out of the search. */
-export function NoMemories({ agent, q, onClear }: { agent: Agent; q: string; onClear: () => void }) {
+/**
+ * Nothing to show of an agent's memory: its own face and a way to teach it when it holds `none` at all, a way out of
+ * the search, or one line for a tab with nothing in it while the others have.
+ */
+export function NoMemories({
+  agent,
+  q,
+  none,
+  onClear,
+}: {
+  agent: Agent;
+  q: string;
+  none: boolean;
+  onClear: () => void;
+}) {
   const { t } = useTranslation();
   if (q.trim())
     return (
@@ -117,6 +130,7 @@ export function NoMemories({ agent, q, onClear }: { agent: Agent; q: string; onC
         {t("memory.emptySearch", { q })}
       </EmptyState>
     );
+  if (!none) return <EmptyState size="inline">{t("memory.emptyTab")}</EmptyState>;
   return (
     <EmptyState
       size="panel"
@@ -249,7 +263,10 @@ function MemoryView({ agent }: { agent: Agent }) {
             </div>
           </article>
         ))}
-        {memory.isSuccess && items.length === 0 && <NoMemories agent={agent} q={q} onClear={() => setQ("")} />}
+        {memory.isError && !memory.data && <ErrorState error={memory.error} onRetry={() => void memory.refetch()} />}
+        {memory.isSuccess && items.length === 0 && (
+          <NoMemories agent={agent} q={q} none={all.length === 0} onClear={() => setQ("")} />
+        )}
       </List>
       <p className="page__note">
         <HelpLink slug="memory">{t("memory.how")}</HelpLink>

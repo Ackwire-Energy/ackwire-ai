@@ -146,7 +146,7 @@ describe("a board's page", () => {
     expect(meta.textContent).toContain("Criado por você");
     // Portuguese counts 0 as one ("0 widget").
     expect(meta.textContent).toMatch(/0 widgets?/);
-    expect(screen().getByText("Seus números num só lugar")).toBeTruthy();
+    expect(screen().getByText("Acompanhe seus números")).toBeTruthy();
     expect(screen().getAllByRole("button", { name: "Adicionar widget" })).toHaveLength(2);
     // Organize needs widgets to move.
     expect(screen().queryByRole("button", { name: "Organizar" })).toBeNull();

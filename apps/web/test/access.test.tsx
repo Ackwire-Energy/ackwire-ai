@@ -241,7 +241,7 @@ describe("Configurações → Agentes e acesso: the matrix", () => {
     const state = seedState();
     state.connections = [];
     const section = await goAccess(state);
-    expect(section.getByText("Dê ferramentas de verdade aos agentes")).toBeTruthy();
+    expect(section.getByText("Escolha o que cada agente pode usar")).toBeTruthy();
     expect(document.querySelector(".level-legend")).toBeNull();
     // The built-in areas are always there: their table brings the legend back.
     await click(section.getByRole("radio", { name: "Nativos" }));

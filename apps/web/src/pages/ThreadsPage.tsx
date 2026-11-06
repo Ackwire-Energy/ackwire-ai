@@ -2,6 +2,7 @@ import type { ThreadActor, ThreadInfo } from "@agenteschat/client";
 import { useChannels, useMissionList, useThreadList } from "@agenteschat/client";
 import { formatFullDate, relativeTime } from "@agenteschat/client/lib/format";
 import { previewBody } from "@agenteschat/client/lib/message-body";
+import { can } from "@agenteschat/client/lib/permissions";
 import { threadMessageCount, threadStatus, threadTitle } from "@agenteschat/client/lib/threads";
 import {
   AvatarStack,
@@ -80,6 +81,11 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
       return next;
     });
   const missions = tab === "missions";
+  // The server's rule. With none yet, the empty state holds the button (the same two lists it reads, unfiltered).
+  const opensMissions = can(org, "post") && can(org, "assign_work");
+  const openMissions = useMissionList(org.id, { status: "open" }, missions);
+  const closedMissions = useMissionList(org.id, { status: "closed" }, missions);
+  const noMissions = missions && openMissions.data?.missions.length === 0 && closedMissions.data?.missions.length === 0;
   const filters = {
     tab,
     ...(channel[0] ? { channelId: channel[0] } : {}),
@@ -140,13 +146,16 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           title={missions ? t("missions.title") : t("threads.title")}
           meta={missions ? t("missions.subtitle") : t("threads.subtitle")}
           actions={
-            <Button
-              variant={missions ? "primary" : "default"}
-              icon={missions ? "plus" : "flag"}
-              onClick={() => setNewMission(true)}
-            >
-              {t("missions.new.open")}
-            </Button>
+            opensMissions &&
+            !noMissions && (
+              <Button
+                variant={missions ? "primary" : "default"}
+                icon={missions ? "plus" : "flag"}
+                onClick={() => setNewMission(true)}
+              >
+                {t("missions.new.open")}
+              </Button>
+            )
           }
         />
         <div className="threads-tabs">
@@ -700,7 +709,7 @@ function ThreadsEmpty({
   const { t } = useTranslation();
   const { org } = useOrg();
   const look = useRightHandLook();
-  const channel = useChannels(org.id).data?.[0];
+  const channel = useChannels(org.id).data?.find((c) => c.isMember);
   if (filtered) {
     return (
       <EmptyState

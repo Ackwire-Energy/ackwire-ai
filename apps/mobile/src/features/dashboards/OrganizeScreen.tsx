@@ -194,7 +194,7 @@ function Arrange({ board }: { board: Dashboard }) {
         <GroupedFooter>{t("mobile.dashboards.organize.hint")}</GroupedFooter>
         {widgets.length === 0 ? (
           <Text variant="subhead" tone="muted" style={styles.empty}>
-            {t("dashboards.empty.title")}
+            {t("dashboards.empty.text")}
           </Text>
         ) : null}
         <View style={{ height: widgets.length ? widgets.length * (rowH + GAP) - GAP : 0 }}>

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet } from "react-native";
 import { STORED } from "@/lib/storage";
 import { LargeTitleScreen, Text } from "@/ui";
-import { FirstUse } from "../shared/FirstUse";
+import { FirstUse, LoadFailed } from "../shared/FirstUse";
 import { usePullRefresh } from "../shared/hooks";
 import { useConversations } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
@@ -47,6 +47,8 @@ export function ThreadsScreen() {
         <Text tone="faint" style={styles.center}>
           {t("mobile.common.loading")}
         </Text>
+      ) : list.failed && rows.length === 0 ? (
+        <LoadFailed onRetry={() => void list.refetch()} />
       ) : rows.length === 0 ? (
         <FirstUse
           place="threads"

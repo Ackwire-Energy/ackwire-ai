@@ -297,7 +297,8 @@ export function RoutinesPage() {
   const [status, setStatus] = useState<"all" | "active" | "paused" | "event">("all");
   const [q, setQ] = useState("");
   const list = routines.data ?? [];
-  const noRoutines = routines.isSuccess && list.length === 0;
+  // After the directory: who may create hangs on the agents they own.
+  const noRoutines = routines.isSuccess && list.length === 0 && !dir.loading;
   const look = useRightHandLook();
   // The server's rule: who manages routines, or an agent's owner for that agent.
   const mayCreate = can(org, "manage_routines") || dir.agents.some((a) => a.ownerUserId === me.user.id);
@@ -369,6 +370,7 @@ export function RoutinesPage() {
           meta={t("routines.subtitle")}
           actions={
             // The empty state takes over this button: one way in, in the middle of the page.
+            mayCreate &&
             !noRoutines && (
               <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
                 {t("routines.new")}

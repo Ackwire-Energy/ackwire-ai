@@ -240,7 +240,22 @@ export function AccessTab() {
             ) : skills.isError ? (
               <span className="muted">{t("skills.unavailable")}</span>
             ) : library.length === 0 ? (
-              <span className="small muted">{t("skills.empty")}</span>
+              <EmptyState
+                size="panel"
+                agent={lookOf(agent) ?? true}
+                title={t("skills.emptyTitle")}
+                actions={
+                  viewer === "admin" && (
+                    <Button asChild variant="primary" icon="plus">
+                      <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "skills" }}>
+                        {t("skills.install")}
+                      </Link>
+                    </Button>
+                  )
+                }
+              >
+                {t("skills.emptyText")}
+              </EmptyState>
             ) : skillsEditable ? (
               <SkillPicker
                 skills={library}
@@ -262,7 +277,7 @@ export function AccessTab() {
               <span className="small muted">{t("skills.agentEmpty", { name: agent.name })}</span>
             )}
             <WasLine changeKey="skills" />
-            {viewer === "admin" && (
+            {viewer === "admin" && library.length > 0 && (
               <Link
                 className="agp-more"
                 to="/org/$orgId/settings/$section"

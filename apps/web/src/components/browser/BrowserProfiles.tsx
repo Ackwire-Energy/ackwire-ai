@@ -23,6 +23,7 @@ import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar, AgentWho } from "../AgentAvatar";
 import { AgentSwitches } from "../AgentSwitches";
+import { ErrorState, LoadingList } from "../Loading";
 import { useOrg } from "../org-context";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
@@ -307,7 +308,7 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
         action={
           manage &&
           !outdated &&
-          mine.length > 0 && (
+          !(profiles.isSuccess && mine.length === 0) && (
             <Button size="sm" icon="plus" onClick={() => setOpen({ kind: "new" })}>
               {t("browser.profiles.new")}
             </Button>
@@ -316,6 +317,10 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
       />
       {outdated ? (
         <SettingNote icon="alert">{t("browser.profiles.outdated")}</SettingNote>
+      ) : profiles.isPending ? (
+        <LoadingList count={2} avatar={false} />
+      ) : profiles.isError && !profiles.data ? (
+        <ErrorState error={profiles.error} onRetry={() => void profiles.refetch()} />
       ) : mine.length === 0 ? (
         <EmptyState
           size="panel"

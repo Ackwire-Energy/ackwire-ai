@@ -25,13 +25,14 @@ import {
   type ExistingSignIn,
   freePlanAccount,
   gateDims,
+  mayConnectAi,
   type PlanChoice,
   type PlanGate,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { Button, Dialog, DialogBody, DialogFooter, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -107,11 +108,19 @@ const ConnectAiContext = createContext<ConnectAi | null>(null);
 /** Null outside the workspace shell (an isolated page in a test): no Connect there. */
 export const useConnectAi = () => useContext(ConnectAiContext);
 
-/** Whether this person has an AI to connect: the workspace's key, or a plan for an agent they have or may make. */
+/**
+ * Whether this person has an AI to connect: the workspace's key, a plan for an agent they have or may make, or their
+ * own for the right hand. Yes until the agents are known, so nobody reads "who connects it" for a moment.
+ */
 export function useMayConnectAi() {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  return stepPermissions(org, me.user.id, dir.agents).connectAi || can(org, "create_agents");
+  return (
+    dir.loading ||
+    stepPermissions(org, me.user.id, dir.agents).connectAi ||
+    can(org, "create_agents") ||
+    mayConnectAi(rightHandOf(dir.agents), me.user.id, org)
+  );
 }
 
 export function ConnectAiProvider({ children }: { children: ReactNode }) {

@@ -2190,7 +2190,7 @@
       "title": "Todo empieza con un mensaje",
       "text": "Escribe aquí abajo y todos lo verán.",
       "viewerTitle": "Los mensajes aparecen aquí",
-      "viewerText": "Podrás leer esta conversación en cuanto alguien escriba."
+      "viewerText": "Cuando alguien escriba, lo lees aquí."
     },
     "ai": {
       "title": "Dales a tus agentes una IA con la que pensar",

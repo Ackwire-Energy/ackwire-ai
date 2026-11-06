@@ -114,7 +114,7 @@ export function IssuesPage() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.toLowerCase() === "n") {
         e.preventDefault();
-        setCreating({ columnId: null });
+        if (posts) setCreating({ columnId: null });
       } else if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
@@ -122,7 +122,7 @@ export function IssuesPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [posts]);
   return (
     <div className="page issues">
       <div className="issues__main">
@@ -213,7 +213,7 @@ export function IssuesPage() {
                   <Button variant="primary" icon="plus" onClick={() => setCreating({ columnId: null })}>
                     {t("issues.new")}
                   </Button>
-                  <AskAgentButton draft={t("issues.askText")} />
+                  <AskAgentButton draft={t("issues.askFirst")} />
                 </>
               )
             }

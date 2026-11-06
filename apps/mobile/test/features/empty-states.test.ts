@@ -126,3 +126,17 @@ test("a link to a page that doesn't exist names it from its slug", () => {
   expect(titleOfSlug("processos/deploy-final")).toBe("deploy final");
   expect(titleOfSlug("onboarding")).toBe("onboarding");
 });
+
+describe("a list that didn't load is not an empty one", () => {
+  test("each says so before its first use or all clear", () => {
+    const before = (file: string, guard: string, empty: string) => {
+      const code = source(file);
+      expect(code.indexOf(guard)).toBeGreaterThan(-1);
+      expect(code.indexOf(guard)).toBeLessThan(code.indexOf(empty));
+    };
+    before("chats/ThreadsScreen.tsx", "list.failed", '<FirstUse\n          place="threads"');
+    before("chats/ConversationListScreen.tsx", "list.failed", "<FirstUse {...firstStep}");
+    before("activity/ActivityScreen.tsx", "list.isError && !list.data", "<AllClear />");
+    before("team/TeamScreen.tsx", "!groups.data ? null", "title={t(noSectors.title)}");
+  });
+});

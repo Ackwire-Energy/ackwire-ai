@@ -48,7 +48,7 @@ export function MissionsTab({
   const active: Mission[] = open.data?.missions ?? [];
   const ended: Mission[] = closed.data?.missions ?? [];
   const counts = open.data?.counts ?? closed.data?.counts;
-  if (open.isPending) return <LoadingList count={3} />;
+  if (open.isPending || (active.length === 0 && closed.isPending)) return <LoadingList count={3} />;
   if (open.isError && !open.data) return <ErrorState error={open.error} onRetry={() => void open.refetch()} />;
   if (active.length === 0 && ended.length === 0) {
     if (q || filters.agentId || filters.channelId)

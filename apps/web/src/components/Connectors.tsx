@@ -214,7 +214,13 @@ export function ConnectorsSection({
     />
   );
   const loaded = connections.isSuccess && servers.isSuccess;
-  const noneYet = loaded && apps.length === 0 && accounts.length === 0 && dbList.length === 0;
+  const noneYet =
+    loaded &&
+    !mailAccounts.isLoading &&
+    !databases.isLoading &&
+    apps.length === 0 &&
+    accounts.length === 0 &&
+    dbList.length === 0;
   const look = useRightHandLook();
 
   return (

@@ -48,7 +48,7 @@ import { dashboardWaitingCard } from "../dashboards/logic";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
 import { ChangeRequestCard } from "../right-hand/SettingsCard";
 import { AgentFace, Face } from "../shared/Face";
-import { useEmptyLook } from "../shared/FirstUse";
+import { LoadFailed, useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { Tile } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
@@ -138,7 +138,9 @@ export function ActivityScreen() {
             </View>
           </LayoutAnimationConfig>
         </>
-      ) : list.isLoading ? null : filter !== "done" ? (
+      ) : list.isLoading ? null : list.isError && !list.data ? (
+        <LoadFailed onRetry={() => void list.refetch()} />
+      ) : filter !== "done" ? (
         <AllClear />
       ) : days.length === 0 ? (
         <EmptyState size="inline" title={t("mobile.activity.noneDone")} />

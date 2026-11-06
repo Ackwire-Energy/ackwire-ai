@@ -2104,7 +2104,7 @@ export const featureKeysPtBR = {
       title: "Tudo começa com uma mensagem",
       text: "Escreva aqui embaixo e todo mundo aqui vê.",
       viewerTitle: "As mensagens aparecem aqui",
-      viewerText: "Você lê esta conversa assim que alguém escrever.",
+      viewerText: "Quando alguém escrever, você lê por aqui.",
     },
     ai: {
       title: "Dê aos agentes uma IA para pensar",

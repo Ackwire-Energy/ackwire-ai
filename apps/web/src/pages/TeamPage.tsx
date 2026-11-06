@@ -1,5 +1,5 @@
 import type { FormerAgent } from "@agenteschat/client";
-import { useAgentGroups, useAiStatus, useFormerAgents, useTeam } from "@agenteschat/client";
+import { useAgentGroups, useAiStatus, useChannels, useFormerAgents, useTeam } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
@@ -34,7 +34,9 @@ export function TeamPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const team = useTeam(org.id);
-  const groups = useAgentGroups(org.id).data ?? [];
+  const sectors = useAgentGroups(org.id);
+  const channels = useChannels(org.id);
+  const groups = sectors.data ?? [];
   const dir = useDirectory(org.id);
   // Asked with the page, so every view says at once whether an agent can work.
   useAiStatus(org.id);
@@ -53,7 +55,10 @@ export function TeamPage() {
   const former = useFormerAgents(org.id);
   const archived = (former.data ?? []).filter((a) => !a.deleted);
   const [deleting, setDeleting] = useState<FormerAgent | null>(null);
-  const shown = view !== "usage" && data && agents.length > 0 ? data : null;
+  // Setores and the map read these two: before they answer, "no setor yet" or "no channel yet" would be a lie.
+  const lookups = [sectors, channels];
+  const lookupFailed = lookups.find((q) => q.isError && !q.data);
+  const shown = view !== "usage" && data && agents.length > 0 && lookups.every((q) => q.data) ? data : null;
   const noAgents = view !== "usage" && !!data && agents.length === 0;
   const look = useRightHandLook();
   const maker = can(org, "create_agents");
@@ -93,9 +98,15 @@ export function TeamPage() {
           options={VIEWS.map((v) => ({ value: v, label: t(`team.view.${v}`) }))}
         />
       </PageHeader>
-      {view !== "usage" && team.isLoading && <LoadingCards count={2} />}
+      {view !== "usage" &&
+        (team.isLoading || (data && agents.length > 0 && !lookupFailed && lookups.some((q) => q.isPending))) && (
+          <LoadingCards count={2} />
+        )}
       {view !== "usage" && team.isError && !data && (
         <ErrorState error={team.error} onRetry={() => void team.refetch()} />
+      )}
+      {view !== "usage" && data && agents.length > 0 && lookupFailed && (
+        <ErrorState error={lookupFailed.error} onRetry={() => void lookupFailed.refetch()} />
       )}
       {noAgents && (
         <EmptyState

@@ -9,6 +9,7 @@ import { useOrg } from "@/providers/org";
 import { Button, EmptyState, ListRow, SectionHeader, Text } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
+import { LoadFailed } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
@@ -115,7 +116,9 @@ export function TeamScreen() {
       ) : null}
 
       <SectionHeader title={t("team.view.sectors")} {...(sectors.length > 0 ? { count: sectors.length } : {})} />
-      {sectors.length === 0 ? (
+      {groups.isError && !groups.data ? (
+        <LoadFailed onRetry={() => void groups.refetch()} />
+      ) : !groups.data ? null : sectors.length === 0 ? (
         <EmptyState
           size="panel"
           agent={lodi ? agentLook(lodi) : true}

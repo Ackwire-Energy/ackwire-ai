@@ -2106,7 +2106,7 @@ export const featureKeysEn = {
       title: "It all starts with a message",
       text: "Write below and everyone here sees it.",
       viewerTitle: "Messages show up here",
-      viewerText: "You can read this conversation as soon as someone writes.",
+      viewerText: "When someone writes, you read it here.",
     },
     ai: {
       title: "Give your agents an AI to think with",

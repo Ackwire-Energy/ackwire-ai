@@ -5038,7 +5038,7 @@
     "value": "Messages show up here"
   },
   "empty.chat.viewerText": {
-    "value": "You can read this conversation as soon as someone writes."
+    "value": "When someone writes, you read it here."
   },
   "empty.ai.title": {
     "value": "Give your agents an AI to think with"

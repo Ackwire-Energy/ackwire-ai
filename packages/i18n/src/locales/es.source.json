@@ -7315,7 +7315,7 @@
     "value": "Only you see these. Your agents use them only when you ask."
   },
   "vault.list.teamEmpty": {
-    "value": "Save it once and agents can use it"
+    "value": "Share logins without passing passwords around"
   },
   "vault.list.teamEmptyText": {
     "value": "Save a login, a key or contact details once, and choose which agents may use it."
@@ -11124,7 +11124,7 @@
     "value": "Corrections, preferences and ways of working it finds show up here."
   },
   "agentPage.memory.learnedEmptyTitle": {
-    "value": "What it works out on its own stays here"
+    "value": "Learns from every correction"
   },
   "agentPage.memory.howTo": {
     "value": "How-to"
@@ -11278,7 +11278,7 @@
     "value": "Nothing with this filter."
   },
   "agentPage.activity.emptyTitle": {
-    "value": "Every job is on record here"
+    "value": "Follow every job"
   },
   "agentPage.activity.emptyText": {
     "value": "The steps and cost of each job {{name}} does show up here."
@@ -11705,6 +11705,9 @@
   },
   "memory.emptySearch": {
     "value": "Nothing found for “{{q}}”."
+  },
+  "memory.emptyTab": {
+    "value": "Nothing here for now."
   },
   "memory.emptyTitle": {
     "value": "{{name}}'s memory starts here"
@@ -14245,8 +14248,11 @@
     "value": "Ask {{name}} to do this task"
   },
   "issues.askText": {
-    "value": "Help me create the team's first tasks.",
+    "value": "{{name}} reads what he needs, comments the plan here and does it. Anything sensitive, like publishing, asks for your approval.",
     "female": "{{name}} reads what she needs, comments the plan here and does it. Anything sensitive, like publishing, asks for your approval."
+  },
+  "issues.askFirst": {
+    "value": "Help me create the team's first tasks."
   },
   "issues.askButton": {
     "value": "Ask {{name}}"
@@ -18507,7 +18513,10 @@
     "value": "Events and routines in the next 30 days show up here."
   },
   "calendar.agendaEmptyTitle": {
-    "value": "Keep the next 30 days in view"
+    "value": "A clear calendar for the next 30 days"
+  },
+  "calendar.noResults": {
+    "value": "Nothing with this filter."
   },
   "calendar.more": {
     "value": "+{{count}} more"
@@ -18649,9 +18658,6 @@
   },
   "skills.unavailable": {
     "value": "Skills aren't available on this server yet."
-  },
-  "skills.empty": {
-    "value": "No skills yet."
   },
   "skills.emptyTitle": {
     "value": "Teach it once, and every agent knows"
@@ -20491,7 +20497,7 @@
     "value": "Recently edited"
   },
   "wiki.emptyTitle": {
-    "value": "What the team knows, in one place"
+    "value": "Keep what the team needs to know"
   },
   "wiki.emptyText": {
     "value": "Start with one page. A structure that tends to work:"
@@ -22132,13 +22138,13 @@
     "value": "Create an agent to decide which apps it uses and what it does in each."
   },
   "access.noAgentsTitle": {
-    "value": "Choose what each agent can reach"
+    "value": "Give each agent the right access"
   },
   "access.noConnectors": {
-    "value": "Connect the workspace's apps once and choose what each agent may use."
+    "value": "Connect the workspace's apps once and set each agent's access here."
   },
   "access.noConnectorsTitle": {
-    "value": "Give agents real tools"
+    "value": "Choose what each agent can use"
   },
   "access.noConnectorsViewerTitle": {
     "value": "See what agents can use"
@@ -31391,6 +31397,9 @@
   "chat.sayHiText": {
     "value": "Mention an agent with @ and it joins in."
   },
+  "chat.readOnlyEmpty": {
+    "value": "Messages show up here"
+  },
   "chat.suggestions": {
     "value": "Suggestions to start"
   },
@@ -35306,7 +35315,7 @@
     "value": "Only you see “{{title}}”"
   },
   "dashboards.empty.title": {
-    "value": "Your numbers in one place"
+    "value": "Track your numbers"
   },
   "dashboards.empty.text": {
     "value": "Ask an agent for a widget or pin a block from the chat, and it stays up to date here."

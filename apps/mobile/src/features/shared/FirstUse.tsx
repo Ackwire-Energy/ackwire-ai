@@ -12,6 +12,18 @@ export function useEmptyLook(): StickerLook | true {
   return lodi ? agentLook(lodi) : true;
 }
 
+/** A list that didn't load is not an empty one: what happened, and the way to ask again. */
+export function LoadFailed({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <EmptyState
+      size="inline"
+      title={t("common.loadFailed")}
+      action={<Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={onRetry} />}
+    />
+  );
+}
+
 /**
  * A place with nothing in it yet: the agent, its words, and the first step. With `acts` false the button is gone
  * (the server would refuse it) and the words say who does it.

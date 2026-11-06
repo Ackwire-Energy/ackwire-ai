@@ -632,17 +632,6 @@ export function MachinesSection() {
             size="panel"
             agent={look}
             title={t(canPair ? "computers.other.emptyTitle" : "computers.other.emptyViewerTitle")}
-            actions={
-              canPair && (
-                <Button
-                  variant="primary"
-                  icon="plus"
-                  onClick={() => document.getElementById("sec-machines-connect")?.scrollIntoView({ block: "center" })}
-                >
-                  {t("machines.download.title")}
-                </Button>
-              )
-            }
           >
             {t(canPair ? "computers.other.emptyText" : "computers.other.emptyViewer")}
           </EmptyState>

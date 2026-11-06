@@ -49,7 +49,7 @@ import { MiniMonth } from "@/components/calendar/MiniMonth";
 import { MonthView } from "@/components/calendar/MonthView";
 import { SeriesPrompt } from "@/components/calendar/SeriesPrompt";
 import { TimeGrid } from "@/components/calendar/TimeGrid";
-import { ErrorState } from "@/components/Loading";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useOpenParam } from "@/lib/open-param";
@@ -69,6 +69,7 @@ const SOURCES: { source: ItemSource; icon: IconName }[] = [
   { source: "deadline", icon: "issues" },
 ];
 type Filters = Record<ItemSource, boolean>;
+const ALL_SOURCES: Filters = { person: true, agent: true, routine: true, reminder: true, deadline: true };
 
 /** A pending edit or delete of a recurring event: which occurrences? */
 interface SeriesAsk {
@@ -106,13 +107,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   const [focus, setFocus] = useState(() => startOfDay(day ? dateOnly(day) : today));
   const [businessOnly, setBusinessOnly] = useState(false);
   const [panel, setPanel] = useState(() => typeof window === "undefined" || window.innerWidth >= 1180);
-  const [filters, setFilters] = useState<Filters>({
-    person: true,
-    agent: true,
-    routine: true,
-    reminder: true,
-    deadline: true,
-  });
+  const [filters, setFilters] = useState<Filters>(ALL_SOURCES);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ draft: EventDraft | null; event: CalendarEvent | null } | null>(null);
   const [ask, setAsk] = useState<SeriesAsk | null>(null);
@@ -194,7 +189,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
       const k = e.key;
       if (k === "n" || k === "N") {
         e.preventDefault();
-        newAt(focus);
+        if (posts) newAt(focus);
       } else if (k === "t" || k === "T") {
         e.preventDefault();
         setFocus(startOfDay(today));
@@ -291,6 +286,11 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
     />
   );
   const inGrid = items.filter((it) => days.some((d) => onDay(it, d)));
+  const posts = can(org, "post");
+  const filtersOff = Object.values(filters).includes(false);
+  // The last range stays on screen while the next one loads: its items say nothing about these days.
+  const agendaWaits = range.isLoading || range.isPlaceholderData;
+  const agendaEmpty = view === "agenda" && range.isSuccess && !agendaWaits && inGrid.length === 0 && !filtersOff;
   const filterChips = (
     <Toolbar size="sm" label={t("calendar.filters")}>
       {SOURCES.map(({ source, icon }) => (
@@ -324,10 +324,13 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               aria-expanded={panel}
               onClick={() => setPanel((p) => !p)}
             />
-            <Button variant="primary" icon="plus" className="cal-page__new" onClick={() => newAt(focus)}>
-              {t("calendar.new")}
-              <Kbd aria-hidden="true">N</Kbd>
-            </Button>
+            {/* Creating an event is posting. An empty agenda holds this button: one way in, in the middle of the page. */}
+            {posts && !agendaEmpty && (
+              <Button variant="primary" icon="plus" className="cal-page__new" onClick={() => newAt(focus)}>
+                {t("calendar.new")}
+                <Kbd aria-hidden="true">N</Kbd>
+              </Button>
+            )}
           </>
         }
       >
@@ -396,10 +399,12 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               openKey={openKey}
               onOpenKey={onOpenKey}
               details={details}
-              onCreate={(r) => setDialog({ draft: { start: fromView(r.start), end: fromView(r.end) }, event: null })}
+              onCreate={(r) => {
+                if (posts) setDialog({ draft: { start: fromView(r.start), end: fromView(r.end) }, event: null });
+              }}
               onMove={move}
               onFocusDay={setFocus}
-              emptyHint={range.isSuccess && inGrid.length === 0 ? t("calendar.emptyHint") : null}
+              emptyHint={posts && range.isSuccess && inGrid.length === 0 ? t("calendar.emptyHint") : null}
             />
           )}
           {view === "month" && (
@@ -415,7 +420,8 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               onFocusDay={setFocus}
             />
           )}
-          {view === "agenda" && (
+          {view === "agenda" && agendaWaits && <LoadingList count={4} avatar={false} />}
+          {view === "agenda" && range.data && !agendaWaits && (
             <AgendaView
               days={days}
               items={items}
@@ -423,7 +429,8 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               openKey={openKey}
               onOpenKey={onOpenKey}
               details={details}
-              onNew={can(org, "post") ? () => newAt(focus) : undefined}
+              onNew={posts ? () => newAt(focus) : undefined}
+              onClearFilters={filtersOff ? () => setFilters(ALL_SOURCES) : undefined}
             />
           )}
         </div>

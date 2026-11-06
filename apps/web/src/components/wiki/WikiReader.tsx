@@ -648,8 +648,8 @@ export function WikiReader({
   const [asking, setAsking] = useState<string | null>(null);
   const embed = useEmbedRenderer(page.data?.source?.attachments);
   const folders = [...new Set(pages.map((x) => x.folder).filter(Boolean))].sort();
-  // Who edits pages (and pins, moves and deletes them); a locked page, and locking it, only who configures.
   const look = useRightHandLook();
+  // Who edits pages (and pins, moves and deletes them); a locked page, and locking it, only who configures.
   const writes = can(org, "edit_wiki") && p?.canEdit !== false;
   const admin = can(org, "configure");
   // Who sees a page: people who write the wiki and manage roles (the server checks the same).

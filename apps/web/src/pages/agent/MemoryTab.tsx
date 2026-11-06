@@ -33,7 +33,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
-import { LoadingLine } from "@/components/Loading";
+import { ErrorState, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
@@ -542,10 +542,12 @@ export function MemoryTab() {
             </Toolbar>
             {memory.isLoading ? (
               <LoadingLine width={260} />
+            ) : memory.isError && !memory.data ? (
+              <ErrorState error={memory.error} onRetry={() => void memory.refetch()} />
             ) : kind === "learned" ? (
               <LearnedList list={learned} />
             ) : shown.length === 0 ? (
-              <NoMemories agent={agent} q={q} onClear={() => setQ("")} />
+              <NoMemories agent={agent} q={q} none={list.length === 0} onClear={() => setQ("")} />
             ) : (
               <ul className="agp-list agp-mems">
                 {shown.map((m) => (

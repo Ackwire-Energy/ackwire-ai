@@ -32,7 +32,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usd } from "@/components/AgentFields";
 import { AskAgentButton } from "@/components/AskAgentButton";
-import { LoadingList } from "@/components/Loading";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { groupByDay, isRoutineRun, type RunFilter, runMatches } from "@/lib/agent-edit";
@@ -274,6 +274,8 @@ export function ActivityTab() {
         </Toolbar>
         {runs.isLoading ? (
           <LoadingList count={4} />
+        ) : runs.isError && !runs.data ? (
+          <ErrorState error={runs.error} onRetry={() => void runs.refetch()} />
         ) : list.length === 0 ? (
           <EmptyState
             size="panel"

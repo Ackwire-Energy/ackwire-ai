@@ -176,8 +176,8 @@ export function TeamMap({ team }: { team: Team }) {
           },
         };
 
-  // Every agent still outside the channels: there's no map to draw yet.
-  if (columns.every((c) => c.channelId === null)) {
+  // Every agent still outside the channels: there's no map to draw yet. One in a channel I don't see is placed.
+  if (columns.every((c) => c.channelId === null && c.agents.every((a) => !a.channelIds?.length))) {
     // The one agent this person may place: an agent's channels are its owner's or who manages agents' to change.
     const first = team.agents.find(
       (a) => !look.isLodi(a) && (can(org, "manage_agents") || a.ownerUserId === me.user.id),
