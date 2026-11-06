@@ -153,6 +153,16 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(errorText(pt, new ApiError(429, "rate_limited", "Slow down"))).toBe("common.tooMany");
   });
 
+  test("Better Auth's refusals a person meets on sign-up say what happened, never the plain line", () => {
+    const instance = i18next.createInstance();
+    void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+    const said = (status: number, code: string) => authErrorText(instance.t, { status, code, message: code });
+    expect(said(422, "USER_ALREADY_EXISTS")).toBe(ptBR.auth.refused.linked);
+    expect(said(422, "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL")).toBe(ptBR.auth.refused.linked);
+    expect(said(400, "PASSWORD_TOO_SHORT")).toBe(ptBR.auth.passwordHelp);
+    expect(said(400, "INVALID_PASSWORD")).toBe(ptBR.errors.reauth.password);
+  });
+
   test("anything that isn't the server's answer: common.unknownError, never its own message", () => {
     const bug = new TypeError("Cannot read properties of undefined (reading 'id')");
     expect(errorText(en, bug)).toBe("common.unknownError");

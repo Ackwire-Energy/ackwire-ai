@@ -1473,7 +1473,7 @@ export function NotificationsPage() {
       title,
       "info",
       { label: t("notifications.toast.undo"), run: () => action.mutate({ type: "snooze", item: n, until: null }) },
-      n.latest.title ?? n.latest.text ?? n.latest.quote ?? "",
+      n.latest.title ?? latestText(t, n.latest) ?? n.latest.quote ?? "",
     );
   };
 

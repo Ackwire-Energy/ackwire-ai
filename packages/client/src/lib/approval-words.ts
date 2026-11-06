@@ -103,9 +103,10 @@ function wordedTitle(t: TFunction, approval: TitledApproval): string | null {
       .split(", ")
       .map((slug) => actionName(t, slug))
       .join(", ");
-  const action = approvalAction({ tool: approval.tool, scope: approval.scope ?? "" });
-  if (action !== "other") return t(`approval.titles.action.${action}`);
   const parts = partsOf(own);
+  // The action is guessed from any word of the name: a read that names one ("list_merge_requests") is still a read.
+  const action = approvalAction({ tool: approval.tool, scope: approval.scope ?? "" });
+  if (action !== "other" && !(parts.verb && READ_VERBS.has(parts.verb))) return t(`approval.titles.action.${action}`);
   return parts.verb ? toolName(t, parts, own) : null;
 }
 

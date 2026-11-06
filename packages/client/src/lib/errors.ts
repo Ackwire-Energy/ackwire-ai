@@ -189,6 +189,13 @@ const KNOWN = {
   SIGNUP_CLOSED: "auth.flow.closedLead",
   // A sign-up whose name is its password (apps/server auth.ts `NAME_IS_PASSWORD`).
   NAME_IS_PASSWORD: "auth.flow.nameIsPassword",
+  // Better Auth's own refusals on sign-up or a password change (an expired reset link is the reset page's own state).
+  USER_ALREADY_EXISTS: "auth.refused.linked",
+  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: "auth.refused.linked",
+  INVALID_EMAIL: "errors.said.validEmail",
+  PASSWORD_TOO_SHORT: "auth.passwordHelp",
+  PASSWORD_TOO_LONG: "auth.passwordTooLong",
+  INVALID_PASSWORD: "errors.reauth.password",
   account_not_linked: "auth.unconfirmed",
   // A provider that hasn't confirmed its own address, to a confirmed account here (apps/server auth.ts `authHandler`).
   provider_email_unverified: "auth.providerUnverified",

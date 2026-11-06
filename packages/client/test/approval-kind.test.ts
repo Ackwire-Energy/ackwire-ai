@@ -237,6 +237,15 @@ describe("an approval's title", () => {
     ).toBe("Criar issue (Github), Listar canais (Slack)");
   });
 
+  test("a read that names an action reads as the read, never as doing it", () => {
+    const title = (tool: string, label: string) =>
+      approvalTitle(pt, { tool, title: label, params: {}, email: null, connector: "custom" });
+    expect(title("gitlab_list_merge_requests", "GitLab: List merge requests")).not.toBe("Fazer um merge");
+    expect(title("gitlab_list_merge_requests", "GitLab: List merge requests")).toStartWith("Listar");
+    expect(title("hubspot_get_email_stats", "HubSpot: Get email stats")).toStartWith("Ver");
+    expect(title("gitlab_merge_request_merge", "GitLab: Merge")).toBe("Fazer um merge");
+  });
+
   test("a tool with no verb in its name keeps the one name it has, off the sentence", () => {
     const quirky = {
       tool: "acme_widgets",
