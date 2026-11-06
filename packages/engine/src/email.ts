@@ -1,7 +1,19 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { EmailError, type EmailSender, type PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  type Executor,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { formatMoneyUsd } from "@agenteschat/i18n/format";
 import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
 import { nanoUsdToUsd } from "@agenteschat/providers";
@@ -233,6 +245,20 @@ export type EmailTemplate =
       email: string;
       orgNames: string[];
       dueAt: string | null;
+      timeZone: string;
+      support: string | null;
+      url: string;
+    }
+  /**
+   * An account deleted by its person (ADR 0088 §10): when it goes for good, in their time zone, the workspaces that
+   * close with it, and that signing in with `url` brings it back until then.
+   */
+  | {
+      kind: "account_deleting";
+      locale: EmailLocale;
+      email: string;
+      orgNames: string[];
+      dueAt: string;
       timeZone: string;
       support: string | null;
       url: string;
@@ -786,6 +812,26 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.why(inertText(t.orgName)),
       );
     }
+    case "account_deleting": {
+      const c = w.accountDeleting;
+      const names = new Intl.ListFormat(lang, { type: "conjunction" })
+        .formatToParts(t.orgNames.map((name) => inertText(name)))
+        .map((part): Inline => (part.type === "element" ? { b: part.value } : part.value));
+      const { day, time } = dayAndTime(new Date(t.dueAt), t.timeZone, lang);
+      return doc(
+        c.subject(day),
+        c.preheader,
+        c.headline,
+        [
+          { p: c.body(inertText(t.email), day, time) },
+          ...(t.orgNames.length > 0 ? [{ p: c.closes(t.orgNames.length, names) }] : []),
+          { p: c.undo },
+          { button: c.button, url: t.url },
+          { small: t.support ? w.accountDeleted.support(t.support) : w.accountDeleted.noSupport },
+        ],
+        c.why,
+      );
+    }
     case "account_deleted": {
       const c = w.accountDeleted;
       const names = new Intl.ListFormat(lang, { type: "conjunction" })
@@ -831,6 +877,32 @@ export function emailsByLocale(recipients: { email: string; locale: EmailLocale 
   return [...groups].map(([locale, to]) => ({ locale, to, key: locale === "pt-BR" ? key : `${key}:${locale}` }));
 }
 
+/** What an account waiting for its deletion still gets: what it asked for, and what it must be told. */
+const ABOUT_THE_ACCOUNT: ReadonlySet<EmailTemplate["kind"]> = new Set([
+  "password_reset",
+  "verify_email",
+  "account_deleting",
+  "account_deleted",
+]);
+
+/** These addresses, less the accounts waiting for their deletion (ADR 0088 §10): nothing else reaches them. */
+async function inUse(tx: Executor, to: string[]) {
+  const leaving = await tx
+    .select({ email: schema.users.email })
+    .from(schema.users)
+    .where(
+      and(
+        isNotNull(schema.users.deletionDueAt),
+        inArray(
+          sql`lower(${schema.users.email})`,
+          to.map((a) => a.toLowerCase()),
+        ),
+      ),
+    );
+  const gone = new Set(leaving.map((r) => r.email.toLowerCase()));
+  return to.filter((a) => !gone.has(a.toLowerCase()));
+}
+
 /**
  * Queues an email (outbox job `email.send`), in the caller's transaction.
  * `key` is the idempotency key: the same key is sent once (outbox dedupe and
@@ -847,10 +919,12 @@ export async function queueEmail(
     runAt?: Date;
   },
 ) {
+  const to = ABOUT_THE_ACCOUNT.has(input.template.kind) ? input.to : await inUse(tx, input.to);
+  if (to.length === 0) return;
   await enqueue(tx, {
     orgId: input.orgId,
     kind: "email.send",
-    payload: { key: input.key, to: input.to, template: input.template },
+    payload: { key: input.key, to, template: input.template },
     dedupeKey: `email:${input.key}`,
     maxAttempts: input.maxAttempts ?? 6,
     runAt: input.runAt,

@@ -27,6 +27,12 @@ export const users = pgTable("users", {
    */
   blockedAt: timestamp({ withTimezone: true }),
   blockedReason: text(),
+  /**
+   * Deleted by the person, gone for good at this date (ADR 0088 §10): until then it signs in only to the waiting
+   * screen, and every membership check reads it as no member (`accountInUse`). Not a Better Auth field.
+   */
+  deletionDueAt: timestamp({ withTimezone: true }),
+  deletionRequestedAt: timestamp({ withTimezone: true }),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

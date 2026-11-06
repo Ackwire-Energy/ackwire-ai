@@ -1360,15 +1360,15 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     const ada = await teammate("ada", { ownerUserId: bia.id });
     const lia = await teammate("lia", { ownerUserId: bia.id });
-    const issues = { id: "issues:write", label: "Issues", on: true };
+    const calendar = { id: "calendar:write", label: "Propose events", on: true };
     const { proposals, skipped } = await proposeFor({
       target: "agent_instructions",
       agentIds: [],
       change: "",
       access: [
         { agentId: ada.id, lines: [{ id: "wiki:write", label: "Write to the wiki", on: false }] },
-        { agentId: lia.id, lines: [issues, { id: "drive:read", label: "Read files", on: false }] },
-        { agentId: f.agent.id, lines: [issues] },
+        { agentId: lia.id, lines: [calendar, { id: "drive:read", label: "Read files", on: false }] },
+        { agentId: f.agent.id, lines: [calendar] },
       ],
     });
     expect(skipped).toEqual([
@@ -1376,11 +1376,11 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       "Your own apps aren't proposed here: ask for one with request_permission.",
     ]);
     const rowOf = (agentId: string) => proposals.find((p) => p.agentId === agentId);
-    expect(rowOf(lia.id)).toMatchObject({ target: "agent_access", access: [issues] });
+    expect(rowOf(lia.id)).toMatchObject({ target: "agent_access", access: [calendar] });
     expect(proposals.map((p) => p.agentId).sort()).toEqual([ada.id, lia.id].sort());
     expect(permissionAsks()).toBe(0);
 
-    // Bia owns both: she may take Ada's wiki away, not give Lia issues.
+    // Bia owns both: she may take Ada's wiki away, not give Lia the calendar.
     await expect(decideProposal(f.db, bia.id, f.org.id, rowOf(lia.id)?.id ?? "", "accept")).rejects.toBeInstanceOf(
       ForbiddenError,
     );
@@ -1394,7 +1394,7 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     await expect(decideProposal(f.db, f.owner.id, f.org.id, rowOf(lia.id)?.id ?? "", "accept")).rejects.toBeInstanceOf(
       ConflictError,
     );
-    expect(await scopesOf(lia.id)).not.toContain("issues:write");
+    expect(await scopesOf(lia.id)).not.toContain("calendar:write");
   });
 
   test("the tool names apps as request_permission does (a connection by its name, a built-in scope) and posts one card", async () => {

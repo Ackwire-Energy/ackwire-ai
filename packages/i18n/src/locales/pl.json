@@ -6330,6 +6330,7 @@
     "createdByShort": "Utworzone przez: {{name}}",
     "fromMessage": "z <0>wiadomości na #{{channel}}</0>",
     "fromAgent": "z prośby do agenta",
+    "privateTask": "Tylko osoby w tej rozmowie widzą to zadanie.",
     "subIssues_one": "Podzadania · {{count}}",
     "subIssues_few": "Podzadania · {{count}}",
     "subIssues_many": "Podzadania · {{count}}",
@@ -11824,6 +11825,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Tej osoby nie ma w tej rozmowie, więc nie widzi tego zadania."
+    },
     "connector": {
       "labelTaken": "Inny konektor ma już tę nazwę.",
       "labelInvalid": "Nazwa musi mieć od 1 do 80 znaków.",
@@ -12052,6 +12056,7 @@
       "undoForbidden": "Cofnąć to może tylko osoba, dla której agent pracował, jego właściciel albo administrator."
     },
     "account": {
+      "notRestorable": "Tego konta nie da się już przywrócić.",
       "notOwner": "Może to zrobić tylko osoba, która połączyła to konto lub plan."
     },
     "channel": {
@@ -14784,16 +14789,26 @@
     "membersOnly": "Przywrócić ją może tylko właściciel.",
     "restored": "{{name}} wróciła"
   },
+  "accountDeleting": {
+    "title": "Twoje konto jest usuwane",
+    "text": "Zniknie na dobre {{due}}, razem z przestrzeniami roboczymi, w których jesteś tylko ty.",
+    "textLate": "Zniknie za chwilę.",
+    "what": "Do tego czasu nikt nie może się tu z tobą skontaktować i nie dostajesz powiadomień. Po przywróceniu wszystko wróci do poprzedniego stanu.",
+    "plans": "Plany, za które płacisz, nadal nie będą odnawiane. Nic nie zostanie pobrane, dopóki nie włączysz któregoś z powrotem.",
+    "restore": "Przywróć konto",
+    "restored": "Twoje konto wróciło"
+  },
   "deleteAccount": {
     "menu": "Usuń konto",
     "card": {
-      "text": "Opuszczasz wszystkie przestrzenie robocze, a twoje konto zostaje trwale usunięte.",
+      "text": "Opuszczasz wszystkie przestrzenie robocze, a twoje konto zostaje trwale usunięte 7 dni później. Do tego czasu możesz je przywrócić.",
       "button": "Usuń konto…",
       "oneWorkspace": "Chcesz usunąć tylko tę przestrzeń roboczą? To jest w sekcji Ogólne.",
       "leaveWorkspace": "Chcesz opuścić tylko tę przestrzeń roboczą? To jest w sekcji Członkowie."
     },
     "title": "Usunąć całe twoje konto?",
-    "intro": "To usuwa całe twoje konto, a nie tylko jedną przestrzeń roboczą. Tego nie da się cofnąć.",
+    "intro": "To usuwa całe twoje konto, a nie tylko jedną przestrzeń roboczą.",
+    "when": "Twoje konto zniknie na dobre {{date}}. Do tego czasu zaloguj się, aby je przywrócić.",
     "whole": "Całe twoje konto",
     "oneWorkspace": "Chcesz usunąć tylko jedną przestrzeń roboczą? Twoje konto zostaje.",
     "closes": "{{name}} zostaje teraz zamknięta. Jesteś tam jedyną osobą, więc zostanie trwale usunięta {{date}}.",
@@ -14826,7 +14841,7 @@
     "finishSetup": "Dokończ konfigurację",
     "deleteOrg": "Usuń {{name}}",
     "submit": "Usuń konto",
-    "deleted": "Konto usunięte"
+    "deleted": "Twoje konto zniknie na dobre {{date}}. Zaloguj się wcześniej, aby je przywrócić."
   },
   "billing": {
     "open": "Otwórz plan i płatności",

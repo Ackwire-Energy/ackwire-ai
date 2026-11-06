@@ -267,7 +267,6 @@ describe("a scope the agent lacks", () => {
     expect(read.content).toContain('call request_permission now with permission "drive:read"');
     const asked = await bridged(run, "request_permission", {
       permission: "drive:read",
-      reason: "Ler o arquivo que a pessoa enviou",
       why: "A pessoa enviou um arquivo HTML e pediu para eu ler o conteúdo dele agora.",
     });
     expect(asked.pause?.kind).toBe("approval");
@@ -426,7 +425,7 @@ describe("its other limits", () => {
     for (const [name, input] of [
       ["create_artifact", { title: "x", kind: "document", markdown: "x" }],
       ["share_artifact", { artifact_id: file.id }],
-      ["request_permission", { permission: "sandbox:run", reason: "x", why: "x" }],
+      ["request_permission", { permission: "sandbox:run", why: "x" }],
     ] as const) {
       const refused = await bridged(run, name, input);
       expect(refused.isError).toBe(true);

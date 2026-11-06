@@ -197,6 +197,8 @@ export interface User {
    * access allowed them; `org.create_refused` and `org.create_unpaid` can still refuse it).
    */
   canCreateWorkspace?: boolean;
+  /** They deleted this account: the apps show only its waiting screen. `dueAt` is null once the date passed. */
+  deletion?: { dueAt: string | null; requestedAt: string | null };
   /** The app's language for emails, pushes and every device (ADR 0122); null before any app said one. */
   locale?: string | null;
   /** The language follows each device's own (Automático) until the person picks one. */

@@ -984,6 +984,8 @@
     }
   },
   "delete": {
+    "intro": "Das lässt sich nicht rückgängig machen.",
+    "introGrace": "Du hast 7 Tage Zeit, es dir anders zu überlegen.",
     "goes": {
       "account": "Dein Konto, dein Zugriff und deine Sitzungen sind weg.",
       "orgs": "Workspaces, in denen du das einzige Mitglied bist, werden gelöscht.",

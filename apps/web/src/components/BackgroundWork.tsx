@@ -1,7 +1,8 @@
 import { type Issue, type Message, useChannels, type WorkView } from "@agenteschat/client";
+import { heldBack } from "@agenteschat/client/lib/issues";
 import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Icon, WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
+import { Button, Icon, WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -109,6 +110,39 @@ export function IssueWorkBlock({ issue }: { issue: Issue }) {
   return <CardBlock issue={issue} work={work} />;
 }
 
+/**
+ * On a task tied to a private conversation, with no work line to say so: who sees it, and, for one an agent made there,
+ * the way to show it to everyone.
+ */
+export function PrivateTaskBlock({ issue }: { issue: Issue }) {
+  const { org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { t } = useTranslation();
+  const channels = useChannels(org.id);
+  const share = useMutation({
+    mutationFn: () => api.issues.share(org.id, issue.id),
+    onSuccess: () => {
+      toast.show(t("work.shared"));
+      void qc.invalidateQueries({ queryKey: ["org", org.id, "issues"] });
+    },
+    onError: () => toast.show(t("work.shareFailed"), "error"),
+  });
+  if (issue.backgroundWork || !heldBack(issue, channels.data)) return null;
+  return (
+    <p className="issue-private">
+      <Icon name="lock" size={14} />
+      <span>{t("issues.privateTask")}</span>
+      {issue.createdBy.type === "agent" && (
+        <Button size="sm" loading={share.isPending} disabled={share.isPending} onClick={() => share.mutate()}>
+          {t("work.shareEveryone")}
+        </Button>
+      )}
+    </p>
+  );
+}
+
 function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
   const { org, me } = useOrg();
   const api = useApi();
@@ -127,8 +161,7 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
     onError: () => toast.show(t("work.shareFailed"), "error"),
   });
   // Only a card a DM or a private channel holds back, for who may show it (who asked, its creator, an admin).
-  const channel = issue.channelId ? channels.data?.find((c) => c.id === issue.channelId) : undefined;
-  const heldBack = Boolean(issue.channelId && channels.data && (!channel || channel.visibility === "private"));
+  const held = heldBack(issue, channels.data);
   const mayShare =
     work.requestedByUserId === me.user.id ||
     (issue.createdBy.type === "person" && issue.createdBy.id === me.user.id) ||
@@ -160,7 +193,7 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
                 {t("work.stop")}
               </WorkLineAction>
             )}
-            {heldBack && mayShare && (
+            {held && mayShare && (
               <WorkLineAction disabled={share.isPending} onClick={() => share.mutate()}>
                 {t("work.shareEveryone")}
               </WorkLineAction>

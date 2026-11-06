@@ -14251,6 +14251,9 @@
   "issues.fromAgent": {
     "value": "from a request to an agent"
   },
+  "issues.privateTask": {
+    "value": "Only people in this conversation see this task."
+  },
   "issues.subIssues": {
     "value": {
       "one": "Subtasks · {{count}}",
@@ -26675,6 +26678,9 @@
   "files.zoom.hintZoomedTouch": {
     "value": "Drag to move around. Tap to fit it back"
   },
+  "errors.issue.assigneeOutside": {
+    "value": "This person isn't in this conversation, so they can't see this task."
+  },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."
   },
@@ -27205,6 +27211,9 @@
   },
   "errors.agent.undoForbidden": {
     "value": "Only the person the agent worked for, its owner or an admin can undo this."
+  },
+  "errors.account.notRestorable": {
+    "value": "This account can't be restored anymore."
   },
   "errors.account.notOwner": {
     "value": "Only the person who connected this account or plan can do this."
@@ -33442,11 +33451,32 @@
   "deleting.restored": {
     "value": "{{name}} is back"
   },
+  "accountDeleting.title": {
+    "value": "Your account is being deleted"
+  },
+  "accountDeleting.text": {
+    "value": "It goes for good on {{due}}, with the workspaces only you are in."
+  },
+  "accountDeleting.textLate": {
+    "value": "It will be gone in a moment."
+  },
+  "accountDeleting.what": {
+    "value": "Until then nobody can reach you here and you get no notifications. Restore it and everything is back as it was."
+  },
+  "accountDeleting.plans": {
+    "value": "The plans you pay for stay off. Nothing is charged until you turn one back on."
+  },
+  "accountDeleting.restore": {
+    "value": "Restore account"
+  },
+  "accountDeleting.restored": {
+    "value": "Your account is back"
+  },
   "deleteAccount.menu": {
     "value": "Delete account"
   },
   "deleteAccount.card.text": {
-    "value": "You leave every workspace and your account is deleted for good."
+    "value": "You leave every workspace and your account is deleted for good 7 days later. You can restore it until then."
   },
   "deleteAccount.card.button": {
     "value": "Delete account…"
@@ -33461,13 +33491,16 @@
     "value": "Delete your whole account?"
   },
   "deleteAccount.intro": {
-    "value": "This deletes your whole account, not just one workspace. It can't be undone."
+    "value": "This deletes your whole account, not just one workspace."
   },
   "deleteAccount.whole": {
     "value": "Your whole account"
   },
   "deleteAccount.oneWorkspace": {
     "value": "Want to delete just one workspace? Your account stays."
+  },
+  "deleteAccount.when": {
+    "value": "Your account goes for good on {{date}}. Until then, sign in to restore it."
   },
   "deleteAccount.closes": {
     "value": "{{name}} closes now. You're the only one there, so it's deleted for good on {{date}}."
@@ -33542,7 +33575,7 @@
     "value": "Delete account"
   },
   "deleteAccount.deleted": {
-    "value": "Account deleted"
+    "value": "Your account goes for good on {{date}}. Sign in before then to restore it."
   },
   "billing.open": {
     "value": "Open plan and billing"

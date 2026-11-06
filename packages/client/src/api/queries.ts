@@ -345,6 +345,16 @@ export const CLOSING_POLL_MS = 30_000;
 export const useClosingMe = () =>
   useQuery({ ...meQuery(useApi()), refetchInterval: CLOSING_POLL_MS, refetchOnWindowFocus: "always" });
 
+/** Brings my account back; `GET /me` then opens its workspaces again. */
+export function useRestoreAccount() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.account.restore(),
+    onSuccess: () => qc.refetchQueries({ queryKey: keys.me }),
+  });
+}
+
 /** What deleting my account would do (`GET /account/deletion`): asked anew each time. */
 export const useAccountDeletionPlan = (enabled = true) => {
   const api = useApi();

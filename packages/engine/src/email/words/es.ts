@@ -284,6 +284,27 @@ export const words: EmailWords = {
     button: "Ver apps conectadas",
     why: (org) => `Recibiste este correo porque se conectó una app a tu cuenta en ${org} en agentes.chat.`,
   },
+  accountDeleting: {
+    subject: (day) => `Tu cuenta de agentes.chat se eliminará el ${day}`,
+    preheader: "Tienes 7 días para cambiar de opinión.",
+    headline: "Tu cuenta se está eliminando",
+    body: (email, day, time) => [
+      "Eliminaremos la cuenta ",
+      { b: email },
+      ` el ${day} a las ${time}. Se cerró la sesión en todas partes y nadie puede contactarte aquí hasta que vuelvas.`,
+    ],
+    closes: (count, names) => [
+      plural("es", count, {
+        one: "El espacio de trabajo donde solo estabas tú se cerró ahora y se elimina en la misma fecha: ",
+        other: "Los espacios de trabajo donde solo estabas tú se cerraron ahora y se eliminan en la misma fecha: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "¿Cambiaste de opinión? Inicia sesión antes de esa fecha y pulsa Restaurar.",
+    button: "Iniciar sesión para restaurar",
+    why: "Recibiste este correo porque esta dirección tiene una cuenta en agentes.chat.",
+  },
   accountDeleted: {
     subject: "Se eliminó tu cuenta de agentes.chat",
     preheader: "Se cerró la sesión en todas partes y ya no se puede volver a iniciar sesión.",

@@ -71,7 +71,7 @@
   },
   "account": {
     "deleteFailed": "Non è stato possibile eliminare il tuo account ora. Riprova.",
-    "deleted": "Il tuo account è stato eliminato.",
+    "deleted": "Il tuo account sparisce per sempre il {{date}}. Accedi prima di allora per ripristinarlo.",
     "signedOut": "Sei uscito."
   },
   "theme": {

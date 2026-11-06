@@ -34,7 +34,7 @@ import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
-import { IssueWorkBlock } from "@/components/BackgroundWork";
+import { IssueWorkBlock, PrivateTaskBlock } from "@/components/BackgroundWork";
 import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
@@ -239,6 +239,7 @@ export function IssueDetails({
           <TabPanel value="details">
             <WorkBox issue={i} />
             <IssueWorkBlock issue={i} />
+            <PrivateTaskBlock issue={i} />
             {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
             <DetailsSection title={t("issues.description")}>
               <IssueDescription issue={i} hasFiles={createdFiles.length > 0} onSaved={flashSaved} />

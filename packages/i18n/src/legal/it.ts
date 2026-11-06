@@ -8,7 +8,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
       "L'accordo per l'utilizzo di agentes.chat: il tuo workspace, i tuoi agenti e ciò di cui ciascuna parte è responsabile.",
     courtesy:
       "La presente è una traduzione di cortesia. In caso di divergenza rispetto alla versione inglese, prevale la versione inglese.",
-    updated: "2026-11-04",
+    updated: "2026-11-05",
     sections: [
       {
         id: "agreement",
@@ -122,7 +122,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Durata e cessazione",
         blocks: [
-          "Puoi smettere di utilizzare il Servizio ed eliminare il tuo account in qualsiasi momento nell'app. Possiamo sospendere o far cessare il tuo accesso in caso di violazione sostanziale dei presenti Termini, laddove previsto dalla legge, oppure con un preavviso di 30 giorni se interrompiamo il Servizio. Se facciamo cessare il Servizio per motivi diversi da una tua violazione, renderemo disponibile il tuo Contenuto del Workspace per l'esportazione per 30 giorni, dopodiché lo elimineremo come descritto nell'Informativa sulla privacy. Le sezioni che per loro natura sopravvivono alla cessazione (comprese le sezioni 6, 9, 11, 13, 14 e 15) restano in vigore.",
+          "Puoi smettere di utilizzare il Servizio ed eliminare il tuo account in qualsiasi momento nell'app. Viene rimosso 7 giorni dopo, e puoi ripristinarlo fino ad allora. Possiamo sospendere o far cessare il tuo accesso in caso di violazione sostanziale dei presenti Termini, laddove previsto dalla legge, oppure con un preavviso di 30 giorni se interrompiamo il Servizio. Se facciamo cessare il Servizio per motivi diversi da una tua violazione, renderemo disponibile il tuo Contenuto del Workspace per l'esportazione per 30 giorni, dopodiché lo elimineremo come descritto nell'Informativa sulla privacy. Le sezioni che per loro natura sopravvivono alla cessazione (comprese le sezioni 6, 9, 11, 13, 14 e 15) restano in vigore.",
         ],
       },
       {
@@ -175,7 +175,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
       "Quali dati raccogliamo, che cosa gli agenti inviano e dove, chi può vedere il tuo workspace e quali diritti hai.",
     courtesy:
       "La presente è una traduzione di cortesia. In caso di divergenza rispetto alla versione inglese, prevale la versione inglese.",
-    updated: "2026-11-04",
+    updated: "2026-11-05",
     sections: [
       {
         id: "overview",
@@ -265,7 +265,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Dati dell'account:** per tutta la durata dell'account. Quando elimini il tuo account nell'app, esso viene rimosso immediatamente ed esce dai nostri backup entro 30 giorni, fatta eccezione per i registri che siamo tenuti a conservare per legge. Qualsiasi workspace di cui eri l'unico membro viene chiuso contestualmente, e il suo contenuto viene eliminato 7 giorni dopo, come descritto di seguito. I workspace di cui facevi parte conservano il tuo nome e il tuo indirizzo e-mail nei propri registri di audit per tutto il tempo in cui ciascuno di essi esiste.",
+              "**Dati dell'account:** per tutta la durata dell'account. Quando elimini il tuo account nell'app, esso viene disconnesso ovunque immediatamente e rimosso 7 giorni dopo, salvo che tu lo ripristini prima, ed esce dai nostri backup entro i 30 giorni successivi, fatta eccezione per i registri che siamo tenuti a conservare per legge. Qualsiasi workspace di cui eri l'unico membro viene chiuso contestualmente, e il suo contenuto viene eliminato 7 giorni dopo, come descritto di seguito. I workspace di cui facevi parte conservano il tuo nome e il tuo indirizzo e-mail nei propri registri di audit per tutto il tempo in cui ciascuno di essi esiste.",
               "**Contenuto del Workspace:** per tutta la durata del workspace, e prima nel caso in cui il workspace elimini contenuti specifici. Alla cessazione del piano agentes.chat di un workspace, il suo contenuto resta disponibile per 90 giorni e viene poi eliminato. Quando un proprietario elimina un workspace, questo viene chiuso immediatamente per tutti e il suo contenuto viene eliminato 7 giorni dopo, salvo che un proprietario lo ripristini prima di tale termine, ed esce dai nostri backup entro i 30 giorni successivi, fatta eccezione per i contenuti che siamo tenuti a conservare per legge o come prova di un abuso (vedi sotto).",
               "**Log:** i log delle richieste e di sicurezza fino a 90 giorni. I registri di utilizzo dei modelli (token e costo) per tutta la durata del workspace, poiché i budget e i report di utilizzo dipendono da essi.",
               "**Dati di fatturazione:** finché paghi per un workspace e, successivamente, per il tempo richiesto dalla normativa fiscale e contabile.",

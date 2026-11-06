@@ -92,7 +92,7 @@ import {
 } from "./rrule";
 import { providerFailure } from "./runs";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
-import { standingRefusal } from "./standing";
+import { deletionPending, standingRefusal } from "./standing";
 import { alwaysAsks } from "./tools/gateway";
 import {
   assertMayContinuePause,
@@ -2113,6 +2113,8 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   };
   const creator = routine.createdByUserId;
   const membership = creator ? await getMembership(db, creator, routine.orgId) : null;
+  // Their account waits for its deletion and may come back: the slot passes, the routine keeps its schedule.
+  if (creator && !membership && (await deletionPending(db, creator))) return skip("creator_left");
   if (!creator || !membership) return paused("creator_left");
   const agent = await getAgent(db, routine.orgId, routine.agentId);
   if (!agent || agent.archivedAt) return paused("agent_archived");

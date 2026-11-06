@@ -5919,6 +5919,7 @@
     "createdByShort": "Erstellt von {{name}}",
     "fromMessage": "aus <0>einer Nachricht in #{{channel}}</0>",
     "fromAgent": "aus einer Anfrage an einen Agent",
+    "privateTask": "Nur Personen in dieser Unterhaltung sehen diese Aufgabe.",
     "subIssues_one": "Unteraufgaben · {{count}}",
     "subIssues_other": "Unteraufgaben · {{count}}",
     "fromWebhook": "aus einem {{provider}}-Event",
@@ -11016,6 +11017,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Diese Person ist nicht in dieser Unterhaltung und sieht diese Aufgabe deshalb nicht."
+    },
     "connector": {
       "labelTaken": "Ein anderer Konnektor hat schon diesen Namen.",
       "labelInvalid": "Der Name braucht 1 bis 80 Zeichen.",
@@ -11242,6 +11246,7 @@
       "undoForbidden": "Nur die Person, für die der Agent gearbeitet hat, sein Inhaber oder ein Admin kann das rückgängig machen."
     },
     "account": {
+      "notRestorable": "Dieses Konto kann nicht mehr wiederhergestellt werden.",
       "notOwner": "Nur wer dieses Konto oder Abo verbunden hat, kann das tun."
     },
     "channel": {
@@ -13833,16 +13838,26 @@
     "membersOnly": "Nur ein Inhaber kann ihn wiederherstellen.",
     "restored": "{{name}} ist zurück"
   },
+  "accountDeleting": {
+    "title": "Dein Konto wird gelöscht",
+    "text": "Es verschwindet am {{due}} endgültig, zusammen mit den Workspaces, in denen nur du bist.",
+    "textLate": "Es verschwindet in wenigen Augenblicken.",
+    "what": "Bis dahin erreicht dich hier niemand, und du bekommst keine Benachrichtigungen. Stellst du es wieder her, ist alles wie vorher.",
+    "plans": "Die Tarife, die du bezahlst, verlängern sich weiter nicht. Es wird nichts berechnet, bis du einen wieder einschaltest.",
+    "restore": "Konto wiederherstellen",
+    "restored": "Dein Konto ist zurück"
+  },
   "deleteAccount": {
     "menu": "Konto löschen",
     "card": {
-      "text": "Du verlässt jeden Workspace und dein Konto wird endgültig gelöscht.",
+      "text": "Du verlässt jeden Workspace und dein Konto wird 7 Tage später endgültig gelöscht. Bis dahin kannst du es wiederherstellen.",
       "button": "Konto löschen…",
       "oneWorkspace": "Möchtest du nur diesen Workspace löschen? Das geht unter Allgemein.",
       "leaveWorkspace": "Möchtest du nur diesen Workspace verlassen? Das geht unter Mitglieder."
     },
     "title": "Dein ganzes Konto löschen?",
-    "intro": "Damit löschst du dein ganzes Konto, nicht nur einen Workspace. Das lässt sich nicht rückgängig machen.",
+    "intro": "Damit löschst du dein ganzes Konto, nicht nur einen Workspace.",
+    "when": "Dein Konto verschwindet am {{date}} endgültig. Bis dahin kannst du dich anmelden und es wiederherstellen.",
     "whole": "Dein ganzes Konto",
     "oneWorkspace": "Möchtest du nur einen Workspace löschen? Dein Konto bleibt.",
     "closes": "{{name}} wird jetzt geschlossen. Du bist dort die einzige Person, also wird er am {{date}} endgültig gelöscht.",
@@ -13869,7 +13884,7 @@
     "finishSetup": "Einrichtung abschließen",
     "deleteOrg": "{{name}} löschen",
     "submit": "Konto löschen",
-    "deleted": "Konto gelöscht"
+    "deleted": "Dein Konto verschwindet am {{date}} endgültig. Melde dich vorher an, um es wiederherzustellen."
   },
   "billing": {
     "open": "Tarif und Abrechnung öffnen",

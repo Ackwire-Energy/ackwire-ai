@@ -5905,6 +5905,7 @@ export const en = {
     createdByShort: "Created by {{name}}",
     fromMessage: "from <0>a message in #{{channel}}</0>",
     fromAgent: "from a request to an agent",
+    privateTask: "Only people in this conversation see this task.",
     subIssues_one: "Subtasks · {{count}}",
     subIssues_other: "Subtasks · {{count}}",
     fromWebhook: "from a {{provider}} event",
@@ -10624,6 +10625,9 @@ export const en = {
     },
   },
   errors: {
+    issue: {
+      assigneeOutside: "This person isn't in this conversation, so they can't see this task.",
+    },
     connector: {
       labelTaken: "Another connector already has this name.",
       labelInvalid: "The name needs 1 to 80 characters.",
@@ -10860,6 +10864,7 @@ export const en = {
       undoForbidden: "Only the person the agent worked for, its owner or an admin can undo this.",
     },
     account: {
+      notRestorable: "This account can't be restored anymore.",
       notOwner: "Only the person who connected this account or plan can do this.",
     },
     channel: {
@@ -13512,12 +13517,23 @@ export const en = {
     membersOnly: "Only an owner can restore it.",
     restored: "{{name}} is back",
   },
+  /** The screen an account waiting for its deletion sees in place of the app: `text` while its date is ahead. */
+  accountDeleting: {
+    title: "Your account is being deleted",
+    text: "It goes for good on {{due}}, with the workspaces only you are in.",
+    textLate: "It will be gone in a moment.",
+    what: "Until then nobody can reach you here and you get no notifications. Restore it and everything is back as it was.",
+    /** Only where plans are billed. */
+    plans: "The plans you pay for stay off. Nothing is charged until you turn one back on.",
+    restore: "Restore account",
+    restored: "Your account is back",
+  },
   /** Deleting your account (Configurações › Sua conta): what goes, what stays, and what has to happen first. */
   deleteAccount: {
     menu: "Delete account",
     /** Sua conta's last card: its title is `menu`. */
     card: {
-      text: "You leave every workspace and your account is deleted for good.",
+      text: "You leave every workspace and your account is deleted for good 7 days later. You can restore it until then.",
       button: "Delete account…",
       /** The link to Settings › General, for someone who only meant this workspace. */
       oneWorkspace: "Want to delete just this workspace? It's in General.",
@@ -13525,7 +13541,8 @@ export const en = {
       leaveWorkspace: "Want to leave just this workspace? It's in Members.",
     },
     title: "Delete your whole account?",
-    intro: "This deletes your whole account, not just one workspace. It can't be undone.",
+    intro: "This deletes your whole account, not just one workspace.",
+    when: "Your account goes for good on {{date}}. Until then, sign in to restore it.",
     /** The heading over deleting the account on a closed workspace's screen and on the onboarding. */
     whole: "Your whole account",
     /** Over links to delete a workspace instead. */
@@ -13561,7 +13578,7 @@ export const en = {
     finishSetup: "Finish setup",
     deleteOrg: "Delete {{name}}",
     submit: "Delete account",
-    deleted: "Account deleted",
+    deleted: "Your account goes for good on {{date}}. Sign in before then to restore it.",
   },
   /** The billing service (ADR 0079): this server shows no plan, price or currency, only the way there. */
   billing: {

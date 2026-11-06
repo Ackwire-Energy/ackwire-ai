@@ -6,7 +6,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
     title: "Términos de uso",
     summary: "El acuerdo para usar agentes.chat: su espacio de trabajo, sus agentes y de qué responde cada parte.",
     courtesy: "Esta es una traducción de cortesía. Si difiere de la versión en inglés, prevalece la versión en inglés.",
-    updated: "2026-11-04",
+    updated: "2026-11-05",
     sections: [
       {
         id: "agreement",
@@ -120,7 +120,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Vigencia y terminación",
         blocks: [
-          "Usted puede dejar de utilizar el Servicio y eliminar su cuenta en cualquier momento desde la aplicación. Podemos suspender o dar por terminado su acceso por incumplimiento grave de estos Términos, cuando lo exija la ley, o con un aviso previo de 30 días si dejamos de prestar el Servicio. Cuando pongamos fin al Servicio por motivos distintos de un incumplimiento suyo, pondremos su Contenido del Espacio de Trabajo a su disposición para exportarlo durante 30 días y después lo eliminaremos según se describe en la Política de privacidad. Las secciones que por su naturaleza subsisten tras la terminación (incluidas la 6, 9, 11, 13, 14 y 15) seguirán vigentes.",
+          "Usted puede dejar de utilizar el Servicio y eliminar su cuenta en cualquier momento desde la aplicación. Se suprime 7 días después, y usted puede restaurarla hasta entonces. Podemos suspender o dar por terminado su acceso por incumplimiento grave de estos Términos, cuando lo exija la ley, o con un aviso previo de 30 días si dejamos de prestar el Servicio. Cuando pongamos fin al Servicio por motivos distintos de un incumplimiento suyo, pondremos su Contenido del Espacio de Trabajo a su disposición para exportarlo durante 30 días y después lo eliminaremos según se describe en la Política de privacidad. Las secciones que por su naturaleza subsisten tras la terminación (incluidas la 6, 9, 11, 13, 14 y 15) seguirán vigentes.",
         ],
       },
       {
@@ -172,7 +172,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Qué recopilamos, qué envían los agentes y adónde, quién puede ver su espacio de trabajo y qué derechos tiene usted.",
     courtesy: "Esta es una traducción de cortesía. Si difiere de la versión en inglés, prevalece la versión en inglés.",
-    updated: "2026-11-04",
+    updated: "2026-11-05",
     sections: [
       {
         id: "overview",
@@ -262,7 +262,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Datos de cuenta:** durante la vigencia de la cuenta. Cuando usted elimina su cuenta desde la aplicación, se suprime de inmediato y desaparece de nuestras copias de seguridad en un plazo de 30 días, salvo los registros que debamos conservar por ley. Cualquier espacio de trabajo del que usted fuera el único miembro se cierra al mismo tiempo, y su contenido se elimina 7 días después según se describe a continuación. Los espacios de trabajo de los que usted formaba parte conservan su nombre y su dirección de correo electrónico en sus registros de auditoría mientras cada uno de ellos exista.",
+              "**Datos de cuenta:** durante la vigencia de la cuenta. Cuando usted elimina su cuenta desde la aplicación, se cierra su sesión en todas partes de inmediato y se suprime 7 días después, salvo que usted la restaure antes, y desaparece de nuestras copias de seguridad en un plazo de 30 días desde entonces, salvo los registros que debamos conservar por ley. Cualquier espacio de trabajo del que usted fuera el único miembro se cierra al mismo tiempo, y su contenido se elimina 7 días después según se describe a continuación. Los espacios de trabajo de los que usted formaba parte conservan su nombre y su dirección de correo electrónico en sus registros de auditoría mientras cada uno de ellos exista.",
               "**Contenido del Espacio de Trabajo:** durante la vigencia del espacio de trabajo, y antes cuando el espacio de trabajo elimina contenido concreto. Cuando finaliza el plan de agentes.chat de un espacio de trabajo, su contenido sigue disponible durante 90 días y después se elimina. Cuando un propietario elimina un espacio de trabajo, este se cierra para todos de inmediato y su contenido se elimina 7 días después, salvo que un propietario lo restaure antes, y desaparece de nuestras copias de seguridad en los 30 días siguientes, salvo el contenido que debamos conservar por ley o como registro de un abuso (véase más abajo).",
               "**Registros:** los registros de solicitudes y de seguridad, hasta 90 días. Los registros de uso de modelos (tokens y costo), durante la vigencia del espacio de trabajo, porque los presupuestos y los informes de uso dependen de ellos.",
               "**Datos de facturación:** mientras usted pague por un espacio de trabajo y, después, durante el tiempo que exija la normativa tributaria y contable.",

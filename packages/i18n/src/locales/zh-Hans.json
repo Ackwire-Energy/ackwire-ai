@@ -5743,6 +5743,7 @@
     "createdByShort": "由 {{name}} 创建",
     "fromMessage": "来自<0>#{{channel}} 中的一条消息</0>",
     "fromAgent": "来自对智能体的一个请求",
+    "privateTask": "只有这段对话中的人能看到这个任务。",
     "subIssues_other": "子任务 · {{count}}",
     "fromWebhook": "来自一个 {{provider}} 事件",
     "description": "描述",
@@ -10640,6 +10641,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "这个人不在这段对话中，因此看不到这个任务。"
+    },
     "connector": {
       "labelTaken": "已有其他连接器使用这个名称。",
       "labelInvalid": "名称需为 1 到 80 个字符。",
@@ -10865,6 +10869,7 @@
       "undoForbidden": "只有智能体为其工作的人、智能体负责人或管理员可以撤销此操作。"
     },
     "account": {
+      "notRestorable": "这个账号已无法恢复。",
       "notOwner": "只有连接此账号或套餐的人可以执行此操作。"
     },
     "channel": {
@@ -13464,16 +13469,26 @@
     "membersOnly": "只有所有者可以恢复它。",
     "restored": "{{name}} 已恢复"
   },
+  "accountDeleting": {
+    "title": "你的账号正在删除",
+    "text": "它将于 {{due}} 永久消失，只有你一人的工作区也会一起消失。",
+    "textLate": "它很快就会消失。",
+    "what": "在那之前，这里没有人能联系到你，你也不会收到通知。恢复后，一切都会回到原样。",
+    "plans": "你付费的套餐仍不会续费。在你重新开启之前不会收费。",
+    "restore": "恢复账号",
+    "restored": "你的账号回来了"
+  },
   "deleteAccount": {
     "menu": "删除账号",
     "card": {
-      "text": "你会退出所有工作区，账号将被永久删除。",
+      "text": "你会退出所有工作区，账号将在 7 天后被永久删除。在那之前可以恢复。",
       "button": "删除账号…",
       "oneWorkspace": "只想删除这个工作区？在“常规”里。",
       "leaveWorkspace": "只想退出这个工作区？在“成员”里。"
     },
     "title": "删除你的整个账号？",
-    "intro": "这会删除你的整个账号，而不只是一个工作区。此操作无法撤销。",
+    "intro": "这会删除你的整个账号，而不只是一个工作区。",
+    "when": "你的账号将于 {{date}} 永久消失。在那之前，登录即可恢复。",
     "whole": "你的整个账号",
     "oneWorkspace": "只想删除一个工作区？你的账号会保留。",
     "closes": "{{name}} 现在关闭。那里只有你一个人，所以将于 {{date}} 永久删除。",
@@ -13497,7 +13512,7 @@
     "finishSetup": "完成设置",
     "deleteOrg": "删除 {{name}}",
     "submit": "删除账号",
-    "deleted": "账号已删除"
+    "deleted": "你的账号将于 {{date}} 永久消失。在此之前登录即可恢复。"
   },
   "billing": {
     "open": "打开套餐和账单",

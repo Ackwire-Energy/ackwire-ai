@@ -1055,6 +1055,8 @@
     }
   },
   "delete": {
+    "intro": "Non si può annullare.",
+    "introGrace": "Hai 7 giorni per cambiare idea.",
     "goes": {
       "account": "Il tuo account, i tuoi accessi e le tue sessioni spariscono.",
       "orgs": "Gli spazi di lavoro in cui sei l'unico membro vengono eliminati.",

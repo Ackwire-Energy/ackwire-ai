@@ -5,10 +5,12 @@ import {
   useApi,
   useAuthConfig,
   useClosingMe,
+  useRestoreAccount,
   useRestoreWorkspace,
 } from "@agenteschat/client";
 import { billingHoldOf, isPaidReturn } from "@agenteschat/client/lib/billing";
 import {
+  accountDeletingText,
   accountOutOfReach,
   deletedByText,
   deletingText,
@@ -18,7 +20,7 @@ import {
   workspaceNotes,
   workspaceOpens,
 } from "@agenteschat/client/lib/deletion";
-import { holdText, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
+import { errorText, holdText, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Card, CardHeader, EmptyState, Icon, Spinner } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -176,14 +178,66 @@ export function DeletingScreen({ org, me }: { org: OrgSummary; me: Me }) {
   );
 }
 
+/**
+ * The account was deleted and waits for its date: this screen in place of the whole app (`__root.tsx`), since no
+ * workspace answers it. When it goes, Restaurar, and Sair. Past the date only the wait is left.
+ */
+export function AccountDeletingScreen({ dueAt }: { dueAt: string | null }) {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const restore = useRestoreAccount();
+  const billing = Boolean(useAuthConfig().data?.billingUrl);
+  useClosingMe();
+  const due = !!dueAt && Date.parse(dueAt) > Date.now();
+  return (
+    <div className="page page--mid suspended-page">
+      <header className="page__header">
+        <h1 className="page-title">{t("accountDeleting.title")}</h1>
+      </header>
+      <EmptyState
+        icon="trash"
+        actions={
+          <>
+            {due && (
+              <Button
+                variant="primary"
+                loading={restore.isPending}
+                disabled={restore.isPending}
+                onClick={() =>
+                  restore.mutate(undefined, {
+                    onSuccess: async () => {
+                      toast.show(t("accountDeleting.restored"));
+                      await navigate({ to: "/" });
+                    },
+                    onError: (error) => toast.show(errorText(t, error), "error"),
+                  })
+                }
+              >
+                {t("accountDeleting.restore")}
+              </Button>
+            )}
+            <SignOutButton disabled={restore.isPending} />
+          </>
+        }
+      >
+        {accountDeletingText(t, i18n.language, dueAt)}
+        {due && <span className="deleting-page__members">{t("accountDeleting.what")}</span>}
+        {due && billing && <span className="deleting-page__members">{t("accountDeleting.plans")}</span>}
+      </EmptyState>
+    </div>
+  );
+}
+
 /** Sair, from a workspace closed to its people: out of the account, to the sign-in. */
-function SignOutButton() {
+function SignOutButton({ disabled }: { disabled?: boolean }) {
   const { t } = useTranslation();
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   return (
     <Button
+      disabled={disabled}
       onClick={async () => {
         await auth.signOut();
         qc.clear();

@@ -340,7 +340,7 @@ export function approvalOrigin(authority: RunAuthority): ApprovalOrigin | null {
 /** The reason every request for a person (an approval, `ask_user`) carries, at least this long. */
 export const WHY_MIN_CHARS = 40;
 export const WHY_MAX_CHARS = 1000;
-export const WHY_REFUSAL = "Say why first: what you found and why this action; people see it on the card.";
+export const WHY_REFUSAL = `Say why first, in \`why\`: at least ${WHY_MIN_CHARS} characters on what you found and why this action; people see it on the card.`;
 
 const WHY_PROPERTY: JsonSchema = {
   type: "string",

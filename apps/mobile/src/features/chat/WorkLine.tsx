@@ -1,4 +1,5 @@
 import { type Issue, type Message, useApi, useChannels, type WorkView } from "@agenteschat/client";
+import { heldBack } from "@agenteschat/client/lib/issues";
 import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -7,7 +8,7 @@ import { createContext, type ReactNode, useContext, useEffect, useState } from "
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { haptics, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
+import { haptics, Icon, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
@@ -176,7 +177,7 @@ export function IssueWorkLine({ issue }: { issue: Issue }) {
   const c = useColors();
   const work = issue.backgroundWork;
   const blocked = blockedText(t, issue.blocked);
-  if (!work && !blocked) return null;
+  if (!work && !blocked) return <PrivateTaskLine issue={issue} />;
   const progress = work ? workPlanProgress(work) : null;
   return (
     <View style={styles.block}>
@@ -220,7 +221,7 @@ export function IssueWorkLine({ issue }: { issue: Issue }) {
  * Mostrar para todos: a card a DM or a private channel holds back, for who may show it to the whole workspace (who
  * asked for the work, its creator, an admin).
  */
-function ShareAction({ issue, work }: { issue: Issue; work: WorkView }) {
+function ShareAction({ issue, work }: { issue: Issue; work?: WorkView }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -237,11 +238,12 @@ function ShareAction({ issue, work }: { issue: Issue; work: WorkView }) {
     },
     onError: () => toast({ title: t("work.shareFailed"), icon: "info" }),
   });
-  const channel = issue.channelId ? channels.data?.find((c) => c.id === issue.channelId) : undefined;
-  const heldBack = Boolean(issue.channelId && channels.data && (!channel || channel.visibility === "private"));
   const mayShare =
-    work.requestedByUserId === meId || (issue.createdBy.type === "person" && issue.createdBy.id === meId) || admin;
-  if (!heldBack || !mayShare) return null;
+    !work ||
+    work.requestedByUserId === meId ||
+    (issue.createdBy.type === "person" && issue.createdBy.id === meId) ||
+    admin;
+  if (!heldBack(issue, channels.data) || !mayShare) return null;
   return (
     <Action
       label={t("work.shareEveryone")}
@@ -254,7 +256,25 @@ function ShareAction({ issue, work }: { issue: Issue; work: WorkView }) {
   );
 }
 
+/** A task tied to a private conversation, with no work line to say so: who sees it, and how to show it to everyone. */
+function PrivateTaskLine({ issue }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const channels = useChannels(useOrgId());
+  if (issue.backgroundWork || !heldBack(issue, channels.data)) return null;
+  return (
+    <View style={styles.privateTask}>
+      <Icon name="lock" size={14} color={c.muted} />
+      <Text variant="small" tone="muted" style={styles.grow}>
+        {t("issues.privateTask")}
+      </Text>
+      {issue.createdBy.type === "agent" ? <ShareAction issue={issue} /> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  privateTask: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
   line: {
     flexDirection: "row",
     gap: 10,

@@ -118,6 +118,7 @@ import {
   withJudgeFallback,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
+import { type AppleTokenRevoker, appleTokenRevoker } from "./auth";
 import { hookConfig } from "./routes/app/context";
 
 /** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
@@ -131,6 +132,8 @@ export interface EngineOptions {
   /** Tests: extra tool sources, in-process MCP, fake HTTP, fake embeddings. */
   toolSources?: ToolSource[];
   mcpConnect?: McpConnect;
+  /** Revokes Apple tokens at an account's deletion (ADR 0035); absent: from `config`. */
+  appleRevoke?: AppleTokenRevoker;
   http?: typeof fetch;
   embeddings?: { provider: EmbeddingProvider; apiKey: string };
   deltaFlushMs?: number;
@@ -633,6 +636,8 @@ export function buildEngine(o: EngineOptions) {
       : null,
   };
   const jobDeps: JobDeps = {
+    accountEmails: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, support: config.SUPPORT_EMAIL } : null,
+    appleRevoke: o.appleRevoke ?? appleTokenRevoker(config),
     voice,
     db,
     gateway,

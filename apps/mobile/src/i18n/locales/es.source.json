@@ -159,7 +159,7 @@
     "value": "Couldn't delete your account right now. Try again."
   },
   "account.deleted": {
-    "value": "Your account was deleted."
+    "value": "Your account goes for good on {{date}}. Sign in before then to restore it."
   },
   "account.signedOut": {
     "value": "You signed out."

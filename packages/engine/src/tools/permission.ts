@@ -101,7 +101,7 @@ export function createPermissionToolSource(): ToolSource {
           missing.length
             ? `Not yet on for you: ${missing.map((m) => `${m.id} (${m.label})`).join("; ")}.`
             : "Everything you can be given is already on."
-        }`,
+        }${labels.has("issues:write") ? " A task goes on our board: ask for issues:write, never make it in another tool the person didn't name." : ""}`,
         scope: "",
         sensitive: true,
         inputSchema: {
@@ -110,19 +110,13 @@ export function createPermissionToolSource(): ToolSource {
             permission: missing.length
               ? { type: "string", enum: missing.map((m) => m.id) }
               : { type: "string", maxLength: 200 },
-            reason: {
-              type: "string",
-              minLength: 1,
-              maxLength: 500,
-              description: "What you need it for, in one short sentence the person reads on the card.",
-            },
           },
-          required: ["permission", "reason"],
+          required: ["permission"],
           additionalProperties: false,
         },
         describe(input) {
           const id = String(input.permission ?? "");
-          return { title: `Turn on: ${labels.get(id) ?? id}`, detail: String(input.reason ?? "") };
+          return { title: `Turn on: ${labels.get(id) ?? id}` };
         },
         async execute(input, c) {
           const id = String(input.permission ?? "");

@@ -274,6 +274,24 @@ export const words: EmailWords = {
     button: "Lihat aplikasi yang terhubung",
     why: (org) => `Kamu menerima email ini karena sebuah aplikasi terhubung ke akunmu di ${org} di agentes.chat.`,
   },
+  accountDeleting: {
+    subject: (day) => `Akun agentes.chat kamu akan dihapus pada ${day}`,
+    preheader: "Kamu punya 7 hari untuk berubah pikiran.",
+    headline: "Akunmu sedang dihapus",
+    body: (email, day, time) => [
+      "Kami akan menghapus akun ",
+      { b: email },
+      ` pada ${day} pukul ${time}. Akun ini sudah keluar di semua perangkat, dan tidak ada yang bisa menghubungimu di sini sampai kamu kembali.`,
+    ],
+    closes: (_count, names) => [
+      "Ruang kerja yang hanya berisi kamu sudah ditutup dan hilang pada tanggal yang sama: ",
+      ...names,
+      ".",
+    ],
+    undo: "Berubah pikiran? Masuk sebelum tanggal itu dan tekan Pulihkan.",
+    button: "Masuk untuk memulihkan",
+    why: "Kamu menerima email ini karena alamat ini punya akun di agentes.chat.",
+  },
   accountDeleted: {
     subject: "Akun agentes.chat kamu sudah dihapus",
     preheader: "Akun ini sudah keluar di semua perangkat dan tidak bisa masuk lagi.",

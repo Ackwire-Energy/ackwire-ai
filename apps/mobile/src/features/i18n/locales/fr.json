@@ -1055,6 +1055,8 @@
     }
   },
   "delete": {
+    "intro": "C'est irréversible.",
+    "introGrace": "Vous avez 7 jours pour changer d'avis.",
     "goes": {
       "account": "Votre compte, vos accès et vos sessions disparaissent.",
       "orgs": "Les espaces de travail dont vous êtes le seul membre sont supprimés.",

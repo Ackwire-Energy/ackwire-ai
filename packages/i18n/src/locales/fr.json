@@ -6140,6 +6140,7 @@
     "createdByShort": "Créée par {{name}}",
     "fromMessage": "depuis <0>un message dans #{{channel}}</0>",
     "fromAgent": "depuis une demande à un agent",
+    "privateTask": "Seules les personnes de cette conversation voient cette tâche.",
     "subIssues_one": "Sous-tâches · {{count}}",
     "subIssues_many": "Sous-tâches · {{count}}",
     "subIssues_other": "Sous-tâches · {{count}}",
@@ -11442,6 +11443,9 @@
     }
   },
   "errors": {
+    "issue": {
+      "assigneeOutside": "Cette personne n'est pas dans cette conversation, elle ne voit donc pas cette tâche."
+    },
     "connector": {
       "labelTaken": "Un autre connecteur porte déjà ce nom.",
       "labelInvalid": "Le nom doit compter de 1 à 80 caractères.",
@@ -11669,6 +11673,7 @@
       "undoForbidden": "Seuls la personne pour qui l'agent a travaillé, son responsable ou un admin peuvent annuler cela."
     },
     "account": {
+      "notRestorable": "Ce compte ne peut plus être restauré.",
       "notOwner": "Seule la personne qui a connecté ce compte ou cet abonnement peut faire cela."
     },
     "channel": {
@@ -14362,16 +14367,26 @@
     "membersOnly": "Seul un propriétaire peut le restaurer.",
     "restored": "{{name}} est de retour"
   },
+  "accountDeleting": {
+    "title": "Votre compte est en cours de suppression",
+    "text": "Il disparaît définitivement le {{due}}, avec les espaces de travail dont vous êtes le seul membre.",
+    "textLate": "Il disparaîtra dans un instant.",
+    "what": "D'ici là, personne ne peut vous joindre ici et vous ne recevez aucune notification. Si vous le restaurez, tout redevient comme avant.",
+    "plans": "Les abonnements que vous payez restent sans renouvellement. Rien n'est facturé tant que vous n'en réactivez pas un.",
+    "restore": "Restaurer le compte",
+    "restored": "Votre compte est de retour"
+  },
   "deleteAccount": {
     "menu": "Supprimer le compte",
     "card": {
-      "text": "Vous quittez tous les espaces de travail et votre compte est supprimé définitivement.",
+      "text": "Vous quittez tous les espaces de travail et votre compte est supprimé définitivement 7 jours plus tard. D'ici là, vous pouvez le restaurer.",
       "button": "Supprimer le compte…",
       "oneWorkspace": "Vous voulez supprimer seulement cet espace de travail ? C'est dans Général.",
       "leaveWorkspace": "Vous voulez quitter seulement cet espace de travail ? C'est dans Membres."
     },
     "title": "Supprimer tout votre compte ?",
-    "intro": "Cela supprime tout votre compte, pas seulement un espace de travail. Cette action est définitive.",
+    "intro": "Cela supprime tout votre compte, pas seulement un espace de travail.",
+    "when": "Votre compte disparaît définitivement le {{date}}. D'ici là, connectez-vous pour le restaurer.",
     "whole": "Tout votre compte",
     "oneWorkspace": "Vous voulez supprimer un seul espace de travail ? Votre compte reste.",
     "closes": "{{name}} ferme maintenant. Vous êtes la seule personne à y être, il sera donc supprimé définitivement le {{date}}.",
@@ -14401,7 +14416,7 @@
     "finishSetup": "Terminer la configuration",
     "deleteOrg": "Supprimer {{name}}",
     "submit": "Supprimer le compte",
-    "deleted": "Compte supprimé"
+    "deleted": "Votre compte disparaît définitivement le {{date}}. Connectez-vous avant pour le restaurer."
   },
   "billing": {
     "open": "Ouvrir l'abonnement et la facturation",
