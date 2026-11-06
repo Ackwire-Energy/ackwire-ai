@@ -67,6 +67,45 @@ describe("a form's rhythm", () => {
     expect(uses).toEqual([]);
   });
 
+  test("a dialog's form has no box, so its body scrolls and its footer stays in a short window", () => {
+    expect(rule(".ac-dialog > form")).toContain("display: contents;");
+    expect(rule(".ac-dialog__body")).toContain("overflow-y: auto;");
+  });
+
+  test("on a phone a form's Segmented wraps a choice instead of running it past the track", () => {
+    const item = rule(".ac-field > .ac-seg > .ac-seg__item");
+    expect(item).toContain("white-space: normal;");
+    expect(item).toContain("min-width: min-content;");
+    expect(rule(".ac-field > .ac-seg")).toContain("min-height: var(--seg-h);");
+  });
+
+  test("a textarea's words start where an input's do, and a tab's panel keeps the form's gap", () => {
+    expect(rule("textarea.ac-input")).toContain("padding: 10px var(--control-px-md);");
+    expect(rule(".ac-tabpanel")).toContain("gap: var(--form-gap);");
+  });
+
+  test("a ghost at a footer's edge puts its words on the dialog's edge", () => {
+    expect(rule(".ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):first-child")).toContain(
+      "margin-inline-start: calc(-1 * var(--ghost-plate));",
+    );
+    expect(rule(".ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):last-child")).toContain(
+      "margin-inline-end: calc(-1 * var(--ghost-plate));",
+    );
+  });
+
+  test("Cancelar looks the same in every footer: the plain button, never a ghost", () => {
+    const ghosts = sources(join(ROOT, "apps/web/src")).flatMap((f) =>
+      [...readFileSync(f, "utf8").matchAll(/<DialogFooter\b[\s\S]*?<\/DialogFooter>/g)].flatMap((foot) =>
+        [...foot[0].matchAll(/<Button\b[^>]*variant="ghost"[^>]*>\s*\{t\("[\w.]*[cC]ancel"\)\}/g)].map(() => f),
+      ),
+    );
+    expect(ghosts).toEqual([]);
+  });
+
+  test("a sheet's head wraps its buttons on a phone", () => {
+    expect(rule(".ac-details__actions")).toContain("flex-wrap: wrap;");
+  });
+
   test("a form's actions sit at the end, spaced as a dialog's footer", () => {
     expect(rule(".ac-form__actions")).toContain("justify-content: flex-end;");
     expect(rule(".ac-form__actions")).toContain("gap: var(--space-2);");

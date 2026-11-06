@@ -382,10 +382,13 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Nothing starts on the computer until the key is there; a paste that isn't a key says so.
     expect(machines?.lastLogin()).toBeUndefined();
     const keyBox = within(panel).getByLabelText("Chave do GLM Coding");
+    expect(within(panel).getByRole("link", { name: "Abrir z.ai" }).className).toContain("ac-btn--primary");
     await type(keyBox, "short");
     expect(panel.textContent).toContain("Isso não parece uma chave do GLM Coding.");
     const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
     await type(keyBox, KEY);
+    // With a key typed, sending is the one primary: opening the page steps back.
+    expect(within(panel).getByRole("link", { name: "Abrir z.ai" }).className).not.toContain("ac-btn--primary");
     await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
     await settle(8);
     expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([

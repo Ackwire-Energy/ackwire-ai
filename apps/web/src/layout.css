@@ -1805,7 +1805,8 @@ html:not([data-pointer]) .artifact-card__open:focus-visible {
   text-align: left;
   vertical-align: top;
 }
-.artifact-table thead th {
+.artifact-table thead th,
+.artifact-table thead td {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -1814,6 +1815,7 @@ html:not([data-pointer]) .artifact-card__open:focus-visible {
 }
 .artifact-table--edit td {
   padding: 4px;
+  vertical-align: middle;
 }
 .artifact-table__sort {
   display: inline-flex;
@@ -5225,6 +5227,12 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   .tr-seg .ac-seg__item {
     padding: 0 7px;
     gap: 5px;
+  }
+}
+/* On the narrowest phones the level's word stays and its swatch goes, or the last level scrolled out of the track. */
+@media (max-width: 400px) {
+  .tr-seg .ac-toolpx-swatch {
+    display: none;
   }
 }
 /* The agent's tools (read only, `ToolLevelsView`) also show in the panel beside its DM (`agp-side`): there the pixel
@@ -9552,11 +9560,14 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 .endpoint-models {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-inline-size: 0;
   margin: 0;
   padding: 0;
   border: 0;
+}
+.endpoint-models > .ac-field__label {
+  margin-block-end: calc(var(--field-gap) - var(--space-2));
 }
 .endpoint-model {
   display: grid;
@@ -11668,13 +11679,13 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .channel-perms__intro p {
   margin: 0;
 }
+/* The role list over its permissions: the dialog's column can't hold both side by side, whose words wrapped word by word. */
 .channel-perms__grid {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .channel-perms__targets {
-  flex: 0 0 168px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -11777,13 +11788,6 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   color: var(--ok);
 }
 @media (max-width: 640px) {
-  .channel-perms__grid {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .channel-perms__targets {
-    flex: none;
-  }
   .channel-perms__key {
     flex-direction: column;
     align-items: flex-start;
@@ -12180,9 +12184,6 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
 .sidebar-setup__name {
   font-size: 14px;
   font-weight: 600;
-}
-.sidebar-setup__row > .ac-seg {
-  justify-self: start;
 }
 /* No room beside the name on a phone: the choices go under it. */
 @media (max-width: 560px) {

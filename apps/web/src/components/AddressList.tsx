@@ -44,6 +44,7 @@ export function AddressList({
   const [invalid, setInvalid] = useState(false);
   const [cleared, setCleared] = useState<string[] | null>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
+  const field = useRef<HTMLInputElement>(null);
   // "Remover tudo" unmounts with the chips; focus lands on "Desfazer" instead of the page.
   useEffect(() => {
     if (cleared) undoRef.current?.focus();
@@ -57,11 +58,14 @@ export function AddressList({
     onChange([...new Set([...values, ...valid])]);
     setText("");
     setCleared(null);
+    // The + turns off with the field empty: the keyboard stays where the next address goes.
+    field.current?.focus();
   };
   return (
     <div className="mail-list">
       <Field label={label} id={id} help={help} error={invalid ? (invalidText ?? t("mail.list.invalid")) : undefined}>
         <AffixInput
+          ref={field}
           value={text}
           disabled={disabled}
           inputMode={inputMode}

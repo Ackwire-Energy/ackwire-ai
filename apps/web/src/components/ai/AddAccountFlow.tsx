@@ -687,7 +687,7 @@ function AddAccountFlow({
         <Step
           n={1}
           side={
-            <OpenPage href={plan.site} primary={!opened} onOpened={() => setOpened(true)}>
+            <OpenPage href={plan.site} primary={!opened && !code.trim()} onOpened={() => setOpened(true)}>
               {t("aiAccounts.add.openKeys", { site: site.host })}
             </OpenPage>
           }

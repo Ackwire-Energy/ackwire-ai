@@ -697,6 +697,7 @@ html:not([data-pointer]) .nwc-pk .ac-select__trigger:focus-visible {
 /* Format and size side by side. */
 .nwc-pks {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;

@@ -1814,9 +1814,7 @@ function SetupCopyDialog({
         )}
       </Locked>
       <DialogFooter bar>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
           disabled={chosen.length === 0}
@@ -2222,7 +2220,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
     >
       <Locked when={busy}>
         <DialogBody>
-          <div className="stack-4" style={{ gap: 14 }}>
+          <div className="ac-form">
             <OptionList
               aria-label={t("agentPage.work.browserDialog.title", g)}
               layout="cards"

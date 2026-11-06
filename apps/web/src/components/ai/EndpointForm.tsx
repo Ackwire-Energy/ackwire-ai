@@ -33,7 +33,7 @@ import {
   SettingNote,
   Spinner,
 } from "@agenteschat/ui";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -64,6 +64,7 @@ export function EndpointForm({
   );
   const [typed, setTyped] = useState("");
   const [typedWrong, setTypedWrong] = useState(false);
+  const typedBox = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState<{ cred: Credential; checks: EndpointCheck[] } | null>(null);
   const list = useEndpointModels(orgId);
   const add = useAddCredential(orgId);
@@ -78,6 +79,8 @@ export function EndpointForm({
     if (!next) return;
     setDraft(next);
     setTyped("");
+    // The + turns off with the field empty, and a × leaves with its row: the keyboard stays in the form.
+    typedBox.current?.focus();
   };
   const fetchModels = () =>
     list.mutate(
@@ -216,6 +219,7 @@ export function EndpointForm({
             }
           >
             <AffixInput
+              ref={typedBox}
               value={typed}
               spellCheck={false}
               autoComplete="off"
@@ -263,7 +267,10 @@ export function EndpointForm({
                       iconOnly
                       icon="close"
                       aria-label={t("common.removeName", { name: m.id })}
-                      onClick={() => setDraft((d) => withoutModel(d, m.id))}
+                      onClick={() => {
+                        setDraft((d) => withoutModel(d, m.id));
+                        typedBox.current?.focus();
+                      }}
                     />
                     {m.on && (
                       <span className="endpoint-model__prices">

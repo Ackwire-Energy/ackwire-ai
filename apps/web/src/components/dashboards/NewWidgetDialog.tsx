@@ -853,9 +853,7 @@ function NewWidgetBody({
         ) : (
           <span className="nw-dest" aria-hidden="true" />
         )}
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         {primary}
       </DialogFooter>
       <AgentPickerDialog

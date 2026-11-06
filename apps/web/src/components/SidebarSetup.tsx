@@ -186,6 +186,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
               </span>
               <span className="sidebar-setup__name">{t(`shell.${id}`)}</span>
               <Segmented
+                block
                 size="sm"
                 label={t(`shell.${id}`)}
                 value={sidebarPlace(items, id)}

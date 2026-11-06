@@ -754,7 +754,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-presets__list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--space-2) var(--form-gap);
 }
 .routine-preset {
   display: flex;

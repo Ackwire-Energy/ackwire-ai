@@ -95,6 +95,37 @@ describe("Outro provedor in Settings › Chaves de IA", () => {
     expect(screen().queryByRole("dialog", { name: "Adicionar chave de API" })).toBeNull();
   });
 
+  test("by keyboard: Enter adds without saving, the + and a × leave the focus in the field, Buscar modelos comes before it", async () => {
+    const { add, api } = await openForm();
+    const typed = within(add).getByLabelText("Adicionar um modelo") as HTMLInputElement;
+    await type(within(add).getByLabelText("Endereço"), "https://gw.example/v1");
+    let saves = 0;
+    (api.agents as { addCredential: unknown }).addCredential = () => {
+      saves += 1;
+      return new Promise(() => {});
+    };
+    await type(typed, "llama-4");
+    await act(async () => fireEvent.keyDown(typed, { key: "Enter" }));
+    await settle();
+    expect(saves).toBe(0);
+    expect(screen().queryByRole("dialog", { name: "Adicionar chave de API" })).not.toBeNull();
+    expect(within(add).queryByRole("checkbox", { name: "llama-4" })).not.toBeNull();
+
+    await type(typed, "qwen-3");
+    const plus = within(add).getByRole("button", { name: "Adicionar" });
+    await act(async () => plus.focus());
+    await click(plus);
+    expect(document.activeElement).toBe(typed);
+    const remove = within(add).getByRole("button", { name: "Remover qwen-3" });
+    await act(async () => remove.focus());
+    await click(remove);
+    expect(document.activeElement).toBe(typed);
+
+    const fetch = within(add).getByRole("button", { name: "Buscar modelos" }) as HTMLButtonElement;
+    expect(fetch.disabled).toBe(false);
+    expect(fetch.compareDocumentPosition(typed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   test("Enter adds a typed model, its × takes it off, and while saving every control is off", async () => {
     const { add, api } = await openForm();
     await type(within(add).getByLabelText("Nome"), "OpenGateway");
