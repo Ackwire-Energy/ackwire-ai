@@ -9,10 +9,10 @@ import { isComputerBrain } from "./brains/types";
 import { invalidateOrg } from "./cache";
 import { addChannelMember, removeChannelMember, setChannelAgentAutoReply } from "./channels";
 import { sha256 } from "./crypto";
-import { NotFoundError } from "./errors";
+import { ForbiddenError, NotFoundError } from "./errors";
 import { publishAgentsChanged } from "./events";
 import { setAgentComputerTarget } from "./machines";
-import { can, getMembership } from "./organizations";
+import { can, getMembership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
 import { isRightHand } from "./right-hand";
 import { canonicalJson } from "./tools/json-schema";
@@ -135,13 +135,20 @@ async function setValue(
 ) {
   const { db, pubsub } = deps;
   switch (line.field) {
-    // Its owner may undo what its owner may decide, without managing agents.
-    case "instructions":
+    // Whoever decides instructions, who needn't manage agents: the editor below would refuse its owner.
+    case "instructions": {
+      const [membership, agent] = await Promise.all([
+        requirePermission(db, actorId, orgId, "read"),
+        getAgent(db, orgId, agentId),
+      ]);
+      if (!can(membership, "review_memory") && !can(membership, "manage_agents") && agent?.ownerUserId !== actorId)
+        throw new ForbiddenError("Only its owner or an admin can put its instructions back", "action.not_allowed");
       await db
         .update(agents)
         .set({ instructions: String(value), updatedAt: new Date() })
         .where(eq(agents.id, agentId));
       return invalidateOrg(orgId);
+    }
     case "role":
       return void (await updateAgent(db, actorId, orgId, agentId, { role: String(value) }, { pubsub }));
     case "apps":

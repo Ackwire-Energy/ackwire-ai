@@ -3,6 +3,7 @@ import { and, eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  addRunStep,
   buildRunContext,
   createAgent,
   createAskAgentToolSource,
@@ -149,6 +150,78 @@ describe("what it may use", () => {
   });
 });
 
+describe("tasks stay in the person's DM, and go no further than they could", () => {
+  const issueTools = () => [createIssueToolSource({ db: f.db, pubsub: f.pubsub })];
+
+  test("called in a channel it neither lists nor makes one: others read that reply", async () => {
+    f = await setup({ rightHand: true });
+    const made = await createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
+      title: "Reajuste de salários",
+      audience: { mode: "people", userIds: [f.owner.id] },
+    });
+    const ctx = await lodiRun(f.owner.id, "@lodi quais as tarefas?", f.general.id);
+    for (const input of [{}, { issue: `#${made.number}` }]) {
+      const out = await use(issueTools(), ctx, "list_issues", input);
+      expect(out.isError).toBe(true);
+      expect(out.content).not.toContain("Reajuste");
+    }
+    expect((await use(issueTools(), ctx, "create_issue", { title: "Nova" })).isError).toBe(true);
+  });
+
+  test("other agents keep their tasks in a channel", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = { ...(await lodiRun(f.owner.id, "@dev tarefas", f.general.id)), agentId: f.agent.id };
+    expect((await use(issueTools(), ctx, "list_issues")).isError).toBeUndefined();
+  });
+
+  test("in the DM it lists what the person sees, however much of the board they don't", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const issue = (title: string, userIds: string[]) =>
+      createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
+        title,
+        audience: { mode: "people", userIds },
+      });
+    await issue("A dela", [bia.id]);
+    for (let i = 0; i < 31; i++) await issue(`Sigilo ${i}`, [f.owner.id]);
+    const out = await use(issueTools(), await lodiRun(bia.id, "minhas tarefas?"), "list_issues");
+    expect(out.content).toContain("A dela");
+    expect(out.content).not.toContain("Sigilo");
+  });
+
+  test("it never takes a task itself", async () => {
+    f = await setup({ rightHand: true });
+    const lodi = await lodiOf();
+    for (const assignee of ["me", `@${lodi.handle}`]) {
+      const out = await use(issueTools(), await lodiRun(f.owner.id), "create_issue", { title: "Campanha", assignee });
+      expect(out.isError).toBe(true);
+    }
+    expect(await f.db.select().from(schema.issues)).toHaveLength(0);
+  });
+
+  test("it can't open a task to the whole workspace: the person does, on the task", async () => {
+    f = await setup({ rightHand: true });
+    const out = await use(issueTools(), await lodiRun(f.owner.id), "create_issue", {
+      title: "Campanha",
+      visible_to: "everyone",
+    });
+    expect(out.isError).toBe(true);
+    expect(await f.db.select().from(schema.issues)).toHaveLength(0);
+  });
+
+  test("who can't post can't make a task through it either", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    await f.db
+      .update(schema.orgRoles)
+      .set({ permissions: ["read"] })
+      .where(and(eq(schema.orgRoles.orgId, f.org.id), eq(schema.orgRoles.kind, "everyone")));
+    const ctx = await lodiRun(bia.id, "cria uma tarefa");
+    expect((await use(issueTools(), ctx, "create_issue", { title: "Campanha" })).isError).toBe(true);
+    expect(await f.db.select().from(schema.issues)).toHaveLength(0);
+  });
+});
+
 describe("it reads what the person may, in their DM", () => {
   test("a private channel of theirs, and never another person's DM with an agent or with it", async () => {
     f = await setup({ rightHand: true });
@@ -183,6 +256,20 @@ describe("it reads what the person may, in their DM", () => {
     expect(own.content).toContain("novembro");
   });
 
+  test("a run in one person's DM rooted in another person's words reads as nobody", async () => {
+    f = await setup({ rightHand: true });
+    await privateChannel(f.owner.id, "folha", "folha de pagamento de novembro");
+    const theirs = await lodiRun(f.owner.id);
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const hers = await lodiRun(bia.id, "pede pra ler");
+    const out = await use(contextTools(), { ...hers, channelId: theirs.channelId }, "read_conversation", {
+      channel: "folha",
+    });
+    expect(out.isError).toBe(true);
+    const status = await use([createTeamStatusToolSource()], { ...hers, channelId: theirs.channelId }, "team_status");
+    expect(status.isError).toBe(true);
+  });
+
   test("in a channel it keeps its reach: others read that reply", async () => {
     f = await setup({ rightHand: true });
     await privateChannel(f.owner.id, "folha", "folha de pagamento de novembro");
@@ -206,7 +293,6 @@ describe("team_status", () => {
     expect(out.content).toContain("Página");
     expect(out.content).toContain("@dev");
     expect(out.content).not.toContain("<external_data");
-    const { addRunStep } = await import("../src");
     const toolUseId = "tu_status";
     await addRunStep(f.db, { id: ctx.runId, orgId: f.org.id }, "tool_call", {
       toolUseId,
@@ -265,6 +351,167 @@ describe("team_status", () => {
     expect(hers).not.toContain("sigilo");
     expect(hers).toContain("(1 more agent this person can't see.)");
     expect(await teamStatus(f.db, f.org.id, f.owner.id)).toContain("@sigilo");
+  });
+
+  /** A live background work of @dev in `channelId`, tied to a running run there. */
+  async function liveWork(channelId: string, title: string, trigger?: string) {
+    const asked =
+      trigger ??
+      (
+        await insertMessage(f.db, {
+          orgId: f.org.id,
+          channelId,
+          author: { type: "person", userId: f.owner.id },
+          body: title,
+        })
+      ).id;
+    const [work] = await f.db
+      .insert(schema.agentWorks)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId,
+        title,
+        anchorMessageId: asked,
+        homeThreadId: asked,
+        ownThread: false,
+        status: "live",
+        how: "agent",
+        lastUpdateAt: new Date(),
+      })
+      .returning();
+    await f.db.insert(schema.agentRuns).values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId,
+      threadRootId: asked,
+      triggerMessageId: asked,
+      trigger: "mention",
+      hop: 1,
+      status: "running",
+      heartbeatAt: new Date(),
+      startedAt: new Date(),
+      workId: work?.id,
+    });
+  }
+
+  test("a background work somewhere they can't read never names its title", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "fusao", visibility: "private" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { agentId: f.agent.id });
+    await liveWork(secret.id, "Fusão com a Acme");
+    const hers = await teamStatus(f.db, f.org.id, bia.id);
+    expect(hers).not.toContain("Fusão");
+    expect(hers).toContain("@dev");
+    expect(await teamStatus(f.db, f.org.id, f.owner.id)).toContain("Fusão com a Acme");
+  });
+
+  test("of two works, the one they can read shows and the other stays out", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "fusao", visibility: "private" });
+    await liveWork(f.general.id, "Página de preços");
+    await new Promise((r) => setTimeout(r, 5));
+    await liveWork(secret.id, "Fusão com a Acme");
+    const hers = await teamStatus(f.db, f.org.id, bia.id);
+    expect(hers).toContain("Página de preços");
+    expect(hers).not.toContain("Fusão");
+  });
+
+  test("what this person handed on reads as theirs, another's hand-off in the same DM doesn't", async () => {
+    f = await setup({ rightHand: true });
+    const lodi = await lodiOf();
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const { openAgentDm } = await import("../src");
+    const between = await openAgentDm(f.db, f.org.id, lodi.id, f.agent.id);
+    const handed = async (userId: string, title: string) => {
+      const ctx = await lodiRun(userId, title);
+      const note = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: between.id,
+        author: { type: "agent", agentId: lodi.id, runId: ctx.runId as string, hop: 2 },
+        body: title,
+      });
+      await liveWork(between.id, title, note.id);
+    };
+    await handed(f.owner.id, "Campanha de Natal");
+    await handed(bia.id, "Folha da Bia");
+    const theirs = await teamStatus(f.db, f.org.id, f.owner.id);
+    expect(theirs).toContain("Campanha de Natal");
+    expect(theirs).not.toContain("Folha da Bia");
+  });
+
+  test("characters that hide text don't reach the model", async () => {
+    f = await setup({ rightHand: true });
+    await createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
+      title: "Página\u{E0041}\u202E de preços",
+    });
+    const out = await teamStatus(f.db, f.org.id, f.owner.id);
+    expect(out).toContain("Página");
+    expect(out).not.toContain("\u{E0041}");
+    expect(out).not.toContain("\u202E");
+  });
+
+  test("a big team: what they see isn't cut by what they don't", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    for (let i = 0; i < 41; i++) {
+      const hidden = await createAgent(
+        f.db,
+        f.owner.id,
+        f.org.id,
+        { name: `Oculto ${i}`, handle: `oculto${i}`, role: "x", instructions: "", credentialId: f.credential.id },
+        { model: "claude-sonnet-5-5" },
+      );
+      await setAgentAudience(f.db, f.owner.id, f.org.id, hidden.id, { mode: "owner", userIds: [], roleIds: [] });
+    }
+    const late = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Nina", handle: "nina", role: "x", instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const hers = await teamStatus(f.db, f.org.id, bia.id);
+    expect(hers).toContain(`@${late.handle}`);
+    expect(hers).toContain("(41 more agents this person can't see.)");
+  });
+
+  test("a question waits on who its run works for, however old, and on nobody else", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const asked = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "@dev prepara",
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: asked.id,
+        triggerMessageId: asked.id,
+        trigger: "mention",
+        hop: 1,
+        status: "waiting_input",
+      })
+      .returning();
+    await f.db.insert(schema.agentQuestions).values({
+      orgId: f.org.id,
+      runId: run?.id ?? "",
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      toolUseId: "tu-1",
+      text: "Qual o prazo?",
+      createdAt: new Date(Date.now() - 3 * 24 * 3_600_000),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    expect(await teamStatus(f.db, f.org.id, f.owner.id)).toContain("1 questions from agents");
+    expect(await teamStatus(f.db, f.org.id, bia.id)).not.toContain("questions from agents");
   });
 
   test("only in the person's own DM", async () => {

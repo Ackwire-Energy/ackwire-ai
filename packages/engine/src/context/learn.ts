@@ -1,5 +1,18 @@
 import type { ErrorTags } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { modelInfo } from "@agenteschat/providers";
 import { recordAgentActions } from "../agent-actions";
 import { steeredByOthers } from "../authority";
@@ -24,7 +37,8 @@ import {
 import { changeSkillAsAgent } from "./learned-skills";
 import { type ContextDeps, isTrustedMessage, judgeOf, memoryJudging, resolveSummaryModel } from "./summaries";
 
-const { agentRuns, agentRunSteps, agentLearningDays, agents, contextItems, messages, skills, users } = schema;
+const { agentQuestions, agentRuns, agentRunSteps, agentLearningDays, agents, contextItems, messages, skills, users } =
+  schema;
 
 export const LEARN_DEFAULTS = { maxPerAgentDay: 20, minToolCalls: 6, skillAfter: 3 };
 export const learnConfig = (deps: Pick<ContextDeps, "learn">) => ({ ...LEARN_DEFAULTS, ...deps.learn });
@@ -123,9 +137,27 @@ export async function learnTrust(ctx: Pick<ToolContext, "orgId" | "runId" | "tri
 }
 
 /**
+ * Reads of what others wrote that carry no outside mark, since it stays in the workspace (a task's title, a wiki page,
+ * a teammate's answer). The run keeps its trust (`team_status` must not weaken what is handed on), but such a title can
+ * be what an agent copied from an email, so a change made after reading it waits on a person's eyes.
+ */
+const OTHERS_WORDS = new Set([
+  "team_status",
+  "list_issues",
+  "list_artifacts",
+  "list_routines",
+  "get_summary",
+  "expand",
+  "search_wiki",
+  "read_wiki_page",
+  "ask_agent",
+]);
+
+/**
  * The person whose own words this run answers, when it may act on them with no card (ADR 0092 §5, amended): it is high
- * trust, the message that started it is theirs (not a colleague's or a notice's) and nobody else wrote into it while it
- * worked. Null otherwise. Only says whose words: what that person may decide is the caller's to check.
+ * trust, the message that started it is theirs (not a colleague's or a notice's), nobody else wrote into it or answered
+ * it while it worked, and it read nothing others wrote (`OTHERS_WORDS`). Null otherwise. Only says whose words: what
+ * that person may decide is the caller's to check.
  */
 export async function ownWords(
   ctx: Pick<ToolContext, "orgId" | "runId" | "triggerMessageId"> & { db: Database },
@@ -138,6 +170,14 @@ export async function ownWords(
     .from(messages)
     .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
   if (trigger?.authorUserId !== person) return null;
+  const calls = await runCalls(ctx.db, { id: ctx.runId, orgId: ctx.orgId });
+  if (calls.some((c) => OTHERS_WORDS.has(c.name))) return null;
+  const [answered] = await ctx.db
+    .select({ id: agentQuestions.id })
+    .from(agentQuestions)
+    .where(and(eq(agentQuestions.runId, ctx.runId), ne(agentQuestions.answeredByUserId, person)))
+    .limit(1);
+  if (answered) return null;
   return (await steeredByOthers(ctx.db, ctx.orgId, person, [ctx.runId])) ? null : person;
 }
 

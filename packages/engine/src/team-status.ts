@@ -1,5 +1,6 @@
-import { and, type Database, eq, gte, inArray, isNull, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, rowsOf, schema, sql } from "@agenteschat/db";
 import { lineInEnglish, loadAgentStatuses } from "./agent-status";
+import { readerOfRun } from "./agents-dm-reads";
 import { listApprovals } from "./approvals";
 import { seesAgentDetails } from "./audience";
 import { readsOrMayJoin } from "./channels";
@@ -10,6 +11,7 @@ import { appPageLink } from "./message-links";
 import { getMembership } from "./organizations";
 import { isRightHand, rightHandReader } from "./right-hand";
 import type { ToolDefinition, ToolSource } from "./tools/types";
+import { cleanOutside } from "./untrusted";
 import { liveWorksByAgent } from "./works";
 
 const { agentQuestions, agentRuns, agents, channels } = schema;
@@ -18,7 +20,7 @@ export const TEAM_STATUS_TOOL = "team_status";
 
 /** "Lately": what the report looks back on. */
 const LATELY_MS = 24 * 3_600_000;
-/** A task of an agent that moved for this long is stuck. */
+/** An agent's task that hasn't moved for this long is stuck. */
 const STUCK_MS = 4 * 3_600_000;
 const TEAM_MAX = 40;
 const TASKS_LISTED = 12;
@@ -29,7 +31,7 @@ const TITLE_CHARS = 100;
  * outside (`readsOutside`), or what it hands on next is treated as outside too. With no angle brackets they can't
  * open one, and `read_conversation` keeps its mark for when the person asks for detail.
  */
-const clean = (text: string) => oneLine(text.replace(/[<>]/g, " "), TITLE_CHARS);
+const clean = (text: string) => oneLine(cleanOutside(text).replace(/[<>]/g, " "), TITLE_CHARS);
 
 /**
  * What the team is doing, for this person, from stored data with no model call (ADR 0137 §13): only agents they see
@@ -41,9 +43,9 @@ export async function teamStatus(db: Database, orgId: string, personId: string, 
     .select()
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
-    .orderBy(agents.createdAt)
-    .limit(TEAM_MAX);
-  const seen = team.filter((a) => seesAgentDetails(a, personId, membership));
+    .orderBy(agents.createdAt);
+  const visible = team.filter((a) => seesAgentDetails(a, personId, membership));
+  const seen = visible.slice(0, TEAM_MAX);
   const ids = seen.map((a) => a.id);
   const since = new Date(now.getTime() - LATELY_MS).toISOString();
   const [statuses, works, runsNow, ended, tasks, approvals, proposals, questions] = await Promise.all([
@@ -51,7 +53,7 @@ export async function teamStatus(db: Database, orgId: string, personId: string, 
     liveWorksByAgent(db, orgId, ids),
     ids.length
       ? db
-          .select({ agentId: agentRuns.agentId, channelId: agentRuns.channelId })
+          .select({ id: agentRuns.id, agentId: agentRuns.agentId, channelId: agentRuns.channelId })
           .from(agentRuns)
           .where(
             and(
@@ -75,14 +77,13 @@ export async function teamStatus(db: Database, orgId: string, personId: string, 
     proposalsWaitingFor(db, personId, orgId),
     ids.length
       ? db
-          .select({ agentId: agentQuestions.agentId, channelId: agentQuestions.channelId })
+          .select({ runId: agentQuestions.runId })
           .from(agentQuestions)
           .where(
             and(
               eq(agentQuestions.orgId, orgId),
               inArray(agentQuestions.agentId, ids),
               eq(agentQuestions.status, "open"),
-              gte(agentQuestions.createdAt, new Date(since)),
             ),
           )
       : [],
@@ -91,9 +92,21 @@ export async function teamStatus(db: Database, orgId: string, personId: string, 
     ...runsNow.map((r) => r.channelId),
     ...[...works.values()].flat().map((w) => w.channelId),
     ...ended.map((r) => r.channel_id),
-    ...questions.map((q) => q.channelId),
   ];
   const reads = await readsOrMayJoin(db, orgId, personId, places);
+  const forThem = async (runIds: (string | null)[]) => {
+    const ids = [...new Set(runIds.filter((id): id is string => !!id))];
+    const readers = await Promise.all(ids.map((id) => readerOfRun(db, orgId, id)));
+    return new Set(ids.filter((_, i) => readers[i] === personId));
+  };
+  // What they handed on runs in the agents' DM, which no person reads: it is still theirs to hear about.
+  const theirs = await forThem(
+    [...runsNow.map((r) => ({ runId: r.id, channelId: r.channelId })), ...[...works.values()].flat()]
+      .filter((r) => !reads.has(r.channelId))
+      .map((r) => r.runId),
+  );
+  const shows = (place: { channelId: string; runId: string | null }) =>
+    reads.has(place.channelId) || (!!place.runId && theirs.has(place.runId));
   const named = reads.size
     ? await db
         .select({ id: channels.id, name: channels.name, kind: channels.kind })
@@ -113,14 +126,14 @@ export async function teamStatus(db: Database, orgId: string, personId: string, 
     const status = statusOf.get(a.id);
     const line = status?.status ?? null;
     const mine = works.get(a.id) ?? [];
-    const here = [
-      ...runsNow.filter((r) => r.agentId === a.id).map((r) => r.channelId),
-      ...mine.map((w) => w.channelId),
-    ];
-    const unseen = here.some((id) => !reads.has(id));
-    const named = line && !line.text && !line.subject && !line.second;
-    if (unseen && !named) working.push(`- @${a.handle}: busy with something this person can't see`);
-    else if (mine[0]) working.push(`- @${a.handle}: on "${clean(mine[0].title)}"${where(mine[0].channelId)}`);
+    const here = [...runsNow.filter((r) => r.agentId === a.id).map((r) => ({ ...r, runId: r.id })), ...mine];
+    const unseen = here.some((p) => !shows(p));
+    const shown = mine.find(shows);
+    const plain = line && !line.text && !line.subject && !line.second;
+    if (shown) {
+      const link = shown.issue ? ` ${appPageLink(orgId, `/issues/${shown.issue.number}`)}` : "";
+      working.push(`- @${a.handle}: on "${clean(shown.title)}"${where(shown.channelId)}${link}`);
+    } else if (unseen && !plain) working.push(`- @${a.handle}: busy with something this person can't see`);
     else if (line) working.push(`- @${a.handle}: ${clean(lineInEnglish(line) ?? "working")}`);
     else if (status?.presence === "busy") working.push(`- @${a.handle}: working`);
     else quiet.push(`@${a.handle}`);
@@ -145,13 +158,13 @@ export async function teamStatus(db: Database, orgId: string, personId: string, 
         return `- @${handle.get(r.agent_id)}: ${r[key]}${seenHere ? where(r.channel_id) : " somewhere this person can't see"}`;
       });
   const waiting = approvals.filter((a) => a.canDecide);
-  const asked = questions.filter((q) => reads.has(q.channelId));
+  const asked = await forThem(questions.map((q) => q.runId));
   const needs = [
     waiting.length ? `- ${waiting.length} approvals: offer_approvals shows them` : "",
     proposals ? `- ${proposals} proposed changes on Aprovações` : "",
-    asked.length ? `- ${asked.length} questions from agents, unanswered` : "",
+    asked.size ? `- ${asked.size} questions from agents, unanswered` : "",
   ].filter(Boolean);
-  const hidden = team.length - seen.length;
+  const hidden = team.length - visible.length;
 
   const section = (title: string, lines: string[]) => (lines.length ? `${title}\n${lines.join("\n")}` : "");
   return [
@@ -164,6 +177,7 @@ export async function teamStatus(db: Database, orgId: string, personId: string, 
     section("Runs finished today:", counts("done")),
     section("Runs that failed today:", counts("failed")),
     section("Waiting for this person:", needs),
+    visible.length > seen.length ? `(${visible.length - seen.length} more agents not listed.)` : "",
     hidden > 0 ? `(${hidden} more agent${hidden > 1 ? "s" : ""} this person can't see.)` : "",
   ]
     .filter(Boolean)

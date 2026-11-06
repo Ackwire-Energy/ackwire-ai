@@ -253,6 +253,14 @@ export async function rightHandReader(
   return people.length === 1 && people[0]?.userId === person ? person : null;
 }
 
+/** The right hand anywhere but a person's own DM with it: what only reads or writes for that person stays out. */
+export async function rightHandAway(
+  ctx: Pick<ToolContext, "orgId" | "agentId" | "channelId" | "runId" | "triggerMessageId"> & { db: Executor },
+) {
+  const [agent] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
+  return isRightHand(agent) && !(await rightHandReader(ctx));
+}
+
 /** Its computer turns' permission profile: the runner's locked-down `chat` (`LOCKED_BRAIN_PROTOCOL`). */
 export const RIGHT_HAND_TURN = { mode: "chat" } as const;
 

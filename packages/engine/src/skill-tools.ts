@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, eq, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { recordAgentActions } from "./agent-actions";
 import { sniffModelImage } from "./avatars";
+import { readsOrMayJoin } from "./channels";
 import { learnTrust, ownWords } from "./context/learn";
 import { changeSkillAsAgent } from "./context/learned-skills";
 import { memoryResult } from "./context/tools";
@@ -253,7 +254,12 @@ export function createSkillToolSource(
               }))
             : [];
           if (files.length > 10) return { content: "At most 10 files at a time.", isError: true };
-          const { trust, person } = await learnTrust(ctx);
+          const { trust, person: behind } = await learnTrust(ctx);
+          // A card under the reply only reaches them where they read it: in the agents' DM (a hand-off), the inbox does.
+          const person =
+            behind && (await readsOrMayJoin(ctx.db, ctx.orgId, behind, [ctx.channelId])).has(ctx.channelId)
+              ? behind
+              : null;
           const words = await ownWords(ctx);
           const decides = !!words && can(await getMembership(ctx.db, words, ctx.orgId), "manage_agents");
           const change = await changeSkillAsAgent(

@@ -91,10 +91,10 @@ A customer moving 18 agents clicked one card per change, for changes he had just
 
 ### Decision
 
-- **The rule (`ownWords`, `context/learn.ts`).** A row applies when the tool is called, with a receipt and Desfazer in place of a card, when all of this holds: the run is high trust (`learnTrust`: a person behind it and no outside content read, ADR 0120), the message that started it is that person's own (not a colleague's or a notice's), nobody else wrote into it while it worked, and that person may decide the row now (`mayDecide`, `maySettle`).
+- **The rule (`ownWords`, `context/learn.ts`).** A row applies when the tool is called, with a receipt and Desfazer in place of a card, when all of this holds: the run is high trust (`learnTrust`: a person behind it and no outside content read, ADR 0120), the message that started it is that person's own (not a colleague's or a notice's), nobody else wrote into it or answered its question while it worked, it read nothing others wrote with no outside mark (a task, a wiki page, a summary, a teammate's answer, `team_status`: `OTHERS_WORDS`, since such a title can be text an agent copied from an email), and that person may decide the row now (`mayDecide`, `maySettle`).
 - **Covered.** Instructions, a role and apps (`propose_instruction_change`, `applyAsked`), settings (`propose_settings_change`, the card posted already done, with its own Desfazer) and a skill (`update_skill`, whatever "Agentes melhoram as skills sozinhos" or a lock says, as who may decide could accept the card anyway).
 - **Not covered, still a card.** The org context, which every agent reads. A file of a skill that runs on computers. Deleting an agent, which has no Undo. An agent's settings row on itself (ADR 0139: an agent raising its own budget is the person's).
-- **Receipts.** `agent.settings_changed`, its `fields` then `instructions`, `role` or `apps` for those rows. Their texts sit in the action's `before` column, never in `params`, which everyone in the conversation reads. Desfazer refuses once someone changed it since, as any receipt.
+- **Receipts.** `agent.settings_changed`, its `fields` then `instructions`, `role` or `apps` for those rows. Their texts sit in the action's `before` column, never in `params`, which everyone in the conversation reads. Desfazer refuses once someone changed it since, as any receipt. An instructions row is put back only by its owner or who may decide it, never by the owner of the agent that proposed it.
 
 ### Consequences
 

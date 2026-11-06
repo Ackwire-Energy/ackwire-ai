@@ -11,6 +11,7 @@ import {
   insertMessage,
   linkRunActions,
   listNotifications,
+  openPersonAgentDm,
   SKILL_CHANGE_LIMITS,
   type SkillDetail,
   saveSkill,
@@ -336,6 +337,27 @@ describe("agents improve skills by themselves (ADR 0120, ADR 0020)", () => {
       .where(eq(schema.notifications.kind, "proposal_waiting"));
     expect(rows.map((n) => n.userId)).toContain(admin.id);
     expect(rows.map((n) => n.userId)).not.toContain(f.owner.id);
+  });
+
+  test("in a room the person doesn't read (a hand-off in the agents' DM), they get the inbox row", async () => {
+    f = await setup({ skillTools: true });
+    await personSkill(f);
+    const run = await personRun(f);
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const between = await openPersonAgentDm(f.db, f.org.id, bia.id, f.agent.id);
+    await f.db.update(schema.agentRuns).set({ channelId: between.id }).where(eq(schema.agentRuns.id, run.id));
+    const away = { ...run, channelId: between.id };
+    await usedSkill(away);
+    await step(away, "web_fetch", { url: "https://vendor.example" }, "page");
+    const out = await invoke(away, "update_skill", { name: "deploy", body: "# deploy\n1. Build twice." });
+    expect(out.data?.memoryUpdate).toBeUndefined();
+    const [proposal] = await proposals();
+    expect(proposal?.requestedByUserId).toBeNull();
+    const rows = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.kind, "proposal_waiting"));
+    expect(rows.map((n) => n.userId)).toContain(f.owner.id);
   });
 
   test("with nobody behind the run there is no card, and who decides has the inbox row", async () => {
