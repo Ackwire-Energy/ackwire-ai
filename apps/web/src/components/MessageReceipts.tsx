@@ -101,11 +101,9 @@ function KeptAnswer({ message, kept, children }: { message: Message; kept: boole
       {answer === "pending" || answer === "answering" ? (
         <span>{t("receipts.picking")}</span>
       ) : (
-        <ReceiptAction>
-          <button type="button" className="ac-receipt__action" onClick={() => void connect?.answer(message.id)}>
-            {t("noAi.card.answerNow")}
-          </button>
-        </ReceiptAction>
+        <button type="button" className="ac-receipt__action" onClick={() => void connect?.answer(message.id)}>
+          {t("noAi.card.answerNow")}
+        </button>
       )}
     </span>
   );
