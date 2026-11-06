@@ -48,6 +48,7 @@ import {
   PlanWithoutAgent,
   useGatesWithoutAgent,
   usePlanGates,
+  usePlanHold,
 } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { useOrg } from "@/components/org-context";
@@ -183,6 +184,7 @@ function ConnectAiDialog({
   const models = useModels();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
+  const hold = usePlanHold();
   // The team's right hand thinks with each person's own AI (ADR 0137 §11): everyone's to connect for their DM.
   const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id || isRightHand(a));
   // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
@@ -418,6 +420,7 @@ function ConnectAiDialog({
                   savedNote={keyNote}
                   refused={refused}
                   saving={add.isPending}
+                  held={hold !== null}
                   onSave={saveKey}
                   endpoint={
                     <EndpointForm

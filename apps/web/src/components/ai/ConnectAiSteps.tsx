@@ -1410,6 +1410,7 @@ export function KeyPanel({
   savedNote,
   refused,
   saving,
+  held,
   onSave,
   endpoint,
 }: {
@@ -1425,12 +1426,13 @@ export function KeyPanel({
   /** The provider refused the key on its test call: nothing was kept. */
   refused?: ReturnType<typeof keyRefusal>;
   saving?: boolean;
+  /** A billing hold stops every model call: the key starts with the plan (`planHoldOf`). */
+  held?: boolean;
   onSave?: () => void;
 }) {
   const { t } = useTranslation();
   const fieldId = useId();
   const [touched, setTouched] = useState(false);
-  const hold = usePlanHold();
   const { provider, apiKey } = draft;
   const keyOf = provider === CUSTOM_PROVIDER ? null : provider;
   const maker = keyOf ? providerOf(keyOf) : undefined;
@@ -1450,7 +1452,7 @@ export function KeyPanel({
         <SettingNote icon="lock">{t("connectAi.keyLocked")}</SettingNote>
       ) : saved ? (
         <SettingNote icon="check" live>
-          {hold ? t("connectAi.key.savedHeld") : (savedNote ?? t("connectAi.key.saved"))}
+          {held ? t("connectAi.key.savedHeld") : (savedNote ?? t("connectAi.key.saved"))}
         </SettingNote>
       ) : provider === CUSTOM_PROVIDER ? (
         <>
@@ -1458,7 +1460,7 @@ export function KeyPanel({
             {t("endpoint.optionSub")}
           </p>
           {endpoint}
-          {hold && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
+          {held && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
         </>
       ) : keyOf && maker && site ? (
         <>
@@ -1509,8 +1511,8 @@ export function KeyPanel({
             )}
             {refused && <KeyRefused refusal={refused} />}
           </Step>
-          <SettingNote icon={hold ? "clock" : "agent"}>
-            {t(hold ? "connectAi.key.held" : "connectAi.key.forAll")}
+          <SettingNote icon={held ? "clock" : "agent"}>
+            {t(held ? "connectAi.key.held" : "connectAi.key.forAll")}
           </SettingNote>
         </>
       ) : null}

@@ -1475,7 +1475,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             }))}
           />
           {hold && <PlanHold hold={hold} onKey={card !== "key" && can("brain") ? () => choose("key") : undefined} />}
-          {hold && card === "key" && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
+          {hold && card === "key" && can("brain") && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
           {chosenSide && <SettingNote icon={chosenSide.icon}>{chosenSide.text}</SettingNote>}
           <Card as="section" className="ai-panel" aria-label={t("brain.title")}>
             {card === "key" ? (
