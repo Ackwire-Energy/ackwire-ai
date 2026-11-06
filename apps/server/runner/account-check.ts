@@ -22,6 +22,8 @@ import { type RunCommand, runSync, systemdBooted } from "./service";
  * `SELF_CHECK_EVERY_MS`: every barrier it relies on, tried for real on a stand-in sign-in and agent.
  */
 export const SELF_CHECK_EVERY_MS = 6 * 3600_000;
+/** After a failed check: soon, and again while it keeps failing. */
+export const SELF_CHECK_RETRY_MS = 5 * 60_000;
 const PROBE_ACCOUNT = "00000000-0000-4000-8000-000000000000";
 const PROBE_AGENT: AgentUser = { id: PROBE_ACCOUNT, user: "ag-00000000", uid: PROBE_AGENT_UID };
 const PROBE_TIMEOUT_MS = 20_000;

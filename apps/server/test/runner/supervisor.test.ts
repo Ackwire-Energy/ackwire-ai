@@ -2663,7 +2663,7 @@ test.if(posix)(
 test.if(posix)(
   "a system-mode runner lists Claude's own login only once its switch is on and its self-check passed",
   async () => {
-    const run = async (claudeSharedLogin: unknown, verdict: string | null) => {
+    const run = async (claudeSharedLogin: unknown, verdict: string | null, retried?: string | null) => {
       const home = newHome();
       const ws = tempDir("root-ws-");
       dirs.push(ws);
@@ -2714,8 +2714,9 @@ test.if(posix)(
         },
         selfCheck: async () => {
           checks++;
-          return verdict;
+          return checks > 1 && retried !== undefined ? retried : verdict;
         },
+        ...(retried !== undefined ? { selfCheckRetryMs: 50 } : {}),
       });
       daemon.start();
       return { daemon, sockets, swept: () => swept, checks: () => checks };
@@ -2747,6 +2748,15 @@ test.if(posix)(
     await waitFor(() => hellos(failed.sockets).at(-1)?.claudeLoginBlocked !== undefined, 8000);
     expect(hellos(failed.sockets).at(-1)?.claudeLoginBlocked).toContain("Bash");
     await failed.daemon.stop();
+
+    // A failure at a busy moment (boot, a relay starting) is tried again soon, not only at the next 6-hourly run.
+    const recovered = await run(on, "The Claude CLI didn't start as the sign-in's user", null);
+    await waitFor(
+      () => hellos(recovered.sockets).at(-1)?.claudeLoginMethods?.toString() === "setup_token,cli_login",
+      8000,
+    );
+    expect(recovered.checks()).toBe(2);
+    await recovered.daemon.stop();
   },
   20_000,
 );
