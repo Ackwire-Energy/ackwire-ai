@@ -7,6 +7,7 @@ import {
   workContinuable,
   workLine,
   workStatusText,
+  workWaitsOnPerson,
 } from "@agenteschat/client/lib/long-work";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { workingNow } from "@agenteschat/client/lib/working";
@@ -72,6 +73,29 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
       workLine(t, work({ status: "canceled", state: null, finishedAt: NOW.toISOString(), canceledByUserId: "u" }), ctx)
         .text,
     ).toBe("Parado por Bia aos 12 min");
+  });
+
+  test("waiting on an answer: what it asks takes the update's place, and only then", async () => {
+    const t = await translator("pt-BR");
+    const question = { text: "Envio agora ou espero?", messageId: "q1" };
+    const asks = workLine(t, work({ state: "waiting_input", question }), ctx);
+    expect(asks.text).toBe("Aguardando sua resposta");
+    expect(asks.question).toEqual(question);
+    expect(asks.update).toBeNull();
+    expect(asks.threadId).toBe("a1");
+    // Back at work, an old question never lingers on the line.
+    const back = workLine(t, work({ state: "working", question }), ctx);
+    expect(back.question).toBeNull();
+    expect(back.update).toBe("Esquema lido; migrando as tabelas.");
+    // Nothing to quote (a secret, a hand-off): the line alone, with its last update.
+    expect(workLine(t, work({ state: "waiting_input" }), ctx).question).toBeNull();
+  });
+
+  test("its line opens the thread beside the thread's own link only while a person's move is in there", () => {
+    expect(workWaitsOnPerson({ state: "waiting_input" })).toBe(true);
+    expect(workWaitsOnPerson({ state: "waiting_approval" })).toBe(true);
+    for (const state of ["working", "paused", "waiting_computer", "queued", null] as const)
+      expect(workWaitsOnPerson({ state })).toBe(false);
   });
 
   test("in English, and a long work's hours", async () => {

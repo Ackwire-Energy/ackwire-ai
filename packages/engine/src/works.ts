@@ -16,7 +16,7 @@ import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, isTerminal, replyThreadOf, runErrorDetail } from "./runs";
 import { maskCredentials } from "./tool-detail";
 
-const { agentWorks, agentRuns, messages, threadFollows, users } = schema;
+const { agentQuestions, agentWorks, agentRuns, messages, threadFollows, users } = schema;
 
 export type WorkRow = typeof agentWorks.$inferSelect;
 export type WorkPlanItem = schema.WorkPlanItem;
@@ -130,6 +130,8 @@ export interface WorkView {
   finishedAt: string | null;
   nextUpdateAt: string | null;
   lastUpdate: { text: string; at: string; seq: number } | null;
+  /** Waiting on an answer: what its run asked (the first if it asked several), and the message that holds the card. */
+  question: { text: string; messageId: string | null } | null;
   plan: WorkPlanItem[];
   issue: { id: string; number: number } | null;
   resultMessageId: string | null;
@@ -176,6 +178,25 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
       ),
     )
     .orderBy(desc(agentRuns.createdAt));
+  const asking = runs.filter((r) => r.status === "waiting_input" && !r.code && !r.waitingMachineId).map((r) => r.id);
+  const questions = asking.length
+    ? await db
+        .select({
+          runId: agentQuestions.runId,
+          channelId: agentQuestions.channelId,
+          text: agentQuestions.text,
+          messageId: agentQuestions.messageId,
+        })
+        .from(agentQuestions)
+        .where(
+          and(
+            eq(agentQuestions.orgId, orgId),
+            inArray(agentQuestions.runId, asking),
+            eq(agentQuestions.status, "open"),
+          ),
+        )
+        .orderBy(asc(agentQuestions.createdAt))
+    : [];
   const queued = rows.filter((r) => r.status === "queued");
   const lines = queued.length
     ? await db
@@ -232,6 +253,9 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
       } else state = "working";
     }
     const mine = lines.filter((l) => l.agentId === w.agentId);
+    // Only one asked in the work's own conversation: a view reaches whoever reads that one.
+    const asked =
+      state === "waiting_input" ? questions.find((q) => q.runId === run?.id && q.channelId === w.channelId) : undefined;
     const detail = status === "failed" ? runErrorDetail(run?.error) : null;
     out.set(w.id, {
       id: w.id,
@@ -253,6 +277,7 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
         w.lastUpdateText && w.updateSeq > 0
           ? { text: w.lastUpdateText, at: w.lastUpdateAt.toISOString(), seq: w.updateSeq }
           : null,
+      question: asked ? { text: plainText(asked.text, WORK_LIMITS.updateMax), messageId: asked.messageId } : null,
       plan: w.plan,
       issue: w.issueId && numbers.has(w.issueId) ? { id: w.issueId, number: numbers.get(w.issueId) as number } : null,
       resultMessageId: w.resultMessageId,

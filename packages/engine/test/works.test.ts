@@ -433,6 +433,43 @@ test("waiting: no timer while it waits, the line says on what, and it starts ove
   expect(Date.parse(view?.nextUpdateAt ?? "")).toBe(now.getTime() + 10 * 60_000);
 });
 
+test("waiting on an answer, the view says what it asked, in one line and only while the question is open", async () => {
+  f = await setup();
+  const run = await working("@dev roda a migração");
+  const { work } = await moved(run);
+  const question = (over: Partial<typeof schema.agentQuestions.$inferInsert> = {}) => ({
+    orgId: f.org.id,
+    runId: run.id,
+    agentId: run.agentId,
+    channelId: f.general.id,
+    toolUseId: "tu-1",
+    text: "Envio agora\n\npara @ana ou espero?",
+    expiresAt: new Date(Date.now() + 3600_000),
+    ...over,
+  });
+  const [first] = await f.db.insert(schema.agentQuestions).values(question()).returning();
+  await f.db.insert(schema.agentQuestions).values(question({ toolUseId: "tu-2", text: "E a outra?" }));
+  await f.db.update(schema.agentRuns).set({ status: "waiting_input" }).where(eq(schema.agentRuns.id, run.id));
+  expect(await workView(f.db, f.org.id, work.id)).toMatchObject({
+    state: "waiting_input",
+    question: { text: "Envio agora para ana ou espero?", messageId: null },
+  });
+  // A question another conversation holds stays out of a view this one's readers get.
+  await f.db.update(schema.agentQuestions).set({ channelId: f.org.id }).where(eq(schema.agentQuestions.runId, run.id));
+  expect((await workView(f.db, f.org.id, work.id))?.question).toBeNull();
+  await f.db
+    .update(schema.agentQuestions)
+    .set({ channelId: f.general.id })
+    .where(eq(schema.agentQuestions.runId, run.id));
+  await f.db
+    .update(schema.agentQuestions)
+    .set({ status: "answered" })
+    .where(eq(schema.agentQuestions.id, first?.id as string));
+  expect((await workView(f.db, f.org.id, work.id))?.question?.text).toBe("E a outra?");
+  await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, run.id));
+  expect((await workView(f.db, f.org.id, work.id))?.question).toBeNull();
+});
+
 test("cards: none for a quick run nor a short auto work; card: true makes one; a named issue is reused untouched", async () => {
   f = await setup();
   const quick = await working("@dev oi");

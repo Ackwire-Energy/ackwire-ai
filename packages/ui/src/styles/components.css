@@ -5719,6 +5719,16 @@ html:not([data-pointer]) .ac-work__head:focus-visible {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+.ac-workline__question {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
 .ac-workline__action {
   border: 0;
   padding: 0;

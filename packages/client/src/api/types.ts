@@ -2199,6 +2199,8 @@ export interface WorkView {
   finishedAt: string | null;
   nextUpdateAt: string | null;
   lastUpdate: { text: string; at: string; seq: number } | null;
+  /** Waiting on an answer: what its run asked, and the message that holds the card. */
+  question?: { text: string; messageId: string | null } | null;
   plan: { id: string; text: string; state: "todo" | "doing" | "done" }[];
   issue: { id: string; number: number } | null;
   resultMessageId: string | null;

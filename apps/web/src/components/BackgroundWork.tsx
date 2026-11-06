@@ -1,5 +1,5 @@
 import { type Issue, type Message, useChannels, type WorkView } from "@agenteschat/client";
-import { blockedText, workLine, workPlanProgress } from "@agenteschat/client/lib/long-work";
+import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Icon, WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -44,8 +44,9 @@ function useWorkLine(work: WorkView) {
 }
 
 /**
- * Under the agent's "Vou cuidar disso": how the work stands, its last update, Tarefa #, Parar, Ver resultado. Once its
- * thread has replies, the thread's own line under it opens the thread (`threaded`): no second way in.
+ * Under the agent's "Vou cuidar disso": how the work stands, its last update or what it asks, Tarefa #, Parar, Ver
+ * resultado. Once its thread has replies, the thread's own line under it opens the thread (`threaded`): no second way
+ * in, unless it waits on someone, who goes straight to the card in the panel.
  */
 export function MessageWorkLine({ message, threaded }: { message: Message; threaded?: boolean }) {
   const work = message.longWork;
@@ -63,10 +64,13 @@ function AnchorLine({ work, threaded }: { work: WorkView; threaded: boolean }) {
       tone={view.tone}
       text={view.text}
       update={view.update}
+      question={view.question?.text}
       actions={
         <>
-          {view.threadId && !threaded && actions?.openThread && (
-            <WorkLineAction onClick={() => actions.openThread?.(view.threadId as string)}>
+          {view.threadId && (!threaded || workWaitsOnPerson(work)) && actions?.openThread && (
+            <WorkLineAction
+              onClick={() => actions.openThread?.(view.threadId as string, view.question?.messageId ?? undefined)}
+            >
               {t("work.openThread")}
             </WorkLineAction>
           )}
@@ -143,6 +147,7 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
         tone={view.tone}
         text={view.text}
         update={view.update ? `${t("work.lastUpdate")}: ${view.update}` : null}
+        question={view.question?.text}
         actions={
           <>
             <WorkLineAction onClick={openConversation}>{t("work.openThread")}</WorkLineAction>
