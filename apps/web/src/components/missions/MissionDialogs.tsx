@@ -358,9 +358,10 @@ export function NewMissionDialog({
       </Locked>
       <DialogFooter
         note={
-          <>
-            <Icon name="shield" size={14} /> {t("missions.new.approvals")}
-          </>
+          <span className="ac-iconline">
+            <Icon name="shield" size={14} />
+            <span>{t("missions.new.approvals")}</span>
+          </span>
         }
       >
         <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
