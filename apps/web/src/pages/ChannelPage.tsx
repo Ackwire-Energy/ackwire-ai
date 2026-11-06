@@ -69,6 +69,7 @@ import {
   useThreadInfo,
   useThreadMessages,
   useThreadMission,
+  useThreadRange,
   useUpdateChannel,
   useWaiting,
   useWikiTree,
@@ -977,7 +978,7 @@ function ChannelView({
             (chrome?.dmAgentId ? true : Boolean(local.threadId) && r.threadId === local.threadId),
         );
       const fresh = agents.filter((id) => !atWork(id));
-      if (fresh.length > 0) live.expect(channel.id, local.id, fresh);
+      if (fresh.length > 0) live.expect(channel.id, local.id, fresh, local.threadId ?? undefined);
       // No one guessed in a channel with agents: the router picks, and its `message.routed` always follows. The
       // clock at once, as its own `message.routing` says; a GIF or a sticker alone routes to nobody, so no clock.
       else if (agents.length === 0 && !chrome?.dmAgentId && channelAgents.length > 0 && !isMediaAlone(local))
@@ -2001,16 +2002,10 @@ function ChannelView({
   // their place), with the selection band in place of the timeline and its bar in place of the composer.
   const adjustInfo = useThreadInfo(org.id, adjustThreadId);
   const adjusting = adjustInfo.data;
-  const movedMessages = useThreadMessages(
-    org.id,
-    adjusting?.context?.moved ? adjusting.channelId : undefined,
-    adjusting?.id ?? "",
-  );
+  const movedMessages = useThreadRange(org.id, adjusting, Boolean(adjusting?.context?.moved));
   const adjustList = useMemo(() => {
     if (!adjusting) return [];
-    const moved = adjusting.context?.moved
-      ? (movedMessages.data ?? []).filter((m) => m.id !== adjusting.id && m.createdAt < adjusting.createdAt)
-      : [];
+    const moved = adjusting.context?.moved ? (movedMessages.data ?? []) : [];
     return rangeCandidates(
       mergeTimeline([...older, ...(channelMessages.data ?? [])], [moved.map((m) => ({ ...m, threadId: null }))]),
     );
