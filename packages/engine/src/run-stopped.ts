@@ -6,7 +6,7 @@ import { publishMessageCreated } from "./events";
 import { messageView, replyExcerpt } from "./messages";
 import type { Notice } from "./notices";
 import { requireActiveMembership } from "./organizations";
-import { type AgentRun, type RunStatus, replyThreadOf } from "./runs";
+import { type AgentRun, computerWaitOf, type RunStatus, replyThreadOf } from "./runs";
 
 /**
  * A person stopped an agent's task (ADR 0128): the agent is told, in the conversation the task belonged to (a
@@ -90,7 +90,7 @@ export async function tellAgentStopped(
     byUserId,
     byName: person?.name ?? "",
     label: await labelOfRun(db, run),
-    was: wasOf(previous),
+    was: computerWaitOf(run) ? "waiting" : wasOf(previous),
     ...(cleanReason(reason) ? { reason: cleanReason(reason) } : {}),
     ...(helpers.length ? { helpers: helpers.join(", ") } : {}),
   };

@@ -178,6 +178,20 @@ describe("stopping a task tells the agent (ADR 0128)", () => {
     expect(sent).toContain("já fiz eu mesma");
   });
 
+  test("stopped while it asked its computer from the line, it waited: it wasn't working yet", async () => {
+    f = await setup();
+    await ask("@dev prepara o relatório de vendas");
+    const [run] = await runs();
+    const [machine] = await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "Mac" }).returning();
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "running", waitingMachineId: machine?.id })
+      .where(eq(schema.agentRuns.id, run?.id ?? ""));
+    await cancelRun(deps(), f.owner.id, f.org.id, run?.id ?? "");
+    const [notice] = await stoppedNotices();
+    expect(notice?.meta).toMatchObject({ notice: { refs: { was: "waiting" } } });
+  });
+
   test("the reason said later: only who stopped it, once", async () => {
     f = await setup();
     await ask("@dev revisa o contrato");
