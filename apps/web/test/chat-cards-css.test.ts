@@ -45,8 +45,8 @@ test("the cards in a message share one width: the tools, a lone call's line, eve
     ".chart-card",
     ".correction-ask",
     ".iw-card",
-    // Connect an AI, a proposed agent, a stretch, waiting for its computer.
-    ".waitcard",
+    // A request still waiting as a pill: connect an AI, a stretch, waiting for its computer.
+    ".rq-open",
     // A mission's link and its command to approve, the browser's request and where it browsed.
     ".mi-linkcard",
     ".mi-cmd",
@@ -78,9 +78,8 @@ test("nothing in a message wears the hover plate's own gray: cards a step up, we
   // Light: a well is the plate's tint over the row (darker hovered or not); dark: its own darker ground.
   expect(declarations(css, '[data-theme="light"]')).toContainEqual(["--msg-well", "var(--plate-soft)"]);
   expect(declarations(css, '[data-theme="dark"]')).toContainEqual(["--msg-well", "var(--sunken)"]);
-  // Receipts, and what waits for a click (connect an AI, a stretch, waiting for its computer, "refazer ou
-  // explicar?"), are cards like the tools: the card face and its hairline, never the sunken gray.
-  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".waitcard", ".correction-ask"]) {
+  // Receipts and "redo or explain?" are cards like the tools: the card face and its hairline, never the sunken gray.
+  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".correction-ask"]) {
     expect([selector, value(selector, "background")]).toEqual([selector, "var(--surface-raised)"]);
     expect([selector, value(selector, "box-shadow")]).toEqual([selector, "var(--card-shadow)"]);
   }
@@ -88,8 +87,11 @@ test("nothing in a message wears the hover plate's own gray: cards a step up, we
   expect(value(".rq", "background")).toBe("var(--raised)");
   expect(value(".rq", "box-shadow")).toBe("0 0 0 1px var(--line2)");
   // No card in a message sits on the well: the well is the hover plate's tint.
-  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".waitcard", ".correction-ask", ".ac-approval", ".rq"])
+  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".correction-ask", ".ac-approval", ".rq"])
     expect(`${selector} ${value(selector, "background")}`).not.toMatch(/sunken|msg-well|plate/);
+  // What waits for a click (connect an AI, a stretch, waiting for its computer) is a pill: a hairline, no fill.
+  for (const selector of [".rq-open", ".rq-done"])
+    expect([selector, value(selector, "background")]).toEqual([selector, undefined]);
 });
 
 test("a receipt's sentence and a tool's line wrap, whole: no ellipsis", () => {

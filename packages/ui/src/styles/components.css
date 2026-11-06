@@ -1522,6 +1522,112 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   color: var(--ink-muted);
 }
 
+/*
+ * EventPill: an automatic event of a conversation as one object, a hairline frame (no fill) holding the sentence and
+ * its actions, each after a hairline; the cut corner of the ruler's controls. What "Show" opens goes under it.
+ */
+.ac-eventpill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.ac-eventpill__frame {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  min-height: var(--control-h-sm);
+  border-radius: var(--control-r-sm) var(--control-r-sm) var(--control-r-sm) 3px;
+  box-shadow: inset 0 0 0 1px var(--line2);
+  font-size: 13.5px;
+  line-height: 18px;
+  color: var(--ink2);
+}
+.ac-eventpill__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 12px 6px 10px;
+}
+.ac-eventpill__mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--faint);
+}
+.ac-eventpill__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ac-eventpill__time {
+  flex: none;
+  font-size: 12px;
+  color: var(--faint);
+}
+/* The chevron drawn at 12px, a step under the action's words. */
+.ac-eventpill__chev {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--faint);
+  transition: transform 0.15s;
+}
+.ac-eventpill__more[aria-expanded="true"] .ac-eventpill__chev {
+  transform: rotate(90deg);
+}
+.ac-eventpill__actions {
+  display: inline-flex;
+  flex: none;
+  align-items: stretch;
+}
+.ac-eventpill__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ac-eventpill__action:last-child {
+  border-radius: 0 var(--control-r-sm) var(--control-r-sm) 0;
+}
+.ac-eventpill__action:hover:not(:disabled) {
+  background: var(--plate);
+  color: var(--ink);
+}
+/* A request waiting for someone: its words in ink, what it asks for in a soft tint (no colored border). */
+.ac-eventpill--waiting .ac-eventpill__text {
+  color: var(--ink);
+}
+.ac-eventpill__action--primary {
+  background: color-mix(in srgb, var(--attention) 10%, transparent);
+  color: var(--ink);
+}
+.ac-eventpill__action--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--attention) 18%, transparent);
+}
+.ac-eventpill__action:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+html:not([data-pointer]) .ac-eventpill__action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-eventpill__chev {
+    transition: none;
+  }
+}
+
 /* Chip */
 .ac-chip {
   display: inline-flex;

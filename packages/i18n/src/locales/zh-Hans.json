@@ -8567,9 +8567,7 @@
     "elapsedSeconds": "{{n}} 秒",
     "elapsedMinutes": "{{m}} 分 {{s}} 秒",
     "stopAgent": "停止 {{name}}",
-    "stoppedByYou": "被你停止",
-    "stoppedBy": "被 {{name}} 停止",
-    "stopped": "已停止",
+    "stopped": "在这里停止",
     "continueRun": "继续",
     "stepLimit": "已达到步骤上限",
     "stuck": "因卡住而停止",
@@ -14113,9 +14111,8 @@
       "here": "这里"
     },
     "stopped": {
-      "line": "你停止了这个任务",
-      "lineBy": "{{name}} 停止了这个任务",
-      "told": "已告知 {{agent}}，除非有人要求，否则不会再继续。",
+      "line": "你停止了 {{agent}}",
+      "lineBy": "{{name}} 停止了 {{agent}}",
       "reason": "原因：“{{reason}}”",
       "sayWhy": "说明原因",
       "whyPlaceholder": "想说明原因吗？（可选）",

@@ -14,9 +14,9 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, Text, useTheme } from "@/ui";
+import { EventPillAction, EventPillText, Text } from "@/ui";
+import { AskDone, AskWaiting } from "../chat/asks";
 import { useDirectory, useMeId } from "../shared/hooks";
 
 type Answer = "pending" | "answering" | "still_missing";
@@ -47,15 +47,15 @@ export const openConnectAi = (
 };
 
 /**
- * The web's no-AI card under an agent's "não tenho uma IA" reply (`meta.noAi`): Conectar opens the key sheet,
- * and once the agent has an AI, Responder agora has it answer what it couldn't (who asked, its owner or an admin).
+ * The web's no-AI request under an agent's "I have no AI" reply (`meta.noAi`), as a waiting pill: Connect (tinted, for
+ * who may connect) opens the key sheet; anyone else reads who can. Once the agent has an AI, a decided request's pill
+ * with "Answer now" has it answer what it couldn't (who asked, its owner or an admin).
  */
 export function NoAiCard({ message: m }: { message: Message }) {
   const { t } = useTranslation();
   const api = useApi();
   const { orgId, org } = useOrg();
   const dir = useDirectory();
-  const { colors } = useTheme();
   const status = useAiStatus(orgId);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const meId = useMeId();
@@ -77,9 +77,11 @@ export function NoAiCard({ message: m }: { message: Message }) {
   const fix = planLine ? planLineFix(planLine, agent, meId, org) : null;
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name.split(" ")[0] : undefined;
   const locked = (
-    <Text variant="footnote" tone="muted">
-      {!planLine && owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}
-    </Text>
+    <EventPillText>
+      <Text variant="footnote" tone="muted">
+        {!planLine && owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}
+      </Text>
+    </EventPillText>
   );
   const title = answering
     ? t("noAi.card.answering", { name })
@@ -100,65 +102,57 @@ export function NoAiCard({ message: m }: { message: Message }) {
       setAnswer(code === "ai.still_missing" ? "still_missing" : null);
     }
   };
+  // Its agent has an AI now (or is answering): a decided request, one pill with "Answer now" in it.
+  if (answering || (!planLine && (ready || answer === "pending")))
+    return (
+      <AskDone
+        done
+        words={title}
+        actions={
+          !answering && mayAnswer ? (
+            <EventPillAction
+              key="answer"
+              label={t("noAi.card.answerNow")}
+              loading={answer === "pending"}
+              onPress={() => void answerNow()}
+            />
+          ) : null
+        }
+      />
+    );
+  // Still waiting for an AI: the waiting pill, Connect (or the plan's fix) tinted for who may press it.
+  const action = planLine ? (
+    fix ? (
+      <EventPillAction
+        key="connect"
+        primary
+        label={t(fix === "connectMine" ? "rightHand.settings.connectMine" : "noAi.rightHand.useKey")}
+        onPress={() =>
+          openConnectAi({
+            from: m.id,
+            agentId: card.agentId,
+            ...(fix === "connectMine" ? {} : { intent: "api_key" }),
+          })
+        }
+      />
+    ) : null
+  ) : mayConnect ? (
+    <EventPillAction
+      key="connect"
+      primary
+      label={t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
+      onPress={() =>
+        openConnectAi({
+          from: m.id,
+          intent: card.intent,
+          provider: card.provider,
+          agentId: card.agentId,
+          ...(plan ? { plan } : {}),
+        })
+      }
+    />
+  ) : null;
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
-      <View style={styles.top}>
-        <LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16} color={colors.ink2} />
-        <Text variant="subhead" style={styles.title}>
-          {title}
-        </Text>
-      </View>
-      {answering ? null : planLine ? (
-        fix ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            label={t(fix === "connectMine" ? "rightHand.settings.connectMine" : "noAi.rightHand.useKey")}
-            onPress={() =>
-              openConnectAi({
-                from: m.id,
-                agentId: card.agentId,
-                ...(fix === "connectMine" ? {} : { intent: "api_key" }),
-              })
-            }
-          />
-        ) : (
-          locked
-        )
-      ) : ready || answer === "pending" ? (
-        mayAnswer ? (
-          <Button
-            variant="primary"
-            size="sm"
-            label={t("noAi.card.answerNow")}
-            disabled={answer === "pending"}
-            onPress={() => void answerNow()}
-          />
-        ) : null
-      ) : !mayConnect ? (
-        locked
-      ) : (
-        <Button
-          variant="secondary"
-          size="sm"
-          label={t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
-          onPress={() =>
-            openConnectAi({
-              from: m.id,
-              intent: card.intent,
-              provider: card.provider,
-              agentId: card.agentId,
-              ...(plan ? { plan } : {}),
-            })
-          }
-        />
-      )}
-    </View>
+    <AskWaiting forMe={action !== null} mark="bolt" words={title} actions={action} below={action ? null : locked} />
   );
 }
-
-const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
-  top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  title: { flex: 1, fontWeight: "600" },
-});

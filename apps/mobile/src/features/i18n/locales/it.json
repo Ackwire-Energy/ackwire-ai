@@ -342,9 +342,9 @@
       "wellNow": "Si è fermato per leggere la tua nota"
     },
     "stopped": {
-      "byYou": "Fermato da te",
-      "by": "Fermato da {{name}}",
-      "plain": "Fermato",
+      "byYou": "Fermato qui",
+      "by": "{{name}} l'ha fermato qui",
+      "plain": "Fermato qui",
       "limit": "Al limite di passaggi",
       "stuck": "Fermato perché si è bloccato",
       "continue": "Continua",

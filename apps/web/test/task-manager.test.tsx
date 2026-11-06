@@ -392,7 +392,7 @@ describe("the task manager page", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
   });
 
-  test("the panel's Parar tarefa: the stopped state, then Dizer por quê; Esc closes it", async () => {
+  test("the panel's Parar tarefa: the stopped state, then Add a reason; Esc closes it", async () => {
     const state = seedState({ taskManager: busy() });
     await open(state, "task-manager");
     // Each row opens its own panel too.
@@ -405,7 +405,7 @@ describe("the task manager page", () => {
     expect(stopCalls(state)).toEqual([["r-api"]]);
     // Still open once it stopped: who stopped it, the agent told, and the reason's field for me.
     expect(panel().textContent).toContain("Parada");
-    expect(panel().textContent).toContain("Você parou esta tarefa · Atlas recebeu o aviso");
+    expect(panel().textContent).toContain("Você parou o Atlas");
     expect(within(panel()).queryByRole("button", { name: "Parar tarefa" })).toBeNull();
     const why = "Mudou a prioridade";
     await type(within(panel()).getByRole("textbox", { name: "Quer dizer por quê? (opcional)" }), why);
@@ -431,7 +431,7 @@ describe("the task manager page", () => {
     await type(within(ask).getByRole("textbox", { name: "Por quê? (opcional)" }), "Vou fazer eu mesmo");
     await click(within(ask).getByRole("button", { name: "Parar 2" }));
     await settle(4);
-    expect(panel().textContent).toContain("Você parou esta tarefa");
+    expect(panel().textContent).toContain("Você parou a Ada");
     expect(panel().textContent).toContain("Motivo: «Vou fazer eu mesmo»");
     expect(within(panel()).queryByRole("textbox")).toBeNull();
   });
@@ -1064,9 +1064,9 @@ describe("the stopped notice in the conversation", () => {
     state.messages.push(notice({ byUserId: "u-walter", byName: "Walter" }));
     await open(state, `dm/agent/${ADA_ID}`);
     const line = document.querySelector(".cn-stopped") as HTMLElement;
-    expect(line.textContent).toContain("Você parou esta tarefa · Ada recebeu o aviso");
+    expect(line.textContent).toContain("Você parou a Ada");
     expect(line.textContent).not.toContain("Motivo");
-    await click(within(line).getByRole("button", { name: "Dizer por quê" }));
+    await click(within(line).getByRole("button", { name: "Dizer o motivo" }));
     const field = within(line).getByRole("textbox", { name: "Quer dizer por quê? (opcional)" });
     expect((within(line).getByRole("button", { name: "Mandar" }) as HTMLButtonElement).disabled).toBe(true);
     await type(field, "Já resolvi por outro caminho");
@@ -1079,16 +1079,16 @@ describe("the stopped notice in the conversation", () => {
     ]);
     const after = document.querySelector(".cn-stopped") as HTMLElement;
     expect(after.textContent).toContain("Motivo: «Já resolvi por outro caminho»");
-    expect(within(after).queryByRole("button", { name: "Dizer por quê" })).toBeNull();
+    expect(within(after).queryByRole("button", { name: "Dizer o motivo" })).toBeNull();
   });
 
-  test("someone else stopped it: their name, the reason they gave, and no Dizer por quê for me", async () => {
+  test("someone else stopped it: their name, the reason they gave, and no Add a reason for me", async () => {
     const state = withDm();
     state.messages.push(notice({ byUserId: "u-joao", byName: "João", reason: "Mudou o plano" }));
     await open(state, `dm/agent/${ADA_ID}`);
     const line = document.querySelector(".cn-stopped") as HTMLElement;
-    expect(line.textContent).toContain("João parou esta tarefa · Ada recebeu o aviso");
+    expect(line.textContent).toContain("João parou a Ada");
     expect(line.textContent).toContain("Motivo: «Mudou o plano»");
-    expect(within(line).queryByRole("button", { name: "Dizer por quê" })).toBeNull();
+    expect(within(line).queryByRole("button", { name: "Dizer o motivo" })).toBeNull();
   });
 });

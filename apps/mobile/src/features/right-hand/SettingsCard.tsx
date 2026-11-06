@@ -17,22 +17,21 @@ import {
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { delegateLine } from "@agenteschat/client/lib/approval-words";
-import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { decidersOf, onlyKey, removalOf, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, LineIcon, Text } from "@/ui";
+import { Button, EventPillAction, Icon, LineIcon, Text } from "@/ui";
 import { openAgentDelete } from "../agents/DeleteAgentScreen";
 import { AgentProposalView } from "../agents/ProposalCard";
-import { DelegateUndo } from "../agents/RightHandDelegate";
+import { useDelegateUndoAction } from "../agents/RightHandDelegate";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
 import { markName } from "../chat/logic";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useMeId } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useWhen } from "../shared/hooks";
 
 /**
  * The right hand's card of a teammate's settings (ADR 0137), as on the web: a request per row (one agent, one
@@ -83,7 +82,7 @@ export function ChangeRequestCard({ n }: { n: AppNotification }) {
 /**
  * One row: the agent in the well, "Modelo: Haiku → Sonnet" a line each, and the decision. Who may decide it gets
  * Aplicar and Descartar (Recusar in the inbox); the person who asked and can't, Pedir a um admin, then whom it went
- * to; out of date, Refazer. Decided, one line with who did it, and Desfazer on its receipt while it lasts.
+ * to; out of date, Refazer. Decided, one pill with who did it, and Undo on its receipt while it lasts.
  */
 function SettingsRow({
   p,
@@ -112,6 +111,8 @@ function SettingsRow({
   const ask = useAskProposal(orgId);
   const redo = useSendDm(orgId);
   const actions = useAgentActions(orgId, message?.channelId ?? "");
+  const delegateUndo = useDelegateUndoAction(first ? delegate : null);
+  const when = useWhen();
   const agent = dir.anyAgent(p.agentId);
   const proposer = p.proposedByAgentId ?? p.agentId;
   const name = agent?.name ?? t("channel.unknownAgent");
@@ -150,50 +151,46 @@ function SettingsRow({
           : t("rightHand.card.declinedBy", { name: p.decidedBy?.name ?? "" });
     const undoable =
       receipt && !receipt.undoneAt && receipt.undoableUntil && Date.parse(receipt.undoableUntil) > Date.now();
-    const words = [
-      `${who}: ${markName(name)}`,
-      ...lines.map((l) => `${lowerFirst(l.field, i18n.language)} ${l.to}`),
+    // The sentence says who and on which agent; what changed (and whether it was undone) opens under the pill.
+    const details = [
+      ...lines.map((l) => `${l.field}: ${l.from} → ${l.to}`),
       ...(receipt?.undoneAt ? [t("rightHand.card.undone")] : []),
-    ].join(" · ");
+    ];
+    const reason = byRightHand ? delegate?.reason : null;
     return (
-      <View style={styles.done}>
-        <View style={styles.fill}>
-          <AskDone
-            done={p.status === "accepted" && !receipt?.undoneAt && delegate?.state !== "undone"}
-            words={words}
-            more={
-              byRightHand && delegate?.reason
-                ? {
-                    label: t("rightHandApprovals.card.why"),
-                    content: (
-                      <Text variant="footnote" tone="ink2">
-                        {delegate.reason}
-                      </Text>
-                    ),
-                  }
-                : undefined
-            }
-          />
-        </View>
-        {byRightHand ? (
-          first ? (
-            <DelegateUndo d={delegate} />
+      <AskDone
+        done={p.status === "accepted" && !receipt?.undoneAt && delegate?.state !== "undone"}
+        words={`${who}: ${markName(name)}`}
+        time={p.decidedAt ? when.short(p.decidedAt) : undefined}
+        actions={
+          byRightHand ? (
+            delegateUndo
+          ) : undoable ? (
+            <EventPillAction
+              label={t("rightHand.card.undo")}
+              loading={actions.undo.isPending}
+              onPress={() =>
+                actions.undo.mutate(receipt.id, {
+                  onSuccess: () => void qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
+                  onError: failed,
+                })
+              }
+            />
           ) : null
-        ) : undoable ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            label={t("rightHand.card.undo")}
-            loading={actions.undo.isPending}
-            onPress={() =>
-              actions.undo.mutate(receipt.id, {
-                onSuccess: () => void qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
-                onError: failed,
-              })
-            }
-          />
-        ) : null}
-      </View>
+        }
+        more={
+          details.length > 0 || reason
+            ? {
+                label: reason ? t("rightHandApprovals.card.why") : t("approval.seeDetails"),
+                content: (
+                  <Text variant="footnote" tone="ink2">
+                    {[...details, ...(reason ? [reason] : [])].join("\n")}
+                  </Text>
+                ),
+              }
+            : undefined
+        }
+      />
     );
   }
 
@@ -313,9 +310,6 @@ function SettingsRow({
 }
 
 const styles = StyleSheet.create({
-  // From the top: the decided line opens 8 under it and is 20 tall, so a 36 button's middle is that line's; centered,
-  // it sat 4 above the line, and beside the line's opened details it drifted down.
-  done: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   fill: { flex: 1, minWidth: 0 },
   // The icon on the first line when whom it went to wraps.
   sent: { flexDirection: "row", alignItems: "flex-start", gap: 6 },

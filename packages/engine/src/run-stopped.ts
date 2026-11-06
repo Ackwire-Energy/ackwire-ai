@@ -11,7 +11,8 @@ import { type AgentRun, computerWaitOf, type RunStatus, replyThreadOf } from "./
 /**
  * A person stopped an agent's task (ADR 0128): the agent is told, in the conversation the task belonged to (a
  * routine's room for a routine), with why when the person says it. The notice wakes nothing (stopping means stop):
- * the agent reads it before its next turn there. People see it as one line ("You stopped this task · Dev was told").
+ * the agent reads it before its next turn there. People see it as one line ("You stopped Dev · Waits until someone
+ * asks to continue").
  */
 
 const { agentRuns, agentWorks, messages, threads, users } = schema;

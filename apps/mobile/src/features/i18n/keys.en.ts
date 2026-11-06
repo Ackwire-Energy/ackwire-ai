@@ -332,9 +332,9 @@ export const featureKeysEn = {
       wellNow: "Stopped to read your note",
     },
     stopped: {
-      byYou: "Stopped by you",
-      by: "Stopped by {{name}}",
-      plain: "Stopped",
+      byYou: "Stopped here",
+      by: "{{name}} stopped here",
+      plain: "Stopped here",
       limit: "At the step limit",
       stuck: "Stopped because it got stuck",
       continue: "Continue",

@@ -9554,9 +9554,7 @@
     "elapsedSeconds": "{{n}} s",
     "elapsedMinutes": "{{m}} min {{s}} s",
     "stopAgent": "Zatrzymaj {{name}}",
-    "stoppedByYou": "Zatrzymane przez ciebie",
-    "stoppedBy": "Zatrzymane przez: {{name}}",
-    "stopped": "Zatrzymane",
+    "stopped": "Zatrzymano tutaj",
     "continueRun": "Kontynuuj",
     "stepLimit": "Osiągnięto limit kroków",
     "stuck": "Zatrzymane, bo utknęło",
@@ -15443,9 +15441,8 @@
       "here": "tutaj"
     },
     "stopped": {
-      "line": "Zatrzymałeś(-aś) to zadanie",
-      "lineBy": "{{name}} zatrzymał(a) to zadanie",
-      "told": "{{agent}} wie o tym i wróci do zadania tylko, jeśli ktoś poprosi.",
+      "line": "Zatrzymałeś(-aś) agenta {{agent}}",
+      "lineBy": "{{name}} zatrzymał(a) agenta {{agent}}",
       "reason": "Powód: «{{reason}}»",
       "sayWhy": "Podaj powód",
       "whyPlaceholder": "Chcesz podać powód? (opcjonalnie)",

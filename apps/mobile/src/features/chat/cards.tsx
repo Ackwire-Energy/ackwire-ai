@@ -37,7 +37,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Button, Count, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
+import { Button, Count, EventPillAction, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalAheadLine,
@@ -106,16 +106,17 @@ export function ApprovalInline({ approvalId, messageId }: { approvalId: string; 
 }
 
 /**
- * One decided request, as the conversation's event line: how it ended and what it did ("Aprovado por você · Gerar
- * imagem"); its values (so several of one tool are told apart), when it goes out if approved ahead, and the reason
- * open under it.
+ * One decided request, as the conversation's event pill: how it ended and what it did ("Approved by you: Generate
+ * image"), when it was decided; its values (so several of one tool are told apart), when it goes out if approved
+ * ahead, and the reason open under it ("See details"). Approved ahead and still to run, "Cancel" withdraws it.
  */
 function ApprovalDone({ approval: a }: { approval: Approval }) {
   const { t, i18n } = useTranslation();
   const meId = useMeId();
   const dir = useDirectory();
+  const when = useWhen();
   const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
-  // Approved ahead and still to run: when it goes out, said under its line, and a way to withdraw it.
+  // Approved ahead and still to run: when it goes out, said under its pill, and a way to withdraw it.
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   const cancelAhead = useCancelAhead();
   const lines = [
@@ -123,10 +124,20 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
     scheduled ? t("approval.ahead.scheduled", { when: nextLabel(i18n.language, scheduled) }) : null,
     a.reason ? t("approval.reasonLine", { reason: a.reason }) : null,
   ].filter((x): x is string => Boolean(x));
-  const done = (
+  return (
     <AskDone
       done={a.status === "approved"}
-      words={`${outcome} · ${markName(approvalHeadline(t, a, i18n.language))}`}
+      words={`${outcome}: ${markName(approvalHeadline(t, a, i18n.language))}`}
+      time={a.decidedAt ? when.short(a.decidedAt) : undefined}
+      actions={
+        scheduled && a.canCancel ? (
+          <EventPillAction
+            label={t("approval.ahead.cancel")}
+            loading={cancelAhead.pending}
+            onPress={() => cancelAhead.cancel(a.id)}
+          />
+        ) : null
+      }
       more={
         lines.length > 0
           ? {
@@ -140,21 +151,6 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
           : undefined
       }
     />
-  );
-  if (!scheduled || !a.canCancel) return done;
-  return (
-    <View>
-      {done}
-      <View style={styles.cancelAhead}>
-        <Button
-          variant="ghost"
-          size="sm"
-          label={t("approval.ahead.cancel")}
-          loading={cancelAhead.pending}
-          onPress={() => cancelAhead.cancel(a.id)}
-        />
-      </View>
-    </View>
   );
 }
 

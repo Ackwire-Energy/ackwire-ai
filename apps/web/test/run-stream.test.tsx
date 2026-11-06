@@ -136,7 +136,7 @@ describe("live row and Parar", () => {
     expect(lines().at(-1)?.getAttribute("aria-expanded")).toBe("false");
   });
 
-  test("Parar: one click on the composer's stop, then 'Parado por você · Continuar'; text kept", async () => {
+  test("Parar: one click on the composer's stop, then the pill 'You stopped Ada | Continue'; text kept", async () => {
     const { state, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await ev({ type: "agent.delta", ...ids, seq: 0, text: "Começando a análise" });
@@ -151,7 +151,7 @@ describe("live row and Parar", () => {
     const stopped = screen()
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("Começando a análise")) as HTMLElement;
-    expect(stopped.textContent).toContain("Parado por você");
+    expect(stopped.textContent).toContain("Você parou a Ada");
     expect(within(stopped).getByRole("button", { name: "Continuar" })).toBeTruthy();
     expect(stopped.querySelector('.ac-avatar[data-state="idle"]')).not.toBeNull();
   });

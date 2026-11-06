@@ -488,48 +488,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   padding: 6px 0 6px 47px;
 }
 
-/* The agent's one card while it waits for its computer (instead of repeated messages); a card face, never the well. */
-.waitcard {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: var(--msg-card-w);
-  /* The other cards' room in a message (the tools, the changes, a file). */
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  border-bottom-left-radius: var(--radius-cut);
-  background: var(--surface-raised);
-  box-shadow: var(--card-shadow);
-}
-.waitcard__top {
-  font-weight: 600;
-}
-.waitcard__top .ac-icon {
-  color: var(--attention);
-}
-.waitcard[data-done] .waitcard__top .ac-icon {
-  color: var(--success);
-}
-.waitcard p {
-  gap: 6px;
-  margin: 0;
-  font-size: 13.5px;
-  color: var(--ink-muted);
-}
-/*
- * A chip beside the row's buttons ("Criado" by "Abrir perfil") shares their centre line, and in their type size their
- * baseline too, whatever its height: a 22px chip sat 5px above a 32px button's middle.
- */
-.waitcard__acts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.waitcard__acts > .ac-chip {
-  font-size: var(--control-fs-sm);
-}
-/* What a proposed agent gets, a line each, as quiet as the card's other lines. */
+/* A line each, quiet: what a proposed agent gets, the skills a pill updates, a team's week, a waiting update. */
 .waitcard__lines {
   display: flex;
   flex-direction: column;
@@ -3450,9 +3409,33 @@ html:not([data-pointer]) .skill-file--open:focus-visible {
   gap: 8px;
   margin: 0;
 }
-/* The waiting update takes the sheet's column, not a chat card's width. */
+/* The waiting update: a card face in the sheet's column (the chat's waiting requests are pills, `RequestOpen`). */
 .skill-wait {
-  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-cut);
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
+}
+.skill-wait__top {
+  font-weight: 600;
+}
+.skill-wait__top .ac-icon {
+  color: var(--attention);
+}
+.skill-wait > p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+}
+.skill-wait__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .skill-diff {
   display: flex;
@@ -6276,8 +6259,8 @@ html:not([data-pointer]) .stop-run:focus-visible {
   margin: 0 2px 0 4px;
   background: var(--line);
 }
-/* "Parado por você · Continuar" under a stopped answer. */
-.run-canceled {
+/* Continue alone under an answer whose text already says why it stopped; a stopped answer's pill is `StopPill`. */
+p.run-canceled {
   display: inline-flex;
   align-items: center;
   gap: 6px;

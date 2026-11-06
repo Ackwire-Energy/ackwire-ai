@@ -22,9 +22,10 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Icon, type IconName, LineIcon, Locked, Text } from "@/ui";
+import { AgentAvatar, Button, EventPillAction, EventPillText, Icon, type IconName, LineIcon, Locked, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
+import { AskWaiting } from "../chat/asks";
 import { requestComposerText } from "../chat/composer-request";
 import { MESSAGE_STICKER } from "../chat/media";
 import { useOpenDm } from "../new/useOpenDm";
@@ -37,7 +38,8 @@ import { AnswerChips, TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
 
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
- * any AI is connected: its greeting, then the first card the workspace needs, as on the web. No AI yet: Connect AI.
+ * any AI is connected: its greeting, then the first card the workspace needs, as on the web. No AI yet: a waiting pill
+ * with "Connect" (tinted), what it is for under it.
  * An AI and no agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A
  * team and nobody else here yet: inviting people and the first task, written in that agent's composer. Last, until the
  * person picks, how agents talk to them (ADR 0147). Once the start card has stopped asking, a line to build the team
@@ -97,15 +99,26 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
           </View>
         ) : null}
         {cards.includes("connect") && (
-          <IntroCard icon="brain" title={t("rightHand.intro.connect.title")} text={t("rightHand.intro.connect.text")}>
-            <Button
-              variant="primary"
-              size="card"
-              wide
-              label={t("rightHand.intro.connect.action")}
-              onPress={() => openConnectAi({ agentId: agent.id })}
-            />
-          </IntroCard>
+          <AskWaiting
+            forMe
+            mark="brain"
+            words={t("rightHand.intro.connect.title")}
+            actions={
+              <EventPillAction
+                key="connect"
+                primary
+                label={t("rightHand.intro.connect.action")}
+                onPress={() => openConnectAi({ agentId: agent.id })}
+              />
+            }
+            below={
+              <EventPillText>
+                <Text variant="footnote" tone="muted">
+                  {t("rightHand.intro.connect.text")}
+                </Text>
+              </EventPillText>
+            }
+          />
         )}
         {cards.includes("start") && (
           <StartCard channelId={channelId} left={presetsLeft(teamHandles)} first={team.length === 0} />

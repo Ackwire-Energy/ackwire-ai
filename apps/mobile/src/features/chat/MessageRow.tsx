@@ -53,10 +53,10 @@ import { useOrg } from "@/providers/org";
 import {
   CHROME_MAX_SCALE,
   Count,
+  EventPillAction,
   Icon,
   InkOrbit,
   LineIcon,
-  PixelStopped,
   PressScale,
   ProviderLogo,
   Text,
@@ -116,7 +116,8 @@ import { QuoteAbove, QuotePlate } from "./QuoteLine";
 import { ReachLines } from "./ReachLines";
 import { Receipts } from "./Receipts";
 import { SecretCard } from "./SecretCard";
-import { SpeedFallbackLine } from "./StoppedLine";
+import { SpeedFallbackLine, StopPill } from "./StoppedLine";
+import { useStoppedRun } from "./stopped-runs";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
@@ -824,9 +825,11 @@ function Sending({ offline, end }: { offline: boolean; end: boolean }) {
 }
 
 /**
- * A reply someone stopped: what it wrote stays, with "Parado por você · Continuar" ("No limite de passos ·
- * Continuar" under the reply of a run that reached its step limit); the button picks up from where it stopped
- * (a new run) and goes away once it did, for everyone.
+ * A reply someone stopped: what it wrote stays, with one pill under it, "You stopped Ada · 14:16 | Continue | Add a
+ * reason" ("At the step limit | Continue" under the reply of a run that reached its step limit). The run's stop
+ * notice, when the conversation has it, gives the pill its words (who, the reason, "Add a reason") and draws nothing
+ * itself (`stoppedRunsOf`). Continue picks up from where it stopped (a new run) and goes away once it did, for
+ * everyone.
  */
 function StoppedLine({
   message: m,
@@ -839,7 +842,7 @@ function StoppedLine({
   stopped: { byUserId: string | null; continuedRunId: string | null };
   /**
    * It ended at its step limit, or because it got stuck, or its long work failed on its AI provider (the end's text
-   * already says so, so only Continuar shows): nobody stopped it.
+   * already says so, so only Continue shows): nobody stopped it.
    */
   limit?: "steps" | "stuck" | "failed";
 }) {
@@ -853,14 +856,19 @@ function StoppedLine({
   const org = useOrg().org;
   const { colors: c, shadows } = useTheme();
   const [busy, setBusy] = useState(false);
+  // The stop's notice, when it is in this conversation: who stopped it, the reason, its time.
+  const stop = useStoppedRun(limit ? null : runId);
   // Continued here or on another device (`run.continued`), or already in the message's meta.
   const continued = useContinuedRun(m.id) ?? stopped.continuedRunId;
-  const byMe = Boolean(meId) && stopped.byUserId === meId;
-  const by = limit
-    ? t(limit === "stuck" ? "mobile.chat.stopped.stuck" : "mobile.chat.stopped.limit")
+  const byMe = Boolean(meId) && (stop?.notice.byUserId || stopped.byUserId) === meId;
+  // Without a notice and a name for whoever stopped it, or nobody did: the words the reply alone can say.
+  const fallback = limit
+    ? limit === "failed"
+      ? null
+      : t(limit === "stuck" ? "mobile.chat.stopped.stuck" : "mobile.chat.stopped.limit")
     : byMe
       ? t("mobile.chat.stopped.byYou")
-      : stopped.byUserId
+      : stopped.byUserId && dir.nameOf({ type: "person", id: stopped.byUserId })
         ? t("mobile.chat.stopped.by", { name: dir.nameOf({ type: "person", id: stopped.byUserId }) })
         : t("mobile.chat.stopped.plain");
   const owner = m.author.id ? dir.agentById.get(m.author.id)?.ownerUserId : null;
@@ -892,39 +900,49 @@ function StoppedLine({
         });
       });
   };
-  const said = limit !== "failed";
-  if (!said && !open) return null;
+  if (fallback === null) {
+    // Its text already says why (its long work's provider failed): Continue alone, nothing to say.
+    if (!open) return null;
+    return (
+      <View style={styles.stopped}>
+        <PressScale
+          onPress={onContinue}
+          accessibilityRole="button"
+          // 26 points tall in the line: the slop gives it the 44 a finger needs.
+          hitSlop={{ top: 9, bottom: 9, left: 4, right: 4 }}
+          style={[styles.continue, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
+        >
+          <View style={styles.continueIn}>
+            <Icon name="play" size={12} color={c.ink} />
+            <Text variant="caption" tone="ink" style={styles.medium} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+              {t("mobile.chat.stopped.continue")}
+            </Text>
+          </View>
+        </PressScale>
+      </View>
+    );
+  }
+  const agentName = dir.nameOf(m.author) || t("channel.unknownAgent");
   return (
     <View style={styles.stopped}>
-      {said ? <PixelStopped size={12} /> : null}
-      {said ? (
-        <Text variant="caption" tone="muted">
-          {by}
-        </Text>
-      ) : null}
-      {open ? (
-        <>
-          {said ? (
-            <Text variant="caption" tone="faint">
-              ·
-            </Text>
-          ) : null}
-          <PressScale
-            onPress={onContinue}
-            accessibilityRole="button"
-            // 26 points tall in the line: the slop gives it the 44 a finger needs.
-            hitSlop={{ top: 9, bottom: 9, left: 4, right: 4 }}
-            style={[styles.continue, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
-          >
-            <View style={styles.continueIn}>
-              <Icon name="play" size={12} color={c.ink} />
-              <Text variant="caption" tone="ink" style={styles.medium} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-                {t("mobile.chat.stopped.continue")}
-              </Text>
-            </View>
-          </PressScale>
-        </>
-      ) : null}
+      <StopPill
+        agent={agentName}
+        notice={stop?.notice}
+        at={stop?.message.createdAt}
+        byUserId={limit ? null : stopped.byUserId}
+        fallback={fallback}
+        cont={
+          !continued && (open || busy) ? (
+            <EventPillAction
+              key="continue"
+              lead="play"
+              label={t("mobile.chat.stopped.continue")}
+              loading={busy}
+              onPress={onContinue}
+            />
+          ) : null
+        }
+      />
     </View>
   );
 }
@@ -1168,7 +1186,8 @@ const styles = StyleSheet.create({
   meStatus: { marginTop: 4, textAlign: "right" },
   status: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, minHeight: 18 },
   statusEnd: { alignSelf: "flex-end" },
-  stopped: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  // The stop's pill (or Continue alone) under the reply's words.
+  stopped: { alignItems: "flex-start", marginTop: 6 },
   continue: {
     minHeight: 26,
     borderTopLeftRadius: 10,

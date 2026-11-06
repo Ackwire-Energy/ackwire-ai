@@ -24,7 +24,7 @@ const line = (change: Record<string, unknown>): Message => ({
 });
 
 describe("Plano atualizado", () => {
-  test("the icon sits beside the text (one row), short changes listed whole", async () => {
+  test("one pill: the icon beside the text in its frame, short changes listed whole", async () => {
     await renderPage(
       <MissionPlanChangeLine message={line({ added: [{ id: "i1", title: "Login" }], removed: [], changed: [] })} />,
       {
@@ -34,10 +34,10 @@ describe("Plano atualizado", () => {
     );
     await settle(2);
     const row = document.querySelector(".mi-evt") as HTMLElement;
-    // Two children: the icon and the text box (the action lives inside the text, never alone on a line).
-    expect(row.children).toHaveLength(2);
-    expect(row.children[0]?.tagName.toLowerCase()).toBe("svg");
-    expect(row.textContent).toContain("Plano atualizado: + Login");
+    // The icon and the words in one row of the pill's frame.
+    const main = row.querySelector(".ac-eventpill__main") as HTMLElement;
+    expect(main.children[0]?.querySelector("svg")).not.toBeNull();
+    expect(main.querySelector(".mi-evt__text")?.textContent).toContain("Plano atualizado: + Login");
   });
 
   test("a long change folds into '+N itens editados'", async () => {

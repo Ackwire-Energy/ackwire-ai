@@ -591,7 +591,7 @@ describe("an offline computer's note", () => {
     await settle(10);
     const pill = row("m-wait").querySelector(".ac-msg__head .cq-away");
     expect(pill?.textContent).toBe("Fora há 3 min");
-    expect(row("m-wait").querySelector(".waitcard")?.textContent).not.toContain("3 min");
+    expect(row("m-wait").querySelector(".rq-open")?.textContent).not.toContain("3 min");
   });
 });
 

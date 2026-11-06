@@ -342,9 +342,9 @@
       "wellNow": "S'est arrêté pour lire votre note"
     },
     "stopped": {
-      "byYou": "Arrêté par vous",
-      "by": "Arrêté par {{name}}",
-      "plain": "Arrêté",
+      "byYou": "Arrêté ici",
+      "by": "{{name}} l'a arrêté ici",
+      "plain": "Arrêté ici",
       "limit": "Limite d'étapes atteinte",
       "stuck": "Arrêté car bloqué",
       "continue": "Continuer",

@@ -328,9 +328,9 @@
       "wellNow": "Stopte om je bericht te lezen"
     },
     "stopped": {
-      "byYou": "Gestopt door jou",
-      "by": "Gestopt door {{name}}",
-      "plain": "Gestopt",
+      "byYou": "Hier gestopt",
+      "by": "{{name}} stopte hier",
+      "plain": "Hier gestopt",
       "limit": "Stappenlimiet bereikt",
       "stuck": "Gestopt omdat hij vastliep",
       "continue": "Doorgaan",
