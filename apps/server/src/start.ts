@@ -55,6 +55,7 @@ import {
   drainLocalRuns,
   EMAIL_PICTURES,
   emailArtFor,
+  enableAccountContacts,
   enableCaches,
   enableOperatorEvents,
   ensureRightHands,
@@ -289,6 +290,7 @@ async function boot(
   // OpenRouter's public model list (ADR 0087): read only while a workspace has an OpenRouter key.
   enableOpenRouterModels(fetch);
   applyBootSwitches(config);
+  enableAccountContacts(config.PUBLIC_URL, adapters.email);
   if (config.OPERATOR_API_TOKEN) {
     // Before the API serves a page: a caller restarting after a restore must find these rows first.
     const adopted = await adoptRestoredOperatorEvents(database.db);

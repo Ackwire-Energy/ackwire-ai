@@ -8,6 +8,7 @@ import {
   createOutboxPump,
   type DesktopControl,
   enqueue,
+  enqueueAccountContacts,
   enqueueAutonomyReport,
   enqueueIdleReflections,
   enqueueOverdueAccountDeletions,
@@ -372,6 +373,10 @@ export function startWorkers(deps: WorkerDeps) {
   // Confirmed waiting list entries from before contacts were synced (no-op for the rest: dedupe key).
   void enqueueWaitlistContacts(db).catch((error) =>
     log.error("background job failed", { job: "waitlistContacts", error }),
+  );
+  // Accounts from before contacts were synced (no-op for the rest: dedupe key).
+  void enqueueAccountContacts(db).catch((error) =>
+    log.error("background job failed", { job: "accountContacts", error }),
   );
 
   const offWake = deps.pubsub.subscribe(WAKE_TOPIC, () => void ticks.get("outbox")?.());

@@ -936,8 +936,8 @@ export async function sendQueuedEmail(sender: EmailSender, payload: Record<strin
   const to = Array.isArray(payload.to) ? payload.to.map(String) : [];
   if (to.length === 0) throw new PermanentJobError("email without recipients");
   const { subject, html, text, inline } = renderEmail(payload.template as EmailTemplate, art);
-  try {
-    await sender.send({
+  await sender
+    .send({
       subject,
       html,
       text,
@@ -945,11 +945,14 @@ export async function sendQueuedEmail(sender: EmailSender, payload: Record<strin
       to,
       idempotencyKey: String(payload.key),
       tags: [{ name: "kind", value: (payload.template as EmailTemplate).kind }],
-    });
-  } catch (error) {
-    if (error instanceof EmailError && !error.retryable) throw new PermanentJobError(error.message);
-    throw error;
-  }
+    })
+    .catch(rethrowEmailError);
+}
+
+/** A provider's refusal that a retry won't change fails the job for good; anything else is retried. */
+export function rethrowEmailError(error: unknown): never {
+  if (error instanceof EmailError && !error.retryable) throw new PermanentJobError(error.message);
+  throw error;
 }
 
 /** The 80%/100% budget email to the agent's owner, or the admins without one (once per agent, month and level). */

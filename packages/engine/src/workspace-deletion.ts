@@ -16,6 +16,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { enqueueAccountContact } from "./account-contacts";
 import { recordAudit } from "./audit";
 import { orgMessageCount } from "./billing-link";
 import { caches } from "./cache";
@@ -1124,6 +1125,7 @@ export async function scheduleAccountDeletion(deps: DeletionDeps, userId: string
     await tx.delete(pushDevices).where(eq(pushDevices.userId, userId));
     for (const m of mine) await followOwner(tx, m.orgId);
     await recordOperatorEvent(tx, { type: "user.deletion_requested", userId, data: { dueAt: dueAt.toISOString() } });
+    await enqueueAccountContact(tx, userId);
     if (deps.emails) {
       const names = closed.length
         ? await tx
@@ -1203,6 +1205,7 @@ export async function restoreAccount(deps: DeletionDeps, userId: string) {
       .where(and(eq(organizations.deletionRequestedBy, userId), eq(organizations.deletionDueAt, account.dueAt)));
     await tx.update(users).set({ deletionDueAt: null, deletionRequestedAt: null }).where(eq(users.id, userId));
     await recordOperatorEvent(tx, { type: "user.deletion_canceled", userId });
+    await enqueueAccountContact(tx, userId);
     const mine = await tx
       .select({ orgId: organizationMembers.orgId })
       .from(organizationMembers)

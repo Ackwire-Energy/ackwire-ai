@@ -61,3 +61,11 @@ Under `/api/operator/v1`, behind `OPERATOR_API_TOKEN` like the rest (ADR 0056): 
 - The waiting list moves to production as a CSV, without touching its contacts.
 - On a new database whoever signs up first is the installation's owner, exempt from §4: set `OWNER_CLAIM_SHA256`, or sign up before the address is public.
 - A member who needs their own workspace before sign-up opens gets it by allowing their address from the console (`allowed`), once the address is confirmed. Treating plus or dot variants as one person is left out until it is needed.
+
+## Addendum (2026-11-06): accounts are contacts too
+
+On agentes.chat Cloud (`isAgentesCloud(PUBLIC_URL)`) with a provider that keeps contacts, every account is a contact at the email provider as well, so marketing segments keep themselves up to date. A self-hosted server never syncs its accounts and queues no job; there is no switch.
+
+- Job `account.contact` (`account-contacts.ts`, `orgId: null`) saves `account_created_at` and, when set, `locale`; a null `users.locale` leaves the contact's own (the waiting list's) alone. The handler reads the account when it runs, not when it was queued.
+- It is queued after sign-up commits, on a language change, when an operator blocks or lets an account back, when a deletion is requested or undone, and before an account's row is deleted (the job carries the address). These have no dedupe key: each change syncs once more. At boot every account is queued with a key of what its contact holds (`on:<locale>` or `off`), so a restart with nothing changed is a no-op.
+- A blocked account, one being deleted or one gone loses `account_created_at` (a null property, which the provider's `PATCH` removes; a contact it doesn't have isn't created). The contact itself is never deleted: that would lose its unsubscribe state.
