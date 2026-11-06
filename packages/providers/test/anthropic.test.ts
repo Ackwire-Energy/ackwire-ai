@@ -437,7 +437,11 @@ describe("preserved thinking: thinking sent back under other tools (accounts cre
     );
     const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
     const error = await ask(provider, unreadableHistory(), AFTER).catch((e: unknown) => e);
-    expect(error).toMatchObject({ message: `provider denied access (403 permission_error): ${said}`, status: 403, said });
+    expect(error).toMatchObject({
+      message: `provider denied access (403 permission_error): ${said}`,
+      status: 403,
+      said,
+    });
   });
 
   test("a refused request keeps the API's error type and words, capped; one not about thinking goes once", async () => {
