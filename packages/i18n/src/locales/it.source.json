@@ -4383,7 +4383,7 @@
     "value": "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it."
   },
   "channel.deleteIssues": {
-    "value": "Its tasks go too, as only the channel's members could see them."
+    "value": "Its tasks go too, as only the channel's members and administrators could see them."
   },
   "channel.deleteOrArchive": {
     "value": "To keep the conversation, archive the channel instead."
@@ -23221,7 +23221,7 @@
     "value": "Everyone in the workspace can see it: it's in the public channel #{{name}}"
   },
   "drive.audience.privateChannel": {
-    "value": "Only members of #{{name}} can see it"
+    "value": "Only members of #{{name}} and administrators can see it"
   },
   "drive.audience.dm": {
     "value": "Only you and {{name}} can see it: it came from a direct message"
@@ -23233,7 +23233,7 @@
     "value": "Private"
   },
   "drive.privateHint": {
-    "value": "Only the people in the conversation see these files"
+    "value": "Only the people in the conversation see these files. In a channel, administrators do too."
   },
   "drive.downloadAs": {
     "value": "Download as"

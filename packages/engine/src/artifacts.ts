@@ -1216,7 +1216,7 @@ export async function fileReach(db: Database, orgId: string, artifactId: string,
     return `It is in the shared Drive, from #${a.name}: everyone in the workspace sees it.`;
   }
   const notShared = `in the Drive's private section, not in the shared Drive. ${hint}`.trimEnd();
-  if (a.kind === "channel") return `Only the members of #${a.name} see it: it is ${notShared}`;
+  if (a.kind === "channel") return `Only the members of #${a.name} and administrators see it: it is ${notShared}`;
   const people = await db
     .select({ name: schema.users.name })
     .from(channelMembers)

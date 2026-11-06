@@ -1905,7 +1905,7 @@
     "delete": "Usuń kanał",
     "deleteTitle": "Usunąć #{{channel}} na zawsze?",
     "deleteGoes": "Znika od razu: wiadomości, wątki, pliki i przypięte, to, co agenci zapamiętali z kanału, oraz rutyny, które w nim publikują.",
-    "deleteIssues": "Jego zadania też znikają, bo widzieli je tylko członkowie kanału.",
+    "deleteIssues": "Jego zadania też znikają, bo widzieli je tylko członkowie kanału i administratorzy.",
     "deleteOrArchive": "Aby zachować rozmowę, zarchiwizuj kanał zamiast go usuwać.",
     "deleteTypeName": "Wpisz {{channel}}, aby potwierdzić",
     "deleteDone": "Kanał #{{channel}} został usunięty.",
@@ -10220,12 +10220,12 @@
     "audience": {
       "workspace": "Widzą go wszyscy w przestrzeni roboczej",
       "publicChannel": "Widzą go wszyscy w przestrzeni roboczej: jest na publicznym kanale #{{name}}",
-      "privateChannel": "Widzą go tylko członkowie #{{name}}",
+      "privateChannel": "Widzą go tylko członkowie #{{name}} i administratorzy",
       "dm": "Widzisz go tylko ty i {{name}}: pochodzi z wiadomości bezpośredniej",
       "dmGone": "Widzą go tylko osoby z tej rozmowy: pochodzi z wiadomości bezpośredniej"
     },
     "private": "Prywatne",
-    "privateHint": "Te pliki widzą tylko osoby z rozmowy",
+    "privateHint": "Te pliki widzą tylko osoby z rozmowy. W kanale także administratorzy.",
     "downloadAs": "Pobierz jako",
     "uploading_one": "Przesyłanie {{count}} pliku",
     "uploading_few": "Przesyłanie {{count}} plików",

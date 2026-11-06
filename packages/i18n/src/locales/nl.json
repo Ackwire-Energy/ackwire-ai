@@ -1787,7 +1787,7 @@
     "delete": "Kanaal verwijderen",
     "deleteTitle": "#{{channel}} definitief verwijderen?",
     "deleteGoes": "Verdwijnt nu: berichten, threads, bestanden en vastgezette berichten, wat de agents uit het kanaal onthielden en de routines die erin posten.",
-    "deleteIssues": "De taken gaan ook weg, want alleen de leden van het kanaal konden ze zien.",
+    "deleteIssues": "De taken gaan ook weg, want alleen de leden van het kanaal en beheerders konden ze zien.",
     "deleteOrArchive": "Wil je het gesprek bewaren, archiveer het kanaal dan.",
     "deleteTypeName": "Typ {{channel}} om te bevestigen",
     "deleteDone": "#{{channel}} is verwijderd.",
@@ -9561,12 +9561,12 @@
     "audience": {
       "workspace": "Iedereen in de werkruimte kan het zien",
       "publicChannel": "Iedereen in de werkruimte kan het zien: het staat in het openbare kanaal #{{name}}",
-      "privateChannel": "Alleen leden van #{{name}} kunnen het zien",
+      "privateChannel": "Alleen leden van #{{name}} en beheerders kunnen het zien",
       "dm": "Alleen jij en {{name}} kunnen het zien: het komt uit een direct bericht",
       "dmGone": "Alleen de mensen in dat gesprek kunnen het zien: het komt uit een direct bericht"
     },
     "private": "Privé",
-    "privateHint": "Alleen de mensen in het gesprek zien deze bestanden",
+    "privateHint": "Alleen de mensen in het gesprek zien deze bestanden. In een kanaal ook beheerders.",
     "downloadAs": "Downloaden als",
     "uploading_one": "{{count}} bestand uploaden",
     "uploading_other": "{{count}} bestanden uploaden",

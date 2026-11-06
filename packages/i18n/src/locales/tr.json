@@ -1787,7 +1787,7 @@
     "delete": "Kanalı sil",
     "deleteTitle": "#{{channel}} kalıcı olarak silinsin mi?",
     "deleteGoes": "Hemen gider: mesajlar, ileti dizileri, dosyalar ve sabitlenenler, ajanların bu kanaldan hatırladıkları ve buraya gönderi yapan rutinler.",
-    "deleteIssues": "Görevleri de silinir, çünkü onları yalnızca kanalın üyeleri görebiliyordu.",
+    "deleteIssues": "Görevleri de silinir, çünkü onları yalnızca kanalın üyeleri ve yöneticiler görebiliyordu.",
     "deleteOrArchive": "Konuşmayı saklamak için kanalı silmek yerine arşivle.",
     "deleteTypeName": "Onaylamak için {{channel}} yaz",
     "deleteDone": "#{{channel}} silindi.",
@@ -9436,12 +9436,12 @@
     "audience": {
       "workspace": "Çalışma alanındaki herkes görebilir",
       "publicChannel": "Çalışma alanındaki herkes görebilir: herkese açık #{{name}} kanalında",
-      "privateChannel": "Yalnızca #{{name}} üyeleri görebilir",
+      "privateChannel": "Yalnızca #{{name}} üyeleri ve yöneticiler görebilir",
       "dm": "Yalnızca siz ve {{name}} görebilirsiniz: bir doğrudan mesajdan geldi",
       "dmGone": "Yalnızca o konuşmadaki kişiler görebilir: bir doğrudan mesajdan geldi"
     },
     "private": "Özel",
-    "privateHint": "Bu dosyaları yalnızca konuşmadaki kişiler görür",
+    "privateHint": "Bu dosyaları yalnızca konuşmadaki kişiler görür. Bir kanalda yöneticiler de görür.",
     "downloadAs": "Şu biçimde indir",
     "uploading_one": "{{count}} dosya yükleniyor",
     "uploading_other": "{{count}} dosya yükleniyor",

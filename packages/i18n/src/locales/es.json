@@ -1846,7 +1846,7 @@
     "delete": "Eliminar canal",
     "deleteTitle": "¿Eliminar #{{channel}} para siempre?",
     "deleteGoes": "Se va ahora: mensajes, hilos, archivos y fijados, lo que los agentes guardaron del canal y las rutinas que publican en él.",
-    "deleteIssues": "Sus tareas también se van, porque solo los miembros del canal podían verlas.",
+    "deleteIssues": "Sus tareas también se van, porque solo los miembros del canal y los administradores podían verlas.",
     "deleteOrArchive": "Para conservar la conversación, archiva el canal en lugar de eliminarlo.",
     "deleteTypeName": "Escribe {{channel}} para confirmar",
     "deleteDone": "#{{channel}} se eliminó.",
@@ -9809,12 +9809,12 @@
     "audience": {
       "workspace": "Todos en el espacio de trabajo pueden verlo",
       "publicChannel": "Todos en el espacio de trabajo pueden verlo: está en el canal público #{{name}}",
-      "privateChannel": "Solo los miembros de #{{name}} pueden verlo",
+      "privateChannel": "Solo los miembros de #{{name}} y los administradores pueden verlo",
       "dm": "Solo tú y {{name}} pueden verlo: vino de un mensaje directo",
       "dmGone": "Solo las personas de esa conversación pueden verlo: vino de un mensaje directo"
     },
     "private": "Privado",
-    "privateHint": "Solo las personas de la conversación ven estos archivos",
+    "privateHint": "Solo las personas de la conversación ven estos archivos. En un canal, también los administradores.",
     "downloadAs": "Descargar como",
     "uploading_one": "Subiendo {{count}} archivo",
     "uploading_many": "Subiendo {{count}} archivos",

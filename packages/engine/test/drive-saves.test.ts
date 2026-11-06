@@ -191,7 +191,10 @@ describe("where a saved file lands, and who finds it", () => {
     const { bob } = await world();
     const room = await createChannel(f.db, f.owner.id, f.org.id, { name: "vendas", visibility: "private" });
     await addChannelMember(f.db, f.owner.id, f.org.id, room.id, { agentId: f.agent.id });
-    await savesBoth(ctxOf(await runAfter(f.agent.id, room.id, "@dev salva")), "Only the members of #vendas see it");
+    await savesBoth(
+      ctxOf(await runAfter(f.agent.id, room.id, "@dev salva")),
+      "Only the members of #vendas and administrators see it",
+    );
     expect(await titles(f.owner.id)).toEqual(BOTH);
     expect((await driveOf(f.owner.id))[0]?.audience).toEqual({ kind: "channel", name: "vendas", private: true });
     expect(await titles(bob.id)).toEqual([]);

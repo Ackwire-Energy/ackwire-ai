@@ -1779,7 +1779,7 @@ export const en = {
     deleteGoes:
       "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it.",
     /** A private channel's tasks (issues): nobody could open them once its members are gone. */
-    deleteIssues: "Its tasks go too, as only the channel's members could see them.",
+    deleteIssues: "Its tasks go too, as only the channel's members and administrators could see them.",
     deleteOrArchive: "To keep the conversation, archive the channel instead.",
     deleteTypeName: "Type {{channel}} to confirm",
     deleteDone: "#{{channel}} was deleted.",
@@ -9363,12 +9363,12 @@ export const en = {
     audience: {
       workspace: "Everyone in the workspace can see it",
       publicChannel: "Everyone in the workspace can see it: it's in the public channel #{{name}}",
-      privateChannel: "Only members of #{{name}} can see it",
+      privateChannel: "Only members of #{{name}} and administrators can see it",
       dm: "Only you and {{name}} can see it: it came from a direct message",
       dmGone: "Only the people in that conversation can see it: it came from a direct message",
     },
     private: "Private",
-    privateHint: "Only the people in the conversation see these files",
+    privateHint: "Only the people in the conversation see these files. In a channel, administrators do too.",
     downloadAs: "Download as",
     uploading_one: "Uploading {{count}} file",
     uploading_other: "Uploading {{count}} files",

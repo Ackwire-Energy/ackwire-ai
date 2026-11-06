@@ -153,6 +153,24 @@ describe("deleting a task", () => {
     expect(heard.sort()).toEqual(["admin", "named"]);
   });
 
+  test("a public channel's task is the workspace's: its end reaches who isn't in the channel too", async () => {
+    f = await setup();
+    await addMember(f.db, f.org.id, "member", "Outside");
+    const issue = await createIssue({ db: f.db }, person(f.owner.id), f.org.id, {
+      title: "Public",
+      channelId: f.general.id,
+    });
+    expect(issue.audience.mode).toBe("everyone");
+    const heard: unknown[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (event) => heard.push(event));
+
+    await deleteIssue(deps(), f.owner.id, f.org.id, issue.id);
+
+    expect(heard).toContainEqual(
+      expect.objectContaining({ event: expect.objectContaining({ type: "issue.deleted", issueId: issue.id }) }),
+    );
+  });
+
   test("everyone's notifications about it go", async () => {
     f = await setup();
     const issue = await createIssue({ db: f.db }, person(f.owner.id), f.org.id, { title: "Told" });

@@ -4,7 +4,7 @@ import { recordAudit } from "./audit";
 import { stopRun } from "./cancel";
 import { endChannelWork, markChannelDeleted } from "./channel-deletion";
 import { ForbiddenError } from "./errors";
-import { canSee, findVisible, publishToTaskReaders } from "./issues";
+import { canSee, findVisible, publishToTaskReaders, taskAudienceOf, tiedPeople } from "./issues";
 import { clearIssueNotifications } from "./notifications";
 import { can, requireActiveMembership } from "./organizations";
 import { ACTIVE_RUN_STATUSES } from "./run-inbox";
@@ -109,11 +109,12 @@ export async function deleteIssue(deps: AgentDeletionDeps, userId: string, orgId
   });
   for (const room of rooms) await endChannelWork(deps, userId, orgId, room);
   await clearIssueNotifications(deps, orgId, ids);
+  const tied = await tiedPeople(db, gone);
   for (const r of gone)
     await publishToTaskReaders(
       deps,
       orgId,
-      { channelId: r.channelId, everyone: !r.restricted && !r.channelId, userIds: r.audienceUserIds },
+      { channelId: r.channelId, audience: taskAudienceOf(r, tied) },
       { type: "issue.deleted", issueId: r.id, number: r.number },
     );
 }

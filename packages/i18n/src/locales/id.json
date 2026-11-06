@@ -1728,7 +1728,7 @@
     "delete": "Hapus kanal",
     "deleteTitle": "Hapus #{{channel}} untuk selamanya?",
     "deleteGoes": "Hilang sekarang: pesan, utas, file dan sematan, apa yang diingat agen dari kanal ini, serta rutinitas yang memposting di sini.",
-    "deleteIssues": "Tugasnya juga ikut terhapus, karena hanya anggota channel yang bisa melihatnya.",
+    "deleteIssues": "Tugasnya juga ikut terhapus, karena hanya anggota channel dan admin yang bisa melihatnya.",
     "deleteOrArchive": "Untuk menyimpan percakapannya, arsipkan kanal alih-alih menghapusnya.",
     "deleteTypeName": "Ketik {{channel}} untuk mengonfirmasi",
     "deleteDone": "#{{channel}} telah dihapus.",
@@ -9154,12 +9154,12 @@
     "audience": {
       "workspace": "Semua orang di ruang kerja bisa melihatnya",
       "publicChannel": "Semua orang di ruang kerja bisa melihatnya: file ini ada di kanal publik #{{name}}",
-      "privateChannel": "Hanya anggota #{{name}} yang bisa melihatnya",
+      "privateChannel": "Hanya anggota #{{name}} dan admin yang bisa melihatnya",
       "dm": "Hanya kamu dan {{name}} yang bisa melihatnya: file ini berasal dari pesan langsung",
       "dmGone": "Hanya orang di percakapan itu yang bisa melihatnya: file ini berasal dari pesan langsung"
     },
     "private": "Privat",
-    "privateHint": "Hanya orang di percakapan yang bisa melihat file ini",
+    "privateHint": "Hanya orang di percakapan yang bisa melihat file ini. Di channel, admin juga bisa.",
     "downloadAs": "Unduh sebagai",
     "uploading_other": "Mengunggah {{count}} file",
     "uploadWaiting": "dalam antrean",

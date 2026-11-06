@@ -566,7 +566,7 @@ async function views(db: Database, rows: IssueRow[], reader?: string): Promise<I
     createdBy: { type: r.createdByType as WorkActor["type"], id: r.createdById },
     source: r.source as unknown as IssueSource,
     channelId: r.channelId,
-    audience: audienceOf(r, tied),
+    audience: taskAudienceOf(r, tied),
     parentIssueId: r.parentIssueId,
     pullRequests: r.pullRequests as unknown as IssueView["pullRequests"],
     githubUrl: r.githubUrl,
@@ -584,7 +584,7 @@ async function views(db: Database, rows: IssueRow[], reader?: string): Promise<I
 }
 
 /** The people of the private conversations these tasks are tied to, by channel. */
-async function tiedPeople(db: Database, rows: IssueRow[]) {
+export async function tiedPeople(db: Database, rows: IssueRow[]) {
   const ids = [...new Set(rows.flatMap((r) => (r.channelId ? [r.channelId] : [])))];
   const out = new Map<string, string[]>();
   if (ids.length === 0) return out;
@@ -603,7 +603,7 @@ async function tiedPeople(db: Database, rows: IssueRow[]) {
   return out;
 }
 
-function audienceOf(r: IssueRow, tied: Map<string, string[]>): IssueAudience {
+export function taskAudienceOf(r: IssueRow, tied: Map<string, string[]>): IssueAudience {
   if (r.restricted) return { mode: "people", userIds: r.audienceUserIds, channelId: null };
   const people = r.channelId ? tied.get(r.channelId) : undefined;
   return people
@@ -757,12 +757,12 @@ export interface IssueDeps {
 export async function publishToTaskReaders(
   deps: IssueDeps,
   orgId: string,
-  task: { channelId: string | null; everyone: boolean; userIds: string[] },
+  task: { channelId: string | null; audience: Pick<IssueAudience, "mode" | "userIds"> },
   event:
     | { type: "issue.created" | "issue.updated"; issue: IssueView }
     | { type: "issue.deleted"; issueId: string; number: number },
 ) {
-  if (task.everyone) {
+  if (task.audience.mode === "everyone") {
     await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event });
     return;
   }
@@ -771,17 +771,12 @@ export async function publishToTaskReaders(
   const admins = rowsOf<{ user_id: string }>(
     await deps.db.execute(membersWhoMaySql(sql`${orgId}::uuid`, "administrator")),
   ).map((r) => r.user_id);
-  const named = task.channelId ? [] : task.userIds;
+  const named = task.channelId ? [] : task.audience.userIds;
   for (const userId of new Set([...admins, ...named])) await publishUserEvent(deps.pubsub, orgId, userId, event);
 }
 
 const announce = (deps: IssueDeps, orgId: string, issue: IssueView, type: "issue.created" | "issue.updated") =>
-  publishToTaskReaders(
-    deps,
-    orgId,
-    { channelId: issue.channelId, everyone: issue.audience.mode === "everyone", userIds: issue.audience.userIds },
-    { type, issue },
-  );
+  publishToTaskReaders(deps, orgId, issue, { type, issue });
 
 /** Creates an issue with the next number of the org. */
 export async function createIssue(

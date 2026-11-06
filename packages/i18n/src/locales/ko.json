@@ -1728,7 +1728,7 @@
     "delete": "채널 삭제",
     "deleteTitle": "#{{channel}} 채널을 영구 삭제할까요?",
     "deleteGoes": "지금 사라지는 것: 메시지, 스레드, 파일, 고정 항목, 에이전트가 이 채널에서 기억한 내용, 여기에 게시하는 루틴.",
-    "deleteIssues": "채널 멤버만 볼 수 있었기 때문에 작업도 함께 삭제됩니다.",
+    "deleteIssues": "채널 멤버와 관리자만 볼 수 있었기 때문에 작업도 함께 삭제됩니다.",
     "deleteOrArchive": "대화를 남기려면 삭제 대신 채널을 보관하세요.",
     "deleteTypeName": "확인하려면 {{channel}} 입력",
     "deleteDone": "#{{channel}} 채널을 삭제했어요.",
@@ -9094,12 +9094,12 @@
     "audience": {
       "workspace": "워크스페이스의 모든 사람이 볼 수 있어요",
       "publicChannel": "공개 채널 #{{name}}에 있어서 워크스페이스의 모든 사람이 볼 수 있어요",
-      "privateChannel": "#{{name}} 멤버만 볼 수 있어요",
+      "privateChannel": "#{{name}} 멤버와 관리자만 볼 수 있어요",
       "dm": "다이렉트 메시지에서 온 파일이라 나와 {{name}}만 볼 수 있어요",
       "dmGone": "다이렉트 메시지에서 온 파일이라 그 대화에 있는 사람만 볼 수 있어요"
     },
     "private": "비공개",
-    "privateHint": "대화에 있는 사람만 이 파일을 볼 수 있어요",
+    "privateHint": "대화에 있는 사람만 이 파일을 볼 수 있어요. 채널에서는 관리자도 볼 수 있어요.",
     "downloadAs": "다른 형식으로 다운로드",
     "uploading_other": "파일 {{count}}개 업로드 중",
     "uploadWaiting": "대기 중",

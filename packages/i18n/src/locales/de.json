@@ -1787,7 +1787,7 @@
     "delete": "Kanal löschen",
     "deleteTitle": "#{{channel}} endgültig löschen?",
     "deleteGoes": "Weg ist sofort: Nachrichten, Threads, Dateien und Angeheftetes, was die Agenten sich aus dem Kanal gemerkt haben, und die Routinen, die dort posten.",
-    "deleteIssues": "Seine Aufgaben sind auch weg, da nur die Mitglieder des Kanals sie sehen konnten.",
+    "deleteIssues": "Seine Aufgaben sind auch weg, da nur die Mitglieder des Kanals und Administratoren sie sehen konnten.",
     "deleteOrArchive": "Um das Gespräch zu behalten, archiviere den Kanal stattdessen.",
     "deleteTypeName": "Gib {{channel}} zur Bestätigung ein",
     "deleteDone": "#{{channel}} wurde gelöscht.",
@@ -9496,12 +9496,12 @@
     "audience": {
       "workspace": "Alle im Workspace können es sehen",
       "publicChannel": "Alle im Workspace können es sehen: Es ist im öffentlichen Kanal #{{name}}",
-      "privateChannel": "Nur Mitglieder von #{{name}} können es sehen",
+      "privateChannel": "Nur Mitglieder von #{{name}} und Administratoren können es sehen",
       "dm": "Nur du und {{name}} könnt es sehen: Es stammt aus einer Direktnachricht",
       "dmGone": "Nur die Personen in dieser Unterhaltung können es sehen: Es stammt aus einer Direktnachricht"
     },
     "private": "Privat",
-    "privateHint": "Nur die Personen in der Unterhaltung sehen diese Dateien",
+    "privateHint": "Nur die Personen in der Unterhaltung sehen diese Dateien. In einem Kanal auch Administratoren.",
     "downloadAs": "Herunterladen als",
     "uploading_one": "{{count}} Datei wird hochgeladen",
     "uploading_other": "{{count}} Dateien werden hochgeladen",

@@ -1728,7 +1728,7 @@
     "delete": "删除频道",
     "deleteTitle": "要永久删除 #{{channel}} 吗？",
     "deleteGoes": "立即删除：消息、话题、文件和置顶，智能体从这个频道记住的内容，以及在这里发帖的例行任务。",
-    "deleteIssues": "它的任务也会一并删除，因为只有频道成员能看到它们。",
+    "deleteIssues": "它的任务也会一并删除，因为只有频道成员和管理员能看到它们。",
     "deleteOrArchive": "想保留对话的话，请归档频道而不是删除。",
     "deleteTypeName": "输入 {{channel}} 以确认",
     "deleteDone": "#{{channel}} 已删除。",
@@ -9165,12 +9165,12 @@
     "audience": {
       "workspace": "工作区中的所有人都能看到",
       "publicChannel": "工作区中的所有人都能看到：它在公开频道 #{{name}} 中",
-      "privateChannel": "只有 #{{name}} 的成员能看到",
+      "privateChannel": "只有 #{{name}} 的成员和管理员能看到",
       "dm": "只有你和 {{name}} 能看到：它来自私信",
       "dmGone": "只有那段对话中的成员能看到：它来自私信"
     },
     "private": "私密",
-    "privateHint": "只有对话中的成员能看到这些文件",
+    "privateHint": "只有对话中的成员能看到这些文件。在频道中，管理员也能看到。",
     "downloadAs": "下载为",
     "uploading_other": "正在上传 {{count}} 个文件",
     "uploadWaiting": "排队中",

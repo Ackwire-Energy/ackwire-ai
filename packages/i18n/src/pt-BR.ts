@@ -1771,7 +1771,7 @@ export const ptBR = {
     deleteTitle: "Apagar o #{{channel}} de vez?",
     deleteGoes:
       "Sai agora: mensagens, threads, arquivos e fixados, o que os agentes guardaram do canal e as rotinas que postam nele.",
-    deleteIssues: "As tarefas dele saem também, porque só os membros do canal podiam vê-las.",
+    deleteIssues: "As tarefas dele saem também, porque só os membros do canal e os administradores podiam vê-las.",
     deleteOrArchive: "Para guardar a conversa, arquive o canal em vez de apagar.",
     deleteTypeName: "Digite {{channel}} para confirmar",
     deleteDone: "#{{channel}} foi apagado.",
@@ -9481,12 +9481,12 @@ export const ptBR = {
     audience: {
       workspace: "Todo o workspace pode ver",
       publicChannel: "Todo o workspace pode ver: está no canal público #{{name}}",
-      privateChannel: "Só os membros de #{{name}} podem ver",
+      privateChannel: "Só os membros de #{{name}} e os administradores podem ver",
       dm: "Só você e {{name}} podem ver: veio de uma mensagem direta",
       dmGone: "Só quem estava na conversa pode ver: veio de uma mensagem direta",
     },
     private: "Privado",
-    privateHint: "Só quem está na conversa vê estes arquivos",
+    privateHint: "Só quem está na conversa vê estes arquivos. Num canal, os administradores também.",
     downloadAs: "Baixar como",
     uploading_one: "Enviando {{count}} arquivo",
     uploading_other: "Enviando {{count}} arquivos",
