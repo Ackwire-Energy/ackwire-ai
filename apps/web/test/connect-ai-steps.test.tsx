@@ -328,7 +328,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(dialog).getByRole("region", { name: "Kimi Code" })).toBeTruthy();
   });
 
-  test("the picker's rows: a check on the name's line, and the chosen option's panel 12px under its select", async () => {
+  test("the picker's rows: a check on the name's line, and the chosen option's panel a form's gap under its select", async () => {
     const ui = await stylesheet("../../../packages/ui/src/styles/components.css");
     expect(ruleOf(ui, '.ac-option[aria-pressed="true"]::after')).toContain("height: 18px");
     const layout = await stylesheet("../src/layout.css");
@@ -340,9 +340,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout.split("\n@supports (top: 1lh) {")[1] ?? "", key)).toContain(
       "top: calc(var(--space-3) + 0.5lh - 9px)",
     );
-    // The picker's 8px gap and 4px more.
-    expect(ruleOf(layout, ".ai-picker")).toContain("gap: var(--space-2)");
-    expect(ruleOf(layout, ".ai-picker > .ai-panel")).toContain("margin-top: 4px");
+    // The form's rhythm: the panel stands from the select as any field from the next.
+    expect(ruleOf(layout, ".ai-picker")).toContain("gap: var(--form-gap)");
   });
 
   test("a coding plan's key: its own key page, then the key sealed to the computer (in no request); the agent thinks with it", async () => {
@@ -375,11 +374,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(panel).getByLabelText("Chave do GLM Coding").getAttribute("aria-describedby")).toBe(
       safe.button.getAttribute("aria-describedby"),
     );
-    // Z.ai publishes no prefix for its keys: no example in the field, never a bare "…". Its buttons are the field's
-    // height (the ruler's default step).
+    // Z.ai publishes no prefix for its keys: no example in the field, never a bare "…". Colar sits inside the field,
+    // and sending waits for a key: no greyed button under an empty field.
     expect(within(panel).getByLabelText("Chave do GLM Coding").hasAttribute("placeholder")).toBe(false);
-    for (const name of ["Colar", "Enviar ao MacBook"])
-      expect(within(panel).getByRole("button", { name }).classList.contains("ac-btn--sm")).toBe(false);
+    expect(within(panel).getByRole("button", { name: "Colar" }).closest(".ac-input-affix")).not.toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Enviar ao MacBook" })).toBeNull();
     // Nothing starts on the computer until the key is there; a paste that isn't a key says so.
     expect(machines?.lastLogin()).toBeUndefined();
     const keyBox = within(panel).getByLabelText("Chave do GLM Coding");
@@ -653,8 +652,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".ai-panel--plan .ai-panel__row > :not(.ac-setnote)")).toContain(
       "margin-left: calc(var(--lead) + 12px)",
     );
-    // A key's field can narrow to 102px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
-    expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 102px");
+    // A key's field takes its line: "Enviar ao Computador da Costa Atelier" goes under it, whatever the name.
+    expect(ruleOf(layout, ".agp-addacct__paste .ac-input-affix")).toContain("flex: 1 1 100%");
   });
 
   test("a computer the person connected: the account their agents share, saved for the agent at once; or one just for it", async () => {
@@ -1053,8 +1052,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(panel).getByLabelText("Cole aqui").getAttribute("placeholder")).toBe("sk-ant-…");
     expect(within(panel).queryByRole("button", { name: /^Sobre Crie a sua chave/ })).toBeNull();
     expect(panel.textContent).not.toContain("Salva.");
-    // Save key is the field's height (the ruler's default step), not a small button beside a tall field.
-    expect(within(panel).getByRole("button", { name: "Salvar chave" }).classList.contains("ac-btn--sm")).toBe(false);
+    // No greyed Save under an empty field: it comes up with a key to save.
+    expect(within(panel).queryByRole("button", { name: "Salvar chave" })).toBeNull();
     await type(within(panel).getByLabelText("Cole aqui"), "sk-ant-api03-abcdefghijklmnop");
     await click(within(panel).getByRole("button", { name: "Salvar chave" }));
     await settle(4);
@@ -1129,6 +1128,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       await act(async () => answer());
       await settle(6);
     });
+    await type(within(panel).getByRole("textbox", { name: "Código do Claude" }), "c0de");
     expect(within(panel).getByRole("button", { name: "Enviar ao computador" })).toBeTruthy();
     // This sign-in's code goes by itself.
     await type(within(panel).getByRole("textbox", { name: "Código do Claude" }), "c0de#st4te");

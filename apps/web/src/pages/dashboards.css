@@ -242,7 +242,7 @@ html:not([data-pointer]) .db-card:focus-visible {
 .db-dialog__body {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: var(--form-gap);
   overflow: auto;
 }
 .db-f {

@@ -30,6 +30,7 @@ export function Segmented<V extends string>({
   label,
   size = "md",
   disabled = false,
+  block = false,
   className,
 }: {
   value: V;
@@ -39,6 +40,8 @@ export function Segmented<V extends string>({
   size?: "md" | "sm";
   /** Shown, not changed (a member reading an admin's setting, a setting this server can't use). */
   disabled?: boolean;
+  /** Fills its row, outside a form's column too (beside a section's heading, in a side panel). */
+  block?: boolean;
   className?: string;
 }) {
   const field = useFieldControl({});
@@ -74,7 +77,7 @@ export function Segmented<V extends string>({
       {...(field.labelledBy ? { "aria-labelledby": field.labelledBy } : { "aria-label": label })}
       aria-describedby={field["aria-describedby"]}
       aria-disabled={disabled || undefined}
-      className={cx("ac-seg", size === "sm" && "ac-seg--sm", className)}
+      className={cx("ac-seg", size === "sm" && "ac-seg--sm", block && "ac-seg--block", className)}
       onKeyDown={(e) => {
         if (e.key === "ArrowRight" || e.key === "ArrowDown") {
           e.preventDefault();

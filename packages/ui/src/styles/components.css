@@ -478,6 +478,10 @@ html:not([data-pointer]) .ac-link:focus-visible {
   gap: var(--form-gap);
   min-width: 0;
 }
+/* A paragraph among fields takes the form's gap, not its browser margins on top. */
+:where(.ac-form, .ac-field, .ac-dialog__body) > p {
+  margin: 0;
+}
 .ac-form__actions {
   display: flex;
   align-items: center;
@@ -4628,11 +4632,21 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-seg::-webkit-scrollbar {
   display: none;
 }
-/* In a form it fills the field, its options sharing the track evenly while each still fits on its line. */
-.ac-field > .ac-seg {
+/* In a form it fills its column, its options sharing the track evenly while each still fits on its line. */
+.ac-seg--block,
+.ac-field > .ac-seg,
+.ac-form > .ac-seg,
+.ac-dialog__body > .ac-seg {
   display: flex;
 }
-.ac-field > .ac-seg > .ac-seg__item {
+.ac-seg--block {
+  flex: 1 1 auto;
+  width: 100%;
+}
+.ac-seg--block > .ac-seg__item,
+.ac-field > .ac-seg > .ac-seg__item,
+.ac-form > .ac-seg > .ac-seg__item,
+.ac-dialog__body > .ac-seg > .ac-seg__item {
   flex: 1 1 0;
   min-width: max-content;
 }

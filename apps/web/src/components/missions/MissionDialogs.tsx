@@ -174,8 +174,8 @@ export function NewMissionDialog({
     >
       <Locked when={create.isPending}>
         <DialogBody>
-          <div className="mi-field">
-            <label className="mi-field__label" htmlFor={goalId}>
+          <div className="ac-field">
+            <label className="ac-field__label" htmlFor={goalId}>
               {t("missions.new.goal")}
             </label>
             <Textarea
@@ -211,8 +211,8 @@ export function NewMissionDialog({
             </div>
           ) : (
             <div className={names ? "mi-grid2" : undefined}>
-              <div className="mi-field">
-                <span className="mi-field__label">{t("missions.new.agent")}</span>
+              <div className="ac-field">
+                <span className="ac-field__label">{t("missions.new.agent")}</span>
                 <Select
                   aria-label={t("missions.new.agent")}
                   value={agent?.id}
@@ -240,8 +240,8 @@ export function NewMissionDialog({
                 />
               </div>
               {names && (
-                <div className="mi-field">
-                  <span className="mi-field__label">{t("missions.new.computer")}</span>
+                <div className="ac-field">
+                  <span className="ac-field__label">{t("missions.new.computer")}</span>
                   <span className="mi-pill mi-pill--field">
                     <MachineIcon machineId={machine?.id} />
                     {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
@@ -282,8 +282,8 @@ export function NewMissionDialog({
             </ul>
           )}
           {agent && agent.executors.length > 0 && (
-            <div className="mi-field">
-              <span className="mi-field__label">{t("missions.new.who")}</span>
+            <div className="ac-field">
+              <span className="ac-field__label">{t("missions.new.who")}</span>
               <Select
                 aria-label={t("missions.new.who")}
                 value={executor}
@@ -299,13 +299,13 @@ export function NewMissionDialog({
             </div>
           )}
           {!none && (
-            <div className="mi-field">
-              <span className="mi-field__label">{t("missions.commandApproval.label")}</span>
+            <div className="ac-field">
+              <span className="ac-field__label">{t("missions.commandApproval.label")}</span>
               <CommandApprovalSelect value={approval} onChange={setApproval} />
             </div>
           )}
-          <div className="mi-field">
-            <span className="mi-field__label">{t("missions.new.home")}</span>
+          <div className="ac-field">
+            <span className="ac-field__label">{t("missions.new.home")}</span>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <Segmented
                 size="sm"
@@ -350,7 +350,7 @@ export function NewMissionDialog({
             </span>
           </div>
           {error && (
-            <p className="ac-field__error" role="alert" style={{ marginTop: 12 }}>
+            <p className="ac-field__error" role="alert">
               {error}
             </p>
           )}

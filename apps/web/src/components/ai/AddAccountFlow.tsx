@@ -12,7 +12,7 @@ import {
 } from "@agenteschat/client/lib/machines";
 import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
-import { Button, cx, Icon, InfoHint, Input, Locked, ProviderLogo, SettingNote } from "@agenteschat/ui";
+import { AffixInput, Button, cx, Icon, InfoHint, Locked, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -533,12 +533,12 @@ function AddAccountFlow({
       </span>
     </p>
   );
-  // The field's buttons are its height (the ruler's default step), so the row reads as one line.
+  // Empty, the field offers Colar inside its end. Filled, Send comes up under it: no greyed button before there's a key.
   const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <span className="agp-addacct__paste">
         <Locked when={loading}>
-          <Input
+          <AffixInput
             ref={field}
             id={codeId}
             type={secret ? "password" : "text"}
@@ -555,16 +555,20 @@ function AddAccountFlow({
                 if (valid && ready && !loading) void send();
               }
             }}
+            action={
+              !code.trim() && (
+                <Button variant="ghost" size="sm" icon="copy" onClick={() => void paste()}>
+                  {t("aiAccounts.add.paste")}
+                </Button>
+              )
+            }
           />
-          {!code.trim() && (
-            <Button icon="copy" onClick={() => void paste()}>
-              {t("aiAccounts.add.paste")}
-            </Button>
-          )}
         </Locked>
-        <Button variant="primary" loading={loading} disabled={!valid || !ready} onClick={() => void send()}>
-          {t("agentPage.work.brain.add.send", { computer })}
-        </Button>
+        {(code.trim() || !ready) && (
+          <Button variant="primary" loading={loading} disabled={!valid || !ready} onClick={() => void send()}>
+            {t("agentPage.work.brain.add.send", { computer })}
+          </Button>
+        )}
       </span>
       {pasteFailed && <SettingNote icon="alert">{t("aiAccounts.add.pasteFailed")}</SettingNote>}
       {sendFailed && (

@@ -621,7 +621,7 @@ describe("Rotinas: the form's two plain questions", () => {
       "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
     );
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
-    expect(dialog.querySelectorAll(".routine-kind p")).toHaveLength(0);
+    expect(posts.closest(".ac-field")?.querySelectorAll(".ac-field__help")).toHaveLength(0);
     await act(async () =>
       fireEvent.change(within(dialog).getByLabelText("O que fazer"), { target: { value: "Revise os PRs abertos." } }),
     );

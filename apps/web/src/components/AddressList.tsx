@@ -1,12 +1,12 @@
 import { splitAddresses } from "@agenteschat/client/lib/mail";
-import { Button, Field, Input, Token, TokenList } from "@agenteschat/ui";
+import { AffixInput, Button, Field, Token, TokenList } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
  * A list of email addresses or `@domains` (email rules, routine filters), or
  * of other values with their own `split` (a database's hidden columns):
- * type one or several (commas or spaces), Enter or "Adicionar"; each shows
+ * type one or several (commas or spaces), Enter or the + inside the field; each shows
  * as a chip with a remove button. `clearable` adds "Remover tudo" for two or
  * more chips, undone in place.
  */
@@ -61,41 +61,43 @@ export function AddressList({
   return (
     <div className="mail-list">
       <Field label={label} id={id} help={help} error={invalid ? (invalidText ?? t("mail.list.invalid")) : undefined}>
-        <div className="mail-list__add">
-          <Input
-            value={text}
-            disabled={disabled}
-            inputMode={inputMode}
-            autoComplete="off"
-            placeholder={placeholder ?? t("mail.list.placeholder")}
-            list={suggestions ? `${id}-suggestions` : undefined}
-            onChange={(e) => {
-              setText(e.target.value);
-              setInvalid(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                add();
-              }
-            }}
-          />
-          <Button
-            type="button"
-            disabled={disabled || !text.trim()}
-            aria-label={t("mail.list.addTo", { name: label })}
-            onClick={add}
-          >
-            {t("mail.list.add")}
-          </Button>
-          {suggestions && (
-            <datalist id={`${id}-suggestions`}>
-              {suggestions.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          )}
-        </div>
+        <AffixInput
+          value={text}
+          disabled={disabled}
+          inputMode={inputMode}
+          autoComplete="off"
+          placeholder={placeholder ?? t("mail.list.placeholder")}
+          list={suggestions ? `${id}-suggestions` : undefined}
+          onChange={(e) => {
+            setText(e.target.value);
+            setInvalid(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          action={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon="plus"
+              disabled={disabled || !text.trim()}
+              aria-label={t("mail.list.addTo", { name: label })}
+              onClick={add}
+            />
+          }
+        />
+        {suggestions && (
+          <datalist id={`${id}-suggestions`}>
+            {suggestions.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        )}
       </Field>
       {values.length > 0 && (
         <TokenList label={label}>

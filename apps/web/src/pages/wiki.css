@@ -1395,7 +1395,7 @@ p.wiki-rich__raw {
 .wiki-ask {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--form-gap);
 }
 .wiki-ask__quote {
   margin: 0;

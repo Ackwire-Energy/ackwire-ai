@@ -215,7 +215,17 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
             </li>
           ))}
         </ul>
-        <h3 className="sidebar-setup__heading">{t("shell.sidebarSetup.order")}</h3>
+        <div className="ac-field__label-row">
+          <h3 className="sidebar-setup__heading">{t("shell.sidebarSetup.order")}</h3>
+          <button
+            type="button"
+            className="ac-link ac-link--muted small"
+            disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
+            onClick={() => sections.put([...SIDEBAR_SECTIONS])}
+          >
+            {t("contextMenu.restoreOrder")}
+          </button>
+        </div>
         <p className="small muted sidebar-setup__hint">{t("shell.sidebarSetup.orderHint")}</p>
         <ol className="sidebar-setup sidebar-setup--order">
           {sections.order.map((id, i) => (
@@ -247,14 +257,6 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
         </ol>
       </DialogBody>
       <DialogFooter note={t("shell.sidebarSetup.instant")}>
-        <Button
-          variant="ghost"
-          icon="undo"
-          disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
-          onClick={() => sections.put([...SIDEBAR_SECTIONS])}
-        >
-          {t("contextMenu.restoreOrder")}
-        </Button>
         <Button
           variant="ghost"
           icon="undo"

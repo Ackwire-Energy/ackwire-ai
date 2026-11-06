@@ -53,6 +53,13 @@ describe("a form's rhythm", () => {
     expect(rule(".ac-field > .ac-seg > .ac-seg__item")).toContain("min-width: max-content;");
   });
 
+  test("a Segmented straight in a form's column fills it too, and `block` does it anywhere", () => {
+    for (const box of [".ac-form > .ac-seg", ".ac-dialog__body > .ac-seg", ".ac-seg--block"])
+      expect(rule(box)).toContain("display: flex;");
+    render(<Segmented block label="Vista" value="a" onValueChange={() => {}} options={[{ value: "a", label: "A" }]} />);
+    expect(screen.getByRole("radiogroup", { name: "Vista" }).className).toContain("ac-seg--block");
+  });
+
   test('nothing stacks on a class with no rule: `className="stack"` once left a form with no gaps at all', () => {
     const uses = ["apps/web/src", "packages/ui/src"]
       .flatMap((d) => sources(join(ROOT, d)))

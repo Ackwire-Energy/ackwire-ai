@@ -317,15 +317,17 @@ function AddAccountFlow({
           if (valid && ready && !loading) void send();
         }}
       />
-      <View style={styles.send}>
-        <Button
-          variant="primary"
-          wide
-          label={t("agentPage.work.brain.add.send", { computer })}
-          disabled={!valid || !ready || loading}
-          onPress={() => void send()}
-        />
-      </View>
+      {code.trim() || !ready ? (
+        <View style={styles.send}>
+          <Button
+            variant="primary"
+            wide
+            label={t("agentPage.work.brain.add.send", { computer })}
+            disabled={!valid || !ready || loading}
+            onPress={() => void send()}
+          />
+        </View>
+      ) : null}
       {sendFailed ? (
         <Note icon="x" live>
           {sendFailed === "away"

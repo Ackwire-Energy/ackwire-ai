@@ -1183,7 +1183,6 @@ a.mi-pr:hover {
   color: var(--faint);
 }
 .mi-notes {
-  margin-top: 12px;
   padding: 10px 12px;
   border-radius: 14px;
   background: var(--sunken);
@@ -1191,17 +1190,6 @@ a.mi-pr:hover {
   color: var(--ink2);
 }
 .mi-notes .ac-icon {
-  color: var(--faint);
-}
-.mi-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 12px;
-}
-.mi-field__label {
-  font-size: 12.5px;
-  font-weight: 650;
   color: var(--faint);
 }
 .mi-grid2 {
@@ -1719,8 +1707,9 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 .mi-cfg__body {
   padding-bottom: 8px;
 }
+.mi-cfg__body .ac-setsec > .ac-field,
 .mi-cfg__computer {
-  margin-top: 8px;
+  margin-top: var(--form-gap);
 }
 .mi-cfg__foot {
   display: flex;

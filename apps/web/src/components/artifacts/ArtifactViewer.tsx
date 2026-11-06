@@ -11,6 +11,7 @@ import {
   cx,
   DetailsDialog,
   Field,
+  FormActions,
   Icon,
   Input,
   Locked,
@@ -316,8 +317,7 @@ function Editor({ artifact, onDone }: { artifact: ArtifactDetail; onDone: (saved
   const [stale, setStale] = useState(false);
   return (
     <form
-      className="stack-4"
-      style={{ gap: 12 }}
+      className="ac-form"
       onSubmit={(e) => {
         e.preventDefault();
         save.mutate(
@@ -367,14 +367,14 @@ function Editor({ artifact, onDone }: { artifact: ArtifactDetail; onDone: (saved
           </div>
         </div>
       )}
-      <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+      <FormActions>
         <Button type="button" onClick={() => onDone(false)}>
           {t("artifacts.cancel")}
         </Button>
         <Button type="submit" variant="primary" disabled={stale} loading={save.isPending}>
           {t("artifacts.save")}
         </Button>
-      </div>
+      </FormActions>
     </form>
   );
 }
