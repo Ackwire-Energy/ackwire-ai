@@ -135,7 +135,15 @@ export function ReplyChips({ message }: { message: Message }) {
 }
 
 /** The team on a card or a template: a row per agent, the routines, the skills and what waits for approval. */
-export function TeamPlanBody({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (agent: TeamAgentDraft) => void }) {
+export function TeamPlanBody({
+  plan,
+  onAdjust,
+  locked,
+}: {
+  plan: TeamPlan;
+  onAdjust?: (agent: TeamAgentDraft) => void;
+  locked?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -163,6 +171,7 @@ export function TeamPlanBody({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a
                 size="sm"
                 variant="ghost"
                 aria-label={t("teamPlan.card.adjustName", { name: a.name })}
+                disabled={locked}
                 onClick={() => onAdjust(a)}
               >
                 {t("teamPlan.card.adjust")}
@@ -278,7 +287,7 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
           lead={plan.lead || names}
           body={
             <>
-              <TeamPlanBody plan={plan} onAdjust={decides ? setAdjusting : undefined} />
+              <TeamPlanBody plan={plan} onAdjust={decides ? setAdjusting : undefined} locked={busy} />
               {card.error && (
                 <p className="rq__error" role="alert">
                   {teamFailureText(t, card.error, i18n.language)}
@@ -324,7 +333,6 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
           }
           end={<span className="small muted">{countsText(t, plan)}</span>}
           what={names}
-          locked={busy}
         />
         {adjusting && (
           <AdjustDialog

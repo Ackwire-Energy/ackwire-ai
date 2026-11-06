@@ -445,8 +445,14 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
     deny.mutate(
       { id: denying.id, reason: reason.trim() || undefined },
       {
-        onSuccess: () => toast.show(t("members.requests.denied")),
-        onSettled: () => setDenying(null),
+        onSuccess: () => {
+          toast.show(t("members.requests.denied"));
+          setDenying(null);
+        },
+        // Any other failure keeps the dialog: the reason stays there to send again.
+        onError: (e) => {
+          if (errorCode(e) === "join.answered") setDenying(null);
+        },
       },
     );
   };
@@ -541,11 +547,18 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
         closeLabel={t("common.close")}
         width={440}
       >
-        <DialogBody>
-          <Field label={t("members.requests.reason")} id="join-deny-reason" help={t("members.requests.reasonHelp")}>
-            <Textarea rows={3} maxLength={JOIN_REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} />
-          </Field>
-        </DialogBody>
+        <Locked when={deny.isPending}>
+          <DialogBody>
+            <Field label={t("members.requests.reason")} id="join-deny-reason" help={t("members.requests.reasonHelp")}>
+              <Textarea
+                rows={3}
+                maxLength={JOIN_REASON_MAX}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={() => setDenying(null)}>{t("common.cancel")}</Button>
           <Button variant="danger" loading={deny.isPending} onClick={denyOne}>

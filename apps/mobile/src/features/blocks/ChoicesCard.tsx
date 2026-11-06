@@ -11,7 +11,7 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Icon, Locked, Sky, Text, useToast } from "@/ui";
+import { Icon, Sky, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
@@ -147,7 +147,8 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
       <Text variant="body" style={styles.question}>
         {q.question}
       </Text>
-      <Locked when={answer.isPending} style={styles.options}>
+      {/* Not `Locked`: it closes the keyboard, and in a conversation that's the composer's. */}
+      <View style={[styles.options, answer.isPending && styles.sending]}>
         {q.options.map((o, i) => {
           const on = d.picks[d.step] === i;
           return (
@@ -184,7 +185,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             </Pressable>
           );
         })}
-      </Locked>
+      </View>
       {questions.length > 1 ? (
         <View style={[styles.foot, { borderTopColor: c.line2 }]}>
           <Pressable
@@ -246,6 +247,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   question: { paddingHorizontal: 14, paddingTop: 6 },
   options: { gap: 6, padding: 14, paddingTop: 10 },
+  sending: { opacity: 0.6 },
   option: {
     flexDirection: "row",
     alignItems: "flex-start",

@@ -34,6 +34,18 @@ describe("a form that is sending turns its controls off", () => {
     expect(card.indexOf("</Locked>")).toBeLessThan(card.indexOf('label={t("secret.send")}'));
   });
 
+  test("fixing a memory locks its text while it saves", () => {
+    const profile = read("features/agents/AgentProfileScreen.tsx");
+    expect(profile).toMatch(/<Locked when=\{action\.isPending\}>\s*<TextArea value=\{text\}/);
+  });
+
+  test("answering a choice card leaves the keyboard to the composer, which `Locked` would close", () => {
+    const card = read("features/blocks/ChoicesCard.tsx");
+    expect(card).not.toContain("<Locked");
+    expect(card).toContain("disabled={answer.isPending}");
+    expect(card).toContain("answer.isPending && styles.sending");
+  });
+
   test("signing in locks the field while the answer is on its way", () => {
     const flow = read("features/auth/AuthFlow.tsx");
     expect(flow).toContain("<Locked when={pending}");

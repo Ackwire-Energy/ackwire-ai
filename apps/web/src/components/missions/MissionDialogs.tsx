@@ -811,13 +811,15 @@ function JoinRequests({ mission, enabled }: { mission: Mission; enabled: boolean
             <span className="mi-person__name">{r.name}</span>
             <span className="mi-person__actions">
               <div style={{ width: 150 }}>
-                <Select
-                  size="sm"
-                  aria-label={t("missions.join.roleOf", { name: r.name })}
-                  value={roles[r.userId] ?? "comment"}
-                  onValueChange={(v) => setRoles((prev) => ({ ...prev, [r.userId]: v }))}
-                  options={roleOptions}
-                />
+                <Locked when={decide.isPending}>
+                  <Select
+                    size="sm"
+                    aria-label={t("missions.join.roleOf", { name: r.name })}
+                    value={roles[r.userId] ?? "comment"}
+                    onValueChange={(v) => setRoles((prev) => ({ ...prev, [r.userId]: v }))}
+                    options={roleOptions}
+                  />
+                </Locked>
               </div>
               <Button
                 size="sm"

@@ -182,6 +182,7 @@ export function ImageCropDialog({
       onClose();
     },
   });
+  const busy = save.isPending || remove.isPending;
   const zoomBy = (d: number) =>
     setCrop((c) => clampCrop({ ...c, zoom: Math.min(MAX_ZOOM, Math.max(1, c.zoom + d)) }, size.w, size.h));
   const scale = coverScale(size.w, size.h) * crop.zoom;
@@ -195,7 +196,7 @@ export function ImageCropDialog({
       closeLabel={t("common.close")}
       width={420}
     >
-      <Locked when={save.isPending || remove.isPending}>
+      <Locked when={busy}>
         <DialogBody>
           <input
             ref={input}
@@ -212,6 +213,7 @@ export function ImageCropDialog({
                 role="img"
                 aria-label={t("photo.preview")}
                 onPointerDown={(e: PointerEvent<HTMLDivElement>) => {
+                  if (busy) return;
                   drag.current = { x: e.clientX, y: e.clientY, crop };
                   e.currentTarget.setPointerCapture?.(e.pointerId);
                 }}
@@ -283,7 +285,7 @@ export function ImageCropDialog({
               onDrop={(e) => {
                 e.preventDefault();
                 setOver(false);
-                void choose(e.dataTransfer?.files?.[0]);
+                if (!busy) void choose(e.dataTransfer?.files?.[0]);
               }}
             >
               {placeholder}

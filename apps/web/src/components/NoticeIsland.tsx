@@ -334,20 +334,21 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
           <>
             {typing && target ? (
               <form className="ni__reply" onSubmit={submit}>
-                <input
-                  ref={input}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      e.stopPropagation();
-                      setTyping(false);
-                    }
-                  }}
-                  placeholder={t("island.placeholder")}
-                  aria-label={t("island.reply")}
-                  disabled={reply.isPending}
-                />
+                <Locked when={reply.isPending}>
+                  <input
+                    ref={input}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.stopPropagation();
+                        setTyping(false);
+                      }
+                    }}
+                    placeholder={t("island.placeholder")}
+                    aria-label={t("island.reply")}
+                  />
+                </Locked>
                 <Button
                   type="submit"
                   variant="primary"

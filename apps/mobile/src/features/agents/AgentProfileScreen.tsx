@@ -44,6 +44,7 @@ import {
   Icon,
   IconButton,
   type IconName,
+  Locked,
   PixelOrbit,
   ProviderLogo,
   Row,
@@ -876,7 +877,9 @@ export function MemoryFix({
   return (
     <>
       <SheetTitle title={t(`mobile.intentAgents.fix.title${g}`, { name: agentName })} />
-      <TextArea value={text} onChangeText={setText} autoFocus maxLength={8000} />
+      <Locked when={action.isPending}>
+        <TextArea value={text} onChangeText={setText} autoFocus maxLength={8000} />
+      </Locked>
       <View style={styles.src}>
         <Icon name="chat" size={14} color={c.muted} />
         <Text variant="small" tone="muted" numberOfLines={1} style={styles.grow}>

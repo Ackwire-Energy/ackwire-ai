@@ -557,7 +557,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   white-space: pre-wrap;
 }
 /* Under the request card's well, on its 4px grid. */
-.rq > .waitcard__lines {
+.rq > .ac-locked > .waitcard__lines {
   margin-top: 12px;
 }
 
@@ -1236,7 +1236,8 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   color: var(--ink);
 }
 /* What a form brings of its own to a `Locked`, outside the kit's disabled looks. */
-.ac-locked:disabled :is(button, input, textarea):not([class^="ac-"], [class*=" ac-"], .ac-input-affix input) {
+.ac-locked:disabled :is(button, input, textarea):not([class^="ac-"], [class*=" ac-"], .ac-input-affix input),
+.ac-locked:disabled :is(.ac-recur__day, .ac-token__remove, .ac-searchfield__clear, .ac-setmore__toggle) {
   cursor: not-allowed;
   opacity: 0.6;
 }

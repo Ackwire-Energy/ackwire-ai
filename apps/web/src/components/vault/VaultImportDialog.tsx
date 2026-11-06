@@ -114,7 +114,7 @@ export function VaultImportDialog({
     if (!hasFiles(e.dataTransfer)) return false;
     e.preventDefault();
     e.stopPropagation();
-    return true;
+    return !importer.busy;
   };
 
   return (

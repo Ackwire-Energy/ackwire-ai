@@ -70,9 +70,21 @@ export function useDontRun(runId: string | null) {
   return { run, pending };
 }
 
-export function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
+export function DontRunButton({
+  runId,
+  may,
+  count = 1,
+  state,
+}: {
+  runId: string | null;
+  may: boolean;
+  count?: number;
+  /** A card that locks its other buttons on it keeps the state itself. */
+  state?: ReturnType<typeof useDontRun>;
+}) {
   const { t } = useTranslation();
-  const dontRun = useDontRun(runId);
+  const own = useDontRun(runId);
+  const dontRun = state ?? own;
   if (!runId) return null;
   return (
     <TextAction
@@ -185,6 +197,7 @@ export function UsagePauseCardView({ message, card }: { message: Message; card: 
   const api = useApi();
   const toast = useToast();
   const [pending, setPending] = useState(false);
+  const dontRun = useDontRun(card.runId);
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const { title, line } = usagePauseText(t, i18n.language, card, name);
@@ -219,7 +232,7 @@ export function UsagePauseCardView({ message, card }: { message: Message; card: 
       ) : (
         <>
           <span className="small muted">{line}</span>
-          <Locked when={pending}>
+          <Locked when={pending || dontRun.pending}>
             <span className="waitcard__acts">
               <Button
                 size="sm"
@@ -235,7 +248,7 @@ export function UsagePauseCardView({ message, card }: { message: Message; card: 
               >
                 {t("usageCard.continue")}
               </Button>
-              <DontRunButton runId={card.runId} may={may} />
+              <DontRunButton runId={card.runId} may={may} state={dontRun} />
               {!may && <span className="small muted">{t("usageCard.forbidden")}</span>}
             </span>
           </Locked>
