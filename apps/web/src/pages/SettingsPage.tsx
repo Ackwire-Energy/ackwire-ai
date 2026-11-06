@@ -973,6 +973,7 @@ export function KeyDialog({
               <Field label={t("settings.keyLabel")} id="key-label">
                 <Input
                   value={label}
+                  disabled={pending}
                   onChange={(e) => setLabel(e.target.value)}
                   placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
                 />
@@ -989,6 +990,7 @@ export function KeyDialog({
                 autoComplete="off"
                 placeholder={providerOf(provider)?.placeholder}
                 value={apiKey}
+                disabled={pending}
                 onChange={(e) => setApiKey(e.target.value)}
               />
             </Field>
@@ -1003,6 +1005,7 @@ export function KeyDialog({
               >
                 <Input
                   value={workspaceId}
+                  disabled={pending}
                   onChange={(e) => setWorkspaceId(e.target.value)}
                   placeholder={t("settings.workspaceIdPlaceholder")}
                   autoComplete="off"
@@ -1011,7 +1014,9 @@ export function KeyDialog({
             )}
           </DialogBody>
           <DialogFooter>
-            <Button onClick={onClose}>{t("common.cancel")}</Button>
+            <Button onClick={onClose} disabled={pending}>
+              {t("common.cancel")}
+            </Button>
             <Button type="submit" variant="primary" disabled={pending}>
               {mode === "rotate" ? t("settings.rotate") : t("settings.saveKey")}
             </Button>

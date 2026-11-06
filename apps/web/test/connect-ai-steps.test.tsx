@@ -1030,6 +1030,18 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.textContent).toContain("Salva. Todo agente sem plano pensa com ela.");
   });
 
+  test("while a key saves, nothing that belongs to it moves: the way to pay, its maker, the field", async () => {
+    const { api, dialog, choose } = await connect();
+    api.agents.addCredential = () => new Promise(() => {});
+    await choose("Chave de API");
+    const panel = within(dialog).getByRole("region", { name: "Chave de API" });
+    await type(within(panel).getByLabelText("Cole aqui"), "sk-ant-api03-abcdefghijklmnop");
+    await click(within(panel).getByRole("button", { name: "Salvar chave" }));
+    expect(within(panel).getByLabelText<HTMLInputElement>("Cole aqui").disabled).toBe(true);
+    expect(aiSelect(dialog, "Provedor").hasAttribute("disabled")).toBe(true);
+    expect(payWith(dialog, "Com um plano").hasAttribute("disabled")).toBe(true);
+  });
+
   test("a sign-in started once the computer is ready is stopped on that computer when its panel goes", async () => {
     const workspace: AiComputer = { ...MAC, machineId: "managed_1", name: "Computador da Acme" };
     const { state, api, machines, dialog, choose, services } = await connect({

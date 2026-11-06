@@ -83,7 +83,7 @@ import { PickList } from "../shared/PickList";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { EndpointForm } from "./EndpointForm";
-import { existingRows, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
+import { existingRows, type FlowView, flowBack, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
 import { useAiOrg } from "./org";
 import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
 
@@ -178,14 +178,6 @@ export function useGatesWithoutAgent(orgId: string, on: boolean) {
 }
 
 type GatesWithoutAgent = ReturnType<typeof useGatesWithoutAgent>;
-
-/** Where the flow is: the first page, the plans, one plan's page, the API key's, or that key's makers. */
-export type FlowView =
-  | { page: "home" }
-  | { page: "plans" }
-  | { page: "plan"; choice: PlanChoice }
-  | { page: "key" }
-  | { page: "makers" };
 
 /** The page an intent opens on (a message that asked for a plan or a key). */
 export const viewOf = (choice: AiChoice | null): FlowView =>
@@ -351,7 +343,7 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
       go({ page: "plan", choice });
     }
   };
-  const to: FlowView | null = view.page === "home" ? null : view.page === "makers" ? { page: "key" } : { page: "home" };
+  const to = flowBack(view, login !== null);
   const title =
     view.page === "home"
       ? (sheetTitle ?? t("connectAi.title.any"))
@@ -1191,6 +1183,7 @@ function KeyPage({
                 label={t("connectAi.key.paste")}
                 placeholder={maker.placeholder}
                 secret
+                disabled={form.saving}
                 onSubmit={() => {
                   setTouched(true);
                   if (valid && keyButton) onSaveKey?.();

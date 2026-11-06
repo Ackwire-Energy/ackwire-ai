@@ -15,6 +15,7 @@ import {
   accountSaved,
   agentAccounts,
   existingRows,
+  flowBack,
   modelInput,
   modelRows,
   modelSections,
@@ -987,5 +988,17 @@ describe("Seus planos' rows", () => {
     const row = readFileSync(join(import.meta.dir, "../../src/ui/Row.tsx"), "utf8");
     expect(row).toContain("padding: 14,");
     expect(row).not.toContain("paddingVertical");
+  });
+});
+
+describe("Back in Connect an AI", () => {
+  test("a plan picked from the list goes back to the list, a sign-in from a row of what the person has to that row", () => {
+    const plan = { page: "plan", choice: "chatgpt" } as const;
+    expect(flowBack(plan, false)).toEqual({ page: "plans" });
+    expect(flowBack(plan, true)).toEqual({ page: "home" });
+    expect(flowBack({ page: "plans" }, false)).toEqual({ page: "home" });
+    expect(flowBack({ page: "makers" }, false)).toEqual({ page: "key" });
+    expect(flowBack({ page: "key" }, false)).toEqual({ page: "home" });
+    expect(flowBack({ page: "home" }, false)).toBeNull();
   });
 });

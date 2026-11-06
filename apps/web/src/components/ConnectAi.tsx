@@ -366,6 +366,7 @@ function ConnectAiDialog({
                 setPickedTarget(defaultTarget({ agents, hasAi, set: setOf(next) }));
             }}
             dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
+            busy={add.isPending}
             keySelect={
               mayAddKey &&
               !keySaved && (

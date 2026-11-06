@@ -14,7 +14,8 @@ import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { Button, SheetScreen } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
-import { ConnectAiFlow, type FlowView, viewOf } from "./ConnectAiSteps";
+import { ConnectAiFlow, viewOf } from "./ConnectAiSteps";
+import type { FlowView } from "./logic";
 import { openPage } from "./parts";
 
 /**

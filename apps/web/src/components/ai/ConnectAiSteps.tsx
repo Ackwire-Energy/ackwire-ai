@@ -180,6 +180,7 @@ export function AiPicker({
   panel,
   have,
   keySelect,
+  busy = false,
 }: {
   choice: AiChoice | null;
   onPick: (choice: AiChoice) => void;
@@ -187,6 +188,8 @@ export function AiPicker({
   panel: ReactNode;
   have?: (panel: ReactNode) => ReactNode;
   keySelect?: ReactNode;
+  /** A key is saving: the choice waits for it. */
+  busy?: boolean;
 }) {
   const { t } = useTranslation();
   // Back from the key, the plan it left.
@@ -199,6 +202,7 @@ export function AiPicker({
       <Segmented
         className="ai-picker__pay"
         label={t("connectAi.pay.label")}
+        disabled={busy}
         value={choice === "key" ? "key" : "plan"}
         onValueChange={(next) => onPick(next === "key" ? "key" : lastPlan.current)}
         options={[
@@ -1378,6 +1382,7 @@ export function KeyPanel({
                 placeholder={maker.placeholder}
                 value={apiKey}
                 invalid={wrong}
+                disabled={saving}
                 onChange={(e) => onDraft({ provider, apiKey: e.target.value })}
                 onBlur={() => setTouched(true)}
                 onKeyDown={(e) => {
