@@ -438,7 +438,7 @@ const opened = (socket: WebSocket) =>
   });
 
 /** The person's realtime socket, ready: what it got, and a wait for one frame. */
-async function realtimeSocket(port: number, cookie: string, orgId: string) {
+async function realtimeSocket(port: number | undefined, cookie: string, orgId: string) {
   const frames: Record<string, unknown>[] = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/api/ws?orgId=${orgId}`, {
     headers: { cookie, origin: ORIGIN },
@@ -454,7 +454,7 @@ async function realtimeSocket(port: number, cookie: string, orgId: string) {
 }
 
 /** A view's frame socket: the frames it got as bytes, and how it closed. */
-function frameSocket(port: number, ticket: string) {
+function frameSocket(port: number | undefined, ticket: string) {
   const got: Uint8Array[] = [];
   const socket = new WebSocket(`ws://127.0.0.1:${port}/api/browser/frames?ticket=${ticket}`);
   socket.binaryType = "arraybuffer";

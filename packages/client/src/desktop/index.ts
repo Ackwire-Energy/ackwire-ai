@@ -204,9 +204,11 @@ export function desktopSocketUrl(
   base: SocketBase,
   v: { orgId: string; agentId: string; mode: DesktopMode; switches?: boolean; preview?: boolean },
 ) {
-  const params = v.preview
-    ? { orgId: v.orgId, agentId: v.agentId, preview: 1, mode: "watch" }
-    : { orgId: v.orgId, agentId: v.agentId, ...(v.switches ? { switch: 1 } : {}), mode: v.mode };
+  // In this order, one key at a time: an optional key may not be undefined in the address's parameters.
+  const params: Record<string, string | number> = { orgId: v.orgId, agentId: v.agentId };
+  if (v.preview) params.preview = 1;
+  else if (v.switches) params.switch = 1;
+  params.mode = v.preview ? "watch" : v.mode;
   return socketUrl(base, "/api/desktop", params);
 }
 
