@@ -2998,6 +2998,24 @@
     "dmLabel": "Bericht van {{author}} in het DM met {{name}}",
     "noAccess": "Bericht zonder toegang"
   },
+  "linkPills": {
+    "document": "Document",
+    "spreadsheet": "Spreadsheet",
+    "presentation": "Presentatie",
+    "file": "Bestand",
+    "folder": "Map",
+    "customer": "Klant",
+    "payment": "Betaling",
+    "invoice": "Factuur",
+    "subscription": "Abonnement",
+    "pull": "Pull request",
+    "merge": "Merge request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Meer tonen",
+    "less": "Minder tonen"
+  },
   "secret": {
     "group": "Geheim verzoek van {{agent}}",
     "chip": "Wacht",

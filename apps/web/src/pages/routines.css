@@ -671,10 +671,10 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.routine-runs__item small {
-  display: block;
+.routine-runs__words {
   margin-top: 1px;
   font-size: 13px;
+  line-height: 1.5;
   color: var(--muted);
 }
 .routine-runs__item time {

@@ -3034,6 +3034,26 @@ export const en = {
     dmLabel: "Message from {{author}} in the DM with {{name}}",
     noAccess: "Message you can't see",
   },
+  /** A bare address of a known service in a message, as a pill. The words stand in for a title the address doesn't have. */
+  linkPills: {
+    document: "Document",
+    spreadsheet: "Spreadsheet",
+    presentation: "Presentation",
+    file: "File",
+    folder: "Folder",
+    customer: "Customer",
+    payment: "Payment",
+    invoice: "Invoice",
+    subscription: "Subscription",
+    pull: "Pull request",
+    merge: "Merge request",
+    issue: "Issue",
+  },
+  /** A long text an agent wrote, folded on a page: a run's record, a mission's summary. */
+  folded: {
+    more: "Show more",
+    less: "Show less",
+  },
   secret: {
     group: "Secret request from {{agent}}",
     chip: "Waiting",

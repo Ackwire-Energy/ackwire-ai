@@ -2984,6 +2984,24 @@
     "dmLabel": "{{name}} ile doğrudan mesajda {{author}} tarafından gönderilen mesaj",
     "noAccess": "Erişiminiz olmayan mesaj"
   },
+  "linkPills": {
+    "document": "Belge",
+    "spreadsheet": "Hesap tablosu",
+    "presentation": "Sunum",
+    "file": "Dosya",
+    "folder": "Klasör",
+    "customer": "Müşteri",
+    "payment": "Ödeme",
+    "invoice": "Fatura",
+    "subscription": "Abonelik",
+    "pull": "Pull request",
+    "merge": "Merge request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Daha fazla göster",
+    "less": "Daha az göster"
+  },
   "secret": {
     "group": "{{agent}} ajanından gizli bilgi isteği",
     "chip": "Bekliyor",

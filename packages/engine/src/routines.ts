@@ -264,7 +264,7 @@ export interface RoutineRunView {
   finishedAt: string | null;
 }
 
-/** How much of a background run's record the views carry (the routine keeps it whole). */
+/** How much of a run's record a routine's list carries (`recentRuns`); its runs' own list has it whole. */
 const RECORD_EXCERPT = 500;
 
 /** How many recent runs each routine carries in the list (its run strip). */
@@ -674,7 +674,7 @@ function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRu
               : "waiting_plan"
             : run.code,
     ...(by ? { codeParams: { by } } : cause ? { codeParams: cause.errorParams } : {}),
-    summary: detailed && run.status !== "canceled" ? replyExcerpt(run.summary, RECORD_EXCERPT) : "",
+    summary: detailed && run.status !== "canceled" ? run.summary : "",
     brain: run.brain,
     link: link && run.messageId ? { ...link, messageId: run.messageId } : null,
     ...(status === "waiting" ? { approvalId } : {}),
@@ -691,10 +691,14 @@ function recentViews(runs: RunRow[], details: RunDetails, detailed: boolean): Ro
   const byCost = runs.some((r) => used(r).cost > 0);
   const amount = (r: RunRow) => (byCost ? used(r).cost : used(r).tokens);
   const max = Math.max(0, ...runs.map(amount));
-  return runs.map((r) => ({
-    ...runView(r, details, detailed),
-    weight: max > 0 ? Math.round((amount(r) / max) * 100) / 100 : 0,
-  }));
+  return runs.map((r) => {
+    const view = runView(r, details, detailed);
+    return {
+      ...view,
+      summary: replyExcerpt(view.summary, RECORD_EXCERPT),
+      weight: max > 0 ? Math.round((amount(r) / max) * 100) / 100 : 0,
+    };
+  });
 }
 
 /** The conversation a routine reports to (a channel, a thread's, a DM); null for DM and Drive routines. */

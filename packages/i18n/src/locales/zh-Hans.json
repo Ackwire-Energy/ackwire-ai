@@ -2888,6 +2888,24 @@
     "dmLabel": "{{author}} 在与 {{name}} 的私信中的消息",
     "noAccess": "无权查看的消息"
   },
+  "linkPills": {
+    "document": "文档",
+    "spreadsheet": "电子表格",
+    "presentation": "演示文稿",
+    "file": "文件",
+    "folder": "文件夹",
+    "customer": "客户",
+    "payment": "付款",
+    "invoice": "发票",
+    "subscription": "订阅",
+    "pull": "拉取请求",
+    "merge": "合并请求",
+    "issue": "议题"
+  },
+  "folded": {
+    "more": "显示更多",
+    "less": "收起"
+  },
   "secret": {
     "group": "来自 {{agent}} 的密钥请求",
     "chip": "等待中",

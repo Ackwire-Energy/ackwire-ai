@@ -7260,6 +7260,48 @@
   "messageRefs.noAccess": {
     "value": "Message you can't see"
   },
+  "linkPills.document": {
+    "value": "Document"
+  },
+  "linkPills.spreadsheet": {
+    "value": "Spreadsheet"
+  },
+  "linkPills.presentation": {
+    "value": "Presentation"
+  },
+  "linkPills.file": {
+    "value": "File"
+  },
+  "linkPills.folder": {
+    "value": "Folder"
+  },
+  "linkPills.customer": {
+    "value": "Customer"
+  },
+  "linkPills.payment": {
+    "value": "Payment"
+  },
+  "linkPills.invoice": {
+    "value": "Invoice"
+  },
+  "linkPills.subscription": {
+    "value": "Subscription"
+  },
+  "linkPills.pull": {
+    "value": "Pull request"
+  },
+  "linkPills.merge": {
+    "value": "Merge request"
+  },
+  "linkPills.issue": {
+    "value": "Issue"
+  },
+  "folded.more": {
+    "value": "Show more"
+  },
+  "folded.less": {
+    "value": "Show less"
+  },
   "secret.group": {
     "value": "Secret request from {{agent}}"
   },

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { linkPill } from "@agenteschat/client/lib/link-pills";
 import { messagePath, parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { messageRefWords, parseInline } from "../../src/features/chat/logic";
 import { messageRefHref } from "../../src/features/links/app-links";
@@ -46,5 +47,20 @@ describe("a message link in the phone's chat", () => {
     expect(href.startsWith("/link?")).toBe(true);
     expect(href).toContain(`org=${other}`);
     expect(decodeURIComponent(href)).toContain(`/chat/${CH}?m=${M}`);
+  });
+});
+
+describe("a link pill on the phone (`Spans`: a link whose words are its address)", () => {
+  const PR = "https://github.com/agentes-chat/agentes.chat/pull/148";
+  const bare = (text: string) =>
+    parseInline(text).flatMap((s) => (s.kind === "link" && s.text === s.href ? [linkPill(s.href)?.ref] : []));
+
+  test("a bare address, also before a sentence's end, and one written as its own link's words", () => {
+    expect(bare(`Veja ${PR}.`)).toEqual(["#148"]);
+    expect(bare(`[${PR}](${PR})`)).toEqual(["#148"]);
+  });
+
+  test("a link with its own words stays as written", () => {
+    expect(bare(`[o PR de ontem](${PR})`)).toEqual([]);
   });
 });

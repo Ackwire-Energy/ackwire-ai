@@ -116,6 +116,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { FoldedBody } from "@/chat/FoldedBody";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { CancelAhead } from "@/components/ApprovalItem";
 import { AskAgentButton } from "@/components/AskAgentButton";
@@ -1868,7 +1869,7 @@ function RunItem({ run: x, routine: r }: { run: RoutineRun; routine: Routine }) 
       <span className={`routine-runs__node routine-runs__node--${pixel ?? "running"}`}>
         <Icon name={pixel ? RUN_NODE_ICON[pixel] : isRunAtWork(x.status) ? "play" : "dash"} size={14} />
       </span>
-      <span>
+      <div>
         {x.status === "waiting" && x.approvalId ? (
           <DetailsLink item={{ kind: "approval", id: x.approvalId }} className="routine-runs__link">
             {outcome}
@@ -1876,9 +1877,13 @@ function RunItem({ run: x, routine: r }: { run: RoutineRun; routine: Routine }) 
         ) : (
           <b>{outcome}</b>
         )}
-        {words && <small>{words}</small>}
+        {words && (
+          <div className="routine-runs__words">
+            <FoldedBody body={words} />
+          </div>
+        )}
         <RunChatLink run={x} />
-      </span>
+      </div>
       <time dateTime={x.at}>{whenAt(t, i18n.language, x.at)}</time>
     </li>
   );

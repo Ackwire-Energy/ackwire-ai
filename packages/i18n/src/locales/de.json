@@ -2997,6 +2997,24 @@
     "dmLabel": "Nachricht von {{author}} in der Direktnachricht mit {{name}}",
     "noAccess": "Nachricht ohne Zugriff"
   },
+  "linkPills": {
+    "document": "Dokument",
+    "spreadsheet": "Tabelle",
+    "presentation": "Präsentation",
+    "file": "Datei",
+    "folder": "Ordner",
+    "customer": "Kunde",
+    "payment": "Zahlung",
+    "invoice": "Rechnung",
+    "subscription": "Abonnement",
+    "pull": "Pull-Request",
+    "merge": "Merge-Request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Mehr anzeigen",
+    "less": "Weniger anzeigen"
+  },
   "secret": {
     "group": "Secret-Anfrage von {{agent}}",
     "chip": "Wartet",

@@ -152,6 +152,9 @@ export function webmailOf(
 }
 
 /** The text ended as a sentence: a full stop added unless it already ends with one, "!", "?" or "…". */
+/** Whether an agent's text is long enough to start folded on a page, in the app and on the phone. */
+export const foldsText = (text: string) => text.length > 320 || text.split("\n").length > 6;
+
 export const endSentence = (text: string) => (/[.!?…]$/.test(text) ? text : `${text}.`);
 
 /** `text` around the last `part` in it (a value put into a sentence): what comes before and after, or null. */

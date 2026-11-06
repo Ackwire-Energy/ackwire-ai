@@ -2887,6 +2887,24 @@
     "dmLabel": "{{name}}とのDMでの {{author}} のメッセージ",
     "noAccess": "アクセスできないメッセージ"
   },
+  "linkPills": {
+    "document": "ドキュメント",
+    "spreadsheet": "スプレッドシート",
+    "presentation": "プレゼンテーション",
+    "file": "ファイル",
+    "folder": "フォルダ",
+    "customer": "顧客",
+    "payment": "支払い",
+    "invoice": "請求書",
+    "subscription": "サブスクリプション",
+    "pull": "プルリクエスト",
+    "merge": "マージリクエスト",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "さらに表示",
+    "less": "表示を減らす"
+  },
   "secret": {
     "group": "{{agent}}からのシークレットのリクエスト",
     "chip": "待機中",

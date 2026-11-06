@@ -2898,6 +2898,24 @@
     "dmLabel": "Pesan dari {{author}} di DM dengan {{name}}",
     "noAccess": "Pesan tanpa akses"
   },
+  "linkPills": {
+    "document": "Dokumen",
+    "spreadsheet": "Spreadsheet",
+    "presentation": "Presentasi",
+    "file": "File",
+    "folder": "Folder",
+    "customer": "Pelanggan",
+    "payment": "Pembayaran",
+    "invoice": "Invoice",
+    "subscription": "Langganan",
+    "pull": "Pull request",
+    "merge": "Merge request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Tampilkan lebih banyak",
+    "less": "Tampilkan lebih sedikit"
+  },
   "secret": {
     "group": "Permintaan rahasia dari {{agent}}",
     "chip": "Menunggu",

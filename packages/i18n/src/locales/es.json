@@ -3095,6 +3095,24 @@
     "dmLabel": "Mensaje de {{author}} en el MD con {{name}}",
     "noAccess": "Mensaje sin acceso"
   },
+  "linkPills": {
+    "document": "Documento",
+    "spreadsheet": "Hoja de cálculo",
+    "presentation": "Presentación",
+    "file": "Archivo",
+    "folder": "Carpeta",
+    "customer": "Cliente",
+    "payment": "Pago",
+    "invoice": "Factura",
+    "subscription": "Suscripción",
+    "pull": "Pull request",
+    "merge": "Merge request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Mostrar más",
+    "less": "Mostrar menos"
+  },
   "secret": {
     "group": "Pedido de secreto de {{agent}}",
     "chip": "Esperando",

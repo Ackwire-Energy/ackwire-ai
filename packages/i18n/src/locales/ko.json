@@ -2885,6 +2885,24 @@
     "dmLabel": "{{name}}과(와)의 DM에 있는 {{author}} 메시지",
     "noAccess": "볼 수 없는 메시지"
   },
+  "linkPills": {
+    "document": "문서",
+    "spreadsheet": "스프레드시트",
+    "presentation": "프레젠테이션",
+    "file": "파일",
+    "folder": "폴더",
+    "customer": "고객",
+    "payment": "결제",
+    "invoice": "인보이스",
+    "subscription": "구독",
+    "pull": "풀 리퀘스트",
+    "merge": "머지 리퀘스트",
+    "issue": "이슈"
+  },
+  "folded": {
+    "more": "더 보기",
+    "less": "간단히 보기"
+  },
   "secret": {
     "group": "{{agent}}의 비밀 정보 요청",
     "chip": "대기 중",

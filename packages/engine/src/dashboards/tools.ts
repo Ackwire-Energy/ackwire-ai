@@ -591,7 +591,7 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
         }
         return {
           content:
-            "Updated: the widget shows it now. Finish now with a one-line record of what you checked (it is not posted).",
+            "Updated: the widget shows it now. Finish now with a one-line record of what you checked (it is not posted), with no title or label.",
           data: { widget: { id: view.id, status: view.status } },
         };
       } catch (error) {

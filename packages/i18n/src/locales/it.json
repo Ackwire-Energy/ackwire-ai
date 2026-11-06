@@ -3099,6 +3099,24 @@
     "dmLabel": "Messaggio di {{author}} nel messaggio diretto con {{name}}",
     "noAccess": "Messaggio non accessibile"
   },
+  "linkPills": {
+    "document": "Documento",
+    "spreadsheet": "Foglio di calcolo",
+    "presentation": "Presentazione",
+    "file": "File",
+    "folder": "Cartella",
+    "customer": "Cliente",
+    "payment": "Pagamento",
+    "invoice": "Fattura",
+    "subscription": "Abbonamento",
+    "pull": "Pull request",
+    "merge": "Merge request",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "Mostra altro",
+    "less": "Mostra meno"
+  },
   "secret": {
     "group": "Richiesta di un segreto da {{agent}}",
     "chip": "In attesa",
