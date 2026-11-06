@@ -32,11 +32,22 @@ const click = async (el: Element) => {
   await settle(2);
 };
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-/** Radix tabs activate on mouse down. */
+/** Radix tabs activate on mouse down; the tabs not in the bar are in its "More" menu (opened on pointer down). */
 const openTab = async (name: RegExp) => {
   const tabs = screen().getByRole("tablist", { name: "Seções da Ada" });
-  await act(async () => fireEvent.mouseDown(within(tabs).getByRole("tab", { name }), { button: 0 }));
-  await settle(4);
+  const tab = within(tabs).queryByRole("tab", { name });
+  if (tab) {
+    await act(async () => fireEvent.mouseDown(tab, { button: 0 }));
+    await settle(4);
+    return;
+  }
+  await act(async () =>
+    fireEvent.pointerDown(within(tabs).getByRole("button", { name: /^Mais/ }), { button: 0, ctrlKey: false }),
+  );
+  await settle(2);
+  // Named by its button: "Mais", or "Mais 2" while those tabs hold unsaved changes.
+  await click(within(screen().getByRole("menu", { name: /^Mais/ })).getByRole("menuitem", { name }));
+  await settle(2);
 };
 const saveBar = () => screen().queryByRole("region", { name: "Alterações não salvas" });
 /** The hidden text of the ⓘ named `About <label>`. */
@@ -61,23 +72,36 @@ const updates = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2]);
 
 describe("agent page: tabs and the URL", () => {
-  test("eight tabs; the chosen one goes to ?tab=; a link opens a tab; the memory tab counts the proposal", async () => {
+  test("four tabs and More; the chosen one goes to ?tab=; a link opens a tab; the memory tab counts the proposal", async () => {
     const { router } = await go();
     const tabs = screen().getByRole("tablist", { name: "Seções da Ada" });
     expect(
       within(tabs)
         .getAllByRole("tab")
         .map((t) => t.textContent),
-    ).toEqual([
-      "Visão geral",
-      "Instruções",
-      "Ferramentas e acesso",
-      "Memória1",
-      "Arquivos",
-      "Uso",
-      "Atividade",
-      "Configurações",
-    ]);
+    ).toEqual(["Visão geral", "Instruções", "Memória1", "Atividade"]);
+    // The rest are in More; the one opened from there shows in the bar, and More keeps the others.
+    await openTab(/^Uso/);
+    expect(router.state.location.search).toMatchObject({ tab: "usage" });
+    expect(
+      within(screen().getByRole("tablist", { name: "Seções da Ada" }))
+        .getAllByRole("tab")
+        .map((t) => t.textContent),
+    ).toEqual(["Visão geral", "Instruções", "Memória1", "Atividade", "Uso"]);
+    await act(async () =>
+      fireEvent.pointerDown(
+        within(screen().getByRole("tablist", { name: "Seções da Ada" })).getByRole("button", { name: /^Mais/ }),
+        { button: 0, ctrlKey: false },
+      ),
+    );
+    await settle(2);
+    expect(
+      within(screen().getByRole("menu", { name: "Mais" }))
+        .getAllByRole("menuitem")
+        .map((m) => m.textContent),
+    ).toEqual(["Ferramentas e acesso", "Arquivos", "Configurações"]);
+    await act(async () => fireEvent.keyDown(screen().getByRole("menu", { name: "Mais" }), { key: "Escape" }));
+    await settle(2);
     expect(screen().getByRole("heading", { level: 1, name: "Ada" })).toBeTruthy();
     await openTab(/^Atividade/);
     expect(router.state.location.search).toMatchObject({ tab: "activity" });
@@ -97,17 +121,18 @@ describe("agent page: tabs and the URL", () => {
     expect(screen().getByRole("article", { name: "Atualizar as instruções da Ada" })).toBeTruthy();
   });
 
-  test("the cover with its actions; the agent, name and @ under it; Como trabalha with the numbers in the side column", async () => {
+  test("the cover with its actions; the face on its edge with the name and @ beside it; Como trabalha in the overview", async () => {
     await go();
     const hero = document.querySelector(".agp-hero") as HTMLElement;
     const cover = hero.querySelector(".agp-cover") as HTMLElement;
     // No status pill.
     expect(hero.textContent).not.toContain("Esperando aprovação");
     expect(hero.querySelector(".agp-face")).toBeTruthy();
-    // A wide page: how it works is the overview's side column, not under the name.
+    // How it works is the overview's Ficha, never under the name; its usage row says the money.
     const work = screen().getByRole("region", { name: "Como trabalha" });
     expect(hero.contains(work)).toBe(false);
-    expect(work.closest(".agp-aside")).toBeTruthy();
+    expect(work.closest(".agp-overview")).toBeTruthy();
+    expect(hero.querySelector(".agp-idrow .agp-face + .agp-ident")).toBeTruthy();
     expect(work.textContent).toContain("US$\u00a012,30");
     expect(work.textContent).toContain("de US$\u00a040");
     expect(within(cover).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
@@ -222,12 +247,44 @@ describe("agent page: its usage (ADR 0063)", () => {
 });
 
 describe("agent page: the budget on the overview", () => {
-  test("who thinks is under the name; the overview keeps the money, Mudar opens Orçamento", async () => {
+  test("the Ficha's budget row opens Orçamento in a dialog: Save saves it, Cancel puts it back", async () => {
+    const { state } = await go("?tab=overview");
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    await click(within(work).getByRole("button", { name: "Orçamento" }));
+    const dialog = screen().getByRole("dialog", { name: "Orçamento" });
+    await type(within(dialog).getByRole("textbox", { name: /^Orçamento mensal/ }), "55,5");
+    await click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    expect(screen().queryByRole("dialog", { name: "Orçamento" })).toBeNull();
+    expect(saveBar()).toBeNull();
+    await click(within(work).getByRole("button", { name: "Orçamento" }));
+    const again = screen().getByRole("dialog", { name: "Orçamento" });
+    await type(within(again).getByRole("textbox", { name: /^Orçamento mensal/ }), "55,5");
+    await click(within(again).getByRole("button", { name: "Salvar" }));
+    await settle(6);
+    expect(updates(state)).toEqual([{ monthlyBudgetUsd: 55.5 }]);
+    expect(screen().queryByRole("dialog", { name: "Orçamento" })).toBeNull();
+  });
+
+  test("the Ficha's rows open their dialogs: who answers, who may talk, channels, what it may use", async () => {
     const { router } = await go("?tab=overview");
-    expect(screen().queryByRole("region", { name: "Quem pensa e orçamento" })).toBeNull();
-    const card = screen().getByRole("region", { name: "Orçamento" });
-    await click(within(card).getByRole("button", { name: "Mudar" }));
-    expect(router.state.location.search).toMatchObject({ tab: "settings", sec: "budget" });
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    const team = screen().getByRole("region", { name: "Com quem" });
+    for (const [row, title] of [
+      ["Responsável", "Responsável"],
+      ["Quem pode falar", "Quem pode falar com a Ada"],
+      ["Canais", "Canais"],
+    ] as const) {
+      const button = within(team).getByRole("button", { name: row });
+      await click(button);
+      expect(button.getAttribute("data-open")).toBe("true");
+      const dialog = screen().getByRole("dialog", { name: title });
+      await click(within(dialog).getByRole("button", { name: "Cancelar" }));
+      expect(screen().queryByRole("dialog", { name: title })).toBeNull();
+    }
+    await click(within(work).getByRole("button", { name: "Pode usar" }));
+    const uses = screen().getByRole("dialog", { name: "Pode usar" });
+    await click(within(uses).getByRole("button", { name: "Mudar acessos" }));
+    expect(router.state.location.search).toMatchObject({ tab: "access" });
   });
 
   test("a member reads who thinks from the agent (no computer)", async () => {
@@ -276,9 +333,10 @@ describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () =
     expect(line(work)).toBe("Claude Team · semana 40% · 5h 12%");
     expect(within(work).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("40");
     expect(work.textContent).not.toMatch(/orçamento|US\$/);
-    // The side card: the same line, nothing called a budget, and the rest in Uso.
-    expect(screen().queryByRole("region", { name: "Orçamento" })).toBeNull();
-    const card = screen().getByRole("region", { name: "Uso" });
+    // Its row's dialog: the same line, nothing called a budget, and the rest in Uso.
+    expect(within(work).queryByRole("button", { name: "Orçamento" })).toBeNull();
+    await click(within(work).getByRole("button", { name: "Uso" }));
+    const card = screen().getByRole("dialog", { name: "Uso" });
     expect(line(card)).toBe("Claude Team · semana 40% · 5h 12%");
     expect(card.textContent).not.toMatch(/orçamento|US\$/);
     await click(within(card).getByRole("button", { name: "Ver tudo" }));
@@ -290,8 +348,9 @@ describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () =
     const work = screen().getByRole("region", { name: "Como trabalha" }).textContent ?? "";
     expect(work.indexOf("Claude Team · semana 40%")).toBeGreaterThanOrEqual(0);
     expect(work.indexOf("Claude Team · semana 40%")).toBeLessThan(work.indexOf("US$\u00a012,30 de US$\u00a040"));
-    const card = screen().getByRole("region", { name: "Uso" });
-    expect(card.textContent).toMatch(/^Uso.*Claude Team · semana 40% · 5h 12%.*US\$\u00a012,30 de US\$\u00a040 em /);
+    await click(screen().getByRole("button", { name: "Uso" }));
+    const card = screen().getByRole("dialog", { name: "Uso" });
+    expect(card.textContent).toMatch(/Claude Team · semana 40% · 5h 12%.*US\$\u00a012,30 de US\$\u00a040 em /);
   });
 
   test("on the API: the budget as before, and no plan line", async () => {
@@ -299,8 +358,8 @@ describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () =
     const work = screen().getByRole("region", { name: "Como trabalha" });
     expect(work.querySelector(".ac-planmeter")).toBeNull();
     expect(work.textContent).toContain("US$\u00a012,30");
-    expect(screen().getByRole("region", { name: "Orçamento" })).toBeTruthy();
-    expect(screen().queryByRole("region", { name: "Uso" })).toBeNull();
+    expect(within(work).getByRole("button", { name: "Orçamento" })).toBeTruthy();
+    expect(within(work).queryByRole("button", { name: "Uso" })).toBeNull();
   });
 
   test("a plan whose windows aren't known yet shows nothing rather than 0%", async () => {
@@ -308,8 +367,8 @@ describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () =
     const work = screen().getByRole("region", { name: "Como trabalha" });
     expect(work.querySelector(".ac-planmeter")).toBeNull();
     expect(work.textContent).not.toMatch(/orçamento|US\$/);
-    expect(screen().queryByRole("region", { name: "Uso" })).toBeNull();
-    expect(screen().queryByRole("region", { name: "Orçamento" })).toBeNull();
+    expect(within(work).queryByRole("button", { name: "Uso" })).toBeNull();
+    expect(within(work).queryByRole("button", { name: "Orçamento" })).toBeNull();
   });
 
   test("near the limit it says when the window renews", async () => {
@@ -318,7 +377,8 @@ describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () =
       windows: [{ kind: "five_hour", usedPercent: 92, resetsAt: new Date(Date.now() + 90 * 60_000).toISOString() }],
     };
     await go("", onPlan(0, almost));
-    const card = screen().getByRole("region", { name: "Uso" });
+    await click(screen().getByRole("button", { name: "Uso" }));
+    const card = screen().getByRole("dialog", { name: "Uso" });
     expect(line(card)).toBe("Claude Team · 5h 92%");
     expect(card.querySelector(".ac-planmeter__state")?.textContent).toMatch(
       /^Quase no limite · renova (\S+ )?às \d\d:\d\d$/,

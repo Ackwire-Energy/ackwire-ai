@@ -4477,6 +4477,12 @@ export const en = {
       usage: "Usage",
       activity: "Activity",
       settings: "Settings",
+      more: "More",
+    },
+    /** The overview's two lists of rows: how it works, then who it works with. */
+    ficha: {
+      with: "Who it works with",
+      computer: "Computer",
     },
     changed: "Changed",
     undo: "Undo",

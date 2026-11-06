@@ -4551,7 +4551,12 @@
       "files": "Archivos",
       "usage": "Uso",
       "activity": "Actividad",
-      "settings": "Configuración"
+      "settings": "Configuración",
+      "more": "Más"
+    },
+    "ficha": {
+      "with": "Con quién",
+      "computer": "Computadora"
     },
     "changed": "Cambiado",
     "undo": "Deshacer",

@@ -4291,7 +4291,12 @@
       "files": "文件",
       "usage": "用量",
       "activity": "动态",
-      "settings": "设置"
+      "settings": "设置",
+      "more": "更多"
+    },
+    "ficha": {
+      "with": "与谁合作",
+      "computer": "电脑"
     },
     "changed": "已更改",
     "undo": "撤销",

@@ -10753,6 +10753,15 @@
   "agentPage.tabs.settings": {
     "value": "Settings"
   },
+  "agentPage.tabs.more": {
+    "value": "More"
+  },
+  "agentPage.ficha.with": {
+    "value": "Who it works with"
+  },
+  "agentPage.ficha.computer": {
+    "value": "Computer"
+  },
   "agentPage.changed": {
     "value": "Changed"
   },

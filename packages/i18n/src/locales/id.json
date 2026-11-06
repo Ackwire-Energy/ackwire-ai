@@ -4276,7 +4276,12 @@
       "files": "File",
       "usage": "Pemakaian",
       "activity": "Aktivitas",
-      "settings": "Pengaturan"
+      "settings": "Pengaturan",
+      "more": "Lainnya"
+    },
+    "ficha": {
+      "with": "Bekerja dengan siapa",
+      "computer": "Komputer"
     },
     "changed": "Diubah",
     "undo": "Urungkan",

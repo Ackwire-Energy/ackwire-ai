@@ -4582,7 +4582,12 @@
       "files": "Fichiers",
       "usage": "Utilisation",
       "activity": "Activité",
-      "settings": "Paramètres"
+      "settings": "Paramètres",
+      "more": "Plus"
+    },
+    "ficha": {
+      "with": "Avec qui",
+      "computer": "Ordinateur"
     },
     "changed": "Modifié",
     "undo": "Annuler",

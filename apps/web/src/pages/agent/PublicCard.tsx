@@ -54,16 +54,20 @@ export function AgentPublicCard({
           <div className="agp-cover">
             <AgentCover color={(look?.color ?? "indigo") as AgentColor} busy={false} />
           </div>
-          <span className="agp-face">
-            <AgentAvatar agentId={agent.id} size="xl" name={agent.name} />
-          </span>
-          <div className="agp-ident">
-            <h1 className="agp-name">{agent.name}</h1>
-            <span className="agp-handle">
-              @{agent.handle}
-              {agent.role && ` · ${agent.role}`}
+          <div className="agp-idrow">
+            <span className="agp-face">
+              <AgentAvatar agentId={agent.id} size="xl" name={agent.name} />
             </span>
-            {tellsNameStory(agent) && <span className="small muted agp-story">{t("rightHand.profile.nameStory")}</span>}
+            <div className="agp-ident">
+              <h1 className="agp-name">{agent.name}</h1>
+              <span className="agp-handle">
+                @{agent.handle}
+                {agent.role && ` · ${agent.role}`}
+              </span>
+              {tellsNameStory(agent) && (
+                <span className="small muted agp-story">{t("rightHand.profile.nameStory")}</span>
+              )}
+            </div>
           </div>
         </section>
       </header>

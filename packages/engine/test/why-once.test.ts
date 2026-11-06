@@ -107,6 +107,7 @@ const invoke = async (name: string, input: Record<string, unknown>) => {
 };
 
 describe("one reason, `why`", () => {
+  // Many renders/tool calls in one test: over 5 s on a loaded CI runner, well under alone.
   test("every built-in sensitive tool and connected app's reaches its card with `why` and its required fields", async () => {
     const mcp = fakeGithubMcp();
     const deps = (): ConnectorDeps => ({
@@ -145,7 +146,7 @@ describe("one reason, `why`", () => {
       "github_merge_pull_request",
       "run_code",
     ]);
-  });
+  }, 15_000);
 
   test("a mailbox's sensitive tools too", async () => {
     m = await mailSetup();
