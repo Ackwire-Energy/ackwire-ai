@@ -79,7 +79,7 @@ for (const turn of TURNS) {
     if (turn.id === "block") {
       const show = last.tools?.find((t) => t.name === "show_block");
       expect(show?.description).toContain("Use it on your own whenever using something beats reading about it");
-      expect(`${show?.description}\n${results(last)}`).toContain("<ac-slider");
+      expect(`${show?.description}\n${results(last)}`).toContain('"type":"slider"');
     }
   }, 60_000);
 }

@@ -227,7 +227,7 @@ export function validateContent(raw: unknown): TextContent {
         }
         // Drawn once from its start: a formula that fails on the block's own data is the agent's to fix now.
         const failing = dryRunBlock(spec);
-        if (failing.length > 0) throw new ValidationError(failing.slice(0, 5).join("; "), "block.spec");
+        if (failing.length > 0) throw new ValidationError(failing.slice(0, 5).join(". "), "block.spec");
         return { kind: "block", spec, ...more };
       }
       if (typeof c.html !== "string" || !c.html.trim()) throw new ValidationError("a block needs a spec or html");
