@@ -164,7 +164,8 @@ export function ChartSheet() {
   );
 }
 
-function ChartView({
+/** The chart itself, with no card around it: a message's chart card, and a chart inside a live block (ADR 0113). */
+export function ChartView({
   spec,
   accent,
   big = false,

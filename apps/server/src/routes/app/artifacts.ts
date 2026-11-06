@@ -80,7 +80,17 @@ const Content = z
   .discriminatedUnion("kind", [
     ...textContents,
     FileContent,
-    z.object({ kind: z.literal("block"), html: z.string(), subtitle: z.string().optional() }),
+    z.object({
+      kind: z.literal("block"),
+      spec: z.record(z.string(), z.unknown()).optional().openapi({
+        description: "The block's parts, data and formulas, drawn by the apps (ADR 0113). Either this or html.",
+      }),
+      html: z
+        .string()
+        .optional()
+        .openapi({ description: "The agent's own page, which runs only when a person opens it. Either this or spec." }),
+      subtitle: z.string().optional(),
+    }),
     z.object({
       kind: z.literal("poll"),
       question: z.string(),

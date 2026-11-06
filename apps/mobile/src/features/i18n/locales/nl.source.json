@@ -83,6 +83,15 @@
   "blocks.wake": {
     "value": "Tap to open"
   },
+  "blocks.pageTitle": {
+    "value": "A block with its own code"
+  },
+  "blocks.pageBody": {
+    "value": "It runs apart from the app, with no access to your account or the internet."
+  },
+  "blocks.runPage": {
+    "value": "Open block"
+  },
   "blocks.goesTo": {
     "value": "Goes to {{name}}:"
   },

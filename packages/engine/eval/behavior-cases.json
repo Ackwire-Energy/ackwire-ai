@@ -2496,6 +2496,7 @@
       "skipJudge": ["looked_first", "next_step"],
       "mustCall": ["show_block"],
       "mustNotCall": ["create_artifact", "start_poll"],
+      "blockSpec": true,
       "behavior": "Lia shows a simulator with show_block, in her reply, with the Acme numbers as its starting values and a sentence saying what it is. No file."
     }
   },
@@ -2524,6 +2525,7 @@
       "skipJudge": ["looked_first", "next_step"],
       "mustCall": ["show_block"],
       "mustNotCall": ["create_artifact", "start_poll"],
+      "blockSpec": true,
       "behavior": "Lia shows the three plans in a block the person can filter and pick from, and the pick comes back to her through the block."
     }
   },
@@ -2552,7 +2554,66 @@
       "skipJudge": ["looked_first", "next_step"],
       "mustCall": ["show_block"],
       "mustNotCall": ["create_artifact"],
+      "blockSpec": true,
       "behavior": "Lia shows a short form with show_block whose answer comes back to her, instead of listing questions in text."
+    }
+  },
+  {
+    "id": "block-draw",
+    "title": "\"sorteia quem fecha a loja sábado\"",
+    "source": "synthetic (live blocks as parts, ADR 0113): a draw everyone sees land the same, made by the server",
+    "agent": {
+      "name": "Lia",
+      "role": "Finanças e operações",
+      "instructions": "Ajuda o time da Acme com números, comparações e decisões do dia a dia."
+    },
+    "org": {
+      "name": "Acme",
+      "context": "Acme é uma rede de três restaurantes em Curitiba. Fixo mensal por casa: R$ 42.000. Prato médio: R$ 58, custo do prato R$ 21, 26 dias abertos por mês. Faturamento de março: R$ 412.300; janeiro R$ 380.100, fevereiro R$ 365.900, abril R$ 428.700, maio R$ 441.000, junho R$ 436.200. Planos de internet na mesa: Essencial 300 Mega R$ 189, Equipe 600 Mega R$ 289, Empresa 1 Giga R$ 459. O time fala português."
+    },
+    "conversation": {
+      "where": "channel",
+      "trigger": {
+        "author": "Marina",
+        "body": "@lia sorteia quem fecha a loja do Batel no sábado: Ana, Bruno, Carla ou Dario. Quero que todo mundo aqui veja o resultado."
+      }
+    },
+    "blocks": true,
+    "expect": {
+      "skipJudge": ["looked_first", "next_step"],
+      "mustCall": ["show_block"],
+      "mustNotCall": ["create_artifact", "start_poll"],
+      "blockSpec": true,
+      "behavior": "Lia shows a block with the four names and a button that draws on the server, so everyone sees the same name; she never picks a name herself in the text."
+    }
+  },
+  {
+    "id": "block-filter",
+    "title": "\"quero ver o faturamento por mês e filtrar o semestre\"",
+    "source": "synthetic (live blocks as parts, ADR 0113): a view to filter, from the org's own numbers",
+    "agent": {
+      "name": "Lia",
+      "role": "Finanças e operações",
+      "instructions": "Ajuda o time da Acme com números, comparações e decisões do dia a dia."
+    },
+    "org": {
+      "name": "Acme",
+      "context": "Acme é uma rede de três restaurantes em Curitiba. Fixo mensal por casa: R$ 42.000. Prato médio: R$ 58, custo do prato R$ 21, 26 dias abertos por mês. Faturamento de março: R$ 412.300; janeiro R$ 380.100, fevereiro R$ 365.900, abril R$ 428.700, maio R$ 441.000, junho R$ 436.200. Planos de internet na mesa: Essencial 300 Mega R$ 189, Equipe 600 Mega R$ 289, Empresa 1 Giga R$ 459. O time fala português."
+    },
+    "conversation": {
+      "where": "dm",
+      "trigger": {
+        "author": "Marina",
+        "body": "Lia, me mostra o faturamento de janeiro a junho num gráfico e deixa eu escolher se vejo só o primeiro trimestre, só o segundo ou tudo."
+      }
+    },
+    "blocks": true,
+    "expect": {
+      "skipJudge": ["looked_first", "next_step"],
+      "mustCall": ["show_block"],
+      "mustNotCall": ["create_artifact", "start_poll"],
+      "blockSpec": true,
+      "behavior": "Lia shows a block with the six months of Acme's revenue from the context, a choice between the first quarter, the second and all, and a chart that follows the choice. No file."
     }
   },
   {

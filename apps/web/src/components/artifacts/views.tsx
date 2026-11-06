@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { ChoicesCard } from "@/components/blocks/ChoicesCard";
 import { LiveBlock } from "@/components/blocks/LiveBlock";
 import { PollCard } from "@/components/blocks/PollCard";
+import { SpecBlock } from "@/components/blocks/SpecBlock";
 import { Markdown } from "@/lib/markdown";
 import { FileSummary, FileView } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";
@@ -41,16 +42,25 @@ export function ArtifactContentView({
         </div>
       );
     case "block":
-      return source ? (
+      if (!source) return null;
+      return content.spec ? (
+        <SpecBlock
+          id={source.id}
+          version={source.version}
+          spec={content.spec}
+          agentId={source.agentId ?? ""}
+          big
+        />
+      ) : (
         <LiveBlock
           id={source.id}
           version={source.version}
           title={title}
-          html={content.html}
+          html={content.html ?? ""}
           agentId={source.agentId ?? ""}
           big
         />
-      ) : null;
+      );
     case "poll":
       return source ? <PollCard id={source.id} version={source.version} /> : null;
     case "choices":

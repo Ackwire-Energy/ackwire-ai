@@ -22495,6 +22495,15 @@
   "blocks.retryText": {
     "value": "That block didn't open here. Can you send it again?"
   },
+  "blocks.pageTitle": {
+    "value": "A block with its own code"
+  },
+  "blocks.pageBody": {
+    "value": "It runs apart from the app, with no access to your account or the internet."
+  },
+  "blocks.runPage": {
+    "value": "Open block"
+  },
   "blocks.someone": {
     "value": "Someone"
   },

@@ -3516,8 +3516,38 @@ export function useSharedBlock(orgId: string, id: string, version: number) {
     /** The state came, or can't: a page waits for it, so it never starts from its own defaults over everyone's. */
     loaded: query.isSuccess || query.isError,
     forPage: block ? stateForPage(block, changing) : null,
+    /** Values this person changed that the server hasn't taken yet. */
+    changing,
     fromPage,
     draw,
+  };
+}
+
+/**
+ * A block drawn by the app itself (ADR 0113): everyone's state, with what this person just changed shown at once
+ * while it goes to the server. `set` is a person's own act (a drag, a tap), so it is always shared.
+ */
+export function useBlockValues(orgId: string, id: string, version: number) {
+  const shared = useSharedBlock(orgId, id, version);
+  const [mine, setMine] = useState<Record<string, unknown>>({});
+  const { fromPage, block, changing } = shared;
+  const set = useCallback(
+    (values: Record<string, unknown>) => {
+      setMine((old) => ({ ...old, ...values }));
+      fromPage(values, true);
+    },
+    [fromPage],
+  );
+  const base = block?.state;
+  const state: Record<string, unknown> = { ...(base ?? {}) };
+  for (const [key, value] of Object.entries(mine)) if (changing.has(key)) state[key] = value;
+  return {
+    state,
+    changes: block?.changes ?? {},
+    rev: block?.rev ?? 0,
+    loaded: shared.loaded,
+    set,
+    draw: shared.draw,
   };
 }
 
