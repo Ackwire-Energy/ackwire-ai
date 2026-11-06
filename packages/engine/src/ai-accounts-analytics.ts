@@ -2,6 +2,7 @@ import type { AuthMethod } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, isNull, lt, schema, sql } from "@agenteschat/db";
 import { GEMINI_ENTERPRISE_PROVIDER, isPlanId } from "@agenteschat/providers/plans";
 import { z } from "zod";
+import { onLiveMachine } from "./claude-auth-policy";
 import { ANALYTICS_ROWS_MAX, analyticsRange, howMany } from "./connector-usage";
 import { decodeCursor, encodeCursor } from "./cursor";
 
@@ -19,12 +20,6 @@ const asDate = (v: string | Date) => new Date(v);
 export const AI_ACCOUNTS_RECENT_FAILURES = 50;
 export const AI_ACCOUNT_STATUSES = ["active", "signed_out", "signing_in", "removing"] as const;
 
-/**
- * A removed computer keeps its accounts for when it comes back (ADR 0041), but nobody can use them meanwhile: every
- * count and the list leave them out. `exists`, so no join repeats an account.
- */
-export const onLiveMachine = sql`exists (select 1 from ${machines} where ${machines.orgId} = ${ma.orgId}
-  and ${machines.id} = ${ma.machineId} and ${machines.deletedAt} is null)`;
 const listed = sql`${ma.status} in ('active', 'signed_out')`;
 const known = sql`${ma.email} is not null and ${ma.providerOrgId} is not null`;
 

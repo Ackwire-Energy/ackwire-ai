@@ -4,9 +4,8 @@ import {
   type ClaudeLoginMethod,
   claudeLoginMethodsOf,
 } from "@agenteschat/adapters";
-import { and, asc, count, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, asc, count, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { z } from "zod";
-import { onLiveMachine } from "./ai-accounts-analytics";
 import { ValidationError } from "./errors";
 
 /**
@@ -18,6 +17,14 @@ import { ValidationError } from "./errors";
  */
 
 const { claudeAuthSettings, machineAccounts, machines, organizations } = schema;
+
+/**
+ * A removed computer keeps its accounts for when it comes back (ADR 0041), but nobody can use them meanwhile: counts
+ * and lists leave them out. `exists`, so no join repeats an account. Here, not with the analytics: `machine-accounts`
+ * imports this module, and importing the analytics from it would load `routines` before it is initialized.
+ */
+export const onLiveMachine = sql`exists (select 1 from ${machines} where ${machines.orgId} = ${machineAccounts.orgId}
+  and ${machines.id} = ${machineAccounts.machineId} and ${machines.deletedAt} is null)`;
 
 export const CLAUDE_AUTH_ROLLOUTS = ["selected", "all"] as const;
 export type ClaudeAuthRollout = (typeof CLAUDE_AUTH_ROLLOUTS)[number];
