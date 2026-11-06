@@ -119,16 +119,9 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   line-height: 18px;
   color: var(--muted);
 }
-/* The button is centred on the face, which keeps it inside the row's padding however the text beside it rises. */
+/* In the row's middle: on its first line a 32px button (40px on touch) reaches past the row's edge. */
 .home-row__act {
-  align-self: start;
-  margin-top: calc((32px - var(--control-h-sm)) / 2);
-}
-/* Touch grows a small button to 40px. */
-@media (pointer: coarse) {
-  .home-row__act {
-    margin-top: calc((32px - var(--control-h-md)) / 2);
-  }
+  align-self: center;
 }
 /* A system face (a computer, a request to join): the same 32px tile as a person's. */
 .home-row__sys {

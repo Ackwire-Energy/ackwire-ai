@@ -293,6 +293,11 @@ html[data-pointer] :focus-visible {
 .ac-acts > .ac-acts {
   display: contents;
 }
+/* A card's line of buttons of its own: on a phone the next button goes under, never past the card's edge. */
+.ac-card > .ac-acts {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+}
 .ac-acts > .ac-btn--ghost {
   margin-inline: calc(-1 * var(--ghost-plate));
 }
@@ -2453,6 +2458,9 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-locked:has(+ .ac-dialog__foot--bar) > .ac-dialog__body {
   padding-bottom: 12px;
 }
+.ac-form__actions {
+  flex-wrap: wrap;
+}
 /* Beside the buttons while it fits on one line, on a line of its own above them when it doesn't: at its content's width,
    the wrap gives it the line before the buttons could squeeze it word by word. */
 .ac-dialog__foot-note {
@@ -2460,9 +2468,6 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   min-width: 0;
   font-size: 13px;
   color: var(--ink-muted);
-}
-.ac-form__actions {
-  flex-wrap: wrap;
 }
 
 /* Meter */
@@ -3857,7 +3862,8 @@ html:not([data-pointer]) .ac-token__remove:focus-visible {
   height: 22px;
   border-radius: var(--radius-xs);
   font-size: var(--text-xs);
-  --token-px: 6px;
+  /* 7 less the ✕'s 5 of spare: its plate 2px from the end, as from the top and bottom. */
+  --token-px: 7px;
   --token-x-spare: 5px;
 }
 .ac-token--sm .ac-token__remove {

@@ -15,6 +15,19 @@
       .slice(0, 3);
     return el.tagName.toLowerCase() + classes.map((c) => `.${c}`).join("");
   };
+  /**
+   * A finding named only by the kit's classes (`button.ac-btn.ac-btn--sm in section.ac-card`) would, in the baseline,
+   * excuse that pair on every screen: it also carries the nearest box around it with a class of the app's own.
+   */
+  const UTILITY = /^(ac-|row$|stack|small$|muted$|grow$|is-|has-)/;
+  const kitOnly = (signature) => !(signature?.match(/\.[\w-]+/g) ?? []).some((c) => !UTILITY.test(c.slice(1)));
+  const placeOf = (el) => {
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const classes = typeof p.className === "string" ? p.className.split(/\s+/) : [];
+      if (classes.some((c) => c && !UTILITY.test(c))) return sig(p);
+    }
+    return undefined;
+  };
   const words = (el) => (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
   const style = (el) => getComputedStyle(el);
   const painted = (color) => color !== "transparent" && !/rgba\(.*,\s*0\)$/.test(color);
@@ -75,7 +88,14 @@
     const rects = [];
     const walk = (node) => {
       if (node.nodeType === 3) {
-        if (node.textContent.trim()) for (const r of textRange(node).getClientRects()) if (r.width > 0) rects.push(r);
+        if (!node.textContent.trim()) return;
+        // Words cut by an ellipsis end where their box does, not where the hidden rest would.
+        const clip =
+          style(node.parentElement).overflowX === "visible" ? null : node.parentElement.getBoundingClientRect();
+        for (const r of textRange(node).getClientRects()) {
+          if (r.width > 0)
+            rects.push(clip ? { left: Math.max(r.left, clip.left), right: Math.min(r.right, clip.right) } : r);
+        }
         return;
       }
       if (node.nodeType !== 1 || !seen(node)) return;
@@ -150,6 +170,7 @@
           if (inset[side] < EDGE_MIN - 0.25)
             out.push({
               rule: "edge",
+              node: el,
               el: sig(el),
               box: sig(row.box),
               side,
@@ -176,7 +197,14 @@
         const right = b.right - c.right;
         if (left < 0 || right < 0) continue;
         if (Math.abs(left - right) > PAD_DIFF)
-          out.push({ rule: "pad", el: sig(el), left: +left.toFixed(1), right: +right.toFixed(1), text: words(el) });
+          out.push({
+            rule: "pad",
+            node: el,
+            el: sig(el),
+            left: +left.toFixed(1),
+            right: +right.toFixed(1),
+            text: words(el),
+          });
       }
     },
     text(out) {
@@ -188,9 +216,9 @@
           const tall = el.scrollHeight - el.clientHeight;
           const clips = (v) => v === "hidden" || v === "clip";
           if (clips(s.overflowX) && wide > 1 && s.textOverflow !== "ellipsis")
-            out.push({ rule: "clipped", el: sig(el), px: wide, text: words(el) });
+            out.push({ rule: "clipped", node: el, el: sig(el), px: wide, text: words(el) });
           if (clips(s.overflowY) && tall > 2 && s.webkitLineClamp === "none" && s.textOverflow !== "ellipsis")
-            out.push({ rule: "clipped", el: sig(el), px: tall, text: words(el) });
+            out.push({ rule: "clipped", node: el, el: sig(el), px: tall, text: words(el) });
         }
         if (el.children.length > 1 && s.display !== "inline") {
           // An inline box's rectangle spans every line it wraps on, and a float's words flow around it: neither overlaps.
@@ -210,6 +238,7 @@
               if (ox > 2 && oy > 2 && !pulled)
                 out.push({
                   rule: "overlap",
+                  node: kids[i],
                   el: sig(kids[i]),
                   box: sig(kids[j]),
                   px: Math.round(Math.min(ox, oy)),
@@ -235,12 +264,25 @@
         for (const n of el.childNodes)
           if (n.nodeType === 3) for (const r of textRange(n).getClientRects()) tops.add(Math.round(r.top));
         if (tops.size >= 3 && count / tops.size < 1.6)
-          out.push({ rule: "wordwrap", el: sig(el), box: sig(parent), lines: tops.size, text: words(el) });
+          out.push({ rule: "wordwrap", node: el, el: sig(el), box: sig(parent), lines: tops.size, text: words(el) });
       }
     },
     viewport(out) {
       const over = document.documentElement.scrollWidth - innerWidth;
-      if (over > 1) out.push({ rule: "viewport", el: "html", px: over });
+      if (over > 1) {
+        // Named by what reaches furthest, or one baseline entry for "html" would let every page overflow.
+        let far = innerWidth + 1;
+        let culprit = null;
+        for (const el of document.body.querySelectorAll("*")) {
+          if (!seen(el) || inFloat(el) || contained(el)) continue;
+          const right = el.getBoundingClientRect().right;
+          if (right >= far) {
+            far = right;
+            culprit = el;
+          }
+        }
+        out.push({ rule: "viewport", node: culprit, el: "html", box: culprit ? sig(culprit) : undefined, px: over });
+      }
       for (const el of document.body.querySelectorAll("*")) {
         if (
           !(ownText(el) || el.matches("button,a,input,select,textarea")) ||
@@ -252,7 +294,7 @@
         const r = el.getBoundingClientRect();
         // Entirely outside is a closed drawer.
         if (r.right <= innerWidth + 1 || r.left >= innerWidth || r.right <= 0 || contained(el)) continue;
-        out.push({ rule: "viewport", el: sig(el), px: Math.round(r.right - innerWidth), text: words(el) });
+        out.push({ rule: "viewport", node: el, el: sig(el), px: Math.round(r.right - innerWidth), text: words(el) });
       }
     },
     plate(out) {
@@ -266,7 +308,7 @@
         const dx = (a.left + a.right - b.left - b.right) / 2;
         const dy = (a.top + a.bottom - b.top - b.bottom) / 2;
         if (Math.abs(dx) > PLATE_DIFF || Math.abs(dy) > PLATE_DIFF)
-          out.push({ rule: "plate", el: sig(el), dx: +dx.toFixed(1), dy: +dy.toFixed(1) });
+          out.push({ rule: "plate", node: el, el: sig(el), dx: +dx.toFixed(1), dy: +dy.toFixed(1) });
       }
     },
     stack(out) {
@@ -283,6 +325,7 @@
           if (Math.abs(gap - want) > GAP_DIFF)
             out.push({
               rule: "stack",
+              node: kids[i],
               el: `${sig(kids[i - 1])} + ${sig(kids[i])}`,
               box: sig(el),
               px: +gap.toFixed(1),
@@ -304,7 +347,7 @@
       seenOf = new Map();
       const out = [];
       for (const rule of Object.values(rules)) rule(out);
-      return out;
+      return out.map(({ node, ...f }) => (kitOnly(f.el) && kitOnly(f.box) && node ? { ...f, at: placeOf(node) } : f));
     },
   };
 })();

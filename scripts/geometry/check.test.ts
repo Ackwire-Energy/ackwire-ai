@@ -9,6 +9,14 @@ describe("geometry check", () => {
     expect(keyOf(f, 1280)).not.toBe(keyOf(f, 320));
   });
 
+  test("a finding named only by the kit's classes is keyed by its place too, so one entry can't excuse every screen", () => {
+    const f = { rule: "edge", el: "button.ac-btn.ac-btn--sm", box: "section.ac-card", px: -93 };
+    expect(keyOf({ ...f, at: "div.ai-panel" }, 320)).toBe(
+      "edge@320 button.ac-btn.ac-btn--sm in section.ac-card at div.ai-panel",
+    );
+    expect(keyOf({ ...f, at: "div.home-row" }, 320)).not.toBe(keyOf({ ...f, at: "div.ai-panel" }, 320));
+  });
+
   test("only what the baseline doesn't know fails; what got fixed is listed", () => {
     expect(compare(["a", "b", "b"], ["b", "c"])).toEqual({ fresh: ["a"], gone: ["c"] });
   });

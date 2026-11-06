@@ -9986,19 +9986,12 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
 .agp-attn__t b {
   font-weight: 600;
 }
-/* One line box as tall as the title's (15/22): the button overflows it evenly, and the tile's padding keeps it clear of
-   the edge, as `.ac-captail` does in a row. */
+/* In the row's middle, as Home's rows: on the title's line a 32px button would reach the card's edge. */
 .agp-attn__tail {
   display: flex;
   flex: none;
+  align-self: center;
   align-items: center;
-  height: 22px;
-  margin-block: calc((var(--control-h-sm) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
-}
-@media (pointer: coarse) {
-  .agp-attn__tail {
-    margin-block: calc((var(--control-h-md) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
-  }
 }
 .agp-attn__t span {
   color: var(--muted);

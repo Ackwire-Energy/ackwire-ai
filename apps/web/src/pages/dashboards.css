@@ -629,6 +629,7 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
   min-width: 0;
 }
 .nwc-row--format {
+  flex-wrap: wrap;
   margin-top: auto;
 }
 /* After the test: the ask as one line that opens it again. */
@@ -694,12 +695,12 @@ html:not([data-pointer]) .nwc-pk .ac-select__trigger:focus-visible {
   width: 12px;
   height: 12px;
 }
-/* Format and size side by side. */
+/* Format and size side by side, whole: the ask beside them is what ends in "…". */
 .nwc-pks {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 6px;
-  min-width: 0;
 }
 .nwc-pk--box .ac-select__trigger {
   box-shadow: inset 0 0 0 1px var(--line);

@@ -26,11 +26,14 @@ export interface Finding {
   rule: string;
   el: string;
   box?: string;
+  /** The nearest box with a class of the app's own, for a finding named only by the kit's classes. */
+  at?: string;
   text?: string;
   [detail: string]: unknown;
 }
 
-export const keyOf = (f: Finding, width: number) => `${f.rule}@${width} ${f.el}${f.box ? ` in ${f.box}` : ""}`;
+export const keyOf = (f: Finding, width: number) =>
+  `${f.rule}@${width} ${f.el}${f.box ? ` in ${f.box}` : ""}${f.at ? ` at ${f.at}` : ""}`;
 
 /** Offenders the baseline doesn't know, and baseline entries nothing hit any more. */
 export function compare(found: Iterable<string>, baseline: string[]) {
@@ -143,6 +146,10 @@ export async function launch(bin: string, profile: string) {
     log += decoder.decode(value);
     url = log.match(/ws:\/\/\S+/)?.[0];
   }
+  // Kept draining: a full stderr pipe would block Chrome mid-run (Linux runners log to it freely).
+  void (async () => {
+    while (!(await reader.read()).done);
+  })();
   const ws = new WebSocket(url);
   await new Promise((ok, fail) => {
     ws.onopen = ok;
@@ -228,7 +235,7 @@ function writeReport(file: string, hits: Hit[], states: number, fresh: string[])
     screen.set(key, h);
     byScreen.set(h.screen, screen);
   }
-  const detail = ({ finding: { rule: _r, el: _e, box: _b, text, ...rest } }: Hit) =>
+  const detail = ({ finding: { rule: _r, el: _e, box: _b, at: _a, text, ...rest } }: Hit) =>
     `${Object.entries(rest)
       .map(([k, v]) => `${k} ${v}`)
       .join(", ")}${text ? ` "${text}"` : ""}`;
