@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import {
+  BROWSER_VIEW,
   channelTopic,
   chatActivityTopic,
   MAX_FRAME_BYTES,
@@ -517,8 +518,12 @@ export function createRealtime(deps: RealtimeDeps) {
     const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
     if (!limit.allowed) return send(ws, { type: "error", code: "rate_limited", agentId });
     const previous = ws.data.browsers.get(agentId);
-    // Still starting: a second `browser.watch` meanwhile is a no-op.
-    if (previous && startingBrowsers.has(previous)) return;
+    // Still starting: a second `browser.watch` meanwhile only changes the rate (the client sends no `browser.fps`
+    // for it: a card opened while a thumbnail's watch starts asks the top rate this way).
+    if (previous && startingBrowsers.has(previous)) {
+      if (frame.acks === true) browserRate(ws, agentId, frame.maxFps ?? BROWSER_VIEW.maxFps, order);
+      return;
+    }
     // Already here: watching again is the client's retry (after reconnecting, offline, an ended
     // stream or a lost permission), so the old view goes and a fresh one starts.
     if (previous) {
@@ -552,6 +557,8 @@ export function createRealtime(deps: RealtimeDeps) {
         if (frames.getBufferedAmount() > MAX_FRAME_BACKLOG) return false;
         return frames.send(browserFrameBytes(picture)) !== 0;
       }
+      // Backed up: not sent now; the pacer keeps it (newest wins) and tries again, so an idle page's last one shows.
+      if (ws.getBufferedAmount() > MAX_FRAME_BACKLOG) return false;
       // This socket takes it as base64, never with the bytes; `ack`: answer it once drawn.
       const { bytes: _bytes, jpeg: _jpeg, data: _data, ...rest } = picture;
       const json = { ...rest, data: browserFrameBase64(picture), ...(paced ? { ack: true } : {}) };
@@ -604,12 +611,10 @@ export function createRealtime(deps: RealtimeDeps) {
       watch = await live.watch(
         {
           userId: user.id,
+          // Backed up (a slow phone link): the pacer holds the newest frame until it drains (`deliver`), never skips.
           send: (message) => pacer.send(message),
-          // Backed up (a slow phone link): skip frames, the next one sent is the newest. Its frame socket when it
-          // has one: that is where the pictures go.
-          busy: backedUp,
           // The computer sends the next frame only while some viewer has room for it (ADR 0040 §7.1); a backed-up
-          // socket has none, it would skip the frame. Nothing tells when it drains: the owed ack goes within
+          // socket has none, it would only wait. Nothing tells when it drains: the owed ack goes within
           // `BROWSER_VIEW.ackOwedMs` anyway.
           ...(paced ? { room: () => pacer.room() && !backedUp() } : {}),
         },

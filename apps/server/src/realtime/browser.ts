@@ -143,6 +143,11 @@ export function parseBrowserClientFrame(raw: string | Buffer): BrowserClientFram
 
 /** A full window with no ack for this long sends the newest frame anyway (a hidden tab draws nothing). */
 export const VIEWER_ACK_STALL_MS = BROWSER_VIEW.viewerStallMs;
+/**
+ * A frame its backed-up socket couldn't take is tried again this often: an idle page sends no newer one, so it
+ * would otherwise never show (ADR 0040 §7.1). Bun says nothing when a socket drains.
+ */
+export const VIEWER_BACKLOG_RETRY_MS = 250;
 
 export interface ViewerPacer<M extends { type: string } = { type: string }> {
   /** A live-view message to the viewer: frames in the window and at its rate, everything else at once. */
@@ -166,8 +171,8 @@ export interface ViewerPacer<M extends { type: string } = { type: string }> {
  * rate the same way (a thumbnail needs one frame a second): a frame sooner than that waits, newest wins, and one
  * timer sends it when the interval ends. Other messages go at once; one that ends or hides the view drops the frame
  * waiting, which would show a page it no longer may. `deliver` answering false sent nothing (its socket is backed
- * up): that frame takes no room in the window. `onRoom`: the viewer may take a frame again (it drew one, or its
- * interval passed), so the computer's next one is worth sending.
+ * up): that frame takes no room in the window, and waits (newest wins) to be tried again. `onRoom`: the viewer may
+ * take a frame again (it drew one, or its interval passed), so the computer's next one is worth sending.
  */
 export function createViewerPacer<M extends { type: string }>(
   deliver: (message: M) => unknown,
@@ -176,6 +181,8 @@ export function createViewerPacer<M extends { type: string }>(
     stallMs?: number;
     minIntervalMs?: number;
     onRoom?: () => void;
+    /** Tests: how soon a frame its backed-up socket refused is tried again (`VIEWER_BACKLOG_RETRY_MS`). */
+    retryMs?: number;
     now?: () => number;
     timers?: { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void };
   } = {},
@@ -193,6 +200,8 @@ export function createViewerPacer<M extends { type: string }>(
   let stall: unknown = null;
   /** Ends the current interval: the frame waiting for it goes, and the viewer has room again. */
   let pace: unknown = null;
+  /** Tries the frame its backed-up socket refused again. */
+  let retry: unknown = null;
   let lastSent = Number.NEGATIVE_INFINITY;
   let closed = false;
   const unstall = () => {
@@ -202,6 +211,10 @@ export function createViewerPacer<M extends { type: string }>(
   const unpace = () => {
     if (pace !== null) timers.clearTimeout(pace);
     pace = null;
+  };
+  const unretry = () => {
+    if (retry !== null) timers.clearTimeout(retry);
+    retry = null;
   };
   const release = () => {
     const next = held;
@@ -228,6 +241,7 @@ export function createViewerPacer<M extends { type: string }>(
         if (hides) {
           held = null;
           unpace();
+          unretry();
         }
         deliver(message);
         return;
@@ -248,11 +262,22 @@ export function createViewerPacer<M extends { type: string }>(
         schedulePace();
         return;
       }
+      // This frame is newer than any waiting one, which must never follow it.
+      held = null;
+      unpace();
+      unretry();
       inflight++;
+      const before = lastSent;
       lastSent = now();
-      // Not sent (its socket is backed up): it takes no room in the window.
+      // Not sent (its socket is backed up): it takes no room in the window, and waits to be tried again.
       if (deliver(message) === false) {
         inflight--;
+        lastSent = before;
+        held = message;
+        retry = timers.setTimeout(() => {
+          retry = null;
+          release();
+        }, opts.retryMs ?? VIEWER_BACKLOG_RETRY_MS);
         return;
       }
       // The computer hears when this viewer's rate lets the next frame go.
@@ -287,6 +312,7 @@ export function createViewerPacer<M extends { type: string }>(
       held = null;
       unstall();
       unpace();
+      unretry();
     },
   };
   return pacer;

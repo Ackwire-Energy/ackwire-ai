@@ -60,8 +60,10 @@ function setup(opts: { window?: number; stallMs?: number } = {}) {
   const dialed: { streamId: string; data: FakeData }[] = [];
   const logs: string[] = [];
   const rooms: string[] = [];
+  const handed: Frame[] = [];
   const views = new BrowserViews({
     ...opts,
+    fallback: (frame) => void handed.push(frame),
     dial: async (streamId) => {
       const data = new FakeData();
       dialed.push({ streamId, data });
@@ -70,7 +72,7 @@ function setup(opts: { window?: number; stallMs?: number } = {}) {
     log: (line) => logs.push(line),
   });
   views.onRoom = (agentId) => rooms.push(agentId);
-  return { views, dialed, logs, rooms, last: () => dialed.at(-1)?.data as FakeData };
+  return { views, dialed, logs, rooms, handed, last: () => dialed.at(-1)?.data as FakeData };
 }
 
 test("an agent with no view: its frames are the caller's to send as before", () => {
@@ -117,7 +119,7 @@ test("a full window with no ack for a while is a dead socket: the view ends, and
   await waitFor(() => last().closed !== null);
   // Never written into the dead socket: the server opens a new view.
   expect(last().seqs()).toEqual([1]);
-  expect(last().closed?.code).toBe(STREAM_CLOSE.tooSlow);
+  expect(last().closed?.code).toBe(STREAM_CLOSE.viewTooSlow);
   expect(views.viewing()).toEqual([]);
   expect(views.push(frame("ana", 4))).toBe(false);
   // Its stream sends its next frame, now on the machine socket.
@@ -137,7 +139,7 @@ test("a full window stalls with nothing waiting too: a paced stream sends nothin
   await views.open("ana", "S".repeat(43));
   views.push(frame("ana", 1));
   await waitFor(() => last().closed !== null);
-  expect(last().closed?.code).toBe(STREAM_CLOSE.tooSlow);
+  expect(last().closed?.code).toBe(STREAM_CLOSE.viewTooSlow);
   expect(rooms).toEqual(["ana"]);
 });
 
@@ -157,7 +159,7 @@ test("a full window whose bytes are still leaving is a slow uplink, not a dead s
   expect(data.seqs()).toEqual([1, 2]);
   // Then nothing leaves and no ack comes: a dead socket.
   await waitFor(() => data.closed !== null);
-  expect(data.closed?.code).toBe(STREAM_CLOSE.tooSlow);
+  expect(data.closed?.code).toBe(STREAM_CLOSE.viewTooSlow);
 });
 
 test("a socket that keeps draining but never acks still ends, after a few stalls", async () => {
@@ -175,7 +177,7 @@ test("a socket that keeps draining but never acks still ends, after a few stalls
   } finally {
     clearInterval(draining);
   }
-  expect(data.closed?.code).toBe(STREAM_CLOSE.tooSlow);
+  expect(data.closed?.code).toBe(STREAM_CLOSE.viewTooSlow);
   expect(Date.now() - start).toBeGreaterThanOrEqual(30);
 });
 
@@ -252,6 +254,25 @@ test("a view ends with its stream, its socket, the connection, or a new view of 
   views.closeAll();
   expect(dialed[3]?.data.closed?.code).toBe(STREAM_CLOSE.normal);
   expect(views.viewing()).toEqual([]);
+});
+
+test("a view that dies while its stream runs hands its newest frame to the machine socket; one that ends doesn't", async () => {
+  const { views, dialed, handed } = setup({ window: 1, stallMs: 5 });
+  await views.open("ana", "A".repeat(43));
+  for (const seq of [1, 2]) views.push(frame("ana", seq));
+  // No ack: dead. The newest (2, held and never sent) goes the other way, once.
+  await waitFor(() => handed.length === 1);
+  expect(handed.map((f) => f.seq)).toEqual([2]);
+  // The server closed a view: the same.
+  await views.open("ana", "B".repeat(43));
+  views.push(frame("ana", 3));
+  (dialed[1] as { data: FakeData }).data.socket.close(STREAM_CLOSE.restarting);
+  expect(handed.map((f) => f.seq)).toEqual([2, 3]);
+  // A view replaced by a new one, or ended with its stream, hands nothing over.
+  await views.open("ana", "C".repeat(43));
+  await views.open("ana", "D".repeat(43));
+  views.end("ana");
+  expect(handed.map((f) => f.seq)).toEqual([2, 3]);
 });
 
 test("a dial that fails leaves no view: frames go as before", async () => {

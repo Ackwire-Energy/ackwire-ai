@@ -37,6 +37,12 @@ export interface BrowserViewsOptions {
   dial(streamId: string): Promise<DataSocket>;
   /** One line per view when it ends: what it sent, what it skipped, whether it stalled. */
   log?: (line: string) => void;
+  /**
+   * A view that died while its stream runs (no acknowledgement, or the server closed it) hands its agent's newest
+   * frame here, to go on the machine socket: the server takes it (newer than anything the view brought), so an idle
+   * page shows its current picture even if no view opens again.
+   */
+  fallback?: (frame: Frame) => void;
   /** Tests: smaller or shorter than `BROWSER_VIEW`. */
   window?: number;
   stallMs?: number;
@@ -78,7 +84,7 @@ export class BrowserViews {
     const socket = await this.opts.dial(streamId);
     const old = this.views.get(agentId);
     // Not `end`: the stream goes on, and its newest frame is the new view's first.
-    if (old) this.close(old, STREAM_CLOSE.normal, "a new view");
+    if (old) this.close(old, STREAM_CLOSE.normal, "a new view", false);
     const view: View = {
       agentId,
       socket,
@@ -135,7 +141,7 @@ export class BrowserViews {
   end(agentId: string) {
     this.latest.delete(agentId);
     const view = this.views.get(agentId);
-    if (view) this.close(view, STREAM_CLOSE.normal, "the stream ended");
+    if (view) this.close(view, STREAM_CLOSE.normal, "the stream ended", false);
   }
 
   /** The server's connection dropped: every view goes (the server opens them again with the streams). */
@@ -190,7 +196,7 @@ export class BrowserViews {
         return;
       }
       view.stalled = true;
-      this.close(view, STREAM_CLOSE.tooSlow, "no acknowledgement");
+      this.close(view, STREAM_CLOSE.viewTooSlow, "no acknowledgement");
     };
     arm();
   }
@@ -211,15 +217,18 @@ export class BrowserViews {
     if (held && !view.closed) this.push(held);
   }
 
-  private close(view: View, code: number, reason: string) {
-    this.drop(view);
+  private close(view: View, code: number, reason: string, handOver = true) {
+    this.drop(view, handOver);
     view.socket.close(code, reason);
   }
 
   /** The view is gone; its agent's newest frame stays in `latest` for the next one. */
-  private drop(view: View) {
+  private drop(view: View, handOver = true) {
     if (view.closed) return;
     view.closed = true;
+    // Its stream goes on without it: the newest picture, which it may have held or lost on its way, goes the other way.
+    const last = handOver ? this.latest.get(view.agentId) : undefined;
+    if (last) this.opts.fallback?.(last);
     view.held = null;
     if (view.stall) clearTimeout(view.stall);
     view.stall = null;

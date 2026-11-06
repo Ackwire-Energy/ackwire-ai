@@ -330,10 +330,10 @@ describe("RealtimeConnection", () => {
     socket.push({ type: "browser.frame", agentId: "a1", seq: 10, data: "/9j/", metadata: {}, ack: true });
     expect(seqs).toEqual([10]);
     // The server's side of the frame socket closed first and it sent the next one here: drawn, though this side
-    // hasn't heard the close yet.
+    // hasn't heard the close yet (maybe never: half-open). That socket goes here too.
     socket.push({ type: "browser.frame", agentId: "a1", seq: 11, data: "/9j/", metadata: {}, ack: true });
     expect(seqs).toEqual([10, 11]);
-    expect(frames.closed).toBe(false);
+    expect(frames.closed).toBe(true);
     // Both answered on this socket, each once.
     const acks = () => socket.sent.filter((f) => (f as { type: string }).type === "browser.ack");
     for (let i = 0; i < 20 && acks().length < 2; i++) await Bun.sleep(5);
@@ -341,10 +341,109 @@ describe("RealtimeConnection", () => {
       { type: "browser.ack", agentId: "a1", seq: 10 },
       { type: "browser.ack", agentId: "a1", seq: 11 },
     ]);
-    // Bytes again: a picture here from before them is not drawn over them.
-    frames.onmessage?.({ data: frameBytes(12, [0xff, 0xd8]).buffer });
+    // Its numbers are forgotten: a stream that starts again from 0 here is drawn.
+    socket.push({ type: "browser.frame", agentId: "a1", seq: 0, data: "/9j/", metadata: {}, ack: true });
+    expect(seqs).toEqual([10, 11, 0]);
+    // A new ticket: bytes again, and a picture here from before them is not drawn over them.
+    socket.push({ type: "browser.frames", agentId: "a1", ticket: "t2" });
+    const next = sockets[2] as FakeSocket;
+    next.open();
+    next.onmessage?.({ data: frameBytes(12, [0xff, 0xd8]).buffer });
     socket.push({ type: "browser.frame", agentId: "a1", seq: 11, data: "/9j/", metadata: {} });
-    expect(seqs).toEqual([10, 11, 12]);
+    expect(seqs).toEqual([10, 11, 0, 12]);
+    release();
+    conn.stop();
+  });
+
+  test("a half-open frame socket: a stream started again here is drawn, and a new frame socket asked for", () => {
+    const { factory, sockets } = fakeSockets();
+    const clock = manualTimers();
+    const conn = new RealtimeConnection({
+      url: "ws://x/api/ws?orgId=o",
+      createSocket: factory,
+      timers: clock.timers,
+      pingMs: 0,
+    });
+    const seqs: unknown[] = [];
+    conn.onBrowserFrame((frame) => {
+      if (frame.type === "browser.frame") seqs.push(frame.seq);
+    });
+    conn.start();
+    const socket = sockets[0] as FakeSocket;
+    socket.open();
+    const release = conn.browserWatcher.acquire("a1");
+    socket.push({ type: "browser.frames", agentId: "a1", ticket: "t1" });
+    const frames = sockets[1] as FakeSocket;
+    frames.open();
+    frames.onmessage?.({ data: frameBytes(500, [0xff, 0xd8], 1_700_000_000_000).buffer });
+    // Captured at the same moment, sent here before the switch: not drawn over it.
+    const here = (seq: number, capturedAt: number) =>
+      socket.push({ type: "browser.frame", agentId: "a1", seq, data: "/9j/", metadata: { capturedAt }, ack: true });
+    here(499, 1_700_000_000_000 - 100);
+    here(0, 1_700_000_000_000 + 500);
+    expect(seqs).toEqual([500]);
+    expect(frames.closed).toBe(false);
+    // The server lost that socket; the agent's browser started again (numbered from 0), captured long after.
+    here(0, 1_700_000_000_000 + 60_000);
+    expect(seqs).toEqual([500, 0]);
+    expect(frames.closed).toBe(true);
+    here(1, 1_700_000_000_000 + 61_000);
+    expect(seqs).toEqual([500, 0, 1]);
+    // A new ticket for the same view, never a new watch.
+    expect(clock.pending.map((p) => p.ms)).toContain(1000);
+    clock.pending.find((p) => p.ms === 1000)?.fn();
+    expect(socket.sent.filter((f) => (f as { type: string }).type === "browser.frames.renew")).toEqual([
+      { type: "browser.frames.renew", agentId: "a1" },
+    ]);
+    expect(socket.sent.filter((f) => (f as { type: string }).type === "browser.watch")).toHaveLength(1);
+    release();
+    conn.stop();
+  });
+
+  test("pictures late on the frame socket after the view ended are answered but held until it runs again", async () => {
+    const { factory, sockets } = fakeSockets();
+    const conn = new RealtimeConnection({ url: "ws://x/api/ws?orgId=o", createSocket: factory, pingMs: 0 });
+    const seen: string[] = [];
+    conn.onBrowserFrame((frame) => {
+      seen.push(frame.type === "browser.frame" ? `frame ${String(frame.seq)}` : String(frame.type));
+    });
+    conn.start();
+    const socket = sockets[0] as FakeSocket;
+    socket.open();
+    const release = conn.browserWatcher.acquire("a1");
+    socket.push({ type: "browser.frames", agentId: "a1", ticket: "t1" });
+    const frames = sockets[1] as FakeSocket;
+    frames.open();
+    frames.onmessage?.({ data: frameBytes(1, [0xff, 0xd8]).buffer });
+    for (let i = 0; i < 20 && frames.sent.length < 1; i++) await Bun.sleep(5);
+    expect(seen).toEqual(["frame 1"]);
+
+    // The computer reconnects: the view ends on the realtime socket, then pictures sent before that arrive late on
+    // the frame socket. Not drawn (the view would look live and cancel its retry), answered at once all the same.
+    socket.push({ type: "browser.unavailable", agentId: "a1", reason: "reconnecting" });
+    frames.onmessage?.({ data: frameBytes(2, [0xff, 0xd8]).buffer });
+    frames.onmessage?.({ data: frameBytes(3, [0xff, 0xd8]).buffer });
+    expect(seen).toEqual(["frame 1", "browser.unavailable"]);
+    expect(frames.sent).toEqual([{ type: "ack" }, { type: "ack" }, { type: "ack" }]);
+    // Its stream starts again by itself: the status, then the newest picture held meanwhile.
+    socket.push({ type: "browser.status", agentId: "a1", mode: "watch" });
+    expect(seen).toEqual(["frame 1", "browser.unavailable", "browser.status", "frame 3"]);
+    frames.onmessage?.({ data: frameBytes(4, [0xff, 0xd8]).buffer });
+    expect(seen.at(-1)).toBe("frame 4");
+
+    // Ended (closed), with a late picture: held; watching again drops it (the watch brings the newest page).
+    socket.push({ type: "browser.ended", agentId: "a1", reason: "closed" });
+    frames.onmessage?.({ data: frameBytes(5, [0xff, 0xd8]).buffer });
+    conn.browserWatcher.rewatch("a1");
+    socket.push({ type: "browser.status", agentId: "a1", mode: "watch" });
+    expect(seen.slice(-2)).toEqual(["browser.ended", "browser.status"]);
+    frames.onmessage?.({ data: frameBytes(0, [0xff, 0xd8]).buffer });
+    expect(seen.at(-1)).toBe("frame 0");
+
+    // An input's refusal ends nothing: pictures go on.
+    socket.push({ type: "error", agentId: "a1", code: "not_in_control" });
+    frames.onmessage?.({ data: frameBytes(1, [0xff, 0xd8]).buffer });
+    expect(seen.at(-1)).toBe("frame 1");
     release();
     conn.stop();
   });

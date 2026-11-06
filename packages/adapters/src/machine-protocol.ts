@@ -897,6 +897,11 @@ export const STREAM_CLOSE = {
   internal: 1011,
   /** A side doesn't keep up: its backlog passed the limit. */
   tooSlow: 1013,
+  /**
+   * Protocol 46: the runner closed a browser's live view that got no acknowledgement in `BROWSER_VIEW.stallMs` (its
+   * link too slow, or dead). In 3000-4999 because the standard WebSocket client (Node's) refuses to send 1013.
+   */
+  viewTooSlow: 4413,
   badRequest: 4400,
   /** Data socket: a bad token, or another machine's stream. */
   badToken: 4401,

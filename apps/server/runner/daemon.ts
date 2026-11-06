@@ -967,7 +967,11 @@ export class RunnerDaemon implements RequestObserver {
     // Frames go out on whatever connection this session has at the time (it reconnects by itself).
     let live: RunnerConnection | null = null;
     // The live views of the agents' browsers (ADR 0040 §7.1): a viewed agent's frames go on a socket of their own.
-    const views = new BrowserViews({ dial: (streamId) => streams.dial(streamId, "browserView"), log });
+    const views = new BrowserViews({
+      dial: (streamId) => streams.dial(streamId, "browserView"),
+      fallback: (frame) => void live?.send(frame),
+      log,
+    });
     const toServer = (frame: RunnerFrame): boolean => {
       if (frame.type === "browser.frame" && views.push(frame)) return true;
       if (frame.type === "browser.stream.ended") views.end(frame.agentId);
@@ -1177,6 +1181,7 @@ export class RunnerDaemon implements RequestObserver {
       desktops: this.desktops,
       terminals: this.terminals,
       streams,
+      browserViews: views,
       desktopUse,
       desktopTaken: (agentId) => {
         if (supervisor) supervisor.desktopTaken(agentId);
@@ -1277,7 +1282,6 @@ export class RunnerDaemon implements RequestObserver {
       mcp,
       browser,
       streams,
-      browserViews: views,
       desktopUse,
       connection,
       supervisor,

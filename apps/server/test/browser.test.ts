@@ -277,6 +277,69 @@ describe("createViewerPacer", () => {
     pacer.close();
   });
 
+  test("a frame sent once its interval ended, before the late timer fired, is never followed by an older one", () => {
+    let now = 0;
+    let ids = 0;
+    const pending = new Map<number, () => void>();
+    const timers = {
+      setTimeout(fn: () => void) {
+        pending.set(++ids, fn);
+        return ids;
+      },
+      clearTimeout: (id: unknown) => void pending.delete(id as number),
+    };
+    const fire = () => {
+      for (const [id, fn] of [...pending]) {
+        pending.delete(id);
+        fn();
+      }
+    };
+    const got: Message[] = [];
+    const pacer = createViewerPacer<Message>((m) => got.push(m), {
+      window: Number.POSITIVE_INFINITY,
+      minIntervalMs: 1000,
+      now: () => now,
+      timers,
+    });
+    pacer.send(frame(1));
+    now = 500;
+    pacer.send(frame(2));
+    // The interval ended, its timer runs late: the newer frame goes now.
+    now = 1001;
+    pacer.send(frame(3));
+    expect(seqs(got)).toEqual([1, 3]);
+    fire();
+    now = 3000;
+    fire();
+    expect(seqs(got)).toEqual([1, 3]);
+    pacer.close();
+  });
+
+  test("a frame its backed-up socket refused waits (newest wins) and goes once the socket drains", () => {
+    const clock = fakeClock();
+    const got: Message[] = [];
+    let backedUp = true;
+    const pacer = createViewerPacer<Message>(
+      (m) => {
+        if (backedUp && m.type === "browser.frame") return false;
+        got.push(m);
+        return true;
+      },
+      { window: 3, retryMs: 100, now: clock.now, timers: clock.timers },
+    );
+    pacer.send(frame(1));
+    pacer.send(frame(2));
+    clock.advance(100);
+    expect(seqs(got)).toEqual([]);
+    // The page went idle: nothing newer comes, and the last one still shows once the socket drains.
+    backedUp = false;
+    clock.advance(100);
+    expect(seqs(got)).toEqual([2]);
+    clock.advance(1000);
+    expect(seqs(got)).toEqual([2]);
+    pacer.close();
+  });
+
   test("a viewer that draws nothing for a while (a hidden tab) gets the newest frame anyway", async () => {
     const got: Message[] = [];
     const pacer = createViewerPacer<Message>((m) => got.push(m), { window: 1, stallMs: 5 });
@@ -902,7 +965,8 @@ describe("live view socket", () => {
       stub.restore();
       await Promise.race([server.stop(true), Bun.sleep(500)]);
     }
-  });
+    // About 3.3 s of real waits on the legacy one-second rate, on top of the seed.
+  }, 15_000);
 
   test("browser.fps changes a view's rate in place: no new watch", async () => {
     const { owner, org } = await seeded();
@@ -966,6 +1030,39 @@ describe("live view socket", () => {
       ws.close();
     } finally {
       limiter.consume = realConsume;
+      stub.restore();
+      await Promise.race([server.stop(true), Bun.sleep(500)]);
+    }
+  });
+
+  test("a second watch with a higher rate, while the first still starts, sets the rate (no browser.fps)", async () => {
+    const { owner, org } = await seeded();
+    const server = listen(t);
+    let release: () => void = () => {};
+    const first = new Promise<void>((resolve) => {
+      release = () => resolve();
+    });
+    const stub = stubWatch({ first });
+    try {
+      const { ws, frames } = await realtimeSocket(server.port, owner.cookie(), org.orgId);
+      // A thumbnail watches at 1 fps; its card opens before the stream started: a watch at the top rate.
+      ws.send(JSON.stringify({ type: "browser.watch", agentId: org.agentId, acks: true, maxFps: 1 }));
+      for (let i = 0; i < 100 && stub.calls() < 1; i++) await Bun.sleep(10);
+      ws.send(JSON.stringify({ type: "browser.watch", agentId: org.agentId, acks: true }));
+      await Bun.sleep(50);
+      release();
+      await Bun.sleep(30);
+      // The second watch is a no-op for the view: still one watch.
+      expect(stub.calls()).toBe(1);
+      const seqs = () => frames.flatMap((f) => (f.type === "browser.frame" ? [f.seq] : []));
+      stub.viewer()?.send(picture(org.agentId, 1));
+      stub.viewer()?.send(picture(org.agentId, 2));
+      // Both at once, not the second after a second.
+      for (let i = 0; i < 20 && seqs().length < 2; i++) await Bun.sleep(10);
+      expect(seqs()).toEqual([1, 2]);
+      ws.close();
+    } finally {
+      release();
       stub.restore();
       await Promise.race([server.stop(true), Bun.sleep(500)]);
     }

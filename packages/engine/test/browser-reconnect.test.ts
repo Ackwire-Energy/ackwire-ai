@@ -171,13 +171,61 @@ test("a runner at protocol 46 gets the view's own socket: frames come as bytes, 
   // Garbage is answered too (it must not hold the window shut), and shows nothing.
   view?.data(new Uint8Array([9, 9, 9]));
   expect(socket.sent).toHaveLength(2);
-  // A frame still on the machine socket was sent before the view's own: dropped.
-  await runner.frame(3);
+  // A frame still on the machine socket was sent before the view's own (no newer than it): dropped.
+  await runner.frame(2);
   expect(seqs()).toEqual([1, 2]);
-  // Its socket closed: frames on the machine socket show again.
+  // Its socket closed: newer frames on the machine socket show again.
   view?.closed();
   await runner.frame(4);
   expect(seqs()).toEqual([1, 2, 4]);
+  stop();
+  live.close();
+});
+
+test("a newer frame on the machine socket: the computer left the view, so it shows and the view closes", async () => {
+  const { hub, paired, live, got, viewer } = await liveSetup({ viewRetryMs: [5] });
+  const runner = browserRunner(hub);
+  await runner.hello(paired.token);
+  const { stop } = await live.watch(viewer, f.org.id, f.agent.id);
+  await until(() => runner.views().length === 1);
+  const seqs = () => got.flatMap((m) => (m.type === "browser.frame" ? [m.seq] : []));
+  const socket = fakeSocket();
+  const view = live.claimView(runner.views()[0]?.streamId ?? "", paired.machineId, socket.socket);
+  const frame = (seq: number) =>
+    encodeBrowserFrame({ seq, metadata: { deviceWidth: 1280, deviceHeight: 800 } }, new Uint8Array([0xff, 0xd8]));
+  view?.data(frame(5));
+  // The runner closed the view as too slow, but its close never came (a half-open socket).
+  await runner.frame(6);
+  expect(seqs()).toEqual([5, 6]);
+  expect(socket.closed).not.toBeNull();
+  // The old view's late frames show nothing, nor does a machine-socket frame from before it.
+  view?.data(frame(7));
+  await runner.frame(4);
+  expect(seqs()).toEqual([5, 6]);
+  // It is opened again.
+  await until(() => runner.views().length === 2);
+  expect(runner.views()).toHaveLength(2);
+  stop();
+  live.close();
+});
+
+test("after a view closes, a machine-socket frame older than what it brought is never drawn", async () => {
+  const { hub, paired, live, got, viewer } = await liveSetup({ viewRetryMs: [] });
+  const runner = browserRunner(hub);
+  await runner.hello(paired.token);
+  const { stop } = await live.watch(viewer, f.org.id, f.agent.id);
+  await until(() => runner.views().length === 1);
+  const seqs = () => got.flatMap((m) => (m.type === "browser.frame" ? [m.seq] : []));
+  const view = live.claimView(runner.views()[0]?.streamId ?? "", paired.machineId, fakeSocket().socket);
+  const metadata = { deviceWidth: 1280, deviceHeight: 800 };
+  view?.data(encodeBrowserFrame({ seq: 20, metadata }, new Uint8Array([0xff, 0xd8])));
+  view?.closed(STREAM_CLOSE.tooSlow);
+  // Sent before the view opened, late behind a big reply on the machine socket.
+  await runner.frame(3);
+  expect(seqs()).toEqual([20]);
+  // What the computer sends after the view's end shows.
+  await runner.frame(21);
+  expect(seqs()).toEqual([20, 21]);
   stop();
   live.close();
 });
@@ -260,17 +308,17 @@ test("a view closed as too slow for its link keeps its backoff, even when the ne
   const { machineId } = paired;
   const claim = (i: number) => live.claimView(runner.views()[i]?.streamId ?? "", machineId, fakeSocket().socket);
   const metadata = { deviceWidth: 1280, deviceHeight: 800 };
-  claim(0)?.closed(STREAM_CLOSE.tooSlow);
+  claim(0)?.closed(STREAM_CLOSE.viewTooSlow);
   await until(() => runner.views().length === 2);
   // Its first frame proves nothing about the link: the next drop waits the longer time.
   const second = claim(1);
   second?.data(encodeBrowserFrame({ seq: 1, metadata }, new Uint8Array([0xff, 0xd8])));
-  second?.closed(STREAM_CLOSE.tooSlow);
+  second?.closed(STREAM_CLOSE.viewTooSlow);
   await Bun.sleep(15);
   expect(runner.views()).toHaveLength(2);
   await until(() => runner.views().length === 3);
   // Out of tries.
-  claim(2)?.closed(STREAM_CLOSE.tooSlow);
+  claim(2)?.closed(STREAM_CLOSE.viewTooSlow);
   await Bun.sleep(60);
   expect(runner.views()).toHaveLength(3);
   stop();

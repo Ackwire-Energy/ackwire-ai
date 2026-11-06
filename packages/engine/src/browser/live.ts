@@ -273,6 +273,11 @@ interface AgentLive {
   viewAttempts: number;
   /** Its last view closed as too slow for its link (`STREAM_CLOSE.tooSlow`): a first frame keeps the backoff. */
   viewSlow: boolean;
+  /**
+   * The newest `seq` a view of this stream brought, null before one did: a frame on the machine socket that isn't
+   * newer was sent before that view opened (a view's first frame is the runner's newest), so it is never drawn.
+   */
+  viewSeq: number | null;
   viewers: Set<LiveViewer>;
   unsubscribe: Map<LiveViewer, () => void>;
   /** The mode the runner was last asked for; null = not streaming. */
@@ -584,6 +589,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     if (state.mode === null || mode === null) {
       state.page = null;
       state.frame = null;
+      state.viewSeq = null;
     }
     const fresh = state.mode === null;
     state.mode = mode;
@@ -952,6 +958,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           viewRetry: null,
           viewAttempts: 0,
           viewSlow: false,
+          viewSeq: null,
           mode: null,
           controllerUserId: null,
           handoff: null,
@@ -1211,6 +1218,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
             if (!state.viewSlow) state.viewAttempts = 0;
           }
           const { seq, metadata, jpeg } = frame;
+          state.viewSeq = Math.max(state.viewSeq ?? seq, seq);
           // The JPEG as it came: base64 and a frame socket's bytes are made from it only when a viewer needs them.
           view.viewerDrops += received(state, { agentId, seq, metadata, jpeg });
           // Paced by the people watching: the computer sends no frame that nobody here could take.
@@ -1222,7 +1230,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           endView(view);
           const state = live.get(agentId);
           if (!state || state.view !== view) return;
-          state.viewSlow = code === STREAM_CLOSE.tooSlow;
+          state.viewSlow = code === STREAM_CLOSE.viewTooSlow || code === STREAM_CLOSE.tooSlow;
           // Its frames come on the machine socket again (the runner goes back to it by itself), until it reopens.
           state.view = null;
           deps.log?.warn("browser live view socket closed", { agentId });
@@ -1237,8 +1245,16 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         const state = live.get(frame.agentId);
         // Only from the agent's own computer.
         if (!state || state.machineId !== machineId) return;
-        // Its own socket brings the pictures now: one still on the machine socket was sent before it.
-        if (state.view?.framed) return;
+        // Sent before a view brought a newer one: a straggler, even after that view closed (ADR 0040 §7.1).
+        if (state.viewSeq !== null && frame.seq <= state.viewSeq) return;
+        if (state.view?.framed) {
+          // Newer than its view brought: the runner left that view (too slow), and its close never came (a
+          // half-open socket ends only at the idle timeout). This frame shows now; the view opens again.
+          deps.log?.warn("browser live view left by the computer", { agentId: frame.agentId });
+          closeView(state);
+          state.viewSlow = true;
+          retryView(frame.agentId, state);
+        }
         received(state, { agentId: frame.agentId, seq: frame.seq, data: frame.data, metadata: frame.metadata });
       },
       streamEnded(machineId: string, frame: Extract<RunnerFrame, { type: "browser.stream.ended" }>) {
