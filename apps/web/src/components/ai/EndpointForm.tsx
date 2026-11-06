@@ -14,25 +14,47 @@ import {
   endpointReady,
   pricesProblem,
   withListedModels,
+  withoutModel,
   withTypedModel,
 } from "@agenteschat/client/lib/endpoints";
-import { Button, Checkbox, Field, Icon, Input, Locked, Segmented, SettingNote } from "@agenteschat/ui";
-import { useId, useState } from "react";
+import {
+  AffixInput,
+  Button,
+  Checkbox,
+  DialogBody,
+  DialogFooter,
+  Field,
+  FormActions,
+  FormStack,
+  Icon,
+  Input,
+  Locked,
+  Segmented,
+  SettingNote,
+  Spinner,
+} from "@agenteschat/ui";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
  * "Outro provedor" (ADR 0146): a workspace's own OpenAI- or Anthropic-compatible endpoint. The admin names it, picks
  * its API, types its address and key, fetches its models (or types their ids), chooses which agents may use and their
  * prices, then saves: the server runs one test call per model and the results show here. With `credential`, it
- * changes a saved endpoint's models and prices (its address and key stay).
+ * changes a saved endpoint's models and prices (its address and key stay). With `onCancel` it fills a dialog, its
+ * body and footer; without, it is a block of a panel with its action under it.
  */
 export function EndpointForm({
   orgId,
   credential,
+  lead,
+  onCancel,
   onDone,
 }: {
   orgId: string;
   credential?: Credential;
+  /** The form's first field, owned by the caller (the provider's select): locked and laid out with the rest. */
+  lead?: ReactNode;
+  onCancel?: () => void;
   onDone: (saved: Credential) => void;
 }) {
   const { t } = useTranslation();
@@ -95,146 +117,121 @@ export function EndpointForm({
   const ready = editing ? endpointModelsOf(draft) !== null : endpointReady(draft);
   const unpriced = draft.models.some((m) => m.on && !m.input.trim() && !m.output.trim());
 
+  const Body = onCancel ? DialogBody : FormStack;
+  const Foot = onCancel ? DialogFooter : FormActions;
+
   if (saved) {
     return (
-      <div className="stack" style={{ gap: 12 }}>
-        <b>{t("endpoint.results")}</b>
-        <ul className="ac-iconlist" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-          {checksInOrder(draft, saved.checks).map((c) => {
-            const view = CHECK_VIEW[c.check];
-            return (
-              <li key={c.model} className="ac-iconline">
-                <Icon name={view.tone === "ok" ? "check" : "alert"} size={14} />
-                <span>
-                  <b>{c.model}</b> · {t(view.key, { error: c.error ?? "" })}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-        <span className="row" style={{ justifyContent: "flex-end" }}>
+      <>
+        <Body>
+          <b>{t("endpoint.results")}</b>
+          <ul className="ac-iconlist endpoint-checks">
+            {checksInOrder(draft, saved.checks).map((c) => {
+              const view = CHECK_VIEW[c.check];
+              return (
+                <li key={c.model} className="ac-iconline">
+                  <Icon name={view.tone === "ok" ? "check" : "alert"} size={14} />
+                  <span>
+                    <b>{c.model}</b> · {t(view.key, { error: c.error ?? "" })}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </Body>
+        <Foot>
           <Button variant="primary" onClick={() => onDone(saved.cred)}>
             {t("endpoint.done")}
           </Button>
-        </span>
-      </div>
+        </Foot>
+      </>
     );
   }
 
   return (
-    <div className="stack" style={{ gap: 12 }}>
+    <>
       <Locked when={saving}>
-        {!editing && (
-          <>
-            <Field label={t("endpoint.name")} id={`${ids}-name`}>
-              <Input
-                value={draft.name}
-                maxLength={80}
-                placeholder={t("endpoint.namePlaceholder")}
-                onChange={(e) => set({ name: e.target.value })}
-              />
-            </Field>
-            <Segmented<EndpointStyle>
-              label={t("endpoint.style")}
-              value={draft.style}
-              onValueChange={(style) => set({ style })}
-              options={ENDPOINT_STYLES.map((s) => ({ value: s, label: t(`endpoint.styles.${s}`) }))}
-            />
-            <Field
-              label={t("endpoint.address")}
-              id={`${ids}-url`}
-              help={t("endpoint.addressHelp", { example: endpointBaseExample(draft.style) })}
-            >
-              <Input
-                value={draft.baseURL}
-                inputMode="url"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder={endpointBaseExample(draft.style)}
-                onChange={(e) => set({ baseURL: e.target.value })}
-              />
-            </Field>
-            <Field label={t("endpoint.key")} id={`${ids}-key`} help={t("endpoint.keyHelp")}>
-              <Input
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={draft.apiKey}
-                onChange={(e) => set({ apiKey: e.target.value })}
-              />
-            </Field>
-            <span className="row">
-              <Button
-                icon="refresh"
-                loading={list.isPending}
-                disabled={!endpointAddressLooksValid(draft.baseURL)}
-                onClick={fetchModels}
+        <Body>
+          {lead}
+          {!editing && (
+            <>
+              <Field label={t("endpoint.name")} id={`${ids}-name`}>
+                <Input
+                  value={draft.name}
+                  maxLength={80}
+                  placeholder={t("endpoint.namePlaceholder")}
+                  onChange={(e) => set({ name: e.target.value })}
+                />
+              </Field>
+              <Field label={t("endpoint.style")} group>
+                <Segmented<EndpointStyle>
+                  label={t("endpoint.style")}
+                  value={draft.style}
+                  onValueChange={(style) => set({ style })}
+                  options={ENDPOINT_STYLES.map((s) => ({ value: s, label: t(`endpoint.styles.${s}`) }))}
+                />
+              </Field>
+              <Field
+                label={t("endpoint.address")}
+                id={`${ids}-url`}
+                help={t("endpoint.addressHelp", { example: endpointBaseExample(draft.style) })}
               >
-                {t("endpoint.fetch")}
-              </Button>
-            </span>
-            {list.data?.error && (
-              <SettingNote icon="alert">{t("endpoint.listFailed", { error: list.data.error })}</SettingNote>
-            )}
-          </>
-        )}
-        {draft.models.length > 0 && (
-          <fieldset className="stack" style={{ gap: 8, border: 0, margin: 0, padding: 0 }}>
-            <legend className="small muted" style={{ padding: 0 }}>
-              {t("endpoint.choose")}
-            </legend>
-            {draft.models.map((m) => {
-              const problem = m.on ? pricesProblem(m) : null;
-              return (
-                <div key={m.id} className="stack" style={{ gap: 4 }}>
-                  <span className="row" style={{ gap: 8 }}>
-                    <Checkbox id={`${ids}-m-${m.id}`} checked={m.on} onCheckedChange={(on) => setModel(m.id, { on })} />
-                    <label htmlFor={`${ids}-m-${m.id}`}>{m.id}</label>
-                  </span>
-                  {m.on && (
-                    <span className="row" style={{ gap: 8, paddingInlineStart: 28, flexWrap: "wrap" }}>
-                      <Input
-                        aria-label={t("endpoint.priceIn", { model: m.id })}
-                        placeholder={t("endpoint.priceInShort")}
-                        inputMode="decimal"
-                        value={m.input}
-                        invalid={problem !== null}
-                        style={{ width: 120 }}
-                        onChange={(e) => setModel(m.id, { input: e.target.value })}
-                      />
-                      <Input
-                        aria-label={t("endpoint.priceOut", { model: m.id })}
-                        placeholder={t("endpoint.priceOutShort")}
-                        inputMode="decimal"
-                        value={m.output}
-                        invalid={problem !== null}
-                        style={{ width: 120 }}
-                        onChange={(e) => setModel(m.id, { output: e.target.value })}
-                      />
-                      <span className="small muted">{t("endpoint.priceUnit")}</span>
-                    </span>
-                  )}
-                  {problem && (
-                    <div className="ac-field__error" role="alert" style={{ paddingInlineStart: 28 }}>
-                      {t(problem === "both" ? "endpoint.priceBoth" : "endpoint.priceInvalid")}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </fieldset>
-        )}
-        <Field
-          label={t("endpoint.addModel")}
-          id={`${ids}-typed`}
-          error={typedWrong ? t("endpoint.modelInvalid") : undefined}
-        >
-          <span className="agp-addacct__paste">
-            <Input
+                <Input
+                  value={draft.baseURL}
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={endpointBaseExample(draft.style)}
+                  onChange={(e) => set({ baseURL: e.target.value })}
+                />
+              </Field>
+              <Field label={t("endpoint.key")} id={`${ids}-key`} help={t("endpoint.keyHelp")}>
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={draft.apiKey}
+                  onChange={(e) => set({ apiKey: e.target.value })}
+                />
+              </Field>
+            </>
+          )}
+          <Field
+            label={t("endpoint.addModel")}
+            id={`${ids}-typed`}
+            error={typedWrong ? t("endpoint.modelInvalid") : undefined}
+            labelAside={
+              !editing && (
+                <button
+                  type="button"
+                  className="ac-link ac-link--muted small ac-iconline"
+                  aria-busy={list.isPending || undefined}
+                  disabled={list.isPending || !endpointAddressLooksValid(draft.baseURL)}
+                  onClick={fetchModels}
+                >
+                  {list.isPending && <Spinner size={12} />}
+                  {t("endpoint.fetch")}
+                </button>
+              )
+            }
+          >
+            <AffixInput
               value={typed}
               spellCheck={false}
               autoComplete="off"
               placeholder={t("endpoint.modelPlaceholder")}
+              invalid={typedWrong}
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  icon="plus"
+                  aria-label={t("endpoint.add")}
+                  disabled={!typed.trim()}
+                  onClick={addTyped}
+                />
+              }
               onChange={(e) => {
                 setTyped(e.target.value);
                 setTypedWrong(false);
@@ -245,18 +242,73 @@ export function EndpointForm({
                 addTyped();
               }}
             />
-            <Button icon="plus" disabled={!typed.trim()} onClick={addTyped}>
-              {t("endpoint.add")}
-            </Button>
-          </span>
-        </Field>
-        {unpriced && <SettingNote icon="info">{t("endpoint.unpriced")}</SettingNote>}
+          </Field>
+          {list.data?.error && (
+            <SettingNote icon="alert">{t("endpoint.listFailed", { error: list.data.error })}</SettingNote>
+          )}
+          {draft.models.length > 0 && (
+            <fieldset className="endpoint-models" aria-labelledby={`${ids}-choose`}>
+              <span className="ac-field__label" id={`${ids}-choose`}>
+                {t("endpoint.choose")}
+              </span>
+              {draft.models.map((m) => {
+                const problem = m.on ? pricesProblem(m) : null;
+                return (
+                  <div key={m.id} className="endpoint-model">
+                    <Checkbox id={`${ids}-m-${m.id}`} checked={m.on} onCheckedChange={(on) => setModel(m.id, { on })} />
+                    <label htmlFor={`${ids}-m-${m.id}`}>{m.id}</label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon="close"
+                      aria-label={t("common.removeName", { name: m.id })}
+                      onClick={() => setDraft((d) => withoutModel(d, m.id))}
+                    />
+                    {m.on && (
+                      <span className="endpoint-model__prices">
+                        <Input
+                          aria-label={t("endpoint.priceIn", { model: m.id })}
+                          placeholder={t("endpoint.priceInShort")}
+                          inputMode="decimal"
+                          value={m.input}
+                          invalid={problem !== null}
+                          onChange={(e) => setModel(m.id, { input: e.target.value })}
+                        />
+                        <Input
+                          aria-label={t("endpoint.priceOut", { model: m.id })}
+                          placeholder={t("endpoint.priceOutShort")}
+                          inputMode="decimal"
+                          value={m.output}
+                          invalid={problem !== null}
+                          onChange={(e) => setModel(m.id, { output: e.target.value })}
+                        />
+                      </span>
+                    )}
+                    {problem && (
+                      <div className="ac-field__error endpoint-model__error" role="alert">
+                        {t(problem === "both" ? "endpoint.priceBoth" : "endpoint.priceInvalid")}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {draft.models.some((m) => m.on) && <span className="ac-field__help">{t("endpoint.priceUnit")}</span>}
+            </fieldset>
+          )}
+          {unpriced && <SettingNote icon="info">{t("endpoint.unpriced")}</SettingNote>}
+        </Body>
       </Locked>
-      <span className="row" style={{ justifyContent: "flex-end" }}>
+      <Foot note={saving ? t("endpoint.testing") : undefined}>
+        {onCancel && (
+          <Button onClick={onCancel} disabled={saving}>
+            {t("common.cancel")}
+          </Button>
+        )}
         <Button variant="primary" loading={saving} disabled={!ready || saving} onClick={save}>
-          {saving ? t("endpoint.testing") : t(editing ? "endpoint.saveModels" : "endpoint.save")}
+          {t(editing ? "endpoint.saveModels" : "endpoint.save")}
         </Button>
-      </span>
-    </div>
+      </Foot>
+    </>
   );
 }

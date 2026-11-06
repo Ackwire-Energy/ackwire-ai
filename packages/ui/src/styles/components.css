@@ -468,8 +468,21 @@ html:not([data-pointer]) .ac-link:focus-visible {
 .ac-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--field-gap);
   min-width: 0;
+}
+/* A form's fields, notes and groups (`FormStack`). `Locked` has no box, so what it holds is the form's own child. */
+.ac-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-gap);
+  min-width: 0;
+}
+.ac-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 .ac-field__label {
   font-size: 13px;
@@ -611,6 +624,9 @@ textarea.ac-input {
 .ac-input-affix:hover {
   border-color: var(--line-strong);
 }
+.ac-input-affix:has(input[aria-invalid="true"]) {
+  border-color: var(--danger);
+}
 .ac-input-affix:focus-within {
   background: var(--raised);
   border-color: var(--field-line);
@@ -629,6 +645,18 @@ textarea.ac-input {
   font: inherit;
   color: var(--ink);
   background: transparent;
+}
+.ac-input-affix input:first-child {
+  padding-inline-start: var(--control-px-md);
+}
+.ac-input-affix input::placeholder {
+  color: var(--faint);
+}
+/* A small button inside the field's end, as far from its top, bottom and end. */
+.ac-input-affix__action {
+  flex: none;
+  display: flex;
+  padding-inline-end: calc((var(--control-h-md) - 2px - var(--control-h-sm)) / 2);
 }
 /* A code typed one character per box (CodeInput, ADR 0144): fields of the ruler's large height and its radius, as wide
    as they fit up to a square-ish 44, the character centred in tabular figures. Twelve boxes still fit a chat card on a
@@ -2398,7 +2426,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   padding: 4px var(--dialog-pad);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--form-gap);
 }
 .ac-dialog__body > * {
   flex: none;
@@ -4599,6 +4627,14 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 }
 .ac-seg::-webkit-scrollbar {
   display: none;
+}
+/* In a form it fills the field, its options sharing the track evenly while each still fits on its line. */
+.ac-field > .ac-seg {
+  display: flex;
+}
+.ac-field > .ac-seg > .ac-seg__item {
+  flex: 1 1 0;
+  min-width: max-content;
 }
 .ac-seg__item {
   position: relative;

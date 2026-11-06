@@ -217,6 +217,14 @@ describe("provider marks", () => {
     expect(logo(render(<ProviderLogo id="mosaic" size="chip" />).container).textContent).toBe("M");
   });
 
+  test("a workspace's own endpoint is a generic mark, never the letter C of its id", () => {
+    const el = logo(render(<ProviderLogo id="custom" size="xs" />).container);
+    expect(el.querySelector(".ac-brand__initial")).toBeNull();
+    expect(el.dataset.mark).toBe("custom");
+    expect(el.querySelector("path")?.getAttribute("d")).toBe(pathMark("custom").path);
+    expect(el.className).toContain("ac-brand--mono");
+  });
+
   test("BrainLogo still draws Claude for Claude Code and OpenAI for Codex, at its sizes", () => {
     const claude = logo(render(<BrainLogo kind="claude_code" />).container);
     expect(claude.dataset.mark).toBe("claude");

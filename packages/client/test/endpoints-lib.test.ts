@@ -11,11 +11,18 @@ import {
   parsePrice,
   pricesProblem,
   withListedModels,
+  withoutModel,
   withTypedModel,
 } from "../src/lib/endpoints";
 import { keyRuns, modelChoices } from "../src/lib/providers";
 
 describe("the endpoint form", () => {
+  test("a model taken off leaves the others as they were", () => {
+    const d = withListedModels(emptyEndpointDraft(), [{ id: "a" }, { id: "b" }]);
+    expect(withoutModel(d, "a").models.map((m) => m.id)).toEqual(["b"]);
+    expect(d.models).toHaveLength(2);
+  });
+
   test("listed models start off, typed ones on; a typed id that isn't one is refused", () => {
     let d = withListedModels({ ...emptyEndpointDraft(), name: "GW", baseURL: "https://gw.example/v1" }, [
       { id: "a" },

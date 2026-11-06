@@ -1029,3 +1029,18 @@ describe("Back in Connect an AI", () => {
     expect(flowBack({ page: "home" }, false)).toBeNull();
   });
 });
+
+describe("Outro provedor on the phone", () => {
+  test("the API under a header across the width, Buscar modelos on the add line's header, + in the field, × per model", async () => {
+    // The screen is a component the tests can't render: what it wires in, as text.
+    const form = await Bun.file(new URL("../../src/features/ai/EndpointForm.tsx", import.meta.url).pathname).text();
+    expect(form).toContain('<GroupedHeader>{t("endpoint.style")}</GroupedHeader>');
+    expect(form).toContain('wide="fit"');
+    expect(form.indexOf('t("endpoint.style")')).toBeLessThan(form.indexOf('t("endpoint.address")'));
+    expect(form).toMatch(
+      /<GroupedHeader\s+aside=\{\s*<Button\s+variant="text"\s+size="sm"\s+label=\{t\("endpoint\.fetch"\)\}/,
+    );
+    expect(form).toContain('<IconButton icon="plus" label={t("endpoint.add")}');
+    expect(form).toContain("withoutModel(d, m.id)");
+  });
+});

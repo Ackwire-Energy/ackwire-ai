@@ -9577,6 +9577,45 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   flex: 1;
   min-width: 102px;
 }
+/* "Outro provedor": its models under the field that adds them, each with a way to remove it, prices under its name. */
+.endpoint-models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.endpoint-model {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--field-gap) var(--space-2);
+}
+.endpoint-model > label {
+  overflow-wrap: anywhere;
+}
+/* Its × stands under the field's +, which sits inside the field's border. */
+.endpoint-model > .ac-btn {
+  margin-inline-end: calc((var(--control-h-md) - var(--control-h-sm)) / 2);
+}
+.endpoint-model__prices,
+.endpoint-model__error {
+  grid-column: 2 / -1;
+}
+.endpoint-model__prices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+.endpoint-checks {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .agp-addacct__code output {
   font-size: 24px;
   font-weight: 650;

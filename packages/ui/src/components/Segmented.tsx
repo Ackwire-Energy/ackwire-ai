@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState }
 import { cx } from "../cx";
 import { Button, type ButtonProps } from "./Button";
 import { CountChip } from "./Chip";
+import { useFieldControl } from "./Field";
 
 export interface SegmentedOption<V extends string> {
   value: V;
@@ -20,7 +21,7 @@ export interface SegmentedOption<V extends string> {
  * A segmented control: one choice of a few, a raised pill slides (spring)
  * under the chosen one. Radio semantics (`radiogroup` / `radio`), arrows move.
  * A value no option has (several things that differ) shows no choice, and Tab
- * reaches the first option.
+ * reaches the first option. Inside a `Field` (with `group`) it takes the field's full width and label.
  */
 export function Segmented<V extends string>({
   value,
@@ -40,6 +41,7 @@ export function Segmented<V extends string>({
   disabled?: boolean;
   className?: string;
 }) {
+  const field = useFieldControl({});
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
   const chosen = options.findIndex((o) => o.value === value);
@@ -69,7 +71,8 @@ export function Segmented<V extends string>({
   return (
     <div
       role="radiogroup"
-      aria-label={label}
+      {...(field.labelledBy ? { "aria-labelledby": field.labelledBy } : { "aria-label": label })}
+      aria-describedby={field["aria-describedby"]}
       aria-disabled={disabled || undefined}
       className={cx("ac-seg", size === "sm" && "ac-seg--sm", className)}
       onKeyDown={(e) => {

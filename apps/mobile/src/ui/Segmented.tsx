@@ -8,8 +8,11 @@ import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 export type SegmentedProps = FiltersProps & {
-  /** As wide as its box, the segments sharing it (a screen's views, as an agent's Hoje · Acesso · Memória). */
-  wide?: boolean;
+  /**
+   * As wide as its box, the segments sharing it evenly (a screen's views, as an agent's Hoje · Acesso · Memória).
+   * `fit`: each as wide as its words first, so long labels stay on one line (a form's choice).
+   */
+  wide?: boolean | "fit";
 };
 
 /** The track's inset around the segments; a segment's corner is the track's less it, so the two stay concentric. */
@@ -42,7 +45,10 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
             }}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
-            style={({ pressed }) => [wide ? { flex: 1 } : null, pressed && !on ? { opacity: 0.6 } : null]}
+            style={({ pressed }) => [
+              wide === "fit" ? { flexGrow: 1 } : wide ? { flex: 1 } : null,
+              pressed && !on ? { opacity: 0.6 } : null,
+            ]}
             // A 28-point segment: the slop gives it the 44 a finger needs, past the track's own padding.
             hitSlop={{ top: 8, bottom: 8 }}
           >

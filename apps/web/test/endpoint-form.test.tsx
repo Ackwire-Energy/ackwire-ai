@@ -67,4 +67,56 @@ describe("Outro provedor in Settings › Chaves de IA", () => {
     await click(within(add).getByRole("button", { name: "Concluir" }));
     expect(screen().queryByRole("dialog", { name: "Adicionar chave de API" })).toBeNull();
   });
+
+  const openForm = async (state = seedState()) => {
+    const api = createFakeApi(state);
+    await renderApp(`/org/${ORG_ID}/settings/keys`, { api });
+    await settle(5);
+    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
+    await click(within(keys).getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    await pick(within(add).getByRole("combobox", { name: "Provedor" }), /Outro provedor/);
+    return { add, api };
+  };
+
+  test("laid out as a dialog: its fields in the body, Buscar modelos on the label's line, Cancelar then the save in the footer", async () => {
+    const { add } = await openForm();
+    const body = add.querySelector(".ac-dialog__body") as HTMLElement;
+    expect(body.querySelector(".ac-brand__initial")).toBeNull();
+    expect(body.querySelector('.ac-brand[data-mark="custom"]')).not.toBeNull();
+    expect(within(body).getByRole("radiogroup", { name: "API" }).closest(".ac-field")).not.toBeNull();
+    const fetch = within(body).getByRole("button", { name: "Buscar modelos" });
+    expect(fetch.closest(".ac-field__label-row")?.textContent).toContain("Adicionar um modelo");
+    expect(fetch.className).not.toContain("ac-btn");
+    expect(within(body).getByRole("button", { name: "Adicionar" }).closest(".ac-input-affix")).not.toBeNull();
+    const foot = add.querySelector(".ac-dialog__foot") as HTMLElement;
+    expect([...foot.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Cancelar", "Salvar e testar"]);
+    await click(within(foot).getByRole("button", { name: "Cancelar" }));
+    expect(screen().queryByRole("dialog", { name: "Adicionar chave de API" })).toBeNull();
+  });
+
+  test("Enter adds a typed model, its × takes it off, and while saving every control is off", async () => {
+    const { add, api } = await openForm();
+    await type(within(add).getByLabelText("Nome"), "OpenGateway");
+    await type(within(add).getByLabelText("Endereço"), "https://gw.example/v1");
+    const typed = within(add).getByLabelText("Adicionar um modelo");
+    for (const id of ["llama-4", "qwen-3"]) {
+      await type(typed, id);
+      await act(async () => fireEvent.keyDown(typed, { key: "Enter" }));
+      await settle();
+    }
+    expect((typed as HTMLInputElement).value).toBe("");
+    await click(within(add).getByRole("button", { name: "Remover qwen-3" }));
+    expect(within(add).queryByRole("checkbox", { name: "qwen-3" })).toBeNull();
+    expect(within(add).getByRole("checkbox", { name: "llama-4" })).toBeDefined();
+
+    (api.agents as { addCredential: unknown }).addCredential = () => new Promise(() => {});
+    await click(within(add).getByRole("button", { name: "Salvar e testar" }));
+    expect(add.textContent).toContain("Testando cada modelo…");
+    expect(within(add).getByRole("button", { name: "Cancelar" }).hasAttribute("disabled")).toBe(true);
+    expect(add.querySelector("fieldset.ac-locked")?.hasAttribute("disabled")).toBe(true);
+    expect(
+      add.querySelector("fieldset.ac-locked")?.contains(within(add).getByRole("combobox", { name: "Provedor" })),
+    ).toBe(true);
+  });
 });
