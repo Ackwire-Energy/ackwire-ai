@@ -1,5 +1,6 @@
 import type { Message, ThreadInfo, ThreadStartMeta } from "../api/types";
 import { clockHour } from "./format";
+import { plainLine } from "./markdown";
 
 /**
  * Threads in the web (ADR 0029): the range suggested by "Criar thread a partir daqui", the
@@ -86,9 +87,8 @@ export function timeSpan(locale: string, fromIso: string, toIso: string): string
 }
 
 /** The name a thread shows: its title, else its root's text. */
-/** A thread's name: its title, else its first message without markdown marks (`**`, `__`, backticks). */
-export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) =>
-  t.title?.trim() || t.rootText.replace(/\*\*|__|`/g, "");
+/** A thread's name: its title, else its first message in plain words. */
+export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) => t.title?.trim() || plainLine(t.rootText);
 
 // ── "Ajustar trecho": the selection on the channel ───────────────────────────
 

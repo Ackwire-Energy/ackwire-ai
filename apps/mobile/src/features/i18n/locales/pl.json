@@ -129,7 +129,6 @@
     "refuse": "Odrzuć",
     "approve": "Zatwierdź",
     "hold": "Przytrzymaj, aby zatwierdzić",
-    "holding": "Trzymaj dalej…",
     "holdNote": "Wysokie ryzyko: przytrzymaj przycisk przez sekundę.",
     "tapNote": "Zatwierdzenie wykona to od razu.",
     "tapNoteAhead": "Zatwierdzenie teraz obejmie {{when}}.",
@@ -1130,8 +1129,7 @@
     "addPasswordFirst": "Najpierw dodaj hasło do konta na stronie, a potem wpisz je tutaj.",
     "addPasswordWeb": "Dodaj hasło na stronie",
     "otherAccount": "Zalogowano się na inne konto. Nic nie zostało usunięte.",
-    "hold": "Przytrzymaj, aby usunąć",
-    "holding": "Trzymaj dalej…"
+    "hold": "Przytrzymaj, aby usunąć"
   },
   "files": {
     "type": {

@@ -117,7 +117,6 @@
     "refuse": "Ablehnen",
     "approve": "Freigeben",
     "hold": "Zum Freigeben gedrückt halten",
-    "holding": "Weiter gedrückt halten…",
     "holdNote": "Hohes Risiko: Halte den Button eine Sekunde lang gedrückt.",
     "tapNote": "Mit der Freigabe passiert es sofort.",
     "tapNoteAhead": "Eine Freigabe jetzt gilt für {{when}}.",
@@ -988,8 +987,7 @@
     "addPasswordFirst": "Füge deinem Konto zuerst auf der Website ein Passwort hinzu und gib es dann hier ein.",
     "addPasswordWeb": "Passwort auf der Website hinzufügen",
     "otherAccount": "Du hast dich mit einem anderen Konto angemeldet. Es wurde nichts gelöscht.",
-    "hold": "Zum Löschen gedrückt halten",
-    "holding": "Weiter gedrückt halten…"
+    "hold": "Zum Löschen gedrückt halten"
   },
   "files": {
     "type": {

@@ -1363,7 +1363,9 @@
       "drive": "Fichiers, rapports et tableaux",
       "routines": "Ce que les agents font seuls, à heure fixe",
       "calendar": "Réunions et échéances",
-      "team": "Qui est qui : personnes, agents et leurs groupes"
+      "team": "Qui est qui : personnes, agents et leurs groupes",
+      "dashboards": "Des chiffres et des graphiques que les agents tiennent à jour",
+      "taskManager": "Ce que chaque agent fait en ce moment, et arrêter ce qu'il faut"
     },
     "customizeSidebar": "Personnaliser la barre latérale",
     "sidebarMenu": {
@@ -1382,7 +1384,6 @@
       "auto": "Quand il y a quelque chose",
       "autoHint": "Apparaît quand quelque chose vous attend",
       "reset": "Rétablir par défaut",
-      "instant": "Les changements s'appliquent tout de suite.",
       "tools": "Outils",
       "toolsTitle": "En haut",
       "order": "Ordre des sections",
@@ -1436,6 +1437,8 @@
     "threads": "Fils",
     "routines": "Routines",
     "team": "Équipe",
+    "dashboards": "Tableaux de bord",
+    "taskManager": "Gestionnaire des tâches",
     "calendar": "Agenda",
     "drive": "Drive",
     "members": "Membres",
@@ -4090,7 +4093,6 @@
     },
     "highRisk": "Action à haut risque",
     "hold": "Maintenir pour approuver",
-    "holding": "Maintenez…",
     "holdLabel": "{{action}} : maintenez pour confirmer",
     "holdHint": "Maintenez le bouton pour approuver. Action à haut risque : un simple clic ne suffit pas.",
     "holdNote": "Haut risque : maintenez le bouton pour confirmer.",
@@ -5908,6 +5910,17 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "Supprimer la tâche",
+      "title": "Supprimer la tâche #{{number}} ?",
+      "body": "Elle disparaît pour tout le monde, avec sa conversation et les fichiers de la conversation.",
+      "steps_one": "Son étape disparaît aussi.",
+      "steps_many": "Ses {{count}} étapes disparaissent aussi.",
+      "steps_other": "Ses {{count}} étapes disparaissent aussi.",
+      "working": "{{name}} arrête ce qu'il fait dessus.",
+      "confirm": "Supprimer",
+      "done": "Tâche #{{number}} supprimée."
+    },
     "assigneeFilter": "Responsable",
     "priorityFilter": "Priorité",
     "title": "Tâches",
@@ -10859,6 +10872,16 @@
     "namePlaceholder": "Ex. : Support client",
     "continueIn": "Continuer sur {{name}}",
     "continueInComposio": "Continuer sur Composio",
+    "githubOrgs": {
+      "title": "Organisations atteintes",
+      "none": "Aucune organisation pour l'instant.",
+      "lead": "GitHub ne demande les organisations que la première fois. Pour en ajouter une, ouvrez la page de l'app là-bas et cliquez sur Grant à côté.",
+      "open": "Autoriser des organisations sur GitHub",
+      "added": "Maintenant aussi : {{names}}.",
+      "removed": "Plus maintenant : {{names}}.",
+      "same": "Rien n'a changé dans les organisations.",
+      "failed": "Impossible de lire les organisations pour le moment."
+    },
     "composioHelp": "Vous vous connectez sur la page de Composio, en anglais, puis revenez ici. {{name}} affiche l'autorisation sous le nom « Composio ».",
     "or": "ou",
     "withKey": "Connecter avec une clé API",
@@ -11476,7 +11499,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Cette personne n'est pas dans cette conversation, elle ne voit donc pas cette tâche."
+      "assigneeOutside": "Cette personne n'est pas dans cette conversation, elle ne voit donc pas cette tâche.",
+      "deleteForbidden": "Seule la personne qui a créé cette tâche ou un administrateur peut la supprimer."
     },
     "connector": {
       "labelTaken": "Un autre connecteur porte déjà ce nom.",
@@ -14872,7 +14896,6 @@
   "taskManager": {
     "title": "Gestionnaire des tâches",
     "subtitle": "Ce que font les agents maintenant et ce qui s'est terminé aujourd'hui.",
-    "nav": "Gestionnaire des tâches",
     "search": "Rechercher une tâche, un agent ou une app",
     "working_one": "{{count}} au travail",
     "working_many": "{{count}} au travail",
@@ -15041,7 +15064,6 @@
       "room": "A de la place",
       "computers": "Ordinateurs"
     },
-    "navWhat": "Ce que chaque agent fait en ce moment, et arrêter ce qu'il faut",
     "cards": {
       "label": "Agents",
       "previous": "Agents précédents",
@@ -15282,8 +15304,6 @@
   "dashboards": {
     "title": "Tableaux de bord",
     "subtitle": "Des chiffres et des graphiques que les agents tiennent à jour.",
-    "sidebar": "Tableaux de bord",
-    "navWhat": "Des chiffres et des graphiques que les agents tiennent à jour",
     "new": "Nouveau tableau de bord",
     "back": "Tableaux de bord",
     "home": "Mon accueil",

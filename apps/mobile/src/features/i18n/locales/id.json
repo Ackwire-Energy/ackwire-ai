@@ -111,7 +111,6 @@
     "refuse": "Tolak",
     "approve": "Setujui",
     "hold": "Tahan untuk menyetujui",
-    "holding": "Terus tahan…",
     "holdNote": "Risiko tinggi: tahan tombol selama satu detik.",
     "tapNote": "Menyetujui langsung menjalankannya.",
     "tapNoteAhead": "Menyetujui sekarang berlaku untuk {{when}}.",
@@ -917,8 +916,7 @@
     "addPasswordFirst": "Tambahkan kata sandi ke akunmu di situs web dulu, lalu ketik di sini.",
     "addPasswordWeb": "Tambahkan kata sandi di situs web",
     "otherAccount": "Kamu masuk ke akun lain. Tidak ada yang dihapus.",
-    "hold": "Tahan untuk menghapus",
-    "holding": "Terus tahan…"
+    "hold": "Tahan untuk menghapus"
   },
   "files": {
     "type": {

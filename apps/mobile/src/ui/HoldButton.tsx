@@ -1,6 +1,6 @@
 import { mixHex } from "@agenteschat/ui/agent/engine";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, {
@@ -19,10 +19,8 @@ import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 export interface HoldButtonProps {
-  /** Shown at rest, e.g. "Segure para aprovar". */
+  /** "Segure para aprovar". One label: a shorter one while held would shrink the button under the finger. */
   label: string;
-  /** Shown while held, e.g. "Segure…". */
-  holdLabel: string;
   onConfirm: () => void;
   /** How long to hold (default 1100 ms). */
   durationMs?: number;
@@ -36,21 +34,13 @@ export interface HoldButtonProps {
  * Hold to confirm (high-risk approvals): the button fills from the left while held, ticks a haptic,
  * confirms with a success haptic when full, and cancels when released early.
  */
-export function HoldButton({
-  label,
-  holdLabel,
-  onConfirm,
-  durationMs = 1100,
-  disabled = false,
-  size = "md",
-}: HoldButtonProps) {
+export function HoldButton({ label, onConfirm, durationMs = 1100, disabled = false, size = "md" }: HoldButtonProps) {
   const theme = useTheme();
   const { t } = useTranslation();
   const look = primaryLook(theme);
   const s = BUTTON_SIZES[size];
   const fill = useSharedValue(0);
   const press = useSharedValue(0);
-  const [holding, setHolding] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const confirmRef = useRef(onConfirm);
   confirmRef.current = onConfirm;
@@ -63,13 +53,11 @@ export function HoldButton({
   );
 
   const start = () => {
-    setHolding(true);
     haptics.light();
     fill.value = withTiming(1, { duration: durationMs, easing: Easing.linear });
     press.value = theme.reducedMotion ? 1 : withSpring(1, theme.motion.press);
     timer.current = setTimeout(() => {
       timer.current = null;
-      setHolding(false);
       press.value = withTiming(0, { duration: 120 });
       fill.value = withTiming(0, { duration: 250 });
       haptics.success();
@@ -80,7 +68,6 @@ export function HoldButton({
     if (!timer.current) return;
     clearTimeout(timer.current);
     timer.current = null;
-    setHolding(false);
     cancelAnimation(fill);
     fill.value = withTiming(0, { duration: 250, easing: Easing.bezier(0.2, 0.8, 0.2, 1) });
     press.value = theme.reducedMotion ? 0 : withSpring(0, theme.motion.press);
@@ -129,7 +116,7 @@ export function HoldButton({
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
           style={[systemText(s.text, weights.semibold), { color: look.text }]}
         >
-          {holding ? holdLabel : label}
+          {label}
         </RNText>
       </Pressable>
     </Animated.View>

@@ -199,7 +199,18 @@ test("the tools' order: each person's own, per workspace, every tool once, besid
   await owner(sidebar, { method: "PATCH", json: { item: "wiki", place: "always" } });
   await owner(`${sidebar}/order`, { method: "PUT", json: { order: ["people", "tools", "channels", "agents"] } });
 
-  const driveFirst = ["drive", "approvals", "threads", "issues", "wiki", "routines", "calendar", "team"];
+  const driveFirst = [
+    "drive",
+    "approvals",
+    "threads",
+    "issues",
+    "wiki",
+    "routines",
+    "calendar",
+    "team",
+    "dashboards",
+    "taskManager",
+  ];
   const saved = await put({ order: driveFirst });
   expect(saved.status).toBe(200);
   expect(await saved.json()).toEqual({ order: driveFirst });

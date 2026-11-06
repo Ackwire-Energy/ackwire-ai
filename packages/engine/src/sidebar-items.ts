@@ -19,6 +19,8 @@ export const SIDEBAR_ITEMS = [
   "routines",
   "calendar",
   "team",
+  "dashboards",
+  "taskManager",
 ] as const;
 export type SidebarItem = (typeof SIDEBAR_ITEMS)[number];
 export const SIDEBAR_PLACES = ["always", "more", "auto"] as const;

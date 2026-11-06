@@ -3212,6 +3212,12 @@
   "shell.moreWhat.team": {
     "value": "Who's who: people, agents and their groups"
   },
+  "shell.moreWhat.dashboards": {
+    "value": "Numbers and charts the agents keep up to date"
+  },
+  "shell.moreWhat.taskManager": {
+    "value": "What each agent is doing now, and stopping what you need"
+  },
   "shell.customizeSidebar": {
     "value": "Customize sidebar"
   },
@@ -3253,9 +3259,6 @@
   },
   "shell.sidebarSetup.reset": {
     "value": "Reset to default"
-  },
-  "shell.sidebarSetup.instant": {
-    "value": "Changes apply right away."
   },
   "shell.sidebarSetup.tools": {
     "value": "Tools"
@@ -3406,6 +3409,12 @@
   },
   "shell.team": {
     "value": "Team"
+  },
+  "shell.dashboards": {
+    "value": "Dashboards"
+  },
+  "shell.taskManager": {
+    "value": "Task manager"
   },
   "shell.calendar": {
     "value": "Calendar"
@@ -7278,6 +7287,24 @@
   "secret.replaces": {
     "value": "Replaces the key {{agent}} already has under this name."
   },
+  "secret.labelPassword": {
+    "value": "Password for {{host}}"
+  },
+  "secret.labelCode": {
+    "value": "Code for {{host}}"
+  },
+  "secret.labelKey": {
+    "value": "A key for {{agent}}'s computer"
+  },
+  "secret.labelFile": {
+    "value": "The file {{path}}"
+  },
+  "secret.placeholder": {
+    "value": "Type it here"
+  },
+  "secret.account": {
+    "value": "Account: {{username}}."
+  },
   "secret.private": {
     "value": "Sent encrypted straight to the computer. It stays out of the chat and away from the agent."
   },
@@ -7301,6 +7328,36 @@
   },
   "secret.outcomeWithdrawn": {
     "value": "{{agent}} no longer needs this."
+  },
+  "secret.endedDeclined": {
+    "value": "Declined. {{agent}} goes on without it."
+  },
+  "secret.endedExpired": {
+    "value": "Nobody answered in time. {{agent}} goes on without it, and can ask again."
+  },
+  "secret.endedRunStopped": {
+    "value": "{{agent}}'s task stopped before this was answered. Ask {{agent}} again if you still need it."
+  },
+  "secret.endedSuperseded": {
+    "value": "{{agent}} asked again in a newer request."
+  },
+  "secret.endedComputer": {
+    "value": "This can't reach {{agent}} anymore: the computer that asked changed. Ask {{agent}} to ask again."
+  },
+  "secret.endedPersonLeft": {
+    "value": "{{person}} left the workspace before answering."
+  },
+  "secret.endedClosed": {
+    "value": "This request closed before anyone answered. Ask {{agent}} again if you still need it."
+  },
+  "secret.seeNewer": {
+    "value": "See the newer request"
+  },
+  "secret.computerAway": {
+    "value": "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment."
+  },
+  "secret.computerPaused": {
+    "value": "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}."
   },
   "secret.failed": {
     "value": "Couldn't deliver it. Is the agent's computer on?"
@@ -9581,9 +9638,6 @@
   },
   "approvals.hold": {
     "value": "Hold to approve"
-  },
-  "approvals.holding": {
-    "value": "Hold…"
   },
   "approvals.holdLabel": {
     "value": "{{action}}: hold to confirm"
@@ -13708,6 +13762,30 @@
   },
   "scopes.custom_write.description": {
     "value": "Use the write tools. Those marked sensitive always ask for approval."
+  },
+  "issues.delete.action": {
+    "value": "Delete task"
+  },
+  "issues.delete.title": {
+    "value": "Delete task #{{number}}?"
+  },
+  "issues.delete.body": {
+    "value": "It goes for everyone, with its conversation and the conversation's files."
+  },
+  "issues.delete.steps": {
+    "value": {
+      "one": "Its step goes too.",
+      "other": "Its {{count}} steps go too."
+    }
+  },
+  "issues.delete.working": {
+    "value": "{{name}} stops what it's doing on it."
+  },
+  "issues.delete.confirm": {
+    "value": "Delete"
+  },
+  "issues.delete.done": {
+    "value": "Task #{{number}} deleted."
   },
   "issues.assigneeFilter": {
     "value": "Assignee"
@@ -25378,6 +25456,30 @@
   "connectFlow.continueInComposio": {
     "value": "Continue on Composio"
   },
+  "connectFlow.githubOrgs.title": {
+    "value": "Organizations it reaches"
+  },
+  "connectFlow.githubOrgs.none": {
+    "value": "No organization yet."
+  },
+  "connectFlow.githubOrgs.lead": {
+    "value": "GitHub asks about organizations only the first time. To add one, open the app's page there and press Grant beside it."
+  },
+  "connectFlow.githubOrgs.open": {
+    "value": "Grant organizations on GitHub"
+  },
+  "connectFlow.githubOrgs.added": {
+    "value": "Now also: {{names}}."
+  },
+  "connectFlow.githubOrgs.removed": {
+    "value": "No longer: {{names}}."
+  },
+  "connectFlow.githubOrgs.same": {
+    "value": "Nothing changed in the organizations."
+  },
+  "connectFlow.githubOrgs.failed": {
+    "value": "Couldn't read the organizations now."
+  },
   "connectFlow.composioHelp": {
     "value": "You sign in on Composio's page, in English, and come back here. {{name}} shows the permission as “Composio”."
   },
@@ -26784,6 +26886,9 @@
   },
   "errors.issue.assigneeOutside": {
     "value": "This person isn't in this conversation, so they can't see this task."
+  },
+  "errors.issue.deleteForbidden": {
+    "value": "Only who created this task or an administrator can delete it."
   },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."
@@ -32342,6 +32447,12 @@
   "builtinTools.run_skill_script.description": {
     "value": "Runs a skill's script in the environment."
   },
+  "builtinTools.vault_make_password.label": {
+    "value": "Make a password"
+  },
+  "builtinTools.vault_make_password.description": {
+    "value": "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it."
+  },
   "builtinTools.computer_status.label": {
     "value": "Check the computer"
   },
@@ -32425,6 +32536,12 @@
   },
   "builtinTools.browser_type_secret.description": {
     "value": "Types a password you gave it into a password or code field, without seeing it."
+  },
+  "builtinTools.browser_make_password.label": {
+    "value": "Make a password"
+  },
+  "builtinTools.browser_make_password.description": {
+    "value": "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it."
   },
   "builtinTools.browser_wait.label": {
     "value": "Wait for the page"
@@ -33327,6 +33444,9 @@
   "browser.watch.step.browser_type_secret": {
     "value": "Typed a password"
   },
+  "browser.watch.step.browser_make_password": {
+    "value": "Made a password"
+  },
   "browser.watch.step.browser_wait": {
     "value": "Waited for the page"
   },
@@ -33630,14 +33750,14 @@
   "deleteAccount.intro": {
     "value": "This deletes your whole account, not just one workspace."
   },
+  "deleteAccount.when": {
+    "value": "Your account goes for good on {{date}}. Until then, sign in to restore it."
+  },
   "deleteAccount.whole": {
     "value": "Your whole account"
   },
   "deleteAccount.oneWorkspace": {
     "value": "Want to delete just one workspace? Your account stays."
-  },
-  "deleteAccount.when": {
-    "value": "Your account goes for good on {{date}}. Until then, sign in to restore it."
   },
   "deleteAccount.closes": {
     "value": "{{name}} closes now. You're the only one there, so it's deleted for good on {{date}}."
@@ -34468,9 +34588,6 @@
   "taskManager.subtitle": {
     "value": "What the agents are doing now and what ended today."
   },
-  "taskManager.nav": {
-    "value": "Task manager"
-  },
   "taskManager.search": {
     "value": "Search a task, agent or app"
   },
@@ -34845,9 +34962,6 @@
   },
   "taskManager.queue.computers": {
     "value": "Computers"
-  },
-  "taskManager.navWhat": {
-    "value": "What each agent is doing now, and stopping what you need"
   },
   "taskManager.cards.label": {
     "value": "Agents"
@@ -35388,12 +35502,6 @@
   },
   "dashboards.subtitle": {
     "value": "Numbers and charts the agents keep up to date."
-  },
-  "dashboards.sidebar": {
-    "value": "Dashboards"
-  },
-  "dashboards.navWhat": {
-    "value": "Numbers and charts the agents keep up to date"
   },
   "dashboards.new": {
     "value": "New dashboard"
@@ -36360,68 +36468,5 @@
   },
   "teamTemplates.ask": {
     "value": "I used the {{name}} template. To fit it to your business: **what makes {{org}} different?**"
-  },
-  "secret.labelPassword": {
-    "value": "Password for {{host}}"
-  },
-  "secret.labelCode": {
-    "value": "Code for {{host}}"
-  },
-  "secret.labelKey": {
-    "value": "A key for {{agent}}'s computer"
-  },
-  "secret.labelFile": {
-    "value": "The file {{path}}"
-  },
-  "secret.placeholder": {
-    "value": "Type it here"
-  },
-  "secret.account": {
-    "value": "Account: {{username}}."
-  },
-  "secret.endedDeclined": {
-    "value": "Declined. {{agent}} goes on without it."
-  },
-  "secret.endedExpired": {
-    "value": "Nobody answered in time. {{agent}} goes on without it, and can ask again."
-  },
-  "secret.endedRunStopped": {
-    "value": "{{agent}}'s task stopped before this was answered. Ask {{agent}} again if you still need it."
-  },
-  "secret.endedSuperseded": {
-    "value": "{{agent}} asked again in a newer request."
-  },
-  "secret.endedComputer": {
-    "value": "This can't reach {{agent}} anymore: the computer that asked changed. Ask {{agent}} to ask again."
-  },
-  "secret.endedPersonLeft": {
-    "value": "{{person}} left the workspace before answering."
-  },
-  "secret.endedClosed": {
-    "value": "This request closed before anyone answered. Ask {{agent}} again if you still need it."
-  },
-  "secret.seeNewer": {
-    "value": "See the newer request"
-  },
-  "secret.computerAway": {
-    "value": "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment."
-  },
-  "secret.computerPaused": {
-    "value": "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}."
-  },
-  "builtinTools.vault_make_password.label": {
-    "value": "Make a password"
-  },
-  "builtinTools.vault_make_password.description": {
-    "value": "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it."
-  },
-  "builtinTools.browser_make_password.label": {
-    "value": "Make a password"
-  },
-  "builtinTools.browser_make_password.description": {
-    "value": "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it."
-  },
-  "browser.watch.step.browser_make_password": {
-    "value": "Made a password"
   }
 }

@@ -14,6 +14,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { plainLine, plainLines } from "@agenteschat/ui/markdown";
 import { getAgent } from "./agents";
 import { audienceError, canTalkTo, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
@@ -246,7 +247,7 @@ const seenFromDmSql = (orgId: string, dmId: string, channelId: SQL) => sql`exist
     where dm_m.channel_id = ${dmId}::uuid and dm_m.org_id = ${orgId}::uuid and dm_m.user_id is not null
       and exists (select 1 from ${channelMembers} cm2 where cm2.channel_id = ${channelId} and cm2.user_id = dm_m.user_id))`;
 
-async function canSee(
+export async function canSee(
   db: Database,
   actor: IssueActor,
   orgId: string,
@@ -703,7 +704,12 @@ export async function createIssue(
   return view;
 }
 
-async function findVisible(db: Database, actor: IssueActor, orgId: string, where: { id?: string; number?: number }) {
+export async function findVisible(
+  db: Database,
+  actor: IssueActor,
+  orgId: string,
+  where: { id?: string; number?: number },
+) {
   await requireOrgMember(db, actor, orgId);
   const [row] = await db
     .select()
@@ -1206,7 +1212,7 @@ export async function issueFromMessage(
   // People are never members of a task's conversation: they read it as they read its task.
   if (!(await canSee(deps.db, actor, orgId, made.task ? made.tiedTo : message.channelId)))
     throw new NotFoundError("Message not found");
-  const firstLine = message.body.split("\n")[0]?.trim() ?? "";
+  const firstLine = plainLines(message.body)[0] ?? plainLine(message.body);
   return createIssue(deps, actor, orgId, {
     title: input.title?.trim() || firstLine.slice(0, 120) || "New issue",
     description: message.body,

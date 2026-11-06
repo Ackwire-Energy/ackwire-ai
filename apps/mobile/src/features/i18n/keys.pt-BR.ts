@@ -126,7 +126,6 @@ export const featureKeysPtBR = {
     refuse: "Recusar",
     approve: "Aprovar",
     hold: "Segure para aprovar",
-    holding: "Segure…",
     holdNote: "Alto risco: segure o botão por um segundo.",
     tapNote: "Aprovar faz a ação na hora.",
     tapNoteAhead: "Aprovar agora vale para {{when}}.",
@@ -1014,7 +1013,6 @@ export const featureKeysPtBR = {
     addPasswordWeb: "Adicionar senha no site",
     otherAccount: "Você entrou em outra conta. Nada foi apagado.",
     hold: "Segure para apagar",
-    holding: "Segure…",
   },
   files: {
     type: {

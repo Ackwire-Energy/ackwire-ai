@@ -92,6 +92,7 @@ import type {
   GifKey,
   GifPage,
   GitHubAppInstallation,
+  GitHubOrgAccess,
   GitHubRepositories,
   Health,
   HostComputer,
@@ -1033,6 +1034,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ installUrl: string }>(`${org(orgId)}/github-app/install`, { json: { returnTo } })).installUrl,
       remove: (orgId, id) => request<void>(`${org(orgId)}/github-app/installations/${enc(id)}`, { method: "DELETE" }),
       repositories: (orgId) => request<GitHubRepositories>(`${org(orgId)}/github/repositories`),
+      access: (orgId) => request<GitHubOrgAccess>(`${org(orgId)}/github/access`),
     },
     search: {
       query: async (orgId, input) =>
@@ -1314,6 +1316,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       get: (orgId, number) => request<Issue>(`${org(orgId)}/issues/by-number/${number}`),
       create: (orgId, input) => request<Issue>(`${org(orgId)}/issues`, { json: input }),
       update: (orgId, id, patch) => request<Issue>(`${org(orgId)}/issues/${enc(id)}`, { method: "PATCH", json: patch }),
+      delete: (orgId, id) => request<void>(`${org(orgId)}/issues/${enc(id)}`, { method: "DELETE" }),
       share: (orgId, id) => request<Issue>(`${org(orgId)}/issues/${enc(id)}/share`, { method: "POST" }),
       setCriterion: (orgId, id, criterionId, done) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/criteria/${enc(criterionId)}`, {

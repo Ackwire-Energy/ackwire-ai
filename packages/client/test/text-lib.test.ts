@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { plainLines } from "../src/lib/markdown";
+import { plainLine, plainLines } from "../src/lib/markdown";
 import {
   around,
   emailTypoFix,
@@ -179,4 +179,21 @@ test("the password chosen is the name typed: trimmed, exact, never an empty name
   expect(nameIsPassword("Fake#Pass1", "admin$10")).toBe(false);
   expect(nameIsPassword("Ana Souza", "outra-senha-1")).toBe(false);
   expect(nameIsPassword("  ", "  ")).toBe(false);
+});
+
+test("plainLine: a message's words on one line, every mark gone, code and tables included", () => {
+  expect(plainLine("**Das 31 clínicas**, 14 _não_ [confirmaram](https://x.co) @ana")).toBe(
+    "Das 31 clínicas, 14 não confirmaram @ana",
+  );
+  expect(plainLine("## Faltas\n\n- `Sorriso`\n- Aurora\n\n> dito ontem\n\n---")).toBe(
+    "Faltas Sorriso Aurora dito ontem",
+  );
+  expect(plainLine("Veja:\n\n```sql\nselect 1\nfrom a\n```\nFim")).toBe("Veja: select 1 from a Fim");
+  expect(plainLine("| Clínica | Faltas |\n| --- | ---: |\n| Sorriso | 23 |")).toBe("Clínica Faltas Sorriso 23");
+});
+
+test("plainLine: a text cut in the middle leaves no half marks", () => {
+  expect(plainLine("```sql\nselect nome from cli")).toBe("select nome from cli");
+  expect(plainLine("Antes **negrito cortad")).toBe("Antes negrito cortad");
+  expect(plainLine("| Clínica | Faltas |\n| --- | --")).toBe("Clínica · Faltas");
 });

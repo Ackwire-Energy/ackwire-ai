@@ -1399,7 +1399,9 @@
       "drive": "Pliki, raporty i tabele",
       "routines": "Co agenci robią sami, o czasie",
       "calendar": "Spotkania i terminy",
-      "team": "Kto jest kim: ludzie, agenci i ich grupy"
+      "team": "Kto jest kim: ludzie, agenci i ich grupy",
+      "dashboards": "Liczby i wykresy, które agenci utrzymują w aktualności",
+      "taskManager": "Co teraz robi każdy agent i zatrzymywanie tego, co trzeba"
     },
     "customizeSidebar": "Dostosuj pasek boczny",
     "sidebarMenu": {
@@ -1418,7 +1420,6 @@
       "auto": "Gdy coś jest",
       "autoHint": "Pojawia się, gdy coś na ciebie czeka",
       "reset": "Przywróć domyślne",
-      "instant": "Zmiany działają od razu.",
       "tools": "Narzędzia",
       "toolsTitle": "Na górze",
       "order": "Kolejność sekcji",
@@ -1474,6 +1475,8 @@
     "threads": "Wątki",
     "routines": "Rutyny",
     "team": "Zespół",
+    "dashboards": "Dashboardy",
+    "taskManager": "Menedżer zadań",
     "calendar": "Kalendarz",
     "drive": "Drive",
     "members": "Członkowie",
@@ -4243,7 +4246,6 @@
     },
     "highRisk": "Akcja wysokiego ryzyka",
     "hold": "Przytrzymaj, aby zatwierdzić",
-    "holding": "Przytrzymaj…",
     "holdLabel": "{{action}}: przytrzymaj, aby potwierdzić",
     "holdHint": "Przytrzymaj przycisk, aby zatwierdzić. Akcja wysokiego ryzyka: jedno kliknięcie nie wystarczy.",
     "holdNote": "Wysokie ryzyko: przytrzymaj przycisk, aby potwierdzić.",
@@ -6098,6 +6100,18 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "Usuń zadanie",
+      "title": "Usunąć zadanie #{{number}}?",
+      "body": "Zniknie dla wszystkich, razem z rozmową i jej plikami.",
+      "steps_one": "Jego krok też zniknie.",
+      "steps_few": "Jego {{count}} kroki też znikną.",
+      "steps_many": "Jego {{count}} kroków też zniknie.",
+      "steps_other": "Jego {{count}} kroku też zniknie.",
+      "working": "{{name}} przerywa pracę nad nim.",
+      "confirm": "Usuń",
+      "done": "Usunięto zadanie #{{number}}."
+    },
     "assigneeFilter": "Przypisana osoba",
     "priorityFilter": "Priorytet",
     "title": "Zadania",
@@ -11225,6 +11239,16 @@
     "namePlaceholder": "Np. Wsparcie",
     "continueIn": "Kontynuuj w {{name}}",
     "continueInComposio": "Kontynuuj w Composio",
+    "githubOrgs": {
+      "title": "Dostępne organizacje",
+      "none": "Na razie żadnej organizacji.",
+      "lead": "GitHub pyta o organizacje tylko za pierwszym razem. Aby dodać kolejną, otwórz tam stronę aplikacji i kliknij Grant obok niej.",
+      "open": "Zezwól na organizacje w GitHubie",
+      "added": "Teraz także: {{names}}.",
+      "removed": "Już nie: {{names}}.",
+      "same": "W organizacjach nic się nie zmieniło.",
+      "failed": "Nie udało się teraz odczytać organizacji."
+    },
     "composioHelp": "Logujesz się na stronie Composio, po angielsku, i wracasz tutaj. {{name}} pokaże uprawnienie jako „Composio”.",
     "or": "lub",
     "withKey": "Połącz kluczem API",
@@ -11858,7 +11882,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Tej osoby nie ma w tej rozmowie, więc nie widzi tego zadania."
+      "assigneeOutside": "Tej osoby nie ma w tej rozmowie, więc nie widzi tego zadania.",
+      "deleteForbidden": "Tylko osoba, która utworzyła to zadanie, lub administrator może je usunąć."
     },
     "connector": {
       "labelTaken": "Inny konektor ma już tę nazwę.",
@@ -15258,7 +15283,6 @@
   "taskManager": {
     "title": "Menedżer zadań",
     "subtitle": "Co agenci robią teraz i co skończyło się dzisiaj.",
-    "nav": "Menedżer zadań",
     "search": "Szukaj zadania, agenta lub aplikacji",
     "working_one": "{{count}} pracuje",
     "working_few": "{{count}} pracują",
@@ -15440,7 +15464,6 @@
       "room": "Są wolne miejsca",
       "computers": "Komputery"
     },
-    "navWhat": "Co teraz robi każdy agent i zatrzymywanie tego, co trzeba",
     "cards": {
       "label": "Agenci",
       "previous": "Poprzedni agenci",
@@ -15683,8 +15706,6 @@
   "dashboards": {
     "title": "Dashboardy",
     "subtitle": "Liczby i wykresy, które agenci utrzymują w aktualności.",
-    "sidebar": "Dashboardy",
-    "navWhat": "Liczby i wykresy, które agenci utrzymują w aktualności",
     "new": "Nowy dashboard",
     "back": "Dashboardy",
     "home": "Mój Start",

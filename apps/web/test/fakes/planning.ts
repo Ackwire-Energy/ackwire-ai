@@ -674,6 +674,11 @@ export function createMockPlanning(
         }
         return clone(s.columns);
       },
+      delete: async (orgId, id) => {
+        record("issues.delete", orgId, id);
+        const s = await store(orgId);
+        s.issues = s.issues.filter((i) => i.id !== id);
+      },
       deleteColumn: async (orgId, columnId, moveTo) => {
         record("issues.deleteColumn", columnId, moveTo);
         const s = await columnsOf(orgId);

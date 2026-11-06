@@ -14,6 +14,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { plainLine } from "@agenteschat/ui/markdown";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
@@ -719,7 +720,7 @@ function excerpt(body: string, page: Pick<PageRow, "slug" | "aliases">) {
   const ref = parseWikiLinks(body).find((r) => slugs.has(r.slug));
   const at = ref ? body.indexOf(`[[${ref.target}`) : -1;
   const start = Math.max(0, at - 60);
-  const text = body.slice(start, start + 160).replace(/\s+/g, " ");
+  const text = plainLine(body.slice(start, start + 160));
   return `${start > 0 ? "…" : ""}${text}${start + 160 < body.length ? "…" : ""}`;
 }
 

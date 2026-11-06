@@ -17,6 +17,7 @@ import {
 } from "@agenteschat/db";
 import { mentionsEveryone } from "@agenteschat/i18n/everyone";
 import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
+import { plainLine } from "@agenteschat/ui/markdown";
 import { type AgentActionView, actionsFor } from "./agent-actions";
 import { currentHandles } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
@@ -141,10 +142,7 @@ export const REPLY_EXCERPT_LENGTH = 200;
 
 /** One line of a message for a quote: whitespace collapsed, code fences dropped, ~200 chars. */
 export function replyExcerpt(body: string, max = REPLY_EXCERPT_LENGTH): string {
-  const line = body
-    .replace(/```[\w+-]*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const line = plainLine(body);
   return line.length > max ? `${cutText(line, max - 1).trimEnd()}…` : line;
 }
 

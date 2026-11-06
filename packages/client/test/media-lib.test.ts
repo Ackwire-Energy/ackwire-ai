@@ -191,6 +191,7 @@ describe("the word for a GIF or a sticker where text shows", () => {
 
   test("a search hit says its words, else what it was: only a voice message's hit says voice message", () => {
     expect(hitText(t, { snippet: "deploy notes", mediaKind: "gif" })).toBe("deploy notes");
+    expect(hitText(t, { snippet: "**O deploy**\n\n```sh\nbun run\n```" })).toBe("O deploy bun run");
     expect(hitText(t, { snippet: "", mediaKind: "voice" })).toBe("Mensagem de voz");
     // Listed by filters alone: a GIF or a sticker sent with no words.
     expect(hitText(t, { snippet: "", mediaKind: "gif" })).toBe("GIF");

@@ -120,7 +120,6 @@ export const featureKeysEn = {
     refuse: "Decline",
     approve: "Approve",
     hold: "Hold to approve",
-    holding: "Keep holding…",
     holdNote: "High risk: hold the button for a second.",
     tapNote: "Approving does it right away.",
     tapNoteAhead: "Approving now covers {{when}}.",
@@ -1011,7 +1010,6 @@ export const featureKeysEn = {
     addPasswordWeb: "Add a password on the website",
     otherAccount: "You signed in to another account. Nothing was deleted.",
     hold: "Hold to delete",
-    holding: "Keep holding…",
   },
   files: {
     type: {

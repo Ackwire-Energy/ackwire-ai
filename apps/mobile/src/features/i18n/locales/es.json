@@ -123,7 +123,6 @@
     "refuse": "Rechazar",
     "approve": "Aprobar",
     "hold": "Mantén presionado para aprobar",
-    "holding": "Sigue presionando…",
     "holdNote": "Riesgo alto: mantén presionado el botón un segundo.",
     "tapNote": "Al aprobar, se hace de inmediato.",
     "tapNoteAhead": "Aprobar ahora cubre {{when}}.",
@@ -1059,8 +1058,7 @@
     "addPasswordFirst": "Primero agrega una contraseña a tu cuenta en el sitio web y después escríbela aquí.",
     "addPasswordWeb": "Agregar una contraseña en el sitio web",
     "otherAccount": "Iniciaste sesión en otra cuenta. No se eliminó nada.",
-    "hold": "Mantén presionado para eliminar",
-    "holding": "Sigue presionando…"
+    "hold": "Mantén presionado para eliminar"
   },
   "files": {
     "type": {

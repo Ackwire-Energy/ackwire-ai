@@ -1363,7 +1363,9 @@
       "drive": "File, report e tabelle",
       "routines": "Ciò che gli agenti fanno da soli, all'orario giusto",
       "calendar": "Riunioni e scadenze",
-      "team": "Chi è chi: persone, agenti e i loro gruppi"
+      "team": "Chi è chi: persone, agenti e i loro gruppi",
+      "dashboards": "Numeri e grafici che gli agenti tengono aggiornati",
+      "taskManager": "Cosa sta facendo ogni agente ora, e fermare ciò che serve"
     },
     "customizeSidebar": "Personalizza la barra laterale",
     "sidebarMenu": {
@@ -1382,7 +1384,6 @@
       "auto": "Quando c'è qualcosa",
       "autoHint": "Compare quando qualcosa ti aspetta",
       "reset": "Ripristina predefiniti",
-      "instant": "Le modifiche si applicano subito.",
       "tools": "Strumenti",
       "toolsTitle": "In alto",
       "order": "Ordine delle sezioni",
@@ -1436,6 +1437,8 @@
     "threads": "Thread",
     "routines": "Routine",
     "team": "Team",
+    "dashboards": "Dashboard",
+    "taskManager": "Gestione attività",
     "calendar": "Calendario",
     "drive": "Drive",
     "members": "Membri",
@@ -4092,7 +4095,6 @@
     },
     "highRisk": "Azione ad alto rischio",
     "hold": "Tieni premuto per approvare",
-    "holding": "Tieni premuto…",
     "holdLabel": "{{action}}: tieni premuto per confermare",
     "holdHint": "Tieni premuto il pulsante per approvare. Azione ad alto rischio: un solo clic non basta.",
     "holdNote": "Alto rischio: tieni premuto il pulsante per confermare.",
@@ -5915,6 +5917,17 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "Elimina attività",
+      "title": "Eliminare l'attività #{{number}}?",
+      "body": "Sparisce per tutti, con la sua conversazione e i file della conversazione.",
+      "steps_one": "Anche il suo passaggio sparisce.",
+      "steps_many": "Anche i suoi {{count}} passaggi spariscono.",
+      "steps_other": "Anche i suoi {{count}} passaggi spariscono.",
+      "working": "{{name}} smette di lavorarci.",
+      "confirm": "Elimina",
+      "done": "Attività #{{number}} eliminata."
+    },
     "assigneeFilter": "Assegnatario",
     "priorityFilter": "Priorità",
     "title": "Attività",
@@ -10869,6 +10882,16 @@
     "namePlaceholder": "Es. Assistenza",
     "continueIn": "Continua su {{name}}",
     "continueInComposio": "Continua su Composio",
+    "githubOrgs": {
+      "title": "Organizzazioni raggiunte",
+      "none": "Ancora nessuna organizzazione.",
+      "lead": "GitHub chiede delle organizzazioni solo la prima volta. Per aggiungerne un'altra, apri lì la pagina dell'app e premi Grant accanto.",
+      "open": "Autorizza organizzazioni su GitHub",
+      "added": "Ora anche: {{names}}.",
+      "removed": "Non più: {{names}}.",
+      "same": "Nelle organizzazioni non è cambiato nulla.",
+      "failed": "Non è stato possibile leggere le organizzazioni ora."
+    },
     "composioHelp": "Accedi nella pagina di Composio, in inglese, e torni qui. {{name}} mostra il permesso come “Composio”.",
     "or": "oppure",
     "withKey": "Collega con una chiave API",
@@ -11486,7 +11509,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Questa persona non è in questa conversazione, quindi non vede questa attività."
+      "assigneeOutside": "Questa persona non è in questa conversazione, quindi non vede questa attività.",
+      "deleteForbidden": "Solo chi ha creato questa attività o un amministratore può eliminarla."
     },
     "connector": {
       "labelTaken": "Un altro connettore ha già questo nome.",
@@ -14876,7 +14900,6 @@
   "taskManager": {
     "title": "Gestione attività",
     "subtitle": "Cosa fanno gli agenti ora e cosa è finito oggi.",
-    "nav": "Gestione attività",
     "search": "Cerca un'attività, un agente o un'app",
     "working_one": "{{count}} al lavoro",
     "working_many": "{{count}} al lavoro",
@@ -15045,7 +15068,6 @@
       "room": "Ha spazio",
       "computers": "Computer"
     },
-    "navWhat": "Cosa sta facendo ogni agente ora, e fermare ciò che serve",
     "cards": {
       "label": "Agenti",
       "previous": "Agenti precedenti",
@@ -15286,8 +15308,6 @@
   "dashboards": {
     "title": "Dashboard",
     "subtitle": "Numeri e grafici che gli agenti tengono aggiornati.",
-    "sidebar": "Dashboard",
-    "navWhat": "Numeri e grafici che gli agenti tengono aggiornati",
     "new": "Nuova dashboard",
     "back": "Dashboard",
     "home": "La mia Home",

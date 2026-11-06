@@ -1327,7 +1327,9 @@
       "drive": "Bestanden, rapporten en tabellen",
       "routines": "Wat agents zelf doen, op tijd",
       "calendar": "Vergaderingen en deadlines",
-      "team": "Wie is wie: mensen, agents en hun groepen"
+      "team": "Wie is wie: mensen, agents en hun groepen",
+      "dashboards": "Getallen en grafieken die de agents actueel houden",
+      "taskManager": "Wat elke agent nu doet, en stoppen wat nodig is"
     },
     "customizeSidebar": "Zijbalk aanpassen",
     "sidebarMenu": {
@@ -1346,7 +1348,6 @@
       "auto": "Als er iets is",
       "autoHint": "Verschijnt als er iets op je wacht",
       "reset": "Standaard herstellen",
-      "instant": "Wijzigingen gelden meteen.",
       "tools": "Tools",
       "toolsTitle": "Bovenaan",
       "order": "Volgorde van de onderdelen",
@@ -1398,6 +1399,8 @@
     "threads": "Threads",
     "routines": "Routines",
     "team": "Team",
+    "dashboards": "Dashboards",
+    "taskManager": "Taakbeheer",
     "calendar": "Agenda",
     "drive": "Drive",
     "members": "Leden",
@@ -3966,7 +3969,6 @@
     },
     "highRisk": "Actie met hoog risico",
     "hold": "Vasthouden om goed te keuren",
-    "holding": "Vasthouden…",
     "holdLabel": "{{action}}: vasthouden om te bevestigen",
     "holdHint": "Houd de knop vast om goed te keuren. Actie met hoog risico: één klik is niet genoeg.",
     "holdNote": "Hoog risico: houd de knop vast om te bevestigen.",
@@ -5742,6 +5744,16 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "Taak verwijderen",
+      "title": "Taak #{{number}} verwijderen?",
+      "body": "Hij verdwijnt voor iedereen, met zijn gesprek en de bestanden daarvan.",
+      "steps_one": "Zijn stap verdwijnt ook.",
+      "steps_other": "Zijn {{count}} stappen verdwijnen ook.",
+      "working": "{{name}} stopt met het werk eraan.",
+      "confirm": "Verwijderen",
+      "done": "Taak #{{number}} verwijderd."
+    },
     "assigneeFilter": "Toegewezen aan",
     "priorityFilter": "Prioriteit",
     "title": "Taken",
@@ -10512,6 +10524,16 @@
     "namePlaceholder": "Bijv. Support",
     "continueIn": "Verder op {{name}}",
     "continueInComposio": "Verder op Composio",
+    "githubOrgs": {
+      "title": "Bereikte organisaties",
+      "none": "Nog geen organisatie.",
+      "lead": "GitHub vraagt alleen de eerste keer naar organisaties. Om er een toe te voegen, open je daar de pagina van de app en klik je ernaast op Grant.",
+      "open": "Organisaties toestaan op GitHub",
+      "added": "Nu ook: {{names}}.",
+      "removed": "Niet meer: {{names}}.",
+      "same": "Er is niets veranderd in de organisaties.",
+      "failed": "De organisaties konden nu niet worden gelezen."
+    },
     "composioHelp": "Je logt in op de pagina van Composio, in het Engels, en komt hier terug. {{name}} toont de toestemming als “Composio”.",
     "or": "of",
     "withKey": "Koppelen met een API-sleutel",
@@ -11113,7 +11135,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "Deze persoon zit niet in dit gesprek en ziet deze taak dus niet."
+      "assigneeOutside": "Deze persoon zit niet in dit gesprek en ziet deze taak dus niet.",
+      "deleteForbidden": "Alleen wie deze taak heeft gemaakt of een beheerder kan hem verwijderen."
     },
     "connector": {
       "labelTaken": "Een andere connector heeft deze naam al.",
@@ -14453,7 +14476,6 @@
   "taskManager": {
     "title": "Taakbeheer",
     "subtitle": "Wat de agents nu doen en wat vandaag klaar is.",
-    "nav": "Taakbeheer",
     "search": "Zoek een taak, agent of app",
     "working_one": "{{count}} bezig",
     "working_other": "{{count}} bezig",
@@ -14609,7 +14631,6 @@
       "room": "Heeft ruimte",
       "computers": "Computers"
     },
-    "navWhat": "Wat elke agent nu doet, en stoppen wat nodig is",
     "cards": {
       "label": "Agents",
       "previous": "Vorige agents",
@@ -14848,8 +14869,6 @@
   "dashboards": {
     "title": "Dashboards",
     "subtitle": "Getallen en grafieken die de agents actueel houden.",
-    "sidebar": "Dashboards",
-    "navWhat": "Getallen en grafieken die de agents actueel houden",
     "new": "Nieuw dashboard",
     "back": "Dashboards",
     "home": "Mijn start",

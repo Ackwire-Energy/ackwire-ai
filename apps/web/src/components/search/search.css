@@ -283,8 +283,11 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   font-weight: 500;
   color: var(--faint);
 }
+/* "Ir para" has its own column: however long the words, they stop before it. */
 .search-result {
-  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   border-radius: var(--radius-lg);
   background: var(--raised);
   box-shadow: var(--e1);
@@ -293,13 +296,8 @@ html:not([data-pointer]) .search-box__x:focus-visible {
 .search-result .ac-msg {
   --msg-inline: 12px;
 }
-/* Over the row, whose hover lifts it (`.ac-msg:hover`): at any less, it would show through the row and never get the
-   click. */
 .search-result__jump.ac-btn {
-  position: absolute;
-  z-index: var(--z-lifted);
-  top: 8px;
-  right: 8px;
+  margin: 4px 8px 0 0;
   opacity: 0;
 }
 .search-result:is(:hover, :focus-within) {

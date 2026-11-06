@@ -3,6 +3,7 @@ import {
   commentIssue,
   createIssue,
   createIssueColumn,
+  deleteIssue,
   deleteIssueColumn,
   getIssueDetail,
   type IssueDeps,
@@ -17,7 +18,17 @@ import {
   updateIssueColumn,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  json,
+  noContent,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
 import { WorkView } from "./schemas";
 
 const tags = ["Issues"];
@@ -284,6 +295,30 @@ export function issueRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, issueId } = c.req.valid("param");
       return c.json(await updateIssue(issues, person(c.get("user").id), orgId, issueId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/issues/{issueId}",
+      tags,
+      security,
+      summary: "Delete a task for good (who created it, an administrator; on an agent's task, whoever may assign work)",
+      description:
+        "Its steps and its conversation go with it, and what an agent is doing on it stops. The audit log keeps who deleted it and its title; its number isn't given again.",
+      request: { params: IssueParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, issueId } = c.req.valid("param");
+      await deleteIssue(
+        { db, pubsub: adapters.pubsub, hub: deps.extras?.sandbox?.machines?.hub ?? null, mail: adapters.mail },
+        c.get("user").id,
+        orgId,
+        issueId,
+      );
+      return c.body(null, 204);
     },
   );
 

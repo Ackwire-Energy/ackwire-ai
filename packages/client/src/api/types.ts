@@ -1911,6 +1911,12 @@ export interface GitHubRepositories {
   truncated: boolean;
 }
 
+/** The organizations the GitHub connection reaches now (`null`: GitHub didn't answer) and GitHub's page to grant more. */
+export interface GitHubOrgAccess {
+  orgs: string[] | null;
+  manageUrl: string | null;
+}
+
 /** One permission of an agent: a built-in scope (`connectionId: null`) or a connection's scope. */
 export interface ScopeGrant {
   connectionId: string | null;
@@ -6113,7 +6119,17 @@ export interface NoticePrefs {
 }
 
 /** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
-export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "team";
+export type SidebarItem =
+  | "approvals"
+  | "threads"
+  | "issues"
+  | "wiki"
+  | "drive"
+  | "routines"
+  | "calendar"
+  | "team"
+  | "dashboards"
+  | "taskManager";
 /** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
 export type SidebarPlace = "always" | "more" | "auto";
 /** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */

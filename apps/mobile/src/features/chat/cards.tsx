@@ -263,12 +263,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       <>
         <View style={styles.itemActs}>
           {high ? (
-            <HoldButton
-              size="card"
-              label={label}
-              holdLabel={t("mobile.approval.holding")}
-              onConfirm={() => decideMany(scope, "approve")}
-            />
+            <HoldButton size="card" label={label} onConfirm={() => decideMany(scope, "approve")} />
           ) : (
             <Button
               variant="primary"
@@ -453,12 +448,7 @@ function ApprovalGroupItem({
           <>
             <View style={styles.itemActs}>
               {approvalRisk(a) === "high" ? (
-                <HoldButton
-                  size="card"
-                  label={t("mobile.approval.hold")}
-                  holdLabel={t("mobile.approval.holding")}
-                  onConfirm={onApprove}
-                />
+                <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={onApprove} />
               ) : (
                 <Button
                   variant="primary"
@@ -583,12 +573,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
             <>
               <View style={styles.itemActs}>
                 {high ? (
-                  <HoldButton
-                    size="card"
-                    label={t("mobile.approval.hold")}
-                    holdLabel={t("mobile.approval.holding")}
-                    onConfirm={() => approve()}
-                  />
+                  <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
                 ) : (
                   <Button
                     variant="primary"

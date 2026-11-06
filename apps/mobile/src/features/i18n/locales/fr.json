@@ -123,7 +123,6 @@
     "refuse": "Refuser",
     "approve": "Approuver",
     "hold": "Maintenir pour approuver",
-    "holding": "Continuez d'appuyer…",
     "holdNote": "Risque élevé : maintenez le bouton une seconde.",
     "tapNote": "Approuver lance l'action tout de suite.",
     "tapNoteAhead": "Approuver maintenant couvre {{when}}.",
@@ -1059,8 +1058,7 @@
     "addPasswordFirst": "Ajoutez d'abord un mot de passe à votre compte sur le site, puis saisissez-le ici.",
     "addPasswordWeb": "Ajouter un mot de passe sur le site",
     "otherAccount": "Vous vous êtes connecté à un autre compte. Rien n'a été supprimé.",
-    "hold": "Maintenir pour supprimer",
-    "holding": "Continuez d'appuyer…"
+    "hold": "Maintenir pour supprimer"
   },
   "files": {
     "type": {

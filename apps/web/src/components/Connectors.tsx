@@ -196,6 +196,9 @@ export function ConnectorsSection({
       Boolean(url && !item?.server?.accountLabel) &&
       all.filter((i) => i.server && url && sameServer(i.server.serverUrl, url)).length > 1;
     if (item && admin && done === "connected") setFlow({ step: 1, item, naming });
+    // GitHub comes straight back when nothing is left to ask: the dialog says what it reaches now and where to add more.
+    if (item?.def?.id === "github" && admin && done === "reconnected")
+      setFlow({ step: 0, def: item.def, mode: "reconnect", item });
     window.history.replaceState(null, "", window.location.pathname);
   }, [connected, outcome, review, connections.data, servers.data, catalog.data, listsFetching, admin, t, toast]);
 

@@ -1456,31 +1456,6 @@ function MoreTools({
             {countOf(id)}
           </Link>
         ))}
-        {/* Dashboards (ADR 0135 §14) and the task manager (ADR 0128): always here, not tools a person places. */}
-        <Link
-          to="/org/$orgId/dashboards"
-          params={{ orgId: org.id }}
-          className="ac-menu__item sidebar__more-item"
-          onClick={() => setOpen(false)}
-        >
-          <Icon name="chart" />
-          <span className="ac-menu__label">
-            {t("dashboards.sidebar")}
-            <span className="ac-menu__desc">{t("dashboards.navWhat")}</span>
-          </span>
-        </Link>
-        <Link
-          to="/org/$orgId/task-manager"
-          params={{ orgId: org.id }}
-          className="ac-menu__item sidebar__more-item"
-          onClick={() => setOpen(false)}
-        >
-          <Icon name="stageProgress" />
-          <span className="ac-menu__label">
-            {t("taskManager.title")}
-            <span className="ac-menu__desc">{t("taskManager.navWhat")}</span>
-          </span>
-        </Link>
         <div className="ac-menu__separator" aria-hidden="true" />
         <button
           type="button"
@@ -1496,28 +1471,7 @@ function MoreTools({
           <span className="ac-menu__label">{t("shell.customizeSidebar")}</span>
         </button>
       </Popover>
-      <div className="sidebar__more-active">
-        {items.map(row)}
-        {/* A board's own page too (`/dashboards/<id>`): the link is active on the pages under it. */}
-        <Link
-          to="/org/$orgId/dashboards"
-          params={{ orgId: org.id }}
-          className="sidebar__item"
-          title={t("dashboards.sidebar")}
-        >
-          <Icon name="chart" />
-          <span className="sidebar__item-label">{t("dashboards.sidebar")}</span>
-        </Link>
-        <Link
-          to="/org/$orgId/task-manager"
-          params={{ orgId: org.id }}
-          className="sidebar__item"
-          title={t("taskManager.title")}
-        >
-          <Icon name="stageProgress" />
-          <span className="sidebar__item-label">{t("taskManager.nav")}</span>
-        </Link>
-      </div>
+      <div className="sidebar__more-active">{items.map(row)}</div>
     </>
   );
 }

@@ -154,6 +154,10 @@ html:not([data-pointer]) .wiki-row:focus-visible {
 .wiki-folder-row {
   position: relative;
 }
+/* Its count stops short of the button's place, shown or not. */
+.wiki-folder-row .wiki-row__n {
+  margin-right: 24px;
+}
 .wiki-folder-row__act {
   position: absolute;
   top: 5px;

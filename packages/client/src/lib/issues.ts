@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "../api/types";
+import { can } from "./permissions";
 
 export const BOARD: IssueStatus[] = ["todo", "in_progress", "in_review", "done"];
 export const STATUSES: IssueStatus[] = [...BOARD, "canceled"];
@@ -13,6 +14,32 @@ export const STATUS_ICON: Record<IssueStatus, "stageTodo" | "stageProgress" | "s
   done: "stageDone",
   canceled: "close",
 };
+
+/**
+ * Who sees "Excluir tarefa": who created it, an administrator, and, on a task no person created, whoever may give
+ * agents work. Mirrors `mayDelete` in packages/engine/src/issue-deletion.ts, which decides.
+ */
+export function canDeleteIssue(
+  org: Parameters<typeof can>[0],
+  i: Pick<Issue, "createdBy">,
+  myUserId: string | null | undefined,
+) {
+  if (i.createdBy.type === "person") return i.createdBy.id === myUserId || can(org, "administrator");
+  return can(org, "assign_work") || can(org, "administrator");
+}
+
+/** The sentences of a task's delete confirmation: what goes with it (`who`: the agent that stops, when one is on it). */
+export function deleteIssueText(t: TFunction, i: Pick<Issue, "subIssues">, who: string | null) {
+  const steps = i.subIssues?.length ?? 0;
+  return [
+    t("issues.delete.body"),
+    steps > 0 ? t("issues.delete.steps", { count: steps }) : "",
+    who ? t("issues.delete.working", { name: who }) : "",
+    t("common.cantUndo"),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 /** A task a DM or a private channel holds back: only who reads that conversation sees it (`channels`: the app's list). */
 export function heldBack(i: Pick<Issue, "channelId">, channels: { id: string; visibility: string }[] | undefined) {

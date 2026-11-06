@@ -1312,6 +1312,8 @@ export const en = {
       routines: "What agents do on their own, on time",
       calendar: "Meetings and deadlines",
       team: "Who's who: people, agents and their groups",
+      dashboards: "Numbers and charts the agents keep up to date",
+      taskManager: "What each agent is doing now, and stopping what you need",
     },
     customizeSidebar: "Customize sidebar",
     /** The sidebar's own menu (right click on its empty space), its headers' + and its rows' hover buttons. */
@@ -1331,7 +1333,6 @@ export const en = {
       auto: "When there's something",
       autoHint: "Shows up when something waits for you",
       reset: "Reset to default",
-      instant: "Changes apply right away.",
       tools: "Tools",
       toolsTitle: "On top",
       order: "Section order",
@@ -1384,6 +1385,8 @@ export const en = {
     threads: "Threads",
     routines: "Routines",
     team: "Team",
+    dashboards: "Dashboards",
+    taskManager: "Task manager",
     calendar: "Calendar",
     drive: "Drive",
     members: "Members",
@@ -4013,7 +4016,6 @@ export const en = {
     },
     highRisk: "High-risk action",
     hold: "Hold to approve",
-    holding: "Hold…",
     holdLabel: "{{action}}: hold to confirm",
     holdHint: "Hold the button to approve. High-risk action: a single click isn't enough.",
     holdNote: "High risk: hold the button to confirm.",
@@ -5700,6 +5702,16 @@ export const en = {
     },
   },
   issues: {
+    delete: {
+      action: "Delete task",
+      title: "Delete task #{{number}}?",
+      body: "It goes for everyone, with its conversation and the conversation's files.",
+      steps_one: "Its step goes too.",
+      steps_other: "Its {{count}} steps go too.",
+      working: "{{name}} stops what it's doing on it.",
+      confirm: "Delete",
+      done: "Task #{{number}} deleted.",
+    },
     assigneeFilter: "Assignee",
     priorityFilter: "Priority",
     title: "Tasks",
@@ -10118,6 +10130,17 @@ export const en = {
     namePlaceholder: "E.g. Support",
     continueIn: "Continue on {{name}}",
     continueInComposio: "Continue on Composio",
+    /** On Reconnect GitHub: its sign-in asks about organizations only the first time. */
+    githubOrgs: {
+      title: "Organizations it reaches",
+      none: "No organization yet.",
+      lead: "GitHub asks about organizations only the first time. To add one, open the app's page there and press Grant beside it.",
+      open: "Grant organizations on GitHub",
+      added: "Now also: {{names}}.",
+      removed: "No longer: {{names}}.",
+      same: "Nothing changed in the organizations.",
+      failed: "Couldn't read the organizations now.",
+    },
     composioHelp:
       "You sign in on Composio's page, in English, and come back here. {{name}} shows the permission as “Composio”.",
     or: "or",
@@ -10661,6 +10684,7 @@ export const en = {
   errors: {
     issue: {
       assigneeOutside: "This person isn't in this conversation, so they can't see this task.",
+      deleteForbidden: "Only who created this task or an administrator can delete it.",
     },
     connector: {
       labelTaken: "Another connector already has this name.",
@@ -13999,7 +14023,6 @@ export const en = {
     title: "Task manager",
     /** Under the title when no agent is working or waiting on you. */
     subtitle: "What the agents are doing now and what ended today.",
-    nav: "Task manager",
     search: "Search a task, agent or app",
     working_one: "{{count}} working",
     working_other: "{{count}} working",
@@ -14155,7 +14178,6 @@ export const en = {
       room: "Has room",
       computers: "Computers",
     },
-    navWhat: "What each agent is doing now, and stopping what you need",
     cards: { label: "Agents", previous: "Previous agents", next: "More agents" },
     table: "Tasks",
     noResults: "No task matches this search.",
@@ -14366,9 +14388,6 @@ export const en = {
   dashboards: {
     title: "Dashboards",
     subtitle: "Numbers and charts the agents keep up to date.",
-    sidebar: "Dashboards",
-    /** Its line in the sidebar's More menu. */
-    navWhat: "Numbers and charts the agents keep up to date",
     new: "New dashboard",
     back: "Dashboards",
     home: "My Home",

@@ -26,6 +26,6 @@ describe("the tools' order", () => {
 
   test("the setup dialog moves a tool one place in the whole order", () => {
     expect(moveSection(order, "issues", -1).slice(0, 3)).toEqual(["approvals", "issues", "threads"]);
-    expect(moveSection(order, "team", 1)).toEqual(order);
+    expect(moveSection(order, "taskManager", 1)).toEqual(order);
   });
 });

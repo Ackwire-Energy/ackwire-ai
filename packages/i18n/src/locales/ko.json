@@ -1291,7 +1291,9 @@
       "drive": "파일, 보고서, 표",
       "routines": "에이전트가 정해진 시간에 스스로 하는 일",
       "calendar": "회의와 마감일",
-      "team": "누가 누구인지: 사람, 에이전트, 그룹"
+      "team": "누가 누구인지: 사람, 에이전트, 그룹",
+      "dashboards": "에이전트가 최신 상태로 유지하는 숫자와 차트",
+      "taskManager": "에이전트마다 지금 하는 일을 보고, 필요한 작업은 중지해요"
     },
     "customizeSidebar": "사이드바 맞춤 설정",
     "sidebarMenu": {
@@ -1310,7 +1312,6 @@
       "auto": "내용이 있을 때",
       "autoHint": "나를 기다리는 일이 있을 때 표시돼요",
       "reset": "기본값으로 재설정",
-      "instant": "변경 사항은 바로 적용돼요.",
       "tools": "도구",
       "toolsTitle": "위쪽",
       "order": "섹션 순서",
@@ -1360,6 +1361,8 @@
     "threads": "스레드",
     "routines": "루틴",
     "team": "팀",
+    "dashboards": "대시보드",
+    "taskManager": "작업 관리자",
     "calendar": "캘린더",
     "drive": "Drive",
     "members": "멤버",
@@ -3806,7 +3809,6 @@
     },
     "highRisk": "고위험 작업",
     "hold": "길게 눌러 승인",
-    "holding": "계속 누르세요…",
     "holdLabel": "{{action}}: 길게 눌러 확인",
     "holdHint": "버튼을 길게 눌러 승인하세요. 고위험 작업이라 한 번 클릭으로는 부족해요.",
     "holdNote": "고위험: 버튼을 길게 눌러 확인하세요.",
@@ -5480,6 +5482,15 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "작업 삭제",
+      "title": "작업 #{{number}}을(를) 삭제할까요?",
+      "body": "대화와 대화의 파일까지 모두에게서 사라져요.",
+      "steps_other": "단계 {{count}}개도 함께 사라져요.",
+      "working": "{{name}}이(가) 이 작업을 멈춰요.",
+      "confirm": "삭제",
+      "done": "작업 #{{number}}을(를) 삭제했어요."
+    },
     "assigneeFilter": "담당자",
     "priorityFilter": "우선순위",
     "title": "작업",
@@ -10022,6 +10033,16 @@
     "namePlaceholder": "예: 고객 지원",
     "continueIn": "{{name}}에서 계속",
     "continueInComposio": "Composio에서 계속",
+    "githubOrgs": {
+      "title": "연결된 조직",
+      "none": "아직 조직이 없어요.",
+      "lead": "GitHub는 처음 한 번만 조직을 물어봐요. 추가하려면 GitHub에서 앱 페이지를 열고 조직 옆의 Grant를 누르세요.",
+      "open": "GitHub에서 조직 허용",
+      "added": "이제 추가됨: {{names}}.",
+      "removed": "더 이상 안 됨: {{names}}.",
+      "same": "조직에 달라진 것이 없어요.",
+      "failed": "지금은 조직을 읽을 수 없어요."
+    },
     "composioHelp": "Composio 페이지에서 영어로 로그인한 뒤 여기로 돌아와요. {{name}}에는 권한이 “Composio”로 표시돼요.",
     "or": "또는",
     "withKey": "API 키로 연결",
@@ -10607,7 +10628,8 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "이 사람은 이 대화에 없어서 이 작업을 볼 수 없어요."
+      "assigneeOutside": "이 사람은 이 대화에 없어서 이 작업을 볼 수 없어요.",
+      "deleteForbidden": "이 작업은 만든 사람이나 관리자만 삭제할 수 있어요."
     },
     "connector": {
       "labelTaken": "이미 같은 이름의 커넥터가 있어요.",
@@ -13781,7 +13803,6 @@
   "taskManager": {
     "title": "작업 관리자",
     "subtitle": "에이전트가 지금 하는 일과 오늘 끝난 일이에요.",
-    "nav": "작업 관리자",
     "search": "작업, 에이전트, 앱 검색",
     "working_other": "{{count}}개 작업 중",
     "waiting_other": "{{count}}개 내 확인 대기",
@@ -13924,7 +13945,6 @@
       "room": "자리 있음",
       "computers": "컴퓨터"
     },
-    "navWhat": "에이전트마다 지금 하는 일을 보고, 필요한 작업은 중지해요",
     "cards": {
       "label": "에이전트",
       "previous": "이전 에이전트",
@@ -14161,8 +14181,6 @@
   "dashboards": {
     "title": "대시보드",
     "subtitle": "에이전트가 최신 상태로 유지하는 숫자와 차트예요.",
-    "sidebar": "대시보드",
-    "navWhat": "에이전트가 최신 상태로 유지하는 숫자와 차트",
     "new": "새 대시보드",
     "back": "대시보드",
     "home": "내 홈",

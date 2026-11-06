@@ -758,6 +758,21 @@ html:not([data-pointer]) .nt-more:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
+/* The bar floats over the row's end: while it shows, the row's words stop short of it, as many buttons as it has. */
+@media (min-width: 721px) {
+  .nt-item:is(:hover, :focus-within, .is-cur, :has([data-state="open"])):not(.is-replying) > .nt-c {
+    padding-right: var(--nt-acts-room, 48px);
+  }
+  .nt-item:has(.nt-acts > :nth-child(2)) {
+    --nt-acts-room: 82px;
+  }
+  .nt-item:has(.nt-acts > :nth-child(3)) {
+    --nt-acts-room: 116px;
+  }
+  .nt-item:has(.nt-acts > :nth-child(4)) {
+    --nt-acts-room: 150px;
+  }
+}
 .nt-nb {
   position: relative;
   width: var(--control-h-sm);

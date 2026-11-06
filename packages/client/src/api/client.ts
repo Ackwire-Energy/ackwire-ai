@@ -126,6 +126,7 @@ import type {
   GifPage,
   GifQuery,
   GitHubAppInstallation,
+  GitHubOrgAccess,
   GitHubRepositories,
   Health,
   HostComputer,
@@ -902,6 +903,8 @@ export interface ApiClient {
     remove(orgId: string, id: string): Promise<void>;
     /** Repositories the organization's GitHub reaches, by account. */
     repositories(orgId: string): Promise<GitHubRepositories>;
+    /** The organizations the GitHub connection reaches now, and GitHub's page to grant more (admins). */
+    access(orgId: string): Promise<GitHubOrgAccess>;
   };
   search: {
     query(
@@ -1123,6 +1126,8 @@ export interface ApiClient {
     get(orgId: string, number: number): Promise<Issue>;
     create(orgId: string, input: IssueInput): Promise<Issue>;
     update(orgId: string, id: string, patch: IssuePatch): Promise<Issue>;
+    /** For good, with its steps and its conversation; what an agent is doing on it stops (`canDeleteIssue`). */
+    delete(orgId: string, id: string): Promise<void>;
     setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
     /** "Mostrar para todos" (ADR 0121): a card from a conversation, shared with the whole workspace. */
     share(orgId: string, id: string): Promise<Issue>;

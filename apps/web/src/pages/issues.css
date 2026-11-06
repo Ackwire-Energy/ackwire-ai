@@ -1963,6 +1963,11 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   justify-content: space-between;
   gap: 8px;
 }
+.issue-page__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 /* "Tasks" and "Conversation" sit a step above the details, never on the fields card. */
 .issue-page__main {
   display: flex;

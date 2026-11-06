@@ -117,7 +117,6 @@
     "refuse": "Reddet",
     "approve": "Onayla",
     "hold": "Onaylamak için basılı tutun",
-    "holding": "Basılı tutmaya devam edin…",
     "holdNote": "Yüksek risk: düğmeyi bir saniye basılı tutun.",
     "tapNote": "Onaylarsanız hemen yapılır.",
     "tapNoteAhead": "Şimdi onaylarsanız {{when}} için de geçerli olur.",
@@ -988,8 +987,7 @@
     "addPasswordFirst": "Önce web sitesinden hesabınıza bir şifre ekleyin, sonra buraya yazın.",
     "addPasswordWeb": "Web sitesinde şifre ekle",
     "otherAccount": "Başka bir hesaba giriş yaptınız. Hiçbir şey silinmedi.",
-    "hold": "Silmek için basılı tutun",
-    "holding": "Basılı tutmaya devam edin…"
+    "hold": "Silmek için basılı tutun"
   },
   "files": {
     "type": {

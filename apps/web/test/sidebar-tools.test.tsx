@@ -112,11 +112,9 @@ describe("the tools on top", () => {
   test("by default Threads, Tarefas, Drive and Equipe, Aprovações while some wait; the rest in More, then Personalizar", async () => {
     await go();
     expect(rows()[0]).toBe("Início");
-    // Dashboards (ADR 0135) is no row of its own: it is in More.
     expect(rows()).not.toContain("Painéis");
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive", "Equipe"]);
     const more = await openMore();
-    // Dashboards (ADR 0135) and the task manager (ADR 0128) are always there, after the tools a person places.
     expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Painéis", "Gerenciador de tarefas"]);
     expect(
       within(more)
@@ -193,6 +191,21 @@ describe("the tools on top", () => {
     await choose(dialog, "Drive", "Em Mais");
     expect(state.sidebarItems).toEqual({ wiki: "always", drive: "more" });
     expect(listed()).toEqual(["Threads", "Tarefas", "Wiki", "Equipe"]);
+  });
+
+  test("Painéis and the task manager are tools like the rest: Sempre brings them into the list, each line one row", async () => {
+    const state = await go(noneWaiting());
+    const dialog = await openSetup();
+    expect([...dialog.querySelectorAll(".sidebar-setup__name")].map((n) => n.textContent)).toEqual(
+      expect.arrayContaining(["Painéis", "Gerenciador de tarefas"]),
+    );
+    expect(chosen(dialog, "Gerenciador de tarefas")).toBe("Em Mais");
+    await choose(dialog, "Gerenciador de tarefas", "Sempre");
+    await choose(dialog, "Painéis", "Sempre");
+    expect(sent(state)).toContainEqual(["taskManager", "always"]);
+    expect(sent(state)).toContainEqual(["dashboards", "always"]);
+    expect(listed()).toEqual(expect.arrayContaining(["Painéis", "Gerenciador de tarefas"]));
+    expect(dialog.querySelector(".ac-dialog__foot-note")).toBeNull();
   });
 
   test("the choices couldn't be read: a choice here moves only its tool, and the server's answer shows the rest", async () => {
@@ -290,7 +303,18 @@ describe("the tools on top", () => {
       // Wiki waits in More between Tarefas and Drive: one press is one step in the list.
       expect(listed()).toEqual(["Aprovações", "Threads", "Drive", "Tarefas", "Equipe"]);
       expect(toolOrder(state)).toEqual([
-        ["approvals", "threads", "drive", "issues", "wiki", "routines", "calendar", "team"],
+        [
+          "approvals",
+          "threads",
+          "drive",
+          "issues",
+          "wiki",
+          "routines",
+          "calendar",
+          "team",
+          "dashboards",
+          "taskManager",
+        ],
       ]);
       expect(tool("Drive").getAttribute("aria-keyshortcuts")).toBe("Alt+Shift+ArrowUp Alt+Shift+ArrowDown");
       // At the top, up does nothing; an arrow alone is the page's.
@@ -330,6 +354,8 @@ describe("the tools on top", () => {
         "routines",
         "calendar",
         "team",
+        "dashboards",
+        "taskManager",
       ]);
     });
 
