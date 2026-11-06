@@ -1554,8 +1554,10 @@
         "noLead": "Belum ada penanggung jawab. Pilih siapa yang mengurus departemen ini.",
         "noBackup": "Tidak ada pengganti. Kalau penanggung jawab pergi, tidak ada yang menggantikan."
       },
-      "emptyTitle": "Belum ada departemen",
-      "empty": "Departemen menata agen menurut bidang, seperti Penjualan atau Dukungan. Departemen muncul sebagai bagian di daftar semua orang."
+      "emptyTitle": "Atur tim menurut bidang",
+      "empty": "Setiap departemen punya penanggung jawab, jadi semua orang tahu siapa mengurus apa.",
+      "emptyViewerTitle": "Lihat siapa mengurus apa",
+      "emptyViewer": "Orang yang mengelola agen membuat departemen, lalu departemen muncul di sini."
     },
     "usage": {
       "lead": "Penggunaan agen oleh setiap orang bulan ini, dan batasnya.",

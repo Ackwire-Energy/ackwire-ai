@@ -1606,8 +1606,10 @@
         "noLead": "Nog geen hoofd. Kies wie voor deze afdeling zorgt.",
         "noBackup": "Geen vervanger. Als het hoofd weg is, neemt niemand het over."
       },
-      "emptyTitle": "Nog geen afdelingen",
-      "empty": "Afdelingen delen de agenten in per gebied, zoals Verkoop of Support. Ze verschijnen als secties in ieders lijsten."
+      "emptyTitle": "Deel het team in per gebied",
+      "empty": "Elke afdeling heeft een hoofd, zodat iedereen ziet wie waarvoor zorgt.",
+      "emptyViewerTitle": "Zie wie waarvoor zorgt",
+      "emptyViewer": "Wie de agenten beheert, maakt de afdelingen. Ze verschijnen dan hier."
     },
     "usage": {
       "lead": "Wat elke persoon deze maand van de agenten gebruikt, en de limieten.",

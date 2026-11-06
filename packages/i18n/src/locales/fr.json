@@ -1658,8 +1658,10 @@
         "noLead": "Pas encore de responsable. Choisissez qui s'occupe de ce service.",
         "noBackup": "Pas de suppléant. Si le responsable est absent, personne ne prend le relais."
       },
-      "emptyTitle": "Aucun service pour l'instant",
-      "empty": "Les services organisent les agents par domaine, comme Ventes ou Support. Ils apparaissent comme des sections dans les listes de tout le monde."
+      "emptyTitle": "Organisez l'équipe par domaine",
+      "empty": "Chaque service a un responsable, et tout le monde voit qui s'occupe de quoi.",
+      "emptyViewerTitle": "Voyez qui s'occupe de quoi",
+      "emptyViewer": "Les personnes qui gèrent les agents créent les services, et ils apparaissent ici."
     },
     "usage": {
       "lead": "Ce que chaque personne utilise des agents ce mois-ci, et les limites.",

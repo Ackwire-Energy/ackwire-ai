@@ -1658,8 +1658,10 @@
         "noLead": "Sin responsable. Elige quién se ocupa de este departamento.",
         "noBackup": "Sin suplente. Si el responsable no está, nadie lo cubre."
       },
-      "emptyTitle": "Todavía no hay departamentos",
-      "empty": "Los departamentos organizan a los agentes por área, como Ventas o Soporte. Aparecen como secciones en las listas de todos."
+      "emptyTitle": "Organiza el equipo por áreas",
+      "empty": "Cada departamento tiene un responsable, así todos ven quién se ocupa de qué.",
+      "emptyViewerTitle": "Mira quién se ocupa de qué",
+      "emptyViewer": "Quien gestiona los agentes crea los departamentos, y aparecen aquí."
     },
     "usage": {
       "lead": "Cuánto usa cada persona de los agentes este mes, y los límites.",

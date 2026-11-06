@@ -1599,9 +1599,11 @@ export const en = {
         noLead: "No lead yet. Pick who looks after this department.",
         noBackup: "No substitute. If the lead is away, nobody covers.",
       },
-      emptyTitle: "No departments yet",
-      empty:
-        "Departments organize the agents by area, like Sales or Support. They show as sections in everyone's lists.",
+      emptyTitle: "Organize the team by area",
+      empty: "Each department has a lead, so everyone can see who looks after what.",
+      /** For who can't create one. */
+      emptyViewerTitle: "See who looks after what",
+      emptyViewer: "Whoever manages the agents creates departments, and they show up here.",
     },
     usage: {
       lead: "What each person uses of the agents this month, and the limits.",

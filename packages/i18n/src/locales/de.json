@@ -1606,8 +1606,10 @@
         "noLead": "Noch keine Leitung. Wähle, wer sich um diese Abteilung kümmert.",
         "noBackup": "Keine Vertretung. Wenn die Leitung weg ist, springt niemand ein."
       },
-      "emptyTitle": "Noch keine Abteilungen",
-      "empty": "Abteilungen ordnen die Agenten nach Bereich, etwa Vertrieb oder Support. Sie erscheinen als Abschnitte in den Listen aller."
+      "emptyTitle": "Ordne das Team nach Bereichen",
+      "empty": "Jede Abteilung hat eine Leitung, so sehen alle, wer sich um was kümmert.",
+      "emptyViewerTitle": "Sieh, wer sich um was kümmert",
+      "emptyViewer": "Wer die Agenten verwaltet, erstellt die Abteilungen. Sie erscheinen dann hier."
     },
     "usage": {
       "lead": "Was jede Person diesen Monat von den Agenten nutzt, und die Limits.",

@@ -4,7 +4,7 @@ import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { sectorGap, sectorReach } from "@agenteschat/client/lib/team-views";
-import { AvatarStack, Button, Card, EmptyState, Icon, Select } from "@agenteschat/ui";
+import { AvatarStack, Button, Card, Icon, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,7 +20,7 @@ import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useToast } from "@/lib/toast";
 import { useWhen } from "@/pages/RoutinesPage";
-import { ChannelName, SectorMark, sectorStyle, useTeamLookups } from "./shared";
+import { ChannelName, NoSectors, SectorMark, sectorStyle, useTeamLookups } from "./shared";
 
 const NOBODY = "none";
 /** Routines listed on a setor's card before "and N more". */
@@ -70,18 +70,7 @@ export function TeamSectors({ team, groups }: { team: Team; groups: AgentGroup[]
         {actions}
       </div>
       {groups.length === 0 ? (
-        <EmptyState
-          title={t("team.sectors.emptyTitle")}
-          actions={
-            arranges && (
-              <Button variant="primary" icon="plus" onClick={() => setDialog({ mode: "create" })}>
-                {t("agentGroups.create")}
-              </Button>
-            )
-          }
-        >
-          {t("team.sectors.empty")}
-        </EmptyState>
+        <NoSectors lodi={look.lodi} onCreate={arranges ? () => setDialog({ mode: "create" }) : undefined} />
       ) : (
         <div className="team-sectors__grid">
           {groups.map((g, i) => (

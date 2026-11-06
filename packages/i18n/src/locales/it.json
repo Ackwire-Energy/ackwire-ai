@@ -1658,8 +1658,10 @@
         "noLead": "Ancora nessun responsabile. Scegli chi si occupa di questo reparto.",
         "noBackup": "Nessun sostituto. Se il responsabile è assente, nessuno lo copre."
       },
-      "emptyTitle": "Ancora nessun reparto",
-      "empty": "I reparti organizzano gli agenti per area, come Vendite o Supporto. Appaiono come sezioni negli elenchi di tutti."
+      "emptyTitle": "Organizza il team per area",
+      "empty": "Ogni reparto ha un responsabile, così tutti vedono chi si occupa di cosa.",
+      "emptyViewerTitle": "Vedi chi si occupa di cosa",
+      "emptyViewer": "I reparti li crea chi gestisce gli agenti, e poi appaiono qui."
     },
     "usage": {
       "lead": "Quanto usa degli agenti ogni persona questo mese, e i limiti.",

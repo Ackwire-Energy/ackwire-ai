@@ -3939,10 +3939,16 @@
     "value": "No substitute. If the lead is away, nobody covers."
   },
   "team.sectors.emptyTitle": {
-    "value": "No departments yet"
+    "value": "Organize the team by area"
   },
   "team.sectors.empty": {
-    "value": "Departments organize the agents by area, like Sales or Support. They show as sections in everyone's lists."
+    "value": "Each department has a lead, so everyone can see who looks after what."
+  },
+  "team.sectors.emptyViewerTitle": {
+    "value": "See who looks after what"
+  },
+  "team.sectors.emptyViewer": {
+    "value": "Whoever manages the agents creates departments, and they show up here."
   },
   "team.usage.lead": {
     "value": "What each person uses of the agents this month, and the limits."

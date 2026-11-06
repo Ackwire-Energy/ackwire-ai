@@ -1606,8 +1606,10 @@
         "noLead": "Henüz sorumlu yok. Bu departmanla kimin ilgileneceğini seçin.",
         "noBackup": "Yedek yok. Sorumlu yokken kimse onun yerine bakmaz."
       },
-      "emptyTitle": "Henüz departman yok",
-      "empty": "Departmanlar ajanları Satış veya Destek gibi alanlara göre düzenler. Herkesin listelerinde bölüm olarak görünürler."
+      "emptyTitle": "Ekibi alanlara göre düzenle",
+      "empty": "Her departmanın bir sorumlusu olur, böylece herkes kimin neyle ilgilendiğini görür.",
+      "emptyViewerTitle": "Kimin neyle ilgilendiğini gör",
+      "emptyViewer": "Departmanları ajanları yöneten kişi oluşturur, sonra burada görünürler."
     },
     "usage": {
       "lead": "Bu ay her kişinin ajanları ne kadar kullandığı ve sınırlar.",

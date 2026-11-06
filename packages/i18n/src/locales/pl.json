@@ -1710,8 +1710,10 @@
         "noLead": "Brak kierownika. Wybierz, kto opiekuje się tym działem.",
         "noBackup": "Brak zastępcy. Gdy kierownika nie ma, nikt go nie zastąpi."
       },
-      "emptyTitle": "Nie ma jeszcze działów",
-      "empty": "Działy porządkują agentów według obszaru, na przykład Sprzedaż lub Wsparcie. Pojawiają się jako sekcje na listach wszystkich."
+      "emptyTitle": "Uporządkuj zespół według obszarów",
+      "empty": "Każdy dział ma kierownika, więc wszyscy widzą, kto czym się zajmuje.",
+      "emptyViewerTitle": "Zobacz, kto czym się zajmuje",
+      "emptyViewer": "Działy tworzy osoba zarządzająca agentami. Potem pojawią się tutaj."
     },
     "usage": {
       "lead": "Ile każda osoba korzysta z agentów w tym miesiącu, i limity.",

@@ -1591,9 +1591,10 @@ export const ptBR = {
         noLead: "Sem responsável. Escolha quem cuida deste setor.",
         noBackup: "Sem substituto. Se o responsável sair, ninguém cobre.",
       },
-      emptyTitle: "Nenhum setor ainda",
-      empty:
-        "Setores organizam os agentes por área, como Vendas ou Suporte. Eles aparecem como seções nas listas de todos.",
+      emptyTitle: "Organize o time por área",
+      empty: "Cada setor tem um responsável, e todo mundo vê quem cuida do quê.",
+      emptyViewerTitle: "Veja quem cuida do quê",
+      emptyViewer: "Quem gerencia os agentes cria os setores, e eles aparecem aqui.",
     },
     usage: {
       lead: "Quanto cada pessoa usa dos agentes este mês, e os limites.",
