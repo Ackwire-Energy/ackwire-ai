@@ -34,6 +34,30 @@ describe("a task's GitHub link", () => {
     expect(within(aside).getByLabelText("Link do GitHub")).not.toBeNull();
   });
 
+  test("Enter and the blur that follows it save once", async () => {
+    const api = createFakeApi(seedState());
+    let saves = 0;
+    const update = api.issues.update.bind(api.issues);
+    api.issues.update = (...args: Parameters<typeof update>) => {
+      saves += 1;
+      return update(...args);
+    };
+    await renderApp(`/org/${ORG_ID}/issues/131`, { api });
+    await settle(6);
+    const aside = document.querySelector(".issue-aside") as HTMLElement;
+    const field = within(aside).getByLabelText("Link do GitHub");
+    await act(async () => {
+      fireEvent.change(field, { target: { value: url } });
+    });
+    await act(async () => {
+      fireEvent.keyDown(field, { key: "Enter" });
+      await Promise.resolve();
+      fireEvent.blur(field);
+    });
+    await settle(4);
+    expect(saves).toBe(1);
+  });
+
   test("its row on the board shows the chip", async () => {
     const api = createFakeApi(seedState());
     const task = await api.issues.get(ORG_ID, 131);

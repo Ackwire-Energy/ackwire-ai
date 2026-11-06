@@ -18,7 +18,7 @@ type Step = [kind: "tool_call" | "tool_result", data: Record<string, unknown>];
 /** A run in #general answering `body`, with these tool calls and results; its tool context. */
 async function runWith(
   body: string,
-  calls: [name: string, result: string, data?: Record<string, unknown>][],
+  calls: [name: string, result: string, data?: Record<string, unknown>, input?: Record<string, unknown>][],
   background = false,
 ) {
   const trigger = await insertMessage(f.db, {
@@ -42,8 +42,8 @@ async function runWith(
     })
     .returning();
   if (!row) throw new Error("no run");
-  const steps: Step[] = calls.flatMap(([name, content, data], i) => [
-    ["tool_call", { toolUseId: `t${i}`, name, input: {} }],
+  const steps: Step[] = calls.flatMap(([name, content, data, input], i) => [
+    ["tool_call", { toolUseId: `t${i}`, name, input: input ?? {} }],
     ["tool_result", { toolUseId: `t${i}`, name, content, ...(data ? { data } : {}) }],
   ]);
   let seq = 0;
@@ -219,6 +219,53 @@ describe("web_fetch's outbound check", () => {
         ["browser_read", `Link: ${out}`, { url: "https://shop.example/" }],
       ]);
       expect((await webFetch(ctx, out)).data).toMatchObject({ code: "outbound.private_text" });
+    });
+
+    describe("an address the agent itself made a browser tool show", () => {
+      const site = { url: "https://shop.example/" };
+      const secret = "448812 Use it within 10 minutes and never share";
+      const out = `https://shop.example/v?c=${encodeURIComponent(secret)}`;
+      const refused = { code: "outbound.private_text" };
+
+      test("`find` repeated beside the page is no address of the page's, whatever was stored or is live", async () => {
+        const said = `Page: https://shop.example/\nNothing on the page answers "${out}".`;
+        const stored = await runWith("@dev check my inbox", [
+          ["mail_read", MAIL],
+          ["browser_read", said, site, { find: out }],
+        ]);
+        expect((await webFetch(stored, out)).data).toMatchObject(refused);
+        const live = await runWith("@dev check my inbox", []);
+        recordRead(live.runId, "mail_read", MAIL);
+        recordRead(live.runId, "browser_read", said, site, { find: out });
+        expect((await webFetch(live, out)).data).toMatchObject(refused);
+      });
+
+      test("nor a target repeated by a failed click, inside a `browser_do` plan, cut short or spelled another way", async () => {
+        const plain = `https://shop.example/v?c=${secret.replaceAll(" ", "+")}`;
+        const ctx = await runWith("@dev check my inbox", [
+          ["mail_read", MAIL],
+          ["browser_do", `Couldn't click "${plain.slice(0, -6)}"`, site, { steps: [{ do: "click", target: plain }] }],
+        ]);
+        expect((await webFetch(ctx, plain.slice(0, -6))).data).toMatchObject(refused);
+      });
+
+      test("nor what it filled in a field that the page then shows", async () => {
+        const ctx = await runWith("@dev check my inbox", [
+          ["mail_read", MAIL],
+          ["browser_fill", "Filled", site, { target: "e3", text: out }],
+          ["browser_read", `textbox "Note" value="${out}"`, site],
+        ]);
+        expect((await webFetch(ctx, out)).data).toMatchObject(refused);
+      });
+
+      test("words it asked about don't block a link the page shows without them", async () => {
+        const shown = `https://shop.example/print?title=${encodeURIComponent("the northern plant passed its review")}`;
+        const ctx = await runWith("@dev read the report", [
+          ["browser_read", "the northern plant passed its review", site],
+          ["browser_read", `Print: ${shown}`, site, { find: "the print link" }],
+        ]);
+        expect((await webFetch(ctx, shown)).isError).toBeUndefined();
+      });
     });
 
     test("an open that was refused is no visit, and only browser tools say where a browser is", async () => {

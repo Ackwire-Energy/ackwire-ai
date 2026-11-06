@@ -831,6 +831,7 @@ function GithubLink({ issue: i }: { issue: Issue }) {
     action.mutate({ type: "update", id: i.id, patch: { githubUrl } }, { onSuccess: () => setText("") });
   const submit = () => {
     const url = text.trim();
+    if (action.isPending) return;
     if (!url) return setInvalid(false);
     setInvalid(!isGithubLink(url));
     if (isGithubLink(url)) save(url);
@@ -858,6 +859,7 @@ function GithubLink({ issue: i }: { issue: Issue }) {
   return (
     <Locked when={action.isPending}>
       <Field
+        className="issue-github__field"
         label={t("issues.github.label")}
         id={`is-github-${i.id}`}
         error={invalid ? t("issues.github.invalid") : undefined}

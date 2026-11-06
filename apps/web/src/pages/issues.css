@@ -1216,6 +1216,9 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   align-items: center;
   gap: 4px;
 }
+.issue-github__field {
+  margin-top: 12px;
+}
 .issue-github__chip {
   max-width: 100%;
   color: var(--ink);

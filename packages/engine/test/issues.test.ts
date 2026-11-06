@@ -800,5 +800,10 @@ describe("issues", () => {
     const inSecret = { type: "agent" as const, agentId: f.agent.id, channelId: secret.id };
     await expect(getIssue(f.db, inGeneral, f.org.id, { id: hidden.id })).rejects.toBeInstanceOf(NotFoundError);
     expect((await getIssue(f.db, inSecret, f.org.id, { id: hidden.id })).title).toBe("Segredo");
+    const githubUrl = "https://github.com/acme/app/issues/1";
+    await expect(updateIssue(deps, inGeneral, f.org.id, hidden.id, { githubUrl })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    expect((await getIssue(f.db, inSecret, f.org.id, { id: hidden.id })).githubUrl).toBeNull();
   });
 });
