@@ -21897,14 +21897,8 @@
   "run.stopAgent": {
     "value": "Stop {{name}}"
   },
-  "run.stoppedByYou": {
-    "value": "Stopped by you"
-  },
-  "run.stoppedBy": {
-    "value": "Stopped by {{name}}"
-  },
   "run.stopped": {
-    "value": "Stopped"
+    "value": "Stopped here"
   },
   "run.continueRun": {
     "value": "Continue"
@@ -35144,19 +35138,16 @@
     "value": "here"
   },
   "taskManager.stopped.line": {
-    "value": "You stopped this task"
+    "value": "You stopped {{agent}}"
   },
   "taskManager.stopped.lineBy": {
-    "value": "{{name}} stopped this task"
-  },
-  "taskManager.stopped.told": {
-    "value": "{{agent}} was told and only picks it up again if someone asks."
+    "value": "{{name}} stopped {{agent}}"
   },
   "taskManager.stopped.reason": {
     "value": "Reason: «{{reason}}»"
   },
   "taskManager.stopped.sayWhy": {
-    "value": "Say why"
+    "value": "Add a reason"
   },
   "taskManager.stopped.whyPlaceholder": {
     "value": "Want to say why? (optional)"

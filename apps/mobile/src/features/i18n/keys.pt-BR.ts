@@ -338,9 +338,9 @@ export const featureKeysPtBR = {
       wellNow: "Parou para ler seu recado",
     },
     stopped: {
-      byYou: "Parado por você",
-      by: "Parado por {{name}}",
-      plain: "Parado",
+      byYou: "Parou aqui",
+      by: "{{name}} parou aqui",
+      plain: "Parou aqui",
       limit: "No limite de passos",
       stuck: "Parou porque travou",
       continue: "Continuar",

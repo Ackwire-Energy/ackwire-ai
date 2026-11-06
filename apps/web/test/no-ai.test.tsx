@@ -74,7 +74,7 @@ const banner = () => document.querySelector(".noai-banner") as HTMLElement | nul
 const cardRow = () =>
   screen()
     .getAllByRole("article")
-    .find((a) => a.querySelector(".waitcard")) as HTMLElement;
+    .find((a) => a.querySelector(".rq-open, .rq-done")) as HTMLElement;
 const dialog = (name: string | RegExp) => screen().queryByRole("dialog", { name });
 /** The computer's own sign-in isn't Walter's here: a plan signs in from the page. */
 const noOwnSignIn = (api: ReturnType<typeof createFakeApi>) => {
@@ -398,8 +398,8 @@ describe("the agent's no-AI card", () => {
     await open(state);
     const row = cardRow();
     expect(row.textContent).toContain("Ada não vai responder porque não tem uma IA\u00a0conectada.");
-    // The card is that line and Connect, even for whoever asked.
-    expect(row.querySelector(".waitcard p")).toBeNull();
+    // The pill is that line and Connect, even for whoever asked: nothing under it.
+    expect(row.querySelector(".rq-open__below")).toBeNull();
     expect(row.textContent).not.toContain("Depois de conectar");
     expect(row.textContent).not.toContain("Ainda não consigo responder");
     await click(within(row).getByRole("button", { name: "Conectar" }));

@@ -25,19 +25,19 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
-import { Button, type IconName, LineIcon, Text, useTheme } from "@/ui";
-import { AskDone } from "../chat/asks";
-import { useCardTop } from "../chat/look";
+import { EventPillAction, EventPillText, type IconName, Text } from "@/ui";
+import { AskDone, AskWaiting } from "../chat/asks";
 import { PersonLimitNote } from "../usage/people";
 import { openPage } from "./parts";
 
 /**
  * The web's cards to connect an app or an MCP server (`offer_connect_app`) and to invite people (`offer_invites`) in
- * place of their text: the button opens the app's own screen, filled in (Conectores at the service or at connecting by
- * address with the address typed in; Convidar pessoas with the addresses). Done from live data, one quiet line.
+ * place of their text, as waiting pills: the tinted action opens the app's own screen, filled in (Conectores at the
+ * service or at connecting by address with the address typed in; Convidar pessoas with the addresses), the agent's why
+ * and the address under the pill. Done from live data, a decided request's pill.
  * The right hand's approvals, people and "Abrir" cards (ADR 0137 §4) open the matching screen here (an approval, the
  * members), or the page on the website where the phone has none.
  */
@@ -227,6 +227,10 @@ function OpenScreen({ card }: { card: Extract<Card, { kind: "open_page" }> }) {
   );
 }
 
+/**
+ * One offer as a waiting pill: its title, the action (tinted) for who may take it, else who may in the text under it;
+ * the agent's why and the detail (an address, names) under the pill too. Done, a decided request's pill.
+ */
 function Shell({
   icon,
   title,
@@ -246,8 +250,6 @@ function Shell({
   onAction: () => void;
   blocked: string;
 }) {
-  const { colors } = useTheme();
-  const cardTop = useCardTop();
   if (done) {
     return (
       <View>
@@ -255,33 +257,30 @@ function Shell({
       </View>
     );
   }
+  const note = action ? null : blocked;
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
-      <View style={styles.row}>
-        <LineIcon name={icon} variant="subhead" size={16} color={colors.ink2} />
-        <Text variant="subhead" style={styles.title}>
-          {title}
-        </Text>
-      </View>
-      {why ? <Text variant="body">{why}</Text> : null}
-      {detail ? (
-        <Text variant="small" tone="muted">
-          {detail}
-        </Text>
-      ) : null}
-      {action ? (
-        <Button variant="primary" size="sm" label={action} onPress={onAction} />
-      ) : (
-        <Text variant="small" tone="muted">
-          {blocked}
-        </Text>
-      )}
-    </View>
+    <AskWaiting
+      forMe={action !== null}
+      mark={icon}
+      words={title}
+      actions={action ? <EventPillAction key="act" primary label={action} onPress={onAction} /> : null}
+      below={
+        why || detail || note ? (
+          <EventPillText>
+            {why ? <Text variant="footnote">{why}</Text> : null}
+            {detail ? (
+              <Text variant="footnote" tone="muted">
+                {detail}
+              </Text>
+            ) : null}
+            {note ? (
+              <Text variant="footnote" tone="muted">
+                {note}
+              </Text>
+            ) : null}
+          </EventPillText>
+        ) : null
+      }
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  title: { flex: 1, fontWeight: "600" },
-});

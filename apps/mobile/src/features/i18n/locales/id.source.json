@@ -786,13 +786,13 @@
     "value": "Stopped to read your note"
   },
   "chat.stopped.byYou": {
-    "value": "Stopped by you"
+    "value": "Stopped here"
   },
   "chat.stopped.by": {
-    "value": "Stopped by {{name}}"
+    "value": "{{name}} stopped here"
   },
   "chat.stopped.plain": {
-    "value": "Stopped"
+    "value": "Stopped here"
   },
   "chat.stopped.limit": {
     "value": "At the step limit"

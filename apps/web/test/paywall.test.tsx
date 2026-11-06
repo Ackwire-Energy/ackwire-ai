@@ -75,7 +75,7 @@ const click = async (el: Element, rounds = 6) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
 };
-const card = () => document.querySelector(".waitcard") as HTMLElement;
+const card = () => document.querySelector(":is(.rq-open, .rq-done)") as HTMLElement;
 const calls = (state: State, method: string) => state.calls.filter((c) => c.method === method);
 
 describe("the wall", () => {

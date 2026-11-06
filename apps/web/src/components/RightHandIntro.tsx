@@ -19,7 +19,15 @@ import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/cli
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
 import { BUSINESS_TYPES, isTemplateBusiness, startCardAnswer } from "@agenteschat/client/lib/team-plan";
-import { AgentSticker, Button, Icon, Message, MessageText, normalizeAppearance, WAVE_SECONDS } from "@agenteschat/ui";
+import {
+  AgentSticker,
+  Button,
+  EventPillAction,
+  Message,
+  MessageText,
+  normalizeAppearance,
+  WAVE_SECONDS,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -35,7 +43,7 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
-import { RequestCard } from "@/components/RequestCard";
+import { RequestCard, RequestOpen } from "@/components/RequestCard";
 import { AnswerChips, TeamTemplatesDialog } from "@/components/TeamPlan";
 import { TextAction } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -44,12 +52,13 @@ import { useToast } from "@/lib/toast";
 
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
- * any AI is connected: its greeting, then the one card the workspace needs next (`introCards`). No AI yet: Connect
- * AI. An AI and no agent besides it: how to start. A team: how agents talk to the person (ADR 0147) until they pick,
- * then, nobody else here yet, inviting people and the first task. With no card left, a line to build the team with
- * it, at any time. On a billing hold it can't answer, so the start card and what's next alone, with no model call
- * behind them. On the person's first visit, its waving sticker under the greeting, drawn as a sticker message is and
- * decorative (the greeting already says hello). Its face and name open the profile card, as on any message.
+ * any AI is connected: its greeting, then the one card the workspace needs next (`introCards`). No AI yet: a waiting
+ * pill with "Connect AI". An AI and no agent besides it: how to start. A team: how agents talk to the person (ADR 0147)
+ * until they pick, then, nobody else here yet, inviting people and the first task. With no card left, a line to build
+ * the team with it, at any time. On a billing hold it can't answer, so the start card and what's next alone, with no
+ * model call behind them. On the person's first visit, its waving sticker under the greeting, drawn as a sticker
+ * message is and decorative (the greeting already says hello). Its face and name open the profile card, as on any
+ * message.
  */
 export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: string }) {
   const { t, i18n } = useTranslation();
@@ -116,18 +125,17 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
         />
       )}
       {cards.includes("connect") && connect && (
-        <div className="waitcard">
-          <span className="waitcard__top ac-iconline">
-            <Icon name="plug" size={16} />
-            <span>{t("rightHand.intro.connect.title")}</span>
-          </span>
-          <p>{t("rightHand.intro.connect.text")}</p>
-          <span className="waitcard__acts">
-            <Button size="sm" variant="primary" onClick={() => connect.open({ agentId: agent.id })}>
+        <RequestOpen
+          mine
+          action={
+            <EventPillAction primary onClick={() => connect.open({ agentId: agent.id })}>
               {t("rightHand.intro.connect.action")}
-            </Button>
-          </span>
-        </div>
+            </EventPillAction>
+          }
+          below={<p>{t("rightHand.intro.connect.text")}</p>}
+        >
+          {t("rightHand.intro.connect.title")}
+        </RequestOpen>
       )}
       {cards.includes("start") && (
         <StartCard

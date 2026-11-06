@@ -341,9 +341,9 @@
       "wellNow": "Se detuvo para leer tu nota"
     },
     "stopped": {
-      "byYou": "Lo detuviste tú",
-      "by": "Lo detuvo {{name}}",
-      "plain": "Detenido",
+      "byYou": "Se detuvo aquí",
+      "by": "{{name}} lo detuvo aquí",
+      "plain": "Se detuvo aquí",
       "limit": "Llegó al límite de pasos",
       "stuck": "Se detuvo porque se trabó",
       "continue": "Continuar",

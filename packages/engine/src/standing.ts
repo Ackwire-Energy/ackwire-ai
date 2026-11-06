@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { en } from "@agenteschat/i18n/en";
+import { enqueueAccountContact } from "./account-contacts";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError } from "./errors";
@@ -533,6 +534,7 @@ export async function setUserBlocked(
       .where(eq(users.id, userId))
       .returning({ blockedAt: users.blockedAt, reason: users.blockedReason });
     if (!row) return null;
+    await enqueueAccountContact(tx, userId);
     if (!change.blocked) return { ...row, sessionsRevoked: 0, orgIds: [] };
     const revoked = await tx.delete(sessions).where(eq(sessions.userId, userId)).returning({ id: sessions.id });
     await tx.delete(pushDevices).where(eq(pushDevices.userId, userId));

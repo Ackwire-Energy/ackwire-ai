@@ -18,6 +18,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type AppLocale, appLocale, isAppLocale, LOCALE_CODES } from "@agenteschat/i18n/locale";
+import { enqueueAccountContact } from "./account-contacts";
 import { type AgentStyle, isAgentStyle, saveAgentStyle } from "./agent-style";
 import { dropAgentRules } from "./approval-rules";
 import { revokeMemberApps } from "./apps/revoke";
@@ -823,7 +824,10 @@ export type UserLocale = AppLocale;
  */
 export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false, pubsub?: PubSub) {
   if (!isAppLocale(locale)) throw new ValidationError(`locale must be one of ${LOCALE_CODES.join(", ")}`);
-  await db.update(users).set({ locale, localeAuto: auto }).where(eq(users.id, userId));
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ locale, localeAuto: auto }).where(eq(users.id, userId));
+    await enqueueAccountContact(tx, userId);
+  });
   // Runners render each agent's browser start page in its responsible person's language.
   if (pubsub) {
     const orgs = await db.selectDistinct({ id: agents.orgId }).from(agents).where(eq(agents.ownerUserId, userId));
@@ -1398,6 +1402,7 @@ export async function deleteAccount(
           .returning({ id: agents.id, orgId: agents.orgId })
       : [];
     if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
+    await enqueueAccountContact(tx, userId);
     await tx.delete(users).where(eq(users.id, userId));
     for (const org of plan.leaves) await followOwner(tx, org.id);
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their

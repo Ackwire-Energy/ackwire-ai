@@ -313,9 +313,9 @@
       "wellNow": "Berhenti untuk membaca catatanmu"
     },
     "stopped": {
-      "byYou": "Kamu hentikan",
-      "by": "Dihentikan oleh {{name}}",
-      "plain": "Dihentikan",
+      "byYou": "Berhenti di sini",
+      "by": "{{name}} menghentikannya di sini",
+      "plain": "Berhenti di sini",
       "limit": "Mencapai batas langkah",
       "stuck": "Berhenti karena macet",
       "continue": "Lanjutkan",

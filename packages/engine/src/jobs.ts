@@ -9,6 +9,7 @@ import type {
   WebPushSender,
 } from "@agenteschat/adapters";
 import { and, count, eq, inArray, isNull, ne, queryTrace, schema, sql } from "@agenteschat/db";
+import { ACCOUNT_CONTACT_JOB, saveAccountContact } from "./account-contacts";
 import { AGENT_MEDIA_JOB, enqueueAgentMedia, maybeSendAgentMedia } from "./agent-media";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
@@ -946,6 +947,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
       await saveWaitlistContact(deps.db, deps.email, String(job.payload.entryId));
+    },
+    [ACCOUNT_CONTACT_JOB]: async (job) => {
+      if (!deps.email) throw new PermanentJobError("no email sender configured");
+      await saveAccountContact(deps.db, deps.email, {
+        userId: String(job.payload.userId),
+        email: String(job.payload.email),
+      });
     },
     // A background task on a connected computer ended: its conversation wakes (ADR 0029).
     "machine.task_done": async (job) => {

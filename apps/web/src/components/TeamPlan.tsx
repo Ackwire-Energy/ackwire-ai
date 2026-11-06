@@ -24,6 +24,7 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EventPillAction,
   Field,
   Icon,
   Input,
@@ -379,21 +380,19 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
           label={title}
           action={
             undoable ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                loading={team.undo.isPending}
+              <EventPillAction
+                disabled={team.undo.isPending}
                 onClick={() => team.undo.mutate(undefined, { onError: failed })}
               >
                 {t("agentActions.undo")}
-              </Button>
+              </EventPillAction>
             ) : undefined
           }
+          time={card.decidedAt ? whenAt(t, i18n.language, card.decidedAt) : undefined}
         >
           {by ? t("teamPlan.card.created", { name: by }) : t("teamPlan.card.createdYou")}: <b>{names}</b>
           {channels && ` · ${channels}`}
           {counts.routines > 0 && ` · ${t("teamPlan.card.routineCount", { count: counts.routines })}`}
-          {card.decidedAt && ` · ${whenAt(t, i18n.language, card.decidedAt)}`}
         </RequestDone>
         {card.created?.skipped.includes("skills") && <p className="small muted">{t("teamPlan.card.skillsWait")}</p>}
         {card.created?.skipped.includes("weekly") && <p className="small muted">{t("teamPlan.card.weeklyWait")}</p>}

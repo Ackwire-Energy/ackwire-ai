@@ -1243,7 +1243,7 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(line).toMatchObject({ key: "chat.notice.wakeSkipped", values: { name: "Ada", agents: "Infra, zed" } });
   });
 
-  test("an agent's follow-up: when it will be back and for what, then the line that woke it", () => {
+  test("an agent's follow-up: when it will be back and for what (Cancel while it is to come), then the line that woke it", () => {
     // Today, so the line needs no day.
     const at = new Date(new Date().setHours(12, 0, 0, 0)).toISOString();
     const when = { time: (iso: string) => (iso === at ? "12:00" : "?"), locale: "pt-BR" };
@@ -1259,6 +1259,7 @@ describe("automatic lines (notices) and fast replies", () => {
       key: "chat.notice.followUp",
       values: { name: "Ada", about: "ver o CI", time: "12:00", day: "" },
       text: "Check CI run 42",
+      pending: true,
     });
     const canceled = eventLineOf(
       agentMsg("n2", { notice: { kind: "follow_up", text: "x", refs: { ...refs, state: "canceled" } } }),
@@ -1266,6 +1267,7 @@ describe("automatic lines (notices) and fast replies", () => {
       when,
     );
     expect(canceled?.key).toBe("chat.notice.followUpCanceled");
+    expect(canceled?.pending).toBe(false);
     const woke = eventLineOf(
       agentMsg("n3", { notice: { kind: "follow_up", text: "x", refs: { ...refs, wake: "1", followUpId: "n1" } } }),
       names,

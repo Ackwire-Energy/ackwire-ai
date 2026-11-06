@@ -52,6 +52,9 @@ import {
   Button,
   Checkbox,
   Chip,
+  EventPill,
+  EventPillAction,
+  EventPillMore,
   Icon,
   type IconName,
   Locked,
@@ -494,39 +497,42 @@ export function AutoApprovedLine({ messages }: { messages: Message[] }) {
       onError: (error) => toast.show(errorText(t, error), "error"),
     });
   return (
-    <div className="mi-evt mi-evt--auto ac-iconline" data-message-id={first.id}>
-      <Icon name="check" size={14} />
-      <span>
-        {t("missions.auto.label")}:{" "}
-        {items.length === 1 ? <code>{first.command}</code> : t("missions.auto.many", { count: items.length })} ·{" "}
-        {reason} · {formatTime(i18n.language, first.at)}
-      </span>
-      {items.length > 1 && (
-        <button type="button" className="ac-link mi-lnk" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          {open ? t("missions.auto.hide") : t("missions.auto.show")}
-        </button>
-      )}
-      {canRevoke && (
-        <button
-          type="button"
-          className="ac-link mi-lnk"
-          title={t("missions.auto.revokeHint")}
-          disabled={set.isPending}
-          onClick={revoke}
-        >
-          {t("missions.auto.revoke")}
-        </button>
-      )}
-      {open && items.length > 1 && (
-        <ul className="mi-evt__list">
-          {items.map((i) => (
-            <li key={i.id}>
-              <code>{i.command}</code>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <EventPill
+      className="mi-evt mi-evt--auto"
+      data-message-id={first.id}
+      mark={<Icon name="check" size={14} />}
+      time={formatTime(i18n.language, first.at)}
+      actions={
+        items.length > 1 || canRevoke ? (
+          <>
+            {canRevoke && (
+              <EventPillAction title={t("missions.auto.revokeHint")} disabled={set.isPending} onClick={revoke}>
+                {t("missions.auto.revoke")}
+              </EventPillAction>
+            )}
+            {items.length > 1 && (
+              <EventPillMore open={open} onClick={() => setOpen((o) => !o)}>
+                {open ? t("missions.auto.hide") : t("missions.auto.show")}
+              </EventPillMore>
+            )}
+          </>
+        ) : undefined
+      }
+      below={
+        open && items.length > 1 ? (
+          <ul className="mi-evt__list">
+            {items.map((i) => (
+              <li key={i.id}>
+                <code>{i.command}</code>
+              </li>
+            ))}
+          </ul>
+        ) : undefined
+      }
+    >
+      {t("missions.auto.label")}:{" "}
+      {items.length === 1 ? <code>{first.command}</code> : t("missions.auto.many", { count: items.length })} · {reason}
+    </EventPill>
   );
 }
 
@@ -1109,23 +1115,24 @@ export function MissionPlanChangeLine({ message }: { message: Message }) {
   const shown = long ? parts.slice(0, PLAN_CHANGE_SHOWN - 1) : parts;
   const rest = parts.length - shown.length;
   return (
-    <div className="mi-evt ac-iconline" data-message-id={message.id}>
-      <Icon name="edit" size={14} />
+    <EventPill
+      className="mi-evt"
+      data-message-id={message.id}
+      mark={<Icon name="edit" size={14} />}
+      actions={
+        panel ? (
+          <EventPillAction onClick={() => panel.openFiles(change.missionId, "mission.md")}>
+            {t("missions.plan.see")}
+          </EventPillAction>
+        ) : undefined
+      }
+    >
       <span className="mi-evt__text" title={before || (long ? parts.join("\n") : undefined)}>
         <b>{t("missions.planChange.title")}</b>
         {shown.length > 0 ? `: ${shown.join(" · ")}` : ""}
         {long ? ` · ${t("missions.planChange.more", { count: rest })}` : ""}
-        {/* Inline after the text: when it wraps, it stays on the text's left edge. */}
-        {panel && (
-          <>
-            {" · "}
-            <button type="button" className="mi-link" onClick={() => panel.openFiles(change.missionId, "mission.md")}>
-              {t("missions.plan.see")}
-            </button>
-          </>
-        )}
       </span>
-    </div>
+    </EventPill>
   );
 }
 
@@ -1144,7 +1151,7 @@ const NOTICE_ICON: Record<string, IconName> = {
 };
 
 /**
- * The computer went offline, came back, a task ended: one quiet line. A task's end names its computer only where the
+ * The computer went offline, came back, a task ended: one event pill (what can be done about it under it). A task's end names its computer only where the
  * workspace has more than one (`useNamesComputers`).
  */
 export function TaskNoticeLine({ message }: { message: Message }) {
@@ -1171,33 +1178,38 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   const blocked = task?.blocked ?? [];
   const key = `missions.notice.${notice.code}`;
   return (
-    <div className="mi-evt ac-iconline" data-message-id={message.id}>
-      <Icon name={NOTICE_ICON[notice.code] ?? "computer"} size={14} />
-      <span>
-        {/* i18next takes the first key that exists: a notice with no `…NoComputer` words keeps its own. */}
-        {t(names ? key : [`${key}NoComputer`, key], {
-          ...p,
-          count: Number(p.count ?? 1),
-          span: Number.isFinite(seconds) ? formatSpan(t, seconds) : "",
-          defaultValue: message.body,
-        })}{" "}
-        · {formatTime(i18n.language, message.createdAt)}
-      </span>
-      {blocked.length > 0 && task?.missionId && (
-        <BlockedCommands missionId={task.missionId} taskId={task.id} blocked={blocked} />
-      )}
-      {notice.code === "machine_access_requested" && here && (
-        <span className="mi-evt__act">
-          <ShowRequestsButton />
-        </span>
-      )}
-      {notice.code === "machine_access_requested" && p.command && !here && !managed && (
-        <span className="mi-evt__command">
-          <span className="small muted">{t("missions.notice.access_command")}</span>
-          <CommandBlock command={p.command} />
-        </span>
-      )}
-    </div>
+    <EventPill
+      className="mi-evt"
+      data-message-id={message.id}
+      mark={<Icon name={NOTICE_ICON[notice.code] ?? "computer"} size={14} />}
+      time={formatTime(i18n.language, message.createdAt)}
+      below={
+        <>
+          {blocked.length > 0 && task?.missionId && (
+            <BlockedCommands missionId={task.missionId} taskId={task.id} blocked={blocked} />
+          )}
+          {notice.code === "machine_access_requested" && here && (
+            <span className="mi-evt__act">
+              <ShowRequestsButton />
+            </span>
+          )}
+          {notice.code === "machine_access_requested" && p.command && !here && !managed && (
+            <span className="mi-evt__command">
+              <span className="small muted">{t("missions.notice.access_command")}</span>
+              <CommandBlock command={p.command} />
+            </span>
+          )}
+        </>
+      }
+    >
+      {/* i18next takes the first key that exists: a notice with no `…NoComputer` words keeps its own. */}
+      {t(names ? key : [`${key}NoComputer`, key], {
+        ...p,
+        count: Number(p.count ?? 1),
+        span: Number.isFinite(seconds) ? formatSpan(t, seconds) : "",
+        defaultValue: message.body,
+      })}
+    </EventPill>
   );
 }
 

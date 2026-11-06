@@ -44,6 +44,7 @@ import {
   CodeInput,
   Diff,
   diffLines,
+  EventPillAction,
   Field,
   Icon,
   Input,
@@ -360,9 +361,13 @@ function ProposalDone({
     .sort()
     .at(-1);
   return (
-    <RequestDone done={outcome.accepted} label={label} more={{ label: t("ask.seeChange"), content: children }}>
+    <RequestDone
+      done={outcome.accepted}
+      label={label}
+      more={{ label: t("ask.seeChange"), content: children }}
+      time={at ? whenAt(t, i18n.language, at) : undefined}
+    >
       {outcome.label}: {what}
-      {at && ` · ${whenAt(t, i18n.language, at)}`}
     </RequestDone>
   );
 }
@@ -1012,14 +1017,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         more={{ label: t("approval.seeDetails"), content: `${current.purpose}\n${where}` }}
         action={
           current.supersededBy ? (
-            <Button size="sm" variant="ghost" onClick={() => void showNewer()}>
-              {t("secret.seeNewer")}
-            </Button>
+            <EventPillAction onClick={() => void showNewer()}>{t("secret.seeNewer")}</EventPillAction>
           ) : undefined
         }
+        time={ended ? whenAt(t, i18n.language, ended) : undefined}
       >
         <b>{label}</b> · {secretOutcome(t, current, mine, person, agentName)}
-        {ended && ` · ${whenAt(t, i18n.language, ended)}`}
         {vaultSave === "saved" && ` · ${t("vault.card.saved")}`}
       </RequestDone>
       {(vaultSave === "failed" || vaultSave === "dropped") && (

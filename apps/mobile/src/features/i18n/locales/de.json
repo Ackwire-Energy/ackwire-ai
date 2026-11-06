@@ -327,9 +327,9 @@
       "wellNow": "Hat angehalten, um deine Notiz zu lesen"
     },
     "stopped": {
-      "byYou": "Von dir gestoppt",
-      "by": "Von {{name}} gestoppt",
-      "plain": "Gestoppt",
+      "byYou": "Hier gestoppt",
+      "by": "{{name}} hat hier gestoppt",
+      "plain": "Hier gestoppt",
       "limit": "Schrittlimit erreicht",
       "stuck": "Gestoppt, weil er nicht weiterkam",
       "continue": "Weiter",

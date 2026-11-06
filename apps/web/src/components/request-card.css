@@ -272,33 +272,18 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 
 /*
- * A decided request (RequestDone): no card, one quiet line. A pixel mark, words that wrap, and "Ver …" right after them.
+ * A decided request (RequestDone): no card, one event pill (`EventPill`). A pixel mark, words that wrap, its time, and
+ * its actions in the frame ("Ver …" opens the rest under it).
  */
 .rq-done {
   max-width: var(--msg-card-w);
 }
-.rq-done__line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--muted);
-}
-/* The mark and the buttons stand on the first line of its words, however many they wrap to. */
+/* The mark: the pill's own, a pixel square or bar on its words' first line. */
 .rq-done__mark {
-  flex: none;
   display: inline-grid;
   place-items: center;
   width: 14px;
-  height: 20px;
-}
-.rq-done__line > .ac-btn {
-  flex: none;
-  margin-block: -6px;
-}
-.rq-done__line > .rq__more {
-  margin-block: -2px;
+  height: 18px;
 }
 .rq-done__mark > span {
   width: 8px;
@@ -310,6 +295,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
   height: 5px;
   background: var(--ok);
 }
+/* Its words wrap, never cut. */
 .rq-done__text {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -320,8 +306,39 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 /* What it opens is someone's words: a long reason wraps and keeps its lines. */
 .rq-done .rq__details {
+  align-self: stretch;
+  margin-top: 0;
   overflow-wrap: anywhere;
   white-space: pre-line;
+}
+
+/*
+ * A request still waiting (RequestOpen): the same pill, its words in ink and what it asks for in a soft tint. Its why,
+ * what it gives or a command sit under the frame, quiet, as plain lines (never a card).
+ */
+.rq-open {
+  max-width: var(--msg-card-w);
+}
+.rq-open .rq__details {
+  align-self: stretch;
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+.rq-open__below {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 2px;
+  font-size: 13px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+.rq-open__below p {
+  margin: 0;
+}
+.rq-open__below code {
+  white-space: pre-wrap;
 }
 
 /* Waiting for you: a pixel square outline in the warning tone, pulsing. */

@@ -187,12 +187,12 @@ describe("in the chat and the sidebar", () => {
     });
   }
 
-  test("the notice becomes the waiting card, then says the computer is back", async () => {
+  test("the notice becomes the waiting pill, then a decided one saying the computer is back", async () => {
     const { api, state } = setup();
     withNotice(state);
     const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
-    const card = document.querySelector(".waitcard") as HTMLElement;
+    const card = document.querySelector(".rq-open") as HTMLElement;
     expect(card).not.toBeNull();
     expect(card.textContent).toContain("Esperando o MacBook Air voltar");
     expect(card.textContent).toContain(
@@ -204,9 +204,11 @@ describe("in the chat and the sidebar", () => {
     fakeMachinesOf.get(api)?.setOutages({ outages: [], targets: [] });
     await act(async () => sockets.last().push(orgEvent({ type: "machine.status", machineId: MAC, online: true })));
     await settle(8);
-    const back = document.querySelector(".waitcard") as HTMLElement;
-    expect(back.hasAttribute("data-done")).toBe(true);
-    expect(back.textContent).toContain("O MacBook Air voltou");
+    expect(document.querySelector(".rq-open")).toBeNull();
+    const back = [...document.querySelectorAll<HTMLElement>(".rq-done")].find((e) =>
+      e.textContent?.includes("O MacBook Air voltou"),
+    ) as HTMLElement;
+    expect(back.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
     expect(within(back).queryByRole("button")).toBeNull();
     expect(screen().queryByRole("region", { name: "Computadores desconectados" })).toBeNull();
   });
@@ -217,7 +219,7 @@ describe("in the chat and the sidebar", () => {
     fakeMachinesOf.get(api)?.setSetup({ state: "ready" });
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
-    const card = document.querySelector(".waitcard") as HTMLElement;
+    const card = document.querySelector(".rq-open") as HTMLElement;
     expect(card.textContent).toContain("Esperando o MacBook Air voltar");
     expect(within(card).queryByRole("button", { name: "Trocar computador" })).toBeNull();
   });
@@ -229,7 +231,7 @@ describe("in the chat and the sidebar", () => {
     api.machines.computerSetup = () => new Promise(() => {});
     const first = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
-    const card = document.querySelector(".waitcard") as HTMLElement;
+    const card = document.querySelector(".rq-open") as HTMLElement;
     expect(card.textContent).toContain("Esperando o MacBook Air voltar");
     expect(within(card).queryByRole("button", { name: "Trocar computador" })).toBeNull();
     const notice = screen().getByRole("region", { name: "Computadores desconectados" });
@@ -239,7 +241,7 @@ describe("in the chat and the sidebar", () => {
     state.authConfig = { ...state.authConfig, workspaceComputer: false };
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
-    const again = document.querySelector(".waitcard") as HTMLElement;
+    const again = document.querySelector(".rq-open") as HTMLElement;
     expect(within(again).getByRole("button", { name: "Trocar computador" })).toBeTruthy();
     const shown = screen().getByRole("region", { name: "Computadores desconectados" });
     expect(within(shown).getByRole("button", { name: "Trocar computador" })).toBeTruthy();

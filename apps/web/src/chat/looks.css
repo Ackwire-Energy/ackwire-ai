@@ -31,6 +31,8 @@
 }
 .channel__messages[data-look="bubbles"] {
   padding-inline: 12px;
+  /* Quiet rows (an event pill, a thread's line) on the bubbles' column: the row's 8px, the 32px face, the 8px gap. */
+  --thread-indent: 48px;
 }
 .ac-msg[data-look="bubbles"] {
   --msg-inline: 8px;
@@ -66,6 +68,11 @@
 }
 .ac-msg[data-look="bubbles"] .ac-msg__gutter-time {
   display: none;
+}
+/* The pair row before a reply ("Theo ⇄ Iris"): its first face centred over the bubbles' 32px face (the row's 8px +
+   7px, less the button's own 10px). A reach line's pair row keeps its place in the line. */
+.channel__messages[data-look="bubbles"] .consult-pair:not(.ag-rc--talk > .consult-pair) {
+  padding-left: 5px;
 }
 /* Everyone's words in a bubble, as wide as what they say, up to 76% of the column; cards stay out, on its left edge. */
 .ac-msg[data-look="bubbles"] .ac-msg__text {
@@ -218,10 +225,19 @@
   font-size: inherit;
   color: inherit;
 }
+/* The details over a bubble's time: as wide as their words, wrapping only past 300px. Anchored on the 30px time, a
+   shrink-to-fit width would break the date after every letter. */
 .ac-msg__stamp .ac-msg__tip {
   left: auto;
   right: 0;
+  width: max-content;
+  max-width: min(300px, var(--tip-room, 80vw));
   white-space: normal;
+}
+/* No room on the left (a short bubble on the left, `placeStampTip`): to the right. */
+.ac-msg__stamp[data-tip="start"] .ac-msg__tip {
+  left: 0;
+  right: auto;
 }
 .ac-msg__stamp .ac-msg__aside {
   height: 14px;
@@ -267,9 +283,46 @@
   }
 }
 /* What hangs under a bubble, in one width. */
-.ac-msg[data-look="bubbles"] .ac-msg__body > :is(.ac-tools, .brw-ac, .rq-done) {
+.ac-msg[data-look="bubbles"] .ac-msg__body > :is(.ac-tools, .brw-ac, .rq-done, .rq-open) {
   width: 100%;
   max-width: 520px;
+}
+/*
+ * An event pill right under a bubble (stopped here, a request waiting or decided) is the bubble's tab: one piece with
+ * it, in its color, no frame; the bubble's corner over it squares off. Its actions split by the bubble's own hairline.
+ */
+.ac-msg[data-look="bubbles"]:not(.ac-msg--own) .ac-msg__text:has(+ .ac-eventpill) {
+  border-bottom-left-radius: 4px;
+}
+.ac-msg[data-look="bubbles"] .ac-msg__body > .ac-msg__text + .ac-eventpill {
+  width: auto;
+  max-width: var(--bubble-w, 76%);
+}
+/* The body's rule in this look: a tab stands on its bubble, not a part's gap off it. */
+.ac-msg.ac-msg[data-look="bubbles"] .ac-msg__body > .ac-msg__text + .ac-eventpill {
+  margin-top: 1px;
+}
+.ac-msg[data-look="bubbles"] .ac-msg__text + .ac-eventpill > .ac-eventpill__frame {
+  min-height: 28px;
+  border-radius: 4px 12px 12px 12px;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--msg-bubble), var(--ink) 3%);
+  font-size: 13px;
+  overflow: hidden;
+}
+.ac-msg[data-look="bubbles"] .ac-msg__text + .ac-eventpill .ac-eventpill__main {
+  padding-block: 5px;
+}
+.ac-msg[data-look="bubbles"] .ac-msg__text + .ac-eventpill .ac-eventpill__action {
+  border-left-color: color-mix(in srgb, var(--ink) 8%, transparent);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.ac-msg[data-look="bubbles"] .ac-msg__text + .ac-eventpill .ac-eventpill__action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.ac-msg[data-look="bubbles"] .ac-msg__text + .ac-eventpill .ac-eventpill__action--primary {
+  background: color-mix(in srgb, var(--attention) 12%, transparent);
 }
 /* A narrow window: any bubble may take the row. */
 @media (max-width: 600px) {
@@ -286,6 +339,10 @@
 }
 
 /* ── Compacta: the time, a small face, the name and the text on one line. ── */
+.channel__messages[data-look="compact"] {
+  /* Quiet rows (an event pill, a thread's line) on the text's column, past the clock and the small face. */
+  --thread-indent: 88px;
+}
 .ac-msg[data-look="compact"] {
   --msg-inline: 12px;
   display: block;
@@ -340,6 +397,10 @@
 .ac-msg[data-look="compact"] .ac-msg__body {
   display: block;
 }
+/* The pair row before a reply: its first face on the small face's column (62px, less the button's own 10px). */
+.channel__messages[data-look="compact"] .consult-pair:not(.ag-rc--talk > .consult-pair) {
+  padding-left: 52px;
+}
 .ac-msg[data-look="compact"] .ac-msg__head {
   display: inline;
   margin-right: 6px;
@@ -375,6 +436,73 @@
 .ac-msg[data-look="compact"] .ac-msg__body > .ac-tools .ac-tools__head {
   min-height: 28px;
   padding-block: 1px;
+}
+/*
+ * An event pill here is a row of the look's grid, read like the lines around it: no frame, its time in the clock's
+ * column, its mark in the small face's, its sentence on the text's column and its actions as words after it.
+ */
+.channel__messages[data-look="compact"] .ac-eventpill {
+  position: relative;
+}
+.channel__messages[data-look="compact"] .ac-eventpill__frame {
+  display: block;
+  min-height: 20px;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.channel__messages[data-look="compact"] .ac-eventpill--waiting .ac-eventpill__frame {
+  color: var(--ink);
+}
+.channel__messages[data-look="compact"] .ac-eventpill__main {
+  display: inline;
+  padding: 0;
+}
+/* The text's column is 88px in: the small face's at 62px, the clock's 40px at 14px. */
+.channel__messages[data-look="compact"] .ac-eventpill__mark {
+  position: absolute;
+  top: 1px;
+  left: -26px;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+}
+.channel__messages[data-look="compact"] .ac-eventpill__time {
+  position: absolute;
+  top: 2px;
+  left: -74px;
+  width: 40px;
+  font-size: 11px;
+  line-height: 17px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.channel__messages[data-look="compact"] .ac-eventpill__actions {
+  display: inline-flex;
+  gap: 10px;
+  margin-left: 10px;
+  vertical-align: top;
+}
+.channel__messages[data-look="compact"] .ac-eventpill__action {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--ink2);
+}
+.channel__messages[data-look="compact"] .ac-eventpill__action:hover:not(:disabled) {
+  background: none;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.channel__messages[data-look="compact"] .ac-eventpill__action--primary {
+  color: var(--ink);
 }
 
 /* ── Sua conta › Conversa: each choice is its picture, the conversation's own rows scaled down. ── */

@@ -27,7 +27,7 @@ import { useCardTop } from "../chat/look";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
-import { useDirectory } from "../shared/hooks";
+import { useDirectory, useWhen } from "../shared/hooks";
 
 /** The proposal cards an agent's message carries (`meta.memoryUpdates`, or an older `meta.proposalId`). */
 export function InstructionProposals({ message: m }: { message: Message }) {
@@ -49,6 +49,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const dir = useDirectory();
+  const when = useWhen();
   const { colors } = useTheme();
   const cardTop = useCardTop();
   const toast = useToast();
@@ -237,16 +238,21 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
     </View>
   );
   if (rows.some(isOpen)) return card;
-  // Decided: one line like a decided approval, the card when asked for.
+  // Decided: one pill like a decided approval, with the last decision's time; the card when asked for.
   const outcome = cardOutcome(t, rows);
+  const decidedAt = rows.reduce<string | null>(
+    (at, r) => (r.decidedAt && (!at || r.decidedAt > at) ? r.decidedAt : at),
+    null,
+  );
   const what = many
     ? runs.map((r) => (r.bold ? markName(r.text) : r.text)).join("")
     : markName(proposalTitle(t, first, orgName, agentName));
   return (
     <AskDone
       done={outcome.accepted}
-      words={`${outcome.label} · ${what}`}
-      more={{ label: t("ask.seeChange"), content: card }}
+      words={`${outcome.label}: ${what}`}
+      time={decidedAt ? when.short(decidedAt) : undefined}
+      more={{ label: t("ask.seeChange"), content: card, card: true }}
     />
   );
 }

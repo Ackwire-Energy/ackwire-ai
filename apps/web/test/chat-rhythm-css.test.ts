@@ -49,6 +49,9 @@ const PARTS = [
   "mi-suggest",
   "mi-tag",
   "rq-done",
+  "rq-open",
+  "cn-pill",
+  "ac-eventpill",
   "brw-rq",
   "consult-pair",
   "channel__unread",
@@ -143,10 +146,12 @@ test("a message's body sets what stands between its parts, and no part sets it f
   const own = rules(css)
     .filter((r) => r.declarations.some(setsVertical))
     .flatMap((r) => r.selectors.filter((s) => PARTS.some((cls) => named(s, cls))))
-    // A part's insides and its place in a card or a page are its own business.
+    // A part's insides and its place in a card or a page are its own business; the body's rule, a look's too.
     .filter(
       (s) =>
-        !/^\.(ac-msg__error-row\s*>|issue|mi-delivery|ac-msg\s\.ac-msg__body|ac-msg\.ac-msg\s\.ac-msg__body)/.test(s),
+        !/^\.(ac-msg__error-row\s*>|issue|mi-delivery|ac-msg\s\.ac-msg__body|ac-msg\.ac-msg(\[data-look=[^\]]+\])?\s\.ac-msg__body)/.test(
+          s,
+        ),
     );
   expect(own).toEqual([]);
   // Nor by what stands above it.
@@ -154,6 +159,18 @@ test("a message's body sets what stands between its parts, and no part sets it f
     .filter((r) => r.declarations.some(setsVertical))
     .flatMap((r) => r.selectors.filter((s) => /^\.ac-msg(__text|-media|__head)[^ ]*[+~]/.test(s)));
   expect(byNeighbour).toEqual([]);
+});
+
+test("an event pill is a part: the body sets its top, and a bubble's tab stands on its bubble", () => {
+  const tab = rules(css).find((r) =>
+    r.selectors.some((s) =>
+      /^\.ac-msg\.ac-msg\[data-look=.?bubbles.?\]\s\.ac-msg__body>\.ac-msg__text\+\.ac-eventpill$/.test(s),
+    ),
+  );
+  expect(tab?.declarations).toEqual([["margin-top", "1px"]]);
+  expect(last(".ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .rq-done, .rq-open)", "margin-top")).toBe(
+    "2px",
+  );
 });
 
 test("a card that also stands alone is outranked in a message", () => {

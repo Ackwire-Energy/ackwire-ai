@@ -1,5 +1,26 @@
-/* What reached an agent's conversation (a notice) and a routine's background start: one quiet line,
-   like the other automatic lines of a conversation (`.iw-line`, `.mi-evt`); the text on demand. */
+/* What reached an agent's conversation (a notice), a stopped task, a part that failed to draw: one event pill
+   (`EventPill`) in the messages' text column; what it opens goes under it. */
+.cn-pill {
+  margin-inline: var(--thread-indent, 64px) 12px;
+}
+/* Inside a message, in place of one of its parts, or under a stopped reply: already in the text's column. */
+.cn-pill--part,
+.ac-msg__body .cn-pill {
+  margin-inline: 0;
+}
+/* The text itself, under the pill: a quiet rule on its left. */
+.cn-line__body {
+  align-self: stretch;
+  margin: 2px 0 2px 10px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink2);
+}
+
+/* A quiet line outside the chat's events (a consultation's state in its panel) and its inline toggles ("Ver
+   relatório", a consultation's link). */
 .cn-line {
   flex-wrap: wrap;
   gap: 4px 8px;
@@ -7,10 +28,6 @@
   font-size: 12.5px;
   line-height: 18px;
   color: var(--faint);
-}
-/* Inside a message, in place of one of its parts: already in the text's column. */
-.cn-line--part {
-  margin-inline: 0;
 }
 /* Never wider than the room beside the icon (14px + the 8px gap): long text wraps here. */
 .cn-line__text {
@@ -38,16 +55,6 @@ html:not([data-pointer]) .cn-line__toggle:focus-visible {
   border-radius: 2px;
   box-shadow: var(--focus-ring);
 }
-/* The text itself, under the line, aligned with the words (not the icon). */
-.cn-line__body {
-  flex-basis: 100%;
-  margin: 2px 0 2px 22px;
-  padding-left: 10px;
-  border-left: 2px solid var(--line);
-  font-size: 13.5px;
-  line-height: 20px;
-  color: var(--ink2);
-}
 
 /* The routine report an agent's message answers, unfolded under it ("Ver relatório"). */
 .cn-report__toggle {
@@ -68,12 +75,10 @@ html:not([data-pointer]) .cn-line__toggle:focus-visible {
   font-weight: 400;
 }
 
-/* "Você parou esta tarefa" (ADR 0128): the same quiet line; "Dizer por quê" opens its field and Mandar
-   (`.tm-saywhy`) under it, in the words' column. */
+/* "You stopped Ada" (ADR 0128): "Add a reason" opens its field and Send (`.tm-saywhy`) under the pill. */
 .cn-stopped__why {
-  flex: 1 1 100%;
+  align-self: stretch;
   max-width: 520px;
-  margin: 2px 0 2px 22px;
 }
 
 /*

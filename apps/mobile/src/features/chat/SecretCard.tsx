@@ -16,7 +16,7 @@ import {
   secretValueProblem,
   secretWhere,
 } from "@agenteschat/client/lib/secret-requests";
-import { secretOutcome } from "@agenteschat/client/lib/secret-words";
+import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,6 +27,7 @@ import {
   Button,
   Chip,
   CodeInput,
+  EventPillAction,
   fieldText,
   haptics,
   Icon,
@@ -40,7 +41,7 @@ import {
 import { IconTile } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
 import { useSheetIfAny } from "../shared/SheetHost";
 import { codeComplete, codeLength, LIMITS, secretToVaultInput, vaultSaveOffered } from "../vault/logic";
@@ -70,6 +71,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const { org } = useOrg();
   const meId = useMeId();
   const dir = useDirectory();
+  const when = useWhen();
   const c = useColors();
   const toast = useToast();
   const asks = useAskStore();
@@ -204,33 +206,27 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   ]
     .filter(Boolean)
     .join(" ");
-  // Closed: one line, how it ended and which secret, never its value; what it was for when asked.
+  // Closed: one pill, how it ended and which secret, never its value, and when; what it was for when asked.
+  const endedAt = secretEndedAt(r);
   if (!pending)
     return (
       <>
         <AskDone
           done={r.status === "delivered"}
-          words={[
-            markName(label),
-            secretOutcome(t, r, mine, person, agentName),
-            kept === "saved" ? t("mobile.vault.card.saved") : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+          words={`${secretOutcome(t, r, mine, person, agentName)}: ${markName(label)}`}
+          time={endedAt ? when.short(endedAt) : undefined}
+          actions={
+            r.supersededBy ? <EventPillAction label={t("secret.seeNewer")} onPress={() => void showNewer()} /> : null
+          }
           more={{
             label: t("approval.seeDetails"),
             content: (
               <Text variant="small" tone="muted">
-                {`${r.purpose}\n${where}`}
+                {[r.purpose, where, kept === "saved" ? t("mobile.vault.card.saved") : null].filter(Boolean).join("\n")}
               </Text>
             ),
           }}
         />
-        {r.supersededBy ? (
-          <View style={styles.retry}>
-            <Button variant="ghost" size="sm" label={t("secret.seeNewer")} onPress={() => void showNewer()} />
-          </View>
-        ) : null}
         {kept === "failed" || kept === "dropped" || (kept === "saving" && retry.current) ? (
           <View style={styles.retry}>
             <Icon name="x" size={13} color={c.danger} />

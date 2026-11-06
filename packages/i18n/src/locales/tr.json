@@ -8898,9 +8898,7 @@
     "elapsedSeconds": "{{n}} sn",
     "elapsedMinutes": "{{m}} dk {{s}} sn",
     "stopAgent": "{{name}} durdur",
-    "stoppedByYou": "Siz durdurdunuz",
-    "stoppedBy": "{{name}} durdurdu",
-    "stopped": "Durduruldu",
+    "stopped": "Burada durdu",
     "continueRun": "Devam et",
     "stepLimit": "Adım sınırında",
     "stuck": "Takıldığı için durdu",
@@ -14463,9 +14461,8 @@
       "here": "burada"
     },
     "stopped": {
-      "line": "Bu görevi siz durdurdunuz",
-      "lineBy": "{{name}} bu görevi durdurdu",
-      "told": "{{agent}} bilgilendirildi ve ancak biri isterse devam eder.",
+      "line": "{{agent}} sizin tarafınızdan durduruldu",
+      "lineBy": "{{agent}}, {{name}} tarafından durduruldu",
       "reason": "Neden: «{{reason}}»",
       "sayWhy": "Nedenini söyle",
       "whyPlaceholder": "Nedenini söylemek ister misiniz? (isteğe bağlı)",

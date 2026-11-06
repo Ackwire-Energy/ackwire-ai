@@ -327,9 +327,9 @@
       "wellNow": "Notunuzu okumak için durdu"
     },
     "stopped": {
-      "byYou": "Siz durdurdunuz",
-      "by": "{{name}} durdurdu",
-      "plain": "Durduruldu",
+      "byYou": "Burada durdu",
+      "by": "{{name}} burada durdurdu",
+      "plain": "Burada durdu",
       "limit": "Adım sınırına ulaştı",
       "stuck": "Takıldığı için durdu",
       "continue": "Devam et",

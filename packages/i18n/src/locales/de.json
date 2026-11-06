@@ -8956,9 +8956,7 @@
     "elapsedMinutes": "{{m}} min {{s}} s",
     "stopAgent": "{{name}} stoppen",
     "stopAgent_female": "{{name}} stoppen",
-    "stoppedByYou": "Von dir gestoppt",
-    "stoppedBy": "Von {{name}} gestoppt",
-    "stopped": "Gestoppt",
+    "stopped": "Hier gestoppt",
     "continueRun": "Weiter",
     "stepLimit": "Am Schrittlimit",
     "stuck": "Gestoppt, weil er feststeckte",
@@ -14533,9 +14531,8 @@
       "here": "hier"
     },
     "stopped": {
-      "line": "Du hast diese Aufgabe gestoppt",
-      "lineBy": "{{name}} hat diese Aufgabe gestoppt",
-      "told": "{{agent}} wurde informiert und macht nur weiter, wenn jemand darum bittet.",
+      "line": "Du hast {{agent}} gestoppt",
+      "lineBy": "{{name}} hat {{agent}} gestoppt",
       "reason": "Grund: „{{reason}}“",
       "sayWhy": "Grund nennen",
       "whyPlaceholder": "Möchtest du sagen, warum? (optional)",

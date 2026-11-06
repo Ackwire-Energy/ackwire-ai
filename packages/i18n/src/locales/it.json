@@ -9335,9 +9335,7 @@
     "elapsedSeconds": "{{n}}s",
     "elapsedMinutes": "{{m}}m {{s}}s",
     "stopAgent": "Ferma {{name}}",
-    "stoppedByYou": "Fermata da te",
-    "stoppedBy": "Fermata da {{name}}",
-    "stopped": "Fermata",
+    "stopped": "Fermato qui",
     "continueRun": "Continua",
     "stepLimit": "Al limite di passaggi",
     "stuck": "Fermata perché si era bloccata",
@@ -15145,9 +15143,8 @@
       "here": "qui"
     },
     "stopped": {
-      "line": "Hai fermato questa attività",
-      "lineBy": "{{name}} ha fermato questa attività",
-      "told": "{{agent}} ha ricevuto l'avviso e la riprende solo se qualcuno lo chiede.",
+      "line": "Hai fermato {{agent}}",
+      "lineBy": "{{name}} ha fermato {{agent}}",
       "reason": "Motivo: «{{reason}}»",
       "sayWhy": "Spiega perché",
       "whyPlaceholder": "Vuoi dire perché? (facoltativo)",

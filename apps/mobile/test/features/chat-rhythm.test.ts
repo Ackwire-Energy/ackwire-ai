@@ -50,11 +50,11 @@ describe("one rhythm, the web's numbers (chat-rhythm-css.test.ts holds them to t
       ["chat/issue-work.tsx", ["card"]],
       ["browser/TrailCard.tsx", ["card"]],
       ["voice/VoiceMessage.tsx", ["box"]],
-      ["ai/NoAiCard.tsx", ["card"]],
-      ["ai/OfferCard.tsx", ["card"]],
-      ["ai/StretchCard.tsx", ["card"]],
-      ["ai/UsagePauseCard.tsx", ["card", "acts"]],
-      ["ai/CostlyProposalCard.tsx", ["card"]],
+      ["ai/UsagePauseCard.tsx", ["acts"]],
+      ["chat/asks.tsx", ["done"]],
+      ["chat/EventLine.tsx", ["line"]],
+      ["chat/StoppedLine.tsx", ["line"]],
+      ["chat/issue-work.tsx", ["line"]],
       ["agents/ProposalCard.tsx", ["card"]],
       ["agents/InstructionProposalCard.tsx", ["card"]],
       ["missions/cards.tsx", ["mcard", "askcard", "inv"]],
@@ -77,17 +77,27 @@ describe("one rhythm, the web's numbers (chat-rhythm-css.test.ts holds them to t
       "chat/issue-work.tsx",
       "missions/cards.tsx",
       "browser/TrailCard.tsx",
-      "ai/NoAiCard.tsx",
-      "ai/OfferCard.tsx",
-      "ai/StretchCard.tsx",
-      "ai/UsagePauseCard.tsx",
-      "ai/CostlyProposalCard.tsx",
       "agents/ProposalCard.tsx",
       "agents/InstructionProposalCard.tsx",
       "right-hand/TeamWeekCard.tsx",
     ]) {
       expect(await read(file)).toContain("useCardTop(");
     }
+  });
+
+  test("an event pill is a part: the body sets its top, the list its row's, and none sets one of its own", async () => {
+    const asks = await read("chat/asks.tsx");
+    // Decided and waiting alike; a pill alone (a mission's screen) keeps the part's 8.
+    expect(asks.match(/const ownTop = useOwnTop\(8\);/g)).toHaveLength(2);
+    expect(asks.match(/style=\{\[styles\.done, ownTop\]\}/g)).toHaveLength(2);
+    for (const file of ["ai/NoAiCard.tsx", "ai/OfferCard.tsx", "ai/StretchCard.tsx", "ai/CostlyProposalCard.tsx"]) {
+      const sheet = await read(file);
+      expect(sheet).toMatch(/<Ask(Waiting|Done)/);
+      expect(sheet).not.toMatch(/margin(Top|Bottom|Vertical)/);
+    }
+    expect(await read("chat/StoppedLine.tsx")).not.toContain("inRow");
+    for (const file of ["chat/EventLine.tsx", "chat/StoppedLine.tsx", "chat/issue-work.tsx"])
+      expect(await read(file)).toContain("[styles.line, { marginTop: gap }]");
   });
 
   test("what stacks inside a row's words takes the part gap too", async () => {

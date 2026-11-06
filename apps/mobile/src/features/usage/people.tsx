@@ -17,7 +17,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Text, useToast } from "@/ui";
+import { Button, EventPillAction, EventPillText, Text, useToast } from "@/ui";
+import { AskDone, AskWaiting } from "../chat/asks";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { Meter, UsageCard } from "./parts";
@@ -133,13 +134,13 @@ export function MyUsageCard() {
 }
 
 /**
- * The agent's card when the person behind its run is at their monthly limit, as the web's: for that person, why, with
- * "Pedir mais" and their month; for anyone else, whose limit it is. Once raised, one quiet line.
+ * The agent's note when the person behind its run is at their monthly limit, as the web's, a waiting pill: for that
+ * person, "Ask for more" (tinted) and "See my usage", why under it; for anyone else, whose limit it is. Once raised, a
+ * decided request's pill.
  */
 export function PersonLimitNote({ card }: { card: PersonLimitCard }) {
   const { t, i18n } = useTranslation();
   const { orgId } = useOrg();
-  const c = useColors();
   const dir = useDirectory();
   const api = useApi();
   const qc = useQueryClient();
@@ -169,38 +170,47 @@ export function PersonLimitNote({ card }: { card: PersonLimitCard }) {
       : mine
         ? t("peopleUsage.card.title")
         : t("peopleUsage.card.other", { name: nameOf(card.userId) });
+  if (card.state === "raised") return <AskDone done words={title} />;
+  // Refused, there is nothing left to ask: their month stays, quiet.
+  const asks = mine && card.state !== "refused";
   return (
-    <View style={[styles.limitCard, { backgroundColor: c.sunken }]}>
-      <Text variant="subhead" tone="ink">
-        {title}
-      </Text>
-      {mine && card.state !== "raised" ? (
-        <>
-          <Text variant="footnote" tone="muted">
-            {card.state === "refused"
-              ? t("peopleUsage.card.refused", { name: by, date })
-              : t("peopleUsage.card.text", { date })}
-          </Text>
-          <View style={styles.acts}>
-            {card.state !== "refused" ? (
-              <Button
-                variant="primary"
-                size="sm"
-                label={asked ? t("peopleUsage.card.asked") : t("peopleUsage.card.ask")}
-                disabled={asked || pending}
-                onPress={() => void ask()}
-              />
-            ) : null}
-            <Button
-              variant="secondary"
-              size="sm"
-              label={t("peopleUsage.card.see")}
-              onPress={() => router.push("/usage" as never)}
-            />
-          </View>
-        </>
-      ) : null}
-    </View>
+    <AskWaiting
+      forMe={asks}
+      mark="pause"
+      words={title}
+      actions={
+        mine
+          ? [
+              asks ? (
+                <EventPillAction
+                  key="ask"
+                  primary
+                  label={asked ? t("peopleUsage.card.asked") : t("peopleUsage.card.ask")}
+                  loading={pending}
+                  disabled={asked}
+                  onPress={() => void ask()}
+                />
+              ) : null,
+              <EventPillAction
+                key="see"
+                label={t("peopleUsage.card.see")}
+                onPress={() => router.push("/usage" as never)}
+              />,
+            ]
+          : null
+      }
+      below={
+        mine ? (
+          <EventPillText>
+            <Text variant="footnote" tone="muted">
+              {card.state === "refused"
+                ? t("peopleUsage.card.refused", { name: by, date })
+                : t("peopleUsage.card.text", { date })}
+            </Text>
+          </EventPillText>
+        ) : null
+      }
+    />
   );
 }
 
@@ -244,5 +254,4 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   tabular: { fontVariant: ["tabular-nums"] },
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  limitCard: { marginTop: 10, borderRadius: 14, padding: 12, gap: 6, alignItems: "flex-start" },
 });

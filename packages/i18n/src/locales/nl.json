@@ -9020,9 +9020,7 @@
     "elapsedSeconds": "{{n}}s",
     "elapsedMinutes": "{{m}}m {{s}}s",
     "stopAgent": "{{name}} stoppen",
-    "stoppedByYou": "Gestopt door jou",
-    "stoppedBy": "Gestopt door {{name}}",
-    "stopped": "Gestopt",
+    "stopped": "Hier gestopt",
     "continueRun": "Doorgaan",
     "stepLimit": "Op de stappenlimiet",
     "stuck": "Gestopt omdat hij vastliep",
@@ -14708,9 +14706,8 @@
       "here": "hier"
     },
     "stopped": {
-      "line": "Je hebt deze taak gestopt",
-      "lineBy": "{{name}} heeft deze taak gestopt",
-      "told": "{{agent}} weet het en gaat pas weer verder als iemand erom vraagt.",
+      "line": "Je hebt {{agent}} gestopt",
+      "lineBy": "{{name}} heeft {{agent}} gestopt",
       "reason": "Reden: «{{reason}}»",
       "sayWhy": "Zeg waarom",
       "whyPlaceholder": "Wil je zeggen waarom? (optioneel)",

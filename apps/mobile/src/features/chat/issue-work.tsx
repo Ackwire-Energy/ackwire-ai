@@ -3,11 +3,11 @@ import { type IssueWorkRef, issueTakenOf } from "@agenteschat/client/lib/issues"
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Icon, LineIcon, Text } from "@/ui";
+import { EventPill, Icon, Text } from "@/ui";
 import { StateChip } from "../issues/parts";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
-import { LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
+import { MSG_TEXT } from "./logic";
 import { useCardTop } from "./look";
 
 /**
@@ -55,30 +55,30 @@ export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId
   );
 }
 
-/** Where the issue came from: one quiet line, "Ada pegou a issue #24 · título" (opens the issue). */
+/** Where the issue came from: one event pill, "Ada took task #24 · its title", the issue a tap on it away. */
 export function IssueTakenLine({ message, gap }: { message: Message; gap: number }) {
   const { t } = useTranslation();
-  const c = useColors();
   const dir = useDirectory();
   const when = useWhen();
   const taken = issueTakenOf(message.meta);
   if (!taken) return null;
   const name = dir.nameOf(message.author);
   return (
-    <Pressable
-      onPress={() => router.push(`/issues/${taken.number}`)}
-      accessibilityRole="link"
-      style={({ pressed }) => [styles.line, { marginTop: gap }, pressed && styles.pressed]}
-    >
-      <LineIcon name="issue" size={LINE_MARK} color={c.faint} variant="small" />
-      <Text variant="small" tone="faint" style={styles.grow}>
+    <View style={[styles.line, { marginTop: gap }]}>
+      <EventPill mark="issue" time={when.time(message.createdAt)}>
         {t("chat.issueWork.taken", { name })}{" "}
-        <Text variant="small" tone="muted">
+        <Text
+          variant="small"
+          tone="ink2"
+          style={[styles.link, styles.bold]}
+          onPress={() => router.push(`/issues/${taken.number}`)}
+          accessibilityRole="link"
+          suppressHighlighting
+        >
           #{taken.number} · {taken.title}
-        </Text>{" "}
-        · {when.time(message.createdAt)}
-      </Text>
-    </Pressable>
+        </Text>
+      </EventPill>
+    </View>
   );
 }
 
@@ -90,12 +90,8 @@ const styles = StyleSheet.create({
   foot: { flexDirection: "row", alignItems: "center", gap: 4 },
   bold: { fontWeight: "600" },
   pressed: { opacity: 0.85 },
-  // An event line at the messages' words: the mark, the words in 15/20.
-  line: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: LINE_GAP,
-    paddingLeft: MSG_TEXT,
-    paddingRight: 16,
-  },
+  // An event pill at the messages' words, left aligned; the list sets its top.
+  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
+  // The pill's words' size (its sentence sets it; a nested text keeps the variant's own otherwise).
+  link: { fontSize: 14, lineHeight: 19 },
 });

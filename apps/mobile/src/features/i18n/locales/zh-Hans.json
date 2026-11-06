@@ -313,9 +313,9 @@
       "wellNow": "停下来读了你的留言"
     },
     "stopped": {
-      "byYou": "由你停止",
-      "by": "由 {{name}} 停止",
-      "plain": "已停止",
+      "byYou": "在这里停止",
+      "by": "{{name}} 在这里停止了",
+      "plain": "在这里停止",
       "limit": "已达步骤上限",
       "stuck": "卡住了，已停止",
       "continue": "继续",

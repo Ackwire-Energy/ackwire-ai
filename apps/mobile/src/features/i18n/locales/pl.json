@@ -355,9 +355,9 @@
       "wellNow": "Przerwa na przeczytanie twojej uwagi"
     },
     "stopped": {
-      "byYou": "Zatrzymane przez ciebie",
-      "by": "Zatrzymane przez: {{name}}",
-      "plain": "Zatrzymano",
+      "byYou": "Zatrzymano tutaj",
+      "by": "{{name}} zatrzymał(a) tutaj",
+      "plain": "Zatrzymano tutaj",
       "limit": "Osiągnięto limit kroków",
       "stuck": "Zatrzymano, bo praca utknęła",
       "continue": "Kontynuuj",

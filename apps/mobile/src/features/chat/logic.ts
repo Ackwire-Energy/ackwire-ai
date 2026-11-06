@@ -61,9 +61,6 @@ export const rowFrame = (block: number, gap: number) => ({
   marginTop: gap - block,
   marginBottom: -block,
 });
-/** An event line's mark (its "small" words' size) and the gap to them: what unfolds under it starts there. */
-export const LINE_MARK = 15;
-export const LINE_GAP = 8;
 
 // ── Timeline ─────────────────────────────────────────────────────────────────
 
@@ -178,8 +175,10 @@ export interface EventLineView {
   icon: "clock" | "agent" | "chat" | "check" | "bell";
   key: string;
   values: Record<string, string>;
-  /** Shown on "Ver": the message's text, else the notice's. */
+  /** Shown on "Show": the message's text, else the notice's. */
   text: string;
+  /** A follow-up still to come: it can be canceled ("Cancel"). */
+  pending?: boolean;
 }
 
 const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
@@ -229,7 +228,7 @@ export function eventLineOf(
       });
     case "follow_up": {
       const followUp = followUpLine(notice, names.author, when);
-      return followUp ? line(followUp.key, followUp.values) : null;
+      return followUp ? { ...line(followUp.key, followUp.values), pending: followUp.pending } : null;
     }
     default:
       return line("chat.notice.other", { name: names.author });

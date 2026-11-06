@@ -9319,9 +9319,7 @@
     "elapsedMinutes": "{{m}} min {{s}} s",
     "stopAgent": "Arrêter {{name}}",
     "stopAgent_female": "Arrêter {{name}}",
-    "stoppedByYou": "Arrêté par vous",
-    "stoppedBy": "Arrêté par {{name}}",
-    "stopped": "Arrêté",
+    "stopped": "Arrêté ici",
     "continueRun": "Continuer",
     "stepLimit": "Limite d'étapes atteinte",
     "stuck": "Arrêté car il était bloqué",
@@ -15141,11 +15139,10 @@
       "here": "ici"
     },
     "stopped": {
-      "line": "Vous avez arrêté cette tâche",
-      "lineBy": "{{name}} a arrêté cette tâche",
-      "told": "{{agent}} a reçu l'avis et ne la reprend que si quelqu'un le demande.",
+      "line": "Vous avez arrêté {{agent}}",
+      "lineBy": "{{name}} a arrêté {{agent}}",
       "reason": "Raison : « {{reason}} »",
-      "sayWhy": "Dire pourquoi",
+      "sayWhy": "Donner la raison",
       "whyPlaceholder": "Vous voulez dire pourquoi ? (facultatif)",
       "send": "Envoyer"
     },

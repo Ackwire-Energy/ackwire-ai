@@ -1,10 +1,10 @@
-import { EmailError, type EmailSender } from "@agenteschat/adapters";
+import type { EmailSender } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNull, lt, ne, or, schema, sql } from "@agenteschat/db";
 import { type AppLocale, appLocale, LOCALE_CODES } from "@agenteschat/i18n/locale";
 import { randomToken, sha256 } from "./crypto";
-import { emailLocale, queueEmail } from "./email";
+import { emailLocale, queueEmail, rethrowEmailError } from "./email";
 import { ValidationError } from "./errors";
-import { enqueue, PermanentJobError } from "./outbox";
+import { enqueue } from "./outbox";
 
 const { waitlistEntries } = schema;
 
@@ -157,8 +157,8 @@ export async function saveWaitlistContact(db: Database, email: EmailSender, entr
   if (!email.saveContact) return;
   const [entry] = await db.select().from(waitlistEntries).where(eq(waitlistEntries.id, entryId));
   if (!entry || entry.source === WAITLIST_IMPORT_SOURCE) return;
-  try {
-    await email.saveContact({
+  await email
+    .saveContact({
       email: entry.email,
       properties: {
         waitlist: entry.confirmedAt ? "confirmed" : "pending",
@@ -167,9 +167,6 @@ export async function saveWaitlistContact(db: Database, email: EmailSender, entr
         waitlist_joined_at: entry.createdAt.toISOString(),
         ...(entry.confirmedAt ? { waitlist_confirmed_at: entry.confirmedAt.toISOString() } : {}),
       },
-    });
-  } catch (error) {
-    if (error instanceof EmailError && !error.retryable) throw new PermanentJobError(error.message);
-    throw error;
-  }
+    })
+    .catch(rethrowEmailError);
 }

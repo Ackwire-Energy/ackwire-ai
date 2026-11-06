@@ -488,9 +488,12 @@ describe("the agent's AI", () => {
     );
     expect(screen).toMatch(/\{lockedHere \? \(\s*<Note icon="lock">\s*\{t\("connectAi\.accountsLocked", \{/);
     expect(grouped).toContain("if (items.length === 0) return null;");
-    // The card's mark sits on the first line of its title, which wraps to two or three on a phone.
-    expect(card).toContain('<LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16}');
-    expect(card).toContain('top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },');
+    // Still waiting, a waiting pill (its sentence wraps to two or three lines on a phone): the breathing mark and
+    // Connect tinted for who may connect, a quiet bolt and who can for anyone else.
+    expect(card).toContain(
+      '<AskWaiting forMe={action !== null} mark="bolt" words={title} actions={action} below={action ? null : locked} />',
+    );
+    expect(card).not.toContain("<Button");
     // "Ada's page": its Conectar opens on the plan she thinks with (`agentPlan`), ChatGPT for Codex.
     expect(profile).toContain("openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })");
     // A plan's page asks the computers for their own sign-ins again: Codex's is known by a usage read with it.
