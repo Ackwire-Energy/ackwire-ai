@@ -77,7 +77,8 @@ export function AgentHero({
           <AgentCover color={draft.look.color as AgentColor} busy={busy} clear={() => [face.current, acts.current]} />
           <div className="agp-cover__acts" ref={acts}>
             {!panel && (
-              <Button asChild variant="primary" size="sm" className="agp-chat">
+              // The same glass as "…" beside it: a solid button on the light cover read as a washed-out slab.
+              <Button asChild size="sm" className="agp-chat agp-glass">
                 <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
                   <Icon name="message" size={14} />
                   {t("agent.chat")}
