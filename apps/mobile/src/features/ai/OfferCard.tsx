@@ -248,7 +248,7 @@ function Shell({
   const { colors } = useTheme();
   if (done) {
     return (
-      <View style={styles.done}>
+      <View>
         <AskDone done words={done} />
       </View>
     );
@@ -279,8 +279,7 @@ function Shell({
 }
 
 const styles = StyleSheet.create({
-  done: { marginTop: 6 },
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
 });

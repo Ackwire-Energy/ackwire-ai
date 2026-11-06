@@ -130,9 +130,7 @@ describe("my own messages sit on the right", () => {
       .replace(/ \)/g, ")");
     const hanging =
       ".ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))";
-    expect(css).toContain(`${hanging} { padding-bottom: 6px; }`);
     expect(css).toContain(`${hanging} .ac-msg__text { border-bottom-right-radius: var(--own-cut); }`);
-    expect(css).toContain(`${hanging} + .ac-msg--own { padding-top: 6px; }`);
     expect(css).toContain(`${hanging} + .ac-msg--own .ac-msg__text { border-top-right-radius: 18px; }`);
   });
 

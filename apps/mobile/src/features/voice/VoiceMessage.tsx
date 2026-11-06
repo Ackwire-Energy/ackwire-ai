@@ -210,7 +210,7 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
 });
 
 const styles = StyleSheet.create({
-  box: { marginTop: 4, gap: 6, maxWidth: 320 },
+  box: { gap: 6, maxWidth: 320 },
   // The chat's card (files, tools, media): 14 round, the corner cut at the bottom left.
   card: {
     gap: 4,

@@ -4,7 +4,6 @@
   flex-direction: column;
   gap: 8px;
   max-width: var(--msg-card-w);
-  margin-top: 6px;
   padding: 14px;
   border-radius: 18px;
   background: var(--raised);
@@ -61,7 +60,7 @@
 }
 /* Where the issue came from: one quiet line, like the other automatic lines of a conversation. */
 .iw-line {
-  margin: 4px 12px 4px var(--thread-indent, 64px);
+  margin-inline: var(--thread-indent, 64px) 12px;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--faint);

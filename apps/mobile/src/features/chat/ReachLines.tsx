@@ -215,7 +215,7 @@ export function confirmQuestion(t: TFunction, question: { title: string; descrip
 }
 
 const styles = StyleSheet.create({
-  list: { marginTop: 12, gap: 8 },
+  list: { gap: 8 },
   locked: { alignItems: "center", gap: 10, paddingVertical: 6 },
   lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },

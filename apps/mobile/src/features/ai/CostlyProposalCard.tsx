@@ -103,7 +103,7 @@ export function CostlyProposalCard({ message: m }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

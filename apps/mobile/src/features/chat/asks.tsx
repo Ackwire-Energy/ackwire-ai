@@ -73,6 +73,7 @@ import {
   questionOf,
   workingEntries,
 } from "./logic";
+import { useOwnTop } from "./look";
 import type { RowSight } from "./row-sight";
 
 /**
@@ -437,6 +438,7 @@ export function AskCard({
   expiry?: ReactNode;
   foot?: ReactNode;
 }) {
+  const ownTop = useOwnTop(12);
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
@@ -480,7 +482,7 @@ export function AskCard({
     ) : null;
   return (
     // A plain view the conversation measures (never flattened away), around the card that fades in.
-    <View ref={slot} collapsable={false} style={styles.slot}>
+    <View ref={slot} collapsable={false} style={ownTop}>
       <Animated.View entering={reduced ? undefined : FadeIn.duration(300)} style={[styles.card, surface]}>
         <View style={styles.clip}>
           <View style={styles.head}>
@@ -602,6 +604,7 @@ export function AskDone({
   words: string;
   more?: { label: string; content: ReactNode } | null;
 }) {
+  const ownTop = useOwnTop(8);
   const c = useColors();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
@@ -634,7 +637,7 @@ export function AskDone({
   const enter = reduced ? undefined : FadeIn.duration(160);
   if (!more)
     return (
-      <Animated.View entering={enter} style={styles.done}>
+      <Animated.View entering={enter} style={[styles.done, ownTop]}>
         {line}
       </Animated.View>
     );
@@ -649,7 +652,7 @@ export function AskDone({
         accessibilityHint={more.label}
         accessibilityState={{ expanded: open }}
         hitSlop={12}
-        style={({ pressed }) => [styles.done, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.done, ownTop, pressed && styles.pressed]}
       >
         {line}
         <View style={[styles.doneMark, open ? styles.flip : undefined]}>
@@ -782,7 +785,6 @@ export function AskBar({
 }
 
 const styles = StyleSheet.create({
-  slot: { marginTop: 12 },
   // The app's card (`useSurface`) with its cut corner at the bottom left, as the waiting cards.
   card: { borderRadius: 20, borderBottomLeftRadius: 6 },
   clip: {
@@ -817,7 +819,7 @@ const styles = StyleSheet.create({
   expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
   // A decided request: an event line on the conversation itself, nothing around it; the mark on the first line's
   // reading middle (a 20-point line), the words to the end of the column.
-  done: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP, alignSelf: "stretch", marginTop: 8 },
+  done: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP, alignSelf: "stretch" },
   doneMark: { height: 20, justifyContent: "center" },
   doneWords: { flex: 1, minWidth: 0 },
   // Under the words, not the mark.

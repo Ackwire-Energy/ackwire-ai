@@ -119,7 +119,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
   );
   return (
     // Its week ("Como foi a semana do time, de 28 out. a 3 nov.") is the message's text, above.
-    <View style={styles.wrap}>
+    <View>
       <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
         <View style={styles.head}>
           <Text variant="footnote" tone="muted" style={styles.semibold}>
@@ -336,7 +336,6 @@ function Fix({
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: 8 },
   card: {
     paddingTop: 12,
     paddingHorizontal: 14,

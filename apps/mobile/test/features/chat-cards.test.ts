@@ -19,13 +19,13 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(row, [
-          "{opener}\n              {words}\n            </>\n          )}",
+          "{opener}\n                    {words}\n                  </>\n                )}",
           "<Receipts message={m} />",
-          "{cards}\n          {/* Its tools after",
+          "{cards}\n            {/* Its tools after",
           "<TurnTools",
           "<SavedTools",
           "<NoAiCard message={m} />",
-          "{foot}\n        </View>\n      </Pressable>\n    </>\n  );\n});",
+          "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>\n    </>\n  );\n});",
         ]),
       ),
     ).toBe(true);
@@ -43,7 +43,7 @@ describe("a reply's tools sit last, live and saved", () => {
     const row = source("MessageRow.tsx");
     const [toolsAt, footAt] = at(row, [
       "<SavedTools\n",
-      "{foot}\n        </View>\n      </Pressable>\n    </>\n  );\n});",
+      "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>\n    </>\n  );\n});",
     ]);
     const last = row.slice(toolsAt, footAt);
     for (const card of [
@@ -65,7 +65,7 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(live, [
-          "{run.text && !wordsOnTop ? (\n                <RevealText",
+          "{run.text && !wordsOnTop ? (\n                  <RevealText",
           '<TurnTools items={lines} agentName={agent?.name ?? ""}',
         ]),
       ),
@@ -77,7 +77,10 @@ describe("agents it asked first: one pair row right before the reply, never insi
   test("saved: the row sits before the reply's own row (which then shows its face and name), none in its body", () => {
     const row = source("MessageRow.tsx");
     expect(ascending(at(row, ["const grouped = groupedIn && !pair;", "{pair}\n      {quote && !inBubble"]))).toBe(true);
-    const [bodyAt, endAt] = at(row, ["<View style={styles.body}>", "{foot}\n        </View>\n      </Pressable>"]);
+    const [bodyAt, endAt] = at(row, [
+      "<View style={[styles.body, { gap: rhythm.part }]}>",
+      "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>",
+    ]);
     expect(row.slice(bodyAt, endAt)).not.toContain("Consult");
   });
 

@@ -27,6 +27,18 @@ export const DEFAULT_CHANNEL_STYLE: ChatStyle = "left";
 export const DEFAULT_DM_STYLE: ChatStyle = "bubbles";
 export const DEFAULT_CHAT_TONE: ChatTone = "light";
 
+/**
+ * A conversation's vertical rhythm, the web's (`--msg-part-gap`, `--msg-turn-gap`, `--msg-block`) and the phone's:
+ * `part` between what stacks inside one group (a message's parts, the next row of the same turn), `turn` between
+ * groups, measured from what shows to what shows. `block` is a row's plate past its content, and takes no room.
+ */
+export const CHAT_RHYTHM: Record<ChatStyle, { part: number; turn: number; block: number }> = {
+  left: { part: 8, turn: 20, block: 6 },
+  comfortable: { part: 8, turn: 20, block: 6 },
+  bubbles: { part: 8, turn: 16, block: 1 },
+  compact: { part: 4, turn: 8, block: 1 },
+};
+
 /** What a conversation shows. A DM has two speakers; anything with more, or with no one person across, is a channel. */
 export function chatLookOf(prefs: ChatPrefs | undefined, dm: boolean): { style: ChatStyle; tone: ChatTone } {
   return dm

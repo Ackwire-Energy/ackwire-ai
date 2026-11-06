@@ -286,7 +286,7 @@ function SettingChange({ p }: { p: Proposal }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 10, alignItems: "stretch" },
+  card: { borderRadius: 14, padding: 12, gap: 10, alignItems: "stretch" },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   section: { gap: 8 },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 10 },

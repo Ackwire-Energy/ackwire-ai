@@ -51,6 +51,16 @@ export const MSG_AVATAR = 34;
 export const MSG_GAP = 12;
 /** Where a message's words start: event lines, receipts and what hangs under a message line up there. */
 export const MSG_TEXT = MSG_INSET + MSG_AVATAR + MSG_GAP;
+
+/**
+ * A row in the list, `gap` under what shows above it. Its plate (a mention, a press) reaches past its content, and it
+ * gives that room back, so the next row counts from what shows too.
+ */
+export const rowFrame = (block: number, gap: number) => ({
+  paddingVertical: block,
+  marginTop: gap - block,
+  marginBottom: -block,
+});
 /** An event line's mark (its "small" words' size) and the gap to them: what unfolds under it starts there. */
 export const LINE_MARK = 15;
 export const LINE_GAP = 8;

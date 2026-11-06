@@ -71,10 +71,11 @@ import {
   narrowDrawn,
   PHRASE_FADE_MS,
   type PhraseTurn,
+  rowFrame,
   turnPhrase,
   workingEntries,
 } from "./logic";
-import { lookRows, useRowLook } from "./look";
+import { lookRows, useRhythm, useRowLook } from "./look";
 import { MessageText } from "./MessageText";
 import { type RowSight, rowsShown } from "./row-sight";
 import { TurnTools } from "./ToolCalls";
@@ -196,6 +197,7 @@ export const TurnRow = memo(function TurnRow({
   const { scheme } = useTheme();
   const bubbled = look.style === "bubbles";
   const compact = look.style === "compact";
+  const rhythm = useRhythm();
   const agent = dir.agentById.get(run.agentId);
   const color = agentLook(agent).color;
   const phase = turnPhase(run);
@@ -240,7 +242,12 @@ export const TurnRow = memo(function TurnRow({
       <View
         ref={seen}
         collapsable={false}
-        style={[styles.msg, bubbled && lookRows.bubblesRow, compact && lookRows.compactRow]}
+        style={[
+          styles.msg,
+          bubbled && lookRows.bubblesRow,
+          compact && lookRows.compactRow,
+          rowFrame(rhythm.block, rhythm.turn),
+        ]}
       >
         {compact ? <View style={lookRows.compactClock} /> : null}
         <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
@@ -250,57 +257,59 @@ export const TurnRow = memo(function TurnRow({
             mode={live ? (phase === "writing" ? "run" : "think") : "idle"}
           />
         </View>
-        <View style={styles.body}>
-          <View style={styles.who}>
-            {!bubbled || look.names ? (
-              <Text
-                variant="footnote"
-                tone="ink2"
-                style={[styles.name, bubbled ? { color: nameInk(color, scheme === "dark") } : undefined]}
-                numberOfLines={1}
-              >
-                {agent?.name ?? ""}
-              </Text>
-            ) : null}
-            {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
+        <View style={[styles.body, { gap: rhythm.part }]}>
+          <View>
+            <View style={styles.who}>
+              {!bubbled || look.names ? (
+                <Text
+                  variant="footnote"
+                  tone="ink2"
+                  style={[styles.name, bubbled ? { color: nameInk(color, scheme === "dark") } : undefined]}
+                  numberOfLines={1}
+                >
+                  {agent?.name ?? ""}
+                </Text>
+              ) : null}
+              {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
               `RunClock`); "parado" once stopped. */}
-            <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
-              {live ? (
-                <Text variant="footnote" tone="faint">
-                  {when.time(new Date(since ?? mountedAt).toISOString())}
-                </Text>
-              ) : (
-                <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-                  {word}
-                  {took}
-                </Text>
-              )}
-            </View>
-            {/* Its words arriving: its time and its stop after the time it started (the line above the composer no
+              <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
+                {live ? (
+                  <Text variant="footnote" tone="faint">
+                    {when.time(new Date(since ?? mountedAt).toISOString())}
+                  </Text>
+                ) : (
+                  <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+                    {word}
+                    {took}
+                  </Text>
+                )}
+              </View>
+              {/* Its words arriving: its time and its stop after the time it started (the line above the composer no
               longer says them while the row shows). */}
-            {live ? <RunTail run={run} now={now} /> : null}
-          </View>
-          {/* Nothing said and no steps yet: the words stream where the opener stands, so the line it opens
-            with stays put when a tool call turns it into narration. */}
-          {bubbled && (said || run.text) ? (
-            <View style={[lookRows.bubble, { backgroundColor: c.bubble }]}>
-              {said && !wordsOnTop ? <MessageText body={said} selectable={false} /> : null}
-              {run.text ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
+              {live ? <RunTail run={run} now={now} /> : null}
             </View>
-          ) : (
-            <>
-              {wordsOnTop && run.text ? (
-                <RevealText text={run.text} live={phase === "writing"} accent={color} />
-              ) : said ? (
-                <View style={styles.say}>
-                  <MessageText body={said} selectable={false} />
-                </View>
-              ) : null}
-              {run.text && !wordsOnTop ? (
-                <RevealText text={run.text} live={phase === "writing"} accent={color} />
-              ) : null}
-            </>
-          )}
+            {/* Nothing said and no steps yet: the words stream where the opener stands, so the line it opens
+            with stays put when a tool call turns it into narration. */}
+            {bubbled && (said || run.text) ? (
+              <View style={[lookRows.bubble, { backgroundColor: c.bubble }]}>
+                {said && !wordsOnTop ? <MessageText body={said} selectable={false} /> : null}
+                {run.text ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
+              </View>
+            ) : (
+              <>
+                {wordsOnTop && run.text ? (
+                  <RevealText text={run.text} live={phase === "writing"} accent={color} />
+                ) : said ? (
+                  <View style={styles.say}>
+                    <MessageText body={said} selectable={false} />
+                  </View>
+                ) : null}
+                {run.text && !wordsOnTop ? (
+                  <RevealText text={run.text} live={phase === "writing"} accent={color} />
+                ) : null}
+              </>
+            )}
+          </View>
           {/* Its tools last, where its saved reply keeps them. */}
           <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
         </View>
@@ -826,8 +835,6 @@ const styles = StyleSheet.create({
     gap: MSG_GAP,
     paddingLeft: MSG_INSET,
     paddingRight: 16,
-    paddingVertical: 10,
-    marginTop: 4,
   },
   avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },

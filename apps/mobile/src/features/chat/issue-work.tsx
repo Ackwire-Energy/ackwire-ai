@@ -54,7 +54,7 @@ export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId
 }
 
 /** Where the issue came from: one quiet line, "Ada pegou a issue #24 · título" (opens the issue). */
-export function IssueTakenLine({ message }: { message: Message }) {
+export function IssueTakenLine({ message, gap }: { message: Message; gap: number }) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -66,7 +66,7 @@ export function IssueTakenLine({ message }: { message: Message }) {
     <Pressable
       onPress={() => router.push(`/issues/${taken.number}`)}
       accessibilityRole="link"
-      style={({ pressed }) => [styles.line, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.line, { marginTop: gap }, pressed && styles.pressed]}
     >
       <LineIcon name="issue" size={LINE_MARK} color={c.faint} variant="small" />
       <Text variant="small" tone="faint" style={styles.grow}>
@@ -81,7 +81,7 @@ export function IssueTakenLine({ message }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 8, padding: 14, borderRadius: 20, gap: 8 },
+  card: { padding: 14, borderRadius: 20, gap: 8 },
   head: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1, flexShrink: 1 },
   title: { fontWeight: "600" },
@@ -93,7 +93,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: LINE_GAP,
-    marginVertical: 4,
     paddingLeft: MSG_TEXT,
     paddingRight: 16,
   },

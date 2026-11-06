@@ -15,7 +15,7 @@ import { LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
  * 14:09 · Dev recebeu o aviso e só retoma se alguém pedir.", with the reason when there is one. Who stopped it, while
  * it has none, gets "Dizer por quê": a short field the agent reads.
  */
-export function StoppedLine({ message, notice }: { message: Message; notice: StoppedNotice }) {
+export function StoppedLine({ message, notice, gap }: { message: Message; notice: StoppedNotice; gap: number }) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -48,7 +48,7 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
     );
   };
   return (
-    <View style={styles.line}>
+    <View style={[styles.line, { marginTop: gap }]}>
       <View style={styles.head}>
         <LineIcon name="stop" size={LINE_MARK} color={c.faint} variant="small" />
         <Text variant="small" tone="faint" style={styles.grow}>
@@ -106,7 +106,7 @@ export function SpeedFallbackLine({ message }: { message: Message }) {
   const dir = useDirectory();
   const agent = dir.agentById.get(message.author.id ?? "");
   return (
-    <View style={styles.inRow}>
+    <View>
       <View style={styles.head}>
         <LineIcon name="info" size={LINE_MARK} color={c.faint} variant="small" />
         <Text variant="small" tone="faint" style={styles.grow}>
@@ -134,8 +134,7 @@ export function SpeedFallbackLine({ message }: { message: Message }) {
 
 const styles = StyleSheet.create({
   // Aligned with the messages' words, as the other automatic lines (`EventLine`).
-  line: { marginVertical: 4, paddingLeft: MSG_TEXT, paddingRight: 16 },
-  inRow: { marginTop: 4 },
+  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },

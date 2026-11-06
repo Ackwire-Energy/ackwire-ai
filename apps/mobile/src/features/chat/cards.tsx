@@ -863,7 +863,6 @@ const styles = StyleSheet.create({
   optPressed: { transform: [{ scale: 0.98 }] },
   other: { backgroundColor: "transparent", borderWidth: 1 },
   tlink: {
-    marginTop: 8,
     alignSelf: "flex-start",
     maxWidth: "100%",
     flexDirection: "row",

@@ -367,7 +367,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 2px 0;
   font-size: 13.5px;
   color: var(--muted);
   white-space: pre-line;

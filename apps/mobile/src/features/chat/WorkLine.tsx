@@ -274,11 +274,10 @@ function PrivateTaskLine({ issue }: { issue: Issue }) {
 }
 
 const styles = StyleSheet.create({
-  privateTask: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  privateTask: { flexDirection: "row", alignItems: "center", gap: 8 },
   line: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 14,

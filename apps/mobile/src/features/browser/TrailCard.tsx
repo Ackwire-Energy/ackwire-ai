@@ -229,7 +229,7 @@ export function TrailCard({
 const SITE_ICON = 13;
 
 const styles = StyleSheet.create({
-  card: { marginTop: 12, borderRadius: 20, overflow: "hidden" },
+  card: { borderRadius: 20, overflow: "hidden" },
   head: { flexDirection: "row", alignItems: "center", gap: 12, padding: 10 },
   pressed: { opacity: 0.7 },
   thumb: {

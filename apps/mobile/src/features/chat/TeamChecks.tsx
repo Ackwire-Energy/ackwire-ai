@@ -86,7 +86,7 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
 }
 
 const styles = StyleSheet.create({
-  list: { marginTop: 12, gap: 8 },
+  list: { gap: 8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   // The receipts' card: a hairline, the cut corner; the icon (as the conversation's event lines), the first line and

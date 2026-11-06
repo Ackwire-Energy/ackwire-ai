@@ -107,9 +107,10 @@ import {
   nameInk,
   questionOf,
   reactionPills,
+  rowFrame,
   workStepsOf,
 } from "./logic";
-import { lookRows, useRowLook } from "./look";
+import { lookRows, RowPartContext, useRhythm, useRowLook } from "./look";
 import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
 import { QuoteAbove, QuotePlate } from "./QuoteLine";
@@ -138,6 +139,7 @@ const TRAIL_RECENT_MS = 12 * 60 * 60_000;
 export const MessageRow = memo(function MessageRow({
   message: m,
   grouped: groupedIn,
+  newTurn,
   meId,
   thread,
   onLongPress,
@@ -153,6 +155,8 @@ export const MessageRow = memo(function MessageRow({
 }: {
   message: Message;
   grouped: boolean;
+  /** Next in its turn, but under something else: it takes a turn's gap. */
+  newTurn?: boolean | undefined;
   /** My own row's place in a run of my rows (`runPosition`): the corners it shares square off, the time ends it. */
   run?: RunPosition;
   /** The message it groups under, and whether that one shows its thread's link: what hangs under it ends the run. */
@@ -243,6 +247,7 @@ export const MessageRow = memo(function MessageRow({
   // It asked other agents first: one row right before it (its run's questions on the run's first message here, and
   // the ones its `meta.consulted` names), so it shows its face and name again under that row.
   const reached = useMemo(() => reachHandoffs(m.meta), [m.meta]);
+  const rhythm = useRhythm();
   const consults = useRunConsults(
     isAgent && !m.local && !readOnly && !mediaAfter ? m.agentRunId : null,
     m,
@@ -255,6 +260,7 @@ export const MessageRow = memo(function MessageRow({
       <ConsultPairRow askerId={m.author.id} channelId={m.channelId} items={consults} />
     ) : null;
   const grouped = groupedIn && !pair;
+  const rowGap = grouped && !newTurn ? rhythm.part : rhythm.turn;
   // A question to another agent (in their DM) carries the asking run: its work shows on that run's reply.
   const ownWork = isAgent && Boolean(m.agentRunId) && !meta?.consultation && !mediaAfter;
   const steps = ownWork ? workStepsOf(meta) : null;
@@ -375,11 +381,7 @@ export const MessageRow = memo(function MessageRow({
           <ThreadLink thread={thread} />
         </View>
       ) : null}
-      {readOnly ? null : (
-        <View style={onRight ? styles.meEnd : undefined}>
-          <Reactions message={m} meId={meId} />
-        </View>
-      )}
+      {readOnly ? null : <Reactions message={m} meId={meId} end={onRight} />}
       {m.local === "pending" || (m.local === "failed" && offline) ? (
         <Sending offline={offline} end={onRight} />
       ) : m.local === "failed" ? (
@@ -421,7 +423,7 @@ export const MessageRow = memo(function MessageRow({
       <View
         style={[
           bubbled ? lookRows.bubble : styles.bubble,
-          bubbled && styles.bubbleEnd,
+          styles.bubbleEnd,
           BUBBLE_RUN[run],
           { backgroundColor: (bubbled && look.fill) || c.bubble },
         ]}
@@ -454,47 +456,44 @@ export const MessageRow = memo(function MessageRow({
         onLongPress={press}
         delayLongPress={380}
         accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
-        style={({ pressed }) => [
-          styles.me,
-          grouped && styles.meCont,
-          (run === "start" || run === "mid") && styles.meRunOn,
-          pressed && press && styles.mePressed,
-        ]}
+        style={({ pressed }) => [styles.me, rowFrame(rhythm.block, rowGap), pressed && press && styles.mePressed]}
       >
-        {m.pinned ? (
-          <View style={[styles.pinLine, styles.meEnd]}>
-            <PinMark />
-            <Text variant="caption" tone="faint">
-              {t("mobile.pins.mark")}
-            </Text>
+        <RowPartContext.Provider value={true}>
+          <View style={[styles.meParts, { gap: rhythm.part }]}>
+            {m.pinned ? (
+              <View style={[styles.pinLine, styles.meEnd]}>
+                <PinMark />
+                <Text variant="caption" tone="faint">
+                  {t("mobile.pins.mark")}
+                </Text>
+              </View>
+            ) : null}
+            {/* With no words there is no bubble to hold it. */}
+            {quote && (!body || voiceOf(meta) || choiceReply) ? (
+              <View style={styles.meEnd}>
+                <QuotePlate reply={quote} onJump={onQuote} />
+              </View>
+            ) : null}
+            {lead}
+            {body && media ? (
+              <View style={styles.meFiles}>
+                <ChatMedia media={media} align="end" liveId={m.id} />
+              </View>
+            ) : null}
+            {(body || media) && files.length > 0 ? (
+              <View style={styles.meFiles}>
+                <MessageFiles files={files} align="end" />
+              </View>
+            ) : null}
+            {cards}
+            {missionDecision}
+            {foot}
           </View>
-        ) : null}
-        {/* With no words there is no bubble to hold it. */}
-        {quote && (!body || voiceOf(meta) || choiceReply) ? (
-          <View style={styles.meEnd}>
-            <QuotePlate reply={quote} onJump={onQuote} />
-          </View>
-        ) : null}
-        {lead}
-        {body && media ? (
-          <View style={styles.meFiles}>
-            <ChatMedia media={media} align="end" liveId={m.id} />
-          </View>
-        ) : null}
-        {(body || media) && files.length > 0 ? (
-          <View style={styles.meFiles}>
-            <MessageFiles files={files} align="end" />
-          </View>
-        ) : null}
-        <View style={styles.meCards}>
-          {cards}
-          {missionDecision}
-          {foot}
-        </View>
+        </RowPartContext.Provider>
         {/* One time per run of my rows (they group a few minutes apart), under its last, the receipt's mark ending
             its line; a send in flight says so. */}
         {!m.local && (run === "end" || run === "solo") && !myBubble ? (
-          <View style={styles.meTime}>
+          <View style={[styles.meTime, { marginTop: rhythm.part / 2 }]}>
             <Text variant="caption" tone="faint">
               {when.time(m.createdAt)}
             </Text>
@@ -512,7 +511,7 @@ export const MessageRow = memo(function MessageRow({
       style={[
         styles.who,
         m.author.type === "person" && !inBubble && !compact && styles.whoRoom,
-        (inBubble || compact) && styles.whoTight,
+        (inBubble || compact || !words) && styles.whoTight,
       ]}
     >
       {!bubbled || look.names ? (
@@ -635,10 +634,12 @@ export const MessageRow = memo(function MessageRow({
       </View>
     ) : null;
 
+  const quoteAbove = Boolean(quote && !inBubble);
+  const nameOrWords = Boolean(inBubble || !grouped || pinLine || reportOpened || opener || words);
   return (
     <>
       {pair}
-      {quote && !inBubble ? <QuoteAbove look={look} reply={quote} onJump={onQuote} /> : null}
+      {quote && !inBubble ? <QuoteAbove look={look} reply={quote} onJump={onQuote} gap={rowGap} /> : null}
       <Pressable
         onLongPress={press}
         delayLongPress={380}
@@ -647,8 +648,7 @@ export const MessageRow = memo(function MessageRow({
           styles.msg,
           bubbled && lookRows.bubblesRow,
           compact && lookRows.compactRow,
-          grouped && styles.cont,
-          quote && !inBubble && styles.replied,
+          rowFrame(rhythm.block, quoteAbove ? QUOTE_GAP : rowGap),
           // A mention of me: the row's tint says it, with round corners; no accent bar on its left edge.
           mentionsMe && { backgroundColor: `${c.amber}17`, borderRadius: 14 },
           pressed && press && { backgroundColor: c.sunken },
@@ -662,141 +662,147 @@ export const MessageRow = memo(function MessageRow({
         <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
           {grouped ? null : <Face who={m.author} size={compact ? 18 : bubbled ? 30 : 34} live={false} />}
         </View>
-        <View style={styles.body}>
-          {inBubble ? (
-            <>
-              {pinLine}
-              {reportOpened}
-              <View style={[lookRows.bubble, OTHER_RUN[run], { backgroundColor: c.bubble }]}>
-                {!grouped && (look.names || tagged) ? who(true) : null}
-                {quote ? <QuotePlate reply={quote} onJump={onQuote} /> : null}
-                {opener}
-                <View style={styles.bubbleLine}>
-                  {words}
-                  <View style={styles.stamp}>
-                    <Text variant="caption" tone="muted">
-                      {when.time(m.createdAt)}
-                    </Text>
-                    {receipt || seenBy ? (
-                      <ReceiptMark message={m} mine={mine} receipt={receipt} seenBy={seenBy} />
-                    ) : null}
-                  </View>
-                </View>
+        <View style={[styles.body, { gap: rhythm.part }]}>
+          <RowPartContext.Provider value={true}>
+            {nameOrWords ? (
+              <View>
+                {inBubble ? (
+                  <>
+                    {pinLine}
+                    {reportOpened}
+                    <View style={[lookRows.bubble, OTHER_RUN[run], { backgroundColor: c.bubble }]}>
+                      {!grouped && (look.names || tagged) ? who(true) : null}
+                      {quote ? <QuotePlate reply={quote} onJump={onQuote} /> : null}
+                      {opener}
+                      <View style={styles.bubbleLine}>
+                        {words}
+                        <View style={styles.stamp}>
+                          <Text variant="caption" tone="muted">
+                            {when.time(m.createdAt)}
+                          </Text>
+                          {receipt || seenBy ? (
+                            <ReceiptMark message={m} mine={mine} receipt={receipt} seenBy={seenBy} />
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                  </>
+                ) : compact && !grouped ? (
+                  <>
+                    <View style={styles.compactLine}>
+                      {who(false)}
+                      {!reportOpened && !opener ? words : null}
+                    </View>
+                    {reportOpened}
+                    {opener}
+                    {reportOpened || opener ? words : null}
+                  </>
+                ) : (
+                  <>
+                    {grouped ? null : who(false)}
+                    {pinLine}
+                    {reportOpened}
+                    {opener}
+                    {words}
+                  </>
+                )}
               </View>
-            </>
-          ) : compact && !grouped ? (
-            <>
-              <View style={styles.compactLine}>
-                {who(false)}
-                {!reportOpened && !opener ? words : null}
-              </View>
-              {reportOpened}
-              {opener}
-              {reportOpened || opener ? words : null}
-            </>
-          ) : (
-            <>
-              {grouped ? null : who(false)}
-              {pinLine}
-              {reportOpened}
-              {opener}
-              {words}
-            </>
-          )}
-          {talk && !brainWait ? (
-            <Pressable
-              onPress={() => router.push(chatHref(m.channelId, m.threadId ?? m.id))}
-              accessibilityRole="button"
-              hitSlop={8}
-              style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
-            >
-              <Text variant="footnote" tone="muted" style={styles.medium}>
-                {t("chat.talk.readAll")}
-              </Text>
-              <Text variant="footnote" tone="faint">
-                · {t("chat.talk.more", { count: talk.more })}
-              </Text>
-              <Icon name="right" size={13} color={c.faint} />
-            </Pressable>
-          ) : null}
-          {media ? <ChatMedia media={media} liveId={m.id} /> : null}
-          {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
-          {isAgent && meta?.speedFallback === true ? <SpeedFallbackLine message={m} /> : null}
-          {(stopped || atLimit || providerCut) && m.agentRunId ? (
-            <StoppedLine
-              message={m}
-              runId={m.agentRunId}
-              stopped={
-                stopped ?? {
-                  byUserId: null,
-                  continuedRunId: atLimit?.continuedRunId ?? providerCut?.continuedRunId ?? null,
+            ) : null}
+            {talk && !brainWait ? (
+              <Pressable
+                onPress={() => router.push(chatHref(m.channelId, m.threadId ?? m.id))}
+                accessibilityRole="button"
+                hitSlop={8}
+                style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
+              >
+                <Text variant="footnote" tone="muted" style={styles.medium}>
+                  {t("chat.talk.readAll")}
+                </Text>
+                <Text variant="footnote" tone="faint">
+                  · {t("chat.talk.more", { count: talk.more })}
+                </Text>
+                <Icon name="right" size={13} color={c.faint} />
+              </Pressable>
+            ) : null}
+            {media ? <ChatMedia media={media} liveId={m.id} /> : null}
+            {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
+            {isAgent && meta?.speedFallback === true ? <SpeedFallbackLine message={m} /> : null}
+            {(stopped || atLimit || providerCut) && m.agentRunId ? (
+              <StoppedLine
+                message={m}
+                runId={m.agentRunId}
+                stopped={
+                  stopped ?? {
+                    byUserId: null,
+                    continuedRunId: atLimit?.continuedRunId ?? providerCut?.continuedRunId ?? null,
+                  }
                 }
-              }
-              limit={providerCut ? "failed" : atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
-            />
-          ) : null}
-          {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
-          {isAgent ? <TeamChecks message={m} /> : null}
-          {isAgent ? <ReachLines message={m} /> : null}
-          {isAgent && m.longWork ? <MessageWorkLine message={m} threaded={Boolean(thread)} /> : null}
-          {files.length > 0 ? <MessageFiles files={files} /> : null}
-          {trails && m.author.id && trails.browser.length > 0 ? (
-            <TrailCard
-              agentId={m.author.id}
-              runId={m.agentRunId ?? null}
-              steps={trails.browser}
-              stopped={stopped}
-              recent={trails.recent}
-            />
-          ) : null}
-          {trails && m.author.id && trails.desktop.length > 0 ? (
-            <TrailCard
-              agentId={m.author.id}
-              runId={m.agentRunId ?? null}
-              steps={trails.desktop}
-              stopped={stopped}
-              screen="desktop"
-            />
-          ) : null}
-          {cards}
-          {/* Its tools after its words, what it changed and its cards: the same place live, kept and saved. */}
-          {kept ? (
-            <TurnTools
-              items={opened?.lines ?? kept.items}
-              agentName={agent?.name ?? name}
-              color={color}
-              quoteOf={(id) => kept.quotes[id]}
-              done
-              settled
-            />
-          ) : steps && m.agentRunId ? (
-            <SavedTools
-              runId={m.agentRunId}
-              meta={meta}
-              agentName={agent?.name ?? name}
-              color={color}
-              skipScreens={onCards}
-            />
-          ) : null}
-          {/* What waits for a person's click comes last, after the words and the tools. */}
-          {isAgent ? <NoAiCard message={m} /> : null}
-          {isAgent ? <StretchCard message={m} /> : null}
-          {isAgent ? <CostlyProposalCard message={m} /> : null}
-          {isAgent ? <UsagePauseCard message={m} /> : null}
-          {isAgent ? <UsageWaitCancel message={m} /> : null}
-          {isAgent ? <ProposalCard message={m} /> : null}
-          {isAgent ? <TeamCard message={m} /> : null}
-          {isAgent ? <ReplyChips message={m} /> : null}
-          {isAgent ? <OfferCard message={m} /> : null}
-          {isAgent ? <InstructionProposals message={m} /> : null}
-          {isAgent ? <SettingsProposals message={m} /> : null}
-          {isAgent ? <TeamWeek message={m} /> : null}
-          {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
-          {handoff ? <HandoffCard handoff={handoff} /> : null}
-          {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
-          {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
-          {missionDecision}
-          {foot}
+                limit={providerCut ? "failed" : atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
+              />
+            ) : null}
+            {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
+            {isAgent ? <TeamChecks message={m} /> : null}
+            {isAgent ? <ReachLines message={m} /> : null}
+            {isAgent && m.longWork ? <MessageWorkLine message={m} threaded={Boolean(thread)} /> : null}
+            {files.length > 0 ? <MessageFiles files={files} /> : null}
+            {trails && m.author.id && trails.browser.length > 0 ? (
+              <TrailCard
+                agentId={m.author.id}
+                runId={m.agentRunId ?? null}
+                steps={trails.browser}
+                stopped={stopped}
+                recent={trails.recent}
+              />
+            ) : null}
+            {trails && m.author.id && trails.desktop.length > 0 ? (
+              <TrailCard
+                agentId={m.author.id}
+                runId={m.agentRunId ?? null}
+                steps={trails.desktop}
+                stopped={stopped}
+                screen="desktop"
+              />
+            ) : null}
+            {cards}
+            {/* Its tools after its words, what it changed and its cards: the same place live, kept and saved. */}
+            {kept ? (
+              <TurnTools
+                items={opened?.lines ?? kept.items}
+                agentName={agent?.name ?? name}
+                color={color}
+                quoteOf={(id) => kept.quotes[id]}
+                done
+                settled
+              />
+            ) : steps && m.agentRunId ? (
+              <SavedTools
+                runId={m.agentRunId}
+                meta={meta}
+                agentName={agent?.name ?? name}
+                color={color}
+                skipScreens={onCards}
+              />
+            ) : null}
+            {/* What waits for a person's click comes last, after the words and the tools. */}
+            {isAgent ? <NoAiCard message={m} /> : null}
+            {isAgent ? <StretchCard message={m} /> : null}
+            {isAgent ? <CostlyProposalCard message={m} /> : null}
+            {isAgent ? <UsagePauseCard message={m} /> : null}
+            {isAgent ? <UsageWaitCancel message={m} /> : null}
+            {isAgent ? <ProposalCard message={m} /> : null}
+            {isAgent ? <TeamCard message={m} /> : null}
+            {isAgent ? <ReplyChips message={m} /> : null}
+            {isAgent ? <OfferCard message={m} /> : null}
+            {isAgent ? <InstructionProposals message={m} /> : null}
+            {isAgent ? <SettingsProposals message={m} /> : null}
+            {isAgent ? <TeamWeek message={m} /> : null}
+            {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
+            {handoff ? <HandoffCard handoff={handoff} /> : null}
+            {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
+            {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
+            {missionDecision}
+            {foot}
+          </RowPartContext.Provider>
         </View>
       </Pressable>
     </>
@@ -1023,7 +1029,7 @@ function PinMark() {
 }
 
 /** People's pills show a count (mine outlined); an agent that reacted shows its face; then the memory marks. */
-function Reactions({ message: m, meId }: { message: Message; meId: string | null }) {
+function Reactions({ message: m, meId, end }: { message: Message; meId: string | null; end: boolean }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const { colors: c, reducedMotion: reduced } = useTheme();
@@ -1039,7 +1045,7 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   return (
     <LayoutAnimationConfig skipEntering skipExiting>
       {shown ? (
-        <View style={styles.reacts}>
+        <View style={[styles.reacts, end && styles.meEnd]}>
           {pills.flatMap((p) => [
             ...(p.people > 0
               ? [
@@ -1093,8 +1099,8 @@ const PILL_MOVE = LinearTransition;
 /** The turn's last corner, cut as a card's is, on the side my bubble stands. */
 const BUBBLE_CUT = 6;
 
-/** Between the rows of a run of mine: one bubble under the other, close. */
-const RUN_GAP = 2;
+/** A row under the quote it answers: they read as one. */
+const QUOTE_GAP = 2;
 
 /** The bubble's corners by its place in a run of my rows: the sides it shares with its neighbours square off. */
 const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBottomRightRadius?: number }> = {
@@ -1122,11 +1128,7 @@ const styles = StyleSheet.create({
     gap: MSG_GAP,
     paddingLeft: MSG_INSET,
     paddingRight: 16,
-    paddingVertical: 10,
-    marginTop: 4,
   },
-  cont: { paddingTop: 0, marginTop: 0 },
-  replied: { paddingTop: 2, marginTop: 0 },
   avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
   // A long pick wraps: the check stays on its first line.
@@ -1150,11 +1152,9 @@ const styles = StyleSheet.create({
   stamp: { flexDirection: "row", alignItems: "center", gap: 4, height: 16, marginLeft: "auto" },
   compactLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 6 },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
-  me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
-  meCont: { paddingTop: RUN_GAP / 2, marginTop: 0 },
-  // A run of my rows sits RUN_GAP apart (half under this one, half over the next).
-  meRunOn: { paddingBottom: RUN_GAP / 2 },
-  meTime: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 4, height: 16 },
+  me: { paddingLeft: 64, paddingRight: 16, alignItems: "flex-end" },
+  meParts: { alignSelf: "stretch" },
+  meTime: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4, height: 16 },
   mePressed: { opacity: 0.7 },
   meEnd: { alignSelf: "flex-end" },
   bubble: {
@@ -1164,11 +1164,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   meFiles: { alignSelf: "stretch" },
-  meCards: { alignSelf: "stretch" },
-  meStatus: { marginTop: 4, textAlign: "right" },
-  status: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, minHeight: 18 },
+  meStatus: { textAlign: "right" },
+  status: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 18 },
   statusEnd: { alignSelf: "flex-end" },
-  stopped: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  stopped: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
   continue: {
     minHeight: 26,
     borderTopLeftRadius: 10,
@@ -1183,7 +1182,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "flex-start",
     gap: 4,
-    marginTop: 6,
     minHeight: 28,
   },
   pressedDim: { opacity: 0.6 },
@@ -1204,7 +1202,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   pinLine: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
-  reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
+  reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   // The outline is always there (clear unless it is mine), so a pill keeps its size when I add or take mine.
   react: {
     minHeight: 30,

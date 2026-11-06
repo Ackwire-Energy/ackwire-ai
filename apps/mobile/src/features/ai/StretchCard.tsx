@@ -44,7 +44,7 @@ export function StretchCard({ message: m }: { message: Message }) {
   };
   if (continued) {
     return (
-      <View style={styles.done}>
+      <View>
         <AskDone
           done
           words={
@@ -75,8 +75,7 @@ export function StretchCard({ message: m }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  done: { marginTop: 6 },
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
 });

@@ -21,7 +21,7 @@ import { StoppedLine } from "./StoppedLine";
  * pair row when it is farther up (a tap opens their conversation).
  * A task a person stopped has its own line (`StoppedLine`).
  */
-export function EventLine({ message, fold }: { message: Message; fold?: ConsultNoticeFold }) {
+export function EventLine({ message, fold, gap }: { message: Message; fold?: ConsultNoticeFold; gap: number }) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -29,12 +29,17 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
   const [open, setOpen] = useState(false);
   // A person stopped one of the agent's tasks (ADR 0128): its own line, with the reason, or a way to give one.
   const stopped = stoppedNoticeOf(message.meta);
-  if (stopped) return <StoppedLine message={message} notice={stopped} />;
+  if (stopped) return <StoppedLine message={message} notice={stopped} gap={gap} />;
   if (fold?.fold === "hide") return null;
   // Farther up than the reply that asked: the same pair row where the answer arrived, opening their conversation.
   if (fold?.fold === "line")
     return (
-      <ConsultPairRow askerId={fold.consultation.agentId} channelId={message.channelId} items={[fold.consultation]} />
+      <ConsultPairRow
+        askerId={fold.consultation.agentId}
+        channelId={message.channelId}
+        items={[fold.consultation]}
+        gap={gap}
+      />
     );
   // An answer from another agent that carries the consultation, its reply not here: the same pair row a reply
   // has (who asked whom), never the text written for the agent; a tap opens what they said.
@@ -53,11 +58,12 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
         askerId={consulted.askerId}
         channelId={message.channelId}
         items={[pairItemOf(consulted.consultation)]}
+        gap={gap}
       />
     );
   if (!line) return null;
   return (
-    <View style={styles.line}>
+    <View style={[styles.line, { marginTop: gap }]}>
       <View style={styles.head}>
         <LineIcon name={line.icon} size={LINE_MARK} color={c.faint} variant="small" />
         <Text variant="small" tone="faint" style={styles.grow}>
@@ -92,7 +98,7 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
 const styles = StyleSheet.create({
   // Aligned with the messages' words, like `IssueTakenLine`; an event line as a decided request's (`AskDone`): the
   // mark on the first line, the words in 15/20.
-  line: { marginVertical: 4, paddingLeft: MSG_TEXT, paddingRight: 16 },
+  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP },
   grow: { flex: 1, flexShrink: 1 },
   toggle: { fontWeight: "600" },
