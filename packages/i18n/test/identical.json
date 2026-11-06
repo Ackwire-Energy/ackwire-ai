@@ -420,6 +420,7 @@
       "connectAi.pick.plan"
     ],
     "fr": [
+      "settings.about.version",
       "deleteAccount.agentCount",
       "deleteAccount.messageCount",
       "queue.fill.routine",
@@ -771,6 +772,7 @@
       "agentPage.work.brain.speeds.standard"
     ],
     "de": [
+      "settings.about.version",
       "access.agentCol",
       "access.area.browser",
       "access.area.desktop",

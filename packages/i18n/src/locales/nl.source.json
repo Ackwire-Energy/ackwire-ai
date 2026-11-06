@@ -29415,6 +29415,9 @@
   "settings.section.approvals": {
     "value": "Approvals"
   },
+  "settings.section.about": {
+    "value": "About agentes.chat"
+  },
   "settings.sectionText.account": {
     "value": "Your profile and how the app looks for you."
   },
@@ -29474,6 +29477,24 @@
   },
   "settings.sectionText.approvals": {
     "value": "Who decides for you when an agent asks for your approval."
+  },
+  "settings.sectionText.about": {
+    "value": "Who makes it, its license and where its source code is."
+  },
+  "settings.about.basedOn": {
+    "value": "Based on <site>agentes.chat</site> by Codari Global, LLC"
+  },
+  "settings.about.version": {
+    "value": "Version"
+  },
+  "settings.about.license": {
+    "value": "Free software under the <license>GNU Affero General Public License v3</license>, with no warranty."
+  },
+  "settings.about.source": {
+    "value": "Source code"
+  },
+  "settings.about.copyright": {
+    "value": "Copyright © 2026 Codari Global, LLC and contributors"
   },
   "settings.title": {
     "value": "Settings"

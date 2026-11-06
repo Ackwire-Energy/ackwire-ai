@@ -11670,7 +11670,8 @@
       "media": "GIFとステッカー",
       "voice": "音声",
       "apps": "AIアプリ",
-      "approvals": "承認"
+      "approvals": "承認",
+      "about": "agentes.chat について"
     },
     "sectionText": {
       "account": "あなたのプロフィールと、アプリの表示設定。",
@@ -11692,7 +11693,15 @@
       "media": "会話で送れるものと、エージェントのGIFやステッカー。",
       "voice": "会話でのボイスメッセージと、音声をテキストにするサービス。",
       "apps": "Claude、Cursor などのアプリからエージェントにタスクを頼めます。",
-      "approvals": "エージェントがあなたの承認を求めたとき、代わりに決める人。"
+      "approvals": "エージェントがあなたの承認を求めたとき、代わりに決める人。",
+      "about": "開発元、ライセンス、ソースコードの場所。"
+    },
+    "about": {
+      "basedOn": "Codari Global, LLC の <site>agentes.chat</site> をもとにしています",
+      "version": "バージョン",
+      "license": "<license>GNU Affero General Public License v3</license> のもとで提供される自由ソフトウェアです。保証はありません。",
+      "source": "ソースコード",
+      "copyright": "Copyright © 2026 Codari Global, LLC およびコントリビューター"
     },
     "title": "設定",
     "account": {

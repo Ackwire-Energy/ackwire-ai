@@ -11731,7 +11731,8 @@
       "media": "GIF 和贴纸",
       "voice": "语音",
       "apps": "AI 应用",
-      "approvals": "审批"
+      "approvals": "审批",
+      "about": "关于 agentes.chat"
     },
     "sectionText": {
       "account": "你的个人资料和应用外观。",
@@ -11753,7 +11754,15 @@
       "media": "对话中可以发送的内容，以及智能体的 GIF 和贴纸。",
       "voice": "对话中的语音消息，以及由谁把语音转成文字。",
       "apps": "从 Claude、Cursor 等应用给智能体分配任务。",
-      "approvals": "当智能体请求你的批准时，替你做决定的人。"
+      "approvals": "当智能体请求你的批准时，替你做决定的人。",
+      "about": "开发者、许可证以及源代码的位置。"
+    },
+    "about": {
+      "basedOn": "基于 Codari Global, LLC 的 <site>agentes.chat</site>",
+      "version": "版本",
+      "license": "依据 <license>GNU Affero General Public License v3</license> 发布的自由软件，不提供任何担保。",
+      "source": "源代码",
+      "copyright": "Copyright © 2026 Codari Global, LLC 及贡献者"
     },
     "title": "设置",
     "account": {

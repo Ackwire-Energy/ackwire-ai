@@ -12573,7 +12573,8 @@
       "media": "GIF e sticker",
       "voice": "Voce",
       "apps": "App IA",
-      "approvals": "Approvazioni"
+      "approvals": "Approvazioni",
+      "about": "Informazioni su agentes.chat"
     },
     "sectionText": {
       "account": "Il tuo profilo e come appare l'app per te.",
@@ -12595,7 +12596,15 @@
       "media": "Cosa si può inviare in conversazione, e le GIF e gli sticker degli agenti.",
       "voice": "Messaggi vocali nelle conversazioni, e chi trasforma la voce in testo.",
       "apps": "Chiedi compiti agli agenti da Claude, Cursor e altre app.",
-      "approvals": "Chi decide per te quando un agente chiede la tua approvazione."
+      "approvals": "Chi decide per te quando un agente chiede la tua approvazione.",
+      "about": "Chi lo fa, la sua licenza e dove si trova il codice sorgente."
+    },
+    "about": {
+      "basedOn": "Basato su <site>agentes.chat</site> di Codari Global, LLC",
+      "version": "Versione",
+      "license": "Software libero sotto la <license>GNU Affero General Public License v3</license>, senza garanzia.",
+      "source": "Codice sorgente",
+      "copyright": "Copyright © 2026 Codari Global, LLC e collaboratori"
     },
     "title": "Impostazioni",
     "account": {

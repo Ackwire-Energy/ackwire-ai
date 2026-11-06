@@ -12060,7 +12060,8 @@
       "media": "GIF'ler ve çıkartmalar",
       "voice": "Ses",
       "apps": "Yapay zeka uygulamaları",
-      "approvals": "Onaylar"
+      "approvals": "Onaylar",
+      "about": "agentes.chat hakkında"
     },
     "sectionText": {
       "account": "Profiliniz ve uygulamanın size nasıl göründüğü.",
@@ -12082,7 +12083,15 @@
       "media": "Konuşmada neler gönderilebildiği ve ajanların GIF'leri ile çıkartmaları.",
       "voice": "Konuşmalardaki sesli mesajlar ve sesi metne kimin dönüştürdüğü.",
       "apps": "Claude, Cursor ve diğer uygulamalardan ajanlara görev verin.",
-      "approvals": "Bir ajan onayınızı istediğinde sizin yerinize kimin karar verdiği."
+      "approvals": "Bir ajan onayınızı istediğinde sizin yerinize kimin karar verdiği.",
+      "about": "Kimin yaptığı, lisansı ve kaynak kodunun yeri."
+    },
+    "about": {
+      "basedOn": "Codari Global, LLC tarafından geliştirilen <site>agentes.chat</site> tabanlı",
+      "version": "Sürüm",
+      "license": "<license>GNU Affero General Public License v3</license> kapsamında özgür yazılım, garantisi yoktur.",
+      "source": "Kaynak kodu",
+      "copyright": "Copyright © 2026 Codari Global, LLC ve katkıda bulunanlar"
     },
     "title": "Ayarlar",
     "account": {

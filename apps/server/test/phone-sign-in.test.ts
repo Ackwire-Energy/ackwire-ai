@@ -111,6 +111,7 @@ describe("GET /api/instance", () => {
       api: 1,
       minApi: 1,
       url: ORIGIN,
+      sourceUrl: "https://github.com/agentes-chat/agentes-chat",
       signIn: { email: true, google: true, github: false, apple: false },
       // Nobody yet: the first account signs up.
       signup: "open",
@@ -120,6 +121,13 @@ describe("GET /api/instance", () => {
     await signUp(browser(t), "owner@example.com");
     const after = (await (await t.app.request("/api/instance")).json()) as { signup: string };
     expect(after.signup).toBe("invite");
+  });
+
+  test("a modified version links its own source", async () => {
+    t = await createTestServer({ env: { SOURCE_URL: "https://git.example.com/fork" } });
+    expect(await (await t.app.request("/api/instance")).json()).toMatchObject({
+      sourceUrl: "https://git.example.com/fork",
+    });
   });
 
   test("agentes.chat's own servers say they are the Cloud", async () => {

@@ -120,6 +120,27 @@ describe("finding the settings", () => {
     }
   });
 
+  test("Sobre o agentes.chat: for a member too, with the license's attribution, the version and the source", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    state.instance = { version: "2026.11.06.1", sourceUrl: "https://git.example.com/fork" };
+    await go("settings/about", state);
+    expect(screen().getAllByRole("heading", { level: 2, name: "Sobre o agentes.chat" }).length).toBeGreaterThan(0);
+    const site = screen().getByRole("link", { name: "agentes.chat" });
+    expect(site.closest("h2")?.textContent).toBe("Baseado no agentes.chat da Codari Global, LLC");
+    expect(site.getAttribute("href")).toBe("https://agentes.chat");
+    expect(screen().getByText("2026.11.06.1")).toBeTruthy();
+    expect(screen().getByRole("link", { name: "GNU Affero General Public License v3" }).getAttribute("href")).toBe(
+      "https://www.gnu.org/licenses/agpl-3.0.html",
+    );
+    expect(
+      screen()
+        .getByRole("link", { name: /git\.example\.com\/fork/ })
+        .getAttribute("href"),
+    ).toBe("https://git.example.com/fork");
+    expect(screen().getByText("Copyright © 2026 Codari Global, LLC e colaboradores")).toBeTruthy();
+  });
+
   test("an unknown section goes back to Geral", async () => {
     const { router } = await go("settings/nada");
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings`);

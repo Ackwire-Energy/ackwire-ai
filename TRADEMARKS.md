@@ -23,7 +23,8 @@ Codari Global, LLC, registered or not. The code licenses ([LICENSE](LICENSE)) gr
 
 Forks are allowed under the code licenses. A public fork needs its own name and logo and, for the
 apps, its own store listing, icon and bundle ID (not `chat.agentes.*`). You may call it "a fork of
-agentes.chat".
+agentes.chat". Whatever its name, it keeps the attribution the license requires ("Based on
+agentes.chat by Codari Global, LLC") in its About screen.
 
 ## Questions
 
