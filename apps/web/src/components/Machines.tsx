@@ -69,6 +69,7 @@ import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ThisMacButton, useAgentsHere, useIsThisMac } from "@/components/ThisMac";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { BrowserProfilesCard } from "./browser/BrowserProfiles";
@@ -612,6 +613,7 @@ export function MachinesSection() {
   const canPair = can(org, "pair_computers");
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
+  const look = useRightHandLook();
   // This server's computer and the workspace's own have cards of their own: this list is people's.
   const list = (machines.data ?? []).filter((m) => m.kind !== "managed" && m.kind !== "host");
   return (
@@ -629,12 +631,13 @@ export function MachinesSection() {
           <ErrorState error={machines.error} onRetry={() => void machines.refetch()} />
         )}
         {machines.isSuccess && list.length === 0 && (
-          <div className="computers-empty">
-            <ComputerPortrait kind="mac" state="offline" size={96} />
-            <span className="computers-empty__text">
-              <b>{t("computers.other.emptyTitle")}</b>
-            </span>
-          </div>
+          <EmptyState
+            size="panel"
+            agent={look}
+            title={t(canPair ? "computers.other.emptyTitle" : "computers.other.emptyViewerTitle")}
+          >
+            {t(canPair ? "computers.other.emptyText" : "computers.other.emptyViewer")}
+          </EmptyState>
         )}
         {list.length > 0 && (
           <List aria-label={t("computers.other.title")}>

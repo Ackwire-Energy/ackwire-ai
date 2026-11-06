@@ -21,7 +21,7 @@ import {
   type WebPushSender,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
-import { like, schema } from "@agenteschat/db";
+import { eq, isNotNull, like, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   createFakeJudge,
@@ -165,6 +165,7 @@ export async function createTestServer(
     adapters,
     modelProviders: Object.fromEntries(PROVIDER_IDS.map((id) => [id, provider])),
     toolSources: options.toolSources,
+    appleRevoke: options.appleRevoke,
     mcpConnect: options.mcpConnect,
     http: options.http,
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
@@ -218,7 +219,6 @@ export async function createTestServer(
         context: engine.context,
         sandbox: engine.sandbox,
         gitProxy: engine.gitProxy,
-        appleRevoke: options.appleRevoke,
         desktopFetch: options.desktopFetch,
         browserLive: engine.browserLive,
         router: engine.router,
@@ -413,6 +413,19 @@ export async function deletionCode(t: TestServer, b: Browser, orgId: string | nu
   if (sent.status !== 202) throw new Error(`deletion code: ${sent.status} ${await sent.text()}`);
   await t.drain();
   return lastCode(t);
+}
+
+/** The 7 days pass: every account waiting for its deletion goes, by its job. */
+export async function deletionsDue(t: TestServer) {
+  await t.db
+    .update(schema.users)
+    .set({ deletionDueAt: new Date(Date.now() - 60_000) })
+    .where(isNotNull(schema.users.deletionDueAt));
+  await t.db
+    .update(schema.outbox)
+    .set({ nextAttemptAt: new Date(0) })
+    .where(eq(schema.outbox.kind, "account.delete"));
+  await t.drain();
 }
 
 export async function signUp(b: Browser, email: string) {

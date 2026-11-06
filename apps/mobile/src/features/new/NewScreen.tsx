@@ -157,7 +157,7 @@ export function NewScreen() {
             </Animated.View>
           ) : null}
           {typed && agents.length + people.length === 0 && !dir.loading ? (
-            <EmptyState icon="search" title={t("mobile.find.nothing", { q: typed })} />
+            <EmptyState size="inline" title={t("mobile.find.nothing", { q: typed })} />
           ) : null}
         </View>
       </Animated.View>

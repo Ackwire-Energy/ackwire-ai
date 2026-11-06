@@ -71,7 +71,7 @@
   },
   "account": {
     "deleteFailed": "暂时无法删除你的账号，请重试。",
-    "deleted": "你的账号已删除。",
+    "deleted": "你的账号将于 {{date}} 永久消失。在此之前登录即可恢复。",
     "signedOut": "你已退出登录。"
   },
   "theme": {

@@ -76,7 +76,7 @@ import {
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createModelProviders, enableOpenRouterModels } from "@agenteschat/providers";
 import { createApp } from "./app";
-import { appleTokenRevoker, createAuth } from "./auth";
+import { createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { checkHumanCheckAtBoot } from "./http/human-check";
 import { createLogger, type Logger } from "./logger";
@@ -402,7 +402,6 @@ async function boot(
         speech: engine.speech,
         voice: engine.voice,
         gitProxy: engine.gitProxy,
-        appleRevoke: appleTokenRevoker(config),
       },
     },
     log,

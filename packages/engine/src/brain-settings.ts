@@ -287,7 +287,15 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
 }
 
 /** Why a computer brain can't be chosen right now. */
-export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
+export type BrainUnavailable =
+  | "no_computer"
+  | "exec_off"
+  | "runner_old"
+  | "tool_off"
+  | "not_installed"
+  | "outdated"
+  /** Its runner hasn't said which CLIs it has yet (`detectedAt`): nobody knows whether this one is there. */
+  | "not_reported";
 
 export interface BrainOption {
   kind: BrainKind;
@@ -313,6 +321,10 @@ type MachineLike = Parameters<typeof machineExecutors>[0] & {
   } | null;
 } & Parameters<typeof machineOnline>[0];
 
+/** A CLI the computer doesn't list: gone only once its runner has looked (the same check the turns make). */
+const missingCli = (machine: MachineLike): BrainUnavailable =>
+  machine.executors?.detectedAt ? "not_installed" : "not_reported";
+
 /**
  * What the agent's computer can think with; the model brain always. A
  * computer brain needs the runner's `brain.turn` (`BRAIN_PROTOCOL`, the same
@@ -328,7 +340,7 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
     else if (machine.protocol < BRAIN_PROTOCOL) reason = "runner_old";
     else if (machine.access?.tools && machine.access.tools[executor] === false) reason = "tool_off";
     else if (!found?.available.includes(executor))
-      reason = executor === "codex" && found?.codexTooOld ? "outdated" : "not_installed";
+      reason = executor === "codex" && found?.codexTooOld ? "outdated" : missingCli(machine);
     return {
       kind,
       available: !reason,
@@ -368,7 +380,7 @@ function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode" | "g
   )
     reason = "runner_old";
   else if (tools && (tools[kind] ?? tools.codex) === false) reason = "tool_off";
-  else if (!machine.executors?.[kind]) reason = "not_installed";
+  else if (!machine.executors?.[kind]) reason = missingCli(machine);
   return {
     kind,
     available: !reason,
@@ -1717,6 +1729,8 @@ export interface AiComputer {
     antigravity: boolean;
     key: boolean;
   };
+  /** Why a CLI of `brains` can't think there, as `brainOptions` says it. */
+  off: Partial<Record<BrainKind, BrainUnavailable>>;
   /** What it can think with now: Claude Code (Claude and the coding plans), Codex (ChatGPT), Cursor, OpenCode, Grok, Antigravity. */
   brains: {
     claude_code: boolean;
@@ -1729,7 +1743,9 @@ export interface AiComputer {
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the caller connected (it is theirs, and
    * the agents on it think with it when no account is picked). Claude Code when `claude auth status` said it is
-   * signed in (or its plan's usage is known); Codex once its usage is known. Its plan and usage when known.
+   * signed in (or its plan's usage is known); Codex once its usage is known. Its plan and usage when known. Never
+   * OpenCode: its CLI needs no sign-in, so its presence says nothing about anyone's account (`brains.opencode` and
+   * `canAdd` say where its free tier can think, ADR 0132 §6).
    */
   own: Partial<Record<AccountKind, OwnSignIn>>;
 }
@@ -1783,6 +1799,7 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
           antigravity: sharesSignIns(m, "antigravity"),
           key: sharesSignIns(m, "key"),
         },
+        off: Object.fromEntries(options.flatMap((o) => (o.reason ? [[o.kind, o.reason]] : []))),
         brains: {
           claude_code: can("claude_code"),
           codex: can("codex"),
@@ -1791,13 +1808,7 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
           grok: can("grok"),
           antigravity: can("antigravity"),
         },
-        own:
-          m.pairedByUserId === userId
-            ? ownSignIns(m.executors, can)
-            : // OpenCode's free tier there thinks for anyone's agents (ADR 0132): nobody signs in on it.
-              m.pairedByUserId === null && can("opencode")
-              ? { opencode: {} }
-              : {},
+        own: m.pairedByUserId === userId ? ownSignIns(m.executors, can) : {},
       };
     }),
   };
@@ -1819,7 +1830,5 @@ function ownSignIns(
       ...(usage.claude_code ? { usage: usage.claude_code } : {}),
     };
   if (can("codex") && usage.codex) out.codex = { usage: usage.codex };
-  // Its own OpenCode always thinks: its own sign-ins, or the free tier with none.
-  if (can("opencode")) out.opencode = {};
   return out;
 }

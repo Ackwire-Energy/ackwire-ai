@@ -27,27 +27,31 @@ export function PixelSky({ options, className }: { options: SkyOptions; classNam
 export function SkyGlow({
   color = "sky",
   surface = "--bg",
+  bare,
   className,
 }: {
   color?: AgentColor;
   /** The token of the surface the glow sits on (it fades from it). */
   surface?: string;
+  /** Only the light, for an agent drawn over it. */
+  bare?: boolean;
   className?: string;
 }) {
   return (
     <span className={cx("ac-sky-glow", className)} aria-hidden="true">
-      <PixelSky options={glowOptions(color, surface)} />
+      <PixelSky options={glowOptions(color, surface, bare)} />
     </span>
   );
 }
 
 const WHITE = pixelOf("#ffffff");
 
-export function glowOptions(color: AgentColor, surface = "--bg"): SkyOptions {
+export function glowOptions(color: AgentColor, surface = "--bg", bare = false): SkyOptions {
   const body = pixelOf(spriteTone(color));
   return {
     pixel: 4,
     surface,
+    seeThrough: bare,
     palette: (bg) => glowTones(color, bg),
     light: 0,
     base: (u, v, t) => {
@@ -57,10 +61,12 @@ export function glowOptions(color: AgentColor, surface = "--bg"): SkyOptions {
       const edge = Math.min(1, u * 5, (1 - u) * 5, v * 5, (1 - v) * 5);
       return edge * Math.exp(-(dx * dx + dy * dy) / 0.18) * (0.9 + 0.06 * Math.sin(t * 0.8));
     },
-    after: (f) => {
-      const k = 2;
-      const y = Math.round(f.h * 0.5 - 9 + Math.sin(f.t * 1.6) * 2);
-      drawSprite(f, Math.round(f.w / 2 - 9), y, k, body, WHITE, f.t % 4.2 > 4.04);
-    },
+    after: bare
+      ? undefined
+      : (f) => {
+          const k = 2;
+          const y = Math.round(f.h * 0.5 - 9 + Math.sin(f.t * 1.6) * 2);
+          drawSprite(f, Math.round(f.w / 2 - 9), y, k, body, WHITE, f.t % 4.2 > 4.04);
+        },
   };
 }

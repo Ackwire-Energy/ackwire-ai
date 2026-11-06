@@ -5,6 +5,7 @@ setupDom();
 
 import type { Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { chooseAi, openAiSelect, payWith } from "./ai-picker";
 import { createFakeApi, fakeAgentBrain, LODI_ID, NOW, ORG_ID, seedDm, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -52,11 +53,10 @@ test("its plan's computer away: one plain line in its DM, and Usar uma chave de 
   await settle(6);
   const dialog = screen().getByRole("dialog", { name: /Lodi/ });
   // Every plan, as for any agent: Codex's and Cursor's too (ADR 0137 §4, the owner's accepted risk).
-  const picker = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
-  for (const name of ["Claude", "ChatGPT", "Cursor"]) {
-    expect(within(picker).queryByRole("button", { name })).toBeTruthy();
-  }
-  expect(within(picker).queryAllByRole("button", { name: /OpenCode/ }).length).toBeGreaterThan(0);
+  await act(async () => fireEvent.click(payWith(dialog, "Com um plano")));
+  await settle(4);
+  const plans = (await openAiSelect(dialog)).map((o) => o.textContent);
+  expect(plans).toEqual(expect.arrayContaining(["Claude", "ChatGPT", "Cursor", "OpenCode"]));
 });
 
 test("the workspace's plan serves only its owner: the line says so, and Conectar meu plano opens Connect", async () => {
@@ -159,9 +159,9 @@ test("Connect for it, with a ChatGPT plan another agent already thinks with: tha
   expect(picker.firstElementChild?.textContent).toBe("Já conectadas");
   const plan = within(picker).getByRole("button", { name: /^ChatGPT · Plus/ });
   expect(plan.textContent).toContain("Também usada por Ada");
-  // The ChatGPT tile's panel offers that plan again first; its new sign-in, under Outra conta, can be pressed now,
-  // never a button loading for good.
-  await act(async () => fireEvent.click(within(picker).getByRole("button", { name: "ChatGPT" })));
+  // ChatGPT's panel offers that plan again first; its new sign-in, under Outra conta, can be pressed now, never a
+  // button loading for good.
+  await chooseAi(dialog, "ChatGPT");
   await settle(10);
   const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
   expect(within(panel).getByRole("button", { name: /^Usar ChatGPT · Plus/ })).toBeTruthy();

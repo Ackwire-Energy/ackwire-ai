@@ -259,7 +259,7 @@ export const en = {
     account: (email: string): Text => [
       "Type this code to delete the whole account ",
       { b: email },
-      ", not just one workspace. It goes at once, and the workspaces only you are in close with it.",
+      ", not just one workspace. It's signed out everywhere at once and deleted for good 7 days later, and the workspaces only you are in close with it.",
     ],
     support: (address: string): Text => [
       "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and write to ",
@@ -302,6 +302,27 @@ export const en = {
     note: "Didn't connect it? Disconnect it now and change your password.",
     button: "See connected apps",
     why: (org: string) => `You got this email because an app was connected to your account in ${org} on agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day: string) => `Your agentes.chat account will be deleted on ${day}`,
+    preheader: "You have 7 days to change your mind.",
+    headline: "Your account is being deleted",
+    body: (email: string, day: string, time: string): Text => [
+      "We will delete the account ",
+      { b: email },
+      ` on ${day} at ${time}. It's signed out everywhere, and nobody can reach you here until you're back.`,
+    ],
+    closes: (count: number, names: Inline[]): Text => [
+      plural("en", count, {
+        one: "The workspace only you were in closed now and goes on the same date: ",
+        other: "The workspaces only you were in closed now and go on the same date: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Changed your mind? Sign in before that date and press Restore.",
+    button: "Sign in to restore",
+    why: "You got this email because this address has an account on agentes.chat.",
   },
   accountDeleted: {
     subject: "Your agentes.chat account was deleted",

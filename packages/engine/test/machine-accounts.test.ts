@@ -7,6 +7,8 @@ import {
   CLAUDE_AUTH_PROTOCOL,
   generateSecretKeyPair,
   type MachineRequest,
+  OPENCODE_KEY_PROVIDER,
+  OPENCODE_PROTOCOL,
   type OwnPlanUsage,
   openSecret,
   orgTopic,
@@ -105,7 +107,7 @@ async function sharedMachine() {
   return paired;
 }
 
-async function addAccount(machineId: string, id: string, kind: "claude_code" | "codex", over = {}) {
+async function addAccount(machineId: string, id: string, kind: "claude_code" | "codex" | "opencode", over = {}) {
   await f.db.insert(schema.machineAccounts).values({
     id,
     orgId: f.org.id,
@@ -118,6 +120,36 @@ async function addAccount(machineId: string, id: string, kind: "claude_code" | "
     ...over,
   });
 }
+
+test("OpenCode's CLI on a computer is no sign-in of anyone's: a real key still lists", async () => {
+  f = await setup();
+  const { machineId } = await sharedMachine();
+  await f.db
+    .update(schema.machines)
+    .set({
+      protocol: OPENCODE_PROTOCOL,
+      execAllowed: true,
+      executors: { opencode: { version: "1.19.5" }, detectedAt: new Date().toISOString() },
+    })
+    .where(eq(schema.machines.id, machineId));
+  const page = await listAiAccounts({ db: f.db }, f.owner.id, f.org.id);
+  const row = page.computers.find((c) => c.machineId === machineId);
+  // Available to choose (the free tier), claimed by nobody.
+  expect(row?.own).toEqual({});
+  expect(row?.brains.opencode).toBe(true);
+  expect(row?.canAdd).toBe(true);
+  expect(page.accounts.filter((a) => a.machineId === machineId)).toEqual([]);
+
+  await f.db.update(schema.machines).set({ pairedByUserId: f.owner.id }).where(eq(schema.machines.id, machineId));
+  expect(
+    (await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers.find((c) => c.machineId === machineId)?.own,
+  ).toEqual({});
+
+  const key = "00000000-0000-4000-8000-0000000000c0";
+  await addAccount(machineId, key, "opencode", { provider: OPENCODE_KEY_PROVIDER, label: "OpenCode" });
+  const keyed = await listAiAccounts({ db: f.db }, f.owner.id, f.org.id);
+  expect(keyed.accounts.filter((a) => a.machineId === machineId).map((a) => a.id)).toEqual([key]);
+});
 
 const agentRow = async (id = f.agent.id) => {
   const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, id));
@@ -529,6 +561,7 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
         antigravity: false,
         key: false,
       },
+      off: expect.any(Object),
       brains: {
         claude_code: expect.any(Boolean),
         codex: expect.any(Boolean),
@@ -1781,9 +1814,9 @@ test("where each agent is its own OS user, a key's login made for one agent leav
   });
 });
 
-// ── How each connection signs in (protocol 49, ADR 0150) ────────────────────
+// ── How each connection signs in (protocol 50, ADR 0150) ────────────────────
 
-/** A computer where each agent is its own OS user, on `protocol`, its runner saying `methods` (protocol 49). */
+/** A computer where each agent is its own OS user, on `protocol`, its runner saying `methods` (protocol 50). */
 async function systemMachine(protocol = CLAUDE_AUTH_PROTOCOL, methods?: ("cli_login" | "setup_token")[]) {
   const paired = await ownedMachine(protocol);
   const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId));
@@ -1900,7 +1933,7 @@ test("a runner that can use Claude's own login for all agents gets it; an older 
   expect(runner.calls[0]).toMatchObject({ shared: true, method: "cli_login" });
   expect(await accountRow(login.loginId)).toMatchObject({ authMethod: "cli_login", status: "signing_in" });
 
-  // Below protocol 49 in system mode: setup-token is all it does, so the policy's own login is refused.
+  // Below protocol 50 in system mode: setup-token is all it does, so the policy's own login is refused.
   const { machineId: old } = await systemMachine(SHARED_ACCOUNTS_PROTOCOL, ["cli_login"]);
   const oldRunner = fakeHub(old, () => ({ url: "https://claude.ai/x" }), { protocol: SHARED_ACCOUNTS_PROTOCOL });
   await expect(beginAccountLogin(oldRunner.deps, f.owner.id, f.org.id, old, "claude_code")).rejects.toMatchObject({
@@ -2056,7 +2089,7 @@ test("one email in two of Claude's organizations is two accounts; a login that d
   expect(asBia.accounts.map((a) => a.providerOrgId)).toEqual([null, null, null, null]);
 });
 
-test("hello keeps what a new Claude sign-in for all agents can use on the computer (protocol 49)", async () => {
+test("hello keeps what a new Claude sign-in for all agents can use on the computer (protocol 50)", async () => {
   f = await setup();
   const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
   hubs.push(hub);

@@ -106,7 +106,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "browser.live.noComputer",
     "computers.hostMissing",
     "computers.lead",
-    "connectAi.key.platform",
     "connectAi.wait.connecting",
     "errors.mission.unavailable",
     "machines.download.step2",
@@ -124,7 +123,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "onboarding.computer.otherComputer",
     // A self-hosted server on a private host, which AI apps on the internet can't reach.
     "onboarding.import.aiApp.private",
-    "onboarding.platformKeyDesc",
     "openOnPhone.stepTailscale",
     "outage.dialog.none",
     "settings.platformAvailable",

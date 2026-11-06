@@ -137,6 +137,26 @@ describe("EmptyState with sky", () => {
     expect(container.querySelector(".ac-empty__icon")).not.toBeNull();
     expect(container.querySelector(".ac-sky")).toBeNull();
   });
+
+  test("with a size and an agent: the agent in its light instead of the icon, no box", () => {
+    const { container } = render(
+      <EmptyState size="page" agent={{ color: "green" }} mood="deal" icon="issues" title="Tudo certo" />,
+    );
+    expect(container.querySelector(".ac-empty--page")).not.toBeNull();
+    const sticker = container.querySelector<HTMLElement>(".ac-empty__agent .ac-sticker");
+    expect(sticker?.dataset.mood).toBe("deal");
+    expect(sticker?.style.width).toBe("128px");
+    expect(container.querySelector(".ac-empty__agent .ac-sky-glow")).not.toBeNull();
+    expect(container.querySelector(".ac-empty__icon")).toBeNull();
+  });
+
+  test("a panel's agent is smaller, and an inline list never grows one", () => {
+    const panel = render(<EmptyState size="panel" agent title="Aqui" />);
+    expect(panel.container.querySelector<HTMLElement>(".ac-sticker")?.style.width).toBe("96px");
+    const inline = render(<EmptyState size="inline" agent title="Nada com esse nome" />);
+    expect(inline.container.querySelector(".ac-empty--inline .ac-sticker")).toBeNull();
+    expect(inline.container.querySelector(".ac-empty--inline .ac-empty__agent")).toBeNull();
+  });
 });
 
 describe("the sky's loop", () => {

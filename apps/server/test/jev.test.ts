@@ -1,7 +1,15 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { monthStartUtc } from "@agenteschat/engine";
-import { type Browser, browser, createTestServer, deletionCode, signUp, type TestServer } from "./harness";
+import {
+  type Browser,
+  browser,
+  createTestServer,
+  deletionCode,
+  deletionsDue,
+  signUp,
+  type TestServer,
+} from "./harness";
 
 let t: TestServer | undefined;
 afterEach(async () => {
@@ -160,6 +168,7 @@ test("once the first account deletes itself, its key goes with it and nobody inh
   expect((await owner("/api/app/jev", { method: "PUT", json: { apiKey: SECRET_KEY } })).status).toBe(200);
   const code = await deletionCode(t, owner, null);
   expect((await owner("/api/app/account", { method: "DELETE", json: { code } })).status).toBe(204);
+  await deletionsDue(t);
   expect(await t.db.select().from(schema.instanceSecrets)).toEqual([]);
   const gone = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "jev.key_removed"));
   expect(gone).toMatchObject([{ orgId: beta, actorType: "system", details: { hint: "9f2c" } }]);
@@ -175,6 +184,7 @@ test("once no account is left, the next first account has it", async () => {
   expect((await first("/api/app/jev")).status).toBe(200);
   const code = await deletionCode(app, first, null);
   expect((await first("/api/app/account", { method: "DELETE", json: { code } })).status).toBe(204);
+  await deletionsDue(app);
   const next = browser(t);
   await signUp(next, "next@example.com");
   expect((await next("/api/app/jev")).status).toBe(200);

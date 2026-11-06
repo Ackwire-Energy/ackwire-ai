@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { hostOf, matchesQuery, sortItems } from "./lib";
 import { AgentFaces } from "./VaultAccess";
 import { VaultConnections } from "./VaultConnections";
@@ -106,6 +107,7 @@ export function VaultSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const vault = useVault(org.id);
+  const look = useRightHandLook();
   const [tab, setTab] = useState<Tab | null>(null);
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
@@ -128,6 +130,8 @@ export function VaultSection() {
   // The kind filter only where it can narrow something: a view that holds more than one kind.
   const kinds = new Set(inTab.map((i) => i.kind)).size;
   const open = (which: "new" | "import") => () => setDialog(which);
+  const addsInList =
+    !!data && current !== "connections" && inTab.length === 0 && (current === "personal" || canManageTeam);
   const pickTab = (next: Tab) => {
     setTab(next);
     // Each view starts unfiltered: a search or a kind from the other one would hide what this one holds.
@@ -147,10 +151,9 @@ export function VaultSection() {
     if (filtered)
       return (
         <EmptyState
-          icon="search"
+          size="panel"
           actions={
             <Button
-              variant="ghost"
               onClick={() => {
                 setQuery("");
                 setKind("all");
@@ -163,15 +166,24 @@ export function VaultSection() {
           {t("vault.list.noMatch")}
         </EmptyState>
       );
-    // Empty: what goes here and why, with no buttons of its own (Import and New item are right above, in the header).
+    const adds = (
+      <Button variant="primary" icon="plus" onClick={open("new")}>
+        {t("vault.new.open")}
+      </Button>
+    );
     if (current === "personal")
       return (
-        <EmptyState icon="lock" title={t("vault.list.personalEmpty")}>
+        <EmptyState size="page" agent={look} title={t("vault.list.personalEmpty")} actions={adds}>
           {t("vault.list.personalEmptyText")}
         </EmptyState>
       );
     return (
-      <EmptyState icon="members" title={canManageTeam ? t("vault.list.teamEmpty") : t("vault.list.sharedEmpty")}>
+      <EmptyState
+        size="page"
+        agent={look}
+        title={canManageTeam ? t("vault.list.teamEmpty") : t("vault.list.sharedEmpty")}
+        actions={canManageTeam && adds}
+      >
         {canManageTeam ? t("vault.list.teamEmptyText") : t("vault.list.sharedEmptyText")}
       </EmptyState>
     );
@@ -188,9 +200,12 @@ export function VaultSection() {
             <Button icon="upload" onClick={open("import")}>
               {t("vault.import.open")}
             </Button>
-            <Button variant="primary" icon="plus" onClick={open("new")}>
-              {t("vault.new.open")}
-            </Button>
+            {/* The empty list takes over this button: one way in, in the middle of the page. */}
+            {!addsInList && (
+              <Button variant="primary" icon="plus" onClick={open("new")}>
+                {t("vault.new.open")}
+              </Button>
+            )}
           </>
         }
       />

@@ -1,14 +1,13 @@
 import { isWaitingHandoff, useBrowserHandoffMutations } from "@agenteschat/client";
-import { entryButton, entryKind, entryLine, entryPortrait, entryState } from "@agenteschat/client/lib/agent-computer";
+import { entryButton, entryLine, entryState } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
-import { Button, ComputerPortrait, Icon, SkyStrip } from "@agenteschat/ui";
+import { Button, Icon } from "@agenteschat/ui";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { stepText } from "@/components/browser/BrowserCard";
 import { useAgentComputer } from "@/components/computer/facts";
 import { useOpenComputer } from "@/components/computer/open";
 import { useOrg } from "@/components/org-context";
-import { colorOf } from "@/components/Sky";
 import { useSetupWait, useWaitReader } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
@@ -21,8 +20,8 @@ import "@/components/computer/computer.css";
 const OLD_LINKS = ["browser", "desktop", "terminal"] as const;
 
 /**
- * "Desk's computer" at the top of the agent's overview (on its page and in the panel beside its DM): one row,
- * one status line, one button that opens the computer dialog, Help when a request waits for this person.
+ * "Desk's computer", the first row of the overview's fact sheet (Ficha.tsx) (on its page and in the panel beside its DM): one status
+ * line, one button that opens the computer dialog, Help when a request waits for this person.
  * Only for whoever may watch it, the wait included. `?computer=1` opens it (`?browser=1`, `?desktop=1` and
  * `?terminal=1` too: older links). The row never opens a stream.
  */
@@ -75,34 +74,48 @@ export function ComputerNow() {
     });
   };
   const tone = state.kind === "needsYou" ? "warn" : state.kind === "needsOther" ? "asked" : undefined;
+  const status = (
+    <span className="cmp-entry__line">
+      {state.kind === "held" && <Icon name="pause" size={14} />}
+      {state.kind === "problem" && <Icon name="alert" size={14} />}
+      {state.kind === "needsOther" && <Icon name="clock" size={14} />}
+      <span>{line}</span>
+    </span>
+  );
+  const action =
+    button === "help" ? (
+      <Button size="sm" variant="primary" loading={actions.takeControl.isPending} onClick={help}>
+        {t("agentComputer.help")}
+      </Button>
+    ) : button === "choose" ? (
+      <Button size="sm" onClick={() => openWork("computer")}>
+        {t("agentComputer.choose")}
+      </Button>
+    ) : (
+      <Button size="sm" icon="computer" onClick={() => openComputer(agent.id)}>
+        {t("agentComputer.open")}
+      </Button>
+    );
   return (
-    <section className="cmp-entry" data-tone={tone} aria-label={t("agentComputer.title", g)}>
-      <SkyStrip color={colorOf(agent)} moving={state.kind === "working"} />
-      <div className="cmp-entry__row">
-        <ComputerPortrait kind={entryKind(f.edition, view.machine)} state={entryPortrait(state, f.setup)} />
-        <span className="cmp-entry__t">
-          <b>{t("agentComputer.title", g)}</b>
-          <span className="cmp-entry__line">
-            {state.kind === "held" && <Icon name="pause" size={14} />}
-            {state.kind === "problem" && <Icon name="alert" size={14} />}
-            {state.kind === "needsOther" && <Icon name="clock" size={14} />}
-            <span>{line}</span>
-          </span>
-        </span>
-        {button === "help" ? (
-          <Button size="sm" variant="primary" loading={actions.takeControl.isPending} onClick={help}>
-            {t("agentComputer.help")}
-          </Button>
-        ) : button === "choose" ? (
-          <Button size="sm" onClick={() => openWork("computer")}>
-            {t("agentComputer.choose")}
-          </Button>
-        ) : (
-          <Button size="sm" icon="computer" onClick={() => openComputer(agent.id)}>
-            {t("agentComputer.open")}
-          </Button>
-        )}
-      </div>
+    // A row of the fact sheet: its button is the way in for the keyboard; a click anywhere else on it opens the same.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the row's own button does the same from the keyboard
+    <section
+      className="cmp-entry agp-frow"
+      data-tone={tone}
+      aria-label={t("agentComputer.title", g)}
+      onClick={(e) => {
+        if ((e.target as Element).closest("button")) return;
+        if (button === "help") help();
+        else if (button === "choose") openWork("computer");
+        else openComputer(agent.id);
+      }}
+    >
+      <span className="agp-cell__key">
+        <Icon name="computer" size={16} />
+      </span>
+      <small className="agp-frow__label">{t("agentPage.ficha.computer")}</small>
+      <span className="agp-frow__value">{status}</span>
+      <span className="agp-frow__tail">{action}</span>
     </section>
   );
 }

@@ -13,6 +13,7 @@ export function WorkLine({
   tone,
   text,
   update,
+  question,
   actions,
   className,
 }: {
@@ -20,6 +21,8 @@ export function WorkLine({
   text: string;
   /** The latest update, plain text. */
   update?: string | null;
+  /** What it waits to hear: two lines at most, all of it on hover. */
+  question?: string | null;
   /** Links and buttons after the line. */
   actions?: ReactNode;
   className?: string;
@@ -34,6 +37,11 @@ export function WorkLine({
           <span>{text}</span>
           {actions}
         </p>
+        {question ? (
+          <p className="ac-workline__question" title={question}>
+            {question}
+          </p>
+        ) : null}
         {update ? <p className="ac-workline__update">{update}</p> : null}
       </div>
     </div>

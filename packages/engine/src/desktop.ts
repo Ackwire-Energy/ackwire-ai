@@ -14,6 +14,7 @@ import {
   agentUsesScreen,
   BROWSER_HANDOFF_TOPIC,
   type BrowserHandoffView,
+  browserOnDesktop,
   CONTROL_GRACE_MS,
   handoffView,
   noteComputerTaken,
@@ -225,6 +226,8 @@ export async function auditStream(db: Database, s: Stream) {
       seconds: Math.round((Date.now() - (s.readyAt ?? s.openedAt)) / 1000),
       bytesIn: s.bytesIn,
       bytesOut: s.bytesOut,
+      // A browser card's view of this screen (ADR 0058 §7): watch only.
+      ...(s.preview ? { preview: true } : {}),
     },
   });
 }
@@ -264,6 +267,8 @@ export interface DesktopStatus {
   controlRefusal: DriveRefusal | null;
   /** The agent is held, or its workspace on hold: people may watch, nobody takes control. */
   held: boolean;
+  /** The agent's browser runs on this desktop (ADR 0058 §7): its browser card shows this screen. */
+  browserOnDesktop: boolean;
 }
 
 /**
@@ -294,10 +299,11 @@ export async function desktopStatus(
       canControl: false,
       controlRefusal: none ? null : "role",
       held: await standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
+      browserOnDesktop: false,
     };
   }
   await requireDesktopAccess(db, userId, orgId, agentId);
-  const [served, open, controlRefusal, held] = await Promise.all([
+  const [served, open, controlRefusal, held, onDesk] = await Promise.all([
     desktopTarget(db, ANYWHERE, orgId, agentId, "desktop"),
     openHandoffOn(db, orgId, agentId, "desktop"),
     computerDriving(db, userId, orgId, agentId).then(
@@ -305,6 +311,7 @@ export async function desktopStatus(
       (): DriveRefusal => "not_allowed",
     ),
     standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
+    browserOnDesktop(db, orgId, agentId),
   ]);
   const online = "machineId" in served && deps.hub ? (await deps.hub.status(served.machineId))?.online === true : false;
   const desktop: StreamTarget = "refused" in served || online ? served : refused(STREAM_CLOSE.unreachable, "offline");
@@ -345,6 +352,7 @@ export async function desktopStatus(
     canControl: controlRefusal === null,
     controlRefusal,
     held,
+    browserOnDesktop: "machineId" in desktop && onDesk,
   };
 }
 

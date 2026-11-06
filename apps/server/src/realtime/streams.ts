@@ -12,7 +12,8 @@ import { personUpgrade, UUID } from "./ws";
  *
  * - `GET /api/desktop?orgId&agentId&mode=watch|control` (raw RFB, binary; an
  *   older app's `keyboard` is ignored; `switch=1`: its mode may change in place,
- *   ADR 0058 §17) and
+ *   ADR 0058 §17; `preview=1`: a browser card's view, watch only, never
+ *   switched, ADR 0058 §7) and
  *   `GET /api/terminal?orgId&agentId&cols&rows` (the shell's bytes; text
  *   frames: `resize` out, `exit` in) are a person's sockets, refused before
  *   the upgrade like `/api/ws` (401 without a session, 403 for a foreign
@@ -140,7 +141,10 @@ export function createStreamSockets(deps: { db: Database; auth: Auth; config: Co
       if (!UUID.test(agentId) || !request) {
         return new Response("agentId and a mode (or a terminal's cols and rows) are required", { status: 400 });
       }
-      const switches = request.kind === "desktop" && q.get("switch") === "1";
+      // A browser card's view of the screen (ADR 0058 §7) only watches, so it never takes a mode change either.
+      const preview = request.kind === "desktop" && q.get("preview") === "1";
+      if (preview && request.mode !== "watch") return new Response("A preview only watches", { status: 400 });
+      const switches = !preview && request.kind === "desktop" && q.get("switch") === "1";
       const data: ViewerSocketData = {
         kind: "stream.viewer",
         input: {
@@ -150,6 +154,7 @@ export function createStreamSockets(deps: { db: Database; auth: Auth; config: Co
           request,
           sessionToken: user.sessionToken,
           ...(switches ? { switches } : {}),
+          ...(preview ? { preview } : {}),
         },
         stream: null,
         sessionValidatedAt: 0,

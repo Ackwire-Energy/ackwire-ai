@@ -71,7 +71,7 @@
   },
   "account": {
     "deleteFailed": "Impossible de supprimer votre compte pour le moment. Réessayez.",
-    "deleted": "Votre compte a été supprimé.",
+    "deleted": "Votre compte disparaît définitivement le {{date}}. Connectez-vous avant pour le restaurer.",
     "signedOut": "Vous êtes déconnecté."
   },
   "theme": {

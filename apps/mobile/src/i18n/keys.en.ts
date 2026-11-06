@@ -76,7 +76,7 @@ export const mobileEn = {
   },
   account: {
     deleteFailed: "Couldn't delete your account right now. Try again.",
-    deleted: "Your account was deleted.",
+    deleted: "Your account goes for good on {{date}}. Sign in before then to restore it.",
     signedOut: "You signed out.",
   },
   theme: {

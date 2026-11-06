@@ -133,6 +133,12 @@ describe("brain settings", () => {
       ["codex", false, "runner_old"],
     ]);
     expect(reasons(mac({ protocol: BRAIN_PROTOCOL }))[1]).toEqual(["claude_code", true, null]);
+    // Its runner hasn't looked yet: nobody knows what's there, and it says that, never "not installed".
+    const looking = reasons(mac({ executors: {} })).slice(1, 3);
+    expect(looking).toEqual([
+      ["claude_code", true, null],
+      ["codex", false, "not_reported"],
+    ]);
     const oldCodex = mac({ executors: { codex: { version: "codex-cli 0.100.0" }, detectedAt: "x" } });
     expect(reasons(oldCodex).slice(1, 3)).toEqual([
       ["claude_code", false, "not_installed"],

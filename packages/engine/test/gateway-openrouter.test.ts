@@ -180,6 +180,7 @@ test("a model OpenRouter stopped listing fails with a clear message; with no lis
   setOpenRouterModels({}, 0);
   const unread = await ask(f, agent.id).catch((e: unknown) => e);
   expect(unread).toBeInstanceOf(ProviderError);
+  expect(unread).toMatchObject({ provider: "OpenRouter", message: "could not reach provider" });
   expect(unread).toMatchObject({ retryable: true });
   expect(f.provider.calls).toHaveLength(0);
   expect(await f.db.select().from(schema.usageRecords)).toHaveLength(0);

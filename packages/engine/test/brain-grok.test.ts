@@ -121,7 +121,11 @@ test("Quem pensa: Grok where its runner and CLI are, its models as the CLI liste
   const option = (m: unknown) => brainOptions(m as never).find((o) => o.kind === "grok");
   expect(option(machine())).toMatchObject({ available: true, defaultModel: null, models: [{ value: "grok-4.6" }] });
   expect(option(machine({ protocol: GROK_PROTOCOL - 1 }))).toMatchObject({ available: false, reason: "runner_old" });
-  expect(option(machine({ executors: {} }))).toMatchObject({ available: false, reason: "not_installed" });
+  expect(option(machine({ executors: { detectedAt: "x" } }))).toMatchObject({
+    available: false,
+    reason: "not_installed",
+  });
+  expect(option(machine({ executors: {} }))).toMatchObject({ available: false, reason: "not_reported" });
   expect(grokModels([]).map((m) => m.value)).toEqual(GROK_BUILD_MODELS.map((m) => m.id));
   expect(defaultBrainModel("grok")).toBeNull();
   expect(isBrainKind("grok") && isComputerBrain("grok")).toBe(true);

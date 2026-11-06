@@ -41,6 +41,7 @@ import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { LookRows, ModelSelect, modelOptions } from "@/components/AgentFields";
+import { PlanHold, usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi } from "@/components/ConnectAi";
 import { PrefRow } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
@@ -185,6 +186,8 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
+  const hold = usePlanHold();
+  const connect = useConnectAi();
   // The workspace's AI (ADR 0137 §11): what every DM thinks with while its person has no plan of their own.
   const kind = planKind(agent.brain?.kind);
   const view = useAgentBrain(org.id, agent.id, true, false, "workspace").data;
@@ -225,6 +228,14 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const opened = view ? !view.onlyOwner : false;
   return (
     <>
+      {hold && (
+        <Card className="ai-panel">
+          <PlanHold
+            hold={hold}
+            onKey={connect ? () => connect.open({ agentId: agent.id, intent: "api_key" }) : undefined}
+          />
+        </Card>
+      )}
       <Card>
         <div className="settings-rows">
           <PrefRow
@@ -296,7 +307,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
               )
             }
           />
-          {!kind && (
+          {!kind && !hold && (
             <PrefRow
               id="rh-plan"
               icon="plug"

@@ -144,7 +144,7 @@ test("proposals an agent made for a teammate name it and say what they change: i
       agentIds: [ada.id],
       change: "Responder em português.",
       roles: [{ agentId: ada.id, role: "Revisora" }],
-      access: [{ agentId: ada.id, lines: [{ id: "issues:write", label: "Issues", on: true }] }],
+      access: [{ agentId: ada.id, lines: [{ id: "calendar:write", label: "Propose events", on: true }] }],
       rationale: "",
       requesterId: me?.id ?? "",
     },
@@ -169,7 +169,7 @@ test("proposals an agent made for a teammate name it and say what they change: i
   });
   expect(of("agent_access")).toMatchObject({
     title: "Change Ada's access",
-    access: [{ id: "issues:write", label: "Issues", on: true }],
+    access: [{ id: "calendar:write", label: "Propose events", on: true }],
     before: "",
     decider: { type: "admins" },
   });

@@ -29,10 +29,10 @@ import { computerEdition } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
+import { uncheckedKeyLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   keyLooksValid,
-  PROVIDERS,
   type ProviderId,
   providerGuess,
   providerLabel,
@@ -48,6 +48,7 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EmptyState,
   Field,
   Icon,
   InfoHint,
@@ -57,7 +58,6 @@ import {
   Meter,
   PageHeader,
   ProviderLogo,
-  Select,
   Switch,
   Textarea,
 } from "@agenteschat/ui";
@@ -72,6 +72,7 @@ import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { WhoPicksSection } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
@@ -88,7 +89,7 @@ import { useOrg } from "@/components/org-context";
 import { UsageTabs } from "@/components/PeopleUsage";
 import { PlanUsageCards } from "@/components/PlanUsage";
 import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
-import { KeyMismatch, KeyRefused, KeySite } from "@/components/ProviderKey";
+import { KeyMismatch, KeyRefused, KeySite, ProviderKeySelect } from "@/components/ProviderKey";
 import { RightHandSettingsSection } from "@/components/RightHandSettings";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
@@ -98,6 +99,7 @@ import { VaultSection } from "@/components/vault/VaultSection";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
 import { workspaceUsesApi } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -723,8 +725,10 @@ function KeysSection() {
     | { type: "remove"; cred: Credential }
     | { type: "models"; cred: Credential }
   >(null);
+  const look = useRightHandLook();
   if (!allowed) return null;
   const live = (credentials.data ?? []).filter((c) => !c.revokedAt);
+  const noKeys = credentials.isSuccess && live.length === 0;
   return (
     <Card aria-labelledby="sec-keys">
       <CardHeader
@@ -733,14 +737,29 @@ function KeysSection() {
         title={t("settings.keysTitle")}
         hint={{ name: t("common.about", { label: t("settings.keysTitle") }), text: t("settings.keysSubtitle") }}
         action={
-          <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
-            {t("settings.addKey")}
-          </Button>
+          !noKeys && (
+            <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
+              {t("settings.addKey")}
+            </Button>
+          )
         }
       />
       {platform.data && <p className="small muted">{t("settings.platformAvailable")}</p>}
       {credentials.isLoading && <LoadingList count={2} avatar={false} trailing />}
-      {credentials.isSuccess && live.length === 0 && <p className="small muted">{t("settings.noKeys")}</p>}
+      {noKeys && (
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t("settings.noKeysTitle")}
+          actions={
+            <Button variant="primary" icon="plus" onClick={() => setDialog({ type: "add" })}>
+              {t("settings.addKey")}
+            </Button>
+          }
+        >
+          {t("settings.noKeys")}
+        </EmptyState>
+      )}
       {live.length > 0 && (
         <List>
           {live.map((c) => {
@@ -870,14 +889,14 @@ export function KeyDialog({
   const toast = useToast();
   const add = useAddCredential(org.id, true);
   const rotate = useRotateCredential(org.id, true);
+  const held = usePlanHold() !== null;
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const failed = (e: unknown) => {
     setRefused(keyRefusal(t, e));
     if (!keyRefusal(t, e)) toast.show(errorText(t, e), "error");
   };
   const unchecked = (saved: Credential) => {
-    if (saved.check === "unchecked")
-      toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(saved.provider) }), "info");
+    if (saved.check === "unchecked") toast.show(uncheckedKeyLine(t, providerLabel(saved.provider), held), "info");
   };
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -906,31 +925,13 @@ export function KeyDialog({
   const pending = add.isPending || rotate.isPending;
   const providerSelect = (
     <Field label={t("settings.provider")} id="key-provider">
-      <Select
+      <ProviderKeySelect
         value={custom ? CUSTOM_PROVIDER : provider}
-        onValueChange={(v) => {
+        disabled={pending}
+        onChange={(v) => {
           setCustom(v === CUSTOM_PROVIDER);
-          if (v !== CUSTOM_PROVIDER) setProvider(v as ProviderId);
+          if (v !== CUSTOM_PROVIDER) setProvider(v);
         }}
-        options={[
-          ...PROVIDERS.map((p) => ({
-            value: p.id as string,
-            label: p.label,
-            leading: <ProviderLogo id={p.id} size="xs" />,
-          })),
-          {
-            value: CUSTOM_PROVIDER,
-            label: t("endpoint.option"),
-            description: t("endpoint.optionSub"),
-            leading: <ProviderLogo id={CUSTOM_PROVIDER} size="xs" />,
-          },
-        ]}
-        renderValue={(o) => (
-          <span className="row">
-            {o.leading}
-            {o.label}
-          </span>
-        )}
       />
     </Field>
   );
@@ -1044,7 +1045,9 @@ export function KeyDialog({
             </DialogBody>
           </Locked>
           <DialogFooter>
-            <Button onClick={onClose}>{t("common.cancel")}</Button>
+            <Button onClick={onClose} disabled={pending}>
+              {t("common.cancel")}
+            </Button>
             <Button type="submit" variant="primary" loading={pending}>
               {mode === "rotate" ? t("settings.rotate") : t("settings.saveKey")}
             </Button>

@@ -9,6 +9,7 @@ import {
   screenPageStays,
   screenPageUrl,
   sessionCookieScript,
+  typedSince,
 } from "../../src/features/computer/screen-page";
 import {
   atDesktopEdge,
@@ -23,6 +24,7 @@ import {
   dragView,
   fitScale,
   followCursor,
+  keepView,
   lookAt,
   MAX_SCALE,
   TAP_DRAG_MS,
@@ -42,6 +44,13 @@ describe("the page behind the agent's screen", () => {
     expect(screenPageStays(SERVER, "https://app.example.evil.example/screen.html")).toBe(false);
     expect(screenPageStays(SERVER, "https://app.example@evil.example/screen.html")).toBe(false);
     expect(screenPageStays(SERVER, "not a url")).toBe(false);
+  });
+
+  test("a browser card's page only watches, and is still the server's own page (ADR 0058 §7)", () => {
+    const url = screenPageUrl(SERVER, "org", "ada", { preview: true });
+    expect(url).toBe("https://app.example/screen.html?o=org&a=ada&p=1");
+    expect(screenPageStays(SERVER, url)).toBe(true);
+    expect(screenPageUrl(SERVER, "org", "ada", { preview: false })).toBe(screenPageUrl(SERVER, "org", "ada"));
   });
 
   test("a message counts only from the server's page, and only as what it can say", () => {
@@ -233,6 +242,25 @@ describe("the camera over the agent's screen", () => {
     expect(dragView({ x: 0, y: 0 }, s, { x: 0, y: 30 }, wide, desk).left).toBeCloseTo(-30);
   });
 
+  test("the keyboard coming keeps the zoom the person had, and the cursor in sight", () => {
+    const tall = { width: 336, height: 520 };
+    const short = { width: 336, height: 220 };
+    const camera = { x: 400, y: 300 };
+    // Near the bottom of the tall view: the shorter one moves down just enough to keep it inside its margin.
+    const cursor = { x: 500, y: 300 + 480 / 1.6 };
+    const kept = keepView(camera, 1.6, cursor, short, desk);
+    expect(kept.s).toBe(1.6);
+    expect(kept.camera.x).toBe(400);
+    const py = (cursor.y - kept.camera.y) * kept.s;
+    expect(py).toBeCloseTo(220 - 220 * 0.2);
+    // Already in sight, nothing moves; going back to the tall box keeps the zoom too.
+    expect(keepView(camera, 1.6, { x: 500, y: 340 }, short, desk)).toEqual({ s: 1.6, camera });
+    expect(keepView(kept.camera, 1.6, cursor, tall, desk).s).toBe(1.6);
+    // Never smaller than the whole screen, nor past what stays sharp.
+    expect(keepView(camera, 0.01, cursor, short, desk).s).toBeCloseTo(fitScale(short, desk));
+    expect(keepView(camera, 99, cursor, short, desk).s).toBe(MAX_SCALE);
+  });
+
   test("the cursor knows when it has reached the desktop's edge", () => {
     expect(atDesktopEdge({ x: 0, y: 300 }, desk)).toBe(true);
     expect(atDesktopEdge({ x: 1280, y: 300 }, desk)).toBe(true);
@@ -350,5 +378,24 @@ describe("pressing and dragging with one finger", () => {
   test("a press whose lift never came is let go by the next touch", () => {
     const held = dragStep(dragStep(DRAG_REST, "touch", 0).drag, "hold", 320).drag;
     expect(dragStep(held, "touch", 2000).act).toBe("release");
+  });
+});
+
+describe("typing straight onto the screen", () => {
+  test("what came is typed, what went is Backspaces", () => {
+    expect(typedSince("", "a")).toEqual({ back: 0, typed: "a" });
+    expect(typedSince("ab", "abc")).toEqual({ back: 0, typed: "c" });
+    expect(typedSince("abc", "ab")).toEqual({ back: 1, typed: "" });
+    expect(typedSince("ab", "ab")).toEqual({ back: 0, typed: "" });
+    // A swiped word or a pasted text comes whole.
+    expect(typedSince("oi ", "oi tudo bem")).toEqual({ back: 0, typed: "tudo bem" });
+  });
+
+  test("an emoji is one character, and a change in the middle leaves the same text there", () => {
+    expect(typedSince("ok 👍", "ok ")).toEqual({ back: 1, typed: "" });
+    expect(typedSince("ok", "ok 👍")).toEqual({ back: 0, typed: " 👍" });
+    // The caret went back to "he" and typed "x": the screen's "hello" becomes "hexllo" too.
+    const { back, typed } = typedSince("hello", "hexllo");
+    expect("hello".slice(0, 5 - back) + typed).toBe("hexllo");
   });
 });

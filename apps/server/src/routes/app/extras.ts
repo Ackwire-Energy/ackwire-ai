@@ -16,7 +16,6 @@ import type {
   Talker,
   VoiceDeps,
 } from "@agenteschat/engine";
-import type { AppleTokenRevoker } from "../../auth";
 
 /**
  * Backend services the app API needs beyond the core deps (owned by the
@@ -41,8 +40,6 @@ export interface AppExtras {
   sandbox?: SandboxDeps | null;
   /** The git proxy for agents' computers (ADR 0024); absent = off. */
   gitProxy?: GitProxyDeps;
-  /** Revokes Apple tokens when an account is deleted (ADR 0035); absent/null = Apple sign-in off. */
-  appleRevoke?: AppleTokenRevoker | null;
   /** Outbound HTTP to GitHub for the desktop app's releases (ADR 0036; tests inject a fake GitHub). */
   desktopFetch?: typeof fetch;
   /** The agent browser's live view (ADR 0040): handoff changes switch its stream; absent = handoffs only. */

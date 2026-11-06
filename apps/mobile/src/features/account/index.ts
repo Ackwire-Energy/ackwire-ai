@@ -21,7 +21,7 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Deletes the account (App Store 5.1.1(v)), with the proof that it's them: the code emailed to them, or their
+ * Deletes the account in 7 days (App Store 5.1.1(v), ADR 0088 §10), with the proof that it's them: the code emailed to them, or their
  * password on a server that sends no email (`reason: "proof"` when refused). Refused while the person is the only
  * owner of an organization with other members (`sole_owner`). On success the phone is signed out.
  */

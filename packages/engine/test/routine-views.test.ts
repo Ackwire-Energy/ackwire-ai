@@ -232,6 +232,19 @@ describe("routine views", () => {
     const outside = await getRoutineView(f.db, bia.id, f.org.id, routine.id);
     expect(outside.recentRuns[5]).toMatchObject({ status: "waiting", approvalId: null, summary: "" });
 
+    // A provider's failure says its cause to who reads the records, and only the outcome to anyone else.
+    const noCredit = await agentRun("failed", { error: "provider_error: no_credit@OpenRouter: Insufficient credits" });
+    await routineRun(routine.id, 0.1, { status: "failed", code: "provider_error", agentRunId: noCredit.id });
+    const read = await getRoutineView(f.db, f.owner.id, f.org.id, routine.id);
+    expect(read.recentRuns[0]).toMatchObject({
+      code: "provider_no_credit",
+      codeParams: { provider: "OpenRouter", detail: "Insufficient credits" },
+    });
+    const notRead = await getRoutineView(f.db, bia.id, f.org.id, routine.id);
+    expect(notRead.recentRuns[0]?.code).toBe("provider_error");
+    expect(notRead.recentRuns[0]?.codeParams).toBeUndefined();
+    await f.db.delete(schema.routineRuns).where(eq(schema.routineRuns.agentRunId, noCredit.id));
+
     // Its agent run answered: no longer waiting; a failure streak shows as failing.
     await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, away.id));
     await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, asking.id));

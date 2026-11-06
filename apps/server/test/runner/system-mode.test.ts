@@ -3,7 +3,8 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { MACHINE_OPS, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
+import { MACHINE_OPS, type MachineRequest, type RunnerAccess } from "@agenteschat/adapters/machine-protocol";
+import type { BrowserViews } from "../../runner/browser-views";
 import {
   configPath,
   DEFAULT_AGENT_UID_RANGE,
@@ -418,8 +419,8 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
   } as unknown as MachineRequest;
   expect(await errorCode(() => handleRequest(ctx, stream, scope))).toBe("bad_request");
   // Every op has its place. The root process keeps a secret's key and sealed box until the server commits its
-  // delivery, the computer's accounts and access settings, and the desktops and streams: a stream's data socket
-  // needs the machine token, which no worker holds.
+  // delivery, the computer's accounts and access settings, the desktops and streams, and the browsers' live views:
+  // a stream's or a view's data socket needs the machine token, which no worker holds.
   expect(Object.keys(OP_ROUTES).sort()).toEqual([...MACHINE_OPS].sort());
   expect(MACHINE_OPS.filter((op) => OP_ROUTES[op] === "machine")).toEqual([
     "secret",
@@ -432,6 +433,8 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
     "desktop.session.stop",
     "desktop.session.status",
     "stream.open",
+    // The live view's data socket needs the machine token, which only root holds (ADR 0040 §7.1).
+    "browser.view.open",
   ]);
 
   if (posix) {
@@ -439,6 +442,48 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
     expect(await errorCode(() => handleRequest(ctx, exec, scope))).toBe("ok");
     expect(existsSync(marker)).toBe(true);
   }
+});
+
+test("system mode: root opens a live view itself, keyed by the agent or the profile in lower case", async () => {
+  const opened: { key: string; streamId: string }[] = [];
+  const views = {
+    open: async (key: string, streamId: string) => {
+      opened.push({ key, streamId });
+      return { opened: true as const };
+    },
+  } as unknown as BrowserViews;
+  let tools: RunnerAccess["tools"] = { claude: false, codex: false, commands: true, browser: true };
+  const ctxWith = (browserViews?: BrowserViews): HandlerContext => ({
+    workspaceReal: home(),
+    exec: true,
+    token: "t",
+    systemMode: () => true,
+    access: () => ({ folders: [], tools }),
+    ...(browserViews ? { browserViews } : {}),
+  });
+  const ctx = ctxWith(views);
+  const scope = { signal: new AbortController().signal, output: () => {} };
+  const agent = { id: "a1b2c3d4-0000-4000-8000-000000000001", handle: "ana" };
+  const streamId = "v".repeat(43);
+  const view = (over: Record<string, unknown> = {}) =>
+    ({ op: "browser.view.open", streamId, agent, ...over }) as unknown as MachineRequest;
+  // No worker serves it: root dials the data socket itself, with the machine token only it holds.
+  expect(await handleRequest(ctx, view(), scope)).toEqual({ opened: true });
+  const profile = "C0FFEE00-0000-4000-8000-00000000ABCD";
+  expect(await handleRequest(ctx, view({ profile: { id: profile } }), scope)).toEqual({ opened: true });
+  expect(opened).toEqual([
+    { key: agent.id, streamId },
+    { key: `profile:${profile.toLowerCase()}`, streamId },
+  ]);
+  // A profile id that isn't one, a stream id that isn't one, no agent: nothing is dialed.
+  expect(await errorCode(() => handleRequest(ctx, view({ profile: { id: "../nope" } }), scope))).toBe("bad_request");
+  expect(await errorCode(() => handleRequest(ctx, view({ streamId: "short" }), scope))).toBe("bad_request");
+  expect(await errorCode(() => handleRequest(ctx, view({ agent: undefined }), scope))).toBe("bad_request");
+  // A runner without live views, and the browser switched off on this computer.
+  expect(await errorCode(() => handleRequest(ctxWith(), view(), scope))).toBe("browser_unavailable");
+  tools = { ...tools, browser: false };
+  expect(await errorCode(() => handleRequest(ctx, view(), scope))).toBe("not_allowed");
+  expect(opened).toHaveLength(2);
 });
 
 const runScript = (...args: string[]) =>

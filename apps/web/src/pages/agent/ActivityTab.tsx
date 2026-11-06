@@ -17,6 +17,7 @@ import {
   Button,
   Card,
   Chip,
+  EmptyState,
   Icon,
   Meter,
   type MonthDay,
@@ -30,10 +31,12 @@ import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usd } from "@/components/AgentFields";
-import { LoadingList } from "@/components/Loading";
+import { AskAgentButton } from "@/components/AskAgentButton";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { groupByDay, isRoutineRun, type RunFilter, runMatches } from "@/lib/agent-edit";
+import { lookOf } from "@/lib/look";
 import { usageShown } from "@/lib/plan-usage";
 import { useAgentEdit } from "./context";
 import { RunChip, runWhere } from "./pieces";
@@ -271,17 +274,34 @@ export function ActivityTab() {
         </Toolbar>
         {runs.isLoading ? (
           <LoadingList count={4} />
+        ) : runs.isError && !runs.data ? (
+          <ErrorState error={runs.error} onRetry={() => void runs.refetch()} />
+        ) : list.length === 0 ? (
+          <EmptyState
+            size="panel"
+            agent={lookOf(agent) ?? true}
+            title={t("agentPage.activity.emptyTitle")}
+            actions={<AskAgentButton agent={agent} variant="primary" />}
+          >
+            {t("agentPage.activity.emptyText", g)}
+          </EmptyState>
         ) : visible.length === 0 ? (
-          <div className="agp-empty">
-            <b>
-              {q.trim()
-                ? t("agent.runsEmpty", { q })
-                : list.length === 0
-                  ? t("agent.runsNone")
-                  : t("agentPage.activity.noneFilter")}
-            </b>
-            {(q.trim() || filter !== "all") && <span className="small muted">{t("agentPage.activity.clear")}</span>}
-          </div>
+          <EmptyState
+            size="inline"
+            actions={
+              <Button
+                size="sm"
+                onClick={() => {
+                  setQ("");
+                  setFilter("all");
+                }}
+              >
+                {t("filters.clearAll")}
+              </Button>
+            }
+          >
+            {q.trim() ? t("agent.runsEmpty", { q }) : t("agentPage.activity.noneFilter")}
+          </EmptyState>
         ) : (
           <div className="agp-runs">
             {days.map((d) => (

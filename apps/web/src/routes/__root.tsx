@@ -1,3 +1,4 @@
+import { useMe } from "@agenteschat/client";
 import { Button, EmptyState } from "@agenteschat/ui";
 import { createRootRouteWithContext, Link, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -6,6 +7,7 @@ import type { RouterContext } from "@/app/router-context";
 import { ContextMenuHost } from "@/components/DesktopMenus";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
 import { ErrorScreen } from "@/components/ErrorScreen";
+import { AccountDeletingScreen } from "@/components/Standing";
 import { askForPhone, asksForPhone, inDesktopApp, pageReadyAfterPaint, routeNewWindowLinks } from "@/lib/desktop";
 import { dispatchPushOpen } from "@/lib/push-open";
 import { listenForPushOpens } from "@/lib/web-push";
@@ -20,6 +22,7 @@ function Root() {
   // agentes for Mac: the workspace has its title bar (org.$orgId.tsx); every other page drags from the top.
   const inWorkspace = useRouterState({ select: (s) => s.location.pathname.startsWith("/org/") });
   const router = useRouter();
+  const deletion = useMe().data?.user.deletion;
   // In the app: once this first screen is on the glass, the app's cover over the window goes.
   useEffect(pageReadyAfterPaint, []);
   // In the app: a link to another site opens in the browser, one to this server in the window (main_window.rs).
@@ -54,7 +57,7 @@ function Root() {
     <>
       {inDesktopApp() && !inWorkspace && <DesktopDragStrip />}
       <ContextMenuHost />
-      <Outlet />
+      {deletion ? <AccountDeletingScreen dueAt={deletion.dueAt} /> : <Outlet />}
     </>
   );
 }

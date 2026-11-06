@@ -5796,6 +5796,16 @@ html:not([data-pointer]) .ac-work__head:focus-visible {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+.ac-workline__question {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
 .ac-workline__action {
   border: 0;
   padding: 0;
@@ -8693,6 +8703,81 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   display: flex;
   justify-content: center;
   margin-bottom: var(--space-4);
+}
+/* With a size: no box, the words centered in the room it has, the agent in its light over them. */
+.ac-empty--page,
+.ac-empty--panel,
+.ac-empty--inline {
+  border: 0;
+}
+.ac-empty--page,
+.ac-empty--panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.ac-empty--page {
+  flex: 1;
+  min-height: clamp(360px, 60vh, 560px);
+  padding: var(--space-8) var(--space-4);
+}
+.ac-empty--panel {
+  padding: var(--space-6) var(--space-4);
+}
+.ac-empty--inline {
+  padding: var(--space-3);
+  font-size: 13px;
+}
+.ac-empty__agent {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(320px, 100%);
+  margin-bottom: var(--space-6);
+}
+.ac-empty__agent .ac-sky-glow {
+  position: absolute;
+  inset: -12px 0;
+}
+.ac-empty__agent .ac-sticker {
+  position: relative;
+}
+.ac-empty--page .ac-empty__title {
+  margin-bottom: var(--space-1);
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 30px;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.ac-empty--page .ac-empty__text,
+.ac-empty--panel .ac-empty__text {
+  max-width: 68ch;
+  font-size: var(--text-md);
+}
+.ac-empty--page .ac-empty__actions {
+  margin-top: var(--space-6);
+}
+/* A phone's page head takes half the screen: the button stays in reach. */
+@media (max-width: 640px) {
+  .ac-empty--page {
+    min-height: 0;
+    padding-block: var(--space-4);
+  }
+  .ac-empty__agent {
+    margin-bottom: var(--space-4);
+  }
+  .ac-empty--page .ac-empty__actions {
+    margin-top: var(--space-4);
+  }
+}
+.ac-empty--inline .ac-empty__title {
+  font-size: 13px;
+  line-height: 20px;
+}
+.ac-empty--inline .ac-empty__actions {
+  margin-top: var(--space-2);
 }
 
 /*

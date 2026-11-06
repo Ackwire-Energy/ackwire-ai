@@ -376,7 +376,7 @@ describe("the wiki", () => {
 
   test("empty wiki: a friendly start with the suggested structure", async () => {
     const { state, router } = await go("wiki", seedState(), false);
-    expect(document.body.textContent).toContain("A wiki está vazia");
+    expect(document.body.textContent).toContain("Guarde o que o time precisa saber");
     expect(screen().getByRole("list", { name: "Estrutura sugerida" }).textContent).toContain("Glossário");
     await click(screen().getByRole("button", { name: "Usar a estrutura sugerida" }));
     await settle(10);

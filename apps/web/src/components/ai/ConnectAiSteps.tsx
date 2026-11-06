@@ -15,10 +15,12 @@ import {
   accountTitle,
   existingAi,
   groupPlans,
+  ownSignInLower,
   planWordOf,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
+import type { BillingHold } from "@agenteschat/client/lib/billing";
 import {
   computerEdition,
   computerName,
@@ -35,11 +37,11 @@ import {
   ALL_AGENTS,
   behindComputer,
   catchUp,
+  dimmedLine,
   type ExistingSignIn,
   freePlanAccount,
   gateDims,
   gateLine,
-  KEY_MARKS,
   kindOf,
   ownSignInFor,
   PLAN_CHOICES,
@@ -47,11 +49,14 @@ import {
   type PlanGate,
   planGate,
   planGateWithoutAgent,
+  planHoldOf,
   planLabel,
   planMark,
   planOfAccount,
+  planPickText,
   planTitle,
   signsInOnce,
+  uncheckedKeyLine,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
@@ -60,7 +65,6 @@ import {
   keyLooksValid,
   keyRuns,
   keyStepHint,
-  PROVIDERS,
   type ProviderId,
   providerLabel,
   providerOf,
@@ -75,14 +79,14 @@ import {
   InfoHint,
   Input,
   Locked,
-  LogoMark,
   OptionCard,
   ProviderLogo,
-  ProviderStack,
+  Segmented,
   Select,
   SettingNote,
   Spinner,
 } from "@agenteschat/ui";
+import { matchesWords } from "@agenteschat/ui/search";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { Fragment, type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
@@ -90,7 +94,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useOrg } from "@/components/org-context";
-import { KeyMismatch, KeyRefused } from "@/components/ProviderKey";
+import { KeyMismatch, KeyRefused, ProviderSelect } from "@/components/ProviderKey";
 import { managedOf, SetupProgress, useSetupWait, useWaitReader } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { planWord } from "@/lib/plan-usage";
@@ -100,8 +104,8 @@ import { PlanReplies } from "./PlanReplies";
 
 /*
  * One picker wherever an AI is connected (the setup's AI step, Connect an AI, Settings › AI accounts): for one agent
- * with no AI what the person already has (`ExistingRows`), then the six plans, by their makers' marks, then one API
- * key row; the chosen option's panel right under it. A plan
+ * with no AI what the person already has (`ExistingRows`), then a plan or an API key, and one select of whose, by
+ * their makers' marks; the chosen option's panel right under it. A plan
  * signs in on the agent's computer (ADR 0059): while the workspace's computer is on its way, its panel waits in
  * place and turns on by itself, with what needs no computer (a maker's page, a key to paste) on meanwhile.
  */
@@ -176,9 +180,10 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
 export type PlanGates = ReturnType<typeof usePlanGates>;
 
 /**
- * The six plans as tiles (one dims where it can't sign in; it still opens its panel), then the API key row, with the
- * chosen option's `panel` right under it: nothing comes between an option and its steps. `have`: what the person
- * already has (`ExistingRows`), before them; with `choice` null one of its rows is chosen, and it gets the panel.
+ * Which one the person pays with, a plan or an API key, then one select of whose (a plan that can't sign in dims, and
+ * still opens its panel), with the chosen option's `panel` right under it: nothing comes between an option and its
+ * steps. `have`: what the person already has (`ExistingRows`), before them; with `choice` null one of its rows is
+ * chosen, and it gets the panel. `keySelect`: the key's makers (its draft is the caller's), when one may be chosen.
  */
 export function AiPicker({
   choice,
@@ -186,37 +191,55 @@ export function AiPicker({
   dims,
   panel,
   have,
+  keySelect,
+  busy = false,
 }: {
   choice: AiChoice | null;
   onPick: (choice: AiChoice) => void;
   dims?: (choice: PlanChoice) => boolean;
   panel: ReactNode;
   have?: (panel: ReactNode) => ReactNode;
+  keySelect?: ReactNode;
+  /** A key is saving: the choice waits for it. */
+  busy?: boolean;
 }) {
   const { t } = useTranslation();
+  // Back from the key, the plan it left.
+  const lastPlan = useRef<PlanChoice>("claude");
+  if (choice && choice !== "key") lastPlan.current = choice;
   return (
-    <>
-      {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-      <div className="grid-options grid-options--plans" role="group" aria-label={t("onboarding.keyStep.title")}>
-        {have?.(choice === null && panel)}
-        {PLAN_CHOICES.map((c) => (
-          <OptionCard key={c} pressed={choice === c} onClick={() => onPick(c)}>
-            <ProviderLogo id={planMark(c)} size="sm" off={dims?.(c)} />
-            <span className="ac-option__title">{planLabel(t, c)}</span>
-          </OptionCard>
-        ))}
-        {choice !== null && choice !== "key" && panel}
-        <p className="ai-picker__or">{t("connectAi.orPayGo")}</p>
-        <OptionCard pressed={choice === "key"} onClick={() => onPick("key")} className="ai-picker__key ac-iconline">
-          <ProviderStack ids={KEY_MARKS} />
-          <span className="ac-option__text">
-            <span className="ac-option__title">{t("connectAi.key.title")}</span>
-            <span className="ac-option__desc">{t("connectAi.key.makers")}</span>
-          </span>
-        </OptionCard>
-      </div>
-      {choice === "key" && panel}
-    </>
+    // biome-ignore lint/a11y/useSemanticElements: rows and selects, not a native fieldset
+    <div className="ai-picker" role="group" aria-label={t("onboarding.keyStep.title")}>
+      {have?.(choice === null && panel)}
+      <Segmented
+        className="ai-picker__pay"
+        label={t("connectAi.pay.label")}
+        disabled={busy}
+        value={choice === "key" ? "key" : "plan"}
+        onValueChange={(next) => onPick(next === "key" ? "key" : lastPlan.current)}
+        options={[
+          { value: "plan", label: t("connectAi.pay.plan") },
+          { value: "key", label: t("connectAi.pay.key") },
+        ]}
+      />
+      {choice === "key" ? (
+        keySelect
+      ) : (
+        <ProviderSelect<PlanChoice>
+          aria-label={t("connectAi.pick.plan")}
+          placeholder={t("connectAi.pick.placeholder")}
+          value={choice ?? undefined}
+          onValueChange={onPick}
+          matches={(o, q) => matchesWords(planPickText(t, o.value), q)}
+          options={PLAN_CHOICES.map((c) => ({
+            value: c,
+            label: planLabel(t, c),
+            leading: <ProviderLogo id={planMark(c)} size="xs" off={dims?.(c)} />,
+          }))}
+        />
+      )}
+      {choice !== null && panel}
+    </div>
   );
 }
 
@@ -298,6 +321,7 @@ export function ExistingRows({
   const toast = useToast();
   const dir = useDirectory(org.id);
   const models = useModels();
+  const held = usePlanHold() !== null;
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const view = gates.view;
@@ -347,8 +371,7 @@ export function ExistingRows({
   const pickKey = (key: Credential) =>
     save(async () => {
       const { check } = await api.agents.checkCredential(org.id, key.id);
-      if (check === "unchecked")
-        toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(key.provider) }), "info");
+      if (check === "unchecked") toast.show(uncheckedKeyLine(t, providerLabel(key.provider), held), "info");
       const row = dir.agentById.get(agent.id);
       // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
       if (view.scope === "mine" && row) {
@@ -361,6 +384,19 @@ export function ExistingRows({
       return { label: key.label, choice: "key", onlyOwner: false };
     });
   const g = agentGrammar(agent.name);
+  // A row a plan's gate dims is off for a reason the panel under the picker may not be showing: said once, under them.
+  const dimmed = rows.flatMap((r) => {
+    if (r.kind !== "account") return [];
+    const gate = gates.gateOf(planOfAccount(r.choice.login));
+    return gateDims(gate) ? [{ gate, kind: r.choice.login.kind }] : [];
+  })[0];
+  const dimmedWhy =
+    dimmed &&
+    dimmedLine(t, dimmed.gate, {
+      ...dimmed,
+      edition: gates.edition,
+      computer: view.computer?.name ?? computerName(t, org.name, null),
+    });
   const items = rows.map((r) => {
     if (r.kind === "key") {
       const k = r.key;
@@ -422,6 +458,7 @@ export function ExistingRows({
     <>
       <p className="ai-picker__or">{named ? t("connectAi.have.titleFor", g) : t("connectAi.have.title")}</p>
       {items}
+      {dimmedWhy && <SettingNote icon="alert">{dimmedWhy}</SettingNote>}
       {refused && <KeyRefused refusal={refused} />}
       {lends && <p className="ai-picker__or">{t("agentPage.work.brain.accountOthers")}</p>}
       {onManageKeys && rows.some((r) => r.kind === "key") && (
@@ -969,7 +1006,7 @@ function PlanSteps({
     );
   }
   if (ownSaved) {
-    const label = t("connectAi.own.sharedLower");
+    const label = ownSignInLower(t, kind);
     return (
       <>
         <SettingNote icon="check" live>
@@ -1121,7 +1158,9 @@ function PlanSteps({
           {ownable && (
             <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
               <span className="ac-option__text">
-                <span className="ac-option__title">{t("connectAi.own.shared")}</span>
+                <span className="ac-option__title">
+                  {kind === "opencode" ? t("connectAi.own.free") : t("connectAi.own.shared")}
+                </span>
                 {ownPlan && <span className="ac-option__desc">{`${brand} ${ownPlan}`}</span>}
               </span>
             </OptionCard>
@@ -1187,6 +1226,45 @@ function PlanSteps({
   );
 }
 
+/** The billing hold on this workspace that stops its plans (`planHoldOf`). */
+export function usePlanHold() {
+  const { org } = useOrg();
+  return planHoldOf(computerEdition(useComputerSetup(org.id).data), org.standing);
+}
+
+/**
+ * A plan a workspace with no agentes.chat plan in force can't use, in place of its steps: why, the way to that plan for
+ * whoever pays (anyone else reads who can), and an API key for whoever may add one. A hold stops the Model Gateway too,
+ * so the key's panel says it starts with the plan (`KeyPanel`).
+ */
+export function PlanHold({ hold, onKey }: { hold: BillingHold; onKey?: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const billingUrl = useAuthConfig().data?.billingUrl;
+  const canPay = can(org, "manage_billing") && Boolean(billingUrl);
+  const key = can(org, "manage_credentials") ? onKey : undefined;
+  return (
+    <>
+      <SettingNote icon="alert">{t("connectAi.billing")}</SettingNote>
+      {!canPay && <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>}
+      {(canPay || key) && (
+        <span className="ac-acts">
+          {canPay && (
+            <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+              {t(`standing.billing.cta.${hold}`)}
+            </BillingLinkButton>
+          )}
+          {key && (
+            <Button size="sm" onClick={key}>
+              {t("noAi.rightHand.useKey")}
+            </Button>
+          )}
+        </span>
+      )}
+    </>
+  );
+}
+
 /**
  * Why a plan's panel waits or can't sign in there (`PlanGate`), with the way on: the computer's wait, a key now, a
  * computer to connect. Nothing once it's ready.
@@ -1238,34 +1316,25 @@ function GateWait({
     </p>
   );
   const hold = holdText(t, org.standing);
-  const billingUrl = useAuthConfig().data?.billingUrl;
-  const canPay = can(org, "manage_billing") && Boolean(billingUrl);
   // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself as events arrive).
-  const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
+  const why = gateLine(t, {
+    gate,
+    edition,
+    kind,
+    computer,
+    hold,
+    machine: machines.data?.find((m) => m.id === machineId),
+  });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "billing") {
-    // A hold stops the Model Gateway too, so a key is no way out here: only the workspace's plan is.
-    wait = (
-      <>
-        <SettingNote icon="alert">{t("connectAi.billing")}</SettingNote>
-        {canPay ? (
-          <span>
-            <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
-              {t(`standing.billing.cta.${gate.hold}`)}
-            </BillingLinkButton>
-          </span>
-        ) : (
-          <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>
-        )}
-      </>
-    );
+    wait = <PlanHold hold={gate.hold} onKey={onKey} />;
   } else if (gate.state === "preparing") {
     // The computer's wait in one well: how far it is and the time left, or why it waits (not where the rail beside it
     // already says so), then when the step under it turns on, said once (the owner's email line says it for them). A
     // hold decides when anything runs there: it speaks alone. The well's lines start on the panel's text edge, so none
-    // leads with an icon.
-    wait = (hold || preparing) && (
+    // leads with an icon. With no view of it yet the well still says what the disabled step under it waits for.
+    wait = (
       <div className="ai-panel__wait">
         {hold ? (
           <p className="setup-line" role="status">
@@ -1310,7 +1379,7 @@ function GateWait({
         <SettingNote icon={why.rechecks ? "clock" : "alert"} live={why.rechecks}>
           {why.text}
         </SettingNote>
-        {useKey}
+        {!hold && useKey}
       </>
     );
   } else if (gate.state === "missing") {
@@ -1338,27 +1407,26 @@ function GateWait({
   return wait;
 }
 
-/** The API key being added: its maker (or the agentes.chat key, where the server offers one) and the key. */
+/** The API key being added: its maker and the key. */
 export interface KeyDraft {
   /** `custom`: a workspace's own endpoint (ADR 0146), which has a form of its own (`endpoint`). */
-  provider: ProviderId | "platform" | typeof CUSTOM_PROVIDER;
+  provider: ProviderId | typeof CUSTOM_PROVIDER;
   apiKey: string;
 }
 
 /**
- * The API key: who charges for it (a maker's key only: the agentes.chat key isn't paid to a provider; the row just
- * chosen already names the panel), its maker by its mark, where that maker's keys are made, then the key, pasted
- * here. `onSave`: saved right here (the dialog); else the caller saves it with its own button (the setup).
+ * The API key: who charges for it, where its maker's keys are made (the maker comes from the picker's select), then the
+ * key, pasted here. `onSave`: saved right here (the dialog); else the caller saves it with its own button (the setup).
  */
 export function KeyPanel({
   draft,
   onDraft,
-  platform,
   locked,
   saved,
   savedNote,
   refused,
   saving,
+  held,
   onSave,
   endpoint,
 }: {
@@ -1366,8 +1434,6 @@ export function KeyPanel({
   onDraft: (draft: KeyDraft) => void;
   /** The "Outro provedor" form, shown when it is chosen. */
   endpoint?: ReactNode;
-  /** The server has a key of its own to offer. */
-  platform?: boolean;
   /** Only an admin adds an API key. */
   locked?: boolean;
   saved?: boolean;
@@ -1376,19 +1442,21 @@ export function KeyPanel({
   /** The provider refused the key on its test call: nothing was kept. */
   refused?: ReturnType<typeof keyRefusal>;
   saving?: boolean;
+  /** A billing hold stops every model call: the key starts with the plan (`planHoldOf`). */
+  held?: boolean;
   onSave?: () => void;
 }) {
   const { t } = useTranslation();
   const fieldId = useId();
   const [touched, setTouched] = useState(false);
   const { provider, apiKey } = draft;
-  const keyOf = provider === "platform" || provider === CUSTOM_PROVIDER ? null : provider;
+  const keyOf = provider === CUSTOM_PROVIDER ? null : provider;
   const maker = keyOf ? providerOf(keyOf) : undefined;
   const hint = maker && keyStepHint(maker);
   const valid = keyOf === null || keyLooksValid(keyOf, apiKey);
   const wrong = touched && apiKey.trim().length > 0 && !valid;
   const site = maker ? new URL(`https://${maker.site}`) : null;
-  const pick = (next: KeyDraft["provider"]) => onDraft({ provider: next, apiKey });
+  const pick = (next: ProviderId) => onDraft({ provider: next, apiKey });
   return (
     <Card as="section" className="ai-panel" aria-label={t("connectAi.key.title")}>
       {keyOf && (
@@ -1400,101 +1468,70 @@ export function KeyPanel({
         <SettingNote icon="lock">{t("connectAi.keyLocked")}</SettingNote>
       ) : saved ? (
         <SettingNote icon="check" live>
-          {savedNote ?? t("connectAi.key.saved")}
+          {held ? t("connectAi.key.savedHeld") : (savedNote ?? t("connectAi.key.saved"))}
         </SettingNote>
-      ) : (
+      ) : provider === CUSTOM_PROVIDER ? (
         <>
-          <Locked when={Boolean(saving)}>
-            {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-            <div className="grid-options grid-options--plans" role="group" aria-label={t("settings.provider")}>
-              {PROVIDERS.map((p) => (
-                <OptionCard key={p.id} pressed={provider === p.id} onClick={() => pick(p.id)}>
-                  <ProviderLogo id={p.id} size="sm" />
-                  <span className="ac-option__title">{p.label}</span>
-                </OptionCard>
-              ))}
-              {endpoint && (
-                <OptionCard pressed={provider === CUSTOM_PROVIDER} onClick={() => pick(CUSTOM_PROVIDER)}>
-                  <ProviderLogo id={CUSTOM_PROVIDER} size="sm" />
-                  <span className="ac-option__title">{t("endpoint.option")}</span>
-                </OptionCard>
-              )}
-              {platform && (
-                <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")} className="ai-key__ours">
-                  <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
-                    <LogoMark />
-                  </span>
-                  <span className="ac-option__title">{t("connectAi.key.platform")}</span>
-                </OptionCard>
-              )}
-            </div>
-          </Locked>
-          {provider === CUSTOM_PROVIDER ? (
-            <>
-              <p className="small muted" style={{ margin: 0 }}>
-                {t("endpoint.optionSub")}
-              </p>
-              {endpoint}
-            </>
-          ) : keyOf && maker && site ? (
-            <>
-              <Step
-                n={1}
-                side={
-                  <OpenPage href={site.href} primary={!apiKey}>
-                    {t("aiAccounts.add.openKeys", { site: site.host })}
-                  </OpenPage>
-                }
-              >
-                <StepTitle
-                  title={t("connectAi.key.create", { provider: providerLabel(keyOf) })}
-                  hint={hint && t(hint)}
-                />
-              </Step>
-              <Step n={2}>
-                <label htmlFor={fieldId}>
-                  <b>{t("connectAi.key.paste")}</b>
-                </label>
-                <span className="agp-addacct__paste">
-                  <Locked when={Boolean(saving)}>
-                    <Input
-                      id={fieldId}
-                      type="password"
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder={maker.placeholder}
-                      value={apiKey}
-                      invalid={wrong}
-                      onChange={(e) => onDraft({ provider, apiKey: e.target.value })}
-                      onBlur={() => setTouched(true)}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter" || !onSave) return;
-                        e.preventDefault();
-                        setTouched(true);
-                        if (valid) onSave();
-                      }}
-                    />
-                  </Locked>
-                  {onSave && (
-                    <Button variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
-                      {t("settings.saveKey")}
-                    </Button>
-                  )}
-                </span>
-                {wrong && (
-                  <div className="ac-field__error" role="alert">
-                    <KeyMismatch provider={keyOf} apiKey={apiKey} onPick={pick} />
-                  </div>
-                )}
-                {refused && <KeyRefused refusal={refused} />}
-              </Step>
-              <SettingNote icon="agent">{t("connectAi.key.forAll")}</SettingNote>
-            </>
-          ) : (
-            <p className="small muted">{t("onboarding.platformKeyDesc")}</p>
-          )}
+          <p className="small muted" style={{ margin: 0 }}>
+            {t("endpoint.optionSub")}
+          </p>
+          {endpoint}
+          {held && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
         </>
-      )}
+      ) : keyOf && maker && site ? (
+        <>
+          <Step
+            n={1}
+            side={
+              <OpenPage href={site.href} primary={!apiKey}>
+                {t("aiAccounts.add.openKeys", { site: site.host })}
+              </OpenPage>
+            }
+          >
+            <StepTitle title={t("connectAi.key.create", { provider: providerLabel(keyOf) })} hint={hint && t(hint)} />
+          </Step>
+          <Step n={2}>
+            <label htmlFor={fieldId}>
+              <b>{t("connectAi.key.paste")}</b>
+            </label>
+            <span className="agp-addacct__paste">
+              <Locked when={Boolean(saving)}>
+                <Input
+                  id={fieldId}
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={maker.placeholder}
+                  value={apiKey}
+                  invalid={wrong}
+                  onChange={(e) => onDraft({ provider, apiKey: e.target.value })}
+                  onBlur={() => setTouched(true)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" || !onSave) return;
+                    e.preventDefault();
+                    setTouched(true);
+                    if (valid) onSave();
+                  }}
+                />
+              </Locked>
+              {onSave && (
+                <Button variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
+                  {t("settings.saveKey")}
+                </Button>
+              )}
+            </span>
+            {wrong && (
+              <div className="ac-field__error" role="alert">
+                <KeyMismatch provider={keyOf} apiKey={apiKey} onPick={pick} />
+              </div>
+            )}
+            {refused && <KeyRefused refusal={refused} />}
+          </Step>
+          <SettingNote icon={held ? "clock" : "agent"}>
+            {t(held ? "connectAi.key.held" : "connectAi.key.forAll")}
+          </SettingNote>
+        </>
+      ) : null}
     </Card>
   );
 }

@@ -14,6 +14,7 @@ import {
   listsExisting,
   offersSignInAgain,
   ownSignInListed,
+  ownSignInLower,
   ownSignInName,
   ownSignInReady,
   ownSignIns,
@@ -286,6 +287,26 @@ describe("the computers' own sign-ins", () => {
     expect(ownSignIns(undefined)).toEqual([]);
   });
 
+  test("OpenCode's free tier is a choice where its CLI runs, never a sign-in anyone has", () => {
+    const t = ((key: string) => key) as unknown as TFunction;
+    const running = { brains: { opencode: true } as AiComputer["brains"], own: {} };
+    // Nobody signed in: no row in "Seus planos", whatever an older server still sends.
+    expect(ownSignIns({ computers: [computer({ ...running, own: { opencode: {} } })] })).toEqual([]);
+    const agent = { ownSignIn: false, brain: "opencode", account: null, canUsePlans: true } as const;
+    // On a computer nobody connected, for anyone's agent.
+    expect(ownSignInReady(agent, computer({ ...running, mine: false }), "opencode")).toBe(true);
+    // On someone else's computer, no.
+    expect(ownSignInReady(agent, computer({ ...running, mine: false, canAdd: false }), "opencode")).toBe(false);
+    // On a computer the agent's owner connected, for that owner's agents.
+    expect(ownSignInReady({ ownSignIn: true }, computer(running), "opencode")).toBe(true);
+    expect(ownSignInReady(agent, computer(running), "opencode")).toBe(false);
+    // Not where the CLI can't run.
+    expect(ownSignInReady({ ownSignIn: true }, computer({ own: {} }), "opencode")).toBe(false);
+    expect(ownSignInName(t, true, "Mac", "opencode")).toBe("connectAi.own.free");
+    expect(ownSignInName(t, true, "Mac", "claude_code")).toBe("connectAi.own.shared");
+    expect(ownSignInLower(t, "opencode")).toBe("connectAi.own.freeLower");
+  });
+
   test("an agent's account choice offers the computer's own sign-in only where it can think for the agent", () => {
     type View = Parameters<typeof ownSignInListed>[0];
     const theirs: View = { ownSignIn: true, brain: "model", account: null, canUsePlans: true };
@@ -350,7 +371,7 @@ describe("the computer's own sign-in by name", () => {
   test("the viewer's own computer: the account their agents share; someone else's: that computer's", () => {
     expect(ownSignInName(t, true, "MacBook")).toBe("The account your agents share");
     expect(ownSignInName(t, false, "MacBook")).toBe("MacBook's account");
-    const own = { label: null, machineName: "MacBook", mine: true };
+    const own = { label: null, machineName: "MacBook", mine: true, kind: "claude_code" as const };
     expect(accountName(t, own)).toBe("The account your agents share");
     expect(accountName(t, { ...own, mine: false })).toBe("MacBook's account");
     expect(accountName(t, { ...own, label: "Trabalho" })).toBe("Trabalho");

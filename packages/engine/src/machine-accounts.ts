@@ -126,7 +126,7 @@ export interface MachineAccountView {
   email: string | null;
   plan: string | null;
   status: MachineAccountStatus;
-  /** False: the computer's last look at its status said nothing for sure (protocol 49); `status` is the last known. */
+  /** False: the computer's last look at its status said nothing for sure (protocol 50); `status` is the last known. */
   statusKnown: boolean;
   /** Whose it is; null: nobody's (its person was deleted, or the desktop app signed it in where nobody paired). */
   ownerId: string | null;
@@ -145,7 +145,7 @@ export interface MachineAccountView {
   keyHint: string | null;
   /** It thinks for every agent its owner gives it on that computer (protocol 29); else for one. */
   shared: boolean;
-  /** Claude's organization it is signed in to (opaque, protocol 49), for its owner's eyes only; null: not known. */
+  /** Claude's organization it is signed in to (opaque, protocol 50), for its owner's eyes only; null: not known. */
   providerOrgId: string | null;
 }
 
@@ -485,7 +485,7 @@ interface Settled {
 }
 
 /**
- * What a report says of how an account signs in and whether it is signed in (protocol 49). An inconclusive look
+ * What a report says of how an account signs in and whether it is signed in (protocol 50). An inconclusive look
  * (`statusUnknown`) leaves a listed account's status as it was; the method and Claude's organization stay as last
  * known when the report doesn't say them.
  */

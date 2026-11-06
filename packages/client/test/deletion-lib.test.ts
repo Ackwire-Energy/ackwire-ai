@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AccountDeletionPlan } from "../src/api/types";
 import {
+  accountDeletingText,
   accountDeletionLines,
   accountOutOfReach,
   deletableWorkspaces,
@@ -15,6 +16,7 @@ import {
   workspaceNotes,
   workspaceOpens,
 } from "../src/lib/deletion";
+import { heldBack } from "../src/lib/issues";
 
 /** The key and its values, so a test sees which words were picked (the words themselves: packages/i18n). */
 const t = ((key: string, o?: Record<string, unknown>) =>
@@ -122,10 +124,10 @@ describe("what deleting an account does, line by line", () => {
       accountDeletionLines(t, "en", plan(patch), { cloud: true, billing, now }).map((l) => l.kind);
     const leaves = { leaves: [{ id: "w", name: "Team", role: "member" as const }] };
     const closes = { closes: [{ id: "a", name: "Solo" }] };
-    expect(kinds(leaves, true)).toEqual(["leaves", "plan", "messages"]);
-    expect(kinds({ ...closes, ...leaves }, true)).toEqual(["closes", "leaves", "plan", "messages"]);
+    expect(kinds(leaves, true)).toEqual(["when", "leaves", "plan", "messages"]);
+    expect(kinds({ ...closes, ...leaves }, true)).toEqual(["when", "closes", "leaves", "plan", "messages"]);
     expect(kinds({ ...closes, ...leaves }, false)).not.toContain("plan");
-    expect(kinds({}, true)).toEqual(["messages"]);
+    expect(kinds({}, true)).toEqual(["when", "messages"]);
   });
 });
 
@@ -268,4 +270,24 @@ describe("a workspace beside its name in a list", () => {
     expect(workspaceLabel("Sol", "Being deleted")).toBe("Sol (Being deleted)");
     expect(workspaceLabel("Sol", undefined)).toBe("Sol");
   });
+});
+
+test("the waiting screen says when the account goes, and only the wait once that passed", () => {
+  const at = Date.parse("2026-11-05T12:00:00Z");
+  expect(accountDeletingText(t, "en", "2026-11-12T12:00:00Z", at)).toContain("Nov");
+  expect(accountDeletingText(t, "en", "2026-11-01T12:00:00Z", at)).not.toContain("Nov");
+  expect(accountDeletingText(t, "en", null, at)).not.toContain("Nov");
+});
+
+test("a task is held back by a DM or a private channel, never by a public one or with no channel", () => {
+  const channels = [
+    { id: "open", visibility: "public" },
+    { id: "secret", visibility: "private" },
+  ];
+  expect(heldBack({ channelId: null }, channels)).toBe(false);
+  expect(heldBack({ channelId: "open" }, channels)).toBe(false);
+  expect(heldBack({ channelId: "secret" }, channels)).toBe(true);
+  // A DM isn't in the channel list.
+  expect(heldBack({ channelId: "dm" }, channels)).toBe(true);
+  expect(heldBack({ channelId: "dm" }, undefined)).toBe(false);
 });

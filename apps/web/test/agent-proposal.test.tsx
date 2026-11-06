@@ -5,6 +5,7 @@ setupDom();
 
 import type { AgentDraft, AgentInput, AgentProposalCard, MailAccount, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { aiSelect } from "./ai-picker";
 import { ATLAS_ID, createFakeApi, ENG_ID, fakeMailOf, meWithRole, NOW, ORG_ID, seedState } from "./fake-api";
 import { railStep, title, typeIn } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
@@ -435,12 +436,7 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
     const dialogs = screen().getAllByRole("dialog", { name: /Conectar uma IA/ });
     expect(dialogs).toHaveLength(1);
-    const picker = within(dialogs[0] as HTMLElement).getByRole("group", { name: "Qual IA eles vão usar?" });
-    expect(
-      within(picker)
-        .getByRole("button", { name: /^OpenCode Go/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    expect(aiSelect(dialogs[0] as HTMLElement).textContent).toBe("OpenCode Go");
   });
 
   test("on an account of mine it suggests: created on that account, with no plan sign-in to open", async () => {

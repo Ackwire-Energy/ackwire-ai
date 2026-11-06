@@ -302,10 +302,13 @@ export function FilteredResults({
         ))}
         {hits.isSuccess && list.length === 0 ? (
           <EmptyState
-            icon="search"
+            size="inline"
             title={t("mobile.find.nothing", {
               q: text.trim() || chips.map((c) => searchChipLabel(t, i18n.language, c)).join(" "),
             })}
+            {...(onClear && chips.length > 0
+              ? { action: <Button variant="secondary" size="sm" label={t("filters.clearAll")} onPress={onClear} /> }
+              : {})}
           />
         ) : null}
       </View>

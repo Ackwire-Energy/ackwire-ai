@@ -61,6 +61,7 @@ function brokerFor(
     onReady?: StreamBrokerDeps["onReady"];
     onClosed?: StreamBrokerDeps["onClosed"];
     limits?: StreamBrokerDeps["limits"];
+    claim?: StreamBrokerDeps["claim"];
   } = {},
 ) {
   const requests: MachineRequest[] = [];
@@ -90,6 +91,7 @@ function brokerFor(
     onClosed: options.onClosed,
     recheck: options.recheck,
     limits: options.limits,
+    claim: options.claim,
   });
   broker = created;
   return { broker: created, requests, runners };
@@ -199,6 +201,41 @@ describe("the broker", () => {
     broker.accept(silent.socket);
     await until(() => silent.closed !== null, "the hello timeout");
     expect(silent.closed?.code).toBe(STREAM_CLOSE.late);
+  });
+
+  test("a data socket naming no stream of its own goes to whoever claims it: an agent browser's live view", async () => {
+    f = await setup();
+    const machine = await paired();
+    const got: (string | Uint8Array)[] = [];
+    let ended = 0;
+    const claims: { id: string; machineId: string }[] = [];
+    const VIEW = "B".repeat(43);
+    const { broker } = brokerFor(machine, {
+      claim: (id, machineId) => {
+        claims.push({ id, machineId });
+        return id === VIEW ? { data: (d) => void got.push(d), closed: () => void ended++ } : null;
+      },
+    });
+    const dial = async (streamId: string) => {
+      const socket = fakeSocket();
+      const link = broker.accept(socket.socket);
+      await broker.fromRunner(link, JSON.stringify({ type: "stream.hello", token: machine.token, streamId }));
+      return { socket, link };
+    };
+    expect((await dial("A".repeat(43))).socket.closed?.code).toBe(STREAM_CLOSE.notFound);
+    const view = await dial(VIEW);
+    expect(view.socket.closed).toBeNull();
+    expect(view.socket.sent).toEqual(['{"type":"stream.ready"}']);
+    expect(claims.at(-1)).toEqual({ id: VIEW, machineId: machine.machineId });
+    await broker.fromRunner(view.link, new Uint8Array([1, 2, 3]));
+    expect(got).toEqual([new Uint8Array([1, 2, 3])]);
+    broker.runnerClosed(view.link, STREAM_CLOSE.normal);
+    expect(ended).toBe(1);
+    // The server stopping closes a claimed socket and tells whoever claimed it.
+    const again = await dial(VIEW);
+    broker.stop();
+    expect(again.socket.closed?.code).toBe(STREAM_CLOSE.restarting);
+    expect(ended).toBe(2);
   });
 
   test("onReady: once per stream, once its data socket is ready; never for one that got none", async () => {
@@ -441,6 +478,88 @@ describe("the broker", () => {
     broker.stop();
     expect(watchers.map((w) => w.viewer.closed?.code)).toEqual([1001, 1001, 1001]);
     expect(broker.count(f.agent.id, "desktop")).toBe(0);
+  });
+});
+
+describe("a browser card's view of the screen (ADR 0058 §7)", () => {
+  test("never starts the desktop, holds 3 of its 4 places, yields to a full viewer and never changes mode", async () => {
+    f = await setup();
+    const machine = await paired();
+    let off = true;
+    let refuseOnce = false;
+    const { broker, requests } = brokerFor(machine, {
+      authorize: async (input) => ({
+        machineId: machine.machineId,
+        agent: { id: input.agentId, handle: "dev" },
+        switches: true,
+      }),
+      reply: async (request) => {
+        if (request.op !== "stream.open") throw new Error(`unexpected ${request.op}`);
+        if (off && request.start !== true) {
+          throw new MachineRequestError("desktop_off", "The agent's desktop isn't running");
+        }
+        // The computer still counts the card's view that just yielded, until its data socket has closed.
+        if (refuseOnce) {
+          refuseOnce = false;
+          throw new MachineRequestError("too_many_streams", "Too many");
+        }
+        const link = broker.accept(fakeSocket().socket);
+        const hello = { type: "stream.hello", token: machine.token, streamId: request.streamId };
+        await broker.fromRunner(link, JSON.stringify(hello));
+        return { opened: true };
+      },
+    });
+    const preview = (userId = f.owner.id): StreamInput => ({
+      ...input(WATCH, f.agent.id, userId),
+      preview: true,
+      switches: true,
+    });
+    const open = async (what: StreamInput) => {
+      const viewer = fakeSocket();
+      const stream = broker.open(viewer.socket, what);
+      await until(() => stream.runner !== null || viewer.closed !== null, "the stream");
+      return { viewer, stream };
+    };
+
+    // A desktop that isn't running stays so: refused, with no start and no start after it.
+    const stopped = await open(preview());
+    expect(stopped.viewer.closed).toEqual({ code: STREAM_CLOSE.refused, reason: "desktop_off" });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ op: "stream.open", kind: "desktop", mode: "watch" });
+    expect(requests[0]).not.toHaveProperty("start");
+
+    off = false;
+    const cards = [await open(preview()), await open(preview("bia")), await open(preview("caio"))];
+    expect(cards.every((c) => c.viewer.closed === null && c.stream.runner !== null)).toBe(true);
+    for (const r of requests.slice(1)) expect(r).not.toHaveProperty("start");
+    // A fourth card would take the last place, which stays for whoever opens the screen itself.
+    expect((await open(preview("dani"))).viewer.closed).toEqual({
+      code: STREAM_CLOSE.tooMany,
+      reason: "too_many_streams",
+    });
+
+    // Never turned to control: no `{"type":"mode"}` frame, nothing switched.
+    broker.switchWhere(() => true, "control");
+    for (const c of cards) {
+      expect(broker.switches(c.stream)).toBe(false);
+      expect(c.stream.request).toEqual(WATCH);
+      expect(c.viewer.sent).toEqual([]);
+    }
+
+    // A person opening the screen itself takes the last place, then the oldest card's.
+    const first = await open(input(WATCH));
+    expect(first.viewer.closed).toBeNull();
+    refuseOnce = true;
+    const before = requests.length;
+    const second = await open(input(WATCH, f.agent.id, "bia"));
+    expect(second.viewer.closed).toBeNull();
+    expect(second.stream.runner).not.toBeNull();
+    expect(cards[0]?.viewer.closed).toEqual({ code: STREAM_CLOSE.tooMany, reason: "preview_yield" });
+    expect(cards.slice(1).every((c) => c.viewer.closed === null)).toBe(true);
+    // Asked again once, after the computer's own count let go of the card's view.
+    expect(requests.slice(before).map((r) => r.op)).toEqual(["stream.open", "stream.open"]);
+    expect(requests.at(-1)).toMatchObject({ start: true });
+    expect(broker.count(f.agent.id, "desktop")).toBe(4);
   });
 });
 

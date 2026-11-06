@@ -8,6 +8,7 @@ import {
   useUsageReport,
 } from "@agenteschat/client";
 import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatShortDate, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { accountShares, noWindowsText, planMeterText, splitUsage } from "@agenteschat/client/lib/plan-usage";
@@ -21,7 +22,9 @@ import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, Icon, Segmented, Text, useTheme, useToast } from "@/ui";
+import { PlanHoldNote, usePlanHold } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Loaded, PushedHeader } from "../shared/parts";
@@ -43,6 +46,7 @@ export function UsageScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const usage = usePlanUsage(orgId);
+  const hold = usePlanHold(orgId, org);
   const allowed = can(org, "view_usage");
   const report = useUsageReport(orgId, allowed);
   // Calls, not money: every member sees them (ADR 0107 §7).
@@ -88,17 +92,23 @@ export function UsageScreen() {
                   title={t("usageViews.accounts.title")}
                   footer={data.accounts.length > 0 ? t("usageViews.estimate") : undefined}
                 >
-                  {data.accounts.length === 0 ? (
-                    <Text variant="small" tone="muted">
-                      {t("usageViews.accounts.empty")}
-                    </Text>
+                  {data.accounts.length === 0 && hold ? (
+                    <PlanHoldNote org={org} />
+                  ) : data.accounts.length === 0 ? (
+                    <FirstUse
+                      place="ai"
+                      size="inline"
+                      acts
+                      label={t("aiAccounts.page.connect")}
+                      onPress={() => router.push("/ai-accounts")}
+                    />
                   ) : (
                     [...machines].map(([machineId, list]) => (
                       <View key={machineId} style={styles.machine}>
                         <View style={styles.machineName}>
                           <Icon name="laptop" size={12} color={c.faint} />
                           <Text variant="caption" tone="faint" style={[styles.caps, styles.shrink]}>
-                            {list[0]?.machineName.toLocaleUpperCase()}
+                            {computerNameOf(t, org?.name ?? "", list[0]?.machineName ?? "").toLocaleUpperCase()}
                           </Text>
                         </View>
                         {list.map((a, i) => (

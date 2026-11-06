@@ -39,18 +39,31 @@ export const RIGHT_HAND_AUTO = {
     "Sets the team up with people: short questions and cards (a new agent, a setting, an app, an invite). Small work: the smallest tier and low effort, unless the person asks for something long or complex.",
 } as const;
 
+/** In `RIGHT_HAND_GRANTS`: nothing outside them can be turned on, so nobody is told to ask for it (`refusalOf`). */
+export const FIXED_GRANTS = "fixed";
+
+/** What it reads for a tool it doesn't have: a way forward, as no card or admin can give it one. */
+export const RIGHT_HAND_REFUSAL =
+  "this isn't one of your tools and nothing can turn it on: your tools are fixed. Hand the work to the agent whose job it is (ask_agent, tell_agent) or propose one, and never ask the person to try again";
+
 /**
- * Its tools, fixed in code whatever its grant rows say (`loadScopeKeys`): the setup cards, reading context, routines
- * for any agent, and `propose_instruction_change` (under `memory:write`, whose memory tools are denied: its runs keep
- * no memory, so nothing one person tells it reaches another). No apps, web, computer, databases, files or mail, so it
- * can't be used to reach data; nor posting elsewhere, putting agents in channels without a card, or long work.
+ * Its tools, fixed in code whatever its grant rows say (`loadScopeKeys`): the setup cards, reading context, reading
+ * the Drive and the wiki as the person behind the run (ADR 0137 §12), routines for any agent, and
+ * `propose_instruction_change` (under `memory:write`, whose memory tools are denied: its runs keep no memory, so
+ * nothing one person tells it reaches another). No writing files, apps, web, computer, databases or mail, nor posting
+ * elsewhere (`share_artifact` too), putting agents in channels without a card, or long work.
  */
 export const RIGHT_HAND_GRANTS: readonly string[] = [
+  FIXED_GRANTS,
   "setup:write",
   "context:read",
+  "drive:read",
+  "wiki:read",
   "schedule:write",
   "memory:write",
   ...[
+    "request_permission",
+    "share_artifact",
     "remember",
     "update_memory",
     "forget",
@@ -75,10 +88,11 @@ export async function followOwner(db: Executor, orgId: string) {
   await db.execute(sql`update ${agents} a set owner_user_id = (
       select om.user_id from ${organizationMembers} om join ${users} u on u.id = om.user_id
       where om.org_id = ${orgId}::uuid and om.role = 'owner'
-      order by u.blocked_at is not null, om.created_at limit 1)
+      order by u.blocked_at is not null or u.deletion_due_at is not null, om.created_at limit 1)
     where a.org_id = ${orgId}::uuid and a.builtin = ${RIGHT_HAND}
       and not exists (select 1 from ${organizationMembers} om join ${users} u on u.id = om.user_id
-        where om.org_id = a.org_id and om.user_id = a.owner_user_id and om.role = 'owner' and u.blocked_at is null)`);
+        where om.org_id = a.org_id and om.user_id = a.owner_user_id and om.role = 'owner'
+          and u.blocked_at is null and u.deletion_due_at is null)`);
 }
 
 /**

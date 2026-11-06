@@ -61,11 +61,11 @@ export interface MachineExecutors {
   desktopUse?: { available: boolean; reason?: string };
   /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
   mode?: "system";
-  /** `hello.claudeLoginMethods` (protocol 49): what a new Claude sign-in for all agents can use there; absent: older. */
+  /** `hello.claudeLoginMethods` (protocol 50): what a new Claude sign-in for all agents can use there; absent: older. */
   claudeLoginMethods?: ("cli_login" | "setup_token" | "api_key")[];
   /** `hello.claudeLoginBlocked`: why the computer's self-check keeps `cli_login` for all agents off. */
   claudeLoginBlocked?: string;
-  /** `hello.authEgressGroup` (protocol 49): root's Claude sign-in CLIs there run in the `agentes-auth` group. */
+  /** `hello.authEgressGroup` (protocol 50): root's Claude sign-in CLIs there run in the `agentes-auth` group. */
   authEgressGroup?: true;
   /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */
   ownUsage?: {
@@ -307,7 +307,7 @@ export const machineAccounts = pgTable(
      */
     shared: boolean().notNull().default(false),
     /**
-     * How it signs in (protocol 49): `cli_login`, `setup_token` or `api_key`. Set when its sign-in starts and from
+     * How it signs in (protocol 50): `cli_login`, `setup_token` or `api_key`. Set when its sign-in starts and from
      * what the runner reports, never cleared by a report that doesn't say; null: unknown.
      */
     authMethod: text(),

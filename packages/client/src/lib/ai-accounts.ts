@@ -314,7 +314,7 @@ export interface OwnSignInRow {
 export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefined): OwnSignInRow[] {
   const out: OwnSignInRow[] = [];
   for (const c of view?.computers ?? []) {
-    for (const kind of ["claude_code", "codex", "cursor", "opencode"] as const) {
+    for (const kind of ["claude_code", "codex", "cursor"] as const) {
       const own = c.own?.[kind];
       if (!own) continue;
       out.push({
@@ -340,25 +340,36 @@ export const ownSignInTitle = (t: TFunction, o: Pick<OwnSignInRow, "kind" | "pla
 
 /**
  * A computer's own sign-in by name: on a computer the viewer connected, the account their agents there share; on
- * someone else's, that computer's ("MacBook's account").
+ * someone else's, that computer's ("MacBook's account"). OpenCode with no account is nobody's: its free models.
  */
-export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
-  mine ? t("connectAi.own.shared") : t("agentPage.work.brain.thisComputer", { computer });
+export const ownSignInName = (t: TFunction, mine: boolean, computer: string, kind?: MachineAccountKind) =>
+  kind === "opencode"
+    ? t("connectAi.own.free")
+    : mine
+      ? t("connectAi.own.shared")
+      : t("agentPage.work.brain.thisComputer", { computer });
+
+/** `ownSignInName` inside a sentence ("Ada pensa com a conta que os seus agentes dividem"). */
+export const ownSignInLower = (t: TFunction, kind: string | null) =>
+  t(kind === "opencode" ? "connectAi.own.freeLower" : "connectAi.own.sharedLower");
 
 /**
  * The computer's own sign-in of `kind` can think for the agent (ADR 0041, ADR 0059 §3): whoever connected that
  * computer owns the agent, and its runner reported that CLI signed in there (`own`, the computer's `/ai-accounts`
- * row). On a computer nobody connected (the workspace's own) it never can.
+ * row). On a computer nobody connected (the workspace's own) it never can. OpenCode signs in nowhere: its free tier
+ * is a choice wherever its CLI runs, for the agents of whoever connected that computer and, on a computer nobody
+ * connected (`canAdd` without `mine`), for anyone's (ADR 0132 §6). It is never listed as the person's AI.
  */
 export const ownSignInReady = (
   brain: Pick<AgentBrain, "ownSignIn"> | undefined,
-  row: (Pick<AiComputer, "own"> & Partial<Pick<AiComputer, "mine">>) | undefined,
+  row: (Pick<AiComputer, "own"> & Partial<Pick<AiComputer, "mine" | "brains" | "canAdd">>) | undefined,
   kind: MachineAccountKind,
 ) =>
-  // OpenCode's free tier on a computer nobody connected thinks for anyone's agent (ADR 0132): the server lists it
-  // there, on a computer that isn't the viewer's.
-  (brain?.ownSignIn === true || (kind === "opencode" && brain !== undefined && row?.mine === false)) &&
-  row?.own?.[kind] !== undefined;
+  kind === "opencode"
+    ? row?.brains?.opencode === true &&
+      row.canAdd === true &&
+      (brain?.ownSignIn === true || (brain !== undefined && row.mine === false))
+    : brain?.ownSignIn === true && row?.own?.[kind] !== undefined;
 
 /**
  * An agent's account choice lists the computer's own sign-in where it is ready (`ownSignInReady`), and while the
@@ -368,7 +379,7 @@ export const ownSignInReady = (
  */
 export const ownSignInListed = (
   brain: Pick<AgentBrain, "ownSignIn" | "brain" | "account" | "canUsePlans">,
-  row: Pick<AiComputer, "own"> | undefined,
+  row: Parameters<typeof ownSignInReady>[1],
   kind: MachineAccountKind,
 ) =>
   ownSignInReady(brain, row, kind) ||

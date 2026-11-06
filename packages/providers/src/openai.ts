@@ -208,14 +208,29 @@ function fromResponse(response: Response): ModelResult {
 }
 
 /**
+ * What an upstream's raw error says: its text, or the message of its JSON body. Nothing else of a body or a page is
+ * shown: a validation error can carry the request back, system prompt included.
+ */
+function upstreamWords(raw: unknown) {
+  if (typeof raw !== "string") return "";
+  if (!/^\s*[{[<]/.test(raw)) return raw;
+  try {
+    const body = JSON.parse(raw) as { message?: unknown; error?: { message?: unknown } } | null;
+    const message = body?.error?.message ?? body?.message;
+    return typeof message === "string" ? message : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
  * What an error body says. OpenRouter's own message is often only "Provider returned error": the upstream's words are
- * in `metadata.raw`, as text or as its JSON body.
+ * in `metadata.raw`.
  */
 export function saidIn(error: InstanceType<typeof OpenAI.APIError>) {
   const body = error.error as { message?: unknown; metadata?: { raw?: unknown } } | undefined;
-  const raw = body?.metadata?.raw;
-  const upstream = typeof raw === "string" ? (/"message"\s*:\s*"([^"]+)"/.exec(raw)?.[1] ?? raw) : "";
-  return shortSaid(upstream || (typeof body?.message === "string" ? body.message : ""));
+  const upstream = upstreamWords(body?.metadata?.raw);
+  return shortSaid(upstream || (typeof body?.message === "string" ? body.message : "")) || undefined;
 }
 
 /**
@@ -229,7 +244,7 @@ export function openAIError(error: unknown): ProviderError {
     if (error.code === "insufficient_quota") {
       const said = saidIn(error);
       const why = `no prepaid credit left at the provider (429 insufficient_quota)${said ? `: ${said}` : ""}`;
-      return new ProviderError(why, false, error.status ?? 429);
+      return new ProviderError(why, false, error.status ?? 429, undefined, said);
     }
     if (error.status === undefined) {
       if (error.code === "rate_limit_exceeded") return new ProviderError("rate limited by provider", true, 429);
@@ -241,12 +256,19 @@ export function openAIError(error: unknown): ProviderError {
   if (error instanceof OpenAI.AuthenticationError) return new ProviderError("invalid provider API key", false, 401);
   if (error instanceof OpenAI.PermissionDeniedError) return deniedError(error.code, saidIn(error));
   if (error instanceof OpenAI.InternalServerError) return new ProviderError("provider error", true, error.status);
+  if (error instanceof OpenAI.APIConnectionTimeoutError) return new ProviderError("provider timed out", true);
   if (error instanceof OpenAI.APIConnectionError) return new ProviderError("could not reach provider", true);
   if (error instanceof OpenAI.APIUserAbortError) return new ProviderError("request aborted", false);
   if (error instanceof OpenAI.APIError) {
     const what = [error.status ?? "?", error.code].filter(Boolean).join(" ");
     const said = saidIn(error);
-    return new ProviderError(`provider rejected the request (${what})${said ? `: ${said}` : ""}`, false, error.status);
+    return new ProviderError(
+      `provider rejected the request (${what})${said ? `: ${said}` : ""}`,
+      false,
+      error.status,
+      undefined,
+      said,
+    );
   }
   if (error instanceof OpenAI.OpenAIError || error instanceof SyntaxError) {
     return new ProviderError(`could not read the model's reply: ${error.message}`, true);

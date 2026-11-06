@@ -7,6 +7,7 @@ import type { ComputerSetup, Me } from "../src/api/types";
 import {
   agentsWaitingForComputer,
   computerName,
+  computerNameOf,
   newerSetup,
   noComputerChoice,
   SETUP_STAGES,
@@ -244,6 +245,9 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     // The server's own: its runner's name, and what it is until the runner names it.
     expect(computerName(t, "Oficina", { kind: "host", name: "srv-1" })).toBe("srv-1");
     expect(computerName(t, "Oficina", { kind: "host", name: "" })).toBe("machines.host.label");
+    // A list that carries only the name reads the same.
+    expect(computerNameOf(t, "Oficina", "Oficina's computer")).toBe(ours);
+    expect(computerNameOf(t, "Oficina", "MacBook Air")).toBe("MacBook Air");
   });
 
   test("drawn as a server before and after it exists", () => {

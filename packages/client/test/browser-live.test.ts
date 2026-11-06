@@ -2,10 +2,12 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import {
   BROWSER_DRAG_FLUSH_MS,
+  BROWSER_FPS,
   BROWSER_HOVER_MS,
   BROWSER_INPUT_BATCH,
   BROWSER_UNWATCH_DELAY_MS,
   type BrowserInputEvent,
+  browserFps,
   browserHandoffOf,
   browserSiteUrl,
   browserSteps,
@@ -637,6 +639,78 @@ describe("one watch per agent on a socket (no stream flapping)", () => {
     view("second");
     serve();
     expect(seen.second).toEqual(["status", "frame"]);
+  });
+
+  test("each view says the rate it needs: the socket asks for the most any of them needs, in place when it changes", () => {
+    const sent: Record<string, unknown>[] = [];
+    const t = fakeTimers();
+    const watches = createBrowserWatches({ send: (f) => sent.push(f), timers: t.timers });
+    // A closed card: one frame a second is all its small picture needs.
+    const card = watches.acquire(AGENT, BROWSER_FPS.preview);
+    expect(sent).toEqual([{ type: "browser.watch", agentId: AGENT, maxFps: 1 }]);
+    // The open view: whatever the stream sends (no limit of its own, so none said).
+    const open = watches.acquire(AGENT);
+    expect(sent.at(-1)).toEqual({ type: "browser.watch", agentId: AGENT });
+    // It folds into a preview too: said in place, never a new watch (that would restart the view).
+    open.setMaxFps(BROWSER_FPS.preview);
+    expect(sent.at(-1)).toEqual({ type: "browser.fps", agentId: AGENT, maxFps: 1 });
+    // A change that leaves the most anyone needs as it was says nothing.
+    card.setMaxFps(1);
+    expect(sent).toHaveLength(3);
+    open.setMaxFps(BROWSER_FPS.control);
+    expect(sent.at(-1)).toEqual({ type: "browser.fps", agentId: AGENT, maxFps: 15 });
+    // The view that needed the most leaves: the others' rate.
+    open();
+    expect(sent.at(-1)).toEqual({ type: "browser.fps", agentId: AGENT, maxFps: 1 });
+    // Watched again (Try again, the socket back): with the rate needed now.
+    watches.rewatch(AGENT);
+    expect(sent.at(-1)).toEqual({ type: "browser.watch", agentId: AGENT, maxFps: 1 });
+    watches.resumeAll();
+    expect(sent.at(-1)).toEqual({ type: "browser.watch", agentId: AGENT, maxFps: 1 });
+    card();
+    t.run();
+    expect(sent.at(-1)).toEqual({ type: "browser.unwatch", agentId: AGENT });
+    // A view that left changes nothing.
+    card.setMaxFps(BROWSER_FPS.control);
+    expect(sent.at(-1)).toEqual({ type: "browser.unwatch", agentId: AGENT });
+    // Out of range asks for what the server takes.
+    expect([browserFps(0), browserFps(60), browserFps(undefined), browserFps(5)]).toEqual([1, 15, 15, 5]);
+  });
+
+  test("a live view passes its rate to the watch, and changes it in place, with a shared watcher or without", () => {
+    const sent: Record<string, unknown>[] = [];
+    const watches = createBrowserWatches({ send: (f) => sent.push(f) });
+    const shared = createBrowserLiveConnection({
+      send: (f) => sent.push(f),
+      watcher: watches,
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+      maxFps: BROWSER_FPS.preview,
+    });
+    shared.start();
+    expect(sent).toEqual([{ type: "browser.watch", agentId: AGENT, maxFps: 1 }]);
+    shared.setMaxFps(undefined);
+    expect(sent.at(-1)).toEqual({ type: "browser.fps", agentId: AGENT, maxFps: 15 });
+    shared.close();
+
+    const own: Record<string, unknown>[] = [];
+    const alone = createBrowserLiveConnection({
+      send: (f) => own.push(f),
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+    });
+    // Not watching yet: the rate goes with the watch.
+    alone.setMaxFps(BROWSER_FPS.preview);
+    expect(own).toEqual([]);
+    alone.start();
+    expect(own).toEqual([{ type: "browser.watch", agentId: AGENT, maxFps: 1 }]);
+    alone.setMaxFps(BROWSER_FPS.control);
+    expect(own.at(-1)).toEqual({ type: "browser.fps", agentId: AGENT, maxFps: 15 });
+    alone.close();
+    alone.setMaxFps(BROWSER_FPS.preview);
+    expect(own.at(-1)).toEqual({ type: "browser.unwatch", agentId: AGENT });
   });
 
   test("Try again watches again at once, after a retry was set for later", () => {

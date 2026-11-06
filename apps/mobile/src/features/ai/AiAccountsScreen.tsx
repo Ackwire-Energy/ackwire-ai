@@ -22,10 +22,11 @@ import {
   ownSignInTitle,
   signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { agentAi, aiStateOf, uncheckedKeyLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import { providerLabel } from "@agenteschat/client/lib/providers";
@@ -36,12 +37,13 @@ import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSh
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
 import { openConnectAi } from "./NoAiCard";
-import { alertKeyRefused, Note } from "./parts";
+import { alertKeyRefused, Note, PlanHoldNote, usePlanHold } from "./parts";
 
 /*
  * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", first the sign-ins of the
@@ -97,6 +99,7 @@ export function AiAccountsScreen() {
   const meId = useMeId();
   const status = useAiStatus(orgId);
   const [again, setAgain] = useState<Account | null>(null);
+  const hold = usePlanHold(orgId, org);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
@@ -207,6 +210,8 @@ export function AiAccountsScreen() {
     );
   };
 
+  // Under a hold its note says what comes first: an invitation to connect a plan would contradict it.
+  const none = !hold && ai.isSuccess && rows.length === 0 && own.length === 0;
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("mobile.ai.row")} solid={false} grouped />
@@ -225,12 +230,11 @@ export function AiAccountsScreen() {
             </Text>
           </InfoHint>
         </View>
+        {hold && !again ? <PlanHoldNote org={org} /> : null}
         {ai.isLoading ? <ActivityIndicator color={c.muted} /> : null}
         {ai.isError ? <Note icon="x">{t("common.loadFailed")}</Note> : null}
-        {ai.isSuccess && rows.length === 0 && own.length === 0 ? (
-          <Text variant="small" tone="muted">
-            {t("aiAccounts.page.empty")}
-          </Text>
+        {none ? (
+          <FirstUse place="ai" size="panel" acts label={t("aiAccounts.page.connect")} onPress={() => openConnectAi()} />
         ) : null}
         {/* Settings' own groups on the grouped gray: the mark in the 32 pt column, the hairline from the text on. */}
         {own.length > 0 ? (
@@ -265,7 +269,7 @@ export function AiAccountsScreen() {
                     : identityUnknown(a, machineOf(a))
                       ? t("aiAccounts.page.identityUnknown")
                       : null),
-                several ? t("aiAccounts.page.on", { computer: a.computer }) : null,
+                several ? t("aiAccounts.page.on", { computer: computerNameOf(t, org?.name ?? "", a.computer) }) : null,
                 a.usedBy.length > 0
                   ? t("aiAccounts.page.usedBy", { count: a.usedBy.length, agents: names(a.usedBy) })
                   : t("aiAccounts.page.noAgent"),
@@ -311,30 +315,36 @@ export function AiAccountsScreen() {
               </Text>
               <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
             </View>
-            <AddAccount
-              machineId={again.machineId}
-              kind={again.kind}
-              computer={again.computer}
-              again={again.id}
-              email={again.email}
-              local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
-              {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
-              onAdded={() => {
-                setAgain(null);
-                refetch();
-              }}
-            />
+            {hold ? (
+              <PlanHoldNote org={org} />
+            ) : (
+              <AddAccount
+                machineId={again.machineId}
+                kind={again.kind}
+                computer={again.computer}
+                again={again.id}
+                email={again.email}
+                local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
+                {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
+                onAdded={() => {
+                  setAgain(null);
+                  refetch();
+                }}
+              />
+            )}
           </View>
         ) : null}
-        <View style={styles.start}>
-          <Button
-            size="sm"
-            variant={rows.length || own.length ? "secondary" : "primary"}
-            icon="plus"
-            label={t("aiAccounts.page.connect")}
-            onPress={() => openConnectAi()}
-          />
-        </View>
+        {none ? null : (
+          <View style={styles.start}>
+            <Button
+              size="sm"
+              variant={rows.length || own.length ? "secondary" : "primary"}
+              icon="plus"
+              label={t("aiAccounts.page.connect")}
+              onPress={() => openConnectAi()}
+            />
+          </View>
+        )}
         {can(org, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
       </ScrollView>
     </View>
@@ -344,7 +354,8 @@ export function AiAccountsScreen() {
 /** The workspace's API keys (the web's "Chaves de provedor"): the default one, a key swapped or deleted. */
 function KeysSection({ locale }: { locale: string }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const held = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -379,7 +390,7 @@ function KeysSection({ locale }: { locale: string }) {
               toast({
                 title:
                   saved.check === "unchecked"
-                    ? t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) })
+                    ? uncheckedKeyLine(t, providerLabel(k.provider), held)
                     : t("settings.rotated"),
                 icon: "check",
               });

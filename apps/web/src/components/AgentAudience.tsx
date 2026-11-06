@@ -86,6 +86,7 @@ export function AudienceChoice({
   agentName,
   idPrefix,
   compact,
+  layout = "cards",
   onPlan = false,
 }: {
   value: AgentAudience;
@@ -94,6 +95,8 @@ export function AudienceChoice({
   agentName: string;
   idPrefix: string;
   compact?: boolean;
+  /** Compact's choices as cards (default) or as rows. */
+  layout?: "cards" | "rows";
   /** It thinks with a person's plan (ADR 0059 §5). */
   onPlan?: boolean;
 }) {
@@ -130,7 +133,7 @@ export function AudienceChoice({
         <>
           <OptionList
             aria-label={t("audience.title", g)}
-            layout="cards"
+            layout={layout}
             value={value.mode}
             onValueChange={(mode) => onChange({ ...value, mode })}
             options={MODES.map((mode) => ({
