@@ -84,11 +84,26 @@ test("the start card's answer: one of its choices, or a message the interview fo
   expect(startCardAnswer([at("1", "person", "Agência")] as never, choices)).toBe("Agência");
   const asked = at("2", "agent", "?", { replyChips: { choices: ["a"], step: 2, of: 3 } });
   expect(startCardAnswer([at("1", "person", "Vendo pão"), asked] as never, choices)).toBe("Vendo pão");
+  // A greeting first: the tap after it is the answer, at once and after the interview's next question.
+  expect(startCardAnswer([at("1", "person", "oi"), at("2", "person", "Agência")] as never, choices)).toBe("Agência");
+  expect(startCardAnswer([at("1", "person", "oi"), at("2", "person", "Agência"), asked] as never, choices)).toBe(
+    "Agência",
+  );
+  // A team card with no interview before it (asked outright, or a template's) stops the card asking too.
+  const team = at("3", "agent", "", {
+    actionCard: { kind: "team_proposal", state: "open", expiresAt: at("3", "agent").createdAt, params: { agents: [] } },
+  });
+  expect(startCardAnswer([at("1", "person", "Monta o time da padaria"), team] as never, choices)).toBe(
+    "Monta o time da padaria",
+  );
+  expect(startCardAnswer([team] as never, choices)).toBe("");
 });
 
 test("its greeting's cards: Connect AI, then how to start, then what next, then none", () => {
   const base = { noAi: false, aiKnown: true, teamHandles: [] as string[], createsAgents: true, alone: true };
   expect(introCards({ ...base, noAi: true })).toEqual(["connect"]);
+  // Having typed with no AI, the card under their message offers Connect: not a second one up here.
+  expect(introCards({ ...base, noAi: true, noAiCard: true })).toEqual([]);
   expect(introCards(base)).toEqual(["start"]);
   // Not known yet, or someone who can't create agents: no start card.
   expect(introCards({ ...base, aiKnown: false })).toEqual([]);

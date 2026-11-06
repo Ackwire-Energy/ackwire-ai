@@ -12,6 +12,7 @@ import {
   useMissionParticipants,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { executorName } from "@agenteschat/client/lib/missions";
@@ -226,7 +227,7 @@ export function NewMissionDialog({
                       a.eligible && a.machine
                         ? names
                           ? t("missions.new.agentOn", {
-                              computer: a.machine.name,
+                              computer: computerNameOf(t, org.name, a.machine.name),
                               state: a.machine.online ? t("missions.online") : t("missions.offline"),
                             })
                           : a.machine.online
@@ -234,7 +235,9 @@ export function NewMissionDialog({
                             : t("missions.computerOffline")
                         : cloud && (a.reason ?? "no_computer") === "no_computer"
                           ? waitWords
-                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
+                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
+                              computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                            }),
                     leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
                   }))}
                 />
@@ -263,7 +266,9 @@ export function NewMissionDialog({
                       <span>
                         {cloud && (a.reason ?? "no_computer") === "no_computer"
                           ? waitWords
-                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" })}
+                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
+                              computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                            })}
                       </span>
                     </span>
                     {!cloud && (
@@ -293,7 +298,7 @@ export function NewMissionDialog({
               {agent.codexTooOld && (
                 <span className="mi-hint ac-iconline">
                   <Icon name="info" size={14} />
-                  {t("missions.new.codexOld", { computer: agent.machine?.name ?? "" })}
+                  {t("missions.new.codexOld", { computer: computerNameOf(t, org.name, agent.machine?.name ?? "") })}
                 </span>
               )}
             </div>
@@ -492,7 +497,10 @@ export function CloseMissionDialog({
               <Icon name="stop" size={14} />
               <span>
                 {names
-                  ? t("missions.close.running", { count: mission.runningTasks, computer: mission.machine?.name ?? "" })
+                  ? t("missions.close.running", {
+                      count: mission.runningTasks,
+                      computer: computerNameOf(t, org.name, mission.machine?.name ?? ""),
+                    })
                   : t("missions.close.runningNoComputer", { count: mission.runningTasks })}
               </span>
             </div>
@@ -753,7 +761,9 @@ export function ShareMissionDialog({
             {mission.machine && (
               <div className="mi-optrow">
                 <div>
-                  <label htmlFor={lendId}>{t("missions.share.lend", { computer: mission.machine.name })}</label>
+                  <label htmlFor={lendId}>
+                    {t("missions.share.lend", { computer: computerNameOf(t, org.name, mission.machine.name) })}
+                  </label>
                   <small>{t("missions.share.lendText", { name: handing?.name ?? "" })}</small>
                 </div>
                 <Switch id={lendId} checked={lend} onCheckedChange={setLend} />

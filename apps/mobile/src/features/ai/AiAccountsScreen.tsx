@@ -153,9 +153,9 @@ export function AiAccountsScreen() {
           ? t("aiAccounts.page.disconnectAgents", {
               count: a.usedBy.length,
               agents: names(a.usedBy),
-              computer: a.computer,
+              computer: computerNameOf(t, org?.name ?? "", a.computer),
             })
-          : t("aiAccounts.page.disconnectNone", { computer: a.computer }),
+          : t("aiAccounts.page.disconnectNone", { computer: computerNameOf(t, org?.name ?? "", a.computer) }),
         ...(endsOnClaude(a, machineOf(a)) ? [t("aiAccounts.page.revokeOnClaude")] : []),
       ].join(" "),
       [

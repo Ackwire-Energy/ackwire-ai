@@ -327,9 +327,11 @@ export function AiAccountsSection() {
               ? t("aiAccounts.page.disconnectAgents", {
                   count: open.account.usedBy.length,
                   agents: names(open.account.usedBy),
-                  computer: open.account.logins[0]?.computer ?? "",
+                  computer: computerNameOf(t, org.name, open.account.logins[0]?.computer ?? ""),
                 })
-              : t("aiAccounts.page.disconnectNone", { computer: open.account.logins[0]?.computer ?? "" }),
+              : t("aiAccounts.page.disconnectNone", {
+                  computer: computerNameOf(t, org.name, open.account.logins[0]?.computer ?? ""),
+                }),
             ...(open.account.logins.some((l) =>
               endsOnClaude(
                 l,

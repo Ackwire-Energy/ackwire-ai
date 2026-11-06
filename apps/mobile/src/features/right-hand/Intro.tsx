@@ -9,7 +9,7 @@ import {
   useSetAgentStyle,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
@@ -63,6 +63,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
     createsAgents,
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org?.agentStyle === null,
+    noAiCard: useMessages(orgId, channelId).data?.some((m) => noAiCardOf(m.meta)),
   });
   const send = useSendAnswer(channelId);
   return (

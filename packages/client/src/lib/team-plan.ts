@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
 import type { Message, ReplyChips, TeamPlan, TeamProposalCard } from "../api/types";
+import { teamProposalOf } from "./action-cards";
 import { errorText } from "./errors";
 
 /**
@@ -53,16 +54,21 @@ export const answerPicks = (choices: readonly string[], answer: string | null) =
 };
 
 /**
- * The start card's answer: the conversation's first message, once it is one of the card's `choices` or the interview
- * followed it. Anything else ("oi", or something written before an AI was connected) answered nothing: the card keeps
- * asking.
+ * The start card's answer: the person's first message that is one of its `choices`, wherever it came, or, once the
+ * interview or a team card followed, what they wrote first ("" with nothing written: a template's card). Anything else
+ * ("oi", or something written before an AI was connected) answered nothing: the card keeps asking.
  */
 export function startCardAnswer(
   messages: readonly Pick<Message, "id" | "createdAt" | "author" | "body" | "local" | "meta">[] | undefined,
   choices: readonly string[],
 ): string | null {
-  const first = answerAfter(messages, null);
-  return answerPicks(choices, first).length > 0 || messages?.some((m) => replyChipsOf(m.meta)) ? first : null;
+  const said = [...(messages ?? [])]
+    .sort(byTime)
+    .filter((m) => m.author.type === "person" && m.local !== "failed")
+    .map((m) => m.body);
+  const pick = said.find((body) => answerPicks(choices, body).length > 0);
+  if (pick !== undefined) return pick;
+  return messages?.some((m) => replyChipsOf(m.meta) || teamProposalOf(m.meta)) ? (said[0] ?? "") : null;
 }
 
 /** Taps put together in the order the answers are listed. */

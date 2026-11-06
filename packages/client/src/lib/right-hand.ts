@@ -139,8 +139,10 @@ export function introCards(s: {
   alone: boolean;
   /** They never picked how agents talk to them (`agentStyle` null; undefined from an older server). */
   askStyle?: boolean;
+  /** A no-AI card already answered them in this conversation: its Connect is the one to press. */
+  noAiCard?: boolean;
 }): ("connect" | "start" | "next" | "style")[] {
-  if (s.noAi) return ["connect"];
+  if (s.noAi) return s.noAiCard ? [] : ["connect"];
   const presets = new Set<string>(PRESETS);
   const start =
     s.aiKnown &&

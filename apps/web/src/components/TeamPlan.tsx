@@ -81,7 +81,7 @@ export function AnswerChips({
     });
   };
   const listed = answered ? choices.filter((c) => shown.has(c)) : choices;
-  if (listed.length === 0 && !step) return null;
+  if (listed.length === 0 && !(step && step.of > 1)) return null;
   return (
     <div className="tp-chips">
       {listed.length > 0 && (
@@ -101,7 +101,7 @@ export function AnswerChips({
           ))}
         </div>
       )}
-      {(step || (multiple && !answered)) && (
+      {((step && step.of > 1) || (multiple && !answered)) && (
         <div className="tp-chips__foot">
           {multiple && !answered && picked.size > 0 && (
             <Button size="sm" variant="primary" onClick={() => onSend(answerText(choices, picked))}>
@@ -434,12 +434,12 @@ function FirstTaskCard({ message, card }: { message: Message; card: TeamProposal
             {tasks.map((f) => (
               <li key={f.agentId} className="tp-agent">
                 <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
-                <span className="tp-agent__text ac-captop">
+                <span className="tp-agent__text">
                   <b>{f.name}</b>
                   <span className="tp-agent__line">{f.task}</span>
                 </span>
                 {/* On the name's line, as on the team card's rows, however long the task runs. */}
-                <span className="tp-agent__tail ac-captop">
+                <span className="tp-agent__tail">
                   <Button
                     size="sm"
                     onClick={() => {

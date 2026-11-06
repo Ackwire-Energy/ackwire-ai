@@ -1052,6 +1052,48 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     }
   });
 
+  test("a sign-in's popup the browser refused: the sign-in goes on and its link is there to open by hand", async () => {
+    await onMac();
+    const realOpen = window.open;
+    window.open = (() => null) as unknown as typeof window.open;
+    try {
+      const d = await brainDialog();
+      await pick(d, "Conta", /^Adicionar conta/);
+      await settle(6);
+      const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+      expect(within(block).getByRole("link", { name: "Abrir de novo" }).getAttribute("href")).toBe(
+        "https://claude.ai/oauth/authorize?code=true&state=st4te",
+      );
+    } finally {
+      window.open = realOpen;
+    }
+  });
+
+  test("a sign-in that can't get its link: the popup closes and the dialog says why", async () => {
+    const { api } = await onMac();
+    api.machines.beginAccountLogin = async () => {
+      throw new Error("the computer didn't answer");
+    };
+    let closed = 0;
+    const popup = { closed: false, opener: {}, location: { replace: () => {} }, close: () => closed++ };
+    const realOpen = window.open;
+    window.open = (() => popup) as unknown as typeof window.open;
+    try {
+      const d = await brainDialog();
+      await pick(d, "Conta", /^Adicionar conta/);
+      await settle(6);
+      const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+      expect(closed).toBe(1);
+      expect(shownText(block)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
+    } finally {
+      window.open = realOpen;
+    }
+  });
+
   test("Add account: Copy link begins the sign-in with no window, copies its link and shows the code step", async () => {
     const { state, api } = await onMac();
     const opened: string[] = [];
