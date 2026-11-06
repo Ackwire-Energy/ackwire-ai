@@ -22,8 +22,8 @@ import {
   startVersionWatch,
   VERSION_CHECK_MS,
 } from "./lib/app-version";
-import { tolerateForeignDomEdits } from "./lib/dom-guard";
 import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
+import { tolerateForeignDomEdits } from "./lib/dom-guard";
 import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { catchEarlyErrors, reportError, setErrorScope, startErrorReports } from "./lib/error-reports";
 import { pageScrollReset } from "./lib/page-scroll";

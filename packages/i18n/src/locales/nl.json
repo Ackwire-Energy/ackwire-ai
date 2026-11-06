@@ -6039,7 +6039,7 @@
     "noLinks": "Nog niets gekoppeld.",
     "github": {
       "label": "GitHub-link",
-      "placeholder": "Plak de link van een GitHub-issue of PR",
+      "placeholder": "Link van issue of PR",
       "invalid": "Dat is geen link van een GitHub-issue of pull request.",
       "remove": "GitHub-link verwijderen"
     },

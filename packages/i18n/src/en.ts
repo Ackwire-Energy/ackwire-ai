@@ -5981,7 +5981,7 @@ export const en = {
     noLinks: "Nothing linked yet.",
     github: {
       label: "GitHub link",
-      placeholder: "Paste a GitHub issue or PR link",
+      placeholder: "Issue or PR link",
       invalid: "That isn't the link of a GitHub issue or pull request.",
       remove: "Remove the GitHub link",
     },

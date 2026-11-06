@@ -6221,7 +6221,7 @@
     "noLinks": "Ancora niente di collegato.",
     "github": {
       "label": "Link GitHub",
-      "placeholder": "Incolla il link di una issue o PR di GitHub",
+      "placeholder": "Link di issue o PR",
       "invalid": "Questo non è il link di una issue o pull request di GitHub.",
       "remove": "Rimuovi il link GitHub"
     },

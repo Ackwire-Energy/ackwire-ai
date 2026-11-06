@@ -14495,7 +14495,7 @@
     "value": "GitHub link"
   },
   "issues.github.placeholder": {
-    "value": "Paste a GitHub issue or PR link"
+    "value": "Issue or PR link"
   },
   "issues.github.invalid": {
     "value": "That isn't the link of a GitHub issue or pull request."

@@ -5799,7 +5799,7 @@
     "noLinks": "Belum ada yang ditautkan.",
     "github": {
       "label": "Tautan GitHub",
-      "placeholder": "Tempel tautan issue atau PR GitHub",
+      "placeholder": "Tautan issue atau PR",
       "invalid": "Itu bukan tautan issue atau pull request GitHub.",
       "remove": "Hapus tautan GitHub"
     },

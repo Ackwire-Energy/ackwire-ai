@@ -2,8 +2,8 @@ import type { Issue, IssueActivity, IssuePriority } from "@agenteschat/client";
 import { keys, useChannels, useIssue, useIssueAction, useIssueActivity, useIssueColumns } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
 import { issueEventText } from "@agenteschat/client/lib/issues";
 import { foldSteps } from "@agenteschat/client/lib/work";
@@ -890,7 +890,7 @@ function Links({ issue: i }: { issue: Issue }) {
     <>
       <div className="issue-aside__item">
         <span className="ac-field__label">{t("issues.links")}</span>
-        {i.pullRequests.length === 0 && <span className="small muted">{t("issues.noLinks")}</span>}
+        {i.pullRequests.length === 0 && !i.githubUrl && <span className="small muted">{t("issues.noLinks")}</span>}
         {i.pullRequests.map((pr) => (
           <a key={pr.number} href={webUrl(pr.url)} target="_blank" rel="noopener noreferrer" className="issue-link">
             <Icon name="pullRequest" size={16} />

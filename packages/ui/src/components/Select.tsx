@@ -176,7 +176,9 @@ export function Select<V extends string = string>({
           <span className="ac-select__value">
             {/* In elements of ours, never bare text nor Radix's portal of the chosen item's text: a browser translating
                 the page replaces text nodes, and React then fails removing them when the value or the page changes. */}
-            <RSelect.Value placeholder={placeholder ? <span className="ac-select__text">{placeholder}</span> : undefined}>
+            <RSelect.Value
+              placeholder={placeholder ? <span className="ac-select__text">{placeholder}</span> : undefined}
+            >
               {chosen ? (renderValue?.(chosen) ?? <span className="ac-select__text">{chosen.label}</span>) : undefined}
             </RSelect.Value>
           </span>

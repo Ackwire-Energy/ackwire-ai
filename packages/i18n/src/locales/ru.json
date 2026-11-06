@@ -6371,7 +6371,7 @@
     "noLinks": "Пока ничего не связано.",
     "github": {
       "label": "Ссылка на GitHub",
-      "placeholder": "Вставьте ссылку на issue или PR в GitHub",
+      "placeholder": "Ссылка на issue или PR",
       "invalid": "Это не ссылка на issue или pull request в GitHub.",
       "remove": "Убрать ссылку на GitHub"
     },

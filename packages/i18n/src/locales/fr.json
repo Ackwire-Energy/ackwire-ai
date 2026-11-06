@@ -6214,7 +6214,7 @@
     "noLinks": "Rien de lié pour l'instant.",
     "github": {
       "label": "Lien GitHub",
-      "placeholder": "Collez le lien d'une issue ou d'une PR GitHub",
+      "placeholder": "Lien de l'issue ou PR",
       "invalid": "Ce n'est pas le lien d'une issue ou d'une pull request GitHub.",
       "remove": "Retirer le lien GitHub"
     },

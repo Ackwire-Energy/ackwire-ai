@@ -5950,7 +5950,7 @@
     "noLinks": "Henüz bağlantılı bir şey yok.",
     "github": {
       "label": "GitHub bağlantısı",
-      "placeholder": "Bir GitHub issue veya PR bağlantısı yapıştır",
+      "placeholder": "Issue veya PR bağlantısı",
       "invalid": "Bu bir GitHub issue veya pull request bağlantısı değil.",
       "remove": "GitHub bağlantısını kaldır"
     },

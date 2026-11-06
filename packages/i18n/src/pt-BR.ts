@@ -6065,7 +6065,7 @@ export const ptBR = {
     noLinks: "Nada ligado ainda.",
     github: {
       label: "Link do GitHub",
-      placeholder: "Cole o link de uma issue ou PR do GitHub",
+      placeholder: "Link da issue ou PR",
       invalid: "Esse não é o link de uma issue ou pull request do GitHub.",
       remove: "Remover o link do GitHub",
     },

@@ -5811,7 +5811,7 @@
     "noLinks": "还没有关联内容。",
     "github": {
       "label": "GitHub 链接",
-      "placeholder": "粘贴 GitHub issue 或 PR 的链接",
+      "placeholder": "Issue 或 PR 链接",
       "invalid": "这不是 GitHub issue 或 pull request 的链接。",
       "remove": "移除 GitHub 链接"
     },

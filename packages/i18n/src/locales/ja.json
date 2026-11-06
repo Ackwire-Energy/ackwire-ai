@@ -5762,7 +5762,7 @@
     "noLinks": "リンクされたものはまだありません。",
     "github": {
       "label": "GitHub リンク",
-      "placeholder": "GitHub の Issue または PR のリンクを貼り付け",
+      "placeholder": "Issue または PR のリンク",
       "invalid": "GitHub の Issue または Pull Request のリンクではありません。",
       "remove": "GitHub リンクを削除"
     },

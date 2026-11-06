@@ -13,8 +13,8 @@ import {
   useIssueColumns,
 } from "@agenteschat/client";
 import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
 import { conversationLine, isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -54,6 +54,7 @@ import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
+import { SheetTitle } from "../shared/PromptForm";
 import {
   type ActionItem,
   ActionList,
@@ -64,7 +65,6 @@ import {
   tapHaptic,
   useSurface,
 } from "../shared/parts";
-import { SheetTitle } from "../shared/PromptForm";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 import { IssueActivityFeed } from "./IssueActivity";

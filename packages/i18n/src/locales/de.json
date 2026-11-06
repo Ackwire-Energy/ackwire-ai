@@ -5989,7 +5989,7 @@
     "noLinks": "Noch nichts verknüpft.",
     "github": {
       "label": "GitHub-Link",
-      "placeholder": "Link zu einem GitHub-Issue oder PR einfügen",
+      "placeholder": "Issue- oder PR-Link",
       "invalid": "Das ist kein Link zu einem GitHub-Issue oder Pull Request.",
       "remove": "GitHub-Link entfernen"
     },

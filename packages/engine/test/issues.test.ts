@@ -696,7 +696,11 @@ describe("issues", () => {
 
     const refused = await tool("update_issue").execute({ issue: "#1", github_url: "javascript:alert(1)" }, ctx);
     expect(refused.isError).toBe(true);
-    for (const bad of ["https://evil.example/acme/app/issues/1", "https://github.com/acme/app", "http://github.com/a/b/pull/1"]) {
+    for (const bad of [
+      "https://evil.example/acme/app/issues/1",
+      "https://github.com/acme/app",
+      "http://github.com/a/b/pull/1",
+    ]) {
       await expect(
         updateIssue(deps, person(f.owner.id), f.org.id, (await read()).id, { githubUrl: bad }),
       ).rejects.toBeInstanceOf(ValidationError);

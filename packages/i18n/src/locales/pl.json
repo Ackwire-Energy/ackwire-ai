@@ -6404,7 +6404,7 @@
     "noLinks": "Nic jeszcze nie powiązano.",
     "github": {
       "label": "Link do GitHub",
-      "placeholder": "Wklej link do issue lub PR na GitHub",
+      "placeholder": "Link do issue lub PR",
       "invalid": "To nie jest link do issue ani pull requesta na GitHub.",
       "remove": "Usuń link do GitHub"
     },
