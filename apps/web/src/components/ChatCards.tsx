@@ -310,6 +310,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
           ) : undefined
         }
         what={target}
+        locked={decide.isPending}
       />
     );
   }
@@ -513,6 +514,7 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
           ) : undefined
         }
         what={tt(head.key, head.values).replace(/<\/?b>/g, "")}
+        locked={decide.isPending}
       />
     );
   }
@@ -685,6 +687,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         }
         what={current.text}
         onSubmit={writing ? send : undefined}
+        locked={busy}
       />
     );
   }
@@ -938,6 +941,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         end={until}
         what={current.name}
         onSubmit={mine ? submit : undefined}
+        locked={deliver.isPending || decline.isPending}
       />
     );
   }

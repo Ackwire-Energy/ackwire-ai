@@ -1432,6 +1432,12 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
   line-height: normal;
   color: var(--ink);
 }
+.brw-go__field input:disabled {
+  color: var(--muted);
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+  cursor: not-allowed;
+}
 .brw-go__field input::placeholder {
   color: var(--faint);
 }

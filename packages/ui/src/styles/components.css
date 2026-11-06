@@ -2301,8 +2301,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   flex: none;
 }
 /* With no footer under it, the body or the list keeps the dialog's own edge below its last item. */
-.ac-dialog__body:last-child,
-.ac-dialog__list:last-child {
+:is(.ac-dialog__body, .ac-dialog__list):last-child:not(.ac-locked:not(:last-child) > *) {
   padding-bottom: var(--dialog-pad);
 }
 .ac-dialog__list {

@@ -324,6 +324,7 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
           }
           end={<span className="small muted">{countsText(t, plan)}</span>}
           what={names}
+          locked={busy}
         />
         {adjusting && (
           <AdjustDialog

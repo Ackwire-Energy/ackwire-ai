@@ -53,6 +53,7 @@ import {
   Icon,
   type IconName,
   isApple,
+  Locked,
   onScreenNow,
   PixelSpinner,
   SkyStrip,
@@ -1397,33 +1398,35 @@ export function BrowserCard({
       {inControl &&
         (failing ? (
           <div className="brw-ac__foot brw-ac__fail">
-            <b>{t("browser.live.failTitle")}</b>
-            <span className="small muted">{t("browser.live.failHelp", g)}</span>
-            <div className="brw-reasons">
-              {FAIL_REASONS.map((r) => (
-                <FilterToggle key={r} pressed={reason === r} onPressedChange={(on) => setReason(on ? r : null)}>
-                  {t(`browser.live.failReasons.${r}`)}
-                </FilterToggle>
-              ))}
-            </div>
-            <Textarea
-              rows={1}
-              autoGrow
-              className="brw-ac__note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={t("browser.live.failPlaceholder")}
-              maxLength={900}
-            />
-            <div className="brw-ac__row">
-              <span className="brw-grow" />
-              <Button size="sm" variant="ghost" onClick={() => setFailing(false)}>
-                {t("browser.live.back")}
-              </Button>
-              <Button size="sm" variant="primary" loading={actions.failed.isPending} onClick={fail}>
-                {t("browser.live.failSend", g)}
-              </Button>
-            </div>
+            <Locked when={actions.failed.isPending}>
+              <b>{t("browser.live.failTitle")}</b>
+              <span className="small muted">{t("browser.live.failHelp", g)}</span>
+              <div className="brw-reasons">
+                {FAIL_REASONS.map((r) => (
+                  <FilterToggle key={r} pressed={reason === r} onPressedChange={(on) => setReason(on ? r : null)}>
+                    {t(`browser.live.failReasons.${r}`)}
+                  </FilterToggle>
+                ))}
+              </div>
+              <Textarea
+                rows={1}
+                autoGrow
+                className="brw-ac__note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t("browser.live.failPlaceholder")}
+                maxLength={900}
+              />
+              <div className="brw-ac__row">
+                <span className="brw-grow" />
+                <Button size="sm" variant="ghost" onClick={() => setFailing(false)}>
+                  {t("browser.live.back")}
+                </Button>
+                <Button size="sm" variant="primary" loading={actions.failed.isPending} onClick={fail}>
+                  {t("browser.live.failSend", g)}
+                </Button>
+              </div>
+            </Locked>
           </div>
         ) : handingBack ? (
           <HandBackFoot

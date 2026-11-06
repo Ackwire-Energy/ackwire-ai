@@ -829,6 +829,11 @@ html:not([data-pointer]) .nt-nb:focus-visible {
 .nt-cmp textarea::placeholder {
   color: var(--faint);
 }
+.nt-cmp textarea:disabled {
+  color: var(--muted);
+  -webkit-text-fill-color: currentColor;
+  cursor: not-allowed;
+}
 .nt-cmp__row {
   display: flex;
   align-items: center;

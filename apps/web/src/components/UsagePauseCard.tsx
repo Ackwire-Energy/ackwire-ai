@@ -12,7 +12,7 @@ import {
   usagePauseText,
   usageWaitFix,
 } from "@agenteschat/client/lib/usage-pause";
-import { Button, Icon } from "@agenteschat/ui";
+import { Button, Icon, Locked } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ButtonHTMLAttributes, useState } from "react";
@@ -219,22 +219,26 @@ export function UsagePauseCardView({ message, card }: { message: Message; card: 
       ) : (
         <>
           <span className="small muted">{line}</span>
-          <span className="waitcard__acts">
-            <Button
-              size="sm"
-              variant="primary"
-              loading={pending}
-              disabled={!may}
-              title={
-                may ? t(card.source === "budget" ? "usageCard.hintBudget" : "usageCard.hint") : t("usageCard.forbidden")
-              }
-              onClick={go}
-            >
-              {t("usageCard.continue")}
-            </Button>
-            <DontRunButton runId={card.runId} may={may} />
-            {!may && <span className="small muted">{t("usageCard.forbidden")}</span>}
-          </span>
+          <Locked when={pending}>
+            <span className="waitcard__acts">
+              <Button
+                size="sm"
+                variant="primary"
+                loading={pending}
+                disabled={!may}
+                title={
+                  may
+                    ? t(card.source === "budget" ? "usageCard.hintBudget" : "usageCard.hint")
+                    : t("usageCard.forbidden")
+                }
+                onClick={go}
+              >
+                {t("usageCard.continue")}
+              </Button>
+              <DontRunButton runId={card.runId} may={may} />
+              {!may && <span className="small muted">{t("usageCard.forbidden")}</span>}
+            </span>
+          </Locked>
         </>
       )}
     </div>

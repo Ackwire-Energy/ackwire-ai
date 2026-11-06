@@ -563,6 +563,7 @@ export function DesktopView({
           variant="primary"
           icon={back.icon}
           className={back.className}
+          disabled={actions.failed.isPending}
           onClick={() => {
             // The note opens in the dialog, never over the full-screen screen.
             head?.setFull(false);
