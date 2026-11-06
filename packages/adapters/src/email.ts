@@ -31,8 +31,11 @@ export interface InlinePart {
 /** A marketing contact (e.g. a confirmed waiting list address), keyed by email. */
 export interface EmailContact {
   email: string;
-  /** Custom properties, merged into what the provider already has. */
-  properties: Record<string, string | number>;
+  /**
+   * Custom properties, merged into what the provider already has; null removes one. With a null the contact is only
+   * updated: one the provider doesn't have yet isn't created.
+   */
+  properties: Record<string, string | number | null>;
 }
 
 export interface EmailSender {
@@ -117,7 +120,10 @@ export function createMillionSendSender(options: {
       }
       return { id: body.id };
     },
-    /** `POST /contacts`; an existing contact (409) gets its properties merged with `PATCH /contacts/{email}`. */
+    /**
+     * `POST /contacts`; an existing contact (409) gets its properties merged with `PATCH /contacts/{email}`. A null
+     * goes only by `PATCH`, where it removes the key; a contact it doesn't find (404) has nothing to remove.
+     */
     async saveContact(contact) {
       const call = async (method: string, path: string, body: unknown) => {
         try {
@@ -130,9 +136,14 @@ export function createMillionSendSender(options: {
           throw new EmailError(`could not reach MillionSend: ${String(error)}`, true);
         }
       };
-      let res = await call("POST", "/contacts", { email: contact.email, properties: contact.properties });
-      if (res.status === 409)
-        res = await call("PATCH", `/contacts/${encodeURIComponent(contact.email)}`, { properties: contact.properties });
+      const patch = () =>
+        call("PATCH", `/contacts/${encodeURIComponent(contact.email)}`, { properties: contact.properties });
+      const removes = Object.values(contact.properties).includes(null);
+      let res = removes
+        ? await patch()
+        : await call("POST", "/contacts", { email: contact.email, properties: contact.properties });
+      if (res.status === 409) res = await patch();
+      if (removes && res.status === 404) return;
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { message?: string; name?: string };
         throw new EmailError(
