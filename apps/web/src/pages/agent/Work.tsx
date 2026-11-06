@@ -51,6 +51,7 @@ import {
   accountChoices,
   lendable,
   ownSignInListed,
+  ownSignInLower,
   ownSignInName,
   ownSignInReady,
   ownSignInTitle,
@@ -67,7 +68,7 @@ import {
   SPEEDS,
 } from "@agenteschat/client/lib/brain-advanced";
 import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
-import { setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { computerNameOf, setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
@@ -297,7 +298,12 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       ? null
       : view?.account
         ? (planAccounts.find((a) => a.id === view.account)?.label ?? null)
-        : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
+        : ownSignInName(
+            t,
+            view?.ownSignIn === true && view.canUsePlans,
+            view?.computer?.name ?? "",
+            kind === "model" ? undefined : kind,
+          );
   // Near or at its plan's limit: said where the account is.
   const usage =
     !view || kind === "model"
@@ -770,7 +776,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
   const accountKind = kind === "model" ? null : kind;
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
-  const computerName = view.computer?.name ?? "";
+  const computerName = computerNameOf(t, org.name, view.computer?.name ?? "");
   // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
   const allAccounts = [
     ...view.accounts.map((v) => added.find((a) => a.id === v.id) ?? v),
@@ -1029,7 +1035,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ? // Chosen only where it is its owner's: the computer's own sign-in, the account their agents share.
                   t("aiAccounts.done.savedAgent", {
                     agent: agent.name,
-                    label: t("connectAi.own.sharedLower"),
+                    label: ownSignInLower(t, accountKind),
                   })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
@@ -1182,7 +1188,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       ? [
           {
             value: HERE,
-            label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName),
+            label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName, accountKind ?? undefined),
             description: accountKind && ownPlan ? ownSignInTitle(t, { kind: accountKind, plan: ownPlan }) : undefined,
             leading: sharedIcon,
           },

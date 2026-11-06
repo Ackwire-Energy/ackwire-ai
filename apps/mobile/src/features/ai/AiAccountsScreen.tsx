@@ -19,6 +19,7 @@ import {
   ownSignIns,
   ownSignInTitle,
 } from "@agenteschat/client/lib/ai-accounts";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -259,7 +260,7 @@ export function AiAccountsScreen() {
               const out = a.status === "signed_out";
               const facts = [
                 a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
-                several ? t("aiAccounts.page.on", { computer: a.computer }) : null,
+                several ? t("aiAccounts.page.on", { computer: computerNameOf(t, org?.name ?? "", a.computer) }) : null,
                 a.usedBy.length > 0
                   ? t("aiAccounts.page.usedBy", { count: a.usedBy.length, agents: names(a.usedBy) })
                   : t("aiAccounts.page.noAgent"),
