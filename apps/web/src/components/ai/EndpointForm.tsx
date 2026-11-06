@@ -41,7 +41,8 @@ import { useTranslation } from "react-i18next";
  * its API, types its address and key, fetches its models (or types their ids), chooses which agents may use and their
  * prices, then saves: the server runs one test call per model and the results show here. With `credential`, it
  * changes a saved endpoint's models and prices (its address and key stay). With `onCancel` it fills a dialog, its
- * body and footer; without, it is a block of a panel with its action under it.
+ * body and footer; without, it is a block of a panel whose action comes up under it once there's something to save,
+ * like the panel's own Salvar chave.
  */
 export function EndpointForm({
   orgId,
@@ -306,16 +307,18 @@ export function EndpointForm({
           {unpriced && <SettingNote icon="info">{t("endpoint.unpriced")}</SettingNote>}
         </Body>
       </Locked>
-      <Foot note={saving ? t("endpoint.testing") : undefined}>
-        {onCancel && (
-          <Button onClick={onCancel} disabled={saving}>
-            {t("common.cancel")}
+      {(onCancel || ready || saving) && (
+        <Foot note={saving ? t("endpoint.testing") : undefined}>
+          {onCancel && (
+            <Button onClick={onCancel} disabled={saving}>
+              {t("common.cancel")}
+            </Button>
+          )}
+          <Button variant="primary" loading={saving} disabled={!ready || saving} onClick={save}>
+            {t(editing ? "endpoint.saveModels" : "endpoint.save")}
           </Button>
-        )}
-        <Button variant="primary" loading={saving} disabled={!ready || saving} onClick={save}>
-          {t(editing ? "endpoint.saveModels" : "endpoint.save")}
-        </Button>
-      </Foot>
+        </Foot>
+      )}
     </>
   );
 }

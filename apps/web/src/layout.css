@@ -3364,7 +3364,7 @@ html:not([data-pointer]) .skill-file--open:focus-visible {
   gap: var(--space-1) var(--space-2);
 }
 .skill-picks {
-  margin: 12px 0 0;
+  margin: 0;
   padding: 0;
   border: 0;
   min-width: 0;
@@ -3385,10 +3385,6 @@ html:not([data-pointer]) .skill-file--open:focus-visible {
 /* Which of the workspace's GitHub connections read a private repository: GitHub's bare mark on the line. */
 .skill-via {
   margin: 0;
-}
-/* The tab's own gap above the skills it read, not that and the list's margin too. */
-.skill-via + .skill-picks {
-  margin-top: 0;
 }
 .skill-via > .connector-icon,
 .ac-btn > .connector-icon {
@@ -5233,6 +5229,12 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 @media (max-width: 400px) {
   .tr-seg .ac-toolpx-swatch {
     display: none;
+  }
+  .tr-decide .tr-row__ctl {
+    flex-wrap: wrap;
+  }
+  .tr-decide .tr-seg .ac-seg__item {
+    padding: 0 6px;
   }
 }
 /* The agent's tools (read only, `ToolLevelsView`) also show in the panel beside its DM (`agp-side`): there the pixel

@@ -992,6 +992,21 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.querySelector(".ac-spinner, .ac-pixspin")).toBeNull();
   });
 
+  test("Outro provedor in the panel: its Salvar e testar comes up once the form can be saved, no greyed button before", async () => {
+    const { dialog } = await connect();
+    await chooseAi(dialog, "Chave de API");
+    await chooseAi(dialog, "Outro provedor", true);
+    await settle(3);
+    expect(within(dialog).queryByRole("button", { name: "Salvar e testar" })).toBeNull();
+    await type(within(dialog).getByLabelText("Nome"), "OpenGateway");
+    await type(within(dialog).getByLabelText("Endereço"), "https://gw.example/v1");
+    const typed = within(dialog).getByLabelText("Adicionar um modelo");
+    await type(typed, "llama-4");
+    await act(async () => fireEvent.keyDown(typed, { key: "Enter" }));
+    await settle();
+    expect(within(dialog).getByRole("button", { name: "Salvar e testar" }).hasAttribute("disabled")).toBe(false);
+  });
+
   test("a plan for Ada, then the API key for the rest: its field is there, and only a saved key says it's saved", async () => {
     const { state, machines, dialog, choose } = await connect();
     machines?.endLogin("login_1", { state: "done", account: claudeMax });

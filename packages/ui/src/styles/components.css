@@ -2445,7 +2445,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 }
 .ac-dialog__list {
   flex: 1 1 auto;
-  min-height: min(120px, 20vh);
+  min-height: min(120px, 15vh);
   overflow-y: auto;
   /* As the body's: room for the first and last rows' focus rings, which the scroll area would clip. */
   padding: 4px var(--dialog-pad);
