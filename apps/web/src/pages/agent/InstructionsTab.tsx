@@ -115,7 +115,7 @@ export function InstructionsTab() {
                 <b className="ac-captop">{t("agentPage.instructions.proposals", { count: pending.length })}</b>
                 <span>{t("agentPage.overview.proposes", g)}</span>
               </span>
-              <span className="agp-attn__tail">
+              <span className="agp-attn__tail ac-captop">
                 <Button size="sm" onClick={() => goTo("memory")}>
                   {t("agentPage.overview.review")}
                 </Button>
