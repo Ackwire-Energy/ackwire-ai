@@ -289,6 +289,10 @@ export function computerName(
   return [`${orgName}'s computer`, `Computador da ${orgName}`].includes(machine.name) ? ours : machine.name;
 }
 
+/** `computerName` where a list carries only a computer's name: the workspace's own reads in the reader's words. */
+export const computerNameOf = (t: TFunction, orgName: string, name: string) =>
+  computerName(t, orgName, { kind: "managed", name });
+
 export type NoComputer = "workspace" | "none";
 
 /**

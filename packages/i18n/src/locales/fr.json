@@ -2404,6 +2404,8 @@
     "own": {
       "shared": "Le compte partagé par vos agents",
       "sharedLower": "le compte partagé par vos agents",
+      "free": "Modèles gratuits d'OpenCode",
+      "freeLower": "les modèles gratuits d'OpenCode",
       "one": "Un compte rien que pour {{name}}",
       "one_female": "Un compte rien que pour {{name}}",
       "each": "Un compte rien que pour eux"

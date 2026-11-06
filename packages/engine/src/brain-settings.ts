@@ -1743,7 +1743,9 @@ export interface AiComputer {
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the caller connected (it is theirs, and
    * the agents on it think with it when no account is picked). Claude Code when `claude auth status` said it is
-   * signed in (or its plan's usage is known); Codex once its usage is known. Its plan and usage when known.
+   * signed in (or its plan's usage is known); Codex once its usage is known. Its plan and usage when known. Never
+   * OpenCode: its CLI needs no sign-in, so its presence says nothing about anyone's account (`brains.opencode` and
+   * `canAdd` say where its free tier can think, ADR 0132 §6).
    */
   own: Partial<Record<AccountKind, OwnSignIn>>;
 }
@@ -1806,13 +1808,7 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
           grok: can("grok"),
           antigravity: can("antigravity"),
         },
-        own:
-          m.pairedByUserId === userId
-            ? ownSignIns(m.executors, can)
-            : // OpenCode's free tier there thinks for anyone's agents (ADR 0132): nobody signs in on it.
-              m.pairedByUserId === null && can("opencode")
-              ? { opencode: {} }
-              : {},
+        own: m.pairedByUserId === userId ? ownSignIns(m.executors, can) : {},
       };
     }),
   };
@@ -1834,7 +1830,5 @@ function ownSignIns(
       ...(usage.claude_code ? { usage: usage.claude_code } : {}),
     };
   if (can("codex") && usage.codex) out.codex = { usage: usage.codex };
-  // Its own OpenCode always thinks: its own sign-ins, or the free tier with none.
-  if (can("opencode")) out.opencode = {};
   return out;
 }
