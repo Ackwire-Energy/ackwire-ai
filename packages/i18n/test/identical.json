@@ -420,6 +420,7 @@
       "connectAi.pick.plan"
     ],
     "fr": [
+      "wiki.bulk.agents",
       "deleteAccount.agentCount",
       "deleteAccount.messageCount",
       "queue.fill.routine",
@@ -1424,6 +1425,7 @@
       "agentPage.work.brain.speeds.standard"
     ],
     "nl": [
+      "wiki.bulk.agents",
       "deleteAccount.agentCount",
       "queue.fill.routine",
       "access.agentCol",

@@ -114,6 +114,8 @@ function AppStack() {
       <Stack.Screen name="wiki-history" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-move" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-audience" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-trash" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-agents" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-write" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />

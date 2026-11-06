@@ -4,7 +4,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon } from "@agenteschat/client/lib/files";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { leafTitle } from "@agenteschat/client/lib/wiki";
+import { leafTitle, wikiImportOf } from "@agenteschat/client/lib/wiki";
 import {
   Avatar,
   Button,
@@ -837,13 +837,7 @@ export function WikiReader({
   }
 
   const crumbs = (editing ? draft.folder : (p?.folder ?? "")).split("/").filter(Boolean);
-  // Everything the page's import brought: by its id, or by vault for imports made before ids.
-  const importPages = (p: WikiPageData) =>
-    pages.filter((x) =>
-      p.importId
-        ? x.importId === p.importId
-        : x.sourceType === p.sourceType && x.sourceName === p.sourceName && !x.importId,
-    );
+  const imported = p ? wikiImportOf(pages, p) : null;
   // The page's actions: its "…" and the right click on its title.
   const pageEntries = (p: WikiPageData): MenuEntry[] => [
     {
@@ -916,12 +910,12 @@ export function WikiReader({
             danger: true,
             run: () => setConfirmDelete(true),
           },
-          ...(p.sourceType === "obsidian" && p.sourceName
+          ...(imported
             ? ([
                 {
                   kind: "item",
                   id: "delete-import",
-                  label: t("wiki.bulk.deleteImport", { name: p.sourceName, count: importPages(p).length }),
+                  label: t("wiki.bulk.deleteImport", { name: imported.name, count: imported.pages.length }),
                   icon: "trash",
                   danger: true,
                   run: () => setDeleteImport(true),
@@ -1133,11 +1127,11 @@ export function WikiReader({
           </DialogFooter>
         </Dialog>
       )}
-      {p && deleteImport && p.sourceName && (
+      {deleteImport && imported && (
         <WikiBulkDeleteDialog
-          target={p.importId ? { importId: p.importId } : { source: { type: p.sourceType ?? "", name: p.sourceName } }}
-          count={importPages(p).length}
-          what={{ kind: "import", name: p.sourceName }}
+          target={imported.target}
+          count={imported.pages.length}
+          what={{ kind: "import", name: imported.name }}
           onClose={() => setDeleteImport(false)}
           onDone={() => void navigate({ to: "/org/$orgId/wiki", params: { orgId: org.id } })}
         />
