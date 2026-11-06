@@ -2,10 +2,16 @@ import { and, desc, eq, gt, isNull, or, schema, sql } from "@agenteschat/db";
 import { type ConnectorState, connectorStates, type ServerCatalog } from "../connectors/listing";
 import { secretSite } from "../secret-request-tool";
 import { REQUEST_SECRET_TOOL, secretStillHeld } from "../secrets";
-import { OFFER_CONNECT_APP_TOOL } from "../setup-tools";
 import { HOW_TO_GET } from "./directory";
 import { missingPermissions, REQUEST_PERMISSION_TOOL } from "./permission";
 import type { ToolContext, ToolDefinition } from "./types";
+
+/**
+ * `offer_connect_app`'s name (built in `setup-tools.ts`, which re-exports it). Kept here: importing it from there
+ * would close an import cycle (setup-tools → schedule-tools → routines → the gateway → this file) that reads
+ * `ROUTINE_EVENTS` before `routines.ts` has set it.
+ */
+export const OFFER_CONNECT_APP_TOOL = "offer_connect_app";
 
 /** How many of the people's last messages in the conversation `person_said` is looked for in. */
 const PEOPLE_MESSAGES_READ = 30;

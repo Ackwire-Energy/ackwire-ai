@@ -92,6 +92,56 @@ export interface MediaToolDeps {
   gifs: GifProvider | null;
 }
 
+/**
+ * The GIF search the calling agent may use: the server's, answering now, with the workspace's GIFs on and the agent's
+ * own switch (`agents.media_replies`). Null: no GIF. Where it goes is the caller's check (`post_message` posts one in
+ * another channel, ADR 0091 addendum 2026-11-05).
+ */
+export async function agentGifSearch(
+  gifs: GifProvider | null | undefined,
+  ctx: Pick<ToolContext, "db" | "orgId" | "agentId">,
+): Promise<GifProvider | null> {
+  if (!gifs?.available()) return null;
+  const [settings, agent] = await Promise.all([
+    mediaSettings(ctx.db, ctx.orgId),
+    getAgentCached(ctx.db, ctx.orgId, ctx.agentId),
+  ]);
+  return settings.gifs && agent && !agent.archivedAt && agent.mediaReplies ? gifs : null;
+}
+
+/** What `AgentGifPoster.find` found: the GIF, or why none goes (`query`: the search as the provider got it). */
+export type GifToPost = { gif: GifMedia } | { none: "off" } | { none: "empty" | "down" | "not_found"; query: string };
+
+/**
+ * `post_message`'s GIF (ADR 0091 addendum 2026-11-05), handed to the chat tools by whoever builds them, so
+ * `chat-tools.ts` never imports this file (its imports would close a cycle through `context.ts`).
+ */
+export interface AgentGifPoster {
+  /** Whether the calling agent may send a GIF now (`agentGifSearch`). */
+  offered(ctx: ToolContext): Promise<boolean>;
+  /** A GIF for the model's `search`, found as `send_gif` finds one (the workspace's rating, fixed by `seed`). */
+  find(ctx: ToolContext, search: unknown, seed: string): Promise<GifToPost>;
+}
+
+export function createAgentGifPoster(gifs: GifProvider | null | undefined): AgentGifPoster {
+  return {
+    offered: async (ctx) => (await agentGifSearch(gifs, ctx)) !== null,
+    async find(ctx, search, seed) {
+      const provider = await agentGifSearch(gifs, ctx);
+      if (!provider) return { none: "off" };
+      const query = gifSearchOf(search);
+      if (!query) return { none: "empty", query };
+      const { gifRating } = await mediaSettings(ctx.db, ctx.orgId);
+      // Undefined: the provider didn't answer (an outage, a limit, too slow).
+      const gif = await findGif(provider, { query, rating: gifRating, seed: `${seed}:${query}` }).catch(
+        () => undefined,
+      );
+      if (gif === undefined) return { none: "down", query };
+      return gif ? { gif } : { none: "not_found", query };
+    },
+  };
+}
+
 type RunRow = { hop: number; createdAt: Date };
 
 /** The run's hop (its messages carry it) and start (its own messages are read from there). */
@@ -195,7 +245,7 @@ function gifTool(deps: MediaToolDeps, gifs: GifProvider, options: { sticker: boo
   const instead = options.sticker ? " Send your sticker with `send_sticker` instead, or just reply." : " Just reply.";
   return {
     name: SEND_GIF_TOOL,
-    description: `Send a GIF in this conversation ${WHEN} \`search\` says what the GIF shows, as a short search in English (1 to 6 words, e.g. "good morning coffee cat") whatever language the conversation is in: GIF search matches English best. ${AFTER}`,
+    description: `Send a GIF in this conversation ${WHEN} \`search\` says what the GIF shows, as a short search in English (1 to 6 words, e.g. "good morning coffee cat") whatever language the conversation is in: GIF search matches English best. ${AFTER} To post a GIF in another channel, use post_message with \`gif\`.`,
     scope: "",
     inputSchema: {
       type: "object",
