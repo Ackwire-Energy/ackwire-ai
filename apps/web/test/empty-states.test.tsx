@@ -85,6 +85,8 @@ describe("who can't act gets an honest line and no button that fails", () => {
 
   test("an agent that doesn't answer me: its files say what they are, with nothing to ask", async () => {
     const state = fresh(["read", "talk_to_agents", "manage_agents"]);
+    // Who manages agents sees the ones that don't answer them.
+    Object.assign(state.me?.organizations[0] ?? {}, { role: "admin" });
     for (const a of state.agents) if (a.id === ADA_ID) a.audience = { mode: "owner", userIds: [], roleIds: [] };
     await go(state, `agents/${ADA_ID}?tab=files`);
     expect(title()).toBeUndefined();

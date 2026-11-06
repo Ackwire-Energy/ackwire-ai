@@ -623,7 +623,7 @@ describe("Configurações do workspace", () => {
     await renderApp(`/org/${ORG_ID}/settings/usage`, { api });
     await settle(5);
     expect(shownText(screen().getByRole("region", { name: "Contas dos planos" }))).toBe(
-      "Contas dos planosUse o plano de IA que você já pagaConecte um plano e acompanhe aqui o quanto cada agente usa dele.",
+      "Contas dos planosUse o plano de IA que você já pagaConecte um plano e acompanhe aqui o quanto cada agente usa dele.Conectar uma IA",
     );
   });
 });
