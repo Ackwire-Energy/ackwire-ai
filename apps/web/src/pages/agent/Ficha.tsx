@@ -2,7 +2,18 @@ import type { Routine } from "@agenteschat/client";
 import { useAgentDetail, useAgentSkills, useRoutines, useUsage } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
-import { Avatar, Button, Chip, Dialog, DialogFooter, Icon, Meter, PlanMeter, Switch } from "@agenteschat/ui";
+import {
+  Avatar,
+  Button,
+  Chip,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Icon,
+  Meter,
+  PlanMeter,
+  Switch,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -216,7 +227,9 @@ export function Ficha() {
         closeLabel={t("common.close")}
         width={520}
       >
-        <UsageBody />
+        <DialogBody>
+          <UsageBody />
+        </DialogBody>
         <DialogFooter>
           <Button onClick={() => setOpen(null)}>{t("common.close")}</Button>
           <GoButton tab="usage" label={t("agentPage.overview.seeAll")} onGo={() => setOpen(null)} />
@@ -246,7 +259,7 @@ export function Ficha() {
         title={t("audience.title", g)}
         fields={["audience"]}
       >
-        <AudienceEditor />
+        <AudienceEditor layout="rows" />
       </EditDialog>
       <EditDialog
         open={open === "channels"}
@@ -263,11 +276,13 @@ export function Ficha() {
         closeLabel={t("common.close")}
         width={520}
       >
-        <ul className="agp-list">
-          {mine.map((r) => (
-            <RoutineLine key={r.id} routine={r} onGo={() => setOpen(null)} />
-          ))}
-        </ul>
+        <DialogBody>
+          <ul className="agp-list">
+            {mine.map((r) => (
+              <RoutineLine key={r.id} routine={r} onGo={() => setOpen(null)} />
+            ))}
+          </ul>
+        </DialogBody>
         <DialogFooter>
           <Button onClick={() => setOpen(null)}>{t("common.close")}</Button>
         </DialogFooter>
@@ -320,7 +335,7 @@ function EditDialog({
   };
   return (
     <Dialog open={open} onOpenChange={(o) => !o && cancel()} title={title} closeLabel={t("common.close")} width={520}>
-      {children}
+      <DialogBody>{children}</DialogBody>
       <DialogFooter>
         {editable ? (
           <>
@@ -367,69 +382,71 @@ function AccessDialog({ open, onClose }: { open: boolean; onClose: () => void })
       closeLabel={t("common.close")}
       width={560}
     >
-      <div className="agp-kv">
-        <div>
-          <span className="agp-k">{t("access.kind.connectors")}</span>
-          {connectors.length ? (
-            <span className="agp-chips">
-              {connectors.map((r) => {
-                const n = resourceName(t, r, items);
-                return (
-                  <span key={r.id} className="ac-chip agp-res">
-                    <ResourceIcon resource={r} items={items} name={n} />
-                    {t(
-                      levels[r.id] === "write"
-                        ? "agentPage.overview.levelWrite"
-                        : levels[r.id] === "custom"
-                          ? "agentPage.overview.levelCustom"
-                          : "agentPage.overview.levelRead",
-                      { name: n },
-                    )}
-                    {r.connector === "github" && repoSuffix}
-                  </span>
-                );
-              })}
-            </span>
-          ) : (
-            <span className="small muted">{t("agentPage.overview.noConnectors")}</span>
+      <DialogBody>
+        <div className="agp-kv">
+          <div>
+            <span className="agp-k">{t("access.kind.connectors")}</span>
+            {connectors.length ? (
+              <span className="agp-chips">
+                {connectors.map((r) => {
+                  const n = resourceName(t, r, items);
+                  return (
+                    <span key={r.id} className="ac-chip agp-res">
+                      <ResourceIcon resource={r} items={items} name={n} />
+                      {t(
+                        levels[r.id] === "write"
+                          ? "agentPage.overview.levelWrite"
+                          : levels[r.id] === "custom"
+                            ? "agentPage.overview.levelCustom"
+                            : "agentPage.overview.levelRead",
+                        { name: n },
+                      )}
+                      {r.connector === "github" && repoSuffix}
+                    </span>
+                  );
+                })}
+              </span>
+            ) : (
+              <span className="small muted">{t("agentPage.overview.noConnectors")}</span>
+            )}
+          </div>
+          {builtins.length > 0 && (
+            <div>
+              <span className="agp-k">{t("access.kind.builtin")}</span>
+              <span className="agp-chips">
+                {builtins.map((r) => {
+                  const n = resourceName(t, r, items);
+                  return (
+                    <span key={r.id} className="ac-chip agp-res">
+                      <ResourceIcon resource={r} items={items} name={n} />
+                      {n}
+                    </span>
+                  );
+                })}
+              </span>
+            </div>
+          )}
+          {enabledSkills.length > 0 && (
+            <div>
+              <span className="agp-k">{t("skills.agentTitle")}</span>
+              <span className="agp-chips">
+                {enabledSkills.map((s) => (
+                  <Chip key={s.id} icon="book">
+                    {s.name}
+                  </Chip>
+                ))}
+              </span>
+            </div>
           )}
         </div>
-        {builtins.length > 0 && (
-          <div>
-            <span className="agp-k">{t("access.kind.builtin")}</span>
-            <span className="agp-chips">
-              {builtins.map((r) => {
-                const n = resourceName(t, r, items);
-                return (
-                  <span key={r.id} className="ac-chip agp-res">
-                    <ResourceIcon resource={r} items={items} name={n} />
-                    {n}
-                  </span>
-                );
-              })}
-            </span>
-          </div>
-        )}
-        {enabledSkills.length > 0 && (
-          <div>
-            <span className="agp-k">{t("skills.agentTitle")}</span>
-            <span className="agp-chips">
-              {enabledSkills.map((s) => (
-                <Chip key={s.id} icon="book">
-                  {s.name}
-                </Chip>
-              ))}
-            </span>
-          </div>
-        )}
-      </div>
-      <AgentAsksLine
-        agentName={agent.name}
-        groups={agentConnectorTools(t, connectors, levels, items)}
-        items={items}
-        canChange={false}
-        onChange={onClose}
-      />
+        <AgentAsksLine
+          agentName={agent.name}
+          groups={agentConnectorTools(t, connectors, levels, items)}
+          items={items}
+          canChange={false}
+          onChange={onClose}
+        />
+      </DialogBody>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.close")}</Button>
         <GoButton tab="access" label={label} onGo={onClose} />

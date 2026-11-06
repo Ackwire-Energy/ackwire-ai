@@ -522,7 +522,8 @@ export function OwnerEditor() {
 }
 
 /** Who can talk to it. */
-export function AudienceEditor() {
+/** `layout`: the choices as cards (the Settings tab) or as rows (a dialog, where three cards leave one alone). */
+export function AudienceEditor({ layout = "cards" }: { layout?: "cards" | "rows" } = {}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -537,6 +538,7 @@ export function AudienceEditor() {
         <>
           <AudienceChoice
             compact
+            layout={layout}
             value={draft.audience}
             onChange={chooseAudience}
             ownerUserId={ownerId}
