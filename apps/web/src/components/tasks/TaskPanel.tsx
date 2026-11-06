@@ -2,6 +2,7 @@ import type { EndedTask, ManagedTask } from "@agenteschat/client";
 import { TASK_MANAGER_POLL_MS, useTaskSteps } from "@agenteschat/client";
 import { type Activity, activityVerb, toolActivity } from "@agenteschat/client/lib/activity";
 import { capitalize } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   delegationText,
   endedState,
@@ -154,13 +155,17 @@ export function TaskPanel({
                 <span>
                   <b>
                     {byMe
-                      ? t("taskManager.stopped.line")
+                      ? t("taskManager.stopped.line", { agent: name, context: agentGrammar(name).context })
                       : stopper
-                        ? t("taskManager.stopped.lineBy", { name: stopper.name })
+                        ? t("taskManager.stopped.lineBy", {
+                            name: stopper.name,
+                            agent: name,
+                            context: agentGrammar(name).context,
+                          })
                         : t("taskManager.state.stopped")}
                   </b>
                   {" · "}
-                  {t("taskManager.stopped.told", { agent: name })}
+                  {t("taskManager.stopped.told")}
                   {reason && ` ${t("taskManager.stopped.reason", { reason })}`}
                 </span>
               </p>

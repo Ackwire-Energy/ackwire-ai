@@ -1,5 +1,6 @@
 import { type Message, useStopReason } from "@agenteschat/client";
 import { seesDetails } from "@agenteschat/client/lib/audience";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { StoppedNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,9 +12,9 @@ import { ReasonField } from "../task-manager/parts";
 import { LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
 
 /**
- * A person stopped one of the agent's tasks (ADR 0128): one calm line where the task was, "Você parou esta tarefa ·
- * 14:09 · Dev recebeu o aviso e só retoma se alguém pedir.", with the reason when there is one. Who stopped it, while
- * it has none, gets "Dizer por quê": a short field the agent reads.
+ * A person stopped one of the agent's tasks (ADR 0128): one calm line where the task was, "You stopped Dev · 14:09 ·
+ * Waits until someone asks to continue.", with the reason when there is one. Who stopped it, while it has none, gets
+ * "Add a reason": a short field the agent reads.
  */
 export function StoppedLine({ message, notice }: { message: Message; notice: StoppedNotice }) {
   const { t } = useTranslation();
@@ -32,7 +33,10 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
   const mine = notice.byUserId === meId;
   const agent = dir.nameOf(message.author) || t("channel.unknownAgent");
   const by = notice.byName || dir.nameOf({ type: "person", id: notice.byUserId });
-  const who = mine ? t("taskManager.stopped.line") : t("taskManager.stopped.lineBy", { name: by });
+  const { context } = agentGrammar(agent);
+  const who = mine
+    ? t("taskManager.stopped.line", { agent, context })
+    : t("taskManager.stopped.lineBy", { name: by, agent, context });
   const send = () => {
     const text = why.trim();
     if (!text) return;
@@ -57,7 +61,7 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
           </Text>
           {` · ${when.time(message.createdAt)}`}
           {reason ? ` · ${t("taskManager.stopped.reason", { reason })}` : null}
-          {` · ${t("taskManager.stopped.told", { agent })}`}
+          {` · ${t("taskManager.stopped.told")}`}
           {mine && !reason && !writing ? (
             <>
               {" · "}

@@ -824,8 +824,8 @@ function Sending({ offline, end }: { offline: boolean; end: boolean }) {
 }
 
 /**
- * A reply someone stopped: what it wrote stays, with "Parado por você · Continuar" ("No limite de passos ·
- * Continuar" under the reply of a run that reached its step limit); the button picks up from where it stopped
+ * A reply someone stopped: what it wrote stays, with "Stopped here · Continue" ("At the step limit ·
+ * Continue" under the reply of a run that reached its step limit); the button picks up from where it stopped
  * (a new run) and goes away once it did, for everyone.
  */
 function StoppedLine({

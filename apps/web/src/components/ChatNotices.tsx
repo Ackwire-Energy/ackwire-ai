@@ -4,6 +4,7 @@ import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { seesDetails } from "@agenteschat/client/lib/audience";
 import { pairItemOf } from "@agenteschat/client/lib/consult-group";
 import { formatTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   consultationOfNotice,
   followUpLine,
@@ -201,8 +202,8 @@ export function SpeedFallbackLine({ agent }: { agent: Agent | undefined }) {
 }
 
 /**
- * "Você parou esta tarefa · Dev recebeu o aviso e só retoma se alguém pedir." and the reason when one was said. Who
- * stopped it can still say why ("Dizer por quê": a field and Mandar, in the line); the agent reads it on its next turn.
+ * "You stopped Dev · Waits until someone asks to continue." and the reason when one was said. Who stopped it can
+ * still say why ("Add a reason": a field and Send, in the line); the agent reads it on its next turn.
  */
 function StoppedLine({ message, notice }: { message: Message; notice: StoppedNotice }) {
   const { t } = useTranslation();
@@ -216,13 +217,18 @@ function StoppedLine({ message, notice }: { message: Message; notice: StoppedNot
   const reason = notice.reason ?? sent;
   const stopper = notice.byName || dir.memberById.get(notice.byUserId)?.name || "";
   const agent = message.author.type === "agent" ? dir.authorName(message.author) : t("channel.unknownAgent");
+  const { context } = agentGrammar(agent);
   return (
     <div className="cn-line ac-iconline cn-stopped" data-message-id={message.id}>
       <PixelStop size={12} dim />
       <span className="cn-line__text">
-        <b>{mine ? t("taskManager.stopped.line") : t("taskManager.stopped.lineBy", { name: stopper })}</b>
+        <b>
+          {mine
+            ? t("taskManager.stopped.line", { agent, context })
+            : t("taskManager.stopped.lineBy", { name: stopper, agent, context })}
+        </b>
         {" · "}
-        {t("taskManager.stopped.told", { agent })}
+        {t("taskManager.stopped.told")}
         {reason && ` ${t("taskManager.stopped.reason", { reason })}`}
         {mine && !reason && !asking && (
           <>

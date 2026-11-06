@@ -9161,9 +9161,9 @@
     "elapsedMinutes": "{{m}} min {{s}} s",
     "stopAgent": "Detener a {{name}}",
     "stopAgent_female": "Detener a {{name}}",
-    "stoppedByYou": "La detuviste tú",
-    "stoppedBy": "Detenida por {{name}}",
-    "stopped": "Detenida",
+    "stoppedByYou": "Se detuvo aquí",
+    "stoppedBy": "{{name}} lo detuvo aquí",
+    "stopped": "Se detuvo aquí",
     "continueRun": "Continuar",
     "stepLimit": "En el límite de pasos",
     "stuck": "Se detuvo porque se trabó",
@@ -14885,11 +14885,11 @@
       "here": "aquí"
     },
     "stopped": {
-      "line": "Detuviste esta tarea",
-      "lineBy": "{{name}} detuvo esta tarea",
-      "told": "{{agent}} recibió el aviso y solo la retoma si alguien se lo pide.",
+      "line": "Detuviste a {{agent}}",
+      "lineBy": "{{name}} detuvo a {{agent}}",
+      "told": "Espera a que alguien le pida seguir.",
       "reason": "Motivo: «{{reason}}»",
-      "sayWhy": "Decir por qué",
+      "sayWhy": "Decir el motivo",
       "whyPlaceholder": "¿Quieres decir por qué? (opcional)",
       "send": "Enviar"
     },

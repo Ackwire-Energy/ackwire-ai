@@ -6276,7 +6276,7 @@ html:not([data-pointer]) .stop-run:focus-visible {
   margin: 0 2px 0 4px;
   background: var(--line);
 }
-/* "Parado por você · Continuar" under a stopped answer. */
+/* "Stopped here · Continue" under a stopped answer. */
 .run-canceled {
   display: inline-flex;
   align-items: center;
