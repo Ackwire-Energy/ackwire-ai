@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { en } from "@agenteschat/i18n/en";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
@@ -494,6 +494,15 @@ export const accountInUse = sql<boolean>`(${users.blockedAt} is null and ${users
 export async function accountClosed(db: Executor, userId: string) {
   const [row] = await db.select({ open: accountInUse }).from(users).where(eq(users.id, userId));
   return row?.open !== true;
+}
+
+/** Whether this account waits for its deletion (ADR 0088 §10). */
+export async function deletionPending(db: Executor, userId: string) {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), isNotNull(users.deletionDueAt)));
+  return !!row;
 }
 
 /**

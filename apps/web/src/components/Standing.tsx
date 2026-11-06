@@ -212,7 +212,7 @@ export function AccountDeletingScreen({ dueAt }: { dueAt: string | null }) {
                 {t("accountDeleting.restore")}
               </Button>
             )}
-            <SignOutButton />
+            <SignOutButton disabled={restore.isPending} />
           </>
         }
       >
@@ -225,13 +225,14 @@ export function AccountDeletingScreen({ dueAt }: { dueAt: string | null }) {
 }
 
 /** Sair, from a workspace closed to its people: out of the account, to the sign-in. */
-function SignOutButton() {
+function SignOutButton({ disabled }: { disabled?: boolean }) {
   const { t } = useTranslation();
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   return (
     <Button
+      disabled={disabled}
       onClick={async () => {
         await auth.signOut();
         qc.clear();

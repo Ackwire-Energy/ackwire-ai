@@ -119,9 +119,11 @@ export function DeleteAccountScreen() {
     const result = await deleteAccount(toSend?.input);
     setBusy(false);
     // Scheduled: the session ends and the gate shows sign-in, which comes back to the waiting screen.
-    if (result.ok)
-      toast({ title: t("mobile.account.deleted", { date: formatShortDate(i18n.language, deletionDueFrom()) }) });
-    else if (result.reason === "sole_owner") {
+    // An older server deletes at once: there is no date, and nothing to come back to.
+    if (result.ok) {
+      if (!legacy)
+        toast({ title: t("mobile.account.deleted", { date: formatShortDate(i18n.language, deletionDueFrom()) }) });
+    } else if (result.reason === "sole_owner") {
       if (legacy) setBlockedBy(result.organizations);
       else void plan.refetch();
     } else if (result.reason === "proof") {

@@ -51,7 +51,13 @@ export function DeletingAccount({ dueAt }: { dueAt: string | null }) {
             }
           />
         ) : null}
-        <Button variant="ghost" wide label={t("mobile.org.signOut")} onPress={() => void signOut()} />
+        <Button
+          variant="ghost"
+          wide
+          label={t("mobile.org.signOut")}
+          disabled={restore.isPending}
+          onPress={() => void signOut()}
+        />
       </AuthScaffold>
     </View>
   );

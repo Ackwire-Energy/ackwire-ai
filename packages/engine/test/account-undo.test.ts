@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { orgTopic, type RealtimeEvent } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
 import {
   ACCOUNT_DELETE_JOB,
   ACCOUNT_DELETION_DAYS,
   accountDeletionPlan,
   addChannelMember,
+  approverIds,
   changeMemberRole,
   createOrganization,
   enableOperatorEvents,
@@ -26,6 +27,7 @@ import {
   setUserBlocked,
 } from "../src";
 import { addMember, addUser, type Fixture, makeAdmin, setup } from "./fixtures";
+import { channelRoutine, fire, routineRow } from "./routine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -166,6 +168,27 @@ describe("scheduling", () => {
   });
 });
 
+describe("while it waits", () => {
+  test("an approval named to them goes to who can answer", async () => {
+    const { bia } = await aMemberWithTheirOwn();
+    const named = { orgId: f.org.id, ownerUserId: null, approvers: { userIds: [bia.id] } } as never;
+    expect(await approverIds(f.db, named)).toEqual([bia.id]);
+    await scheduleAccountDeletion(deps(), bia.id);
+    expect(await approverIds(f.db, named)).not.toContain(bia.id);
+  });
+
+  test("a routine of theirs passes its slot and keeps its schedule: restoring finds it running", async () => {
+    const { bia } = await aMemberWithTheirOwn();
+    await makeAdmin(f.db, f.org.id, bia.id);
+    const routine = await channelRoutine(f, {}, bia.id);
+    await scheduleAccountDeletion(deps(), bia.id);
+    expect(await fire(f, routine.id, new Date())).toMatchObject({ status: "skipped", code: "creator_left" });
+    expect(await routineRow(f, routine.id)).toMatchObject({ active: true, pausedReason: null });
+    await restoreAccount(deps(), bia.id);
+    expect(await fire(f, routine.id, new Date(Date.now() + 1000))).not.toMatchObject({ status: "skipped" });
+  });
+});
+
 describe("restoring", () => {
   test("it is all back, workspace included, and the feed says the account brought it, so no plan renews by itself", async () => {
     const { bia, own } = await aMemberWithTheirOwn();
@@ -177,6 +200,22 @@ describe("restoring", () => {
     expect(await getMembership(f.db, bia.id, f.org.id)).not.toBeNull();
     expect((await feedOf("user.deletion_canceled")).map((e) => e.userId)).toEqual([bia.id]);
     expect((await feedOf("organization.deletion_canceled")).map((e) => e.data)).toEqual([{ via: "account" }]);
+  });
+
+  test("twice is refused and changes nothing; the first date's job finds nothing, deleted again or not", async () => {
+    const { bia } = await aMemberWithTheirOwn();
+    enableOperatorEvents();
+    await scheduleAccountDeletion(deps(), bia.id);
+    await restoreAccount(deps(), bia.id);
+    await expect(restoreAccount(deps(), bia.id)).rejects.toMatchObject({ code: "account.not_restorable" });
+    expect(await feedOf("user.deletion_canceled")).toHaveLength(1);
+    expect(await purgeAccount(deps(), bia.id)).toBe(false);
+    expect(await userRow(bia.id)).not.toBeNull();
+
+    const again = await scheduleAccountDeletion(deps(), bia.id);
+    expect(await purgeAccount(deps(), bia.id)).toBe(false);
+    expect((await userRow(bia.id))?.deletionDueAt).toEqual(again.dueAt);
+    expect(await jobs(ACCOUNT_DELETE_JOB)).toHaveLength(2);
   });
 
   test("a suspended workspace stays closed; the account still comes back", async () => {
@@ -227,6 +266,35 @@ describe("at the date", () => {
       .where(eq(schema.organizations.id, own.id));
     expect(await purgeWorkspace({ db: f.db, pubsub: f.pubsub }, own.id)).toBe(true);
     expect(await orgRow(own.id)).toBeNull();
+  });
+
+  test("a failure midway leaves everything as it was, still restorable by no one and deleted on the next try", async () => {
+    const { bia } = await aMemberWithTheirOwn();
+    await f.db
+      .insert(schema.accounts)
+      .values({ id: "a1", accountId: "s", providerId: "apple", userId: bia.id, refreshToken: "r1" });
+    const revoked: unknown[] = [];
+    const appleRevoke = async (token: unknown) => {
+      revoked.push(token);
+    };
+    await scheduleAccountDeletion(deps(), bia.id);
+    await pastDue(bia.id);
+    await f.db.execute(sql`create function refuse() returns trigger language plpgsql as
+      $$ begin raise exception 'the disk is full'; end $$`);
+    await f.db.execute(sql`create trigger refuse before delete on users for each row execute function refuse()`);
+
+    await expect(purgeAccount({ ...deps(), appleRevoke }, bia.id)).rejects.toThrow();
+    expect(await userRow(bia.id)).not.toBeNull();
+    expect(await f.db.select().from(schema.accounts).where(eq(schema.accounts.userId, bia.id))).toHaveLength(1);
+    expect(
+      await f.db.select().from(schema.organizationMembers).where(eq(schema.organizationMembers.userId, bia.id)),
+    ).toHaveLength(2);
+    expect(revoked).toEqual([]);
+    expect(await emailsTo(bia.email)).toEqual(["account_deleting"]);
+
+    await f.db.execute(sql`drop trigger refuse on users`);
+    expect(await purgeAccount({ ...deps(), appleRevoke }, bia.id)).toBe(true);
+    expect(revoked).toHaveLength(1);
   });
 
   test("the workspace can go first; a blocked account waits; the hourly sweep finds what a deploy lost", async () => {

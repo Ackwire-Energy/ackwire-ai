@@ -29,7 +29,7 @@ export const users = pgTable("users", {
   blockedReason: text(),
   /**
    * Deleted by the person, gone for good at this date (ADR 0088 §10): until then it signs in only to the waiting
-   * screen, and every membership check reads it as no member (`openAccount`). Not a Better Auth field.
+   * screen, and every membership check reads it as no member (`accountInUse`). Not a Better Auth field.
    */
   deletionDueAt: timestamp({ withTimezone: true }),
   deletionRequestedAt: timestamp({ withTimezone: true }),
