@@ -283,7 +283,7 @@ describe("the Cloud's plan gate tells the truth", () => {
     expect(dimmedLine(enT, { state: "billing", hold: "payment" }, where)).toBe(enT("connectAi.billing"));
     expect(dimmedLine(enT, { state: "missing" }, where)).toBe(enT("aiAccounts.connect.noComputer"));
     expect(dimmedLine(enT, { state: "unsupported", reason: "not_installed" }, where)).toBe(
-      gateLine(enT, { gate: { state: "unsupported", reason: "not_installed" }, ...where })?.text,
+      gateLine(enT, { gate: { state: "unsupported", reason: "not_installed" }, ...where })?.text ?? "",
     );
   });
 
