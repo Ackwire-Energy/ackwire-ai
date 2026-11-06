@@ -215,6 +215,15 @@ describe("the agent's AI", () => {
     expect(sheet).toContain("queryKey: keys.brainMachines(orgId)");
   });
 
+  test("under a hold, Uso's empty plans card says what comes first and invites no plan", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const usage = await Bun.file(new URL("../../src/features/usage/UsageScreen.tsx", import.meta.url).pathname).text();
+    expect(usage).toContain("usePlanHold(orgId, org)");
+    expect(usage.indexOf("<PlanHoldNote")).toBeGreaterThan(-1);
+    expect(usage.indexOf("<PlanHoldNote")).toBeLessThan(usage.indexOf('place="ai"'));
+    expect(usage).toContain("data.accounts.length === 0 && hold ?");
+  });
+
   test("the agent's AI and a plan's page draw the same switch, line and ⓘ, and nothing asks to accept the terms", async () => {
     // The screens are components the tests can't render: what they wire in, as text.
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();

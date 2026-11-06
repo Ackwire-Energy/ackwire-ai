@@ -18,6 +18,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { PlanHold, usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi, useMayConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -65,6 +66,7 @@ export function PlanUsageCards() {
   const look = useRightHandLook();
   const connectAi = useConnectAi();
   const mayConnect = useMayConnectAi();
+  const hold = usePlanHold();
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -95,7 +97,10 @@ export function PlanUsageCards() {
           title={t("usageViews.accounts.title")}
           hint={{ name: t("common.about", { label: t("usageViews.accounts.title") }), text: t("usageViews.estimate") }}
         />
-        {data.accounts.length === 0 ? (
+        {data.accounts.length === 0 && hold ? (
+          // What comes first, as in Contas de IA: an invitation to connect a plan would contradict it.
+          <PlanHold hold={hold} onKey={connectAi ? () => connectAi.open({ intent: "api_key" }) : undefined} />
+        ) : data.accounts.length === 0 ? (
           <EmptyState
             size="panel"
             agent={look}

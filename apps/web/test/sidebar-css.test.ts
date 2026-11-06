@@ -67,7 +67,10 @@ test("a row's hover buttons get their own room instead of covering the name and 
   // Each button is 24px, from 4px before the row's end.
   const open = '.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))';
   expect(value(`${open} > .sidebar__row-acts`, "opacity")).toBe("1");
-  expect(value(`${open} > .sidebar__item`, "padding-right")).toBe("var(--acts-room, 32px)");
+  // Not in the rail, which has no such buttons: room kept there would push the mark out of its plate.
+  const wide = `.sidebar:not([data-rail="true"]) ${open} > .sidebar__item`;
+  expect(value(wide, "padding-right")).toBe("var(--acts-room, 32px)");
+  expect(value(`${open} > .sidebar__item`, "padding-right")).toBeUndefined();
   expect(value('.sidebar__row[data-acts="2"]', "--acts-room")).toBe("56px");
   expect(value(".sidebar__row-acts", "opacity")).toBe("0");
   // Centred on the row, as the face is, on a two-line row too.

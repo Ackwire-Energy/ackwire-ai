@@ -55,15 +55,15 @@ test("a DM's sidebar: a settings row's words keep the column, and its buttons wr
   const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`)).split("}")[0];
   expect(rule(".dm-side__sec .settings-row")).toContain("flex-wrap: wrap");
   expect(rule(".dm-side__sec .settings-row > .settings-row__text")).toContain("flex: 1 1 0");
-  const buttons = rule(
-    ".dm-side__sec .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end",
-  );
+  const buttons = rule(".dm-side .dm-side__sec .settings-row.settings-row--lead > .settings-row__end");
   expect(buttons).toContain("flex-basis: 100%");
   // The name's 22px box belongs beside the words, never around buttons under them.
   expect(buttons).toContain("height: auto");
   expect(rule(".dm-side__sec .rh-set__acts")).toContain("flex-wrap: wrap");
   // Only there: Settings' rows keep their layout.
-  expect(css.match(/^[^\n]*settings-row[^\n]*\{$/gm)?.every((line) => line.startsWith(".dm-side__sec"))).toBe(true);
+  expect(css.match(/^[^\n]*settings-row[^\n]*\{$/gm)?.every((line) => /^(\.dm-side )?\.dm-side__sec/.test(line))).toBe(
+    true,
+  );
 });
 
 test("a DM's floating sidebar: 360px over the chat, and where panels take the whole screen it does too", async () => {

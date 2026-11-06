@@ -81,6 +81,10 @@ async function open(who: Who, path: string, accounts: AiAccounts["accounts"] = [
     accounts,
     ...(paired ? { options: EVERY_PROGRAM, accountsSupported: true, canManageAccounts: true } : NO_COMPUTER),
   });
+  if (path.endsWith("/usage")) {
+    const usageOf = api.orgs.planUsage;
+    api.orgs.planUsage = async (orgId) => ({ ...(await usageOf(orgId)), accounts: [] });
+  }
   await renderApp(path, { api });
   await settle(8);
   return { state, api };
@@ -227,6 +231,18 @@ describe("the other places a plan is chosen", () => {
     expect(shownText(screen().getByRole("dialog", { name: /Conectar uma IA/ }))).toContain(HELD);
     // No plan yet: the hold's lines stand alone, no invitation to connect one.
     expect(screen().queryByText("Use o plano de IA que você já paga")).toBeNull();
+  });
+
+  test("Uso with no plan: the hold's lines in the plans' card, no invitation to connect one", async () => {
+    const card = () => screen().getByRole("region", { name: "Contas dos planos" });
+    await open("owner", `/org/${ORG_ID}/settings/usage`);
+    expect(shownText(card())).toContain(WHY);
+    expect(buttonNamed(card(), PAY)).not.toBeNull();
+    expect(screen().queryByText("Use o plano de IA que você já paga")).toBeNull();
+    cleanup();
+    await open("selfhost", `/org/${ORG_ID}/settings/usage`);
+    expect(shownText(card())).not.toContain(WHY);
+    expect(screen().getByText("Use o plano de IA que você já paga")).toBeTruthy();
   });
 
   test("Contas de IA, with the plan in force or self-hosted: nothing of it", async () => {
