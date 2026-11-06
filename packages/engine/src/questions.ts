@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, lt, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gte, isNull, lt, schema, sql } from "@agenteschat/db";
 import { runAuthorityById } from "./authority";
 import { readableChannelIds, requireChannelAccess } from "./channels";
 import { findMember, plainName } from "./chat-tools";
@@ -8,7 +8,7 @@ import { isAgentOnlyDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import type { ResourcefulDeps } from "./hand-off";
-import { resolveQuestionNotifications } from "./notification-producers";
+import { notifyQuestion, resolveQuestionNotifications } from "./notification-producers";
 import { enqueue } from "./outbox";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
@@ -173,20 +173,37 @@ async function peopleNamedIn(db: Executor, orgId: string, channelId: string, tex
 }
 
 /**
- * Who a question that didn't say is for: the person behind the run, when its text names them and nobody else
- * here. A name alone proves nothing ("Ana disse que sim, confirmam?" asks the room), so anyone else it names
- * stays a question for the room.
+ * Who a question that didn't say is for: the person behind the run, or the last to write here since it started
+ * (who it is replying to), when its text names them and nobody else here. A name alone proves nothing ("Ana disse
+ * que sim, confirmam?" asks the room), so anyone else it names stays a question for the room.
  */
 export async function impliedAddressee(
   db: Executor,
-  run: { id: string; orgId: string },
-  channelId: string,
+  run: { id: string; orgId: string; createdAt: Date },
+  place: { channelId: string; threadId: string | null },
   text: string,
 ): Promise<string | null> {
-  const { personId } = await runAuthorityById(db, run.orgId, run.id);
-  if (!personId) return null;
-  const named = await peopleNamedIn(db, run.orgId, channelId, text);
-  return named.length === 1 && named[0]?.userId === personId ? personId : null;
+  const [{ personId }, [last]] = await Promise.all([
+    runAuthorityById(db, run.orgId, run.id),
+    db
+      .select({ userId: messages.authorUserId })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, run.orgId),
+          eq(messages.channelId, place.channelId),
+          place.threadId ? eq(messages.threadId, place.threadId) : isNull(messages.threadId),
+          eq(messages.authorType, "person"),
+          gte(messages.createdAt, run.createdAt),
+          isNull(messages.deletedAt),
+        ),
+      )
+      .orderBy(desc(messages.createdAt))
+      .limit(1),
+  ]);
+  const named = await peopleNamedIn(db, run.orgId, place.channelId, text);
+  const [one] = named;
+  return named.length === 1 && one && (one.userId === personId || one.userId === last?.userId) ? one.userId : null;
 }
 
 /** What the model hears back once the question is closed. */
@@ -352,6 +369,39 @@ export async function withdrawQuestion(deps: { db: Database; pubsub?: PubSub }, 
     await resolveQuestionNotifications(deps, withdrawn.orgId, withdrawn.id).catch(() => {});
   }
   return withdrawn;
+}
+
+/**
+ * The person open questions wait on left (`channelId`, or the whole workspace): each goes back to the room, or
+ * nobody could answer it until it expires.
+ */
+export async function releaseQuestionsOf(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  userId: string,
+  channelId?: string,
+) {
+  const released = await deps.db.transaction(async (tx) => {
+    const rows = await tx
+      .update(agentQuestions)
+      .set({ requestedForUserId: null })
+      .where(
+        and(
+          eq(agentQuestions.orgId, orgId),
+          eq(agentQuestions.requestedForUserId, userId),
+          eq(agentQuestions.status, "open"),
+          channelId ? eq(agentQuestions.channelId, channelId) : undefined,
+        ),
+      )
+      .returning();
+    for (const row of rows) await syncQuestionMessage(tx, row);
+    return rows;
+  });
+  for (const row of released) {
+    await publishQuestion(deps.pubsub, row, "question.asked");
+    await resolveQuestionNotifications(deps, orgId, row.id).catch(() => {});
+    await notifyQuestion(deps, row).catch(() => {});
+  }
 }
 
 /** Closes questions past their deadline and resumes their runs (worker, every minute). */

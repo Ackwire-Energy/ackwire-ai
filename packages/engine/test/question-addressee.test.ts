@@ -4,11 +4,14 @@ import type { ModelRequest } from "@agenteschat/providers";
 import {
   addChannelMember,
   answerQuestion,
+  deleteAccount,
   dismissQuestion,
   drainOutbox,
   ForbiddenError,
   listThreads,
   postPersonMessage,
+  removeChannelMember,
+  removeMember,
   workViews,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -120,6 +123,55 @@ describe("a question for one person", () => {
     ]);
   });
 
+  test("someone else's message doesn't wait behind it: it gets a run of its own, the question stays theirs", async () => {
+    const { bia } = await setupRoom();
+    const root = await say(f.owner.id, "plano");
+    await say(f.owner.id, ask({ question: "Qual foi o combinado?", person: "bia" }), root.id);
+    const said = await say(f.owner.id, "@dev enquanto isso, qual o status?", root.id);
+
+    const runs = await f.db.select().from(schema.agentRuns);
+    const waiting = runs.find((r) => r.status === "waiting_input");
+    expect(waiting?.pendingMessageIds).toEqual([]);
+    expect(runs.find((r) => r.triggerMessageId === said.id)?.status).toBe("done");
+    expect((await questions())[0]).toMatchObject({ status: "open", requestedForUserId: bia.id });
+
+    // Theirs still goes to the waiting run.
+    await say(bia.id, "foi sexta", root.id);
+    expect((await questions())[0]).toMatchObject({ status: "answered", answeredByUserId: bia.id });
+    expect((await f.db.select().from(schema.agentRuns)).every((r) => r.status === "done")).toBe(true);
+  });
+
+  const leaving: [string, (userId: string) => Promise<unknown>][] = [
+    [
+      "leaves the channel",
+      (id) => removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: id }, { pubsub: f.pubsub }),
+    ],
+    ["leaves the workspace", (id) => removeMember(f.db, f.owner.id, f.org.id, id, { pubsub: f.pubsub })],
+    ["deletes their account", (id) => deleteAccount(f.db, id, { pubsub: f.pubsub })],
+  ];
+  for (const [how, leave] of leaving) {
+    test(`the person it is for ${how}: it goes back to the room, whose reply answers it`, async () => {
+      const { bia } = await setupRoom();
+      const root = await say(f.owner.id, "plano");
+      await say(f.owner.id, ask({ question: "Qual foi o combinado?", person: "bia" }), root.id);
+      await leave(bia.id);
+
+      const [q] = await questions();
+      expect(q).toMatchObject({ status: "open", requestedForUserId: null });
+      const [card] = await f.db
+        .select()
+        .from(schema.messages)
+        .where(eq(schema.messages.id, q?.messageId ?? ""));
+      expect(card?.meta.question).toMatchObject({ requestedForUserId: null });
+      const open = (await f.db.select().from(schema.notifications)).filter(
+        (n) => n.kind === "agent_question" && !n.doneAt,
+      );
+      expect(open.map((n) => n.userId)).toEqual([f.owner.id]);
+      await answerQuestion(deps(), f.owner.id, f.org.id, q?.id ?? "", { text: "sexta" });
+      expect((await questions())[0]).toMatchObject({ status: "answered", answeredByUserId: f.owner.id });
+    });
+  }
+
   test("a long work's view carries who it waits for", async () => {
     const { bia } = await setupRoom();
     await say(f.owner.id, ask({ question: "Qual foi o combinado?", person: "bia" }));
@@ -164,6 +216,26 @@ describe("a question that doesn't say who it is for", () => {
     await say(bia.id, ask({ question: "Bia e ana, qual foi o combinado?" }));
     await say(f.owner.id, ask({ question: "Qual ambiente?" }));
     expect((await questions()).map((q) => q.requestedForUserId)).toEqual([null, null]);
+  });
+
+  test("it names who just wrote here: they are who it replies to, even with someone else behind the run", async () => {
+    let turn = 0;
+    f = await setup({
+      askUser: true,
+      reply: (req: ModelRequest) => {
+        if (!JSON.stringify(req.messages).includes("primeira")) return { chunks: ["Feito."] };
+        turn++;
+        if (turn > 2) return { chunks: ["Ok."] };
+        const question = turn === 1 ? "A primeira, qual foi?" : "Bia, e a segunda?";
+        return { chunks: [], toolUses: [{ name: "ask_user", input: { why: WHY, question } }] };
+      },
+    });
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+    const root = await say(f.owner.id, "plano");
+    await say(f.owner.id, "@dev me ajuda com a primeira", root.id);
+    await say(bia.id, "foi sexta", root.id);
+    expect((await questions()).map((q) => q.requestedForUserId).sort()).toEqual([bia.id, null].sort());
   });
 
   test("the name has to be a whole word", async () => {

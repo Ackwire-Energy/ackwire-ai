@@ -822,7 +822,7 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       ask.requestedForUserId &&
       (await readableChannelIds(tx, run.orgId, ask.requestedForUserId, [asked.channelId])).size > 0
         ? ask.requestedForUserId
-        : await impliedAddressee(tx, run, asked.channelId, ask.text);
+        : await impliedAddressee(tx, run, asked, ask.text);
     const [inserted] = await tx
       .insert(agentQuestions)
       .values({

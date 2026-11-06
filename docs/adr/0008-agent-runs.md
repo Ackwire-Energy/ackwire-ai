@@ -70,6 +70,11 @@ free again.
 rule, anyone who reads the conversation answers. Set, only that person answers or skips it (by card, API or reply), the
 notification and `needsYou` are theirs, and everyone else's card says who it waits for, with no actions. Admins are no
 exception: a secret request works the same way, and the question closes by itself after 24 hours. When the agent
-doesn't say and the text names the person behind the run and nobody else in the conversation, it is theirs
-(`impliedAddressee`), on every path through `postPauseCards`. A name alone is no proof, so a question naming someone
-else stays with the room.
+doesn't say and the text names the person behind the run, or the last person to write there since it started, and
+nobody else in the conversation, it is theirs (`impliedAddressee`), on every path through `postPauseCards`. A name alone
+is no proof, so a question naming anyone else stays with the room.
+
+Someone else's message answers nothing and doesn't wait behind the question: it leaves the run for a run of its own
+(`holdsMessages` with the writer). If the person leaves the conversation or the workspace, or deletes their account, the
+question goes back to the room and to the person behind the run (`releaseQuestionsOf`), since nobody could answer it
+otherwise.

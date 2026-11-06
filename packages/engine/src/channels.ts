@@ -144,9 +144,12 @@ export async function announceChannelLeavers(
   leavers: ChannelLeaver[],
 ) {
   const { pubsub } = deps;
+  // Loaded here: questions build on this module.
+  const { releaseQuestionsOf } = await import("./questions");
   for (const { channelId, userId } of leavers) {
     caches.channelMembers.delete(`${orgId}:${channelId}`);
     await clearChannelNotifications(deps, orgId, userId, channelId);
+    await releaseQuestionsOf(deps, orgId, userId, channelId);
     const removed = {
       type: "channel.member_removed" as const,
       channelId,

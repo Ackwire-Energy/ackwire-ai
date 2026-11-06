@@ -2,7 +2,7 @@ import { and, type Executor, eq, inArray, schema } from "@agenteschat/db";
 import type { StoredTranscript } from "./run-resume";
 import type { AgentRun } from "./runs";
 
-const { agentConsultations, agentRuns, browserHandoffs } = schema;
+const { agentConsultations, agentQuestions, agentRuns, browserHandoffs } = schema;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -11,12 +11,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * wait (a blocking decision, a review). Such a run takes no new messages: the decision may take hours and
  * the agent stays responsive meanwhile, so whatever arrives (another agent's question, a notice, a
  * person's message) gets a run of its own. A run waiting on a question to people, another agent's answer,
- * help in its browser or its computer still takes them (the message answers, wakes or resumes it).
+ * help in its browser or its computer still takes them (the message answers, wakes or resumes it), unless the
+ * question is for one person and `from`, the person writing, is someone else: their message answers nothing here.
  * `transcript` left out: read here when it matters (only for `waiting_input`).
  */
 export async function holdsMessages(
   db: Executor,
   run: Pick<AgentRun, "id" | "orgId" | "status"> & { transcript?: AgentRun["transcript"] },
+  from?: string | null,
 ): Promise<boolean> {
   if (run.status === "waiting_approval") return true;
   if (run.status !== "waiting_input") return false;
@@ -36,6 +38,16 @@ export async function holdsMessages(
   if (t?.waitingForBrain) return false;
   const calls = (t?.pending?.calls ?? []).filter((c) => !c.result);
   if (calls.some((c) => c.approvalId || c.secretRequestId)) return true;
+  const asked = from ? calls.flatMap((c) => (c.questionId ? [c.questionId] : [])) : [];
+  if (asked.length > 0) {
+    const open = await db
+      .select({ forUserId: agentQuestions.requestedForUserId })
+      .from(agentQuestions)
+      .where(
+        and(eq(agentQuestions.orgId, run.orgId), inArray(agentQuestions.id, asked), eq(agentQuestions.status, "open")),
+      );
+    if (open.length > 0 && open.every((q) => q.forUserId && q.forUserId !== from)) return true;
+  }
   // A call's `waitId` (not a question's): a browser handoff, an `ask_agent` consultation, else a mission's own wait.
   const waitIds = calls.flatMap((c) => (!c.questionId && c.waitId ? [c.waitId] : []));
   if (waitIds.length === 0) return false;

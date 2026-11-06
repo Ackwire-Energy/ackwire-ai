@@ -259,7 +259,8 @@ export async function handoffReplyIntent(
  * - Approvals and secrets: `held`. Text never grants or decides them; the
  *   card does. Such a run takes no new messages at all (`holdsMessages`,
  *   they get a run of their own), and steering never asks here for one.
- * - A question to people: null (the message already answered it, on insert).
+ * - A question to people: null (the message already answered it, on insert, or, for one person and from
+ *   someone else, left for a run of its own: `holdsMessages`).
  * - A mission's own wait, its computer: null (read when it resumes).
  *
  * Null: nothing to do; the message stays queued, read when the run resumes.
