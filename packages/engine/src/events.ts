@@ -147,21 +147,6 @@ export type ChannelEvent =
        */
       from?: number;
     }
-  /**
-   * The text the agent streamed before calling tools was progress narration
-   * ("Go isn't installed; I'll try…"), not the answer: show it as a step
-   * of the work and clear it from the live reply. The message holds only the
-   * final answer.
-   */
-  | {
-      type: "agent.narration";
-      channelId: string;
-      threadId: string | null;
-      runId: string;
-      agentId: string;
-      turn: number;
-      text: string;
-    }
   /** An agent run changed state (`running` = typing indicator). */
   | {
       type: "agent.run";
@@ -789,6 +774,20 @@ export const publishVaultChanged = (pubsub: PubSub | undefined, orgId: string) =
     orgId,
     event: { type: "vault.changed", orgId } satisfies VaultChangedEvent,
   });
+
+/**
+ * The team changed (an agent made, renamed, given a look, archived, back or deleted): the apps read their lists again.
+ * Nothing else goes out: what each person may see of it stays behind the agents' own endpoints.
+ */
+export const publishAgentsChanged = (pubsub: PubSub | undefined, orgId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "agents.changed" } });
+
+/**
+ * A channel was made, renamed, archived, back or deleted, or its members changed. On the org's topic, unlike
+ * `channel.member_*`: a channel made a moment ago has nobody subscribed to it yet. Same contract as the agents': no ids.
+ */
+export const publishChannelsChanged = (pubsub: PubSub | undefined, orgId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "channels.changed" } });
 
 /** An event for one person (forwarded to every connection they have open in that organization). */
 export type UserEvent = { type: string; [key: string]: unknown };

@@ -1713,6 +1713,11 @@
     "linkCopied": "Bağlantı kopyalandı.",
     "reply": "Yanıtla",
     "quoteOf": "{{name}} kişisine yanıt: {{excerpt}}. Mesajı gör",
+    "quoteGone": "Orijinal mesaj silindi",
+    "jumpTooFar": "Bu mesaj buradan açmak için fazla geride.",
+    "quoteNoWords": "Metinsiz mesaj",
+    "replyingTo": "{{name}} yanıtlanıyor",
+    "cancelReply": "Yanıtı iptal et",
     "emoji": "Emoji",
     "uploading": "yükleniyor…",
     "uploadFailed": "yüklenmedi",
@@ -1925,6 +1930,10 @@
       "configure": "Ayarla",
       "nameStory": "Adı, denizcilere yol gösteren yıldız lodestar'dan gelir."
     },
+    "saved": {
+      "workspace": "{{name}} artık kendi planı olmayan herkes için {{label}} ile düşünüyor.",
+      "mine": "{{name}} ile sohbetin artık {{label}} ile düşünüyor. Yalnızca seninki."
+    },
     "settings": {
       "name": "Ad ve görünüm",
       "nameHelp": "Kenar çubuğunda hep “{{label}}” olarak görünür.",
@@ -1945,6 +1954,8 @@
       "connectMine": "Planımı bağla",
       "useWorkspace": "Çalışma alanınınkini kullan",
       "fallbackKey": "Kendi planın yoksa çalışma alanının API anahtarını kullanır.",
+      "fallbackKeyOf": "Kendi planın yoksa çalışma alanının anahtarını kullanır: {{label}}.",
+      "fallbackNoKey": "Çalışma alanının henüz API anahtarı yok, bu yüzden kendi planın olmadan burada kimse sana yanıt vermez.",
       "fallbackPlan": "Kendi planın yoksa herkese yanıt veren {{owner}} planını kullanır.",
       "fallbackYours": "Başka plan yoksa senin olan çalışma alanı planını kullanır.",
       "fallbackNone": "Kendi planın yoksa {{name}} sana yanıt veremez: çalışma alanının planı yalnızca {{owner}} için yanıt verir.",
@@ -2205,8 +2216,11 @@
     "have": {
       "title": "Zaten bağlı",
       "titleFor": "Zaten bağlı, {{name}} için",
-      "other": "Ya da başka birini bağlayın"
+      "other": "Ya da başka birini bağlayın",
+      "manageKeys": "Anahtarları yönet veya sil"
     },
+    "billing": "Plan, çalışma alanının bilgisayarında oturum açar ve bilgisayar etkin bir agentes.chat planıyla gelir.",
+    "billingWeb": "Web'de, agentes.chat'te bir plan seç.",
     "orPayGo": "Ya da kullandıkça ödeyin",
     "plan": {
       "claude": {
@@ -2255,6 +2269,7 @@
       "paste": "Buraya yapıştırın",
       "forAll": "Planı olmayan her ajan bununla düşünür.",
       "saved": "Kaydedildi. Planı olmayan her ajan bununla düşünür.",
+      "savedUnchecked": "Kaydedildi, ama {{provider}} yanıt vermedi, bu yüzden anahtar kontrol edilemedi. Başarısız olursa nedenini sohbet söyler.",
       "notPlan": "Bir kodlama planının anahtarı yukarıdaki kendi seçeneğine girilir.",
       "billing": "Anahtarın projesi için faturalandırmayı açın. Faturalandırma olmadan Google, ajanlarınızın gönderdiklerini kullanabilir.",
       "privacy": "Ajanlarınızın gönderdiklerini hangi sağlayıcıların saklayabileceğine OpenRouter gizlilik ayarlarınız karar verir.",
@@ -2949,11 +2964,16 @@
   "secret": {
     "group": "{{agent}} ajanından gizli bilgi isteği",
     "chip": "Bekliyor",
-    "targetEnv": "{{agent}} ajanının bilgisayarına {{name}} değişkeni olarak girer.",
+    "targetEnv": "{{agent}} ajanının bilgisayarına, komutları için gider.",
     "targetFile": "{{agent}} ajanının bilgisayarındaki {{path}} dosyasına gider.",
     "targetSite": "Bunu yalnızca {{agent}} ajanının tarayıcısı, {{host}} üzerinde yazar. {{agent}} ajanının komutlarının dışında kalır.",
     "replaces": "{{agent}} ajanının bu adla zaten sahip olduğu anahtarın yerini alır.",
-    "label": "{{name}} değeri",
+    "labelPassword": "{{host}} şifresi",
+    "labelCode": "{{host}} kodu",
+    "labelKey": "{{agent}} bilgisayarı için bir anahtar",
+    "labelFile": "{{path}} dosyası",
+    "placeholder": "Buraya yazın",
+    "account": "Hesap: {{username}}.",
     "private": "Şifrelenmiş olarak doğrudan bilgisayara gönderilir. Sohbetin dışında ve ajandan uzak kalır.",
     "send": "Gönder",
     "decline": "Reddet",
@@ -2961,8 +2981,17 @@
     "waitingFor": "Yalnızca {{person}} yanıtlayabilir.",
     "outcomeBy": "{{person}} iletti",
     "outcomeByYou": "Siz ilettiniz",
-    "outcomeWithdrawn": "Artık gerekmiyor",
-    "alreadyAnswered": "Bu istek zaten yanıtlandı ya da süresi doldu.",
+    "outcomeWithdrawn": "{{agent}} artık buna ihtiyaç duymuyor.",
+    "endedDeclined": "Reddedildi. {{agent}} bunsuz devam ediyor.",
+    "endedExpired": "Kimse zamanında yanıtlamadı. {{agent}} bunsuz devam ediyor ve yeniden isteyebilir.",
+    "endedRunStopped": "{{agent}} görevi yanıttan önce durdu. Hâlâ gerekiyorsa {{agent}} ajanından yeniden isteyin.",
+    "endedSuperseded": "{{agent}} daha yeni bir istekle yeniden istedi.",
+    "endedComputer": "Bu artık {{agent}} ajanına ulaşamaz: isteyen bilgisayar değişti. {{agent}} ajanından yeniden istemesini isteyin.",
+    "endedPersonLeft": "{{person}} yanıtlamadan önce çalışma alanından ayrıldı.",
+    "endedClosed": "Bu istek yanıtlanmadan kapandı. Hâlâ gerekiyorsa {{agent}} ajanından yeniden isteyin.",
+    "seeNewer": "Daha yeni isteği gör",
+    "computerAway": "{{agent}} bilgisayarı şu anda yanıt vermiyor. Bu istek {{time}} saatine kadar açık kalır. Birazdan yeniden deneyin.",
+    "computerPaused": "{{agent}} bilgisayarı sahibi tarafından duraklatıldı. Bu istek {{time}} saatine kadar açık kalır.",
     "failed": "İletilemedi. Ajanın bilgisayarı açık mı?",
     "empty": "Değeri yazın.",
     "tooLarge": "Çok büyük (en fazla 16 KB)."
@@ -5576,7 +5605,7 @@
     },
     "vault_write": {
       "label": "Vault iletişim bilgilerini düzenleme",
-      "description": "Vault'ta iletişim bilgilerini kaydetme ve güncelleme, kayıtlı bir girişin kullanıcı adını ya da bir açıklamayı değiştirme ve kendi kaydettiklerini silme."
+      "description": "Vault'ta iletişim bilgilerini kaydetme ve güncelleme, kayıtlı bir girişin kullanıcı adını ya da bir açıklamayı değiştirme, açtığı hesaplar için şifre oluşturma ve kendi kaydettiklerini silme."
     },
     "github_git_read": {
       "label": "Depo klonlama (git)",
@@ -7884,7 +7913,9 @@
         "runnerOld": "{{computer}} üzerindeki agentes.chat programı eski ve güncelleme yolda. Bittiğinde bu kendiliğinden değişir.",
         "execOff": "{{computer}} henüz {{program}} çalıştıramıyor. İlgileniyoruz, bu kendiliğinden değişir.",
         "toolOff": "{{program}}, {{computer}} üzerinde henüz izinli değil. Bu bizim tarafımızda: daha sonra yeniden dene.",
-        "preparing": "{{computer}} hazırlanıyor. Bittiğinde bu kendiliğinden değişir."
+        "preparing": "{{computer}} hazırlanıyor. Bittiğinde bu kendiliğinden değişir.",
+        "stuck": "{{program}} {{computer}} üzerinde hâlâ hazır değil ve bu kendiliğinden değişmeyecek. Şimdilik bir API anahtarı kullan ve bu planı sonra yeniden dene.",
+        "away": "{{computer}} yeniden başlatmanın süreceğinden daha uzun süredir yok. Şimdilik bir API anahtarı kullan ve bu planı sonra yeniden dene."
       }
     },
     "done": {
@@ -8901,6 +8932,18 @@
     "startsIn": "~{{n}} dk sonra başlar",
     "startsAfter": "{{after}} bitince başlar",
     "left": "~{{n}} dk kaldı",
+    "overdue": "normalden uzun sürüyor",
+    "openTask": "Görevi aç",
+    "fill": {
+      "agent_one": "bir ajanın istediği {{count}} iş",
+      "agent_other": "ajanların istediği {{count}} iş",
+      "person_one": "bir kişi için {{count}} iş",
+      "person_other": "kişiler için {{count}} iş",
+      "routine_one": "{{count}} rutin",
+      "routine_other": "{{count}} rutin",
+      "work_one": "{{count}} uzun iş",
+      "work_other": "{{count}} uzun iş"
+    },
     "who": "{{name}}",
     "away": "{{time}} uzakta",
     "purpose": {
@@ -8916,11 +8959,11 @@
       "yourDm": "DM'in",
       "dm": "{{name}} ile DM",
       "thread": "#{{name}} içinde bir konu",
+      "agents": "ajanlar arasında bir konuşma",
       "private": "özel bir konuşma"
     },
     "live": {
       "nextEta": "Bilgisayarı bekliyor. Sıradaki o, yaklaşık {{n}} dk sonra",
-      "nextAfter": "Bilgisayarı bekliyor. {{after}} bitince sıradaki o",
       "next": "Bilgisayarı bekliyor. Sıradaki o",
       "waiting": "Bilgisayarı bekliyor",
       "behind": "Sırada, {{nth}}. {{names}} sonrasında",
@@ -10905,6 +10948,7 @@
       "titleNoLetters": "Başlıkta harf veya rakam olmalı.",
       "lockAdminsOnly": "Sayfaları yalnızca yöneticiler kilitler."
     },
+    "replyGone": "Yanıtladığın mesaj artık burada değil.",
     "media": {
       "off": "Bu çalışma alanında GIF'ler ve çıkartmalar kapalı.",
       "notFound": "O GIF artık kullanılamıyor. Başka birini seçin.",
@@ -12080,6 +12124,10 @@
     "keyValue": "API anahtarı",
     "keyInvalid": "API anahtarını yapıştırın (en az 8 karakter).",
     "keyRefused": "Sağlayıcı bu anahtarı kabul etmedi.",
+    "keyNoCredit": "{{provider}} bu anahtarda kredi olmadığını söylüyor. Oradan kredi ekle ve yeniden kaydet. Hiçbir şey kaydedilmedi.",
+    "keyDenied": "{{provider}} bu anahtarın çağrı yapmasına izin vermedi. Oradan izinlerini kontrol et ve yeniden kaydet. Hiçbir şey kaydedilmedi.",
+    "keySaid": "{{provider}} şunu söyledi: {{said}}",
+    "keyInUse": "{{agents}} hâlâ bu anahtarla düşünüyor.",
     "keyManagement": "Bu bir yönetim anahtarı. Normal bir API anahtarı oluşturun.",
     "autoModels": {
       "title": "Otomatik için modeller",
@@ -12100,6 +12148,11 @@
     "remove": "Sil",
     "removeTitle": "{{label}} anahtarını silin",
     "removeText": "Anahtar kalıcı olarak silinir. Hâlâ onu kullanan bir ajan varsa sunucu reddeder: önce o ajanların anahtarını değiştirin.",
+    "removeUnused": "Anahtar kalıcı olarak silinir. Bu anahtarla düşünen ajan yok.",
+    "removeUsedOther_one": "{{agents}} bu anahtarla düşünüyor. Anahtar gidince başka bir anahtara geçer veya modeline uyan yoksa yapay zekâ ister.",
+    "removeUsedOther_other": "{{agents}} bu anahtarla düşünüyor. Anahtar gidince başka bir anahtara geçerler veya modellerine uyan yoksa yapay zekâ isterler.",
+    "removeUsedNone_one": "{{agents}} bu anahtarla düşünüyor ve başka bir şeyi yok. Anahtar gidince sen başka bir yapay zekâ bağlayana kadar yanıt vermez.",
+    "removeUsedNone_other": "{{agents}} bu anahtarla düşünüyor ve başka bir şeyleri yok. Anahtar gidince sen başka bir yapay zekâ bağlayana kadar yanıt vermezler.",
     "noKeys": "Henüz anahtar yok.",
     "platformAvailable": "Bu sunucunun Claude anahtarı da kullanılabilir.",
     "usageTitle": "Türe göre API harcaması",
@@ -12512,6 +12565,7 @@
       "waitingAgents": "{{name}} işin bir kısmını devretti ve yanıt bekliyor"
     },
     "consultPair": {
+      "took": "{{time}} sürdü",
       "asking": "soruyor",
       "working": "üzerinde çalışıyor",
       "waitingApproval": "onay bekliyor",
@@ -12869,6 +12923,7 @@
       "usage_paused_budget": "{{agent}} bu işi duraklattı · aylık bütçe %{{percent}}",
       "work_auto_moved": "Bu biraz sürecek, o yüzden arka planda devam ediyorum. Güncellemeleri buraya yazacağım, bir sonraki yaklaşık {{minutes}} dk içinde.",
       "work_auto_movedOver": "Bu biraz sürecek, o yüzden arka planda devam ediyorum. Güncellemeleri buraya yazacağım.",
+      "moved_on": "{{link}} içinde devam ediyor",
       "work_end_done": "Bitti ({{minutes}} dk).",
       "work_end_failed": "Bu arka plan işi tamamlanmadı ({{minutes}} dk).",
       "work_end_failedWhy": "Bu arka plan işi tamamlanmadı ({{minutes}} dk): {{why}}.",
@@ -13149,6 +13204,10 @@
       "label": "Beceri betiği çalıştır",
       "description": "Bir becerinin betiğini ortamda çalıştırır."
     },
+    "vault_make_password": {
+      "label": "Şifre oluştur",
+      "description": "Bilgisayarında güçlü bir şifre oluşturur ve görmeden Vault'ta anahtar olarak saklar."
+    },
     "computer_status": {
       "label": "Bilgisayarı kontrol et",
       "description": "Hangi bilgisayar olduğunu ve yanıt verip vermediğini söyler."
@@ -13204,6 +13263,10 @@
     "browser_type_secret": {
       "label": "Şifre yaz",
       "description": "Ona verdiğiniz bir şifreyi, görmeden bir şifre veya kod alanına yazar."
+    },
+    "browser_make_password": {
+      "label": "Şifre oluştur",
+      "description": "Bilgisayarında bir site için güçlü bir şifre oluşturur, görmeden Vault'ta saklar ve yazar."
     },
     "browser_wait": {
       "label": "Sayfayı bekle",
@@ -13548,6 +13611,7 @@
         "browser_scroll": "Sayfayı kaydırdı",
         "browser_upload": "Bir dosya yükledi",
         "browser_type_secret": "Bir şifre yazdı",
+        "browser_make_password": "Bir şifre oluşturdu",
         "browser_wait": "Sayfayı bekledi",
         "browser_screenshot": "Ekran görüntüsü aldı",
         "browser_ask_person": "Yardım istedi",
@@ -14063,6 +14127,18 @@
     "tasks_one": "{{count}} görev",
     "tasks_other": "{{count}} görev",
     "free": "Boşta",
+    "hiddenTasks_one": "göremediğiniz {{count}} görev",
+    "hiddenTasks_other": "göremediğiniz {{count}} görev",
+    "hiddenLine_one": "Göremediğiniz konuşmalarda {{count}} görev daha var.",
+    "hiddenLine_other": "Göremediğiniz konuşmalarda {{count}} görev daha var.",
+    "helpers_one": "{{count}} yardımcı",
+    "helpers_other": "{{count}} yardımcı",
+    "delegated": {
+      "fromPerson": "{{name}} başlattı",
+      "fromYou": "siz başlattınız",
+      "fromRoutine": "{{name}} rutini başlattı",
+      "stopNote": "Durdurursanız {{name}} bunu öğrenir ve kendiliğinden yeniden istemez."
+    },
     "columns": {
       "task": "Görev",
       "state": "Durum",
@@ -14072,6 +14148,7 @@
     },
     "sections": {
       "asked": "Kişilerin istedikleri",
+      "delegated": "Ajanların istedikleri",
       "background": "Arka planda rutinler"
     },
     "state": {
@@ -14143,6 +14220,9 @@
       "openManager": "Görev yöneticisinde aç"
     },
     "confirm": {
+      "chainTitle_one": "{{name}} ve {{count}} yardımcı durdurulsun mu?",
+      "chainTitle_other": "{{name}} ve {{count}} yardımcı durdurulsun mu?",
+      "chainBody": "Yapılanlar kalır ve hepsi bilgilendirilir.",
       "title_one": "{{name}} ajanının görevi durdurulsun mu?",
       "title_other": "{{name}} ajanının {{count}} görevi durdurulsun mu?",
       "body": "Yapılanlar korunur ve {{name}} ajanına durdurduğunuz bildirilir.",

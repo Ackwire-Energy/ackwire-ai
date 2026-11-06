@@ -14,6 +14,8 @@ export interface BlobStore {
   readonly kind: string;
   put(key: string, body: Uint8Array, options: { contentType: string }): Promise<void>;
   get(key: string): Promise<{ body: Uint8Array; contentType: string } | null>;
+  /** The object's bytes as they are read, where the store can; without it, `get`. */
+  stream?(key: string): Promise<ReadableStream<Uint8Array> | null>;
   delete(key: string): Promise<void>;
   /** Keys under `prefix`, at most `limit` (default 1000). */
   list(prefix: string, limit?: number): Promise<string[]>;

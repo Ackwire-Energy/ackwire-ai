@@ -23,9 +23,11 @@ import {
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
+import { keyRemovalText } from "@agenteschat/client/lib/ai-accounts";
 import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
+import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -51,6 +53,7 @@ import {
   InfoHint,
   Input,
   List,
+  Locked,
   Meter,
   PageHeader,
   ProviderLogo,
@@ -85,7 +88,7 @@ import { useOrg } from "@/components/org-context";
 import { UsageTabs } from "@/components/PeopleUsage";
 import { PlanUsageCards } from "@/components/PlanUsage";
 import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
-import { KeyMismatch, KeySite } from "@/components/ProviderKey";
+import { KeyMismatch, KeyRefused, KeySite } from "@/components/ProviderKey";
 import { RightHandSettingsSection } from "@/components/RightHandSettings";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
@@ -784,18 +787,10 @@ function KeysSection() {
                       variant="ghost"
                       size="sm"
                       className="ac-btn--danger"
-                      disabled={isDefault}
-                      title={isDefault ? t("settings.removeDefaultBlocked") : undefined}
-                      aria-describedby={isDefault ? `default-note-${c.id}` : undefined}
                       onClick={() => setDialog({ type: "remove", cred: c })}
                     >
                       {t("settings.remove")}
                     </Button>
-                    {isDefault && (
-                      <span id={`default-note-${c.id}`} className="ac-visually-hidden">
-                        {t("settings.removeDefaultBlocked")}
-                      </span>
-                    )}
                   </div>
                 </span>
               </div>
@@ -826,7 +821,7 @@ function KeysSection() {
         open={dialog?.type === "remove"}
         onOpenChange={(o) => !o && setDialog(null)}
         title={t("settings.removeTitle", { label: dialog?.type === "remove" ? dialog.cred.label : "" })}
-        description={t("settings.removeText")}
+        description={dialog?.type === "remove" ? keyRemovalText(t, dialog.cred, live, platform.data === true) : ""}
         closeLabel={t("common.close")}
         width={440}
       >
@@ -838,7 +833,7 @@ function KeysSection() {
             loading={remove.isPending}
             onClick={() => {
               if (dialog?.type !== "remove") return;
-              remove.mutate({ id: dialog.cred.id, purge: true }, { onSuccess: () => setDialog(null) });
+              remove.mutate({ id: dialog.cred.id, purge: true, release: true }, { onSuccess: () => setDialog(null) });
             }}
           >
             {t("settings.remove")}
@@ -873,8 +868,17 @@ export function KeyDialog({
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
-  const add = useAddCredential(org.id);
-  const rotate = useRotateCredential(org.id);
+  const add = useAddCredential(org.id, true);
+  const rotate = useRotateCredential(org.id, true);
+  const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
+  const failed = (e: unknown) => {
+    setRefused(keyRefusal(t, e));
+    if (!keyRefusal(t, e)) toast.show(errorText(t, e), "error");
+  };
+  const unchecked = (saved: Credential) => {
+    if (saved.check === "unchecked")
+      toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(saved.provider) }), "info");
+  };
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState<ProviderId>("anthropic");
@@ -890,6 +894,7 @@ export function KeyDialog({
     setProvider(providerGuess(pasted, suggested ?? cred?.provider));
     setCustom(mode === "add" && suggested === CUSTOM_PROVIDER);
     setTouched(false);
+    setRefused(null);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);
   const error =
@@ -959,12 +964,15 @@ export function KeyDialog({
             e.preventDefault();
             setTouched(true);
             if (!valid) return;
+            setRefused(null);
             if (mode === "rotate" && cred) {
               rotate.mutate(
                 { id: cred.id, apiKey: apiKey.trim() },
                 {
-                  onSuccess: () => {
+                  onError: failed,
+                  onSuccess: (saved) => {
                     toast.show(t("settings.rotated"));
+                    unchecked(saved);
                     onClose();
                   },
                 },
@@ -978,7 +986,9 @@ export function KeyDialog({
                   ...(provider === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
                 },
                 {
+                  onError: failed,
                   onSuccess: (saved) => {
+                    unchecked(saved);
                     onAdded?.(saved);
                     onClose();
                   },
@@ -987,52 +997,55 @@ export function KeyDialog({
             }
           }}
         >
-          <DialogBody>
-            {mode === "add" && providerSelect}
-            {mode === "add" && (
-              <Field label={t("settings.keyLabel")} id="key-label">
-                <Input
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
-                />
-              </Field>
-            )}
-            <Field
-              label={t("settings.keyValue")}
-              id="key-value-set"
-              error={error}
-              help={<KeySite provider={provider} />}
-            >
-              <Input
-                type="password"
-                autoComplete="off"
-                placeholder={providerOf(provider)?.placeholder}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </Field>
-            {mode === "add" && provider === "anthropic" && (
+          <Locked when={pending}>
+            <DialogBody>
+              {mode === "add" && providerSelect}
+              {mode === "add" && (
+                <Field label={t("settings.keyLabel")} id="key-label">
+                  <Input
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
+                  />
+                </Field>
+              )}
               <Field
-                label={t("onboarding.anthropicWorkspace")}
-                id="key-ws-set"
-                hint={{
-                  name: t("common.about", { label: t("onboarding.anthropicWorkspace") }),
-                  text: t("onboarding.anthropicWorkspaceHelp"),
-                }}
+                label={t("settings.keyValue")}
+                id="key-value-set"
+                error={error}
+                help={<KeySite provider={provider} />}
               >
                 <Input
-                  value={workspaceId}
-                  onChange={(e) => setWorkspaceId(e.target.value)}
-                  placeholder={t("settings.workspaceIdPlaceholder")}
+                  type="password"
                   autoComplete="off"
+                  placeholder={providerOf(provider)?.placeholder}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
                 />
               </Field>
-            )}
-          </DialogBody>
+              {refused && <KeyRefused refusal={refused} />}
+              {mode === "add" && provider === "anthropic" && (
+                <Field
+                  label={t("onboarding.anthropicWorkspace")}
+                  id="key-ws-set"
+                  hint={{
+                    name: t("common.about", { label: t("onboarding.anthropicWorkspace") }),
+                    text: t("onboarding.anthropicWorkspaceHelp"),
+                  }}
+                >
+                  <Input
+                    value={workspaceId}
+                    onChange={(e) => setWorkspaceId(e.target.value)}
+                    placeholder={t("settings.workspaceIdPlaceholder")}
+                    autoComplete="off"
+                  />
+                </Field>
+              )}
+            </DialogBody>
+          </Locked>
           <DialogFooter>
             <Button onClick={onClose}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" disabled={pending}>
+            <Button type="submit" variant="primary" loading={pending}>
               {mode === "rotate" ? t("settings.rotate") : t("settings.saveKey")}
             </Button>
           </DialogFooter>
@@ -1125,23 +1138,25 @@ function DefaultBudgetCard() {
           );
         }}
       >
-        <Field
-          label={t("settings.defaultBudget")}
-          id="set-default-budget"
-          hint={{
-            name: t("common.about", { label: t("settings.defaultBudget") }),
-            text: t("settings.defaultBudgetHelp"),
-          }}
-          error={invalid ? t("agent.budgetInvalid") : undefined}
-        >
-          <Input
-            inputMode="decimal"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            readOnly={!editable}
-            disabled={saved === undefined}
-          />
-        </Field>
+        <Locked when={update.isPending}>
+          <Field
+            label={t("settings.defaultBudget")}
+            id="set-default-budget"
+            hint={{
+              name: t("common.about", { label: t("settings.defaultBudget") }),
+              text: t("settings.defaultBudgetHelp"),
+            }}
+            error={invalid ? t("agent.budgetInvalid") : undefined}
+          >
+            <Input
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              readOnly={!editable}
+              disabled={saved === undefined}
+            />
+          </Field>
+        </Locked>
         {editable && (
           <Button type="submit" variant="primary" disabled={!dirty || update.isPending} loading={update.isPending}>
             {t("common.save")}

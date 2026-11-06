@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { authClient } from "@/lib/auth";
-import { Button } from "@/ui";
+import { Button, Locked } from "@/ui";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { haptics } from "@/ui/haptics";
@@ -56,19 +56,22 @@ export function ResetPasswordScreen({ token }: { token: string | null }) {
       agentMode={pending ? "run" : "idle"}
       {...(secret ? { expression: "closed" as const } : {})}
     >
-      <PasswordField
-        value={password}
-        onChangeText={setPassword}
-        fresh
-        onSecretChange={setSecret}
-        onSubmitEditing={() => void save()}
-        label={t("invite.createPassword")}
-      />
+      <Locked when={pending}>
+        <PasswordField
+          value={password}
+          onChangeText={setPassword}
+          fresh
+          onSecretChange={setSecret}
+          onSubmitEditing={() => void save()}
+          label={t("invite.createPassword")}
+        />
+      </Locked>
       <Button
         variant="primary"
         wide
         label={t("mobile.reset.save")}
-        disabled={!ready || pending}
+        loading={pending}
+        disabled={!ready}
         onPress={() => void save()}
       />
     </AuthScaffold>

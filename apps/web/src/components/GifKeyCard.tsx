@@ -13,6 +13,7 @@ import {
   type IconName,
   Input,
   List,
+  Locked,
   SettingNote,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -75,24 +76,26 @@ function GifKeySteps({
       <Step n={2}>
         <StepTitle title={t("settings.media.giphy.steps.paste")} htmlFor={field} />
         <span className="agp-addacct__paste">
-          <Input
-            id={field}
-            type="password"
-            value={value}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={t("settings.media.giphy.steps.placeholder")}
-            // The steps open in place of the button pressed: the field takes the focus.
-            autoFocus
-            invalid={Boolean(error)}
-            aria-describedby={below}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              if (key.length >= GIF_KEY_MIN && !saving) onSave();
-            }}
-          />
+          <Locked when={saving}>
+            <Input
+              id={field}
+              type="password"
+              value={value}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={t("settings.media.giphy.steps.placeholder")}
+              // The steps open in place of the button pressed: the field takes the focus.
+              autoFocus
+              invalid={Boolean(error)}
+              aria-describedby={below}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                if (key.length >= GIF_KEY_MIN && !saving) onSave();
+              }}
+            />
+          </Locked>
           <Button variant="primary" disabled={key.length < GIF_KEY_MIN} loading={saving} onClick={onSave}>
             {t("settings.saveKey")}
           </Button>

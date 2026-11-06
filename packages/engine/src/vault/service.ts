@@ -256,6 +256,8 @@ export interface VaultItemForAgent {
   username: string | null;
   keyName: string | null;
   contact: VaultContactFields | null;
+  /** Values a made password replaced, kept for `undo`. */
+  earlier?: number;
 }
 
 /**

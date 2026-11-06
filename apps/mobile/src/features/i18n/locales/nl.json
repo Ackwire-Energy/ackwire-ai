@@ -1965,7 +1965,6 @@
       "as": "Logt in als {{username}}.",
       "saved": "Opgeslagen in de Vault",
       "notSaved": "Verstuurd, maar niet opgeslagen in de Vault",
-      "codeLabel": "Code voor {{name}}",
       "codeIncomplete": "Typ elk cijfer van de code.",
       "codeNote": "Versleuteld rechtstreeks naar de computer gestuurd. Codes worden nooit opgeslagen."
     }

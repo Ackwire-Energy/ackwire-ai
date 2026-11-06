@@ -145,7 +145,7 @@ describe("saving what was sent", () => {
     expect(key).toMatchObject({
       kind: "key",
       keyName: "NPM_TOKEN",
-      title: "NPM_TOKEN",
+      title: "Npm token",
       description: "Publish the package",
       keyHint: "3456",
     });

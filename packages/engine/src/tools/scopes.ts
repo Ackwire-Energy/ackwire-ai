@@ -196,7 +196,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   "vault:write": {
     label: "Edit Vault contacts",
     description:
-      "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved.",
+      "Save and update contact details in the Vault, change a saved login's username or a description, make passwords for accounts it creates, and delete what it saved.",
   },
 };
 
@@ -208,6 +208,8 @@ export const VAULT_READ_SCOPE = "vault:read";
 export const VAULT_WRITE_SCOPE = "vault:write";
 /** The tool whose grant stands for using the Vault at all: a login typed or a key given to a command checks it. */
 export const VAULT_LIST_TOOL = "vault_list";
+/** The tool whose grant stands for keeping things in the Vault: a password an agent makes checks it. */
+export const VAULT_SAVE_TOOL = "vault_save";
 
 /** A built-in scope by name: own keys only, so "constructor" or "toString" never passes as one. */
 export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, scope);

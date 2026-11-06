@@ -279,6 +279,7 @@ function RemovalCard({
         }
         actions={decision || undefined}
         what={label}
+        locked={decide.isPending || ask.isPending}
       />
     </>
   );
@@ -485,6 +486,7 @@ function SettingsRow({
       }
       actions={decision || undefined}
       what={label}
+      locked={decide.isPending || ask.isPending || redo.isPending}
     />
   );
 }
@@ -663,6 +665,7 @@ function MemberChanges({ message, card }: { message: Message; card: MemberChange
           </ul>
         }
         what={title}
+        locked={change.isPending || setRoles.isPending}
       />
     </>
   );

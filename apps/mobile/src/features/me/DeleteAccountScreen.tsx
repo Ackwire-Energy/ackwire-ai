@@ -21,7 +21,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteAccount } from "@/features/account";
 import { serverUrl } from "@/lib/server";
-import { Button, Card, HoldButton, type IconName, LineIcon, Text, useToast } from "@/ui";
+import { Button, Card, HoldButton, type IconName, LineIcon, Locked, Text, useToast } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { openPage } from "../ai/parts";
@@ -263,17 +263,19 @@ export function DeleteAccountScreen() {
             ) : null}
             {proof === "code" && sent ? (
               <View style={styles.proof}>
-                <AuthField
-                  code
-                  value={code}
-                  onChangeText={(value) => setCode(typedCode(value))}
-                  placeholder={t("proof.code")}
-                  accessibilityLabel={t("proof.code")}
-                  keyboardType="number-pad"
-                  textContentType="oneTimeCode"
-                  autoComplete="one-time-code"
-                  returnKeyType="done"
-                />
+                <Locked when={busy || sending}>
+                  <AuthField
+                    code
+                    value={code}
+                    onChangeText={(value) => setCode(typedCode(value))}
+                    placeholder={t("proof.code")}
+                    accessibilityLabel={t("proof.code")}
+                    keyboardType="number-pad"
+                    textContentType="oneTimeCode"
+                    autoComplete="one-time-code"
+                    returnKeyType="done"
+                  />
+                </Locked>
                 <Text variant="small" tone="muted">
                   {t("proof.sent", { email: sent.email })}
                 </Text>
@@ -281,16 +283,16 @@ export function DeleteAccountScreen() {
                   variant="ghost"
                   size="sm"
                   label={left > 0 ? t("proof.resendIn", { time: formatTimeLeft(left) }) : t("proof.resend")}
-                  disabled={left > 0}
+                  disabled={left > 0 || busy}
                   loading={sending}
                   onPress={() => void sendCode()}
                 />
               </View>
             ) : null}
             {proof === "password" ? (
-              <View style={styles.proof}>
+              <Locked when={busy} style={styles.proof}>
                 <PasswordField label={t("proof.password")} value={password} onChangeText={setPassword} />
-              </View>
+              </Locked>
             ) : null}
             {refused ? (
               <Text variant="small" tone="danger" accessibilityLiveRegion="polite">

@@ -25,6 +25,7 @@ import {
   Field,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   PlanMeter,
@@ -411,11 +412,13 @@ function RenameDialog({
           );
         }}
       >
-        <DialogBody>
-          <Field label={t("aiAccounts.page.nameLabel")} id="ai-rename" help={t("aiAccounts.done.name")}>
-            <Input value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} />
-          </Field>
-        </DialogBody>
+        <Locked when={busy}>
+          <DialogBody>
+            <Field label={t("aiAccounts.page.nameLabel")} id="ai-rename" help={t("aiAccounts.done.name")}>
+              <Input value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={onClose}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" loading={busy} disabled={!name || name === account.label}>

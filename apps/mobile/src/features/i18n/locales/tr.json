@@ -1965,7 +1965,6 @@
       "as": "{{username}} olarak giriş yapar.",
       "saved": "Vault'a kaydedildi",
       "notSaved": "Gönderildi ama Vault'a kaydedilmedi",
-      "codeLabel": "{{name}} için kod",
       "codeIncomplete": "Kodun tüm rakamlarını yazın.",
       "codeNote": "Şifrelenmiş olarak doğrudan bilgisayara gönderilir. Kodlar hiçbir zaman kaydedilmez."
     }

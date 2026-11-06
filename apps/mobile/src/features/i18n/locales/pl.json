@@ -2163,7 +2163,6 @@
       "as": "Loguje się jako {{username}}.",
       "saved": "Zapisano w Vault",
       "notSaved": "Wysłano, ale nie zapisano w Vault",
-      "codeLabel": "Kod dla {{name}}",
       "codeIncomplete": "Wpisz wszystkie cyfry kodu.",
       "codeNote": "Wysyłane w postaci zaszyfrowanej prosto na komputer. Kody nigdy nie są zapisywane."
     }

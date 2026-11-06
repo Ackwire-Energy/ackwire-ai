@@ -90,6 +90,8 @@ describe("S3 client against the fake server", () => {
       );
       await store.put("a/b c.txt", new TextEncoder().encode("hi"), { contentType: "text/plain" });
       expect(new TextDecoder().decode((await store.get("a/b c.txt"))?.body)).toBe("hi");
+      expect(await new Response(await store.stream?.("a/b c.txt")).text()).toBe("hi");
+      expect(await store.stream?.("a/none.txt")).toBeNull();
       expect(await store.list("a/")).toEqual(["a/b c.txt"]);
       const url = (await store.signedUrl("a/b c.txt", { expiresInSeconds: 60, filename: "b.txt" })) ?? "";
       expect((await f.s3.fetch(url, { method: "GET" })).status).toBe(200);

@@ -1061,26 +1061,26 @@ async function contentOf(deps: ArtifactDeps, a: ArtifactRow, v: VersionRow): Pro
 }
 
 /**
- * The bytes of a `file` artifact at `version` (default: latest), after the
- * visibility check: for `import_file` and the like.
+ * Where the bytes of a `file` artifact at `version` (default: latest) are, after
+ * the visibility check: for `import_file` and the like.
  */
-export async function readFileArtifact(
+export async function storedFileOfArtifact(
   deps: ArtifactDeps,
   actor: ArtifactActor,
   orgId: string,
   artifactId: string,
   version?: number,
-): Promise<{ title: string; version: number; name: string; contentType: string; bytes: Uint8Array }> {
+) {
   const a = await readable(deps, actor, orgId, artifactId);
   if (a.kind !== "file") throw new ValidationError(`this artifact is a ${a.kind}, not an uploaded file`);
   const v = await versionRow(deps.db, a, version);
-  const object = await readVersion(deps, a, v);
   return {
-    title: a.title,
     version: v.version,
     name: v.fileName ?? "file",
-    contentType: v.contentType,
-    bytes: object.body,
+    storageConfigId: v.storageConfigId,
+    blobKey: v.blobKey,
+    size: v.size,
+    sha256: v.sha256,
   };
 }
 

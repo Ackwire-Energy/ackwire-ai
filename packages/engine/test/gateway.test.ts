@@ -392,6 +392,15 @@ test("provider errors propagate and record no usage", async () => {
   expect(await f.db.select().from(schema.usageRecords)).toHaveLength(0);
 });
 
+test("a provider that echoes the call's key doesn't pass it on, whatever its shape", async () => {
+  f = await setup({
+    reply: () =>
+      new ProviderError(`provider rejected the request (400): bad ${f.provider.calls.at(-1)?.apiKey}`, false, 400),
+  });
+  const error = await call(f).catch((e: Error) => e);
+  expect((error as Error).message).toBe("provider rejected the request (400): bad ••••");
+});
+
 test("usage summary needs view_usage", async () => {
   f = await setup();
   await call(f);

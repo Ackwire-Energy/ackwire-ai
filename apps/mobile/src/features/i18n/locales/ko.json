@@ -1866,7 +1866,6 @@
       "as": "{{username}}(으)로 로그인해요.",
       "saved": "Vault에 저장했어요",
       "notSaved": "보냈지만 Vault에는 저장하지 않았어요",
-      "codeLabel": "{{name}}의 코드",
       "codeIncomplete": "코드의 모든 숫자를 입력하세요.",
       "codeNote": "암호화되어 컴퓨터로 바로 전송돼요. 코드는 저장되지 않아요."
     }

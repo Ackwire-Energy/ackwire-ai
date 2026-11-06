@@ -402,7 +402,7 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
     expect(save.getAttribute("aria-checked")).toBe("true");
     // The asking agent is preselected.
     expect(within(card()).getByRole("list", { name: t("vault.card.agents") }).textContent).toContain("Ada");
-    await type(within(card()).getByLabelText(t("secret.label", { name: "NPM_TOKEN" })), "npm_live_abc123");
+    await type(within(card()).getByLabelText(t("secret.labelKey", { agent: "Ada" })), "npm_live_abc123");
     await click(within(card()).getByRole("button", { name: t("secret.send") }));
     await settle(6);
 
@@ -430,7 +430,10 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
     const site = { kind: "site" as const, site: "https://shop.example.com" };
     const { state, t, card } = await withRequest(site, { name: "SHOP_PASSWORD", username: "guessed@shop.example.com" });
     await type(within(card()).getByLabelText(t("vault.field.username")), "  ");
-    await type(within(card()).getByLabelText(t("secret.label", { name: "SHOP_PASSWORD" })), "hunter2-for-the-shop");
+    await type(
+      within(card()).getByLabelText(t("secret.labelPassword", { host: "shop.example.com" })),
+      "hunter2-for-the-shop",
+    );
     await click(within(card()).getByRole("button", { name: t("secret.send") }));
     await settle(6);
     const call = state.calls.find((c) => c.method === "secrets.saveToVault");
@@ -447,7 +450,10 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
     );
     await click(within(card()).getByRole("checkbox", { name: t("vault.card.save") }));
     expect(within(card()).queryByLabelText(t("vault.field.username"))).toBeNull();
-    await type(within(card()).getByLabelText(t("secret.label", { name: "SHOP_PASSWORD" })), "hunter2-for-real");
+    await type(
+      within(card()).getByLabelText(t("secret.labelPassword", { host: "shop.example.com" })),
+      "hunter2-for-real",
+    );
     await click(within(card()).getByRole("button", { name: t("secret.send") }));
     await settle(6);
     expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true);
@@ -460,7 +466,7 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
       { kind: "site", site: "https://shop.example.com" },
       { name: "SHOP_CODE", codeDigits: 6 },
     );
-    const code = within(card()).getByRole("group", { name: t("secret.label", { name: "SHOP_CODE" }) });
+    const code = within(card()).getByRole("group", { name: t("secret.labelCode", { host: "shop.example.com" }) });
     const boxes = within(code).getAllByRole("textbox") as HTMLInputElement[];
     expect(boxes).toHaveLength(6);
     expect(boxes[0]?.getAttribute("aria-label")).toBe(t("vault.card.codeBox", { n: 1, total: 6 }));

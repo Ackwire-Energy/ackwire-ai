@@ -61,6 +61,7 @@ import {
   GroupedList,
   GroupedRow,
   type IconName,
+  Locked,
   ProviderLogo,
   Sky,
   Text,
@@ -889,7 +890,7 @@ function NewAgentForm({
           ) : (
             <>
               <StepBar index={index} total={total} name={stepNames[step]} />
-              {views[step]()}
+              <Locked when={busy}>{views[step]()}</Locked>
             </>
           )}
         </ScrollView>
@@ -912,7 +913,9 @@ function NewAgentForm({
                 ) : null}
               </>
             ) : null}
-            {backs ? <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} /> : null}
+            {backs ? (
+              <Button variant="secondary" label={t("common.back")} disabled={busy} onPress={() => goTo(index - 1)} />
+            ) : null}
             {goes ? (
               <View style={styles.fill}>
                 <Button
@@ -923,7 +926,7 @@ function NewAgentForm({
                       ? t("newAgent.create", { name: name.trim() || shownName })
                       : t("common.continue")
                   }
-                  disabled={busy}
+                  loading={busy}
                   onPress={next}
                 />
               </View>

@@ -479,7 +479,8 @@ export async function updateVaultItem(
   if (changed.length === 0) return itemView(deps, item, connection, viewer);
 
   const version = item.secretVersion + 1;
-  if (plaintext !== null) Object.assign(set, await sealItemValue(deps, item, version, plaintext));
+  if (plaintext !== null)
+    Object.assign(set, await sealItemValue(deps, item, version, plaintext), { previousSecrets: [] });
   set.updatedAt = vaultNow(deps);
   const row = await db.transaction(async (tx) => {
     const [updated] = await tx

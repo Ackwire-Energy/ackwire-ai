@@ -9,6 +9,7 @@ import { publishChannelEvent, publishMessageCreated } from "./events";
 import { cutText } from "./format";
 import { linkIssueToWork, setWorkIssueState } from "./issues";
 import { deliverLive } from "./live-steer";
+import { messageLink } from "./message-links";
 import { insertMessage, type Message, messageView, replyExcerpt } from "./messages";
 import { missionOfThread } from "./missions";
 import { enqueue } from "./outbox";
@@ -305,7 +306,12 @@ type RunLike = Pick<
  * not a mission's thread, not a routine's run and not one that already is.
  */
 export async function workEligible(db: Executor, run: RunLike): Promise<boolean> {
-  if (run.background || run.workId || isTerminal(run.status)) return false;
+  return !run.workId && !isTerminal(run.status) && movableRun(db, run);
+}
+
+/** Whether a run's work may leave where it answers now (`moveRun`, `moveToBackground`). */
+export async function movableRun(db: Executor, run: RunLike): Promise<boolean> {
+  if (run.background) return false;
   const channel = await getChannelCached(db as Database, run.orgId, run.channelId);
   if (!channel || (channel.kind !== "channel" && channel.kind !== "dm") || isAgentOnlyDm(channel)) return false;
   const thread = replyThreadOf(run);
@@ -453,6 +459,57 @@ export async function moveToBackground(
   }
   const [fresh] = await db.select().from(agentWorks).where(eq(agentWorks.id, work.id));
   return { work: fresh ?? work, anchor, queued: moved.queued };
+}
+
+/**
+ * A person asked it to go on elsewhere (`post_message` with `move_here`): from now on the run answers at `to`'s
+ * channel's top level (`replyThreadOf`: its root is its trigger), its long work's updates and report too, and every
+ * later wake of it, which reads this row. A line where it was links to `to`.
+ */
+export async function moveRun(
+  deps: { db: Database; pubsub?: PubSub },
+  run: Pick<
+    AgentRun,
+    "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "workId"
+  >,
+  to: Message,
+) {
+  const from = { channelId: run.channelId, threadId: replyThreadOf(run), agentId: run.agentId, runId: run.id };
+  const link = messageLink(run.orgId, to);
+  const now = new Date();
+  const line = await deps.db.transaction(async (tx) => {
+    await tx
+      .update(agentRuns)
+      .set({ channelId: to.channelId, threadRootId: run.triggerMessageId, updatedAt: now })
+      .where(eq(agentRuns.id, run.id));
+    if (run.workId)
+      await tx
+        .update(agentWorks)
+        .set({ channelId: to.channelId, homeThreadId: null, ownThread: false, updatedAt: now })
+        .where(eq(agentWorks.id, run.workId));
+    return insertMessage(tx, {
+      orgId: run.orgId,
+      channelId: from.channelId,
+      threadId: from.threadId,
+      author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+      body: `Continues in ${link}`,
+      meta: { movedOn: true, bodyCode: "moved_on", bodyParams: { link } },
+    });
+  });
+  localMoves.add(run.id);
+  if (!deps.pubsub) return;
+  await publishMessageCreated(deps.pubsub, messageView(line));
+  // Live rows keep the place they started in: this one ends where it was and, unless it is long work, starts over.
+  const background = run.workId ? { background: true as const } : {};
+  await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...from, ...background });
+  if (!run.workId)
+    await publishChannelEvent(deps.pubsub, {
+      type: "agent.thinking",
+      ...from,
+      channelId: to.channelId,
+      threadId: null,
+    });
+  await deps.pubsub.publish(workTopic(run.id), { type: "run.moved", runId: run.id }).catch(() => {});
 }
 
 /** A work with no title of its own: its thread's title, else the start of the ask. */

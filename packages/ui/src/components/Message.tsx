@@ -32,7 +32,7 @@ export interface MessageLook {
 export const MessageLookContext = createContext<MessageLook | null>(null);
 
 /** What a row's `MessageText` holds besides its words in `bubbles`: the name on top, the time at the end. */
-const BubbleContext = createContext<{ head: ReactNode; tail: ReactNode } | null>(null);
+const BubbleContext = createContext<{ head: ReactNode; tail: ReactNode; quote?: ReactNode } | null>(null);
 
 export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
   /** The avatar element. Omitted for grouped (continuation) messages. */
@@ -73,6 +73,8 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   run?: "solo" | "start" | "mid" | "end";
   /** The message text (use `MessageText`), plus attachments or cards. */
   children: ReactNode;
+  /** The message this one answers, in one line: on top of the words in a bubble, else above the row, joined to its face. */
+  quote?: ReactNode;
   /** Nothing in a `MessageText` (a card, a picture): in `bubbles` its name and time stay above it, with no bubble. */
   bare?: boolean;
   /** The name's color in `bubbles`, on a light and on a dark surface. */
@@ -136,6 +138,7 @@ export function Message({
   own,
   run = "solo",
   children,
+  quote,
   bare,
   nameColor,
   stacked,
@@ -152,6 +155,7 @@ export function Message({
   // In `left` and `compact` a row of mine is a row like anyone's.
   const mine = own && (drawn === "comfortable" || drawn === "bubbles");
   const inBubble = drawn === "bubbles" && !bare;
+  const quoteInBubble = (inBubble || mine) && !bare;
   const tipId = useId();
   const noteId = useId();
   const row = useRef<HTMLElement>(null);
@@ -270,6 +274,7 @@ export function Message({
       }}
       {...rest}
     >
+      {quote && !quoteInBubble && <div className="ac-msg__reply">{quote}</div>}
       {drawn === "compact" && (
         <span className="ac-msg__clock" aria-hidden="true">
           {time}
@@ -291,7 +296,13 @@ export function Message({
         {aside && grouped && !mine && !inBubble && (
           <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>
         )}
-        <BubbleContext.Provider value={inBubble ? { head: mine ? null : head, tail: stamp } : null}>
+        <BubbleContext.Provider
+          value={
+            inBubble || (quote && quoteInBubble)
+              ? { head: inBubble && !mine ? head : null, tail: inBubble ? stamp : null, quote: quoteInBubble && quote }
+              : null
+          }
+        >
           {children}
         </BubbleContext.Provider>
         {footed && (
@@ -342,6 +353,7 @@ export function MessageText({ className, opens = true, closes = true, children, 
   return (
     <div className={cx("ac-msg__text", className)} {...rest}>
       {opens && bubble?.head}
+      {opens && bubble?.quote && <div className="ac-msg__reply">{bubble.quote}</div>}
       {children}
       {closes && bubble?.tail}
     </div>

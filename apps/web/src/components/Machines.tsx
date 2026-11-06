@@ -53,6 +53,7 @@ import {
   InfoHint,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   MenuSeparator,
@@ -484,11 +485,13 @@ function RenameDialog({ machine, onClose }: { machine: Machine | null; onClose: 
           );
         }}
       >
-        <DialogBody>
-          <Field label={t("machines.name")} id="machine-rename" error={error ?? undefined}>
-            <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
-          </Field>
-        </DialogBody>
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <Field label={t("machines.name")} id="machine-rename" error={error ?? undefined}>
+              <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}

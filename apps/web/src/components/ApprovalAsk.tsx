@@ -1,4 +1,4 @@
-import type { Agent, Approval, Member } from "@agenteschat/client";
+import { type Agent, type Approval, type Member, useApprovalsDeciding } from "@agenteschat/client";
 import {
   approvalRuns,
   approveAllScope,
@@ -34,7 +34,7 @@ import {
   expiryText,
   RefuseBox,
 } from "@/pages/ApprovalsPage";
-import { RequestCard, RequestFuse } from "./RequestCard";
+import { RequestCard, RequestFuse, useExpired } from "./RequestCard";
 
 /** The whole time a request has (24 h when the row doesn't say): the fuse burns down over it. */
 const DAY_MS = 24 * 3_600_000;
@@ -55,6 +55,10 @@ export function ApprovalAsk({
   members: Map<string, Member>;
 }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const deciding = useApprovalsDeciding(org.id, [approval.id]);
+  // It stops being decidable the moment it expires, even before the server's event says so.
+  const expired = useExpired(approval.expiresAt);
   const [refusing, setRefusing] = useState(false);
   const why = approvalWhy(approval);
   const origin = approvalOriginShort(approval);
@@ -108,6 +112,7 @@ export function ApprovalAsk({
       }
       end={refusing ? undefined : <RequestFuse left={left} agent={agent} text={expiryText(t, approval)} />}
       what={title}
+      locked={deciding || expired}
     />
   );
 }
@@ -138,6 +143,11 @@ export function ApprovalGroupAsk({
   members: Map<string, Member>;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const deciding = useApprovalsDeciding(
+    org.id,
+    items.map((a) => a.id),
+  );
   // Which runs are unfolded, by `runKeys`: one stays open while its requests are decided, the card reshaping or not.
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
   const first = items[0];
@@ -230,6 +240,7 @@ export function ApprovalGroupAsk({
         deadline ? <RequestFuse left={left} agent={agent} text={expiryText(t, { expiresAt: deadline })} /> : undefined
       }
       what={one ? runHead(t, one, agent) : t("approval.askMany", { count: waiting.length })}
+      locked={deciding}
     />
   );
 }

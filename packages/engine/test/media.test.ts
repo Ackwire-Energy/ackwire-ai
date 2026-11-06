@@ -130,7 +130,7 @@ test("a quote of a GIF or a sticker with no text says what it was, never the GIF
   expect(quotedLine({ replyTo: { authorName: "Ana", excerpt: "olha", mediaKind: "gif" } })).toBe(
     '(replying to Ana: "olha")\n',
   );
-  expect(quotedLine({ replyTo: { authorName: "Ana", excerpt: "" } })).toBe("");
+  expect(quotedLine({ replyTo: { authorName: "Ana", excerpt: "" } })).toBe("(replying to Ana)\n");
 });
 
 test("a person's GIF and sticker reach the agent's run as lines it reads, the GIF's title and size the provider's", async () => {

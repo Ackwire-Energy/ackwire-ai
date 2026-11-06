@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -20,7 +20,15 @@ import {
 } from "../../runner/connection";
 import { MIN_FREE_BYTES } from "../../runner/desktop-session";
 import { RunnerError } from "../../runner/errors";
-import { MAX_IN_FLIGHT, RequestRunner, TURN_BYTES, TURN_SETTLE_MS, TURNS_WITHOUT_MEMORY } from "../../runner/handlers";
+import {
+  LOCKED_TURN_MIN_FREE_BYTES,
+  MAX_IN_FLIGHT,
+  PERSON_TURN_MIN_FREE_BYTES,
+  RequestRunner,
+  TURN_BYTES,
+  TURN_SETTLE_MS,
+  TURNS_WITHOUT_MEMORY,
+} from "../../runner/handlers";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -388,6 +396,193 @@ test("requests run concurrently up to the ceiling; beyond it the runner answers 
   await Promise.all([...started, view]);
   expect(sent.length).toBe(3);
   expect(runner.size).toBe(0);
+});
+
+test("a locked-down turn goes past the room check down to its own floor, and a little past the count where memory isn't known", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  const sent: { id: string; ok: boolean; error?: { code: string } }[] = [];
+  const pending: Promise<void>[] = [];
+  let free: number | null = MIN_FREE_BYTES - 1;
+  const runner = new RequestRunner(
+    { workspaceReal: ws, exec: true, token: "agm_x" },
+    (f) => sent.push(f as unknown as (typeof sent)[number]),
+    () => {},
+    (_ctx, _req, scope) =>
+      new Promise((_, reject) => {
+        scope.signal.addEventListener("abort", () => reject(new RunnerError("internal", "Canceled")));
+      }),
+    { memAvailable: () => free, now: () => 1_000_000 },
+  );
+  const turn = (id: string, locked: boolean) => {
+    const req = { op: "brain.turn", runId: id, ...(locked ? { permissions: { mode: "chat" } } : {}) };
+    pending.push(runner.start(id, req as unknown as MachineRequest));
+  };
+  const refused = () => sent.filter((f) => !f.ok).map((f) => f.id);
+
+  // Below the floor everyone else keeps: the agents' turn waits, the locked-down one runs.
+  turn("work", false);
+  turn("lodi", true);
+  expect(refused()).toEqual(["work"]);
+  expect(runner.size).toBe(1);
+
+  // A computer about to run out turns it away too, and what it just admitted counts.
+  free = LOCKED_TURN_MIN_FREE_BYTES + TURN_BYTES - 1;
+  turn("lodi2", true);
+  expect(refused()).toEqual(["work", "lodi2"]);
+
+  // Where memory isn't known room is a count of turns: it doesn't count against it.
+  free = null;
+  for (let i = 0; i < TURNS_WITHOUT_MEMORY - 1; i++) turn(`c${i}`, false);
+  turn("over", false);
+  turn("lodi3", true);
+  expect(refused()).toEqual(["work", "lodi2", "over"]);
+  // A bound still: a turn it can't measure is no reason to run any number of them.
+  turn("lodi4", true);
+  turn("lodi5", true);
+  expect(refused()).toEqual(["work", "lodi2", "over", "lodi5"]);
+  runner.close();
+  await Promise.allSettled(pending);
+});
+
+describe("the slot held for a person's turn", () => {
+  const room = (over: { free?: number | null; reclaimBrains?: () => Promise<boolean> } = {}) => {
+    const ws = tempDir();
+    dirs.push(ws);
+    const sent: { id: string; ok: boolean; error?: { code: string } }[] = [];
+    const release = new Map<string, () => void>();
+    const s = { free: "free" in over ? over.free : MIN_FREE_BYTES - 1, now: 1_000_000 };
+    const runner = new RequestRunner(
+      { workspaceReal: ws, exec: true, token: "agm_x", reclaimBrains: over.reclaimBrains },
+      (f) => sent.push(f as unknown as (typeof sent)[number]),
+      () => {},
+      (_ctx, req) =>
+        new Promise((resolve) => {
+          release.set((req as { runId?: string }).runId ?? "", () => resolve({}));
+        }),
+      { memAvailable: () => s.free ?? null, now: () => s.now },
+    );
+    const turn = (id: string, flags: Record<string, unknown> = {}) =>
+      runner.start(id, { op: "brain.turn", runId: id, ...flags } as unknown as MachineRequest);
+    const person = (id: string) => turn(id, { personWaiting: true });
+    const refused = () => sent.filter((f) => !f.ok).map((f) => f.id);
+    const end = async (id: string) => {
+      release.get(id)?.();
+      await waitFor(() => sent.some((f) => f.id === id));
+    };
+    return { s, runner, turn, person, refused, end };
+  };
+
+  test("below the floor a person's turn goes ahead and an agent's waits; an old server's turn has no flag and waits", async () => {
+    const { runner, turn, person, refused } = room();
+    await turn("agent");
+    expect(refused()).toEqual(["agent"]);
+    void person("ana");
+    expect(refused()).toEqual(["agent"]);
+    expect(runner.size).toBe(1);
+    runner.close();
+  });
+
+  test("one at a time: a second person waits while the slot is taken, whatever the time", async () => {
+    const { s, runner, person, refused, end } = room({ free: MIN_FREE_BYTES - 1 });
+    void person("ana");
+    s.now += TURN_SETTLE_MS;
+    await person("bia");
+    expect(refused()).toEqual(["bia"]);
+    await end("ana");
+    void person("bia2");
+    expect(refused()).toEqual(["bia"]);
+    expect(runner.size).toBe(1);
+    runner.close();
+  });
+
+  test("used only when no person's turn was admitted in the last TURN_SETTLE_MS, by the floor or by the slot", async () => {
+    const { s, runner, person, refused, end } = room({ free: MIN_FREE_BYTES + 1 });
+    // Over the floor: an ordinary admission, and it still counts.
+    void person("floor");
+    s.free = MIN_FREE_BYTES - 1;
+    await person("soon");
+    expect(refused()).toEqual(["soon"]);
+    s.now += TURN_SETTLE_MS;
+    void person("slot");
+    await end("slot");
+    // The slot is free again, but its turn isn't in the reading yet.
+    s.now += TURN_SETTLE_MS - 1;
+    await person("soon2");
+    expect(refused()).toEqual(["soon", "soon2"]);
+    s.now += 1;
+    void person("later");
+    expect(refused()).toEqual(["soon", "soon2"]);
+    runner.close();
+  });
+
+  test("its own hard floor: under it the turn waits as ever, and a turn still settling counts", async () => {
+    const { s, runner, person, refused } = room({ free: PERSON_TURN_MIN_FREE_BYTES - 1 });
+    await person("low");
+    expect(refused()).toEqual(["low"]);
+    s.free = PERSON_TURN_MIN_FREE_BYTES;
+    void person("fits");
+    expect(refused()).toEqual(["low"]);
+    expect(LOCKED_TURN_MIN_FREE_BYTES).toBeLessThan(PERSON_TURN_MIN_FREE_BYTES);
+    runner.close();
+
+    const other = room({ free: MIN_FREE_BYTES + 1 });
+    void other.turn("agent");
+    other.s.free = PERSON_TURN_MIN_FREE_BYTES + TURN_BYTES - 1;
+    await other.person("settling");
+    expect(other.refused()).toEqual(["settling"]);
+    other.runner.close();
+  });
+
+  test("what it takes counts against the agents' floor", async () => {
+    const { s, runner, turn, person, refused } = room();
+    void person("ana");
+    s.free = MIN_FREE_BYTES + TURN_BYTES - 1;
+    await turn("agent");
+    expect(refused()).toEqual(["agent"]);
+    runner.close();
+  });
+
+  test("a burst of people's turns, all closing idle CLIs at once, gets one slot", async () => {
+    const { runner, person, refused } = room({ reclaimBrains: async () => false });
+    for (const id of ["a", "b", "c", "d"]) void person(id);
+    await waitFor(() => refused().length === 3);
+    expect(refused()).toEqual(["b", "c", "d"]);
+    expect(runner.size).toBe(1);
+    runner.close();
+  });
+
+  test("not where memory isn't known: there is no floor to keep", async () => {
+    const { runner, turn, person, refused } = room({ free: null });
+    for (let i = 0; i < TURNS_WITHOUT_MEMORY; i++) void turn(`t${i}`);
+    await person("ana");
+    expect(refused()).toEqual(["ana"]);
+    runner.close();
+  });
+
+  test("idle CLIs close first: the slot is only for what they couldn't free", async () => {
+    let idle = 1;
+    let closes = 0;
+    const r = room({
+      reclaimBrains: async () => {
+        closes++;
+        if (idle === 0) return false;
+        idle--;
+        r.s.free = MIN_FREE_BYTES;
+        return true;
+      },
+    });
+    // Enough came back: an ordinary admission, the slot stays free for the next person.
+    void r.person("floor");
+    await waitFor(() => r.runner.size === 1 && closes === 1);
+    r.s.free = MIN_FREE_BYTES - 1;
+    r.s.now += TURN_SETTLE_MS;
+    void r.person("slot");
+    await waitFor(() => r.runner.size === 2);
+    expect(closes).toBe(2);
+    expect(r.refused()).toEqual([]);
+    r.runner.close();
+  });
 });
 
 test("a brain turn starts only while the computer has room; recent ones count until they grow; elsewhere a count", async () => {

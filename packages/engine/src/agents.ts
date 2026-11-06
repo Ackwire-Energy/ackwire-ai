@@ -24,6 +24,7 @@ import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { publishAgentsChanged } from "./events";
 import type { CommandApproval } from "./missions";
 import { recordOperatorEvent } from "./operator-events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
@@ -179,7 +180,7 @@ export async function createAgent(
   input: AgentInput & { autonomy?: CommandApproval; audienceMode?: Agent["audienceMode"] },
   defaults: { model: string },
   /** `via`: the agent whose card it was created from (the audit's "via"). */
-  options: { remember?: boolean; via?: string } = {},
+  options: { remember?: boolean; via?: string; pubsub?: PubSub } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
   const { autonomy, audienceMode, ...fields } = input;
@@ -275,6 +276,7 @@ export async function createAgent(
     if (options.remember && (!isAutoModel(agent.model) || agent.credentialId)) {
       await rememberAgentSetup(db, membership, setupOfAgent(agent));
     }
+    await publishAgentsChanged(options.pubsub, orgId);
     return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw handleTaken(values.handle, await takenHandles(db, orgId));
@@ -434,6 +436,7 @@ export async function updateAgent(
   if (thinking && options.remember !== false && !isComputerBrain(agent.brain)) {
     await rememberAgentSetup(db, membership, setupOfAgent(agent));
   }
+  await publishAgentsChanged(options.pubsub, orgId);
   return agent;
 }
 
@@ -471,13 +474,20 @@ export async function archiveAgent(
   caches.agents.delete(`${orgId}:old-handles`);
   // Its channel memberships stay: what runs read of a channel's members leaves it out from now on.
   caches.channelMembers.deletePrefix(`${orgId}:`);
+  if (gone) await publishAgentsChanged(pubsub, orgId);
 }
 
 /**
  * Brings an archived agent back (an archive's Undo, ADR 0137): its handle was kept for it all along (`takenHandles`
  * holds archived agents'), so nothing else took it meanwhile. Not a deleted one.
  */
-export async function unarchiveAgent(db: Database, actorId: string, orgId: string, agentId: string) {
+export async function unarchiveAgent(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  options: { pubsub?: PubSub } = {},
+) {
   await requirePermission(db, actorId, orgId, "manage_agents");
   const [back] = await db
     .update(agents)
@@ -497,6 +507,7 @@ export async function unarchiveAgent(db: Database, actorId: string, orgId: strin
   caches.agents.delete(`${orgId}:archived`);
   caches.agents.delete(`${orgId}:old-handles`);
   caches.channelMembers.deletePrefix(`${orgId}:`);
+  await publishAgentsChanged(options.pubsub, orgId);
 }
 
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {

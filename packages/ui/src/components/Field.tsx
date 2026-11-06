@@ -108,6 +108,41 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ c
   return <input ref={ref} className={cx("ac-input", className)} {...rest} {...wiring} />;
 });
 
+const LockedContext = createContext(false);
+
+/** True inside a `Locked` that's on: for what a fieldset can't reach, such as a contenteditable or a drop zone. */
+export function useLocked() {
+  return useContext(LockedContext);
+}
+
+/**
+ * `<Locked when={sending}>` turns off every control inside, keeping its text, while its action runs or once its result
+ * is final. A Cancel that really cancels stays outside. CSS says `:disabled`, never `[disabled]`, to see a fieldset's.
+ */
+export function Locked({ when, children }: { when: boolean; children: ReactNode }) {
+  const outer = useLocked();
+  const box = useRef<HTMLFieldSetElement>(null);
+  const focused = useRef<HTMLElement | null>(null);
+  // Read while rendering: by a layout effect Chromium has already taken the focus off a disabled control.
+  if (when && !focused.current) {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && box.current?.contains(active)) focused.current = active;
+  }
+  useLayoutEffect(() => {
+    if (when) return;
+    const active = document.activeElement;
+    if (!active || active === document.body) focused.current?.focus({ preventScroll: true });
+    focused.current = null;
+  }, [when]);
+  return (
+    <LockedContext.Provider value={when || outer}>
+      <fieldset ref={box} className="ac-locked" disabled={when}>
+        {children}
+      </fieldset>
+    </LockedContext.Provider>
+  );
+}
+
 /** A border-box height that fits the text: `scrollHeight` leaves the border out. */
 function fitText(el: HTMLTextAreaElement) {
   el.style.height = "auto";

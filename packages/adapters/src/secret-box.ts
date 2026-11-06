@@ -83,6 +83,10 @@ export function vaultAad(input: { keyId: string; agentId: string; use: VaultUse 
   return `agentes-vault|v${SECRET_BOX_VERSION}|${input.keyId}|${input.agentId}|${use}`;
 }
 
+/** What binds a password an agent's computer made to the one request that asked for it (ADR 0144 §8). */
+export const madePasswordAad = (input: { requestId: string; agentId: string }) =>
+  `agentes-vault|v${SECRET_BOX_VERSION}|${input.requestId}|${input.agentId}|made`;
+
 /** The computer's side: a fresh pair; the private key (PKCS#8, base64) never leaves it. */
 export async function generateSecretKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
   const pair = (await subtle().generateKey(EC, true, ["deriveBits"])) as CryptoKeyPair;

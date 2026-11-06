@@ -1,6 +1,6 @@
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Select, Textarea } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Locked, Select, Textarea } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -68,31 +68,33 @@ export function WikiAskDialog({
       closeLabel={t("common.close")}
       width={480}
     >
-      <DialogBody className="wiki-ask">
-        <Field label={t("wiki.ask.agent")}>
-          <Select
-            value={agentId}
-            onValueChange={setAgentId}
-            aria-label={t("wiki.ask.agent")}
-            options={agents.map((a) => ({
-              value: a.id,
-              label: a.name,
-              description: a.role || undefined,
-              leading: <AgentAvatar agent={a} name={a.name} size="sm" />,
-            }))}
-          />
-        </Field>
-        {quote && <blockquote className="wiki-ask__quote">{quote}</blockquote>}
-        <Field label={t("wiki.ask.what")}>
-          <Textarea
-            rows={3}
-            value={text}
-            placeholder={t("wiki.ask.placeholder")}
-            onChange={(e) => setText(e.target.value)}
-            autoFocus
-          />
-        </Field>
-      </DialogBody>
+      <Locked when={sending}>
+        <DialogBody className="wiki-ask">
+          <Field label={t("wiki.ask.agent")}>
+            <Select
+              value={agentId}
+              onValueChange={setAgentId}
+              aria-label={t("wiki.ask.agent")}
+              options={agents.map((a) => ({
+                value: a.id,
+                label: a.name,
+                description: a.role || undefined,
+                leading: <AgentAvatar agent={a} name={a.name} size="sm" />,
+              }))}
+            />
+          </Field>
+          {quote && <blockquote className="wiki-ask__quote">{quote}</blockquote>}
+          <Field label={t("wiki.ask.what")}>
+            <Textarea
+              rows={3}
+              value={text}
+              placeholder={t("wiki.ask.placeholder")}
+              onChange={(e) => setText(e.target.value)}
+              autoFocus
+            />
+          </Field>
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button

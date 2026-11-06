@@ -4784,9 +4784,6 @@
   "vault.card.notSaved": {
     "value": "Sent, but not saved to the Vault"
   },
-  "vault.card.codeLabel": {
-    "value": "Code for {{name}}"
-  },
   "vault.card.codeIncomplete": {
     "value": "Type every digit of the code."
   },

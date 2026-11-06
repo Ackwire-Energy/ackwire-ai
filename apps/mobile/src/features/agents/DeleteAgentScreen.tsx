@@ -63,7 +63,7 @@ export function DeleteAgentScreen({ id, proposal }: { id: string; proposal?: str
   };
 
   return (
-    <SettingsPage title={t("agentPage.delete.title", g)}>
+    <SettingsPage title={t("agentPage.delete.title", g)} locked={purge.isPending}>
       <GroupedList>
         <GroupedRow icon="x" label={t("agentPage.delete.goes")} labelLines={4} />
         <GroupedRow icon="chat" label={t("agentPage.delete.stays")} labelLines={4} />

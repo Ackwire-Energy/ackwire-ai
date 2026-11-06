@@ -92,6 +92,19 @@ describe("nobody will answer: the receipt's sheet, never a line", () => {
   });
 });
 
+describe("a reply heard live", () => {
+  test("too big for its event, it still refreshes its thread's link and header", () => {
+    expect(src("features/chat/live.ts")).toContain("const threadId = repliedThread(event);");
+    expect(src("features/chat/live.ts")).toContain("refreshRepliedThread(qc, orgId, threadId)");
+  });
+});
+
+describe("a reply in a task's conversation", () => {
+  test("the task lists read again, as the web's", () => {
+    expect(src("features/shared/userEvents.ts")).toContain("applyIssueEvent(qc, orgId, event);");
+  });
+});
+
 describe("my message's clock from the moment it is sent", () => {
   test("sent into a channel with agents, it wears the clock before the server says anything, as the web's", () => {
     const screen = src("features/chat/ChatScreen.tsx");

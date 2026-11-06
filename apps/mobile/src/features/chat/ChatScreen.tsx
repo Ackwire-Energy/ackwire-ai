@@ -1,6 +1,7 @@
 import {
   type Agent,
   type ArtifactDetail,
+  type ArtifactRef,
   type BrowserHandoff,
   type ConnectionStatus,
   heldTakeoversHere,
@@ -11,6 +12,7 @@ import {
   type MessageMedia,
   type MessagePin,
   type ReceiptsState,
+  type ReplyRef,
   type RunConsultation,
   type SearchHit,
   sendHelpers,
@@ -46,7 +48,7 @@ import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { firstUnreadId, opensAtLastRead } from "@agenteschat/client/lib/chat-look";
 import { type ConversationWait, conversationWaits } from "@agenteschat/client/lib/computer-queue";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
@@ -61,6 +63,7 @@ import {
 import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { pinsIn } from "@agenteschat/client/lib/pins";
+import { localMeta } from "@agenteschat/client/lib/reply";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
@@ -171,6 +174,7 @@ import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinnedBar, PinsSheet } from "./PinsSheet";
+import { QuoteBar } from "./QuoteLine";
 import { AgentLocked } from "./ReachLines";
 import { RowSight } from "./row-sight";
 import {
@@ -864,11 +868,25 @@ function Chat({
       // A GIF or a sticker alone routes to nobody, so it gets no clock to keep.
       if (channel && channelAgents.length > 0 && !isMediaAlone(message)) live.picking(message.id);
     },
-    onFailed: (_error, { waits }) => {
-      if (!waits) toast({ title: t("mobile.chat.notSent"), icon: "x" });
+    onFailed: (error, { waits }) => {
+      if (waits) return;
+      const gone = errorCode(error) === "message.reply_not_found";
+      toast({ title: gone ? errorText(t, error) : t("mobile.chat.notSent"), icon: "x" });
     },
   });
   const { send, retry } = sendHelpers(post);
+  // "Responder" in a thread: the next message answers this one (`meta.replyTo`).
+  const [quote, setQuote] = useState<Message | null>(null);
+  const [replyAt, setReplyAt] = useState(0);
+  const onReply = useCallback((m: Message) => {
+    setQuote(m);
+    setReplyAt(Date.now());
+  }, []);
+  const takeQuote = (files: ArtifactRef[] = []) => {
+    if (!quote) return files.length > 0 ? localMeta(null, "", files) : undefined;
+    setQuote(null);
+    return localMeta(quote, dir.nameOf(quote.author), files);
+  };
   // Rows keep the same callback (so a streaming reply doesn't re-render every message).
   const retryRef = useRef(retry);
   retryRef.current = retry;
@@ -927,7 +945,8 @@ function Chat({
     if (!text) return;
     const cmd = parseSlash(text);
     if (!cmd) {
-      send(text, threadId, how === "now" ? { steer: "now" } : undefined);
+      const meta = takeQuote();
+      send(text, threadId, how === "now" ? { ...meta, steer: "now" } : meta);
       toEnd();
       return;
     }
@@ -984,12 +1003,16 @@ function Chat({
     orgId,
     channelId,
     threadId,
+    replyTo: quote?.id ?? null,
     authorId: meId ?? "",
     enabled: Boolean(meId && settings?.voiceAvailable && settings.voiceMessages),
-    afterSend: toEnd,
+    afterSend: () => {
+      setQuote(null);
+      toEnd();
+    },
   });
   const sendMedia = (media: MessageMedia) => {
-    send("", threadId, { media });
+    send("", threadId, { ...takeQuote(), media });
     toEnd();
     sheet.close();
   };
@@ -1013,7 +1036,7 @@ function Chat({
         channelId,
         ...(threadId ? { threadId } : {}),
       });
-      send("", threadId, { artifacts: [{ id: saved.id, version: saved.version, title: saved.title }] });
+      send("", threadId, takeQuote([{ id: saved.id, version: saved.version, title: saved.title }]));
       toEnd();
     } catch {
       toast({ title: t("mobile.chat.uploadFailed"), icon: "x" });
@@ -1071,6 +1094,12 @@ function Chat({
 
   // ── Long press ──
   const canMission = !mission && (Boolean(dm) || Boolean(channel));
+  const canReply =
+    isThread &&
+    member &&
+    thread.data?.state !== "archived" &&
+    channel?.can?.post !== false &&
+    (!dmAgent || canTalk(dmAgent));
   // biome-ignore lint/correctness/useExhaustiveDependencies: openNewMission reads the latest state when called
   const onLongPress = useCallback(
     (m: Message) =>
@@ -1082,9 +1111,10 @@ function Chat({
           thread={linkThreads.get(m.threadId ?? m.id)}
           onMission={(goal, rootId) => openNewMission(goal, rootId)}
           onRemind={(message) => openRemind({ message })}
+          {...(canReply ? { onReply } : {})}
         />,
       ),
-    [sheet, canMission, isThread, linkThreads],
+    [sheet, canMission, isThread, linkThreads, canReply, onReply],
   );
 
   // ── Pins ──
@@ -1094,12 +1124,14 @@ function Chat({
   const [seek, setSeek] = useState<string | null>(focusId);
   const [flashId, setFlashId] = useState<string | null>(null);
   const seekPages = useRef(0);
+  const seekPressed = useRef(false);
   const seekReady = isThread ? threadMessages.isSuccess && !threadMessages.isPlaceholderData : top.isSuccess;
   useEffect(() => {
     if (!seek || !seekReady) return;
     const index = shownRows.findIndex((r) => r.kind === "message" && r.message.id === seek);
     if (index >= 0) {
       setSeek(null);
+      seekPressed.current = false;
       letGo();
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
       setFlashId(seek);
@@ -1107,18 +1139,33 @@ function Chat({
     }
     if (isThread || olderDone || seekPages.current >= SEEK_MAX_PAGES) {
       setSeek(null);
+      if (seekPressed.current) toast({ title: t("channel.jumpTooFar") });
+      seekPressed.current = false;
       return;
     }
     if (!loadingOlder) {
       seekPages.current += 1;
       loadOlder();
     }
-  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo]);
+  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo, t, toast]);
   useEffect(() => {
     if (!flashId) return;
     const timer = setTimeout(() => setFlashId(null), FLASH_MS);
     return () => clearTimeout(timer);
   }, [flashId]);
+  const onQuote = useCallback(
+    (reply: ReplyRef) => {
+      // A thread's reply isn't a row of the conversation: it is on the thread's screen.
+      if (!isThread && reply.threadId) {
+        router.push(chatHref(channelId, reply.threadId, reply.messageId));
+        return;
+      }
+      seekPages.current = 0;
+      seekPressed.current = true;
+      setSeek(reply.messageId);
+    },
+    [isThread, channelId],
+  );
   const goToPin = (pin: MessagePin) => {
     sheet.close();
     const target = pinTarget(pin, threadId);
@@ -1672,6 +1719,7 @@ function Chat({
                 inThread={isThread}
                 onLongPress={onLongPress}
                 onRetry={onRetry}
+                onQuote={onQuote}
                 receipt={item.message.id === markAt ? receipt : undefined}
                 seenBy={item.message.id === seenId ? seenBy : undefined}
               />
@@ -1699,6 +1747,7 @@ function Chat({
       linkThreads,
       onLongPress,
       onRetry,
+      onQuote,
       isFresh,
       openBrowsers,
       toggleBrowser,
@@ -2116,6 +2165,10 @@ function Chat({
                     mentionAt={refQuery}
                     insertMention={insertRef}
                     prefill={prefill}
+                    focusAt={replyAt}
+                    banner={
+                      quote ? <QuoteBar name={dir.nameOf(quote.author)} onCancel={() => setQuote(null)} /> : undefined
+                    }
                     mention={({ query, sigil, pick }) =>
                       sigil === "#" ? (
                         <ChannelPicker query={query} pick={pick} />

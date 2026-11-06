@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button";
 import { Dialog, DialogBody, DialogFooter } from "./Dialog";
+import { Locked } from "./Field";
 import { SearchSelect } from "./SearchSelect";
 import { Select, type SelectOption } from "./Select";
 
@@ -133,58 +134,60 @@ export function AccessDialog<L extends string = string>({
       closeLabel={labels.close}
       width={560}
     >
-      <DialogBody className="ac-access">
-        {note && <p className="ac-access__note">{note}</p>}
-        <SearchSelect
-          value={undefined}
-          placeholder={labels.add}
-          aria-label={labels.add}
-          labels={{
-            search: labels.addSearch,
-            searchPlaceholder: labels.addSearch,
-            noResults: labels.noResults,
-            list: labels.addList,
-          }}
-          options={() =>
-            addable.map((s) => ({
-              value: s.id,
-              label: s.name,
-              description: s.detail,
-              leading: s.lead,
-              group: s.group,
-            }))
-          }
-          onValueChange={(id) => {
-            const subject = addable.find((s) => s.id === id);
-            const level = subject && levelsFor(subject).at(-1);
-            if (subject && level) onLevelChange(subject, level.value);
-          }}
-        />
-        <div className="ac-access__list">
-          {base.map((b) => (
-            <AccessRow
-              key={b.id}
-              subject={b}
-              value={b.level}
-              options={b.levels}
-              label={labels.levelOf(b.name)}
-              onChange={(v) => b.onChange(v as L)}
-            />
-          ))}
-          {listed.map((s) => (
-            <AccessRow
-              key={s.id}
-              subject={s}
-              value={levelOf(s) as string}
-              options={levelsFor(s)}
-              label={labels.levelOf(s.name)}
-              onChange={(v) => onLevelChange(s, v as L)}
-              onRemove={() => onLevelChange(s, null)}
-              removeLabel={labels.removeOf(s.name)}
-            />
-          ))}
-        </div>
-      </DialogBody>
+      <Locked when={Boolean(saving)}>
+        <DialogBody className="ac-access">
+          {note && <p className="ac-access__note">{note}</p>}
+          <SearchSelect
+            value={undefined}
+            placeholder={labels.add}
+            aria-label={labels.add}
+            labels={{
+              search: labels.addSearch,
+              searchPlaceholder: labels.addSearch,
+              noResults: labels.noResults,
+              list: labels.addList,
+            }}
+            options={() =>
+              addable.map((s) => ({
+                value: s.id,
+                label: s.name,
+                description: s.detail,
+                leading: s.lead,
+                group: s.group,
+              }))
+            }
+            onValueChange={(id) => {
+              const subject = addable.find((s) => s.id === id);
+              const level = subject && levelsFor(subject).at(-1);
+              if (subject && level) onLevelChange(subject, level.value);
+            }}
+          />
+          <div className="ac-access__list">
+            {base.map((b) => (
+              <AccessRow
+                key={b.id}
+                subject={b}
+                value={b.level}
+                options={b.levels}
+                label={labels.levelOf(b.name)}
+                onChange={(v) => b.onChange(v as L)}
+              />
+            ))}
+            {listed.map((s) => (
+              <AccessRow
+                key={s.id}
+                subject={s}
+                value={levelOf(s) as string}
+                options={levelsFor(s)}
+                label={labels.levelOf(s.name)}
+                onChange={(v) => onLevelChange(s, v as L)}
+                onRemove={() => onLevelChange(s, null)}
+                removeLabel={labels.removeOf(s.name)}
+              />
+            ))}
+          </div>
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         {footerStart && <span className="ac-access__start">{footerStart}</span>}
         <Button onClick={onClose}>{labels.cancel}</Button>

@@ -760,11 +760,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       rotateCredential: (orgId, id, input) =>
         request<Credential>(`${org(orgId)}/credentials/${enc(id)}/rotate`, { json: input }),
-      removeCredential: (orgId, id, purge) =>
+      removeCredential: (orgId, id, purge, release) =>
         request<void>(`${org(orgId)}/credentials/${enc(id)}`, {
           method: "DELETE",
-          query: { purge: purge ? "true" : undefined },
+          query: { purge: purge ? "true" : undefined, release: release ? "true" : undefined },
         }),
+      checkCredential: (orgId, id) =>
+        request<{ check: "ok" | "unchecked" }>(`${org(orgId)}/credentials/${enc(id)}/check`, { json: {} }),
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
       aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),
@@ -812,8 +814,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       runs: async (orgId, filter = {}) =>
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
-      cancelRun: (orgId, runId, reason) =>
-        request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, { json: reason ? { reason } : {} }),
+      cancelRun: (orgId, runId, reason, chain) =>
+        request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, {
+          json: { ...(reason ? { reason } : {}), ...(chain ? { chain } : {}) },
+        }),
       stopReason: (orgId, runId, reason) =>
         request<void>(`${org(orgId)}/runs/${enc(runId)}/stop-reason`, { json: { reason } }),
       continueRun: (orgId, runId) =>
@@ -1617,6 +1621,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/dismiss`, { json: {} }),
     },
     secrets: {
+      get: (orgId, requestId) => request<SecretRequest>(`${org(orgId)}/secret-requests/${enc(requestId)}`),
       deliver: (orgId, requestId, box) =>
         request<SecretRequest>(`${org(orgId)}/secret-requests/${enc(requestId)}/deliver`, { json: { box } }),
       decline: (orgId, requestId) =>

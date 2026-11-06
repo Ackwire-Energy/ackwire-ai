@@ -2180,6 +2180,7 @@ export class RunnerDaemon implements RequestObserver {
       case "read":
         return { kind: "read", summary: `read ${p(req.path)}` };
       case "write":
+      case "pull":
         return { kind: "write", summary: `wrote ${p(req.path)}` };
       case "list":
         return { kind: "list", summary: `looked at ${p(req.path)}` };

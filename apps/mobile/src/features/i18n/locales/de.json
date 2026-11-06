@@ -1965,7 +1965,6 @@
       "as": "Meldet sich als {{username}} an.",
       "saved": "Im Vault gespeichert",
       "notSaved": "Gesendet, aber nicht im Vault gespeichert",
-      "codeLabel": "Code für {{name}}",
       "codeIncomplete": "Gib jede Ziffer des Codes ein.",
       "codeNote": "Wird verschlüsselt direkt an den Computer gesendet. Codes werden nie gespeichert."
     }

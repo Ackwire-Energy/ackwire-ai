@@ -64,6 +64,7 @@ export function SuggestPersonScreen() {
         disabled: suggest.isPending || !email.trim(),
         onPress: () => void submit(),
       }}
+      locked={suggest.isPending}
     >
       <GroupedHeader>{t("members.suggest.email")}</GroupedHeader>
       <GroupedList>

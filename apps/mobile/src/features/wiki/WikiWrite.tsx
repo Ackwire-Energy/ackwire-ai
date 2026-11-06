@@ -25,6 +25,7 @@ import {
   fieldText,
   Icon,
   type IconName,
+  Locked,
   Segmented,
   SheetScreen,
   Text,
@@ -301,24 +302,26 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
               </View>
             ) : null}
           </View>
-          <TextInput
-            ref={input}
-            value={body}
-            onChangeText={setBody}
-            onSelectionChange={(e: TextInputSelectionChangeEvent) => {
-              setSel(e.nativeEvent.selection);
-              if (pending) setPending(null);
-            }}
-            {...(pending ? { selection: pending } : {})}
-            multiline
-            autoFocus={!page}
-            textAlignVertical="top"
-            autoCapitalize="sentences"
-            placeholder={t("mobile.wiki.placeholder")}
-            placeholderTextColor={c.faint}
-            accessibilityLabel={t("wiki.editorLabel", { title })}
-            style={[styles.source, { color: c.ink2 }]}
-          />
+          <Locked when={saving} style={styles.fill}>
+            <TextInput
+              ref={input}
+              value={body}
+              onChangeText={setBody}
+              onSelectionChange={(e: TextInputSelectionChangeEvent) => {
+                setSel(e.nativeEvent.selection);
+                if (pending) setPending(null);
+              }}
+              {...(pending ? { selection: pending } : {})}
+              multiline
+              autoFocus={!page}
+              textAlignVertical="top"
+              autoCapitalize="sentences"
+              placeholder={t("mobile.wiki.placeholder")}
+              placeholderTextColor={c.faint}
+              accessibilityLabel={t("wiki.editorLabel", { title })}
+              style={[styles.source, { color: c.ink2 }]}
+            />
+          </Locked>
           {suggestions.length > 0 || token ? (
             // Rises in as the chat's pickers do, as `[[` starts a link.
             <Animated.View
@@ -358,39 +361,41 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
               ) : null}
             </Animated.View>
           ) : null}
-          <View style={[styles.bar, { borderTopColor: c.line2, paddingBottom: 6 }]}>
-            {tools.map((tool) => (
+          <Locked when={saving}>
+            <View style={[styles.bar, { borderTopColor: c.line2, paddingBottom: 6 }]}>
+              {tools.map((tool) => (
+                <Pressable
+                  key={tool.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={tool.label}
+                  onPress={tool.run}
+                  hitSlop={4}
+                  style={({ pressed }) => [styles.tool, pressed && { backgroundColor: c.sunken }]}
+                >
+                  {tool.icon ? (
+                    <Icon name={tool.icon} size={20} color={c.ink2} />
+                  ) : (
+                    <Text
+                      variant="callout"
+                      style={[styles.toolText, { color: c.ink2 }, tool.key === "italic" && styles.italic]}
+                    >
+                      {tool.text}
+                    </Text>
+                  )}
+                </Pressable>
+              ))}
+              <View style={styles.grow} />
               <Pressable
-                key={tool.key}
                 accessibilityRole="button"
-                accessibilityLabel={tool.label}
-                onPress={tool.run}
+                accessibilityLabel={t("mobile.wiki.hideKeyboard")}
+                onPress={() => Keyboard.dismiss()}
                 hitSlop={4}
                 style={({ pressed }) => [styles.tool, pressed && { backgroundColor: c.sunken }]}
               >
-                {tool.icon ? (
-                  <Icon name={tool.icon} size={20} color={c.ink2} />
-                ) : (
-                  <Text
-                    variant="callout"
-                    style={[styles.toolText, { color: c.ink2 }, tool.key === "italic" && styles.italic]}
-                  >
-                    {tool.text}
-                  </Text>
-                )}
+                <Icon name="keyboard" size={20} color={c.ink2} />
               </Pressable>
-            ))}
-            <View style={styles.grow} />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.wiki.hideKeyboard")}
-              onPress={() => Keyboard.dismiss()}
-              hitSlop={4}
-              style={({ pressed }) => [styles.tool, pressed && { backgroundColor: c.sunken }]}
-            >
-              <Icon name="keyboard" size={20} color={c.ink2} />
-            </Pressable>
-          </View>
+            </View>
+          </Locked>
           <View style={{ height: insets.bottom }} />
         </KeyboardAvoidingView>
       )}

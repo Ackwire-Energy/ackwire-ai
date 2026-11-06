@@ -7,10 +7,11 @@ import {
   useApi,
   useCredentials,
   useMachines,
+  useModels,
 } from "@agenteschat/client";
 import { listsExisting } from "@agenteschat/client/lib/ai-accounts";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
-import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AgentAi,
@@ -30,7 +31,7 @@ import {
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { Button, Dialog, DialogBody, DialogFooter, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -175,8 +176,10 @@ function ConnectAiDialog({
   const status = useAiStatus(org.id);
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const add = useAddCredential(org.id);
+  const add = useAddCredential(org.id, true);
   const api = useApi();
+  const toast = useToast();
+  const models = useModels();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
   // The team's right hand thinks with each person's own AI (ADR 0137 §11): everyone's to connect for their DM.
@@ -261,6 +264,8 @@ function ConnectAiDialog({
   // Anything connected shows Done; only a saved key closes the key's field (after a plan, it's for the other agents).
   const [connected, setConnected] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
+  const [keyNote, setKeyNote] = useState<string>();
+  const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const done = () => {
     setConnected(true);
     void qc.invalidateQueries({ queryKey: keys.aiStatus(org.id) });
@@ -270,18 +275,37 @@ function ConnectAiDialog({
   };
   const saveKey = () => {
     if (draft.provider === "platform" || draft.provider === CUSTOM_PROVIDER) return;
+    setRefused(null);
+    const provider = providerLabel(draft.provider);
     add.mutate(
-      { provider: draft.provider, label: providerLabel(draft.provider), apiKey: draft.apiKey.trim() },
+      { provider: draft.provider, label: provider, apiKey: draft.apiKey.trim() },
       {
+        onError: (error) => {
+          setRefused(keyRefusal(t, error));
+          if (!keyRefusal(t, error)) toast.show(errorText(t, error), "error");
+        },
         onSuccess: async (key) => {
           // The right hand asked for a key ("Usar uma chave de API"): the workspace's AI from now on, and the person's
           // own DM goes back to it.
+          let moved = false;
           if (one && rightHand) {
-            await api.agents.setBrain(org.id, one.id, { brain: "model" }).catch(() => null);
-            await api.agents.setBrain(org.id, one.id, { scope: "workspace", brain: "model" }).catch(() => null);
-            await api.agents.update(org.id, one.id, { credentialId: key.id }).catch(() => null);
+            moved = await rightHandOnKey(api, org.id, one, key, models.data?.models ?? []).then(
+              () => true,
+              (error) => {
+                toast.show(errorText(t, error), "error");
+                return false;
+              },
+            );
             void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
+            void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, one.id) });
           }
+          setKeyNote(
+            key.check === "unchecked"
+              ? t("connectAi.key.savedUnchecked", { provider })
+              : moved && one
+                ? thinksWithLine(t, "workspace", one.name, key.label)
+                : undefined,
+          );
           setKeySaved(true);
           done();
         },
@@ -348,6 +372,13 @@ function ConnectAiDialog({
                     setPickedTarget(forAgent.id);
                     setHeldReader(undefined);
                   }}
+                  onManageKeys={() => {
+                    onClose();
+                    void navigate({
+                      to: "/org/$orgId/settings/$section",
+                      params: { orgId: org.id, section: "keys" },
+                    });
+                  }}
                   onUsed={(id, next) => {
                     setLinked((l) => ({ ...l, [id]: next.choice }));
                     setUsed(next);
@@ -373,6 +404,8 @@ function ConnectAiDialog({
                   onDraft={setDraft}
                   locked={!mayAddKey}
                   saved={keySaved}
+                  savedNote={keyNote}
+                  refused={refused}
                   saving={add.isPending}
                   onSave={saveKey}
                   endpoint={

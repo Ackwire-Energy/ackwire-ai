@@ -27,6 +27,7 @@ import {
   noticeRoutineName,
   skippedHandles,
 } from "@agenteschat/client/lib/notices";
+import { replyOf } from "@agenteschat/client/lib/reply";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { usagePauseCardOf } from "@agenteschat/client/lib/usage-pause";
@@ -138,10 +139,12 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
       lastDay = day;
       prev = null;
     }
-    // A fast reply while its task works keeps its header ("enquanto trabalha"), as on the web.
+    // A fast reply while its task works keeps its header ("enquanto trabalha"), and a reply to a message starts its
+    // own block under its quote, as on the web.
     const grouped =
-      continuesReply(prev, m) ||
-      (!standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m));
+      !replyOf(m.meta) &&
+      (continuesReply(prev, m) ||
+        (!standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m)));
     const last = rows.at(-1);
     const above = grouped && last?.kind === "message" ? last : undefined;
     if (above) above.continued = true;

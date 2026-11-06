@@ -227,6 +227,16 @@ describe("agents at work in the list", () => {
     expect(working).toEqual({ "d:d3": false, "d:d1": true, "d:d2": false, "c:c1": null });
   });
 
+  test("a DM opened with no message yet is on top, by when it began", () => {
+    const now = new Date().toISOString();
+    const rows = buildConversations({
+      channels: [channel("c1", "geral")],
+      dms: [dm("d1", "Dev", 0, 10), { ...dm("d2", "Iris", 0, null), openedAt: now }, dm("d3", "Ana", 0, null)],
+      threads: [],
+    });
+    expect(rows.map((r) => r.key)).toEqual(["d:d2", "d:d1", "d:d3", "c:c1"]);
+  });
+
   test("without who is working, nobody is", () => {
     const rows = buildConversations({ channels: [], dms: [dm("d1", "Dev", 0, 10)], threads: [] });
     expect(rows[0]?.kind === "dm" && rows[0].working).toBe(false);

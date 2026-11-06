@@ -6,7 +6,7 @@ import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { stopRun } from "./cancel";
 import { NotFoundError, ValidationError } from "./errors";
-import { publishOrgEvent } from "./events";
+import { publishChannelsChanged, publishOrgEvent } from "./events";
 import { concludeMission, OPEN_MISSION_STATUSES } from "./missions";
 import { clearChannelNotifications } from "./notifications";
 import { requirePermission } from "./organizations";
@@ -131,6 +131,7 @@ export async function deleteChannel(
   }
   // Clients drop it as they drop an archived channel, and live subscriptions to it end.
   await publishOrgEvent(deps.pubsub, { type: "channel.archived", orgId, channelId });
+  await publishChannelsChanged(deps.pubsub, orgId);
 }
 
 /** Job: a deleted channel's contents go, in one transaction; a no-op for a channel that isn't deleted. */

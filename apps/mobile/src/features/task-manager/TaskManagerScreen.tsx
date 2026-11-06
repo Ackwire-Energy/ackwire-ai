@@ -4,6 +4,7 @@ import {
   agentSummary,
   endedState,
   groupTasks,
+  hiddenCount,
   taskState,
   taskTitle,
   taskWaitWords,
@@ -107,11 +108,19 @@ function TaskManager() {
   const [asking, setAsking] = useState<string | null>(null);
   const [endedOpen, setEndedOpen] = useState(false);
   const view = tasks.data;
-  const { groups, background } = useMemo(() => groupTasks(view?.tasks ?? [], stopping), [view?.tasks, stopping]);
+  const { groups, delegated, background } = useMemo(
+    () => groupTasks(view?.tasks ?? [], stopping),
+    [view?.tasks, stopping],
+  );
   const ended = useMemo(() => endedLatestFirst(view?.ended ?? []), [view?.ended]);
   const all = view?.tasks ?? [];
   const sum = agentSummary(all);
+  // Everyone's work counts here, as on the computers' rows; what the viewer may not see only counts.
+  const working = sum.working + (view?.hidden?.working ?? 0);
+  const hidden = hiddenCount(view?.hidden, null);
   const leadColor = agentLook(dir.anyAgent(all.find((x) => taskState(x) === "working")?.agentId ?? "")).color;
+  /** One tap on a task that asked other agents stops what it asked too: that's what its row's "Parar" means. */
+  const stopOne = (task: ManagedTask) => stop([task.runId], undefined, Boolean(task.helpers));
   const toggle = (agentId: string) =>
     setClosed((was) => {
       const next = new Set(was);
@@ -120,6 +129,7 @@ function TaskManager() {
       return next;
     });
   const askedCount = groups.reduce((n, g) => n + g.tasks.length, 0);
+  const delegatedCount = delegated.reduce((n, g) => n + g.tasks.length, 0);
   const computers = view?.computers ?? [];
   return (
     <PushedLargeTitle
@@ -141,12 +151,12 @@ function TaskManager() {
         // Loaded, the list fades in over the spinner; the rows it starts with don't each fade again.
         <Animated.View {...fade}>
           <LayoutAnimationConfig skipEntering>
-            {sum.tasks > 0 ? (
+            {sum.tasks + hidden > 0 ? (
               <View style={styles.chips}>
-                {sum.working > 0 ? (
+                {working > 0 ? (
                   <Chip
                     leading={<PixelOrbit color={leadColor} size={10} />}
-                    label={t("taskManager.working", { count: sum.working })}
+                    label={t("taskManager.working", { count: working })}
                   />
                 ) : null}
                 {sum.waiting > 0 ? (
@@ -164,6 +174,11 @@ function TaskManager() {
                 subtitle={t("taskManager.empty.body")}
               />
             )}
+            {hidden > 0 ? (
+              <Text variant="footnote" tone="faint" style={styles.none}>
+                {t("taskManager.hiddenLine", { count: hidden })}
+              </Text>
+            ) : null}
             {computers.length > 0 ? (
               <Animated.View {...fade} layout={layout}>
                 <SectionHeader title={t("taskManager.queue.computers")} count={computers.length} />
@@ -191,9 +206,37 @@ function TaskManager() {
                     onCancel={() => setAsking(null)}
                     onStopAll={(reason) => {
                       setAsking(null);
-                      stop(g.stoppable, reason);
+                      stop(g.stoppable, reason, g.helpers > 0);
                     }}
-                    onStop={(runId) => stop([runId])}
+                    onStop={stopOne}
+                    stopping={stopping}
+                    now={now}
+                    meId={meId}
+                  />
+                ))}
+              </Animated.View>
+            ) : null}
+            {delegated.length > 0 ? (
+              <Animated.View {...fade} layout={layout}>
+                <SectionHeader title={t("taskManager.sections.delegated")} count={delegatedCount} />
+                <WaitLines tasks={delegated.flatMap((g) => g.tasks)} now={now} />
+                {delegated.map((g, i) => (
+                  <AgentGroup
+                    key={g.agentId}
+                    group={g}
+                    flat
+                    open={!closed.has(`by:${g.agentId}`)}
+                    onToggle={() => toggle(`by:${g.agentId}`)}
+                    divider={i > 0}
+                    live={i < LIVE_ROWS}
+                    asking={asking === `by:${g.agentId}`}
+                    onAsk={() => setAsking(`by:${g.agentId}`)}
+                    onCancel={() => setAsking(null)}
+                    onStopAll={(reason) => {
+                      setAsking(null);
+                      stop(g.stoppable, reason, true);
+                    }}
+                    onStop={stopOne}
                     stopping={stopping}
                     now={now}
                     meId={meId}
@@ -214,7 +257,7 @@ function TaskManager() {
                       divider={i > 0}
                       now={now}
                       meId={meId}
-                      onStop={() => stop([task.runId])}
+                      onStop={() => stopOne(task)}
                     />
                   </Animated.View>
                 ))}
@@ -257,6 +300,7 @@ function TaskManager() {
  */
 function AgentGroup({
   group,
+  flat = false,
   open,
   onToggle,
   divider,
@@ -271,6 +315,8 @@ function AgentGroup({
   meId,
 }: {
   group: AgentTasks;
+  /** The group of an agent that asked: its rows are other agents' tasks, each with its face. */
+  flat?: boolean;
   open: boolean;
   onToggle: () => void;
   divider: boolean;
@@ -279,7 +325,7 @@ function AgentGroup({
   onAsk: () => void;
   onCancel: () => void;
   onStopAll: (reason: string) => void;
-  onStop: (runId: string) => void;
+  onStop: (task: ManagedTask) => void;
   stopping: ReadonlySet<string>;
   now: number;
   meId: string | null;
@@ -349,7 +395,13 @@ function AgentGroup({
       </Pressable>
       {asking ? (
         <Animated.View {...fade} layout={layout} style={styles.confirm}>
-          <StopConfirm agentId={group.agentId} count={group.stoppable.length} onCancel={onCancel} onStop={onStopAll} />
+          <StopConfirm
+            agentId={group.agentId}
+            count={group.stoppable.length}
+            helpers={flat ? 0 : group.helpers}
+            onCancel={onCancel}
+            onStop={onStopAll}
+          />
         </Animated.View>
       ) : null}
       {open
@@ -358,10 +410,11 @@ function AgentGroup({
               <TaskRow
                 task={task}
                 state={rowState(task, stopping)}
+                flat={flat}
                 divider={i > 0}
                 now={now}
                 meId={meId}
-                onStop={() => onStop(task.runId)}
+                onStop={() => onStop(task)}
               />
             </Animated.View>
           ))
@@ -395,7 +448,7 @@ function TaskRow({
   const c = useColors();
   const dir = useDirectory();
   const title = taskTitle(t, task);
-  const sub = taskSubline(t, task, meId, title);
+  const sub = taskSubline(t, task, meId, title, (id) => dir.anyAgent(id)?.name);
   const words = taskStateWords(t, i18n.language, task, state, now);
   const line = flat ? [dir.nameOf({ type: "agent", id: task.agentId }), sub].filter(Boolean).join(" · ") : sub;
   return (

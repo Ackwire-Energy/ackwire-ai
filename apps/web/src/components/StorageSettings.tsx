@@ -22,6 +22,7 @@ import {
   type IconName,
   Input,
   List,
+  Locked,
   Meter,
   RadioCard,
   RadioGroup,
@@ -342,78 +343,80 @@ function BucketForm({ config }: { config: StorageConfig }) {
         );
       }}
     >
-      <div className="grid-fields grid-fields--wide">
-        <Field
-          label={t("storage.endpoint")}
-          id="st-endpoint"
-          help={t("storage.endpointHelp")}
-          error={missing(form.endpoint) ? t("storage.required") : undefined}
-        >
-          <Input
-            value={form.endpoint}
-            onChange={(e) => set("endpoint", e.target.value)}
-            placeholder="https://"
-            autoComplete="off"
+      <Locked when={test.isPending || save.isPending}>
+        <div className="grid-fields grid-fields--wide">
+          <Field
+            label={t("storage.endpoint")}
+            id="st-endpoint"
+            help={t("storage.endpointHelp")}
+            error={missing(form.endpoint) ? t("storage.required") : undefined}
+          >
+            <Input
+              value={form.endpoint}
+              onChange={(e) => set("endpoint", e.target.value)}
+              placeholder="https://"
+              autoComplete="off"
+            />
+          </Field>
+          <Field
+            label={t("storage.region")}
+            id="st-region"
+            error={missing(form.region) ? t("storage.required") : undefined}
+          >
+            <Input value={form.region} onChange={(e) => set("region", e.target.value)} autoComplete="off" />
+          </Field>
+          <Field
+            label={t("storage.bucket")}
+            id="st-bucket"
+            error={missing(form.bucket) ? t("storage.required") : undefined}
+          >
+            <Input value={form.bucket} onChange={(e) => set("bucket", e.target.value)} autoComplete="off" />
+          </Field>
+          <Field label={t("storage.prefix")} id="st-prefix" help={t("storage.prefixHelp")}>
+            <Input value={form.prefix} onChange={(e) => set("prefix", e.target.value)} autoComplete="off" />
+          </Field>
+          <Field
+            label={t("storage.accessKey")}
+            id="st-access"
+            help={saved ? t("storage.savedHint", { hint: saved.accessKeyIdHint }) : undefined}
+            error={touched && keysMissing && !input.accessKeyId ? t("storage.keysRequired") : undefined}
+          >
+            <Input
+              type="password"
+              value={form.accessKeyId}
+              onChange={(e) => set("accessKeyId", e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+          <Field
+            label={t("storage.secret")}
+            id="st-secret"
+            help={saved ? t("storage.savedHint", { hint: saved.secretHint }) : undefined}
+            error={touched && keysMissing && !input.secretAccessKey ? t("storage.keysRequired") : undefined}
+          >
+            <Input
+              type="password"
+              value={form.secretAccessKey}
+              onChange={(e) => set("secretAccessKey", e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+        </div>
+        <div className="row" style={{ alignItems: "flex-start", gap: 8 }}>
+          <Checkbox
+            id="st-path"
+            checked={form.pathStyle}
+            onCheckedChange={(v) => set("pathStyle", v)}
+            aria-describedby="st-path-help"
           />
-        </Field>
-        <Field
-          label={t("storage.region")}
-          id="st-region"
-          error={missing(form.region) ? t("storage.required") : undefined}
-        >
-          <Input value={form.region} onChange={(e) => set("region", e.target.value)} autoComplete="off" />
-        </Field>
-        <Field
-          label={t("storage.bucket")}
-          id="st-bucket"
-          error={missing(form.bucket) ? t("storage.required") : undefined}
-        >
-          <Input value={form.bucket} onChange={(e) => set("bucket", e.target.value)} autoComplete="off" />
-        </Field>
-        <Field label={t("storage.prefix")} id="st-prefix" help={t("storage.prefixHelp")}>
-          <Input value={form.prefix} onChange={(e) => set("prefix", e.target.value)} autoComplete="off" />
-        </Field>
-        <Field
-          label={t("storage.accessKey")}
-          id="st-access"
-          help={saved ? t("storage.savedHint", { hint: saved.accessKeyIdHint }) : undefined}
-          error={touched && keysMissing && !input.accessKeyId ? t("storage.keysRequired") : undefined}
-        >
-          <Input
-            type="password"
-            value={form.accessKeyId}
-            onChange={(e) => set("accessKeyId", e.target.value)}
-            autoComplete="off"
-          />
-        </Field>
-        <Field
-          label={t("storage.secret")}
-          id="st-secret"
-          help={saved ? t("storage.savedHint", { hint: saved.secretHint }) : undefined}
-          error={touched && keysMissing && !input.secretAccessKey ? t("storage.keysRequired") : undefined}
-        >
-          <Input
-            type="password"
-            value={form.secretAccessKey}
-            onChange={(e) => set("secretAccessKey", e.target.value)}
-            autoComplete="off"
-          />
-        </Field>
-      </div>
-      <div className="row" style={{ alignItems: "flex-start", gap: 8 }}>
-        <Checkbox
-          id="st-path"
-          checked={form.pathStyle}
-          onCheckedChange={(v) => set("pathStyle", v)}
-          aria-describedby="st-path-help"
-        />
-        <span className="list-col" style={{ gap: 2 }}>
-          <label htmlFor="st-path">{t("storage.pathStyle")}</label>
-          <span id="st-path-help" className="small muted">
-            {t("storage.pathStyleHelp")}
+          <span className="list-col" style={{ gap: 2 }}>
+            <label htmlFor="st-path">{t("storage.pathStyle")}</label>
+            <span id="st-path-help" className="small muted">
+              {t("storage.pathStyleHelp")}
+            </span>
           </span>
-        </span>
-      </div>
+        </div>
+      </Locked>
       {current && <TestSteps result={current} />}
       {stale && <p className="small muted">{t("storage.retestNeeded")}</p>}
       <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>

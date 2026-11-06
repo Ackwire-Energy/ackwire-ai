@@ -1,5 +1,5 @@
 import type { WikiPageSummary } from "@agenteschat/client";
-import { Button, Icon, type IconName, Kbd, Menu, MenuItem, modKey } from "@agenteschat/ui";
+import { Button, Icon, type IconName, Kbd, Menu, MenuItem, modKey, useLocked } from "@agenteschat/ui";
 import {
   type ClipboardEvent,
   forwardRef,
@@ -143,6 +143,7 @@ export const WikiRichEditor = forwardRef<
   }
 >(function WikiRichEditor({ value, title, onChange, onSave, pages, label, autoFocus = false, onAsk }, ref) {
   const { t } = useTranslation();
+  const locked = useLocked();
   const box = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const doc = useRef<{ original: string; sources: string[]; snapshots: Map<number, string>; lead: string } | null>(
@@ -533,7 +534,7 @@ export const WikiRichEditor = forwardRef<
         <div
           ref={box}
           className="md wiki-rich"
-          contentEditable
+          contentEditable={!locked}
           suppressContentEditableWarning
           tabIndex={0}
           role="textbox"

@@ -26,7 +26,7 @@ import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { openPersonAgentDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent } from "./events";
+import { publishAgentsChanged, publishChannelEvent } from "./events";
 import { setAgentComputerTarget } from "./machines";
 import { DEFAULT_MAIL_POLICY, setAgentMail } from "./mail/policies";
 import { setAgentChannels } from "./management";
@@ -769,9 +769,9 @@ export async function createProposedAgent(
         ...(delegated ? { monthlyBudgetNanoUsd: delegated.budgetNanoUsd } : {}),
       },
       NEW_AGENT_DEFAULTS,
-      { via: found.proposedBy },
+      { via: found.proposedBy, pubsub: deps.pubsub },
     );
-    if (draft.appearance) agent = await setAgentAppearance(deps.db, userId, orgId, agent.id, draft.appearance);
+    if (draft.appearance) agent = await setAgentAppearance(deps.db, userId, orgId, agent.id, draft.appearance, deps);
   } catch (error) {
     await setCard(deps.db, found.message, found.before, "creating");
     throw error;
@@ -945,6 +945,8 @@ async function giveLines(
       await attempt(async () => {
         await setAgentComputerTarget(deps, userId, orgId, agent.id, ai.machineId);
         await setAgentBrain(deps, userId, orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+        // Who may talk to it moves with its AI, after the apps read it as it was made.
+        await publishAgentsChanged(deps.pubsub, orgId);
       })
     ).ok;
   // Its channels, as the review puts them (an admin's): all of them or none.
