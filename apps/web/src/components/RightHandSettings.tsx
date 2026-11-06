@@ -266,7 +266,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
                   <PlanLine kind={kind} label={signIn?.label} owner={ownerId !== me.user.id ? planOwner : undefined} />
                 ) : (
                   key && (
-                    <span className="rh-set__planline">
+                    <span className="rh-set__planline ac-iconline">
                       <ProviderLogo id={key.provider} size="sm" />
                       <b>{key.label}</b>
                     </span>
