@@ -2250,6 +2250,11 @@
       "one_female": "{{name}} 专用的账号",
       "each": "每个智能体专用的账号"
     },
+    "popup": {
+      "title": "正在连接 {{name}}",
+      "any": "正在连接你的 AI",
+      "text": "正在向电脑请求登录页面，几秒后会在这里打开。"
+    },
     "chatgptCode": {
       "title": "在 ChatGPT 中允许用代码登录",
       "text": "在“设置 › 安全”中，为 Codex 开启设备代码登录。Business 或 Enterprise 套餐需由管理员开启。",

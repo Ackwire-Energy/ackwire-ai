@@ -8,12 +8,7 @@ test("the start card asks what the workspace does with business types as chips, 
   const intro = src("right-hand/Intro.tsx");
   expect(intro).toContain("BUSINESS_TYPES.map((b) => t(`teamPlan.business.$" + "{b}`))");
   expect(intro).toContain('t("teamPlan.start.question", { org: org?.name ?? "" })');
-  for (const key of [
-    "teamPlan.start.templates",
-    "teamPlan.start.presets",
-    "rightHand.intro.start.import",
-    "rightHand.intro.start.form",
-  ])
+  for (const key of ["teamPlan.start.templates", "teamPlan.start.presets", "rightHand.intro.start.import"])
     expect(intro).toContain(`t("${key}")`);
   // "Outra coisa" writes in the composer instead of sending.
   expect(intro).toContain('text === other ? requestComposerText(channelId, "") : send(text)');

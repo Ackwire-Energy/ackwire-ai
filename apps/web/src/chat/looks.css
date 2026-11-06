@@ -117,7 +117,7 @@
   background: none;
   box-shadow: none;
 }
-.ac-msg--mentions-me[data-look="bubbles"] .ac-msg__text {
+.ac-msg--mentions-me[data-look="bubbles"]:not(.ac-msg--own) .ac-msg__text {
   background: color-mix(in srgb, var(--attention) 13%, var(--msg-bubble));
 }
 /* Mine: on the right in the tint or the solid color, its width the same as anyone's. */
@@ -264,14 +264,18 @@
     animation: ac-blink 1s steps(2) infinite;
   }
 }
-/* What hangs under a bubble, 4px off it and in one width. */
+/* What hangs under a bubble, 8px off it and in one width. */
 .ac-msg[data-look="bubbles"] .ac-msg__body > :is(.ac-tools, .brw-ac, .rq-done) {
   width: 100%;
   max-width: 520px;
-  margin: 4px 0 0;
+  margin: 8px 0 0;
 }
 .ac-msg[data-look="bubbles"] .ac-msg__body > .artifact-cards {
   margin-top: 4px;
+}
+/* A card in a row of its own under the same author's words, in any look: as far off them as in the same row. */
+.ac-msg--grouped:not(:has(.ac-msg__text)):has(.rq, .waitcard) {
+  padding-top: 10px;
 }
 .ac-msg[data-look="bubbles"] .ac-msg__body > :is(.ac-reacts, .thread-line) {
   margin-top: 3px;

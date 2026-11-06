@@ -71,11 +71,12 @@ export function AnswerChips({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const answered = answer !== null;
   const shown = answered ? new Set(answerPicks(choices, answer)) : picked;
-  if (choices.length === 0 && !(step && step.of > 1)) return null;
+  const listed = answered ? choices.filter((choice) => shown.has(choice)) : choices;
+  if (listed.length === 0 && !(step && step.of > 1)) return null;
   return (
     <View style={styles.chips}>
       <View style={styles.chipRow}>
-        {choices.map((choice) => {
+        {listed.map((choice) => {
           const on = shown.has(choice);
           return (
             <Pressable

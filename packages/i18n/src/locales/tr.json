@@ -2332,6 +2332,11 @@
       "one": "Yalnızca {{name}} için bir hesap",
       "each": "Yalnızca onlar için bir hesap"
     },
+    "popup": {
+      "title": "{{name}} bağlanıyor",
+      "any": "Yapay zekan bağlanıyor",
+      "text": "Bilgisayardan giriş sayfasını istiyoruz. Birkaç saniye içinde burada açılacak."
+    },
     "chatgptCode": {
       "title": "ChatGPT'de kodla girişe izin verin",
       "text": "Ayarlar › Güvenlik bölümünde Codex için cihaz koduyla girişi açın. Business veya Enterprise planında bunu bir yönetici yapar.",

@@ -167,7 +167,7 @@ describe("the right hand elsewhere", () => {
     expect(document.querySelector(".profile-card")?.textContent).toContain("Lodi");
   });
 
-  test("with a team, or the start card answered by another message, its greeting still ends with the way to build the team", async () => {
+  test("with a team and no card left, its greeting still ends with the way to build the team", async () => {
     const state = withRightHand(seedState());
     seedDm(state, { type: "agent", id: LODI_ID }, { body: "oi, tudo bem?" });
     await go(state, `dm/agent/${LODI_ID}`);

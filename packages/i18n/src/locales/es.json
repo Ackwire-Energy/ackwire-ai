@@ -2425,6 +2425,11 @@
       "one_female": "Una cuenta solo para {{name}}",
       "each": "Una cuenta solo para ellos"
     },
+    "popup": {
+      "title": "Conectando {{name}}",
+      "any": "Conectando tu IA",
+      "text": "Estamos pidiendo la página de inicio de sesión a la computadora. Se abre aquí en unos segundos."
+    },
     "chatgptCode": {
       "title": "Permite iniciar sesión con un código en ChatGPT",
       "text": "En Configuración › Seguridad, activa el inicio de sesión con código de dispositivo para Codex. En Business o Enterprise, lo hace un admin.",

@@ -2361,6 +2361,11 @@ export const en = {
       one: "An account just for {{name}}",
       each: "An account just for them",
     },
+    popup: {
+      title: "Connecting {{name}}",
+      any: "Connecting your AI",
+      text: "We're asking the computer for the sign-in page. It opens here in a few seconds.",
+    },
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
       text: "In Settings\u00a0›\u00a0Security, turn on device code sign-in for Codex. On Business or Enterprise, an admin\u00a0does\u00a0it.",

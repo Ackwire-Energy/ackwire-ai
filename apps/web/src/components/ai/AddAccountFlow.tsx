@@ -17,7 +17,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
-import { openPopup, sendPopup } from "@/lib/popup";
+import { inDesktopApp } from "@/lib/desktop";
+import { openPopup, openWaitingPopup, sendPopup } from "@/lib/popup";
 
 /*
  * "Add account" (ADR 0041 §2, ADR 0059): the computer starts the
@@ -316,6 +317,7 @@ function AddAccountFlow({
         hint,
       });
       if (gone.current) {
+        popup?.close();
         void api.machines.cancelAccountLogin(org.id, machineId, l.loginId).catch(() => undefined);
         return null;
       }
@@ -623,9 +625,12 @@ function AddAccountFlow({
 
   // Opened on the click itself, then sent to the provider's page once the computer has it.
   const start = () => {
-    const popup = openPopup();
+    const popup = openWaitingPopup(kind);
     setOpened(true);
-    void begin(popup);
+    // The desktop app has no popup: its page goes to the browser (main_window.rs).
+    void begin(popup).then((l) => {
+      if (l && inDesktopApp()) openPopup(l.url);
+    });
   };
   const openAgain = (url: string) => (
     <OpenPage href={url} onOpened={() => setOpened(true)}>

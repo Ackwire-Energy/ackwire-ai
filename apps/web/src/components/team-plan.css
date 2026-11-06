@@ -83,8 +83,8 @@ html:not([data-pointer]) .tp-chip:focus-visible {
 .tp-body .tp-agents {
   margin-top: 0;
 }
-/* The face at the top, the name's capitals on its top edge (`ac-captop`), the channel and "Adjust" centred on the
-   name's line however long the description runs. */
+/* The face and the name's line start together, the channel and "Adjust" centred on that line however long the
+   description runs. No rise on the words (`ac-captop`): it would lift the chips into the row's top padding. */
 /* Too narrow for the words beside the channel and "Adjust" (~220px: a thread or the agent's page docked beside the
    chat, a phone), those go under the words, on the same side, instead of leaving the words a sliver. */
 .tp-agent {
@@ -92,7 +92,7 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 12px 12px 12px 4px;
   background: var(--card-well);
   box-shadow: var(--card-well-shadow);
@@ -119,6 +119,11 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   gap: 8px;
   height: 20px;
   line-height: 20px;
+}
+/* Barely taller than the name's line, so what overflows it doesn't eat the row's top padding. */
+.tp-agent__tail .ac-btn {
+  height: 24px;
+  padding-inline: 8px;
 }
 /* The map's rows are one line: the face and the words share a centre. */
 .tp-map .ac-faceline {

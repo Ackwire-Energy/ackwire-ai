@@ -261,6 +261,7 @@ export function Message({
       aria-busy={streaming || undefined}
       style={{ ...rowVars, ...style } as CSSProperties}
       data-look={look ? drawn : undefined}
+      data-own={own && !mine ? "true" : undefined}
       data-tone={mine && drawn === "bubbles" ? look?.tone : undefined}
       data-names={drawn === "bubbles" && look?.names === false ? "false" : undefined}
       data-run={mine || drawn === "bubbles" ? run : undefined}

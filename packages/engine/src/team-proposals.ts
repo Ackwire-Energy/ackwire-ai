@@ -1,5 +1,5 @@
 import { holdEvents, type PubSub } from "@agenteschat/adapters";
-import { and, count, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
 import { checkRoutine, type DraftPlace, type ProposedRoutine, suggestAgentAi } from "./agent-proposals";
@@ -853,7 +853,7 @@ export function teamTools(deps: {
   pubsub?: PubSub;
   context?: ContextDeps;
   /** The run's card share (`cardsLeft` in setup-tools). */
-  cardsLeft: (ctx: ToolContext) => Promise<ToolOutput | null>;
+  cardsLeft: (ctx: ToolContext, asks?: boolean) => Promise<ToolOutput | null>;
   hopOf: (ctx: ToolContext) => Promise<number>;
 }): ToolDefinition[] {
   return [
@@ -888,17 +888,8 @@ export function teamTools(deps: {
       },
       async execute(input, ctx) {
         try {
-          const [asked] = await ctx.db
-            .select({ n: count() })
-            .from(messages)
-            .where(
-              and(
-                eq(messages.orgId, ctx.orgId),
-                eq(messages.agentRunId, ctx.runId),
-                sql`${messages.meta} ? 'replyChips'`,
-              ),
-            );
-          if ((asked?.n ?? 0) > 0) return { content: "You already asked a question in this turn.", isError: true };
+          const full = await deps.cardsLeft(ctx, true);
+          if (full) return full;
           const of = Math.max(1, Number(input.of) || 1);
           const chips: ReplyChips = {
             choices: [...new Set(list(input.choices).map(str).filter(Boolean))].slice(0, MAX_ANSWER_CHOICES),
@@ -973,7 +964,7 @@ export function teamTools(deps: {
                         type: "string",
                         minLength: 1,
                         maxLength: 300,
-                        description: "As the person would say it ('todo dia às 9h') or cron.",
+                        description: "5-field cron in the person's time zone: '0 9 * * 1-5' is weekdays at 9.",
                       },
                       prompt: { type: "string", minLength: 1, maxLength: 10_000 },
                       title: { type: "string", maxLength: 120, description: "What it does, short, in their language." },
@@ -1029,7 +1020,7 @@ export function teamTools(deps: {
       },
       async execute(input, ctx) {
         try {
-          const full = await deps.cardsLeft(ctx);
+          const full = await deps.cardsLeft(ctx, true);
           if (full) return full;
           const forUserId = await personBehindCall(ctx);
           const locale = await personLocale(ctx.db, forUserId);

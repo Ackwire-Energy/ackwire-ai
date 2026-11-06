@@ -14,11 +14,11 @@ import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { answerAfter, BUSINESS_TYPES, isTemplateBusiness, startCardPassed } from "@agenteschat/client/lib/team-plan";
+import { BUSINESS_TYPES, isTemplateBusiness, startCardAnswer } from "@agenteschat/client/lib/team-plan";
 import { AgentSticker, Button, Icon, Message, MessageText, normalizeAppearance, WAVE_SECONDS } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -44,13 +44,12 @@ import { useToast } from "@/lib/toast";
 
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
- * any AI is connected: its greeting, then the first card the workspace needs. No AI yet: Connect AI. An AI and no
- * agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A team and
- * nobody else here yet: inviting people and the first task. Last, until the person picks, how agents talk to them
- * (ADR 0147). Once the start card has stopped asking, a line to build the team with it, at any time. On a billing
- * hold it can't answer, so the start card and what's next alone, with no model call behind them. On the person's first
- * visit, its waving sticker under the greeting, drawn as a sticker message is and decorative (the greeting
- * already says hello). Its face and name open the profile card, as on any message.
+ * any AI is connected: its greeting, then the one card the workspace needs next (`introCards`). No AI yet: Connect
+ * AI. An AI and no agent besides it: how to start. A team: how agents talk to the person (ADR 0147) until they pick,
+ * then, nobody else here yet, inviting people and the first task. With no card left, a line to build the team with
+ * it, at any time. On a billing hold it can't answer, so the start card and what's next alone, with no model call
+ * behind them. On the person's first visit, its waving sticker under the greeting, drawn as a sticker message is and
+ * decorative (the greeting already says hello). Its face and name open the profile card, as on any message.
  */
 export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: string }) {
   const { t, i18n } = useTranslation();
@@ -60,7 +59,6 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
   const members = useMembers(org.id);
   const connect = useConnectAi();
   const actions = useChannelActions();
-  const messages = useMessages(org.id, channelId).data;
   const wave = useRightHandWave(org.id, agent.id);
   const team = dir.agents.filter((a) => !isRightHand(a));
   const teamHandles = team.map((a) => a.handle);
@@ -78,6 +76,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org.agentStyle === null,
     held,
+    noAiCard: useMessages(org.id, channelId).data?.some((m) => noAiCardOf(m.meta)),
   });
   const profile = { actor: { type: "agent", id: agent.id }, label: t("profile.of", { name: agent.name }) } as const;
   return (
@@ -141,14 +140,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
       )}
       {cards.includes("next") && team[0] && <NextCard agent={agent} first={team[0]} held={held} />}
       {cards.includes("style") && <StyleCard agent={agent} />}
-      {offersTeamSetup({
-        noAi,
-        aiKnown,
-        createsAgents,
-        hasTeam: team.length > 0,
-        cardPassed: startCardPassed(messages),
-        held,
-      }) && (
+      {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cards, held }) && (
         <p className="rh-intro__again small muted">
           {t("rightHand.intro.again.question")}{" "}
           <TextAction onClick={() => actions?.resend(t("rightHand.intro.again.message"))}>
@@ -163,7 +155,8 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
 /**
  * How to start (ADR 0137 §10). With no agent yet: "O que a Acme faz?", business types to tap or a sentence to write
  * (each tap the person's own message, which starts the right hand's interview), and the other ways in under it: the
- * team templates, the ready-made agents, an import or the form. Answered, it reads "respondida" with the pick checked.
+ * team templates, the ready-made agents or an import. Answered, it reads "respondida" with the pick alone, and those
+ * ways in are gone.
  * With ready-made agents already made, the tiles of the ones left, each its own Criar. On a billing hold a tap posts
  * that business's template, with no model call, and "Outra coisa" opens the gallery: writing is what won't work yet.
  */
@@ -206,10 +199,9 @@ function StartCard({
     onSettled: () => qc.invalidateQueries({ queryKey: keys.agents(org.id) }),
   });
   const useTemplate = useApplyTeamTemplate(org.id);
-  const said = first ? answerAfter(messages, null) : null;
+  const other = t("teamPlan.business.other");
   const choices = BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`));
-  // On a hold a sentence they wrote got the wall: the chips stay, as the way to a team.
-  const answer = held && said !== null && !choices.includes(said) ? null : said;
+  const answer = first ? startCardAnswer(messages, choices) : null;
   const tap = (text: string) => {
     const business = BUSINESS_TYPES[choices.indexOf(text)];
     if (!held) return text === other ? actions?.focusComposer() : actions?.resend(text);
@@ -220,7 +212,6 @@ function StartCard({
     );
   };
   const question = first ? t("teamPlan.start.question", { org: org.name }) : t("rightHand.intro.start.question");
-  const other = t("teamPlan.business.other");
   return (
     <>
       <RequestCard
@@ -237,7 +228,7 @@ function StartCard({
           <>
             {first && <AnswerChips choices={choices} multiple={false} answer={answer} onSend={tap} />}
             {first && answer === null && !held && <p className="tp-start__write">{t("teamPlan.start.orWrite")}</p>}
-            {presetsOpen && (
+            {presetsOpen && answer === null && (
               <div className="rh-intro__presets">
                 {left.map((p) => {
                   const name = t(`onboarding.presets.${p}.name`);
@@ -263,43 +254,38 @@ function StartCard({
           </>
         }
         actions={
-          <span className="tp-start__foot">
-            <span className="small muted">{t("teamPlan.start.footer")}</span>
-            <button type="button" className="ac-link" onClick={() => setTemplates(true)}>
-              {t("teamPlan.start.templates")}
-            </button>
-            {presetsOpen ? (
+          answer === null && (
+            <span className="tp-start__foot">
+              <span className="small muted">{t("teamPlan.start.footer")}</span>
+              <button type="button" className="ac-link" onClick={() => setTemplates(true)}>
+                {t("teamPlan.start.templates")}
+              </button>
+              {presetsOpen ? (
+                <button
+                  type="button"
+                  className="ac-link"
+                  disabled={create.isPending}
+                  aria-busy={create.isPending}
+                  onClick={() => create.mutate(left)}
+                >
+                  {t("rightHand.intro.start.team")}
+                </button>
+              ) : (
+                <button type="button" className="ac-link" onClick={() => setPresetsOpen(true)}>
+                  {t("teamPlan.start.presets")}
+                </button>
+              )}
               <button
                 type="button"
                 className="ac-link"
-                disabled={create.isPending}
-                aria-busy={create.isPending}
-                onClick={() => create.mutate(left)}
+                onClick={() =>
+                  void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "import" } })
+                }
               >
-                {t("rightHand.intro.start.team")}
+                {t("rightHand.intro.start.import")}
               </button>
-            ) : (
-              <button type="button" className="ac-link" onClick={() => setPresetsOpen(true)}>
-                {t("teamPlan.start.presets")}
-              </button>
-            )}
-            <button
-              type="button"
-              className="ac-link"
-              onClick={() =>
-                void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "import" } })
-              }
-            >
-              {t("rightHand.intro.start.import")}
-            </button>
-            <button
-              type="button"
-              className="ac-link"
-              onClick={() => void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id } })}
-            >
-              {t("rightHand.intro.start.form")}
-            </button>
-          </span>
+            </span>
+          )
         }
       />
       <TeamTemplatesDialog open={templates} onClose={() => setTemplates(false)} />

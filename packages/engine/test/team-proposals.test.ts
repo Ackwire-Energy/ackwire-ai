@@ -8,6 +8,7 @@ import {
   denyTeam,
   listTeamTemplates,
   OFFER_ANSWERS_TOOL,
+  OFFER_INVITES_TOOL,
   openPersonAgentDm,
   PROPOSE_TEAM_TOOL,
   postPersonMessage,
@@ -144,7 +145,27 @@ describe("the right hand's team setup tools", () => {
       of: 3,
     });
     const again = await call(f, ctx, OFFER_ANSWERS_TOOL, { text: "E mais?", step: 3, of: 3 });
-    expect(again.isError).toBe(true);
+    expect(again.content).toContain("one thing at a time");
+    expect(await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, ctx.runId))).toHaveLength(1);
+  });
+
+  test("one thing a turn: after a question no card that waits on the person goes up, and nothing failed", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "Software e apps");
+    await call(f, ctx, OFFER_ANSWERS_TOOL, { text: "**Quem mais?**", step: 3, of: 3 });
+    const invite = await call(f, ctx, OFFER_INVITES_TOOL, { emails: ["bruno@acme.test"], why: "Para o time." });
+    const team = await call(f, ctx, PROPOSE_TEAM_TOOL, TEAM);
+    for (const out of [invite, team]) {
+      expect(out.isError).toBeFalsy();
+      expect(out.content).toContain("one thing at a time");
+    }
+    expect(await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, ctx.runId))).toHaveLength(1);
+    // The next turn is free again.
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, ctx.runId));
+    const next = await lodiRun(f, f.owner.id, "Só eu");
+    expect(
+      (await call(f, next, OFFER_INVITES_TOOL, { emails: ["bruno@acme.test"], why: "Para o time." })).content,
+    ).toContain("Posted the invite card");
   });
 
   test("its prompt runs the interview while there is no team, in its DM", async () => {
@@ -157,6 +178,12 @@ describe("the right hand's team setup tools", () => {
     );
     expect(prompt).toContain(TEAM_INTERVIEW);
     expect(prompt).toContain("ONE propose_team card");
+    expect(prompt).toContain("One thing at a time");
+    // With no team, nothing else is raised over the interview.
+    expect(prompt).toContain("build the first team with them");
+    expect(prompt).not.toContain("offer_invites).");
+    expect(prompt).not.toContain("No computer is ready");
+    expect(prompt).not.toContain("offer one the team needs");
   });
 
   test("with a team too: asked to build or redo it in its DM, it runs the interview", async () => {
@@ -186,7 +213,8 @@ describe("the team card", () => {
     expect(card.params.weekly?.cron).toBe("0 17 * * 5");
     expect(card.params.skills[0]?.name).toBe("tom-de-voz-da-acme");
     expect(card.params.invite).toEqual(["Bruno"]);
-    const newer = await call(f, ctx, PROPOSE_TEAM_TOOL, {
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, ctx.runId));
+    const newer = await call(f, await lodiRun(f, f.owner.id, "Só a Iara"), PROPOSE_TEAM_TOOL, {
       lead: "Só a Iara",
       agents: [{ ...TEAM.agents[0], handle: "iaray" }],
     });

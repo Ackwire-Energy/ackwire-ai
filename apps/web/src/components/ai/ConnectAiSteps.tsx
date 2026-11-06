@@ -25,6 +25,7 @@ import {
   computerEdition,
   computerName,
   etaLine,
+  managedNamed,
   setupView,
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
@@ -394,7 +395,7 @@ export function ExistingRows({
     dimmedLine(t, dimmed.gate, {
       ...dimmed,
       edition: gates.edition,
-      computer: view.computer?.name ?? computerName(t, org.name, null),
+      computer: computerName(t, org.name, managedNamed(view.computer)),
     });
   const items = rows.map((r) => {
     if (r.kind === "key") {

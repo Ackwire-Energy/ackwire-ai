@@ -18,7 +18,7 @@ import {
   planWordOf,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
-import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
+import { computerEdition, computerName, managedNamed, setupView } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorText, holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -428,10 +428,11 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
             dimmedLine(t, agentId !== undefined ? gates.gateOf(choice) : bareGates.at(choice).gate, {
               edition: gates.edition ?? bareGates.edition,
               kind: kindOf(choice),
-              computer:
-                gates.view?.computer?.name ??
-                bareGates.at(choice).computer?.name ??
-                computerName(t, org?.name ?? "", null),
+              computer: computerName(
+                t,
+                org?.name ?? "",
+                managedNamed(gates.view?.computer ?? bareGates.at(choice).computer),
+              ),
             })
           }
           have={have}

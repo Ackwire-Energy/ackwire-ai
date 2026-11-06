@@ -2511,6 +2511,11 @@
       "one": "Konto tylko dla: {{name}}",
       "each": "Osobne konto dla każdego"
     },
+    "popup": {
+      "title": "Łączenie z {{name}}",
+      "any": "Łączenie z Twoją AI",
+      "text": "Prosimy komputer o stronę logowania. Otworzy się tutaj za kilka sekund."
+    },
     "chatgptCode": {
       "title": "Zezwól na logowanie kodem w ChatGPT",
       "text": "W Settings › Security włącz device code sign-in dla Codex. W planach Business i Enterprise robi to administrator.",

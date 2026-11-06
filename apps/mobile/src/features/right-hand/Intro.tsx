@@ -11,11 +11,11 @@ import {
   useSetAgentStyle,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { answerAfter, BUSINESS_TYPES, isTemplateBusiness, startCardPassed } from "@agenteschat/client/lib/team-plan";
+import { BUSINESS_TYPES, isTemplateBusiness, startCardAnswer } from "@agenteschat/client/lib/team-plan";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -71,8 +71,8 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org?.agentStyle === null,
     held,
+    noAiCard: useMessages(orgId, channelId).data?.some((m) => noAiCardOf(m.meta)),
   });
-  const cardPassed = startCardPassed(useMessages(orgId, channelId).data);
   const send = useSendAnswer(channelId);
   return (
     <View style={styles.intro}>
@@ -120,7 +120,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
         )}
         {cards.includes("next") && first && <NextCard first={first} held={held} />}
         {cards.includes("style") && <StyleCard />}
-        {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cardPassed, held }) ? (
+        {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cards, held }) ? (
           <View>
             <Text variant="small" tone="muted">
               {t("rightHand.intro.again.question")}
@@ -181,11 +181,9 @@ function StartCard({
     onSettled: () => qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
   });
   const useTemplate = useApplyTeamTemplate(orgId);
-  const said = first ? answerAfter(messages, null) : null;
-  const choices = BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`));
-  // On a hold a sentence they wrote got the wall: the chips stay, as the way to a team.
-  const answer = held && said !== null && !choices.includes(said) ? null : said;
   const other = t("teamPlan.business.other");
+  const choices = BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`));
+  const answer = first ? startCardAnswer(messages, choices) : null;
   const tap = (text: string) => {
     const business = BUSINESS_TYPES[choices.indexOf(text)];
     if (!held) return text === other ? requestComposerText(channelId, "") : send(text);
@@ -211,7 +209,7 @@ function StartCard({
           <AnswerChips choices={choices} multiple={false} answer={answer} onSend={tap} />
         </Locked>
       ) : null}
-      {presetsOpen ? (
+      {presetsOpen && answer === null ? (
         <>
           {/* Flat rows on the card, divided by hairlines: a tap makes that agent (its "+" says so). */}
           <Locked when={create.isPending}>
@@ -257,39 +255,36 @@ function StartCard({
           />
         </>
       ) : null}
-      <Text variant="caption" tone="muted">
-        {t("teamPlan.start.footer")}
-      </Text>
-      <Button
-        variant="secondary"
-        size="card"
-        wide
-        label={t("teamPlan.start.templates")}
-        onPress={() => setTemplates(true)}
-      />
-      {presetsOpen ? null : (
-        <Button
-          variant="ghost"
-          size="card"
-          wide
-          label={t("teamPlan.start.presets")}
-          onPress={() => setPresetsOpen(true)}
-        />
-      )}
-      <Button
-        variant="ghost"
-        size="card"
-        wide
-        label={t("rightHand.intro.start.import")}
-        onPress={() => router.push("/settings/import")}
-      />
-      <Button
-        variant="ghost"
-        size="card"
-        wide
-        label={t("rightHand.intro.start.form")}
-        onPress={() => router.push("/new-agent")}
-      />
+      {answer === null ? (
+        <>
+          <Text variant="caption" tone="muted">
+            {t("teamPlan.start.footer")}
+          </Text>
+          <Button
+            variant="secondary"
+            size="card"
+            wide
+            label={t("teamPlan.start.templates")}
+            onPress={() => setTemplates(true)}
+          />
+          {presetsOpen ? null : (
+            <Button
+              variant="ghost"
+              size="card"
+              wide
+              label={t("teamPlan.start.presets")}
+              onPress={() => setPresetsOpen(true)}
+            />
+          )}
+          <Button
+            variant="ghost"
+            size="card"
+            wide
+            label={t("rightHand.intro.start.import")}
+            onPress={() => router.push("/settings/import")}
+          />
+        </>
+      ) : null}
       <TeamTemplatesSheet
         open={templates}
         onClose={() => setTemplates(false)}

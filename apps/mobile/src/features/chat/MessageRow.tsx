@@ -649,8 +649,9 @@ export const MessageRow = memo(function MessageRow({
           compact && lookRows.compactRow,
           grouped && styles.cont,
           quote && !inBubble && styles.replied,
-          // A mention of me: the row's tint says it, with round corners; no accent bar on its left edge.
-          mentionsMe && { backgroundColor: `${c.amber}17`, borderRadius: 14 },
+          // A mention of me: the row's tint says it, with round corners; no accent bar on its left edge. In bubbles the
+          // bubble says it.
+          mentionsMe && !inBubble && { backgroundColor: `${c.amber}17`, borderRadius: 14 },
           pressed && press && { backgroundColor: c.sunken },
         ]}
       >
@@ -667,7 +668,9 @@ export const MessageRow = memo(function MessageRow({
             <>
               {pinLine}
               {reportOpened}
-              <View style={[lookRows.bubble, OTHER_RUN[run], { backgroundColor: c.bubble }]}>
+              <View
+                style={[lookRows.bubble, OTHER_RUN[run], { backgroundColor: mentionsMe ? `${c.amber}21` : c.bubble }]}
+              >
                 {!grouped && (look.names || tagged) ? who(true) : null}
                 {quote ? <QuotePlate reply={quote} onJump={onQuote} /> : null}
                 {opener}

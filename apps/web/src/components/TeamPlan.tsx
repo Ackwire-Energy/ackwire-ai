@@ -55,7 +55,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Answers to tap (ADR 0137 §10): each one, or several with "Enviar N", goes as the person's own message, and typing
- * works all along. Answered (a message of theirs came after), the picks stay checked and nothing is tappable.
+ * works all along. Answered (a message of theirs came after), only the picks stay, checked, and nothing is tappable.
  */
 export function AnswerChips({
   choices,
@@ -85,12 +85,13 @@ export function AnswerChips({
       return next;
     });
   };
-  if (choices.length === 0 && !step) return null;
+  const listed = answered ? choices.filter((c) => shown.has(c)) : choices;
+  if (listed.length === 0 && !(step && step.of > 1)) return null;
   return (
     <div className="tp-chips">
-      {choices.length > 0 && (
+      {listed.length > 0 && (
         <div className="tp-chips__row">
-          {choices.map((c) => (
+          {listed.map((c) => (
             <button
               key={c}
               type="button"
@@ -105,7 +106,7 @@ export function AnswerChips({
           ))}
         </div>
       )}
-      {(step || (multiple && !answered)) && (
+      {((step && step.of > 1) || (multiple && !answered)) && (
         <div className="tp-chips__foot">
           {multiple && !answered && picked.size > 0 && (
             <Button size="sm" variant="primary" onClick={() => onSend(answerText(choices, picked))}>
@@ -160,14 +161,14 @@ export function TeamPlanBody({
         {plan.agents.map((a) => (
           <li key={a.handle} className="tp-agent">
             <AgentAvatar name={a.name} appearance={lookOf(a)} size="md" />
-            <span className="tp-agent__text ac-captop">
+            <span className="tp-agent__text">
               <span>
                 <b>{a.name}</b> <span className="muted">{a.role}</span>
               </span>
               <span className="tp-agent__line">{a.line}</span>
             </span>
             {/* On the name's line, whatever the description's length. */}
-            <span className="tp-agent__tail ac-captop">
+            <span className="tp-agent__tail">
               <span className="tp-pill">
                 <Icon name="channel" size={14} />
                 <span>{a.channel}</span>
@@ -461,12 +462,12 @@ function FirstTaskCard({ message, card, held }: { message: Message; card: TeamPr
               {tasks.map((f) => (
                 <li key={f.agentId} className="tp-agent">
                   <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
-                  <span className="tp-agent__text ac-captop">
+                  <span className="tp-agent__text">
                     <b>{f.name}</b>
                     <span className="tp-agent__line">{f.task}</span>
                   </span>
                   {/* On the name's line, as on the team card's rows, however long the task runs. */}
-                  <span className="tp-agent__tail ac-captop">
+                  <span className="tp-agent__tail">
                     <Button
                       size="sm"
                       onClick={() => {

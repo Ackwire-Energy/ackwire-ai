@@ -327,7 +327,7 @@ export function WorkCard({
         : ownSignInName(
             t,
             view?.ownSignIn === true && view.canUsePlans,
-            view?.computer?.name ?? "",
+            computerNameOf(t, org.name, view?.computer?.name ?? ""),
             kind === "model" ? undefined : kind,
           );
   // Near or at its plan's limit: said where the account is.
@@ -439,8 +439,8 @@ export function WorkCard({
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
           {edition === "cloud"
-            ? t("agentPage.work.offlineCloud", { ...g, computer: machine.name })
-            : t("agentPage.work.offline", { ...g, computer: machine.name })}
+            ? t("agentPage.work.offlineCloud", { ...g, computer: computerNameOf(t, org.name, machine.name) })
+            : t("agentPage.work.offline", { ...g, computer: computerNameOf(t, org.name, machine.name) })}
           <ThisMacReconnect machineId={machine.machineId} />
         </SettingNote>
       )}
@@ -457,6 +457,7 @@ export function WorkCard({
  */
 function DesktopUseNote({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const { g } = useAgentEdit();
   const use = m.desktopUse;
   if (m.os !== "linux" || !use || use.available || !use.reason) return null;
@@ -465,7 +466,9 @@ function DesktopUseNote({ machine: m }: { machine: Machine }) {
     <div className="brw-note ac-iconline">
       <Icon name="computer" size={16} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block" }}>{t("desktop.use.agent", { ...g, computer: m.name })}</span>
+        <span style={{ display: "block" }}>
+          {t("desktop.use.agent", { ...g, computer: computerNameOf(t, org.name, m.name) })}
+        </span>
         <span className="small muted">{use.reason}</span>
         {command && <CommandBlock command={command} />}
       </div>
@@ -1079,7 +1082,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ? t(owner ? "agentPage.work.saved.brainMovedOwner" : "agentPage.work.saved.brainMoved", {
                     ...g,
                     brain: brainName,
-                    computer: moves.name,
+                    computer: computerNameOf(t, org.name, moves.name),
                     owner,
                   })
                 : t(owner ? "agentPage.work.saved.brainOwner" : "agentPage.work.saved.brain", {
@@ -1169,12 +1172,15 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         icon: "alert",
         text:
           edition === "cloud"
-            ? t("agentPage.work.brain.offCloud", { computer: where.name })
-            : t("agentPage.work.brain.off", { computer: where.name }),
+            ? t("agentPage.work.brain.offCloud", { computer: computerNameOf(t, org.name, where.name) })
+            : t("agentPage.work.brain.off", { computer: computerNameOf(t, org.name, where.name) }),
       };
     // Where the agent already works goes without saying: only a move changes something.
     if (where.machineId === work.machineId) return null;
-    return { icon: "computer", text: t("agentPage.work.brain.moves", { computer: where.name }) };
+    return {
+      icon: "computer",
+      text: t("agentPage.work.brain.moves", { computer: computerNameOf(t, org.name, where.name) }),
+    };
   };
   const reason = (c: AiChoice) => {
     if (c === "key") return null;
@@ -1192,13 +1198,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         edition,
         hold: holdText(t, org.standing),
         kind: k,
-        computer: view.computer?.name ?? "",
+        computer: computerName,
         machine: work.machines.data?.find((m) => m.id === view.computer?.machineId),
       })?.text ?? null
     );
   };
   const chosenSide = side(card);
-  const whereName = home?.name ?? "";
+  const whereName = computerNameOf(t, org.name, home?.name ?? "");
   const keyChoices = keyOptions(
     t,
     credentials.data ?? [],
@@ -2049,7 +2055,10 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
       refresh();
       toast.show(
         chosen || workspace
-          ? t("agentPage.work.saved.computer", { ...g, computer: chosen ? chosen.name : noComputer.label("workspace") })
+          ? t("agentPage.work.saved.computer", {
+              ...g,
+              computer: chosen ? computerNameOf(t, org.name, chosen.name) : noComputer.label("workspace"),
+            })
           : t("agentPage.work.saved.none", g),
       );
       onClose();
@@ -2144,7 +2153,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
         busy={busy}
         primary={
           chosen
-            ? t("agentPage.work.computer.useMachine", { computer: chosen.name })
+            ? t("agentPage.work.computer.useMachine", { computer: computerNameOf(t, org.name, chosen.name) })
             : workspace
               ? t("agentPage.work.computer.useMachine", { computer: noComputer.label("workspace") })
               : t("agentPage.work.use")
@@ -2239,7 +2248,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
           : on === work.granted
             ? t("agentPage.work.saved.sites")
             : where && !ready(where)
-              ? t("agentPage.work.saved.browserWaiting", { computer: where.name })
+              ? t("agentPage.work.saved.browserWaiting", { computer: computerNameOf(t, org.name, where.name) })
               : t("agentPage.work.saved.browserOn", g),
       );
       onClose();
@@ -2335,7 +2344,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
             {!admin && <SettingNote icon="lock">{t("agentPage.work.browserDialog.admins")}</SettingNote>}
             {moveTo && (
               <SettingNote icon="arrowRight" live>
-                {t("agentPage.work.browserDialog.moves", { ...g, computer: moveTo.name })}
+                {t("agentPage.work.browserDialog.moves", { ...g, computer: computerNameOf(t, org.name, moveTo.name) })}
               </SettingNote>
             )}
             {noComputer && (
