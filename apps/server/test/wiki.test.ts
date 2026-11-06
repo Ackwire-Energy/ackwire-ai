@@ -244,7 +244,10 @@ test("wiki API: a bad note doesn't sink its batch; delete an import, the trash, 
     },
   });
   expect(imported.status).toBe(200);
-  const result = (await imported.json()) as { created: { importId: string }[]; failed: { reason: string }[] };
+  const result = (await imported.json()) as {
+    created: { importId: string }[];
+    failed: { title: string; reason: string }[];
+  };
   expect(result.created).toHaveLength(2);
   expect(result.created[0]?.importId).toBe(importId);
   expect(result.failed).toEqual([{ title: "Enorme", reason: "too_long" }]);

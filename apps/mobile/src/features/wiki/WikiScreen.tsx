@@ -314,15 +314,13 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
               </>
             ) : null}
             {!folder && writes ? (
-              <>
-                <Row
-                  leading={<Tile icon="trash" />}
-                  title={t("wiki.trash.title")}
-                  subtitle={t("wiki.trash.text")}
-                  chevron
-                  onPress={openWikiTrash}
-                />
-              </>
+              <Row
+                leading={<Tile icon="trash" />}
+                title={t("wiki.trash.title")}
+                subtitle={t("wiki.trash.text")}
+                chevron
+                onPress={openWikiTrash}
+              />
             ) : null}
             {!folder && (reads.data ?? []).length > 0 ? (
               <>
