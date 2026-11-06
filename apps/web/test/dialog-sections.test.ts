@@ -33,6 +33,7 @@ const SECTION_COMPONENTS = new Set([
   "ConnectFlow",
   "ConnectedRepos",
   "ConnectorSky",
+  "EndpointForm",
   "ServiceDialog",
   "SkyStrip",
   "ComputerStage",

@@ -483,6 +483,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
             ]}
             value={d.kind}
             onChange={(k) => set({ kind: k as TriggerKind })}
+            wide="fit"
           />
           {schedule ? (
             <>

@@ -546,13 +546,6 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   color: var(--bg);
   font-weight: 600;
 }
-/* Not a .routine-kind: a statement of what it does on its own, not a question with answers. */
-.routine-own-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
 .routine-own {
   display: flex;
   flex-wrap: wrap;
@@ -761,7 +754,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-presets__list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--space-2) var(--form-gap);
 }
 .routine-preset {
   display: flex;
@@ -857,7 +850,7 @@ html:not([data-pointer]) .routine-preset:focus-visible {
 .routine-email {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--form-gap);
   min-width: 0;
 }
 

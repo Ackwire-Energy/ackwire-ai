@@ -432,9 +432,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
           <LookRows look={look} onChange={setLook} />
         </DialogBody>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setLooking(false)}>
-            {t("common.cancel")}
-          </Button>
+          <Button onClick={() => setLooking(false)}>{t("common.cancel")}</Button>
           <Button
             variant="primary"
             loading={update.isPending}

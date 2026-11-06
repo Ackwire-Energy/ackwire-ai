@@ -61,7 +61,7 @@ export function RemoveWidgetDialog({
       width={440}
     >
       <DialogFooter>
-        <Button variant="ghost" onClick={onClose} disabled={remove.isPending}>
+        <Button onClick={onClose} disabled={remove.isPending}>
           {t("common.cancel")}
         </Button>
         <Button variant="danger" loading={remove.isPending} onClick={confirm}>

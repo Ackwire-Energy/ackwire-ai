@@ -836,9 +836,12 @@ function KeysSection() {
         width={520}
       >
         {dialog?.type === "models" && (
-          <DialogBody>
-            <EndpointForm orgId={org.id} credential={dialog.cred} onDone={() => setDialog(null)} />
-          </DialogBody>
+          <EndpointForm
+            orgId={org.id}
+            credential={dialog.cred}
+            onCancel={() => setDialog(null)}
+            onDone={() => setDialog(null)}
+          />
         )}
       </Dialog>
       <Dialog
@@ -954,16 +957,15 @@ export function KeyDialog({
       width={440}
     >
       {custom && mode === "add" ? (
-        <DialogBody>
-          {providerSelect}
-          <EndpointForm
-            orgId={org.id}
-            onDone={(saved) => {
-              onAdded?.(saved);
-              onClose();
-            }}
-          />
-        </DialogBody>
+        <EndpointForm
+          orgId={org.id}
+          lead={providerSelect}
+          onCancel={onClose}
+          onDone={(saved) => {
+            onAdded?.(saved);
+            onClose();
+          }}
+        />
       ) : (
         <form
           onSubmit={(e) => {

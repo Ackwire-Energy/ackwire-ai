@@ -103,7 +103,7 @@ export function PinToDashboard({
       className="wpin"
     >
       <Locked when={pin.isPending}>
-        <DialogBody className="wpin__body">
+        <DialogBody>
           {read ? (
             <div className="wpin__stage">
               <WidgetCard
@@ -147,13 +147,14 @@ export function PinToDashboard({
             </span>
           </div>
           {keep && (
-            <Segmented<KeepSchedule>
-              size="sm"
-              label={t("dashboards.newWidget.updates")}
-              value={schedule}
-              onValueChange={setSchedule}
-              options={KEEP_SCHEDULES.map((s) => ({ value: s, label: t(`widgets.schedulesShort.${s}`) }))}
-            />
+            <Field label={t("dashboards.newWidget.updates")} group>
+              <Segmented<KeepSchedule>
+                label={t("dashboards.newWidget.updates")}
+                value={schedule}
+                onValueChange={setSchedule}
+                options={KEEP_SCHEDULES.map((s) => ({ value: s, label: t(`widgets.schedulesShort.${s}`) }))}
+              />
+            </Field>
           )}
           {pin.isError && <Alert>{errorText(t, pin.error, i18n.language)}</Alert>}
         </DialogBody>

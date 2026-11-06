@@ -212,7 +212,7 @@ export function AiPicker({
     <div className="ai-picker" role="group" aria-label={t("onboarding.keyStep.title")}>
       {have?.(choice === null && panel)}
       <Segmented
-        className="ai-picker__pay"
+        block
         label={t("connectAi.pay.label")}
         disabled={busy}
         value={choice === "key" ? "key" : "plan"}
@@ -460,9 +460,9 @@ export function ExistingRows({
       {items}
       {dimmedWhy && <SettingNote icon="alert">{dimmedWhy}</SettingNote>}
       {refused && <KeyRefused refusal={refused} />}
-      {lends && <p className="ai-picker__or">{t("agentPage.work.brain.accountOthers")}</p>}
+      {lends && <p className="ai-picker__or ai-picker__or--note">{t("agentPage.work.brain.accountOthers")}</p>}
       {onManageKeys && rows.some((r) => r.kind === "key") && (
-        <p className="ai-picker__or">
+        <p className="ai-picker__or ai-picker__or--note">
           <button type="button" className="ac-link ac-link--muted" onClick={onManageKeys}>
             {t("connectAi.have.manageKeys")}
           </button>
@@ -1503,7 +1503,7 @@ export function KeyPanel({
                   }}
                 />
               </Locked>
-              {onSave && (
+              {onSave && apiKey.trim() && (
                 <Button variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
                   {t("settings.saveKey")}
                 </Button>

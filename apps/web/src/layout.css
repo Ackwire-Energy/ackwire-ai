@@ -17,7 +17,7 @@ p {
   overflow-wrap: anywhere;
 }
 
-/* Sign in / sign up: components/auth.css. The "ou" divider stays here: the connect flow uses it too. */
+/* Sign in / sign up: components/auth.css. The "ou" divider stays here: the invite pages use it too. */
 .auth__or {
   display: flex;
   align-items: center;
@@ -115,7 +115,7 @@ p {
 .ai-picker {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
+  gap: var(--form-gap);
 }
 .ai-picker > .ac-option {
   gap: 10px;
@@ -123,13 +123,6 @@ p {
 }
 .ai-picker .ac-option__title {
   font-size: 14px;
-}
-/* The two ways to pay share the width, each its half. */
-.ai-picker__pay.ac-seg {
-  display: flex;
-}
-.ai-picker__pay .ac-seg__item {
-  flex: 1 1 0;
 }
 /* A row's two lines: its check sits on the first, its name's (the padding, then half the line). */
 .ai-picker > .ac-option.ai-picker__key::after {
@@ -143,19 +136,19 @@ p {
     top: calc(var(--space-3) + 0.5lh - 9px);
   }
 }
-/* The chosen option's panel, 12px under the select: nothing comes between an option and its steps. */
-.ai-picker > .ai-panel {
-  margin-top: 4px;
+/* What the person already has: its rows a list, and its line sits on them as a label on its field. */
+.ai-picker > .ac-option + .ac-option {
+  margin-top: calc(var(--space-2) - var(--form-gap));
 }
 .ai-picker__or {
-  margin: 6px 0 -2px;
+  margin: 0 0 calc(var(--field-gap) - var(--form-gap));
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
 }
-/* What the person already has leads the picker: its line starts it, with no room over it. */
-.ai-picker__or:first-child {
-  margin-top: 0;
+/* A line about the rows above it, not the label of what follows. */
+.ai-picker__or--note {
+  margin-bottom: 0;
 }
 /* Its mark leads its first line (an `.ac-iconline`). */
 .ai-picker > .ai-picker__key {
@@ -164,7 +157,7 @@ p {
 .grid-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-  gap: var(--space-3);
+  gap: var(--form-gap) var(--space-3);
 }
 /* Wider columns: a hint with an example (an address, a folder) keeps one line under its field. */
 .grid-fields--wide {
@@ -1852,7 +1845,8 @@ html:not([data-pointer]) .artifact-card__open:focus-visible {
   text-align: left;
   vertical-align: top;
 }
-.artifact-table thead th {
+.artifact-table thead th,
+.artifact-table thead td {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -1861,6 +1855,7 @@ html:not([data-pointer]) .artifact-card__open:focus-visible {
 }
 .artifact-table--edit td {
   padding: 4px;
+  vertical-align: middle;
 }
 .artifact-table__sort {
   display: inline-flex;
@@ -3409,7 +3404,7 @@ html:not([data-pointer]) .skill-file--open:focus-visible {
   gap: var(--space-1) var(--space-2);
 }
 .skill-picks {
-  margin: 12px 0 0;
+  margin: 0;
   padding: 0;
   border: 0;
   min-width: 0;
@@ -3430,10 +3425,6 @@ html:not([data-pointer]) .skill-file--open:focus-visible {
 /* Which of the workspace's GitHub connections read a private repository: GitHub's bare mark on the line. */
 .skill-via {
   margin: 0;
-}
-/* The tab's own gap above the skills it read, not that and the list's margin too. */
-.skill-via + .skill-picks {
-  margin-top: 0;
 }
 .skill-via > .connector-icon,
 .ac-btn > .connector-icon {
@@ -4568,7 +4559,6 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   background: var(--ink);
 }
 .cflow__body {
-  gap: 12px;
   padding-bottom: 16px;
 }
 /* Everything stays inside the dialog, down to phone width. */
@@ -4603,12 +4593,6 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   padding: 0;
   list-style: none;
 }
-.cflow__oauth {
-  height: auto;
-  min-height: var(--control-h-md);
-  white-space: normal;
-  text-align: center;
-}
 .cflow__more summary {
   cursor: pointer;
   color: var(--ink-muted);
@@ -4623,8 +4607,8 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
 .cflow__key {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
+  gap: var(--form-gap);
+  margin-top: var(--space-3);
 }
 /* The server's own words under ours: its codes are long unbroken words. */
 .cflow__said {
@@ -4802,25 +4786,17 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
 .mail-actions {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--form-gap);
 }
 .mail-actions .cflow-group__title {
   margin-top: 0;
 }
-.mail-list {
+/* One field and what belongs to it: its chips and notes, closer to it than the next field. */
+.mail-list,
+.channel-access {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 0;
-}
-.mail-list__add {
-  display: flex;
-  gap: 8px;
-  min-width: 0;
-}
-.mail-list__add > .ac-input,
-.mail-list__add > input {
-  flex: 1 1 auto;
   min-width: 0;
 }
 .mail-list__clear {
@@ -4842,7 +4818,7 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
 .mail-agent {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--form-gap);
   min-width: 0;
 }
 .mail-agent__help {
@@ -4885,7 +4861,7 @@ html:not([data-pointer]) .mail-rules > summary:focus-visible {
 .mail-rules__body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--form-gap);
   margin-top: 12px;
   padding: 14px;
   border-radius: var(--radius-md);
@@ -4895,7 +4871,7 @@ html:not([data-pointer]) .mail-rules > summary:focus-visible {
 .mail-rules__group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--field-gap);
   margin: 0;
   padding: 0;
   border: 0;
@@ -4904,7 +4880,7 @@ html:not([data-pointer]) .mail-rules > summary:focus-visible {
 /* A legend sits outside the fieldset's flex flow, so the gap above doesn't reach it. */
 .mail-rules__group > legend {
   padding: 0;
-  margin-bottom: 8px;
+  margin-bottom: var(--field-gap);
 }
 .mail-rules__unit {
   display: flex;
@@ -4919,7 +4895,7 @@ html:not([data-pointer]) .mail-rules > summary:focus-visible {
 .mail-rules__part {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--form-gap);
   min-width: 0;
 }
 .mail-rules__part + .mail-rules__part {
@@ -4938,7 +4914,7 @@ html:not([data-pointer]) .mail-rules > summary:focus-visible {
 .mail-rules-step {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--form-gap);
   min-width: 0;
 }
 .mail-rules-step__who {
@@ -5310,6 +5286,18 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   .tr-seg .ac-seg__item {
     padding: 0 7px;
     gap: 5px;
+  }
+}
+/* On the narrowest phones the level's word stays and its swatch goes, or the last level scrolled out of the track. */
+@media (max-width: 400px) {
+  .tr-seg .ac-toolpx-swatch {
+    display: none;
+  }
+  .tr-decide .tr-row__ctl {
+    flex-wrap: wrap;
+  }
+  .tr-decide .tr-seg .ac-seg__item {
+    padding: 0 6px;
   }
 }
 /* The agent's tools (read only, `ToolLevelsView`) also show in the panel beside its DM (`agp-side`): there the pixel
@@ -6634,12 +6622,6 @@ html:not([data-pointer]) .run-continue:focus-visible {
 }
 /* A routine's "when": Horário / Evento / Email, then one quiet panel with the
    sentence, "Ajustar" and the next runs; the picker opens inside it. */
-.routine-kind {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
 .routine-when {
   display: flex;
   flex-direction: column;
@@ -9351,8 +9333,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   gap: 16px;
 }
 .agp-advgroup + .agp-advgroup {
-  margin-top: 18px;
-  padding-top: 18px;
+  padding-top: var(--form-gap);
   border-top: 1px solid var(--line);
 }
 .agp-advgroup__title {
@@ -9381,7 +9362,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 .agp-brainfield {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--field-gap);
 }
 .agp-brainfield__label {
   font-size: 13px;
@@ -9570,11 +9551,53 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   gap: 8px;
   margin: 4px 0;
 }
-/* Narrow enough that Paste and "Send to {workspace}'s computer" stay on its line in a panel, in English and in
-   Portuguese, for a two-word name ("Enviar ao Computador da Costa Atelier"); a longer name wraps. */
-.agp-addacct__paste .ac-input {
-  flex: 1;
-  min-width: 102px;
+/* The key's field takes its line, so what it holds fits, and its buttons go under it, whatever a computer's name. */
+.agp-addacct__paste .ac-input,
+.agp-addacct__paste .ac-input-affix {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+/* "Outro provedor": its models under the field that adds them, each with a way to remove it, prices under its name. */
+.endpoint-models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.endpoint-models > .ac-field__label {
+  margin-block-end: calc(var(--field-gap) - var(--space-2));
+}
+.endpoint-model {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--field-gap) var(--space-2);
+}
+.endpoint-model > label {
+  overflow-wrap: anywhere;
+}
+/* Its × stands under the field's +, which sits inside the field's border. */
+.endpoint-model > .ac-btn {
+  margin-inline-end: calc((var(--control-h-md) - var(--control-h-sm)) / 2);
+}
+.endpoint-model__prices,
+.endpoint-model__error {
+  grid-column: 2 / -1;
+}
+.endpoint-model__prices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+.endpoint-checks {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .agp-addacct__code output {
   font-size: 24px;
@@ -11810,13 +11833,13 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .channel-perms__intro p {
   margin: 0;
 }
+/* The role list over its permissions: the dialog's column can't hold both side by side, whose words wrapped word by word. */
 .channel-perms__grid {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .channel-perms__targets {
-  flex: 0 0 168px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -11886,6 +11909,10 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   gap: 12px;
   padding: 10px 12px;
 }
+/* Its three icons never give way to the words: shrunk, the third scrolled out of the track. */
+.channel-perms__key > .ac-seg {
+  flex: none;
+}
 .channel-perms__key + .channel-perms__key {
   border-top: 1px solid var(--line);
 }
@@ -11915,13 +11942,6 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   color: var(--ok);
 }
 @media (max-width: 640px) {
-  .channel-perms__grid {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .channel-perms__targets {
-    flex: none;
-  }
   .channel-perms__key {
     flex-direction: column;
     align-items: flex-start;
@@ -12241,12 +12261,13 @@ html:not([data-pointer]) .sidebar__grip:focus-visible {
 }
 /* "Personalizar a barra lateral": the sections' order under the tools, a number and the arrows on each line. */
 .sidebar-setup__heading {
-  margin: 20px 0 2px;
+  margin: 0;
   font-size: 14px;
   font-weight: 650;
 }
+/* Its heading's line, and the list it speaks of, closer to it than the form's gap. */
 .sidebar-setup__hint {
-  margin: 0 0 4px;
+  margin: calc(var(--field-gap) - var(--form-gap)) 0 calc(var(--space-1) - var(--form-gap));
 }
 .sidebar-setup.sidebar-setup--order {
   grid-template-columns: auto 1fr auto auto;
@@ -12318,9 +12339,6 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
 .sidebar-setup__name {
   font-size: 14px;
   font-weight: 600;
-}
-.sidebar-setup__row > .ac-seg {
-  justify-self: start;
 }
 /* No room beside the name on a phone: the arrows stay on its line, the choices go under it. */
 @media (max-width: 680px) {
@@ -13038,12 +13056,6 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 /* Under the key's field: where it is kept, or why it wasn't saved. */
 .jev-steps__below {
   margin: 0;
-}
-/* On a phone the key's field takes its row, so its placeholder fits, and Save and Cancel go under it together. */
-@media (max-width: 640px) {
-  .jev-steps .agp-addacct__paste .ac-input {
-    flex-basis: 100%;
-  }
 }
 /* Leading a receipt's line under its message, the icon's 2px of padding reach out, so the icon starts on the text's
    edge, as the words do. */

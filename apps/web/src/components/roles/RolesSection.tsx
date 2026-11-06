@@ -430,9 +430,7 @@ function RolePage({
         width={440}
       >
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setDeleting(false)}>
-            {t("common.cancel")}
-          </Button>
+          <Button onClick={() => setDeleting(false)}>{t("common.cancel")}</Button>
           <Button
             variant="danger"
             loading={remove.isPending}
@@ -921,9 +919,7 @@ function AddPeopleDialog({
         </DialogBody>
       </Locked>
       <DialogFooter bar>
-        <Button variant="ghost" onClick={() => close(false)}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={() => close(false)}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
           disabled={picked.size === 0}
@@ -1041,9 +1037,7 @@ function NewRoleDialog({
         </DialogBody>
       </Locked>
       <DialogFooter bar>
-        <Button variant="ghost" onClick={() => onOpenChange(false)}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
         <Button variant="primary" disabled={!name.trim()} loading={create.isPending} onClick={submit}>
           {t("rolesPage.create")}
         </Button>

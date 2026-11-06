@@ -387,10 +387,8 @@ function ScopeFields({
   const { t } = useTranslation();
   return (
     <>
-      <div className="ac-field">
-        <span className="ac-field__label">{t("database.scope")}</span>
+      <Field label={t("database.scope")} group help={whole ? t("database.scopeAllHelp") : undefined}>
         <Segmented
-          size="sm"
           label={t("database.scope")}
           value={whole ? "all" : "one"}
           onValueChange={onScope}
@@ -399,8 +397,7 @@ function ScopeFields({
             { value: "all", label: t("database.scopeAll") },
           ]}
         />
-        {whole && <span className="ac-field__help">{t("database.scopeAllHelp")}</span>}
-      </div>
+      </Field>
       {whole && (
         <Field label={t("database.prefix")} id="db-prefix" help={t("database.prefixHelp")}>
           <Input

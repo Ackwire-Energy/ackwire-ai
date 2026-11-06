@@ -336,16 +336,6 @@ function ConnectStep({
       <Field label={t("connectors.apiKey")} id="cflow-key" help={t("connectors.apiKeyHelp")} error={keyError}>
         <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
       </Field>
-      <div>
-        <Button
-          type="submit"
-          variant={canOAuth ? "default" : "primary"}
-          disabled={busy}
-          loading={(withKey.isPending || connect.isPending) && touched === "key"}
-        >
-          {t("connectors.saveKey")}
-        </Button>
-      </div>
     </form>
   );
 
@@ -391,34 +381,15 @@ function ConnectStep({
             </Field>
           )}
           {githubOrgs && <GithubOrgs />}
-          {canOAuth && (
-            <Button
-              variant="primary"
-              block
-              className="cflow__oauth"
-              disabled={busy}
-              loading={(connect.isPending || oauth.isPending) && touched === "oauth"}
-              onClick={startOAuth}
-            >
-              {viaComposio
-                ? t("connectFlow.continueInComposio")
-                : def
-                  ? t("connectFlow.continueIn", { name: connectorBrand(def) })
-                  : t("connectors.connect")}
-            </Button>
-          )}
           {canOAuth && canKey && (
-            <>
-              <div className="auth__or">{t("connectFlow.or")}</div>
-              <details
-                className="cflow__more"
-                open={keyOpen}
-                onToggle={(e) => setKeyOpen((e.currentTarget as HTMLDetailsElement).open)}
-              >
-                <summary>{t("connectFlow.withKey")}</summary>
-                {keyForm}
-              </details>
-            </>
+            <details
+              className="cflow__more"
+              open={keyOpen}
+              onToggle={(e) => setKeyOpen((e.currentTarget as HTMLDetailsElement).open)}
+            >
+              <summary>{t("connectFlow.withKey")}</summary>
+              {keyForm}
+            </details>
           )}
           {!canOAuth && canKey && keyForm}
         </DialogBody>
@@ -436,6 +407,31 @@ function ConnectStep({
         }
       >
         <Button onClick={onClose}>{t("common.cancel")}</Button>
+        {canKey && (keyOpen || !canOAuth) ? (
+          <Button
+            variant="primary"
+            disabled={busy}
+            loading={(withKey.isPending || connect.isPending) && touched === "key"}
+            onClick={submitKey}
+          >
+            {t("connectors.saveKey")}
+          </Button>
+        ) : (
+          canOAuth && (
+            <Button
+              variant="primary"
+              disabled={busy}
+              loading={(connect.isPending || oauth.isPending) && touched === "oauth"}
+              onClick={startOAuth}
+            >
+              {viaComposio
+                ? t("connectFlow.continueInComposio")
+                : def
+                  ? t("connectFlow.continueIn", { name: connectorBrand(def) })
+                  : t("connectors.connect")}
+            </Button>
+          )
+        )}
       </DialogFooter>
     </>
   );
