@@ -215,7 +215,7 @@ test('the desktop, which "all tools" never covers, is named with what giving it 
   expect(await findTools(ctx, "click a button in an app")).toContain(`\n- ${RUN_CODE}, for:\n  ${DESKTOP_DO}\n`);
   const call = await f.tools?.invoke(ctx, { toolUseId: "tu_desktop", name: "desktop_do", input: { steps: [] } });
   expect(call?.type === "result" ? call.output.content : "").toBe(
-    "Not allowed: this agent lacks the scope sandbox:run. If the request needs it, ask for it with request_permission",
+    'Not allowed: this agent lacks the scope sandbox:run. If the request needs it, call request_permission now with permission "sandbox:run": a card asks a person and your work goes on once they decide. Never ask the person to try again',
   );
 });
 
@@ -227,7 +227,7 @@ test("use_tool with the name of a tool not allowed yet answers as a direct call 
     input: { tool: "browser_open", arguments: { url: "https://example.com" } },
   });
   expect(r?.type === "result" ? r.output.content : "").toBe(
-    "Not allowed: this agent lacks the scope browser:use. If the request needs it, ask for it with request_permission",
+    'Not allowed: this agent lacks the scope browser:use. If the request needs it, call request_permission now with permission "browser:use": a card asks a person and your work goes on once they decide. Never ask the person to try again',
   );
 });
 

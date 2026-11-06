@@ -1575,7 +1575,8 @@ async function executeRunInner(
             message: trigger?.body ?? "",
             recent,
             tools: granted,
-            keep,
+            // The message's words may not mention its file (it may have none), and the agent has to open it.
+            keep: Array.isArray(trigger?.meta.artifacts) ? [...keep, toolGroupKey({ scope: "drive:read" })] : keep,
           });
           toolChoice = choice;
           ctx.loadedGroups = choice.groups;
