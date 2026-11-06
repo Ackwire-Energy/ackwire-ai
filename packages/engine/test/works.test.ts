@@ -1,9 +1,11 @@
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
+import { channelTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   type AgentRun,
   addChannelMember,
+  answerQuestion,
   cancelRun,
   checkInWork,
   continueRun,
@@ -804,6 +806,48 @@ test("a work's card from a DM stays with who reads the DM until someone shows it
   expect(await seen(f.owner.id)).toBe(true);
   expect(await seen(bia.id)).toBe(false);
   const { shareIssueWithEveryone } = await import("../src");
+  const runId = (await runs()).find((r) => r.workId === made.work.id)?.id as string;
+  await f.db.insert(schema.agentQuestions).values({
+    orgId: f.org.id,
+    runId,
+    agentId: f.agent.id,
+    channelId: dm.id,
+    toolUseId: "tu-1",
+    text: "Mando o salário de quem no relatório?",
+    expiresAt: new Date(Date.now() + 3600_000),
+  });
+  await f.db.update(schema.agentRuns).set({ status: "waiting_input" }).where(eq(schema.agentRuns.id, runId));
+  const card = async (userId: string) =>
+    (await listIssues(f.db, { type: "person", userId }, f.org.id)).find((i) => i.id === w?.issueId);
+  expect((await card(f.owner.id))?.backgroundWork?.question?.text).toContain("salário");
   await shareIssueWithEveryone(deps(), { type: "person", userId: f.owner.id }, f.org.id, w?.issueId ?? "");
   expect(await seen(bia.id)).toBe(true);
+  // The card shows to everyone; what its work asks in the DM stays with who reads the DM.
+  expect((await card(bia.id))?.backgroundWork).toMatchObject({ state: "waiting_input", question: null });
+});
+
+test("one answer of several: the run stays parked and the work's line goes on to what it still asks", async () => {
+  f = await setup();
+  const run = await working("@dev roda a migração");
+  const { work } = await moved(run);
+  const question = (toolUseId: string, text: string) => ({
+    orgId: f.org.id,
+    runId: run.id,
+    agentId: run.agentId,
+    channelId: f.general.id,
+    toolUseId,
+    text,
+    expiresAt: new Date(Date.now() + 3600_000),
+  });
+  const [first] = await f.db.insert(schema.agentQuestions).values(question("tu-1", "Qual ambiente?")).returning();
+  await f.db.insert(schema.agentQuestions).values(question("tu-2", "E a janela?"));
+  await f.db.update(schema.agentRuns).set({ status: "waiting_input" }).where(eq(schema.agentRuns.id, run.id));
+  await answerQuestion(deps(), f.owner.id, f.org.id, first?.id as string, { text: "Produção" });
+  const seen: { type: string; work?: { question: { text: string } | null } }[] = [];
+  const off = f.pubsub.subscribe(channelTopic(f.general.id), (e) => void seen.push(e as (typeof seen)[number]));
+  await drainOutbox(f.db, f.handlers);
+  off();
+  expect((await runs()).find((r) => r.id === run.id)?.status).toBe("waiting_input");
+  expect(seen.find((e) => e.type === "agent.work")?.work?.question?.text).toBe("E a janela?");
+  expect((await workView(f.db, f.org.id, work.id))?.question?.text).toBe("E a janela?");
 });
