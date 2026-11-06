@@ -177,6 +177,8 @@ export async function githubOrgAccess(deps: RepoListingDeps, actorId: string, or
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const connection = (await activeConnections(deps.db, orgId)).find((c) => c.connector === "github");
   if (!connection) throw new NotFoundError("GitHub isn't connected");
+  // Read as a person comes back from granting one: its repositories show now, not when the listing expires.
+  forgetOrgRepositories(orgId);
   const clientId = connection.authType === "oauth" ? deps.connectors.oauthApps?.github?.clientId : undefined;
   const manageUrl = clientId
     ? `https://github.com/settings/connections/applications/${encodeURIComponent(clientId)}`

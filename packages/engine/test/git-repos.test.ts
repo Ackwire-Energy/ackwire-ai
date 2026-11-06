@@ -539,6 +539,22 @@ describe("the organization's repositories", () => {
     await expect(githubOrgAccess(deps, member.id, f.org.id)).rejects.toThrow();
   });
 
+  test("back from granting an organization on GitHub, its repositories show at once, not when the listing expires", async () => {
+    f = await setup();
+    await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, { connector: "github", apiKey: "ghp_user_token" });
+    let repos = [repo("walt/one")];
+    const fetch = (async (input: string | URL | Request) =>
+      Response.json(String(input).includes("/user/orgs") ? [{ login: "acme" }] : repos)) as typeof globalThis.fetch;
+    const deps = { db: f.db, connectors: depsOf(f), github: { apiUrl: API, fetch } };
+    const logins = async () => (await listOrgRepositories(deps, f.owner.id, f.org.id)).accounts.map((a) => a.login);
+
+    expect(await logins()).toEqual(["walt"]);
+    repos = [repo("walt/one"), repo("acme/two")];
+    expect(await logins()).toEqual(["walt"]);
+    await githubOrgAccess(deps, f.owner.id, f.org.id);
+    expect(await logins()).toEqual(["acme", "walt"]);
+  });
+
   test("the connection's and the bound installations', merged by account, cached, without tokens", async () => {
     f = await setup();
     await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, { connector: "github", apiKey: "ghp_user_token" });

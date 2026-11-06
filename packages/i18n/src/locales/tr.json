@@ -10402,7 +10402,7 @@
     "githubOrgs": {
       "title": "Erişilen kuruluşlar",
       "none": "Henüz kuruluş yok.",
-      "lead": "GitHub kuruluşları yalnızca ilk seferde sorar. Başka bir tane eklemek için oradaki uygulama sayfasını açın ve yanındaki Grant düğmesine basın.",
+      "lead": "GitHub kuruluşları yalnızca ilk seferde sorar. Başka bir tane eklemek için oradaki uygulama sayfasını açın ve yanındaki Grant düğmesine basın. Sahibi değilseniz düğmede Request yazar ve bir sahip onaylar.",
       "open": "GitHub'da kuruluşlara izin ver",
       "added": "Artık bunlar da var: {{names}}.",
       "removed": "Artık yok: {{names}}.",

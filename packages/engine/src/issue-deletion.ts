@@ -11,7 +11,7 @@ import { can, requireActiveMembership } from "./organizations";
 import { ACTIVE_RUN_STATUSES } from "./run-inbox";
 import { enqueueIndex } from "./search";
 
-const { agentRuns, agentWorks, calendarEvents, issues, wikiLinks } = schema;
+const { agentRuns, agentWorks, calendarEvents, channels, issues, wikiLinks } = schema;
 
 type IssueRow = typeof issues.$inferSelect;
 
@@ -65,8 +65,9 @@ export async function deleteIssue(deps: AgentDeletionDeps, userId: string, orgId
     .from(agentWorks)
     .where(and(eq(agentWorks.orgId, orgId), inArray(agentWorks.issueId, ids), isNull(agentWorks.finishedAt)));
   const live = await db
-    .select()
+    .select({ run: agentRuns, kind: channels.kind })
     .from(agentRuns)
+    .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(
       and(
         eq(agentRuns.orgId, orgId),
@@ -81,8 +82,8 @@ export async function deleteIssue(deps: AgentDeletionDeps, userId: string, orgId
         ),
       ),
     );
-  for (const run of live)
-    await stopRun(deps, orgId, run, null, { type: "person", id: userId }, { forAll: true }).catch(() => null);
+  for (const { run, kind } of live)
+    await stopRun(deps, orgId, run, kind, { type: "person", id: userId }, { forAll: true }).catch(() => null);
 
   await db.transaction(async (tx) => {
     for (const room of rooms) await markChannelDeleted(tx, orgId, room);

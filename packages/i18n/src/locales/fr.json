@@ -10875,7 +10875,7 @@
     "githubOrgs": {
       "title": "Organisations atteintes",
       "none": "Aucune organisation pour l'instant.",
-      "lead": "GitHub ne demande les organisations que la première fois. Pour en ajouter une, ouvrez la page de l'app là-bas et cliquez sur Grant à côté.",
+      "lead": "GitHub ne demande les organisations que la première fois. Pour en ajouter une, ouvrez la page de l'app là-bas et cliquez sur Grant à côté. Si vous n'en êtes pas propriétaire, le bouton indique Request et un propriétaire approuve.",
       "open": "Autoriser des organisations sur GitHub",
       "added": "Maintenant aussi : {{names}}.",
       "removed": "Plus maintenant : {{names}}.",

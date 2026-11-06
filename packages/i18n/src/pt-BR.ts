@@ -10258,7 +10258,7 @@ export const ptBR = {
     githubOrgs: {
       title: "Organizações que ele alcança",
       none: "Nenhuma organização ainda.",
-      lead: "O GitHub só pergunta pelas organizações na primeira vez. Para liberar outra, abra a página do app lá e clique em Grant ao lado dela.",
+      lead: "O GitHub só pergunta pelas organizações na primeira vez. Para liberar outra, abra a página do app lá e clique em Grant ao lado dela. Se você não for dono dela, o botão é Request e um dono aprova.",
       open: "Liberar organizações no GitHub",
       added: "Agora também: {{names}}.",
       removed: "Não alcança mais: {{names}}.",

@@ -10527,7 +10527,7 @@
     "githubOrgs": {
       "title": "Bereikte organisaties",
       "none": "Nog geen organisatie.",
-      "lead": "GitHub vraagt alleen de eerste keer naar organisaties. Om er een toe te voegen, open je daar de pagina van de app en klik je ernaast op Grant.",
+      "lead": "GitHub vraagt alleen de eerste keer naar organisaties. Om er een toe te voegen, open je daar de pagina van de app en klik je ernaast op Grant. Ben je geen eigenaar, dan staat er Request en keurt een eigenaar het goed.",
       "open": "Organisaties toestaan op GitHub",
       "added": "Nu ook: {{names}}.",
       "removed": "Niet meer: {{names}}.",

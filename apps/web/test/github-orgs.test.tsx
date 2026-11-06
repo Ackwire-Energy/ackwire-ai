@@ -83,6 +83,15 @@ describe("Reconectar GitHub", () => {
     expect(reconnectDialog().textContent).toContain("acme");
   });
 
+  test("on an API key there's no app page: it lists the organizations and offers no words about one", async () => {
+    const state = seedState();
+    state.githubAccess = { orgs: ["acme"], manageUrl: null };
+    await openReconnect(state);
+    const dialog = reconnectDialog();
+    expect(dialog.textContent).toContain("acme");
+    expect(dialog.textContent).not.toContain("O GitHub só pergunta");
+  });
+
   test("the sign-in comes straight back: the dialog opens again and says nothing changed, never a silent refresh", async () => {
     const state = seedState();
     state.githubAccess = { orgs: ["acme"], manageUrl: PAGE };

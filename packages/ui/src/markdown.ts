@@ -314,15 +314,18 @@ export function plainLines(source: string): string[] {
       b.type === "paragraph" ? [b.text] : b.type === "list" ? b.items : b.type === "quote" ? b.lines : [],
     )
     .flatMap((text) => text.split("\n"))
-    .map((line) => plainInline(line).replace(/\s+/g, " ").trim())
+    .map((line) => looseMarks(plainInline(line)).replace(/\s+/g, " ").trim())
     .filter(Boolean);
 }
 
 /** A table row that lost its table (a cut text): its cells, without the separator's. */
 const rowCells = (line: string) => splitRow(line).filter((cell) => cell && !/^:?-+:?$/.test(cell));
 
-/** Marks left unpaired where a text was cut. */
-const looseMarks = (text: string) => text.replace(/\*\*|~~|`/g, "");
+/**
+ * Marks left unpaired where a text was cut, and the tags of a collapsed block. `**` between spaces is a word ("2 ** 3").
+ */
+const looseMarks = (text: string) =>
+  text.replace(/(?<=\S)(?:\*\*|~~)|(?:\*\*|~~)(?=\S)|`|<\/?(?:details|summary)>/gi, "");
 
 const plainProse = (text: string) =>
   looseMarks(
@@ -337,13 +340,15 @@ const plainProse = (text: string) =>
 /**
  * A Markdown text on one line, as whatever shows it outside the message reads it: previews, quotes, the inbox, push,
  * search. Every word stays, those of code blocks and tables too (it may be what was searched for), and no mark does.
+ * `shown`: the most that will show, so a list of previews on the server's hot path never parses whole 40,000-character
+ * bodies (marks and addresses take room, hence the margin).
  */
-export function plainLine(source: string): string {
-  return parseMarkdown(source, { breaks: true })
+export function plainLine(source: string, shown = Number.POSITIVE_INFINITY): string {
+  return parseMarkdown(source.slice(0, shown * 8), { breaks: true })
     .flatMap((b) => {
       if (b.type === "code") return [b.text];
       if (b.type === "paragraph" || b.type === "heading") return [plainProse(b.text)];
-      if (b.type === "list") return b.items.map(plainProse);
+      if (b.type === "list") return b.items.map((item) => plainProse(item.replace(/^\[[ xX]\]\s+/, "")));
       if (b.type === "quote") return b.lines.map(plainProse);
       if (b.type === "table") return [...b.header, ...b.rows.flat()].map(plainProse);
       return b.type === "embed" ? [b.target] : [];

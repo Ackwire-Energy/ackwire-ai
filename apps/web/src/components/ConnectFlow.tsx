@@ -484,19 +484,21 @@ function GithubOrgs() {
           {change}
         </p>
       )}
-      <p className="small muted">{t("connectFlow.githubOrgs.lead")}</p>
       {manageUrl && (
-        <Button
-          asChild
-          size="sm"
-          onClick={() => {
-            if (orgs) setOpened(orgs);
-          }}
-        >
-          <a href={manageUrl} target="_blank" rel="noreferrer">
-            {t("connectFlow.githubOrgs.open")}
-          </a>
-        </Button>
+        <>
+          <p className="small muted">{t("connectFlow.githubOrgs.lead")}</p>
+          <Button
+            asChild
+            size="sm"
+            onClick={() => {
+              if (orgs) setOpened(orgs);
+            }}
+          >
+            <a href={manageUrl} target="_blank" rel="noreferrer">
+              {t("connectFlow.githubOrgs.open")}
+            </a>
+          </Button>
+        </>
       )}
     </section>
   );

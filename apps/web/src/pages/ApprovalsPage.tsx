@@ -709,6 +709,7 @@ export function HoldToApprove({
     );
   const start = (el: HTMLElement) => {
     if (timer.current || pending) return;
+    held.current = false;
     setHolding(true);
     timer.current = setTimeout(() => {
       timer.current = null;

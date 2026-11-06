@@ -51,6 +51,23 @@ test("let go early, nothing is approved and the click explains", async () => {
   expect(document.querySelector(".ac-toast")?.textContent).toContain("Segure o botão");
 });
 
+test("a finished hold no click ends (a finger's long press, a failed approve): the next plain click still explains", async () => {
+  const api = createFakeApi(state());
+  api.approvals.approve = () => Promise.reject(new Error("offline"));
+  await renderApp(`/org/${ORG_ID}/approvals`, { api });
+  await settle(8);
+  const button = document.querySelector<HTMLButtonElement>(".ap-hold") as HTMLButtonElement;
+  button.setPointerCapture = () => {};
+  await act(async () => fireEvent.pointerDown(button, { button: 0, pointerId: 7 }));
+  await wait(1150);
+  await settle(4);
+  await act(async () => fireEvent.pointerUp(button, { pointerId: 7 }));
+  await act(async () => fireEvent.pointerDown(button, { button: 0, pointerId: 8 }));
+  await act(async () => fireEvent.pointerUp(button, { pointerId: 8 }));
+  await act(async () => fireEvent.click(button, { detail: 1 }));
+  expect(document.querySelector(".ac-toasts")?.textContent).toContain("Segure o botão");
+});
+
 test("the browser takes the press away (a scroll, a lost capture): the hold ends", async () => {
   const { s, button } = await hold();
   await act(async () => fireEvent.pointerDown(button, { button: 0, pointerId: 7 }));

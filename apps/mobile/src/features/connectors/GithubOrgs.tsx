@@ -42,19 +42,21 @@ export function GithubOrgs() {
         />
       ) : null}
       {change ? <Text variant="small">{change}</Text> : null}
-      <Text variant="small" tone="muted">
-        {t("connectFlow.githubOrgs.lead")}
-      </Text>
       {manageUrl ? (
-        <Button
-          variant="secondary"
-          label={t("connectFlow.githubOrgs.open")}
-          onPress={async () => {
-            if (orgs) setBefore(orgs);
-            await WebBrowser.openBrowserAsync(manageUrl);
-            await access.refetch();
-          }}
-        />
+        <>
+          <Text variant="small" tone="muted">
+            {t("connectFlow.githubOrgs.lead")}
+          </Text>
+          <Button
+            variant="secondary"
+            label={t("connectFlow.githubOrgs.open")}
+            onPress={async () => {
+              if (orgs) setBefore(orgs);
+              await WebBrowser.openBrowserAsync(manageUrl);
+              await access.refetch();
+            }}
+          />
+        </>
       ) : null}
     </View>
   );

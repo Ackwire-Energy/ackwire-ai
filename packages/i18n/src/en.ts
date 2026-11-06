@@ -10134,7 +10134,7 @@ export const en = {
     githubOrgs: {
       title: "Organizations it reaches",
       none: "No organization yet.",
-      lead: "GitHub asks about organizations only the first time. To add one, open the app's page there and press Grant beside it.",
+      lead: "GitHub asks about organizations only the first time. To add one, open the app's page there and press Grant beside it. If you don't own it, the button says Request and an owner approves.",
       open: "Grant organizations on GitHub",
       added: "Now also: {{names}}.",
       removed: "No longer: {{names}}.",

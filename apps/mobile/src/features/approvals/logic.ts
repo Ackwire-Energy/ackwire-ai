@@ -1,5 +1,7 @@
 import type { Approval } from "@agenteschat/client";
+import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { approvalValues } from "@agenteschat/client/lib/approval-words";
+import { plainLine } from "@agenteschat/client/lib/markdown";
 import type { TFunction } from "i18next";
 import { genderOf } from "../shared/logic";
 
@@ -59,8 +61,6 @@ export function approvalTable(
 
 /** What the agent said right before asking: its `why`, else the last turn of the trail. */
 export function approvalSaid(a: Pick<Approval, "why" | "trail">): string | null {
-  const why = a.why?.trim();
-  if (why) return why;
-  const last = a.trail?.at(-1)?.text.trim();
-  return last || null;
+  const last = a.trail?.at(-1)?.text;
+  return approvalWhy(a) || (last ? plainLine(last) : "") || null;
 }

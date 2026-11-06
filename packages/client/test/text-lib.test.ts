@@ -192,6 +192,18 @@ test("plainLine: a message's words on one line, every mark gone, code and tables
   expect(plainLine("| Clínica | Faltas |\n| --- | ---: |\n| Sorriso | 23 |")).toBe("Clínica Faltas Sorriso 23");
 });
 
+test("plainLine: a collapsed block, a checklist and a lone ** in a sentence", () => {
+  expect(plainLine("<details><summary>Ver **mais**</summary>\n\ncorpo\n\n</details>")).toBe("Ver mais corpo");
+  expect(plainLine("<details><summary>Cortado")).toBe("Cortado");
+  expect(plainLines("<details><summary>Ver mais</summary>\n\ncorpo\n\n</details>")).toEqual(["Ver mais", "corpo"]);
+  expect(plainLine("- [ ] fazer\n- [x] feito")).toBe("fazer feito");
+  expect(plainLine("2 ** 3 = 8")).toBe("2 ** 3 = 8");
+});
+
+test("plainLine: given what will show, it reads no further", () => {
+  expect(plainLine(`curto ${"longo ".repeat(100)}`, 10).length).toBeLessThanOrEqual(80);
+});
+
 test("plainLine: a text cut in the middle leaves no half marks", () => {
   expect(plainLine("```sql\nselect nome from cli")).toBe("select nome from cli");
   expect(plainLine("Antes **negrito cortad")).toBe("Antes negrito cortad");

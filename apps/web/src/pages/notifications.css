@@ -758,9 +758,10 @@ html:not([data-pointer]) .nt-more:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
-/* The bar floats over the row's end: while it shows, the row's words stop short of it, as many buttons as it has. */
+/* The bar floats over the row's end: the row's words always stop short of it, as many buttons as it has, so hovering
+   a row never moves them. */
 @media (min-width: 721px) {
-  .nt-item:is(:hover, :focus-within, .is-cur, :has([data-state="open"])):not(.is-replying) > .nt-c {
+  .nt-item > .nt-c {
     padding-right: var(--nt-acts-room, 48px);
   }
   .nt-item:has(.nt-acts > :nth-child(2)) {

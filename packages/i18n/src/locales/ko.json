@@ -10036,7 +10036,7 @@
     "githubOrgs": {
       "title": "연결된 조직",
       "none": "아직 조직이 없어요.",
-      "lead": "GitHub는 처음 한 번만 조직을 물어봐요. 추가하려면 GitHub에서 앱 페이지를 열고 조직 옆의 Grant를 누르세요.",
+      "lead": "GitHub는 처음 한 번만 조직을 물어봐요. 추가하려면 GitHub에서 앱 페이지를 열고 조직 옆의 Grant를 누르세요. 소유자가 아니면 버튼이 Request로 표시되고 소유자가 승인해요.",
       "open": "GitHub에서 조직 허용",
       "added": "이제 추가됨: {{names}}.",
       "removed": "더 이상 안 됨: {{names}}.",

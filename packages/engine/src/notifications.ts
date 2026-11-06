@@ -413,7 +413,7 @@ const MAX_NAMES = 2;
 /** Plain text for a card (`plainLine`), at most `max` chars. `@mentions` stay. */
 export function notificationSnippet(text: string | null | undefined, max = SNIPPET_LENGTH): string {
   if (!text) return "";
-  const plain = plainLine(text);
+  const plain = plainLine(text, max);
   return plain.length > max ? `${cutText(plain, max - 1).trimEnd()}…` : plain;
 }
 

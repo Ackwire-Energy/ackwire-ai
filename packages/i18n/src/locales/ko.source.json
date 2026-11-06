@@ -25463,7 +25463,7 @@
     "value": "No organization yet."
   },
   "connectFlow.githubOrgs.lead": {
-    "value": "GitHub asks about organizations only the first time. To add one, open the app's page there and press Grant beside it."
+    "value": "GitHub asks about organizations only the first time. To add one, open the app's page there and press Grant beside it. If you don't own it, the button says Request and an owner approves."
   },
   "connectFlow.githubOrgs.open": {
     "value": "Grant organizations on GitHub"

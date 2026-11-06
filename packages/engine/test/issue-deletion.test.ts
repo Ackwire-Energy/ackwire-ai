@@ -71,6 +71,39 @@ describe("deleting a task", () => {
     expect(row?.details).toMatchObject({ number: parent.number, title: "The plan", steps: 2 });
   });
 
+  test("a step this person can't see stays, as a task of its own; one an agent works on stops with the rest", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const parent = await createIssue({ db: f.db }, person(f.owner.id), f.org.id, { title: "The plan" });
+    const seen = await createIssue({ db: f.db }, person(f.owner.id), f.org.id, {
+      title: "Seen",
+      parentIssueId: parent.id,
+    });
+    const hidden = await createIssue({ db: f.db }, person(f.owner.id), f.org.id, {
+      title: "Hidden",
+      parentIssueId: parent.id,
+    });
+    const [room] = await f.db
+      .insert(schema.channels)
+      .values({ orgId: f.org.id, name: "closed", kind: "channel", visibility: "private" } as never)
+      .returning();
+    await f.db
+      .update(schema.issues)
+      .set({ channelId: room?.id as string })
+      .where(eq(schema.issues.id, hidden.id));
+    await askAgentToImplement({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, seen.id, f.agent.id);
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.issueId, seen.id));
+
+    await deleteIssue(deps(), f.owner.id, f.org.id, parent.id);
+
+    const left = await f.db.select().from(schema.issues).where(eq(schema.issues.orgId, f.org.id));
+    expect(left.map((i) => [i.id, i.parentIssueId])).toEqual([[hidden.id, null]]);
+    const [stopped] = await f.db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.id, run?.id as string));
+    expect(stopped?.status).toBe("canceled");
+  });
+
   test("what an agent is doing on it stops, and its conversation is deleted and purged", async () => {
     f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
     const issue = await createIssue({ db: f.db }, person(f.owner.id), f.org.id, { title: "Working" });

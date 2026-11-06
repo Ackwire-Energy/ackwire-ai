@@ -11242,7 +11242,7 @@
     "githubOrgs": {
       "title": "Dostępne organizacje",
       "none": "Na razie żadnej organizacji.",
-      "lead": "GitHub pyta o organizacje tylko za pierwszym razem. Aby dodać kolejną, otwórz tam stronę aplikacji i kliknij Grant obok niej.",
+      "lead": "GitHub pyta o organizacje tylko za pierwszym razem. Aby dodać kolejną, otwórz tam stronę aplikacji i kliknij Grant obok niej. Jeśli nie jesteś właścicielem, przycisk to Request, a właściciel zatwierdza.",
       "open": "Zezwól na organizacje w GitHubie",
       "added": "Teraz także: {{names}}.",
       "removed": "Już nie: {{names}}.",

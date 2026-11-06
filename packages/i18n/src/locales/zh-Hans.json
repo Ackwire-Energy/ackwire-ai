@@ -10103,7 +10103,7 @@
     "githubOrgs": {
       "title": "可访问的组织",
       "none": "还没有组织。",
-      "lead": "GitHub 只在第一次询问组织。要添加其他组织，请在 GitHub 打开应用页面，然后点击组织旁边的 Grant。",
+      "lead": "GitHub 只在第一次询问组织。要添加其他组织，请在 GitHub 打开应用页面，然后点击组织旁边的 Grant。如果你不是所有者，按钮显示为 Request，由所有者批准。",
       "open": "在 GitHub 上授权组织",
       "added": "现在还包括：{{names}}。",
       "removed": "不再包括：{{names}}。",

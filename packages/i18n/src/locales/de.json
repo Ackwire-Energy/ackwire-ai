@@ -10466,7 +10466,7 @@
     "githubOrgs": {
       "title": "Erreichte Organisationen",
       "none": "Noch keine Organisation.",
-      "lead": "GitHub fragt nur beim ersten Mal nach Organisationen. Um eine weitere freizugeben, öffne dort die Seite der App und klicke daneben auf Grant.",
+      "lead": "GitHub fragt nur beim ersten Mal nach Organisationen. Um eine weitere freizugeben, öffne dort die Seite der App und klicke daneben auf Grant. Wenn sie dir nicht gehört, steht dort Request und ein Inhaber bestätigt es.",
       "open": "Organisationen auf GitHub freigeben",
       "added": "Jetzt auch: {{names}}.",
       "removed": "Nicht mehr: {{names}}.",

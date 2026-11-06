@@ -10096,7 +10096,7 @@
     "githubOrgs": {
       "title": "Organisasi yang terjangkau",
       "none": "Belum ada organisasi.",
-      "lead": "GitHub hanya menanyakan organisasi pada kali pertama. Untuk menambahkan yang lain, buka halaman aplikasi di sana dan tekan Grant di sampingnya.",
+      "lead": "GitHub hanya menanyakan organisasi pada kali pertama. Untuk menambahkan yang lain, buka halaman aplikasi di sana dan tekan Grant di sampingnya. Jika Anda bukan pemiliknya, tombolnya bertuliskan Request dan pemilik yang menyetujui.",
       "open": "Izinkan organisasi di GitHub",
       "added": "Sekarang juga: {{names}}.",
       "removed": "Tidak lagi: {{names}}.",
