@@ -1312,6 +1312,9 @@ export class RunnerDaemon implements RequestObserver {
       reclaimBrains: supervisor
         ? (spare) => accountBrains?.reclaim(spare) ?? supervisor.reclaimBrains(spare)
         : (spare) => brains.reclaimIdle(spare),
+      warmBrain: supervisor
+        ? async (spare) => accountBrains?.warm(spare) || supervisor.warmBrain(spare)
+        : async (spare) => brains.warm(spare),
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
       // A config written later without the mode never turns a system session back into one that does agents' work.

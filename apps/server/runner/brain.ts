@@ -1724,6 +1724,12 @@ export class BrainManager {
     ).length;
   }
 
+  /** Whether the session `key` (`brainKey`) has an open process: its next turn starts no new CLI. */
+  warm(key: string) {
+    const l = this.live.get(key);
+    return l !== undefined && !l.proc.exited;
+  }
+
   /** The live process of a session, if any (tests). */
   process(agentId: string, session: string): ClaudeProcess | undefined {
     return this.live.get(brainKey(agentId, session))?.proc;
