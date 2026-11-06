@@ -23,9 +23,11 @@ import {
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
+import { keyRemovalText } from "@agenteschat/client/lib/ai-accounts";
 import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
+import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -85,7 +87,7 @@ import { useOrg } from "@/components/org-context";
 import { UsageTabs } from "@/components/PeopleUsage";
 import { PlanUsageCards } from "@/components/PlanUsage";
 import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
-import { KeyMismatch, KeySite } from "@/components/ProviderKey";
+import { KeyMismatch, KeyRefused, KeySite } from "@/components/ProviderKey";
 import { RightHandSettingsSection } from "@/components/RightHandSettings";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
@@ -784,18 +786,10 @@ function KeysSection() {
                       variant="ghost"
                       size="sm"
                       className="ac-btn--danger"
-                      disabled={isDefault}
-                      title={isDefault ? t("settings.removeDefaultBlocked") : undefined}
-                      aria-describedby={isDefault ? `default-note-${c.id}` : undefined}
                       onClick={() => setDialog({ type: "remove", cred: c })}
                     >
                       {t("settings.remove")}
                     </Button>
-                    {isDefault && (
-                      <span id={`default-note-${c.id}`} className="ac-visually-hidden">
-                        {t("settings.removeDefaultBlocked")}
-                      </span>
-                    )}
                   </div>
                 </span>
               </div>
@@ -826,7 +820,7 @@ function KeysSection() {
         open={dialog?.type === "remove"}
         onOpenChange={(o) => !o && setDialog(null)}
         title={t("settings.removeTitle", { label: dialog?.type === "remove" ? dialog.cred.label : "" })}
-        description={t("settings.removeText")}
+        description={dialog?.type === "remove" ? keyRemovalText(t, dialog.cred, live, platform.data === true) : ""}
         closeLabel={t("common.close")}
         width={440}
       >
@@ -838,7 +832,7 @@ function KeysSection() {
             loading={remove.isPending}
             onClick={() => {
               if (dialog?.type !== "remove") return;
-              remove.mutate({ id: dialog.cred.id, purge: true }, { onSuccess: () => setDialog(null) });
+              remove.mutate({ id: dialog.cred.id, purge: true, release: true }, { onSuccess: () => setDialog(null) });
             }}
           >
             {t("settings.remove")}
@@ -873,8 +867,17 @@ export function KeyDialog({
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
-  const add = useAddCredential(org.id);
-  const rotate = useRotateCredential(org.id);
+  const add = useAddCredential(org.id, true);
+  const rotate = useRotateCredential(org.id, true);
+  const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
+  const failed = (e: unknown) => {
+    setRefused(keyRefusal(t, e));
+    if (!keyRefusal(t, e)) toast.show(errorText(t, e), "error");
+  };
+  const unchecked = (saved: Credential) => {
+    if (saved.check === "unchecked")
+      toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(saved.provider) }), "info");
+  };
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState<ProviderId>("anthropic");
@@ -890,6 +893,7 @@ export function KeyDialog({
     setProvider(providerGuess(pasted, suggested ?? cred?.provider));
     setCustom(mode === "add" && suggested === CUSTOM_PROVIDER);
     setTouched(false);
+    setRefused(null);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);
   const error =
@@ -959,12 +963,15 @@ export function KeyDialog({
             e.preventDefault();
             setTouched(true);
             if (!valid) return;
+            setRefused(null);
             if (mode === "rotate" && cred) {
               rotate.mutate(
                 { id: cred.id, apiKey: apiKey.trim() },
                 {
-                  onSuccess: () => {
+                  onError: failed,
+                  onSuccess: (saved) => {
                     toast.show(t("settings.rotated"));
+                    unchecked(saved);
                     onClose();
                   },
                 },
@@ -978,7 +985,9 @@ export function KeyDialog({
                   ...(provider === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
                 },
                 {
+                  onError: failed,
                   onSuccess: (saved) => {
+                    unchecked(saved);
                     onAdded?.(saved);
                     onClose();
                   },
@@ -1012,6 +1021,7 @@ export function KeyDialog({
                 onChange={(e) => setApiKey(e.target.value)}
               />
             </Field>
+            {refused && <KeyRefused refusal={refused} />}
             {mode === "add" && provider === "anthropic" && (
               <Field
                 label={t("onboarding.anthropicWorkspace")}

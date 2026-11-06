@@ -307,3 +307,45 @@ describe("OpenAI adapter (Responses API, scripted transport)", () => {
     expect(cheapModelOf("anthropic")).toBe("claude-haiku-5-5");
   });
 });
+
+describe("what a failure says", () => {
+  const failed = async (body: string, status = 200) => {
+    const provider = createOpenAIProvider({ fetch: scripted(body, status).fetcher, maxRetries: 0 });
+    const call = provider.stream(
+      { model: cheapModelOf("openai") ?? "", system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 16 },
+      { apiKey: "sk-test", onDelta: () => {} },
+    );
+    return call.then(
+      () => null,
+      (e: ProviderError) => e,
+    );
+  };
+  const frame = (code: string, message: string) =>
+    `event: error\ndata: ${JSON.stringify({ type: "error", error: { code, message } })}\n\n`;
+
+  test("no credit inside a stream, with no status: its words and code, and no retry", async () => {
+    const e = await failed(frame("insufficient_quota", "You exceeded your current quota, please check your plan."));
+    expect(e).toMatchObject({
+      message:
+        "no prepaid credit left at the provider (429 insufficient_quota): You exceeded your current quota, please check your plan.",
+      retryable: false,
+      status: 429,
+    });
+  });
+
+  test("no credit on a 429 never reads as a rate limit", async () => {
+    const body = JSON.stringify({ error: { code: "insufficient_quota", message: "Add credit." } });
+    expect(await failed(body, 429)).toMatchObject({ retryable: false, status: 429 });
+  });
+
+  test("a rate limit inside a stream is still one", async () => {
+    expect(await failed(frame("rate_limit_exceeded", "Slow down."))).toMatchObject({ retryable: true, status: 429 });
+  });
+
+  test("any other refusal keeps the status, the code and the words, cut short", async () => {
+    const body = JSON.stringify({ error: { code: "bad_thing", message: `Nope ${"x".repeat(400)}` } });
+    const e = await failed(body, 400);
+    expect(e?.message.startsWith("provider rejected the request (400 bad_thing): Nope x")).toBe(true);
+    expect(e?.message.length).toBeLessThan(360);
+  });
+});

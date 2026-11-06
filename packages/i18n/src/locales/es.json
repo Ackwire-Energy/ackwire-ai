@@ -1999,6 +1999,10 @@
       "configure": "Configurar",
       "nameStory": "El nombre viene de lodestar, la estrella que guía a los navegantes."
     },
+    "saved": {
+      "workspace": "{{name}} ahora piensa con {{label}} para todos los que no tienen plan propio.",
+      "mine": "Tu conversación con {{name}} ahora piensa con {{label}}. Solo la tuya."
+    },
     "settings": {
       "name": "Nombre y aspecto",
       "nameHelp": "En la barra lateral siempre aparece como “{{label}}”.",
@@ -2019,6 +2023,8 @@
       "connectMine": "Conectar mi plan",
       "useWorkspace": "Usar la del workspace",
       "fallbackKey": "Sin plan propio, usa la clave de API del workspace.",
+      "fallbackKeyOf": "Sin plan propio, usa la clave del workspace: {{label}}.",
+      "fallbackNoKey": "El workspace aún no tiene clave de API, así que sin plan propio nadie te responde aquí.",
       "fallbackPlan": "Sin plan propio, usa el plan de {{owner}}, que atiende a todos.",
       "fallbackYours": "Sin otro plan, usa el del workspace, que es tuyo.",
       "fallbackNone": "Sin plan propio, {{name}} no puede responderte: el plan del workspace solo atiende a {{owner}}.",
@@ -2294,8 +2300,11 @@
       "title": "Ya conectadas",
       "titleFor": "Ya conectadas, para {{name}}",
       "titleFor_female": "Ya conectadas, para {{name}}",
-      "other": "O conecta otra"
+      "other": "O conecta otra",
+      "manageKeys": "Gestionar o eliminar claves"
     },
+    "billing": "Un plan inicia sesión en el ordenador del workspace, y el ordenador viene con un plan activo de agentes.chat.",
+    "billingWeb": "Elige uno en la web, en agentes.chat.",
     "orPayGo": "O paga por uso",
     "plan": {
       "claude": {
@@ -2344,6 +2353,7 @@
       "paste": "Pégala aquí",
       "forAll": "Todos los agentes sin plan piensan con ella.",
       "saved": "Guardada. Todos los agentes sin plan piensan con ella.",
+      "savedUnchecked": "Guardada, pero {{provider}} no respondió y la clave no se pudo comprobar. Si falla, la conversación dice por qué.",
       "notPlan": "La clave de un plan de programación va en su propia opción, arriba.",
       "billing": "Activa la facturación del proyecto de la clave. Sin facturación, Google puede usar lo que envían tus agentes.",
       "privacy": "Tu configuración de privacidad de OpenRouter decide qué proveedores pueden guardar lo que envían tus agentes.",
@@ -8187,7 +8197,9 @@
         "runnerOld": "El programa de agentes.chat en {{computer}} está desactualizado y la actualización ya viene en camino. Esto cambia solo cuando termine.",
         "execOff": "{{computer}} todavía no puede ejecutar {{program}}. Ya estamos en eso, y esto cambia solo.",
         "toolOff": "{{program}} todavía no está habilitado en {{computer}}. Eso es cosa nuestra: inténtalo de nuevo más tarde.",
-        "preparing": "{{computer}} se está preparando. Esto cambia solo cuando termine."
+        "preparing": "{{computer}} se está preparando. Esto cambia solo cuando termine.",
+        "stuck": "{{program}} todavía no está listo en {{computer}}, y esto no va a cambiar solo. Usa una clave de API por ahora y vuelve a probar este plan más tarde.",
+        "away": "{{computer}} lleva fuera más de lo que tarda un reinicio. Usa una clave de API por ahora y vuelve a probar este plan más tarde."
       }
     },
     "done": {
@@ -12505,6 +12517,10 @@
     "keyValue": "Clave de API",
     "keyInvalid": "Pega la clave de API (al menos 8 caracteres).",
     "keyRefused": "El proveedor no aceptó esta clave.",
+    "keyNoCredit": "{{provider}} dice que esta clave no tiene crédito. Añade crédito allí y guárdala de nuevo. No se guardó nada.",
+    "keyDenied": "{{provider}} no dejó que esta clave hiciera una llamada. Revisa sus permisos allí y guárdala de nuevo. No se guardó nada.",
+    "keySaid": "{{provider}} dijo: {{said}}",
+    "keyInUse": "{{agents}} aún piensan con esta clave.",
     "keyManagement": "Esta es una clave de administración. Crea una clave de API normal.",
     "autoModels": {
       "title": "Modelos para Automático",
@@ -12525,6 +12541,13 @@
     "remove": "Borrar",
     "removeTitle": "Borrar la clave {{label}}",
     "removeText": "La clave se borra para siempre. Si un agente todavía la usa, el servidor lo rechaza: primero cambia la clave de esos agentes.",
+    "removeUnused": "La clave desaparece para siempre. Ningún agente piensa con ella.",
+    "removeUsedOther_one": "{{agents}} piensa con esta clave. Sin ella, pasa a otra clave o pide una IA si ninguna sirve para su modelo.",
+    "removeUsedOther_many": "{{agents}} piensan con esta clave. Sin ella, pasan a otra clave o piden una IA si ninguna sirve para su modelo.",
+    "removeUsedOther_other": "{{agents}} piensan con esta clave. Sin ella, pasan a otra clave o piden una IA si ninguna sirve para su modelo.",
+    "removeUsedNone_one": "{{agents}} piensa con esta clave y no tiene otra cosa. Sin ella, deja de responder hasta que conectes otra IA.",
+    "removeUsedNone_many": "{{agents}} piensan con esta clave y no tienen otra cosa. Sin ella, dejan de responder hasta que conectes otra IA.",
+    "removeUsedNone_other": "{{agents}} piensan con esta clave y no tienen otra cosa. Sin ella, dejan de responder hasta que conectes otra IA.",
     "noKeys": "Aún no hay claves.",
     "platformAvailable": "La clave de Claude de este servidor también está disponible.",
     "usageTitle": "Gasto de API por tipo",

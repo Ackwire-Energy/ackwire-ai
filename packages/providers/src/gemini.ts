@@ -13,6 +13,7 @@ import {
   ProviderError,
   promptChars,
   type StopReason,
+  shortSaid,
   stableToolsFirst,
   systemText,
 } from "./types";
@@ -66,8 +67,8 @@ interface StreamEvent {
   delta?: { type: string; text?: string; arguments?: string; signature?: string; content?: unknown };
   /** On `step.stop`: the running total since the interaction started. */
   usage?: Usage;
-  interaction?: { model?: string; status?: string; usage?: Usage; errors?: { code?: string }[] };
-  error?: { code?: string };
+  interaction?: { model?: string; status?: string; usage?: Usage; errors?: { code?: string; message?: string }[] };
+  error?: { code?: string; message?: string };
 }
 
 /** A step as the stream builds it: the step (what is replayed), its text and its arguments so far. */
@@ -128,8 +129,8 @@ export function createGeminiProvider(
           throw new ProviderError("could not reach provider", true);
         }
         if (!res.ok || !res.body) {
-          const body = (await res.json().catch(() => null)) as { error?: { code?: string } } | null;
-          throw errorOf(res.status, body?.error?.code);
+          const body = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+          throw errorOf(res.status, body?.error?.code, body?.error?.message);
         }
         for await (const data of sseData(res.body)) {
           if (data === "[DONE]") break;
@@ -141,10 +142,11 @@ export function createGeminiProvider(
             if (event.event_type === "interaction.completed") {
               status = event.interaction?.status;
               usage = event.interaction?.usage ?? usage;
-              const code = event.interaction?.errors?.[0]?.code;
+              const first = event.interaction?.errors?.[0];
+              const code = first?.code;
               if (status === "failed" || status === "cancelled") {
                 if (code && BLOCKED.has(code)) blocked = true;
-                else throw errorOf(undefined, code ?? "api_error");
+                else throw errorOf(undefined, code ?? "api_error", first?.message);
               }
             }
           } else if (event.event_type === "step.start" && event.step && event.index !== undefined) {
@@ -175,7 +177,7 @@ export function createGeminiProvider(
             usage = event.usage;
           } else if (event.event_type === "error") {
             const code = event.error?.code ?? "api_error";
-            if (!BLOCKED.has(code)) throw errorOf(undefined, code);
+            if (!BLOCKED.has(code)) throw errorOf(undefined, code, event.error?.message);
             blocked = true;
             break;
           }
@@ -330,7 +332,7 @@ function usageOf(u: Usage): ModelUsage {
 }
 
 /** A failure by Google's HTTP status or error code, in the words the other adapters use. */
-function errorOf(status: number | undefined, code: string | undefined): ProviderError {
+function errorOf(status: number | undefined, code: string | undefined, message?: string): ProviderError {
   if (status === 401 || code === "authentication") return new ProviderError("invalid provider API key", false, 401);
   if (status === 402 || code === "payment_required")
     return new ProviderError("no prepaid credit left at the provider", false, 402);
@@ -340,5 +342,6 @@ function errorOf(status: number | undefined, code: string | undefined): Provider
     return new ProviderError("rate limited by provider", true, status ?? 429);
   if ((status ?? 0) >= 500 || (code && RETRYABLE.has(code))) return new ProviderError("provider error", true, status);
   const why = [status, code].filter(Boolean).join(" ");
-  return new ProviderError(`provider rejected the request (${why || "?"})`, false, status);
+  const said = message ? shortSaid(message) : "";
+  return new ProviderError(`provider rejected the request (${why || "?"})${said ? `: ${said}` : ""}`, false, status);
 }

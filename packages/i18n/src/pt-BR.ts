@@ -1928,6 +1928,12 @@ export const ptBR = {
       configure: "Configurar",
       nameStory: "O nome vem de lodestar, a estrela que guia os navegantes.",
     },
+    saved: {
+      workspace: "O {{name}} agora pensa com {{label}} para todo mundo sem plano próprio.",
+      workspace_female: "A {{name}} agora pensa com {{label}} para todo mundo sem plano próprio.",
+      mine: "Sua conversa com o {{name}} agora pensa com {{label}}, e só a sua.",
+      mine_female: "Sua conversa com a {{name}} agora pensa com {{label}}, e só a sua.",
+    },
     settings: {
       name: "Nome e visual",
       nameHelp: "Na barra lateral ele aparece sempre como “{{label}}”.",
@@ -1955,6 +1961,8 @@ export const ptBR = {
       connectMine: "Conectar meu plano",
       useWorkspace: "Usar a do workspace",
       fallbackKey: "Sem plano seu, ela usa a chave de API do workspace.",
+      fallbackKeyOf: "Sem plano seu, ela usa a chave do workspace: {{label}}.",
+      fallbackNoKey: "O workspace ainda não tem chave de API, então sem plano seu ninguém te responde aqui.",
       fallbackPlan: "Sem plano seu, ela usa o plano de {{owner}}, que atende todo mundo.",
       fallbackYours: "Sem outro plano, ela usa o do workspace, que é seu.",
       fallbackNone: "Sem plano seu, o {{name}} não te responde: o plano do workspace só atende {{owner}}.",
@@ -2255,7 +2263,10 @@ export const ptBR = {
       titleFor: "Já conectadas, para o {{name}}",
       titleFor_female: "Já conectadas, para a {{name}}",
       other: "Ou conecte outra",
+      manageKeys: "Gerenciar ou apagar chaves",
     },
+    billing: "Um plano entra no computador do workspace, e o computador vem com um plano ativo do agentes.chat.",
+    billingWeb: "Escolha um na web, em agentes.chat.",
     orPayGo: "Ou pague pelo uso",
     plan: {
       claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Ultra, Team ou Enterprise" },
@@ -2282,6 +2293,8 @@ export const ptBR = {
       paste: "Cole aqui",
       forAll: "Todo agente sem plano pensa com ela.",
       saved: "Salva. Todo agente sem plano pensa com ela.",
+      savedUnchecked:
+        "Salva, mas {{provider}} não respondeu e a chave não pôde ser testada. Se ela falhar, a conversa diz o motivo.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
       billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
       privacy:
@@ -7915,6 +7928,9 @@ export const ptBR = {
         toolOff:
           "O {{program}} ainda não está liberado no {{computer}}. Isso é do nosso lado: tente de novo mais tarde.",
         preparing: "O {{computer}} está ficando pronto. Isto muda sozinho quando terminar.",
+        stuck:
+          "O {{program}} ainda não está pronto no {{computer}}, e isto não vai mudar sozinho. Use uma chave de API por enquanto e tente este plano de novo mais tarde.",
+        away: "O {{computer}} está fora há mais tempo do que um reinício leva. Use uma chave de API por enquanto e tente este plano de novo mais tarde.",
       },
     },
     done: {
@@ -11876,6 +11892,12 @@ export const ptBR = {
     keyValue: "Chave da API",
     keyInvalid: "Cole a chave da API (pelo menos 8 caracteres).",
     keyRefused: "O provedor não aceitou esta chave.",
+    keyNoCredit:
+      "{{provider}} diz que esta chave está sem crédito. Coloque crédito lá e salve de novo. Nada foi salvo.",
+    keyDenied:
+      "{{provider}} não deixou esta chave fazer uma chamada. Veja as permissões dela lá e salve de novo. Nada foi salvo.",
+    keySaid: "{{provider}} disse: {{said}}",
+    keyInUse: "{{agents}} ainda pensam com esta chave.",
     keyManagement: "Esta é uma chave de gerenciamento. Crie uma chave de API comum.",
     autoModels: {
       title: "Modelos do Automático",
@@ -11897,6 +11919,15 @@ export const ptBR = {
     removeTitle: "Apagar a chave {{label}}",
     removeText:
       "A chave some de vez. Se algum agente ainda usa esta chave, o servidor recusa: troque a chave desses agentes antes.",
+    removeUnused: "A chave some de vez. Nenhum agente pensa com ela.",
+    removeUsedOther_one:
+      "{{agents}} pensa com esta chave. Sem ela, passa para outra chave, ou pede uma IA se nenhuma servir para o modelo.",
+    removeUsedOther_other:
+      "{{agents}} pensam com esta chave. Sem ela, passam para outra chave, ou pedem uma IA se nenhuma servir para o modelo.",
+    removeUsedNone_one:
+      "{{agents}} pensa com esta chave e não tem outra. Sem ela, para de responder até você conectar outra IA.",
+    removeUsedNone_other:
+      "{{agents}} pensam com esta chave e não têm outra. Sem ela, param de responder até você conectar outra IA.",
     noKeys: "Nenhuma chave ainda.",
     platformAvailable: "A chave do Claude deste servidor também está disponível.",
     usageTitle: "Gastos da API por tipo",

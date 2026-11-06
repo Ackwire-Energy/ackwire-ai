@@ -222,6 +222,9 @@ export class ProviderError extends Error {
   }
 }
 
+/** A provider's words on one line, short enough to show. */
+export const shortSaid = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 300);
+
 /** Rough token estimate (≈ 4 characters per token), used only when the provider gave no count. */
 export const estimateTokens = (chars: number) => Math.ceil(chars / 4);
 

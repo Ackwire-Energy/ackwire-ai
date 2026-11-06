@@ -21,6 +21,8 @@ import {
   aiChoiceOf,
   allAgents,
   behindComputer,
+  CLOUD_AWAY_MS,
+  CLOUD_INSTALL_WAIT_MS,
   catchUp,
   defaultChoice,
   defaultTarget,
@@ -51,6 +53,10 @@ import {
   signsInPerAgent,
 } from "../src/lib/no-ai";
 import { LOGIN_PER_AGENT, OPENCODE_KEY_PLAN, providerFitsChoice, SHARED_SIGN_INS, signInKey } from "../src/lib/plans";
+
+const enI18n = i18next.createInstance();
+void enI18n.init({ lng: "en", resources, initAsync: false });
+const enT: TFunction = enI18n.t.bind(enI18n);
 
 const setup = (patch: Partial<ComputerSetup> = {}) =>
   setupView({
@@ -233,6 +239,68 @@ describe("planGate: what a plan's panel can do now", () => {
     expect(ownSignInFor("chatgpt", brain({ ownSignIn: false }), codex)).toBe(false);
     expect(ownSignInFor("claude", undefined, signedIn)).toBe(false);
   });
+});
+
+describe("the Cloud's plan gate tells the truth", () => {
+  const NOW = Date.parse("2026-11-05T12:00:00Z");
+  const ready = (ago: number) => setup({ state: "ready", step: null, since: new Date(NOW - ago).toISOString() });
+  const noCodex = brain({
+    computer: { machineId: "m1", name: "Acme", online: true },
+    options: [option("claude_code"), option("codex", { available: false, reason: "not_installed" })],
+  });
+  const codexGate = (ago: number) =>
+    planGate({ choice: "chatgpt", edition: "cloud", setup: ready(ago), brain: noCodex, computer: MAC, now: NOW });
+
+  test("a billing hold says so first, for every plan, and offers no sign-in", () => {
+    for (const choice of ["claude", "chatgpt", "cursor", "zen", "grok", "gemini", "zai"] as const) {
+      const standing = { state: "hold", reason: "payment" } as const;
+      expect(gate({ choice, edition: "cloud", standing })).toEqual({ state: "billing", hold: "payment" });
+      expect(
+        planGateWithoutAgent({ choice, edition: "cloud", setup: null, computers: undefined, standing }).gate,
+      ).toEqual({ state: "billing", hold: "payment" });
+    }
+    expect(gateDims({ state: "billing", hold: "unpaid" })).toBe(true);
+    // A review hold isn't about money, and a self-hosted server has no plan to pay.
+    expect(gate({ edition: "cloud", standing: { state: "hold", reason: "review" } }).state).not.toBe("billing");
+    expect(gate({ standing: { state: "hold", reason: "payment" } }).state).toBe("ready");
+  });
+
+  test("a CLI missing from a computer ready just now may still be coming; past that it never reads as installing", () => {
+    const soon = codexGate(CLOUD_INSTALL_WAIT_MS - 60_000);
+    expect(soon).toEqual({ state: "unsupported", reason: "not_installed" });
+    expect(gateRechecks(soon, "cloud")).toBe(true);
+    const late = codexGate(CLOUD_INSTALL_WAIT_MS + 60_000);
+    expect(late).toEqual({ state: "unsupported", reason: "not_installed", overdue: true });
+    expect(gateRechecks(late, "cloud")).toBe(false);
+    const line = cloudLine(late);
+    expect(line?.text).toContain("won't change by itself");
+    expect(line?.text).not.toContain("being installed");
+    expect(line?.rechecks).toBe(false);
+  });
+
+  test("every plan's program gets the same honest line", () => {
+    for (const kind of ["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"] as const) {
+      const line = cloudLine({ state: "unsupported", reason: "not_installed", overdue: true }, kind);
+      expect(line?.text).toContain("Acme");
+      expect(line?.text).toContain("API key");
+    }
+  });
+
+  test("a computer away past a restart stops promising it comes back by itself", () => {
+    const seen = (ago: number) =>
+      ({ os: "linux", mode: "system", lastSeenAt: new Date(NOW - ago).toISOString() }) as const;
+    const line = (ago: number) => cloudLine({ state: "offline" }, "codex", seen(ago))?.text;
+    expect(line(60_000)).toContain("reconnecting");
+    expect(line(CLOUD_AWAY_MS + 60_000)).toContain("away longer");
+  });
+
+  function cloudLine(
+    g: Parameters<typeof gateLine>[1]["gate"],
+    kind: Parameters<typeof gateLine>[1]["kind"] = "codex",
+    machine?: Parameters<typeof gateLine>[1]["machine"],
+  ) {
+    return gateLine(enT, { gate: g, edition: "cloud", kind, computer: "Acme", machine, now: NOW });
+  }
 });
 
 describe("planGateWithoutAgent: a plan connected before its owner has any agent", () => {

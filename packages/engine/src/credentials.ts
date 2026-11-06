@@ -12,6 +12,7 @@ import {
   listedModels,
   type ModelInfo,
   modelInfo,
+  PROVIDERS,
   type ProviderId,
 } from "@agenteschat/providers";
 import { recordAudit } from "./audit";
@@ -27,6 +28,7 @@ import {
   type StoredEndpoint,
 } from "./endpoints";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
+import type { KeyCheck, ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
 
 const { providerCredentials } = schema;
@@ -46,9 +48,16 @@ export interface CredentialSummary {
   isDefault?: boolean;
   /** A workspace endpoint's address, API style and models (`custom`, ADR 0146). Not secret. */
   endpoint?: StoredEndpoint;
+  /** The agents that think with it (`listCredentials`): what removing it would change. */
+  usedBy?: { id: string; name: string }[];
+  /** On a key just saved: `ok` a real call passed, `unchecked` the provider gave no answer about the key. */
+  check?: KeyCheckState;
   createdAt: Date;
   revokedAt: Date | null;
 }
+
+/** What a test call could say of a key that was kept. */
+export type KeyCheckState = "ok" | "unchecked";
 
 const summary = (row: typeof providerCredentials.$inferSelect): CredentialSummary => ({
   id: row.id,
@@ -139,6 +148,24 @@ async function checkKey(provider: string, apiKey: string, http?: typeof fetch) {
     throw new ValidationError("This is a management key. Create a regular API key.", "provider_key_management");
 }
 
+/** The test call a key goes through (the gateway's `verifyKey`), absent on a server with no model gateway. */
+export type KeyVerifier = ModelGateway["verifyKey"];
+
+/**
+ * What a test call means for a key. A refusal (no such key, no credit, no permission) is never kept: it comes back with
+ * the provider's name and words. A provider that gives no answer about the key doesn't stop anything.
+ */
+function passedCheck(providerId: string, result: KeyCheck | undefined) {
+  if (result?.state === "refused") {
+    const provider = PROVIDERS[providerId as ProviderId]?.label ?? providerId;
+    throw new ValidationError(`${provider} refused this key.`, `provider_key_${result.refusal}`, {
+      provider,
+      said: result.said,
+    });
+  }
+  return result?.state === "ok" ? result : null;
+}
+
 /** Stores an org's provider API key, encrypted (envelope encryption). */
 export async function createCredential(
   db: Database,
@@ -159,7 +186,7 @@ export async function createCredential(
     endpoint?: { style: EndpointStyle; baseURL: string; models: EndpointModel[] };
   },
   /** Outbound HTTP for the provider's key check (tests: a fake); `net`: how endpoints may be reached. */
-  opts: { fetch?: typeof fetch; net?: EndpointNet } = {},
+  opts: { fetch?: typeof fetch; net?: EndpointNet; verify?: KeyVerifier } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   if (!isKnownProvider(input.provider)) throw new ValidationError(`Unknown provider ${input.provider}`);
@@ -175,6 +202,18 @@ export async function createCredential(
     models: cleanEndpointModels(input.endpoint.models),
   };
   await checkKey(input.provider, apiKey, opts.fetch);
+  const options = cleanOptions(input);
+  const workspaceId = cleanWorkspaceId(input.workspaceId);
+  const passed = custom
+    ? null
+    : passedCheck(
+        input.provider,
+        await opts.verify?.({
+          orgId,
+          provider: input.provider,
+          key: { apiKey, ...(workspaceId ? { workspaceId } : {}), ...options },
+        }),
+      );
   const id = crypto.randomUUID();
   const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, id));
   const row = await db.transaction(async (tx) => {
@@ -189,8 +228,8 @@ export async function createCredential(
         wrappedDataKey: sealed.wrappedDataKey,
         kekId: sealed.kekId,
         keyHint: apiKey === ENDPOINT_NO_KEY ? "" : apiKey.slice(-4),
-        workspaceId: cleanWorkspaceId(input.workspaceId),
-        options: { ...cleanOptions(input), ...(endpoint ? { endpoint } : {}) },
+        workspaceId,
+        options: { ...options, ...(endpoint ? { endpoint } : {}) },
         createdByUserId: actorId,
       })
       .returning();
@@ -205,7 +244,31 @@ export async function createCredential(
     // Its models, ready for the pickers.
     void ensureOpenRouterModels();
   }
-  return { ...summary(row), isDefault: input.makeDefault === true };
+  await passed?.record(row.id);
+  return {
+    ...summary(row),
+    isDefault: input.makeDefault === true,
+    ...(custom ? {} : { check: passed ? ("ok" as const) : ("unchecked" as const) }),
+  };
+}
+
+/**
+ * Tries a stored key again (admins), before an agent is pointed at it: a key kept before this check, or one whose
+ * credit ran out since, gets the same answer as on save.
+ */
+export async function checkCredential(
+  db: Database,
+  gateway: Pick<ModelGateway, "verifyStoredKey">,
+  actorId: string,
+  orgId: string,
+  credentialId: string,
+): Promise<KeyCheckState> {
+  await requirePermission(db, actorId, orgId, "manage_credentials");
+  const stored = await gateway.verifyStoredKey(orgId, credentialId);
+  if (!stored) throw new NotFoundError("Credential not found");
+  const passed = passedCheck(stored.provider, stored.result);
+  await passed?.record(credentialId);
+  return passed ? "ok" : "unchecked";
 }
 
 function cleanOptions(input: { organization?: string | null; project?: string | null }) {
@@ -274,27 +337,47 @@ export async function defaultCredentialId(db: Database, orgId: string) {
   return (await defaultCredentials(db, orgId)).legacy;
 }
 
-/** Removing a default key would leave its provider without one: refuse until another is the default. */
+/** Removing a default key would leave its provider without one: refused unless the person said to go on (`release`). */
 async function refuseIfDefault(db: Database, orgId: string, credentialId: string) {
   const d = await defaultCredentials(db, orgId);
   if (d.legacy === credentialId || Object.values(d.perProvider).includes(credentialId)) {
-    throw new ConflictError("This is the workspace's default key. Make another key the default first.");
+    throw new ConflictError(
+      "This is the workspace's default key. Make another key the default first.",
+      "credential.default",
+    );
   }
+}
+
+/** The key stops being a default: its provider's next call takes the newest key left, as with no default set. */
+async function dropDefault(tx: Executor, orgId: string, credentialId: string) {
+  await tx
+    .update(schema.organizationSettings)
+    .set({
+      defaultCredentialId: sql`nullif(${schema.organizationSettings.defaultCredentialId}, ${credentialId}::uuid)`,
+      defaultCredentialIds: sql`coalesce((select jsonb_object_agg(key, value) from jsonb_each(${schema.organizationSettings.defaultCredentialIds}) where value <> to_jsonb(${credentialId}::text)), '{}'::jsonb)`,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.organizationSettings.orgId, orgId));
 }
 
 export async function listCredentials(db: Database, actorId: string, orgId: string): Promise<CredentialSummary[]> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
-  const [rows, defaults] = await Promise.all([
+  const [rows, defaults, agents] = await Promise.all([
     db
       .select()
       .from(providerCredentials)
       .where(eq(providerCredentials.orgId, orgId))
       .orderBy(asc(providerCredentials.createdAt)),
     defaultCredentials(db, orgId),
+    db
+      .select({ id: schema.agents.id, name: schema.agents.name, credentialId: schema.agents.credentialId })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, orgId), isNull(schema.agents.archivedAt))),
   ]);
   const isDefault = (r: typeof providerCredentials.$inferSelect) =>
     defaults.perProvider[r.provider] ? defaults.perProvider[r.provider] === r.id : defaults.legacy === r.id;
-  return rows.map((r) => ({ ...summary(r), isDefault: isDefault(r) }));
+  const usedBy = (id: string) => agents.filter((a) => a.credentialId === id).map((a) => ({ id: a.id, name: a.name }));
+  return rows.map((r) => ({ ...summary(r), isDefault: isDefault(r), usedBy: usedBy(r.id) }));
 }
 
 /** Revoked keys stay stored (usage records point at them) but can no longer be decrypted for calls. */
@@ -386,7 +469,7 @@ export async function rotateCredential(
     project?: string | null;
   },
   /** Outbound HTTP for the provider's key check (tests: a fake). */
-  opts: { fetch?: typeof fetch } = {},
+  opts: { fetch?: typeof fetch; verify?: KeyVerifier } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   const apiKey = input.apiKey.trim();
@@ -400,6 +483,22 @@ export async function rotateCredential(
   const current = await usableCredentialRow(db, orgId, credentialId);
   if (!current) throw new NotFoundError("Credential not found");
   await checkKey(current.provider, apiKey, opts.fetch);
+  const custom = current.provider === "custom";
+  const scoped = values.workspaceId ?? current.workspaceId;
+  const passed = custom
+    ? null
+    : passedCheck(
+        current.provider,
+        await opts.verify?.({
+          orgId,
+          provider: current.provider,
+          key: {
+            apiKey,
+            ...(scoped ? { workspaceId: scoped } : {}),
+            ...cleanOptions(values.options ?? current.options),
+          },
+        }),
+      );
   const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, credentialId));
   const [row] = await db
     .update(providerCredentials)
@@ -426,18 +525,26 @@ export async function rotateCredential(
   await auditCredential(db, orgId, actorId, "credential.key_changed", row);
   caches.credentials.delete(`${orgId}:${credentialId}`);
   invalidateDefaults(orgId);
-  return summary(row);
+  await passed?.record(row.id);
+  return { ...summary(row), ...(custom ? {} : { check: passed ? ("ok" as const) : ("unchecked" as const) }) };
 }
 
 /**
- * Deletes a credential for good (the sealed key is gone). Refused while
- * agents use it: they would silently fall back to the platform key.
+ * Deletes a credential for good (the sealed key is gone). Refused while it is a default or agents use it, with what
+ * stands in the way, since they would move to another key without anyone choosing. `release`: the person read what
+ * happens and goes on: those agents lose their pin and resolve as any agent with no key of its own (the provider's
+ * default, its newest key, the platform's), or say they have no AI.
  */
-export async function deleteCredential(db: Database, actorId: string, orgId: string, credentialId: string) {
+export async function deleteCredential(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  credentialId: string,
+  options: { release?: boolean } = {},
+) {
   await requirePermission(db, actorId, orgId, "manage_credentials");
-  await refuseIfDefault(db, orgId, credentialId);
   const users = await db
-    .select({ handle: schema.agents.handle })
+    .select({ id: schema.agents.id, handle: schema.agents.handle, name: schema.agents.name })
     .from(schema.agents)
     .where(
       and(
@@ -446,23 +553,32 @@ export async function deleteCredential(db: Database, actorId: string, orgId: str
         isNull(schema.agents.archivedAt),
       ),
     );
-  if (users.length > 0) {
-    throw new ConflictError(
-      `In use by ${users.map((u) => `@${u.handle}`).join(", ")}. Point them at another key first.`,
-    );
+  if (!options.release) {
+    await refuseIfDefault(db, orgId, credentialId);
+    if (users.length > 0) {
+      throw new ConflictError(
+        `In use by ${users.map((u) => `@${u.handle}`).join(", ")}. Point them at another key first.`,
+        "credential.in_use",
+        { agents: users.map((u) => u.name).join(", ") },
+      );
+    }
   }
-  const deleted = await db
-    .delete(providerCredentials)
-    .where(and(eq(providerCredentials.id, credentialId), eq(providerCredentials.orgId, orgId)))
-    .returning({
-      id: providerCredentials.id,
-      provider: providerCredentials.provider,
-      label: providerCredentials.label,
-      keyHint: providerCredentials.keyHint,
-    });
+  const deleted = await db.transaction(async (tx) => {
+    if (options.release) await dropDefault(tx, orgId, credentialId);
+    return tx
+      .delete(providerCredentials)
+      .where(and(eq(providerCredentials.id, credentialId), eq(providerCredentials.orgId, orgId)))
+      .returning({
+        id: providerCredentials.id,
+        provider: providerCredentials.provider,
+        label: providerCredentials.label,
+        keyHint: providerCredentials.keyHint,
+      });
+  });
   if (!deleted[0]) throw new NotFoundError("Credential not found");
   await auditCredential(db, orgId, actorId, "credential.deleted", deleted[0]);
   caches.credentials.delete(`${orgId}:${credentialId}`);
+  for (const u of users) caches.agents.delete(`${orgId}:${u.id}`);
   invalidateDefaults(orgId);
 }
 

@@ -2074,6 +2074,10 @@
       "configure": "Skonfiguruj",
       "nameStory": "Nazwa pochodzi od lodestar, gwiazdy, według której żeglarze wyznaczają kurs."
     },
+    "saved": {
+      "workspace": "{{name}} myśli teraz z {{label}} dla wszystkich bez własnego planu.",
+      "mine": "Twoja rozmowa z {{name}} myśli teraz z {{label}}. Tylko twoja."
+    },
     "settings": {
       "name": "Nazwa i wygląd",
       "nameHelp": "Na pasku bocznym zawsze widnieje jako „{{label}}”.",
@@ -2094,6 +2098,8 @@
       "connectMine": "Połącz mój plan",
       "useWorkspace": "Użyj AI workspace'u",
       "fallbackKey": "Bez własnego planu korzysta z klucza API workspace'u.",
+      "fallbackKeyOf": "Bez własnego planu korzysta z klucza workspace'u: {{label}}.",
+      "fallbackNoKey": "Workspace nie ma jeszcze klucza API, więc bez własnego planu nikt ci tu nie odpowie.",
       "fallbackPlan": "Bez własnego planu korzysta z planu użytkownika {{owner}}, który odpowiada wszystkim.",
       "fallbackYours": "Bez innego planu korzysta z planu workspace'u, który jest Twój.",
       "fallbackNone": "Bez własnego planu {{name}} nie może Ci odpowiedzieć: plan workspace'u odpowiada tylko użytkownikowi {{owner}}.",
@@ -2380,8 +2386,11 @@
     "have": {
       "title": "Już połączone",
       "titleFor": "Już połączone dla: {{name}}",
-      "other": "Albo połącz inne"
+      "other": "Albo połącz inne",
+      "manageKeys": "Zarządzaj kluczami lub je usuń"
     },
+    "billing": "Plan loguje się na komputerze workspace'u, a komputer jest dostępny z aktywnym planem agentes.chat.",
+    "billingWeb": "Wybierz plan w przeglądarce, na agentes.chat.",
     "orPayGo": "Albo płać za użycie",
     "plan": {
       "claude": {
@@ -2430,6 +2439,7 @@
       "paste": "Wklej go tutaj",
       "forAll": "Myślą z nim wszyscy agenci bez planu.",
       "saved": "Zapisano. Myślą z nim wszyscy agenci bez planu.",
+      "savedUnchecked": "Zapisano, ale {{provider}} nie odpowiedział, więc nie udało się sprawdzić klucza. Jeśli zawiedzie, rozmowa powie dlaczego.",
       "notPlan": "Klucz planu do kodowania wpisz w jego własnej opcji powyżej.",
       "billing": "Włącz rozliczenia dla projektu tego klucza. Bez rozliczeń Google może wykorzystywać to, co wysyłają twoi agenci.",
       "privacy": "Ustawienia prywatności OpenRouter decydują, którzy dostawcy mogą przechowywać to, co wysyłają twoi agenci.",
@@ -8534,7 +8544,9 @@
         "runnerOld": "Program agentes.chat na komputerze {{computer}} jest nieaktualny, a aktualizacja jest w drodze. To zmieni się samo, gdy się skończy.",
         "execOff": "{{computer}} nie może jeszcze uruchomić programu {{program}}. Zajmujemy się tym, a to zmieni się samo.",
         "toolOff": "{{program}} nie jest jeszcze dozwolony na {{computer}}. To po naszej stronie: spróbuj ponownie później.",
-        "preparing": "{{computer}} się przygotowuje. To zmieni się samo, gdy skończy."
+        "preparing": "{{computer}} się przygotowuje. To zmieni się samo, gdy skończy.",
+        "stuck": "{{program}} wciąż nie jest gotowy na {{computer}} i to nie zmieni się samo. Na razie użyj klucza API, a ten plan spróbuj ponownie później.",
+        "away": "{{computer}} jest niedostępny dłużej, niż trwa restart. Na razie użyj klucza API, a ten plan spróbuj ponownie później."
       }
     },
     "done": {
@@ -12977,6 +12989,10 @@
     "keyValue": "Klucz API",
     "keyInvalid": "Wklej klucz API (co najmniej 8 znaków).",
     "keyRefused": "Dostawca nie zaakceptował tego klucza.",
+    "keyNoCredit": "{{provider}} informuje, że ten klucz nie ma środków. Doładuj je tam i zapisz klucz ponownie. Nic nie zapisano.",
+    "keyDenied": "{{provider}} nie pozwolił temu kluczowi wykonać wywołania. Sprawdź tam jego uprawnienia i zapisz go ponownie. Nic nie zapisano.",
+    "keySaid": "{{provider}} odpowiedział: {{said}}",
+    "keyInUse": "{{agents}} nadal myślą z tym kluczem.",
     "keyManagement": "To klucz do zarządzania. Utwórz zwykły klucz API.",
     "autoModels": {
       "title": "Modele dla trybu Automatycznie",
@@ -12997,6 +13013,15 @@
     "remove": "Usuń",
     "removeTitle": "Usuń klucz {{label}}",
     "removeText": "Klucz zniknie na zawsze. Jeśli jakiś agent wciąż go używa, serwer odmówi: najpierw zmień klucz tych agentów.",
+    "removeUnused": "Klucz zniknie na dobre. Żaden agent z nim nie myśli.",
+    "removeUsedOther_one": "{{agents}} myśli z tym kluczem. Bez niego przejdzie na inny klucz albo poprosi o AI, jeśli żaden nie pasuje do modelu.",
+    "removeUsedOther_few": "{{agents}} myślą z tym kluczem. Bez niego przejdą na inny klucz albo poproszą o AI, jeśli żaden nie pasuje do modelu.",
+    "removeUsedOther_many": "{{agents}} myślą z tym kluczem. Bez niego przejdą na inny klucz albo poproszą o AI, jeśli żaden nie pasuje do modelu.",
+    "removeUsedOther_other": "{{agents}} myślą z tym kluczem. Bez niego przejdą na inny klucz albo poproszą o AI, jeśli żaden nie pasuje do modelu.",
+    "removeUsedNone_one": "{{agents}} myśli z tym kluczem i nie ma nic innego. Bez niego przestanie odpowiadać, dopóki nie połączysz innej AI.",
+    "removeUsedNone_few": "{{agents}} myślą z tym kluczem i nie mają nic innego. Bez niego przestaną odpowiadać, dopóki nie połączysz innej AI.",
+    "removeUsedNone_many": "{{agents}} myślą z tym kluczem i nie mają nic innego. Bez niego przestaną odpowiadać, dopóki nie połączysz innej AI.",
+    "removeUsedNone_other": "{{agents}} myślą z tym kluczem i nie mają nic innego. Bez niego przestaną odpowiadać, dopóki nie połączysz innej AI.",
     "noKeys": "Brak kluczy.",
     "platformAvailable": "Dostępny jest też klucz Claude tego serwera.",
     "usageTitle": "Wydatki na API według rodzaju",

@@ -17,6 +17,7 @@ import {
   type PartialUsage,
   ProviderError,
   type StopReason,
+  shortSaid,
   stableToolsFirst,
   type ToolSpec,
   withoutImages,
@@ -27,9 +28,6 @@ const STRUCTURED_OUTPUT = "structured_output";
 
 /** Lets a request say what happens to thinking the API can no longer read back (`block_binding`). */
 const THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01";
-
-/** What the API said about a refused request, at most (it ends up on the run's error). */
-const API_ERROR_CHARS = 300;
 
 /**
  * Anthropic Messages API, streaming. A client is created per call with the
@@ -449,10 +447,7 @@ function toProviderError(error: unknown): ProviderError {
   if (error instanceof Anthropic.APIError) {
     const status = error.status;
     const body = error.error as { error?: { message?: unknown } } | undefined;
-    const said =
-      typeof body?.error?.message === "string"
-        ? body.error.message.replace(/\s+/g, " ").trim().slice(0, API_ERROR_CHARS)
-        : "";
+    const said = typeof body?.error?.message === "string" ? shortSaid(body.error.message) : "";
     const what = [status ?? "?", error.type].filter(Boolean).join(" ");
     return new ProviderError(
       `provider rejected the request (${what})${said ? `: ${said}` : ""}`,

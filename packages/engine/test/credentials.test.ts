@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { runMigration } from "@agenteschat/db/testing";
+import { ProviderError } from "@agenteschat/providers";
 import {
+  checkCredential,
+  createAgent,
   createCredential,
   decryptCredential,
+  defaultCredentials,
+  deleteCredential,
   ForbiddenError,
   listCredentials,
+  NEW_AGENT_DEFAULTS,
   openRouterInUse,
   revokeCredential,
   rotateCredential,
@@ -85,6 +91,115 @@ test('the label migration calls keys named after the provider "Claude" and leave
     [named.id]: "Claude",
     [chosen.id]: "Anthropic da Acme",
     [openai.id]: "Anthropic",
+  });
+});
+
+describe("a key's test call", () => {
+  const input = { provider: "openai", label: "OpenAI", apiKey: "sk-new-test-key-9876" } as const;
+  const save = (verify: Parameters<typeof createCredential>[5]) =>
+    createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, input, verify);
+  const stored = async () => (await listCredentials(f.db, f.owner.id, f.org.id)).filter((c) => c.provider === "openai");
+
+  test("no credit: nothing is kept, and the provider's name and words come back", async () => {
+    const verify = async () => ({ state: "refused" as const, refusal: "no_credit" as const, said: "Add credit." });
+    const error = await save({ verify }).catch((e) => e);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error).toMatchObject({
+      code: "provider_key_no_credit",
+      params: { provider: "OpenAI", said: "Add credit." },
+    });
+    expect(await stored()).toEqual([]);
+  });
+
+  test("a provider that can't be reached doesn't stop the save, and says it wasn't checked", async () => {
+    const saved = await save({ verify: async () => ({ state: "unchecked" }) });
+    expect(saved.check).toBe("unchecked");
+    expect(await stored()).toHaveLength(1);
+  });
+
+  test("a passed call is recorded on the key it tested", async () => {
+    const ids: string[] = [];
+    const record = async (id: string) => void ids.push(id);
+    const saved = await save({ verify: async () => ({ state: "ok", record }) });
+    expect(saved.check).toBe("ok");
+    expect(ids).toEqual([saved.id]);
+  });
+
+  test("the gateway makes the real call, says what it means and keeps no secret in the words", async () => {
+    const said =
+      "provider rejected the request (400 invalid_request_error): Your credit balance is too low sk-new-test-key-9876";
+    const g = await setup({ reply: () => new ProviderError(said, false, 400) });
+    const key = { orgId: g.org.id, provider: "anthropic", key: { apiKey: "sk-new-test-key-9876" } };
+    const out = await g.gateway.verifyKey(key);
+    expect(out).toMatchObject({ state: "refused", refusal: "no_credit" });
+    expect(JSON.stringify(out)).not.toContain("sk-new-test-key");
+    await g.close();
+    const limited = await setup({ reply: () => new ProviderError("rate limited by provider", true, 429) });
+    expect(await limited.gateway.verifyKey({ ...key, orgId: limited.org.id })).toEqual({ state: "unchecked" });
+    await limited.close();
+    const fine = await setup();
+    const passed = await fine.gateway.verifyKey({ ...key, orgId: fine.org.id });
+    expect(passed.state).toBe("ok");
+    await fine.close();
+  });
+
+  test("a stored key is tried again before an agent is pointed at it", async () => {
+    const g = await setup({ reply: () => new ProviderError("no prepaid credit left at the provider", false, 402) });
+    await expect(checkCredential(g.db, g.gateway, g.owner.id, g.org.id, g.credential.id)).rejects.toMatchObject({
+      code: "provider_key_no_credit",
+    });
+    await g.close();
+    expect(await checkCredential(f.db, f.gateway, f.owner.id, f.org.id, f.credential.id)).toBe("ok");
+  });
+});
+
+describe("removing a key", () => {
+  const usingAgent = () =>
+    createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Rio", handle: "rio", role: "x", instructions: "x", credentialId: f.credential.id },
+      NEW_AGENT_DEFAULTS,
+    );
+
+  test("in use: refused with who uses it, and the list says so first", async () => {
+    await usingAgent();
+    const listed = await listCredentials(f.db, f.owner.id, f.org.id);
+    expect(listed.find((c) => c.id === f.credential.id)?.usedBy?.map((a) => a.name)).toContain("Rio");
+    await expect(deleteCredential(f.db, f.owner.id, f.org.id, f.credential.id)).rejects.toMatchObject({
+      code: "credential.in_use",
+    });
+  });
+
+  test("with `release` it goes: the agents lose it, its default too, and the row is gone", async () => {
+    const agent = await usingAgent();
+    const defaults = {
+      defaultCredentialId: f.credential.id,
+      defaultCredentialIds: { anthropic: f.credential.id, openai: "x" },
+    };
+    await f.db
+      .insert(schema.organizationSettings)
+      .values({ orgId: f.org.id, ...defaults })
+      .onConflictDoUpdate({ target: schema.organizationSettings.orgId, set: defaults });
+    await deleteCredential(f.db, f.owner.id, f.org.id, f.credential.id, { release: true });
+    expect(await listCredentials(f.db, f.owner.id, f.org.id)).toEqual([]);
+    const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, agent.id));
+    expect(row?.credentialId).toBeNull();
+    expect(await defaultCredentials(f.db, f.org.id)).toEqual({ legacy: null, perProvider: { openai: "x" } });
+  });
+
+  test("a default key alone is refused until the person goes on", async () => {
+    await f.db
+      .insert(schema.organizationSettings)
+      .values({ orgId: f.org.id, defaultCredentialId: f.credential.id })
+      .onConflictDoUpdate({
+        target: schema.organizationSettings.orgId,
+        set: { defaultCredentialId: f.credential.id },
+      });
+    await expect(deleteCredential(f.db, f.owner.id, f.org.id, f.credential.id)).rejects.toMatchObject({
+      code: "credential.default",
+    });
   });
 });
 

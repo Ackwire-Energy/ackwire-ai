@@ -82,7 +82,11 @@ test("management API: settings, overview, people, invitations, credentials, agen
     defaultAgentBudgetUsd: number;
     agents: { handle: string; monthlyBudgetUsd: number; budgetIsDefault: boolean }[];
   };
-  expect(usage.byKind).toEqual([expect.objectContaining({ kind: "agent", calls: 1 })]);
+  // Each key saved made one real call, on the organization: it counts as a `summary` call.
+  expect(usage.byKind).toEqual([
+    expect.objectContaining({ kind: "agent", calls: 1 }),
+    expect.objectContaining({ kind: "summary", calls: 2 }),
+  ]);
   expect(usage.totalUsd).toBeCloseTo((100 * 2000 + 10 * 10000) / 1e9);
   expect(usage.defaultAgentBudgetUsd).toBe(50);
   expect(usage.agents).toEqual([

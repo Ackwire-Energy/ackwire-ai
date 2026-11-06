@@ -62,6 +62,8 @@ export interface SetupView {
   specs: ComputerSetup["specs"];
   /** The computer itself, once made (its page). */
   machineId: string | null;
+  /** Since when (ms) it is in this phase, when the server says. */
+  since?: number | null;
   /** The server's seconds left when its answer came (`receivedAt`, this device's clock); null: no time said. */
   secondsLeft: number | null;
   receivedAt: number;
@@ -98,6 +100,7 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
     chipKey: `computerSetup.chip.${status}`,
     specs: setup.specs,
     machineId: setup.machineId,
+    since: setup.since ? Date.parse(setup.since) : null,
     secondsLeft,
     receivedAt,
     waited: typeof setup.secondsWaited === "number" ? Math.max(0, setup.secondsWaited) : null,

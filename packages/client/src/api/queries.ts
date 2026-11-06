@@ -827,10 +827,12 @@ export function useWidenAudience(orgId: string, agentId: string) {
   return { widen, busy: save.isPending, done: save.isSuccess && save.data !== null };
 }
 
-export function useAddCredential(orgId: string) {
+/** `silent`: the caller shows a failure itself (a refused key, in its dialog with the way to fix it). */
+export function useAddCredential(orgId: string, silent = false) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
+    meta: { silent },
     mutationFn: (input: Parameters<ApiClient["agents"]["addCredential"]>[1]) => api.agents.addCredential(orgId, input),
     onSuccess: () => {
       // An OpenRouter key brings its models into the pickers.
@@ -2661,10 +2663,11 @@ export const useAiStatus = (
   });
 };
 
-export function useRotateCredential(orgId: string) {
+export function useRotateCredential(orgId: string, silent = false) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
+    meta: { silent },
     mutationFn: ({ id, apiKey }: { id: string; apiKey: string }) => api.agents.rotateCredential(orgId, id, { apiKey }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
   });
@@ -2674,8 +2677,13 @@ export function useRemoveCredential(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, purge }: { id: string; purge?: boolean }) => api.agents.removeCredential(orgId, id, purge),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
+    mutationFn: ({ id, purge, release }: { id: string; purge?: boolean; release?: boolean }) =>
+      api.agents.removeCredential(orgId, id, purge, release),
+    // `aiStatus` lives under `credentials`; the agents that used it have no key of their own now.
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      return qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
+    },
   });
 }
 

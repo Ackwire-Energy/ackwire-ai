@@ -659,8 +659,13 @@ export interface ApiClient {
       credentialId: string,
       input: { apiKey: string; label?: string },
     ): Promise<Credential>;
-    /** Revokes, or deletes for good with `purge` (refused while an agent uses it). */
-    removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
+    /**
+     * Revokes, or deletes for good with `purge`: refused while it's a default or an agent uses it, unless `release`
+     * says the person read what happens to them.
+     */
+    removeCredential(orgId: string, credentialId: string, purge?: boolean, release?: boolean): Promise<void>;
+    /** One cheap real call with a stored key, before an agent is pointed at it. A refusal comes as on saving one. */
+    checkCredential(orgId: string, credentialId: string): Promise<{ check: "ok" | "unchecked" }>;
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
     /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */

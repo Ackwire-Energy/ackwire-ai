@@ -1852,6 +1852,10 @@
       "configure": "设置",
       "nameStory": "名字来自 lodestar，指引水手航向的那颗星。"
     },
+    "saved": {
+      "workspace": "{{name}} 现在用 {{label}} 为所有没有自己套餐的人思考。",
+      "mine": "你与 {{name}} 的对话现在用 {{label}} 思考。仅你的对话。"
+    },
     "settings": {
       "name": "名称和外观",
       "nameHelp": "在侧边栏里它总是显示为“{{label}}”。",
@@ -1872,6 +1876,8 @@
       "connectMine": "连接我的套餐",
       "useWorkspace": "使用工作区的",
       "fallbackKey": "没有自己的套餐时，使用工作区的 API 密钥。",
+      "fallbackKeyOf": "没有自己的套餐时，使用工作区的密钥：{{label}}。",
+      "fallbackNoKey": "工作区还没有 API 密钥，所以没有自己的套餐时这里不会有人回复你。",
       "fallbackPlan": "没有自己的套餐时，使用{{owner}}的套餐，它回复所有人。",
       "fallbackYours": "没有其他套餐时，使用工作区的套餐，它是你的。",
       "fallbackNone": "没有自己的套餐时，{{name}}无法回复你：工作区的套餐只回复{{owner}}。",
@@ -2121,8 +2127,11 @@
       "title": "已连接",
       "titleFor": "已为 {{name}} 连接",
       "titleFor_female": "已为 {{name}} 连接",
-      "other": "或连接其他"
+      "other": "或连接其他",
+      "manageKeys": "管理或删除密钥"
     },
+    "billing": "套餐登录在工作区的电脑上，而这台电脑需要有效的 agentes.chat 套餐才会提供。",
+    "billingWeb": "请在网页上的 agentes.chat 选择一个。",
     "orPayGo": "或按量付费",
     "plan": {
       "claude": {
@@ -2171,6 +2180,7 @@
       "paste": "粘贴到这里",
       "forAll": "所有没有套餐的智能体都用它来思考。",
       "saved": "已保存。所有没有套餐的智能体都用它来思考。",
+      "savedUnchecked": "已保存，但 {{provider}} 没有回应，因此无法检查这个密钥。如果它失败，对话里会说明原因。",
       "notPlan": "编程套餐的密钥请填在上方它自己的选项里。",
       "billing": "请为密钥所属的项目开通结算。不开通结算的话，Google 可能会使用你的智能体发送的内容。",
       "privacy": "你的 OpenRouter 隐私设置决定哪些服务商可以保留你的智能体发送的内容。",
@@ -7644,7 +7654,9 @@
         "runnerOld": "{{computer}} 上的 agentes.chat 程序版本较旧，更新正在路上。完成后这里会自动更新。",
         "execOff": "{{computer}} 暂时还不能运行 {{program}}。我们正在处理，这里会自动更新。",
         "toolOff": "{{computer}} 上还未允许 {{program}}。这是我们这边的问题：请稍后再试。",
-        "preparing": "{{computer}} 正在准备中。完成后这里会自动更新。"
+        "preparing": "{{computer}} 正在准备中。完成后这里会自动更新。",
+        "stuck": "{{program}} 在 {{computer}} 上仍未就绪，而且不会自动改变。请先使用 API 密钥，稍后再试这个套餐。",
+        "away": "{{computer}} 离线的时间已超过一次重启所需。请先使用 API 密钥，稍后再试这个套餐。"
       }
     },
     "done": {
@@ -11735,6 +11747,10 @@
     "keyValue": "API 密钥",
     "keyInvalid": "请粘贴 API 密钥（至少 8 个字符）。",
     "keyRefused": "服务商不接受这个密钥。",
+    "keyNoCredit": "{{provider}} 表示这个密钥没有额度。请在那里充值后重新保存。没有保存任何内容。",
+    "keyDenied": "{{provider}} 不允许这个密钥发起调用。请在那里检查权限后重新保存。没有保存任何内容。",
+    "keySaid": "{{provider}} 回复：{{said}}",
+    "keyInUse": "{{agents}} 仍在用这个密钥思考。",
     "keyManagement": "这是一个管理密钥。请创建普通的 API 密钥。",
     "autoModels": {
       "title": "“自动”使用的模型",
@@ -11755,6 +11771,9 @@
     "remove": "删除",
     "removeTitle": "删除密钥 {{label}}",
     "removeText": "密钥将被永久删除。如果仍有智能体在使用它，服务器会拒绝：请先更换这些智能体的密钥。",
+    "removeUnused": "密钥将被永久删除。没有智能体在用它思考。",
+    "removeUsedOther_other": "{{agents}} 正在用这个密钥思考。删除后会改用其他密钥。如果没有适合其模型的密钥，则会请求连接 AI。",
+    "removeUsedNone_other": "{{agents}} 正在用这个密钥思考，且没有其他方式。删除后将停止回复，直到你连接其他 AI。",
     "noKeys": "还没有密钥。",
     "platformAvailable": "也可以使用此服务器的 Claude 密钥。",
     "usageTitle": "按类型划分的 API 花费",

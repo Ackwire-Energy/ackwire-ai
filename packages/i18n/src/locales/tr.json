@@ -1923,6 +1923,10 @@
       "configure": "Ayarla",
       "nameStory": "Adı, denizcilere yol gösteren yıldız lodestar'dan gelir."
     },
+    "saved": {
+      "workspace": "{{name}} artık kendi planı olmayan herkes için {{label}} ile düşünüyor.",
+      "mine": "{{name}} ile sohbetin artık {{label}} ile düşünüyor. Yalnızca seninki."
+    },
     "settings": {
       "name": "Ad ve görünüm",
       "nameHelp": "Kenar çubuğunda hep “{{label}}” olarak görünür.",
@@ -1943,6 +1947,8 @@
       "connectMine": "Planımı bağla",
       "useWorkspace": "Çalışma alanınınkini kullan",
       "fallbackKey": "Kendi planın yoksa çalışma alanının API anahtarını kullanır.",
+      "fallbackKeyOf": "Kendi planın yoksa çalışma alanının anahtarını kullanır: {{label}}.",
+      "fallbackNoKey": "Çalışma alanının henüz API anahtarı yok, bu yüzden kendi planın olmadan burada kimse sana yanıt vermez.",
       "fallbackPlan": "Kendi planın yoksa herkese yanıt veren {{owner}} planını kullanır.",
       "fallbackYours": "Başka plan yoksa senin olan çalışma alanı planını kullanır.",
       "fallbackNone": "Kendi planın yoksa {{name}} sana yanıt veremez: çalışma alanının planı yalnızca {{owner}} için yanıt verir.",
@@ -2203,8 +2209,11 @@
     "have": {
       "title": "Zaten bağlı",
       "titleFor": "Zaten bağlı, {{name}} için",
-      "other": "Ya da başka birini bağlayın"
+      "other": "Ya da başka birini bağlayın",
+      "manageKeys": "Anahtarları yönet veya sil"
     },
+    "billing": "Plan, çalışma alanının bilgisayarında oturum açar ve bilgisayar etkin bir agentes.chat planıyla gelir.",
+    "billingWeb": "Web'de, agentes.chat'te bir plan seç.",
     "orPayGo": "Ya da kullandıkça ödeyin",
     "plan": {
       "claude": {
@@ -2253,6 +2262,7 @@
       "paste": "Buraya yapıştırın",
       "forAll": "Planı olmayan her ajan bununla düşünür.",
       "saved": "Kaydedildi. Planı olmayan her ajan bununla düşünür.",
+      "savedUnchecked": "Kaydedildi, ama {{provider}} yanıt vermedi, bu yüzden anahtar kontrol edilemedi. Başarısız olursa nedenini sohbet söyler.",
       "notPlan": "Bir kodlama planının anahtarı yukarıdaki kendi seçeneğine girilir.",
       "billing": "Anahtarın projesi için faturalandırmayı açın. Faturalandırma olmadan Google, ajanlarınızın gönderdiklerini kullanabilir.",
       "privacy": "Ajanlarınızın gönderdiklerini hangi sağlayıcıların saklayabileceğine OpenRouter gizlilik ayarlarınız karar verir.",
@@ -7872,7 +7882,9 @@
         "runnerOld": "{{computer}} üzerindeki agentes.chat programı eski ve güncelleme yolda. Bittiğinde bu kendiliğinden değişir.",
         "execOff": "{{computer}} henüz {{program}} çalıştıramıyor. İlgileniyoruz, bu kendiliğinden değişir.",
         "toolOff": "{{program}}, {{computer}} üzerinde henüz izinli değil. Bu bizim tarafımızda: daha sonra yeniden dene.",
-        "preparing": "{{computer}} hazırlanıyor. Bittiğinde bu kendiliğinden değişir."
+        "preparing": "{{computer}} hazırlanıyor. Bittiğinde bu kendiliğinden değişir.",
+        "stuck": "{{program}} {{computer}} üzerinde hâlâ hazır değil ve bu kendiliğinden değişmeyecek. Şimdilik bir API anahtarı kullan ve bu planı sonra yeniden dene.",
+        "away": "{{computer}} yeniden başlatmanın süreceğinden daha uzun süredir yok. Şimdilik bir API anahtarı kullan ve bu planı sonra yeniden dene."
       }
     },
     "done": {
@@ -12066,6 +12078,10 @@
     "keyValue": "API anahtarı",
     "keyInvalid": "API anahtarını yapıştırın (en az 8 karakter).",
     "keyRefused": "Sağlayıcı bu anahtarı kabul etmedi.",
+    "keyNoCredit": "{{provider}} bu anahtarda kredi olmadığını söylüyor. Oradan kredi ekle ve yeniden kaydet. Hiçbir şey kaydedilmedi.",
+    "keyDenied": "{{provider}} bu anahtarın çağrı yapmasına izin vermedi. Oradan izinlerini kontrol et ve yeniden kaydet. Hiçbir şey kaydedilmedi.",
+    "keySaid": "{{provider}} şunu söyledi: {{said}}",
+    "keyInUse": "{{agents}} hâlâ bu anahtarla düşünüyor.",
     "keyManagement": "Bu bir yönetim anahtarı. Normal bir API anahtarı oluşturun.",
     "autoModels": {
       "title": "Otomatik için modeller",
@@ -12086,6 +12102,11 @@
     "remove": "Sil",
     "removeTitle": "{{label}} anahtarını silin",
     "removeText": "Anahtar kalıcı olarak silinir. Hâlâ onu kullanan bir ajan varsa sunucu reddeder: önce o ajanların anahtarını değiştirin.",
+    "removeUnused": "Anahtar kalıcı olarak silinir. Bu anahtarla düşünen ajan yok.",
+    "removeUsedOther_one": "{{agents}} bu anahtarla düşünüyor. Anahtar gidince başka bir anahtara geçer veya modeline uyan yoksa yapay zekâ ister.",
+    "removeUsedOther_other": "{{agents}} bu anahtarla düşünüyor. Anahtar gidince başka bir anahtara geçerler veya modellerine uyan yoksa yapay zekâ isterler.",
+    "removeUsedNone_one": "{{agents}} bu anahtarla düşünüyor ve başka bir şeyi yok. Anahtar gidince sen başka bir yapay zekâ bağlayana kadar yanıt vermez.",
+    "removeUsedNone_other": "{{agents}} bu anahtarla düşünüyor ve başka bir şeyleri yok. Anahtar gidince sen başka bir yapay zekâ bağlayana kadar yanıt vermezler.",
     "noKeys": "Henüz anahtar yok.",
     "platformAvailable": "Bu sunucunun Claude anahtarı da kullanılabilir.",
     "usageTitle": "Türe göre API harcaması",

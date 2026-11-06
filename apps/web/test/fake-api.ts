@@ -225,6 +225,8 @@ export interface FakeState {
   extraModels?: Model[];
   /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
   keyRefusal?: string;
+  /** Its `params`: the provider's name and words. */
+  keyRefusalParams?: Record<string, unknown>;
   /** What an endpoint lists (ADR 0146); absent: nothing. */
   endpointList?: { baseURL: string; models: { id: string }[]; error?: string };
   /** Each model's test result when an endpoint is saved; absent: `ok`. */
@@ -2320,7 +2322,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       credentials: async () => [...state.credentials],
       addCredential: async (orgId, input) => {
         log("agents.addCredential", orgId, { ...input, apiKey: "[redacted]" });
-        if (state.keyRefusal) throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.");
+        if (state.keyRefusal)
+          throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.", state.keyRefusalParams);
         const cred: Credential = {
           id: id("cred"),
           provider: input.provider,
@@ -2351,9 +2354,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         cred.keyHint = input.apiKey.slice(-4);
         return { ...cred };
       },
-      removeCredential: async (orgId, credentialId, purge) => {
-        log("agents.removeCredential", orgId, credentialId, purge);
+      removeCredential: async (orgId, credentialId, purge, release) => {
+        log("agents.removeCredential", orgId, credentialId, purge, release);
         state.credentials = state.credentials.filter((c) => c.id !== credentialId);
+      },
+      checkCredential: async (orgId, credentialId) => {
+        log("agents.checkCredential", orgId, credentialId);
+        if (state.keyRefusal)
+          throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.", state.keyRefusalParams);
+        return { check: "ok" as const };
       },
       platformKeyAvailable: async () => state.platformKey,
       aiStatus: async () =>

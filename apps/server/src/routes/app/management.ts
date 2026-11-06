@@ -1208,7 +1208,7 @@ export function managementRoutes(deps: AppDeps) {
         orgId,
         credentialId,
         c.req.valid("json"),
-        { fetch: deps.extras?.http },
+        { fetch: deps.extras?.http, verify: deps.extras?.context?.gateway?.verifyKey },
       );
       return c.json(credentialOut(row), 200);
     },

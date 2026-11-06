@@ -352,3 +352,25 @@ export function signInPlan(
   if (view.account === null) return row?.own?.[kind]?.plan ?? null;
   return view.accounts.find((a) => a.id === view.account)?.plan ?? null;
 }
+
+/**
+ * What removing a key changes, said before the person goes on (web and phone): the agents that think with it move to
+ * another key, or stop answering where nothing else is left.
+ */
+export function keyRemovalText(
+  t: TFunction,
+  key: Pick<Credential, "id" | "usedBy">,
+  live: readonly Pick<Credential, "id">[],
+  platform: boolean,
+) {
+  const used = key.usedBy ?? [];
+  if (used.length === 0) return t("settings.removeUnused");
+  const others = platform || live.some((k) => k.id !== key.id);
+  return t(others ? "settings.removeUsedOther" : "settings.removeUsedNone", {
+    count: used.length,
+    agents: joinNames(
+      used.map((a) => a.name),
+      t,
+    ),
+  });
+}

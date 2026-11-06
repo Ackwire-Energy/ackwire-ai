@@ -156,7 +156,8 @@ test("a run that keeps failing on a provider outage parks on its last attempt, n
   const told = await toldAboutRun(f, 5);
   const [run] = await f.db.select().from(schema.agentRuns);
   // The last attempt parks the run on the outage ladder (it answers once the provider is back): no failure to report.
-  expect([run?.status, run?.error]).toEqual(["running", null]);
+  // Woken and refused again, it parks at once: one try per wake.
+  expect([run?.status, run?.error]).toEqual(["waiting_input", null]);
   expect(told.slice(0, 3)).toEqual(["1 retry: overloaded", "2 retry: overloaded", "3 retry: overloaded"]);
   expect(told.filter((line) => line.includes("failed"))).toEqual([]);
 });

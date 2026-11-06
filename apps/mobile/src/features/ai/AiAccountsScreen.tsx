@@ -6,6 +6,7 @@ import {
   useApi,
   useCredentials,
   useMachines,
+  usePlatformKey,
   useSettings,
   useUpdateSettings,
 } from "@agenteschat/client";
@@ -13,10 +14,12 @@ import {
   accountTitle,
   agentsToGive,
   endsOnClaude,
+  keyRemovalText,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
 } from "@agenteschat/client/lib/ai-accounts";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -335,7 +338,8 @@ function KeysSection({ locale }: { locale: string }) {
   const update = useUpdateSettings(orgId);
   const live = (credentials.data ?? []).filter((k) => !k.revokedAt);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-  const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
+  const failed = (error: unknown) => toast({ title: errorText(t, error), icon: "x" });
+  const platform = usePlatformKey(orgId);
 
   const rotate = (k: Credential) => {
     if (Platform.OS !== "ios") return;
@@ -349,8 +353,14 @@ function KeysSection({ locale }: { locale: string }) {
           onPress: (value?: string) => {
             const apiKey = (value ?? "").trim();
             if (apiKey.length < 8) return;
-            api.agents.rotateCredential(orgId, k.id, { apiKey }).then(() => {
-              toast({ title: t("settings.rotated"), icon: "check" });
+            api.agents.rotateCredential(orgId, k.id, { apiKey }).then((saved) => {
+              toast({
+                title:
+                  saved.check === "unchecked"
+                    ? t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) })
+                    : t("settings.rotated"),
+                icon: "check",
+              });
               refetch();
             }, failed);
           },
@@ -360,12 +370,16 @@ function KeysSection({ locale }: { locale: string }) {
     );
   };
   const remove = (k: Credential) =>
-    Alert.alert(t("settings.removeTitle", { label: k.label }), t("settings.removeText"), [
+    Alert.alert(t("settings.removeTitle", { label: k.label }), keyRemovalText(t, k, live, platform.data === true), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("settings.remove"),
         style: "destructive",
-        onPress: () => api.agents.removeCredential(orgId, k.id, true).then(refetch, failed),
+        onPress: () =>
+          api.agents.removeCredential(orgId, k.id, true, true).then(() => {
+            refetch();
+            void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+          }, failed),
       },
     ]);
   const actions = (k: Credential, isDefault: boolean) =>
@@ -376,7 +390,7 @@ function KeysSection({ locale }: { locale: string }) {
           ? []
           : [{ label: t("settings.makeDefault"), onPress: () => update.mutate({ defaultCredentialId: k.id }) }]),
         ...(Platform.OS === "ios" ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
-        ...(isDefault ? [] : [{ label: t("settings.remove"), destructive: true, onPress: () => remove(k) }]),
+        { label: t("settings.remove"), destructive: true, onPress: () => remove(k) },
       ],
       t("common.cancel"),
     );
@@ -414,11 +428,6 @@ function KeysSection({ locale }: { locale: string }) {
             );
           })}
         </Card>
-      ) : null}
-      {live.some((k) => settings.data?.defaultCredentialId === k.id) ? (
-        <Text variant="small" tone="faint">
-          {t("settings.removeDefaultBlocked")}
-        </Text>
       ) : null}
       <View style={styles.start}>
         <Button

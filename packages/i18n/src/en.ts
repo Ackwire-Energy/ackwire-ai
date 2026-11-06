@@ -1933,6 +1933,11 @@ export const en = {
       configure: "Configure",
       nameStory: "The name comes from lodestar, the star sailors steer by.",
     },
+    /** What a connect flow says: the right hand has two AIs, and the words say which moved. */
+    saved: {
+      workspace: "{{name}} now thinks with {{label}} for everyone without a plan of their own.",
+      mine: "Your conversation with {{name}} now thinks with {{label}}. Only yours does.",
+    },
     settings: {
       name: "Name and look",
       nameHelp: "In the sidebar it always shows as “{{label}}”.",
@@ -1957,6 +1962,8 @@ export const en = {
       useWorkspace: "Use the workspace's",
       /** Without a plan of their own: what their conversation thinks with. */
       fallbackKey: "Without your own plan, it uses the workspace's API key.",
+      fallbackKeyOf: "Without your own plan, it uses the workspace's key: {{label}}.",
+      fallbackNoKey: "The workspace has no API key yet, so without your own plan nothing answers you here.",
       fallbackPlan: "Without your own plan, it uses {{owner}}'s plan, which serves everyone.",
       fallbackYours: "Without another plan, it uses the workspace's, which is yours.",
       fallbackNone: "Without your own plan, {{name}} can't answer you: the workspace's plan serves only {{owner}}.",
@@ -2237,7 +2244,12 @@ export const en = {
       title: "Already connected",
       titleFor: "Already connected, for {{name}}",
       other: "Or connect another",
+      manageKeys: "Manage or delete keys",
     },
+    /** The Cloud's workspace on a billing hold: a key won't run there either, so only the plan is offered. */
+    billing: "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan.",
+    /** After `billing`, on the phone, where paying isn't offered. */
+    billingWeb: "Choose one on the web, at agentes.chat.",
     orPayGo: "Or pay as you go",
     plan: {
       claude: { title: "Your Claude plan", tiers: "Pro, Max, Ultra, Team or Enterprise" },
@@ -2267,6 +2279,9 @@ export const en = {
       paste: "Paste it here",
       forAll: "Every agent without a plan thinks with it.",
       saved: "Saved. Every agent without a plan thinks with it.",
+      /** Saved, though the provider gave no answer about the key: it may still fail. */
+      savedUnchecked:
+        "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why.",
       notPlan: "A coding plan's key goes in its own option above.",
       billing: "Turn on billing for the key's project. Without billing, Google may use what your agents send.",
       privacy: "Your OpenRouter privacy settings decide which providers may keep what your agents send.",
@@ -7792,6 +7807,10 @@ export const en = {
         execOff: "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself.",
         toolOff: "{{program}} isn't allowed on {{computer}} yet. That's on our side: try again later.",
         preparing: "{{computer}} is getting ready. This changes by itself when it's done.",
+        /** Past the time any of the above takes: nothing says it's still coming. */
+        stuck:
+          "{{program}} still isn't ready on {{computer}}, and this won't change by itself. Use an API key for now, and try this plan again later.",
+        away: "{{computer}} has been away longer than a restart takes. Use an API key for now, and try this plan again later.",
       },
     },
     done: {
@@ -11743,6 +11762,11 @@ export const en = {
     keyValue: "API key",
     keyInvalid: "Paste the API key (at least 8 characters).",
     keyRefused: "The provider didn't accept this key.",
+    keyNoCredit: "{{provider}} says this key has no credit. Add credit there and save it again. Nothing was saved.",
+    keyDenied:
+      "{{provider}} didn't let this key make a call. Check its permissions there and save it again. Nothing was saved.",
+    keySaid: "{{provider}} said: {{said}}",
+    keyInUse: "{{agents}} still think with this key.",
     keyManagement: "This is a management key. Create a regular API key.",
     autoModels: {
       title: "Models for Automatic",
@@ -11764,6 +11788,16 @@ export const en = {
     removeTitle: "Delete the key {{label}}",
     removeText:
       "The key is gone for good. If an agent still uses it, the server refuses: change those agents' key first.",
+    removeUnused: "The key is gone for good. No agent thinks with it.",
+    /** Before deleting a key agents use: another key takes over, or nothing does. */
+    removeUsedOther_one:
+      "{{agents}} thinks with this key. Once it's gone, it moves to another key, or asks for an AI if none fits its model.",
+    removeUsedOther_other:
+      "{{agents}} think with this key. Once it's gone, they move to another key, or ask for an AI if none fits their model.",
+    removeUsedNone_one:
+      "{{agents}} thinks with this key and has nothing else. Once it's gone, it stops answering until you connect another AI.",
+    removeUsedNone_other:
+      "{{agents}} think with this key and have nothing else. Once it's gone, they stop answering until you connect another AI.",
     noKeys: "No keys yet.",
     platformAvailable: "This server's Claude key is also available.",
     usageTitle: "API spend by kind",

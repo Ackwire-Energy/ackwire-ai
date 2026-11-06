@@ -1998,6 +1998,10 @@
       "configure": "Configura",
       "nameStory": "Il nome viene da lodestar, la stella che guida i naviganti."
     },
+    "saved": {
+      "workspace": "{{name}} ora ragiona con {{label}} per tutti quelli senza un piano proprio.",
+      "mine": "La tua conversazione con {{name}} ora ragiona con {{label}}. Solo la tua."
+    },
     "settings": {
       "name": "Nome e aspetto",
       "nameHelp": "Nella barra laterale appare sempre come “{{label}}”.",
@@ -2018,6 +2022,8 @@
       "connectMine": "Collega il mio piano",
       "useWorkspace": "Usa quella del workspace",
       "fallbackKey": "Senza un piano tuo, usa la chiave API del workspace.",
+      "fallbackKeyOf": "Senza un piano tuo, usa la chiave del workspace: {{label}}.",
+      "fallbackNoKey": "Il workspace non ha ancora una chiave API, quindi senza un piano tuo qui non ti risponde nessuno.",
       "fallbackPlan": "Senza un piano tuo, usa il piano di {{owner}}, che risponde a tutti.",
       "fallbackYours": "Senza un altro piano, usa quello del workspace, che è tuo.",
       "fallbackNone": "Senza un piano tuo, {{name}} non può risponderti: il piano del workspace risponde solo a {{owner}}.",
@@ -2299,8 +2305,11 @@
       "title": "Già collegati",
       "titleFor": "Già collegati, per {{name}}",
       "titleFor_female": "Già collegati, per {{name}}",
-      "other": "Oppure collegane un altro"
+      "other": "Oppure collegane un altro",
+      "manageKeys": "Gestisci o elimina le chiavi"
     },
+    "billing": "Un piano accede sul computer del workspace, e il computer arriva con un piano agentes.chat attivo.",
+    "billingWeb": "Scegline uno sul web, su agentes.chat.",
     "orPayGo": "Oppure paga a consumo",
     "plan": {
       "claude": {
@@ -2349,6 +2358,7 @@
       "paste": "Incollala qui",
       "forAll": "Ogni agente senza un piano ragiona con questa.",
       "saved": "Salvata. Ogni agente senza un piano ragiona con questa.",
+      "savedUnchecked": "Salvata, ma {{provider}} non ha risposto e la chiave non è stata verificata. Se fallisce, la conversazione dice perché.",
       "notPlan": "La chiave di un piano di coding va nella sua opzione qui sopra.",
       "billing": "Attiva la fatturazione per il progetto della chiave. Senza fatturazione, Google può usare quello che inviano i tuoi agenti.",
       "privacy": "Le impostazioni privacy di OpenRouter decidono quali fornitori possono conservare quello che inviano i tuoi agenti.",
@@ -8263,7 +8273,9 @@
         "runnerOld": "Il programma agentes.chat su {{computer}} non è aggiornato e l'aggiornamento è in arrivo. Questo cambia da solo quando ha finito.",
         "execOff": "{{computer}} non può ancora eseguire {{program}}. Ci stiamo lavorando, e questo cambia da solo.",
         "toolOff": "{{program}} non è ancora consentito su {{computer}}. Dipende da noi: riprova più tardi.",
-        "preparing": "{{computer}} si sta preparando. Questo cambia da solo quando ha finito."
+        "preparing": "{{computer}} si sta preparando. Questo cambia da solo quando ha finito.",
+        "stuck": "{{program}} non è ancora pronto su {{computer}}, e questo non cambierà da solo. Usa una chiave API per ora e riprova questo piano più tardi.",
+        "away": "{{computer}} è assente da più tempo di un riavvio. Usa una chiave API per ora e riprova questo piano più tardi."
       }
     },
     "done": {
@@ -12585,6 +12597,10 @@
     "keyValue": "Chiave API",
     "keyInvalid": "Incolla la chiave API (almeno 8 caratteri).",
     "keyRefused": "Il provider non ha accettato questa chiave.",
+    "keyNoCredit": "{{provider}} dice che questa chiave non ha credito. Aggiungi credito lì e salvala di nuovo. Non è stato salvato nulla.",
+    "keyDenied": "{{provider}} non ha lasciato fare una chiamata a questa chiave. Controlla lì i suoi permessi e salvala di nuovo. Non è stato salvato nulla.",
+    "keySaid": "{{provider}} ha detto: {{said}}",
+    "keyInUse": "{{agents}} ragionano ancora con questa chiave.",
     "keyManagement": "Questa è una chiave di gestione. Crea una normale chiave API.",
     "autoModels": {
       "title": "Modelli per Automatico",
@@ -12605,6 +12621,13 @@
     "remove": "Elimina",
     "removeTitle": "Elimina la chiave {{label}}",
     "removeText": "La chiave sparisce per sempre. Se un agente la usa ancora, il server rifiuta: prima cambia la chiave di quegli agenti.",
+    "removeUnused": "La chiave sparisce per sempre. Nessun agente ragiona con essa.",
+    "removeUsedOther_one": "{{agents}} ragiona con questa chiave. Senza, passa a un'altra chiave, o chiede un'IA se nessuna va bene per il suo modello.",
+    "removeUsedOther_many": "{{agents}} ragionano con questa chiave. Senza, passano a un'altra chiave, o chiedono un'IA se nessuna va bene per il loro modello.",
+    "removeUsedOther_other": "{{agents}} ragionano con questa chiave. Senza, passano a un'altra chiave, o chiedono un'IA se nessuna va bene per il loro modello.",
+    "removeUsedNone_one": "{{agents}} ragiona con questa chiave e non ha altro. Senza, smette di rispondere finché non colleghi un'altra IA.",
+    "removeUsedNone_many": "{{agents}} ragionano con questa chiave e non hanno altro. Senza, smettono di rispondere finché non colleghi un'altra IA.",
+    "removeUsedNone_other": "{{agents}} ragionano con questa chiave e non hanno altro. Senza, smettono di rispondere finché non colleghi un'altra IA.",
     "noKeys": "Ancora nessuna chiave.",
     "platformAvailable": "È disponibile anche la chiave Claude di questo server.",
     "usageTitle": "Spesa API per tipo",
