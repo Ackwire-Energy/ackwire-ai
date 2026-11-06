@@ -181,8 +181,8 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
               onPress={cycle}
               accessibilityRole="button"
               accessibilityLabel={t("voice.speed")}
-              hitSlop={8}
-              style={[styles.speed, { backgroundColor: c.sunken }]}
+              hitSlop={10}
+              style={({ pressed }) => [styles.speed, { backgroundColor: c.sunken }, pressed && styles.pressed]}
             >
               <Text variant="caption" tone="muted" style={styles.speedText}>
                 {`${rate}×`}
@@ -211,13 +211,14 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
 
 const styles = StyleSheet.create({
   box: { marginTop: 4, gap: 6, maxWidth: 320 },
+  // The chat's card (files, tools, media): 14 round, the corner cut at the bottom left.
   card: {
     gap: 4,
-    paddingVertical: 7,
-    paddingLeft: 7,
-    paddingRight: 8,
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
+    padding: 8,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    borderBottomLeftRadius: 6,
     borderWidth: StyleSheet.hairlineWidth,
   },
   player: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 34 },
@@ -227,14 +228,15 @@ const styles = StyleSheet.create({
   dim: { opacity: 0.5, marginLeft: 6 },
   time: { minWidth: 30, textAlign: "right", fontVariant: ["tabular-nums"] },
   speed: {
-    height: 22,
-    minWidth: 28,
-    paddingHorizontal: 5,
+    height: 24,
+    minWidth: 32,
+    paddingHorizontal: 6,
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
   },
-  speedText: { fontVariant: ["tabular-nums"] },
+  speedText: { fontVariant: ["tabular-nums"], fontWeight: "600" },
+  pressed: { opacity: 0.6 },
   // Under the wave, past the play button.
   words: { paddingLeft: 42, paddingBottom: 2 },
 });

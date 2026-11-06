@@ -85,8 +85,8 @@ export function RightHandSettingsSection() {
 function PlanLine({ kind, label, owner }: { kind: PlanKind; label?: string; owner?: string }) {
   const { t } = useTranslation();
   return (
-    <span className="rh-set__planline">
-      <BrainLogo kind={kind} size="sm" />
+    <span className="rh-set__planline ac-iconline">
+      <BrainLogo kind={kind} size="xs" />
       <b>{label ?? t(`aiAccounts.connect.${kind}`)}</b>
       {owner && <span className="muted">{t("rightHand.settings.planOwner", { owner })}</span>}
     </span>
@@ -140,8 +140,8 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
             />
           ) : (
             fallback && (
-              <span className="rh-set__planline">
-                {wsKind && <BrainLogo kind={wsKind} size="sm" />}
+              <span className="rh-set__planline ac-iconline">
+                {wsKind && <BrainLogo kind={wsKind} size="xs" />}
                 {fallback}
               </span>
             )

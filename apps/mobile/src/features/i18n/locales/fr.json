@@ -1323,6 +1323,9 @@
     "review": "Examiner",
     "answer": "Répondre",
     "open": "Ouvrir",
+    "toolsTitle": "A modifié des outils que tu as approuvés",
+    "toolsWhy": "Les agents gardent la version approuvée jusqu'à ce que tu acceptes la nouvelle.",
+    "reviewChanges": "Revoir les changements",
     "clear": {
       "title": "Rien ne vous attend",
       "text": "Quand un agent a besoin de vous, ça apparaît d'abord ici."

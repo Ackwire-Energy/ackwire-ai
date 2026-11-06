@@ -29,9 +29,9 @@ import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Chip, InfoHint, ProviderLogo, Row, Text, useToast } from "@/ui";
+import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
-import { PushedHeader } from "../shared/parts";
+import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
 import { openConnectAi } from "./NoAiCard";
@@ -99,7 +99,10 @@ export function AiAccountsScreen() {
   const own = ownSignIns(ai.data);
   const several = onSeveralComputers(rows);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
-  const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
+  const failed = () => {
+    errorHaptic();
+    toast({ title: t("agentPage.work.failed"), icon: "x" });
+  };
 
   const rename = (a: Account) => {
     if (Platform.OS !== "ios") return;
@@ -114,6 +117,7 @@ export function AiAccountsScreen() {
             const name = (value ?? "").trim().slice(0, 40);
             if (!name || name === a.label) return;
             api.machines.renameAccount(orgId, a.machineId, a.id, name).then(() => {
+              successHaptic();
               toast({ title: t("aiAccounts.page.renamed", { label: name }), icon: "check" });
               refetch();
             }, failed);
@@ -129,6 +133,7 @@ export function AiAccountsScreen() {
   // One more of the person's agents thinks with an account made for all of them there: no sign-in.
   const give = (a: Account, agent: { id: string; name: string }) =>
     api.agents.setBrain(orgId, agent.id, { brain: a.kind, account: a.id }).then(() => {
+      successHaptic();
       toast({ title: t("aiAccounts.done.savedAgent", { agent: agent.name, label: a.label }), icon: "check" });
       refetch();
       for (const key of [keys.agents(orgId), keys.aiStatus(orgId), keys.agentBrain(orgId, agent.id)])
@@ -154,6 +159,7 @@ export function AiAccountsScreen() {
           style: "destructive",
           onPress: () =>
             api.machines.removeAccount(orgId, a.machineId, a.id).then(() => {
+              successHaptic();
               toast({ title: t("aiAccounts.page.disconnected", { label: a.label }), icon: "check" });
               refetch();
               void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
@@ -220,14 +226,15 @@ export function AiAccountsScreen() {
             {t("aiAccounts.page.empty")}
           </Text>
         ) : null}
+        {/* Settings' own groups on the grouped gray: the mark in the 32 pt column, the hairline from the text on. */}
         {own.length > 0 ? (
-          <Card>
+          <GroupedList>
             {own.map((o) => (
-              <Row
+              <GroupedRow
                 key={o.key}
                 leading={<ProviderLogo id={o.kind} size="sm" />}
-                title={ownSignInTitle(t, o)}
-                subtitle={t("aiAccounts.page.ownOn", { computer: o.computer })}
+                label={ownSignInTitle(t, o)}
+                sub={t("aiAccounts.page.ownOn", { computer: o.computer })}
                 below={
                   o.usage ? (
                     <View style={styles.below}>
@@ -237,10 +244,10 @@ export function AiAccountsScreen() {
                 }
               />
             ))}
-          </Card>
+          </GroupedList>
         ) : null}
         {rows.length > 0 ? (
-          <Card>
+          <GroupedList>
             {rows.map((a) => {
               const plan = planOf(a.provider);
               const out = a.status === "signed_out";
@@ -252,12 +259,12 @@ export function AiAccountsScreen() {
                   : t("aiAccounts.page.noAgent"),
               ].filter(Boolean);
               return (
-                <Row
+                <GroupedRow
                   key={a.id}
                   leading={<ProviderLogo id={a.provider ?? a.kind} size="sm" off={out} />}
-                  title={accountTitle(a)}
-                  subtitle={facts.join(" · ")}
-                  chevron
+                  label={accountTitle(a)}
+                  sub={facts.join(" · ")}
+                  more
                   onPress={() => actions(a)}
                   below={
                     out || a.usage || (plan && !plan.usage) ? (
@@ -280,32 +287,31 @@ export function AiAccountsScreen() {
                 />
               );
             })}
-          </Card>
+          </GroupedList>
         ) : null}
         {again ? (
-          <Card>
-            <View style={styles.again}>
-              <View style={styles.againHead}>
-                <Text variant="callout" tone="ink" style={[styles.bold, styles.grow]}>
-                  {again.label}
-                </Text>
-                <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
-              </View>
-              <AddAccount
-                machineId={again.machineId}
-                kind={again.kind}
-                computer={again.computer}
-                again={again.id}
-                email={again.email}
-                local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
-                {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
-                onAdded={() => {
-                  setAgain(null);
-                  refetch();
-                }}
-              />
+          // On the page, not in a card: the steps draw their own.
+          <View style={styles.again}>
+            <View style={styles.againHead}>
+              <Text variant="callout" tone="ink" style={[styles.bold, styles.grow]}>
+                {again.label}
+              </Text>
+              <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
             </View>
-          </Card>
+            <AddAccount
+              machineId={again.machineId}
+              kind={again.kind}
+              computer={again.computer}
+              again={again.id}
+              email={again.email}
+              local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
+              {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
+              onAdded={() => {
+                setAgain(null);
+                refetch();
+              }}
+            />
+          </View>
         ) : null}
         <View style={styles.start}>
           <Button
@@ -335,7 +341,10 @@ function KeysSection({ locale }: { locale: string }) {
   const update = useUpdateSettings(orgId);
   const live = (credentials.data ?? []).filter((k) => !k.revokedAt);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-  const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
+  const failed = () => {
+    errorHaptic();
+    toast({ title: t("agentPage.work.failed"), icon: "x" });
+  };
 
   const rotate = (k: Credential) => {
     if (Platform.OS !== "ios") return;
@@ -350,6 +359,7 @@ function KeysSection({ locale }: { locale: string }) {
             const apiKey = (value ?? "").trim();
             if (apiKey.length < 8) return;
             api.agents.rotateCredential(orgId, k.id, { apiKey }).then(() => {
+              successHaptic();
               toast({ title: t("settings.rotated"), icon: "check" });
               refetch();
             }, failed);
@@ -365,7 +375,11 @@ function KeysSection({ locale }: { locale: string }) {
       {
         text: t("settings.remove"),
         style: "destructive",
-        onPress: () => api.agents.removeCredential(orgId, k.id, true).then(refetch, failed),
+        onPress: () =>
+          api.agents.removeCredential(orgId, k.id, true).then(() => {
+            successHaptic();
+            refetch();
+          }, failed),
       },
     ]);
   const actions = (k: Credential, isDefault: boolean) =>
@@ -398,22 +412,26 @@ function KeysSection({ locale }: { locale: string }) {
         </Text>
       ) : null}
       {live.length > 0 ? (
-        <Card>
+        <GroupedList>
           {live.map((k) => {
             const isDefault = settings.data?.defaultCredentialId === k.id;
             return (
-              <Row
+              <GroupedRow
                 key={k.id}
                 leading={<ProviderLogo id={k.provider} size="sm" />}
-                title={k.label}
-                subtitle={`${providerLabel(k.provider)} · ${t("settings.keyEndsIn", { hint: k.keyHint })} · ${t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) })}`}
-                meta={isDefault ? <Chip icon="check" label={t("settings.default")} /> : undefined}
-                chevron
+                label={k.label}
+                sub={[
+                  providerLabel(k.provider),
+                  t("settings.keyEndsIn", { hint: k.keyHint }),
+                  t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) }),
+                ].join(" · ")}
+                value={isDefault ? t("settings.default") : undefined}
+                more
                 onPress={() => actions(k, isDefault)}
               />
             );
           })}
-        </Card>
+        </GroupedList>
       ) : null}
       {live.some((k) => settings.data?.defaultCredentialId === k.id) ? (
         <Text variant="small" tone="faint">
@@ -435,14 +453,14 @@ function KeysSection({ locale }: { locale: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  // The 16-point margin of the other AI and usage screens it sits beside.
+  // The settings screens' side margin: the groups on the same 16 pt edge as everywhere else.
   in: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   sectionHead: { gap: 4, paddingHorizontal: 2 },
-  keysHead: { marginTop: 18 },
+  keysHead: { marginTop: 20 },
   below: { gap: 8, marginTop: 6 },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
   start: { alignSelf: "flex-start" },
-  again: { padding: 14, gap: 12 },
-  againHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  again: { gap: 12 },
+  againHead: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 2 },
 });

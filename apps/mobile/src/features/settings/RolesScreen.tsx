@@ -53,7 +53,7 @@ import { Note } from "../ai/parts";
 import { RoleMark } from "../dashboards/parts";
 import { Face } from "../shared/Face";
 import { useColors, useMeId } from "../shared/hooks";
-import { goBack, successHaptic } from "../shared/parts";
+import { goBack, successHaptic, tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import {
   areaChoices,
@@ -386,9 +386,17 @@ function ColorPick({
               accessibilityLabel={t(`look.colors.${color}`, { defaultValue: color })}
               accessibilityState={{ checked: on, disabled }}
               disabled={disabled}
-              hitSlop={4}
-              onPress={() => !on && onPick(color)}
-              style={[styles.swatch, { borderColor: on ? c.ink : "transparent", opacity: disabled ? 0.5 : 1 }]}
+              // 44 pt tall to the finger; side by side, as far as half the gap between swatches.
+              hitSlop={{ top: 7, bottom: 7, left: 4, right: 4 }}
+              onPress={() => {
+                if (on) return;
+                tapHaptic();
+                onPick(color);
+              }}
+              style={({ pressed }) => [
+                styles.swatch,
+                { borderColor: on ? c.ink : "transparent", opacity: disabled ? 0.5 : pressed && !on ? 0.6 : 1 },
+              ]}
             >
               <RoleMark color={color} size={22} />
             </Pressable>
@@ -754,6 +762,7 @@ const styles = StyleSheet.create({
   loading: { marginVertical: 16 },
   colors: { paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   swatches: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  swatch: { padding: 3, borderRadius: 10, borderWidth: 2 },
+  // The ring's corner is the mark's (30% of 22) plus the 2 pt gap and the 2 pt ring: concentric at 10.
+  swatch: { padding: 2, borderRadius: 10, borderWidth: 2 },
   search: { paddingTop: 10 },
 });

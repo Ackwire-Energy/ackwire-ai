@@ -34,7 +34,6 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Icon, LineIcon, Text, useTheme } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
-import { askEndedAt } from "../chat/ask-store";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { requestComposerText } from "../chat/composer-request";
 import { markName } from "../chat/logic";
@@ -164,7 +163,7 @@ export function AgentProposalView({
         waitsFor={decides ? "you" : sends && !card.askedAt ? t("rightHand.card.onlyCreators") : null}
         lead={why || t("actionCard.agentProposal.title", { agent: proposer })}
         well={{
-          tile: <AgentAvatar agent={fullLook(draft.appearance)} size={32} name={draft.name} live={false} />,
+          tile: <AgentAvatar agent={fullLook(draft.appearance)} size={20} name={draft.name} live={false} />,
           title: draft.name,
           detail: [`@${draft.handle}`, draft.role].filter(Boolean).join(" · "),
           more: {
@@ -188,8 +187,9 @@ export function AgentProposalView({
             </>
           ) : undefined
         }
+        expiry={<ExpiryLine createdAt={sentAt} expiresAt={card.expiresAt} />}
         foot={
-          <AskFoot expiry={<ExpiryLine createdAt={sentAt} expiresAt={card.expiresAt} />}>
+          <AskFoot>
             {decides && rightHand ? (
               <>
                 <Button
@@ -259,7 +259,7 @@ export function AgentProposalView({
               </>
             ) : sent ? (
               <View style={styles.sent}>
-                <LineIcon variant="small" name="send" size={14} color={colors.muted} />
+                <LineIcon variant="small" name="send" size={15} color={colors.muted} />
                 <Text variant="small" tone="muted" style={styles.fill}>
                   {sent}
                 </Text>
@@ -287,8 +287,7 @@ export function AgentProposalView({
   return (
     <AskDone
       done={status === "created" && delegate?.state !== "undone"}
-      words={byRightHand ? `${markName(draft.name)} · ${delegated}` : `${outcome}: ${markName(draft.name)}`}
-      at={byRightHand ? delegate?.at : askEndedAt({ ...card, status })}
+      words={byRightHand ? `${markName(draft.name)} · ${delegated}` : `${outcome} · ${markName(draft.name)}`}
       more={{
         label: t(byRightHand && delegate?.state === "approved" ? "rightHandApprovals.card.why" : "ask.seeChange"),
         content: (
@@ -366,7 +365,7 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
     if (l.kind === "channel") {
       const name = channels.data?.find((c) => c.id === l.id)?.name;
       return {
-        icon: <Icon name="hash" size={14} color={colors.muted} />,
+        icon: <Icon name="hash" size={13} color={colors.muted} />,
         text: name ?? t("actionCard.agentProposal.aChannel"),
       };
     }
@@ -380,11 +379,11 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
     }
     if (l.kind === "mail") {
       const box = draft.mail?.find((b) => b.accountId === l.id);
-      return { icon: <Icon name="mail" size={14} color={colors.muted} />, text: says(l.level, box?.address ?? "") };
+      return { icon: <Icon name="mail" size={13} color={colors.muted} />, text: says(l.level, box?.address ?? "") };
     }
     const routine = draft.routine;
     return {
-      icon: <Icon name="clock" size={14} color={colors.muted} />,
+      icon: <Icon name="clock" size={13} color={colors.muted} />,
       text: routine ? [routine.name, proposedRoutineWhen(t, i18n.language, routine)].join(" · ") : l.id,
     };
   };
@@ -408,11 +407,12 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
           .join(" · ");
         return (
           <View key={l.key} style={styles.line}>
-            <View style={styles.mark}>{l.given ? <Icon name="check" size={14} color={colors.success} /> : icon}</View>
+            <View style={styles.mark}>{l.given ? <Icon name="check" size={13} color={colors.success} /> : icon}</View>
             <View style={styles.fill}>
               <Text variant="footnote" tone="ink2">
                 {text}
-                {who ? <Text style={{ color: colors.attention }}>{` · ${who}`}</Text> : null}
+                {/* Someone else gives it: it doesn't wait on the viewer, so no amber. */}
+                {who ? <Text style={{ color: colors.muted }}>{` · ${who}`}</Text> : null}
               </Text>
               {l.kind === "routine" && draft.routine ? (
                 <Text variant="footnote" tone="muted" numberOfLines={2}>

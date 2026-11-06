@@ -147,7 +147,7 @@ export function TrailCard({
           ) : null}
         </View>
         <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={14} color={c.muted} />
+          <Icon name="chev" size={13} color={c.muted} />
         </View>
       </Pressable>
       {open ? (
@@ -158,7 +158,7 @@ export function TrailCard({
               // biome-ignore lint/suspicious/noArrayIndexKey: pages are a fixed list from the message
               <View key={i} style={styles.page}>
                 <View style={styles.site}>
-                  <Icon name={screen === "desktop" ? "laptop" : "globe"} size={14} color={c.muted} />
+                  <Icon name={screen === "desktop" ? "laptop" : "globe"} size={SITE_ICON} color={c.muted} />
                   <Text variant="footnote" tone="ink2" numberOfLines={1} style={[styles.grow, styles.semibold]}>
                     {p.host ?? tt("after.noSite")}
                     {p.path ? (
@@ -180,7 +180,7 @@ export function TrailCard({
                       hitSlop={8}
                       style={({ pressed }) => [styles.ext, pressed && { backgroundColor: c.plate }]}
                     >
-                      <Icon name="out" size={14} color={c.faint} />
+                      <Icon name="out" size={13} color={c.faint} />
                     </Pressable>
                   ) : null}
                 </View>
@@ -225,14 +225,17 @@ export function TrailCard({
   );
 }
 
+/** A page's site mark, beside its footnote name. */
+const SITE_ICON = 13;
+
 const styles = StyleSheet.create({
-  card: { marginTop: 12, borderRadius: 18, overflow: "hidden" },
+  card: { marginTop: 12, borderRadius: 20, overflow: "hidden" },
   head: { flexDirection: "row", alignItems: "center", gap: 12, padding: 10 },
   pressed: { opacity: 0.7 },
   thumb: {
     width: THUMB.width,
     height: THUMB.height,
-    borderRadius: 9,
+    borderRadius: 10,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -245,21 +248,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   dot: { width: 4, height: 4, borderRadius: 2 },
-  address: { flex: 1, height: 7, marginLeft: 4, borderRadius: 4 },
+  address: { flex: 1, height: 7, marginLeft: 4, borderRadius: 999 },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   semibold: { fontWeight: "600" },
   medium: { fontWeight: "500" },
   // Narrower than the web's card: the words go under a long strip instead of being cut.
-  sum: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 3, marginTop: 3 },
-  ended: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
+  sum: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4, marginTop: 4 },
+  ended: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   flip: { transform: [{ rotate: "180deg" }] },
   log: { paddingTop: 6, paddingHorizontal: 14, paddingBottom: 10, borderTopWidth: StyleSheet.hairlineWidth },
   page: { paddingTop: 4 },
   site: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 30 },
-  ext: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  line: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 28, paddingLeft: 22 },
+  ext: { width: 28, height: 28, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  // A line's mark starts where its page's name does: past the site's mark and the gap.
+  line: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 28, paddingLeft: SITE_ICON + 8 },
   mark: { width: 18, alignItems: "center" },
-  times: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  times: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   timesText: { fontWeight: "600", fontVariant: ["tabular-nums"] },
 });

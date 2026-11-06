@@ -25,7 +25,16 @@ export interface SheetProps {
   children?: ReactNode;
   /** An opaque surface instead of glass (requests to approve, forms). */
   solid?: boolean;
+  /**
+   * Once the sheet is gone from the screen (slid out and its modal dismissed). Something the system presents (the
+   * photo library, the camera) must wait for it: presented over a sheet still leaving, iOS dismisses it with the
+   * sheet, and its answer never comes.
+   */
+  onGone?: () => void;
 }
+
+/** After the sheet unmounts, the time iOS takes to dismiss its modal before something else may be presented. */
+const GONE_MS = 80;
 
 /** How far the grabber must be dragged down to close (points), as on the web. */
 const CLOSE_DRAG = 90;
@@ -41,7 +50,7 @@ const WIDE_WIDTH = 560;
  * the screen's curve, glass on iOS and an opaque surface on Android, a grabber to drag down, a scrim to tap
  * away. Keyboard-aware for forms: with the keyboard up it fits the room above it and scrolls.
  */
-export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
+export function Sheet({ open, onClose, children, solid = false, onGone }: SheetProps) {
   const { colors, shadows, reducedMotion } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -59,6 +68,14 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
   const scrim = useSharedValue(0);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const goneRef = useRef(onGone);
+  goneRef.current = onGone;
+  const wasMounted = useRef(mounted);
+  // Unmounted, the modal still dismisses for a moment on iOS: what follows waits for that too.
+  useEffect(() => {
+    if (wasMounted.current && !mounted) setTimeout(() => goneRef.current?.(), GONE_MS);
+    wasMounted.current = mounted;
+  }, [mounted]);
 
   const ease = Easing.bezier(0.32, 0.72, 0, 1);
   const ms = reducedMotion ? 0 : 420;
@@ -139,7 +156,7 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 22 + Math.max(0, insets.bottom - INSET) }}
+              contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 24 + Math.max(0, insets.bottom - INSET) }}
             >
               {children}
             </ScrollView>
@@ -156,6 +173,7 @@ const styles = StyleSheet.create({
   sheet: { marginHorizontal: INSET, marginBottom: INSET, borderRadius: RADIUS, flexShrink: 1 },
   surface: { borderRadius: RADIUS, paddingTop: 8, overflow: "hidden", flexShrink: 1 },
   grab: { alignItems: "center", paddingTop: 4, paddingBottom: 10 },
-  // The system's grabber (as `SheetSurface` draws it): the hairline's tone was too faint on the glass.
+  // The system's own grabber (as `SheetSurface` draws it): 36 × 5, round ends; the hairline's tone was too faint on
+  // the glass.
   grabBar: { width: 36, height: 5, borderRadius: 2.5 },
 });

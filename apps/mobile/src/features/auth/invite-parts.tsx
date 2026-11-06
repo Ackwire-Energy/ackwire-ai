@@ -90,7 +90,7 @@ export function LockedEmail({ email }: { email: string }) {
   const { colors: c } = useTheme();
   return (
     <View style={[styles.locked, { backgroundColor: c.sunken }]} accessible accessibilityHint={t("invite.emailHelp")}>
-      <Icon name="lock" size={16} color={c.muted} />
+      <Icon name="lock" size={15} color={c.muted} />
       <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.grow}>
         {email}
       </Text>
@@ -112,7 +112,12 @@ export function ErrorLine({ error }: { error: string | null }) {
 export function DidYouMean({ fix, onFix }: { fix: string; onFix: (email: string) => void }) {
   const { t } = useTranslation();
   return (
-    <Pressable onPress={() => onFix(fix)} accessibilityRole="button" hitSlop={6}>
+    <Pressable
+      onPress={() => onFix(fix)}
+      accessibilityRole="button"
+      hitSlop={12}
+      style={({ pressed }) => (pressed ? styles.pressed : null)}
+    >
       <Text variant="subhead" style={[CENTER, styles.link]}>
         {t("auth.flow.didYouMean", { email: fix })}
       </Text>
@@ -163,9 +168,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 14,
   },
   link: { fontWeight: "600" },
+  pressed: { opacity: 0.6 },
   said: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
 });

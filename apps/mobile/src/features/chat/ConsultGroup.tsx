@@ -29,7 +29,7 @@ import { Icon, Text } from "@/ui";
 import { consultationHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { tapHaptic } from "../shared/parts";
+import { MSG_AVATAR, MSG_INSET } from "./logic";
 
 /** A question's state in words, on the conversation's screen ("A Iris espera uma aprovação"). */
 export const consultLineLabel = (
@@ -139,9 +139,7 @@ export function ConsultPairRow({
     <View style={inline ? styles.inline : styles.slot}>
       <Pressable
         onPress={() => {
-          if (!opens) return;
-          tapHaptic();
-          router.push(consultationHref(opens, channelId));
+          if (opens) router.push(consultationHref(opens, channelId));
         }}
         disabled={!opens}
         accessibilityRole="button"
@@ -149,15 +147,15 @@ export function ConsultPairRow({
         hitSlop={{ top: 8, bottom: 8 }}
         style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plate }]}
       >
-        <AgentFace agentId={askerId} size={18} live={false} />
+        <AgentFace agentId={askerId} size={FACE} live={false} />
         <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1} ellipsizeMode="clip">
           {from}
         </Text>
-        <Icon name="swap" size={15} color={pair.tone === "live" ? c.agent : c.faint} />
+        <Icon name="swap" size={13} color={pair.tone === "live" ? c.agent : c.faint} />
         <View style={styles.faces}>
           {pair.faces.slice(0, 3).map((f, i) => (
             <View key={f.agentId} style={[i > 0 && [styles.stacked, { borderColor: c.bg }], f.off && styles.off]}>
-              <AgentFace agentId={f.agentId} size={18} live={false} />
+              <AgentFace agentId={f.agentId} size={FACE} live={false} />
             </View>
           ))}
         </View>
@@ -189,23 +187,27 @@ export function ConsultPairRow({
   );
 }
 
+/** The pair's faces. */
+const FACE = 18;
+/** The row's inset: its first face centred over the reply's face column (MessageRow). */
+const ROW_INSET = (MSG_AVATAR - FACE) / 2;
+
 const styles = StyleSheet.create({
-  // The first face centred over the reply's 34pt face column (MessageRow): 14 padding + 8 inset + 9 = 14 + 17.
-  slot: { flexDirection: "row", paddingLeft: 14, paddingRight: 16, marginTop: 6, marginBottom: -6 },
-  // On a reach line the row's own 8pt inset lines its first face up with the line's text.
-  inline: { flexDirection: "row", marginLeft: -8 },
+  slot: { flexDirection: "row", paddingLeft: MSG_INSET, paddingRight: 16, marginTop: 6, marginBottom: -6 },
+  // On a reach line, cancelling the row's own inset lines its first face up with the line's text.
+  inline: { flexDirection: "row", marginLeft: -ROW_INSET },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     minHeight: 28,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    paddingHorizontal: ROW_INSET,
+    borderRadius: 10,
     flexShrink: 1,
   },
   name: { fontWeight: "600", flexShrink: 1 },
   faces: { flexDirection: "row", alignItems: "center" },
-  stacked: { marginLeft: -5, borderLeftWidth: 1.5, borderRadius: 6 },
+  stacked: { marginLeft: -6, borderLeftWidth: 1.5, borderRadius: 6 },
   off: { opacity: 0.45 },
   word: { fontWeight: "600", flexShrink: 1 },
   time: { fontVariant: ["tabular-nums"] },

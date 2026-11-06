@@ -115,10 +115,10 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
               </LineIcon>
             ) : (
               <LineIcon
-                variant="caption"
                 name={state === "waiting" || state === "offline" || state === "handedOn" ? "wait" : "clock"}
-                size={14}
+                size={12}
                 color={c.faint}
+                variant="caption"
               />
             )}
             <Text variant="caption" tone="faint" style={styles.grow}>
@@ -162,5 +162,5 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   answer: { gap: 4, paddingVertical: 8 },
   foot: { paddingHorizontal: 12, paddingTop: 8, gap: 8 },
-  note: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 16 },
+  note: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 14 },
 });

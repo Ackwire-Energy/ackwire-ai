@@ -2,9 +2,9 @@ import { type Agent, type AgentBrakes, BRAKES_DEFAULTS, useUpdateAgent } from "@
 import { can } from "@agenteschat/client/lib/permissions";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, TextInput, View } from "react-native";
+import { StyleSheet, TextInput } from "react-native";
 import { useOrg } from "@/providers/org";
-import { fieldText, GroupedList, GroupedRow, Text } from "@/ui";
+import { fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 
@@ -16,7 +16,8 @@ const nextOf = (list: number[], now: number) => list[(list.indexOf(now) + 1) % l
 
 /**
  * The web's Autonomia sem pedido (ADR 0131) on the phone: costly work nobody asked for asks first, how many such jobs
- * at once, PRs an hour, which agents it may call and its project. Saved at once by who manages agents.
+ * at once, PRs an hour, which agents it may call and its project. Saved at once by who manages agents. Settings' own
+ * groups: each header over its group, each note under it.
  */
 export function BrakesSection({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
@@ -35,13 +36,8 @@ export function BrakesSection({ agent }: { agent: Agent }) {
   };
   const others = [...dir.agentById.values()].filter((a) => !a.former && a.id !== agent.id);
   return (
-    <View style={styles.section}>
-      <Text variant="title" accessibilityRole="header">
-        {t("brakes.title")}
-      </Text>
-      <Text variant="footnote" tone="faint">
-        {t("brakes.subtitle")}
-      </Text>
+    <>
+      <GroupedHeader>{t("brakes.title")}</GroupedHeader>
       <GroupedList>
         <GroupedRow
           icon="shield"
@@ -81,9 +77,8 @@ export function BrakesSection({ agent }: { agent: Agent }) {
           />
         ) : null}
       </GroupedList>
-      <Text variant="footnote" tone="faint">
-        {t("brakes.call")}
-      </Text>
+      <GroupedFooter>{t("brakes.subtitle")}</GroupedFooter>
+      <GroupedHeader>{t("brakes.call")}</GroupedHeader>
       <GroupedList>
         {(["all", "some", "none"] as const).map((v) => (
           <GroupedRow
@@ -112,41 +107,36 @@ export function BrakesSection({ agent }: { agent: Agent }) {
             ))
           : null}
       </GroupedList>
-      <Text variant="footnote" tone="faint">
-        {t("brakes.project")}
-      </Text>
-      <TextInput
-        value={project}
-        onChangeText={setProject}
-        onEndEditing={() => project.trim() !== saved.project && save({ project: project.trim() })}
-        editable={editable}
-        maxLength={80}
-        placeholder={t("brakes.projectPlaceholder")}
-        placeholderTextColor={c.faint}
-        accessibilityLabel={t("brakes.project")}
-        style={[styles.input, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }]}
-      />
-      <Text variant="footnote" tone="faint">
-        {t("brakes.projectHelp")}
-      </Text>
-      {b.project ? (
-        <GroupedList>
+      <GroupedHeader>{t("brakes.project")}</GroupedHeader>
+      <GroupedList>
+        <TextInput
+          value={project}
+          onChangeText={setProject}
+          onEndEditing={() => project.trim() !== saved.project && save({ project: project.trim() })}
+          editable={editable}
+          maxLength={80}
+          placeholder={t("brakes.projectPlaceholder")}
+          placeholderTextColor={c.faint}
+          accessibilityLabel={t("brakes.project")}
+          style={[styles.field, fieldText("body"), { color: c.ink }]}
+        />
+        {/* With a project, in the project's group: the note under it speaks of both. */}
+        {b.project ? (
           <GroupedRow
             label={t("brakes.otherProjects")}
             toggle={b.otherProjects}
             disabled={!editable}
             onPress={() => save({ otherProjects: !b.otherProjects })}
           />
-        </GroupedList>
-      ) : null}
-      <Text variant="footnote" tone="faint">
-        {t("brakes.peopleNote")}
-      </Text>
-    </View>
+        ) : null}
+      </GroupedList>
+      <GroupedFooter>{t("brakes.projectHelp")}</GroupedFooter>
+      <GroupedFooter>{t("brakes.peopleNote")}</GroupedFooter>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { marginTop: 22, gap: 10 },
-  input: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
+  // A field row of a group, as "Create agent"'s.
+  field: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12 },
 });

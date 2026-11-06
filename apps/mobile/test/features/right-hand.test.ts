@@ -34,14 +34,13 @@ test("the right hand is its own row, its DM's unread kept, never one of Agentes'
   expect(agents?.rows.map((r) => r.key)).toEqual(["d:d-a-theo"]);
 });
 
-test("Conversas draws it first in Agentes, tinted, kept in sight while Agentes is closed; alone on top with no Agentes", () => {
+test("Conversas asks the right hand from its own field under the greeting, never one of Agentes' rows", () => {
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
   const chats = src("chats/ChatsScreen.tsx");
-  expect(chats).toContain('const lead = s.key === "agents" ? pin : null;');
-  expect(chats).toMatch(/\{lead\}\s*\{s\.rows\.map/);
-  expect(chats).toContain("{...(lead ? { kept: lead } : {})}");
-  expect(chats).toContain('!sections.some((b) => b.key === "agents")');
-  expect(src("right-hand/Pin.tsx")).toMatch(/live\s+tinted/);
+  expect(chats).toContain("<RightHandAsk row={pinned.pin} onStart={startDm} />");
+  expect(chats).toContain("after={ask}");
+  expect(chats).not.toContain("kept: lead");
+  expect(src("right-hand/Pin.tsx")).toContain('t("mobile.chat.messageTo", { name: row.with.name })');
 });
 
 test("with no DM yet its row starts one, and the Agentes starters leave it out", () => {
@@ -124,10 +123,10 @@ test("Configurações has its section for who manages agents, at its own screen"
 
 test("its DM, cards and profile treat it apart through the one shared helper", () => {
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
-  // No computer in its DM, its own line and composer hint.
+  // No computer in its DM, and its own line; its field says "Mensagem para …" on one line, as every DM's.
   const chat = src("chat/ChatScreen.tsx");
   expect(chat).toContain("isRightHand(dmAgent)");
-  expect(chat).toContain('t("rightHand.composerHint")');
+  expect(chat).not.toContain('t("rightHand.composerHint")');
   expect(chat).toMatch(/dmComputer = dmAgentId && !isThread && !rightHand/);
   // Never archived or deleted from the phone.
   expect(src("agents/AgentEditScreen.tsx")).toContain("admin && !rightHand");

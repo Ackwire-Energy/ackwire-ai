@@ -31,7 +31,19 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Button, Chip, Icon, IconButton, type IconName, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
+import Animated, { FadeIn, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import {
+  Button,
+  Chip,
+  Icon,
+  IconButton,
+  type IconName,
+  LineIcon,
+  PixelOrbit,
+  Text,
+  useReducedMotion,
+  useToast,
+} from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";
@@ -42,6 +54,7 @@ import { agentLook } from "../shared/logic";
 import {
   type ActionItem,
   ActionList,
+  errorHaptic,
   FocusLive,
   PushedHeader,
   successHaptic,
@@ -197,11 +210,8 @@ function ConversationRow({ issue, onOpen }: { issue: Issue; onOpen: () => void }
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={[t("issues.conversation.title"), label, state].filter(Boolean).join(", ")}
-      onPress={() => {
-        tapHaptic();
-        onOpen();
-      }}
-      style={[styles.talk, surface]}
+      onPress={onOpen}
+      style={({ pressed }) => [styles.talk, surface, pressed && styles.pressed]}
     >
       <Icon name="chat" size={18} color={c.muted} />
       {line ? (
@@ -289,6 +299,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
   const action = useIssueAction(orgId);
   const toast = useToast();
   const ai = useAiStatus(orgId);
+  const reduced = useReducedMotion();
   const w = i.work;
   if (!w || i.assignee?.type !== "agent" || !isOpen(i)) return null;
   // Stopped because the agent has nothing to think with: say so, and the way out is connecting one.
@@ -367,26 +378,34 @@ function WorkCard({ issue: i }: { issue: Issue }) {
         </>
       ) : lines.length > 0 ? (
         <View style={styles.steps}>
-          {lines.map((l) => (
-            <View key={l.key} style={styles.stepRow}>
-              {/* On the step's first line: a step that wraps had its mark centred between its lines. */}
-              {l.going ? (
-                <LineIcon variant="small" size={12}>
-                  <PixelOrbit color={color} size={12} />
-                </LineIcon>
-              ) : (
-                <LineIcon
-                  variant="small"
-                  name={l.step.outcome === "refused" ? "x" : "checkc"}
-                  size={13}
-                  color={c.faint}
-                />
-              )}
-              <Text variant="small" tone={l.last ? "ink2" : "muted"} style={styles.grow}>
-                {l.text}
-              </Text>
-            </View>
-          ))}
+          {/* A step the agent takes while the person watches fades in; the ones already there don't. */}
+          <LayoutAnimationConfig skipEntering>
+            {lines.map((l) => (
+              <Animated.View
+                key={l.key}
+                entering={reduced ? undefined : FadeIn.duration(160)}
+                layout={reduced ? undefined : LinearTransition.duration(220)}
+                style={styles.stepRow}
+              >
+                {/* On the step's first line: a step that wraps had its mark centred between its lines. */}
+                {l.going ? (
+                  <LineIcon variant="small" size={12}>
+                    <PixelOrbit color={color} size={12} />
+                  </LineIcon>
+                ) : (
+                  <LineIcon
+                    variant="small"
+                    name={l.step.outcome === "refused" ? "x" : "checkc"}
+                    size={13}
+                    color={c.faint}
+                  />
+                )}
+                <Text variant="small" tone={l.last ? "ink2" : "muted"} style={styles.grow}>
+                  {l.text}
+                </Text>
+              </Animated.View>
+            ))}
+          </LayoutAnimationConfig>
         </View>
       ) : state === "running" ? (
         <Text variant="small" tone="muted">
@@ -461,7 +480,10 @@ function Criteria({ issue: i }: { issue: Issue }) {
                       const { [x.id]: _, ...rest } = s;
                       return rest;
                     }),
-                  onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+                  onError: () => {
+                    errorHaptic();
+                    toast({ title: t("mobile.app.failed"), icon: "x" });
+                  },
                 },
               );
             }}
@@ -502,7 +524,7 @@ function LinkRow({
       accessibilityRole="link"
       style={({ pressed }) => [styles.link, pressed && { backgroundColor: c.sunken }]}
     >
-      {!first ? <View style={[styles.critLine, styles.linkLine, { backgroundColor: c.line }]} /> : null}
+      {!first ? <View style={[styles.linkLine, { backgroundColor: c.line }]} /> : null}
       <View style={[styles.tile, { backgroundColor: c.sunken }]}>
         <Icon name={icon} size={16} color={c.muted} />
       </View>
@@ -597,7 +619,7 @@ function FinishWord({ issue: i }: { issue: Issue }) {
       accessibilityRole="button"
       disabled={action.isPending}
       hitSlop={6}
-      style={styles.barWord}
+      style={({ pressed }) => [styles.barWord, pressed && styles.pressedWord]}
       onPress={() =>
         action.mutate(
           { type: "update", id: i.id, patch: { status } },
@@ -608,7 +630,10 @@ function FinishWord({ issue: i }: { issue: Issue }) {
                 title: t(open ? "mobile.issues.finished" : "mobile.issues.reopened", { number: i.number }),
               });
             },
-            onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+            onError: () => {
+              errorHaptic();
+              toast({ title: t("mobile.app.failed"), icon: "x" });
+            },
           },
         )
       }
@@ -812,6 +837,11 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
   return <ActionList items={items} />;
 }
 
+/** A criterion's check box, a link's tile, and the body's line (iOS) the box centers on. */
+const BOX = 20;
+const TILE = 30;
+const BODY_LINE = 22;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
@@ -822,25 +852,33 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   work: { marginHorizontal: 16, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   workHead: { flexDirection: "row", alignItems: "center", gap: 8 },
-  steps: { gap: 5 },
+  steps: { gap: 6 },
   stepRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
   // A long name gives way to the state after it rather than pushing it off the card.
   shrink: { flexShrink: 1 },
-  groupTitle: { paddingTop: 22, paddingBottom: 7, paddingHorizontal: 20, letterSpacing: 0.4 },
+  groupTitle: { paddingTop: 24, paddingBottom: 8, paddingHorizontal: 20, letterSpacing: 0.4 },
   desc: { paddingHorizontal: 20 },
   card: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },
-  crit: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 11 },
-  critLine: { position: "absolute", top: 0, left: 44, right: 0, height: StyleSheet.hairlineWidth },
-  box: { width: 20, height: 20, borderRadius: 6, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  crit: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  // Each list's hairline starts at its words: past the box, or the tile, and the row's gap.
+  critLine: { position: "absolute", top: 0, left: 14 + BOX + 10, right: 0, height: StyleSheet.hairlineWidth },
+  linkLine: { position: "absolute", top: 0, left: 14 + TILE + 10, right: 0, height: StyleSheet.hairlineWidth },
+  // Centered on the criterion's first line.
+  box: {
+    width: BOX,
+    height: BOX,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: (BODY_LINE - BOX) / 2,
+  },
   struck: { textDecorationLine: "line-through" },
   link: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  // A link's hairline starts at its text (14 + the 30 tile + 10), not at a criterion's (after its 20 box).
-  linkLine: { left: 54 },
   pickerStage: { gap: 6 },
   pickerTitle: { paddingHorizontal: 4 },
-  tile: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  tile: { width: TILE, height: TILE, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   scroll: { paddingBottom: 40 },
   talk: {
     marginHorizontal: 16,
@@ -855,4 +893,6 @@ const styles = StyleSheet.create({
   faces: { flexDirection: "row", gap: 2 },
   barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
   barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
+  pressed: { opacity: 0.85 },
+  pressedWord: { opacity: 0.6 },
 });

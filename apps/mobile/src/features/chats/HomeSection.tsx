@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import Animated, { FadeIn, LayoutAnimationConfig, useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
-import { Count, Icon, LIST_INSET, Text, weights } from "@/ui";
+import { Count, Icon, LIST_INSET, Text, useReducedMotion, weights } from "@/ui";
 import { useColors } from "../shared/hooks";
 import {
   HOME_SECTIONS,
@@ -76,8 +76,9 @@ export function CollapsibleSection({
   children: ReactNode;
 }) {
   const c = useColors();
+  const reduced = useReducedMotion();
   const chevron = useAnimatedStyle(() => ({
-    transform: [{ rotate: withTiming(collapsed ? "-90deg" : "0deg", { duration: 200 }) }],
+    transform: [{ rotate: withTiming(collapsed ? "-90deg" : "0deg", { duration: reduced ? 0 : 200 }) }],
   }));
   return (
     <View>
@@ -104,10 +105,16 @@ export function CollapsibleSection({
         <Count value={count} size={15} weight={weights.medium} color={c.faint} />
         <View style={styles.grow} />
         <Animated.View style={chevron}>
-          <Icon name="chev" size={16} color={c.faint} />
+          <Icon name="chev" size={15} color={c.faint} />
         </Animated.View>
       </Pressable>
-      {collapsed ? (kept ?? null) : children}
+      {collapsed ? (kept ?? null) : null}
+      {/* Opened while the list shows, its rows fade in; open when the list mounts, they just show. */}
+      <LayoutAnimationConfig skipEntering>
+        {collapsed ? null : (
+          <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>{children}</Animated.View>
+        )}
+      </LayoutAnimationConfig>
     </View>
   );
 }

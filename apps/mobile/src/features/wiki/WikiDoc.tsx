@@ -92,7 +92,11 @@ function Block({
             accessibilityRole="checkbox"
             accessibilityState={{ checked: b.done, disabled: !onToggleTask }}
             // Ink, as a task's criteria check: blue is the agents' color, and a fixed white broke on dark.
-            style={[styles.box, b.done ? { backgroundColor: c.ink } : { borderWidth: 1.5, borderColor: c.line2 }]}
+            style={({ pressed }) => [
+              styles.box,
+              b.done ? { backgroundColor: c.ink } : { borderWidth: 1.5, borderColor: c.line2 },
+              pressed && styles.pressed,
+            ]}
           >
             {b.done ? <Icon name="check" size={13} color={c.bg} /> : null}
           </Pressable>
@@ -174,14 +178,16 @@ function Runs({
 const styles = StyleSheet.create({
   doc: { gap: 10 },
   heading: { marginTop: 10 },
-  item: { flexDirection: "row", alignItems: "flex-start", gap: 9 },
+  item: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   mark: { minWidth: 14 },
   grow: { flex: 1, minWidth: 0 },
   box: { width: 20, height: 20, borderRadius: 6, marginTop: 2, alignItems: "center", justifyContent: "center" },
   quote: { borderLeftWidth: 3, paddingLeft: 12 },
-  code: { borderRadius: 12, padding: 12 },
+  // As a diff's block (`DiffView`).
+  code: { borderRadius: 14, padding: 12 },
   rule: { height: StyleSheet.hairlineWidth, marginVertical: 8 },
   mono: { fontFamily: MONO, fontSize: 14, lineHeight: 20 },
   link: { fontWeight: "500" },
   missing: { textDecorationLine: "underline", textDecorationStyle: "dashed" },
+  pressed: { opacity: 0.6 },
 });

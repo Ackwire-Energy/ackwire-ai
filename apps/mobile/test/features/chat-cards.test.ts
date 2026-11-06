@@ -175,7 +175,7 @@ describe("what an agent changed reads whole", () => {
 
   test("Desfazer leaving keeps its room, the time left inside it: the sentence never rewraps", () => {
     const receipts = source("Receipts.tsx");
-    expect(receipts).toContain("return v.button ? button : <Room>{button}</Room>;");
+    expect(receipts).toContain("return v.button ? swapped : <Room>{button}</Room>;");
     expect(receipts).toContain("detail={redo ? undefined : v.timeLeft || formatTimeLeft(0)}");
     expect(receipts).not.toContain('t("agentActions.timeLeft"');
   });

@@ -1167,6 +1167,9 @@
     "review": "Tinjau",
     "answer": "Balas",
     "open": "Buka",
+    "toolsTitle": "Mengubah alat yang kamu setujui",
+    "toolsWhy": "Agen tetap memakai versi yang disetujui sampai kamu menerima yang baru.",
+    "reviewChanges": "Tinjau perubahannya",
     "clear": {
       "title": "Tidak ada yang menunggumu",
       "text": "Saat agen membutuhkanmu, itu muncul di sini lebih dulu."

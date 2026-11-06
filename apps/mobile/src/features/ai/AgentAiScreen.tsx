@@ -475,11 +475,11 @@ const styles = StyleSheet.create({
   loading: { marginTop: 16 },
   meter: { paddingHorizontal: 14, paddingVertical: 12 },
   // A list without a header keeps a header's room above it.
-  advanced: { marginTop: 18 },
+  advanced: { marginTop: 20 },
   dock: { position: "absolute", left: 10, right: 10, borderRadius: 28 },
   dockGlass: {
-    paddingHorizontal: 15,
-    paddingTop: 13,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 10,
     borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,

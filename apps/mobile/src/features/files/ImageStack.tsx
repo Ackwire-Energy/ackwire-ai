@@ -16,7 +16,6 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics, Icon, Text, useReducedMotion, useTheme } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
-import { tapHaptic } from "../shared/parts";
 import { DECK_DRAG, DECK_RISE, deckCard, deckIndex, deckTarget, wrapPlace } from "./deck";
 import { encodeFileList } from "./logic";
 import type { MessageFile } from "./MessageFiles";
@@ -66,8 +65,8 @@ export function ImageStack({ images, width }: { images: StackImage[]; width: num
     [key, place],
   );
 
+  // Opening the pictures is plain navigation: no haptic (a swipe through the stack has its own).
   const open = (at: number) => {
-    tapHaptic();
     router.push({
       pathname: "/images",
       params: {
@@ -256,10 +255,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: DECK_RISE,
     left: SIDE,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  clip: { flex: 1, borderRadius: 18, overflow: "hidden" },
+  clip: { flex: 1, borderRadius: 20, overflow: "hidden" },
   center: {
     position: "absolute",
     top: 0,

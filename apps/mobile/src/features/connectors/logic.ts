@@ -116,13 +116,14 @@ export function capabilityLines(
   exists: (key: string) => boolean,
   def: Pick<ConnectorDef, "id" | "scopes">,
   scopeLabel: (scope: ConnectorDef["scopes"][number]) => string,
-): { text: string; asks: boolean }[] {
+): { text: string; asks: boolean; said?: boolean }[] {
   const base = `connectors.can.${safeId(def.id)}`;
   if (exists(`${base}.1`)) {
-    const lines = (["1", "2", "3"] as const)
+    const lines: { text: string; asks: boolean; said?: boolean }[] = (["1", "2", "3"] as const)
       .filter((n) => exists(`${base}.${n}`))
       .map((n) => ({ text: tr(`${base}.${n}`), asks: false }));
-    if (exists(`${base}.ask`)) lines.push({ text: tr(`${base}.ask`), asks: true });
+    // Our own line for what asks already says it asks ("… sempre pedem sua aprovação"): `said`, nothing to add.
+    if (exists(`${base}.ask`)) lines.push({ text: tr(`${base}.ask`), asks: true, said: true });
     return lines;
   }
   return def.scopes.map((s) => ({ text: scopeLabel(s), asks: s.sensitive }));

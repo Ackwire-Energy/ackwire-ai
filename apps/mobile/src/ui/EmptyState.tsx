@@ -83,12 +83,12 @@ export function EmptyState({ title, subtitle, sky = false, crew, color, icon, ac
 
 const styles = StyleSheet.create({
   // Stretched to its container's width (the sky spans it), whatever the container centers.
-  wrap: { alignSelf: "stretch", alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 36 },
+  wrap: { alignSelf: "stretch", alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32 },
   window: {
     alignSelf: "stretch",
     height: 136,
     marginBottom: 20,
-    borderRadius: 24,
+    borderRadius: 20,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "flex-end",

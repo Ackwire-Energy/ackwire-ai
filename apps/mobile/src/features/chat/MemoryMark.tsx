@@ -13,7 +13,6 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
-import { tapHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 
@@ -44,13 +43,11 @@ export function MemoryMarks({ message, divided }: { message: Message; divided: b
         return (
           <Pressable
             key={memory.id}
-            onPress={() => {
-              tapHaptic();
-              sheet.open(<MemorySheet message={message} memory={memory} onClose={sheet.close} />);
-            }}
+            onPress={() => sheet.open(<MemorySheet message={message} memory={memory} onClose={sheet.close} />)}
             accessibilityRole="button"
             accessibilityLabel={t("memoryMark.label", { name, text: short(memory.text) })}
-            hitSlop={4}
+            // 44 tall to the finger; across, within the row's gap.
+            hitSlop={{ top: 7, bottom: 7, left: 3, right: 3 }}
             style={({ pressed }) => [
               styles.mark,
               { backgroundColor: c.raised, borderColor: c.line },
@@ -246,7 +243,7 @@ const styles = StyleSheet.create({
     height: 30,
     paddingLeft: 4,
     paddingRight: 5,
-    borderRadius: 9,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",

@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { hintBack, hintClosed, hintOpened, hintTouched } from "./hints";
 import { Icon } from "./Icon";
 import { Text, type TextVariant, textLineOf } from "./Text";
@@ -17,6 +18,7 @@ import { leadBox } from "./type-scale";
 /** The ⓘ as drawn (points); `hitSlop` makes its target 44. */
 const GLYPH = 18;
 const SLOP = (44 - GLYPH) / 2;
+const HINT_IN = FadeIn.duration(160);
 
 export interface InfoHintOptions {
   /** The ⓘ's accessible name, translated: `t("common.about", { label })` → "About Time zone". */
@@ -36,7 +38,7 @@ export interface InfoHintOptions {
  */
 export function useInfoHint({ name, text, variant, center = false }: InfoHintOptions) {
   const id = useId();
-  const { colors: c } = useTheme();
+  const { colors: c, reducedMotion } = useTheme();
   const { fontScale } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   useEffect(() => () => hintClosed(id), [id]);
@@ -63,7 +65,10 @@ export function useInfoHint({ name, text, variant, center = false }: InfoHintOpt
       accessibilityRole="button"
       accessibilityLabel={name}
       accessibilityState={{ expanded: open }}
-      style={variant ? leadBox(textLineOf(variant, fontScale), GLYPH) : null}
+      style={({ pressed }) => [
+        variant ? leadBox(textLineOf(variant, fontScale), GLYPH) : null,
+        pressed ? { opacity: 0.6 } : null,
+      ]}
     >
       <Icon name="info" size={GLYPH} color={open ? c.ink : c.muted} />
     </Pressable>
@@ -71,10 +76,13 @@ export function useInfoHint({ name, text, variant, center = false }: InfoHintOpt
   // Always there, so TalkBack reads the text as it appears (VoiceOver: the announcement above).
   const body = (
     <View accessibilityLiveRegion="polite" onTouchStart={touched}>
+      {/* It fades in as it opens; closing, it goes at once (a fading copy would sit over what moves up). */}
       {open ? (
-        <Text variant="footnote" tone="muted" style={[styles.text, center ? styles.centered : null]}>
-          {text}
-        </Text>
+        <Animated.View entering={reducedMotion ? undefined : HINT_IN}>
+          <Text variant="footnote" tone="muted" style={[styles.text, center ? styles.centered : null]}>
+            {text}
+          </Text>
+        </Animated.View>
       ) : null}
     </View>
   );

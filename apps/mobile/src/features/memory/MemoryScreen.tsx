@@ -4,9 +4,21 @@ import { router } from "expo-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, EmptyState, Filters, Row, SearchField, SectionHeader, Text, useToast } from "@/ui";
+import {
+  Button,
+  Chip,
+  EmptyState,
+  Filters,
+  Row,
+  SearchField,
+  SectionHeader,
+  Text,
+  useReducedMotion,
+  useToast,
+} from "@/ui";
 import { MemoryFix } from "../agents/AgentProfileScreen";
 import { canEditMemories } from "../agents/logic";
 import { useMemoryOriginText } from "../agents/useMemoryOriginText";
@@ -17,7 +29,7 @@ import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
-import { goBack, PushedHeader } from "../shared/parts";
+import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { agentFilters, inAgent, justLearned, mostUsed, searchMemories } from "./logic";
 
@@ -40,6 +52,9 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
   const shown = useMemo(() => inAgent(memories.data ?? [], agent), [memories.data, agent]);
   const map = useMemo(() => memoryMap(shown, dir.agents), [shown, dir.agents]);
   const selected = map.stars.find((s) => s.id === picked) ?? map.stars.find((s) => s.kind === "memory") ?? null;
+  // The sky and the search's results cross-fade as a search starts and ends, and fade in when they load.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
   const when = (iso: string) => relativeTime(t, i18n.language, iso);
   const row = (m: Memory, i: number) => (
     <Row
@@ -101,13 +116,11 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
         />
       ) : null}
       {search ? (
-        found.length === 0 ? (
-          <EmptyState icon="search" title={t("mobile.memory.noMatch")} />
-        ) : (
-          found.map(row)
-        )
+        <Animated.View key="found" {...fade}>
+          {found.length === 0 ? <EmptyState icon="search" title={t("mobile.memory.noMatch")} /> : found.map(row)}
+        </Animated.View>
       ) : selected ? (
-        <>
+        <Animated.View key="sky" {...fade}>
           <StarCard
             label={t("mobile.memory.sky")}
             count={shown.length}
@@ -122,7 +135,7 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
           {justLearned(shown).map(row)}
           <SectionHeader title={t("mobile.memory.mostUsed")} />
           {mostUsed(shown).map(row)}
-        </>
+        </Animated.View>
       ) : null}
     </PushedLargeTitle>
   );
@@ -153,6 +166,7 @@ function MemoryDetail({ id }: { id: string }) {
   const m = memories.data?.find((x) => x.id === id);
   const agentId = m?.agentId ?? "";
   const action = useMemoryAction(orgId, agentId);
+  const reduced = useReducedMotion();
   const agent = dir.anyAgent(agentId);
   const name = dir.nameOf({ type: "agent", id: agentId });
   const editable = canEditMemories(agent, { id: meId, org });
@@ -184,6 +198,7 @@ function MemoryDetail({ id }: { id: string }) {
             { type: "archive", id: m.id, archived: true },
             {
               onSuccess: () => {
+                successHaptic();
                 toast({ title: t("mobile.intentAgents.fix.forgotten"), agentId });
                 goBack();
               },
@@ -227,16 +242,18 @@ function MemoryDetail({ id }: { id: string }) {
               onPress={() => setDetails((v) => !v)}
               accessibilityRole="button"
               accessibilityState={{ expanded: details }}
-              hitSlop={8}
-              style={styles.details}
+              hitSlop={12}
+              style={({ pressed }) => [styles.details, pressed && styles.pressed]}
             >
               <Text variant="subhead" tone="ink2" style={styles.bold}>
                 {t("mobile.memory.details")}
               </Text>
               {details ? (
-                <Text variant="subhead" tone="muted" selectable>
-                  {m.text}
-                </Text>
+                <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>
+                  <Text variant="subhead" tone="muted" selectable>
+                    {m.text}
+                  </Text>
+                </Animated.View>
               ) : null}
             </Pressable>
           ) : null}
@@ -285,8 +302,9 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, paddingTop: 14, gap: 10 },
   who: { flexDirection: "row", alignItems: "center", gap: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  before: { borderRadius: 14, paddingHorizontal: 13, paddingVertical: 11 },
-  actions: { paddingHorizontal: 20, paddingTop: 18, gap: 8 },
+  before: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
+  actions: { paddingHorizontal: 20, paddingTop: 20, gap: 8 },
   details: { gap: 6 },
+  pressed: { opacity: 0.6 },
   bold: { fontWeight: "600" },
 });

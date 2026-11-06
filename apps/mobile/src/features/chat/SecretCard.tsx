@@ -9,13 +9,25 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { secretAad } from "@agenteschat/client/lib/secret-box";
 import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
-import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
+import { secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, CodeInput, haptics, Icon, LineIcon, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
+import {
+  Button,
+  Chip,
+  CodeInput,
+  fieldText,
+  haptics,
+  Icon,
+  LineIcon,
+  Segmented,
+  Text,
+  ToggleSwitch,
+  useToast,
+} from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -174,12 +186,11 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         <AskDone
           done={r.status === "delivered"}
           words={[
-            `${secretOutcome(t, r, mine, person)}: ${markName(r.name)}`,
+            `${secretOutcome(t, r, mine, person)} · ${markName(r.name)}`,
             kept === "saved" ? t("mobile.vault.card.saved") : null,
           ]
             .filter(Boolean)
             .join(" · ")}
-          at={secretEndedAt(r)}
           more={{
             label: t("approval.seeDetails"),
             content: (
@@ -218,7 +229,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       agentId={r.agentId}
       waitsFor={mine ? "you" : t("ask.waitingFor", { name: person })}
       lead={r.purpose}
-      well={{ tile: <IconTile name="lock" size={32} />, title: r.name, detail: where }}
+      well={{ tile: <IconTile name="lock" size={20} />, title: r.name, detail: where }}
       body={
         mine ? (
           <>
@@ -280,7 +291,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                   accessibilityState={{ checked: save }}
                   accessibilityLabel={t("mobile.vault.card.save")}
                   accessibilityHint={t("mobile.vault.card.saveText")}
-                  style={styles.saveRow}
+                  style={({ pressed }) => [styles.saveRow, pressed && styles.pressed]}
                 >
                   <LineIcon variant="subhead" name={site ? "globe" : "key"} size={16} color={c.muted} />
                   <View style={styles.grow}>
@@ -326,7 +337,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                         ))
                       )}
                       {sheet ? (
-                        <Pressable onPress={chooseAgents} accessibilityRole="button" hitSlop={8}>
+                        <Pressable
+                          onPress={chooseAgents}
+                          accessibilityRole="button"
+                          hitSlop={12}
+                          style={({ pressed }) => pressed && styles.pressed}
+                        >
                           <Text variant="subhead" tone="ink2" style={styles.semibold}>
                             {t("mobile.vault.card.choose")}
                           </Text>
@@ -357,8 +373,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           </>
         ) : null
       }
+      expiry={<ExpiryLine expiresAt={r.expiresAt} />}
       foot={
-        <AskFoot expiry={<ExpiryLine expiresAt={r.expiresAt} />}>
+        <AskFoot>
           {mine ? (
             <AskButtons
               primary={
@@ -400,17 +417,18 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: "600" },
   field: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     minHeight: 44,
     justifyContent: "center",
   },
-  input: { fontSize: 17, paddingVertical: 10 },
+  input: { ...fieldText("body"), paddingVertical: 10 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   save: { gap: 10, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   // Its explanation wraps: the icon and the switch stay on the title's line, not centred on the whole row.
   saveRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   agents: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
   retry: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pressed: { opacity: 0.6 },
 });

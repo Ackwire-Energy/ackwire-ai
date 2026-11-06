@@ -22,7 +22,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, RowAction, Text, useTheme, useToast } from "@/ui";
+import { Button, LineIcon, RowAction, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
@@ -48,7 +48,7 @@ export function ReachLines({ message: m }: { message: Message }) {
 
 function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: string; authorId: string }) {
   const { t } = useTranslation();
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const orgId = useOrgId();
   const dir = useDirectory();
   const channel = useChannels(orgId).data?.find((c) => c.id === channelId);
@@ -69,14 +69,14 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   if (talk) return <ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />;
   return (
     <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
-      <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
-        <Icon name={handed ? "chat" : "info"} size={16} color={colors.ink2} />
+      <View style={styles.tx}>
+        <LineIcon name={handed ? "chat" : "info"} size={15} color={colors.muted} variant="small" />
       </View>
       <View style={[styles.grow, styles.tx]}>
-        <Text variant="small" tone="ink2" numberOfLines={3} style={styles.oneText}>
+        <Text variant="small" tone="ink2" numberOfLines={3}>
           {runs.map((r, i) =>
             r.bold ? (
-              <Text key={String(i)} variant="small" tone="ink" style={[styles.oneText, styles.bold]}>
+              <Text key={String(i)} variant="small" tone="ink" style={styles.bold}>
                 {r.text}
               </Text>
             ) : (
@@ -220,23 +220,23 @@ const styles = StyleSheet.create({
   lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  // The tile, the first line and the action share one middle, as on the receipts; the sentence wraps under it.
+  // As the team checks' line (TeamChecks): the icon, the first line and the action (32, in a 50 row) share one middle,
+  // also when the words take three lines.
   one: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
     minHeight: 50,
-    paddingVertical: 9,
+    paddingVertical: (50 - 32) / 2,
     paddingLeft: 12,
     paddingRight: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    borderBottomLeftRadius: 6,
   },
-  oneText: { fontSize: 14.5, lineHeight: 19 },
+  // The "small" line (20) on the action's middle.
+  tx: { paddingTop: (32 - 20) / 2 },
   detail: { marginTop: 2 },
-  tx: { paddingTop: 6 },
-  tile: { width: 24, height: 24, marginTop: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 });

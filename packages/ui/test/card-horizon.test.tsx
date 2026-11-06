@@ -34,6 +34,13 @@ describe("a card's horizon", () => {
     expect(horizonHeight(400)).toBe(112);
   });
 
+  test("a small card (the phone's home strip) may ask for less room, and it still stays low", () => {
+    expect(horizonHeight(60)).toBe(0);
+    expect(horizonHeight(60, 56)).toBe(36);
+    expect(horizonHeight(55, 56)).toBe(0);
+    expect(horizonHeight(400, 56)).toBe(112);
+  });
+
   test("light: from the card's own ground into the color's light end, never past half of it", () => {
     const light = horizonTones("sky", "#f6f6f4", false);
     expect(light[0]).toBe("#f6f6f4");

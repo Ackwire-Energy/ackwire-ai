@@ -1,6 +1,7 @@
 import { type ReactNode, useSyncExternalStore } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "../shared/hooks";
 import { type HeaderWordAction, PushedHeader } from "../shared/parts";
@@ -32,7 +33,8 @@ export function Page({
       automaticallyAdjustKeyboardInsets={!footer}
       contentContainerStyle={[styles.body, { paddingBottom: footer ? 24 : 24 + insets.bottom }]}
     >
-      {children}
+      {/* What is there as the screen opens doesn't fade in; what loads while it is watched does (`Loaded`). */}
+      <LayoutAnimationConfig skipEntering>{children}</LayoutAnimationConfig>
     </ScrollView>
   );
   return (

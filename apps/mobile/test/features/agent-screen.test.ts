@@ -166,9 +166,11 @@ describe("the pointer on its way to the page", () => {
 describe("the camera over the agent's screen", () => {
   const desk = DEFAULT_DESKTOP;
 
-  test("watching shows it all; control fills the box, never past what stays sharp", () => {
+  test("watching shows it all; control fills the box, closer upright, never past what stays sharp", () => {
     expect(fitScale(PHONE, desk)).toBeCloseTo(336 / 1280);
-    expect(controlScale(PHONE, desk)).toBeCloseTo(Math.max(320 / 900, (336 / 1280) * 1.25));
+    // Upright (narrower than the desktop) it starts close enough to read a field; sideways, just past the fit.
+    expect(controlScale(PHONE, desk)).toBeCloseTo((336 / 1280) * 2.2);
+    expect(controlScale({ width: 932, height: 430 }, desk)).toBeCloseTo(Math.max(932 / 1280, (430 / 900) * 1.25));
     expect(controlScale({ width: 2000, height: 4000 }, desk)).toBe(MAX_SCALE);
   });
 
