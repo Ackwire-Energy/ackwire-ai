@@ -1,6 +1,8 @@
 import { type ActionRecord, actWithUndo } from "./agent-actions";
+import { agentRoom } from "./artifacts";
 import { cutText } from "./format";
-import { personBehindCall, wikiActorOfCall } from "./requester";
+import { getMembership } from "./organizations";
+import { personBehindCall, routineCreatorOfCall, wikiActorOfCall } from "./requester";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
   appendToWikiPage,
@@ -21,9 +23,9 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
-/** Shown when an agent tries to write without being asked. */
+/** Shown when an agent tries to write with nobody who could have asked. */
 export const WIKI_WRITE_REFUSAL =
-  'Not allowed: write to the wiki only when a person asks in the current message ("save this to the wiki", "document…"; in Portuguese "salva isso na wiki", "documenta…"). Offer to save it instead.';
+  "Not allowed: nobody asked for this. An agent writes to the wiki when a person asks for it, or a routine a person set up says so. Offer to save it instead.";
 
 /**
  * The receipt of a wiki edit (none when the text came out the same). Everyone in the channel sees it, so a restricted
@@ -56,17 +58,22 @@ const heldRun = (ctx: ToolContext) => ({
 /**
  * The org wiki for agents (ADR 0023): `search_wiki` and `read_wiki_page`
  * (`wiki:read`), `create_wiki_page`, `update_wiki_page` and `link_to_wiki`
- * (`wiki:write`). Writes need a person's request in the trigger message, and
- * every version records "by {agent}, at {person}'s request".
+ * (`wiki:write`). Writes need a person's request (the trigger message, or a
+ * routine's instructions: its creator's), and every version records
+ * "by {agent}, at {person}'s request".
  */
 export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
   const wiki = (ctx: ToolContext): WikiDeps => ({ ...deps, db: ctx.db });
   const pageRef = { type: "string", minLength: 1, maxLength: 200, description: "Page title or slug" };
 
   async function writer(ctx: ToolContext): Promise<WikiActor | null> {
-    // Routines and agents' own messages are nobody's request: agents never write the wiki on their own.
-    const userId = await personBehindCall(ctx);
-    return userId ? { type: "agent", agentId: ctx.agentId, requestedByUserId: userId, channelId: ctx.channelId } : null;
+    // A routine's instructions are its creator's request, in a room no person reads: a run its report woke sits in a
+    // conversation, whose private text is no routine's to publish. An agent's own message is nobody's.
+    const inRoom = await agentRoom(ctx.db, ctx.orgId, ctx.channelId);
+    const userId = (await personBehindCall(ctx)) ?? (inRoom ? await routineCreatorOfCall(ctx) : null);
+    // A run stays its person's for good: someone who left asks for nothing.
+    if (!userId || !(await getMembership(ctx.db, userId, ctx.orgId))) return null;
+    return { type: "agent", agentId: ctx.agentId, requestedByUserId: userId, channelId: ctx.channelId };
   }
 
   const tools: ToolDefinition[] = [
@@ -150,7 +157,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
     {
       name: "create_wiki_page",
       description:
-        "Create a wiki page. ONLY when a person asks you to save or document something in the wiki in the current message; never on your own. Use [[Title]] to link other pages.",
+        "Create a wiki page. ONLY when a person asks you to save or document something in the wiki in the current message, or your routine's instructions say so; never on your own. Use [[Title]] to link other pages.",
       scope: "wiki:write",
       inputSchema: {
         type: "object",
@@ -197,7 +204,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
     {
       name: "update_wiki_page",
       description:
-        "Change a wiki page: append text (at the end or to a section) or rewrite one section (`replace_section`), or the whole page (`replace`, needs `base_version` from read_wiki_page). ONLY when a person asks in the current message.",
+        "Change a wiki page: append text (at the end or to a section) or rewrite one section (`replace_section`), or the whole page (`replace`, needs `base_version` from read_wiki_page). ONLY when a person asks in the current message or your routine's instructions say so.",
       scope: "wiki:write",
       inputSchema: {
         type: "object",
@@ -257,7 +264,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
     {
       name: "link_to_wiki",
       description:
-        'Add links from one wiki page to others (in its "See also" section, or `section`: name it in the page\'s language, e.g. "Veja também"). ONLY when a person asks.',
+        'Add links from one wiki page to others (in its "See also" section, or `section`: name it in the page\'s language, e.g. "Veja também"). ONLY when a person or your routine\'s instructions ask.',
       scope: "wiki:write",
       inputSchema: {
         type: "object",

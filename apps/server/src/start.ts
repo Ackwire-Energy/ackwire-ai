@@ -69,6 +69,7 @@ import {
   retireMillionSendMailboxes,
   setMessageLinkBase,
   setRestrictionNotices,
+  surfaceRoomFiles,
   vapidKeys,
   vapidSubject,
 } from "@agenteschat/engine";
@@ -347,6 +348,12 @@ async function boot(
       if (moved > 0) log.info("task comments moved to conversations", { moved });
     })
     .catch((error: unknown) => log.warn("task comments move failed", { error: String(error) }));
+  // Off the boot path: files agents saved in rooms no person reads go to the person they worked for (ADR 0111).
+  void surfaceRoomFiles(database.db)
+    .then((moved) => {
+      if (moved > 0) log.info("files moved out of agent rooms", { moved });
+    })
+    .catch((error: unknown) => log.warn("files move out of agent rooms failed", { error: String(error) }));
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,

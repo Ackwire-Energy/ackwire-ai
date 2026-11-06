@@ -8,6 +8,7 @@ import {
   type ArtifactDetailView,
   addFileVersion,
   createFileArtifact,
+  fileReach,
 } from "./artifacts";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -388,8 +389,15 @@ export async function shareSavedFile(
     );
     const done = await uploadedFile(ctx.db, row);
     if (!done) throw new Error(row.error ?? "the upload did not finish");
+    const [landed] = await ctx.db
+      .select({ channelId: artifacts.channelId })
+      .from(artifacts)
+      .where(eq(artifacts.id, done.id));
     return {
-      content: `${saved.content} It is shown in this conversation: its card goes with your reply ("${done.title}" in the Drive, ${formatBytes(done.size)}, artifact ${done.id}).`,
+      content:
+        landed?.channelId === ctx.channelId
+          ? `${saved.content} It is shown in this conversation: its card goes with your reply ("${done.title}" in the Drive, ${formatBytes(done.size)}, artifact ${done.id}).`
+          : `${saved.content} Saved as "${done.title}" (${formatBytes(done.size)}), artifact ${done.id}. ${await fileReach(ctx.db, ctx.orgId, done.id)}`,
       data: { ...saved.data, artifact: { id: done.id, version: done.version, title: done.title } },
     };
   } catch (error) {

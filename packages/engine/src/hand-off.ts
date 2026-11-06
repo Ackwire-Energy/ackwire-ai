@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import { filesOfRun } from "./artifacts";
 import { routineBriefOfRun } from "./background";
 import { sameSentence } from "./context/items";
 import { deliverNotice, publishDelivery } from "./delivery";
@@ -96,6 +97,8 @@ export async function deliverRoutineReport(
       body: text,
       handedTo: run.id,
     });
+    // Its saved files come with it, as a reply's do: no other card of the run reaches the people.
+    const files = await filesOfRun(tx, run.orgId, run.id, brief.deliverTo.channelId);
     const message = await insertMessage(tx, {
       orgId: run.orgId,
       channelId: brief.deliverTo.channelId,
@@ -105,6 +108,7 @@ export async function deliverRoutineReport(
       body: text,
       meta: {
         routine: { id: brief.routineId, name: brief.name, runId: brief.routineRunId },
+        ...(files.length > 0 ? { artifacts: files } : {}),
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
         ...(relays ? { readOutside: true } : {}),
       },

@@ -247,6 +247,8 @@ export const REFUSALS = {
   routineMedia:
     "This is a routine's background work: nobody is in its room to send a GIF or a sticker to. Just finish, or use hand_off.",
   routineHere: "This is a routine's background work in a room nobody reads: put it in hand_off; the people decide.",
+  routineShare:
+    "This is a routine's background work: the files you save already go where it reports, and hand_off carries their cards. Just hand off.",
   fedElsewhere:
     "A routine's report or work started this, so you keep within what that routine may do: you can't manage routines or reminders, propose events, change channels, ask for secrets or permissions, or use this tool. Say it in your reply here; the people decide.",
   fedMission:
@@ -266,6 +268,7 @@ const ROUTINE_HERE_REFUSAL: Readonly<Record<string, string>> = {
   react: REFUSALS.routineReact,
   send_gif: REFUSALS.routineMedia,
   send_sticker: REFUSALS.routineMedia,
+  share_artifact: REFUSALS.routineShare,
 };
 
 /** The table (see the file's comment): what `authority` may do with `tool`. */
