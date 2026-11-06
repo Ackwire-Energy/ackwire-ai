@@ -841,7 +841,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
 
   test("a free login signed out, signed in again under its row: once she thinks with it, it leaves the list and the panel stays, saying so", async () => {
     const state = walters(withCard(), ADA_ID);
-    const out = acct({ id: "acct_out", label: "Claude 08", email: "ti@acme.example", status: "signed_out" });
+    const out = acct({ id: "acct_out", label: "Claude 08", email: "it@example.org", status: "signed_out" });
     const { api, box, picker } = await connectAda(state, { accounts: [out] });
     const row = within(picker).getByRole("button", { name: /^Claude 08/ });
     await click(row);
@@ -849,7 +849,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: { ...out, status: "active" } });
     await signInWithClaude(box);
     expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([
-      [ORG_ID, "machine_1", "claude_code", { accountId: "acct_out", email: "ti@acme.example" }],
+      [ORG_ID, "machine_1", "claude_code", { accountId: "acct_out", email: "it@example.org" }],
     ]);
     expect(calls(state, "agents.setBrain").map((c) => c.args)).toEqual([
       [ORG_ID, ADA_ID, { brain: "claude_code", account: "acct_out" }],

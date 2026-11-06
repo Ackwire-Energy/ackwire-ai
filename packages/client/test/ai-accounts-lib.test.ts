@@ -167,7 +167,7 @@ describe("existingAi: what a person already has for an agent with no AI", () => 
         [
           claude("theo", "walt@acme.com", { usedBy: ["Theo"] }),
           claude("plus", "walt@gmail.com", { kind: "codex", usedBy: ["Theo"] }),
-          claude("out", "ti@acme.example", { status: "signed_out" }),
+          claude("out", "it@example.org", { status: "signed_out" }),
           claude("free", "team@example.com"),
           claude("own", "ada@acme.com", { usedBy: ["Ada"], status: "signed_out" }),
           claude("bia", "bia@acme.com", { mine: false, ownerId: "u_bia", email: null }),
