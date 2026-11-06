@@ -769,6 +769,8 @@ export interface ApiClient {
       input: { categoryId: string | null; beforeChannelId?: string | null },
     ): Promise<void>;
     join(orgId: string, channelId: string): Promise<void>;
+    /** Out of a channel I'm in. The last person out of a private channel archives it. Never #general. */
+    leave(orgId: string, channelId: string): Promise<void>;
     /** A `#channel` link's card; 404 for a channel I can't see (private and not mine). Archived ones too. */
     card(orgId: string, channelId: string): Promise<ChannelCard>;
     /** A pasted message link's pill; 404 for a message I can't see (a private channel's, a DM I'm not in). */

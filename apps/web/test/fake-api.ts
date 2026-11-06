@@ -2845,6 +2845,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       unarchive: async (orgId, channelId) => {
         log("chat.unarchive", orgId, channelId);
       },
+      leave: async (orgId, channelId) => {
+        log("chat.leave", orgId, channelId);
+        const c = state.channels.find((x) => x.id === channelId);
+        if (c) c.isMember = false;
+      },
       deleteChannel: async (orgId, channelId, name) => {
         log("chat.deleteChannel", orgId, channelId, name);
         const c = state.channels.find((x) => x.id === channelId);

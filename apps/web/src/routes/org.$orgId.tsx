@@ -14,6 +14,7 @@ import { MenuBarActions } from "@/components/DesktopMenus";
 import { DesktopDragStrip, DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { DetailsHost } from "@/components/DetailsHost";
 import { InviteDialogProvider } from "@/components/invite/InviteDialog";
+import { LeaveChannelDialog } from "@/components/LeaveChannelDialog";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
@@ -150,6 +151,7 @@ function OrgLayout() {
                   <div className="shell">
                     <RefetchBar />
                     <CommandMenu />
+                    <LeaveChannelDialog />
                     {!focused && (
                       <>
                         <NavScrim />

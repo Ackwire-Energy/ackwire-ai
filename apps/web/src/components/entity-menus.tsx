@@ -10,7 +10,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { can, managesChannel } from "@agenteschat/client/lib/permissions";
+import { can, leavesChannel, managesChannel } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { leaves, removes } from "@agenteschat/client/lib/roles";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,6 +24,7 @@ import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
 import { useOpenAgentPanel } from "./agent-panel-context";
 import { useChannelActions } from "./channel-actions";
+import { useLeaveChannelWithUndo } from "./LeaveChannelDialog";
 import { useOrg } from "./org-context";
 import { useRemoveMemberDialog } from "./RemoveMember";
 import { isStoppable, useStopRun } from "./StopRun";
@@ -148,6 +149,7 @@ export function useChannelMenu() {
   const markRead = useMarkRead();
   const mute = useMuteChannel(org.id);
   const archive = useArchiveChannelWithUndo();
+  const leave = useLeaveChannelWithUndo();
   const pins = useSidebarPins();
   return (c: Channel, extra: MenuEntry[] = []): MenuEntry[] => {
     const manages = managesChannel(c, me.user.id, org);
@@ -190,9 +192,14 @@ export function useChannelMenu() {
         icon: "link",
         run: () => void copyText(linkTo(`/org/${org.id}/c/${c.id}`), () => toast.show(t("contextMenu.linkCopied"))),
       },
+      ...(leavesChannel(c) || (manages && c.name !== "general") ? ([{ kind: "separator" }] satisfies MenuEntry[]) : []),
+      ...(leavesChannel(c)
+        ? ([
+            { kind: "item", id: "leave", label: t("channel.leave"), icon: "arrowRight", run: () => leave.run(c) },
+          ] satisfies MenuEntry[])
+        : []),
       ...(manages && c.name !== "general"
         ? ([
-            { kind: "separator" },
             {
               kind: "item",
               id: "archive",

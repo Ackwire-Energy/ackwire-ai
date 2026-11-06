@@ -843,6 +843,10 @@ export async function removeChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
+  if (self && channel.kind !== "channel") throw new ValidationError("Only a channel can be left", "channel.leave_kind");
+  // Every person joins #general with the workspace: it is how they all hear the same thing.
+  if (self && channel.name === "general")
+    throw new ValidationError("Everyone stays in #general", "channel.general_stays");
   if (!self && !(await managesChannel(db, membership, actorId, channel))) {
     if ("userId" in member)
       throw new ForbiddenError(
@@ -851,7 +855,7 @@ export async function removeChannelMember(
       );
     await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   }
-  await db
+  const gone = await db
     .delete(channelMembers)
     .where(
       and(
@@ -859,8 +863,18 @@ export async function removeChannelMember(
         eq(channelMembers.channelId, channelId),
         "userId" in member ? eq(channelMembers.userId, member.userId) : eq(channelMembers.agentId, member.agentId),
       ),
-    );
+    )
+    .returning({ channelId: channelMembers.channelId });
   caches.channelMembers.delete(`${orgId}:${channelId}`);
+  // The last person out of a private channel: nobody could reach it again, so it closes (its messages are kept).
+  if (self && gone.length > 0 && channel.visibility === "private" && !channel.archivedAt) {
+    const [stays] = await db
+      .select({ userId: channelMembers.userId })
+      .from(channelMembers)
+      .where(and(eq(channelMembers.channelId, channelId), isNotNull(channelMembers.userId)))
+      .limit(1);
+    if (!stays) await closeChannel(db, orgId, channelId, options);
+  }
   if ("userId" in member) {
     await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, [{ channelId, userId: member.userId }]);
     return;
@@ -898,6 +912,11 @@ export async function archiveChannel(
 ) {
   const channel = await archivableChannel(db, actorId, orgId, channelId);
   if (channel.name === "general") throw new ValidationError("#general can't be archived");
+  await closeChannel(db, orgId, channelId, options);
+}
+
+/** Takes a channel off everyone's list, at once for who has it open. */
+async function closeChannel(db: Database, orgId: string, channelId: string, options: { pubsub?: PubSub }) {
   await db.update(channels).set({ archivedAt: new Date() }).where(eq(channels.id, channelId));
   caches.channels.delete(`${orgId}:${channelId}`);
   await publishOrgEvent(options.pubsub, { type: "channel.archived", orgId, channelId });
