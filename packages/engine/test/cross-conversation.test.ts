@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { eq, migrationsFolder, schema, sql } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  consolidateItem,
+  consolidateOrg,
   createArtifact,
   createChannel,
   drainOutbox,
@@ -12,6 +16,7 @@ import {
   openDm,
   postPersonMessage,
   requesterSharedChannels,
+  retrieveForRun,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -101,6 +106,180 @@ describe("work done in other conversations", () => {
     expect(refused).toMatchObject({ isError: true });
     expect(refused?.content).toContain("not found");
     expect((await f.db.select().from(schema.artifacts)).length).toBe(2);
+  });
+});
+
+describe("what stays in a DM", () => {
+  test("the DM's work shows in a channel only while everyone there is in that DM; files still come when asked", async () => {
+    const prompts: string[] = [];
+    f = await setup({
+      artifactTools: true,
+      reply: (req: ModelRequest) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        prompts.push(systemText(req.system ?? ""));
+        if (last.includes("tool_result")) return { chunks: ["Pronto."] };
+        if (last.includes("monta um relatorio")) {
+          return {
+            chunks: [],
+            toolUses: [
+              {
+                name: "create_artifact",
+                input: { title: "Relatório de salários", kind: "document", markdown: "# Salários\n120" },
+              },
+            ],
+          };
+        }
+        return { chunks: ["ok"] };
+      },
+    });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "monta um relatorio dos salários" });
+    await drainOutbox(f.db, f.handlers);
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bob.id });
+
+    await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev bom dia" });
+    await drainOutbox(f.db, f.handlers);
+    expect(prompts.at(-1)).not.toContain("in other conversations");
+    expect(prompts.at(-1)).not.toContain("Relatório de salários");
+    expect(prompts.at(-1)).toContain("What a person tells you in a DM stays in that DM");
+
+    // The same person still reaches their file when they ask for it.
+    const [report] = await f.db.select().from(schema.artifacts);
+    expect(
+      (
+        await listArtifacts(f.db, { type: "agent", agentId: f.agent.id, channelId: f.general.id }, f.org.id, {
+          requesterUserId: f.owner.id,
+        })
+      ).map((a) => a.id),
+    ).toContain(report?.id ?? "");
+  });
+});
+
+test("said in a DM, kept 'everywhere': it reaches that person's runs, never someone else's", async () => {
+  f = await setup({
+    contextTools: true,
+    reply: (req: ModelRequest) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["Combinado."] };
+      if (last.includes("guarda isso"))
+        return {
+          chunks: [],
+          toolUses: [
+            {
+              name: "remember",
+              input: { content: "A viagem de outubro não pode chegar à equipe.", kind: "preference", everywhere: true },
+            },
+          ],
+        };
+      return { chunks: ["ok"] };
+    },
+  });
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const bob = await addMember(f.db, f.org.id, "member", "bob");
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "guarda isso: a viagem fica entre a gente" });
+  await drainOutbox(f.db, f.handlers);
+  const [kept] = await f.db.select().from(schema.contextItems);
+  expect(kept).toMatchObject({ scopeType: "person", scopeId: f.owner.id, channelIds: [] });
+  const memoryFor = async (personId: string) =>
+    (
+      await retrieveForRun(f.context, {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        text: "viagem de outubro",
+        personIds: [personId],
+      })
+    ).text;
+  expect(await memoryFor(f.owner.id)).toContain("viagem de outubro");
+  expect(await memoryFor(bob.id)).not.toContain("viagem de outubro");
+});
+
+describe("memories from a DM", () => {
+  const memory = {
+    kind: "preference" as const,
+    subject: "viagem",
+    content: "A viagem de outubro não pode chegar à equipe.",
+    trust: "high" as const,
+    confidence: 0.95,
+    evidence: [{ type: "human" as const, ref: "m", at: new Date().toISOString() }],
+    createdByKind: "person" as const,
+  };
+
+  test("a strong one is never proposed: a proposal would show it to who decides, then to every run", async () => {
+    f = await setup({});
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const inDm = { ...memory, orgId: f.org.id, agentId: f.agent.id, createdById: f.owner.id };
+    await consolidateItem(f.db, { ...inDm, scopeType: "agent", scopeId: f.agent.id, channelIds: [dm.id] });
+    await consolidateItem(f.db, { ...inDm, subject: "outra", scopeType: "person", scopeId: f.owner.id });
+    await consolidateItem(f.db, {
+      ...inDm,
+      subject: "canal",
+      content: "O time prefere relatórios às sextas.",
+      scopeType: "agent",
+      scopeId: f.agent.id,
+      channelIds: [f.general.id],
+    });
+    await f.db.update(schema.contextItems).set({ relevance: 1, verified: true });
+    await consolidateOrg(f.context, f.org.id);
+    const proposed = await f.db.select().from(schema.contextProposals);
+    expect(proposed.map((p) => p.proposedText)).toEqual([expect.stringContaining("relatórios às sextas")]);
+  });
+
+  test("two people's preferences on the same subject stay two", async () => {
+    f = await setup({});
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    const of = (userId: string) => ({
+      ...memory,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      scopeType: "person" as const,
+      scopeId: userId,
+      createdById: userId,
+    });
+    await consolidateItem(f.db, of(f.owner.id));
+    await consolidateItem(f.db, of(bob.id));
+    const kept = await f.db.select().from(schema.contextItems);
+    expect(kept.map((i) => i.scopeId).sort()).toEqual([f.owner.id, bob.id].sort());
+  });
+
+  test("the migration gives old 'everywhere' ones from a DM back to who said them, and nothing else", async () => {
+    f = await setup({});
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const inDm = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "entre a gente" });
+    const inChannel = await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "para todos" });
+    const everywhere = {
+      ...memory,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      scopeType: "agent" as const,
+      scopeId: f.agent.id,
+      channelIds: [],
+      createdById: f.owner.id,
+    };
+    const fromDm = await consolidateItem(f.db, { ...everywhere, sourceIds: [inDm.id] });
+    const fromChannel = await consolidateItem(f.db, {
+      ...everywhere,
+      subject: "canal",
+      content: "O time prefere relatórios às sextas.",
+      sourceIds: [inChannel.id],
+    });
+    const rule = await consolidateItem(f.db, {
+      ...everywhere,
+      kind: "rule",
+      subject: "regra",
+      content: "Pode enviar sem perguntar.",
+      sourceIds: [inDm.id],
+    });
+    await f.db.execute(sql.raw(readFileSync(join(migrationsFolder, "0235_dm_memory_stays_personal.sql"), "utf8")));
+    const scope = async (id: string) =>
+      (await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, id)))[0]?.scopeType;
+    expect(await scope(fromDm.item.id)).toBe("person");
+    expect(await scope(fromChannel.item.id)).toBe("agent");
+    expect(await scope(rule.item.id)).toBe("agent");
   });
 });
 

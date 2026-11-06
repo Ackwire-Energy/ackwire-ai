@@ -252,6 +252,7 @@ import {
   invokeToolForRun,
   invokeWithChip,
   mergeToolEffects,
+  type PauseRequests,
   postPauseCards,
   publishPauseCards,
   type RunToolScope,
@@ -4249,7 +4250,7 @@ async function executeRunInner(
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
         const waiting: Approval[] = [];
-        const asks: { id: string; toolUseId: string; text: string; choices: string[] | null; why: string }[] = [];
+        const asks: PauseRequests["questions"] = [];
         const secretAsks: string[] = [];
         /** Mission tools' own waits (a blocking decision, a review): their ids. */
         const waits: string[] = [];
@@ -4274,6 +4275,7 @@ async function executeRunInner(
               toolUseId: use.id,
               text: outcome.text,
               choices: outcome.choices,
+              requestedForUserId: outcome.requestedForUserId,
               why: outcome.why,
             });
           } else if (!outcome.output.isError && waitOf(outcome.output.data)) {

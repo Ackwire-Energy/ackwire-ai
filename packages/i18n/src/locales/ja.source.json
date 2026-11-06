@@ -4534,8 +4534,8 @@
   },
   "receipts.asking": {
     "value": {
-      "one": "{{names}} is waiting for your answer",
-      "other": "{{names}} are waiting for your answer"
+      "one": "{{names}} is waiting for an answer",
+      "other": "{{names}} are waiting for an answer"
     }
   },
   "receipts.outage": {
@@ -4599,7 +4599,7 @@
     "value": "Waiting for approval"
   },
   "receipts.status.asking": {
-    "value": "Waiting for your answer"
+    "value": "Waiting for an answer"
   },
   "receipts.status.outage": {
     "value": "The AI provider is down · retries by itself"

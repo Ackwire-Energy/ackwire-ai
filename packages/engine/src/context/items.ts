@@ -159,6 +159,13 @@ export const isHowTo = (i: Pick<ContextItem, "kind" | "subjectKey">) =>
  * Learning with no chat receipt (ADR 0120): the agent's playbook, and anything it found on its own (no person's words
  * among the evidence), like where a script lives. It stays in the Memory tab and in later runs.
  */
+/**
+ * An item a run may read: not another agent's, and a person's preference only in a run that person is behind
+ * (ADR 0120).
+ */
+export const personMayRead = (item: ContextItem | undefined, person: string | null, agentId: string) =>
+  !item || ((!item.agentId || item.agentId === agentId) && (item.scopeType !== "person" || item.scopeId === person));
+
 export const learnedQuietly = (i: Pick<ContextItem, "kind" | "agentId" | "scopeType" | "createdByKind" | "evidence">) =>
   isPlaybook(i) || !i.evidence.some((e) => e.type === "human");
 /**
@@ -371,6 +378,8 @@ export async function consolidateItem(
           eq(contextItems.scopeType, input.scopeType),
           // A rule holds by its giver (`rulesForPerson`): the same words from someone else are their own rule.
           input.kind === "rule" ? eq(contextItems.createdById, input.createdById ?? "") : undefined,
+          // One person's preference never merges into another's: it would read in that person's runs.
+          input.scopeType === "person" ? eq(contextItems.scopeId, input.scopeId ?? "") : undefined,
           or(eq(contextItems.subjectKey, subjectKey), sql`${contextItems.content} = ${input.content}`),
         ),
       )

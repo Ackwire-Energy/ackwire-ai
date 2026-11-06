@@ -748,7 +748,8 @@ export async function insertMessageWithRuns(
               and exists (select 1 from ${channels} mc where mc.id = ${input.channelId}::uuid and mc.kind = 'channel')
               and ${maySql(sql`om.org_id`, sql`om.user_id`, "administrator")}))
       ), answered as (
-        -- A person's reply where an agent asked something (same channel and thread) answers it.
+        -- A person's reply where an agent asked something (same channel and thread) answers it, unless it is for
+        -- someone else.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
           answered_at = now()
         where ${deliver}::boolean and q.status = 'open' and not exists (select 1 from archived)
@@ -757,9 +758,10 @@ export async function insertMessageWithRuns(
             where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
               and oq.status = 'open' and oq.expires_at > now()
               and oq.thread_id is not distinct from ${threadId}::uuid
-              -- In a channel's main timeline many talk at once: who asked the agent answers it, or
-              -- whoever addresses it.
-              and (${threadId}::uuid is not null
+              and (oq.requested_for_user_id is null or oq.requested_for_user_id = ${userId})
+              -- In a channel's main timeline many talk at once: who it is for or who asked the agent answers it,
+              -- or whoever addresses it.
+              and (${threadId}::uuid is not null or oq.requested_for_user_id = ${userId}
                 or not exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
                 -- Named: a mention of everyone is no answer to whatever each agent asked.
                 or oq.agent_id in (select id from named)

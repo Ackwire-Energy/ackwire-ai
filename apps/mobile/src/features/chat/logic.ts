@@ -330,6 +330,7 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
     status: q.status === "answered" ? "answered" : "open",
     answer: str(q.answer) || null,
     answeredByUserId: str(q.answeredByUserId) || null,
+    ...(str(q.requestedForUserId) ? { requestedForUserId: str(q.requestedForUserId) } : {}),
     ...(q.withdrawn === true ? { withdrawn: true as const } : {}),
     ...(q.dismissed === true ? { dismissed: true as const } : {}),
   };

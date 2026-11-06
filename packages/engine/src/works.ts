@@ -132,7 +132,7 @@ export interface WorkView {
   nextUpdateAt: string | null;
   lastUpdate: { text: string; at: string; seq: number } | null;
   /** Waiting on an answer: what its run asked (the first if it asked several), and the message that holds the card. */
-  question: { text: string; messageId: string | null } | null;
+  question: { text: string; messageId: string | null; requestedForUserId: string | null } | null;
   plan: WorkPlanItem[];
   issue: { id: string; number: number } | null;
   resultMessageId: string | null;
@@ -187,6 +187,7 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
           channelId: agentQuestions.channelId,
           text: agentQuestions.text,
           messageId: agentQuestions.messageId,
+          requestedForUserId: agentQuestions.requestedForUserId,
         })
         .from(agentQuestions)
         .where(
@@ -278,7 +279,13 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
         w.lastUpdateText && w.updateSeq > 0
           ? { text: w.lastUpdateText, at: w.lastUpdateAt.toISOString(), seq: w.updateSeq }
           : null,
-      question: asked ? { text: plainText(asked.text, WORK_LIMITS.updateMax), messageId: asked.messageId } : null,
+      question: asked
+        ? {
+            text: plainText(asked.text, WORK_LIMITS.updateMax),
+            messageId: asked.messageId,
+            requestedForUserId: asked.requestedForUserId,
+          }
+        : null,
       plan: w.plan,
       issue: w.issueId && numbers.has(w.issueId) ? { id: w.issueId, number: numbers.get(w.issueId) as number } : null,
       resultMessageId: w.resultMessageId,

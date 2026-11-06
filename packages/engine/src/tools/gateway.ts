@@ -392,7 +392,7 @@ export type InvokeResult =
   | { type: "result"; output: ToolOutput; ran?: Approval; autoApproved?: { by: string | null; reads: boolean } }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
-  | { type: "question"; text: string; choices: string[] | null; why: string }
+  | { type: "question"; text: string; choices: string[] | null; requestedForUserId: string | null; why: string }
   /** `request_secret`: the executor posts the card and suspends the run. */
   | { type: "secret"; requestId: string };
 
@@ -1322,7 +1322,7 @@ export function createToolGateway(deps: {
         if (prompt.poll && answer.behavior === "deny") await forgetPendingCommand(ctx.db, ctx.orgId, prompt.poll);
       }
       if (builtIn && output.waitForAnswer?.text) {
-        return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices, why };
+        return { type: "question", ...output.waitForAnswer, why };
       }
       const asked = tool.connectionId ? undefined : output.waitForApproval;
       if (asked) {

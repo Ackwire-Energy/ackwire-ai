@@ -144,9 +144,12 @@ export async function announceChannelLeavers(
   leavers: ChannelLeaver[],
 ) {
   const { pubsub } = deps;
+  // Loaded here: questions build on this module.
+  const { releaseQuestionsOf } = await import("./questions");
   for (const { channelId, userId } of leavers) {
     caches.channelMembers.delete(`${orgId}:${channelId}`);
     await clearChannelNotifications(deps, orgId, userId, channelId);
+    await releaseQuestionsOf(deps, orgId, userId, channelId);
     const removed = {
       type: "channel.member_removed" as const,
       channelId,
@@ -498,7 +501,7 @@ export async function peopleAllIn(db: Executor, orgId: string, hereId: string, t
  * or a task's reader; archived channels left out. For screens that quote a conversation outside it (run history).
  */
 export async function readableChannelIds(
-  db: Database,
+  db: Executor,
   orgId: string,
   userId: string,
   channelIds: readonly string[],

@@ -69,6 +69,7 @@ import {
 
 const {
   agentRuns,
+  channels,
   contextProposals,
   contextItems,
   agents,
@@ -157,6 +158,16 @@ export async function proposeFromItem(
 ): Promise<Proposal | null> {
   if (!isPromotable(item)) return null;
   const { db } = deps;
+  // What came from a DM stays there: a proposal shows it to who decides, and once accepted every run reads it.
+  if (item.scopeType === "person") return null;
+  if (item.channelIds.length > 0) {
+    const [dm] = await db
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(inArray(channels.id, item.channelIds), eq(channels.kind, "dm")))
+      .limit(1);
+    if (dm) return null;
+  }
   let target: Proposal["target"];
   let current: string;
   let agentId: string | null = null;

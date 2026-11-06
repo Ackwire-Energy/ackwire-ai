@@ -746,6 +746,7 @@ describe("why: required on every call that asks a person", () => {
       type: "question",
       text: "Which store?",
       choices: ["Centro", "Norte"],
+      requestedForUserId: null,
       why: WHY,
     });
   });

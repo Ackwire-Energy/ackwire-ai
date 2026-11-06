@@ -1066,9 +1066,10 @@ async function queryThreads(
             -- Waiting for its computer to come back isn't working.
             and ar.waiting_machine_id is null) as working,
           (
-            (exists (select 1 from ${schema.agentQuestions} aq where aq.org_id = ${orgId}::uuid
+            exists (select 1 from ${schema.agentQuestions} aq where aq.org_id = ${orgId}::uuid
               and aq.channel_id = root.channel_id and aq.thread_id = root.id and aq.status = 'open'
-              and aq.expires_at > now()) and ${participated})
+              and aq.expires_at > now()
+              and (aq.requested_for_user_id = ${userId} or (aq.requested_for_user_id is null and ${participated})))
             or exists (select 1 from ${schema.approvals} ap where ap.org_id = ${orgId}::uuid
               and ap.status = 'pending' and ap.thread_root_id = root.id
               and (${maySql(orgId, userId, "approve_actions")} or ap.owner_user_id = ${userId}))

@@ -312,7 +312,7 @@ describe("an agent whose AI provider is down", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(8);
     expect(row("o1").textContent).toContain("Ada: o provedor de IA está fora do ar · tenta de novo sozinho");
-    expect(row("o1").textContent).not.toContain("esperando sua resposta");
+    expect(row("o1").textContent).not.toContain("esperando uma resposta");
   });
 });
 
@@ -332,7 +332,7 @@ describe("an agent waiting on its plan's limit", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(8);
     expect(row("p1").textContent).toContain("Ada está esperando o plano");
-    expect(row("p1").textContent).not.toContain("esperando sua resposta");
+    expect(row("p1").textContent).not.toContain("esperando uma resposta");
     await act(async () => fireEvent.click(row("p1").querySelector(".ac-receipt__check") as HTMLElement));
     await settle(2);
     const popover = screen().getByRole("dialog", { name: "Agentes" });

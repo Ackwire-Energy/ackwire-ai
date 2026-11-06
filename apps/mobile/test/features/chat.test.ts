@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation, SecretRequest } from "@agenteschat/client";
 import { activitySentence, barElapsed, barFaces, barWords, entriesOffScreen } from "@agenteschat/client/lib/activity";
+import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { runAround, runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -856,6 +857,12 @@ describe("an agent's question (ask_user)", () => {
     expect(
       questionOf({ question: { ...question, status: "answered", answer: null, dismissed: true } })?.dismissed,
     ).toBe(true);
+    // For one person: it keeps who, and waits on them alone.
+    const forBia = questionOf({ question: { ...question, requestedForUserId: "bia" } });
+    expect(forBia?.requestedForUserId).toBe("bia");
+    expect(questionWaitsOn(forBia ?? question, "bia")).toBe(true);
+    expect(questionWaitsOn(forBia ?? question, "ana")).toBe(false);
+    expect(questionWaitsOn(question, "ana")).toBe(true);
     expect(questionOf({ question: { id: "q", text: "" } })).toBeNull();
     expect(questionOf({})).toBeNull();
     expect(questionOf(undefined)).toBeNull();

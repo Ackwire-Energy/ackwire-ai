@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
+  addChannelMember,
   buildRunContext,
   createAgent,
   createArtifactToolSource,
@@ -138,6 +139,42 @@ async function twoConsultations() {
 }
 
 describe("the agents' DM reads only what was made for the same person (consultations)", () => {
+  test("a person's own DM with the consulted agent: only while everyone where they asked is in it", async () => {
+    const { bob, infra, dm, forAna } = await twoConsultations();
+    const theirs = await openDm(f.db, f.owner.id, f.org.id, { agentId: infra.id });
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: theirs.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "Payroll secret: the bonus stays between us.",
+    });
+    await indexSource(f.context, { orgId: f.org.id, kind: "message", sourceId: said.id });
+    await f.db.insert(schema.agentConsultations).values({
+      orgId: f.org.id,
+      askerRunId: forAna.dev.runId,
+      askerAgentId: f.agent.id,
+      targetAgentId: infra.id,
+      targetRunId: forAna.infra.runId,
+      channelId: dm.id,
+      messageId: forAna.infra.triggerMessageId,
+      waitId: "w",
+      question: "pull the payroll figures",
+      chain: [],
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    const search = async () =>
+      (
+        await (
+          await toolsOf(createContextToolSource(f.context), forAna.infra)
+        )("search_context", {
+          query: "payroll bonus",
+        })
+      ).content;
+    expect(await search()).toContain("stays between us");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bob.id });
+    expect(await search()).not.toContain("stays between us");
+  });
+
   test("a consultation run carries the person behind it", async () => {
     const { bob, forAna, forBob } = await twoConsultations();
     expect(await personBehindCall(forAna.infra)).toBe(f.owner.id);

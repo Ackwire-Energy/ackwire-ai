@@ -1280,6 +1280,8 @@ export async function removeMember(
   const quiet = actorId === targetUserId ? { quiet: true as const } : {};
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId, ...quiet });
   await announceMembers(options.pubsub, orgId, changed);
+  const { releaseQuestionsOf } = await import("./questions");
+  await releaseQuestionsOf({ db, pubsub: options.pubsub }, orgId, targetUserId);
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
   // Loaded here: the routine engine builds on this module.
   const { pauseRoutinesOfCreator } = await import("./routine-firing");
@@ -1429,7 +1431,9 @@ export async function deleteAccount(
   for (const org of [...plan.closes, ...plan.leaves]) {
     await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId: org.id, userId, quiet: true });
   }
+  const { releaseQuestionsOf } = await import("./questions");
   for (const org of plan.leaves) {
+    await releaseQuestionsOf({ db, pubsub: options.pubsub }, org.id, userId);
     const changed = [
       ...released.agents.filter((a) => a.orgId === org.id).flatMap((a) => a.agentIds),
       ...removed.filter((r) => r.computer.orgId === org.id).flatMap((r) => r.freed),

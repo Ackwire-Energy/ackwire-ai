@@ -561,9 +561,11 @@ export const WorkView = z
     nextUpdateAt: z.string().nullable(),
     lastUpdate: z.object({ text: z.string(), at: z.string(), seq: z.number() }).nullable(),
     question: z
-      .object({ text: z.string(), messageId: z.uuid().nullable() })
+      .object({ text: z.string(), messageId: z.uuid().nullable(), requestedForUserId: z.string().nullable() })
       .nullable()
-      .openapi({ description: "Waiting on an answer: what its run asked, and the message that holds the card." }),
+      .openapi({
+        description: "Waiting on an answer: what its run asked, the message that holds the card, and who it is for.",
+      }),
     plan: z.array(z.object({ id: z.string(), text: z.string(), state: z.enum(["todo", "doing", "done"]) })),
     issue: z.object({ id: z.uuid(), number: z.number() }).nullable(),
     resultMessageId: z.uuid().nullable(),
