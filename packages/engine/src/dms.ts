@@ -10,6 +10,7 @@ import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from ".
 import { quietNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
 import { can, getMembership, requirePermission } from "./organizations";
+import { accountInUse } from "./standing";
 
 const { channels, channelMembers, channelReads, messages, agents, users, organizationMembers } = schema;
 
@@ -28,7 +29,7 @@ async function presentPeople(db: Executor, orgId: string, userIds: string[]) {
     .from(organizationMembers)
     .innerJoin(users, eq(users.id, organizationMembers.userId))
     .where(
-      and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, userIds), isNull(users.blockedAt)),
+      and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, userIds), accountInUse),
     );
   return rows.map((r) => r.userId);
 }

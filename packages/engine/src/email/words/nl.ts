@@ -292,6 +292,23 @@ export const words: EmailWords = {
     button: "Gekoppelde apps bekijken",
     why: (org) => `Je krijgt deze e-mail omdat er een app is gekoppeld aan je account in ${org} op agentes.chat.`,
   },
+  accountDeleting: {
+    subject: (day) => `Je agentes.chat-account wordt op ${day} verwijderd`,
+    preheader: "Je hebt 7 dagen om van gedachten te veranderen.",
+    headline: "Je account wordt verwijderd",
+    body: (email, day, time) => ["We verwijderen het account ", { b: email }, ` op ${day} om ${time}. Het is overal uitgelogd en niemand kan je hier bereiken tot je terug bent.`],
+    closes: (count, names) => [
+      plural("nl", count, {
+        one: "De werkruimte waar alleen jij in zat is nu gesloten en verdwijnt op dezelfde datum: ",
+        other: "De werkruimtes waar alleen jij in zat zijn nu gesloten en verdwijnen op dezelfde datum: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Toch van gedachten veranderd? Log voor die datum in en druk op Herstellen.",
+    button: "Inloggen om te herstellen",
+    why: "Je krijgt deze e-mail omdat dit adres een account heeft op agentes.chat.",
+  },
   accountDeleted: {
     subject: "Je agentes.chat-account is verwijderd",
     preheader: "Het is overal uitgelogd en kan niet meer inloggen.",

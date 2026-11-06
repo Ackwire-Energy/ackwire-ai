@@ -1538,9 +1538,10 @@ export async function setWorkIssueState(
 }
 
 /**
- * "Mostrar para todos" (ADR 0121 §4): the one way a task tied to a conversation reaches the whole workspace. Only
- * someone who reads that conversation gets this far. A background work's card: who asked for that work. Any task: who
- * created it, or an admin. A task an agent made in the conversation has no other owner: anyone there.
+ * "Mostrar para todos" (ADR 0121 §4): the one way a task tied to a conversation reaches the whole workspace, and only
+ * someone who reads that conversation gets this far. A background work's card: who asked for that work, who created
+ * the card or an admin. A task an agent made in the conversation has no other owner: anyone there. Any other issue
+ * keeps its channel.
  */
 export async function shareIssueWithEveryone(deps: IssueDeps, actor: IssueActor, orgId: string, issueId: string) {
   const current = await findVisible(deps.db, actor, orgId, { id: issueId });
@@ -1554,10 +1555,10 @@ export async function shareIssueWithEveryone(deps: IssueDeps, actor: IssueActor,
     .limit(1);
   const source = current.source as { type?: string; workId?: string };
   const ofWork = !!work || (source.type === "agent" && !!source.workId);
+  if (!ofWork && current.createdByType !== "agent") throw new ForbiddenError();
   const membership = await requireActiveMembership(deps.db, actor.userId, orgId);
   const creator = current.createdByType === "person" && current.createdById === actor.userId;
-  const agentsOwn = current.createdByType === "agent" && !ofWork;
-  if (work?.requestedByUserId !== actor.userId && !creator && !agentsOwn && !can(membership, "manage_agents"))
+  if (ofWork && work?.requestedByUserId !== actor.userId && !creator && !can(membership, "manage_agents"))
     throw new ForbiddenError();
   const row = await deps.db.transaction(async (tx) => {
     const [updated] = await tx

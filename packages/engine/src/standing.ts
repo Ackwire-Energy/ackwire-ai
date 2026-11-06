@@ -485,6 +485,18 @@ export async function isUserBlocked(db: Executor, userId: string) {
 }
 
 /**
+ * An account in use: not blocked, and not waiting for its deletion (ADR 0088 §10). Anything else counts as nobody:
+ * no membership, no mention, no DM, no email or push.
+ */
+export const accountInUse = sql<boolean>`(${users.blockedAt} is null and ${users.deletionDueAt} is null)`;
+
+/** Whether this account can't join or make anything: blocked, or waiting for its deletion. */
+export async function accountClosed(db: Executor, userId: string) {
+  const [row] = await db.select({ open: accountInUse }).from(users).where(eq(users.id, userId));
+  return row?.open !== true;
+}
+
+/**
  * Blocks an account, or lets it back (the operator API). Blocked, it can't sign in (`auth.ts`), its sessions
  * and phones are gone, and every membership check reads it as no member (`getMembership`): that bites on
  * its next request, even while a browser's cookie cache still holds the session for minutes. Its open

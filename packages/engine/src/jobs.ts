@@ -108,7 +108,13 @@ import { runVaultSync, VAULT_SYNC_JOB, type VaultDeps } from "./vault";
 import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 import { saveWaitlistContact } from "./waitlist";
 import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
-import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
+import {
+  ACCOUNT_DELETE_JOB,
+  type DeletionDeps,
+  ORG_DELETE_JOB,
+  purgeAccount,
+  purgeWorkspace,
+} from "./workspace-deletion";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {
@@ -139,6 +145,10 @@ export interface JobDeps extends RunExecutorDeps {
   push?: PushSender | null;
   /** Web Push to browsers (job `push.send`, ADR 0071); absent = off. */
   webPush?: WebPushSender | null;
+  /** This server sends email: a deleted account is told (job `account.delete`). */
+  accountEmails?: DeletionDeps["emails"];
+  /** Revokes an account's Apple sign-in at its deletion (job `account.delete`); absent/null = Apple sign-in off. */
+  appleRevoke?: Parameters<typeof purgeAccount>[0]["appleRevoke"];
   /** Who has the app open: pushes not waiting on them hold a little (ADR 0071 §7); absent = never held. */
   presence?: Presence | null;
   /** GIF search (ADR 0091): an agent's GIF after its reply (job `agents.media`); absent = its own stickers only. */
@@ -890,6 +900,19 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         { db: deps.db, pubsub: deps.pubsub, connectors: deps.connectors, mail: deps.mail, log: deps.log },
         String(job.payload.orgId),
         { finalAttempt: ctx.finalAttempt },
+      );
+    },
+    // An account whose deletion's date came (`purgeAccount`): a no-op once restored or gone.
+    [ACCOUNT_DELETE_JOB]: async (job) => {
+      await purgeAccount(
+        {
+          db: deps.db,
+          pubsub: deps.pubsub,
+          hub: deps.sandbox?.machines?.hub,
+          emails: deps.accountEmails,
+          appleRevoke: deps.appleRevoke,
+        },
+        String(job.payload.userId),
       );
     },
     "email.send": async (job, ctx) => {

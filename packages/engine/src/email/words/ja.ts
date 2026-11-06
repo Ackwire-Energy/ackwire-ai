@@ -279,6 +279,16 @@ export const words: EmailWords = {
     button: "接続中のアプリを見る",
     why: (org) => `agentes.chat の ${org} であなたのアカウントにアプリが接続されたため、このメールをお送りしています。`,
   },
+  accountDeleting: {
+    subject: (day) => `agentes.chat のアカウントは ${day}に削除されます`,
+    preheader: "考え直せる期間は7日間です。",
+    headline: "アカウントを削除しています",
+    body: (email, day, time) => ["アカウント ", { b: email }, ` を${day} ${time}に削除します。すべての端末からログアウトされ、戻るまでここであなたに連絡することはできません。`],
+    closes: (_count, names) => ["あなただけが参加していたワークスペースは閉じられ、同じ日に削除されます: ", ...names, "。"],
+    undo: "考え直しましたか？その日より前にログインして、「復元」を押してください。",
+    button: "ログインして復元",
+    why: "このアドレスに agentes.chat のアカウントがあるため、このメールをお送りしています。",
+  },
   accountDeleted: {
     subject: "agentes.chat のアカウントが削除されました",
     preheader: "すべての端末からログアウトされ、今後ログインすることはできません。",

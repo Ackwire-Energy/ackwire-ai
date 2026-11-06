@@ -209,15 +209,12 @@ describe("Mostrar para todos", () => {
     expect(hits.map((h) => h.sourceId)).toEqual([task.id]);
   });
 
-  test("a task a person made from a message: its creator or an admin in the conversation, not any member", async () => {
+  test("a task a person made from a private message keeps its channel", async () => {
     f = await setup();
-    const bia = await addMember(f.db, f.org.id, "member", "bia");
     const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
-    await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { userId: bia.id });
     const said = await postPersonMessage(deps(), f.owner.id, f.org.id, secret.id, { body: "Bug" });
     const task = await issueFromMessage(deps(), f.owner.id, f.org.id, said.id);
-    await expect(shareIssueWithEveryone(deps(), person(bia.id), f.org.id, task.id)).rejects.toThrow();
-    expect((await shareIssueWithEveryone(deps(), person(f.owner.id), f.org.id, task.id)).channelId).toBeNull();
+    await expect(shareIssueWithEveryone(deps(), person(f.owner.id), f.org.id, task.id)).rejects.toThrow();
   });
 });
 

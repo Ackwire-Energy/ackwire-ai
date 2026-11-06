@@ -271,6 +271,23 @@ export const ptBR: Words = {
     button: "Ver apps conectados",
     why: (org) => `Você recebeu este e-mail porque um app foi conectado à sua conta na ${org} no agentes.chat.`,
   },
+  accountDeleting: {
+    subject: (day) => `Sua conta do agentes.chat vai ser apagada em ${day}`,
+    preheader: "Você tem 7 dias para mudar de ideia.",
+    headline: "Sua conta está sendo apagada",
+    body: (email, day, time) => ["Vamos apagar a conta ", { b: email }, ` em ${day} às ${time}. Ela saiu de todos os aparelhos, e ninguém fala com você aqui até você voltar.`],
+    closes: (count, names) => [
+      plural("pt-BR", count, {
+        one: "O workspace em que só você estava fechou agora e some na mesma data: ",
+        other: "Os workspaces em que só você estava fecharam agora e somem na mesma data: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Mudou de ideia? Entre antes dessa data e aperte Restaurar.",
+    button: "Entrar para restaurar",
+    why: "Você recebeu este e-mail porque este endereço tem uma conta no agentes.chat.",
+  },
   accountDeleted: {
     subject: "Sua conta do agentes.chat foi apagada",
     preheader: "Ela saiu de todos os aparelhos e não entra mais.",

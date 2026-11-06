@@ -75,10 +75,11 @@ export async function followOwner(db: Executor, orgId: string) {
   await db.execute(sql`update ${agents} a set owner_user_id = (
       select om.user_id from ${organizationMembers} om join ${users} u on u.id = om.user_id
       where om.org_id = ${orgId}::uuid and om.role = 'owner'
-      order by u.blocked_at is not null, om.created_at limit 1)
+      order by u.blocked_at is not null or u.deletion_due_at is not null, om.created_at limit 1)
     where a.org_id = ${orgId}::uuid and a.builtin = ${RIGHT_HAND}
       and not exists (select 1 from ${organizationMembers} om join ${users} u on u.id = om.user_id
-        where om.org_id = a.org_id and om.user_id = a.owner_user_id and om.role = 'owner' and u.blocked_at is null)`);
+        where om.org_id = a.org_id and om.user_id = a.owner_user_id and om.role = 'owner'
+          and u.blocked_at is null and u.deletion_due_at is null)`);
 }
 
 /**

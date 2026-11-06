@@ -186,7 +186,8 @@ export async function dashboardViewerCount(
   const [row] = rowsOf<{ n: number | string }>(
     await db.execute(sql`select count(*)::int as n from organization_members om
       join users u on u.id = om.user_id
-      where om.org_id = ${board.orgId}::uuid and u.blocked_at is null and ${memberSeesSql(board)}`),
+      where om.org_id = ${board.orgId}::uuid and u.blocked_at is null and u.deletion_due_at is null
+        and ${memberSeesSql(board)}`),
   );
   return Number(row?.n ?? 0);
 }
@@ -206,7 +207,7 @@ export async function audienceMembers(db: Executor, orgId: string): Promise<Audi
           where mr.org_id = om.org_id and mr.user_id = om.user_id), '{}'::text[]) as role_ids,
         ${maySql(sql`om.org_id`, sql`om.user_id`, "administrator")} as admin
       from organization_members om join users u on u.id = om.user_id
-      where om.org_id = ${orgId}::uuid and u.blocked_at is null`),
+      where om.org_id = ${orgId}::uuid and u.blocked_at is null and u.deletion_due_at is null`),
   );
   return rows.map((r) => ({ userId: r.user_id, roleIds: r.role_ids ?? [], admin: r.admin === true }));
 }

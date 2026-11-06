@@ -4,6 +4,7 @@ import { seesAgentDetails } from "./audience";
 import { listChannels } from "./channels";
 import { can, getMembership } from "./organizations";
 import type { RolePermission } from "./permissions";
+import { accountInUse } from "./standing";
 import { agentBudgetsThisMonth } from "./usage";
 
 const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
@@ -74,7 +75,7 @@ export async function rightHandPrompt(
       .select({ name: users.name, handle: organizationMembers.handle, role: organizationMembers.role })
       .from(organizationMembers)
       .innerJoin(users, eq(users.id, organizationMembers.userId))
-      .where(and(eq(organizationMembers.orgId, orgId), isNull(users.blockedAt)))
+      .where(and(eq(organizationMembers.orgId, orgId), accountInUse))
       .orderBy(organizationMembers.createdAt)
       .limit(SNAPSHOT_MAX + 1),
     listChannels(db, personId, orgId),

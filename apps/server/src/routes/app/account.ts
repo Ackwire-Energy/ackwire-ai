@@ -4,7 +4,6 @@ import {
   addHostComputer,
   announceMembers,
   announceProfile,
-  appleSignInTokens,
   avatarFile,
   CODE_LENGTH,
   can,
@@ -15,7 +14,6 @@ import {
   createInvitation,
   createOrganization,
   type DeletionDeps,
-  deleteAccount,
   getOrganization,
   hasPassword,
   invitationLogoFile,
@@ -42,9 +40,11 @@ import {
   requireOwnerToDelete,
   requirePermission,
   resolvePermissions,
+  restoreAccount,
   restoreWorkspace,
   revokeInvitation,
   saveOnboarding,
+  scheduleAccountDeletion,
   scheduleDeletion,
   sendDeletionCode,
   setAvatar,
@@ -471,6 +471,19 @@ export function accountRoutes(deps: AppDeps) {
                 description:
                   "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078). `org.create_refused` and `org.create_unpaid` (ADR 0079) can still refuse it.",
               }),
+              deletion: z
+                .object({
+                  dueAt: z
+                    .string()
+                    .nullable()
+                    .openapi({ description: "When it goes for good; null once that date passed." }),
+                  requestedAt: z.string().nullable(),
+                })
+                .optional()
+                .openapi({
+                  description:
+                    "They deleted this account: the apps show only its waiting screen (`DELETE /account/deletion` restores it). No workspace answers meanwhile.",
+                }),
             }),
             organizations: z.array(Organization),
           }),
@@ -510,7 +523,15 @@ export function accountRoutes(deps: AppDeps) {
             emailVerified: verified,
             locale: account.locale,
             localeAuto: account.localeAuto,
-            canCreateWorkspace: creates,
+            canCreateWorkspace: creates && !account.deletionDueAt,
+            ...(account.deletionDueAt
+              ? {
+                  deletion: {
+                    dueAt: account.deletionDueAt.getTime() > now ? account.deletionDueAt.toISOString() : null,
+                    requestedAt: iso(account.deletionRequestedAt),
+                  },
+                }
+              : {}),
           },
           organizations: memberships.map((m) => {
             const setup = onboardingOf(m.orgId);
@@ -749,10 +770,10 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Delete your account",
-      description: `Deletes the signed-in person at once: their sessions, phones and memberships. Workspaces only they are in close now and are deleted for good 7 days later. They leave the others, and the computers they connected there are removed (not in system mode). Messages they wrote stay without an author. What it would do: \`GET /account/deletion\`. Refused with \`sole_owner\` (params: \`organizations\`, their names, and \`orgIds\`) while they are the only owner of a workspace that has others in it and isn't being deleted, before the proof. ${PROOF_TEXT}`,
+      description: `Deletes the signed-in person in 7 days: their sessions and phones end now, and no workspace answers them, but signing in shows a waiting screen with \`DELETE /account/deletion\` to restore it until then. Workspaces only they are in close now and go on the same date. At the date they leave the others, and the computers they connected there are removed (not in system mode). Messages they wrote stay without an author. What it would do: \`GET /account/deletion\`. Refused with \`sole_owner\` (params: \`organizations\`, their names, and \`orgIds\`) while they are the only owner of a workspace that has others in it and isn't being deleted, before the proof. ${PROOF_TEXT}`,
       request: { body: { ...body(Proof), required: false } },
       responses: {
-        204: { description: "Deleted; the session cookies are cleared" },
+        204: { description: "Scheduled; the session cookies are cleared" },
         400: errorResponse("A malformed code, or a wrong one (`reauth.code_wrong`)"),
         401: errors[401],
         403: errorResponse("Blocked, or no proof that it's you (`reauth.code`, `reauth.password`)"),
@@ -768,18 +789,30 @@ export function accountRoutes(deps: AppDeps) {
       const refusal = soleOwnerRefusal(await accountDeletionPlan(db, user.id));
       if (refusal) throw refusal;
       await prove(c, user.id, null, c.req.valid("json"));
-      // Read before the account goes (its sign-in rows are deleted with it).
-      const revoke = deps.extras?.appleRevoke;
-      const appleTokens = revoke ? await appleSignInTokens(db, user.id) : [];
-      await deleteAccount(db, user.id, deletion);
+      await scheduleAccountDeletion(deletion, user.id);
       deps.wakeWorkers?.();
-      // Apple wants its tokens revoked when the account is deleted (best effort: the account is already gone).
-      if (revoke) await Promise.all(appleTokens.map((token) => revoke(token).catch(() => undefined)));
-      // Their photo files (best effort: the account is already gone).
-      const blobs = deps.adapters.platformBlobs;
-      const photos = await blobs.list(`avatars/${user.id}/`).catch(() => [] as string[]);
-      await Promise.all(photos.map((key) => blobs.delete(key).catch(() => undefined)));
       for (const cookie of expiredSessionCookies()) c.header("set-cookie", cookie, { append: true });
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/account/deletion",
+      tags,
+      security,
+      summary: "Restore your account",
+      description:
+        "Before its date only: the account is back as it was, with the workspaces that closed with it. Plans that stopped renewing stay that way. 409 `account.not_restorable` when it isn't being deleted or its date passed.",
+      responses: {
+        204: { description: "Restored" },
+        401: errors[401],
+        409: errorResponse("Not being deleted, or its date passed (`account.not_restorable`)"),
+      },
+    }),
+    async (c) => {
+      await restoreAccount(deletion, c.get("user").id);
       return c.body(null, 204);
     },
   );

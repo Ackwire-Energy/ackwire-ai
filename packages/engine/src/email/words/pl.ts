@@ -312,6 +312,23 @@ export const words: EmailWords = {
     why: (org) =>
       `Otrzymujesz tę wiadomość, ponieważ do twojego konta w przestrzeni roboczej ${org} w agentes.chat podłączono aplikację.`,
   },
+  accountDeleting: {
+    subject: (day) => `Twoje konto agentes.chat zostanie usunięte ${day}`,
+    preheader: "Masz 7 dni, żeby zmienić zdanie.",
+    headline: "Twoje konto jest usuwane",
+    body: (email, day, time) => ["Usuniemy konto ", { b: email }, ` ${day} o ${time}. Zostało wylogowane wszędzie i nikt nie może się tu z tobą skontaktować, dopóki nie wrócisz.`],
+    closes: (count, names) => [
+      plural("pl", count, {
+        one: "Przestrzeń robocza, w której nie było nikogo poza tobą, właśnie się zamknęła i zniknie tego samego dnia: ",
+        other: "Przestrzenie robocze, w których nie było nikogo poza tobą, właśnie się zamknęły i znikną tego samego dnia: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Zmieniasz zdanie? Zaloguj się przed tą datą i naciśnij Przywróć.",
+    button: "Zaloguj się, aby przywrócić",
+    why: "Otrzymujesz tę wiadomość, ponieważ ten adres ma konto w agentes.chat.",
+  },
   accountDeleted: {
     subject: "Twoje konto agentes.chat zostało usunięte",
     preheader: "Zostało wylogowane wszędzie i nie da się już na nie zalogować.",

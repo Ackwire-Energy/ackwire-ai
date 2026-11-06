@@ -291,6 +291,23 @@ export const words: EmailWords = {
     why: (org) =>
       `Du erhältst diese E-Mail, weil eine App mit deinem Konto in ${org} auf agentes.chat verbunden wurde.`,
   },
+  accountDeleting: {
+    subject: (day) => `Dein agentes.chat-Konto wird am ${day} gelöscht`,
+    preheader: "Du hast 7 Tage Zeit, es dir anders zu überlegen.",
+    headline: "Dein Konto wird gelöscht",
+    body: (email, day, time) => ["Wir löschen das Konto ", { b: email }, ` am ${day} um ${time}. Es ist überall abgemeldet, und niemand erreicht dich hier, bis du zurück bist.`],
+    closes: (count, names) => [
+      plural("de", count, {
+        one: "Der Workspace, in dem nur du warst, ist jetzt geschlossen und verschwindet am selben Tag: ",
+        other: `Die ${count} Workspaces, in denen nur du warst, sind jetzt geschlossen und verschwinden am selben Tag: `,
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Doch anders überlegt? Melde dich vor diesem Datum an und tippe auf Wiederherstellen.",
+    button: "Anmelden und wiederherstellen",
+    why: "Du erhältst diese E-Mail, weil diese Adresse ein Konto auf agentes.chat hat.",
+  },
   accountDeleted: {
     subject: "Dein agentes.chat-Konto wurde gelöscht",
     preheader: "Es ist überall abgemeldet und kann sich nicht mehr anmelden.",
