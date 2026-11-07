@@ -594,7 +594,7 @@ function unreachableWhy(a: Agent, person: string | null) {
 export async function reportDroppedMentions(
   deps: { db: Database; pubsub?: PubSub },
   message: { id: string; orgId: string; agentRunId: string | null },
-  dropped: { agentId: string; handle: string; reason: "not_in_channel" | "audience" }[],
+  dropped: { agentId: string; handle: string; reason: "not_in_channel" | "audience"; noAi?: boolean }[],
 ) {
   if (dropped.length === 0) return;
   try {
@@ -633,7 +633,12 @@ export async function reportDroppedMentions(
       deps,
       sender,
       message.id,
-      rows.map((a) => ({ handle: a.handle, why: unreachableWhy(a, person) })),
+      rows.map((a) => ({
+        handle: a.handle,
+        why: audience.find((d) => d.agentId === a.id)?.noAi
+          ? "it has no AI connected, so nothing could answer it"
+          : unreachableWhy(a, person),
+      })),
     );
   } catch {
     // The run that mentioned them is unaffected; the decision row keeps what it had.

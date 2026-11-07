@@ -657,10 +657,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           });
           // A member consulted by note instead (it takes consultations) was reached: no "wasn't woken" notice.
           const consulted = new Set(reach.filter((e) => e.consultationId).map((e) => e.agentId));
+          const noAi = new Set(reach.filter((e) => e.noAi).map((e) => e.agentId));
           await reportDroppedMentions(
             { db: deps.db, pubsub: deps.pubsub },
             message,
-            dropped.filter((d) => !consulted.has(d.agentId)),
+            dropped
+              .filter((d) => !consulted.has(d.agentId))
+              .map((d) => (noAi.has(d.agentId) ? { ...d, noAi: true } : d)),
           );
           await publishRouted(deps.pubsub, message, {
             strategy: "mention",

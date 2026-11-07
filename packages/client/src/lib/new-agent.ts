@@ -133,10 +133,14 @@ export const ROLE_DEFAULTS = {
 /** The look a draft starts with (before a role is picked). */
 export const BLANK_LOOK = { color: "sky", eyes: "round", accessory: "none" } as const satisfies RoleLook;
 
-/** Each connection's level for a role: the preset's level for its catalog connector, else none. */
+/**
+ * Each connection's level for a role: the preset's level for its catalog connector, else write, as every agent already
+ * has it (`grantToEveryAgent`). A custom server's account starts with none: only its first one is everyone's.
+ */
 export function presetLevels(role: RoleId, items: { id: string; def: { id: string } | null }[]) {
   const levels: Record<string, Level> = ROLE_DEFAULTS[role].levels;
-  return Object.fromEntries(items.map((i) => [i.id, (i.def && levels[i.def.id]) || "none"])) as Record<string, Level>;
+  const level = (i: (typeof items)[number]): Level => (i.def ? (levels[i.def.id] ?? "write") : "none");
+  return Object.fromEntries(items.map((i) => [i.id, level(i)])) as Record<string, Level>;
 }
 
 /** The role's channels among the ones given (by name, accents and case ignored). */

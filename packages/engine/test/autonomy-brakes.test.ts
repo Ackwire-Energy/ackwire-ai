@@ -594,11 +594,13 @@ describe("who an agent may call (§8)", () => {
     expect(told.map((m) => m.body)).toEqual([expect.stringContaining("call ada")]);
   });
 
-  test("settings are stored whole and normalized", async () => {
+  test("only the settings people set are stored, normalized: the rest follows the defaults", async () => {
     f = await setup();
     const saved = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, {
       autonomyBrakes: { maxUnrequested: 99, callAgents: "none" },
     });
+    // A default that changes later still reaches this agent.
+    expect(saved.autonomyBrakes).toEqual({ maxUnrequested: 20, callAgents: "none" });
     expect(autonomySettings(saved.autonomyBrakes)).toMatchObject({
       maxUnrequested: 20,
       callAgents: "none",

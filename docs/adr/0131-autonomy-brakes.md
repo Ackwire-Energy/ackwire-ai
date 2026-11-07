@@ -57,7 +57,7 @@ Before `dispatchMentions` wakes agents for an agent's or a routine's message nob
 
 `agents.autonomy_brakes` (jsonb, `{}` = the defaults), read through `autonomySettings` (clamped and filled), shown as `Agent.brakes` and changed with `PATCH …/agents/{id}` `brakes` (fields merged, who manages agents). Web: Configurações → "Trabalho que ninguém pediu" (`BrakesCard`, saved at once). Phone: the agent's edit screen (`BrakesSection`). The defaults keep today's autonomy for normal use: everything a person asks, and cheap proactive steps, are unchanged; only costly unrequested steps ask first.
 
-*Amended 2026-11-07:* defaults are open, admins narrow them. `costly` defaults to `go`: costly work nobody asked for goes ahead within the hourly PR cap and the parallel cap, and §3's card is for agents an admin set to ask first (`costly: ask`). Agents whose brakes were saved before keep what was stored, `ask` included. `otherProjects` stays off: it reads only once a person gives agents projects, which is that narrowing.
+*Amended 2026-11-07:* defaults are open, admins narrow them. `costly` defaults to `go`: costly work nobody asked for goes ahead within the hourly PR cap and the parallel cap, and §3's card is for agents an admin set to ask first (`costly: ask`). Agents whose brakes were saved before keep what was stored, `ask` included (a save then stored every field). A save now stores only the fields people set (`chosenAutonomy`), so a field nobody chose follows the defaults when they change. `otherProjects` stays off: it reads only once a person gives agents projects, which is that narrowing.
 
 ## Consequences
 

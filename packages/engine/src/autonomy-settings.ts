@@ -69,6 +69,15 @@ export function autonomySettings(raw: unknown): AutonomySettings {
   };
 }
 
+/**
+ * What to store for settings a person set (`raw`): only the fields it holds, each normalized. A field nobody chose
+ * stays out, so it follows `AUTONOMY_DEFAULTS` when they change instead of keeping the default of the day it was saved.
+ */
+export function chosenAutonomy(raw: Record<string, unknown>): Partial<AutonomySettings> {
+  const all = autonomySettings(raw);
+  return Object.fromEntries(Object.entries(all).filter(([k]) => raw[k] !== undefined));
+}
+
 /** Whether an agent with `from` settings may wake or hand work to `to` (§8): its list, and other projects. */
 export function mayCall(from: unknown, to: { id: string; autonomy: unknown }): boolean {
   const f = autonomySettings(from);

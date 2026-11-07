@@ -283,6 +283,47 @@ describe("a member that takes consultations for the person behind an agent's mes
     expect(reachOf((await messageOf(sent.id))?.meta)).toEqual([
       { agentId: gil.id, handle: "gil", reason: "audience", noAi: true },
     ]);
+    // The author reads the real cause too.
+    const [told] = await wakeSkipped();
+    expect(told?.body).toContain("no AI connected");
+    expect(told?.body).not.toContain("certain people");
+  });
+
+  test("the same mention again within the hour is the same delivery: no wake_skipped for it", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
+      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
+    });
+    const gil = await agentOf("Gil", "gil", { inGeneral: true });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .where(eq(schema.agents.id, gil.id));
+    await devWrites("@gil revisa o relatório de hoje.", []);
+    await drainOutbox(f.db, f.handlers);
+    // Another of Dev's runs, for another ask, says the same.
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev e o resumo de amanhã?",
+    });
+    const second = (await runsOf()).filter((r) => r.agentId === f.agent.id).at(-1);
+    if (!second || second.id === (await runsOf())[0]?.id) throw new Error("no second run");
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, second.id));
+    const again = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: f.agent.id, runId: second.id, hop: 1 },
+      body: "@gil revisa o relatório de hoje.",
+    });
+    await drainOutbox(f.db, f.handlers);
+
+    const notes = await f.db.select().from(schema.agentConsultations);
+    expect(notes).toHaveLength(1);
+    expect(reachOf((await messageOf(again.id))?.meta)).toEqual([
+      { agentId: gil.id, handle: "gil", reason: "audience", consultationId: notes[0]?.id ?? "" },
+    ]);
+    expect(await wakeSkipped()).toEqual([]);
   });
 });
 
