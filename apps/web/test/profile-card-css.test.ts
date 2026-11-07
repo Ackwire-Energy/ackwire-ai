@@ -37,3 +37,11 @@ test("short of room, the card's banner gives way first, then it scrolls with its
   for (const foot of [".mcard__foot", ".mcard .profile-card__body > .profile-card__actions:last-child"])
     expect(last(declarations(card, foot), "position")).toBe("sticky");
 });
+
+test("the audience popover's Cancelar and Salvar stay pinned to its foot when the choice scrolls", async () => {
+  const card = await sheet("apps/web/src/components/profile-card.css");
+  expect(last(declarations(card, ".mcard-audience.ac-popover"), "padding")).toBe("var(--menu-pad) var(--menu-pad) 0");
+  expect(last(declarations(card, ".mcard-audience__acts"), "position")).toBe("sticky");
+  expect(last(declarations(card, ".mcard-audience__acts"), "bottom")).toBe("0");
+  expect(last(declarations(card, ".mcard-audience__acts"), "padding")).toBe("12px 0 var(--menu-pad)");
+});

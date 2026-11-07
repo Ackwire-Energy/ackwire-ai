@@ -217,7 +217,8 @@ html:not([data-pointer]) .mcard__emoji:focus-visible {
   max-width: calc(100vw - 24px);
   max-height: min(640px, var(--radix-popover-content-available-height, calc(100dvh - 16px)));
   overflow-y: auto;
-  padding: var(--menu-pad);
+  /* The foot's room is Cancelar and Salvar's own (below), so they pin to the edge with it. */
+  padding: var(--menu-pad) var(--menu-pad) 0;
 }
 /* Cancelar and Salvar on the room (`.ac-popover`), everything over them further in. */
 .mcard-audience.ac-popover > :not(.mcard-audience__acts),
@@ -232,10 +233,18 @@ html:not([data-pointer]) .mcard__emoji:focus-visible {
 .mcard-audience__err {
   color: var(--danger);
 }
+/* Taller than the room, the choice scrolls under Cancelar and Salvar, pinned to the foot on the popover's face that
+   fades in over the gap above them. At rest they sit where they did (the fade takes the gap back). */
 .mcard-audience__acts {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: -12px;
+  padding: 12px 0 var(--menu-pad);
+  background: linear-gradient(to bottom, transparent, var(--glass-solid) 12px);
 }
 
 /* The right hand's "Como funciona" (ADR 0137): a fact a line, its icon muted. */
