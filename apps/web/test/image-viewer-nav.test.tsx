@@ -176,15 +176,38 @@ describe("moving through a message's pictures in the viewer", () => {
     expect(document.activeElement).toBe(nav("Imagem anterior"));
   });
 
-  test("the picture beside it loads ahead, so moving is instant", async () => {
+  test("every picture's details load ahead, not only the ones beside it", async () => {
     const r = await channelWith(FOUR());
     await openThumb("tela-2.png");
     await settle(4);
-    const cached = (name: string) =>
-      r.services.queryClient.getQueryData(keys.artifact(ORG_ID, r.ids[name] as string, undefined));
-    expect(cached("tela-1.png")).toBeTruthy();
-    expect(cached("tela-3.png")).toBeTruthy();
-    expect(cached("tela-4.png")).toBeUndefined();
+    for (const name of ["tela-1.png", "tela-3.png", "tela-4.png"]) {
+      const id = r.ids[name] as string;
+      expect(r.services.queryClient.getQueryData(keys.artifact(ORG_ID, id, undefined))).toBeTruthy();
+    }
+  });
+
+  test("two quick steps land on a picture never beside the one shown: its head at once, never Carregando…", async () => {
+    await channelWith(FOUR());
+    await openThumb("tela-2.png");
+    await settle(4);
+    let head: (string | null | undefined)[] = [];
+    await act(async () => {
+      fireEvent.keyDown(dialog(), { key: "ArrowRight" });
+      fireEvent.keyDown(dialog(), { key: "ArrowRight" });
+      head = [title(), place()];
+    });
+    expect(head).toEqual(["tela-4.png", "4 de 4"]);
+  });
+
+  test("← → typed in a field outside the viewer leave the picture alone", async () => {
+    await channelWith(FOUR());
+    await openThumb("tela-2.png");
+    const field = [...document.querySelectorAll("textarea")].find((el) => !dialog().contains(el));
+    if (!field) throw new Error("no composer behind the viewer");
+    await press("ArrowRight", field);
+    await press("ArrowLeft", field);
+    expect(title()).toBe("tela-2.png");
+    expect(place()).toBe("2 de 4");
   });
 
   test("a zoomed picture takes ← → to move around in it; moving to another one shows it fitted", async () => {

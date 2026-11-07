@@ -394,7 +394,9 @@ export function ArtifactViewer({
                 onClick={() => move(1)}
               />
             )}
-            {[prev, next].map((item) => item && <Preload key={item.id} item={item} />)}
+            {set?.map((item) => (
+              <Preload key={item.id} item={item} bytes={item === prev || item === next} />
+            ))}
           </div>
           {sideVersions && <Versions artifact={a} onVersion={onVersion} />}
         </div>
@@ -404,11 +406,14 @@ export function ArtifactViewer({
   );
 }
 
-/** A picture beside the one shown: its details and its bytes load ahead, so moving to it is instant. */
-function Preload({ item }: { item: ViewerItem }) {
+/**
+ * A picture of the set loads ahead: its details always (the head follows at once, however fast the moves), its bytes
+ * when it is beside the one shown (the picture is there at once too).
+ */
+function Preload({ item, bytes }: { item: ViewerItem; bytes: boolean }) {
   const { org } = useOrg();
   const a = useArtifact(org.id, item.id, item.version).data;
-  useArtifactBlob(org.id, item.id, a?.shownVersion ?? 0, a !== undefined);
+  useArtifactBlob(org.id, item.id, a?.shownVersion ?? 0, bytes && a !== undefined);
   return null;
 }
 

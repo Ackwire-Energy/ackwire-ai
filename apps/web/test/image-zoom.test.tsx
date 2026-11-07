@@ -242,6 +242,37 @@ describe("the picture viewer's zoom", () => {
     expect(scaleOf(img)).toBe(1);
   });
 
+  test("a second finger makes the swipe a pinch: the picture lets go of the pull, and the pinch never moves on", async () => {
+    touch = true;
+    const swipes: number[] = [];
+    const { img, stage } = await show(3600, 600, (dir) => swipes.push(dir));
+    const at = (type: "pointerDown" | "pointerMove" | "pointerUp", pointerId: number, x: number) =>
+      act(async () => {
+        fireEvent[type](stage, { pointerId, button: 0, pointerType: "touch", clientX: x, clientY: 350 });
+      });
+    // A finger pulls the picture sideways, then a second one lands: back in its place for the pinch.
+    await at("pointerDown", 1, 600);
+    await at("pointerMove", 1, 500);
+    expect(img.style.transform).toContain("translate(-100px, 250px)");
+    await at("pointerDown", 2, 800);
+    expect(img.style.transform).toContain("translate(0px, 250px)");
+    // Spread to zoom in, then both lift: fitted again, it sits where it should (no pull left over).
+    await at("pointerMove", 2, 950);
+    expect(scaleOf(img)).toBeGreaterThan(1 / 3);
+    await at("pointerUp", 1, 500);
+    await at("pointerUp", 2, 950);
+    key(stage, "0");
+    expect(img.style.transform).toContain("translate(0px, 250px)");
+    // A pinch that stays fitted: the finger left on the glass dragging sideways is still the pinch, not a swipe.
+    await at("pointerDown", 1, 600);
+    await at("pointerDown", 2, 800);
+    await at("pointerUp", 1, 600);
+    await at("pointerMove", 2, 650);
+    await at("pointerUp", 2, 650);
+    expect(swipes).toEqual([]);
+    expect(img.style.transform).toContain("translate(0px, 250px)");
+  });
+
   test("without its bytes yet, the stage waits with its status", async () => {
     const r = render(
       <I18nextProvider i18n={createI18n("pt-BR")}>

@@ -70,9 +70,14 @@ export function ImageZoom({
   const [lensOn, setLensOn] = useState(() => storage.get(STORAGE_KEYS.imageLens) !== "0");
   const hover = useMatchMedia(HOVER);
   const pointers = useRef(new Map<number, Point>());
-  const gesture = useRef<{ start: Point; view: ZoomView; moved: boolean; pinch?: { d: number; mid: Point } } | null>(
-    null,
-  );
+  const gesture = useRef<{
+    start: Point;
+    view: ZoomView;
+    moved: boolean;
+    pinch?: { d: number; mid: Point };
+    /** The finger left of a pinch: it moves a zoomed picture, never swipes to another one. */
+    pinched?: boolean;
+  } | null>(null);
   const zoomedInAt = useRef(0);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -223,6 +228,8 @@ export function ImageZoom({
         moved: true,
         pinch: { d: distance(all[0], all[1]), mid: middle(all[0], all[1]) },
       };
+      // The first finger's sideways pull ends here: the pinch zooms the picture where it really is.
+      setSwipe(0);
     }
     setAnimate(false);
   };
@@ -247,7 +254,7 @@ export function ImageZoom({
     }
     if (!g.moved) return;
     if (isZoomed(g.view, img, stage)) setView(panBy(g.view, p.x - g.start.x, p.y - g.start.y, img, stage));
-    else if (onSwipe && e.pointerType !== "mouse") setSwipe(p.x - g.start.x);
+    else if (onSwipe && e.pointerType !== "mouse" && !g.pinched) setSwipe(p.x - g.start.x);
   };
 
   const onPointerEnd = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -255,15 +262,24 @@ export function ImageZoom({
     const g = gesture.current;
     const left = [...pointers.current.values()];
     if (left[0]) {
-      // One finger of a pinch lifted: the other carries on as a drag.
-      if (viewRef.current) gesture.current = { start: left[0], view: viewRef.current, moved: true };
+      // One finger of a pinch lifted: the other carries on as a drag, still the pinch's (it never swipes).
+      if (viewRef.current) gesture.current = { start: left[0], view: viewRef.current, moved: true, pinched: true };
       return;
     }
     gesture.current = null;
     setDragging(false);
     const v = viewRef.current;
     // A finger dragged the fitted picture: onto the next or previous one when it went far enough sideways, else back.
-    if (g?.moved && !g.pinch && onSwipe && e.pointerType !== "mouse" && img && stage && !isZoomed(g.view, img, stage)) {
+    if (
+      g?.moved &&
+      !g.pinch &&
+      !g.pinched &&
+      onSwipe &&
+      e.pointerType !== "mouse" &&
+      img &&
+      stage &&
+      !isZoomed(g.view, img, stage)
+    ) {
       setAnimate(true);
       setSwipe(0);
       const p = local(e);
