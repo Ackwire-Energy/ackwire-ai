@@ -6,6 +6,9 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+/* Its own room outside a message: in one, the conversation's rhythm sets it (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .tp-chips {
   margin-top: 10px;
 }
 .tp-chips__row {

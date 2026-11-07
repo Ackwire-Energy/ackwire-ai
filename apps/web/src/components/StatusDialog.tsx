@@ -255,7 +255,6 @@ function StatusForm({
             <Button
               variant="ghost"
               size="sm"
-              className="status-dialog__clear"
               onClick={() => onSave({ availability: draft.availability, status: null })}
             >
               {t("presence.clearStatus")}

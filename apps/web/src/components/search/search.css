@@ -131,8 +131,6 @@
 .search-menu__filter {
   align-items: center;
   gap: 12px;
-  padding-top: 6px;
-  padding-bottom: 6px;
 }
 .search-menu__icon {
   flex: none;

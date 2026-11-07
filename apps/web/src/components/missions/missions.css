@@ -11,12 +11,15 @@
 .mi-card {
   position: relative;
   max-width: var(--msg-card-w);
-  margin-top: 10px;
   padding: 16px;
   border-radius: 20px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   animation: mi-pop 0.3s var(--spring) both;
+}
+/* Its own room outside a message: in one, the conversation's rhythm sets it (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .mi-card {
+  margin-top: 10px;
 }
 @keyframes mi-pop {
   from {

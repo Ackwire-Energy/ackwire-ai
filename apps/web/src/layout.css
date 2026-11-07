@@ -836,54 +836,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   gap: 14px;
   padding-bottom: 96px;
 }
-/*
- * A list or a nav beside what it opens (Aprovações, Propostas, Settings): `.page-split` holds the columns. Where they
- * sit side by side, the page fills the work area and never scrolls: the split takes the height under the page's
- * header and each of its columns scrolls on its own, so the header, a column's head and a footer floating at its
- * bottom stay put. Every element between the work area and the split hands the height down. Narrower (these pages
- * stack their columns at 940px), the page scrolls as any other. So it does in a window under 560px tall (a small or
- * zoomed-in one): there the page's header would leave the columns too little room, or none, and what they hold out of
- * reach. `.shell__main` in each selector: the pages' own stylesheets load after this one and must not win.
- */
-@media (min-width: 941px) and (min-height: 560px) {
-  .shell__main:has(.page-split) {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .shell__main > :is(:has(.page-split), .page-split) {
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 0;
-    padding-bottom: 0;
-  }
-  .shell__main :has(.page-split) {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    min-height: 0;
-  }
-  .shell__main :has(.page-split) > * {
-    flex-shrink: 0;
-  }
-  .shell__main :has(.page-split) > :is(:has(.page-split), .page-split) {
-    flex: 1 1 auto;
-  }
-  .shell__main .page-split {
-    min-height: 0;
-    align-items: stretch;
-    grid-template-rows: minmax(0, 1fr);
-  }
-  .shell__main .page-split > * {
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-  /* A column is as tall as the split, not as its content: what it holds scrolls in it instead of squeezing to fit. */
-  .shell__main .page-split > * > * {
-    flex-shrink: 0;
-  }
-}
 .list-group-head {
   display: flex;
   align-items: center;
@@ -1042,45 +994,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   display: flex;
   flex-direction: column;
   padding: 16px 8px 24px;
-}
-/*
- * Turns are told apart by space. What stands in the list takes the turn gap above it; the next row of a turn, and a
- * quiet line under another, the part gap. A row gives back the room of its plate, so it counts as what shows. Two
- * classes' weight: a notice or a card keeps its margin for where it stands alone, and never here.
- */
-.channel__messages > :not(.channel__empty) {
-  --row-gap: var(--msg-turn-gap);
-  margin-block: var(--row-gap) 0;
-}
-.channel__messages > :first-child,
-.channel__messages > .channel__spacer + * {
-  --row-gap: 0px;
-}
-.channel__messages > .ac-msg + .ac-msg--grouped,
-.channel__messages
-  > :not(.ac-msg, .ac-divider, .channel__unread, .channel__spacer)
-  + :not(.ac-msg, .ac-divider, .channel__unread) {
-  --row-gap: var(--msg-part-gap);
-}
-/* A card in a row of its own under the same author's words: as far off them as in the same row. */
-.channel__messages > .ac-msg + .ac-msg--grouped:not(:has(.ac-msg__text)):has(.rq, .mi-card, .iw-card, .brw-ac) {
-  --row-gap: var(--msg-card-gap);
-}
-/* A message that ends on the agents' line (`.ag-rc--talk`) already holds part of the turn's gap under it. */
-.channel__messages
-  > .ac-msg:has(
-    > .ac-msg__body
-      > .ag-rcs:nth-last-child(1 of :not(.ac-msg__actions, .ac-visually-hidden, .ac-msg__aside--floating))
-      > .ag-rc--talk:last-child
-  )
-  + * {
-  --row-gap: var(--msg-part-gap);
-}
-.channel__messages > .ac-msg {
-  margin-block: calc(var(--row-gap) - var(--msg-block)) calc(-1 * var(--msg-block));
-}
-.channel__messages > :is(.ac-divider, .channel__notice) {
-  padding-block: 0;
 }
 /* A message that @mentions the viewer: a tinted row, its corners all round. No accent bar on its left edge: the tint
    and the name in the words say it. No other row carries a plate at rest (only a hover on someone else's row, an open

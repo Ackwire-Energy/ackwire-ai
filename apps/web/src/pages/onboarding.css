@@ -280,8 +280,8 @@ textarea.onb__big.ac-input {
   font-size: 13px;
   color: var(--faint);
 }
-/* An `.ac-link` in the host's sentence ("Change", "skip"): muted until hovered. */
-.onb__link {
+/* An `.ac-link` in the host's sentence ("Change", "skip"): muted until hovered, the kit's faint while it can't be used. */
+.onb__link:where(:not(:disabled)) {
   color: var(--muted);
 }
 .onb__link:hover:not(:disabled) {

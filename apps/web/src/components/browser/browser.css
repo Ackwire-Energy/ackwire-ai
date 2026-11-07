@@ -506,13 +506,16 @@ html:not([data-pointer]) .brw-key:focus-visible {
 /* ---------- the agent's browser in its card ---------- */
 .brw-ac {
   position: relative;
-  margin-top: 6px;
   max-width: var(--msg-card-w);
   border-radius: 18px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
   animation: brw-grow-in 0.24s var(--out);
+}
+/* Its own room outside a message: in one, the conversation's rhythm sets it (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .brw-ac {
+  margin-top: 6px;
 }
 .brw-ac__hint {
   color: var(--faint);

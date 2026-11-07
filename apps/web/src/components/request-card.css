@@ -8,12 +8,15 @@
   position: relative;
   display: block;
   max-width: var(--msg-card-w);
-  margin: 4px 0 8px;
   padding: 14px 16px 0;
   box-sizing: border-box;
   background: var(--raised);
   box-shadow: 0 0 0 1px var(--line2);
   border-radius: 16px 16px 16px 4px;
+}
+/* Its own room outside a message: in one, the conversation's rhythm sets it (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .rq {
+  margin: 4px 0 8px;
 }
 /* Nothing left to decide, so no footer: the card closes on its own padding. */
 .rq:not(:has(.rq__foot)) {

@@ -29,6 +29,10 @@
   --msg-bubble: var(--own-bubble);
   --msg-mine-mix: 30%;
 }
+/* Quiet rows (an event pill, a thread's line) on the text's column: the messages' side padding, 36px face and gap. */
+.channel__messages {
+  --thread-indent: 64px;
+}
 .channel__messages[data-look="bubbles"] {
   padding-inline: 12px;
   /* Quiet rows (an event pill, a thread's line) on the bubbles' column: the row's 8px, the 32px face, the 8px gap. */
@@ -281,11 +285,6 @@
   .ac-msg--streaming[data-look="bubbles"] .ac-msg__text > .md:has(+ .ac-msg__stamp) > :last-child::after {
     animation: ac-blink 1s steps(2) infinite;
   }
-}
-/* What hangs under a bubble, in one width. */
-.ac-msg[data-look="bubbles"] .ac-msg__body > :is(.ac-tools, .brw-ac, .rq-done, .rq-open) {
-  width: 100%;
-  max-width: 520px;
 }
 /*
  * An event pill right under a bubble (stopped here, a request waiting or decided) is the bubble's tab: one piece with

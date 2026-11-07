@@ -224,7 +224,3 @@ html:not([data-pointer]) .status-field__emoji:focus-visible {
 .status-avail__opt .ac-radio {
   margin: 0;
 }
-/* "Limpar status" starts the foot, its words on the dialog's edge like the body's. */
-.status-dialog__clear {
-  margin-left: -10px;
-}

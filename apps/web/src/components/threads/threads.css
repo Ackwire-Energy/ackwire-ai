@@ -3,12 +3,8 @@
  * marker and stub a range leaves in its channel, a closed thread's line, the
  * "Threads (N)" popover, the thread view's header and context block, and the
  * "Ajustar trecho" selection (neutral: ink and gray only; blue is for agents).
- * `--thread-indent` lines quiet rows up with the messages' text column.
+ * `--thread-indent` lines quiet rows up with the messages' text column (set per look, in chat/looks.css).
  */
-/* The messages' side padding, 36px face and gap (`.ac-msg`). */
-.channel__messages {
-  --thread-indent: 64px;
-}
 
 /* ── In the channel ────────────────────────────────────────────────────── */
 .msg--context::before {
@@ -342,11 +338,15 @@ html:not([data-pointer]) .thread-title__button:focus-visible {
   color: var(--faint);
 }
 .thread-context {
-  margin: 6px 8px 10px;
+  margin-inline: 8px;
   border-radius: 16px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
+}
+/* Its own room outside a message: in one, the conversation's rhythm sets it (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .thread-context {
+  margin-block: 6px 10px;
 }
 .thread-context__head {
   display: flex;
@@ -865,8 +865,9 @@ html:not([data-pointer]) .thread-line:focus-visible {
   display: inline-flex;
   flex: none;
 }
-/* Framed faces, agents and people one size: they barely overlap, so none is cut. */
-.thread-line__who .ac-avatar-stack > .ac-avatar + .ac-avatar {
+/* Framed faces, agents and people one size: they barely overlap, so none is cut. Not after a person's initials, which
+   fill their tile (the kit's `.ac-avatar-stack` keeps the next face past it). */
+.thread-line__who .ac-avatar-stack > .ac-avatar:where(:not([data-kind="person"]:not(:has(img)))) + .ac-avatar {
   margin-left: -3px;
 }
 .thread-line__state {
