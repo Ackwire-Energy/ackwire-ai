@@ -51,33 +51,161 @@ export function sortTeam(
   });
 }
 
-/** Who an agent reports to on the org chart: its owner, else its setor's lead; null for neither (or one who left). */
-export function reportsTo(agent: TeamAgent, groups: readonly AgentGroup[], members: ReadonlySet<string>) {
-  if (agent.ownerUserId && members.has(agent.ownerUserId)) return agent.ownerUserId;
-  const lead = groupOf(groups, agent.id)?.leadUserId;
-  return lead && members.has(lead) ? lead : null;
+/** The agent `agent` reports to (Responde a), when it is still on the team; else null. */
+export function supervisorOf<A extends Pick<TeamAgent, "id" | "reportsToAgentId">>(agent: A, agents: readonly A[]) {
+  const id = agent.reportsToAgentId;
+  return id && id !== agent.id ? (agents.find((a) => a.id === id) ?? null) : null;
+}
+
+/** The agents that report to `agentId` directly, in the team's order. */
+export const reportsOf = <A extends Pick<TeamAgent, "id" | "reportsToAgentId">>(
+  agentId: string,
+  agents: readonly A[],
+) => agents.filter((a) => a.reportsToAgentId === agentId && a.id !== agentId);
+
+/** The top of an agent's line: itself when it reports to no agent. */
+export function lineTop<A extends Pick<TeamAgent, "id" | "reportsToAgentId">>(agent: A, agents: readonly A[]) {
+  let at = agent;
+  const seen = new Set([at.id]);
+  for (let up = supervisorOf(at, agents); up && !seen.has(up.id); up = supervisorOf(at, agents)) {
+    seen.add(up.id);
+    at = up;
+  }
+  return at;
 }
 
 /**
+ * Who an agent reports to among people on the org chart: its line's top agent's owner, else that agent's setor's lead;
+ * null for neither (or one who left).
+ */
+export function reportsTo(
+  agent: TeamAgent,
+  groups: readonly AgentGroup[],
+  members: ReadonlySet<string>,
+  agents: readonly TeamAgent[] = [],
+) {
+  const top = lineTop(agent, agents);
+  if (top.ownerUserId && members.has(top.ownerUserId)) return top.ownerUserId;
+  const lead = groupOf(groups, top.id)?.leadUserId;
+  return lead && members.has(lead) ? lead : null;
+}
+
+/** An agent on the chart with the agents that report to it under it, all the way down. */
+export interface ChartNode {
+  agent: TeamAgent;
+  reports: ChartNode[];
+}
+
+/** `top` and its line as a tree (an agent drawn once even if the stored lines loop). */
+function nodeOf(top: TeamAgent, shown: readonly TeamAgent[], seen: Set<string>): ChartNode {
+  seen.add(top.id);
+  return {
+    agent: top,
+    reports: reportsOf(top.id, shown)
+      .filter((a) => !seen.has(a.id))
+      .map((a) => nodeOf(a, shown, seen)),
+  };
+}
+
+/** How many agents report to a node, all the way down ("4 agentes"). */
+export const lineSize = (node: ChartNode): number => node.reports.reduce((n, r) => n + 1 + lineSize(r), 0);
+
+/**
  * The org chart by person: one column per person someone reports to, in the order their first agent was made, and
- * the agents with nobody last (`personId` null). `skip` leaves agents out (the right hand, drawn on its own).
+ * the agents with nobody last (`personId` null). A supervisor sits in its person's column with its reports under it
+ * (`nodes`); `agents` is every agent of the column, flat. `skip` leaves agents out (the right hand, drawn on its own).
  */
 export function chartByPerson(
   agents: readonly TeamAgent[],
   groups: readonly AgentGroup[],
   members: ReadonlySet<string>,
   skip: (a: TeamAgent) => boolean = () => false,
-): { personId: string | null; agents: TeamAgent[] }[] {
+): { personId: string | null; agents: TeamAgent[]; nodes: ChartNode[] }[] {
+  const shown = agents.filter((a) => !skip(a));
   const columns = new Map<string | null, TeamAgent[]>();
-  for (const a of agents) {
-    if (skip(a)) continue;
-    const to = reportsTo(a, groups, members);
+  for (const a of shown) {
+    const to = reportsTo(a, groups, members, shown);
     columns.set(to, [...(columns.get(to) ?? []), a]);
   }
+  const seen = new Set<string>();
+  const col = (personId: string | null, list: TeamAgent[]) => {
+    const nodes = list.filter((a) => lineTop(a, shown).id === a.id).map((a) => nodeOf(a, shown, seen));
+    // A line that loops in storage has no top: each of its agents is drawn on its own, once.
+    for (const a of list) if (!seen.has(a.id)) nodes.push(nodeOf(a, shown, seen));
+    return { personId, agents: list, nodes };
+  };
   const none = columns.get(null);
   columns.delete(null);
-  const out = [...columns].map(([personId, list]) => ({ personId, agents: list }));
-  return none ? [...out, { personId: null, agents: none }] : out;
+  const out = [...columns].map(([personId, list]) => col(personId, list));
+  return none ? [...out, col(null, none)] : out;
+}
+
+/** The agents others report to, in the team's order: the Mapa's band. */
+export const supervisors = (agents: readonly TeamAgent[]) =>
+  agents.filter((s) => agents.some((a) => a.id !== s.id && a.reportsToAgentId === s.id));
+
+/** The one agent every one of `agents` reports to (a Mapa column's or a setor's face), else null. */
+export function sharedSupervisor(agents: readonly TeamAgent[], team: readonly TeamAgent[]) {
+  const ids = new Set(agents.map((a) => a.reportsToAgentId ?? null));
+  const [only] = ids;
+  return ids.size === 1 && only ? (team.find((a) => a.id === only) ?? null) : null;
+}
+
+/**
+ * A setor's supervisor (its "Supervisor" row): the agent most of its agents report to, and how many of the others
+ * (not the supervisor itself) don't, for "1 agente sem supervisor · Aplicar". Null when none of them reports to one.
+ */
+export function sectorSupervisor(group: AgentGroup, team: readonly TeamAgent[]) {
+  const mine = group.agentIds.flatMap((id) => team.find((a) => a.id === id) ?? []);
+  const count = new Map<string, number>();
+  for (const a of mine) if (a.reportsToAgentId) count.set(a.reportsToAgentId, (count.get(a.reportsToAgentId) ?? 0) + 1);
+  const [top] = [...count].sort((x, y) => y[1] - x[1]);
+  const supervisor = top ? team.find((a) => a.id === top[0]) : undefined;
+  if (!supervisor) return null;
+  const off = mine.filter((a) => a.id !== supervisor.id && a.reportsToAgentId !== supervisor.id);
+  return { supervisor, off };
+}
+
+/**
+ * The changes that make every agent of a setor report to `supervisorId` (the supervisor itself left as it is), or that
+ * clear the ones reporting to `clearOf` (`supervisorId` null).
+ */
+export function sectorLineChanges(
+  group: AgentGroup,
+  team: readonly TeamAgent[],
+  supervisorId: string | null,
+  clearOf?: string,
+) {
+  const mine = group.agentIds.flatMap((id) => team.find((a) => a.id === id) ?? []);
+  return supervisorId
+    ? mine
+        .filter((a) => a.id !== supervisorId && a.reportsToAgentId !== supervisorId)
+        .map((a) => ({ agentId: a.id, reportsToAgentId: supervisorId }))
+    : mine
+        .filter((a) => clearOf !== undefined && a.reportsToAgentId === clearOf)
+        .map((a) => ({ agentId: a.id, reportsToAgentId: null }));
+}
+
+/**
+ * Whether `agentId` may report to `to` as the chart sees it (the server checks again): not itself, not into its own
+ * line below it, and at most `MAX_LINE` agents top to bottom.
+ */
+export const MAX_LINE = 3;
+export function mayReportTo(
+  agents: readonly Pick<TeamAgent, "id" | "reportsToAgentId">[],
+  agentId: string,
+  to: string,
+): boolean {
+  if (to === agentId) return false;
+  const byId = new Map(agents.map((a) => [a.id, a]));
+  let above = 0;
+  for (let at: string | null | undefined = to; at; at = byId.get(at)?.reportsToAgentId) {
+    if (at === agentId || above > MAX_LINE) return false;
+    above++;
+  }
+  const height = (id: string, depth: number): number =>
+    depth > MAX_LINE ? depth : Math.max(1, ...reportsOf(id, agents).map((r) => 1 + height(r.id, depth + 1)));
+  return above + height(agentId, 1) <= MAX_LINE;
 }
 
 /**

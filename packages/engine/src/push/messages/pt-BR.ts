@@ -75,4 +75,5 @@ export const ptBR: PushStrings = {
   usageRaisedBody: "Pode continuar.",
   usageRefusedTitle: (a) => `${a} recusou seu pedido de mais uso`,
   teamWeekReady: "Sua semana da equipe está pronta",
+  teamDayReady: "Seu resumo do dia está pronto",
 };

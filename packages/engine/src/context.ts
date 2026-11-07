@@ -21,7 +21,7 @@ import { agentStyleLine, agentStyleOf, isAgentStyle } from "./agent-style";
 import type { Agent } from "./agents";
 import { readerOf, readerOfMessage } from "./agents-dm-reads";
 import type { AiStatusDeps } from "./ai-status";
-import { NO_PERSON, speakerFor } from "./audience";
+import { canTalkTo, NO_PERSON, speakerFor, viaAgent } from "./audience";
 import { runAuthority, UUID } from "./authority";
 import { blockStateNotes } from "./block-state";
 import { caches } from "./cache";
@@ -48,6 +48,7 @@ import {
   WHY_EVERYONE_CALLED,
   WHY_YOU_WERE_CALLED,
 } from "./reply-policy";
+import { linePrompt } from "./reporting";
 import { wikiPersonOf } from "./requester";
 import { isRightHand } from "./right-hand";
 import { RIGHT_HAND_TOOLS, rightHandPrompt } from "./right-hand-prompt";
@@ -847,7 +848,18 @@ export async function buildRunContext(
     .filter((m) => m.agentId && referencedIds.includes(m.agentId))
     .map((m) => `@${m.agentHandle}`);
   // The rest of the org's agents: channel members are described in "Where you are".
-  const team = options.team ? teamPrompt(teamRows, agent.id, requester, here, talks) : "";
+  const team = options.team
+    ? [
+        teamPrompt(teamRows, agent.id, requester, here, talks),
+        linePrompt(
+          // Its line as this person may know it: an agent they can't talk to stays out, as in "# Your team".
+          teamRows.filter((a) => a.id === agent.id || canTalkTo(a, requester, viaAgent(talks))),
+          agent.id,
+        ),
+      ]
+        .filter(Boolean)
+        .join("\n\n")
+    : "";
   const memberList = members
     .map((m) =>
       m.agentHandle

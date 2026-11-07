@@ -32,7 +32,8 @@ export const TEAM_WEEK_CARD = "team_week";
 export const SET_TEAM_WEEK_TOOL = "set_team_week";
 
 const HOUR_MS = 3_600_000;
-const WEEK_MS = 7 * 24 * HOUR_MS;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
 /** A slot missed for longer (the server was down) waits for the next week: a Friday card on Sunday is noise. */
 const POST_WINDOW_MS = 6 * HOUR_MS;
 /** Steps of a task that moved for this long are stalled. */
@@ -50,9 +51,14 @@ export interface TeamWeekPrefs {
   day: number;
   /** 0–23, in the workspace's time zone. */
   hour: number;
+  /**
+   * "Resumo do dia": the same card every day at `hour`, over the last day, in place of the week's. Anyone may turn it
+   * on (the week's is for admins); off by default.
+   */
+  daily: boolean;
 }
 
-export const TEAM_WEEK_DEFAULTS: TeamWeekPrefs = { off: false, day: 5, hour: 17 };
+export const TEAM_WEEK_DEFAULTS: TeamWeekPrefs = { off: false, day: 5, hour: 17, daily: false };
 
 const WEEKDAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
 
@@ -66,18 +72,20 @@ export function teamWeekPrefsOf(raw: unknown): TeamWeekPrefs {
     off: r.off === true,
     day: whole(r.day, 0, 6) ?? TEAM_WEEK_DEFAULTS.day,
     hour: whole(r.hour, 0, 23) ?? TEAM_WEEK_DEFAULTS.hour,
+    daily: r.daily === true,
   };
 }
 
-/** The latest slot at or before `now` within a week, in the workspace's time zone. */
+/** What the card looks back on: a day for "Resumo do dia", else a week. */
+export const teamWeekSpan = (prefs: Pick<TeamWeekPrefs, "daily">) => (prefs.daily ? DAY_MS : WEEK_MS);
+
+/** The latest slot at or before `now` within one span (a day or a week), in the workspace's time zone. */
 export function lastTeamWeekSlot(prefs: TeamWeekPrefs, timezone: string, now: Date): Date | null {
-  const rule: ScheduleRule = {
-    freq: "weekly",
-    byWeekday: [WEEKDAYS[prefs.day] as string],
-    times: [`${String(prefs.hour).padStart(2, "0")}:00`],
-    timezone,
-  };
-  const at = nextOccurrence(rule, new Date(now.getTime() - WEEK_MS));
+  const times = [`${String(prefs.hour).padStart(2, "0")}:00`];
+  const rule: ScheduleRule = prefs.daily
+    ? { freq: "daily", times, timezone }
+    : { freq: "weekly", byWeekday: [WEEKDAYS[prefs.day] as string], times, timezone };
+  const at = nextOccurrence(rule, new Date(now.getTime() - teamWeekSpan(prefs)));
   return at && at.getTime() <= now.getTime() ? at : null;
 }
 
@@ -134,6 +142,8 @@ export type TeamWeekHighlight =
 export interface TeamWeekCard {
   kind: typeof TEAM_WEEK_CARD;
   forUserId: string;
+  /** "Resumo do dia" (`day`) or the week's (absent on cards from before it). */
+  period?: "day" | "week";
   /** The week's first and last day, `YYYY-MM-DD` in the workspace's time zone. */
   from: string;
   to: string;
@@ -163,6 +173,11 @@ interface Window {
   start: Date;
   end: Date;
   timezone: string;
+  /**
+   * An administrator's card counts the whole team's runs and the workspace's spend; anyone else's only runs where they
+   * read and no money (absent: an administrator's).
+   */
+  admin?: boolean;
 }
 
 /** Lowercase words without accents, mentions or punctuation: how two requests are told the same. */
@@ -207,10 +222,13 @@ export async function buildTeamWeek(
     or (c.kind = 'channel' and ${maySql(w.orgId, sql`${w.userId}::text`, "administrator")}))`;
   const teamRuns = sql`r.org_id = ${w.orgId} and r.created_at >= ${start}::timestamptz and r.created_at < ${end}::timestamptz
     and r.agent_id in (select id from agents where org_id = ${w.orgId} and builtin is null)`;
+  const admin = w.admin !== false;
 
   const [counts] = rowsOf<{ done: number | string; failed: number | string }>(
     await db.execute(sql`select count(*) filter (where r.status = 'done') as done,
-      count(*) filter (where r.status = 'failed') as failed from agent_runs r where ${teamRuns}`),
+      count(*) filter (where r.status = 'failed') as failed from agent_runs r
+      ${admin ? sql`` : sql`join channels c on c.id = r.channel_id`}
+      where ${teamRuns} ${admin ? sql`` : sql`and ${visible}`}`),
   );
   const monthStart = new Date(Date.UTC(w.end.getUTCFullYear(), w.end.getUTCMonth(), 1)).toISOString();
   const [spent] = rowsOf<{ n: number | string | null }>(
@@ -357,8 +375,9 @@ export async function buildTeamWeek(
     done: Number(counts?.done ?? 0),
     stuck: Number(counts?.failed ?? 0),
     waiting: waiting.length,
-    spentNanoUsd: Number(spent?.n ?? 0),
-    budgetNanoUsd: team.reduce((sum, a) => sum + budgetOf(a.budget), budgetOf(lodi?.budget)),
+    // The workspace's money is the administrators' to read.
+    spentNanoUsd: admin ? Number(spent?.n ?? 0) : 0,
+    budgetNanoUsd: admin ? team.reduce((sum, a) => sum + budgetOf(a.budget), budgetOf(lodi?.budget)) : 0,
   };
   if (stats.done === 0 && stats.stuck === 0 && rows.length === 0) return null;
   return {
@@ -547,19 +566,21 @@ export async function enqueueTeamWeeks(db: Database, now = new Date()) {
         and exists (select 1 from agents a where a.org_id = m.org_id and a.builtin is null
           and a.archived_at is null and a.deleted_at is null)
         and exists (select 1 from agents a where a.org_id = m.org_id and a.builtin = 'right_hand')
-        and ${maySql(sql`m.org_id`, sql`m.user_id`, "administrator")}`),
+        and (coalesce(m.team_week->>'daily', 'false') = 'true'
+          or ${maySql(sql`m.org_id`, sql`m.user_id`, "administrator")})`),
   );
   let n = 0;
   for (const d of due) {
     const timezone = d.tz || "UTC";
-    const slot = lastTeamWeekSlot(teamWeekPrefsOf(d.team_week), timezone, now);
+    const prefs = teamWeekPrefsOf(d.team_week);
+    const slot = lastTeamWeekSlot(prefs, timezone, now);
     if (!slot || now.getTime() - slot.getTime() > POST_WINDOW_MS) continue;
     n++;
     await enqueue(db, {
       orgId: d.org_id,
       kind: TEAM_WEEK_JOB,
       payload: { userId: d.user_id, slot: slot.toISOString() },
-      dedupeKey: `${TEAM_WEEK_JOB}:${d.org_id}:${d.user_id}:${weekKey(slot, timezone)}`,
+      dedupeKey: `${TEAM_WEEK_JOB}:${d.org_id}:${d.user_id}:${prefs.daily ? `day:${localDate(slot, timezone)}` : weekKey(slot, timezone)}`,
       maxAttempts: 4,
     });
   }
@@ -583,25 +604,36 @@ export async function postTeamWeek(
       join users u on u.id = m.user_id
       where m.org_id = ${orgId} and m.user_id = ${userId}`),
   );
-  if (!member?.admin || teamWeekPrefsOf(member.team_week).off) return null;
+  const prefs = teamWeekPrefsOf(member?.team_week);
+  if (!member || prefs.off || (!member.admin && !prefs.daily)) return null;
   const [lodi] = await db
     .select()
     .from(agents)
     .where(and(eq(agents.orgId, orgId), eq(agents.builtin, "right_hand"), isNull(agents.archivedAt)));
   if (!lodi || !isRightHand(lodi) || !canTalkTo(lodi, userId, await speakerFor(db, orgId, userId))) return null;
   const timezone = member.tz || "UTC";
-  const start = new Date(slot.getTime() - WEEK_MS);
+  const start = new Date(slot.getTime() - teamWeekSpan(prefs));
+  const period = prefs.daily ? "day" : "week";
   const posted = async (tx: Executor) =>
     rowsOf<{ id: string }>(
       await tx.execute(sql`select id from messages where org_id = ${orgId} and author_agent_id = ${lodi.id}
         and meta->'actionCard'->>'kind' = ${TEAM_WEEK_CARD} and meta->'actionCard'->>'forUserId' = ${userId}
-        and meta->'actionCard'->>'from' = ${localDate(start, timezone)} limit 1`),
+        and meta->'actionCard'->>'from' = ${localDate(start, timezone)}
+        and coalesce(meta->'actionCard'->>'period', 'week') = ${period} limit 1`),
     ).length > 0;
   // A retry after the card went out builds nothing: building again would stale the proposals that card shows.
   if (await posted(db)) return null;
-  const built = await buildTeamWeek(db, { orgId, userId, rightHandId: lodi.id, start, end: slot, timezone });
+  const built = await buildTeamWeek(db, {
+    orgId,
+    userId,
+    rightHandId: lodi.id,
+    start,
+    end: slot,
+    timezone,
+    admin: member.admin,
+  });
   if (!built) return null;
-  const card: TeamWeekCard = { ...built, done: {}, dismissedAt: null };
+  const card: TeamWeekCard = { ...built, period, done: {}, dismissedAt: null };
   const message = await db.transaction(async (tx) => {
     const dm = await openPersonAgentDm(tx, orgId, userId, lodi.id);
     if (await posted(tx)) return null;
@@ -610,8 +642,12 @@ export async function postTeamWeek(
       channelId: dm.id,
       author: { type: "agent", agentId: lodi.id, runId: null, hop: 1, stretchId: null },
       // Only this person reads it: the push and the conversation list say it in their language.
-      body: pushStrings(pushLocale(member.locale)).teamWeekReady,
-      meta: { bodyCode: TEAM_WEEK_CARD, bodyParams: { from: card.from, to: card.to }, actionCard: card },
+      body: pushStrings(pushLocale(member.locale))[prefs.daily ? "teamDayReady" : "teamWeekReady"],
+      meta: {
+        bodyCode: TEAM_WEEK_CARD,
+        bodyParams: { from: card.from, to: card.to, ...(prefs.daily ? { period: "day" } : {}) },
+        actionCard: card,
+      },
     });
     await enqueue(tx, {
       orgId,
@@ -645,7 +681,7 @@ export async function setTeamWeekPrefs(db: Executor, orgId: string, userId: stri
   const next = teamWeekPrefsOf({ ...now, ...patch });
   await db
     .update(organizationMembers)
-    .set({ teamWeek: { off: next.off, day: next.day, hour: next.hour } })
+    .set({ teamWeek: { off: next.off, day: next.day, hour: next.hour, daily: next.daily } })
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
   return { ...next, timezone: now.timezone };
 }

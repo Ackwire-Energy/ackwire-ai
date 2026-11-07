@@ -70,3 +70,46 @@
   color: var(--ink);
   text-decoration: underline;
 }
+/* The right hand's hand-offs: one chip per task under its reply, opening the task's conversation beside the chat. */
+.iw-chips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+}
+.iw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(100%, var(--msg-card-w));
+  min-height: 36px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+.iw-chip:hover {
+  background: var(--raised-2);
+}
+html:not([data-pointer]) .iw-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.iw-chip__t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.iw-chip__agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  color: var(--muted);
+}

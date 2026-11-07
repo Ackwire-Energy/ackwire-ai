@@ -1530,7 +1530,10 @@
       "subPerson": "각 에이전트를 담당자 아래에, 담당자가 없으면 부서 리더 아래에 보여줘요.",
       "subSector": "부서별 에이전트예요. {{name}}은(는) 모두와 함께 일해요.",
       "workspace": "워크스페이스",
-      "responsible": "담당자: {{names}}"
+      "responsible": "담당자: {{names}}",
+      "lodi": "당신과 함께 모든 것을 지켜봐요",
+      "supervisor": "감독: {{name}}",
+      "dragSector": "에이전트 위로 끌어다 놓으면 이 부서의 에이전트가 그 에이전트에게 보고해요"
     },
     "map": {
       "lead": "에이전트를 맡은 사람, 에이전트가 있는 채널, 각자 스스로 하는 일, 사람을 기다리는 일을 보여줘요. 점선은 지난 하루 동안 서로 도움을 요청한 에이전트예요.",
@@ -1546,7 +1549,9 @@
       "emptyTitle": "에이전트가 어디서 일하는지 볼 수 있어요",
       "emptyAction": "채널에 추가",
       "emptyViewer": "에이전트 관리자가 채널에 추가하면 여기에 지도가 표시돼요.",
-      "others": "다른 채널"
+      "others": "다른 채널",
+      "band": "감독",
+      "reportsTo": "{{name}}에게 보고"
     },
     "sectors": {
       "lead": "각 부서에는 담당자, 대리, 에이전트, 그리고 그 채널과 루틴이 있어요.",
@@ -1556,6 +1561,12 @@
       "backupLabel": "대리",
       "leadOf": "{{name}} 담당자",
       "backupOf": "{{name}} 대리",
+      "supervisor": "감독",
+      "supervisorOf": "{{name}}의 감독",
+      "unsupervised_other": "감독이 없는 에이전트 {{count}}명",
+      "apply": "적용",
+      "supervisorDone_other": "{{sector}}의 에이전트 {{count}}명이 이제 {{name}}에게 보고해요",
+      "supervisorCleared_other": "{{sector}}의 에이전트 {{count}}명이 더 이상 감독에게 보고하지 않아요",
       "nobody": "없음",
       "none": "없음",
       "channels": "채널",
@@ -1571,6 +1582,14 @@
       "empty": "부서마다 담당자가 있어서 누가 무엇을 맡는지 모두가 알 수 있어요.",
       "emptyViewerTitle": "누가 무엇을 맡는지 확인해요",
       "emptyViewer": "에이전트를 관리하는 사람이 부서를 만들면 여기에 보여요."
+    },
+    "reportsTo": {
+      "label": "보고 대상",
+      "help": "이 에이전트가 누구에게 보고하는지만 알려줘요. 어떤 권한도 주지 않아요.",
+      "none": "없음",
+      "done": "{{agent}}이(가) 이제 {{to}}에게 보고해요",
+      "cleared": "{{agent}}이(가) 더 이상 에이전트에게 보고하지 않아요",
+      "reports": "{{name}}에게 보고하는 에이전트"
     },
     "usage": {
       "lead": "이번 달 각 사람이 에이전트를 얼마나 쓰는지와 한도예요.",
@@ -1958,6 +1977,7 @@
         "ai_account": "계정 주인만 줄 수 있어요",
         "name": "에이전트 이름은 관리자만 바꿀 수 있어요",
         "look": "모습은 관리자와 담당자만 바꿀 수 있어요",
+        "reports_to": "에이전트의 보고 대상은 관리자만 바꿀 수 있어요",
         "many": "이 변경은 관리자만 할 수 있어요"
       }
     },
@@ -1970,10 +1990,12 @@
       "archive": "상태",
       "channel": "채널",
       "name": "이름",
-      "look": "모습"
+      "look": "모습",
+      "reports_to": "보고 대상"
     },
     "value": {
       "lookDefault": "기본 모습",
+      "anAgent": "에이전트",
       "none": "없음",
       "budgetDefault": "워크스페이스 기본값",
       "anAccount": "AI 계정 하나",
@@ -2016,6 +2038,7 @@
   },
   "teamWeek": {
     "title": "팀의 한 주",
+    "dayTitle": "오늘의 정리",
     "suggestions_other": "제안 {{count}}개",
     "stat": {
       "done": "완료한 작업",
@@ -2076,7 +2099,8 @@
       "wed": "매주 수요일 {{time}}",
       "thu": "매주 목요일 {{time}}",
       "fri": "매주 금요일 {{time}}",
-      "sat": "매주 토요일 {{time}}"
+      "sat": "매주 토요일 {{time}}",
+      "day": "매일 {{time}}"
     },
     "off": "꺼짐",
     "schedule": {
@@ -2084,11 +2108,14 @@
       "day": "요일",
       "hour": "시간",
       "stop": "그만 받기",
-      "start": "다시 받기"
+      "start": "다시 받기",
+      "daily": "매일"
     },
     "settings": {
       "label": "팀의 한 주",
-      "help": "매주 {{name}} 님이 DM으로 팀의 한 주와 개선할 점을 알려 줘요. 관리자만 받아요."
+      "help": "매주 {{name}} 님이 DM으로 팀의 한 주와 개선할 점을 알려 줘요. 관리자만 받아요.",
+      "dayLabel": "오늘의 정리",
+      "dayHelp": "매일 {{name}}이(가) DM으로 팀이 한 일과 당신을 기다리는 일을 알려줘요. 전할 것이 있는 날에만요."
     }
   },
   "routing": {
@@ -13019,7 +13046,8 @@
       "askedBy": "{{name}}님이 작업을 요청했어요",
       "view": "작업 보기",
       "taken": "{{name}}이(가) 작업을 맡았어요",
-      "agent": "{{name}}과(와) 함께"
+      "agent": "{{name}}과(와) 함께",
+      "chipLabel": "작업 #{{number}}의 대화 열기, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13029,6 +13057,7 @@
       },
       "autonomy_digest_other": "알림 {{count}}개는 이미 알려졌거나 무해해 보여서 작업하지 않았습니다:",
       "team_week": "팀의 한 주, {{from}}~{{to}}",
+      "team_day": "{{day}}까지 팀의 하루",
       "autonomy_loop": "이 일은 스스로 작업을 멈췄습니다. 하루에 {{count}}번 다시 발생했습니다({{title}}). 어떻게 처리할지 알려 주세요.",
       "mission_plan": "{{computer}}에서 진행할 “{{title}}” 계획",
       "mission_planNoComputer": "“{{title}}” 계획",

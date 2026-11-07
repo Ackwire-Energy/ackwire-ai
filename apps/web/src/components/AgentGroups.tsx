@@ -18,7 +18,7 @@ import {
   MenuRadioGroup,
   MenuSeparator,
 } from "@agenteschat/ui";
-import { type DragEvent, useState } from "react";
+import { type DragEvent, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -218,10 +218,13 @@ export function AgentGroupMenu({
   agent,
   groups,
   onNewGroup,
+  children,
 }: {
   agent: Agent;
   groups: AgentGroup[];
   onNewGroup: () => void;
+  /** More of the row's choices after the setor's (Equipe › Lista: Responde a). */
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -264,6 +267,12 @@ export function AgentGroupMenu({
           >
             {t("agentGroups.moveDown")}
           </MenuItem>
+        </>
+      )}
+      {children && (
+        <>
+          <MenuSeparator />
+          {children}
         </>
       )}
     </Menu>

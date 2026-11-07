@@ -3,12 +3,21 @@ import type { AgentGroup, TeamAgent } from "../src/api/types";
 import {
   chartByPerson,
   filterTeam,
+  lineSize,
+  lineTop,
   mapColumns,
+  mayReportTo,
   noSectorsCopy,
+  reportsOf,
   reportsTo,
   sectorGap,
+  sectorLineChanges,
   sectorReach,
+  sectorSupervisor,
+  sharedSupervisor,
   sortTeam,
+  supervisorOf,
+  supervisors,
 } from "../src/lib/team-views";
 
 const agent = (id: string, over: Partial<TeamAgent> = {}): TeamAgent => ({
@@ -92,5 +101,76 @@ describe("Equipe's views (ADR 0148)", () => {
     expect(sectorGap({ ...eng, leadUserId: null })).toBe("noLead");
     expect(sectorGap(eng)).toBe("noBackup");
     expect(sectorGap({ ...eng, backupUserId: "u-amara" })).toBeNull();
+  });
+});
+
+describe("Responde a (ADR 0148 addendum)", () => {
+  const nina = agent("Nina", { ownerUserId: "u-amara" });
+  const bea = agent("Bea", { reportsToAgentId: "Nina", ownerUserId: "u-lukas" });
+  const cid = agent("Cid", { reportsToAgentId: "Bea" });
+  const dan = agent("Dan", { reportsToAgentId: "Nina" });
+  const team = [nina, bea, cid, dan, kai];
+  const sales: AgentGroup = { id: "g-sales", name: "Vendas", agentIds: ["Bea", "Dan", "Kai"] };
+
+  test("the org chart: a supervisor in its person's column with its line under it, counted", () => {
+    const columns = chartByPerson(team, [], members);
+    expect(columns.map((c) => c.personId)).toEqual(["u-amara", null]);
+    const [amara] = columns;
+    // Bea's owner is Lukas, but she reports to Nina: she sits under her.
+    expect(amara?.agents.map((a) => a.id)).toEqual(["Nina", "Bea", "Cid", "Dan"]);
+    expect(amara?.nodes.map((n) => n.agent.id)).toEqual(["Nina"]);
+    const top = amara?.nodes[0];
+    expect(top?.reports.map((r) => r.agent.id)).toEqual(["Bea", "Dan"]);
+    expect(top?.reports[0]?.reports.map((r) => r.agent.id)).toEqual(["Cid"]);
+    expect(top && lineSize(top)).toBe(3);
+    expect(reportsTo(cid, [], members, team)).toBe("u-amara");
+    expect(lineTop(cid, team).id).toBe("Nina");
+    expect(supervisorOf(cid, team)?.id).toBe("Bea");
+    expect(reportsOf("Nina", team).map((a) => a.id)).toEqual(["Bea", "Dan"]);
+  });
+
+  test("lines that loop in storage still draw each agent once", () => {
+    const a = agent("A", { reportsToAgentId: "B" });
+    const b = agent("B", { reportsToAgentId: "A" });
+    const columns = chartByPerson([a, b], [], members);
+    expect(columns.flatMap((c) => c.agents.map((x) => x.id)).sort()).toEqual(["A", "B"]);
+    const drawn = (n: { agent: TeamAgent; reports: unknown[] }): string[] => [
+      n.agent.id,
+      ...(n.reports as (typeof n)[]).flatMap(drawn),
+    ];
+    expect(columns.flatMap((c) => c.nodes.flatMap(drawn)).sort()).toEqual(["A", "B"]);
+  });
+
+  test("the map's band and a column's face", () => {
+    expect(supervisors(team).map((a) => a.id)).toEqual(["Nina", "Bea"]);
+    expect(sharedSupervisor([bea, dan], team)?.id).toBe("Nina");
+    expect(sharedSupervisor([bea, kai], team)).toBeNull();
+    expect(sharedSupervisor([kai], team)).toBeNull();
+  });
+
+  test("a setor's supervisor, who is off it, and the changes that set or clear it", () => {
+    expect(sectorSupervisor(sales, team)).toEqual({ supervisor: nina, off: [kai] });
+    expect(sectorSupervisor(eng, team)).toBeNull();
+    expect(sectorLineChanges(sales, team, "Nina")).toEqual([{ agentId: "Kai", reportsToAgentId: "Nina" }]);
+    // The supervisor itself is left as it is.
+    expect(sectorLineChanges(sales, team, "Bea")).toEqual([
+      { agentId: "Dan", reportsToAgentId: "Bea" },
+      { agentId: "Kai", reportsToAgentId: "Bea" },
+    ]);
+    expect(sectorLineChanges(sales, team, null, "Nina")).toEqual([
+      { agentId: "Bea", reportsToAgentId: null },
+      { agentId: "Dan", reportsToAgentId: null },
+    ]);
+  });
+
+  test("who an agent may report to: not itself, not below itself, at most 3 agents top to bottom", () => {
+    expect(mayReportTo(team, "Kai", "Kai")).toBe(false);
+    expect(mayReportTo(team, "Nina", "Cid")).toBe(false);
+    expect(mayReportTo(team, "Kai", "Bea")).toBe(true);
+    // Nina, Bea, Cid, Kai: four.
+    expect(mayReportTo(team, "Kai", "Cid")).toBe(false);
+    // Bea's line (Bea, Cid) under Kai: Kai, Bea, Cid.
+    expect(mayReportTo(team, "Bea", "Kai")).toBe(true);
+    expect(mayReportTo([...team, agent("Eli")], "Nina", "Eli")).toBe(false);
   });
 });

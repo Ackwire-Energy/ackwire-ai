@@ -1581,7 +1581,10 @@
       "subPerson": "Jeder Agent unter der verantwortlichen Person, oder unter der Leitung seiner Abteilung, wenn er keine hat.",
       "subSector": "Jede Abteilung mit ihren Agenten. {{name}} arbeitet mit allen.",
       "workspace": "Arbeitsbereich",
-      "responsible": "Verantwortlich: {{names}}"
+      "responsible": "Verantwortlich: {{names}}",
+      "lodi": "begleitet alles mit dir",
+      "supervisor": "Supervisor: {{name}}",
+      "dragSector": "Auf einen Agenten ziehen, damit die Agenten dieses Bereichs ihm berichten"
     },
     "map": {
       "lead": "Wer sich um die Agenten kümmert, in welchen Kanälen sie sind, was jeder selbstständig macht und was auf eine Person wartet. Gestrichelte Linien verbinden Agenten, die sich am letzten Tag um Hilfe gebeten haben.",
@@ -1599,7 +1602,9 @@
       "emptyTitle": "Sieh, wo jeder Agent arbeitet",
       "emptyAction": "Zu einem Kanal hinzufügen",
       "emptyViewer": "Wer die Agenten verwaltet, fügt sie zu Kanälen hinzu, und die Karte erscheint hier.",
-      "others": "Andere Kanäle"
+      "others": "Andere Kanäle",
+      "band": "Supervisoren",
+      "reportsTo": "Berichtet an {{name}}"
     },
     "sectors": {
       "lead": "Jede Abteilung hat eine Leitung, eine Vertretung, ihre Agenten und deren Kanäle und Routinen.",
@@ -1609,6 +1614,15 @@
       "backupLabel": "Vertretung",
       "leadOf": "Leitung von {{name}}",
       "backupOf": "Vertretung in {{name}}",
+      "supervisor": "Supervisor",
+      "supervisorOf": "Supervisor von {{name}}",
+      "unsupervised_one": "{{count}} Agent ohne Supervisor",
+      "unsupervised_other": "{{count}} Agenten ohne Supervisor",
+      "apply": "Anwenden",
+      "supervisorDone_one": "{{count}} Agent von {{sector}} berichtet jetzt an {{name}}",
+      "supervisorDone_other": "{{count}} Agenten von {{sector}} berichten jetzt an {{name}}",
+      "supervisorCleared_one": "{{count}} Agent von {{sector}} berichtet keinem Supervisor mehr",
+      "supervisorCleared_other": "{{count}} Agenten von {{sector}} berichten keinem Supervisor mehr",
       "nobody": "Niemand",
       "none": "Keine",
       "channels": "Kanäle",
@@ -1624,6 +1638,14 @@
       "empty": "Jede Abteilung hat eine Leitung, so sehen alle, wer sich um was kümmert.",
       "emptyViewerTitle": "Sieh, wer sich um was kümmert",
       "emptyViewer": "Wer die Agenten verwaltet, erstellt die Abteilungen. Sie erscheinen dann hier."
+    },
+    "reportsTo": {
+      "label": "Berichtet an",
+      "help": "Sagt nur, wem dieser Agent Rechenschaft gibt. Gibt keine Berechtigung.",
+      "none": "Niemand",
+      "done": "{{agent}} berichtet jetzt an {{to}}",
+      "cleared": "{{agent}} berichtet keinem Agenten mehr",
+      "reports": "Wer an {{name}} berichtet"
     },
     "usage": {
       "lead": "Was jede Person diesen Monat von den Agenten nutzt, und die Limits.",
@@ -2033,6 +2055,7 @@
         "ai_account": "Nur die Person, der das Konto gehört, vergibt es",
         "name": "Nur Admins benennen einen Agenten um",
         "look": "Nur Admins und sein Verantwortlicher ändern sein Aussehen",
+        "reports_to": "Nur Admins ändern, an wen ein Agent berichtet",
         "many": "Nur Admins machen diese Änderungen"
       }
     },
@@ -2045,10 +2068,12 @@
       "archive": "Status",
       "channel": "Kanal",
       "name": "Name",
-      "look": "Aussehen"
+      "look": "Aussehen",
+      "reports_to": "Berichtet an"
     },
     "value": {
       "lookDefault": "Das Standardaussehen",
+      "anAgent": "Ein Agent",
       "none": "Keins",
       "budgetDefault": "Standard des Workspace",
       "anAccount": "Ein KI-Konto",
@@ -2095,6 +2120,7 @@
   },
   "teamWeek": {
     "title": "Teamwoche",
+    "dayTitle": "Tageszusammenfassung",
     "suggestions_one": "{{count}} Vorschlag",
     "suggestions_other": "{{count}} Vorschläge",
     "stat": {
@@ -2164,7 +2190,8 @@
       "wed": "Jeden Mittwoch um {{time}}",
       "thu": "Jeden Donnerstag um {{time}}",
       "fri": "Jeden Freitag um {{time}}",
-      "sat": "Jeden Samstag um {{time}}"
+      "sat": "Jeden Samstag um {{time}}",
+      "day": "Jeden Tag um {{time}}"
     },
     "off": "Aus",
     "schedule": {
@@ -2172,11 +2199,14 @@
       "day": "Tag",
       "hour": "Uhrzeit",
       "stop": "Nicht mehr erhalten",
-      "start": "Wieder erhalten"
+      "start": "Wieder erhalten",
+      "daily": "Jeden Tag"
     },
     "settings": {
       "label": "Teamwoche",
-      "help": "Jede Woche erzählt dir {{name}} in deiner DM, wie es im Team lief und was sich verbessern lässt. Nur Admins bekommen sie."
+      "help": "Jede Woche erzählt dir {{name}} in deiner DM, wie es im Team lief und was sich verbessern lässt. Nur Admins bekommen sie.",
+      "dayLabel": "Tageszusammenfassung",
+      "dayHelp": "Jeden Tag erzählt dir {{name}} in deiner DM, was das Team getan hat und was auf dich wartet, nur an Tagen mit etwas zu sagen."
     }
   },
   "routing": {
@@ -13529,7 +13559,8 @@
       "askedBy": "{{name}} hat um eine Aufgabe gebeten",
       "view": "Aufgabe ansehen",
       "taken": "{{name}} hat die Aufgabe übernommen",
-      "agent": "Mit {{name}}"
+      "agent": "Mit {{name}}",
+      "chipLabel": "Unterhaltung der Aufgabe #{{number}} öffnen, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13540,6 +13571,7 @@
       "autonomy_digest_one": "{{count}} Alarm wirkte bekannt oder harmlos, deshalb habe ich nicht daran gearbeitet:",
       "autonomy_digest_other": "{{count}} Alarme wirkten bekannt oder harmlos, deshalb habe ich nicht daran gearbeitet:",
       "team_week": "So lief die Woche des Teams, {{from}} bis {{to}}",
+      "team_day": "Wie der Tag des Teams lief, bis {{day}}",
       "autonomy_loop": "Ich habe aufgehört, von mir aus daran zu arbeiten. Es kam {{count}} Mal an einem Tag zurück ({{title}}). Sag mir, wie ich damit umgehen soll.",
       "mission_plan": "Plan für „{{title}}“ auf {{computer}}",
       "mission_planNoComputer": "Plan für „{{title}}“",

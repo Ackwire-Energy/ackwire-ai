@@ -1530,7 +1530,10 @@
       "subPerson": "各エージェントを担当者の下に表示します。担当者がいない場合は、部署のリーダーの下に表示します。",
       "subSector": "部署ごとにエージェントを表示します。{{name}} は全員と働きます。",
       "workspace": "ワークスペース",
-      "responsible": "担当者: {{names}}"
+      "responsible": "担当者: {{names}}",
+      "lodi": "あなたと一緒にすべてを見ています",
+      "supervisor": "監督：{{name}}",
+      "dragSector": "エージェントにドラッグすると、この部門のエージェントがそのエージェントに報告します"
     },
     "map": {
       "lead": "エージェントの担当者、エージェントがいるチャンネル、それぞれが自分で行うこと、人の対応を待っていることを表示します。点線は直近 1 日に助けを求め合ったエージェントです。",
@@ -1546,7 +1549,9 @@
       "emptyTitle": "各エージェントの働く場所を確認できます",
       "emptyAction": "チャンネルに追加",
       "emptyViewer": "エージェントの管理者がチャンネルに追加すると、ここにマップが表示されます。",
-      "others": "ほかのチャンネル"
+      "others": "ほかのチャンネル",
+      "band": "監督",
+      "reportsTo": "{{name}} に報告"
     },
     "sectors": {
       "lead": "各部署には担当者、代理、エージェント、そのチャンネルとルーティンがあります。",
@@ -1556,6 +1561,12 @@
       "backupLabel": "代理",
       "leadOf": "{{name}} の担当者",
       "backupOf": "{{name}} の代理",
+      "supervisor": "監督",
+      "supervisorOf": "{{name}} の監督",
+      "unsupervised_other": "監督のいないエージェント {{count}} 件",
+      "apply": "適用",
+      "supervisorDone_other": "{{sector}} のエージェント {{count}} 件が {{name}} に報告するようになりました",
+      "supervisorCleared_other": "{{sector}} のエージェント {{count}} 件は監督に報告しなくなりました",
       "nobody": "なし",
       "none": "なし",
       "channels": "チャンネル",
@@ -1571,6 +1582,14 @@
       "empty": "部署ごとに担当者がいるので、誰が何を見ているかが全員にわかります。",
       "emptyViewerTitle": "誰が何を担当しているかを確認",
       "emptyViewer": "部署はエージェントを管理する人が作成します。作成するとここに表示されます。"
+    },
+    "reportsTo": {
+      "label": "報告先",
+      "help": "このエージェントが誰に報告するかを示すだけです。権限は何も与えません。",
+      "none": "なし",
+      "done": "{{agent}} は {{to}} に報告するようになりました",
+      "cleared": "{{agent}} はエージェントに報告しなくなりました",
+      "reports": "{{name}} に報告するエージェント"
     },
     "usage": {
       "lead": "今月、各メンバーがエージェントをどれだけ使っているかと、その上限です。",
@@ -1958,6 +1977,7 @@
         "ai_account": "割り当てられるのはアカウントの持ち主だけです",
         "name": "エージェントの名前を変えられるのは管理者だけです",
         "look": "見た目を変えられるのは管理者と責任者だけです",
+        "reports_to": "エージェントの報告先を変えられるのは管理者だけです",
         "many": "これらの変更ができるのは管理者だけです"
       }
     },
@@ -1970,10 +1990,12 @@
       "archive": "状態",
       "channel": "チャンネル",
       "name": "名前",
-      "look": "見た目"
+      "look": "見た目",
+      "reports_to": "報告先"
     },
     "value": {
       "lookDefault": "標準の見た目",
+      "anAgent": "エージェント",
       "none": "なし",
       "budgetDefault": "ワークスペースの既定",
       "anAccount": "AIアカウント",
@@ -2016,6 +2038,7 @@
   },
   "teamWeek": {
     "title": "チームの1週間",
+    "dayTitle": "今日のまとめ",
     "suggestions_other": "{{count}}件の提案",
     "stat": {
       "done": "完了したタスク",
@@ -2076,7 +2099,8 @@
       "wed": "毎週水曜 {{time}}",
       "thu": "毎週木曜 {{time}}",
       "fri": "毎週金曜 {{time}}",
-      "sat": "毎週土曜 {{time}}"
+      "sat": "毎週土曜 {{time}}",
+      "day": "毎日 {{time}}"
     },
     "off": "オフ",
     "schedule": {
@@ -2084,11 +2108,14 @@
       "day": "曜日",
       "hour": "時刻",
       "stop": "受け取らない",
-      "start": "また受け取る"
+      "start": "また受け取る",
+      "daily": "毎日"
     },
     "settings": {
       "label": "チームの1週間",
-      "help": "毎週 {{name}} があなたの DM で、チームの様子と改善できることを伝えます。管理者だけが受け取ります。"
+      "help": "毎週 {{name}} があなたの DM で、チームの様子と改善できることを伝えます。管理者だけが受け取ります。",
+      "dayLabel": "今日のまとめ",
+      "dayHelp": "毎日 {{name}} があなたの DM で、チームがしたことと、あなたを待っていることを伝えます。伝えることがある日だけです。"
     }
   },
   "routing": {
@@ -13027,7 +13054,8 @@
       "askedBy": "{{name}}がタスクを依頼しました",
       "view": "タスクを見る",
       "taken": "{{name}}がタスクを引き受けました",
-      "agent": "担当: {{name}}"
+      "agent": "担当: {{name}}",
+      "chipLabel": "タスク #{{number}} の会話を開く、{{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13037,6 +13065,7 @@
       },
       "autonomy_digest_other": "{{count}}件のアラートは既知か無害に見えたので、作業しませんでした:",
       "team_week": "チームの1週間、{{from}}〜{{to}}",
+      "team_day": "{{day}} までのチームの1日",
       "autonomy_loop": "この件は自分の判断で作業をやめました。1日に{{count}}回繰り返されました({{title}})。どう扱うか教えてください。",
       "mission_plan": "{{computer}}での「{{title}}」の計画",
       "mission_planNoComputer": "「{{title}}」の計画",

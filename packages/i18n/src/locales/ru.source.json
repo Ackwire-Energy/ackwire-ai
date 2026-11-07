@@ -3884,6 +3884,15 @@
   "team.chart.responsible": {
     "value": "Responsible: {{names}}"
   },
+  "team.chart.lodi": {
+    "value": "follows everything with you"
+  },
+  "team.chart.supervisor": {
+    "value": "Supervisor: {{name}}"
+  },
+  "team.chart.dragSector": {
+    "value": "Drag onto an agent to make this sector's agents report to it"
+  },
   "team.map.lead": {
     "value": "Who looks after the agents, the channels they are in, what each one does on its own and what waits for a person. Dashed lines are agents that asked each other in the last day."
   },
@@ -3932,6 +3941,12 @@
   "team.map.others": {
     "value": "Other channels"
   },
+  "team.map.band": {
+    "value": "Supervisors"
+  },
+  "team.map.reportsTo": {
+    "value": "Reports to {{name}}"
+  },
   "team.sectors.lead": {
     "value": "Each department has a lead, a substitute, its agents and their channels and routines."
   },
@@ -3952,6 +3967,33 @@
   },
   "team.sectors.backupOf": {
     "value": "Substitute in {{name}}"
+  },
+  "team.sectors.supervisor": {
+    "value": "Supervisor"
+  },
+  "team.sectors.supervisorOf": {
+    "value": "Supervisor of {{name}}"
+  },
+  "team.sectors.unsupervised": {
+    "value": {
+      "one": "{{count}} agent without a supervisor",
+      "other": "{{count}} agents without a supervisor"
+    }
+  },
+  "team.sectors.apply": {
+    "value": "Apply"
+  },
+  "team.sectors.supervisorDone": {
+    "value": {
+      "one": "{{count}} agent of {{sector}} now reports to {{name}}",
+      "other": "{{count}} agents of {{sector}} now report to {{name}}"
+    }
+  },
+  "team.sectors.supervisorCleared": {
+    "value": {
+      "one": "{{count}} agent of {{sector}} no longer reports to a supervisor",
+      "other": "{{count}} agents of {{sector}} no longer report to a supervisor"
+    }
   },
   "team.sectors.nobody": {
     "value": "Nobody"
@@ -3991,6 +4033,24 @@
   },
   "team.sectors.emptyViewer": {
     "value": "Whoever manages the agents creates departments, and they show up here."
+  },
+  "team.reportsTo.label": {
+    "value": "Reports to"
+  },
+  "team.reportsTo.help": {
+    "value": "Only says who this agent answers to. It grants no permission."
+  },
+  "team.reportsTo.none": {
+    "value": "Nobody"
+  },
+  "team.reportsTo.done": {
+    "value": "{{agent}} now reports to {{to}}"
+  },
+  "team.reportsTo.cleared": {
+    "value": "{{agent}} no longer reports to an agent"
+  },
+  "team.reportsTo.reports": {
+    "value": "Who reports to {{name}}"
   },
   "team.usage.lead": {
     "value": "What each person uses of the agents this month, and the limits."
@@ -5012,6 +5072,9 @@
   "rightHand.card.only.look": {
     "value": "Only admins and its owner change its look"
   },
+  "rightHand.card.only.reports_to": {
+    "value": "Only admins change who an agent reports to"
+  },
   "rightHand.card.only.many": {
     "value": "Only admins make these changes"
   },
@@ -5042,8 +5105,14 @@
   "rightHand.field.look": {
     "value": "Look"
   },
+  "rightHand.field.reports_to": {
+    "value": "Reports to"
+  },
   "rightHand.value.lookDefault": {
     "value": "The default look"
+  },
+  "rightHand.value.anAgent": {
+    "value": "An agent"
   },
   "rightHand.value.none": {
     "value": "None"
@@ -5149,6 +5218,9 @@
   },
   "teamWeek.title": {
     "value": "Team week"
+  },
+  "teamWeek.dayTitle": {
+    "value": "Daily summary"
   },
   "teamWeek.suggestions": {
     "value": {
@@ -5315,6 +5387,9 @@
   "teamWeek.every.sat": {
     "value": "Every Saturday at {{time}}"
   },
+  "teamWeek.every.day": {
+    "value": "Every day at {{time}}"
+  },
   "teamWeek.off": {
     "value": "Off"
   },
@@ -5333,11 +5408,20 @@
   "teamWeek.schedule.start": {
     "value": "Receive it again"
   },
+  "teamWeek.schedule.daily": {
+    "value": "Every day"
+  },
   "teamWeek.settings.label": {
     "value": "Team week"
   },
   "teamWeek.settings.help": {
     "value": "Every week {{name}} tells you in your DM how the team did and what to fix. Only admins get it."
+  },
+  "teamWeek.settings.dayLabel": {
+    "value": "Daily summary"
+  },
+  "teamWeek.settings.dayHelp": {
+    "value": "Every day {{name}} tells you in your DM what the team did and what waits for you, on days with something to say."
   },
   "routing.title": {
     "value": "Who picks the agents"
@@ -32972,6 +33056,9 @@
   "chat.issueWork.agent": {
     "value": "With {{name}}"
   },
+  "chat.issueWork.chipLabel": {
+    "value": "Open the conversation of task #{{number}}, {{title}}"
+  },
   "chat.body.autonomy_proposal.pr": {
     "value": "Nobody asked for this directly. May I open a pull request?"
   },
@@ -32989,6 +33076,9 @@
   },
   "chat.body.team_week": {
     "value": "How the team's week went, {{from}} to {{to}}"
+  },
+  "chat.body.team_day": {
+    "value": "How the team's day went, up to {{day}}"
   },
   "chat.body.autonomy_loop": {
     "value": "I stopped working on this on my own. It came back {{count}} times in a day ({{title}}). Tell me how you want it handled."

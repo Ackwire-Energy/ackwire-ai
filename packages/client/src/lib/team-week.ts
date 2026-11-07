@@ -42,6 +42,8 @@ export type TeamWeekHighlight =
 export interface TeamWeekCard {
   kind: "team_week";
   forUserId: string;
+  /** "Resumo do dia" (`day`) or the week's (absent on older cards). */
+  period?: "day" | "week";
   from: string;
   to: string;
   timezone: string;
@@ -58,6 +60,8 @@ export interface TeamWeekPrefs {
   /** 0 = Sunday. */
   day: number;
   hour: number;
+  /** "Resumo do dia": every day at `hour` (anyone may); absent from an older server. */
+  daily?: boolean;
   timezone: string;
 }
 
@@ -127,10 +131,22 @@ export const dayText = (locale: string, day: number) =>
 
 type Say = (key: string, options?: Record<string, unknown>) => string;
 
-/** "Toda sexta às 17:00", in the reader's language. */
-export function teamWeekWhen(t: TFunction, locale: string, prefs: Pick<TeamWeekPrefs, "day" | "hour">) {
-  return (t as unknown as Say)(`teamWeek.every.${DAYS[prefs.day] ?? "fri"}`, { time: hourText(locale, prefs.hour) });
+/** "Toda sexta às 17:00" (or "Todo dia às 9:00"), in the reader's language. */
+export function teamWeekWhen(t: TFunction, locale: string, prefs: Pick<TeamWeekPrefs, "day" | "hour" | "daily">) {
+  const day = prefs.daily ? "day" : (DAYS[prefs.day] ?? "fri");
+  return (t as unknown as Say)(`teamWeek.every.${day}`, { time: hourText(locale, prefs.hour) });
 }
+
+/**
+ * Whether this person's card comes at all: an administrator's weekly unless off; anyone else's only once they asked for
+ * it daily ("Resumo do dia").
+ */
+export const teamWeekOn = (prefs: Pick<TeamWeekPrefs, "off" | "daily">, admin: boolean) =>
+  !prefs.off && (admin || prefs.daily === true);
+
+/** The card's title key: "Resumo do dia" or "Semana da equipe". */
+export const teamWeekTitleKey = (card: Pick<TeamWeekCard, "period">) =>
+  card.period === "day" ? ("teamWeek.dayTitle" as const) : ("teamWeek.title" as const);
 
 /** Names the rows need, from the reader's directory. */
 export interface TeamWeekNames {

@@ -1530,7 +1530,10 @@
       "subPerson": "每个智能体显示在负责人之下，没有负责人时显示在其部门负责人之下。",
       "subSector": "每个部门及其智能体。{{name}} 和所有人一起工作。",
       "workspace": "工作区",
-      "responsible": "负责人：{{names}}"
+      "responsible": "负责人：{{names}}",
+      "lodi": "和你一起关注一切",
+      "supervisor": "主管：{{name}}",
+      "dragSector": "拖到一个智能体上，让这个部门的智能体向它汇报"
     },
     "map": {
       "lead": "谁负责这些智能体、它们在哪些频道、各自独立做什么、哪些在等人处理。虚线表示过去一天里互相求助过的智能体。",
@@ -1546,7 +1549,9 @@
       "emptyTitle": "查看每个智能体在哪里工作",
       "emptyAction": "加入频道",
       "emptyViewer": "管理智能体的成员把它们加入频道后，地图会显示在这里。",
-      "others": "其他频道"
+      "others": "其他频道",
+      "band": "主管",
+      "reportsTo": "向 {{name}} 汇报"
     },
     "sectors": {
       "lead": "每个部门都有负责人、替补、智能体，以及它们的频道和例行工作。",
@@ -1556,6 +1561,12 @@
       "backupLabel": "替补",
       "leadOf": "{{name}} 的负责人",
       "backupOf": "{{name}} 的替补",
+      "supervisor": "主管",
+      "supervisorOf": "{{name}} 的主管",
+      "unsupervised_other": "{{count}} 个智能体没有主管",
+      "apply": "应用",
+      "supervisorDone_other": "{{sector}} 的 {{count}} 个智能体现在向 {{name}} 汇报",
+      "supervisorCleared_other": "{{sector}} 的 {{count}} 个智能体不再向主管汇报",
       "nobody": "无人",
       "none": "无",
       "channels": "频道",
@@ -1571,6 +1582,14 @@
       "empty": "每个部门都有负责人，大家都能看到谁负责什么。",
       "emptyViewerTitle": "看看谁负责什么",
       "emptyViewer": "管理智能体的人创建部门后，部门会显示在这里。"
+    },
+    "reportsTo": {
+      "label": "汇报对象",
+      "help": "只说明这个智能体向谁汇报。不授予任何权限。",
+      "none": "无",
+      "done": "{{agent}} 现在向 {{to}} 汇报",
+      "cleared": "{{agent}} 不再向智能体汇报",
+      "reports": "向 {{name}} 汇报的智能体"
     },
     "usage": {
       "lead": "本月每个人使用智能体的情况，以及上限。",
@@ -1957,6 +1976,7 @@
         "ai_account": "只有账户所有者能分配它",
         "name": "只有管理员能重命名智能体",
         "look": "只有管理员和负责人能更改它的外观",
+        "reports_to": "只有管理员能更改智能体的汇报对象",
         "many": "只有管理员能做这些更改"
       }
     },
@@ -1969,10 +1989,12 @@
       "archive": "状态",
       "channel": "频道",
       "name": "名称",
-      "look": "外观"
+      "look": "外观",
+      "reports_to": "汇报对象"
     },
     "value": {
       "lookDefault": "默认外观",
+      "anAgent": "一个智能体",
       "none": "无",
       "budgetDefault": "工作区默认",
       "anAccount": "一个 AI 账户",
@@ -2015,6 +2037,7 @@
   },
   "teamWeek": {
     "title": "团队周报",
+    "dayTitle": "每日摘要",
     "suggestions_other": "{{count}} 条建议",
     "stat": {
       "done": "完成的任务",
@@ -2075,7 +2098,8 @@
       "wed": "每周三 {{time}}",
       "thu": "每周四 {{time}}",
       "fri": "每周五 {{time}}",
-      "sat": "每周六 {{time}}"
+      "sat": "每周六 {{time}}",
+      "day": "每天 {{time}}"
     },
     "off": "已关闭",
     "schedule": {
@@ -2083,11 +2107,14 @@
       "day": "星期",
       "hour": "时间",
       "stop": "不再接收",
-      "start": "重新接收"
+      "start": "重新接收",
+      "daily": "每天"
     },
     "settings": {
       "label": "团队周报",
-      "help": "每周 {{name}} 会在你的私信里告诉你团队的情况和可以改进的地方。只有管理员会收到。"
+      "help": "每周 {{name}} 会在你的私信里告诉你团队的情况和可以改进的地方。只有管理员会收到。",
+      "dayLabel": "每日摘要",
+      "dayHelp": "{{name}} 每天在你的私信里告诉你团队做了什么、有什么在等你，只在有事可说的日子。"
     }
   },
   "routing": {
@@ -13094,7 +13121,8 @@
       "askedBy": "{{name}} 请求了任务",
       "view": "查看任务",
       "taken": "{{name}} 接手了任务",
-      "agent": "与 {{name}}"
+      "agent": "与 {{name}}",
+      "chipLabel": "打开任务 #{{number}} 的对话，{{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13104,6 +13132,7 @@
       },
       "autonomy_digest_other": "{{count}} 条警报看起来是已知的或无害的，所以我没有处理：",
       "team_week": "团队这一周，{{from}} 至 {{to}}",
+      "team_day": "截至 {{day}} 团队这一天的情况",
       "autonomy_loop": "我已主动停止处理这件事。它一天内重复出现了 {{count}} 次（{{title}}）。告诉我你希望怎么处理。",
       "mission_plan": "在 {{computer}} 上执行“{{title}}”的计划",
       "mission_planNoComputer": "“{{title}}”的计划",

@@ -65,6 +65,7 @@ import {
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
+  setReportsTo,
   speakerOf,
   TEAM_TEMPLATES,
   undoTeam,
@@ -807,6 +808,7 @@ export function agentRoutes(deps: AppDeps) {
     role: z.string(),
     appearance: AgentAppearance.nullable(),
     ownerUserId: z.string().nullable(),
+    reportsToAgentId: z.uuid().nullable().openapi({ description: "Responde a: the agent it reports to, if any." }),
     capabilities: z.array(z.string()).openapi({
       description:
         "What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…); empty without `seesDetails`.",
@@ -1628,6 +1630,42 @@ export function agentRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, groupId } = c.req.valid("param");
       return c.json({ groups: await deleteAgentGroup(groups, c.get("user").id, orgId, groupId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agent-lines",
+      tags,
+      security,
+      summary:
+        "Set who agents report to (Responde a), in order, all or none: one agent, a setor's agents, or Desfazer with what came back (who manages agents)",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            changes: z
+              .array(z.object({ agentId: z.uuid(), reportsToAgentId: z.uuid().nullable() }))
+              .min(1)
+              .max(200),
+          }),
+        ),
+      },
+      responses: {
+        200: json(
+          z.object({
+            previous: z
+              .array(z.object({ agentId: z.uuid(), reportsToAgentId: z.uuid().nullable() }))
+              .openapi({ description: "What the changed agents reported to before: send it back to undo." }),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await setReportsTo(groups, c.get("user").id, orgId, c.req.valid("json").changes), 200);
     },
   );
 

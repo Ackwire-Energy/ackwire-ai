@@ -102,6 +102,23 @@ export const issueWorkOf = (meta: Record<string, unknown> | null | undefined) =>
 /** `meta.issueTaken`: the one line where the issue came from ("Ada took issue #24"). */
 export const issueTakenOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.issueTaken);
 
+/** A task the right hand handed to an agent, as its reply carries it (`meta.tasks`): the chip opens its thread. */
+export interface HandedTask extends IssueWorkRef {
+  /** Its conversation (a channel of kind `task`) and its root: the thread the chip opens. */
+  channelId: string;
+  rootId: string;
+}
+
+/** `meta.tasks`: the tasks a reply handed on (ADR 0137 §13), one chip each. */
+export function handedTasksOf(meta: Record<string, unknown> | null | undefined): HandedTask[] {
+  const list = Array.isArray(meta?.tasks) ? (meta.tasks as unknown[]) : [];
+  return list.flatMap((v) => {
+    const ref = workRef(v);
+    const { rootId, channelId } = v as { rootId?: unknown; channelId?: unknown };
+    return ref && typeof rootId === "string" && typeof channelId === "string" ? [{ ...ref, channelId, rootId }] : [];
+  });
+}
+
 /**
  * `meta.taskConversation`: the root of a task's conversation (ADR 0145). It stands for the task and is never drawn:
  * the task's own screen is right there.

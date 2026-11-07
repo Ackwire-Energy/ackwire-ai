@@ -133,6 +133,7 @@ import { REACT_TOOL } from "./chat-tools";
 import { kickRoomQueue, publishQueueChanged, roomGate, roomHead } from "./computer-queue";
 import {
   announceConsultationChange,
+  answersHandOffs,
   answersOpen,
   consultedInBackground,
   onConsultedRunFinished,
@@ -269,6 +270,7 @@ import {
   bodyCode,
   brainToolOf,
   bridgeToolsFor,
+  type HandedTask,
   invokeToolForRun,
   invokeWithChip,
   mergeToolEffects,
@@ -526,6 +528,8 @@ export interface Transcript {
   browser?: BrowserTrailStep[];
   /** Its desktop calls since the last post, for the card of what it did there (`meta.desktop`). */
   desktop?: BrowserTrailStep[];
+  /** Tasks the right hand handed on, not yet on a posted message (`meta.tasks`, its chips). */
+  tasks?: HandedTask[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
   /** It sent a GIF or its sticker (`send_gif`, `send_sticker`, ADR 0091): an empty final answer posts nothing. */
@@ -1183,7 +1187,7 @@ async function executeRunInner(
   // and the conversations that asked a consulted one (ADR 0034) stop showing it held.
   if (backFromWait) await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   if (waitedOn && USAGE_WAIT_CODES.has(waitedOn)) await usageWaitNoteEnded(deps, run, true).catch(() => {});
-  if (backFromWait && channelRow && isAgentOnlyDm(channelRow)) {
+  if (backFromWait && channelRow && answersHandOffs(channelRow)) {
     await announceConsultationChange({ db, pubsub: deps.pubsub }, run).catch(() => {});
   }
   // Declared before `finished`: the early endings (standing, archived, no AI) read it before any turn.
@@ -1285,8 +1289,8 @@ async function executeRunInner(
     // a hand-off among them is being worked on again, not waiting on a person (`reportHandOffs`).
     if ((status === "waiting_approval" || status === "waiting_input") && !run.background)
       await releaseHeldInbox(db, deps.pubsub, run.id).catch(() => null);
-    // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
-    if (channelRow && isAgentOnlyDm(channelRow))
+    // It answered another agent's question (ADR 0034), or a task the right hand handed it: the asker hears it.
+    if (channelRow && answersHandOffs(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub, judge: deps.context?.judge }, run, status, error).catch(
         () => {},
       );
@@ -5627,13 +5631,15 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const consulted = t.consulted ?? [];
   const browser = t.browser ?? [];
   const desktop = t.desktop ?? [];
+  const tasks = t.tasks ?? [];
   if (
     updates.length === 0 &&
     files.length === 0 &&
     !link &&
     consulted.length === 0 &&
     browser.length === 0 &&
-    desktop.length === 0
+    desktop.length === 0 &&
+    tasks.length === 0
   )
     return undefined;
   t.memoryUpdates = [];
@@ -5642,6 +5648,7 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   t.consulted = [];
   t.browser = [];
   t.desktop = [];
+  t.tasks = [];
   const meta: Record<string, unknown> = {};
   if (updates.length > 0) meta.memoryUpdates = updates;
   if (files.length > 0) meta.artifacts = files;
@@ -5649,6 +5656,7 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   if (consulted.length > 0) meta.consulted = consulted;
   if (browser.length > 0) meta.browser = { steps: browser };
   if (desktop.length > 0) meta.desktop = { steps: desktop };
+  if (tasks.length > 0) meta.tasks = tasks;
   return meta;
 }
 

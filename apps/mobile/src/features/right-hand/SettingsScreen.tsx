@@ -16,7 +16,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { rightHandFallback, rightHandOf } from "@agenteschat/client/lib/right-hand";
-import { dayText, hourText } from "@agenteschat/client/lib/team-week";
+import { dayText, hourText, teamWeekOn } from "@agenteschat/client/lib/team-week";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -366,37 +366,45 @@ function Form({ agent }: { agent: Agent }) {
   );
 }
 
-/** "Semana da equipe" (ADR 0137 §9): the admin's own day and hour of Lodi's weekly card, or off, as on the web. */
+/**
+ * "Semana da equipe" (ADR 0137 §9): an admin's own day and hour of Lodi's weekly card, every day instead, or off;
+ * anyone else's "Resumo do dia", every day or not at all, as on the web.
+ */
 function TeamWeekRows({ name }: { name: string }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const failed = useFailed();
   const admin = can(org, "administrator");
-  const prefs = useTeamWeekPrefs(orgId, admin).data;
+  const prefs = useTeamWeekPrefs(orgId).data;
   const set = useSetTeamWeekPrefs(orgId);
-  if (!admin || !prefs) return null;
+  if (!prefs) return null;
   const save = (patch: Parameters<typeof set.mutate>[0]) => set.mutate(patch, { onError: failed });
   const locale = i18n.language;
+  const on = teamWeekOn(prefs, admin);
+  const label = t(admin ? "teamWeek.settings.label" : "teamWeek.settings.dayLabel");
   return (
     <>
-      <GroupedHeader>{t("teamWeek.settings.label")}</GroupedHeader>
+      <GroupedHeader>{label}</GroupedHeader>
       {/* The day and the hour are rows of the switch's group, as any settings group. */}
       <GroupedList>
         <GroupedRow
           icon="clock"
-          label={t("teamWeek.settings.label")}
-          toggle={!prefs.off}
-          onPress={() => save({ off: !prefs.off })}
+          label={label}
+          toggle={on}
+          onPress={() => save(admin ? { off: !prefs.off } : on ? { daily: false } : { daily: true, off: false })}
         />
-        {prefs.off ? null : (
+        {on && admin ? (
           <Pills
             label={t("teamWeek.schedule.day")}
-            value={prefs.day}
-            options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: d, label: dayText(locale, d) }))}
-            onPick={(day) => save({ day })}
+            value={prefs.daily ? EVERY_DAY : prefs.day}
+            options={[
+              ...[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: d, label: dayText(locale, d) })),
+              { value: EVERY_DAY, label: t("teamWeek.schedule.daily") },
+            ]}
+            onPick={(day) => save(day === EVERY_DAY ? { daily: true } : { daily: false, day })}
           />
-        )}
-        {prefs.off ? null : (
+        ) : null}
+        {!on ? null : (
           <Pills
             label={t("teamWeek.schedule.hour")}
             value={prefs.hour}
@@ -405,10 +413,15 @@ function TeamWeekRows({ name }: { name: string }) {
           />
         )}
       </GroupedList>
-      <GroupedFooter>{t("teamWeek.settings.help", agentGrammar(name))}</GroupedFooter>
+      <GroupedFooter>
+        {t(admin ? "teamWeek.settings.help" : "teamWeek.settings.dayHelp", agentGrammar(name))}
+      </GroupedFooter>
     </>
   );
 }
+
+/** The day pills' "every day" ("Resumo do dia"). */
+const EVERY_DAY = -1;
 
 /** A choice of a few short values as pills that wrap (the days, the hours), the picked one filled. */
 function Pills({

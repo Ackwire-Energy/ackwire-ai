@@ -572,6 +572,8 @@ export const agentView = (a: Agent) => ({
   mediaReplies: a.mediaReplies,
   /** A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand. Null for the others. */
   builtin: a.builtin ?? null,
+  /** "Responde a" (ADR 0148 addendum): the agent it reports to; null = its owner, else its setor's lead. */
+  reportsToAgentId: a.reportsToAgentId ?? null,
   /** Its autonomy brakes (ADR 0131), with the defaults filled in. */
   brakes: autonomySettings(a.autonomyBrakes),
   createdAt: a.createdAt,

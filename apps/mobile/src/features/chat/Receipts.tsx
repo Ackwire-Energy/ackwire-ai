@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/client/lib/actions";
 import { ownActionName } from "@agenteschat/client/lib/approval-words";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { handedTasksOf } from "@agenteschat/client/lib/issues";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -51,7 +52,9 @@ import {
  * history. Optimistic, rolled back with a toast when the server refuses.
  */
 export function Receipts({ message: m }: { message: Message }) {
-  const list = m.actions ?? [];
+  // A task the right hand handed on is its chip (`HandedTaskChips`): its agent is at work on it already.
+  const handed = new Set(handedTasksOf(m.meta).map((h) => h.issueId));
+  const list = (m.actions ?? []).filter((a) => !(a.kind === "issue.created" && handed.has(a.target.id)));
   const layout = receiptLayout(list);
   const now = useTick(layout !== "none" && anyLive(list));
   if (layout === "none") return null;

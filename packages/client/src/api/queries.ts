@@ -69,6 +69,7 @@ import type {
   AgentGroup,
   AgentGroupPatch,
   AgentInput,
+  AgentLineChange,
   AgentMailbox,
   AgentMailboxInput,
   AgentProposalDecision,
@@ -918,6 +919,23 @@ export function useProposeChannelMove(orgId: string) {
   return useMutation({
     mutationFn: (input: { agentId: string; fromChannelId: string | null; toChannelId: string; reason: string }) =>
       api.agents.proposeChannelMove(orgId, input),
+  });
+}
+
+/**
+ * Responde a (ADR 0148 addendum): sets who agents report to at once; the team and the agents read again. Resolves with
+ * what they were (for Desfazer, the same mutation with it).
+ */
+export function useSetAgentLines(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (changes: AgentLineChange[]) => api.agents.setLines(orgId, changes),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.team(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: ["org", orgId, "agent"] });
+    },
   });
 }
 

@@ -1568,6 +1568,10 @@ export const ptBR = {
       subSector: "Cada setor com seus agentes. {{name}} trabalha com todos.",
       workspace: "Workspace",
       responsible: "Responsáveis: {{names}}",
+      /** O Lodi ao lado do workspace, fora da linha de quem responde a quem. */
+      lodi: "acompanha tudo com você",
+      supervisor: "Supervisor: {{name}}",
+      dragSector: "Arraste até um agente para os agentes deste setor responderem a ele",
     },
     map: {
       lead: "Quem cuida dos agentes, os canais onde eles estão, o que cada um faz sozinho e o que espera uma pessoa. As linhas tracejadas são agentes que pediram ajuda um ao outro no último dia.",
@@ -1586,6 +1590,8 @@ export const ptBR = {
       emptyAction: "Colocar num canal",
       emptyViewer: "Quem gerencia os agentes coloca cada um nos canais, e o mapa aparece aqui.",
       others: "Outros canais",
+      band: "Supervisores",
+      reportsTo: "Responde a {{name}}",
     },
     sectors: {
       lead: "Cada setor tem um responsável, um substituto, seus agentes e os canais e rotinas deles.",
@@ -1595,6 +1601,15 @@ export const ptBR = {
       backupLabel: "Substituto",
       leadOf: "Responsável por {{name}}",
       backupOf: "Substituto em {{name}}",
+      supervisor: "Supervisor",
+      supervisorOf: "Supervisor de {{name}}",
+      unsupervised_one: "{{count}} agente sem supervisor",
+      unsupervised_other: "{{count}} agentes sem supervisor",
+      apply: "Aplicar",
+      supervisorDone_one: "{{count}} agente de {{sector}} agora responde a {{name}}",
+      supervisorDone_other: "{{count}} agentes de {{sector}} agora respondem a {{name}}",
+      supervisorCleared_one: "{{count}} agente de {{sector}} não responde mais a um supervisor",
+      supervisorCleared_other: "{{count}} agentes de {{sector}} não respondem mais a um supervisor",
       nobody: "Ninguém",
       none: "Nenhum",
       channels: "Canais",
@@ -1610,6 +1625,15 @@ export const ptBR = {
       empty: "Cada setor tem um responsável, e todo mundo vê quem cuida do quê.",
       emptyViewerTitle: "Veja quem cuida do quê",
       emptyViewer: "Quem gerencia os agentes cria os setores, e eles aparecem aqui.",
+    },
+    /** Responde a (ADR 0148 adendo): a quem um agente presta contas. Não dá nenhuma permissão. */
+    reportsTo: {
+      label: "Responde a",
+      help: "Só diz a quem este agente presta contas. Não dá nenhuma permissão.",
+      none: "Ninguém",
+      done: "{{agent}} agora responde a {{to}}",
+      cleared: "{{agent}} não responde mais a um agente",
+      reports: "Quem responde a {{name}}",
     },
     usage: {
       lead: "Quanto cada pessoa usa dos agentes este mês, e os limites.",
@@ -2052,6 +2076,7 @@ export const ptBR = {
         ai_account: "Só o dono da conta a escolhe",
         name: "Só admins mudam o nome de um agente",
         look: "Só admins e o responsável mudam a aparência",
+        reports_to: "Só admins mudam a quem um agente responde",
         many: "Só admins fazem essas mudanças",
       },
     },
@@ -2065,8 +2090,10 @@ export const ptBR = {
       channel: "Canal",
       name: "Nome",
       look: "Aparência",
+      reports_to: "Responde a",
     },
     value: {
+      anAgent: "Um agente",
       lookDefault: "A aparência padrão",
       none: "Nenhum",
       budgetDefault: "Padrão do workspace",
@@ -2110,6 +2137,7 @@ export const ptBR = {
   },
   teamWeek: {
     title: "Semana da equipe",
+    dayTitle: "Resumo do dia",
     suggestions_one: "{{count}} sugestão",
     suggestions_other: "{{count}} sugestões",
     stat: {
@@ -2185,6 +2213,7 @@ export const ptBR = {
       thu: "Toda quinta às {{time}}",
       fri: "Toda sexta às {{time}}",
       sat: "Todo sábado às {{time}}",
+      day: "Todo dia às {{time}}",
     },
     off: "Desligada",
     schedule: {
@@ -2193,12 +2222,19 @@ export const ptBR = {
       hour: "Hora",
       stop: "Parar de receber",
       start: "Voltar a receber",
+      daily: "Todo dia",
     },
     settings: {
       label: "Semana da equipe",
       help: "Toda semana o {{name}} conta na sua DM como foi o time e o que dá para melhorar. Só admins recebem.",
       help_female:
         "Toda semana a {{name}} conta na sua DM como foi o time e o que dá para melhorar. Só admins recebem.",
+      /** "Resumo do dia": o mesmo cartão todo dia, que qualquer pessoa pode ligar. */
+      dayLabel: "Resumo do dia",
+      dayHelp:
+        "Todo dia o {{name}} conta na sua DM o que o time fez e o que espera você, só nos dias com algo a dizer.",
+      dayHelp_female:
+        "Todo dia a {{name}} conta na sua DM o que o time fez e o que espera você, só nos dias com algo a dizer.",
     },
   },
   routing: {
@@ -13339,6 +13375,8 @@ export const ptBR = {
       view: "Ver tarefa",
       taken: "{{name}} pegou a tarefa",
       agent: "Com {{name}}",
+      /** Uma tarefa que o braço direito passou adiante, como chip na resposta dele: abre a conversa da tarefa. */
+      chipLabel: "Abrir a conversa da tarefa #{{number}}, {{title}}",
     },
     body: {
       /** Os freios da autonomia (ADR 0131): o agente pede antes de trabalho caro que ninguém pediu, o resumo de ruído, a parada de repetição. */
@@ -13350,6 +13388,7 @@ export const ptBR = {
       autonomy_digest_one: "{{count}} alerta parecia conhecido ou inofensivo, então não trabalhei nele:",
       autonomy_digest_other: "{{count}} alertas pareciam conhecidos ou inofensivos, então não trabalhei neles:",
       team_week: "Como foi a semana do time, de {{from}} a {{to}}",
+      team_day: "Como foi o dia do time, até {{day}}",
       autonomy_loop:
         "Parei de trabalhar nisso por conta própria. Voltou {{count}} vezes em um dia ({{title}}). Me diz como você quer que eu trate.",
       mission_plan: "Plano para “{{title}}” no {{computer}}",

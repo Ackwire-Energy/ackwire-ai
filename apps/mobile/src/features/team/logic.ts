@@ -1,6 +1,6 @@
 import type { AgentGroup, Channel, Member, TeamAgent } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
-import { chartByPerson, mapColumns } from "@agenteschat/client/lib/team-views";
+import { type ChartNode, chartByPerson, mapColumns } from "@agenteschat/client/lib/team-views";
 
 export type TeamView = "list" | "chart" | "map";
 
@@ -67,4 +67,18 @@ export function teamSections(
     title: c.channelId ? `#${names.get(c.channelId) ?? ""}` : null,
     agents: c.agents,
   }));
+}
+
+/** The phone's org chart column as rows: each line top to bottom, a supervisor's report one step in (ADR 0148 addendum). */
+export function chartRows(nodes: readonly ChartNode[], depth = 0): { agent: TeamAgent; depth: number }[] {
+  return nodes.flatMap((n) => [{ agent: n.agent, depth }, ...chartRows(n.reports, depth + 1)]);
+}
+
+/** Whether the line of `level` runs on past row `i`: a row of that level follows before the line climbs above it. */
+export function lineContinues(rows: readonly { depth: number }[], i: number, level: number) {
+  for (const r of rows.slice(i + 1)) {
+    if (r.depth < level) return false;
+    if (r.depth === level) return true;
+  }
+  return false;
 }

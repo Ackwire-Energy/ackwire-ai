@@ -239,7 +239,9 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
-      "browser.live.emulated.tablet"
+      "browser.live.emulated.tablet",
+      "team.chart.supervisor",
+      "team.sectors.supervisor"
     ],
     "es": [
       "agent.builtinName",
@@ -433,7 +435,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "team.chart.supervisor",
+      "team.sectors.supervisor"
     ],
     "fr": [
       "settings.about.version",
@@ -1165,7 +1169,9 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "browser.live.emulated.desktop"
+      "browser.live.emulated.desktop",
+      "team.chart.supervisor",
+      "team.sectors.supervisor"
     ],
     "it": [
       "queue.fill.routine",
@@ -1978,7 +1984,10 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "browser.live.emulated.desktop"
+      "browser.live.emulated.desktop",
+      "team.chart.supervisor",
+      "team.map.band",
+      "team.sectors.supervisor"
     ],
     "ja": [
       "access.area.vault",
@@ -2580,7 +2589,9 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "browser.live.emulated.desktop"
+      "browser.live.emulated.desktop",
+      "team.chart.supervisor",
+      "team.sectors.supervisor"
     ],
     "tr": [
       "chat.wait.said",

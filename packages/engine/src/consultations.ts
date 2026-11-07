@@ -1245,6 +1245,13 @@ export async function reportHandOffs(deps: Pick<Deps, "db" | "pubsub">, asker: A
 }
 
 /**
+ * Where a run may answer a question or a note: the agents' DM, or a task's conversation the right hand handed it
+ * (`askAgentToImplement` with `by`, ADR 0137 §13).
+ */
+export const answersHandOffs = (channel: { kind: string; dmKey: string | null }) =>
+  isAgentOnlyDm(channel) || channel.kind === "task";
+
+/**
  * A run in an agents' DM ended or paused (ADR 0034, ADR 0095). Ended, what it owes closes (`settleOwed`) and each
  * asker hears it (`closeConsultation`); a note sent before notes were rows comes back as before (`noteReply`).
  * Waiting on a person, it keeps them open and holds up no other hand-off (`reportHandOffs`).
@@ -1294,7 +1301,7 @@ export async function onConsultedRunStopped(
     .select({ kind: channels.kind, dmKey: channels.dmKey })
     .from(channels)
     .where(and(eq(channels.orgId, run.orgId), eq(channels.id, run.channelId)));
-  if (!channel || !isAgentOnlyDm(channel)) return [];
+  if (!channel || !answersHandOffs(channel)) return [];
   return onConsultedRunFinished(deps, run, "canceled", reason);
 }
 

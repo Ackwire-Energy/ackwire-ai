@@ -9,7 +9,9 @@ import { listIssues } from "./issues";
 import { oneLine } from "./mail/text";
 import { appPageLink } from "./message-links";
 import { getMembership } from "./organizations";
+import { personBehindCall } from "./requester";
 import { isRightHand, rightHandReader } from "./right-hand";
+import { loadTeam } from "./team";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 import { cleanOutside } from "./untrusted";
 import { liveWorksByAgent } from "./works";
@@ -35,15 +37,24 @@ const clean = (text: string) => oneLine(cleanOutside(text).replace(/[<>]/g, " ")
 
 /**
  * What the team is doing, for this person, from stored data with no model call (ADR 0137 §13): only agents they see
- * (the rest a count), and work in a place they can't read says so, with no subject.
+ * (the rest a count), and work in a place they can't read says so, with no subject. `only`: a supervisor's reports
+ * (ADR 0148 addendum), still as this person sees them.
  */
-export async function teamStatus(db: Database, orgId: string, personId: string, now = new Date()) {
+export async function teamStatus(
+  db: Database,
+  orgId: string,
+  personId: string,
+  now = new Date(),
+  only?: ReadonlySet<string>,
+) {
   const membership = await getMembership(db, personId, orgId);
-  const team = await db
-    .select()
-    .from(agents)
-    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
-    .orderBy(agents.createdAt);
+  const team = (
+    await db
+      .select()
+      .from(agents)
+      .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
+      .orderBy(agents.createdAt)
+  ).filter((a) => !only || only.has(a.id));
   const visible = team.filter((a) => seesAgentDetails(a, personId, membership));
   const seen = visible.slice(0, TEAM_MAX);
   const ids = seen.map((a) => a.id);
@@ -184,10 +195,23 @@ export async function teamStatus(db: Database, orgId: string, personId: string, 
     .join("\n\n");
 }
 
+/** The agents under `supervisorId`, all the way down its line (ADR 0148 addendum). */
+export function reportsUnder(team: readonly { id: string; reportsToAgentId: string | null }[], supervisorId: string) {
+  const out = new Set<string>();
+  let level = [supervisorId];
+  while (level.length > 0) {
+    level = team
+      .filter((a) => a.reportsToAgentId && level.includes(a.reportsToAgentId) && !out.has(a.id))
+      .map((a) => a.id);
+    for (const id of level) out.add(id);
+  }
+  return out;
+}
+
 /**
- * `team_status`, for the right hand alone (a supervisor later): the tool of "what's going on". In the core group, so
- * it is there on the first turn of any brain, and only in the person's own DM with it: in a channel, others read the
- * reply.
+ * `team_status`: the tool of "what's going on". The right hand's, in the core group so it is there on the first turn
+ * of any brain, and only in the person's own DM with it: in a channel, others read the reply. A supervisor's (an agent
+ * others report to) covers its reports, as the person behind the run sees them; with nobody behind it, none.
  */
 export function createTeamStatusToolSource(): ToolSource {
   const tool: ToolDefinition = {
@@ -203,11 +227,28 @@ export function createTeamStatusToolSource(): ToolSource {
       return { content: await teamStatus(ctx.db, ctx.orgId, person) };
     },
   };
+  const supervisorTool: ToolDefinition = {
+    ...tool,
+    description:
+      "What the agents who report to you are doing now, as the person you are helping sees it: each one's work, open and stuck tasks, what finished or failed today.",
+    async execute(_input, ctx) {
+      const person = await personBehindCall(ctx);
+      if (!person)
+        return {
+          content: "Only when a person asked: with nobody behind this run, ask your reports with ask_agent.",
+          isError: true,
+        };
+      const team = await loadTeam(ctx.db as Database, ctx.orgId);
+      return { content: await teamStatus(ctx.db, ctx.orgId, person, new Date(), reportsUnder(team, ctx.agentId)) };
+    },
+  };
   return {
     name: "team-status",
     tools: async (ctx) => {
       const [row] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
-      return isRightHand(row) ? [tool] : [];
+      if (isRightHand(row)) return [tool];
+      const team = await loadTeam(ctx.db as Database, ctx.orgId);
+      return team.some((a) => a.reportsToAgentId === ctx.agentId) ? [supervisorTool] : [];
     },
   };
 }

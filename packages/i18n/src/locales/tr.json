@@ -1581,7 +1581,10 @@
       "subPerson": "Her ajan, sorumlu kişinin altında, sorumlusu yoksa departmanının liderinin altında.",
       "subSector": "Her departman ajanlarıyla. {{name}} herkesle çalışır.",
       "workspace": "Çalışma alanı",
-      "responsible": "Sorumlular: {{names}}"
+      "responsible": "Sorumlular: {{names}}",
+      "lodi": "her şeyi seninle takip eder",
+      "supervisor": "Yönetici: {{name}}",
+      "dragSector": "Bu sektörün ajanları ona rapor versin diye bir ajanın üstüne sürükle"
     },
     "map": {
       "lead": "Ajanlarla kim ilgileniyor, hangi kanallarda bulunuyorlar, her biri kendi başına ne yapıyor ve ne bir kişiyi bekliyor. Kesikli çizgiler son bir günde birbirinden yardım isteyen ajanlardır.",
@@ -1599,7 +1602,9 @@
       "emptyTitle": "Her ajanın nerede çalıştığını görün",
       "emptyAction": "Kanala ekle",
       "emptyViewer": "Ajanları yöneten kişi onları kanallara ekler ve harita burada görünür.",
-      "others": "Diğer kanallar"
+      "others": "Diğer kanallar",
+      "band": "Yöneticiler",
+      "reportsTo": "{{name}} adlı ajana rapor verir"
     },
     "sectors": {
       "lead": "Her departmanın bir sorumlusu, bir yedeği, ajanları ve onların kanalları ile rutinleri vardır.",
@@ -1609,6 +1614,15 @@
       "backupLabel": "Yedek",
       "leadOf": "{{name}} sorumlusu",
       "backupOf": "{{name}} yedeği",
+      "supervisor": "Yönetici",
+      "supervisorOf": "{{name}} yöneticisi",
+      "unsupervised_one": "Yöneticisi olmayan {{count}} ajan",
+      "unsupervised_other": "Yöneticisi olmayan {{count}} ajan",
+      "apply": "Uygula",
+      "supervisorDone_one": "{{sector}} sektöründen {{count}} ajan artık {{name}} adlı ajana rapor veriyor",
+      "supervisorDone_other": "{{sector}} sektöründen {{count}} ajan artık {{name}} adlı ajana rapor veriyor",
+      "supervisorCleared_one": "{{sector}} sektöründen {{count}} ajan artık bir yöneticiye rapor vermiyor",
+      "supervisorCleared_other": "{{sector}} sektöründen {{count}} ajan artık bir yöneticiye rapor vermiyor",
       "nobody": "Kimse",
       "none": "Yok",
       "channels": "Kanallar",
@@ -1624,6 +1638,14 @@
       "empty": "Her departmanın bir sorumlusu olur, böylece herkes kimin neyle ilgilendiğini görür.",
       "emptyViewerTitle": "Kimin neyle ilgilendiğini gör",
       "emptyViewer": "Departmanları ajanları yöneten kişi oluşturur, sonra burada görünürler."
+    },
+    "reportsTo": {
+      "label": "Rapor verdiği",
+      "help": "Yalnızca bu ajanın kime hesap verdiğini söyler. Hiçbir izin vermez.",
+      "none": "Kimse",
+      "done": "{{agent}} artık {{to}} adlı ajana rapor veriyor",
+      "cleared": "{{agent}} artık bir ajana rapor vermiyor",
+      "reports": "{{name}} adlı ajana rapor verenler"
     },
     "usage": {
       "lead": "Bu ay her kişinin ajanları ne kadar kullandığı ve sınırlar.",
@@ -2029,6 +2051,7 @@
         "ai_account": "Yalnızca hesabın sahibi verebilir",
         "name": "Bir ajanın adını yalnızca yöneticiler değiştirir",
         "look": "Görünümünü yalnızca yöneticiler ve sorumlusu değiştirir",
+        "reports_to": "Bir ajanın kime rapor verdiğini yalnızca yöneticiler değiştirir",
         "many": "Bu değişiklikleri yalnızca yöneticiler yapar"
       }
     },
@@ -2041,10 +2064,12 @@
       "archive": "Durum",
       "channel": "Kanal",
       "name": "Ad",
-      "look": "Görünüm"
+      "look": "Görünüm",
+      "reports_to": "Rapor verdiği"
     },
     "value": {
       "lookDefault": "Varsayılan görünüm",
+      "anAgent": "Bir ajan",
       "none": "Yok",
       "budgetDefault": "Çalışma alanı varsayılanı",
       "anAccount": "Bir yapay zekâ hesabı",
@@ -2091,6 +2116,7 @@
   },
   "teamWeek": {
     "title": "Ekibin haftası",
+    "dayTitle": "Günün özeti",
     "suggestions_one": "{{count}} öneri",
     "suggestions_other": "{{count}} öneri",
     "stat": {
@@ -2160,7 +2186,8 @@
       "wed": "Her çarşamba {{time}}",
       "thu": "Her perşembe {{time}}",
       "fri": "Her cuma {{time}}",
-      "sat": "Her cumartesi {{time}}"
+      "sat": "Her cumartesi {{time}}",
+      "day": "Her gün {{time}}"
     },
     "off": "Kapalı",
     "schedule": {
@@ -2168,11 +2195,14 @@
       "day": "Gün",
       "hour": "Saat",
       "stop": "Almayı bırak",
-      "start": "Yeniden al"
+      "start": "Yeniden al",
+      "daily": "Her gün"
     },
     "settings": {
       "label": "Ekibin haftası",
-      "help": "{{name}} her hafta DM’inde ekibin nasıl geçtiğini ve neyin iyileştirilebileceğini anlatır. Yalnızca yöneticiler alır."
+      "help": "{{name}} her hafta DM’inde ekibin nasıl geçtiğini ve neyin iyileştirilebileceğini anlatır. Yalnızca yöneticiler alır.",
+      "dayLabel": "Günün özeti",
+      "dayHelp": "{{name}} her gün DM'inde ekibin ne yaptığını ve seni neyin beklediğini anlatır, yalnızca söyleyecek bir şey olan günlerde."
     }
   },
   "routing": {
@@ -13459,7 +13489,8 @@
       "askedBy": "{{name}} şu görevi istedi",
       "view": "Görevi gör",
       "taken": "{{name}} şu görevi aldı",
-      "agent": "{{name}} ile"
+      "agent": "{{name}} ile",
+      "chipLabel": "#{{number}} görevinin sohbetini aç, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13470,6 +13501,7 @@
       "autonomy_digest_one": "{{count}} uyarı bilinen veya zararsız görünüyordu, bu yüzden üzerinde çalışmadım:",
       "autonomy_digest_other": "{{count}} uyarı bilinen veya zararsız görünüyordu, bu yüzden üzerinde çalışmadım:",
       "team_week": "Ekibin haftası nasıl geçti, {{from}} – {{to}}",
+      "team_day": "Ekibin günü nasıl geçti, {{day}} itibarıyla",
       "autonomy_loop": "Bu konuda kendi başıma çalışmayı bıraktım. Bir günde {{count}} kez geri geldi ({{title}}). Nasıl ele almamı istediğini söyle.",
       "mission_plan": "{{computer}} üzerinde “{{title}}” için plan",
       "mission_planNoComputer": "“{{title}}” için plan",

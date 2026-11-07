@@ -428,7 +428,7 @@ export async function stopRun(
     // It may have been answering another agent's question (ADR 0034): the asker hears it couldn't now, not when
     // the question expires. A running one is heard from its worker, once (`executor.ts`); a run its workspace
     // stopped hands nothing on.
-    if (channelKind === "dm" && !standingErrorDetail(error)) {
+    if ((channelKind === "dm" || channelKind === "task") && !standingErrorDetail(error)) {
       // Loaded here: consultations stop their runs through this module.
       const { onConsultedRunStopped } = await import("./consultations");
       await onConsultedRunStopped(deps, run, error).catch(() => null);

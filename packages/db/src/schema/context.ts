@@ -206,6 +206,7 @@ export interface ProposedSettingLine {
     | "reply_mode"
     | "name"
     | "look"
+    | "reports_to"
     | "archive"
     | "delete";
   from: unknown;

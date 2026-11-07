@@ -64,6 +64,15 @@ export function autonomySettings(raw: unknown): AutonomySettings {
   };
 }
 
+/**
+ * Whether two agents are a supervisor and its report, either way round ("Responde a", ADR 0148 addendum): they may
+ * always call each other, whatever their lists say. Who may talk to an agent (its audience) still applies.
+ */
+export const inLine = (
+  a: { id: string; reportsToAgentId?: string | null },
+  b: { id: string; reportsToAgentId?: string | null },
+) => a.reportsToAgentId === b.id || b.reportsToAgentId === a.id;
+
 /** Whether an agent with `from` settings may wake or hand work to `to` (§8): its list, and other projects. */
 export function mayCall(from: unknown, to: { id: string; autonomy: unknown }): boolean {
   const f = autonomySettings(from);
