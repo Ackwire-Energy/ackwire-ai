@@ -9237,6 +9237,8 @@
     "notFound": "このファイルは存在しないか、アクセス権がありません。",
     "moreRows_other": "+ {{count}}行",
     "moreFiles_other": "+ {{count}}個のファイル",
+    "rows_other": "{{count}}行",
+    "files_other": "{{count}}個のファイル",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}}行追加、{{removed}}行削除",
     "htmlPreview": "インタラクティブなページです。開いて表示してください。",

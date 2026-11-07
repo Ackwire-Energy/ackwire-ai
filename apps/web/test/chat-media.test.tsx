@@ -236,8 +236,8 @@ describe("Responder on a media-only message that just arrived", () => {
   const kinds = [
     ["a GIF", { media: GIF_MEDIA }, ".ac-gif"],
     ["a sticker", { media: { kind: "sticker", agentId: ADA_ID, mood: "love" } }, "canvas[role=img]"],
-    ["an image", "image", ".file-thumb"],
-    ["a file", "file", ".file-row"],
+    ["an image", "image", ".artifact-tile[data-media] img"],
+    ["a file", "file", ".artifact-tile[data-kind='file']"],
     ["a voice message", { voice: { clipId: "clip-1", durationMs: 4000, peaks: [0.2, 0.6, 0.4] } }, ".ac-voice"],
   ] as const;
   for (const [what, meta, selector] of kinds) {

@@ -9291,6 +9291,8 @@
     "notFound": "File ini sudah tidak ada atau kamu tidak punya akses.",
     "moreRows_other": "+ {{count}} baris",
     "moreFiles_other": "+ {{count}} file",
+    "rows_other": "{{count}} baris",
+    "files_other": "{{count}} file",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} baris ditambahkan, {{removed}} dihapus",
     "htmlPreview": "Halaman interaktif. Buka untuk melihatnya.",

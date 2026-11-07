@@ -9560,6 +9560,12 @@ export const en = {
     moreRows_other: "+ {{count}} rows",
     moreFiles_one: "+ {{count}} file",
     moreFiles_other: "+ {{count}} files",
+    /** A table tile's size, after its kind ("Table · 15 rows"). */
+    rows_one: "{{count}} row",
+    rows_other: "{{count}} rows",
+    /** A code change tile's size, before its line counts ("5 files · +58 −31"). */
+    files_one: "{{count}} file",
+    files_other: "{{count}} files",
     counts: "+{{added}} −{{removed}}",
     countsLabel: "{{added}} lines added, {{removed}} removed",
     htmlPreview: "Interactive page. Open to see it.",

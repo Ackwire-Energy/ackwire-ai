@@ -9302,6 +9302,8 @@
     "notFound": "这个文件已不存在，或者你没有访问权限。",
     "moreRows_other": "+ {{count}} 行",
     "moreFiles_other": "+ {{count}} 个文件",
+    "rows_other": "{{count}} 行",
+    "files_other": "{{count}} 个文件",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "新增 {{added}} 行，删除 {{removed}} 行",
     "htmlPreview": "交互式页面，打开即可查看。",

@@ -23487,6 +23487,18 @@
       "other": "+ {{count}} files"
     }
   },
+  "artifacts.rows": {
+    "value": {
+      "one": "{{count}} row",
+      "other": "{{count}} rows"
+    }
+  },
+  "artifacts.files": {
+    "value": {
+      "one": "{{count}} file",
+      "other": "{{count}} files"
+    }
+  },
   "artifacts.counts": {
     "value": "+{{added}} −{{removed}}"
   },
