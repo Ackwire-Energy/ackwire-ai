@@ -20,6 +20,7 @@ import {
   withExtension,
 } from "../../src/features/files/logic";
 import { clampZoomTranslate, containSize, doubleTapZoom, MAX_ZOOM, zoomAround } from "../../src/features/files/zoom";
+import { ICONS } from "../../src/ui/icons.data";
 
 const src = (file: string) => readFileSync(join(import.meta.dir, "../../src", file), "utf8");
 
@@ -191,12 +192,24 @@ describe("viewer", () => {
       'files.length > 1 ? t("mobile.files.place", { index: index + 1, count: files.length }) : ""',
     );
     expect(viewer).toContain("[place, author, savedWhen(savedAt(detail))].filter(Boolean)");
-    expect(viewer).toContain('<Round icon="back" label={t("mobile.files.previous")} onPress={() => turn(prev)} />');
-    expect(viewer).toContain('<Round icon="right" label={t("mobile.files.next")} onPress={() => turn(next)} />');
+    expect(viewer).toContain(
+      '<Round icon="left" label={t("mobile.files.previous")} plate={SCRIM} onPress={() => turn(prev)} />',
+    );
+    expect(viewer).toContain(
+      '<Round icon="right" label={t("mobile.files.next")} plate={SCRIM} onPress={() => turn(next)} />',
+    );
     expect(viewer).toContain("visible={chrome && !zoomed}");
     expect(viewer).toContain("pager.current?.scrollTo({ x: to * width, y: 0, animated: !reduced })");
     // The count took the dots' place: one place says where you are.
     expect(viewer).not.toContain("styles.dots");
+  });
+
+  test("‹ and › are one chevron mirrored, on a dark plate that reads on a light picture", () => {
+    // `back` (7×14) is a size larger than `right` (6×12) and half a unit off center: `left` is `right` mirrored.
+    expect(ICONS.left).toEqual([{ t: "path", d: "m15 6-6 6 6 6" }]);
+    expect(ICONS.right).toEqual([{ t: "path", d: "m9 6 6 6-6 6" }]);
+    // The close and ⋯ plates are light (they sit on the black above the picture); ‹ › sit on the picture.
+    expect(src("features/files/ImageViewer.tsx")).toContain('const SCRIM = "rgba(0,0,0,0.45)";');
   });
 
   test("zoom keeps the point under the fingers still and stays inside the picture", () => {

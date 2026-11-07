@@ -49,6 +49,8 @@ export function ImageViewer({
 const WHITE = "#fff";
 const DIM = "rgba(255,255,255,0.6)";
 const PLATE = "rgba(255,255,255,0.14)";
+/** ‹ and ›'s plate: they sit on the picture itself, and a white chevron on a light plate vanishes on a light picture. */
+const SCRIM = "rgba(0,0,0,0.45)";
 /** The round buttons over the picture. */
 const ROUND = 44;
 
@@ -153,12 +155,12 @@ function Viewer({
         <Chrome visible={chrome && !zoomed} drag={drag} style={[styles.sides, { top: height / 2 - ROUND / 2 }]}>
           {prev !== null ? (
             <View style={[styles.side, { left: insets.left + 12 }]}>
-              <Round icon="back" label={t("mobile.files.previous")} onPress={() => turn(prev)} />
+              <Round icon="left" label={t("mobile.files.previous")} plate={SCRIM} onPress={() => turn(prev)} />
             </View>
           ) : null}
           {next !== null ? (
             <View style={[styles.side, { right: insets.right + 12 }]}>
-              <Round icon="right" label={t("mobile.files.next")} onPress={() => turn(next)} />
+              <Round icon="right" label={t("mobile.files.next")} plate={SCRIM} onPress={() => turn(next)} />
             </View>
           ) : null}
         </Chrome>
@@ -265,11 +267,13 @@ function Round({
   label,
   onPress,
   disabled = false,
+  plate = PLATE,
 }: {
   icon: IconName;
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  plate?: string;
 }) {
   return (
     <PressScale
@@ -279,7 +283,7 @@ function Round({
       accessibilityRole="button"
       accessibilityLabel={label}
       hitSlop={4}
-      style={[styles.round, { backgroundColor: PLATE }]}
+      style={[styles.round, { backgroundColor: plate }]}
       contentStyle={styles.center}
     >
       <Icon name={icon} size={20} color={WHITE} />
