@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { systemLauncher } from "../../runner/agent-users";
 import { PolicyNotInForce } from "../../runner/browser-bind-check";
 import {
@@ -10,6 +11,9 @@ import {
   rootDecoys,
 } from "../../runner/browser-bind-policy";
 import type { RunCommand } from "../../runner/service";
+
+/** A root-owned executable that is no link: `/usr/bin/true` is one where coreutils is a multicall binary (Ubuntu 26.04). */
+const ROOT_TOOL = realpathSync("/usr/bin/true");
 
 const user = { id: "agent-1", user: "ag-a1b2c3d4", uid: 20001 };
 const runner = ["/usr/bin/bun", "/opt/agentes/runner.ts"];
@@ -283,7 +287,7 @@ test("a reserved browser port held by another uid fails before or after the kern
 
 test.if(process.platform !== "win32")("namespace diagnostics use the same launcher as the agent bind check", () => {
   const pc = computer();
-  const hook = "/usr/bin/true";
+  const hook = ROOT_TOOL;
   ensureBrowserBindPolicy({ ...user, networkLauncher: hook }, runner, pc.opts);
   const look = pc.calls.filter((c) => c.file === hook);
   expect(look).toHaveLength(2);
