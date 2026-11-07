@@ -194,7 +194,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 /*
  * What will happen, drawn as an attachment's cover: edge to edge between hairlines, its start fading at the foot (an
- * email as it will go out, an action's values with each label above its value).
+ * email as it will go out).
  */
 .rq__preview {
   position: relative;
@@ -228,31 +228,6 @@ html:not([data-pointer]) .rq__more:focus-visible {
 .rq-mail__body {
   margin: 0;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.rq-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px 20px;
-  margin: 0;
-  padding: 12px 16px;
-}
-.rq-facts > div {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.rq-facts dt {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--faint);
-}
-.rq-facts dd {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 19px;
-  font-weight: 600;
-  color: var(--ink);
   overflow-wrap: anywhere;
 }
 .rq__details {

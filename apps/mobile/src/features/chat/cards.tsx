@@ -536,9 +536,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const requester = requesterDecidesLine(t, a);
   // The same approving as Atividade's card: the haptic, the toast saying what follows.
   const { approve, pending, high } = useApproveNow(a, () => asks?.settle(a.id));
-  // An email says to whom and about what; a connector's detail is its raw call (`tool · key=value`), so its
-  // values in words instead, the call under "Ver detalhes". With a preview (the email, the values) the name
-  // line says only where it goes: the preview says the rest.
+  // A connector's detail is its raw call (`tool · key=value`), so its values in words instead, the call under "Ver
+  // detalhes". An email's preview says to whom and about what: its line says only where it goes from.
   const source = useApprovalSource(a);
   const previewed = hasApprovalPreview(a);
   const detail = previewed

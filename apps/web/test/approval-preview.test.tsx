@@ -56,22 +56,15 @@ describe("an approval's preview: what will happen, drawn as an attachment's cove
     expect(card.querySelector(".rq__details .email-letter")).not.toBeNull();
   });
 
-  test("an action's values, each label above its value", async () => {
+  test("an action's values stay on its line: no preview (their names are the tool's own)", async () => {
     const card = await openCard((a) => {
       a.params = { repo: "agentes-chat/app", pull_number: 42 };
     });
-    const facts = [...card.querySelectorAll(".rq__preview .rq-facts > div")].map((d) => [
-      d.querySelector("dt")?.textContent,
-      d.querySelector("dd")?.textContent,
-    ]);
-    expect(facts).toEqual([
-      ["Repo", "agentes-chat/app"],
-      ["Pull number", "42"],
-    ]);
-    expect(card.querySelector(".rq__well small")).toBeNull();
+    expect(card.querySelector(".rq__preview")).toBeNull();
+    expect(card.querySelector(".rq__well")).not.toBeNull();
   });
 
-  test("nothing to draw: no preview, the action's line keeps its values", async () => {
+  test("nothing to draw: no preview, the action's line", async () => {
     const card = await openCard((a) => {
       a.params = {};
     });

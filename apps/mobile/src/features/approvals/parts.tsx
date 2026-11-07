@@ -8,12 +8,7 @@ import {
 } from "@agenteschat/client";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
-import {
-  alwaysRoutineName,
-  approvalDoing,
-  approvalTitle,
-  approvalValues,
-} from "@agenteschat/client/lib/approval-words";
+import { alwaysRoutineName, approvalDoing, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -177,52 +172,33 @@ export function ApprovalMark({
 }
 
 /**
- * What an approval will do, drawn small on its card (its preview): an email as it goes (its subject in bold, to whom
- * under it, then its text), else the values it runs with, each label above its value, side by side as they fit.
- * `hasApprovalPreview` says whether there is anything to draw.
+ * What an approval will do, drawn on its card (its preview): an email as it goes, its subject in bold, to whom under
+ * it, then its text. Only an email: an action's values stay on its line (their names are the tool's own, often
+ * English), the whole call under "Ver detalhes". `hasApprovalPreview` says whether there is one.
  */
 export function ApprovalPreview({ approval: a }: { approval: Approval }) {
   const { t } = useTranslation();
-  if (a.email)
-    return (
-      <View style={styles.previewMail}>
-        <Text variant="subhead" tone="ink" style={styles.medium} numberOfLines={2}>
-          {a.email.subject || t("approval.email.noSubject")}
-        </Text>
-        {a.email.to.length > 0 ? (
-          <Text variant="footnote" tone="muted" numberOfLines={1}>
-            {a.email.to.join(", ")}
-          </Text>
-        ) : null}
-        {a.email.body ? (
-          <Text variant="small" tone="ink2" style={[styles.said, styles.previewBody]}>
-            {a.email.body}
-          </Text>
-        ) : null}
-      </View>
-    );
-  const values = approvalValues(a, { max: PREVIEW_VALUES });
-  if (values.length === 0) return null;
+  if (!a.email) return null;
   return (
-    <View style={styles.previewFacts}>
-      {values.map(([label, value]) => (
-        <View key={label} style={styles.previewFact}>
-          <Text variant="footnote" tone="muted" numberOfLines={1}>
-            {label}
-          </Text>
-          <Text variant="small" tone="ink" numberOfLines={2}>
-            {value}
-          </Text>
-        </View>
-      ))}
+    <View style={styles.previewMail}>
+      <Text variant="subhead" tone="ink" style={styles.medium} numberOfLines={2}>
+        {a.email.subject || t("approval.email.noSubject")}
+      </Text>
+      {a.email.to.length > 0 ? (
+        <Text variant="footnote" tone="muted" numberOfLines={1}>
+          {a.email.to.join(", ")}
+        </Text>
+      ) : null}
+      {a.email.body ? (
+        <Text variant="small" tone="ink2" style={[styles.said, styles.previewBody]}>
+          {a.email.body}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-/** At most this many values on a preview; "Ver detalhes" has them all. */
-const PREVIEW_VALUES = 6;
-
-export const hasApprovalPreview = (a: Approval) => Boolean(a.email) || approvalValues(a, { max: 1 }).length > 0;
+export const hasApprovalPreview = (a: Approval) => Boolean(a.email);
 
 /**
  * The email an approval writes, as it will be: its subject in bold, then De (the mailbox and its provider), Para,
@@ -607,8 +583,6 @@ const styles = StyleSheet.create({
   previewMail: { gap: 2 },
   previewBody: { marginTop: 6 },
   // The values side by side as they fit, each label above its value.
-  previewFacts: { flexDirection: "row", flexWrap: "wrap", columnGap: 16, rowGap: 10 },
-  previewFact: { flexGrow: 1, flexBasis: 120, minWidth: 0, gap: 1 },
   answers: {
     flexDirection: "row",
     alignItems: "flex-start",

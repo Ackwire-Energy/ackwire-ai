@@ -477,7 +477,7 @@ export function AskCard({
           {well.title}
         </Text>
         {well.detail ? (
-          <Text variant="footnote" tone="faint" numberOfLines={well.more ? (open ? 3 : 1) : undefined}>
+          <Text variant="footnote" tone="faint" numberOfLines={well.more ? 3 : undefined}>
             {well.detail}
           </Text>
         ) : null}

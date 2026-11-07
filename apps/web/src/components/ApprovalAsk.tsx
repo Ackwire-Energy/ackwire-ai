@@ -15,7 +15,6 @@ import {
   approvalGroupWaitsFor,
   approvalSummary,
   approvalTitle,
-  approvalValues,
   approvalWaitsFor,
   decisionOutcome,
   requesterDecidesLine,
@@ -43,7 +42,7 @@ const DAY_MS = 24 * 3_600_000;
 
 /**
  * An approval waiting in the conversation, as a request card: the agent's words, what will happen drawn as an
- * attachment's cover (the email as it will go out, the action's values), the exact action on its line with the app's
+ * attachment's cover (an email as it will go out), the exact action on its line with the app's
  * mark, "Ver o e-mail" / "Ver detalhes" opening it whole in the preview's place (with where it came from), then Approve
  * (held for high risk), "Aprovar sempre" where offered (what it covers on a line under the buttons) and "Agora não"
  * (which asks why, kept as a lesson), in one row under the text, and the fuse to its expiry. Who can't decide sees who it waits for.
@@ -79,8 +78,7 @@ export function ApprovalAsk({
   const requester = requesterDecidesLine(t, approval);
   const title = approvalTitle(t, approval);
   const email = approval.email;
-  const preview = <ApprovalPreview approval={approval} />;
-  const previewed = Boolean(email) || approvalValues(approval, { max: PREVIEW_VALUES }).length > 0;
+  const previewed = Boolean(email);
   // What the preview already shows isn't said again on the action's line. A connector's detail is its raw call
   // (`tool · key=value`): its values in words instead, the call under "Ver detalhes".
   const detail = previewed
@@ -96,7 +94,7 @@ export function ApprovalAsk({
       mine={approval.canDecide}
       waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
       lead={why ?? approvalAskLine(t, approval.canDecide)}
-      preview={previewed ? preview : undefined}
+      preview={previewed ? <ApprovalPreview approval={approval} /> : undefined}
       object={{
         logo: <ConnectorMark approval={approval} />,
         title,
@@ -140,35 +138,21 @@ export function ApprovalAsk({
   );
 }
 
-/** At most this many of an action's values on its preview (all of them under "Ver detalhes"). */
-const PREVIEW_VALUES = 6;
-
 /**
  * What an approval will do, drawn as an attachment's cover: an email as it will go out (its subject, to whom, its
- * words), or the action's values, each label above its value (never beside it). Nothing to draw: null.
+ * words). Only an email: an action's values stay on its line (their names are the tool's own, often English), the
+ * whole call under "Ver detalhes".
  */
 function ApprovalPreview({ approval }: { approval: Approval }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const email = approval.email;
-  if (email)
-    return (
-      <div className="rq-mail">
-        <b className="rq-mail__subject">{email.subject || t("approval.email.noSubject")}</b>
-        <span className="rq-mail__to">{email.to.join(", ")}</span>
-        {email.body && <p className="rq-mail__body">{email.body}</p>}
-      </div>
-    );
-  const values = approvalValues(approval, { max: PREVIEW_VALUES, locale: i18n.language });
-  if (values.length === 0) return null;
+  if (!email) return null;
   return (
-    <dl className="rq-facts">
-      {values.map(([label, value]) => (
-        <div key={label}>
-          <dt>{label}</dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="rq-mail">
+      <b className="rq-mail__subject">{email.subject || t("approval.email.noSubject")}</b>
+      <span className="rq-mail__to">{email.to.join(", ")}</span>
+      {email.body && <p className="rq-mail__body">{email.body}</p>}
+    </div>
   );
 }
 
