@@ -46,11 +46,13 @@ import {
   ApprovalDetails,
   ApprovalEmailLetter,
   ApprovalMark,
+  ApprovalPreview,
   ApprovalTraits,
   ApproveAlwaysButton,
   ApproveAlwaysHint,
   approvalHeadline,
   approvalTitleText,
+  hasApprovalPreview,
   useApprovalSource,
   useApproveNow,
   useCancelAhead,
@@ -252,13 +254,13 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
     />
   );
   // A run's or the card's decision, in one row; "Aprovar sempre" (and what it covers, under the row) on a run.
-  const decide = (list: Approval[], label: string, run: boolean) => {
+  const decideParts = (list: Approval[], label: string, run: boolean) => {
     const scope = approveAllScope(list).ids;
     if (scope.length < 2) return null;
     const high = list.some((a) => scope.includes(a.id) && approvalRisk(a) === "high");
     const lead = run ? list.find((a) => always.has(a.id) && a.canDecide) : undefined;
-    return (
-      <>
+    return {
+      acts: (
         <View style={styles.itemActs}>
           {high ? (
             <HoldButton size="card" label={label} onConfirm={() => decideMany(scope, "approve")} />
@@ -281,9 +283,18 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
             onPress={() => decideMany(scope, "refuse")}
           />
         </View>
-        {lead ? <ApproveAlwaysHint approval={lead} name={name} /> : null}
+      ),
+      hint: lead ? <ApproveAlwaysHint approval={lead} name={name} /> : null,
+    };
+  };
+  const decide = (list: Approval[], label: string, run: boolean) => {
+    const parts = decideParts(list, label, run);
+    return parts ? (
+      <>
+        {parts.acts}
+        {parts.hint}
       </>
-    );
+    ) : null;
   };
   const partial =
     blocked > 0 && ids.length > 0 ? (
@@ -301,7 +312,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       well={
         single
           ? {
-              tile: <ApprovalMark approval={first} size={20} />,
+              tile: <ApprovalMark approval={first} size={20} bare />,
               title: head(single),
               more: {
                 label: t("approval.run.show"),
@@ -320,41 +331,45 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
             {runs.map((run, i) => {
               const [lead] = run;
               if (!lead) return null;
-              if (run.length < 2) return item(lead, false, i > 0);
+              if (run.length < 2) return item(lead, false, true);
               const key = keys[i] ?? lead.id;
               const open = opened.has(key);
+              const parts = decideParts(run, t("approval.run.approve"), true);
               return (
-                <View key={key} style={[styles.item, i > 0 && [styles.divided, { borderTopColor: c.line2 }]]}>
+                <View key={key} style={[styles.item, styles.divided, { borderTopColor: c.line2 }]}>
                   <View style={styles.itemRow}>
-                    <LineIcon variant="subhead" size={24}>
-                      <ApprovalMark approval={lead} size={24} />
-                    </LineIcon>
-                    <View style={styles.grow}>
-                      <Text variant="subhead" tone="ink" style={styles.bold}>
-                        {head(run)}
-                      </Text>
-                      <Pressable
-                        onPress={() => {
-                          tapHaptic();
-                          toggle(key);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityState={{ expanded: open }}
-                        // An 18-point line: the slop gives "Show" the 44 a finger needs.
-                        hitSlop={{ top: 13, bottom: 13, left: 6, right: 6 }}
-                        style={({ pressed }) => [styles.runMore, pressed && styles.pressed]}
-                      >
-                        <Text variant="footnote" tone="ink2" style={styles.bold}>
-                          {t("approval.run.show")}
+                    <View style={styles.itemMark}>
+                      <ApprovalMark approval={lead} size={20} bare />
+                    </View>
+                    <View style={styles.itemWrap}>
+                      <View style={styles.itemText}>
+                        <Text variant="subhead" tone="ink" style={styles.bold}>
+                          {head(run)}
                         </Text>
-                        <View style={open ? styles.flip : undefined}>
-                          <Icon name="chev" size={13} color={c.muted} />
-                        </View>
-                      </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            tapHaptic();
+                            toggle(key);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityState={{ expanded: open }}
+                          // An 18-point line: the slop gives "Show" the 44 a finger needs.
+                          hitSlop={{ top: 13, bottom: 13, left: 6, right: 6 }}
+                          style={({ pressed }) => [styles.runMore, pressed && styles.pressed]}
+                        >
+                          <Text variant="footnote" tone="ink2" style={styles.bold}>
+                            {t("approval.run.show")}
+                          </Text>
+                          <View style={open ? styles.flip : undefined}>
+                            <Icon name="chev" size={13} color={c.muted} />
+                          </View>
+                        </Pressable>
+                      </View>
+                      {parts?.acts}
                     </View>
                   </View>
-                  {decide(run, t("approval.run.approve"), true)}
-                  {open ? run.map((a) => item(a, true, true)) : null}
+                  {parts?.hint ? <View style={styles.itemUnder}>{parts.hint}</View> : null}
+                  {open ? <View style={styles.nested}>{run.map((a) => item(a, true, true))}</View> : null}
                 </View>
               );
             })}
@@ -416,34 +431,34 @@ function ApprovalGroupItem({
   return (
     <View style={[styles.item, divider && [styles.divided, { borderTopColor: c.line2 }], !pending && styles.itemDone]}>
       <View style={styles.itemRow}>
-        <LineIcon variant="subhead" size={24}>
-          <ApprovalMark approval={a} size={24} />
-        </LineIcon>
-        <View style={styles.grow}>
-          <Text variant="subhead" tone="ink" numberOfLines={2} style={styles.bold}>
-            {approvalTitleText(t, a)}
-          </Text>
-          {detail ? (
-            <Text variant="footnote" tone="muted" numberOfLines={3}>
-              {detail}
-            </Text>
-          ) : null}
-          {own.why ? (
-            <Text variant="footnote" tone="ink">
-              {own.why}
-            </Text>
-          ) : null}
-          {own.origin ? (
-            <Text variant="footnote" tone="muted">
-              {tt(own.origin.key, own.origin.values)}
-            </Text>
-          ) : null}
-          <ApprovalAheadLine approval={a} />
+        <View style={styles.itemMark}>
+          <ApprovalMark approval={a} size={20} bare />
         </View>
-      </View>
-      {pending ? (
-        a.canDecide ? (
-          <>
+        {/* Its words, then its buttons at the row's right end; where both don't fit, the buttons go right under
+            the words, from where they start. */}
+        <View style={styles.itemWrap}>
+          <View style={styles.itemText}>
+            <Text variant="subhead" tone="ink" numberOfLines={2} style={styles.bold}>
+              {approvalTitleText(t, a)}
+            </Text>
+            {detail ? (
+              <Text variant="footnote" tone="muted" numberOfLines={3}>
+                {detail}
+              </Text>
+            ) : null}
+            {own.why ? (
+              <Text variant="footnote" tone="ink">
+                {own.why}
+              </Text>
+            ) : null}
+            {own.origin ? (
+              <Text variant="footnote" tone="muted">
+                {tt(own.origin.key, own.origin.values)}
+              </Text>
+            ) : null}
+            <ApprovalAheadLine approval={a} />
+          </View>
+          {pending && a.canDecide ? (
             <View style={styles.itemActs}>
               {approvalRisk(a) === "high" ? (
                 <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={onApprove} />
@@ -465,12 +480,18 @@ function ApprovalGroupItem({
                 onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
               />
             </View>
-            {always ? <ApproveAlwaysHint approval={a} name={name} /> : null}
-          </>
+          ) : null}
+        </View>
+      </View>
+      {pending ? (
+        a.canDecide && always ? (
+          <View style={styles.itemUnder}>
+            <ApproveAlwaysHint approval={a} name={name} />
+          </View>
         ) : null
       ) : (
-        // Decided while the card shows: how it ended fades in where its buttons were.
-        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.item}>
+        // Decided while the card shows: how it ended fades in under its words.
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={[styles.item, styles.itemUnder]}>
           <Text variant="footnote" tone="muted">
             {[
               decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name),
@@ -516,10 +537,12 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   // The same approving as Atividade's card: the haptic, the toast saying what follows.
   const { approve, pending, high } = useApproveNow(a, () => asks?.settle(a.id));
   // An email says to whom and about what; a connector's detail is its raw call (`tool · key=value`), so its
-  // values in words instead, the call under "Ver detalhes".
+  // values in words instead, the call under "Ver detalhes". With a preview (the email, the values) the name
+  // line says only where it goes: the preview says the rest.
   const source = useApprovalSource(a);
-  const detail = a.email
-    ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
+  const previewed = hasApprovalPreview(a);
+  const detail = previewed
+    ? source.name
     : !a.connector
       ? a.detail
       : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
@@ -530,8 +553,9 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       agentId={a.agentId}
       waitsFor={a.canDecide ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
       lead={approvalWhy(a) ?? approvalAskLine(t, a.canDecide)}
+      preview={previewed ? <ApprovalPreview approval={a} /> : undefined}
       well={{
-        tile: <ApprovalMark approval={a} size={20} />,
+        tile: <ApprovalMark approval={a} size={20} bare />,
         title: approvalHeadline(t, a, i18n.language),
         detail,
         more: {
@@ -539,7 +563,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
           content: (
             <>
               {a.email ? (
-                <ApprovalEmailLetter email={a.email} />
+                <ApprovalEmailLetter email={a.email} full flat />
               ) : (
                 <>
                   <ApprovalDetails approval={a} stacked />
@@ -829,16 +853,30 @@ const styles = StyleSheet.create({
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  // Requests sharing one card: flat rows divided by hairlines (never a plate in a card), decided ones quieter.
-  items: { gap: 8, marginTop: 10 },
-  // A run's requests, unfolded under it or in the card's well: each with its hairline above.
-  nested: { gap: 8 },
+  // Requests sharing one card: rows edge to edge across the card, each with a hairline above (never a plate in a
+  // card), decided ones quieter.
+  items: { marginTop: 2, marginHorizontal: -16 },
+  // A run's requests, unfolded under it or in the name line's place: the same rows.
+  nested: { marginHorizontal: -16 },
   item: { gap: 8 },
-  // 12 above the hairline (with the list's gap) and 12 under it.
-  divided: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  divided: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
   itemDone: { opacity: 0.7 },
-  // The mark on the title's first line: centred on the whole item it floated beside a two-line title and its values.
+  // The mark beside the title's first line.
   itemRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  itemMark: { width: 20, paddingTop: 1, alignItems: "center" },
+  // Its words and its buttons on one line while they fit; else the buttons wrap under the words, at their start.
+  itemWrap: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: 12,
+    rowGap: 8,
+  },
+  itemText: { flexGrow: 1, flexShrink: 1, flexBasis: 160, minWidth: 0 },
+  // Under the words, from where they start (the mark's 20 and the gap's 10).
+  itemUnder: { marginLeft: 30 },
   // A request's decision: one row under its values, left-aligned, every button the strip's height.
   itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   runMore: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", marginTop: 4 },

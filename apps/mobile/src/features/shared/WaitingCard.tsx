@@ -38,8 +38,8 @@ export interface WaitingCardProps {
 /**
  * One thing waiting on you, as Atividade, Conversas' strip and an agent's profile show it, read as the chat's request
  * card: the card with its cut corner (square bottom left, as the chat's blocks), the asking agent's sky faint across
- * the top (gray when no agent asks), its face with the name and the kind under it (the icon in amber, the waiting
- * color) and, at the right, the fuse to its deadline or where and when; then the request in words, why in muted, what
+ * the top (gray when no agent asks), its face with the name and the kind under it (its icon quiet: no "waiting for
+ * you" mark, the card itself is the ask) and, at the right, the fuse to its deadline or where and when; then the request in words, why in muted, what
  * it goes through on one quiet line, and the decision (or its one action) wide under it.
  */
 export function WaitingCard({
@@ -95,7 +95,7 @@ export function WaitingCard({
                 </Text>
               ) : null}
               <View style={styles.kind}>
-                <Icon name={kind.icon} size={13} color={c.amber} />
+                <Icon name={kind.icon} size={13} color={c.muted} />
                 <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.shrink]}>
                   {kind.label}
                 </Text>

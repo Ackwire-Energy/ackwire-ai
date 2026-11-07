@@ -250,7 +250,7 @@ describe("an approval card's layout", () => {
     return cards.slice(start, cards.indexOf("\nfunction ", start + 1));
   };
 
-  test("the buttons sit in one row under the request, Aprovar, Aprovar sempre, Agora não, what it covers under them", () => {
+  test("the buttons sit in one row (a grouped request's at its row's end), Aprovar, Aprovar sempre, Agora não, what it covers under them", () => {
     for (const name of ["ApprovalAsk", "ApprovalGroupItem"]) {
       const card = fn(name);
       const row = card.slice(card.indexOf("<View style={styles.itemActs}>"));
@@ -270,6 +270,17 @@ describe("an approval card's layout", () => {
       expect([name, row.slice(0, row.indexOf("</View>")).includes(" wide")]).toEqual([name, false]);
     }
     expect(cards).toContain('itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }');
+    // A grouped request: its words and its buttons on one line while they fit, the buttons under the words otherwise.
+    const item = fn("ApprovalGroupItem");
+    expect(
+      ascending(
+        at(item, [
+          "<View style={styles.itemWrap}>",
+          "<View style={styles.itemText}>",
+          "<View style={styles.itemActs}>",
+        ]),
+      ),
+    ).toBe(true);
   });
 
   test("waiting requests of one kind in a row fold into one run: its head, Aprovar todos and Ver cada um", () => {
@@ -308,6 +319,6 @@ describe("the secret card on the phone", () => {
   test("where it goes and whose account wrap: only a well with a way to read the rest is cut", () => {
     const asks = source("asks.tsx");
     expect(asks).toContain("numberOfLines={well.more ? (open ? 3 : 1) : undefined}");
-    expect(asks).toContain("numberOfLines={well && !well.more ? undefined : 4}");
+    expect(asks).toContain("numberOfLines={well.more ? 4 : undefined}");
   });
 });
