@@ -11908,6 +11908,7 @@
       "noAiYet": "Aucune IA n'est encore connectée.",
       "filePurged": "Ce fichier a été supprimé il y a plus de 30 jours et ne peut pas revenir.",
       "looksSecret": "Cela ressemble à un mot de passe ou à une clé, et tout le monde ici le verrait.",
+      "blockSpec": "Ce bloc contient une erreur dans ses éléments ou ses formules, il ne peut donc pas être affiché. Corrigez-le et réessayez.",
       "takeControl": "Prenez d'abord le contrôle du profil.",
       "profileBusy": "Quelqu'un d'autre utilise ce profil.",
       "nameTaken": "Ce nom est déjà utilisé. Choisissez-en un autre.",

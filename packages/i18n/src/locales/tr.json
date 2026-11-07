@@ -11418,6 +11418,7 @@
       "noAiYet": "Henüz bağlı bir yapay zekâ yok.",
       "filePurged": "Bu dosya 30 günden uzun süre önce silindi ve geri gelemez.",
       "looksSecret": "Bu bir parola veya anahtara benziyor ve buradaki herkes görür.",
+      "blockSpec": "Bu bloğun parçalarında veya formüllerinde bir hata var, bu yüzden gösterilemiyor. Düzeltip tekrar deneyin.",
       "takeControl": "Önce profilin kontrolünü alın.",
       "profileBusy": "Bu profili başka biri kullanıyor.",
       "nameTaken": "Bu ad zaten kullanılıyor. Başka bir ad seçin.",

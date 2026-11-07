@@ -11482,6 +11482,7 @@
       "noAiYet": "Es ist noch keine KI verbunden.",
       "filePurged": "Diese Datei wurde vor mehr als 30 Tagen gelöscht und kann nicht zurückkommen.",
       "looksSecret": "Das sieht nach einem Passwort oder Schlüssel aus, und alle hier würden es sehen.",
+      "blockSpec": "Dieser Block hat einen Fehler in seinen Teilen oder Formeln und kann daher nicht angezeigt werden. Korrigiere ihn und versuche es erneut.",
       "takeControl": "Übernimm zuerst die Kontrolle über das Profil.",
       "profileBusy": "Jemand anderes nutzt dieses Profil.",
       "nameTaken": "Dieser Name ist schon vergeben. Wähl einen anderen.",

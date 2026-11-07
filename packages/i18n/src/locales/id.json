@@ -11072,6 +11072,7 @@
       "noAiYet": "Belum ada AI yang terhubung.",
       "filePurged": "File ini dihapus lebih dari 30 hari lalu dan tidak bisa kembali.",
       "looksSecret": "Itu terlihat seperti kata sandi atau kunci, dan semua orang di sini akan melihatnya.",
+      "blockSpec": "Blok ini punya kesalahan di bagian atau rumusnya, jadi tidak bisa ditampilkan. Perbaiki lalu coba lagi.",
       "takeControl": "Ambil alih kontrol profil dulu.",
       "profileBusy": "Orang lain sedang memakai profil ini.",
       "nameTaken": "Nama itu sudah dipakai. Pilih yang lain.",

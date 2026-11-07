@@ -455,6 +455,7 @@ const KNOWN = {
   "ai.still_missing": "errors.said.noAiYet",
   "artifact.purged": "errors.said.filePurged",
   "block.secret": "errors.said.looksSecret",
+  "block.spec": "errors.said.blockSpec",
   "browser.not_in_control": "errors.said.takeControl",
   "browser_profile.busy": "errors.said.profileBusy",
   "browser_profile.name_taken": "errors.said.nameTaken",

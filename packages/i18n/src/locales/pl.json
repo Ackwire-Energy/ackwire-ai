@@ -12338,6 +12338,7 @@
       "noAiYet": "Nadal nie ma połączonej AI.",
       "filePurged": "Ten plik usunięto ponad 30 dni temu i nie może wrócić.",
       "looksSecret": "To wygląda na hasło lub klucz, a wszyscy tutaj by to zobaczyli.",
+      "blockSpec": "Ten blok ma błąd w częściach lub formułach, więc nie można go pokazać. Popraw go i spróbuj ponownie.",
       "takeControl": "Najpierw przejmij kontrolę nad profilem.",
       "profileBusy": "Ktoś inny używa tego profilu.",
       "nameTaken": "Ta nazwa jest już zajęta. Wybierz inną.",
