@@ -242,23 +242,27 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
   flex-wrap: wrap;
   gap: 6px;
 }
-/* The details: every value, label above it, split by hairlines. */
+/* The details: every value with its label above it (never beside), side by side as they fit, under a hairline. */
 .ap-exact__rows {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  gap: 10px 20px;
   margin: 0;
+  padding-top: 10px;
   border-top: 1px solid var(--line);
-}
-.ap-exact__rows > div {
-  display: grid;
-  grid-template-columns: minmax(96px, 30%) minmax(0, 1fr);
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
   font-size: 13.5px;
 }
+.ap-exact__rows > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 150px;
+  min-width: 0;
+  max-width: 100%;
+}
 .ap-exact__rows dt {
-  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--faint);
 }
 .ap-exact__rows dd {
   margin: 0;

@@ -144,28 +144,76 @@ export function useApproveNow(a: Approval, onApproved?: () => void) {
   return { approve, pending: decide.isPending, high };
 }
 
-/** The app a request goes through, as a mark on a tile (`useApprovalSource`); its name is read aloud. */
-export function ApprovalMark({ approval: a, size = 20 }: { approval: Approval; size?: number }) {
+/**
+ * The app a request goes through, as a mark on a tile (`useApprovalSource`); its name is read aloud. `bare`: the mark
+ * alone, as a request card's name line draws it.
+ */
+export function ApprovalMark({
+  approval: a,
+  size = 20,
+  bare = false,
+}: {
+  approval: Approval;
+  size?: number;
+  bare?: boolean;
+}) {
   const source = useApprovalSource(a);
   return (
     <View accessible accessibilityLabel={source.name}>
       {source.kind === "mail" ? (
-        <IconTile name="mail" size={size} />
+        <IconTile name="mail" size={size} bare={bare} />
       ) : source.kind === "builtin" ? (
-        <IconTile name="shield" size={size} />
+        <IconTile name="shield" size={size} bare={bare} />
       ) : (
-        <ConnectorIcon def={source.def} image={source.image} label={source.name} size={size} />
+        <ConnectorIcon def={source.def} image={source.image} label={source.name} size={size} bare={bare} />
       )}
     </View>
   );
 }
 
 /**
- * The email an approval writes, as it will be, one column (label above its value): De (the mailbox and
- * its provider), Para, Assunto, the text folded to four lines ("Ler tudo") unless `full`, and the
- * message it answers.
+ * What an approval will do, drawn on its card (its preview): an email as it goes, its subject in bold, to whom under
+ * it, then its text. Only an email: an action's values stay on its line (their names are the tool's own, often
+ * English), the whole call under "Ver detalhes". `hasApprovalPreview` says whether there is one.
  */
-export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; full?: boolean }) {
+export function ApprovalPreview({ approval: a }: { approval: Approval }) {
+  const { t } = useTranslation();
+  if (!a.email) return null;
+  return (
+    <View style={styles.previewMail}>
+      <Text variant="subhead" tone="ink" style={styles.medium} numberOfLines={2}>
+        {a.email.subject || t("approval.email.noSubject")}
+      </Text>
+      {a.email.to.length > 0 ? (
+        <Text variant="footnote" tone="muted" numberOfLines={1}>
+          {a.email.to.join(", ")}
+        </Text>
+      ) : null}
+      {a.email.body ? (
+        <Text variant="small" tone="ink2" style={[styles.said, styles.previewBody]}>
+          {a.email.body}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+export const hasApprovalPreview = (a: Approval) => Boolean(a.email);
+
+/**
+ * The email an approval writes, as it will be: its subject in bold, then De (the mailbox and its provider), Para,
+ * Cc, Cco, each label above its value (never beside it), the text folded to four lines ("Ler tudo") unless `full`,
+ * and the message it answers. `flat`: drawn on a request card, no frame of its own (never a box in a card).
+ */
+export function ApprovalEmailLetter({
+  email,
+  full,
+  flat = false,
+}: {
+  email: ApprovalEmail;
+  full?: boolean;
+  flat?: boolean;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const [open, setOpen] = useState(false);
@@ -175,7 +223,6 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
     ...(email.to.length > 0 ? [{ label: t("approval.email.to"), value: email.to.join(", ") }] : []),
     ...(email.cc.length > 0 ? [{ label: t("approval.email.cc"), value: email.cc.join(", ") }] : []),
     ...(email.bcc.length > 0 ? [{ label: t("approval.email.bcc"), value: email.bcc.join(", ") }] : []),
-    { label: t("approval.email.subject"), value: email.subject || t("approval.email.noSubject") },
   ];
   const answers = email.original
     ? t(
@@ -190,8 +237,11 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
       )
     : null;
   return (
-    <View style={[styles.letter, { borderColor: c.line2 }]}>
-      <View style={[styles.letterHead, { borderBottomColor: c.line2 }]}>
+    <View style={flat ? styles.letterFlat : [styles.letter, { borderColor: c.line2 }]}>
+      <View style={[flat ? styles.letterHeadFlat : styles.letterHead, { borderBottomColor: c.line2 }]}>
+        <Text variant="subhead" tone="ink" style={styles.medium}>
+          {email.subject || t("approval.email.noSubject")}
+        </Text>
         {rows.map((r) => (
           <View key={r.label}>
             <Text variant="footnote" tone="muted">
@@ -209,7 +259,7 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
         ))}
       </View>
       {email.body ? (
-        <View style={styles.letterBody}>
+        <View style={flat ? styles.letterBodyFlat : styles.letterBody}>
           <Text variant="small" tone="ink2" style={styles.said} numberOfLines={full || open ? undefined : 4}>
             {email.body}
           </Text>
@@ -229,7 +279,13 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
         </View>
       ) : null}
       {answers ? (
-        <View style={[styles.answers, { backgroundColor: c.sunken, borderTopColor: c.line2 }]}>
+        <View
+          style={[
+            flat ? styles.answersFlat : styles.answers,
+            { borderTopColor: c.line2 },
+            !flat && { backgroundColor: c.sunken },
+          ]}
+        >
           <LineIcon name="reply" size={13} color={c.muted} variant="footnote" />
           <Text variant="footnote" tone="muted" style={styles.grow}>
             {answers}
@@ -512,6 +568,21 @@ const styles = StyleSheet.create({
   letter: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, borderBottomLeftRadius: 6, overflow: "hidden" },
   letterHead: { gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   letterBody: { gap: 6, paddingHorizontal: 12, paddingVertical: 10 },
+  // On a request card: no frame, the head and the text divided by a hairline.
+  letterFlat: { gap: 0 },
+  letterHeadFlat: { gap: 8, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  letterBodyFlat: { gap: 6, paddingTop: 10 },
+  answersFlat: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  previewMail: { gap: 2 },
+  previewBody: { marginTop: 6 },
+  // The values side by side as they fit, each label above its value.
   answers: {
     flexDirection: "row",
     alignItems: "flex-start",

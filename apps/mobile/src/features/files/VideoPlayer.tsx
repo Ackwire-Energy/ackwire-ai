@@ -2,7 +2,14 @@ import { useEventListener } from "expo";
 import { type VideoPlayer as Player, useVideoPlayer, VideoView } from "expo-video";
 import { type ComponentRef, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, type GestureResponderEvent, Pressable, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  type GestureResponderEvent,
+  Pressable,
+  Text as RNText,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Glass, Icon, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
@@ -28,8 +35,6 @@ export interface VideoPlayerProps {
   /** Where it plays from, with the session when the link is ours. */
   source: { uri: string; headers?: Record<string, string> };
   name: string;
-  /** After the length on the caption ("7,5 MB"). */
-  size?: string;
   /** `inline` in a message (at `width`, its own shape); `screen` fills the file screen. */
   variant?: "inline" | "screen";
   width?: number;
@@ -41,18 +46,10 @@ export interface VideoPlayerProps {
 
 /**
  * A video with the design system's controls (the web's `VideoPlayer`): stopped, its first frame with a play key and
- * "name · length · size"; playing, a glass bar over its foot (play, timeline, time, sound, full screen) that a tap
+ * its length in a small badge (no name over the picture, as a picture has none); playing, a glass bar over its foot (play, timeline, time, sound, full screen) that a tap
  * on the picture shows or hides. The volume is the phone's own buttons.
  */
-export function VideoPlayer({
-  source,
-  name,
-  size,
-  variant = "inline",
-  width = 300,
-  onOpen,
-  onFailed,
-}: VideoPlayerProps) {
+export function VideoPlayer({ source, name, variant = "inline", width = 300, onOpen, onFailed }: VideoPlayerProps) {
   const { t } = useTranslation();
   const c = useColors();
   const view = useRef<VideoView>(null);
@@ -134,7 +131,7 @@ export function VideoPlayer({
 
   const inline = variant === "inline";
   const height = inline ? videoHeight(width, shape) : undefined;
-  const caption = [duration > 0 ? videoClock(duration) : "", size].filter(Boolean).join(" · ");
+  const length = duration > 0 ? videoClock(duration) : "";
   const playLabel = ended
     ? t("mobile.files.video.replay")
     : playing
@@ -178,16 +175,9 @@ export function VideoPlayer({
         </View>
       ) : null}
 
-      {inline && !started ? (
-        <View style={[styles.caption, { backgroundColor: c.glassSolid }]} pointerEvents="none">
-          <Text variant="footnote" style={styles.name} numberOfLines={1}>
-            {name}
-          </Text>
-          {caption ? (
-            <Text variant="footnote" tone="muted">
-              {caption}
-            </Text>
-          ) : null}
+      {inline && !started && length ? (
+        <View style={styles.length} pointerEvents="none">
+          <RNText style={styles.lengthText}>{length}</RNText>
         </View>
       ) : null}
 
@@ -320,7 +310,8 @@ function Track({
 
 const styles = StyleSheet.create({
   box: { overflow: "hidden", backgroundColor: "#000" },
-  inline: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
+  // An attachment's shape (as the tiles beside it): rounded, the bottom left corner cut, a hairline.
+  inline: { borderRadius: 16, borderBottomLeftRadius: 4, borderWidth: StyleSheet.hairlineWidth },
   screen: { flex: 1 },
   center: {
     position: "absolute",
@@ -345,20 +336,16 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   pressed: { opacity: 0.8, transform: [{ scale: 0.94 }] },
-  caption: {
+  length: {
     position: "absolute",
     left: 8,
-    right: 8,
     bottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 7,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
   },
-  name: { flex: 1, minWidth: 0, fontWeight: "600" },
+  lengthText: { color: "#fff", fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
   open: {
     position: "absolute",
     top: 8,

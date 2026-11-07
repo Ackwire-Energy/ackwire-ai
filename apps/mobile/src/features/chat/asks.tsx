@@ -20,6 +20,7 @@ import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOpen, messageProposalCards, proposalTarget, proposerOf } from "@agenteschat/client/lib/proposals";
 import { secretLabel } from "@agenteschat/client/lib/secret-requests";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   type ComponentRef,
   createContext,
@@ -54,7 +55,6 @@ import {
   Fuse,
   Icon,
   type IconName,
-  LineIcon,
   Text,
   useReducedMotion,
   useTheme,
@@ -390,7 +390,7 @@ export function WaitMark({ size = 8 }: { size?: number }) {
 }
 
 export interface AskWell {
-  /** The app or thing it goes through, as a 32-point tile. */
+  /** The app or thing it goes through: its mark alone, 20 points (no tile inside the card). */
   tile: ReactNode;
   title: string;
   detail?: string | null;
@@ -401,7 +401,7 @@ export interface AskWell {
   more?: { label: string; content: ReactNode; open?: boolean; onToggle?: () => void } | null;
 }
 
-/** Each kind of request by its icon on the card's top line (amber while it waits on the person); Atividade's too. */
+/** Each kind of request by its icon on the card's top line, quiet (no "waiting for you" mark); Atividade's too. */
 export const ASK_ICON: Record<AskKind, IconName> = {
   approval: "shield",
   secret: "key",
@@ -416,12 +416,14 @@ export const ASK_ICON: Record<AskKind, IconName> = {
 
 /**
  * The request card, the same as Atividade's and Conversas' waiting cards (`WaitingCard`): the app's card with its cut
- * corner, the kind on top with its icon (amber when the person decides) and, at its right, the fuse to `expiry`
- * (`ExpiryLine`) or who else decides (`waitsFor`: "esperando Ana", "Aguardando um admin"); then the request in
- * words, why it was asked in muted, and the thing it is about on one quiet line (`well`: its mark, its details and,
- * with `more`, the rest it opens). With no well, `lead` is the request itself. `body` sits under it (a secret's
- * field); `foot` holds the decision (`AskFoot`). In a conversation the card tells it where it is (`id`), for the line
- * above the composer.
+ * corner, the kind on top with its icon and, at its right, who else decides (`waitsFor`: "esperando Ana", "Aguardando
+ * um admin"; no "waiting for you" mark: the card itself is the ask). Then
+ * the agent's words (`lead`), what will happen drawn small edge to edge (`preview`: an email as it will go, the values
+ * it runs with), and the thing it is about on its name line, edge to edge between hairlines (`well`: its mark alone,
+ * its title, its details and, with `more`, "Ver …" opening the rest in the preview's place, or under the line with
+ * no preview). `body` sits under it (a secret's field); `foot` holds the decision (`AskFoot`) and, at its end, the fuse
+ * to `expiry` (`ExpiryLine`) while the person decides. In a conversation the card tells it where it is (`id`), for the
+ * line above the composer.
  */
 export function AskCard({
   id,
@@ -429,6 +431,7 @@ export function AskCard({
   waitsFor,
   lead,
   well,
+  preview,
   body,
   expiry,
   foot,
@@ -439,8 +442,10 @@ export function AskCard({
   waitsFor: "you" | (string & {}) | null;
   lead: string;
   well?: AskWell | null;
+  /** What will happen, drawn small over the name line (an approval's email or values); "Ver …" opens it whole. */
+  preview?: ReactNode;
   body?: ReactNode;
-  /** Its deadline (`ExpiryLine`), at the top line's right while the person decides. */
+  /** Its deadline (`ExpiryLine`), at the foot's end while the person decides. */
   expiry?: ReactNode;
   foot?: ReactNode;
 }) {
@@ -463,28 +468,43 @@ export function AskCard({
     if (!store || !card) return;
     return store.register(id, card);
   }, [store, id]);
-  const title = well ? well.title : lead;
-  const why = well ? lead : null;
-  const source =
-    well && (well.detail || well.more) ? (
-      <>
-        <View style={styles.sourceMark}>{well.tile}</View>
-        <Text
-          variant="footnote"
-          tone="faint"
-          numberOfLines={well.more ? (open ? 3 : 1) : undefined}
-          style={styles.grow}
-        >
-          {well.detail || well.more?.label}
+  const more = well?.more;
+  // The thing it is about, edge to edge: its mark, its title and "Ver …" on one line, its details under them across
+  // the whole width (from the title's column to the card's edge).
+  const line = well ? (
+    <>
+      <View style={styles.lineTop}>
+        <View style={styles.lineMark}>{well.tile}</View>
+        <Text variant="subhead" tone="ink" style={[styles.semibold, styles.grow]}>
+          {well.title}
         </Text>
-        {well.more ? (
-          <LineIcon variant="footnote" size={13}>
+        {more ? (
+          <View style={styles.lineMore}>
+            <Text variant="footnote" tone="muted" style={styles.semibold} numberOfLines={1}>
+              {more.label}
+            </Text>
             <View style={open ? styles.flip : undefined}>
               <Icon name="chev" size={13} color={c.faint} />
             </View>
-          </LineIcon>
+          </View>
         ) : null}
-      </>
+      </View>
+      {well.detail ? (
+        <Text variant="footnote" tone="faint" style={styles.lineDetail}>
+          {well.detail}
+        </Text>
+      ) : null}
+    </>
+  ) : null;
+  const opened =
+    open && more ? (
+      <Animated.View
+        entering={reduced ? undefined : FadeIn.duration(220)}
+        // In the preview's place it keeps the preview's hairline; under the name line, that line's own is enough.
+        style={[styles.edge, styles.exact, preview ? { borderTopColor: c.line } : styles.noTop]}
+      >
+        {more.content}
+      </Animated.View>
     ) : null;
   return (
     // A plain view the conversation measures (never flattened away), around the card that fades in.
@@ -492,51 +512,48 @@ export function AskCard({
       <Animated.View entering={reduced ? undefined : FadeIn.duration(300)} style={[styles.card, surface]}>
         <View style={styles.clip}>
           <View style={styles.head}>
-            <Icon name={ASK_ICON[kind]} size={13} color={waitsFor === "you" ? c.amber : c.muted} />
+            <Icon name={ASK_ICON[kind]} size={13} color={c.muted} />
             <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.grow]}>
               {askKindWords(t, kind, waitsFor === "you")}
             </Text>
-            {waitsFor === "you" ? (
-              expiry
-            ) : waitsFor ? (
+            {waitsFor && waitsFor !== "you" ? (
               <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
                 {waitsFor}
               </Text>
             ) : null}
           </View>
-          {title ? (
-            <Text variant="title" tone="ink" numberOfLines={well && !well.more ? undefined : 4}>
-              {title}
+          {lead ? (
+            <Text variant={well ? "body" : "title"} tone="ink" style={well ? styles.lead : undefined}>
+              {lead}
             </Text>
           ) : null}
-          {why ? (
-            <Text variant="small" tone="muted" style={styles.why}>
-              {why}
-            </Text>
+          {/* With a preview, "Ver …" opens the whole in its place; without one, under the name line. */}
+          {preview && !open ? (
+            <View style={[styles.edge, styles.preview, { borderTopColor: c.line }]}>
+              {preview}
+              <LinearGradient pointerEvents="none" colors={[`${c.raised}00`, c.raised]} style={styles.fade} />
+            </View>
           ) : null}
-          {source ? (
-            well?.more ? (
+          {preview ? opened : null}
+          {line ? (
+            more ? (
               <Pressable
                 onPress={toggle}
                 accessibilityRole="button"
-                accessibilityHint={well.more.label}
+                accessibilityHint={more.label}
                 accessibilityState={{ expanded: open }}
-                hitSlop={10}
-                style={({ pressed }) => [styles.source, open && styles.sourceOpen, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.edge, styles.line, { borderColor: c.line }, pressed && styles.pressed]}
               >
-                {source}
+                {line}
               </Pressable>
             ) : (
-              <View style={styles.source}>{source}</View>
+              <View style={[styles.edge, styles.line, { borderColor: c.line }]}>{line}</View>
             )
           ) : null}
-          {open && well?.more ? (
-            <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} style={styles.exact}>
-              {well.more.content}
-            </Animated.View>
-          ) : null}
+          {preview ? null : opened}
           {body ? <View style={styles.body}>{body}</View> : null}
           {foot}
+          {waitsFor === "you" && expiry ? <View style={styles.expiryRow}>{expiry}</View> : null}
         </View>
       </Animated.View>
     </View>
@@ -564,8 +581,8 @@ export function AskButtons({ primary, secondary }: { primary: ReactNode; seconda
 }
 
 /**
- * The amber fuse burning to the expiry and the time left ("23 h"; "expira em 23 h" read aloud), for the card's top
- * line; without a start, the time alone.
+ * The amber fuse burning to the expiry and the time left ("23 h para decidir"; "expira em 23 h" read aloud), at the
+ * card's foot; without a start, the time alone.
  */
 export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null; expiresAt: string }) {
   const { t } = useTranslation();
@@ -589,7 +606,7 @@ export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null
         maxFontSizeMultiplier={CHROME_MAX_SCALE}
         style={[styles.expiryText, { color: c.amber }]}
       >
-        {left || t("approval.expired")}
+        {left ? t("approvals.left", { time: left }) : t("approval.expired")}
       </Text>
     </View>
   );
@@ -838,22 +855,33 @@ const styles = StyleSheet.create({
   medium: { fontWeight: "500" },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
-  why: { marginTop: -4 },
-  // The thing it is about, one quiet line: its mark, its details, the chevron when it opens more.
-  source: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", minHeight: 24 },
-  // Open, its details take up to three lines: the mark and the chevron stay on the first.
-  sourceOpen: { alignItems: "flex-start" },
-  sourceMark: { flexShrink: 0 },
+  lead: { lineHeight: 22 },
+  // Edge to edge across the card (its 16-point sides), a hairline above.
+  edge: { marginHorizontal: -16, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth },
+  // What will happen, drawn small: as tall as a preview gets, fading at its foot.
+  preview: { maxHeight: 152, overflow: "hidden", paddingVertical: 10 },
+  fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 40 },
+  // The name line: its mark, its title and details, "Ver …"; a hairline under it too, over the decision. The mark
+  // and "Ver …" stand on the title's line (20 points), not in the middle of a tall detail.
+  line: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  lineTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  lineMark: { flexShrink: 0, width: 20, height: 20, alignItems: "center", justifyContent: "center" },
+  lineMore: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 0, maxWidth: "40%", height: 20 },
+  // Under the title, on its column (the mark and its gap), to the card's edge.
+  lineDetail: { marginLeft: 30, marginTop: 1 },
+  // The deadline at the foot's end, right-aligned under the decision.
+  expiryRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 10 },
   pressed: { opacity: 0.7 },
   flip: { transform: [{ rotate: "180deg" }] },
-  exact: { gap: 10 },
+  exact: { gap: 10, paddingVertical: 12 },
+  noTop: { borderTopWidth: 0 },
   body: { gap: 8 },
   foot: { marginTop: 4, gap: 10 },
   buttons: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   primary: { flexGrow: 1.5, flexShrink: 1, minWidth: 0 },
   secondary: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
   expiry: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
-  fuse: { width: 44 },
+  fuse: { width: 36, height: 6 },
   expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
   // A decided request: its pill on the conversation itself, from where the message's text starts; the body sets its top.
   done: { alignSelf: "stretch" },

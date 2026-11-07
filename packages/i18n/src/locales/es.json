@@ -9966,6 +9966,12 @@
     "moreFiles_one": "+ {{count}} archivo",
     "moreFiles_many": "+ {{count}} archivos",
     "moreFiles_other": "+ {{count}} archivos",
+    "rows_one": "{{count}} fila",
+    "rows_many": "{{count}} filas",
+    "rows_other": "{{count}} filas",
+    "files_one": "{{count}} archivo",
+    "files_many": "{{count}} archivos",
+    "files_other": "{{count}} archivos",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} líneas agregadas, {{removed}} eliminadas",
     "htmlPreview": "Página interactiva. Ábrela para verla.",
@@ -15375,7 +15381,8 @@
     "where": {
       "dm": "Conversación directa",
       "routine": "Rutina «{{name}}»",
-      "background": "En segundo plano"
+      "background": "En segundo plano",
+      "here": "Esta conversación"
     },
     "askedBy": "Lo pidió {{name}}",
     "askedByYou": "Lo pediste tú",

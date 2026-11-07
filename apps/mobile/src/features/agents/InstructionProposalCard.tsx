@@ -158,7 +158,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
         well={
           only
             ? {
-                tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={20} />,
+                tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={20} bare />,
                 title: proposalTarget(t, only, agentName, orgName),
                 detail:
                   only.target.type === "agent_role"
@@ -167,7 +167,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
                 more: change,
               }
             : firstLine
-              ? { tile: <IconTile name="file" size={20} />, title: firstLine.text, more: change }
+              ? { tile: <IconTile name="file" size={20} bare />, title: firstLine.text, more: change }
               : null
         }
         body={

@@ -112,7 +112,7 @@ async function openChannel() {
 
 const card = (title: string) => {
   const open = screen().getByRole("button", { name: `Abrir ${title}` });
-  return open.closest(".artifact-card") as HTMLElement;
+  return open.closest(".artifact-tile") as HTMLElement;
 };
 const openCard = async (title: string) => {
   await click(screen().getByRole("button", { name: `Abrir ${title}` }));
@@ -121,31 +121,40 @@ const openCard = async (title: string) => {
 };
 
 describe("artifact cards in the chat", () => {
-  test("one compact card per kind, with title, version, author and a preview", async () => {
+  test("one tile per kind: what it holds drawn small on top, its name with its kind and size under it", async () => {
     await openChannel();
+    const meta = (tile: HTMLElement) => tile.querySelector(".artifact-tile__meta")?.textContent;
     const doc = card("Relatório de incidente: checkout");
-    expect(doc.textContent).toContain("v2");
-    expect(doc.textContent).toContain("Documento · gerado por");
-    expect(doc.textContent).toContain("Incidente no checkout");
-    expect(doc.textContent).not.toContain("cart.items.length"); // code is not in the preview
+    // The document's own start, its headings and lists as in the document; no "made by" (the message says who).
+    expect(doc.querySelector(".artifact-tile__cover h2")?.textContent).toBe("Incidente no checkout");
+    expect(doc.querySelector(".artifact-tile__cover li")?.textContent).toBe("142 eventos desde ontem");
+    expect(doc.querySelector(".artifact-tile__title")?.textContent).toBe("Relatório de incidente: checkout");
+    expect(meta(doc)).toBe("Documento · v2");
+    expect(doc.textContent).not.toContain("gerado por");
 
     const table = card("Pedidos mais comuns nos reviews");
-    expect(table.textContent).toContain("Tabela");
-    expect(within(table).getAllByRole("row")).toHaveLength(4); // header + 3 rows
+    expect(meta(table)).toBe("Tabela · 4 linhas");
+    expect(within(table).getAllByRole("row")).toHaveLength(5); // header + its first rows
     expect(table.textContent).toContain("Modo offline");
-    expect(table.textContent).toContain("+ 1 linha");
+    // A column of numbers lines up on the right; words stay on the left.
+    const [name, mentions] = Array.from(table.querySelectorAll("tbody tr:first-child td"));
+    expect([name?.className ?? "", mentions?.className]).toEqual(["", "is-num"]);
 
     const diff = card("Corrige o checkout com carrinho vazio");
-    expect(diff.textContent).toContain("Alteração de código");
-    expect(diff.textContent).toContain("api/checkout.ts");
-    expect(diff.textContent).toContain("+4 −1");
-    expect(diff.textContent).toContain("4 linhas adicionadas, 0 removidas");
+    expect(meta(diff)).toMatch(/^2 arquivos · \+\d+ −\d+$/);
+    const first = diff.querySelector(".artifact-tile__files li") as HTMLElement;
+    expect(first.querySelector("code")?.textContent).toBe("api/checkout.ts");
+    expect(first.textContent).toContain("+4");
+    expect(first.textContent).toContain("−1");
 
     const diagram = card("Organograma do time");
     const img = within(diagram).getByRole("img", { name: "Diagrama: Organograma do time" });
     expect(img.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
 
+    expect(meta(diagram)).toBe("Diagrama · v1");
+
     const html = card("Painel de erros da semana");
+    expect(meta(html)).toBe("Página HTML · v1");
     // A live thumbnail: the same sandbox, a picture with no scrollbar, out of the tab order and hidden from screen readers.
     await settle(3);
     expect(within(html).getByRole("img", { name: "Página interativa. Abra para ver." })).toBeTruthy();
@@ -154,6 +163,20 @@ describe("artifact cards in the chat", () => {
     expect(thumb.getAttribute("scrolling")).toBe("no");
     expect(thumb.getAttribute("tabindex")).toBe("-1");
     expect(thumb.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("a tile's actions", () => {
+  test("Download and More sit over the cover: Download saves it, More has the right click's other actions", async () => {
+    await openChannel();
+    const doc = card("Relatório de incidente: checkout");
+    const acts = doc.querySelector(".artifact-tile__acts") as HTMLElement;
+    await click(within(acts).getByRole("button", { name: "Baixar" }));
+    await settle(2);
+    expect(saved.at(-1)?.name).toMatch(/\.md$/);
+    await pick(acts, "Mais ações: Relatório de incidente: checkout", "Copiar link");
+    await settle(2);
+    expect(copied.at(-1)).toContain("/drive");
   });
 });
 

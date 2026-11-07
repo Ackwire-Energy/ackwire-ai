@@ -9236,6 +9236,8 @@
     "notFound": "이 파일은 더 이상 존재하지 않거나 접근 권한이 없어요.",
     "moreRows_other": "+ {{count}}행",
     "moreFiles_other": "+ 파일 {{count}}개",
+    "rows_other": "{{count}}행",
+    "files_other": "파일 {{count}}개",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}}줄 추가, {{removed}}줄 삭제",
     "htmlPreview": "인터랙티브 페이지예요. 열어서 확인하세요.",
@@ -14383,7 +14385,8 @@
     "where": {
       "dm": "다이렉트 메시지",
       "routine": "루틴 «{{name}}»",
-      "background": "백그라운드"
+      "background": "백그라운드",
+      "here": "이 대화"
     },
     "askedBy": "{{name}}이(가) 요청함",
     "askedByYou": "내가 요청함",

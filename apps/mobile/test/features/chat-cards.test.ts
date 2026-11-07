@@ -250,7 +250,7 @@ describe("an approval card's layout", () => {
     return cards.slice(start, cards.indexOf("\nfunction ", start + 1));
   };
 
-  test("the buttons sit in one row under the request, Aprovar, Aprovar sempre, Agora não, what it covers under them", () => {
+  test("the buttons sit in one row (a grouped request's at its row's end), Aprovar, Aprovar sempre, Agora não, what it covers under them", () => {
     for (const name of ["ApprovalAsk", "ApprovalGroupItem"]) {
       const card = fn(name);
       const row = card.slice(card.indexOf("<View style={styles.itemActs}>"));
@@ -270,6 +270,17 @@ describe("an approval card's layout", () => {
       expect([name, row.slice(0, row.indexOf("</View>")).includes(" wide")]).toEqual([name, false]);
     }
     expect(cards).toContain('itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }');
+    // A grouped request: its words and its buttons on one line while they fit, the buttons under the words otherwise.
+    const item = fn("ApprovalGroupItem");
+    expect(
+      ascending(
+        at(item, [
+          "<View style={styles.itemWrap}>",
+          "<View style={styles.itemText}>",
+          "<View style={styles.itemActs}>",
+        ]),
+      ),
+    ).toBe(true);
   });
 
   test("waiting requests of one kind in a row fold into one run: its head, Aprovar todos and Ver cada um", () => {
@@ -305,9 +316,18 @@ describe("the secret card on the phone", () => {
     expect(card).toContain('t("secret.seeNewer")');
   });
 
-  test("where it goes and whose account wrap: only a well with a way to read the rest is cut", () => {
+  test('the name line reads whole (never cut mid-sentence), its mark and "Ver …" on the title\'s line, the deadline at the foot', () => {
     const asks = source("asks.tsx");
-    expect(asks).toContain("numberOfLines={well.more ? (open ? 3 : 1) : undefined}");
-    expect(asks).toContain("numberOfLines={well && !well.more ? undefined : 4}");
+    const line = asks.slice(asks.indexOf("const line = well ? ("), asks.indexOf("const opened ="));
+    // The title and the detail wrap whole ("Ver …" is one word on one line).
+    expect(line.slice(0, line.indexOf("{more ?"))).not.toContain("numberOfLines");
+    expect(line.slice(line.indexOf("{well.detail"))).not.toContain("numberOfLines");
+    expect(asks).toContain('lineTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 }');
+    // The detail spans the whole width under the title, never beside "Ver …".
+    expect(asks).toContain("lineDetail: { marginLeft: 30, marginTop: 1 }");
+    expect(asks).toContain("lineMark: { flexShrink: 0, width: 20, height: 20,");
+    // The fuse and the time left under the decision, never on the card's top line.
+    expect(asks).toContain('{waitsFor === "you" && expiry ? <View style={styles.expiryRow}>{expiry}</View> : null}');
+    expect(asks).toContain('{waitsFor && waitsFor !== "you" ? (');
   });
 });

@@ -118,7 +118,8 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(request.getAttribute("role")).toBe("group");
     expect(request.getAttribute("data-ask-kind")).toBe("browser");
     expect(request.textContent).toContain("Precisa de você no navegador");
-    expect(request.textContent).toContain("esperando você");
+    // Waiting for me needs no words on the card (its buttons say it).
+    expect(request.textContent).not.toContain("esperando você");
     expect(request.textContent).toContain("Entrar no painel com a conta de teste");
     const openHere = within(request).getByRole("button", { name: "Abrir aqui" });
     expect(openHere.getAttribute("title")).toBe("Abre neste card, sem sair do chat.");

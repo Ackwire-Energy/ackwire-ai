@@ -9296,6 +9296,8 @@
     "notFound": "File ini sudah tidak ada atau kamu tidak punya akses.",
     "moreRows_other": "+ {{count}} baris",
     "moreFiles_other": "+ {{count}} file",
+    "rows_other": "{{count}} baris",
+    "files_other": "{{count}} file",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} baris ditambahkan, {{removed}} dihapus",
     "htmlPreview": "Halaman interaktif. Buka untuk melihatnya.",
@@ -14493,7 +14495,8 @@
     "where": {
       "dm": "Pesan langsung",
       "routine": "Rutinitas «{{name}}»",
-      "background": "Di latar belakang"
+      "background": "Di latar belakang",
+      "here": "Percakapan ini"
     },
     "askedBy": "{{name}} meminta",
     "askedByYou": "Kamu meminta",

@@ -10419,6 +10419,14 @@
     "moreFiles_few": "+ {{count}} pliki",
     "moreFiles_many": "+ {{count}} plików",
     "moreFiles_other": "+ {{count}} pliku",
+    "rows_one": "{{count}} wiersz",
+    "rows_few": "{{count}} wiersze",
+    "rows_many": "{{count}} wierszy",
+    "rows_other": "{{count}} wiersza",
+    "files_one": "{{count}} plik",
+    "files_few": "{{count}} pliki",
+    "files_many": "{{count}} plików",
+    "files_other": "{{count}} pliku",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "Dodane linie: {{added}}, usunięte: {{removed}}",
     "htmlPreview": "Strona interaktywna. Otwórz, żeby ją zobaczyć.",
@@ -15956,7 +15964,8 @@
     "where": {
       "dm": "Wiadomość bezpośrednia",
       "routine": "Rutyna «{{name}}»",
-      "background": "W tle"
+      "background": "W tle",
+      "here": "Ta rozmowa"
     },
     "askedBy": "{{name}} poprosił(a)",
     "askedByYou": "Twoja prośba",
