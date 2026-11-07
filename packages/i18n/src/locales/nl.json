@@ -9928,7 +9928,7 @@
   "storage": {
     "title": "Opslag",
     "options": "Waar bestanden te bewaren",
-    "agentes": "agentes-opslag",
+    "agentes": "agentes.chat-opslag",
     "agentesText": "Je bestanden blijven in onze opslag, gescheiden per werkruimte.",
     "server": "Deze server",
     "serverText": {
@@ -9939,7 +9939,7 @@
     },
     "showFolder": "De map tonen",
     "place": {
-      "agentes": "agentes-opslag",
+      "agentes": "agentes.chat-opslag",
       "server": "deze server"
     },
     "s3": "Je eigen bucket",

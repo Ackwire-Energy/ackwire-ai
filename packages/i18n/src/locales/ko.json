@@ -9435,7 +9435,7 @@
   "storage": {
     "title": "저장 공간",
     "options": "파일 보관 위치",
-    "agentes": "agentes 저장 공간",
+    "agentes": "agentes.chat 저장 공간",
     "agentesText": "파일은 워크스페이스별로 분리된 저희 저장 공간에 보관돼요.",
     "server": "이 서버",
     "serverText": {
@@ -9446,7 +9446,7 @@
     },
     "showFolder": "폴더 보기",
     "place": {
-      "agentes": "agentes 저장 공간",
+      "agentes": "agentes.chat 저장 공간",
       "server": "이 서버"
     },
     "s3": "내 버킷",

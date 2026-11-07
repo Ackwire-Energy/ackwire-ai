@@ -39,7 +39,7 @@ import {
   type CodingPlan,
   type PlanModelNeed,
 } from "@agenteschat/client/lib/plans";
-import { AUTO, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, keyLine } from "@agenteschat/client/lib/providers";
 import type { TFunction } from "i18next";
 
 /*
@@ -259,7 +259,7 @@ export function existingRows(
           key: row.key.id,
           row,
           label: row.key.label,
-          sub: t("newAgent.otherKeyDesc", { provider: providerLabel(row.key.provider), hint: row.key.keyHint }),
+          sub: keyLine(t, row.key),
           below: t("agentPage.work.brain.modelText", agentGrammar(agentName)),
           mark: row.key.provider,
           off: false,

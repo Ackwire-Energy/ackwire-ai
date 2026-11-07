@@ -353,7 +353,9 @@ export async function setBillingHold(
   });
   if (!done) return null;
   if (!done.written) return { applied: false, standing: done.before };
-  await standingWritten(deps, orgId, done.written);
+  // A first plan is a start, not a return: the person paying just saw it, and nobody else is in yet to tell.
+  const firstPlan = hold === null && done.before.reason === "payment";
+  await standingWritten(deps, orgId, done.written, { notify: !firstPlan });
   return { applied: true, standing: done.written.after };
 }
 
@@ -408,6 +410,7 @@ async function standingWritten(
   deps: StandingDeps,
   orgId: string,
   { after, moved, seen }: { after: OrgStanding; moved: boolean; seen: boolean },
+  { notify = true }: { notify?: boolean } = {},
 ) {
   caches.standing.delete(`${orgId}:`);
   if (seen) {
@@ -417,7 +420,7 @@ async function standingWritten(
       event: { type: "org.standing", orgId, state: after.state, reason: toldReason(after), ...cloudNotice() },
     });
   }
-  if (moved && after.notice === "shown") {
+  if (notify && moved && after.notice === "shown") {
     await notifyOrgStanding(deps, orgId, { ...after, billing: isBillingHold(after), cloud: cloudNotices }).catch(
       () => {},
     );

@@ -9771,7 +9771,7 @@ export const en = {
   storage: {
     title: "Storage",
     options: "Where to keep files",
-    agentes: "agentes storage",
+    agentes: "agentes.chat storage",
     agentesText: "Your files stay in our storage, kept apart per workspace.",
     server: "This server",
     serverText: {
@@ -9782,7 +9782,7 @@ export const en = {
     },
     showFolder: "Show the folder",
     place: {
-      agentes: "agentes storage",
+      agentes: "agentes.chat storage",
       server: "this server",
     },
     s3: "Your own bucket",

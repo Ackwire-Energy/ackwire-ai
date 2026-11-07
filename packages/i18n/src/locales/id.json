@@ -9495,7 +9495,7 @@
   "storage": {
     "title": "Penyimpanan",
     "options": "Tempat menyimpan file",
-    "agentes": "Penyimpanan agentes",
+    "agentes": "Penyimpanan agentes.chat",
     "agentesText": "Filemu disimpan di penyimpanan kami, terpisah untuk tiap ruang kerja.",
     "server": "Server ini",
     "serverText": {
@@ -9506,7 +9506,7 @@
     },
     "showFolder": "Tampilkan folder",
     "place": {
-      "agentes": "penyimpanan agentes",
+      "agentes": "penyimpanan agentes.chat",
       "server": "server ini"
     },
     "s3": "Bucket milikmu sendiri",

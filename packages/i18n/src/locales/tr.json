@@ -9803,7 +9803,7 @@
   "storage": {
     "title": "Depolama",
     "options": "Dosyalar nerede saklansın",
-    "agentes": "agentes depolama alanı",
+    "agentes": "agentes.chat depolama alanı",
     "agentesText": "Dosyalarınız, her çalışma alanı için ayrı tutularak bizim depolama alanımızda kalır.",
     "server": "Bu sunucu",
     "serverText": {
@@ -9814,7 +9814,7 @@
     },
     "showFolder": "Klasörü göster",
     "place": {
-      "agentes": "agentes depolama alanı",
+      "agentes": "agentes.chat depolama alanı",
       "server": "bu sunucu"
     },
     "s3": "Kendi bucket'ınız",

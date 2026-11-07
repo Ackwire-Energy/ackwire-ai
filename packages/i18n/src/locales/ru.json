@@ -10591,7 +10591,7 @@
   "storage": {
     "title": "Хранилище",
     "options": "Где хранить файлы",
-    "agentes": "Хранилище agentes",
+    "agentes": "Хранилище agentes.chat",
     "agentesText": "Ваши файлы хранятся у нас, отдельно для каждого рабочего пространства.",
     "server": "Этот сервер",
     "serverText": {
@@ -10602,7 +10602,7 @@
     },
     "showFolder": "Показать папку",
     "place": {
-      "agentes": "хранилище agentes",
+      "agentes": "хранилище agentes.chat",
       "server": "этот сервер"
     },
     "s3": "Свой бакет",

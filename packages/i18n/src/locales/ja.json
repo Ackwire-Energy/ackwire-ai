@@ -9441,7 +9441,7 @@
   "storage": {
     "title": "ストレージ",
     "options": "ファイルの保存先",
-    "agentes": "agentesストレージ",
+    "agentes": "agentes.chatストレージ",
     "agentesText": "ファイルは当社のストレージに、ワークスペースごとに分けて保存されます。",
     "server": "このサーバー",
     "serverText": {
@@ -9452,7 +9452,7 @@
     },
     "showFolder": "フォルダを表示",
     "place": {
-      "agentes": "agentesストレージ",
+      "agentes": "agentes.chatストレージ",
       "server": "このサーバー"
     },
     "s3": "独自のバケット",

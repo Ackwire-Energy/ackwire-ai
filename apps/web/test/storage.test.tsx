@@ -103,7 +103,7 @@ describe("Configurações → Armazenamento", () => {
     const ours = within(section()).getByRole("radio", { name: /Armazenamento do agentes/ });
     expect(ours.getAttribute("aria-checked")).toBe("true");
     expect(text(ours.closest("label"))).toBe(
-      "Armazenamento do agentesSeus arquivos ficam no nosso armazenamento, separados por workspace.Nenhum arquivo",
+      "Armazenamento do agentes.chatSeus arquivos ficam no nosso armazenamento, separados por workspace.Nenhum arquivo",
     );
     expect(section().textContent).not.toContain("Este servidor");
   });
@@ -218,7 +218,7 @@ describe("Configurações → Armazenamento", () => {
       return link?.querySelector(".settings-tile__state")?.textContent;
     };
     expect(await tile(false)).toBe("Este servidor");
-    expect(await tile(true)).toBe("Armazenamento do agentes");
+    expect(await tile(true)).toBe("Armazenamento do agentes.chat");
   });
 
   test("Show the folder: in the desktop app on its own server, once the app opens it", async () => {
@@ -380,11 +380,11 @@ describe("Configurações → Armazenamento", () => {
 
     await back(true);
     expect(section().textContent).toContain(
-      "Copia para o seu bucket os arquivos que o armazenamento do agentes ainda guarda.",
+      "Copia para o seu bucket os arquivos que o armazenamento do agentes.chat ainda guarda.",
     );
-    await click(within(section()).getByRole("button", { name: "Voltar para o armazenamento do agentes" }));
-    const cloud = screen().getByRole("dialog", { name: "Voltar para o armazenamento do agentes?" });
-    expect(cloud.textContent).toContain("Novos arquivos voltam para o armazenamento do agentes.");
+    await click(within(section()).getByRole("button", { name: "Voltar para o armazenamento do agentes.chat" }));
+    const cloud = screen().getByRole("dialog", { name: "Voltar para o armazenamento do agentes.chat?" });
+    expect(cloud.textContent).toContain("Novos arquivos voltam para o armazenamento do agentes.chat.");
   });
 });
 

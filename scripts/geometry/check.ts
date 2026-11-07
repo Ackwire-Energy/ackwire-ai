@@ -230,6 +230,7 @@ export const SELF_TESTED = [
   "clipped",
   "overlap",
   "wordwrap",
+  "midword",
   "viewport",
   "plate",
   "stack",
