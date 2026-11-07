@@ -202,6 +202,27 @@
 .tm-pill[aria-expanded="true"] .tm-pill__chevron {
   transform: rotate(180deg);
 }
+.tm-pill__count {
+  display: none;
+}
+/* The phone's one-line header (responsive.css): the counts alone, so the agent's name keeps its room. */
+@media (max-width: 760px) {
+  .tm-pill__words,
+  .tm-pill__chevron {
+    display: none;
+  }
+  .tm-pill__count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  /* The waiting mark's box as wide as its 8px square: its 3px of air each side read as padding the number lacks. */
+  .tm-pill__mark:has(> .rq-wait),
+  .tm-pill .rq-wait {
+    width: 8px;
+  }
+}
 .tm-here.ac-chip {
   flex: none;
 }

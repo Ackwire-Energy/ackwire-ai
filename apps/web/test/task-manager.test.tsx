@@ -568,6 +568,9 @@ describe("an agent's tasks beside its DM", () => {
     const pill = screen().getByRole("button", { name: PILL });
     expect(pill.closest(".channel__header")).toBeTruthy();
     expect(pill.getAttribute("aria-expanded")).toBe("false");
+    // The words on a computer; on a phone (tasks.css) the counts alone, so her name keeps the header's room.
+    expect(pill.querySelector(".tm-pill__words")?.textContent).toBe(PILL);
+    expect(pill.querySelector(".tm-pill__count")?.textContent).toBe("31");
     await click(pill);
     expect(pill.getAttribute("aria-expanded")).toBe("true");
     const panel = screen().getByRole("complementary", { name: "Tarefas de Ada" });

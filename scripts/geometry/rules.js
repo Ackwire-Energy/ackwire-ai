@@ -346,6 +346,24 @@
           out.push({ rule: "midword", node: el, el: sig(el), box: placeOf(el), lines: tops.size, text: words(el) });
       }
     },
+    /** A line its "…" leaves a letter or two of ("O…" for an agent's name): it says nothing, the row gave it no room. */
+    stub(out) {
+      for (const el of document.body.querySelectorAll("*")) {
+        if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table,textarea,input")) continue;
+        const s = style(el);
+        // An inline box has no width of its own (`clientWidth` 0) and draws no "…": its block does.
+        if (s.display === "inline" || s.textOverflow !== "ellipsis" || !["hidden", "clip"].includes(s.overflowX))
+          continue;
+        if (words(el).length <= 3 || el.clientWidth >= 2.5 * parseFloat(s.fontSize)) continue;
+        // Its words' own width: with an ellipsis `scrollWidth` can stay a pixel past the box however much it cut ("Otto" in
+        // 34px read "O…" with 35).
+        let natural = el.scrollWidth;
+        for (const n of el.childNodes)
+          if (n.nodeType === 3) natural = Math.max(natural, textRange(n).getBoundingClientRect().width);
+        if (natural - el.clientWidth > 0.5)
+          out.push({ rule: "stub", node: el, el: sig(el), box: placeOf(el), px: el.clientWidth, text: words(el) });
+      }
+    },
     viewport(out) {
       const over = document.documentElement.scrollWidth - innerWidth;
       if (over > 1) {

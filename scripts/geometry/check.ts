@@ -231,6 +231,7 @@ export const SELF_TESTED = [
   "overlap",
   "wordwrap",
   "midword",
+  "stub",
   "viewport",
   "plate",
   "stack",
