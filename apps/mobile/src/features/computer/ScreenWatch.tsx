@@ -4,13 +4,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
-import type { WebView } from "react-native-webview";
 import { useServer } from "@/lib/server";
 import { useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Cover } from "./Cover";
-import { reportStuck, ScreenPage } from "./ScreenPage";
-import { screenCall } from "./screen-page";
+import { reportStuck, ScreenPage, type ScreenPageHandle } from "./ScreenPage";
 import { DEFAULT_DESKTOP, fitScale, type Size } from "./screen-view";
 
 /** How long the screen may stay opening: a socket refused before it opens never closes with a code. */
@@ -49,7 +47,7 @@ export function ScreenWatch({
   const agent = useDirectory().agentById.get(agentId);
   const { color } = agentLook(agent);
   const g = agentGrammar(agent?.name ?? "");
-  const web = useRef<WebView<object>>(null);
+  const web = useRef<ScreenPageHandle>(null);
   const [life, setLife] = useState(0);
   const [ready, setReady] = useState(false);
   const readyNow = useRef(ready);
@@ -60,10 +58,8 @@ export function ScreenWatch({
   const said = useRef(onState);
   said.current = onState;
 
-  const call = (js: string) => web.current?.injectJavaScript(js);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: what the page should be doing, once it can hear
   useEffect(() => {
-    if (ready) call(screenCall("set", { connect, mode: "watch" }));
+    if (ready) web.current?.call("set", { connect, mode: "watch" });
   }, [ready, connect]);
 
   useEffect(() => {
@@ -74,7 +70,7 @@ export function ScreenWatch({
   useEffect(() => {
     if (!connect || page !== "connecting") return;
     const id = setTimeout(() => {
-      reportStuck("card", agentId, readyNow.current, "connecting");
+      reportStuck("card", agentId, { ready: readyNow.current, page: "connecting" });
       setPage("offline");
     }, STUCK_MS);
     return () => clearTimeout(id);
@@ -85,7 +81,7 @@ export function ScreenWatch({
     () => ({
       retry: () => {
         setPage("connecting");
-        if (ready) web.current?.injectJavaScript(screenCall("retry"));
+        if (ready) web.current?.call("retry");
         else setLife((n) => n + 1);
       },
     }),

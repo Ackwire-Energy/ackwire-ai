@@ -4,10 +4,12 @@ import {
   BUTTON,
   POINTER_MS,
   PointerLine,
+  pageCall,
   screenCall,
   screenEvent,
   screenPageStays,
   screenPageUrl,
+  screenWaits,
   sessionAnswer,
   sessionCookieScript,
   typedSince,
@@ -97,6 +99,40 @@ describe("the page behind the agent's screen", () => {
     }
     expect(sessionAnswer({ type: "view", state: "live" }, cookie, SERVER)).toBeNull();
     expect(sessionAnswer({ type: "size", width: 1, height: 1 }, cookie, SERVER)).toBeNull();
+  });
+
+  test("a call the page may open its socket on sets the session in its document first", () => {
+    // Coming back to the app, a mode switch or Tentar de novo open a socket with no page event before it: another
+    // incognito WebView mounting meanwhile (a browser card's) clears every cookie on Android.
+    const session = { cookie: "__Secure-s=tok%3D", server: SERVER };
+    const order: string[] = [];
+    const runInPage = (js: string) =>
+      new Function("document", "window", js)(
+        {
+          set cookie(v: string) {
+            order.push(`cookie ${v}`);
+          },
+        },
+        {
+          agentScreen: { set: () => order.push("set"), retry: () => order.push("retry"), key: () => order.push("key") },
+        },
+      );
+    for (const js of [pageCall(session, "set", { connect: true, mode: "watch" }), pageCall(session, "retry")]) {
+      order.length = 0;
+      runInPage(js);
+      expect(order).toHaveLength(2);
+      expect(order[0]).toBe("cookie __Secure-s=tok%3D; path=/; samesite=strict; secure");
+    }
+    expect(pageCall(session, "key", "Enter")).toBe(screenCall("key", "Enter"));
+    expect(pageCall(session, "pointer", 1, 2, 0)).toBe(screenCall("pointer", 1, 2, 0));
+  });
+
+  test("an agent's screen whose state never comes still says it can't be shown, as one whose socket never opens", () => {
+    expect(screenWaits({ active: true, shown: "connecting", switching: false })).toBe(true);
+    expect(screenWaits({ active: true, shown: "live", switching: true })).toBe(true);
+    expect(screenWaits({ active: true, shown: "live", switching: false })).toBe(false);
+    expect(screenWaits({ active: true, shown: "hidden", switching: false })).toBe(false);
+    expect(screenWaits({ active: false, shown: "connecting", switching: false })).toBe(false);
   });
 
   test("what a person typed stays a value, never code", () => {

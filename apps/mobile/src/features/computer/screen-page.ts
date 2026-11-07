@@ -96,7 +96,15 @@ export function sessionCookieScript(cookie: string, server: string): string {
 export const sessionAnswer = (event: ScreenEvent, cookie: string, server: string): string | null =>
   event.type === "ready" || event.type === "changed" ? sessionCookieScript(cookie, server) : null;
 
-type PageCalls = {
+/**
+ * Whether the agent's screen waits on something that may never come, so past its time it says it can't be shown and is
+ * reported: opening while the app is in front (its state never came, or its socket never opened) or a switch the stream
+ * never takes.
+ */
+export const screenWaits = (s: { active: boolean; shown: DesktopViewState; switching: boolean }) =>
+  s.active && (s.shown === "connecting" || (s.shown === "live" && s.switching));
+
+export type PageCalls = {
   set: [{ connect: boolean; mode: DesktopMode }];
   retry: [];
   pointer: [x: number, y: number, buttons: number];
@@ -107,6 +115,18 @@ type PageCalls = {
 /** A call on the page, for `injectJavaScript`. JSON keeps whatever a person typed a value, never code. */
 export const screenCall = <K extends keyof PageCalls>(method: K, ...args: PageCalls[K]) =>
   `window.agentScreen?.${method}(${args.map((a) => JSON.stringify(a)).join(",")});true;`;
+
+/**
+ * A call on the page as the app sends it: one the page may open its socket on at once (`set`, `retry`) has the session
+ * set just before it, since another WebView mounting meanwhile (a browser card's) may have cleared it (`sessionAnswer`).
+ */
+export const pageCall = <K extends keyof PageCalls>(
+  session: { cookie: string; server: string },
+  method: K,
+  ...args: PageCalls[K]
+) =>
+  (method === "set" || method === "retry" ? sessionCookieScript(session.cookie, session.server) : "") +
+  screenCall(method, ...args);
 
 /** The keys a phone keyboard lacks, on the row over it while typing on the screen (`SCREEN_KEYS` on the page). */
 export const SCREEN_ROW_KEYS = ["Escape", "Tab", "ArrowLeft", "ArrowUp", "ArrowDown", "ArrowRight"] as const;

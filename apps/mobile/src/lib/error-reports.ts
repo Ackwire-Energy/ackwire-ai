@@ -50,7 +50,10 @@ export async function startErrorReports(config: ErrorReportsConfig | null) {
   for (const w of kept) next.capture(w.error, w.tags, w.unhandled);
 }
 
-/** Errors nothing caught (a tap's handler, a promise) are reported too, before the system's handler goes on. */
+/**
+ * Errors nothing caught (a tap's handler, a timer) are reported too, before the system's handler goes on. A promise
+ * nobody awaited never reaches this handler in a release build.
+ */
 export function catchGlobalErrors() {
   const errorUtils = (globalThis as { ErrorUtils?: ErrorUtilsLike }).ErrorUtils;
   if (!errorUtils) return;
