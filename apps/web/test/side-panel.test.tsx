@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Message } from "@agenteschat/client";
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { DESKTOP_QUERY } from "@/components/NavDrawer";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -162,7 +162,9 @@ test("Ver perfil from a thread, then closed: the focus goes back to what opened 
   })[0] as HTMLElement;
   reply.focus();
   await click(reply);
-  await settle(6);
+  // Responder takes the caret to the thread's composer a beat later (ThreadPage): a card opened before then would lose
+  // the focus to it and close.
+  await waitFor(() => expect(document.activeElement?.id).toBe("composer-m-1"));
   await click(within(thread() as HTMLElement).getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
   await settle(6);
   const card = screen().getByRole("dialog", { name: "Perfil" });

@@ -178,7 +178,10 @@ describe("an agent whose every message names an agent it can't reach", () => {
 
     expect((await runsOf()).filter((r) => r.agentId === f.agent.id)).toHaveLength(1);
     expect((await runsOf()).filter((r) => r.agentId === gil.id)).toEqual([]);
-    expect(await wakeSkipped()).toHaveLength(1);
+    const told = await wakeSkipped();
+    expect(told).toHaveLength(1);
+    // The app's words under the message come from the cause.
+    expect(told[0]?.meta.notice).toMatchObject({ refs: { agentHandles: "gil", reason: "audience" } });
   });
 
   test("no notice about the run's own work starts a run of its own once that run ended", async () => {
@@ -287,6 +290,7 @@ describe("a member that takes consultations for the person behind an agent's mes
     const [told] = await wakeSkipped();
     expect(told?.body).toContain("no AI connected");
     expect(told?.body).not.toContain("certain people");
+    expect(told?.meta.notice).toMatchObject({ refs: { agentHandles: "gil", reason: "no_ai" } });
   });
 
   test("the same mention again within the hour is the same delivery: no wake_skipped for it", async () => {

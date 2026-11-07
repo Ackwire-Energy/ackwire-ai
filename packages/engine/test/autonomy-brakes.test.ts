@@ -592,6 +592,7 @@ describe("who an agent may call (§8)", () => {
       (m) => (m.meta as { notice?: { kind?: string } }).notice?.kind === "wake_skipped",
     );
     expect(told.map((m) => m.body)).toEqual([expect.stringContaining("call ada")]);
+    expect(told[0]?.meta).toMatchObject({ notice: { refs: { agentHandles: "ada", reason: "callable" } } });
   });
 
   test("only the settings people set are stored, normalized: the rest follows the defaults", async () => {
