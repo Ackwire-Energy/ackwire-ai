@@ -118,6 +118,7 @@ export function RequestCard({
   label,
   mine,
   waitingFor,
+  source,
   lead,
   object,
   details,
@@ -140,6 +141,8 @@ export function RequestCard({
   mine: boolean;
   /** Who it waits for when it isn't the viewer. */
   waitingFor?: string;
+  /** Where it was asked, after the kind ("Thread · #eng"), where the card stands away from its conversation. */
+  source?: ReactNode;
   /** The agent's own words: what it asks. */
   lead: ReactNode;
   /** The thing it is about, in two lines with a logo; `more` labels the button that opens `details`. */
@@ -202,7 +205,10 @@ export function RequestCard({
     <>
       <CardSky color={colorOf(agent)} />
       <div className="rq__head">
-        <span className="rq__kind">{tt(`ask.kind.${kind}`)}</span>
+        <span className="rq__kind">
+          {tt(`ask.kind.${kind}`)}
+          {source && <span className="rq__source"> · {source}</span>}
+        </span>
         {mine ? (
           <span className="rq__state">
             <WaitMark />

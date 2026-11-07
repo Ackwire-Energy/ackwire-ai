@@ -42,6 +42,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Where it was asked, after the kind, quieter (a card away from its conversation: Notificações). */
+.rq__source {
+  font-weight: 500;
+  color: var(--faint);
+}
 /* The state as words, no pill: waiting for you in the warning tone with its pulsing mark; someone else, muted. */
 .rq__state {
   display: inline-flex;
