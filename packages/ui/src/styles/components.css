@@ -3331,9 +3331,12 @@ html:not([data-pointer]) .ac-back:focus-visible {
     order: -1;
     margin-left: auto;
   }
-  .ac-details__bar--titled > .ac-details__heading,
-  .ac-details__bar > .ac-details__eyebrow:has(:is(h1, h2, [data-inplace])) {
-    flex-basis: 100%;
+  /* Over `.ac-actrow`'s width and cap at the words' length, later in the file, which would keep a short title on the
+     buttons' line, after them. */
+  .ac-details__bar--titled > .ac-details__heading.ac-actrow__text,
+  .ac-details__bar > .ac-details__eyebrow.ac-actrow__text:has(:is(h1, h2, [data-inplace])) {
+    flex: 1 1 100%;
+    max-width: none;
   }
 }
 .ac-details__heading {
