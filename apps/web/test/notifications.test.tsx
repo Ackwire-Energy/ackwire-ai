@@ -299,13 +299,16 @@ describe("Notificações", () => {
     expect(shown).toContain("Mandei o lembrete pelo WhatsApp.");
   });
 
-  test("an agent's question: a suggestion fills the answer, Enviar answers through the question", async () => {
+  test("an agent's question: its suggestions are the card's answers, one a line; a pick answers through the question", async () => {
     const { state } = await go();
     const waiting = screen().getByRole("region", { name: "Esperando você" });
-    await click(within(waiting).getByRole("button", { name: "Usa o cupom antigo" }));
-    const box = within(waiting).getByRole("textbox", { name: "Responder à Ada" }) as HTMLTextAreaElement;
-    expect(box.value).toBe("Usa o cupom antigo");
-    await click(within(waiting).getByRole("button", { name: "Enviar" }));
+    const list = waiting.querySelector(".rq__choices") as HTMLElement;
+    // Its last line writes another: the reply box opens in the card.
+    const lines = [...list.querySelectorAll(".rq__choice")].map((b) => b.textContent);
+    expect(lines.at(-1)).toBe("Outra resposta");
+    await click(within(list).getByRole("button", { name: "Outra resposta" }));
+    expect(within(waiting).getByRole("textbox", { name: "Responder à Ada" })).toBeTruthy();
+    await click(within(list).getByRole("button", { name: "Usa o cupom antigo" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
       ORG_ID,

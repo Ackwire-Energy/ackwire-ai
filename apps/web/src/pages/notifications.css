@@ -159,41 +159,6 @@ html:not([data-pointer]) .nt-item:focus-visible {
     box-shadow: var(--e2), var(--top);
   }
 }
-.nt-sug {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-/* Choices can be whole sentences: each grows with its text and wraps inside the row. */
-.nt-sug button {
-  max-width: 100%;
-  min-height: var(--control-h-sm);
-  padding: 6px var(--control-px-sm);
-  border-radius: var(--control-r-sm);
-  border: 0;
-  background: var(--sunken);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: normal;
-  text-align: left;
-  overflow-wrap: anywhere;
-  color: var(--ink2);
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    transform 0.18s var(--spring);
-}
-.nt-sug button:hover {
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-}
-.nt-sug button:active {
-  transform: scale(0.96);
-}
-html:not([data-pointer]) .nt-sug button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
 .nt-ok {
   color: var(--ok);
 }
@@ -870,8 +835,7 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   .nt-reps,
   .nt-resolved,
   .nt-more .ac-icon,
-  .nt-faces > *,
-  .nt-sug button {
+  .nt-faces > * {
     animation: none;
     transition: none;
   }

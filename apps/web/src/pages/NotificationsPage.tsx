@@ -86,7 +86,7 @@ import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from
 import { useOrg } from "@/components/org-context";
 import { UsageLimitActions } from "@/components/PeopleUsage";
 import { AllowTalkButton } from "@/components/ReachLines";
-import { RequestCard } from "@/components/RequestCard";
+import { RequestCard, RequestChoices, RequestKeys } from "@/components/RequestCard";
 import { ChangeRequestCard } from "@/components/RightHandCards";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
@@ -947,6 +947,7 @@ function WaitCard({
   } else {
     const title = l.title ?? l.text ?? "";
     const source = sourceOf(t, n, channelName);
+    const suggestions = l.suggestions ?? [];
     card = (
       <RequestCard
         id={n.id}
@@ -968,51 +969,55 @@ function WaitCard({
                 <Spinner size={14} />
                 {t("notifications.wait.resolved", { context: g.context, name })}
               </div>
-            ) : s.replying ? (
-              <Composer
-                id={n.id}
-                placeholder={placeholderFor(t, n, dir, channelName)}
-                draft={s.draft}
-                sending={s.sending}
-                onDraft={(text) => h.onDraft(n, text)}
-                onSend={() => h.onSend(n, s.draft, (l.suggestions ?? []).includes(s.draft.trim()))}
-                onCancel={h.onCancel}
-              />
             ) : (
-              (l.suggestions?.length ?? 0) > 0 && (
-                <div className="nt-sug">
-                  {l.suggestions?.map((sug) => (
-                    <button
-                      key={sug}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        h.onDraft(n, sug);
-                        h.onReply(n);
-                      }}
-                    >
-                      {sug}
-                    </button>
-                  ))}
-                </div>
-              )
+              <>
+                {/* The agent's suggested answers: one a line with its key; a pick answers. */}
+                {suggestions.length > 0 && (
+                  <RequestChoices
+                    choices={suggestions.map((label) => ({ label, busy: s.sending && s.draft === label }))}
+                    onPick={(i) => {
+                      const sug = suggestions[i];
+                      if (sug === undefined) return;
+                      h.onDraft(n, sug);
+                      h.onSend(n, sug, true);
+                    }}
+                    disabled={s.sending}
+                    other={s.replying ? undefined : { label: t("ask.otherAnswer"), onClick: () => h.onReply(n) }}
+                  />
+                )}
+                {s.replying && (
+                  <Composer
+                    id={n.id}
+                    placeholder={placeholderFor(t, n, dir, channelName)}
+                    draft={s.draft}
+                    sending={s.sending}
+                    onDraft={(text) => h.onDraft(n, text)}
+                    onSend={() => h.onSend(n, s.draft, suggestions.includes(s.draft.trim()))}
+                    onCancel={h.onCancel}
+                  />
+                )}
+              </>
             )}
           </>
         }
         actions={
           resolving || s.replying ? undefined : (
             <>
-              <Button
-                variant="primary"
-                size="sm"
-                icon="reply"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  h.onReply(n);
-                }}
-              >
-                {t("notifications.reply")}
-              </Button>
+              {suggestions.length > 0 ? (
+                <RequestKeys count={suggestions.length} />
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon="reply"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    h.onReply(n);
+                  }}
+                >
+                  {t("notifications.reply")}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

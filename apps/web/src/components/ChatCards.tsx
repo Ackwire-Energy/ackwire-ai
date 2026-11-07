@@ -47,7 +47,6 @@ import {
   Icon,
   Input,
   MessageText,
-  Spinner,
   Switch,
   Textarea,
 } from "@agenteschat/ui";
@@ -65,7 +64,15 @@ import { AgentAvatar } from "./AgentAvatar";
 import { useOpenAgentPanel } from "./agent-panel-context";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useOrg } from "./org-context";
-import { RequestCard, RequestDone, RequestTile, showRequest, useExpired } from "./RequestCard";
+import {
+  RequestCard,
+  RequestChoices,
+  RequestDone,
+  RequestKeys,
+  RequestTile,
+  showRequest,
+  useExpired,
+} from "./RequestCard";
 import { savesToVault, VaultSaveBlock, type VaultSaveChoice, vaultSaveDefaults } from "./vault/VaultSave";
 import "./proposals.css";
 
@@ -556,23 +563,6 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
   );
 }
 
-/** Number keys answer a question's choices while the focus is in their list (never while typing elsewhere). */
-function choiceKeys(pick: (index: number) => void) {
-  return (list: HTMLElement | null) => {
-    if (!list) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || !/^[1-9]$/.test(e.key)) return;
-      e.preventDefault();
-      pick(Number(e.key) - 1);
-    };
-    list.addEventListener("keydown", onKey);
-    return () => list.removeEventListener("keydown", onKey);
-  };
-}
-
-/** The keys a question's list answers with: one to nine. */
-const CHOICE_KEYS = 9;
-
 /**
  * An agent's question (`ask_user`): neutral card in the thread with the
  * choices as a list, one a line with its number key, and "Outra resposta" (or
@@ -669,44 +659,14 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
           choices.length > 0 || field || errorLine ? (
             <>
               {choices.length > 0 && (
-                <ul className="rq__choices" ref={choiceKeys((i) => pick(choices[i]))}>
-                  {choices.map((choice, i) => (
-                    <li key={choice}>
-                      <button
-                        type="button"
-                        className="rq__choice"
-                        data-choice=""
-                        disabled={busy}
-                        aria-busy={picking(choice) || undefined}
-                        onClick={() => pick(choice)}
-                      >
-                        {i < CHOICE_KEYS && (
-                          <span className="rq__key" aria-hidden="true">
-                            {i + 1}
-                          </span>
-                        )}
-                        <span className="rq__choice-text">{choice}</span>
-                        {picking(choice) && <Spinner size={14} />}
-                      </button>
-                    </li>
-                  ))}
-                  {!writing && (
-                    <li>
-                      <button
-                        ref={reopen}
-                        type="button"
-                        className="rq__choice rq__choice--other"
-                        disabled={busy}
-                        onClick={() => setWriting(true)}
-                      >
-                        <span className="rq__key" aria-hidden="true">
-                          <Icon name="edit" size={14} />
-                        </span>
-                        <span className="rq__choice-text">{t("ask.otherAnswer")}</span>
-                      </button>
-                    </li>
-                  )}
-                </ul>
+                <RequestChoices
+                  choices={choices.map((label) => ({ label, busy: picking(label) }))}
+                  onPick={(i) => pick(choices[i])}
+                  disabled={busy}
+                  other={
+                    writing ? undefined : { label: t("ask.otherAnswer"), onClick: () => setWriting(true), ref: reopen }
+                  }
+                />
               )}
               {field}
               {errorLine}
@@ -741,7 +701,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
               </Button>
             </>
           ) : choices.length > 1 ? (
-            <span className="rq__keys">{t("question.keysHint", { count: Math.min(choices.length, CHOICE_KEYS) })}</span>
+            <RequestKeys count={choices.length} />
           ) : choices.length === 0 ? (
             <Button ref={reopen} variant="primary" size="sm" onClick={() => setWriting(true)}>
               {t("question.answer")}

@@ -1,10 +1,11 @@
 import type { Agent } from "@agenteschat/client";
-import { EventPill, EventPillMore, ExpiryFuse, Icon, type IconName, Locked } from "@agenteschat/ui";
+import { EventPill, EventPillMore, ExpiryFuse, Icon, type IconName, Locked, Spinner } from "@agenteschat/ui";
 import {
   createContext,
   type FormEvent,
   type HTMLAttributes,
   type ReactNode,
+  type Ref,
   useContext,
   useEffect,
   useRef,
@@ -409,6 +410,94 @@ export function RequestOpen({
       {children}
     </EventPill>
   );
+}
+
+/** The keys a request's answers take: one to nine. */
+const CHOICE_KEYS = 9;
+
+/** Number keys pick an answer while the focus is in the list (never while typing elsewhere). */
+function choiceKeys(pick: (index: number) => void) {
+  return (list: HTMLElement | null) => {
+    if (!list) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || !/^[1-9]$/.test(e.key)) return;
+      e.preventDefault();
+      pick(Number(e.key) - 1);
+    };
+    list.addEventListener("keydown", onKey);
+    return () => list.removeEventListener("keydown", onKey);
+  };
+}
+
+/**
+ * The answers an agent offers, in a request card's body: a list, one a line in the full width with its number key
+ * (1 to 9 pick while the focus is in the list), whole sentences wrapping in their line, and `other` ("Outra
+ * resposta") its last line. Only answers: deciding (approve, accept, create) stays the footer's buttons.
+ */
+export function RequestChoices({
+  choices,
+  onPick,
+  disabled = false,
+  other,
+}: {
+  choices: readonly { label: string; busy?: boolean }[];
+  onPick: (index: number) => void;
+  disabled?: boolean;
+  /** The last line, writing an answer of one's own; none while that field is open. */
+  other?: { label: string; onClick: () => void; ref?: Ref<HTMLButtonElement> };
+}) {
+  return (
+    <ul
+      className="rq__choices"
+      ref={choiceKeys((i) => {
+        if (!disabled && choices[i]) onPick(i);
+      })}
+    >
+      {choices.map((c, i) => (
+        <li key={c.label}>
+          <button
+            type="button"
+            className="rq__choice"
+            data-choice=""
+            disabled={disabled}
+            aria-busy={c.busy || undefined}
+            onClick={() => onPick(i)}
+          >
+            {i < CHOICE_KEYS && (
+              <span className="rq__key" aria-hidden="true">
+                {i + 1}
+              </span>
+            )}
+            <span className="rq__choice-text">{c.label}</span>
+            {c.busy && <Spinner size={14} />}
+          </button>
+        </li>
+      ))}
+      {other && (
+        <li>
+          <button
+            ref={other.ref}
+            type="button"
+            className="rq__choice rq__choice--other"
+            disabled={disabled}
+            onClick={other.onClick}
+          >
+            <span className="rq__key" aria-hidden="true">
+              <Icon name="edit" size={14} />
+            </span>
+            <span className="rq__choice-text">{other.label}</span>
+          </button>
+        </li>
+      )}
+    </ul>
+  );
+}
+
+/** The footer's "Tecle 1–3 para responder" under a list of two or more answers. */
+export function RequestKeys({ count }: { count: number }) {
+  const { t } = useTranslation();
+  if (count < 2) return null;
+  return <span className="rq__keys">{t("question.keysHint", { count: Math.min(count, CHOICE_KEYS) })}</span>;
 }
 
 /** Waiting for you: a small pixel square outline that pulses (also in the bar above the composer). */
