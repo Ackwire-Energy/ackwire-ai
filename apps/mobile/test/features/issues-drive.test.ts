@@ -474,8 +474,10 @@ describe("a task's number and title on one row; its conversation on the card", (
     const parts = await read("issues/parts.tsx");
     const card = parts.slice(parts.indexOf("export const BoardCard"), parts.indexOf("function CardConversation("));
     expect(card).toMatch(
-      /<Text variant="callout" numberOfLines=\{3\} style=\{styles\.title\}>\s*<Text variant="callout" tone="faint" style=\{styles\.number\}>\s*#\{i\.number\}/,
+      /<Text variant="callout" numberOfLines=\{3\} style=\{\[styles\.title, styles\.step\]\}>\s*<Text variant="callout" tone="faint" style=\{styles\.number\}>\s*#\{i\.number\}/,
     );
+    // The unread mentions' count ends the title's row.
+    expect(card).toMatch(/\{i\.title\}\s*<\/Text>\s*<MentionCount count=\{mentions\} \/>/);
     // Not again in the meta row.
     expect(card.split("#{i.number}")).toHaveLength(2);
     expect(card.indexOf("<AssigneeFace")).toBeLessThan(card.indexOf("<CardConversation issue={i} />"));

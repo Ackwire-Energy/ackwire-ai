@@ -83,9 +83,14 @@ test("a 3-call tool loop: working text goes to the steps, never live; the long a
   const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
   expect(timeline.map((m) => m.body)).toEqual(["@dev compila o projeto", `${LONG}Instale os dois.`.trim()]);
 
-  // Nothing of the working text reached the conversation live, on any event.
-  expect(JSON.stringify(events)).not.toContain("Vou tentar o compilador");
-  expect(JSON.stringify(events)).not.toContain("Começo verificando");
+  // Nothing of the working text reached the conversation live, on any event but each call's step line (`said`, ADR
+  // 0121): the first sentence written before it.
+  const said = events.flatMap((e) => ("said" in e && e.said ? [e.said] : []));
+  expect(said).toEqual(["Começo verificando o ambiente", "Go não está instalado"]);
+  const live = JSON.stringify(events, (k, v) => (k === "said" ? undefined : v));
+  expect(live).not.toContain("Vou tentar o compilador");
+  expect(live).not.toContain("Começo verificando");
+  expect(live).not.toContain("Go não está instalado");
 
   // Deltas: only the answer, tagged by its turn, with increasing seq (never reused).
   const deltas = events.flatMap((e) =>

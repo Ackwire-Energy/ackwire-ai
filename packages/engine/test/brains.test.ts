@@ -127,7 +127,10 @@ test("a computer brain's text before its own tool call never shows live, only th
   await post(f, "@dev confere a caixa");
   await drainOutbox(f.db, handlersWith(f, brain));
 
-  expect(JSON.stringify(events)).not.toContain("inbox id");
+  // Its first sentence is the call's step line (`said`, ADR 0121), and nowhere else.
+  const said = events.flatMap((e) => ("said" in e && e.said ? [e.said] : []));
+  expect(said).toEqual(["I need the inbox id first"]);
+  expect(JSON.stringify(events, (k, v) => (k === "said" ? undefined : v))).not.toContain("inbox id");
   const deltas = events.flatMap((e) => (e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : []));
   expect(deltas.join("")).toBe("Caixa conferida.");
   const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);

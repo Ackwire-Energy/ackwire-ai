@@ -393,9 +393,13 @@ describe("routines", () => {
     const handOffs = steps.filter((s) => s.kind === "tool_result").map((s) => s.data);
     expect(handOffs).toMatchObject([{ isError: false }, { isError: true }]);
     expect(String(handOffs[1]?.content)).toContain("You already handed off this run's message");
-    // Reported, with its final text as the record. Its creator is in the DM: they see it there.
+    // Reported, with its final text as the record. Its creator is in the DM: they hear it there, once, in the agent's
+    // words (a routine's report in a DM reaches the inbox, it may come with the app closed).
     expect(routineRun).toMatchObject({ status: "reported", summary: "Checado: 3 avaliações novas, reportadas." });
-    expect(await f.db.select().from(schema.notifications)).toEqual([]);
+    const heard = await f.db.select().from(schema.notifications);
+    expect(heard.map((n) => [n.userId, n.kind, n.latest])).toEqual([
+      [f.owner.id, "dm", { text: "Chegaram 3 avaliações novas; 2 negativas sobre o PDF." }],
+    ]);
   });
 
   test("a routine never holds or joins a person's run in the conversation, and people's messages never join it", async () => {

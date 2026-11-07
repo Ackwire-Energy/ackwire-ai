@@ -31,7 +31,8 @@ test("what ships wraps a hold from its top, its lead and its button on the first
   // The offline computer and setup notices keep their centred one-line strip, the × at the buttons' own gap.
   expect(last(shipped, ".outage", "align-items")).toBe("center");
   expect(last(shipped, ".outage", "min-height")).toBe("44px");
-  expect(last(shipped, ".outage", "padding")).toBe("6px 10px 6px 16px");
+  // A button's plate stands `--action-clear` from the strip's top and bottom.
+  expect(last(shipped, ".outage", "padding")).toBe("var(--action-clear) 10px var(--action-clear) 16px");
   expect(last(shipped, ".outage__close", "margin-left")).toBe("-6px");
 
   // On phones every notice reads from the top: the lead and the × on the title's line, whatever wraps under it.
