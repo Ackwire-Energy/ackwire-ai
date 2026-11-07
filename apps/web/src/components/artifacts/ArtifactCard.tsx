@@ -325,21 +325,22 @@ function CoverTable({ columns, rows }: { columns: string[]; rows: string[][] }) 
       <thead>
         <tr>
           {cols.map((c, j) => (
-            <th key={j} className={numeric[j] ? "is-num" : undefined}>
+            <th key={c} className={numeric[j] ? "is-num" : undefined}>
               {c}
             </th>
           ))}
         </tr>
       </thead>
       <tbody>
-        {shown.map((r, i) => (
-          <tr key={i}>
+        {shown.map((r) => (
+          // A static drawing of a few rows: the row's own text is its key.
+          <tr key={r.join("\u001f")}>
             {cols.map((_, j) => {
               const cell = (r[j] ?? "").trim();
               const sign = SIGNED.exec(cell)?.[1];
               const tone = sign ? (sign === "+" ? "is-up" : "is-down") : "";
               return (
-                <td key={j} className={[numeric[j] ? "is-num" : "", tone].filter(Boolean).join(" ") || undefined}>
+                <td key={cols[j]} className={[numeric[j] ? "is-num" : "", tone].filter(Boolean).join(" ") || undefined}>
                   {cell}
                 </td>
               );
