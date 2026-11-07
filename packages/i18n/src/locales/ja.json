@@ -4283,6 +4283,8 @@
           "stepTwo": "Claudeに表示されたコードを貼り付けてください",
           "codeLabel": "Claudeのコード",
           "notCode": "Claudeのコードではないようです。",
+          "stepTwoGoogle": "Google に表示されたコードを貼り付けてください",
+          "codeLabelGoogle": "コードまたはリンク",
           "send": "{{computer}}に送信",
           "sending": "{{computer}}にコードを送信しています…",
           "sent": "コードを送信しました。{{computer}}でログインを完了しています。",

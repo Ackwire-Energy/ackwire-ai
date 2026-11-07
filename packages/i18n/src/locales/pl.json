@@ -4763,6 +4763,8 @@
           "stepTwo": "Wklej kod, który pokazuje Claude",
           "codeLabel": "Kod Claude",
           "notCode": "To nie wygląda na kod Claude.",
+          "stepTwoGoogle": "Wklej kod, który pokazuje Google",
+          "codeLabelGoogle": "Kod lub link",
           "send": "Wyślij na {{computer}}",
           "sending": "Wysyłanie kodu na {{computer}}…",
           "sent": "Kod wysłany. Kończenie logowania na komputerze {{computer}}.",

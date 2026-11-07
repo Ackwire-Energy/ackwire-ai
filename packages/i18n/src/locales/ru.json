@@ -4744,6 +4744,8 @@
           "stepTwo": "Вставьте код, который покажет Claude",
           "codeLabel": "Код Claude",
           "notCode": "Это не похоже на код Claude.",
+          "stepTwoGoogle": "Вставьте код, который показывает Google",
+          "codeLabelGoogle": "Код или ссылка",
           "send": "Отправить на {{computer}}",
           "sending": "Отправляем код на {{computer}}…",
           "sent": "Код отправлен. Завершаем вход на {{computer}}.",

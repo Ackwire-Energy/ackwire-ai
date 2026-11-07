@@ -4604,6 +4604,8 @@
           "stepTwo": "Incolla il codice che mostra Claude",
           "codeLabel": "Codice di Claude",
           "notCode": "Non sembra un codice di Claude.",
+          "stepTwoGoogle": "Incolla il codice che mostra Google",
+          "codeLabelGoogle": "Codice o link",
           "send": "Invia a {{computer}}",
           "sending": "Invio del codice a {{computer}}…",
           "sent": "Codice inviato. Completamento dell'accesso su {{computer}}.",

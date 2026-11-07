@@ -547,6 +547,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "antigravity",
       { provider: "enterprise" },
     ]);
+    // Its second step is Google's: the code its page shows, or that page's address. Claude is named nowhere.
+    expect(shownText(panel)).toContain("Cole o código que o Google mostrar");
+    const field = within(panel).getByRole("textbox", { name: "Código ou link" });
+    expect(field.getAttribute("placeholder")).toBe("Código ou link");
+    expect(shownText(panel)).not.toContain("Claude");
   });
 
   test("a sign-in starting: the line under its title says the computer is asked, until it answers, and only then", async () => {

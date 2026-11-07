@@ -4307,6 +4307,8 @@
           "stepTwo": "粘贴 Claude 显示的代码",
           "codeLabel": "Claude 授权码",
           "notCode": "这看起来不像 Claude 的代码。",
+          "stepTwoGoogle": "粘贴 Google 显示的代码",
+          "codeLabelGoogle": "代码或链接",
           "send": "发送到 {{computer}}",
           "sending": "正在把代码发送到 {{computer}}…",
           "sent": "代码已发送。正在 {{computer}} 上完成登录。",

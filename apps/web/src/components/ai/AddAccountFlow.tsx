@@ -760,13 +760,13 @@ function AddAccountFlow({
         {login && opened && (
           <Step side={busy && !reads.includes("reconnecting") ? undefined : waiting}>
             <label htmlFor={codeId}>
-              <b>{t("agentPage.work.brain.add.stepTwo")}</b>
+              <b>{t("agentPage.work.brain.add.stepTwoGoogle")}</b>
             </label>
             {busy
               ? busyLine
               : pasteRow(
-                  t("agentPage.work.brain.add.codeLabel"),
-                  t("agentPage.work.brain.add.codeLabel"),
+                  t("agentPage.work.brain.add.codeLabelGoogle"),
+                  t("agentPage.work.brain.add.codeLabelGoogle"),
                   false,
                   key.length > 0,
                 )}

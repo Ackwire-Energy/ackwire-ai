@@ -10842,6 +10842,12 @@
   "agentPage.work.brain.add.notCode": {
     "value": "That doesn't look like Claude's code."
   },
+  "agentPage.work.brain.add.stepTwoGoogle": {
+    "value": "Paste the code Google shows"
+  },
+  "agentPage.work.brain.add.codeLabelGoogle": {
+    "value": "Code or link"
+  },
   "agentPage.work.brain.add.send": {
     "value": "Send to {{computer}}"
   },

@@ -4430,6 +4430,8 @@
           "stepTwo": "Claude'un gösterdiği kodu yapıştırın",
           "codeLabel": "Claude kodu",
           "notCode": "Bu bir Claude kodu gibi görünmüyor.",
+          "stepTwoGoogle": "Google'ın gösterdiği kodu yapıştır",
+          "codeLabelGoogle": "Kod veya bağlantı",
           "send": "{{computer}} bilgisayarına gönder",
           "sending": "Kod {{computer}} bilgisayarına gönderiliyor…",
           "sent": "Kod gönderildi. Giriş {{computer}} üzerinde tamamlanıyor.",

@@ -4536,6 +4536,9 @@ export const ptBR = {
           codeLabel: "Código do Claude",
           /** Under the field while what it holds isn't a code of this sign-in (it waits for Enviar). */
           notCode: "Isso não parece o código do Claude.",
+          /** The Gemini sign-in's second step: Google's page shows a code, or lands on one whose link works too. */
+          stepTwoGoogle: "Cole o código que o Google mostrar",
+          codeLabelGoogle: "Código ou link",
           send: "Enviar ao {{computer}}",
           sending: "Enviando o código ao {{computer}}…",
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
