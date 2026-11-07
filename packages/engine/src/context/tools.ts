@@ -181,7 +181,22 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               }),
             )
           : null;
-        const hits = found.filter((_, i) => dmReadable?.[i] !== false);
+        // A routine's run reads the conversation it reports to, never its creator's files there (`files: true`).
+        const fileReach =
+          reader || !found.some((h) => h.kind === "file")
+            ? null
+            : new Set([
+                ...(await agentSearchChannels(ctx.db, ctx.orgId, ctx.agentId, ctx.channelId, { files: true })),
+                ...(theirDm ? [theirDm] : []),
+              ]);
+        const hits = found.filter(
+          (h, i) =>
+            dmReadable?.[i] !== false &&
+            (h.kind !== "file" ||
+              !fileReach ||
+              h.channelIds.length === 0 ||
+              h.channelIds.some((c) => fileReach.has(c))),
+        );
         const said = new Map(
           (
             await describeMessages(

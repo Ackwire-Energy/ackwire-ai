@@ -397,8 +397,8 @@ describe("routines", () => {
     // words (a routine's report in a DM reaches the inbox, it may come with the app closed).
     expect(routineRun).toMatchObject({ status: "reported", summary: "Checado: 3 avaliações novas, reportadas." });
     const heard = await f.db.select().from(schema.notifications);
-    expect(heard.map((n) => [n.userId, n.kind, n.latest])).toEqual([
-      [f.owner.id, "dm", { text: "Chegaram 3 avaliações novas; 2 negativas sobre o PDF." }],
+    expect(heard.map((n) => [n.userId, n.kind, n.count, n.latest])).toEqual([
+      [f.owner.id, "dm", 1, { text: "Chegaram 3 avaliações novas; 2 negativas sobre o PDF." }],
     ]);
   });
 
