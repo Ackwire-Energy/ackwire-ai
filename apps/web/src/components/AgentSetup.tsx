@@ -559,7 +559,7 @@ export function StepDialog({
       <DialogBody className="setup-dlg__body">{children}</DialogBody>
       <DialogFooter note={note}>
         {cancel && (
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
+          <Button onClick={onClose} disabled={busy}>
             {t("common.cancel")}
           </Button>
         )}

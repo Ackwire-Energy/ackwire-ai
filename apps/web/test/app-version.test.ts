@@ -59,6 +59,8 @@ describe("app version", () => {
 
 describe("a page's file from before a deploy (vite:preloadError)", () => {
   afterEach(() => {
+    // The app's watch is the module's: a stale one left here would reload the next file's error screens.
+    startVersionWatch(createVersionWatch({ loaded: null, fetchHtml: async () => "", onStale: () => {} }));
     resetVersionReload();
     sessionStorage.clear();
   });

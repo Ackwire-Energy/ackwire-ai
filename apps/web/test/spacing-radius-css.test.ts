@@ -99,7 +99,10 @@ test("a popover with words and controls of its own has the menu's room, its word
   ];
   for (const [sheet, box] of boxes) {
     expect(last(sheets[sheet], box, "--menu-pad")).toBe("var(--space-2)");
-    expect(last(sheets[sheet], box, "padding")).toBe("var(--menu-pad)");
+    // The audience editor's foot is Cancelar and Salvar's own room, pinned to its edge when the choice scrolls.
+    expect(last(sheets[sheet], box, "padding")).toBe(
+      box === ".mcard-audience.ac-popover" ? "var(--menu-pad) var(--menu-pad) 0" : "var(--menu-pad)",
+    );
     // The corner is the menu's (`.ac-menu`), from that room: none of them sets its own.
     expect(last(sheets[sheet], box, "border-radius")).toBeUndefined();
   }
