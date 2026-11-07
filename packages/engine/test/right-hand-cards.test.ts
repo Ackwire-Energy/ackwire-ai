@@ -22,6 +22,7 @@ import {
   setMemberRoles,
   type ToolContext,
   undoAgentAction,
+  WORKSPACE_ACTION_TOOL,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -114,7 +115,7 @@ test("only the right hand has them, and its prompt offers them instead of refusi
   f = await setup({ rightHand: true });
   const lodi = await lodiOf(f);
   const names = (await gatewayOf(f).granted(await lodiRun(f, f.owner.id, "oi"))).map((t) => t.name);
-  for (const tool of [OFFER_APPROVALS_TOOL, PROPOSE_MEMBER_CHANGES_TOOL, OFFER_OPEN_PAGE_TOOL])
+  for (const tool of [OFFER_APPROVALS_TOOL, PROPOSE_MEMBER_CHANGES_TOOL, OFFER_OPEN_PAGE_TOOL, WORKSPACE_ACTION_TOOL])
     expect(names).toContain(tool);
   const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev oi",
@@ -131,13 +132,16 @@ test("only the right hand has them, and its prompt offers them instead of refusi
     triggerMessageId: trigger.id,
   });
   expect(dev.map((t) => t.name)).not.toContain(OFFER_APPROVALS_TOOL);
+  expect(dev.map((t) => t.name)).not.toContain(WORKSPACE_ACTION_TOOL);
   const prompt = await rightHandPrompt(
     { db: f.db },
     { orgId: f.org.id, agent: lodi, personId: f.owner.id, inDm: true },
   );
   expect(prompt).not.toContain("# Never");
-  for (const tool of [OFFER_APPROVALS_TOOL, PROPOSE_MEMBER_CHANGES_TOOL, OFFER_OPEN_PAGE_TOOL])
+  for (const tool of [OFFER_APPROVALS_TOOL, PROPOSE_MEMBER_CHANGES_TOOL, OFFER_OPEN_PAGE_TOOL, WORKSPACE_ACTION_TOOL])
     expect(prompt).toContain(tool);
+  // It does what the app lets the person do: roles are no longer only a screen it opens.
+  expect(prompt).not.toMatch(/roles[^.]*: offer_open_page/);
   expect(prompt).toContain("Never ask for a key, password or token in the chat");
 });
 

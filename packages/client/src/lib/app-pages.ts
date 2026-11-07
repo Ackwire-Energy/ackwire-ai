@@ -78,6 +78,11 @@ export const APP_PAGES = {
   wiki: { web: "/wiki", phone: "/wiki", may: null, label: "shell.wiki" },
   issues: { web: "/issues", phone: "/issues", may: null, label: "shell.issues" },
   calendar: { web: "/calendar", phone: null, may: null, label: "shell.calendar" },
+  vault: { web: "/settings/vault", phone: "/settings/vault", may: null, label: "settings.section.vault" },
+  ai_apps: { web: "/settings/apps", phone: "/settings/apps", may: null, label: "settings.section.apps" },
+  approval_settings: { web: "/settings/approvals", phone: null, may: null, label: "settings.section.approvals" },
+  media: { web: "/settings/media", phone: "/settings/media", may: "configure", label: "settings.section.media" },
+  voice: { web: "/settings/voice", phone: null, may: "configure", label: "settings.section.voice" },
   agent: { web: "/agents/{agentId}", phone: "/agent/{agentId}", may: null, label: "" },
   channel: { web: "/c/{channelId}", phone: "/chat/{channelId}", may: null, label: "" },
 } as const satisfies Record<string, { web: string; phone: string | null; may: Permission | null; label: string }>;

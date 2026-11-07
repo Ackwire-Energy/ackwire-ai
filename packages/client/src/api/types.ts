@@ -2777,6 +2777,21 @@ export const WORKSPACE_ACTION_IDS = [
   "move_role",
   "set_member_roles",
   "set_channel_permissions",
+  "set_my_status",
+  "set_notifications",
+  "set_my_timezone",
+  "update_channel",
+  "archive_channel",
+  "channel_people",
+  "delete_channel",
+  "revoke_invitation",
+  "resend_invitation",
+  "set_invitation_roles",
+  "decide_join_request",
+  "stop_work",
+  "continue_work",
+  "update_workspace",
+  "set_action_check",
 ] as const;
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
@@ -2792,7 +2807,8 @@ export interface AgentActionTarget {
     | "agent"
     | "repository"
     | "role"
-    | "person";
+    | "person"
+    | "workspace";
   id: string;
   /** Issues. */
   number?: number;
@@ -2888,6 +2904,8 @@ export interface WorkspaceActionCard {
     /** The key its screen asks for (the server checks it again); null: anyone. */
     needs: Permission | null;
     why: string;
+    /** The person it was for tried and the screen's own rule refused them: they send it on, not apply it. */
+    refused?: boolean;
   };
   state: "pending" | "applied" | "dismissed";
   decidedByUserId: string | null;

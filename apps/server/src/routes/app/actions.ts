@@ -134,7 +134,11 @@ export function actionRoutes(deps: AppDeps) {
   );
 
   const CardParams = OrgParams.extend({ messageId: z.uuid() });
-  const cardDeps = { db, pubsub: deps.adapters.pubsub };
+  const cardDeps = {
+    db,
+    pubsub: deps.adapters.pubsub,
+    server: { publicUrl: deps.config.PUBLIC_URL, secret: deps.config.AGENTES_SECRET },
+  };
 
   app.openapi(
     createRoute({

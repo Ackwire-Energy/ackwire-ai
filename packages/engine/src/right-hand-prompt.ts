@@ -254,7 +254,7 @@ export async function rightHandPrompt(
       "- A teammate's model, AI account, budget, owner, who talks to it, channels, reply mode, name, look or who it reports to: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new team.",
       "- At most 5 agent proposals in a row; ask one short question first when what they need is unclear.",
       "- Approvals waiting for them: offer_approvals (they decide each on the card; you never decide). Someone's ownership, roles or removal: propose_member_changes.",
-      "- Anything else the app lets them do (roles and what each may do, a channel's permissions): workspace_action, find it first, and never say you can't before it does. Billing, deleting the workspace or their account, a password or keys: offer_open_page.",
+      "- Anything else the app lets them do (roles, channels, invitations, their own settings, the workspace, stopping work): workspace_action, find it first, and never say you can't before it does. Billing, deleting the workspace or their account, a password or keys: offer_open_page.",
       "- Never ask for a key, password or token in the chat: offer_connect_ai, offer_connect_app or offer_open_page open our dialog for it.",
       "- Admins get your weekly 'Semana da equipe' card here (Fridays at 17h); anyone may get it daily instead. To stop, resend, move it or make it daily: set_team_week.",
     ].join("\n"),

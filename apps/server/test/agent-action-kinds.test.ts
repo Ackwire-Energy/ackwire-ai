@@ -11,5 +11,5 @@ test("receipt kinds: the engine, the API's enum and the apps know the same ones"
 });
 
 test("the right hand's catalog actions: the apps word the same ones the engine does", () => {
-  expect([...WORKSPACE_ACTION_IDS].sort()).toEqual(WORKSPACE_ACTIONS.map((a) => a.id).sort());
+  expect([...WORKSPACE_ACTION_IDS].sort() as string[]).toEqual(WORKSPACE_ACTIONS.map((a) => a.id).sort());
 });

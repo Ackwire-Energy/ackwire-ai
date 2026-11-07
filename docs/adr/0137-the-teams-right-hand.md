@@ -308,3 +308,24 @@ After onboarding the right hand couldn't see the team: `search_context` and `rea
 ## Amendment (2026-11-07): out of the reporting line (§15)
 
 The right hand is nobody's supervisor and reports to nobody (ADR 0148's addendum refuses it at either end). It reaches what each person reaches already, so an agent with no supervisor needs nothing written. The Organograma draws it as a slim chip beside the workspace, "acompanha tudo com você", opening its DM, not above the people.
+
+## Amendment (2026-11-07): it does what the app lets the person do (§4)
+
+### Context
+
+Asked to create a role for a marketing person who may not merge or deploy, the right hand said it could only assign one afterwards and opened Papéis e permissões for the owner to do it by hand. It was following the amendment of 2026-11-04 (§3 there), which kept roles' permissions, a channel's settings and more as screens it only opens. The standing decision says otherwise: it does almost everything the person can do in the app, as them, with the app's own confirmations.
+
+### Decision
+
+1. **One catalog tool, `workspace_action`** (the setup group, the right hand only). `find` returns the best actions with their input and whether this person may; `action` does one. Each entry is the engine call its screen makes with the person as the actor, so every rule of that screen holds (a role below theirs, only keys they hold, a channel they manage, their own status). One tool for all of them keeps its prompt the size of one, and the prompt names it in one line.
+2. **At once with Undo** when the person may decide it, asked in their own words (`ownWords`): a `workspace.changed` receipt on the reply, `params.action` saying which. Desfazer runs the entry's own inverse as whoever clicks, refused when the target moved since. At most 10 such changes a turn.
+3. **A card otherwise** (`meta.actionCard.kind = "workspace_action"`): after outside content was read, when the screen's check refuses the person, or for what can't be undone or is a safety switch (deleting a role or a channel, the action check). Aplicar runs it as the clicker and puts the receipt, with Desfazer when it has one, on the card. The person it was for and can't sends it to whoever may (`change_request` with `source.action`), who opens and applies it from their inbox without reading that DM.
+4. **The catalog today**: create, change, move and delete roles; give and take a person's roles; a channel's exception for a role or a person; their own status, notifications and time zone; a channel's name, topic and privacy, archiving and bringing it back, its people, deleting it; cancelling or resending an invitation and changing the roles it gives; deciding a request to join (a card); stopping and continuing an agent's work; the workspace's name, time zone, team size and default budget; the action check. Beside it: the people card's role rows apply at once with Undo (ownership and removal stay on the card), `propose_settings_change` names people too in who may talk to an agent, `update_issue` is no longer denied (a task the person sees, in their DM), `delete_routine` and `run_routine_now` take any agent's routine the person may manage, it writes wiki pages its person may edit (`wiki:write`, written as itself), and Abrir reaches the Vault, AI apps, approval settings, GIFs and voice.
+5. This replaces §3 of the 2026-11-04 amendment for roles' permissions and a channel's settings, archiving and permissions. Still screens it opens: billing, deleting the workspace or an account, passwords, keys, mailboxes and databases (our own dialogs), pairing a computer and live control (the person at the device), uploads. Still never: messages in the person's name.
+
+### Consequences
+
+- Lodi's own prompt grew by about 50 characters. The tool's schema loads only with the setup group and only for it, so a DM "oi" with any other agent is unchanged.
+- The phone has no roles screen: the card is its way to make these changes.
+- The catalog's invitations and requests to join send email through the server's address and secret, passed to the setup tools and the card's route.
+- Left for later, in the audit's order: a task's or a page's audience, approval covers, deleting tasks and board columns, the language and the rest of their own settings, pins and channel categories, invitation links, the task manager's paused runs, routines' stop, duplicate and take over, models and per-person limits, the Drive, the calendar, skills, agents' extras, proposals waiting on them, apps, AI keys and computers housekeeping, knowledge and memories by hand, dashboards' extras and missions. Posting as the right hand elsewhere waits on the owner's call.

@@ -32,8 +32,10 @@ import {
   type ApprovalsCard,
   actionCardDetail,
   actionCardKey,
+  actionCardWords,
   type MemberChangeRow,
   type MemberChangesCard,
+  mayApplyCard,
   memberRowDone,
   type OpenPageCard,
   rolesAfter,
@@ -782,12 +784,12 @@ export function WorkspaceActionCardView({
   const sentence = (
     <Trans
       i18nKey={actionCardKey(card) as "rightHand.action.other"}
-      values={card.params.words}
+      values={actionCardWords(card, t)}
       components={{ b: <b /> }}
     />
   );
   const detail = actionCardDetail(card, t);
-  const may = card.params.needs === null || can(org, card.params.needs);
+  const may = mayApplyCard(card, { userId: me.user.id, may: (key) => can(org, key) });
   const mine = card.forUserId === me.user.id;
   if (card.state !== "pending") {
     const receipt = actions?.find((a) => a.kind === "workspace.changed");

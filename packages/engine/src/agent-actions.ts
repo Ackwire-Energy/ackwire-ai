@@ -80,7 +80,8 @@ export type AgentActionTargetType =
   | "agent"
   | "repository"
   | "role"
-  | "person";
+  | "person"
+  | "workspace";
 
 /** What the change was made to, with enough to label it ("#23 · Prompt…"). */
 export interface AgentActionTarget {

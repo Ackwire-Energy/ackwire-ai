@@ -183,6 +183,12 @@ describe("receipt sentence values", () => {
     // A newer server's action reads the plain sentence.
     const newer = action({ ...made, params: { action: "paint_office", color: "red" } });
     expect(actionTextValues(newer, t)).toEqual({ color: "red", context: "" });
+    // A variant picks its own sentence, and a bare availability is said in the reader's words.
+    const back = action({ ...made, params: { action: "archive_channel", channel: "vendas", variant: "back" } });
+    expect(actionTextValues(back, t).context).toBe("archive_channel_back");
+    const away = action({ ...made, params: { action: "set_my_status", what: "", availability: "auto" } });
+    const keyOnly = ((key: string) => key) as unknown as TFunction;
+    expect(actionTextValues(away, keyOnly).what).toBe("presence.lower.online");
   });
 
   test("every kind the app knows has its own case (the default gives no values)", () => {

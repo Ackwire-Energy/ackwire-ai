@@ -179,10 +179,35 @@ export function actionTextValues(
       const words = Object.fromEntries(
         Object.entries(p).flatMap(([k, v]) => (k !== "action" && typeof v === "string" ? [[k, v]] : [])),
       );
-      return { ...words, context: KNOWN_ACTIONS.has(str(p.action)) ? str(p.action) : "" };
+      const action = str(p.action);
+      return {
+        ...workspaceActionWords(action, words, t),
+        context: KNOWN_ACTIONS.has(action) ? workspaceActionContext(action, words) : "",
+      };
     }
     default:
       // A kind the server knows and this build doesn't yet (an open tab, an older app): the key's own words.
       return {};
   }
+}
+
+/** A catalog action's sentence with its variant when it has one (`archive_channel_back`, `set_action_check_on`). */
+export const workspaceActionContext = (action: string, words: Record<string, string>) =>
+  words.variant ? `${action}_${words.variant}` : action;
+
+/**
+ * A catalog action's words in the reader's language: what the server can't say (a bare availability, a kind of
+ * notification) said here, so "Mudei seu status: ausente" never reads "away".
+ */
+export function workspaceActionWords(action: string, words: Record<string, string>, t: TFunction) {
+  if (action === "set_my_status" && !words.what && words.availability) {
+    const key = words.availability === "auto" ? "online" : words.availability;
+    return { ...words, what: t(`presence.lower.${key}` as never, { defaultValue: words.availability }) as string };
+  }
+  if (action === "set_notifications" && words.category)
+    return {
+      ...words,
+      category: t(`noticePrefs.category.${words.category}.title` as never, { defaultValue: words.category }) as string,
+    };
+  return words;
 }

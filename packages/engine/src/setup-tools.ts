@@ -41,7 +41,7 @@ import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
 import { OFFER_CONNECT_APP_TOOL } from "./tools/connector-first";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
-import { actNow, workspaceAction, workspaceActionTool } from "./workspace-actions";
+import { actNow, type ServerLinks, workspaceAction, workspaceActionTool } from "./workspace-actions";
 
 const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles } = schema;
 
@@ -100,6 +100,11 @@ export const APP_PAGES = {
   wiki: "Wiki",
   issues: "Issues",
   calendar: "Calendar",
+  vault: "The Vault: saved passwords and contact details, password managers, who may use each",
+  ai_apps: "AI apps signed in to their account and their personal tokens (Settings › AI apps)",
+  approval_settings: "Who approves for them while away, and whether you may approve for them (Settings › Approvals)",
+  media: "GIFs and stickers for the workspace (Settings)",
+  voice: "Voice messages and the speech key (Settings)",
   agent: "An agent's page (instructions, memory, access, its own delete): needs `agent`",
   channel: "A channel (its settings, members, archiving): needs `channel`",
 } as const;
@@ -115,6 +120,8 @@ const PAGE_PERMISSION: Partial<Record<AppPage, RolePermission | "manage_owners">
   storage: "configure",
   right_hand: "manage_agents",
   import: "create_agents",
+  media: "configure",
+  voice: "configure",
 };
 
 /** What one run may make: enough for a request, never a flood (also all a prompt injection gets). */
@@ -338,6 +345,8 @@ export function createSetupToolSource(deps: {
   context?: ContextDeps;
   /** What this server connects, so a card never offers a service it can't (none: the whole catalog). */
   catalog?: ServerCatalog;
+  /** The server's address and secret, for the invitations the right hand's actions send. */
+  server?: ServerLinks;
 }): ToolSource {
   const tools: ToolDefinition[] = [
     {
@@ -1104,7 +1113,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
                 add: r.addRoleIds,
                 remove: r.removeRoleIds,
               }).catch(() => null);
-              if (!done) continue;
+              if (!done || "refused" in done) continue;
               applied.push(`${r.name} (${done.words.change})`);
               rows.splice(rows.indexOf(r), 1);
             }

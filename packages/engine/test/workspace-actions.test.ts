@@ -2,22 +2,32 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   actionsFor,
+  addChannelMember,
   askWorkspaceAction,
+  createChannel,
+  createInvitation,
   createRole,
+  createRoutine,
+  createScheduleToolSource,
   createSetupToolSource,
   createToolGateway,
+  createWikiToolSource,
   decideWorkspaceAction,
+  getOrgSettings,
   getWorkspaceActionCard,
   insertMessage,
   linkRunActions,
   memberRoleIds,
+  noticePrefsView,
   openPersonAgentDm,
   postPersonMessage,
   RIGHT_HAND,
   setMemberRoles,
+  suggestPerson,
   type ToolContext,
   undoAgentAction,
   undoMessageActions,
+  updateRole,
   WORKSPACE_ACTION_TOOL,
   type WorkspaceActionCard,
 } from "../src";
@@ -60,7 +70,9 @@ async function lodiRun(fx: Fixture, userId: string, body: string, outside = fals
   };
 }
 
-const gatewayOf = (fx: Fixture) => createToolGateway({ sources: [createSetupToolSource({ pubsub: fx.pubsub })] });
+const SERVER = { publicUrl: "https://agentes.test" };
+const gatewayOf = (fx: Fixture) =>
+  createToolGateway({ sources: [createSetupToolSource({ pubsub: fx.pubsub, server: SERVER })] });
 async function act(fx: Fixture, ctx: ToolContext, input: Record<string, unknown>) {
   const res = await gatewayOf(fx).invoke(ctx, {
     toolUseId: `tu_${crypto.randomUUID()}`,
@@ -208,8 +220,13 @@ describe("roles through the right hand", () => {
       input: { name: "Revisores", permissions: ["approve_actions"] },
     });
     expect(out.content).toContain("They can't make this change");
+    // In the roles screen's own words.
+    expect(out.content).toContain("You can only give what you can do yourself");
     expect(await roleNamed(f, "Revisores")).toBeNull();
-    expect((await lastCard(f))?.card.params.action).toBe("create_role");
+    const posted = await lastCard(f);
+    expect(posted?.card.params).toMatchObject({ action: "create_role", refused: true });
+    // They hold the roles screen's key, but its rule refused them: they send it on.
+    await askWorkspaceAction({ db: f.db, pubsub: f.pubsub }, lead.id, f.org.id, posted?.id ?? "");
     // One they hold applies at once.
     expect((await act(f, ctx, { action: "create_role", input: { name: "Apoio" } })).content).toContain("Done at once");
   });
@@ -303,5 +320,325 @@ describe("roles through the right hand", () => {
     const nobody = await act(f, ctx, { action: "set_member_roles", input: { person: "Zé", add_roles: ["x"] } });
     expect(nobody.content).toBe('No one called "Zé" in this workspace.');
     expect(await lastCard(f)).toBeNull();
+  });
+});
+
+/** Ends a test run so the person's next message starts another (a DM holds one run at a time). */
+const finish = (fx: Fixture, ctx: ToolContext) =>
+  fx.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, ctx.runId));
+
+const statusOf = async (fx: Fixture, userId: string) =>
+  (
+    await fx.db
+      .select({ availability: schema.organizationMembers.availability, text: schema.organizationMembers.statusText })
+      .from(schema.organizationMembers)
+      .where(and(eq(schema.organizationMembers.orgId, fx.org.id), eq(schema.organizationMembers.userId, userId)))
+  )[0];
+
+describe("the rest of the app through the right hand", () => {
+  test("their own status: anyone sets theirs at once, and Desfazer puts it back", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    const ctx = await lodiRun(f, bia.id, "estou em reunião até as 15h");
+    const out = await act(f, ctx, { action: "set_my_status", input: { availability: "busy", text: "Em reunião" } });
+    expect(out.content).toContain("Done at once");
+    expect(await statusOf(f, bia.id)).toEqual({ availability: "busy", text: "Em reunião" });
+    const messageId = await reply(f, ctx);
+    const [receipt] = (await actionsFor(f.db, f.org.id, [messageId])).get(messageId) ?? [];
+    expect(receipt?.params).toMatchObject({ action: "set_my_status", what: "Em reunião", availability: "busy" });
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, receipt?.id ?? "");
+    expect(await statusOf(f, bia.id)).toEqual({ availability: "auto", text: null });
+  });
+
+  test("their notifications and time zone, and an invitation's roles: at once, each undone", async () => {
+    f = await setup({ rightHand: true });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    const ctx = await lodiRun(f, bia.id, "não quero mais notificação de reação, e estou em Lisboa");
+    const reactions = async () =>
+      (await noticePrefsView(f.db, f.org.id, bia.id)).categories.find((c) => c.id === "reactions")?.on;
+    const start = await reactions();
+    for (const [action, input] of [
+      ["set_notifications", { category: "reactions", on: !start }],
+      ["set_my_timezone", { timezone: "Europe/Lisbon" }],
+    ] as const)
+      expect((await act(f, ctx, { action, input })).content).toContain("Done at once");
+    const zone = async () =>
+      (
+        await f.db
+          .select({ timezone: schema.organizationMembers.timezone })
+          .from(schema.organizationMembers)
+          .where(and(eq(schema.organizationMembers.orgId, f.org.id), eq(schema.organizationMembers.userId, bia.id)))
+      )[0]?.timezone;
+    expect(await reactions()).toBe(!start);
+    expect(await zone()).toBe("Europe/Lisbon");
+    const messageId = await reply(f, ctx);
+    expect((await undoMessageActions(deps, bia.id, f.org.id, messageId)).failed).toEqual([]);
+    expect(await reactions()).toBe(start);
+    expect(await zone()).toBeNull();
+
+    await createRole(f.db, f.owner.id, f.org.id, { name: "Vendas" });
+    await createInvitation(f.db, f.owner.id, f.org.id, { email: "convidada@example.com" });
+    const roles = async () =>
+      (
+        await f.db
+          .select({ roleIds: schema.organizationInvitations.roleIds })
+          .from(schema.organizationInvitations)
+          .where(eq(schema.organizationInvitations.orgId, f.org.id))
+      )[0]?.roleIds;
+    const mine = await lodiRun(f, f.owner.id, "o convite dela entra em Vendas");
+    const out = await act(f, mine, {
+      action: "set_invitation_roles",
+      input: { email: "convidada@example.com", add_roles: ["vendas"] },
+    });
+    expect(out.content).toContain("Done at once");
+    expect(await roles()).toHaveLength(1);
+    const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, mine.runId));
+    await undoAgentAction(deps, f.owner.id, f.org.id, receipt?.id ?? "");
+    expect(await roles()).toEqual([]);
+  });
+
+  test("a channel renamed, its people changed and archived at once, all undone; its deletion is a card", async () => {
+    f = await setup({ rightHand: true });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    const launch = await createChannel(f.db, f.owner.id, f.org.id, { name: "lancamento", topic: "" });
+    const ctx = await lodiRun(f, f.owner.id, "arruma o canal de lançamento");
+    for (const [action, input] of [
+      ["update_channel", { channel: "#lancamento", name: "lancamento-q4", topic: "Campanha do Q4" }],
+      ["channel_people", { channel: "lancamento-q4", add: ["Bia Teste"] }],
+      ["archive_channel", { channel: "lancamento-q4" }],
+    ] as const)
+      expect((await act(f, ctx, { action, input })).content).toContain("Done at once");
+    const row = async () => (await f.db.select().from(schema.channels).where(eq(schema.channels.id, launch.id)))[0];
+    expect(await row()).toMatchObject({ name: "lancamento-q4", topic: "Campanha do Q4" });
+    expect((await row())?.archivedAt).not.toBeNull();
+    const seated = async () =>
+      (await f.db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, launch.id))).map(
+        (m) => m.userId,
+      );
+    expect(await seated()).toContain(bia.id);
+    const messageId = await reply(f, ctx);
+    expect((await undoMessageActions(deps, f.owner.id, f.org.id, messageId)).failed).toEqual([]);
+    expect(await row()).toMatchObject({ name: "lancamento", topic: "", archivedAt: null });
+    expect(await seated()).not.toContain(bia.id);
+    await finish(f, ctx);
+
+    // Bia doesn't manage it: a card, nothing changes.
+    const hers = await lodiRun(f, bia.id, "renomeia o canal");
+    await addChannelMember(f.db, f.owner.id, f.org.id, launch.id, { userId: bia.id });
+    const refused = await act(f, hers, { action: "update_channel", input: { channel: "lancamento", name: "meu" } });
+    expect(refused.content).toContain("They can't make this change");
+    expect((await row())?.name).toBe("lancamento");
+
+    const del = await act(f, await lodiRun(f, f.owner.id, "apaga o canal"), {
+      action: "delete_channel",
+      input: { channel: "lancamento" },
+    });
+    expect(del.content).toContain("Posted a card");
+    expect((await row())?.deletedAt).toBeNull();
+    const posted = await lastCard(f);
+    if (!posted) throw new Error("no card");
+    await decideWorkspaceAction(deps, f.owner.id, f.org.id, posted.id, "apply");
+    expect((await row())?.deletedAt).not.toBeNull();
+  });
+
+  test("an invitation canceled at once by who may invite; a member gets a card", async () => {
+    f = await setup({ rightHand: true });
+    await createInvitation(f.db, f.owner.id, f.org.id, { email: "convidada@example.com" });
+    const pending = async () =>
+      (
+        await f.db
+          .select()
+          .from(schema.organizationInvitations)
+          .where(eq(schema.organizationInvitations.orgId, f.org.id))
+      ).length;
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    const hers = await act(f, await lodiRun(f, bia.id, "cancela o convite"), {
+      action: "revoke_invitation",
+      input: { email: "convidada@example.com" },
+    });
+    expect(hers.content).toContain("They can't make this change");
+    expect(await pending()).toBe(1);
+    const out = await act(f, await lodiRun(f, f.owner.id, "cancela o convite"), {
+      action: "revoke_invitation",
+      input: { email: "Convidada@example.com" },
+    });
+    expect(out.content).toContain("Done at once");
+    expect(await pending()).toBe(0);
+  });
+
+  test("an invitation sent again at once; a request to join decided on a card, let in or turned down", async () => {
+    f = await setup({ rightHand: true });
+    const deps = { db: f.db, pubsub: f.pubsub, server: SERVER };
+    const invited = await createInvitation(f.db, f.owner.id, f.org.id, { email: "convidada@example.com" });
+    await f.db
+      .update(schema.organizationInvitations)
+      .set({ expiresAt: new Date(Date.now() + 3_600_000) })
+      .where(eq(schema.organizationInvitations.email, "convidada@example.com"));
+    const ctx = await lodiRun(f, f.owner.id, "reenvia o convite");
+    const again = await act(f, ctx, { action: "resend_invitation", input: { email: "convidada@example.com" } });
+    expect(again.content).toContain("Done at once");
+    const [row] = await f.db
+      .select()
+      .from(schema.organizationInvitations)
+      .where(eq(schema.organizationInvitations.email, "convidada@example.com"));
+    expect((row?.expiresAt.getTime() ?? 0) - Date.now()).toBeGreaterThan(6 * 86_400_000);
+    expect(invited).toBeTruthy();
+    await finish(f, ctx);
+
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    await suggestPerson(deps, bia.id, f.org.id, { email: "nova@example.com" });
+    await suggestPerson(deps, bia.id, f.org.id, { email: "outra@example.com" });
+    const hers = await act(f, await lodiRun(f, bia.id, "deixa a nova entrar"), {
+      action: "decide_join_request",
+      input: { email: "nova@example.com", approve: true },
+    });
+    expect(hers.content).toContain("They can't make this change");
+    const status = async (email: string) =>
+      (
+        await f.db
+          .select({ status: schema.organizationJoinRequests.status })
+          .from(schema.organizationJoinRequests)
+          .where(eq(schema.organizationJoinRequests.email, email))
+      )[0]?.status;
+    const mine = await lodiRun(f, f.owner.id, "deixa a nova entrar e recusa a outra");
+    for (const [email, approve] of [
+      ["nova@example.com", true],
+      ["outra@example.com", false],
+    ] as const) {
+      const out = await act(f, mine, { action: "decide_join_request", input: { email, approve, reason: "Não agora" } });
+      expect(out.content).toContain("Posted a card");
+      expect(await status(email)).toBe("pending");
+      const posted = await lastCard(f);
+      if (!posted) throw new Error("no card");
+      await decideWorkspaceAction(deps, f.owner.id, f.org.id, posted.id, "apply");
+    }
+    expect(await status("nova@example.com")).toBe("approved");
+    expect(await status("outra@example.com")).toBe("denied");
+  });
+
+  test("stopping an agent's work as the person who may; the right hand never stops itself", async () => {
+    f = await setup({ rightHand: true });
+    const asked = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev faz o relatório",
+    });
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, asked.id));
+    if (!run) throw new Error("no run");
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    const hers = await act(f, await lodiRun(f, bia.id, "para o dev"), {
+      action: "stop_work",
+      input: { agent: "@dev" },
+    });
+    expect(hers.content).toContain("They can't make this change");
+    const status = async () => (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id)))[0];
+    expect((await status())?.status).toBe("queued");
+    const ctx = await lodiRun(f, f.owner.id, "para o dev");
+    expect((await act(f, ctx, { action: "stop_work", input: { agent: "@dev", reason: "Já fiz" } })).content).toContain(
+      "Done at once",
+    );
+    expect((await status())?.status).toBe("canceled");
+    const self = await act(f, ctx, { action: "stop_work", input: { agent: "@lodi" } });
+    expect(self).toMatchObject({ isError: true, content: "That is you: say so, and stop nothing." });
+    const none = await act(f, ctx, { action: "continue_work", input: { agent: "@dev" } });
+    expect(none.isError).toBe(true);
+  });
+
+  test("the workspace's name and time zone at once, undone; the action check always on a card", async () => {
+    f = await setup({ rightHand: true });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const before = await getOrgSettings(f.db, f.owner.id, f.org.id);
+    const ctx = await lodiRun(f, f.owner.id, "muda o nome do workspace");
+    const out = await act(f, ctx, {
+      action: "update_workspace",
+      input: { name: "Acme Teste", timezone: "America/Sao_Paulo" },
+    });
+    expect(out.content).toContain("Done at once");
+    expect(await getOrgSettings(f.db, f.owner.id, f.org.id)).toMatchObject({
+      name: "Acme Teste",
+      timezone: "America/Sao_Paulo",
+    });
+    const check = await act(f, ctx, { action: "set_action_check", input: { on: false } });
+    expect(check.content).toContain("Posted a card");
+    expect((await getOrgSettings(f.db, f.owner.id, f.org.id)).actionCheck).toBe(true);
+    const posted = await lastCard(f);
+    if (!posted) throw new Error("no card");
+    await decideWorkspaceAction(deps, f.owner.id, f.org.id, posted.id, "apply");
+    expect((await getOrgSettings(f.db, f.owner.id, f.org.id)).actionCheck).toBe(false);
+    const messageId = await reply(f, ctx);
+    expect((await undoMessageActions(deps, f.owner.id, f.org.id, messageId)).failed).toEqual([]);
+    expect(await getOrgSettings(f.db, f.owner.id, f.org.id)).toMatchObject({
+      name: before.name,
+      timezone: before.timezone,
+    });
+    const [receipt] = (await actionsFor(f.db, f.org.id, [posted.id])).get(posted.id) ?? [];
+    await undoAgentAction(deps, f.owner.id, f.org.id, receipt?.id ?? "");
+    expect((await getOrgSettings(f.db, f.owner.id, f.org.id)).actionCheck).toBe(true);
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    const hers = await act(f, await lodiRun(f, bia.id, "muda o fuso"), {
+      action: "update_workspace",
+      input: { timezone: "Europe/Lisbon" },
+    });
+    expect(hers.content).toContain("They can't make this change");
+  });
+
+  test("another agent's routine: deleted for who may manage it, with Undo", async () => {
+    f = await setup({ rightHand: true });
+    const routine = await createRoutine({ db: f.db, pubsub: f.pubsub, context: f.context }, f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      prompt: "Resuma o dia.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: { type: "schedule", phrase: "dias úteis às 9h" },
+    });
+    const ctx = await lodiRun(f, f.owner.id, "apaga a rotina do dev");
+    const gateway = createToolGateway({
+      sources: [createScheduleToolSource({ pubsub: f.pubsub, context: f.context })],
+    });
+    const res = await gateway.invoke(ctx, {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: "delete_routine",
+      input: { id: routine.id },
+    });
+    if (res.type !== "result") throw new Error(res.type);
+    expect(res.output.isError).toBeFalsy();
+    const deletedAt = async () =>
+      (await f.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id)))[0]?.deletedAt;
+    expect(await deletedAt()).not.toBeNull();
+    const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, ctx.runId));
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, receipt?.id ?? "");
+    expect(await deletedAt()).toBeNull();
+  });
+
+  test("a wiki page written as itself at the person's request, with Undo; never for who can't edit the wiki", async () => {
+    f = await setup({ rightHand: true });
+    const wiki = createToolGateway({ sources: [createWikiToolSource({ pubsub: f.pubsub, search: f.context })] });
+    const write = async (ctx: ToolContext) => {
+      const res = await wiki.invoke(ctx, {
+        toolUseId: `tu_${crypto.randomUUID()}`,
+        name: "create_wiki_page",
+        input: { title: "Onboarding de marketing", body: "Primeiros passos." },
+      });
+      if (res.type !== "result") throw new Error(res.type);
+      return res.output;
+    };
+    const pages = async () => await f.db.select().from(schema.wikiPages).where(eq(schema.wikiPages.orgId, f.org.id));
+    const ctx = await lodiRun(f, f.owner.id, "documenta o onboarding de marketing na wiki");
+    expect((await write(ctx)).isError).toBeFalsy();
+    expect((await pages()).filter((p) => !p.deletedAt)).toHaveLength(1);
+    const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, ctx.runId));
+    expect(receipt?.kind).toBe("wiki.page_created");
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, receipt?.id ?? "");
+    expect((await pages()).filter((p) => !p.deletedAt)).toHaveLength(0);
+
+    const [everyone] = await f.db
+      .select()
+      .from(schema.orgRoles)
+      .where(and(eq(schema.orgRoles.orgId, f.org.id), eq(schema.orgRoles.kind, "everyone")));
+    await updateRole(f.db, f.owner.id, f.org.id, everyone?.id ?? "", {
+      permissions: (everyone?.permissions ?? []).filter((k) => k !== "edit_wiki"),
+    });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    expect((await write(await lodiRun(f, bia.id, "documenta isso na wiki"))).isError).toBe(true);
+    expect((await pages()).filter((p) => !p.deletedAt)).toHaveLength(0);
   });
 });

@@ -544,6 +544,7 @@ export const AgentAction = z
         "repository",
         "role",
         "person",
+        "workspace",
       ]),
       id: z.string(),
       number: z.number().optional().openapi({ description: "Issues." }),

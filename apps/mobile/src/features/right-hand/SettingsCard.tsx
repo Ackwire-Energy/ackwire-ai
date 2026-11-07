@@ -19,7 +19,13 @@ import {
   useSendDm,
   type WorkspaceActionCard,
 } from "@agenteschat/client";
-import { actionCardDetail, actionCardKey, actionCardOf } from "@agenteschat/client/lib/action-cards";
+import {
+  actionCardDetail,
+  actionCardKey,
+  actionCardOf,
+  actionCardWords,
+  mayApplyCard,
+} from "@agenteschat/client/lib/action-cards";
 import { delegateLine } from "@agenteschat/client/lib/approval-words";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -378,10 +384,10 @@ function WorkspaceActionView({
   const decide = useDecideActionCard(orgId, where);
   const undo = useAgentActions(orgId, where.channelId).undo;
   const say = t as unknown as (key: string, values: Record<string, string>) => string;
-  const sentence = say(actionCardKey(card), card.params.words);
+  const sentence = say(actionCardKey(card), actionCardWords(card, t));
   const plain = sentence.replace(/<\/?b>/g, "");
   const detail = actionCardDetail(card, t);
-  const may = card.params.needs === null || can(org, card.params.needs);
+  const may = mayApplyCard(card, { userId: meId ?? "", may: (key) => can(org, key) });
   const mine = card.forUserId === meId;
   if (card.state !== "pending") {
     const receipt = actions?.find((a) => a.kind === "workspace.changed");

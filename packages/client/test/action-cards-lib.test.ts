@@ -11,6 +11,7 @@ import {
   draftMailLevels,
   installSkillDone,
   inviteDone,
+  mayApplyCard,
   mayContinueStretch,
   memberRowDone,
   proposalLines,
@@ -329,4 +330,10 @@ test("a card of a workspace change: read from the message, its sentence, what a 
   };
   expect(actionCardDetail(changed, t)).toBe("− post");
   expect(actionCardOf({ actionCard: { kind: "workspace_action", params: {} } })).toBeNull();
+  const holds = { userId: "u2", may: () => true };
+  expect(mayApplyCard(card, holds)).toBe(true);
+  expect(mayApplyCard(card, { userId: "u2", may: () => false })).toBe(false);
+  const refused = { ...card, params: { ...card.params, refused: true } };
+  expect(mayApplyCard(refused, { userId: "u1", may: () => true })).toBe(false);
+  expect(mayApplyCard(refused, holds)).toBe(true);
 });

@@ -1,5 +1,5 @@
 import { holdEvents, type PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, desc, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import {
   type ActionRecord,
   type AgentActionTarget,
@@ -7,16 +7,41 @@ import {
   publishMessageActions,
   UNDO_WINDOW_MS,
 } from "./agent-actions";
+import { agentsByHandle } from "./agents";
 import { recordAudit } from "./audit";
+import { cancelRun } from "./cancel";
+import { deleteChannel } from "./channel-deletion";
 import { setChannelOverride } from "./channel-permissions";
-import { listChannels, requireChannelAccess } from "./channels";
+import {
+  addChannelMember,
+  archiveChannel,
+  listChannels,
+  removeChannelMember,
+  requireChannelAccess,
+  unarchiveChannel,
+} from "./channels";
 import { findMember } from "./chat-tools";
 import { ownWords } from "./context/learn";
+import { continueRun } from "./continue-run";
+import { queueInvitationEmail } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
+import { approveJoinRequest, denyJoinRequest } from "./invite-requests";
+import { getOrgSettings, TEAM_SIZES, updateChannel, updateOrgSettings } from "./management";
+import { AVAILABILITIES, type Availability, setMyStatus } from "./member-status";
 import { getMessage, insertMessage, messageView } from "./messages";
+import { NOTICE_CATEGORIES, type NoticeCategory, noticePrefsView, setNoticePref } from "./notice-prefs";
 import { notify, resolveNotifications } from "./notifications";
-import { can, getMembership } from "./organizations";
+import {
+  announceMembers,
+  can,
+  getMembership,
+  requirePermission,
+  resendInvitation,
+  revokeInvitation,
+  setInvitationRoles,
+  updateMyProfile,
+} from "./organizations";
 import {
   CHANNEL_KEYS,
   maySql,
@@ -38,12 +63,23 @@ import {
 } from "./roles";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
-import { compactSchema, rankTools } from "./tools/directory";
+import { rankTools } from "./tools/directory";
 import { canonicalJson, type JsonSchema, validateJson } from "./tools/json-schema";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
-const { agentActions, channelPermissionOverrides, messages, organizationMembers, organizationMemberRoles, orgRoles } =
-  schema;
+const {
+  agentActions,
+  agentRuns,
+  channelMembers,
+  channelPermissionOverrides,
+  channels,
+  messages,
+  organizationInvitations,
+  organizationJoinRequests,
+  organizationMembers,
+  organizationMemberRoles,
+  orgRoles,
+} = schema;
 
 /**
  * Anything else a person can change in the app, done by the right hand as them (ADR 0137 amendment of 2026-11-07): a
@@ -63,6 +99,13 @@ export const MAX_ACTIONS_PER_RUN = 10;
 export interface ActionDeps {
   db: Database;
   pubsub?: PubSub;
+  /** The server's address and `AGENTES_SECRET`: invitations an action sends link back to it. */
+  server?: ServerLinks;
+}
+
+export interface ServerLinks {
+  publicUrl: string;
+  secret?: string;
 }
 
 /** What an action did: its receipt's target and words, and what its Undo puts back. */
@@ -401,21 +444,9 @@ const setMemberRolesAction: WorkspaceAction = {
   async resolve(ctx, _person, input) {
     const who = await personNamed(ctx, str(input.person));
     if (typeof who === "string") return who;
-    const pick = async (names: string[]) => {
-      const out: { id: string; name: string }[] = [];
-      for (const n of names) {
-        const role = await roleNamed(ctx, n);
-        if (typeof role === "string") return role;
-        if (role.kind === "everyone") return "Everyone holds the base role (everyone): it isn't given or taken.";
-        out.push(role);
-      }
-      return out;
-    };
-    const add = await pick(list(input.add_roles));
-    if (typeof add === "string") return add;
-    const take = await pick(list(input.remove_roles));
-    if (typeof take === "string") return take;
-    if (add.length + take.length === 0) return "Say which roles they get or lose.";
+    const roles = await givenRoles(ctx, input);
+    if (typeof roles === "string") return roles;
+    const { add, take } = roles;
     return {
       input: { userId: who.userId, name: who.name, add: add.map((r) => r.id), remove: take.map((r) => r.id) },
       words: { name: who.name, change: roleChange(add, take) },
@@ -445,6 +476,26 @@ const setMemberRolesAction: WorkspaceAction = {
     return undefined;
   },
 };
+
+/** The custom roles an entry gives (`add_roles`) and takes (`remove_roles`), by name, or why not. */
+async function givenRoles(ctx: Pick<ToolContext, "db" | "orgId">, input: Input) {
+  const pick = async (names: string[]) => {
+    const out: { id: string; name: string }[] = [];
+    for (const n of names) {
+      const role = await roleNamed(ctx, n);
+      if (typeof role === "string") return role;
+      if (role.kind === "everyone") return "Everyone holds the base role (everyone): it isn't given or taken.";
+      out.push(role);
+    }
+    return out;
+  };
+  const add = await pick(list(input.add_roles));
+  if (typeof add === "string") return add;
+  const take = await pick(list(input.remove_roles));
+  if (typeof take === "string") return take;
+  if (add.length + take.length === 0) return "Say which roles are given or taken.";
+  return { add, take };
+}
 
 /** "+ Marketing, − Vendas": the same in every language. */
 const roleChange = (add: { name: string }[], take: { name: string }[]) =>
@@ -547,6 +598,817 @@ const channelPermissionsAction: WorkspaceAction = {
   },
 };
 
+// ── Their own status ─────────────────────────────────────────────────────────
+
+/** A person's status in this workspace, as Undo compares and puts it back. */
+async function statusNow(db: Database, orgId: string, userId: string) {
+  const [row] = await db
+    .select({
+      availability: organizationMembers.availability,
+      text: organizationMembers.statusText,
+      emoji: organizationMembers.statusEmoji,
+      until: organizationMembers.statusUntil,
+    })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  return {
+    availability: row?.availability ?? "auto",
+    status: row?.text ? { text: row.text, emoji: row.emoji, until: row.until?.toISOString() ?? null } : null,
+  };
+}
+
+const setStatusAction: WorkspaceAction = {
+  id: "set_my_status",
+  does: "Set their own status: away, busy, out of office or back (auto), and what they are doing until when.",
+  input: {
+    type: "object",
+    properties: {
+      availability: { enum: [...AVAILABILITIES], description: "auto: back, as their activity says." },
+      text: { type: "string", maxLength: 100, description: "What they are doing (empty clears it)." },
+      emoji: { type: "string", maxLength: 16 },
+      until: { type: "string", maxLength: 40, description: "When it ends, ISO 8601 with its offset." },
+    },
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: null,
+  async resolve(_ctx, _person, input) {
+    if (input.availability === undefined && input.text === undefined) return "Say their availability or status.";
+    return { input, words: { what: str(input.text), availability: str(input.availability) } };
+  },
+  async run(deps, actorId, orgId, input) {
+    const before = await statusNow(deps.db, orgId, actorId);
+    await setMyStatus(deps, actorId, orgId, {
+      ...(input.availability !== undefined ? { availability: input.availability as Availability } : {}),
+      ...(input.text !== undefined
+        ? {
+            status: str(input.text)
+              ? { text: str(input.text), emoji: str(input.emoji) || null, until: str(input.until) || null }
+              : null,
+          }
+        : {}),
+    });
+    const after = await statusNow(deps.db, orgId, actorId);
+    return {
+      target: { type: "person", id: actorId },
+      words: { what: after.status?.text ?? "", availability: after.availability },
+      before,
+      after,
+    };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
+    if (actorId !== a.targetId) throw new ForbiddenError("Only they change their own status", "action.not_allowed");
+    if (!same(await statusNow(deps.db, a.orgId, actorId), from)) throw changedSince();
+    await setMyStatus(deps, actorId, a.orgId, to as Parameters<typeof setMyStatus>[3]);
+    return undefined;
+  },
+};
+
+const notificationsAction: WorkspaceAction = {
+  id: "set_notifications",
+  does: "Turn one kind of their notifications in this workspace on or off (the inbox keeps everything).",
+  input: {
+    type: "object",
+    properties: {
+      category: {
+        enum: [...NOTICE_CATEGORIES],
+        description:
+          "waiting: approvals and questions for them; replies: agents' answers; mentions: mentions and DMs; threads: threads they follow; tasks; routines: routines and missions; computers; reactions.",
+      },
+      on: { type: "boolean" },
+    },
+    required: ["category", "on"],
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: null,
+  async resolve(_ctx, _person, input) {
+    return { input, words: { category: str(input.category), variant: input.on === true ? "on" : "off" } };
+  },
+  async run(deps, actorId, orgId, input) {
+    const category = str(input.category) as NoticeCategory;
+    const on = input.on === true;
+    const before = (await noticePrefsView(deps.db, orgId, actorId)).categories.find((c) => c.id === category)?.on;
+    if (before === on) throw new ValidationError("Their notifications are already like that");
+    await setNoticePref(deps.db, orgId, actorId, category, on);
+    return {
+      target: { type: "person", id: actorId },
+      words: { category, variant: on ? "on" : "off" },
+      before: { category, on: !on },
+      after: { category, on },
+    };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
+    if (actorId !== a.targetId) throw new ForbiddenError("Only they change their notifications", "action.not_allowed");
+    const category = str(from.category) as NoticeCategory;
+    const now = (await noticePrefsView(deps.db, a.orgId, actorId)).categories.find((c) => c.id === category)?.on;
+    if (now !== from.on) throw changedSince();
+    await setNoticePref(deps.db, a.orgId, actorId, category, to.on === true);
+    return undefined;
+  },
+};
+
+/** Their own time zone here (null: the workspace's). */
+const timezoneNow = async (db: Database, orgId: string, userId: string) =>
+  (
+    await db
+      .select({ timezone: organizationMembers.timezone })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)))
+  )[0]?.timezone ?? null;
+
+const timezoneWords = (timezone: string | null): Record<string, string> =>
+  timezone ? { timezone } : { timezone: "", variant: "workspace" };
+
+const timezoneAction: WorkspaceAction = {
+  id: "set_my_timezone",
+  does: "Set their own time zone in this workspace, or follow the workspace's again.",
+  input: {
+    type: "object",
+    properties: {
+      timezone: {
+        type: "string",
+        minLength: 1,
+        maxLength: 64,
+        description: 'IANA, e.g. Europe/Lisbon, or "workspace" to follow the workspace\'s.',
+      },
+    },
+    required: ["timezone"],
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: null,
+  async resolve(_ctx, _person, input) {
+    const timezone = str(input.timezone);
+    return { input: { timezone }, words: timezoneWords(timezone === "workspace" ? null : timezone) };
+  },
+  async run(deps, actorId, orgId, input) {
+    const wanted = str(input.timezone) === "workspace" ? null : str(input.timezone);
+    const before = await timezoneNow(deps.db, orgId, actorId);
+    if (before === wanted) throw new ValidationError("Their time zone already is that");
+    await updateMyProfile(deps.db, actorId, orgId, { timezone: wanted });
+    await announceMembers(deps.pubsub, orgId);
+    return {
+      target: { type: "person", id: actorId },
+      words: timezoneWords(wanted),
+      before: { timezone: before },
+      after: { timezone: wanted },
+    };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
+    if (actorId !== a.targetId) throw new ForbiddenError("Only they change their time zone", "action.not_allowed");
+    if ((await timezoneNow(deps.db, a.orgId, actorId)) !== (from.timezone ?? null)) throw changedSince();
+    await updateMyProfile(deps.db, actorId, a.orgId, { timezone: (to.timezone as string | null) ?? null });
+    await announceMembers(deps.pubsub, a.orgId);
+    return undefined;
+  },
+};
+
+// ── Channels ─────────────────────────────────────────────────────────────────
+
+type ChannelRow = typeof channels.$inferSelect;
+
+async function channelRow(db: Database, orgId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), eq(channels.id, id)));
+  return row ?? null;
+}
+
+const CHANNEL_REF = { type: "string", minLength: 1, maxLength: 81, description: "Its name, with or without #." };
+const channelTarget = (c: Pick<ChannelRow, "id" | "name">): AgentActionTarget => ({
+  type: "channel",
+  id: c.id,
+  title: c.name,
+});
+const channelSnapshot = (c: ChannelRow) => ({ name: c.name, topic: c.topic, visibility: c.visibility });
+
+const updateChannelAction: WorkspaceAction = {
+  id: "update_channel",
+  does: "Rename a channel, change its topic, or make it private (invite only) or public.",
+  input: {
+    type: "object",
+    properties: {
+      channel: CHANNEL_REF,
+      name: { type: "string", minLength: 1, maxLength: 80, description: "Lower-case letters, digits, - or _." },
+      topic: { type: "string", maxLength: 500 },
+      private: { type: "boolean" },
+    },
+    required: ["channel"],
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: "manage_channels",
+  async resolve(ctx, person, input) {
+    const channel = await channelNamed(ctx, person, str(input.channel));
+    if (typeof channel === "string") return channel;
+    if (input.name === undefined && input.topic === undefined && input.private === undefined)
+      return "Say what changes: its name, topic or whether it is private.";
+    const { channel: _, ...rest } = input;
+    return { input: { ...rest, channelId: channel.id }, words: { channel: channel.name } };
+  },
+  async run(deps, actorId, orgId, input) {
+    const row = await channelRow(deps.db, orgId, str(input.channelId));
+    if (!row) throw new NotFoundError("Channel not found");
+    const before = channelSnapshot(row);
+    const updated = await updateChannel(
+      deps.db,
+      actorId,
+      orgId,
+      row.id,
+      {
+        ...(str(input.name) ? { name: str(input.name).replace(/^#/, "") } : {}),
+        ...(typeof input.topic === "string" ? { topic: input.topic } : {}),
+        ...(typeof input.private === "boolean" ? { visibility: input.private ? "private" : "public" } : {}),
+      },
+      deps,
+    );
+    const after = channelSnapshot(updated);
+    if (same(before, after)) throw new ValidationError(`#${row.name} already is like that`);
+    return { target: channelTarget(updated), words: { channel: updated.name }, before, after };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
+    const row = await channelRow(deps.db, a.orgId, a.targetId);
+    if (!row || row.archivedAt) throw new NotFoundError("The channel is gone", "action.target_gone");
+    if (!same(channelSnapshot(row), from)) throw changedSince();
+    await updateChannel(
+      deps.db,
+      actorId,
+      a.orgId,
+      row.id,
+      { name: str(to.name), topic: String(to.topic ?? ""), visibility: to.visibility as "public" | "private" },
+      deps,
+    );
+    return undefined;
+  },
+};
+
+/** Archives or brings back, the other one undoing it. */
+async function setArchived(deps: ActionDeps, actorId: string, orgId: string, id: string, archived: boolean) {
+  if (archived) await archiveChannel(deps.db, actorId, orgId, id, deps);
+  else await unarchiveChannel(deps.db, actorId, orgId, id, deps);
+}
+
+const archiveChannelAction: WorkspaceAction = {
+  id: "archive_channel",
+  does: "Archive a channel (it leaves everyone's list; its messages stay) or bring an archived one back.",
+  input: {
+    type: "object",
+    properties: { channel: CHANNEL_REF, back: { type: "boolean", description: "True: bring it back." } },
+    required: ["channel"],
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: "manage_channels",
+  async resolve(ctx, person, input) {
+    const name = str(input.channel).replace(/^#/, "").toLowerCase();
+    if (input.back === true) {
+      const [row] = await ctx.db
+        .select({ id: channels.id, name: channels.name })
+        .from(channels)
+        .where(
+          and(
+            eq(channels.orgId, ctx.orgId),
+            eq(channels.kind, "channel"),
+            eq(channels.name, name),
+            isNotNull(channels.archivedAt),
+            isNull(channels.deletedAt),
+          ),
+        );
+      if (!row) return `No archived channel #${name}.`;
+      return { input: { channelId: row.id, back: true }, words: { channel: row.name, variant: "back" } };
+    }
+    const channel = await channelNamed(ctx, person, name);
+    if (typeof channel === "string") return channel;
+    const words: Record<string, string> = { channel: channel.name };
+    return { input: { channelId: channel.id, back: false }, words };
+  },
+  async run(deps, actorId, orgId, input) {
+    const row = await channelRow(deps.db, orgId, str(input.channelId));
+    if (!row) throw new NotFoundError("Channel not found");
+    const archive = input.back !== true;
+    await setArchived(deps, actorId, orgId, row.id, archive);
+    return {
+      target: channelTarget(row),
+      words: { channel: row.name, ...(archive ? {} : { variant: "back" }) },
+      after: { archived: archive },
+    };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const archived = obj(a.after).archived === true;
+    const row = await channelRow(deps.db, a.orgId, a.targetId);
+    if (!row || row.deletedAt) throw new NotFoundError("The channel is gone", "action.target_gone");
+    const wanted = direction === "undo" ? !archived : archived;
+    if (Boolean(row.archivedAt) === wanted) throw changedSince();
+    await setArchived(deps, actorId, a.orgId, row.id, wanted);
+    return undefined;
+  },
+};
+
+const channelPeopleAction: WorkspaceAction = {
+  id: "channel_people",
+  does: "Add people to a channel, or take someone out of it.",
+  input: {
+    type: "object",
+    properties: {
+      channel: CHANNEL_REF,
+      add: { type: "array", items: { type: "string", minLength: 1, maxLength: 200 }, maxItems: 20 },
+      remove: { type: "array", items: { type: "string", minLength: 1, maxLength: 200 }, maxItems: 20 },
+    },
+    required: ["channel"],
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: "manage_channels",
+  async resolve(ctx, person, input) {
+    const channel = await channelNamed(ctx, person, str(input.channel));
+    if (typeof channel === "string") return channel;
+    const pick = async (names: string[]) => {
+      const out: { userId: string; name: string }[] = [];
+      for (const n of names) {
+        const who = await personNamed(ctx, n);
+        if (typeof who === "string") return who;
+        out.push({ userId: who.userId, name: who.name });
+      }
+      return out;
+    };
+    const add = await pick(list(input.add));
+    if (typeof add === "string") return add;
+    const take = await pick(list(input.remove));
+    if (typeof take === "string") return take;
+    if (add.length + take.length === 0) return "Say who joins or leaves it.";
+    return {
+      input: { channelId: channel.id, channel: channel.name, add, remove: take },
+      words: { channel: channel.name, change: peopleChange(add, take) },
+    };
+  },
+  async run(deps, actorId, orgId, input) {
+    const channelId = str(input.channelId);
+    const seated = new Set(
+      (
+        await deps.db
+          .select({ userId: channelMembers.userId })
+          .from(channelMembers)
+          .where(and(eq(channelMembers.channelId, channelId), isNotNull(channelMembers.userId)))
+      ).map((r) => r.userId),
+    );
+    const people = (v: unknown) => (Array.isArray(v) ? (v as { userId: string; name: string }[]) : []);
+    const add = people(input.add).filter((p) => !seated.has(p.userId));
+    const take = people(input.remove).filter((p) => seated.has(p.userId));
+    if (add.length + take.length === 0) throw new ValidationError(`#${str(input.channel)} already has them like that`);
+    for (const p of add) await addChannelMember(deps.db, actorId, orgId, channelId, { userId: p.userId }, deps);
+    for (const p of take) await removeChannelMember(deps.db, actorId, orgId, channelId, { userId: p.userId }, deps);
+    return {
+      target: { type: "channel", id: channelId, title: str(input.channel) },
+      words: { channel: str(input.channel), change: peopleChange(add, take) },
+      after: { added: add.map((p) => p.userId), removed: take.map((p) => p.userId) },
+    };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const { added, removed } = obj(a.after) as { added?: string[]; removed?: string[] };
+    const [put, out] = direction === "undo" ? [removed ?? [], added ?? []] : [added ?? [], removed ?? []];
+    const seated = new Set(
+      (
+        await deps.db
+          .select({ userId: channelMembers.userId })
+          .from(channelMembers)
+          .where(and(eq(channelMembers.channelId, a.targetId), isNotNull(channelMembers.userId)))
+      ).map((r) => r.userId),
+    );
+    if (put.some((id) => seated.has(id)) || out.some((id) => !seated.has(id))) throw changedSince();
+    for (const userId of out) await removeChannelMember(deps.db, actorId, a.orgId, a.targetId, { userId }, deps);
+    for (const userId of put) await addChannelMember(deps.db, actorId, a.orgId, a.targetId, { userId }, deps);
+    return undefined;
+  },
+};
+
+/** "+ Nina, − Caio": the same in every language. */
+const peopleChange = (add: { name: string }[], take: { name: string }[]) =>
+  [...add.map((p) => `+ ${p.name}`), ...take.map((p) => `− ${p.name}`)].join(", ");
+
+const deleteChannelAction: WorkspaceAction = {
+  id: "delete_channel",
+  does: "Delete a channel for good, its messages and files with it (archive_channel keeps them).",
+  input: { type: "object", properties: { channel: CHANNEL_REF }, required: ["channel"], additionalProperties: false },
+  mode: "card",
+  needs: "manage_channels",
+  async resolve(ctx, person, input) {
+    const channel = await channelNamed(ctx, person, str(input.channel));
+    if (typeof channel === "string") return channel;
+    return { input: { channelId: channel.id }, words: { channel: channel.name } };
+  },
+  async run(deps, actorId, orgId, input) {
+    const row = await channelRow(deps.db, orgId, str(input.channelId));
+    if (!row) throw new NotFoundError("Channel not found");
+    if (!deps.pubsub) throw new Error("Deleting a channel needs the server's events");
+    // Its card is the confirmation the screen asks for by the typed name.
+    await deleteChannel({ db: deps.db, pubsub: deps.pubsub }, actorId, orgId, row.id, row.name);
+    return { target: channelTarget(row), words: { channel: row.name }, final: true };
+  },
+};
+
+// ── People ───────────────────────────────────────────────────────────────────
+
+/** A pending invitation to `email` (any case), or 404. */
+async function pendingInvitation(db: Database, orgId: string, email: string) {
+  const [row] = await db
+    .select({ id: organizationInvitations.id, email: organizationInvitations.email })
+    .from(organizationInvitations)
+    .where(
+      and(
+        eq(organizationInvitations.orgId, orgId),
+        sql`lower(${organizationInvitations.email}) = ${email.toLowerCase()}`,
+        isNull(organizationInvitations.acceptedAt),
+      ),
+    );
+  if (!row) throw new NotFoundError(`No pending invitation for ${email}`);
+  return row;
+}
+
+const revokeInvitationAction: WorkspaceAction = {
+  id: "revoke_invitation",
+  does: "Cancel a pending invitation to the workspace: its link stops working.",
+  input: {
+    type: "object",
+    properties: { email: { type: "string", minLength: 3, maxLength: 254 } },
+    required: ["email"],
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: "invite_people",
+  // Looked up when it runs, as whoever may invite: someone who can't learns nothing of who was invited.
+  async resolve(_ctx, _person, input) {
+    const email = str(input.email).toLowerCase();
+    return { input: { email }, words: { email } };
+  },
+  async run(deps, actorId, orgId, input) {
+    await requirePermission(deps.db, actorId, orgId, "invite_people");
+    const row = await pendingInvitation(deps.db, orgId, str(input.email));
+    await revokeInvitation(deps.db, actorId, orgId, row.id);
+    return { target: { type: "person", id: row.id, title: row.email }, words: { email: row.email }, final: true };
+  },
+};
+
+/** The roles a pending invitation gives (ids), as Undo compares and puts them back. */
+const invitationRoles = async (db: Database, id: string) =>
+  (
+    await db
+      .select({ roleIds: organizationInvitations.roleIds })
+      .from(organizationInvitations)
+      .where(eq(organizationInvitations.id, id))
+  )[0]?.roleIds ?? [];
+
+const invitationRolesAction: WorkspaceAction = {
+  id: "set_invitation_roles",
+  does: "Change the roles a pending invitation gives: the same link, nothing is sent.",
+  input: {
+    type: "object",
+    properties: {
+      email: { type: "string", minLength: 3, maxLength: 254 },
+      add_roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+      remove_roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+    },
+    required: ["email"],
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: "invite_people",
+  async resolve(ctx, _person, input) {
+    const roles = await givenRoles(ctx, input);
+    if (typeof roles === "string") return roles;
+    const email = str(input.email).toLowerCase();
+    return {
+      input: { email, add: roles.add.map((r) => r.id), remove: roles.take.map((r) => r.id) },
+      words: { email, change: roleChange(roles.add, roles.take) },
+    };
+  },
+  async run(deps, actorId, orgId, input) {
+    await requirePermission(deps.db, actorId, orgId, "invite_people");
+    const row = await pendingInvitation(deps.db, orgId, str(input.email));
+    const add = list(input.add);
+    const take = list(input.remove);
+    const before = await invitationRoles(deps.db, row.id);
+    const next = [...new Set([...before, ...add])].filter((id) => !take.includes(id));
+    if (sameSet(before, next)) throw new ValidationError(`The invitation of ${row.email} already gives those roles`);
+    await setInvitationRoles(deps.db, actorId, orgId, row.id, next);
+    const names = await roleNames(deps.db, orgId, [...add, ...take]);
+    const pick = (ids: string[]) => ids.map((id) => ({ name: names.get(id) ?? "" }));
+    return {
+      target: { type: "person", id: row.id, title: row.email },
+      words: { email: row.email, change: roleChange(pick(add), pick(take)) },
+      before: { roleIds: before },
+      after: { roleIds: next },
+    };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
+    if (!sameSet(await invitationRoles(deps.db, a.targetId), list(from.roleIds))) throw changedSince();
+    await setInvitationRoles(deps.db, actorId, a.orgId, a.targetId, list(to.roleIds));
+    return undefined;
+  },
+};
+
+const resendInvitationAction: WorkspaceAction = {
+  id: "resend_invitation",
+  does: "Send a pending invitation again, with 7 more days to accept it.",
+  input: revokeInvitationAction.input,
+  mode: "now",
+  needs: "invite_people",
+  resolve: revokeInvitationAction.resolve,
+  async run(deps, actorId, orgId, input) {
+    if (!deps.server) throw new Error("Sending an invitation needs the server's address");
+    await requirePermission(deps.db, actorId, orgId, "invite_people");
+    const row = await pendingInvitation(deps.db, orgId, str(input.email));
+    const { invitation, token } = await resendInvitation(
+      deps.db,
+      actorId,
+      orgId,
+      row.id,
+      new Date(),
+      deps.server.secret,
+    );
+    await queueInvitationEmail(deps.db, {
+      orgId,
+      invitationId: invitation.id,
+      email: invitation.email,
+      role: invitation.role,
+      url: `${deps.server.publicUrl.replace(/\/$/, "")}/invite/${token}`,
+      inviterId: actorId,
+      ...(deps.server.secret ? { secret: deps.server.secret } : {}),
+    });
+    return {
+      target: { type: "person", id: invitation.id, title: invitation.email },
+      words: { email: invitation.email },
+      final: true,
+    };
+  },
+};
+
+const joinRequestAction: WorkspaceAction = {
+  id: "decide_join_request",
+  does: "Let in someone who asked to join the workspace (with roles), or turn them down with a reason they read.",
+  input: {
+    type: "object",
+    properties: {
+      email: { type: "string", minLength: 3, maxLength: 254 },
+      approve: { type: "boolean" },
+      roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+      reason: { type: "string", maxLength: 500, description: "When turning down: what they read in the email." },
+    },
+    required: ["email", "approve"],
+    additionalProperties: false,
+  },
+  // Someone gets in, or is told no by email: a card the person confirms.
+  mode: "card",
+  needs: "invite_people",
+  async resolve(ctx, _person, input) {
+    const email = str(input.email).toLowerCase();
+    const roles: { id: string; name: string }[] = [];
+    for (const n of list(input.roles)) {
+      const role = await roleNamed(ctx, n);
+      if (typeof role === "string") return role;
+      roles.push(role);
+    }
+    const approve = input.approve === true;
+    return {
+      input: {
+        email,
+        approve,
+        roleIds: roles.map((r) => r.id),
+        roleNames: roles.map((r) => r.name),
+        reason: str(input.reason),
+      },
+      words: { email, variant: approve ? "approve" : "deny" },
+    };
+  },
+  async run(deps, actorId, orgId, input) {
+    // Looked up when it runs, as whoever may invite: someone who can't learns nothing of who asked.
+    await requirePermission(deps.db, actorId, orgId, "invite_people");
+    const [row] = await deps.db
+      .select({ id: organizationJoinRequests.id })
+      .from(organizationJoinRequests)
+      .where(
+        and(
+          eq(organizationJoinRequests.orgId, orgId),
+          sql`lower(${organizationJoinRequests.email}) = ${str(input.email)}`,
+          eq(organizationJoinRequests.status, "pending"),
+        ),
+      );
+    if (!row) throw new NotFoundError(`No request to join from ${str(input.email)}`);
+    const id = row.id;
+    if (input.approve === true) {
+      if (!deps.server) throw new Error("Letting someone in needs the server's address");
+      await approveJoinRequest(
+        { db: deps.db, pubsub: deps.pubsub, ...(deps.server.secret ? { secret: deps.server.secret } : {}) },
+        deps.server.publicUrl,
+        actorId,
+        orgId,
+        id,
+        list(input.roleIds),
+      );
+    } else await denyJoinRequest({ db: deps.db, pubsub: deps.pubsub }, actorId, orgId, id, str(input.reason) || null);
+    return {
+      target: { type: "person", id, title: str(input.email) },
+      words: { email: str(input.email), variant: input.approve === true ? "approve" : "deny" },
+      final: true,
+    };
+  },
+};
+
+// ── Work ─────────────────────────────────────────────────────────────────────
+
+const LIVE = ["queued", "running", "waiting_approval", "waiting_input"] as const;
+
+const agentRef = { type: "string", minLength: 1, maxLength: 64, description: "Its @handle." } as const;
+
+/** An agent by handle, never the right hand itself (stopping it would stop this very turn). */
+async function workerNamed(ctx: ToolContext, handle: string) {
+  const found = await agentsByHandle(ctx.db, ctx.orgId, [handle]);
+  const agent = found.rows[0];
+  if (!agent) return `No agent ${handle.startsWith("@") ? handle : `@${handle}`} here.`;
+  if (agent.id === ctx.agentId) return "That is you: say so, and stop nothing.";
+  return agent;
+}
+
+const stopWorkAction: WorkspaceAction = {
+  id: "stop_work",
+  does: "Stop what an agent is doing now (its runs going, waiting or queued), and say why so it learns.",
+  input: {
+    type: "object",
+    properties: { agent: agentRef, reason: { type: "string", maxLength: 500 } },
+    required: ["agent"],
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: null,
+  async resolve(ctx, _person, input) {
+    const agent = await workerNamed(ctx, str(input.agent));
+    if (typeof agent === "string") return agent;
+    return {
+      input: { agentId: agent.id, name: agent.name, reason: str(input.reason) },
+      words: { agent: agent.name },
+    };
+  },
+  async run(deps, actorId, orgId, input) {
+    const runs = await deps.db
+      .select({ id: agentRuns.id })
+      .from(agentRuns)
+      .where(
+        and(
+          eq(agentRuns.orgId, orgId),
+          eq(agentRuns.agentId, str(input.agentId)),
+          inArray(agentRuns.status, [...LIVE]),
+        ),
+      );
+    if (runs.length === 0) throw new ConflictError(`${str(input.name)} isn't doing anything now`);
+    let stopped = 0;
+    let refused: unknown = null;
+    for (const r of runs) {
+      try {
+        await cancelRun(deps, actorId, orgId, r.id, { ...(str(input.reason) ? { reason: str(input.reason) } : {}) });
+        stopped++;
+      } catch (error) {
+        if (!(error instanceof ForbiddenError)) throw error;
+        refused = error;
+      }
+    }
+    if (stopped === 0) throw refused;
+    return {
+      target: { type: "agent", id: str(input.agentId), title: str(input.name) },
+      words: { agent: str(input.name) },
+      final: true,
+    };
+  },
+};
+
+const continueWorkAction: WorkspaceAction = {
+  id: "continue_work",
+  does: "Let an agent go on with work it stopped: stopped by a person, at its step limit, or cut off by its AI.",
+  input: { type: "object", properties: { agent: agentRef }, required: ["agent"], additionalProperties: false },
+  mode: "now",
+  needs: null,
+  async resolve(ctx, _person, input) {
+    const agent = await workerNamed(ctx, str(input.agent));
+    if (typeof agent === "string") return agent;
+    return { input: { agentId: agent.id, name: agent.name }, words: { agent: agent.name } };
+  },
+  async run(deps, actorId, orgId, input) {
+    const [last] = await deps.db
+      .select({ id: agentRuns.id })
+      .from(agentRuns)
+      .where(
+        and(
+          eq(agentRuns.orgId, orgId),
+          eq(agentRuns.agentId, str(input.agentId)),
+          inArray(agentRuns.status, ["canceled", "done", "failed"]),
+        ),
+      )
+      .orderBy(desc(agentRuns.updatedAt))
+      .limit(1);
+    if (!last) throw new ConflictError(`${str(input.name)} has nothing stopped to go on with`);
+    await continueRun(deps, actorId, orgId, last.id);
+    return {
+      target: { type: "agent", id: str(input.agentId), title: str(input.name) },
+      words: { agent: str(input.name) },
+      final: true,
+    };
+  },
+};
+
+// ── The workspace ────────────────────────────────────────────────────────────
+
+const WORKSPACE_FIELDS = ["name", "timezone", "teamSize", "defaultAgentBudgetNanoUsd"] as const;
+const NANO_PER_USD = 1_000_000_000;
+
+const updateWorkspaceAction: WorkspaceAction = {
+  id: "update_workspace",
+  does: "Change the workspace's name, time zone, team size or the monthly budget of agents without their own.",
+  input: {
+    type: "object",
+    properties: {
+      name: { type: "string", minLength: 1, maxLength: 80 },
+      timezone: { type: "string", minLength: 1, maxLength: 64, description: "IANA, e.g. America/Sao_Paulo." },
+      team_size: { enum: [...TEAM_SIZES] },
+      default_budget_usd: { type: "number", minimum: 0.01, maximum: 100_000 },
+    },
+    additionalProperties: false,
+  },
+  mode: "now",
+  needs: "configure",
+  async resolve(ctx, _person, input) {
+    if (Object.keys(input).length === 0) return "Say what changes.";
+    const [org] = await ctx.db
+      .select({ name: schema.organizations.name })
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, ctx.orgId));
+    return { input, words: { name: org?.name ?? "" } };
+  },
+  async run(deps, actorId, orgId, input) {
+    const now = await getOrgSettings(deps.db, actorId, orgId);
+    const patch: Record<string, unknown> = {
+      ...(str(input.name) ? { name: str(input.name) } : {}),
+      ...(str(input.timezone) ? { timezone: str(input.timezone) } : {}),
+      ...(str(input.team_size) ? { teamSize: str(input.team_size) } : {}),
+      ...(typeof input.default_budget_usd === "number"
+        ? { defaultAgentBudgetNanoUsd: Math.round(input.default_budget_usd * NANO_PER_USD) }
+        : {}),
+    };
+    const fields = WORKSPACE_FIELDS.filter((f) => f in patch);
+    const updated = await updateOrgSettings(deps.db, actorId, orgId, patch);
+    const pick = (o: Record<string, unknown>) => Object.fromEntries(fields.map((f) => [f, o[f]]));
+    const before = pick(now as unknown as Record<string, unknown>);
+    const after = pick(updated as unknown as Record<string, unknown>);
+    if (same(before, after)) throw new ValidationError("The workspace already is like that");
+    return {
+      target: { type: "workspace", id: orgId, title: updated.name },
+      words: { name: updated.name },
+      before,
+      after,
+    };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
+    const now = (await getOrgSettings(deps.db, actorId, a.orgId)) as unknown as Record<string, unknown>;
+    if (!same(Object.fromEntries(Object.keys(from).map((f) => [f, now[f]])), from)) throw changedSince();
+    await updateOrgSettings(deps.db, actorId, a.orgId, to);
+    return undefined;
+  },
+};
+
+const actionCheckAction: WorkspaceAction = {
+  id: "set_action_check",
+  does: "Turn the action check on or off: agents look at what the team already did before an outside action.",
+  input: { type: "object", properties: { on: { type: "boolean" } }, required: ["on"], additionalProperties: false },
+  // A safety switch: always a card someone confirms.
+  mode: "card",
+  needs: "configure",
+  async resolve(_ctx, _person, input) {
+    return { input, words: { variant: input.on === true ? "on" : "off" } };
+  },
+  async run(deps, actorId, orgId, input) {
+    const now = await getOrgSettings(deps.db, actorId, orgId);
+    if (now.actionCheck === (input.on === true)) throw new ValidationError("It already is like that");
+    await updateOrgSettings(deps.db, actorId, orgId, { actionCheck: input.on === true });
+    return {
+      target: { type: "workspace", id: orgId, title: now.name },
+      words: { variant: input.on === true ? "on" : "off" },
+      before: { actionCheck: now.actionCheck },
+      after: { actionCheck: input.on === true },
+    };
+  },
+  async revert(deps, actorId, a, direction, changedSince) {
+    const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
+    if ((await getOrgSettings(deps.db, actorId, a.orgId)).actionCheck !== from.actionCheck) throw changedSince();
+    await updateOrgSettings(deps.db, actorId, a.orgId, { actionCheck: to.actionCheck === true });
+    return undefined;
+  },
+};
+
 // ── The catalog ──────────────────────────────────────────────────────────────
 
 export const WORKSPACE_ACTIONS: readonly WorkspaceAction[] = [
@@ -556,6 +1418,21 @@ export const WORKSPACE_ACTIONS: readonly WorkspaceAction[] = [
   moveRoleAction,
   setMemberRolesAction,
   channelPermissionsAction,
+  setStatusAction,
+  notificationsAction,
+  timezoneAction,
+  updateChannelAction,
+  archiveChannelAction,
+  channelPeopleAction,
+  deleteChannelAction,
+  revokeInvitationAction,
+  resendInvitationAction,
+  invitationRolesAction,
+  joinRequestAction,
+  stopWorkAction,
+  continueWorkAction,
+  updateWorkspaceAction,
+  actionCheckAction,
 ];
 
 export const workspaceAction = (id: unknown) => WORKSPACE_ACTIONS.find((a) => a.id === id) ?? null;
@@ -575,7 +1452,7 @@ export async function findWorkspaceActions(ctx: ToolContext, person: string | nu
     .slice(0, 5)
     .map((t) => workspaceAction(t.name) as WorkspaceAction);
   if (best.length === 0)
-    return `No action matches. The actions: ${WORKSPACE_ACTIONS.map((a) => a.id).join(", ")}. Billing, deleting the workspace or an account, passwords and keys: offer_open_page.`;
+    return `No action matches. The actions: ${WORKSPACE_ACTIONS.map((a) => a.id).join(", ")}. Tasks: update_issue. Routines: update_routine, delete_routine, run_routine_now. Billing, deleting the workspace or an account, passwords and keys: offer_open_page.`;
   return best
     .map(
       (a) =>
@@ -584,8 +1461,8 @@ export async function findWorkspaceActions(ctx: ToolContext, person: string | nu
             ? a.mode === "now"
               ? "They may: it applies at once with Undo."
               : "They may: a card they confirm."
-            : "They can't: a card for someone who may."
-        } Input: ${compactSchema(a.input)}`,
+            : "Their roles don't give it: unless its screen lets them anyway (their own channel or agent), a card for someone who may."
+        } Input: ${JSON.stringify(a.input)}`,
     )
     .join("\n");
 }
@@ -612,6 +1489,8 @@ export interface WorkspaceActionCard {
     words: Record<string, string>;
     needs: Permission | null;
     why: string;
+    /** The person it was for tried and the screen's own rule refused them (a role above theirs): they send it on. */
+    refused?: boolean;
   };
   state: "pending" | "applied" | "dismissed";
   decidedByUserId: string | null;
@@ -634,25 +1513,28 @@ const changesThisRun = async (ctx: ToolContext) =>
       )
   )[0]?.n ?? 0;
 
-/** Runs `a` now for the person behind the call, its receipt in the same transaction (null: they may not). */
+/**
+ * Runs `a` now for the person behind the call, its receipt in the same transaction. `refused`: the screen's own rule
+ * turned them down, in its words (nothing changed).
+ */
 export async function actNow(
-  deps: { pubsub?: PubSub },
+  deps: { pubsub?: PubSub; server?: ServerLinks },
   ctx: ToolContext,
   person: string,
   a: WorkspaceAction,
   input: Input,
-): Promise<ActionDone | null> {
+): Promise<ActionDone | { refused: string }> {
   const events = holdEvents(deps.pubsub);
   try {
     const done = await actWithUndo(
       ctx,
-      (db) => a.run({ db, pubsub: events.pubsub }, person, ctx.orgId, input),
+      (db) => a.run({ db, pubsub: events.pubsub, server: deps.server }, person, ctx.orgId, input),
       (d) => recordOf(a, d),
     );
     await events.flush();
     return done;
   } catch (error) {
-    if (error instanceof ForbiddenError) return null;
+    if (error instanceof ForbiddenError) return { refused: error.message };
     throw error;
   }
 }
@@ -667,16 +1549,21 @@ export interface CardTools {
  * `workspace_action` (the right hand only): finds an action of the catalog and does it as the person behind the run,
  * with their permissions. One tool for all of them, so its prompt stays the size of one.
  */
-export function workspaceActionTool(deps: { pubsub?: PubSub } & CardTools): ToolDefinition {
+export function workspaceActionTool(deps: { pubsub?: PubSub; server?: ServerLinks } & CardTools): ToolDefinition {
   return {
     name: WORKSPACE_ACTION_TOOL,
     description:
-      "Do anything else the app lets this person do, as them and never more: roles and what each may do, people's roles, a channel's permissions and settings. First call it with `find` (what they want, in a few words), then with `action`, its `input` and `why`. A change they may make, asked in their own words, applies at once with Undo; anything else becomes a card for whoever may. The result says which: never say it is done before it does.",
+      "Do anything else the app lets this person do, as them and never more: roles and what each may do, people's roles, a channel's settings, people and permissions, their own status, notifications and time zone, invitations and requests to join, the workspace's settings, stopping or continuing an agent's work. First call it with `find` (what they want, in a few words), then with `action`, its `input` and `why`. A change they may make, asked in their own words, applies at once with Undo; anything else becomes a card for whoever may. The result says which: never say it is done before it does.",
     scope: "setup:write",
     inputSchema: {
       type: "object",
       properties: {
-        find: { type: "string", minLength: 1, maxLength: 200, description: "What they want done, in a few words." },
+        find: {
+          type: "string",
+          minLength: 1,
+          maxLength: 200,
+          description: "What they want done, in a few English words.",
+        },
         action: { type: "string", minLength: 1, maxLength: 64, description: "An action from find." },
         input: { type: "object", description: "The action's input, as find showed it." },
         why: { type: "string", maxLength: 300, description: "One short line for its card, in their language." },
@@ -698,28 +1585,38 @@ export function workspaceActionTool(deps: { pubsub?: PubSub } & CardTools): Tool
         const given = obj(raw.input);
         const errors = validateJson(a.input, given);
         if (errors.length > 0)
-          return { content: `Wrong input: ${errors.join("; ")}. Input: ${compactSchema(a.input)}`, isError: true };
+          return { content: `Wrong input: ${errors.join("; ")}. Input: ${JSON.stringify(a.input)}`, isError: true };
         const resolved = await a.resolve(ctx, person, given);
         if (typeof resolved === "string") return { content: resolved, isError: true };
         const membership = await getMembership(ctx.db, person, ctx.orgId);
         let may = mayDo(membership, a);
-        if (a.mode === "now" && may && (await ownWords(ctx)) === person) {
+        let refused = "";
+        // Tried even without the key: the screen's own rules decide (a channel's creator manages it too).
+        if (a.mode === "now" && (await ownWords(ctx)) === person) {
           if ((await changesThisRun(ctx)) >= MAX_ACTIONS_PER_RUN)
             return { content: `You already made ${MAX_ACTIONS_PER_RUN} changes in this turn.`, isError: true };
           const done = await actNow(deps, ctx, person, a, resolved.input);
-          if (done)
+          if (!("refused" in done))
             return {
               content: `Done at once, with Undo under your reply: ${a.id} (${describe(done.words)}). Say it is done.`,
             };
           // Refused by the engine's own rules (a role above theirs, a key they don't hold): someone who may decides.
           may = false;
+          refused = done.refused;
         }
         const full = await deps.cardsLeft(ctx);
         if (full) return full;
         const card: WorkspaceActionCard = {
           kind: "workspace_action",
           forUserId: person,
-          params: { action: a.id, input: resolved.input, words: resolved.words, needs: a.needs, why: str(raw.why) },
+          params: {
+            action: a.id,
+            input: resolved.input,
+            words: resolved.words,
+            needs: a.needs,
+            why: str(raw.why),
+            ...(refused ? { refused: true } : {}),
+          },
           state: "pending",
           decidedByUserId: null,
           decidedAt: null,
@@ -729,7 +1626,7 @@ export function workspaceActionTool(deps: { pubsub?: PubSub } & CardTools): Tool
           content: `Posted a card to ${a.id} (${describe(resolved.words)}). ${
             may
               ? "They apply it there."
-              : "They can't make this change: the card lets them send it to whoever may. Say so."
+              : `They can't make this change${refused ? ` (the app says: ${refused})` : ""}: the card lets them send it to whoever may. Say so.`
           } Nothing has changed yet.`,
           data: { actionCard: { messageId: message } },
         };
@@ -836,7 +1733,12 @@ export async function decideWorkspaceAction(
       decidedAt: new Date().toISOString(),
     };
     if (decision === "apply") {
-      const done = await a.run({ db, pubsub: events.pubsub }, userId, orgId, found.card.params.input);
+      const done = await a.run(
+        { db, pubsub: events.pubsub, server: deps.server },
+        userId,
+        orgId,
+        found.card.params.input,
+      );
       const record = recordOf(a, done);
       const now = new Date();
       await db.insert(agentActions).values({
@@ -892,7 +1794,8 @@ export async function askWorkspaceAction(deps: ActionDeps, userId: string, orgId
     throw new ForbiddenError("Only the person it was for can send it", "action_card.not_requester");
   if (card.state !== "pending") throw new ConflictError("This card was already decided", "action_card.decided");
   if (card.askedAt) throw new ConflictError("It was already sent", "action_card.asked");
-  if (mayDo(found.membership, a)) throw new ConflictError("You can apply it yourself", "action_card.yours");
+  if (mayDo(found.membership, a) && !card.params.refused)
+    throw new ConflictError("You can apply it yourself", "action_card.yours");
   const next: WorkspaceActionCard = { ...card, askedAt: new Date().toISOString() };
   const [row] = await deps.db
     .update(messages)

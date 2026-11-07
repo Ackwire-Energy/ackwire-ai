@@ -18,11 +18,13 @@ import {
   type WorkspaceActionCard,
 } from "../api/types";
 import type { Level } from "./access-levels";
+import { workspaceActionContext, workspaceActionWords } from "./actions";
 import { type AppPage, isAppPage } from "./app-pages";
 import type { ConnectedItem } from "./connected";
 import { isHttpsUrl, sameServer } from "./custom-tools";
 import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
+import type { Permission } from "./permissions";
 import { type TeamWeekCard, teamWeekCardOf } from "./team-week";
 import { type UsagePauseCard, usagePauseCardOf } from "./usage-pause";
 
@@ -569,6 +571,7 @@ export function workspaceActionCardOf(raw: unknown): WorkspaceActionCard | null 
       words,
       needs: typeof c.params.needs === "string" ? c.params.needs : null,
       why: typeof c.params.why === "string" ? c.params.why : "",
+      ...(c.params.refused === true ? { refused: true } : {}),
     },
     state: c.state === "applied" || c.state === "dismissed" ? c.state : "pending",
     decidedByUserId: typeof c.decidedByUserId === "string" ? c.decidedByUserId : null,
@@ -580,8 +583,12 @@ export function workspaceActionCardOf(raw: unknown): WorkspaceActionCard | null 
 /** The card's sentence: `rightHand.action.{action}`, or the plain one for an action this build doesn't know. */
 export const actionCardKey = (card: WorkspaceActionCard) =>
   (WORKSPACE_ACTION_IDS as readonly string[]).includes(card.params.action)
-    ? `rightHand.action.${card.params.action}`
+    ? `rightHand.action.${workspaceActionContext(card.params.action, card.params.words)}`
     : "rightHand.action.other";
+
+/** The values of the card's sentence, in the reader's language (`workspaceActionWords`). */
+export const actionCardWords = (card: WorkspaceActionCard, t: TFunction) =>
+  workspaceActionWords(card.params.action, card.params.words, t);
 
 /**
  * What a role or a channel's exception gives or takes, in the permissions' own words under the card's sentence
@@ -596,5 +603,29 @@ export function actionCardDetail(card: WorkspaceActionCard, t: TFunction): strin
   if (card.params.action === "create_role") return joinNames(keys(input.permissions).map(short), t);
   if (card.params.action === "update_role") return change(input.add_permissions, input.remove_permissions);
   if (card.params.action === "set_channel_permissions") return change(input.allow, input.deny);
+  const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  if (card.params.action === "update_channel")
+    return [text(input.name) && `#${text(input.name).replace(/^#/, "")}`, text(input.topic)]
+      .filter(Boolean)
+      .join(" · ");
+  if (card.params.action === "update_workspace")
+    return [text(input.name), text(input.timezone)].filter(Boolean).join(" · ");
+  if (card.params.action === "decide_join_request")
+    return input.approve === true
+      ? keys(input.roleNames)
+          .map((n) => `+ ${n}`)
+          .join(", ")
+      : text(input.reason);
   return "";
 }
+
+/**
+ * Whether this viewer gets Aplicar on the card: the key its screen asks for, unless they are the person it was for and
+ * the screen already refused them (a role above theirs), who sends it on instead. The server checks again either way.
+ */
+export const mayApplyCard = (
+  card: WorkspaceActionCard,
+  viewer: { userId: string; may: (key: Permission) => boolean },
+) =>
+  !(card.forUserId === viewer.userId && card.params.refused) &&
+  (card.params.needs === null || viewer.may(card.params.needs));
