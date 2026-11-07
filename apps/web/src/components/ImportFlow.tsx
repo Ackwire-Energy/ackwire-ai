@@ -794,9 +794,9 @@ function Preview({
 
   return (
     <section className="imp-preview" aria-labelledby="imp-preview-title">
-      <header className="imp-head">
+      <header className="imp-head ac-actrow">
         <SourceMark card={origin.card} />
-        <div className="imp-head__text">
+        <div className="imp-head__text ac-actrow__text">
           <Heading level={level} id="imp-preview-title" ref={heading} tabIndex={-1} className="imp-head__title">
             {bundle.source.name}
           </Heading>
@@ -987,14 +987,14 @@ function FilesGroup({ flow, index, level }: { flow: ImportFlowState; index: Inde
             theirs.reduce((n, f) => n + f.size, 0),
           );
           return (
-            <li key={key} className="imp-row" data-off={!flow.copyFiles || undefined}>
+            <li key={key} className="imp-row ac-actrow" data-off={!flow.copyFiles || undefined}>
               <span className="imp-row__mark" aria-hidden="true">
                 <Icon name="drive" size={14} />
               </span>
               <span className="imp-row__lead" aria-hidden="true">
                 {a && <AgentAvatar name={a.name} appearance={normalizeAppearance(a.appearance)} size="sm" />}
               </span>
-              <span className="imp-row__text">
+              <span className="imp-row__text ac-actrow__text">
                 <span className="imp-row__title">
                   {t("onboarding.import.files.folder", { folder: driveFolder(a?.name ?? key) })}
                 </span>
@@ -1155,7 +1155,7 @@ function Row({
     </>
   );
   return (
-    <li className="imp-row" data-off={(!checked && item.action !== "unchanged") || undefined}>
+    <li className="imp-row ac-actrow" data-off={(!checked && item.action !== "unchanged") || undefined}>
       {pickable ? (
         <Checkbox
           id={rowId}
@@ -1173,11 +1173,11 @@ function Row({
         {lead}
       </span>
       {pickable ? (
-        <label htmlFor={rowId} id={`${rowId}-about`} className="imp-row__text">
+        <label htmlFor={rowId} id={`${rowId}-about`} className="imp-row__text ac-actrow__text">
           {text}
         </label>
       ) : (
-        <span className="imp-row__text">{text}</span>
+        <span className="imp-row__text ac-actrow__text">{text}</span>
       )}
       {status && (
         <Chip id={`${rowId}-status`} icon={status.icon} tone={status.tone} className="imp-row__chip">
@@ -1351,11 +1351,11 @@ export function ImportReport({
 
   return (
     <section className="imp-report" aria-labelledby="imp-report-title">
-      <header className="imp-head">
+      <header className="imp-head ac-actrow">
         <span className="imp-mark imp-mark--done" aria-hidden="true">
           <Icon name={missed.length ? "alert" : "check"} />
         </span>
-        <div className="imp-head__text">
+        <div className="imp-head__text ac-actrow__text">
           <Heading level={level} id="imp-report-title" ref={heading} tabIndex={-1} className="imp-head__title">
             {missed.length
               ? t("onboarding.import.report.partial", { done: report.length - missed.length, total: report.length })

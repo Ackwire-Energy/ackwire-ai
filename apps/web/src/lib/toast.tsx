@@ -124,11 +124,11 @@ export function ToastProvider({
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`ac-toast ac-toast--${toast.tone}`}
+            className={`ac-toast ac-actrow ac-toast--${toast.tone}`}
             role={toast.tone === "error" ? "alert" : "status"}
           >
             <Icon name={toast.tone === "error" || toast.tone === "warning" ? "alert" : "check"} />
-            <span className="ac-toast__text">
+            <span className="ac-toast__text ac-actrow__text">
               {toast.detail ? (
                 <>
                   <b className="ac-toast__title">

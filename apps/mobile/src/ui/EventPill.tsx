@@ -8,6 +8,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import { ACT_TEXT_MIN } from "./ActRow";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { LineIcon } from "./LineIcon";
@@ -22,8 +23,6 @@ const MARK = 14;
 /** The small controls' corner, cut at the bottom left (the app's "cut corner"). */
 const RADIUS = 10;
 const CUT = 3;
-/** Narrower than this beside its actions, the sentence would be a sliver: the actions go under it, in the frame. */
-const MIN_WORDS = 170;
 
 export interface EventPillProps {
   /** The event's mark, quiet: an icon's name (drawn faint), or a node of its own (a pixel mark). */
@@ -58,7 +57,7 @@ export function EventPill({ mark, markColor, children, time, actions, below, wai
   const [room, setRoom] = useState(0);
   const [actionsWidth, setActionsWidth] = useState(0);
   const list = actionsOf(actions);
-  const stacked = list.length > 0 && room > 0 && actionsWidth > 0 && room - actionsWidth < MIN_WORDS;
+  const stacked = list.length > 0 && room > 0 && actionsWidth > 0 && room - actionsWidth < ACT_TEXT_MIN;
   const markNode =
     typeof mark === "string" ? (
       <LineIcon name={mark as IconName} size={MARK} color={markColor ?? c.faint} variant="small" text={WORDS} />

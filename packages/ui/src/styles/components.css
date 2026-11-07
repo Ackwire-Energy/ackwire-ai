@@ -3317,6 +3317,9 @@ html:not([data-pointer]) .ac-back:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  /* The title's size (its lines set their own): the 24 characters it keeps beside the buttons (`.ac-actrow`) are the
+     title's. */
+  font-size: 20px;
 }
 .ac-details__icon {
   flex: none;
@@ -10637,4 +10640,29 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 .ac-track__step.is-more .ac-track__node {
   color: var(--muted);
+}
+
+/*
+ * A row of words and the action that ends it (a notice and "Deixar Ana falar com ela", a toast and "Desfazer", a banner
+ * and "Ver em português"): side by side while the words keep a line of 24 characters (or all of them, when shorter),
+ * else the action goes under them, at the row's end. The words never wrap a word a line. The row is `.ac-actrow`, its
+ * words `.ac-actrow__text`, what follows them its action; a lead icon before them stays on their first line. Mirrored
+ * by the phone app's `ACT_ROW` and the landing's copy of this file. Last in the file, so it wins over a component's
+ * own rules for the same boxes.
+ */
+.ac-actrow {
+  display: flex;
+  flex-wrap: wrap;
+}
+/* Through the row, so a component's own `flex: 1` on its words doesn't win. A line breaks on the words' 24 characters,
+   capped at their own length so a short title never sends its action down; then they grow, never wider than all of
+   them on one line. */
+.ac-actrow > .ac-actrow__text {
+  flex: 1 1 auto;
+  width: 24ch;
+  max-width: max-content;
+  min-width: 0;
+}
+.ac-actrow > .ac-actrow__text + * {
+  margin-inline-start: auto;
 }

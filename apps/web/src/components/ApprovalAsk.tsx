@@ -290,11 +290,11 @@ function RunItem({
   if (!first) return null;
   return (
     <li className="rq__item rq__run" data-status="pending">
-      <div className="rq__well">
+      <div className="rq__well ac-actrow">
         <span className="rq__logo">
           <ConnectorMark approval={first} />
         </span>
-        <span className="rq__wt">
+        <span className="rq__wt ac-actrow__text">
           <b>{runHead(t, run, agent)}</b>
         </span>
         <button type="button" className="rq__more" aria-expanded={open} onClick={() => onOpenChange(!open)}>
@@ -344,11 +344,11 @@ function GroupItem({
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <li className={pending ? "rq__item" : "rq__item rq__item--done"} data-status={approval.status}>
-      <div className="rq__well">
+      <div className="rq__well ac-actrow">
         <span className="rq__logo">
           <ConnectorMark approval={approval} />
         </span>
-        <span className="rq__wt">
+        <span className="rq__wt ac-actrow__text">
           <b>{approvalTitle(t, approval)}</b>
           {detail && <small>{detail}</small>}
           {own.why && <small className="rq__item-why">{own.why}</small>}

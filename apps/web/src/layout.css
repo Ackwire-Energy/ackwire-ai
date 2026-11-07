@@ -903,6 +903,12 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   font-weight: 500;
   color: var(--faint);
 }
+/* A title and its count kept together, the words of a head whose actions wrap under them (`.ac-actrow`). */
+.list-group-head__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .list-card {
   border-radius: var(--radius-section);
   background: var(--raised);

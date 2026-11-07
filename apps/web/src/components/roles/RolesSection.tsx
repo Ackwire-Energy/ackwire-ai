@@ -507,8 +507,8 @@ function KeyRow({
   const viaAll = from === "everyone";
   const id = `role-key-${k}`;
   return (
-    <div className="roles-key">
-      <label className="roles-key__text" htmlFor={id}>
+    <div className="roles-key ac-actrow">
+      <label className="roles-key__text ac-actrow__text" htmlFor={id}>
         <b>{t(`permissions.${k}.title`)}</b>
         <span>{t(`permissions.${k}.desc`)}</span>
       </label>

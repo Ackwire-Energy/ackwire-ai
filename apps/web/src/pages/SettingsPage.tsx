@@ -374,8 +374,8 @@ function GeneralSection() {
 
       <Card aria-label={t("settings.orgTitle")}>
         <div className="settings-rows">
-          <div className="settings-row">
-            <div className="settings-row__text">
+          <div className="settings-row ac-actrow">
+            <div className="settings-row__text ac-actrow__text">
               <span className="settings-row__label">{t("orgLogo.label")}</span>
             </div>
             <div className="settings-row__control">
@@ -387,8 +387,8 @@ function GeneralSection() {
               )}
             </div>
           </div>
-          <div className="settings-row">
-            <div className="settings-row__text">
+          <div className="settings-row ac-actrow">
+            <div className="settings-row__text ac-actrow__text">
               <label className="settings-row__label" htmlFor="set-name">
                 {t("settings.name")}
               </label>
@@ -407,8 +407,8 @@ function GeneralSection() {
               />
             </div>
           </div>
-          <div className="settings-row">
-            <div className="settings-row__text">
+          <div className="settings-row ac-actrow">
+            <div className="settings-row__text ac-actrow__text">
               <span className="ac-hintline">
                 <span className="settings-row__label">{t("settings.timezone")}</span>
                 <InfoHint name={t("common.about", { label: t("settings.timezone") })}>
@@ -428,8 +428,8 @@ function GeneralSection() {
               />
             </div>
           </div>
-          <div className="settings-row">
-            <div className="settings-row__text">
+          <div className="settings-row ac-actrow">
+            <div className="settings-row__text ac-actrow__text">
               <span className="ac-hintline">
                 <label className="settings-row__label" htmlFor="set-action-check">
                   {t("settings.actionCheck")}
@@ -552,8 +552,8 @@ function UsageStatisticsCard() {
         }
       />
       <div className="settings-rows">
-        <div className="settings-row">
-          <div className="settings-row__text">
+        <div className="settings-row ac-actrow">
+          <div className="settings-row__text ac-actrow__text">
             <span className="ac-hintline">
               <label className="settings-row__label" htmlFor="set-telemetry">
                 {t("settings.telemetry.label")}

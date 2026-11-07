@@ -557,9 +557,12 @@ function RecentList({ data }: { data: PersonUsage }) {
                 t("peopleUsage.drawer.runs", { count: r.runs }),
               ];
         return (
-          <li key={`${r.kind}-${r.agentId}-${"startedAt" in r ? r.startedAt : r.lastAt}`} className="pu-recent__row">
+          <li
+            key={`${r.kind}-${r.agentId}-${"startedAt" in r ? r.startedAt : r.lastAt}`}
+            className="pu-recent__row ac-actrow"
+          >
             <AgentAvatar agentId={r.agentId} name={agent} size="sm" />
-            <span className="pu-recent__text">
+            <span className="pu-recent__text ac-actrow__text">
               <span className="pu-recent__title">
                 {r.kind !== "work" && <Icon name="lock" size={14} />}
                 {title}

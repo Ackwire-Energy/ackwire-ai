@@ -745,9 +745,9 @@ function NewWidgetBody({
         {mode === "ask" && bell}
       </div>
       {stale && !editing && (
-        <div className="nwc__stale" role="status">
+        <div className="nwc__stale ac-actrow" role="status">
           <Icon name="info" size={16} />
-          <span>
+          <span className="ac-actrow__text">
             <b>{t("dashboards.newWidget.stale")}.</b> {t("dashboards.newWidget.staleHint")}
           </span>
           <Button size="sm" icon="refresh" disabled={!canTest} onClick={runTest}>

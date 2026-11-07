@@ -127,12 +127,12 @@ export function Dialog({
           {bare ? (
             <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
           ) : (
-            <div className="ac-dialog__head">
+            <div className="ac-dialog__head ac-actrow">
               {leading && <span className="ac-dialog__lead">{leading}</span>}
               {subtitle === undefined ? (
-                <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
+                <RDialog.Title className="ac-dialog__title ac-actrow__text">{title}</RDialog.Title>
               ) : (
-                <span className="ac-dialog__titles">
+                <span className="ac-dialog__titles ac-actrow__text">
                   <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
                   <span className="ac-dialog__sub" aria-live="polite">
                     {subtitle}

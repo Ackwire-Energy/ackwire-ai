@@ -436,13 +436,13 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
         const name = p.target.type === "org_context" ? org.name : agentName(p.agentId);
         const status = rowStatus(t, p);
         return (
-          <li key={p.id} className="proposal-row">
+          <li key={p.id} className="proposal-row ac-actrow">
             {p.target.type === "org_context" ? (
               <Icon name="layers" size={20} />
             ) : (
               <AgentAvatar agentId={p.agentId} size="sm" name={name} />
             )}
-            <span className="proposal-row__what">
+            <span className="proposal-row__what ac-actrow__text">
               <span className="proposal-row__name">{name}</span>
               {!isText(p) && <SettingChange p={p} />}
             </span>

@@ -1283,8 +1283,8 @@ function WaitRow({
       onKeyDown={() => {}}
     >
       <span className="nt-face">{face}</span>
-      <div className="nt-wr__main">
-        <div className="nt-wr__text">
+      <div className="nt-wr__main ac-actrow">
+        <div className="nt-wr__text ac-actrow__text">
           <div ref={l1} className={cx("nt-wr__l1", (sub || wraps) && "ac-captop")}>
             <span className="nt-what">
               <Headline n={n} dir={dir} channelName={channelName} />

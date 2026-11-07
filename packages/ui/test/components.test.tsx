@@ -244,10 +244,10 @@ describe("Card", () => {
     // The key leads the title's own row (the action stays out of it), so it keeps the title's first line however the
     // title wraps beside a taller action.
     const [withKey, plain] = [...container.querySelectorAll(".ac-card__lead")];
-    expect(withKey?.className).toBe("ac-card__lead ac-iconline");
+    expect(withKey?.className).toBe("ac-card__lead ac-actrow__text ac-iconline");
     expect(withKey?.firstElementChild?.className).toBe("ac-card__key");
     expect(withKey?.parentElement?.lastElementChild?.className).toBe("ac-card__action");
-    expect(plain?.className).toBe("ac-card__lead");
+    expect(plain?.className).toBe("ac-card__lead ac-actrow__text");
     const [foot, bare] = [...container.querySelectorAll(".ac-card__foot")];
     expect(foot?.className).toBe("ac-card__foot ac-iconline");
     expect(foot?.firstElementChild?.tagName.toLowerCase()).toBe("svg");

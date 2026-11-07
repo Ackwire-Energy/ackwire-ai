@@ -226,9 +226,9 @@ function TaskCard({
   const hasSteps = steps.data?.steps.some((s) => s.kind === "tool_call") ?? false;
   return (
     <li className="tm-taskcard ac-card" data-open={open || undefined}>
-      <div className="tm-taskcard__row">
+      <div className="tm-taskcard__row ac-actrow">
         <TaskMark task={task} />
-        <span className="tm-taskcard__label">
+        <span className="tm-taskcard__label ac-actrow__text">
           <span className="tm-taskcard__title">
             <b>{title}</b>
             {here && <Chip className="tm-here">{t("taskManager.strip.here")}</Chip>}
