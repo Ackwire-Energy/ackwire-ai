@@ -427,11 +427,6 @@
   max-width: min(100%, var(--msg-card-w));
   margin-block: 4px;
 }
-/* On the name's line, as the words are. */
-.ac-msg[data-look="compact"] .choice-reply {
-  display: inline-flex;
-  vertical-align: top;
-}
 .ac-msg[data-look="compact"] .ac-msg__body > .ac-tools .ac-tools__head {
   min-height: 28px;
   padding-block: 1px;

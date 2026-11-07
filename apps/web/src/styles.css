@@ -15,8 +15,9 @@
 @import "./layout.css" layer(base);
 @import "./responsive.css" layer(base);
 @import "./chat/looks.css" layer(base);
-@import "./desktop.css" layer(base);
-/* App rules that must win over a page's own sheet, by specificity: unlayered, as the page sheets are. */
+/* Unlayered, as the page sheets are: app rules that must win over a page's own, by specificity (the desktop app's
+   `html[data-desktop]` ones too). */
+@import "./desktop.css";
 @import "./over-pages.css";
 
 :root {

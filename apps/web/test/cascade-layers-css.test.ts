@@ -38,12 +38,11 @@ test("the kit and the app's base sheets share one cascade layer, so a page sheet
     "./layout.css base",
     "./responsive.css base",
     "./chat/looks.css base",
-    "./desktop.css base",
   ]);
-  // Fonts stay unlayered (they hold only @font-face), and the app rules that must outrank a page sheet's own; nothing
-  // else comes in without a layer.
+  // Fonts stay unlayered (they hold only @font-face), and the app rules that must outrank a page sheet's own (the
+  // desktop app's, written as `html[data-desktop] …` over the pages'); nothing else comes in without a layer.
   for (const i of imports.filter((i) => !i.layer))
-    expect(i.file).toMatch(/^@fontsource-variable\/|^\.\/fonts\.css$|^\.\/over-pages\.css$/);
+    expect(i.file).toMatch(/^@fontsource-variable\/|^\.\/fonts\.css$|^\.\/desktop\.css$|^\.\/over-pages\.css$/);
 });
 
 test("the build keeps the layer: the kit's card and the base sheets inside it, a page sheet's rule outside", async () => {

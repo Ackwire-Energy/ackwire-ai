@@ -98,3 +98,30 @@
 .channel__messages > :is(.ac-divider, .channel__notice) {
   padding-block: 0;
 }
+
+/* Compacta: a choice's reply on the name's line, as the words are (over blocks.css's `.choice-reply`). */
+.ac-msg[data-look="compact"] .choice-reply {
+  display: inline-flex;
+  vertical-align: top;
+}
+
+/* A thread's line under my own message (over threads.css's `.thread-line`): never capped by a short bubble's width (a
+   narrow panel), it grows to the left, into the row's room, instead of its words running out of its plate. */
+.ac-msg--own .thread-line {
+  align-self: flex-end;
+  max-width: none;
+  margin-right: -6px;
+  border-radius: 10px 10px 3px 10px;
+}
+
+/* A wiki link's focus ring, over its chip in the prose (wiki.css's `.wiki-prose .wiki-link`). */
+html:not([data-pointer]) .wiki-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* The first settings row under a card's head starts on a hairline, a DM side panel's too (its `.dm-side__sec
+   .settings-row` drops the rows' own). */
+.ac-card__head + .settings-rows > .settings-row:first-child {
+  border-top: 1px solid var(--line);
+}
