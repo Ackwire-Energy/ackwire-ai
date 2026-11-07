@@ -1934,8 +1934,9 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
  * A task's conversation (ADR 0145). The card's last line is the chat's thread line, quiet inside the card (the card
  * opens; the line isn't a button of its own).
  */
-/* A narrow card wraps the line between its parts (faces, count, state, time), never inside one. */
-.issue-card__talk {
+/* A narrow card wraps the line between its parts (faces, count, state, time), never inside one. Doubled: over the
+   thread line's own gap (threads.css), a sheet in another chunk. */
+.issue-card__talk.issue-card__talk {
   flex-wrap: wrap;
   row-gap: 2px;
   margin: 2px 0 0 -6px;

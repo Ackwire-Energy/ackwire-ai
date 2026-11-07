@@ -84,8 +84,9 @@
   background: var(--ok);
 }
 
-/* Lista: the shared table, with a section row per setor or owner. */
-.team-table__section th {
+/* Lista: the shared table, with a section row per setor or owner. Above the shared table's own `.pu-table th`, which
+   sits in another chunk: a tie would go to whichever sheet the build links last. */
+.team-table .team-table__section th {
   padding-top: 16px;
   font-size: 13px;
   color: var(--ink);

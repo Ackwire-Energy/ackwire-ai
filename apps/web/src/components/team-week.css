@@ -144,7 +144,8 @@
   color: var(--muted);
   font-size: 13px;
 }
-.tw__when {
+/* Doubled: over a request card's end (`.rq__end`, request-card.css), a sheet in another chunk. */
+.tw__when.tw__when {
   margin-left: auto;
   color: var(--muted);
   font-size: 13px;
@@ -174,7 +175,7 @@
     width: 100%;
     justify-content: flex-end;
   }
-  .tw__when {
+  .tw__when.tw__when {
     margin-left: 0;
     white-space: normal;
   }
