@@ -171,6 +171,11 @@ export interface StreamOptions {
   project?: string;
   /** A workspace's own endpoint the call goes to (`custom` provider, ADR 0146). */
   endpoint?: Endpoint;
+  /**
+   * The conversation the call belongs to, the same on each of its calls and never a secret: an endpoint that routes
+   * and caches by it gets it (OpenCode's `x-opencode-session`). Absent: each call is its own.
+   */
+  session?: string;
   /** Called with each text fragment as it is generated. */
   onDelta(text: string): void;
 }

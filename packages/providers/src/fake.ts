@@ -46,6 +46,7 @@ export interface FakeCall {
   apiKey: string;
   workspaceId?: string;
   endpoint?: Endpoint;
+  session?: string;
 }
 
 /**
@@ -62,12 +63,13 @@ export function createFakeProvider(reply?: (request: ModelRequest, call: number)
     id: "anthropic",
     calls,
     countCalls,
-    async stream(request, { apiKey, workspaceId, endpoint, onDelta }): Promise<ModelResult> {
+    async stream(request, { apiKey, workspaceId, endpoint, session, onDelta }): Promise<ModelResult> {
       calls.push({
         request: structuredClone({ ...request, signal: undefined }),
         apiKey,
         workspaceId,
         ...(endpoint ? { endpoint } : {}),
+        ...(session ? { session } : {}),
       });
       const scripted = reply?.(request, calls.length);
       if (scripted instanceof Error) throw scripted;

@@ -61,7 +61,7 @@ import {
 import type { BlockSpecReader } from "./block-state";
 import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, someoneAnswers } from "./blocks";
 import { brainOf } from "./brain-settings";
-import { missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
+import { brainSessionId, missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
 import type { ComputerTurn } from "./brains/prompt";
 import {
@@ -4979,6 +4979,8 @@ function createBrain(
       const t = transcript();
       return { system: t.system, messages: t.messages, notesAt: t.notesAt };
     },
+    // Where it answers, as a computer brain's session counts it: its thread, or the channel it answers in.
+    session: brainSessionId(agent.id, replyThreadOf(run) ?? run.channelId, "model"),
   });
 }
 

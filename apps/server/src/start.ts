@@ -286,7 +286,10 @@ async function boot(
     base,
     defaults,
     // A workspace's own model endpoint (ADR 0146): on agentes.chat Cloud every call connects only to public addresses.
-    createModelProviders({ endpointFetch: allowsPrivateEndpoints(config) ? undefined : publicHttpsFetch() }),
+    createModelProviders({
+      endpointFetch: allowsPrivateEndpoints(config) ? undefined : publicHttpsFetch(),
+      version: release,
+    }),
   );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   resolved = adapters;

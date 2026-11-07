@@ -314,9 +314,11 @@ export function WorkCard({
   const planModel = isAuto(shownPlanModel)
     ? t("brain.auto.label")
     : view
-      ? (brainModelChoices(plan, view.options.find((o) => o.kind === kind)?.models ?? []).find(
-          (c) => c.value === effectiveChoice,
-        )?.label ?? view.effectiveModel)
+      ? (brainModelChoices(
+          plan,
+          view.options.find((o) => o.kind === kind)?.models ?? [],
+          view.accounts.find((a) => a.id === view.account)?.provider,
+        ).find((c) => c.value === effectiveChoice)?.label ?? view.effectiveModel)
       : shownPlanModel;
   // The account by its name only where its plan has more than one there (Claude's and ChatGPT's count the computer's
   // own sign-in), else the plan's name.
@@ -907,7 +909,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   };
   // The card's plan names its models, whichever of its accounts thinks: on a coding plan, any of them.
   const plan = isPlanId(card) ? planOf(card) : undefined;
-  const modelOptions = brainModelChoices(plan, option?.models ?? []);
+  const modelOptions = brainModelChoices(plan, option?.models ?? [], current?.provider);
   const autoMark = (
     <span className="newag__ib">
       <Icon name="bulb" size={16} />

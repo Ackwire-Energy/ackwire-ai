@@ -101,6 +101,8 @@ export interface GatewayCall {
   cacheTtl?: ModelRequest["cacheTtl"];
   /** The per-turn notes, read after the history (`ModelRequest.notes`). */
   notes?: ModelRequest["notes"];
+  /** The agent's conversation, the same on each of its calls (`StreamOptions.session`). */
+  session?: string;
   onDelta(text: string): void;
   signal?: AbortSignal;
 }
@@ -753,6 +755,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           organization: key.organization,
           project: key.project,
           endpoint: key.endpoint,
+          ...(call.session ? { session: call.session } : {}),
           onDelta: call.onDelta,
         });
       } catch (error) {

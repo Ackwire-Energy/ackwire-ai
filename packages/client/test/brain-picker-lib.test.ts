@@ -277,11 +277,15 @@ describe("OpenCode (ADR 0132) in Quem pensa", () => {
     const box: BrainMachine = { machineId: "m1", name: "Mac mini", online: true, options: [claudeCode, opencode] };
     const options = brainPickOptions(t, "en", { api: [], machines: [box], accounts: [zen, goKey], ownerIsMe: true });
     const keyed = options.filter((o) => "accountId" in o.pick && o.pick.accountId === "acc-zen");
-    expect(keyed.map((o) => [(o.pick as { model: string }).model, o.free, o.description])).toEqual([
+    expect(keyed.slice(0, 3).map((o) => [(o.pick as { model: string }).model, o.free, o.description])).toEqual([
       [AUTO, false, "brain.opencodeText"],
       ["opencode/glm-5.3-flash", false, undefined],
       ["opencode/glm-5.3-flash-free", true, "brain.free"],
     ]);
+    // Then the key's OpenCode Go models, as its CLI names them (the computer lists its CLI's with no key).
+    const goModels = keyed.slice(3).map((o) => (o.pick as { model: string }).model);
+    expect(goModels.every((m) => m.startsWith("opencode-go/"))).toBe(true);
+    expect(goModels).toContain("opencode-go/deepseek-v4.1-flash");
     // Go thinks through Claude Code, where OpenCode's free tier never answers: a hint says where they run.
     const go = options.filter((o) => "accountId" in o.pick && o.pick.accountId === "acc-go");
     expect(go.some((o) => o.value.endsWith("-flash-free"))).toBe(false);

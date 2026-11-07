@@ -118,21 +118,52 @@ export function boundedFetch(
   }) as typeof fetch;
 }
 
+/** `http` with `headers` set on every request, over what the SDK set itself (its own User-Agent). */
+export const withHeaders = (http: typeof fetch, headers: Record<string, string>): typeof fetch =>
+  ((input: string | URL | Request, init: RequestInit = {}) => {
+    const merged = new Headers(init.headers);
+    for (const [name, value] of Object.entries(headers)) merged.set(name, value);
+    return http(input, { ...init, headers: merged });
+  }) as typeof fetch;
+
+/**
+ * What OpenCode's gateway asks of a client that isn't OpenCode itself (opencode.ai/v2/docs/console/go, "Where can I
+ * use it", read 2026-11-07): its own User-Agent, never an SDK's, and a stable session id per conversation in
+ * `x-opencode-session`. Its Go plan refuses a call without them ("400 Request is missing x-opencode-session"). Null
+ * for any other endpoint.
+ */
+export function endpointHeaders(baseURL: string, session: string, version = "dev"): Record<string, string> | null {
+  let host: string;
+  try {
+    host = new URL(baseURL).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  return host === "opencode.ai" || host.endsWith(".opencode.ai")
+    ? { "user-agent": `agentes.chat/${version}`, "x-opencode-session": session }
+    : null;
+}
+
 /**
  * The adapter for every workspace endpoint, registered once as `custom`: each call names its endpoint
  * (`StreamOptions.endpoint`) and goes through the catalog's own adapters with that address, Anthropic's in its
  * compatible mode or the Chat Completions one OpenRouter uses. The endpoint's model id is sent, the full
  * `custom:` id comes back (so a catalog id it may share is never priced at the catalog's prices), and a cost the
- * server reports is ignored: the admin's prices count.
+ * server reports is ignored: the admin's prices count. `version`: this server's, in the User-Agent an endpoint that
+ * asks for one gets (`endpointHeaders`).
  */
-export function createCustomProvider(options: { fetch?: typeof fetch; maxRetries?: number } = {}): ModelProvider {
-  const http = boundedFetch(options.fetch);
+export function createCustomProvider(
+  options: { fetch?: typeof fetch; maxRetries?: number; version?: string } = {},
+): ModelProvider {
+  const bounded = boundedFetch(options.fetch);
   return {
     id: "custom",
     async stream(request, streamOptions): Promise<ModelResult> {
       const { endpoint } = streamOptions;
       const parsed = parseCustomModel(request.model);
       if (!endpoint || !parsed) throw new ProviderError("this model has no endpoint", false);
+      const extra = endpointHeaders(endpoint.baseURL, streamOptions.session ?? crypto.randomUUID(), options.version);
+      const http = extra ? withHeaders(bounded, extra) : bounded;
       const inner =
         endpoint.style === "anthropic"
           ? createAnthropicProvider({

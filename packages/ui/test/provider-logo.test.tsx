@@ -74,6 +74,10 @@ describe("provider marks", () => {
     expect(markOf("moonshot")).toBe("kimi");
     expect(markOf("zai")).toBe("zai");
     expect(markOf("gemini")).toBe("gemini");
+    // An AI account's row draws its `provider` before its kind: an OpenCode key is OpenCode's, never a letter Z, and a
+    // Gemini Enterprise seat Gemini's.
+    expect(markOf("zen")).toBe("opencode");
+    expect(markOf("enterprise")).toBe("gemini");
     // A plan names the makers it resells as written.
     expect(
       ["OpenCode", "xAI", "Alibaba", "Meituan", "Tencent", "StepFun", "Meta", "Reflection", "Xiaomi"].map(markOf),

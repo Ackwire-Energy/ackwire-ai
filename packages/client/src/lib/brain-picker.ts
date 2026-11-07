@@ -276,10 +276,11 @@ export function brainPickOptions(
         },
       ];
     }
-    const modelsOn = (machineId: string) =>
+    const modelsOn = (machineId: string, provider?: string | null) =>
       brainModelChoices(
         undefined,
         on.find((m) => m.machineId === machineId)?.options.find((o) => o.kind === kind)?.models ?? [],
+        provider,
       );
     return [
       ...on.flatMap((m) =>
@@ -295,7 +296,7 @@ export function brainPickOptions(
           rows(
             { kind, choice, machineId: a.machineId, accountId: a.id, account: a.label },
             names ? `${name} · ${a.label} · ${a.computer}` : `${name} · ${a.label}`,
-            modelsOn(a.machineId),
+            modelsOn(a.machineId, a.provider),
           ),
         ),
     ];

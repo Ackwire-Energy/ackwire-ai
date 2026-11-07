@@ -115,6 +115,26 @@ describe("Contas de IA", () => {
     expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
   });
 
+  test("an OpenCode key and a Gemini Enterprise seat each show their maker's logo, never a letter", async () => {
+    const zen = {
+      ...MINIMAX,
+      id: "acct_zen",
+      kind: "opencode" as const,
+      label: "OpenCode",
+      provider: "zen",
+      keyHint: "Q7f2",
+    };
+    const seat = { ...WORK, id: "acct_seat", kind: "antigravity" as const, label: "Gemini", provider: "enterprise" };
+    const { rows } = await page([zen, seat], "owner", [
+      { ...MAC, brains: { ...MAC.brains, opencode: true, antigravity: true } },
+    ]);
+    const [oc, gemini] = rows();
+    expect(oc?.textContent).toContain("OpenCode");
+    expect(oc?.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("opencode");
+    expect(gemini?.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("gemini");
+    expect(document.querySelectorAll(".ai-accounts__row .ac-brand__initial")).toHaveLength(0);
+  });
+
   test("a signed-out account its computer couldn't check says so, and still signs in again", async () => {
     const { rows } = await page([{ ...WORK, status: "signed_out" as const, statusKnown: false }]);
     const row = rows()[0] as HTMLElement;
