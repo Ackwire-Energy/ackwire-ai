@@ -259,6 +259,8 @@ describe("Card", () => {
     expect(rule(".ac-card__head")).toContain("align-items: flex-start");
     expect(rule(".ac-card__head:not(:has(.ac-card__sub))")).toContain("align-items: center");
     expect(rule(".ac-card__action")).toContain("align-self: center");
+    // The foot's words take its line, so an action among them reaches its end.
+    expect(rule(".ac-card__foot > span")).toContain("flex: 1;");
     for (const row of [".ac-card__foot", ".ac-setnote", ".ac-alert"]) {
       expect(rule(row)).not.toContain("display:");
       expect(rule(row)).not.toContain("align-items:");

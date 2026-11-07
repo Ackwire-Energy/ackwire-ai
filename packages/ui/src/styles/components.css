@@ -212,10 +212,11 @@ html[data-pointer] :focus-visible {
 }
 
 /*
- * A picture more than 1.25 lines tall (a face, a logo tile, a portrait) beside two or more lines: the first line's
- * capitals start at the picture's top, as a chat name starts at its face. `.ac-captop` goes on the box that holds the
- * first line (block-level, in that line's font size and line height): it rises by the air above its capitals. One
- * line beside a picture centres on it instead (`.ac-iconline`).
+ * A picture more than 1.25 lines tall (a face, a logo tile, a portrait) beside two lines at most (a name and one line
+ * under it): the first line's capitals start at the picture's top, as a chat name starts at its face. `.ac-captop` goes
+ * on the box that holds the first line (block-level, in that line's font size and line height): it rises by the air
+ * above its capitals. One line beside a picture centres on it instead (`.ac-iconline`). Three lines or more beside a
+ * picture are a MediaRow (below): a face never owns a column while the words beside it are squeezed.
  */
 .ac-faceline {
   display: flex;
@@ -263,6 +264,83 @@ html[data-pointer] :focus-visible {
 @media (pointer: coarse) {
   .ac-captail:has(> .ac-btn:not(.ac-btn--ghost)) {
     margin-block: calc((var(--control-h-md) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
+  }
+}
+
+/*
+ * MediaRow: the face (32, or 24 in a list row with `--row`), then the name and the role on its line, everything else
+ * (the text, chips, actions) under them at the row's full width, never in a column beside the face. Classes, not a
+ * component: the row is whatever its markup is (a button, a link, an `li`, a label).
+ *   .ac-mediarow > .ac-mediarow__face, .ac-mediarow__head (<b>name</b> <span .ac-mediarow__meta>role</span>),
+ *   .ac-mediarow__end (on the name's line, at its end), .ac-mediarow__body (under, full width).
+ * `__end--wrap` drops what ends the head under the body, at its start, when the box holding the rows (with
+ * `container-type: inline-size`: a card, a list) is under 480px: a thread or a side panel counts as narrow. A task's
+ * number sits inline before its title, in the title's own words (`.ac-mediarow__num`), never in a column.
+ */
+.ac-mediarow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+}
+.ac-mediarow--row {
+  column-gap: var(--space-2);
+}
+.ac-mediarow__face {
+  grid-area: 1 / 1;
+  display: flex;
+}
+.ac-mediarow__face > :is(.ac-avatar, .ac-rolemark) {
+  width: 32px;
+  height: 32px;
+}
+.ac-mediarow--row > .ac-mediarow__face > :is(.ac-avatar, .ac-rolemark) {
+  width: 24px;
+  height: 24px;
+}
+.ac-mediarow__head {
+  grid-area: 1 / 2;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.4em;
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.ac-mediarow__head > b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.ac-mediarow__meta,
+.ac-mediarow__num {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+.ac-mediarow__num {
+  font-variant-numeric: tabular-nums;
+}
+.ac-mediarow__end {
+  grid-area: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ac-mediarow__body {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+@container (max-width: 479px) {
+  .ac-mediarow__end--wrap {
+    grid-area: auto / 1 / auto / -1;
+    order: 1;
+    justify-self: start;
   }
 }
 
@@ -5435,6 +5513,11 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
 }
 .ac-card__foot > .ac-icon {
   color: var(--faint);
+}
+/* Its words take the line, so an action among them can reach its end. */
+.ac-card__foot > span {
+  flex: 1;
+  min-width: 0;
 }
 .ac-list {
   border: 0;
