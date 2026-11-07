@@ -105,7 +105,7 @@ export interface IssueGroup {
 
 /** The board's empty space, where a press and a drag slide it sideways: never a card, a word or a button. */
 const BOARD_SPACE =
-  ".issues-boardwrap, .issues-board, .issues-stage, .issues-stage__cols, .issues-col, .issues-col__head, .issues-col__cards";
+  ".issues-boardwrap, .issues-board, .issues-stage, .issues-stage__head, .issues-stage__cols, .issues-col, .issues-col__head, .issues-col__grow, .issues-col__cards";
 
 /** How a card shows while one moves: under the pointer (hidden), flying home (landing), picked with Space. */
 export type CardState = Extract<DragEntry<Issue>, { kind: "card" }>["state"];

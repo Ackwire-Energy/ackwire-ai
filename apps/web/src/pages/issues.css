@@ -431,12 +431,13 @@ html:not([data-pointer]) .issues-layout:focus-visible {
   .issues-col > * {
     flex-shrink: 0;
   }
-  /* Out to the column's sides and bottom, so the scroll cuts no card's shadow, lift or focus ring. */
+  /* Out to the column's sides and bottom, so the scroll cuts no card's shadow, lift or focus ring. Contained up and down
+     only: a sideways trackpad swipe over a column still slides the board. */
   .issues-col > .issues-col__cards {
     flex-shrink: 1;
     min-height: 0;
     overflow-y: auto;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
     margin: -4px -8px -8px;
     padding: 4px 8px 8px;
   }

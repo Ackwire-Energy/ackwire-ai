@@ -370,8 +370,10 @@ function createEngine<T extends { id: string }>(ctx: EngineContext<T>) {
       const r = list.getBoundingClientRect();
       if (g.x < r.left || g.x > r.right || g.y < r.top || g.y > r.bottom) continue;
       const was = list.scrollTop;
-      if (g.y > r.bottom - EDGE) list.scrollTop += SCROLL_STEP;
-      else if (g.y < r.top + EDGE) list.scrollTop -= SCROLL_STEP;
+      // A third of a short column at most at each end, so its middle stays a place to drop.
+      const edge = Math.min(EDGE, r.height / 3);
+      if (g.y > r.bottom - edge) list.scrollTop += SCROLL_STEP;
+      else if (g.y < r.top + edge) list.scrollTop -= SCROLL_STEP;
       scrolled ||= list.scrollTop !== was;
     }
     const page = el?.closest<HTMLElement>(".shell__main");

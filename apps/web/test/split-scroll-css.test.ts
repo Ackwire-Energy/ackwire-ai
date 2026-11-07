@@ -46,6 +46,9 @@ test("the task board as Trello's: it fills the window under the page's head with
   const cards = declarations(wide, ".issues-col>.issues-col__cards");
   expect(cards).toContainEqual(["overflow-y", "auto"]);
   expect(cards).toContainEqual(["min-height", "0"]);
+  // Contained up and down only: contained sideways too, a trackpad's sideways swipe over a column would not reach the board.
+  expect(cards).toContainEqual(["overscroll-behavior-y", "contain"]);
+  expect(cards.filter(([p]) => p === "overscroll-behavior" || p === "overscroll-behavior-x")).toEqual([]);
   // A short or narrow window keeps the page's scroll and columns as tall as their cards.
   expect(declarations(atRule(css, "@media (min-width: 941px)"), ".issues-col>.issues-col__cards")).toEqual([]);
   expect(declarations(css, ".issues-col__cards").filter(([p]) => p.startsWith("overflow"))).toEqual([]);
