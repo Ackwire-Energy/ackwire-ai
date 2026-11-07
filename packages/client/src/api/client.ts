@@ -299,6 +299,8 @@ import type {
   UsageReport,
   WebhookProvider,
   WebhookSetup,
+  WikiBulkFailed,
+  WikiBulkTarget,
   WikiFolderAudience,
   WikiGraph,
   WikiImportInput,
@@ -1396,8 +1398,23 @@ export interface ApiClient {
     ): Promise<{ own: WikiFolderAudience | null; above: WikiFolderAudience | null }>;
     /** Reaches the pages in it and its subfolders, and the pages that land in it later. */
     setFolderAudience(orgId: string, folder: string, access: WikiAccess): Promise<{ folder: string; pages: number }>;
-    /** To the trash (the server can restore it). */
+    /** To the trash (restored from the Lixeira for 30 days). */
     remove(orgId: string, slug: string): Promise<void>;
+    /** Many pages to the trash: `kept` counts the ones this person may not delete. */
+    removeMany(orgId: string, target: WikiBulkTarget): Promise<{ deleted: number; kept: number }>;
+    /** The Lixeira: pages deleted in the last 30 days, most recent first. */
+    trash(orgId: string): Promise<WikiPageSummary[]>;
+    restoreMany(orgId: string, ids: string[]): Promise<{ restored: number; kept: number; failed: WikiBulkFailed }>;
+    /** Deletes pages of the trash for good; no `ids` empties it. */
+    purge(orgId: string, ids?: string[]): Promise<{ purged: number; kept: number }>;
+    /** Which agents read many pages at once (null = every agent); who sees them stays. */
+    setAgents(
+      orgId: string,
+      ids: string[],
+      agentIds: string[] | null,
+    ): Promise<{ changed: number; failed: WikiBulkFailed }>;
+    /** "Sempre no contexto dos agentes" (at most 3 pages per workspace). */
+    context(orgId: string, slug: string, on: boolean): Promise<WikiPage>;
     /** What the agents read most in the last 7 days. */
     reads(orgId: string): Promise<WikiTopRead[]>;
     /** Notes of an Obsidian vault (≤ 500 per call; the app batches). */

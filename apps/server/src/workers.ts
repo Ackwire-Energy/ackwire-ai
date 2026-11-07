@@ -38,6 +38,7 @@ import {
   pruneRoutineHookCalls,
   purgeApps,
   purgeDeletedArtifacts,
+  purgeDeletedWikiPages,
   queueApprovalDigests,
   reapRoutineRuns,
   reconcileComposioAccounts,
@@ -123,6 +124,8 @@ export const WORKER_INTERVALS_MS = {
   inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
+  /** Wiki pages in the trash past 30 days are removed with their history. */
+  wikiPurge: 6 * 3600_000,
   voiceExpiry: 24 * 3600_000,
   /** How often watched IMAP folders are looked at (each is checked every `MAIL_POLL_SECONDS`). */
   mailPoll: 30_000,
@@ -289,6 +292,11 @@ export function startWorkers(deps: WorkerDeps) {
       if (purged > 0) log.info("deleted files purged", { versions: purged });
     });
   }
+
+  every("wikiPurge", WORKER_INTERVALS_MS.wikiPurge, async () => {
+    const purged = await purgeDeletedWikiPages(db);
+    if (purged > 0) log.info("wiki pages past the trash purged", { pages: purged });
+  });
 
   every("widgetDrafts", WORKER_INTERVALS_MS.widgetDrafts, async () => {
     const swept = await sweepWidgetDrafts({ db, pubsub: deps.pubsub });

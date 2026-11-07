@@ -34,6 +34,8 @@ export const wikiPages = pgTable(
     locked: boolean().notNull().default(false),
     /** "Fixadas": shown at the top of the wiki for everyone. */
     pinned: boolean().notNull().default(false),
+    /** "Sempre no contexto dos agentes": every run of an agent that reads it gets it, within the wiki's budget. */
+    agentContext: boolean().notNull().default(false),
     /**
      * Limited to an audience (ADR 0023 addendum): only administrators, the people holding one of `audienceRoleIds` and the
      * people in `audienceUserIds` see it.
@@ -53,8 +55,17 @@ export const wikiPages = pgTable(
     agentEditorIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** The folder whose audience this page follows; null = its own audience, or open. */
     audienceFolder: text(),
-    /** Where it came from: "Salvar na wiki" (`message`) or an import (`obsidian`, id = the vault's name). */
-    source: jsonb().$type<{ type: string; id: string; channelId?: string; attachments?: Record<string, string> }>(),
+    /**
+     * Where it came from: "Salvar na wiki" (`message`) or an import (`obsidian`, id = the vault's name, `importId` = the
+     * run that brought it, the same across its batches and retries).
+     */
+    source: jsonb().$type<{
+      type: string;
+      id: string;
+      channelId?: string;
+      importId?: string;
+      attachments?: Record<string, string>;
+    }>(),
     /** `person` or `agent`. */
     createdByType: text().notNull(),
     createdById: text().notNull(),
@@ -155,9 +166,8 @@ export const wikiLinks = pgTable(
 );
 
 /**
- * An agent used a page: it went into the run's context or the agent read it
- * with `read_wiki_page`. Feeds "what the agents read most" and "agents that
- * use this page". Kept for 30 days.
+ * An agent used a page: it went into the run's context (`context`) or the agent opened it with `read_wiki_page`
+ * (`opened`). "What the agents read most" counts the opened ones; "agents that use this page" both. Kept for 30 days.
  */
 export const wikiPageReads = pgTable(
   "wiki_page_reads",
@@ -171,6 +181,8 @@ export const wikiPageReads = pgTable(
       .notNull()
       .references(() => agents.id, { onDelete: "cascade" }),
     runId: uuid(),
+    /** `context` or `opened`. */
+    kind: text().notNull().default("context"),
     /** Where the agent was answering. */
     channelId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

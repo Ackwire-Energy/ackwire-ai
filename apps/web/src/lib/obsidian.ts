@@ -286,6 +286,14 @@ export async function readVault(
 
 // ── Importing ────────────────────────────────────────────────────────────────
 
+/** The server's limits (`WIKI_LIMITS` in the engine, the import route): checked here so no batch is refused. */
+const BODY_MAX = 200_000;
+const NAME_MAX = 300;
+/** A batch stays under this much JSON, whatever its notes weigh. */
+const BATCH_BYTES = 8 * 1024 * 1024;
+/** Waits before each new try of a batch that failed. */
+const RETRY_MS = [1000, 3000];
+
 export interface VaultImportOptions {
   /** Top-level folders to bring ("" = the notes at the root). */
   folders: Set<string>;
@@ -293,19 +301,147 @@ export interface VaultImportOptions {
   into: string;
   onConflict: "keep_both" | "skip";
   onProgress?: (step: "files" | "pages", done: number, total: number) => void;
+  /** "Parar": the batches not sent yet come back in `retry`. */
+  stopped?: () => boolean;
+}
+
+/**
+ * A note that didn't come in: the server's reason, too long here, its batch failed (`batch`) or wasn't sent because the
+ * person stopped (`stopped`); those two can be sent again.
+ */
+export type VaultFailure = { title: string; reason: "title" | "too_long" | "batch" | "stopped"; error?: unknown };
+
+export interface VaultImportResult extends WikiImportResult {
+  /** Notes sent, plus the ones too long to send. */
+  total: number;
+  uploaded: number;
+  failures: VaultFailure[];
+  /** What "Tentar de novo" sends: the notes of the batches that failed, ready to go. */
+  retry: WikiImportNote[];
+  importId: string;
+}
+
+/** The notes to send: tags, aliases and embed names cut to the server's limits; bodies too long left out. */
+export function vaultInputs(
+  notes: VaultNote[],
+  attachmentIds: (note: VaultNote) => Record<string, string>,
+): { inputs: WikiImportNote[]; tooLong: string[] } {
+  const inputs: WikiImportNote[] = [];
+  const tooLong: string[] = [];
+  for (const n of notes) {
+    if (n.body.length > BODY_MAX) {
+      tooLong.push(n.title);
+      continue;
+    }
+    const attachments = Object.fromEntries(
+      Object.entries(attachmentIds(n)).filter(([name]) => name.length <= NAME_MAX),
+    );
+    inputs.push({
+      title: n.title.slice(0, NAME_MAX),
+      folder: n.folder,
+      body: n.body,
+      tags: n.tags.slice(0, 20).map((x) => x.slice(0, 80)),
+      aliases: n.aliases.slice(0, 50).map((x) => x.slice(0, NAME_MAX)),
+      ...(Object.keys(attachments).length ? { attachments } : {}),
+    });
+  }
+  return { inputs, tooLong };
+}
+
+/** Batches of at most `BATCH` notes and `BATCH_BYTES` of JSON. */
+export function vaultBatches(inputs: WikiImportNote[]): WikiImportNote[][] {
+  const out: WikiImportNote[][] = [];
+  let batch: WikiImportNote[] = [];
+  let bytes = 0;
+  for (const n of inputs) {
+    const size = JSON.stringify(n).length;
+    if (batch.length && (batch.length >= BATCH || bytes + size > BATCH_BYTES)) {
+      out.push(batch);
+      batch = [];
+      bytes = 0;
+    }
+    batch.push(n);
+    bytes += size;
+  }
+  if (batch.length) out.push(batch);
+  return out;
+}
+
+const wait = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+/**
+ * Sends notes in batches, each tried again twice before it counts as failed. Every batch carries `importId`, so the
+ * server answers a batch that went in after all (its answer lost) with the pages it already made instead of doubling
+ * them. The batches that still fail come back in `retry`, for "Tentar de novo".
+ */
+export async function sendVaultNotes(
+  api: ApiClient,
+  orgId: string,
+  input: { name: string; folder?: string; onConflict: "keep_both" | "skip"; importId: string; notes: WikiImportNote[] },
+  onProgress?: (done: number, total: number) => void,
+  stopped?: () => boolean,
+) {
+  const result: WikiImportResult & { failures: VaultFailure[]; retry: WikiImportNote[] } = {
+    created: [],
+    skipped: [],
+    failed: [],
+    failures: [],
+    retry: [],
+  };
+  let done = 0;
+  for (const batch of vaultBatches(input.notes)) {
+    if (stopped?.()) {
+      result.retry.push(...batch);
+      result.failures.push(...batch.map((n) => ({ title: n.title, reason: "stopped" as const })));
+      continue;
+    }
+    onProgress?.(done, input.notes.length);
+    let error: unknown = null;
+    for (let attempt = 0; attempt <= RETRY_MS.length; attempt++) {
+      try {
+        const got = await api.wiki.import(orgId, {
+          source: { type: "obsidian", name: input.name },
+          notes: batch,
+          folder: input.folder,
+          onConflict: input.onConflict,
+          importId: input.importId,
+        });
+        result.created.push(...got.created);
+        result.skipped.push(...got.skipped);
+        result.failed.push(...got.failed);
+        result.failures.push(...got.failed);
+        error = null;
+        break;
+      } catch (e) {
+        error = e;
+        const status = (e as { status?: number }).status;
+        // A refusal that a new try won't change (no permission, a bad request): no point waiting.
+        if (status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429) break;
+        const delay = RETRY_MS[attempt];
+        if (delay !== undefined) await wait(delay);
+      }
+    }
+    if (error) {
+      result.retry.push(...batch);
+      result.failures.push(...batch.map((n) => ({ title: n.title, reason: "batch" as const, error })));
+    }
+    done += batch.length;
+  }
+  onProgress?.(input.notes.length, input.notes.length);
+  return result;
 }
 
 /**
  * Sends the embedded attachments to the Drive (each once, ≤ 50 MB), then
- * the notes in batches. Returns what the server made, plus how many
- * attachments went up.
+ * the notes in batches. Returns what the server made, what didn't come in
+ * and why, and how many attachments went up.
  */
 export async function importVault(
   api: ApiClient,
   orgId: string,
   report: VaultReport,
   options: VaultImportOptions,
-): Promise<WikiImportResult & { uploaded: number }> {
+): Promise<VaultImportResult> {
   const notes = report.notes.filter((n) => options.folders.has(n.folder.split("/")[0] ?? ""));
   const wanted = new Map<string, VaultReport["attachments"][number]>();
   for (const n of notes)
@@ -326,37 +462,38 @@ export async function importVault(
     }
     done++;
   }
-  const toInput = (n: VaultNote): WikiImportNote => {
+  const { inputs, tooLong } = vaultInputs(notes, (n) => {
     const attachments: Record<string, string> = {};
     for (const e of n.embeds) {
       const a = attachmentOf(report, e);
       const id = a && ids.get(a.path);
       if (id) attachments[e] = id;
     }
-    return {
-      title: n.title,
-      folder: n.folder,
-      body: n.body,
-      tags: n.tags.slice(0, 20),
-      aliases: n.aliases.slice(0, 50),
-      ...(Object.keys(attachments).length ? { attachments } : {}),
-    };
-  };
-  const result: WikiImportResult = { created: [], skipped: [], failed: [] };
-  for (let i = 0; i < notes.length; i += BATCH) {
-    options.onProgress?.("pages", i, notes.length);
-    const batch = await api.wiki.import(orgId, {
-      source: { type: "obsidian", name: report.name },
-      notes: notes.slice(i, i + BATCH).map(toInput),
+    return attachments;
+  });
+  const importId = crypto.randomUUID();
+  const sent = await sendVaultNotes(
+    api,
+    orgId,
+    {
+      name: report.name,
       folder: options.into.trim() || undefined,
       onConflict: options.onConflict,
-    });
-    result.created.push(...batch.created);
-    result.skipped.push(...batch.skipped);
-    result.failed.push(...batch.failed);
-  }
-  options.onProgress?.("pages", notes.length, notes.length);
-  return { ...result, uploaded: ids.size };
+      importId,
+      notes: inputs,
+    },
+    (d, total) => options.onProgress?.("pages", d, total),
+    options.stopped,
+  );
+  const local = tooLong.map((title) => ({ title, reason: "too_long" as const }));
+  return {
+    ...sent,
+    failed: [...sent.failed, ...local],
+    failures: [...sent.failures, ...local],
+    total: notes.length,
+    uploaded: ids.size,
+    importId,
+  };
 }
 
 /** The page to open after an import: the vault's home note, else the first. */

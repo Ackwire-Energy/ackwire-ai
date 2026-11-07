@@ -6,6 +6,7 @@ import {
   wikiAccessLimited,
   wikiAccessOf,
   wikiBaseLevels,
+  wikiImportOf,
   wikiRowCap,
 } from "../src/lib/wiki";
 
@@ -68,5 +69,28 @@ describe("the wiki access form", () => {
     expect(wikiRowCap("view", "edit")).toBe("edit");
     expect(wikiRowCap("none", "view")).toBe("view");
     expect(wikiRowCap("none", undefined)).toBe("none");
+  });
+});
+
+describe("an import's pages", () => {
+  const page = (title: string, over: Record<string, string | null>) => ({ title, sourceType: "obsidian", ...over });
+  test("by its id, or by vault for imports made before ids; none for a page that wasn't imported", () => {
+    const pages = [
+      page("A", { sourceName: "Vault", importId: "i1" }),
+      page("B", { sourceName: "Vault", importId: "i1" }),
+      page("C", { sourceName: "Vault", importId: "i2" }),
+      page("D", { sourceName: "Vault", importId: null }),
+      { title: "E", sourceType: null, sourceName: null, importId: null },
+    ];
+    expect(wikiImportOf(pages, pages[0] as (typeof pages)[number])).toMatchObject({
+      name: "Vault",
+      target: { importId: "i1" },
+      pages: [{ title: "A" }, { title: "B" }],
+    });
+    expect(wikiImportOf(pages, pages[3] as (typeof pages)[number])).toMatchObject({
+      target: { source: { type: "obsidian", name: "Vault" } },
+      pages: [{ title: "D" }],
+    });
+    expect(wikiImportOf(pages, pages[4] as (typeof pages)[number])).toBeNull();
   });
 });

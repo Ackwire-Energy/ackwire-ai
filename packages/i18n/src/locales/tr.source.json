@@ -21720,6 +21720,171 @@
   "wiki.audienceFolderOpened": {
     "value": "Done. The folder has no limit now."
   },
+  "wiki.audienceRootTitle": {
+    "value": "Access to the whole wiki"
+  },
+  "wiki.audienceRootText": {
+    "value": "It reaches every page and folder of the wiki, and the ones added later."
+  },
+  "wiki.audienceInRoot": {
+    "value": "The whole wiki is limited: here you can only narrow it further."
+  },
+  "wiki.audienceFollowsRoot": {
+    "value": "From the whole wiki"
+  },
+  "wiki.context.on": {
+    "value": "Always in the agents' context"
+  },
+  "wiki.context.off": {
+    "value": "Take out of the agents' context"
+  },
+  "wiki.context.chip": {
+    "value": "Always in context"
+  },
+  "wiki.context.hint": {
+    "value": "Goes into every answer of every agent that reads it, even when nobody mentions it. At most 3 pages."
+  },
+  "wiki.context.added": {
+    "value": "Every agent that reads this page now gets it in every answer."
+  },
+  "wiki.context.removed": {
+    "value": "Agents now get this page only when a message is about it."
+  },
+  "wiki.bulk.select": {
+    "value": "Select"
+  },
+  "wiki.bulk.selectAll": {
+    "value": "Select all"
+  },
+  "wiki.bulk.selected": {
+    "value": {
+      "one": "{{count}} selected",
+      "other": "{{count}} selected"
+    }
+  },
+  "wiki.bulk.agents": {
+    "value": "Agents"
+  },
+  "wiki.bulk.delete": {
+    "value": "Delete"
+  },
+  "wiki.bulk.deleteFolder": {
+    "value": "Delete the folder {{folder}}"
+  },
+  "wiki.bulk.deleteImport": {
+    "value": {
+      "one": "Delete the import “{{name}}” ({{count}} page)",
+      "other": "Delete the import “{{name}}” ({{count}} pages)"
+    }
+  },
+  "wiki.bulk.deleteTitle": {
+    "value": {
+      "one": "Delete {{count}} page?",
+      "other": "Delete {{count}} pages?"
+    }
+  },
+  "wiki.bulk.deleteFolderTitle": {
+    "value": {
+      "one": "Delete the folder {{folder}} and its page?",
+      "other": "Delete the folder {{folder}} and its {{count}} pages?"
+    }
+  },
+  "wiki.bulk.deleteImportTitle": {
+    "value": {
+      "one": "Delete the page imported from “{{name}}”?",
+      "other": "Delete the {{count}} pages imported from “{{name}}”?"
+    }
+  },
+  "wiki.bulk.deleteText": {
+    "value": "They go to the wiki's trash for 30 days, and you can restore them from there."
+  },
+  "wiki.bulk.deleteGo": {
+    "value": {
+      "one": "Move {{count}} page to the trash",
+      "other": "Move {{count}} pages to the trash"
+    }
+  },
+  "wiki.bulk.deleted": {
+    "value": {
+      "one": "{{count}} page moved to the trash.",
+      "other": "{{count}} pages moved to the trash."
+    }
+  },
+  "wiki.bulk.kept": {
+    "value": {
+      "one": "{{count}} stayed: it's locked or only some people edit it.",
+      "other": "{{count}} stayed: they're locked or only some people edit them."
+    }
+  },
+  "wiki.bulk.failed": {
+    "value": {
+      "one": "{{count}} didn't change ({{titles}}): {{reason}}",
+      "other": "{{count}} didn't change ({{titles}}): {{reason}}"
+    }
+  },
+  "wiki.bulk.agentsTitle": {
+    "value": {
+      "one": "Agents that read {{count}} page",
+      "other": "Agents that read {{count}} pages"
+    }
+  },
+  "wiki.bulk.agentsText": {
+    "value": "Who sees each page among people stays as it is."
+  },
+  "wiki.bulk.agentsSaved": {
+    "value": {
+      "one": "Done. {{count}} page updated.",
+      "other": "Done. {{count}} pages updated."
+    }
+  },
+  "wiki.trash.title": {
+    "value": "Trash"
+  },
+  "wiki.trash.text": {
+    "value": "Deleted pages stay here for 30 days, then they're gone."
+  },
+  "wiki.trash.none": {
+    "value": "The trash is empty."
+  },
+  "wiki.trash.restore": {
+    "value": "Restore"
+  },
+  "wiki.trash.restoreMany": {
+    "value": {
+      "one": "Restore {{count}}",
+      "other": "Restore {{count}}"
+    }
+  },
+  "wiki.trash.purge": {
+    "value": "Delete for good"
+  },
+  "wiki.trash.empty": {
+    "value": "Empty trash"
+  },
+  "wiki.trash.emptyTitle": {
+    "value": {
+      "one": "Delete {{count}} page for good?",
+      "other": "Delete {{count}} pages for good?"
+    }
+  },
+  "wiki.trash.emptyText": {
+    "value": "They're gone with their history. This can't be undone."
+  },
+  "wiki.trash.deletedWhen": {
+    "value": "deleted {{when}}"
+  },
+  "wiki.trash.restored": {
+    "value": {
+      "one": "{{count}} page restored.",
+      "other": "{{count}} pages restored."
+    }
+  },
+  "wiki.trash.purged": {
+    "value": {
+      "one": "{{count}} page deleted for good.",
+      "other": "{{count}} pages deleted for good."
+    }
+  },
   "wiki.audienceLevel": {
     "value": "What {{name}} can do"
   },
@@ -21784,7 +21949,7 @@
     "value": "Move {{title}} to the trash?"
   },
   "wiki.deleteText": {
-    "value": "Links to it become “page to create”. You can't restore it from the app yet."
+    "value": "It goes to the wiki's trash for 30 days, and you can restore it from there. Meanwhile, links to it become “page to create”."
   },
   "wiki.deleted": {
     "value": "{{title}} moved to the trash."
@@ -22203,10 +22368,67 @@
   "wiki.import.open": {
     "value": "Open {{title}}"
   },
-  "wiki.import.someFailed": {
+  "wiki.import.sendingNotes": {
     "value": {
-      "one": "{{count}} note didn't come in: {{titles}}",
-      "other": "{{count}} notes didn't come in: {{titles}}"
+      "one": "of {{count}} note sent",
+      "other": "of {{count}} notes sent"
+    }
+  },
+  "wiki.import.stop": {
+    "value": "Stop"
+  },
+  "wiki.import.stopping": {
+    "value": "Stopping…"
+  },
+  "wiki.import.partialTitle": {
+    "value": "Not everything came in"
+  },
+  "wiki.import.partial": {
+    "value": {
+      "one": "{{count}} note: {{done}} came in, {{failed}} didn't",
+      "other": "{{count}} notes: {{done}} came in, {{failed}} didn't"
+    }
+  },
+  "wiki.import.partialText": {
+    "value": "The pages that came in are in the wiki already."
+  },
+  "wiki.import.whyTitle": {
+    "value": "What didn't come in"
+  },
+  "wiki.import.why.batch": {
+    "value": {
+      "one": "{{count}} wasn't sent: {{error}}",
+      "other": "{{count}} weren't sent: {{error}}"
+    }
+  },
+  "wiki.import.why.stopped": {
+    "value": {
+      "one": "{{count}} wasn't sent because you stopped",
+      "other": "{{count}} weren't sent because you stopped"
+    }
+  },
+  "wiki.import.why.tooLong": {
+    "value": {
+      "one": "{{count}} is over 200,000 characters: split it in Obsidian",
+      "other": "{{count}} are over 200,000 characters: split them in Obsidian"
+    }
+  },
+  "wiki.import.why.title": {
+    "value": {
+      "one": "{{count}} has no name that can be a title",
+      "other": "{{count}} have no name that can be a title"
+    }
+  },
+  "wiki.import.why.skipped": {
+    "value": {
+      "one": "{{count}} already had a page with the same name",
+      "other": "{{count}} already had pages with the same name"
+    }
+  },
+  "wiki.import.retry": {
+    "value": {
+      "one": "Try {{count}} again",
+      "other": "Try {{count}} again"
     }
   },
   "wiki.import.overlayTitle": {
@@ -27732,6 +27954,12 @@
   },
   "errors.wiki.editorsExcludeYou": {
     "value": "Include yourself among the people who edit, to keep this page."
+  },
+  "errors.wiki.contextFull": {
+    "value": "{{max}} pages are already always in the agents' context. Take one out first."
+  },
+  "errors.wiki.restoreSlugTaken": {
+    "value": "Another page has this name now. Rename it, then restore again."
   },
   "errors.wiki.titleTaken": {
     "value": "There's already a page called “{{title}}”."

@@ -435,6 +435,7 @@
     ],
     "fr": [
       "settings.about.version",
+      "wiki.bulk.agents",
       "deleteAccount.agentCount",
       "deleteAccount.messageCount",
       "queue.fill.routine",
@@ -1462,6 +1463,7 @@
       "routines.setup.sentry.url"
     ],
     "nl": [
+      "wiki.bulk.agents",
       "deleteAccount.agentCount",
       "queue.fill.routine",
       "access.agentCol",

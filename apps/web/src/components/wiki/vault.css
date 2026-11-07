@@ -308,3 +308,8 @@ html:not([data-pointer]) .vault-drop__area:focus-visible {
     animation: none;
   }
 }
+.vault-done--partial {
+  min-height: 0;
+  justify-content: center;
+  padding: 12px 18px 4px;
+}

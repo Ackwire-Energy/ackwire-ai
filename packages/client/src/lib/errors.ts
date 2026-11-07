@@ -141,6 +141,8 @@ const KNOWN = {
   "wiki.locked": "wiki.lockedHint",
   "wiki.lock_admins_only": "errors.wiki.lockAdminsOnly",
   "wiki.editors_exclude_you": "errors.wiki.editorsExcludeYou",
+  "wiki.context_full": "errors.wiki.contextFull",
+  "wiki.restore_slug_taken": "errors.wiki.restoreSlugTaken",
   "role.name_required": "errors.role.nameRequired",
   "role.name_long": "errors.role.nameLong",
   "role.too_many": "errors.role.tooMany",

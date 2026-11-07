@@ -1,4 +1,4 @@
-import type { WikiAudience } from "../api/types";
+import type { WikiAudience, WikiBulkTarget, WikiPageSummary } from "../api/types";
 import { headingId, parseMarkdown, wikiLinksIn } from "./markdown";
 
 /** "Guia de deploy" → "guia-de-deploy" (unique in the org, like the backend; the folder isn't in it). */
@@ -284,4 +284,27 @@ export function wikiRowCap(base: WikiLevel, row: WikiLevel | undefined): WikiLev
   if (base === "edit") return "edit";
   if (base === "view") return row === "edit" ? "edit" : "view";
   return row ?? "none";
+}
+
+type Imported = Pick<WikiPageSummary, "sourceType" | "sourceName" | "importId">;
+
+/**
+ * Everything `page`'s import brought, and the target that deletes it: by the import's id, or by vault for pages
+ * imported before imports had ids. Null for a page that wasn't imported.
+ */
+export function wikiImportOf<T extends Imported>(
+  pages: T[],
+  page: Imported,
+): { name: string; pages: T[]; target: WikiBulkTarget } | null {
+  const name = page.sourceName;
+  if (page.sourceType !== "obsidian" || !name) return null;
+  if (page.importId) {
+    const importId = page.importId;
+    return { name, pages: pages.filter((p) => p.importId === importId), target: { importId } };
+  }
+  return {
+    name,
+    pages: pages.filter((p) => p.sourceType === page.sourceType && p.sourceName === name && !p.importId),
+    target: { source: { type: page.sourceType, name } },
+  };
 }
