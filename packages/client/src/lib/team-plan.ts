@@ -1,15 +1,14 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
 import type { Message, ReplyChips, TeamPlan, TeamProposalCard } from "../api/types";
-import { teamProposalOf } from "./action-cards";
 import { errorText } from "./errors";
 
 /**
- * The right hand's team setup (ADR 0137 §10), platform-neutral: the start card's business types, the answers tapped
+ * The right hand's team setup (ADR 0137 §10), platform-neutral: the business types, the answers tapped
  * under its questions (each one the person's own message), and what the team card counts and lists.
  */
 
-/** The start card's first question: what the business does. `other` writes in the composer instead of sending. */
+/** What the business does, the first run's row 1 (ADR 0152 §6): `other` asks for a sentence. */
 export const BUSINESS_TYPES = ["agency", "store", "clinic", "software", "support", "services", "other"] as const;
 export type BusinessType = (typeof BUSINESS_TYPES)[number];
 /** Every business type but `other` is a team template's id too (the server's `TEAM_TEMPLATES`). */
@@ -34,8 +33,8 @@ const byTime = (a: Pick<Message, "createdAt">, b: Pick<Message, "createdAt">) =>
   Date.parse(a.createdAt) - Date.parse(b.createdAt);
 
 /**
- * The person's answer to a question: their first message after it (`afterId`; none: the conversation's first, for the
- * start card the app draws). Null while nobody answered.
+ * The person's answer to a question: their first message after it (`afterId`; none: the conversation's first, which
+ * the first run's "O que a Acme faz?" starts from). Null while nobody answered.
  */
 export function answerAfter(
   messages: readonly Pick<Message, "id" | "createdAt" | "author" | "body" | "local">[] | undefined,
@@ -54,24 +53,6 @@ export const answerPicks = (choices: readonly string[], answer: string | null) =
   const parts = new Set(answer.split(ANSWER_JOINER).map((p) => p.trim()));
   return choices.filter((c) => parts.has(c));
 };
-
-/**
- * The start card's answer: the person's first message that is one of its `choices`, wherever it came, or, once the
- * interview or a team card followed, what they wrote first ("" with nothing written: a template's card). Anything else
- * ("oi", or something written before an AI was connected) answered nothing: the card keeps asking.
- */
-export function startCardAnswer(
-  messages: readonly Pick<Message, "id" | "createdAt" | "author" | "body" | "local" | "meta">[] | undefined,
-  choices: readonly string[],
-): string | null {
-  const said = [...(messages ?? [])]
-    .sort(byTime)
-    .filter((m) => m.author.type === "person" && m.local !== "failed")
-    .map((m) => m.body);
-  const pick = said.find((body) => answerPicks(choices, body).length > 0);
-  if (pick !== undefined) return pick;
-  return messages?.some((m) => replyChipsOf(m.meta) || teamProposalOf(m.meta)) ? (said[0] ?? "") : null;
-}
 
 /** Taps put together in the order the answers are listed. */
 export const answerText = (choices: readonly string[], picked: ReadonlySet<string>) =>

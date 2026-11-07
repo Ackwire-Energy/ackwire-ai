@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Agent, AgentSetupChecklist, AudienceMode, SetupStep } from "../api/types";
+import type { Agent, AgentSetupChecklist, AgentSetupStep, AudienceMode, SetupStep } from "../api/types";
 import type { Level } from "./access-levels";
 import { presetChannels, ROLE_DEFAULTS, ROLE_IDS, type RoleId } from "./new-agent";
 
@@ -9,10 +9,10 @@ import { presetChannels, ROLE_DEFAULTS, ROLE_IDS, type RoleId } from "./new-agen
  * says so (an AI that works, an app it may use, a channel it is in). These are the rules the apps share.
  */
 
-export const SETUP_STEPS: readonly SetupStep[] = ["ai", "apps", "where", "who", "how"];
+export const SETUP_STEPS: readonly AgentSetupStep[] = ["ai", "apps", "where", "who", "how"];
 
 /** Only who manages agents changes its apps and how it works; its owner changes its AI, channels and audience. */
-const ADMIN_STEPS: ReadonlySet<SetupStep> = new Set<SetupStep>(["apps", "how"]);
+const ADMIN_STEPS: ReadonlySet<AgentSetupStep> = new Set<AgentSetupStep>(["apps", "how"]);
 
 /** The ready-made role it started from, if the apps know it ("custom" is from scratch: none). */
 export const setupRole = (setup: AgentSetupChecklist | null | undefined): RoleId | null =>
@@ -27,7 +27,7 @@ export const setupRole = (setup: AgentSetupChecklist | null | undefined): RoleId
 export function setupSteps(
   agent: Pick<Agent, "setup" | "ownerUserId" | "builtin">,
   viewer: { meId: string; admin: boolean },
-): SetupStep[] {
+): AgentSetupStep[] {
   if (!agent.setup || agent.builtin) return [];
   if (viewer.admin) return [...SETUP_STEPS];
   if (agent.ownerUserId !== viewer.meId) return [];
@@ -45,8 +45,8 @@ export interface SetupFacts {
 }
 
 /** The steps done: confirmed by a person, or done as its data says. */
-export function setupDone(setup: AgentSetupChecklist, facts: SetupFacts): Set<SetupStep> {
-  const done = new Set<SetupStep>(setup.done);
+export function setupDone(setup: AgentSetupChecklist, facts: SetupFacts): Set<AgentSetupStep> {
+  const done = new Set<AgentSetupStep>(setup.done.filter((s): s is AgentSetupStep => SETUP_STEPS.includes(s as never)));
   if (facts.ai) done.add("ai");
   if (facts.apps) done.add("apps");
   if (facts.where) done.add("where");
@@ -54,7 +54,7 @@ export function setupDone(setup: AgentSetupChecklist, facts: SetupFacts): Set<Se
 }
 
 /** The first step not done yet (the one whose button is the primary one), or null. */
-export const nextStep = (steps: readonly SetupStep[], done: ReadonlySet<SetupStep>) =>
+export const nextStep = (steps: readonly AgentSetupStep[], done: ReadonlySet<AgentSetupStep>) =>
   steps.find((s) => !done.has(s)) ?? null;
 
 /** The apps (catalog connector ids) its role suggests, at their levels; none for an agent from scratch. */
@@ -115,7 +115,7 @@ export interface SetupRow {
 }
 
 /** A row's words (the web's dialog buttons and the phone's screens say the same). */
-export function setupRow(t: TFunction, step: SetupStep, done: boolean, f: SetupRowFacts): SetupRow {
+export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: SetupRowFacts): SetupRow {
   switch (step) {
     case "ai":
       return done
@@ -191,4 +191,164 @@ export function setupRow(t: TFunction, step: SetupStep, done: boolean, f: SetupR
             action: t("agentSetup.see"),
           };
   }
+}
+
+/* ---------- The right hand's first run (ADR 0152 §6) ---------- */
+
+/** Its rows, one order everywhere: AI after the team, because on the Cloud an AI opens only after the plan. */
+export const FIRST_RUN_STEPS = ["about", "team", "ai", "apps", "people"] as const satisfies readonly SetupStep[];
+export type FirstRunStep = (typeof FIRST_RUN_STEPS)[number];
+
+/** What may each row's button do for this person (`stepPermissions` in lib/home, plus `configure`). */
+export interface FirstRunPowers {
+  owner: boolean;
+  configure: boolean;
+  createAgents: boolean;
+  connectAi: boolean;
+  pay: boolean;
+  connectors: boolean;
+  invite: boolean;
+}
+
+/**
+ * The rows this person sees: the right hand's checklist is for the workspace's owners, each row by what they may do.
+ * An invited person sees none of it (their own Connect card and the style card, as before), nor anyone once the
+ * right hand has no checklist (a workspace that had a team before it).
+ */
+export function firstRunSteps(agent: Pick<Agent, "setup" | "builtin">, may: FirstRunPowers): FirstRunStep[] {
+  if (agent.builtin !== "right_hand" || !agent.setup || !may.owner) return [];
+  const row: Record<FirstRunStep, boolean> = {
+    about: may.configure,
+    team: may.createAgents,
+    ai: may.connectAi || may.pay,
+    apps: may.connectors,
+    people: may.invite,
+  };
+  return FIRST_RUN_STEPS.filter((s) => row[s]);
+}
+
+/** What the workspace's data says, read by the apps (mirror of the prompt's `cardOpen`, engine right-hand-prompt). */
+export interface FirstRunFacts {
+  /** The workspace's context isn't empty. */
+  context: boolean;
+  /** An agent besides the right hand exists. */
+  team: boolean;
+  /** The right hand's AI is ready or waiting for its computer, and no billing hold. */
+  ai: boolean;
+  /** An app is connected. */
+  apps: boolean;
+  /** More than one member. */
+  people: boolean;
+}
+
+/** The rows done: from the data, or skipped ("Agora não", the only thing stored). */
+export function firstRunDone(setup: AgentSetupChecklist, facts: FirstRunFacts): Set<FirstRunStep> {
+  const done = new Set<FirstRunStep>();
+  if (facts.context) done.add("about");
+  if (facts.team) done.add("team");
+  if (facts.ai) done.add("ai");
+  if (facts.apps || setup.done.includes("apps")) done.add("apps");
+  if (facts.people || setup.done.includes("people")) done.add("people");
+  return done;
+}
+
+/** How a row reads now: done; open; open with a team card waiting in the chat; or waiting for the plan. */
+export type FirstRunRowState = "done" | "open" | "card" | "plan" | "afterPlan";
+
+/** A row's state on a billing hold: the AI opens with the plan, apps and people after it; the rest as they are. */
+export function firstRunRowState(
+  step: FirstRunStep,
+  s: { done: ReadonlySet<FirstRunStep>; held: boolean; teamCard: boolean },
+): FirstRunRowState {
+  if (s.done.has(step)) return "done";
+  if (s.held && step === "ai") return "plan";
+  if (s.held && (step === "apps" || step === "people")) return "afterPlan";
+  if (step === "team" && s.teamCard) return "card";
+  return "open";
+}
+
+/** The foot's asks wait for a team that can think: rows 2 and 3, and never on a hold. */
+export const firstRunAsks = (done: ReadonlySet<FirstRunStep>, held: boolean) =>
+  !held && done.has("team") && done.has("ai");
+
+/** What the rows say, from what the app read: names already joined in the person's language. */
+export interface FirstRunRowFacts {
+  org: string;
+  /** Agents besides the right hand. */
+  agents: number;
+  /** What the right hand thinks with ("Claude"), once it does. */
+  label: string | null;
+  /** The apps connected ("o Gmail e o Drive"); null when none. */
+  apps: string | null;
+  members: number;
+}
+
+/** One row's words: its title, a line under it while open, its button's word, and "Agora não" where a row skips. */
+export function firstRunRow(
+  tr: TFunction,
+  step: FirstRunStep,
+  state: FirstRunRowState,
+  f: FirstRunRowFacts,
+  skipped: boolean,
+): SetupRow & { skip?: string } {
+  // Keys built from the row's id, so read through an untyped `t`.
+  const t = tr as unknown as (key: string, o?: Record<string, unknown>) => string;
+  const k = (key: string) => `agentSetup.firstRun.${step}.${key}`;
+  if (state === "plan")
+    return { title: t("agentSetup.firstRun.ai.plan"), action: t("agentSetup.firstRun.ai.planAction") };
+  if (state === "afterPlan")
+    return { title: t(k("todo"), { org: f.org }), desc: t("agentSetup.firstRun.afterPlan"), action: "" };
+  if (state === "card") return { title: t(k("todo")), desc: t("agentSetup.firstRun.team.card"), action: "" };
+  if (state === "done") {
+    switch (step) {
+      case "about":
+        return { title: t(k("done"), { org: f.org }), action: t("agentSetup.change") };
+      case "team":
+        return { title: t(k("done"), { count: f.agents }), action: t("agentSetup.see") };
+      case "ai":
+        return { title: f.label ? t(k("done"), { label: f.label }) : t(k("doneAny")), action: t("agentSetup.switch") };
+      case "apps":
+        return { title: f.apps ? t(k("done"), { apps: f.apps }) : t(k("doneNone")), action: t("agentSetup.change") };
+      case "people":
+        return {
+          title: skipped && f.members <= 1 ? t(k("doneNone")) : t(k("done"), { count: f.members }),
+          action: t(k("action")),
+        };
+    }
+  }
+  return {
+    title: t(k("todo"), { org: f.org }),
+    desc: t(k("todoDesc"), { org: f.org }),
+    action: t(k("action")),
+    ...(step === "apps" || step === "people" ? { skip: t("agentSetup.firstRun.notNow") } : {}),
+  };
+}
+
+/**
+ * The ready-made template agents' roles (mirror of `MEMBERS` in packages/engine/src/team-templates.ts), by handle,
+ * for the apps a team just made would use (`firstRunApps`).
+ */
+const TEMPLATE_ROLES: Record<string, RoleId> = {
+  iara: "support",
+  caio: "finance",
+  ada: "dev",
+  lia: "content",
+  theo: "sales",
+  nina: "assistant",
+  otto: "ops",
+  bia: "support",
+};
+
+/** A team agent's role, by its own role or its template handle (`iara-2` is Iara's). */
+export const teamRole = (a: Pick<Agent, "handle" | "setup">): RoleId | null =>
+  setupRole(a.setup) ?? TEMPLATE_ROLES[a.handle.replace(/-\d+$/, "")] ?? null;
+
+/** The apps (catalog connector ids) the team's roles suggest, the most suggested first. */
+export function firstRunApps(team: readonly Pick<Agent, "handle" | "setup">[]): string[] {
+  const count = new Map<string, number>();
+  for (const a of team) {
+    const role = teamRole(a);
+    if (role) for (const id of Object.keys(ROLE_DEFAULTS[role].levels)) count.set(id, (count.get(id) ?? 0) + 1);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }

@@ -1915,22 +1915,12 @@
         "text": "Ajanlar çalışma alanının yapay zekasıyla düşünür. Claude veya ChatGPT planınla giriş yap, API anahtarı gerekmez.",
         "action": "Bağla"
       },
-      "start": {
-        "question": "Nasıl başlamak istersin?",
-        "createOne": "{{name}} oluştur",
-        "team": "Başlangıç ekibi kur",
-        "describe": "Neye ihtiyacım olduğunu anlat",
-        "import": "Ajanlarımı içe aktar",
-        "form": "Formu doldur"
-      },
       "again": {
         "question": "Ekibi benimle kurmak ister misin?",
         "action": "Ekibi kur",
         "message": "Ekibi kurmama yardım et."
       },
       "next": {
-        "question": "Ekip geldi. Şimdi ne yapalım?",
-        "invite": "Kişileri davet et",
         "firstTask": "{{name}} için ilk görevi ver"
       },
       "style": {
@@ -1938,12 +1928,6 @@
         "text": "Tüm ajanlar için geçerli, hesabınızdan istediğiniz zaman değiştirebilirsiniz.",
         "simple": "Basit, teknik terim yok",
         "technical": "Teknik, ayrıntılarıyla"
-      },
-      "firstTask": {
-        "theo": "İlk haftamızın planını çıkar: her birimiz önce ne yapıyor?",
-        "ada": "Bizim için önce neyi geliştirebilir ya da otomatikleştirebilirsin?",
-        "lia": "En yakın 5 rakibimiz kim ve bizden daha iyi ne yapıyorlar?",
-        "atlas": "Hatalarımızda, kuyruklarımızda ve deploy'larımızda önce neyi izleyeceksin, bir şey bozulduğunda bana nasıl haber vereceksin?"
       }
     },
     "profile": {
@@ -3711,46 +3695,11 @@
       "answer": "Yanıtla",
       "open": "Aç"
     },
-    "steps": {
-      "title": "İlk adımlar",
-      "progress": "{{done}}/{{total}}",
-      "hide": "Gizle",
-      "done": "Tamam",
-      "agent": {
-        "title": "İlk ajanınızı oluşturun",
-        "text": "Ne yaptığını söyleyin, ekibe katılsın.",
-        "action": "Ajan oluştur"
-      },
-      "plan": {
-        "title": "Bir agentes.chat planı seç",
-        "text": "Çalışma alanının planı olunca ajanlar çalışmaya başlar.",
-        "action": "Planları gör"
-      },
-      "ai": {
-        "title": "Bir yapay zeka bağlayın",
-        "text": "Ajanlarınız onunla düşünür.",
-        "action": "Bağla"
-      },
-      "ask": {
-        "title": "Bir ajandan bir şey isteyin",
-        "text": "Aşağıya veya bir konuşmaya yazın.",
-        "action": "Sor"
-      },
-      "team": {
-        "title": "Ekibinizi davet edin",
-        "text": "Kişiler ve ajanlar burada birlikte çalışır.",
-        "action": "Davet et"
-      },
-      "routine": {
-        "title": "Bir rutin oluşturun",
-        "text": "Bir ajan bir işi kendi başına, programına göre yapar.",
-        "action": "Rutin oluştur"
-      }
-    },
     "calm": {
       "title": "Her şey yolunda",
       "text": "Ajanlarınız size ihtiyaç duyduklarında burada haber verecek."
-    }
+    },
+    "firstRun": "Kaldığın yerden devam et · {{total}} adımdan {{done}}"
   },
   "notifications": {
     "title": "Bildirimler",
@@ -5123,6 +5072,70 @@
     "tasks": {
       "a": "Benim için neler yapabilirsiniz?",
       "b": "Nereden başlıyoruz?"
+    },
+    "firstRun": {
+      "title": "{{org}} ekibinin işe başlaması için",
+      "complete": "Her şey hazır.",
+      "notNow": "Şimdi değil",
+      "afterPlan": "Planla açılır.",
+      "about": {
+        "todo": "{{org}} ne yapıyor, anlat.",
+        "todoDesc": "Bunu tüm ajanlar okur.",
+        "action": "Anlat",
+        "done": "{{org}} ne yapıyor biliyorum",
+        "title": "{{org}} ne yapıyor?",
+        "desc": "Bunu tüm ajanlar okur. İstediğin zaman değiştirebilirsin.",
+        "line": "Tek cümleyle",
+        "optional": "İsteğe bağlı. Cümle yoksa seçtiğin tür geçerli."
+      },
+      "team": {
+        "todo": "Ekibi kur.",
+        "todoDesc": "İşin için bir şablon, sonra her şeyi değiştirebilirsin.",
+        "action": "Ekibi gör",
+        "done_one": "Ekipte {{count}} ajan",
+        "done_other": "Ekipte {{count}} ajan",
+        "card": "Aşağıdaki kartta devam et"
+      },
+      "ai": {
+        "todo": "Bir yapay zekâ bağla.",
+        "todoDesc": "Zaten ödediğin olur.",
+        "action": "Bağla",
+        "done": "{{label}} ile düşünüyorum",
+        "doneAny": "Artık bir yapay zekâ ile düşünüyorum",
+        "plan": "agentes.chat planıyla açılır.",
+        "planAction": "agentes.chat planlarını gör"
+      },
+      "apps": {
+        "todo": "İş uygulamalarını bağla.",
+        "todoDesc": "Okumak hiçbir şeyi değiştirmez.",
+        "action": "Seç",
+        "done": "{{apps}} okuyorum",
+        "doneNone": "Şimdilik uygulama yok",
+        "title": "İş uygulamaları",
+        "desc": "Yeni kurduğun ekibin kullanacakları önce gelir. Okumak hiçbir şeyi değiştirmez, göndermek, silmek ve ödemek ise onayını ister.",
+        "connect": "Bağla",
+        "all": "Tüm uygulamaları gör"
+      },
+      "people": {
+        "todo": "Birlikte çalıştığın kişileri çağır.",
+        "todoDesc": "Onlar da ajanlarla konuşur.",
+        "action": "Davet et",
+        "done_one": "Burada {{count}} kişi",
+        "done_other": "Burada {{count}} kişi",
+        "doneNone": "Şimdilik sadece sen"
+      },
+      "say": {
+        "about": "Not aldım. Bunu tüm ajanlar okur.",
+        "team": "Ekip geldi.",
+        "ai": "Artık ekip düşünüyor.",
+        "apps": "Tamam, artık uygulamaları okuyorum.",
+        "people": "Burada daha çok insan olması güzel."
+      },
+      "asks": {
+        "lead": "Şimdi benden bir şey iste:",
+        "fit": "Ekibi işime göre ayarla",
+        "who": "Ekipte kim neyle ilgileniyor?"
+      }
     }
   },
   "newAgent": {
@@ -15529,11 +15542,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "{{org}} ne iş yapıyor? Buna göre hazır bir ekip kurarım, sen sadece kontrol edersin.",
-      "orWrite": "Ya da aşağıya kendi sözlerinle, tek cümleyle yaz.",
-      "footer": "Ne istediğini biliyor musun?",
-      "templates": "Ekip şablonlarını gör",
-      "presets": "Hazır ajanlar"
+      "templates": "Ekip şablonlarını gör"
     },
     "business": {
       "agency": "Ajans",
@@ -15544,7 +15553,6 @@
       "services": "Hizmet ofisi",
       "other": "Başka bir şey"
     },
-    "answered": "yanıtlandı",
     "step": "Soru {{step}}/{{of}}",
     "send": "{{count}} gönder",
     "card": {
@@ -15599,11 +15607,14 @@
     "templates": {
       "title": "Ekip şablonları",
       "lead": "İşletme türüne uygun hazır bir ekip. Sonra {{name}} seninle birlikte uyarlar.",
-      "heldLead": "İşine en yakın olanı seç. Oluşturmadan önce her ajanı ayarlayabilirsin.",
-      "use": "Bu şablonu kullan",
+      "heldLead": "İşine en yakın olanı seç. Sonra her şeyi değiştirebilirsin.",
+      "create": "Ekibi oluştur",
+      "import": "Başka bir uygulamadan ajan getir",
+      "scratch": "Sıfırdan ajan oluştur",
+      "failed": "Ekip oluşturulmadı. Nedeni sohbetteki kartta.",
       "none": "Hiçbiri",
       "noneSub": "Ne yaptığını anlat, {{name}} kursun",
-      "tailor": "Sonra işine uyarlamak için 2 soru soracağım."
+      "tailor": "Sonra sadece işine göre ayarlamamı iste."
     },
     "weekly": {
       "name": "Ekibin haftası"
@@ -15752,7 +15763,6 @@
         "line": "PR açmadan önce neyin kontrol edileceği"
       }
     },
-    "approvals": "Müşterilere gidenler onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin.",
-    "ask": "{{name}} şablonunu kullandım. İşine uyarlamak için: **{{org}} neyi farklı yapıyor?**"
+    "approvals": "Müşterilere gidenler onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin."
   }
 }

@@ -122,7 +122,11 @@ export async function ensureRightHand(db: Executor, orgId: string): Promise<stri
     .where(and(eq(agents.orgId, orgId), eq(agents.builtin, RIGHT_HAND)));
   if (had) return null;
   const { freeHandle, takenHandles } = await import("./agents");
-  const taken = await takenHandles(db, orgId);
+  const { FIRST_RUN_SETUP } = await import("./setup-checklist");
+  const [taken, [other]] = await Promise.all([
+    takenHandles(db, orgId),
+    db.select({ id: agents.id }).from(agents).where(eq(agents.orgId, orgId)).limit(1),
+  ]);
   const handle = taken.has(RIGHT_HAND_DEFAULTS.handle)
     ? freeHandle(RIGHT_HAND_DEFAULTS.handle, taken)
     : RIGHT_HAND_DEFAULTS.handle;
@@ -137,6 +141,8 @@ export async function ensureRightHand(db: Executor, orgId: string): Promise<stri
       brainModel: AUTO_MODEL,
       brainEffort: AUTO_MODEL,
       appearance: { ...RIGHT_HAND_DEFAULTS.appearance },
+      // A workspace with no agent yet opens on its first-run checklist (ADR 0152 §6).
+      ...(other ? {} : { setup: FIRST_RUN_SETUP }),
     })
     .onConflictDoNothing()
     .returning({ id: agents.id });

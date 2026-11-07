@@ -106,8 +106,7 @@
     "waiting": "Wartet auf dich",
     "workingNow": "Arbeitet gerade",
     "missionTitle": "Mission {{title}}",
-    "directChat": "Direkter Chat",
-    "stepAsk": "Starte eine Unterhaltung mit einem Agenten."
+    "directChat": "Direkter Chat"
   },
   "approval": {
     "asksIn": "bittet um deine Freigabe · #{{channel}}",

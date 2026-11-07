@@ -193,10 +193,31 @@ test("its prompt says what the person may do, and shows only the agents they may
   expect(member).not.toContain("US$");
 });
 
+test("while an owner's first-run card has a row open, its prompt points to the card instead of listing the gaps", async () => {
+  f = await setup({ rightHand: true });
+  const [lodi] = await rightHandOf(f.org.id);
+  if (!lodi) throw new Error("no right hand");
+  const prompt = (personId: string) =>
+    rightHandPrompt({ db: f.db }, { orgId: f.org.id, agent: lodi, personId, inDm: true });
+  await f.db.update(schema.organizations).set({ context: "" }).where(eq(schema.organizations.id, f.org.id));
+  const owner = await prompt(f.owner.id);
+  expect(owner).toContain("The checklist card at the top of your DM shows what is left to set up");
+  expect(owner).not.toContain("The workspace has no context yet");
+  expect(owner).not.toContain("No computer is ready");
+  // The interview is for whoever asks: no start card to point to any more.
+  expect(owner).toContain("When they ask at any time to build or redo the team");
+  expect(owner).not.toContain("start card");
+  // Someone else has no card: the gaps as before.
+  const member = await addMember(f.db, f.org.id, "member");
+  expect(await prompt(member.id)).toContain("The workspace has no context yet");
+});
+
 test("its setup checklist names the workspace's context and a computer until they are there", async () => {
   f = await setup({ rightHand: true });
   const [lodi] = await rightHandOf(f.org.id);
   if (!lodi) throw new Error("no right hand");
+  // A workspace that had a team before the first-run card has none.
+  await f.db.update(schema.agents).set({ setup: null }).where(eq(schema.agents.id, lodi.id));
   const prompt = () =>
     rightHandPrompt({ db: f.db }, { orgId: f.org.id, agent: lodi, personId: f.owner.id, inDm: true });
   await f.db.update(schema.organizations).set({ context: "" }).where(eq(schema.organizations.id, f.org.id));

@@ -1916,15 +1916,6 @@ export const ptBR = {
         text: "Os agentes pensam com a IA do workspace. Entre com o seu plano do Claude ou do ChatGPT, sem chave de API.",
         action: "Conectar",
       },
-      start: {
-        question: "Como você quer começar?",
-        /** A ready-made agent's tile: creates it alone. */
-        createOne: "Criar {{name}}",
-        team: "Montar um time pra começar",
-        describe: "Descrever o que preciso",
-        import: "Importar meus agentes",
-        form: "Preencher o formulário",
-      },
       /** Under its greeting once the start card stopped asking; `message`: what the button sends, as the person. */
       again: {
         question: "Quer montar o time comigo?",
@@ -1932,8 +1923,6 @@ export const ptBR = {
         message: "Me ajuda a montar o time.",
       },
       next: {
-        question: "O time chegou. E agora?",
-        invite: "Convidar pessoas",
         firstTask: "Dar a primeira tarefa para o {{name}}",
         firstTask_female: "Dar a primeira tarefa para a {{name}}",
       },
@@ -1943,14 +1932,6 @@ export const ptBR = {
         text: "Vale para todos os agentes, e você muda quando quiser na sua conta.",
         simple: "Simples, sem termos técnicos",
         technical: "Técnico, com os detalhes",
-      },
-      /** Written in the ready-made agent's DM composer by "Dar a primeira tarefa", for the person to send or change. */
-      firstTask: {
-        theo: "Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?",
-        ada: "O que você poderia construir ou automatizar para a gente primeiro?",
-        lia: "Quem são os nossos 5 concorrentes mais próximos, e o que eles fazem melhor que a gente?",
-        atlas:
-          "O que você vai acompanhar primeiro nos nossos erros, filas e deploys, e como me avisa quando algo quebrar?",
       },
     },
     profile: {
@@ -3801,31 +3782,9 @@ export const ptBR = {
     mission: "<b>{{name}}</b> espera você numa missão",
     seeAll: "Ver tudo",
     action: { review: "Revisar", answer: "Responder", open: "Abrir" },
-    steps: {
-      title: "Primeiros passos",
-      progress: "{{done}} de {{total}}",
-      hide: "Ocultar",
-      done: "Feito",
-      agent: {
-        title: "Crie seu primeiro agente",
-        text: "Diga o que ele faz e ele entra na equipe.",
-        action: "Criar agente",
-      },
-      plan: {
-        title: "Escolher um plano do agentes.chat",
-        text: "Os agentes começam a trabalhar quando o workspace tiver um.",
-        action: "Ver planos",
-      },
-      ai: { title: "Conecte uma IA", text: "É com ela que os agentes pensam.", action: "Conectar" },
-      ask: { title: "Peça algo a um agente", text: "Escreva aqui embaixo ou numa conversa.", action: "Pedir" },
-      team: { title: "Convide seu time", text: "Pessoas e agentes trabalham juntos aqui.", action: "Convidar" },
-      routine: {
-        title: "Crie uma rotina",
-        text: "Um agente faz algo sozinho, na hora marcada.",
-        action: "Criar rotina",
-      },
-    },
     calm: { title: "Tudo em dia", text: "Seus agentes avisam aqui quando precisarem de você." },
+    /** One line back to the right hand's first-run checklist while a row is left (ADR 0152 §6). */
+    firstRun: "Continue de onde parou · {{done}} de {{total}}",
   },
   notifications: {
     title: "Notificações",
@@ -5257,6 +5216,78 @@ export const ptBR = {
     tasks: {
       a: "O que você consegue fazer por mim?",
       b: "Por onde a gente começa?",
+    },
+    /**
+     * The right hand's first run (ADR 0152 §6): its checklist card for the workspace's owners, one row per thing to set
+     * up, read done from the data; `{{org}}`: the workspace.
+     */
+    firstRun: {
+      title: "Para o time da {{org}} começar a trabalhar",
+      complete: "Tudo pronto.",
+      notNow: "Agora não",
+      /** Apps and people on a billing hold: no button, they open with the plan. */
+      afterPlan: "Abre com o plano.",
+      about: {
+        todo: "Me conte o que a {{org}} faz.",
+        todoDesc: "Todos os agentes leem isso.",
+        action: "Contar",
+        done: "Já sei o que a {{org}} faz",
+        title: "O que a {{org}} faz?",
+        desc: "Todos os agentes leem isso. Você muda quando quiser.",
+        line: "Em uma frase",
+        optional: "Opcional. Sem frase, vale o tipo que você marcou.",
+      },
+      team: {
+        todo: "Monte o time.",
+        todoDesc: "Um modelo para o seu negócio, você muda tudo depois.",
+        action: "Ver o time",
+        done_one: "{{count}} agente no time",
+        done_other: "{{count}} agentes no time",
+        /** While a team card the right hand proposed waits in the chat. */
+        card: "Continue no card abaixo",
+      },
+      ai: {
+        todo: "Conecte uma IA.",
+        todoDesc: "Serve a que você já paga.",
+        action: "Conectar",
+        done: "Penso com {{label}}",
+        doneAny: "Já penso com uma IA",
+        plan: "Abre com o plano do agentes.chat.",
+        planAction: "Ver planos do agentes.chat",
+      },
+      apps: {
+        todo: "Conecte os apps do trabalho.",
+        todoDesc: "Ler nunca muda nada.",
+        action: "Escolher",
+        done: "Leio {{apps}}",
+        doneNone: "Sem apps por enquanto",
+        title: "Os apps do trabalho",
+        desc: "Os que o time acabou de usar vêm primeiro. Ler nunca muda nada, e enviar, apagar e pagar pedem a sua aprovação.",
+        connect: "Conectar",
+        all: "Ver todos os apps",
+      },
+      people: {
+        todo: "Chame quem trabalha com você.",
+        todoDesc: "Eles falam com os agentes também.",
+        action: "Convidar",
+        done_one: "{{count}} pessoa aqui",
+        done_other: "{{count}} pessoas aqui",
+        doneNone: "Só você por enquanto",
+      },
+      /** Its line for a moment once a row is done. */
+      say: {
+        about: "Anotado. Todos os agentes leem isso.",
+        team: "O time chegou.",
+        ai: "Agora o time pensa.",
+        apps: "Pronto, já leio os apps.",
+        people: "Que bom ter mais gente aqui.",
+      },
+      /** Once the team can think: what the person may ask next. `fit` and `who` are sent to the right hand as written. */
+      asks: {
+        lead: "Agora me peça algo:",
+        fit: "Ajuste o time ao meu negócio",
+        who: "Quem do time cuida do quê?",
+      },
     },
   },
   newAgent: {
@@ -15600,11 +15631,7 @@ export const ptBR = {
   },
   teamPlan: {
     start: {
-      question: "O que a {{org}} faz? Com isso eu monto um time pronto, e você só confere.",
-      orWrite: "Ou escreva do seu jeito aqui embaixo, numa frase.",
-      footer: "Já sabe o que quer?",
       templates: "Ver modelos de time",
-      presets: "Agentes prontos",
     },
     business: {
       agency: "Agência",
@@ -15615,7 +15642,6 @@ export const ptBR = {
       services: "Escritório de serviços",
       other: "Outra coisa",
     },
-    answered: "respondida",
     step: "Pergunta {{step}} de {{of}}",
     send: "Enviar {{count}}",
     card: {
@@ -15671,11 +15697,14 @@ export const ptBR = {
     templates: {
       title: "Modelos de time",
       lead: "Um time pronto para o seu tipo de negócio. Depois o {{name}} ajusta com você.",
-      heldLead: "Escolha o mais perto do seu negócio. Você ajusta cada agente antes de criar.",
-      use: "Usar este modelo",
+      heldLead: "Escolha o mais perto do seu negócio. Você muda tudo depois.",
+      create: "Criar o time",
+      import: "Trazer agentes de outro app",
+      scratch: "Criar um agente do zero",
+      failed: "O time não foi criado. O motivo está no card da conversa.",
       none: "Nenhum desses",
       noneSub: "Conte o que você faz e o {{name}} monta",
-      tailor: "Depois eu faço 2 perguntas para ajustar ao seu caso.",
+      tailor: "Depois é só me pedir para ajustar ao seu negócio.",
     },
     weekly: {
       name: "A semana do time",
@@ -15825,6 +15854,5 @@ export const ptBR = {
       },
     },
     approvals: "O que sai para os clientes espera a sua aprovação. Dá para liberar depois, quando você confiar neles.",
-    ask: "Usei o modelo {{name}}. Para ajustar ao seu caso: **o que a {{org}} faz de diferente?**",
   },
 } satisfies LocaleStrings;

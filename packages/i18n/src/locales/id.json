@@ -1844,22 +1844,12 @@
         "text": "Agen berpikir dengan AI workspace. Masuk dengan paket Claude atau ChatGPT Anda, tanpa kunci API.",
         "action": "Hubungkan"
       },
-      "start": {
-        "question": "Bagaimana Anda ingin mulai?",
-        "createOne": "Buat {{name}}",
-        "team": "Susun tim awal",
-        "describe": "Jelaskan yang saya butuhkan",
-        "import": "Impor agen saya",
-        "form": "Isi formulir"
-      },
       "again": {
         "question": "Mau menyusun tim bersama saya?",
         "action": "Susun tim",
         "message": "Bantu saya menyusun tim."
       },
       "next": {
-        "question": "Timnya sudah datang. Lalu apa?",
-        "invite": "Undang orang",
         "firstTask": "Beri {{name}} tugas pertama"
       },
       "style": {
@@ -1867,12 +1857,6 @@
         "text": "Berlaku untuk semua agen, dan bisa kamu ubah kapan saja di akunmu.",
         "simple": "Sederhana, tanpa istilah teknis",
         "technical": "Teknis, lengkap dengan detailnya"
-      },
-      "firstTask": {
-        "theo": "Susun rencana minggu pertama kita: apa yang dikerjakan masing-masing dari kita lebih dulu?",
-        "ada": "Apa yang bisa kamu bangun atau otomatiskan untuk kami lebih dulu?",
-        "lia": "Siapa 5 pesaing terdekat kita, dan apa yang mereka lakukan lebih baik dari kita?",
-        "atlas": "Apa yang akan kamu pantau lebih dulu dari error, antrean, dan deploy kita, dan bagaimana kamu memberi tahu saya saat ada yang rusak?"
       }
     },
     "profile": {
@@ -3603,46 +3587,11 @@
       "answer": "Jawab",
       "open": "Buka"
     },
-    "steps": {
-      "title": "Langkah pertama",
-      "progress": "{{done}} dari {{total}}",
-      "hide": "Sembunyikan",
-      "done": "Selesai",
-      "agent": {
-        "title": "Buat agen pertamamu",
-        "text": "Sebutkan tugasnya dan agen itu bergabung ke tim.",
-        "action": "Buat agen"
-      },
-      "plan": {
-        "title": "Pilih paket agentes.chat",
-        "text": "Agen mulai bekerja setelah workspace punya paket.",
-        "action": "Lihat paket"
-      },
-      "ai": {
-        "title": "Hubungkan AI",
-        "text": "Dengan inilah agenmu berpikir.",
-        "action": "Hubungkan"
-      },
-      "ask": {
-        "title": "Minta sesuatu ke agen",
-        "text": "Tulis di bawah atau di percakapan.",
-        "action": "Minta"
-      },
-      "team": {
-        "title": "Undang timmu",
-        "text": "Di sini orang dan agen bekerja bersama.",
-        "action": "Undang"
-      },
-      "routine": {
-        "title": "Buat rutinitas",
-        "text": "Agen mengerjakan sesuatu sendiri, sesuai jadwal.",
-        "action": "Buat rutinitas"
-      }
-    },
     "calm": {
       "title": "Semua beres",
       "text": "Agenmu akan memberi tahu di sini saat mereka membutuhkanmu."
-    }
+    },
+    "firstRun": "Lanjutkan dari terakhir · {{done}} dari {{total}}"
   },
   "notifications": {
     "title": "Notifikasi",
@@ -4978,6 +4927,68 @@
     "tasks": {
       "a": "Apa yang bisa kamu lakukan untukku?",
       "b": "Mulai dari mana?"
+    },
+    "firstRun": {
+      "title": "Agar tim {{org}} mulai bekerja",
+      "complete": "Semua siap.",
+      "notNow": "Nanti saja",
+      "afterPlan": "Terbuka dengan paket.",
+      "about": {
+        "todo": "Ceritakan apa yang dilakukan {{org}}.",
+        "todoDesc": "Semua agen membaca ini.",
+        "action": "Ceritakan",
+        "done": "Saya tahu apa yang dilakukan {{org}}",
+        "title": "Apa yang dilakukan {{org}}?",
+        "desc": "Semua agen membaca ini. Kamu bisa mengubahnya kapan saja.",
+        "line": "Dalam satu kalimat",
+        "optional": "Opsional. Tanpa kalimat, jenis yang kamu pilih yang dipakai."
+      },
+      "team": {
+        "todo": "Bentuk timnya.",
+        "todoDesc": "Template untuk bisnismu, semuanya bisa diubah nanti.",
+        "action": "Lihat tim",
+        "done_other": "{{count}} agen di tim",
+        "card": "Lanjutkan di kartu di bawah"
+      },
+      "ai": {
+        "todo": "Hubungkan AI.",
+        "todoDesc": "Yang sudah kamu bayar bisa dipakai.",
+        "action": "Hubungkan",
+        "done": "Saya berpikir dengan {{label}}",
+        "doneAny": "Saya sudah berpikir dengan AI",
+        "plan": "Terbuka dengan paket agentes.chat.",
+        "planAction": "Lihat paket agentes.chat"
+      },
+      "apps": {
+        "todo": "Hubungkan aplikasi kerjamu.",
+        "todoDesc": "Membaca tidak pernah mengubah apa pun.",
+        "action": "Pilih",
+        "done": "Saya membaca {{apps}}",
+        "doneNone": "Belum ada aplikasi",
+        "title": "Aplikasi kerjamu",
+        "desc": "Yang akan dipakai tim barumu muncul lebih dulu. Membaca tidak pernah mengubah apa pun, dan mengirim, menghapus, serta membayar meminta persetujuanmu.",
+        "connect": "Hubungkan",
+        "all": "Lihat semua aplikasi"
+      },
+      "people": {
+        "todo": "Ajak orang yang bekerja denganmu.",
+        "todoDesc": "Mereka juga bicara dengan agen.",
+        "action": "Undang",
+        "done_other": "{{count}} orang di sini",
+        "doneNone": "Baru kamu saja"
+      },
+      "say": {
+        "about": "Dicatat. Semua agen membaca ini.",
+        "team": "Timnya sudah datang.",
+        "ai": "Sekarang tim bisa berpikir.",
+        "apps": "Selesai, saya sudah membaca aplikasinya.",
+        "people": "Senang ada lebih banyak orang di sini."
+      },
+      "asks": {
+        "lead": "Sekarang minta sesuatu ke saya:",
+        "fit": "Sesuaikan tim dengan bisnis saya",
+        "who": "Siapa di tim mengurus apa?"
+      }
     }
   },
   "newAgent": {
@@ -15166,11 +15177,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "Apa yang dikerjakan {{org}}? Dengan itu saya susun tim yang siap, dan kamu tinggal mengecek.",
-      "orWrite": "Atau tulis dengan caramu di bawah, dalam satu kalimat.",
-      "footer": "Sudah tahu yang kamu mau?",
-      "templates": "Lihat template tim",
-      "presets": "Agen siap pakai"
+      "templates": "Lihat template tim"
     },
     "business": {
       "agency": "Agensi",
@@ -15181,7 +15188,6 @@
       "services": "Kantor jasa",
       "other": "Lainnya"
     },
-    "answered": "terjawab",
     "step": "Pertanyaan {{step}} dari {{of}}",
     "send": "Kirim {{count}}",
     "card": {
@@ -15233,11 +15239,14 @@
     "templates": {
       "title": "Template tim",
       "lead": "Tim siap untuk jenis usahamu. Lalu {{name}} menyesuaikannya bersamamu.",
-      "heldLead": "Pilih yang paling dekat dengan usahamu. Kamu bisa menyesuaikan setiap agen sebelum membuatnya.",
-      "use": "Pakai template ini",
+      "heldLead": "Pilih yang paling mirip bisnismu. Semuanya bisa diubah nanti.",
+      "create": "Buat tim",
+      "import": "Bawa agen dari aplikasi lain",
+      "scratch": "Buat agen dari awal",
+      "failed": "Tim tidak dibuat. Alasannya ada di kartu percakapan.",
       "none": "Tidak ada yang cocok",
       "noneSub": "Ceritakan apa yang kamu kerjakan dan {{name}} menyusunnya",
-      "tailor": "Lalu saya ajukan 2 pertanyaan untuk menyesuaikannya dengan usahamu."
+      "tailor": "Nanti, cukup minta saya menyesuaikannya dengan bisnismu."
     },
     "weekly": {
       "name": "Minggu tim"
@@ -15385,7 +15394,6 @@
         "line": "apa yang dicek sebelum membuka PR"
       }
     },
-    "approvals": "Yang dikirim ke pelanggan menunggu persetujuanmu. Kamu bisa melepasnya nanti, saat sudah percaya pada mereka.",
-    "ask": "Saya pakai template {{name}}. Untuk menyesuaikannya dengan usahamu: **apa yang membuat {{org}} berbeda?**"
+    "approvals": "Yang dikirim ke pelanggan menunggu persetujuanmu. Kamu bisa melepasnya nanti, saat sudah percaya pada mereka."
   }
 }

@@ -106,8 +106,7 @@
     "waiting": "Sizi bekliyor",
     "workingNow": "Şu an çalışıyor",
     "missionTitle": "Misyon {{title}}",
-    "directChat": "Doğrudan sohbet",
-    "stepAsk": "Bir ajanla sohbet başlatın."
+    "directChat": "Doğrudan sohbet"
   },
   "approval": {
     "asksIn": "onayınızı istiyor · #{{channel}}",

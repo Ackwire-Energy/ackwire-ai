@@ -1992,22 +1992,12 @@
         "text": "Los agentes piensan con la IA del workspace. Inicia sesión con tu plan de Claude o de ChatGPT, sin clave de API.",
         "action": "Conectar"
       },
-      "start": {
-        "question": "¿Cómo quieres empezar?",
-        "createOne": "Crear a {{name}}",
-        "team": "Armar un equipo para empezar",
-        "describe": "Describir lo que necesito",
-        "import": "Importar mis agentes",
-        "form": "Llenar el formulario"
-      },
       "again": {
         "question": "¿Quieres armar el equipo conmigo?",
         "action": "Armar el equipo",
         "message": "Ayúdame a armar el equipo."
       },
       "next": {
-        "question": "El equipo ya llegó. ¿Y ahora?",
-        "invite": "Invitar personas",
         "firstTask": "Darle una primera tarea a {{name}}"
       },
       "style": {
@@ -2015,12 +2005,6 @@
         "text": "Vale para todos los agentes, y puedes cambiarlo cuando quieras en tu cuenta.",
         "simple": "Sencillo, sin términos técnicos",
         "technical": "Técnico, con los detalles"
-      },
-      "firstTask": {
-        "theo": "Arma el plan de nuestra primera semana: ¿qué hace primero cada uno de nosotros?",
-        "ada": "¿Qué podrías construir o automatizar para nosotros primero?",
-        "lia": "¿Quiénes son nuestros 5 competidores más cercanos, y qué hacen mejor que nosotros?",
-        "atlas": "¿Qué vas a vigilar primero en nuestros errores, colas y deploys, y cómo me avisas cuando algo falle?"
       }
     },
     "profile": {
@@ -3832,46 +3816,11 @@
       "answer": "Responder",
       "open": "Abrir"
     },
-    "steps": {
-      "title": "Primeros pasos",
-      "progress": "{{done}} de {{total}}",
-      "hide": "Ocultar",
-      "done": "Hecho",
-      "agent": {
-        "title": "Crea tu primer agente",
-        "text": "Di qué hace y se une al equipo.",
-        "action": "Crear agente"
-      },
-      "plan": {
-        "title": "Elige un plan de agentes.chat",
-        "text": "Los agentes empiezan a trabajar cuando el workspace tenga uno.",
-        "action": "Ver planes"
-      },
-      "ai": {
-        "title": "Conecta una IA",
-        "text": "Es con lo que piensan tus agentes.",
-        "action": "Conectar"
-      },
-      "ask": {
-        "title": "Pídele algo a un agente",
-        "text": "Escribe abajo o en una conversación.",
-        "action": "Pedir"
-      },
-      "team": {
-        "title": "Invita a tu equipo",
-        "text": "Aquí las personas y los agentes trabajan juntos.",
-        "action": "Invitar"
-      },
-      "routine": {
-        "title": "Crea una rutina",
-        "text": "Un agente hace algo por su cuenta, a la hora programada.",
-        "action": "Crear rutina"
-      }
-    },
     "calm": {
       "title": "Todo al día",
       "text": "Tus agentes te avisarán aquí cuando te necesiten."
-    }
+    },
+    "firstRun": "Sigue donde lo dejaste · {{done}} de {{total}}"
   },
   "notifications": {
     "title": "Notificaciones",
@@ -5302,6 +5251,70 @@
     "tasks": {
       "a": "¿Qué puedes hacer por mí?",
       "b": "¿Por dónde empezamos?"
+    },
+    "firstRun": {
+      "title": "Para que el equipo de {{org}} empiece a trabajar",
+      "complete": "Todo listo.",
+      "notNow": "Ahora no",
+      "afterPlan": "Se abre con el plan.",
+      "about": {
+        "todo": "Cuéntame qué hace {{org}}.",
+        "todoDesc": "Todos los agentes leen esto.",
+        "action": "Contar",
+        "done": "Ya sé qué hace {{org}}",
+        "title": "¿Qué hace {{org}}?",
+        "desc": "Todos los agentes leen esto. Lo cambias cuando quieras.",
+        "line": "En una frase",
+        "optional": "Opcional. Sin frase, vale el tipo que marcaste."
+      },
+      "team": {
+        "todo": "Arma el equipo.",
+        "todoDesc": "Una plantilla para tu negocio, puedes cambiarlo todo después.",
+        "action": "Ver el equipo",
+        "done_one": "{{count}} agente en el equipo",
+        "done_other": "{{count}} agentes en el equipo",
+        "card": "Sigue en la tarjeta de abajo"
+      },
+      "ai": {
+        "todo": "Conecta una IA.",
+        "todoDesc": "Sirve la que ya pagas.",
+        "action": "Conectar",
+        "done": "Pienso con {{label}}",
+        "doneAny": "Ya pienso con una IA",
+        "plan": "Se abre con el plan de agentes.chat.",
+        "planAction": "Ver planes de agentes.chat"
+      },
+      "apps": {
+        "todo": "Conecta las apps del trabajo.",
+        "todoDesc": "Leer nunca cambia nada.",
+        "action": "Elegir",
+        "done": "Leo {{apps}}",
+        "doneNone": "Sin apps por ahora",
+        "title": "Las apps del trabajo",
+        "desc": "Primero las que usaría el equipo que acabas de crear. Leer nunca cambia nada, y enviar, borrar y pagar piden tu aprobación.",
+        "connect": "Conectar",
+        "all": "Ver todas las apps"
+      },
+      "people": {
+        "todo": "Llama a quienes trabajan contigo.",
+        "todoDesc": "Ellos también hablan con los agentes.",
+        "action": "Invitar",
+        "done_one": "{{count}} persona aquí",
+        "done_other": "{{count}} personas aquí",
+        "doneNone": "Solo tú por ahora"
+      },
+      "say": {
+        "about": "Anotado. Todos los agentes leen esto.",
+        "team": "Llegó el equipo.",
+        "ai": "Ahora el equipo piensa.",
+        "apps": "Listo, ya leo las apps.",
+        "people": "Qué bueno tener más gente aquí."
+      },
+      "asks": {
+        "lead": "Ahora pídeme algo:",
+        "fit": "Ajusta el equipo a mi negocio",
+        "who": "¿Quién del equipo se encarga de qué?"
+      }
     }
   },
   "newAgent": {
@@ -16076,11 +16089,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "¿Qué hace {{org}}? Con eso armo un equipo listo, y tú solo lo revisas.",
-      "orWrite": "O escríbelo a tu manera aquí abajo, en una frase.",
-      "footer": "¿Ya sabes lo que quieres?",
-      "templates": "Ver plantillas de equipo",
-      "presets": "Agentes listos"
+      "templates": "Ver plantillas de equipo"
     },
     "business": {
       "agency": "Agencia",
@@ -16091,7 +16100,6 @@
       "services": "Despacho de servicios",
       "other": "Otra cosa"
     },
-    "answered": "respondida",
     "step": "Pregunta {{step}} de {{of}}",
     "send": "Enviar {{count}}",
     "card": {
@@ -16146,11 +16154,14 @@
     "templates": {
       "title": "Plantillas de equipo",
       "lead": "Un equipo listo para tu tipo de negocio. Después {{name}} lo ajusta contigo.",
-      "heldLead": "Elige lo más parecido a tu negocio. Puedes ajustar cada agente antes de crearlo.",
-      "use": "Usar esta plantilla",
+      "heldLead": "Elige el más cercano a tu negocio. Puedes cambiarlo todo después.",
+      "create": "Crear el equipo",
+      "import": "Traer agentes de otra app",
+      "scratch": "Crear un agente desde cero",
+      "failed": "El equipo no se creó. El motivo está en la tarjeta de la conversación.",
       "none": "Ninguna de estas",
       "noneSub": "Cuenta lo que haces y {{name}} lo arma",
-      "tailor": "Después hago 2 preguntas para ajustarlo a tu caso."
+      "tailor": "Después, solo pídeme que lo ajuste a tu negocio."
     },
     "weekly": {
       "name": "La semana del equipo"
@@ -16300,7 +16311,6 @@
         "line": "qué revisar antes de abrir un PR"
       }
     },
-    "approvals": "Lo que sale para los clientes espera tu aprobación. Puedes liberarlo después, cuando confíes en ellos.",
-    "ask": "Usé la plantilla {{name}}. Para ajustarla a tu caso: **¿qué hace diferente {{org}}?**"
+    "approvals": "Lo que sale para los clientes espera tu aprobación. Puedes liberarlo después, cuando confíes en ellos."
   }
 }

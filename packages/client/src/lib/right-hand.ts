@@ -2,7 +2,6 @@ import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
 import type { Agent, AgentBrain, BrainScope, Credential, DirectMessage, Model } from "../api/types";
 import { agentGrammar } from "./grammar";
-import { PRESETS } from "./onboarding";
 import { AUTO, keyRuns } from "./providers";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
@@ -105,12 +104,13 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
   return { orgId, agentId: rightHand?.id ?? null };
 }
 
-/** The ready-made agents not created yet, by handle. */
-export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p) => !teamHandles.includes(p));
+/** Where the first-run checklist stands for this person (ADR 0152 §6): `none` when it isn't theirs. */
+export type FirstRunState = "none" | "open" | "complete";
 
 /**
  * Whether its greeting ends with the way to build the team again, for whoever may create agents once an AI is there:
- * only with a team and no card left under the greeting (`cards`), which would offer the same or ask something first.
+ * only with a team, no card left under the greeting (`cards`) and no open checklist, which would offer the same or
+ * ask something first.
  */
 export const offersTeamSetup = (s: {
   noAi: boolean;
@@ -121,41 +121,29 @@ export const offersTeamSetup = (s: {
   cards: readonly string[];
   /** A billing hold (`planHoldOf`): it can't answer, so its line would send a message that gets refused. */
   held?: boolean;
-}) => s.aiKnown && !s.noAi && !s.held && s.createsAgents && s.hasTeam && s.cards.length === 0;
+  checklist?: FirstRunState;
+}) => s.aiKnown && !s.noAi && !s.held && s.createsAgents && s.hasTeam && s.cards.length === 0 && s.checklist !== "open";
 
 /**
- * The cards under the right hand's greeting at the top of its DM (ADR 0137), one question at a time: Connect AI while
- * there is none. With one, how to start (for whoever may create agents): with no agent yet, or, still alone, while the
- * team is only ready-made agents and some are left, each tile its own Criar, beside what next. Once that is settled,
- * how the person wants agents to talk to them, until they pick (ADR 0147), and only then what next: the team here and
- * nobody else yet. On a billing hold, how to start and what next alone: an AI comes after the plan, and a saved key
- * reading as ready changes nothing.
+ * The cards under the right hand's greeting at the top of its DM besides the first-run checklist (ADR 0137, ADR 0152
+ * §6), one question at a time. The owner's checklist has the setup in its rows: while it is open nothing else asks,
+ * and once complete, how the person wants agents to talk to them (ADR 0147) until they pick. Anyone else: Connect AI
+ * while there is none, then that question. On a billing hold neither: an AI comes after the plan.
  */
 export function introCards(s: {
   noAi: boolean;
   /** The AI status has loaded. */
   aiKnown: boolean;
-  /** The handles of the agents besides the right hand. */
-  teamHandles: readonly string[];
-  createsAgents: boolean;
-  /** The person is the workspace's only member. */
-  alone: boolean;
   /** They never picked how agents talk to them (`agentStyle` null; undefined from an older server). */
   askStyle?: boolean;
   /** A billing hold (`planHoldOf`). */
   held?: boolean;
   /** A no-AI card already answered them in this conversation: its Connect is the one to press. */
   noAiCard?: boolean;
-}): ("connect" | "start" | "next" | "style")[] {
-  if (s.noAi && !s.held) return s.noAiCard ? [] : ["connect"];
-  const presets = new Set<string>(PRESETS);
-  const start =
-    s.aiKnown &&
-    s.createsAgents &&
-    (s.teamHandles.length === 0 ||
-      (s.alone && presetsLeft(s.teamHandles).length > 0 && s.teamHandles.every((h) => presets.has(h))));
-  const next = s.teamHandles.length > 0 && s.alone;
-  if (start) return next ? ["start", "next"] : ["start"];
+  checklist?: FirstRunState;
+}): ("connect" | "style")[] {
+  if (s.checklist === "open") return [];
+  if (s.noAi && !s.held && s.checklist !== "complete") return s.noAiCard ? [] : ["connect"];
   if (s.askStyle && s.aiKnown && !s.held) return ["style"];
-  return next ? ["next"] : [];
+  return [];
 }

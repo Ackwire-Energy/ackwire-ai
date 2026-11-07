@@ -1,10 +1,10 @@
-import type { Agent, SetupStep } from "@agenteschat/client";
+import type { Agent, AgentSetupStep } from "@agenteschat/client";
 import { useAgentAccess, useAgentDetail, useAiStatus, useMe } from "@agenteschat/client";
 import { levelOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
 import { audienceOf } from "@agenteschat/client/lib/audience";
 import { firstName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import {
   askedLine,
@@ -17,12 +17,13 @@ import {
   suggestedChannels,
   suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Card, Icon, type IconName, Text } from "@/ui";
 import { openConnectAi } from "../../ai/NoAiCard";
+import { usePlanHold } from "../../ai/parts";
 import { requestComposerText } from "../../chat/composer-request";
 import { useOpenDm } from "../../new/useOpenDm";
 import { resourceName, useConnectedById } from "../../settings/hooks";
@@ -40,7 +41,7 @@ import { useAgentChannels } from "./useAgentChannels";
  * same card while something is left.
  */
 
-const STEP_ICON: Record<SetupStep, IconName> = {
+const STEP_ICON: Record<AgentSetupStep, IconName> = {
   ai: "brain",
   apps: "bolt",
   where: "hash",
@@ -49,7 +50,7 @@ const STEP_ICON: Record<SetupStep, IconName> = {
 };
 
 /** The steps this person sees for this agent (none: the checklist isn't theirs, or the agent has none). */
-export function useSetupSteps(agent: Agent | undefined): SetupStep[] {
+export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   const { org } = useOrg();
   const meId = useMeId();
   return agent && meId ? setupSteps(agent, { meId, admin: can(org, "manage_agents") }) : [];
@@ -107,7 +108,6 @@ export function AgentSetupCard({
 }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
-  const c = useColors();
   const dir = useDirectory();
   const meId = useMeId();
   const openDm = useOpenDm();
@@ -118,7 +118,6 @@ export function AgentSetupCard({
   const detail = useAgentDetail(orgId, agent.id);
   const visible = useAgentChannels();
   const items = useConnectedById();
-  const [said, setSaid] = useState<{ step: SetupStep; text: string } | null>(null);
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
 
@@ -127,37 +126,22 @@ export function AgentSetupCard({
   const visibleIds = new Set(visible.list.map((ch) => ch.id));
   const inChannels = (detail.data?.channels ?? []).filter((ch) => visibleIds.has(ch.id));
   const aiState = aiStateOf(status.data, agent.id);
+  // On a billing hold nothing thinks, a saved key included: the AI row says where the plan is, in words.
+  const held = usePlanHold(orgId, org) !== null;
   const done = agent.setup
     ? setupDone(agent.setup, {
-        ai: aiState === "ready" || aiState === "waiting",
+        ai: !held && (aiState === "ready" || aiState === "waiting"),
         apps: granted.length > 0,
         where: inChannels.length > 0,
       })
-    : new Set<SetupStep>();
+    : new Set<AgentSetupStep>();
   const doneHere = steps.filter((s) => done.has(s));
   const all = doneHere.length === steps.length;
   const next = nextStep(steps, done);
 
   // Everything it reads has loaded: a step that turns done after this was done now (its line and a haptic).
   const ready = status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending);
-  const seen = useRef<Set<SetupStep> | null>(null);
-  const sayTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const doneKey = doneHere.join();
-  const name = agent.name;
-  useEffect(() => {
-    if (!ready) return;
-    const now = new Set(doneKey ? (doneKey.split(",") as SetupStep[]) : []);
-    const before = seen.current;
-    seen.current = now;
-    if (!before) return;
-    const fresh = [...now].find((s) => !before.has(s));
-    if (!fresh) return;
-    successHaptic();
-    setSaid({ step: fresh, text: t(`agentSetup.say.${fresh}`, agentGrammar(name)) });
-    clearTimeout(sayTimer.current);
-    sayTimer.current = setTimeout(() => setSaid(null), 2600);
-  }, [ready, doneKey, name, t]);
-  useEffect(() => () => clearTimeout(sayTimer.current), []);
+  const said = useDoneSay(ready, doneHere, (step) => t(`agentSetup.say.${step}`, agentGrammar(agent.name)));
 
   if (steps.length === 0 || (place === "profile" && all)) return null;
 
@@ -173,7 +157,7 @@ export function AgentSetupCard({
   const audience = audienceOf(agent);
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const ownerIsMe = Boolean(meId && agent.ownerUserId === meId);
-  const rowOf = (step: SetupStep) =>
+  const rowOf = (step: AgentSetupStep) =>
     setupRow(t, step, done.has(step), {
       org: org?.name ?? "",
       role,
@@ -191,7 +175,7 @@ export function AgentSetupCard({
       onPlan: Boolean(agent.brain && agent.brain.kind !== "model"),
     });
 
-  const act = (step: SetupStep) => {
+  const act = (step: AgentSetupStep) => {
     tapHaptic();
     if (step === "ai") openConnectAi({ agentId: agent.id });
     else openSetupStep(agent.id, step);
@@ -211,6 +195,77 @@ export function AgentSetupCard({
   const title =
     place === "dm" ? (all ? t("agentSetup.ready", g) : t("agentSetup.title")) : t("agentSetup.titleProfile", g);
   return (
+    <SetupCardView
+      title={title}
+      done={doneHere.length}
+      total={steps.length}
+      rows={steps.map((s) => {
+        const row = rowOf(s);
+        if (s === "ai" && held && !done.has(s)) {
+          return {
+            key: s,
+            icon: STEP_ICON[s],
+            done: false,
+            dim: true,
+            title: planHoldPhoneLine(t, can(org, "manage_billing")),
+          };
+        }
+        return {
+          key: s,
+          icon: STEP_ICON[s],
+          done: done.has(s),
+          title: row.title,
+          desc: row.desc,
+          saying: said?.step === s ? said.text : null,
+          action: { label: row.action, primary: s === next, onPress: () => act(s) },
+        };
+      })}
+      foot={
+        done.has("ai") && tasks.length > 0 ? (
+          <SetupAsks
+            lead={all ? t("agentSetup.tasksAllDone") : t("agentSetup.tasksLead")}
+            asks={tasks.map((task) => ({ label: task, onPress: () => ask(task) }))}
+          />
+        ) : null
+      }
+    />
+  );
+}
+
+/** One row of a checklist card, as drawn: its button (a text button once done), "Agora não", or words alone. */
+export interface SetupCardRow {
+  key: string;
+  icon: IconName;
+  done: boolean;
+  title: string;
+  desc?: string | undefined;
+  saying?: string | null;
+  action?: { label: string; primary?: boolean; onPress: () => void };
+  skip?: { label: string; onPress: () => void; busy?: boolean };
+  /** It waits for something else (the plan): quieter, with no button. */
+  dim?: boolean;
+}
+
+/**
+ * A checklist card's drawing on the phone, a new agent's (ADR 0152 §2) and the right hand's first run (§6): the head
+ * and its count, the segmented bar, the rows, a foot of asks.
+ */
+export function SetupCardView({
+  title,
+  done,
+  total,
+  rows,
+  foot,
+}: {
+  title: string;
+  done: number;
+  total: number;
+  rows: SetupCardRow[];
+  foot?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  return (
     <Card style={styles.card}>
       <View style={styles.inner} accessibilityLabel={title}>
         <View style={styles.cardHead}>
@@ -218,90 +273,132 @@ export function AgentSetupCard({
             {title}
           </Text>
           <Text variant="caption" tone="muted">
-            {t("agentSetup.count", { done: doneHere.length, total: steps.length })}
+            {t("agentSetup.count", { done, total })}
           </Text>
         </View>
         <View style={styles.meter} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          {steps.map((s, i) => (
-            <View key={s} style={[styles.seg, { backgroundColor: i < doneHere.length ? c.ink : c.line2 }]} />
+          {rows.map((r, i) => (
+            <View key={r.key} style={[styles.seg, { backgroundColor: i < done ? c.ink : c.line2 }]} />
           ))}
         </View>
         <View accessibilityLiveRegion="polite">
-          {steps.map((s, i) => {
-            const row = rowOf(s);
-            const isDone = done.has(s);
-            const saying = said?.step === s ? said.text : null;
-            return (
-              <View
-                key={s}
-                style={[styles.row, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
-              >
-                {isDone ? (
-                  <View style={[styles.check, { backgroundColor: c.ink }]}>
-                    <Icon name="check" size={12} color={c.bg} />
-                  </View>
-                ) : (
-                  <View style={styles.lead}>
-                    <Icon name={STEP_ICON[s]} size={18} color={c.ink2} />
-                  </View>
-                )}
-                <View style={styles.fill}>
-                  <Text variant="small" tone={isDone ? "ink2" : "ink"} style={isDone ? undefined : styles.bold}>
-                    {row.title}
-                  </Text>
-                  {saying ? (
-                    <Text variant="caption" tone="ok">
-                      {saying}
-                    </Text>
-                  ) : !isDone && row.desc ? (
-                    <Text variant="caption" tone="muted">
-                      {row.desc}
-                    </Text>
-                  ) : null}
+          {rows.map((r, i) => (
+            <View
+              key={r.key}
+              style={[styles.row, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
+            >
+              {r.done ? (
+                <View style={[styles.check, { backgroundColor: c.ink }]}>
+                  <Icon name="check" size={12} color={c.bg} />
                 </View>
-                {isDone ? (
-                  <Button variant="text" size="sm" label={row.action} onPress={() => act(s)} />
+              ) : (
+                <View style={styles.lead}>
+                  <Icon name={r.icon} size={18} color={r.dim ? c.faint : c.ink2} />
+                </View>
+              )}
+              <View style={styles.fill}>
+                <Text
+                  variant="small"
+                  tone={r.done ? "ink2" : r.dim ? "muted" : "ink"}
+                  style={r.done || r.dim ? undefined : styles.bold}
+                >
+                  {r.title}
+                </Text>
+                {r.saying ? (
+                  <Text variant="caption" tone="ok">
+                    {r.saying}
+                  </Text>
+                ) : !r.done && r.desc ? (
+                  <Text variant="caption" tone="muted">
+                    {r.desc}
+                  </Text>
+                ) : null}
+                {!r.done && r.skip ? (
+                  <View style={styles.skip}>
+                    <Button
+                      variant="text"
+                      size="sm"
+                      label={r.skip.label}
+                      disabled={r.skip.busy}
+                      onPress={r.skip.onPress}
+                    />
+                  </View>
+                ) : null}
+              </View>
+              {r.action ? (
+                r.done ? (
+                  <Button variant="text" size="sm" label={r.action.label} onPress={r.action.onPress} />
                 ) : (
                   <Button
-                    variant={s === next ? "primary" : "secondary"}
+                    variant={r.action.primary ? "primary" : "secondary"}
                     size="sm"
-                    label={row.action}
-                    onPress={() => act(s)}
+                    label={r.action.label}
+                    disabled={r.skip?.busy}
+                    onPress={r.action.onPress}
                   />
-                )}
-              </View>
-            );
-          })}
+                )
+              ) : null}
+            </View>
+          ))}
         </View>
-        {done.has("ai") && tasks.length > 0 ? (
-          <View style={[styles.foot, { borderTopColor: c.line }]}>
-            <Text variant="small" style={styles.bold}>
-              {all ? t("agentSetup.tasksAllDone") : t("agentSetup.tasksLead")}
-            </Text>
-            {tasks.map((task) => (
-              <Pressable
-                key={task}
-                onPress={() => ask(task)}
-                accessibilityRole="button"
-                accessibilityLabel={task}
-                style={({ pressed }) => [
-                  styles.task,
-                  { borderColor: c.line2 },
-                  pressed && { backgroundColor: c.sunken },
-                ]}
-              >
-                <Icon name="chat" size={16} color={c.ink2} />
-                <Text variant="small" style={styles.fill}>
-                  {task}
-                </Text>
-                <Icon name="right" size={16} color={c.faint} />
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+        {foot}
       </View>
     </Card>
   );
+}
+
+/** The card's foot: a lead, then asks to press. */
+export function SetupAsks({ lead, asks }: { lead: string; asks: { label: string; onPress: () => void }[] }) {
+  const c = useColors();
+  return (
+    <View style={[styles.foot, { borderTopColor: c.line }]}>
+      <Text variant="small" style={styles.bold}>
+        {lead}
+      </Text>
+      {asks.map((a) => (
+        <Pressable
+          key={a.label}
+          onPress={a.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={a.label}
+          style={({ pressed }) => [styles.task, { borderColor: c.line2 }, pressed && { backgroundColor: c.sunken }]}
+        >
+          <Icon name="chat" size={16} color={c.ink2} />
+          <Text variant="small" style={styles.fill}>
+            {a.label}
+          </Text>
+          <Icon name="right" size={16} color={c.faint} />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * A step done while the card is in view (after everything it reads has loaded): its line for a moment and a haptic.
+ */
+export function useDoneSay<S extends string>(ready: boolean, doneNow: readonly S[], sayOf: (step: S) => string) {
+  const [said, setSaid] = useState<{ step: S; text: string } | null>(null);
+  const seen = useRef<Set<S> | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const say = useRef(sayOf);
+  say.current = sayOf;
+  const doneKey = doneNow.join();
+  useEffect(() => {
+    if (!ready) return;
+    const now = new Set(doneKey ? (doneKey.split(",") as S[]) : []);
+    const before = seen.current;
+    seen.current = now;
+    if (!before) return;
+    const fresh = [...now].find((s) => !before.has(s));
+    if (!fresh) return;
+    successHaptic();
+    setSaid({ step: fresh, text: say.current(fresh) });
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaid(null), 2600);
+  }, [ready, doneKey]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return said;
 }
 
 const styles = StyleSheet.create({
@@ -318,6 +415,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
   lead: { width: 22, alignItems: "center" },
   check: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  skip: { alignSelf: "flex-start", marginTop: 2 },
   foot: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, paddingBottom: 8, gap: 8 },
   task: {
     flexDirection: "row",

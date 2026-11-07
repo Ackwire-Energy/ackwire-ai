@@ -359,6 +359,8 @@ function NewAgentForm({
         role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText.trim(),
         instructions,
         model: thinks.model,
+        // Its setup checklist suggests from the ready-made role it started from (ADR 0152 §2).
+        setup: { role: role && role !== "custom" ? role : null },
         ownerUserId: meId ?? null,
         audience: { mode: "everyone", userIds: [] },
         credentialId: thinks.credentialId,

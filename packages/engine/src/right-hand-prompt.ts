@@ -11,17 +11,16 @@ import { agentBudgetsThisMonth } from "./usage";
 const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
 
 /**
- * How it builds a team (ADR 0137 §10), the first one or later on: the start card the app draws asks question 1, then
- * two more with answers to tap, then one team card. A template's card asks its own two questions.
+ * How it builds a team (ADR 0137 §10) when someone asks it to: three questions with answers to tap, then one team card.
+ * The first run's checklist (ADR 0152 §6) makes a template's team with no model call, so this is for whoever types.
  */
 export const TEAM_INTERVIEW = [
   "# Starting the team",
-  "The app's start card above asks 'What does the workspace do?' (question 1 of 3). When they answer it, or ask at any time to build or redo the team, run a short interview, one question per turn, each with offer_answers. When they only greet you, greet back in one line and point to that card; don't ask it again:",
+  "When they ask at any time to build or redo the team, run a short interview, one question per turn, each with offer_answers:",
   "- Question 1 of 3, when they didn't answer it yet: what the workspace does.",
   "- Question 2 of 3: what takes most of their time today (multiple: true; 5 to 7 answers fitting their business, the last one 'Outra coisa' in their language). Start by saying back in a few words what they do.",
   "- Question 3 of 3: who else works there (no answers to tap, or a couple like 'Só eu').",
   "Then propose the team with ONE propose_team card: 2 to 4 agents for what takes their time, each in its own channel, 1 or 2 routines each, 1 or 2 skills, the line on what waits for their approval, a first_task each, the people they named in `invite`, and weekly_check: true. Skip a question they already answered; never ask more than three. Agents already here stay: propose what is missing around them.",
-  "A team card from a template ('Usar este modelo') already asked its first question (1 of 2): take the answer, ask the second with offer_answers (who else works there and who approves what goes out to clients), then propose_team again fitted to both (it replaces the template's card).",
 ].join("\n");
 
 /** What the person behind the run may do here, as its prompt names it. */
@@ -64,7 +63,7 @@ export async function rightHandPrompt(
   const { db } = deps;
   const { orgId, agent, personId } = input;
   const membership = await getMembership(db, personId, orgId);
-  const [person, team, people, channels, budgets, apps, workspace, computers] = await Promise.all([
+  const [person, team, people, channels, budgets, apps, workspace, computers, self] = await Promise.all([
     db.select({ name: users.name }).from(users).where(eq(users.id, personId)),
     db
       .select()
@@ -92,6 +91,10 @@ export async function rightHandPrompt(
       .from(machines)
       .where(and(eq(machines.orgId, orgId), isNotNull(machines.tokenHash)))
       .limit(1),
+    db
+      .select({ setup: agents.setup })
+      .from(agents)
+      .where(and(eq(agents.orgId, orgId), eq(agents.id, agent.id))),
   ]);
   const roleNames = membership?.roleIds.length
     ? (
@@ -180,6 +183,9 @@ export async function rightHandPrompt(
         ? `This workspace's computer isn't ready yet, so the agents can't browse or run code. Nobody sets it up: ${unpaid ? "it comes by itself once the plan is paid (Settings › Plan and billing)" : "it is on its way, and Settings › Computers shows how far it is"}.`
         : "No computer is ready for the agents yet, so they can't browse or run code: say where it is set up (Settings › Computers)."
       : "",
+  ].filter(Boolean);
+  // What the team's agents lack, which no row of the first-run checklist shows.
+  const teamThings = [
     seen.some((a) => channelsOf(a.id).length === 0)
       ? "An agent is in no channel: offer to add it to one (propose_settings_change, its channels)."
       : "",
@@ -190,7 +196,25 @@ export async function rightHandPrompt(
       ? "An agent used 80% or more of its monthly budget: say so to someone who may raise it."
       : "",
   ].filter(Boolean);
-  const checklist = team.length === 0 ? firstThings : [...firstThings, ...laterThings];
+  // The first-run checklist at the top of an owner's DM (ADR 0152 §6) shows the setup rows: while one is open, this
+  // names none of them (mirror of `firstRunDone` in packages/client/src/lib/setup-checklist.ts).
+  const skipped = new Set(self[0]?.setup?.done ?? []);
+  const cardOpen =
+    owner &&
+    self[0]?.setup != null &&
+    (!workspace[0]?.context.trim() ||
+      team.length === 0 ||
+      anyAi === false ||
+      (apps.length === 0 && !skipped.has("apps")) ||
+      (people.length <= 1 && !skipped.has("people")));
+  const checklist = cardOpen
+    ? [
+        "The checklist card at the top of your DM shows what is left to set up (what the workspace does, the team, an AI, apps, people). Offer none of it unless they ask; at most point to its next row once.",
+        ...teamThings,
+      ]
+    : team.length === 0
+      ? firstThings
+      : [...firstThings, ...laterThings, ...teamThings];
 
   return [
     `You are ${agent.name} (@${agent.handle}), this workspace's assistant: the team's right hand and the one agent people talk to. What's going on: team_status. A question for a teammate: ask_agent. Work for one: tell_agent, with create_issue first when it's real work, follow_up if it may take long, then report here once. You also set up and change the team and the workspace with them. No hands-on work yourself (no code, no answering customers, no research): hand it to whose job it is, or propose an agent.`,

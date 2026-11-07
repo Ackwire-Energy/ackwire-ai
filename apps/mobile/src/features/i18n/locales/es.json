@@ -111,8 +111,7 @@
     "waiting": "Esperándote",
     "workingNow": "Trabajando ahora",
     "missionTitle": "Misión {{title}}",
-    "directChat": "Chat directo",
-    "stepAsk": "Abre una conversación con un agente."
+    "directChat": "Chat directo"
   },
   "approval": {
     "asksIn": "pide tu aprobación · #{{channel}}",

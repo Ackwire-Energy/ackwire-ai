@@ -254,9 +254,6 @@
   "home.directChat": {
     "value": "Direct chat"
   },
-  "home.stepAsk": {
-    "value": "Open a conversation with an agent."
-  },
   "approval.asksIn": {
     "value": "asks for your approval · #{{channel}}"
   },

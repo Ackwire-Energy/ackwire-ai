@@ -110,7 +110,6 @@ export const featureKeysEn = {
     workingNow: "Working now",
     missionTitle: "Mission {{title}}",
     directChat: "Direct chat",
-    stepAsk: "Open a conversation with an agent.",
   },
   approval: {
     asksIn: "asks for your approval · #{{channel}}",

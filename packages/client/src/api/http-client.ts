@@ -726,10 +726,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             ...(locale ? { query: { locale } } : {}),
           })
         ).templates,
-      applyTeamTemplate: (orgId, templateId, locale, tap) =>
-        request<{ channelId: string; messageId: string }>(`${org(orgId)}/team-templates/${enc(templateId)}/use`, {
-          json: { ...(locale ? { locale } : {}), ...(tap ? { tap } : {}) },
-        }),
+      applyTeamTemplate: (orgId, templateId, locale) =>
+        request<{
+          channelId: string;
+          messageId: string;
+          state: TeamProposalCard["state"];
+          error: TeamProposalCard["error"] | null;
+        }>(`${org(orgId)}/team-templates/${enc(templateId)}/use`, { json: locale ? { locale } : {} }),
       decideCostly: (orgId, signalId, decision) =>
         request<{ state: CostlyDecision }>(`${org(orgId)}/autonomy-proposals/${enc(signalId)}`, {
           json: { decision },

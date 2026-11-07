@@ -116,8 +116,7 @@
     "waiting": "Ждёт вас",
     "workingNow": "Работают сейчас",
     "missionTitle": "Миссия {{title}}",
-    "directChat": "Личный чат",
-    "stepAsk": "Начните разговор с агентом."
+    "directChat": "Личный чат"
   },
   "approval": {
     "asksIn": "просит вашего одобрения · #{{channel}}",

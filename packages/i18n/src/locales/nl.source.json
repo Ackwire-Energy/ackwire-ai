@@ -4727,24 +4727,6 @@
   "rightHand.intro.connect.action": {
     "value": "Connect"
   },
-  "rightHand.intro.start.question": {
-    "value": "How do you want to start?"
-  },
-  "rightHand.intro.start.createOne": {
-    "value": "Create {{name}}"
-  },
-  "rightHand.intro.start.team": {
-    "value": "Build a starter team"
-  },
-  "rightHand.intro.start.describe": {
-    "value": "Describe what I need"
-  },
-  "rightHand.intro.start.import": {
-    "value": "Import my agents"
-  },
-  "rightHand.intro.start.form": {
-    "value": "Fill in the form"
-  },
   "rightHand.intro.again.question": {
     "value": "Want to build the team with me?"
   },
@@ -4753,12 +4735,6 @@
   },
   "rightHand.intro.again.message": {
     "value": "Help me build the team."
-  },
-  "rightHand.intro.next.question": {
-    "value": "The team is here. What next?"
-  },
-  "rightHand.intro.next.invite": {
-    "value": "Invite people"
   },
   "rightHand.intro.next.firstTask": {
     "value": "Give {{name}} a first task"
@@ -4774,18 +4750,6 @@
   },
   "rightHand.intro.style.technical": {
     "value": "Technical, with the details"
-  },
-  "rightHand.intro.firstTask.theo": {
-    "value": "Plan our first week: what does each of us do first?"
-  },
-  "rightHand.intro.firstTask.ada": {
-    "value": "What could you build or automate for us first?"
-  },
-  "rightHand.intro.firstTask.lia": {
-    "value": "Who are our 5 closest competitors, and what do they do better than us?"
-  },
-  "rightHand.intro.firstTask.atlas": {
-    "value": "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?"
   },
   "rightHand.profile.how": {
     "value": "How it works"
@@ -9024,77 +8988,14 @@
   "home.action.open": {
     "value": "Open"
   },
-  "home.steps.title": {
-    "value": "First steps"
-  },
-  "home.steps.progress": {
-    "value": "{{done}} of {{total}}"
-  },
-  "home.steps.hide": {
-    "value": "Hide"
-  },
-  "home.steps.done": {
-    "value": "Done"
-  },
-  "home.steps.agent.title": {
-    "value": "Create your first agent"
-  },
-  "home.steps.agent.text": {
-    "value": "Say what it does and it joins the team."
-  },
-  "home.steps.agent.action": {
-    "value": "Create agent"
-  },
-  "home.steps.plan.title": {
-    "value": "Choose an agentes.chat plan"
-  },
-  "home.steps.plan.text": {
-    "value": "The agents start working once the workspace has one."
-  },
-  "home.steps.plan.action": {
-    "value": "See plans"
-  },
-  "home.steps.ai.title": {
-    "value": "Connect an AI"
-  },
-  "home.steps.ai.text": {
-    "value": "It's what your agents think with."
-  },
-  "home.steps.ai.action": {
-    "value": "Connect"
-  },
-  "home.steps.ask.title": {
-    "value": "Ask an agent for something"
-  },
-  "home.steps.ask.text": {
-    "value": "Write below or in a conversation."
-  },
-  "home.steps.ask.action": {
-    "value": "Ask"
-  },
-  "home.steps.team.title": {
-    "value": "Invite your team"
-  },
-  "home.steps.team.text": {
-    "value": "People and agents work together here."
-  },
-  "home.steps.team.action": {
-    "value": "Invite"
-  },
-  "home.steps.routine.title": {
-    "value": "Create a routine"
-  },
-  "home.steps.routine.text": {
-    "value": "An agent does something on its own, on schedule."
-  },
-  "home.steps.routine.action": {
-    "value": "Create routine"
-  },
   "home.calm.title": {
     "value": "All caught up"
   },
   "home.calm.text": {
     "value": "Your agents will tell you here when they need you."
+  },
+  "home.firstRun": {
+    "value": "Pick up where you left off · {{done}} of {{total}}"
   },
   "notifications.title": {
     "value": "Notifications"
@@ -12593,6 +12494,150 @@
   },
   "agentSetup.tasks.b": {
     "value": "Where do we start?"
+  },
+  "agentSetup.firstRun.title": {
+    "value": "Getting {{org}}'s team to work"
+  },
+  "agentSetup.firstRun.complete": {
+    "value": "All set."
+  },
+  "agentSetup.firstRun.notNow": {
+    "value": "Not now"
+  },
+  "agentSetup.firstRun.afterPlan": {
+    "value": "Opens with the plan."
+  },
+  "agentSetup.firstRun.about.todo": {
+    "value": "Tell me what {{org}} does."
+  },
+  "agentSetup.firstRun.about.todoDesc": {
+    "value": "Every agent reads this."
+  },
+  "agentSetup.firstRun.about.action": {
+    "value": "Tell"
+  },
+  "agentSetup.firstRun.about.done": {
+    "value": "I know what {{org}} does"
+  },
+  "agentSetup.firstRun.about.title": {
+    "value": "What does {{org}} do?"
+  },
+  "agentSetup.firstRun.about.desc": {
+    "value": "Every agent reads this. You can change it anytime."
+  },
+  "agentSetup.firstRun.about.line": {
+    "value": "In one sentence"
+  },
+  "agentSetup.firstRun.about.optional": {
+    "value": "Optional. Without one, the type you picked counts."
+  },
+  "agentSetup.firstRun.team.todo": {
+    "value": "Build the team."
+  },
+  "agentSetup.firstRun.team.todoDesc": {
+    "value": "A template for your business, you can change everything later."
+  },
+  "agentSetup.firstRun.team.action": {
+    "value": "See the team"
+  },
+  "agentSetup.firstRun.team.done": {
+    "value": {
+      "one": "{{count}} agent on the team",
+      "other": "{{count}} agents on the team"
+    }
+  },
+  "agentSetup.firstRun.team.card": {
+    "value": "Continue on the card below"
+  },
+  "agentSetup.firstRun.ai.todo": {
+    "value": "Connect an AI."
+  },
+  "agentSetup.firstRun.ai.todoDesc": {
+    "value": "The one you already pay for works."
+  },
+  "agentSetup.firstRun.ai.action": {
+    "value": "Connect"
+  },
+  "agentSetup.firstRun.ai.done": {
+    "value": "I think with {{label}}"
+  },
+  "agentSetup.firstRun.ai.doneAny": {
+    "value": "I think with an AI now"
+  },
+  "agentSetup.firstRun.ai.plan": {
+    "value": "Opens with the agentes.chat plan."
+  },
+  "agentSetup.firstRun.ai.planAction": {
+    "value": "See agentes.chat plans"
+  },
+  "agentSetup.firstRun.apps.todo": {
+    "value": "Connect your work apps."
+  },
+  "agentSetup.firstRun.apps.todoDesc": {
+    "value": "Reading never changes anything."
+  },
+  "agentSetup.firstRun.apps.action": {
+    "value": "Choose"
+  },
+  "agentSetup.firstRun.apps.done": {
+    "value": "I read {{apps}}"
+  },
+  "agentSetup.firstRun.apps.doneNone": {
+    "value": "No apps for now"
+  },
+  "agentSetup.firstRun.apps.title": {
+    "value": "Your work apps"
+  },
+  "agentSetup.firstRun.apps.desc": {
+    "value": "The ones the team you just made would use come first. Reading never changes anything, and sending, deleting and paying ask for your approval."
+  },
+  "agentSetup.firstRun.apps.connect": {
+    "value": "Connect"
+  },
+  "agentSetup.firstRun.apps.all": {
+    "value": "See all apps"
+  },
+  "agentSetup.firstRun.people.todo": {
+    "value": "Bring in the people you work with."
+  },
+  "agentSetup.firstRun.people.todoDesc": {
+    "value": "They talk to the agents too."
+  },
+  "agentSetup.firstRun.people.action": {
+    "value": "Invite"
+  },
+  "agentSetup.firstRun.people.done": {
+    "value": {
+      "one": "{{count}} person here",
+      "other": "{{count}} people here"
+    }
+  },
+  "agentSetup.firstRun.people.doneNone": {
+    "value": "Just you for now"
+  },
+  "agentSetup.firstRun.say.about": {
+    "value": "Noted. Every agent reads this."
+  },
+  "agentSetup.firstRun.say.team": {
+    "value": "The team is here."
+  },
+  "agentSetup.firstRun.say.ai": {
+    "value": "Now the team thinks."
+  },
+  "agentSetup.firstRun.say.apps": {
+    "value": "Done, I can read the apps now."
+  },
+  "agentSetup.firstRun.say.people": {
+    "value": "Good to have more people here."
+  },
+  "agentSetup.firstRun.asks.lead": {
+    "value": "Now ask me something:"
+  },
+  "agentSetup.firstRun.asks.fit": {
+    "value": "Fit the team to my business"
+  },
+  "agentSetup.firstRun.asks.who": {
+    "value": "Who on the team does what?"
   },
   "newAgent.title": {
     "value": "Create agent"
@@ -37675,20 +37720,8 @@
   "dashboards.errors.notTested": {
     "value": "Test it first: the widget is created once its test works."
   },
-  "teamPlan.start.question": {
-    "value": "What does {{org}} do? With that I build a ready team, and you just check it."
-  },
-  "teamPlan.start.orWrite": {
-    "value": "Or write it your way below, in one sentence."
-  },
-  "teamPlan.start.footer": {
-    "value": "Already know what you want?"
-  },
   "teamPlan.start.templates": {
     "value": "See team templates"
-  },
-  "teamPlan.start.presets": {
-    "value": "Ready-made agents"
   },
   "teamPlan.business.agency": {
     "value": "Agency"
@@ -37710,9 +37743,6 @@
   },
   "teamPlan.business.other": {
     "value": "Something else"
-  },
-  "teamPlan.answered": {
-    "value": "answered"
   },
   "teamPlan.step": {
     "value": "Question {{step}} of {{of}}"
@@ -37850,10 +37880,19 @@
     "value": "A ready team for your kind of business. Then {{name}} fits it with you."
   },
   "teamPlan.templates.heldLead": {
-    "value": "Pick the closest to your business. You can change every agent before creating them."
+    "value": "Pick the closest to your business. You can change everything later."
   },
-  "teamPlan.templates.use": {
-    "value": "Use this template"
+  "teamPlan.templates.create": {
+    "value": "Create the team"
+  },
+  "teamPlan.templates.import": {
+    "value": "Bring agents from another app"
+  },
+  "teamPlan.templates.scratch": {
+    "value": "Create an agent from scratch"
+  },
+  "teamPlan.templates.failed": {
+    "value": "The team wasn't created. The reason is on the card in the chat."
   },
   "teamPlan.templates.none": {
     "value": "None of these"
@@ -37862,7 +37901,7 @@
     "value": "Tell what you do and {{name}} builds it"
   },
   "teamPlan.templates.tailor": {
-    "value": "Then I ask 2 questions to fit it to your business."
+    "value": "Later, just ask me to fit it to your business."
   },
   "teamPlan.weekly.name": {
     "value": "The team's week"
@@ -38145,8 +38184,5 @@
   },
   "teamTemplates.approvals": {
     "value": "What goes out to customers waits for your approval. You can let it go later, once you trust them."
-  },
-  "teamTemplates.ask": {
-    "value": "I used the {{name}} template. To fit it to your business: **what makes {{org}} different?**"
   }
 }

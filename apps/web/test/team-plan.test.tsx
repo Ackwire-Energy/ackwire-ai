@@ -208,8 +208,8 @@ describe("the team card", () => {
 });
 
 describe("team templates", () => {
-  test("the start card's Ver modelos de time lists them with a preview; Usar este modelo posts it", async () => {
-    const state = withRightHand(seedState({ agents: [] }));
+  test("the checklist's Ver o time lists them with a preview; Criar o time makes it at once (ADR 0152 §6)", async () => {
+    const state = withRightHand(seedState({ agents: [] }), { setup: { role: null, done: [] } });
     state.members = state.members.slice(0, 1);
     state.teamTemplates = [
       {
@@ -228,13 +228,18 @@ describe("team templates", () => {
       },
     ];
     await openDm(state);
-    await click(button("Ver modelos de time"), 10);
+    await click(button("Ver o time"), 10);
     const dialog = screen().getByRole("dialog", { name: "Modelos de time" });
     expect(dialog.textContent).toContain("Para quem vende um sistema.");
     expect(dialog.textContent).toContain("Responde os clientes no WhatsApp e no e-mail.");
     await click(within(dialog).getByRole("button", { name: /Clínica ou consultório/ }), 4);
     expect(dialog.textContent).toContain("Para clínicas.");
-    await click(within(dialog).getByRole("button", { name: "Usar este modelo" }), 10);
+    // The other ways in, under the list.
+    for (const name of ["Trazer agentes de outro app", "Criar um agente do zero"])
+      expect(within(dialog).getByRole("button", { name }).className).toBe("ac-link");
+    await click(within(dialog).getByRole("button", { name: "Criar o time" }), 12);
     expect(calls(state, "agents.applyTeamTemplate").map((c) => c.args[1])).toEqual(["clinic"]);
+    expect(screen().queryByRole("dialog", { name: "Modelos de time" })).toBeNull();
+    expect(document.querySelector(".setup-cl")?.textContent).toContain("1 agente no time");
   });
 });

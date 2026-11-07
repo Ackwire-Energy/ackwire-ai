@@ -777,9 +777,12 @@ export function useApplyTeamTemplate(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ templateId, locale, tap }: { templateId: string; locale?: string; tap?: string }) =>
-      api.agents.applyTeamTemplate(orgId, templateId, locale, tap),
-    onSuccess: ({ channelId }) => void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) }),
+    mutationFn: ({ templateId, locale }: { templateId: string; locale?: string }) =>
+      api.agents.applyTeamTemplate(orgId, templateId, locale),
+    onSuccess: ({ channelId }) => {
+      void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+    },
   });
 }
 

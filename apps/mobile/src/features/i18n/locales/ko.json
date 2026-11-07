@@ -101,8 +101,7 @@
     "waiting": "내 확인 대기",
     "workingNow": "지금 작업 중",
     "missionTitle": "미션 {{title}}",
-    "directChat": "1:1 채팅",
-    "stepAsk": "에이전트와 대화를 시작하세요."
+    "directChat": "1:1 채팅"
   },
   "approval": {
     "asksIn": "승인을 요청해요 · #{{channel}}",

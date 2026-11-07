@@ -296,3 +296,40 @@ html:not([data-pointer]) .setup-task:focus-visible {
 .setup-dlg__more > .ac-field {
   margin-top: 16px;
 }
+
+/* The right hand's first run (ADR 0152 §6): a row that waits for the plan, or for the team card in the chat. */
+.setup-row[data-dim] .setup-row__text b,
+.setup-row[data-dim] > .ac-icon {
+  color: var(--ink-muted);
+}
+.setup-row__act {
+  display: flex;
+  gap: 8px;
+}
+.setup-dlg__error {
+  color: var(--danger);
+}
+.setup-apps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.setup-apps__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  border-top: 1px solid var(--line);
+}
+.setup-apps__row:first-child {
+  border-top: 0;
+}
+.setup-apps__row b {
+  font-weight: 600;
+}
+.setup-apps__row small {
+  color: var(--ink-muted);
+}
+.setup-apps__row .ac-btn {
+  margin-left: auto;
+}

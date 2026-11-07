@@ -1,4 +1,3 @@
-import type { PubSub } from "@agenteschat/adapters";
 import { type Database, eq, schema } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import type { AppLocale } from "@agenteschat/i18n/locale";
@@ -6,24 +5,23 @@ import { takenHandles } from "./agents";
 import type { AgentAppearance } from "./appearance";
 import { CHANNEL_NAME_PATTERN } from "./channels";
 import type { ContextDeps } from "./context/summaries";
-import { publishMessageCreated } from "./events";
-import { insertMessage, messageView } from "./messages";
 import { requirePermission } from "./organizations";
 import { billingHold } from "./standing";
 import {
   channelPlaces,
   checkTeam,
+  createTeam,
   personLocale,
   postTeamCard,
-  type ReplyChips,
   rightHandDm,
+  type TeamDeps,
   type TeamParams,
 } from "./team-proposals";
 
 /**
  * "Ver modelos de time" (ADR 0137 §10): six business types, each a team of the same few agents, kept in code with its
- * words in `@agenteschat/i18n` (`teamTemplates.*`, every language). "Usar este modelo" posts it as the right hand's
- * team card, then its first question to fit it to the business.
+ * words in `@agenteschat/i18n` (`teamTemplates.*`, every language). "Criar o time" makes it at once, as the right
+ * hand's team card in its created state.
  */
 export const TEAM_TEMPLATES = ["agency", "store", "clinic", "software", "support", "services"] as const;
 export type TeamTemplateId = (typeof TEAM_TEMPLATES)[number];
@@ -206,22 +204,18 @@ export async function listTeamTemplates(
   );
 }
 
-/** A team card made on a billing hold outlives the reminder on the third day: it waits for the plan. */
-const HELD_CARD_TTL_MS = 30 * 24 * 3600_000;
-
 /**
- * "Usar este modelo" (`POST …/team-templates/{id}/use`): the template's team as the right hand's card in the person's
- * DM with it (no model call), then its first question to fit it (1 of 2), whose answer starts the right hand's turn.
- * On a billing hold nobody can answer that: no question, and `tap`, what the person tapped on the start card, is kept
- * as their message with no run (`meta.templateTap`).
+ * "Criar o time" from a template (`POST …/team-templates/{id}/use`, ADR 0152 §6): the template's team, made at once as
+ * the right hand's card in the person's DM with it, which then reads created with Desfazer. No model call and no
+ * question after, so it works on a billing hold too. A step that fails leaves the card open with its reason, as
+ * `createTeam` does for any team card.
  */
 export async function useTeamTemplate(
-  deps: { db: Database; pubsub?: PubSub; context?: ContextDeps },
+  deps: TeamDeps & { context?: ContextDeps },
   userId: string,
   orgId: string,
   id: TeamTemplateId,
   preferred?: string | null,
-  tap?: string,
 ) {
   await requirePermission(deps.db, userId, orgId, "create_agents");
   const held = (await billingHold(deps.db, orgId)) !== null;
@@ -238,27 +232,8 @@ export async function useTeamTemplate(
     templateInput(id, locale, org, taken, blocked, held),
     locale,
   );
-  if (held && tap) {
-    const said = await insertMessage(deps.db, {
-      orgId,
-      channelId: dm.id,
-      author: { type: "person", userId },
-      body: tap,
-      meta: { templateTap: id },
-    });
-    if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(said));
-  }
   const place = { orgId, channelId: dm.id, threadId: null, agentId: lodi.id, runId: null, hop: 0 };
-  const card = await postTeamCard(deps, place, params, userId, held ? HELD_CARD_TTL_MS : undefined);
-  if (held) return { channelId: dm.id, messageId: card.id };
-  const chips: ReplyChips = { choices: [], multiple: false, step: 1, of: 2 };
-  const question = await insertMessage(deps.db, {
-    orgId,
-    channelId: dm.id,
-    author: { type: "agent", agentId: lodi.id, runId: null, hop: 0, stretchId: null },
-    body: serverText(locale, "teamTemplates.ask", { org, name: serverText(locale, `teamTemplates.${id}.name`) }),
-    meta: { replyChips: chips, teamTemplate: id },
-  });
-  if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(question));
-  return { channelId: dm.id, messageId: card.id };
+  const card = await postTeamCard(deps, place, params, userId);
+  const made = await createTeam(deps, userId, orgId, card.id);
+  return { channelId: dm.id, messageId: card.id, state: made.card.state, error: made.card.error ?? null };
 }

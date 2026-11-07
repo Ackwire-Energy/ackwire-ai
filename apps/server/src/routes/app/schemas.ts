@@ -353,7 +353,10 @@ export const FormerAgent = z
   .openapi("FormerAgent");
 
 /** The steps of a new agent's setup checklist (ADR 0152 §2). */
-export const SetupStep = z.enum(["ai", "apps", "where", "who", "how"]).openapi("SetupStep");
+export const SetupStep = z.enum(["ai", "apps", "where", "who", "how", "about", "team", "people"]).openapi("SetupStep", {
+  description:
+    "A new agent's steps (`ai`, `apps`, `where`, `who`, `how`), or the right hand's first run (`about`, `team`, `ai`, `apps`, `people`, ADR 0152 §6), where only `apps` and `people` are stored (skipped).",
+});
 
 export const AgentSetupChecklist = z
   .object({

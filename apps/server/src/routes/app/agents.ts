@@ -1254,30 +1254,39 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/team-templates/{templateId}/use",
       tags,
       security,
-      summary: "Post a template's team as the right hand's card in your DM with it (\"Usar este modelo\")",
+      summary: 'Create a template\'s team at once ("Criar o time")',
       description:
-        "No model call: the card, then the right hand's first question to fit it to the business (1 of 2), whose answer starts its turn. On a billing hold, no question, and `tap` (what the person tapped) is kept as their message with no run.",
+        "No model call, so it works on a billing hold too: the team is made, and its card in your DM with the right hand reads created, with Undo for a day (ADR 0152 §6). `state` is `pending` with the card's error when a step failed.",
       request: {
         params: OrgParams.extend({ templateId: z.enum(TEAM_TEMPLATES) }),
-        body: {
-          ...body(z.object({ locale: z.string().max(20).optional(), tap: z.string().min(1).max(200).optional() })),
-          required: false,
-        },
+        body: { ...body(z.object({ locale: z.string().max(20).optional() })), required: false },
       },
-      responses: { 200: json(z.object({ channelId: z.uuid(), messageId: z.uuid() })), ...errors },
+      responses: {
+        200: json(
+          z.object({
+            channelId: z.uuid(),
+            messageId: z.uuid(),
+            state: z.enum(["pending", "creating", "created", "denied", "superseded", "undone"]),
+            error: z
+              .object({
+                step: z.string(),
+                reason: z.string(),
+                status: z.number().int().optional(),
+                code: z.string().optional(),
+                params: z.record(z.string(), z.unknown()).optional(),
+              })
+              .nullable()
+              .openapi({ description: "The step that failed and why, as the card keeps it; null once created." }),
+          }),
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId, templateId } = c.req.valid("param");
       const context = deps.extras?.context;
       const input = c.req.valid("json");
-      const out = await useTeamTemplate(
-        { db, pubsub: adapters.pubsub, context },
-        c.get("user").id,
-        orgId,
-        templateId,
-        input?.locale,
-        input?.tap,
-      );
+      const out = await useTeamTemplate({ ...teamDeps(), context }, c.get("user").id, orgId, templateId, input?.locale);
       return c.json(out, 200);
     },
   );
@@ -1497,6 +1506,8 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId, agentId, step } = c.req.valid("param");
       const actor = c.get("user").id;
       await confirmSetupStep(db, actor, orgId, agentId, step);
+      // Another device of theirs, or another admin, ticks the row at once.
+      await publishAgentsChanged(adapters.pubsub, orgId);
       const agent = await getAgent(db, orgId, agentId);
       if (!agent) throw new NotFoundError("Agent not found");
       const [seesCost, brains, viewer, old] = await Promise.all([

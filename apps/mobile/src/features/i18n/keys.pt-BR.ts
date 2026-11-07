@@ -116,7 +116,6 @@ export const featureKeysPtBR = {
     workingNow: "Trabalhando agora",
     missionTitle: "Missão {{title}}",
     directChat: "Conversa direta",
-    stepAsk: "Abra uma conversa com um agente.",
   },
   approval: {
     asksIn: "pede sua aprovação · #{{channel}}",

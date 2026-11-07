@@ -1918,22 +1918,12 @@
         "text": "De agents denken met de AI van de workspace. Log in met je Claude- of ChatGPT-abonnement, zonder API-sleutel.",
         "action": "Koppelen"
       },
-      "start": {
-        "question": "Hoe wil je beginnen?",
-        "createOne": "{{name}} maken",
-        "team": "Een startteam samenstellen",
-        "describe": "Beschrijven wat ik nodig heb",
-        "import": "Mijn agents importeren",
-        "form": "Het formulier invullen"
-      },
       "again": {
         "question": "Wil je het team met mij samenstellen?",
         "action": "Team samenstellen",
         "message": "Help me het team samen te stellen."
       },
       "next": {
-        "question": "Het team is er. En nu?",
-        "invite": "Mensen uitnodigen",
         "firstTask": "{{name}} een eerste taak geven"
       },
       "style": {
@@ -1941,12 +1931,6 @@
         "text": "Het geldt voor alle agents, en je kunt het altijd wijzigen in je account.",
         "simple": "Eenvoudig, zonder vaktaal",
         "technical": "Technisch, met de details"
-      },
-      "firstTask": {
-        "theo": "Maak het plan voor onze eerste week: wat doet ieder van ons eerst?",
-        "ada": "Wat zou je als eerste voor ons kunnen bouwen of automatiseren?",
-        "lia": "Wie zijn onze 5 naaste concurrenten, en wat doen ze beter dan wij?",
-        "atlas": "Wat ga je als eerste volgen in onze fouten, wachtrijen en deploys, en hoe laat je het me weten als er iets stukgaat?"
       }
     },
     "profile": {
@@ -3728,46 +3712,11 @@
       "answer": "Beantwoorden",
       "open": "Openen"
     },
-    "steps": {
-      "title": "Eerste stappen",
-      "progress": "{{done}} van {{total}}",
-      "hide": "Verbergen",
-      "done": "Klaar",
-      "agent": {
-        "title": "Maak je eerste agent",
-        "text": "Zeg wat hij doet en hij hoort bij het team.",
-        "action": "Agent maken"
-      },
-      "plan": {
-        "title": "Kies een agentes.chat-abonnement",
-        "text": "De agents gaan aan het werk zodra de workspace er een heeft.",
-        "action": "Abonnementen bekijken"
-      },
-      "ai": {
-        "title": "Een AI koppelen",
-        "text": "Daar denken je agents mee.",
-        "action": "Koppelen"
-      },
-      "ask": {
-        "title": "Vraag een agent iets",
-        "text": "Schrijf hieronder of in een gesprek.",
-        "action": "Vragen"
-      },
-      "team": {
-        "title": "Nodig je team uit",
-        "text": "Mensen en agents werken hier samen.",
-        "action": "Uitnodigen"
-      },
-      "routine": {
-        "title": "Maak een routine",
-        "text": "Een agent doet zelf iets, volgens een schema.",
-        "action": "Routine maken"
-      }
-    },
     "calm": {
       "title": "Je bent helemaal bij",
       "text": "Je agents laten je hier weten als ze je nodig hebben."
-    }
+    },
+    "firstRun": "Ga verder waar je was · {{done}} van {{total}}"
   },
   "notifications": {
     "title": "Meldingen",
@@ -5192,6 +5141,70 @@
     "tasks": {
       "a": "Wat kun je voor me doen?",
       "b": "Waar beginnen we?"
+    },
+    "firstRun": {
+      "title": "Zodat het team van {{org}} aan de slag kan",
+      "complete": "Alles klaar.",
+      "notNow": "Niet nu",
+      "afterPlan": "Opent met het abonnement.",
+      "about": {
+        "todo": "Vertel me wat {{org}} doet.",
+        "todoDesc": "Alle agenten lezen dit.",
+        "action": "Vertellen",
+        "done": "Ik weet wat {{org}} doet",
+        "title": "Wat doet {{org}}?",
+        "desc": "Alle agenten lezen dit. Je wijzigt het wanneer je wilt.",
+        "line": "In één zin",
+        "optional": "Optioneel. Zonder zin telt het type dat je koos."
+      },
+      "team": {
+        "todo": "Stel het team samen.",
+        "todoDesc": "Een sjabloon voor je bedrijf, je kunt later alles wijzigen.",
+        "action": "Team bekijken",
+        "done_one": "{{count}} agent in het team",
+        "done_other": "{{count}} agenten in het team",
+        "card": "Ga verder op de kaart hieronder"
+      },
+      "ai": {
+        "todo": "Koppel een AI.",
+        "todoDesc": "Die waar je al voor betaalt werkt.",
+        "action": "Koppelen",
+        "done": "Ik denk met {{label}}",
+        "doneAny": "Ik denk nu met een AI",
+        "plan": "Opent met het agentes.chat-abonnement.",
+        "planAction": "agentes.chat-abonnementen bekijken"
+      },
+      "apps": {
+        "todo": "Koppel je werk-apps.",
+        "todoDesc": "Lezen verandert nooit iets.",
+        "action": "Kiezen",
+        "done": "Ik lees {{apps}}",
+        "doneNone": "Voorlopig geen apps",
+        "title": "Je werk-apps",
+        "desc": "Die het net gemaakte team zou gebruiken staan bovenaan. Lezen verandert nooit iets, en versturen, verwijderen en betalen vragen jouw akkoord.",
+        "connect": "Koppelen",
+        "all": "Alle apps bekijken"
+      },
+      "people": {
+        "todo": "Haal de mensen erbij met wie je werkt.",
+        "todoDesc": "Zij praten ook met de agenten.",
+        "action": "Uitnodigen",
+        "done_one": "{{count}} persoon hier",
+        "done_other": "{{count}} mensen hier",
+        "doneNone": "Voorlopig alleen jij"
+      },
+      "say": {
+        "about": "Genoteerd. Alle agenten lezen dit.",
+        "team": "Het team is er.",
+        "ai": "Nu denkt het team.",
+        "apps": "Klaar, ik lees de apps nu.",
+        "people": "Fijn dat er meer mensen zijn."
+      },
+      "asks": {
+        "lead": "Vraag me nu iets:",
+        "fit": "Pas het team aan mijn bedrijf aan",
+        "who": "Wie in het team doet wat?"
+      }
     }
   },
   "newAgent": {
@@ -15774,11 +15787,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "Wat doet {{org}}? Daarmee stel ik een kant-en-klaar team samen, en jij controleert het alleen.",
-      "orWrite": "Of schrijf het hieronder op je eigen manier, in één zin.",
-      "footer": "Weet je al wat je wilt?",
-      "templates": "Teamsjablonen bekijken",
-      "presets": "Kant-en-klare agents"
+      "templates": "Teamsjablonen bekijken"
     },
     "business": {
       "agency": "Bureau",
@@ -15789,7 +15798,6 @@
       "services": "Dienstverlenend kantoor",
       "other": "Iets anders"
     },
-    "answered": "beantwoord",
     "step": "Vraag {{step}} van {{of}}",
     "send": "{{count}} versturen",
     "card": {
@@ -15844,11 +15852,14 @@
     "templates": {
       "title": "Teamsjablonen",
       "lead": "Een kant-en-klaar team voor jouw soort bedrijf. Daarna past {{name}} het met je aan.",
-      "heldLead": "Kies wat het dichtst bij je bedrijf ligt. Je kunt elke agent aanpassen voordat je hem maakt.",
-      "use": "Dit sjabloon gebruiken",
+      "heldLead": "Kies wat het dichtst bij je bedrijf ligt. Je kunt later alles wijzigen.",
+      "create": "Team maken",
+      "import": "Agenten uit een andere app halen",
+      "scratch": "Een agent vanaf nul maken",
+      "failed": "Het team is niet gemaakt. De reden staat op de kaart in het gesprek.",
       "none": "Geen van deze",
       "noneSub": "Vertel wat je doet en {{name}} stelt het samen",
-      "tailor": "Daarna stel ik 2 vragen om het op jouw bedrijf af te stemmen."
+      "tailor": "Vraag me later gewoon om het aan je bedrijf aan te passen."
     },
     "weekly": {
       "name": "De week van het team"
@@ -15997,7 +16008,6 @@
         "line": "wat je controleert voordat je een PR opent"
       }
     },
-    "approvals": "Wat naar klanten gaat, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt.",
-    "ask": "Ik heb het sjabloon {{name}} gebruikt. Om het op jouw bedrijf af te stemmen: **wat doet {{org}} anders?**"
+    "approvals": "Wat naar klanten gaat, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt."
   }
 }

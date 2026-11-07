@@ -380,15 +380,17 @@ describe("team templates", () => {
     expect(en.find((t) => t.id === "software")?.team.agents[0]?.channel).toBe("support");
   });
 
-  test("Usar este modelo posts its card and the first question to fit it, in the person's DM with Lodi", async () => {
+  test("Criar o time makes the template's team in one call: its card reads created, with no question after", async () => {
     f = await setup({ rightHand: true });
     const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "clinic", "pt-BR");
+    expect(used).toMatchObject({ state: "created", error: null });
     const card = await cardOf(f, used.messageId);
     expect(card.params.template).toBe("clinic");
+    expect(card.state).toBe("created");
     expect(card.params.agents.map((a) => a.name)).toEqual(["Nina", "Caio", "Iara"]);
+    expect(card.created?.agentIds).toHaveLength(3);
     const rows = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, used.channelId));
-    const question = rows.find((m) => m.meta.replyChips);
-    expect(question?.meta.replyChips).toEqual({ choices: [], multiple: false, step: 1, of: 2 });
-    expect(question?.body).toContain("Clínica ou consultório");
+    expect(rows.some((m) => m.meta.replyChips)).toBe(false);
+    expect(rows.filter((m) => m.authorType === "agent")).toHaveLength(1);
   });
 });

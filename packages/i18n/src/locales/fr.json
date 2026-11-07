@@ -1995,22 +1995,12 @@
         "text": "Les agents réfléchissent avec l’IA du workspace. Connectez-vous avec votre abonnement Claude ou ChatGPT, sans clé API.",
         "action": "Connecter"
       },
-      "start": {
-        "question": "Comment voulez-vous commencer ?",
-        "createOne": "Créer {{name}}",
-        "team": "Monter une première équipe",
-        "describe": "Décrire ce dont j’ai besoin",
-        "import": "Importer mes agents",
-        "form": "Remplir le formulaire"
-      },
       "again": {
         "question": "Vous voulez monter l'équipe avec moi ?",
         "action": "Monter l'équipe",
         "message": "Aidez-moi à monter l'équipe."
       },
       "next": {
-        "question": "L’équipe est là. Et maintenant ?",
-        "invite": "Inviter des personnes",
         "firstTask": "Donner une première tâche à {{name}}"
       },
       "style": {
@@ -2018,12 +2008,6 @@
         "text": "Cela vaut pour tous les agents, et vous pouvez le changer quand vous voulez dans votre compte.",
         "simple": "Simple, sans jargon",
         "technical": "Technique, avec les détails"
-      },
-      "firstTask": {
-        "theo": "Prépare le plan de notre première semaine : que fait chacun de nous en premier ?",
-        "ada": "Que pourrais-tu construire ou automatiser pour nous en premier ?",
-        "lia": "Qui sont nos 5 concurrents les plus proches, et que font-ils mieux que nous ?",
-        "atlas": "Que vas-tu surveiller en premier dans nos erreurs, nos files et nos déploiements, et comment me préviens-tu quand quelque chose casse ?"
       }
     },
     "profile": {
@@ -3836,46 +3820,11 @@
       "answer": "Répondre",
       "open": "Ouvrir"
     },
-    "steps": {
-      "title": "Premiers pas",
-      "progress": "{{done}} sur {{total}}",
-      "hide": "Masquer",
-      "done": "Terminé",
-      "agent": {
-        "title": "Créez votre premier agent",
-        "text": "Dites ce qu'il fait et il rejoint l'équipe.",
-        "action": "Créer un agent"
-      },
-      "plan": {
-        "title": "Choisir un abonnement agentes.chat",
-        "text": "Les agents se mettent au travail dès que le workspace en a un.",
-        "action": "Voir les abonnements"
-      },
-      "ai": {
-        "title": "Connectez une IA",
-        "text": "C'est avec elle que vos agents réfléchissent.",
-        "action": "Connecter"
-      },
-      "ask": {
-        "title": "Demandez quelque chose à un agent",
-        "text": "Écrivez ci-dessous ou dans une conversation.",
-        "action": "Demander"
-      },
-      "team": {
-        "title": "Invitez votre équipe",
-        "text": "Les personnes et les agents travaillent ensemble ici.",
-        "action": "Inviter"
-      },
-      "routine": {
-        "title": "Créez une routine",
-        "text": "Un agent fait quelque chose de lui-même, selon un horaire.",
-        "action": "Créer une routine"
-      }
-    },
     "calm": {
       "title": "Vous êtes à jour",
       "text": "Vos agents vous préviendront ici quand ils auront besoin de vous."
-    }
+    },
+    "firstRun": "Reprenez là où vous en étiez · {{done}} sur {{total}}"
   },
   "notifications": {
     "title": "Notifications",
@@ -5353,6 +5302,70 @@
     "tasks": {
       "a": "Que peux-tu faire pour moi ?",
       "b": "Par où commence-t-on ?"
+    },
+    "firstRun": {
+      "title": "Pour que l'équipe de {{org}} se mette au travail",
+      "complete": "Tout est prêt.",
+      "notNow": "Pas maintenant",
+      "afterPlan": "S'ouvre avec l'offre.",
+      "about": {
+        "todo": "Dites-moi ce que fait {{org}}.",
+        "todoDesc": "Tous les agents lisent ceci.",
+        "action": "Raconter",
+        "done": "Je sais ce que fait {{org}}",
+        "title": "Que fait {{org}} ?",
+        "desc": "Tous les agents lisent ceci. Vous le changez quand vous voulez.",
+        "line": "En une phrase",
+        "optional": "Facultatif. Sans phrase, c'est le type coché qui compte."
+      },
+      "team": {
+        "todo": "Montez l'équipe.",
+        "todoDesc": "Un modèle pour votre activité, vous changez tout après.",
+        "action": "Voir l'équipe",
+        "done_one": "{{count}} agent dans l'équipe",
+        "done_other": "{{count}} agents dans l'équipe",
+        "card": "Continuez sur la carte ci-dessous"
+      },
+      "ai": {
+        "todo": "Connectez une IA.",
+        "todoDesc": "Celle que vous payez déjà convient.",
+        "action": "Connecter",
+        "done": "Je pense avec {{label}}",
+        "doneAny": "Je pense avec une IA",
+        "plan": "S'ouvre avec l'offre agentes.chat.",
+        "planAction": "Voir les offres agentes.chat"
+      },
+      "apps": {
+        "todo": "Connectez vos applis de travail.",
+        "todoDesc": "Lire ne change jamais rien.",
+        "action": "Choisir",
+        "done": "Je lis {{apps}}",
+        "doneNone": "Pas d'applis pour l'instant",
+        "title": "Vos applis de travail",
+        "desc": "Celles que l'équipe que vous venez de créer utiliserait passent en premier. Lire ne change jamais rien, et envoyer, supprimer et payer demandent votre accord.",
+        "connect": "Connecter",
+        "all": "Voir toutes les applis"
+      },
+      "people": {
+        "todo": "Faites venir les personnes avec qui vous travaillez.",
+        "todoDesc": "Elles parlent aussi aux agents.",
+        "action": "Inviter",
+        "done_one": "{{count}} personne ici",
+        "done_other": "{{count}} personnes ici",
+        "doneNone": "Juste vous pour l'instant"
+      },
+      "say": {
+        "about": "Noté. Tous les agents lisent ceci.",
+        "team": "L'équipe est là.",
+        "ai": "L'équipe pense maintenant.",
+        "apps": "C'est fait, je lis les applis.",
+        "people": "Content d'avoir plus de monde ici."
+      },
+      "asks": {
+        "lead": "Maintenant, demandez-moi quelque chose :",
+        "fit": "Adapte l'équipe à mon activité",
+        "who": "Qui fait quoi dans l'équipe ?"
+      }
     }
   },
   "newAgent": {
@@ -16216,11 +16229,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "Que fait {{org}} ? Avec ça je monte une équipe prête, et tu n'as plus qu'à vérifier.",
-      "orWrite": "Ou écris-le à ta façon ci-dessous, en une phrase.",
-      "footer": "Tu sais déjà ce que tu veux ?",
-      "templates": "Voir les modèles d'équipe",
-      "presets": "Agents tout prêts"
+      "templates": "Voir les modèles d'équipe"
     },
     "business": {
       "agency": "Agence",
@@ -16231,7 +16240,6 @@
       "services": "Cabinet de services",
       "other": "Autre chose"
     },
-    "answered": "répondue",
     "step": "Question {{step}} sur {{of}}",
     "send": "Envoyer {{count}}",
     "card": {
@@ -16286,11 +16294,14 @@
     "templates": {
       "title": "Modèles d'équipe",
       "lead": "Une équipe prête pour ton type d'activité. Ensuite {{name}} l'ajuste avec toi.",
-      "heldLead": "Choisissez le plus proche de votre activité. Vous pouvez ajuster chaque agent avant de le créer.",
-      "use": "Utiliser ce modèle",
+      "heldLead": "Choisissez le plus proche de votre activité. Vous changez tout après.",
+      "create": "Créer l'équipe",
+      "import": "Importer des agents d'une autre appli",
+      "scratch": "Créer un agent de zéro",
+      "failed": "L'équipe n'a pas été créée. La raison est sur la carte de la conversation.",
       "none": "Aucun de ceux-ci",
       "noneSub": "Dis ce que tu fais et {{name}} la monte",
-      "tailor": "Ensuite je pose 2 questions pour l'adapter à ton activité."
+      "tailor": "Ensuite, demandez-moi simplement de l'adapter à votre activité."
     },
     "weekly": {
       "name": "La semaine de l'équipe"
@@ -16440,7 +16451,6 @@
         "line": "ce qu'il faut vérifier avant d'ouvrir une PR"
       }
     },
-    "approvals": "Ce qui part vers les clients attend ton accord. Tu pourras le libérer plus tard, quand tu leur feras confiance.",
-    "ask": "J'ai utilisé le modèle {{name}}. Pour l'adapter à ton activité : **qu'est-ce que {{org}} fait de différent ?**"
+    "approvals": "Ce qui part vers les clients attend ton accord. Tu pourras le libérer plus tard, quand tu leur feras confiance."
   }
 }

@@ -106,8 +106,7 @@
     "waiting": "Wacht op jou",
     "workingNow": "Nu aan het werk",
     "missionTitle": "Missie {{title}}",
-    "directChat": "Direct gesprek",
-    "stepAsk": "Begin een gesprek met een agent."
+    "directChat": "Direct gesprek"
   },
   "approval": {
     "asksIn": "vraagt je goedkeuring · #{{channel}}",

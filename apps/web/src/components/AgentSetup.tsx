@@ -1,4 +1,4 @@
-import type { Agent, AgentAudience, AudienceMode, SetupStep } from "@agenteschat/client";
+import type { Agent, AgentAudience, AgentSetupStep, AudienceMode } from "@agenteschat/client";
 import {
   keys,
   useAgentAccess,
@@ -66,7 +66,7 @@ import {
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   LevelRow,
@@ -78,7 +78,9 @@ import {
 } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ModelSelect, modelOptions, NO_OWNER, OwnerSelect } from "@/components/AgentFields";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
@@ -95,7 +97,7 @@ import "./agent-setup.css";
  * all the steps, its owner the ones they may change. Its profile shows the same card while something is left.
  */
 
-const STEP_ICON: Record<SetupStep, IconName> = {
+const STEP_ICON: Record<AgentSetupStep, IconName> = {
   ai: "bolt",
   apps: "plug",
   where: "channel",
@@ -104,7 +106,7 @@ const STEP_ICON: Record<SetupStep, IconName> = {
 };
 
 /** The steps this person sees for this agent (none: the checklist isn't theirs, or the agent has none). */
-export function useSetupSteps(agent: Agent | undefined): SetupStep[] {
+export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
   const { org, me } = useOrg();
   return agent ? setupSteps(agent, { meId: me.user.id, admin: can(org, "manage_agents") }) : [];
 }
@@ -163,8 +165,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
   const detail = useAgentDetail(org.id, agent.id);
   const visible = useVisibleChannels();
   const items = useConnectedById();
-  const [open, setOpen] = useState<SetupStep | null>(null);
-  const [said, setSaid] = useState<{ step: SetupStep; text: string } | null>(null);
+  const [open, setOpen] = useState<AgentSetupStep | null>(null);
   const burstRef = useRef<HTMLCanvasElement>(null);
   const g = agentGrammar(agent.name);
   const role = setupRole(agent.setup);
@@ -174,38 +175,23 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
   const visibleIds = new Set(visible.list.map((c) => c.id));
   const inChannels = (detail.data?.channels ?? []).filter((c) => visibleIds.has(c.id));
   const aiState = aiStateOf(status.data, agent.id);
+  // On a billing hold nothing thinks, a saved key included: the AI row leads to the plan.
+  const held = usePlanHold() !== null;
   const done = agent.setup
     ? setupDone(agent.setup, {
-        ai: aiState === "ready" || aiState === "waiting",
+        ai: !held && (aiState === "ready" || aiState === "waiting"),
         apps: granted.length > 0,
         where: inChannels.length > 0,
       })
-    : new Set<SetupStep>();
+    : new Set<AgentSetupStep>();
   const doneHere = steps.filter((s) => done.has(s));
   const all = doneHere.length === steps.length;
   const next = nextStep(steps, done);
   // Everything it reads has loaded: a step that turns done after this was done now (its line and the burst).
   const ready = status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending);
-  const seen = useRef<Set<SetupStep> | null>(null);
-  const sayTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const doneKey = doneHere.join();
-  const total = steps.length;
-  const color = agent.appearance?.color;
-  const name = agent.name;
-  useEffect(() => {
-    if (!ready) return;
-    const now = new Set(doneKey ? (doneKey.split(",") as SetupStep[]) : []);
-    const before = seen.current;
-    seen.current = now;
-    if (!before) return;
-    const fresh = [...now].find((s) => !before.has(s));
-    if (!fresh) return;
-    setSaid({ step: fresh, text: t(`agentSetup.say.${fresh}`, agentGrammar(name)) });
-    burst(burstRef.current, color, now.size === total);
-    clearTimeout(sayTimer.current);
-    sayTimer.current = setTimeout(() => setSaid(null), 2600);
-  }, [ready, doneKey, total, color, name, t]);
-  useEffect(() => () => clearTimeout(sayTimer.current), []);
+  const said = useDoneSay(ready, doneHere, steps.length, agent.appearance?.color, burstRef, (step) =>
+    t(`agentSetup.say.${step}`, agentGrammar(agent.name)),
+  );
 
   if (steps.length === 0 || (place === "profile" && all)) return null;
 
@@ -222,7 +208,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const ownerIsMe = agent.ownerUserId === me.user.id;
 
-  const rowOf = (step: SetupStep) =>
+  const rowOf = (step: AgentSetupStep) =>
     setupRow(t, step, done.has(step), {
       org: org.name,
       role,
@@ -240,7 +226,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
       onPlan,
     });
 
-  const act = (step: SetupStep) => {
+  const act = (step: AgentSetupStep) => {
     if (step === "ai") connect?.open({ agentId: agent.id });
     else setOpen(step);
   };
@@ -263,79 +249,233 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
   const title =
     place === "dm" ? (all ? t("agentSetup.ready", g) : t("agentSetup.title")) : t("agentSetup.titleProfile", g);
   return (
-    <section className="setup-cl" aria-label={title} data-place={place}>
-      <canvas ref={burstRef} className="setup-cl__burst" aria-hidden="true" tabIndex={-1} />
-      <div className="setup-cl__head">
-        <b>{title}</b>
-        <small>{t("agentSetup.count", { done: doneHere.length, total: steps.length })}</small>
-      </div>
-      <div className="setup-cl__meter" aria-hidden="true">
-        {steps.map((s, i) => (
-          <i key={s} data-on={i < doneHere.length || undefined} />
-        ))}
-      </div>
-      <ul className="setup-cl__rows" aria-live="polite">
-        {steps.map((s) => {
-          const row = rowOf(s);
-          const isDone = done.has(s);
-          const saying = said?.step === s ? said.text : null;
-          return (
-            <li key={s} className="setup-row" data-done={isDone || undefined} data-new={saying ? true : undefined}>
-              {isDone ? (
-                <span className="setup-row__check">
-                  <Icon name="check" size={14} />
-                </span>
-              ) : (
-                <Icon name={STEP_ICON[s]} size={20} />
-              )}
-              <span className="setup-row__text">
-                <b>
-                  {row.title}
-                  {isDone && (s !== "ai" || connect) && (
-                    <button type="button" className="setup-row__link" onClick={() => act(s)}>
-                      {row.action}
-                    </button>
-                  )}
-                </b>
-                {saying ? (
-                  <span className="setup-row__say">{saying}</span>
-                ) : (
-                  !isDone && row.desc && <span>{row.desc}</span>
-                )}
-              </span>
-              {!isDone && (s !== "ai" || connect) && (
-                <span className="setup-row__act">
-                  <Button size="sm" variant={s === next ? "primary" : undefined} onClick={() => act(s)}>
-                    {row.action}
-                  </Button>
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      {done.has("ai") && tasks.length > 0 && (
-        <div className="setup-cl__foot">
-          <b>{all ? t("agentSetup.tasksAllDone") : t("agentSetup.tasksLead")}</b>
-          <div className="setup-cl__tasks">
-            {tasks.map((task) => (
-              <button key={task} type="button" className="setup-task" onClick={() => ask(task)}>
-                <Icon name="message" size={16} />
-                <span>{task}</span>
-                <Icon name="arrowRight" size={16} />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+    <SetupCardView
+      title={title}
+      done={doneHere.length}
+      total={steps.length}
+      place={place}
+      burstRef={burstRef}
+      rows={steps.map((s) => {
+        const row = rowOf(s);
+        const isDone = done.has(s);
+        const acts = s !== "ai" || Boolean(connect);
+        if (s === "ai" && held && !isDone) {
+          return {
+            key: s,
+            icon: STEP_ICON[s],
+            done: false,
+            title: t("agentSetup.firstRun.ai.plan"),
+            ...(can(org, "manage_billing")
+              ? {
+                  actionNode: (
+                    <BillingLinkButton
+                      orgId={org.id}
+                      from="hold"
+                      size="sm"
+                      variant={s === next ? "primary" : undefined}
+                    >
+                      {t("agentSetup.firstRun.ai.planAction")}
+                    </BillingLinkButton>
+                  ),
+                }
+              : {}),
+          };
+        }
+        return {
+          key: s,
+          icon: STEP_ICON[s],
+          done: isDone,
+          title: row.title,
+          desc: row.desc,
+          saying: said?.step === s ? said.text : null,
+          ...(acts ? { action: { label: row.action, primary: s === next, onClick: () => act(s) } } : {}),
+        };
+      })}
+      foot={
+        done.has("ai") &&
+        tasks.length > 0 && (
+          <SetupAsks
+            lead={all ? t("agentSetup.tasksAllDone") : t("agentSetup.tasksLead")}
+            asks={tasks.map((task) => ({ label: task, onClick: () => ask(task) }))}
+          />
+        )
+      }
+    >
       {open === "apps" && (
         <AppsDialog agent={agent} connectors={connectors} onClose={() => setOpen(null)} onSaved={confirmed} />
       )}
       {open === "where" && <WhereDialog agent={agent} onClose={() => setOpen(null)} onSaved={confirmed} />}
       {open === "who" && <WhoDialog agent={agent} onClose={() => setOpen(null)} onSaved={confirmed} />}
       {open === "how" && <HowDialog agent={agent} onClose={() => setOpen(null)} onSaved={confirmed} />}
+    </SetupCardView>
+  );
+}
+
+/** One row of a checklist card, as drawn: its button, a second one ("Agora não"), or a link once done. */
+export interface SetupCardRow {
+  key: string;
+  icon: IconName;
+  done: boolean;
+  title: string;
+  desc?: string | undefined;
+  /** Its line just after it was done, in the agent's voice. */
+  saying?: string | null;
+  /** Its button (a link once done); none: nothing to press for this person, or the row waits (`dim`). */
+  action?: { label: string; primary?: boolean; onClick: () => void };
+  /** In place of its button: a link elsewhere (the plan's page). */
+  actionNode?: ReactNode;
+  skip?: { label: string; onClick: () => void; busy?: boolean };
+  /** It waits for something else (the plan): drawn quieter, with no button. */
+  dim?: boolean;
+}
+
+/**
+ * A checklist card's drawing, the one for a new agent (ADR 0152 §2) and the right hand's first run (§6): the head and
+ * its count, the segmented bar, the rows, a foot of asks. The data and dialogs are its users'.
+ */
+export function SetupCardView({
+  title,
+  done,
+  total,
+  place,
+  rows,
+  foot,
+  burstRef,
+  children,
+}: {
+  title: string;
+  done: number;
+  total: number;
+  place: "dm" | "profile";
+  rows: SetupCardRow[];
+  foot?: ReactNode;
+  burstRef?: RefObject<HTMLCanvasElement | null>;
+  children?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section className="setup-cl" aria-label={title} data-place={place}>
+      <canvas ref={burstRef} className="setup-cl__burst" aria-hidden="true" tabIndex={-1} />
+      <div className="setup-cl__head">
+        <b>{title}</b>
+        <small>{t("agentSetup.count", { done, total })}</small>
+      </div>
+      <div className="setup-cl__meter" aria-hidden="true">
+        {rows.map((r, i) => (
+          <i key={r.key} data-on={i < done || undefined} />
+        ))}
+      </div>
+      <ul className="setup-cl__rows" aria-live="polite">
+        {rows.map((r) => (
+          <li
+            key={r.key}
+            className="setup-row"
+            data-done={r.done || undefined}
+            data-new={r.saying ? true : undefined}
+            data-dim={r.dim || undefined}
+          >
+            {r.done ? (
+              <span className="setup-row__check">
+                <Icon name="check" size={14} />
+              </span>
+            ) : (
+              <Icon name={r.icon} size={20} />
+            )}
+            <span className="setup-row__text">
+              <b>
+                {r.title}
+                {r.done && r.action && (
+                  <button type="button" className="setup-row__link" onClick={r.action.onClick}>
+                    {r.action.label}
+                  </button>
+                )}
+              </b>
+              {r.saying ? (
+                <span className="setup-row__say">{r.saying}</span>
+              ) : (
+                !r.done && r.desc && <span>{r.desc}</span>
+              )}
+            </span>
+            {!r.done && (r.action || r.actionNode || r.skip) && (
+              <span className="setup-row__act">
+                {r.skip && (
+                  <Button size="sm" variant="ghost" disabled={r.skip.busy} onClick={r.skip.onClick}>
+                    {r.skip.label}
+                  </Button>
+                )}
+                {r.actionNode ??
+                  (r.action && (
+                    <Button
+                      size="sm"
+                      variant={r.action.primary ? "primary" : undefined}
+                      disabled={r.skip?.busy}
+                      onClick={r.action.onClick}
+                    >
+                      {r.action.label}
+                    </Button>
+                  ))}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {foot}
+      {children}
     </section>
   );
+}
+
+/** The card's foot: a lead, then asks to press (each fills the composer, or sends). */
+export function SetupAsks({ lead, asks }: { lead: string; asks: { label: string; onClick: () => void }[] }) {
+  return (
+    <div className="setup-cl__foot">
+      <b>{lead}</b>
+      <div className="setup-cl__tasks">
+        {asks.map((a) => (
+          <button key={a.label} type="button" className="setup-task" onClick={a.onClick}>
+            <Icon name="message" size={16} />
+            <span>{a.label}</span>
+            <Icon name="arrowRight" size={16} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A step done while the card is in view (after everything it reads has loaded): its line for a moment, and a burst of
+ * pixels in the agent's colors, a bigger one when it was the last.
+ */
+export function useDoneSay<S extends string>(
+  ready: boolean,
+  doneNow: readonly S[],
+  total: number,
+  color: string | undefined,
+  burstRef: RefObject<HTMLCanvasElement | null>,
+  sayOf: (step: S) => string,
+) {
+  const [said, setSaid] = useState<{ step: S; text: string } | null>(null);
+  const seen = useRef<Set<S> | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const say = useRef(sayOf);
+  say.current = sayOf;
+  const doneKey = doneNow.join();
+  useEffect(() => {
+    if (!ready) return;
+    const now = new Set(doneKey ? (doneKey.split(",") as S[]) : []);
+    const before = seen.current;
+    seen.current = now;
+    if (!before) return;
+    const fresh = [...now].find((s) => !before.has(s));
+    if (!fresh) return;
+    setSaid({ step: fresh, text: say.current(fresh) });
+    burst(burstRef.current, color, now.size === total);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaid(null), 2600);
+  }, [ready, doneKey, total, color, burstRef]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return said;
 }
 
 /** A few pixels in the agent's colors burst from the card when a step is done (none with reduced motion). */
@@ -379,7 +519,7 @@ function burst(cv: HTMLCanvasElement | null, color: string | undefined, big: boo
 
 /* ---------- The small dialogs behind the buttons: one step each, the suggestion marked ---------- */
 
-function StepDialog({
+export function StepDialog({
   title,
   description,
   wide,
@@ -427,7 +567,7 @@ function StepDialog({
 }
 
 /** Saves a step's choice, then confirms the step; a failure says why and keeps the dialog. */
-function useStepSave(agent: Agent, step: SetupStep, onSaved: () => void) {
+export function useStepSave(agent: Agent, step: AgentSetupStep, onSaved: () => void) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();

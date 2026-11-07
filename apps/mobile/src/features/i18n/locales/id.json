@@ -101,8 +101,7 @@
     "waiting": "Menunggumu",
     "workingNow": "Sedang bekerja",
     "missionTitle": "Misi {{title}}",
-    "directChat": "Obrolan langsung",
-    "stepAsk": "Buka percakapan dengan agen."
+    "directChat": "Obrolan langsung"
   },
   "approval": {
     "asksIn": "meminta persetujuanmu · #{{channel}}",

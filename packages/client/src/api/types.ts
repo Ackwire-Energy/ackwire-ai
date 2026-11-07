@@ -646,8 +646,13 @@ export interface Agent {
   setup?: AgentSetupChecklist | null;
 }
 
-/** A step of a new agent's setup checklist (ADR 0152 §2); their order is `SETUP_STEPS` (lib/setup-checklist). */
-export type SetupStep = "ai" | "apps" | "where" | "who" | "how";
+/**
+ * A step of a new agent's setup checklist (ADR 0152 §2), in `SETUP_STEPS`' order, or of the right hand's first run
+ * (§6: `about`, `team`, `ai`, `apps`, `people`, in `FIRST_RUN_STEPS`' order). Both in lib/setup-checklist.
+ */
+export type SetupStep = AgentSetupStep | "about" | "team" | "people";
+/** A new agent's own steps (ADR 0152 §2). */
+export type AgentSetupStep = "ai" | "apps" | "where" | "who" | "how";
 
 /** A new agent's setup checklist (ADR 0152 §2). */
 export interface AgentSetupChecklist {

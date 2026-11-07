@@ -4,12 +4,10 @@ import type { AppNotification } from "../src/api/types";
 import { upcomingAt } from "../src/lib/format";
 import {
   DONE_MS,
-  firstSteps,
   homeDone,
   homeMentions,
   homeWaiting,
   homeWidgetFailures,
-  startingOut,
   startPlace,
   stepPermissions,
   upcomingRoutines,
@@ -131,63 +129,7 @@ describe("Início's sections", () => {
   });
 });
 
-describe("a new workspace's first steps", () => {
-  const may = { createAgents: true, connectAi: true, talk: true, invite: true, routines: true };
-  const none = { agents: 0, hasAi: false, asked: false, people: 1, routines: 0, may };
-  test("an AI, a request and a routine wait for an agent; each step shown only to who may take it", () => {
-    expect(firstSteps(none)).toEqual([
-      { id: "agent", done: false },
-      { id: "team", done: false },
-    ]);
-    expect(firstSteps({ ...none, agents: 2 })).toEqual([
-      { id: "agent", done: true },
-      { id: "ai", done: false },
-      { id: "ask", done: false },
-      { id: "team", done: false },
-      { id: "routine", done: false },
-    ]);
-    // A member who owns no agent can't connect an AI (the dialog would send them to someone else): no such step.
-    const member = { createAgents: false, connectAi: false, talk: true, invite: false, routines: false };
-    expect(firstSteps({ ...none, agents: 2, may: member })).toEqual([{ id: "ask", done: false }]);
-    // Owning an agent, they connect its AI.
-    expect(firstSteps({ ...none, agents: 2, may: { ...member, connectAi: true } })).toEqual([
-      { id: "ai", done: false },
-      { id: "ask", done: false },
-    ]);
-  });
-  test("the right hand alone opens the steps after it, but doesn't make the first agent", () => {
-    expect(firstSteps({ ...none, agents: 1, made: 0 }).slice(0, 2)).toEqual([
-      { id: "agent", done: false },
-      { id: "ai", done: false },
-    ]);
-    expect(firstSteps({ ...none, agents: 2, made: 1 })[0]).toEqual({ id: "agent", done: true });
-  });
-
-  test("none once every step shown is done", () => {
-    expect(firstSteps({ agents: 2, hasAi: true, asked: true, people: 3, routines: 1, may })).toEqual([]);
-  });
-
-  test("starting out while an agent, its AI or a first request is to do; a team and a routine can wait for good", () => {
-    expect(startingOut(firstSteps(none))).toBe(true);
-    expect(startingOut(firstSteps({ ...none, agents: 1, hasAi: true }))).toBe(true);
-    // A workspace of one in use for months: invite and routine still open, nothing new about it.
-    expect(startingOut(firstSteps({ ...none, agents: 1, hasAi: true, asked: true }))).toBe(false);
-    expect(startingOut([])).toBe(false);
-  });
-
-  test("on a billing hold the plan comes first for who pays, and an AI and invitations wait for it", () => {
-    const all = { createAgents: true, connectAi: true, talk: true, invite: true, routines: true };
-    const held = { ...none, agents: 1, held: true };
-    expect(firstSteps({ ...held, may: { ...all, pay: true } }).map((s) => s.id)).toEqual([
-      "plan",
-      "agent",
-      "ask",
-      "routine",
-    ]);
-    expect(firstSteps({ ...held, may: { ...all, pay: false } }).map((s) => s.id)).toEqual(["agent", "ask", "routine"]);
-    expect(firstSteps({ ...none, agents: 1, may: { ...all, pay: true } }).map((s) => s.id)).not.toContain("plan");
-  });
-
+describe("what a person may do of a new workspace's setup", () => {
   test("who may take each step: their permissions, and an AI for the workspace's key or an agent of their own", () => {
     const agents = [{ ownerUserId: "u-joao" }, { ownerUserId: null }];
     expect(stepPermissions({ permissions: ["read", "talk_to_agents"] }, "u-ana", agents)).toEqual({

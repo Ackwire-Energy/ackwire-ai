@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { type Database, eq, schema } from "@agenteschat/db";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { type Database, eq, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import { agentView, confirmSetupStep, createAgent, createOrganization, NotFoundError, newSetup, setupOf } from "../src";
 import { addMember, addUser } from "./fixtures";
@@ -42,9 +44,10 @@ describe("setup checklist", () => {
       { name: "Nina", handle: "nina", setup: { role: "support" } },
       MODEL,
     );
-    expect(agentView(nina).setup).toEqual({ role: "support", done: [] });
+    // Who talks to it and how it works have good defaults: they start done.
+    expect(agentView(nina).setup).toEqual({ role: "support", done: ["who", "how"] });
     const sol = await createAgent(w.db, w.owner.id, w.org.id, { name: "Sol", handle: "sol" }, MODEL);
-    expect(agentView(sol).setup).toEqual({ role: null, done: [] });
+    expect(agentView(sol).setup).toEqual({ role: null, done: ["who", "how"] });
     // Something that isn't a role id is no role.
     const odd = await createAgent(
       w.db,
@@ -53,16 +56,33 @@ describe("setup checklist", () => {
       { name: "Odd", handle: "odd", setup: { role: "Atendimento ao cliente" } },
       MODEL,
     );
-    expect(agentView(odd).setup).toEqual({ role: null, done: [] });
+    expect(agentView(odd).setup).toEqual({ role: null, done: ["who", "how"] });
   });
 
-  test("the right hand has none (it is made apart)", async () => {
+  test("a new workspace's right hand starts its first-run checklist (ADR 0152 §6)", async () => {
     const w = await workspace();
     const [lodi] = await w.db
       .select({ setup: schema.agents.setup })
       .from(schema.agents)
       .where(eq(schema.agents.builtin, "right_hand"));
-    expect(lodi?.setup ?? null).toBeNull();
+    expect(lodi?.setup).toEqual({ role: null, done: [] });
+  });
+
+  test("on the right hand only Agora não is stored, on apps and people, by who may connect or invite", async () => {
+    const w = await workspace();
+    const [lodi] = await w.db.select().from(schema.agents).where(eq(schema.agents.builtin, "right_hand"));
+    const id = lodi?.id ?? "";
+    await confirmSetupStep(w.db, w.owner.id, w.org.id, id, "apps");
+    await confirmSetupStep(w.db, w.owner.id, w.org.id, id, "people");
+    expect(await stored(w.db, id)).toEqual({ role: null, done: ["apps", "people"] });
+    // The other rows read done from the data alone, and a new agent's steps aren't its.
+    for (const step of ["about", "team", "ai", "where"] as const) {
+      await expect(confirmSetupStep(w.db, w.owner.id, w.org.id, id, step)).rejects.toBeInstanceOf(NotFoundError);
+    }
+    // And a new agent's checklist has no first-run rows.
+    const leo = await createAgent(w.db, w.owner.id, w.org.id, { name: "Leo", handle: "leo" }, MODEL);
+    await expect(confirmSetupStep(w.db, w.owner.id, w.org.id, leo.id, "people")).rejects.toBeInstanceOf(NotFoundError);
+    expect(await stored(w.db, id)).toEqual({ role: null, done: ["apps", "people"] });
   });
 
   test("its owner confirms a step once; twice changes nothing; the order is kept", async () => {
@@ -78,16 +98,16 @@ describe("setup checklist", () => {
     await confirmSetupStep(w.db, w.member.id, w.org.id, leo.id, "where");
     await confirmSetupStep(w.db, w.member.id, w.org.id, leo.id, "apps");
     await confirmSetupStep(w.db, w.member.id, w.org.id, leo.id, "where");
-    expect(await stored(w.db, leo.id)).toEqual({ role: null, done: ["where", "apps"] });
+    expect(await stored(w.db, leo.id)).toEqual({ role: null, done: ["who", "how", "where", "apps"] });
   });
 
   test("whoever manages agents confirms any agent's; another member can't", async () => {
     const w = await workspace();
     const leo = await createAgent(w.db, w.owner.id, w.org.id, { name: "Leo", handle: "leo" }, MODEL);
-    await confirmSetupStep(w.db, w.admin.id, w.org.id, leo.id, "who");
-    expect(await stored(w.db, leo.id)).toEqual({ role: null, done: ["who"] });
-    await expect(confirmSetupStep(w.db, w.member.id, w.org.id, leo.id, "how")).rejects.toBeInstanceOf(NotFoundError);
-    expect(await stored(w.db, leo.id)).toEqual({ role: null, done: ["who"] });
+    await confirmSetupStep(w.db, w.admin.id, w.org.id, leo.id, "where");
+    expect(await stored(w.db, leo.id)).toEqual({ role: null, done: ["who", "how", "where"] });
+    await expect(confirmSetupStep(w.db, w.member.id, w.org.id, leo.id, "apps")).rejects.toBeInstanceOf(NotFoundError);
+    expect(await stored(w.db, leo.id)).toEqual({ role: null, done: ["who", "how", "where"] });
   });
 
   test("an agent made before the checklist keeps none", async () => {
@@ -98,10 +118,27 @@ describe("setup checklist", () => {
     expect(await stored(w.db, old.id)).toBeNull();
   });
 
+  test("the migration gives the checklist to the right hand of workspaces with no agent besides it", async () => {
+    const w = await workspace();
+    const other = await createOrganization(w.db, w.owner.id, { name: "Beta" });
+    await createAgent(w.db, w.owner.id, other.organization.id, { name: "Leo", handle: "leo" }, MODEL);
+    await w.db.update(schema.agents).set({ setup: null }).where(eq(schema.agents.builtin, "right_hand"));
+    const file = readFileSync(join(import.meta.dir, "../../db/migrations/0239_agent_setup.sql"), "utf8");
+    const backfill = file.split("--> statement-breakpoint")[1] ?? "";
+    await w.db.execute(sql.raw(backfill));
+    const rows = await w.db
+      .select({ orgId: schema.agents.orgId, setup: schema.agents.setup })
+      .from(schema.agents)
+      .where(eq(schema.agents.builtin, "right_hand"));
+    const of = (orgId: string) => rows.find((r) => r.orgId === orgId)?.setup ?? null;
+    expect(of(w.org.id)).toEqual({ role: null, done: [] });
+    expect(of(other.organization.id)).toBeNull();
+  });
+
   test("reading it drops what isn't a step or a role", () => {
     expect(setupOf(null)).toBeNull();
     expect(setupOf({ role: "dev", done: ["ai", "nope", "ai", "how"] })).toEqual({ role: "dev", done: ["ai", "how"] });
     expect(setupOf({ role: 7, done: "ai" })).toEqual({ role: null, done: [] });
-    expect(newSetup(undefined)).toEqual({ role: null, done: [] });
+    expect(newSetup(undefined)).toEqual({ role: null, done: ["who", "how"] });
   });
 });

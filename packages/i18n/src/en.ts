@@ -1923,15 +1923,6 @@ export const en = {
         text: "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed.",
         action: "Connect",
       },
-      start: {
-        question: "How do you want to start?",
-        /** A ready-made agent's tile: creates it alone. */
-        createOne: "Create {{name}}",
-        team: "Build a starter team",
-        describe: "Describe what I need",
-        import: "Import my agents",
-        form: "Fill in the form",
-      },
       /** Under its greeting once the start card stopped asking; `message`: what the button sends, as the person. */
       again: {
         question: "Want to build the team with me?",
@@ -1939,8 +1930,6 @@ export const en = {
         message: "Help me build the team.",
       },
       next: {
-        question: "The team is here. What next?",
-        invite: "Invite people",
         firstTask: "Give {{name}} a first task",
       },
       /** Asked once, until the person picks (ADR 0147): how every agent here talks to them. */
@@ -1949,14 +1938,6 @@ export const en = {
         text: "It goes for every agent, and you can change it anytime in your account.",
         simple: "Simple, no jargon",
         technical: "Technical, with the details",
-      },
-      /** Written in the ready-made agent's DM composer by "Give … a first task", for the person to send or change. */
-      firstTask: {
-        theo: "Plan our first week: what does each of us do first?",
-        ada: "What could you build or automate for us first?",
-        lia: "Who are our 5 closest competitors, and what do they do better than us?",
-        atlas:
-          "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?",
       },
     },
     profile: {
@@ -3803,32 +3784,9 @@ export const en = {
     mission: "<b>{{name}}</b> needs you in a mission",
     seeAll: "See all",
     action: { review: "Review", answer: "Answer", open: "Open" },
-    steps: {
-      title: "First steps",
-      progress: "{{done}} of {{total}}",
-      hide: "Hide",
-      done: "Done",
-      agent: {
-        title: "Create your first agent",
-        text: "Say what it does and it joins the team.",
-        action: "Create agent",
-      },
-      /** First for whoever pays, on a billing hold. */
-      plan: {
-        title: "Choose an agentes.chat plan",
-        text: "The agents start working once the workspace has one.",
-        action: "See plans",
-      },
-      ai: { title: "Connect an AI", text: "It's what your agents think with.", action: "Connect" },
-      ask: { title: "Ask an agent for something", text: "Write below or in a conversation.", action: "Ask" },
-      team: { title: "Invite your team", text: "People and agents work together here.", action: "Invite" },
-      routine: {
-        title: "Create a routine",
-        text: "An agent does something on its own, on schedule.",
-        action: "Create routine",
-      },
-    },
     calm: { title: "All caught up", text: "Your agents will tell you here when they need you." },
+    /** One line back to the right hand's first-run checklist while a row is left (ADR 0152 §6). */
+    firstRun: "Pick up where you left off · {{done}} of {{total}}",
   },
   notifications: {
     title: "Notifications",
@@ -5192,6 +5150,78 @@ export const en = {
     tasks: {
       a: "What can you do for me?",
       b: "Where do we start?",
+    },
+    /**
+     * The right hand's first run (ADR 0152 §6): its checklist card for the workspace's owners, one row per thing to set
+     * up, read done from the data; `{{org}}`: the workspace.
+     */
+    firstRun: {
+      title: "Getting {{org}}'s team to work",
+      complete: "All set.",
+      notNow: "Not now",
+      /** Apps and people on a billing hold: no button, they open with the plan. */
+      afterPlan: "Opens with the plan.",
+      about: {
+        todo: "Tell me what {{org}} does.",
+        todoDesc: "Every agent reads this.",
+        action: "Tell",
+        done: "I know what {{org}} does",
+        title: "What does {{org}} do?",
+        desc: "Every agent reads this. You can change it anytime.",
+        line: "In one sentence",
+        optional: "Optional. Without one, the type you picked counts.",
+      },
+      team: {
+        todo: "Build the team.",
+        todoDesc: "A template for your business, you can change everything later.",
+        action: "See the team",
+        done_one: "{{count}} agent on the team",
+        done_other: "{{count}} agents on the team",
+        /** While a team card the right hand proposed waits in the chat. */
+        card: "Continue on the card below",
+      },
+      ai: {
+        todo: "Connect an AI.",
+        todoDesc: "The one you already pay for works.",
+        action: "Connect",
+        done: "I think with {{label}}",
+        doneAny: "I think with an AI now",
+        plan: "Opens with the agentes.chat plan.",
+        planAction: "See agentes.chat plans",
+      },
+      apps: {
+        todo: "Connect your work apps.",
+        todoDesc: "Reading never changes anything.",
+        action: "Choose",
+        done: "I read {{apps}}",
+        doneNone: "No apps for now",
+        title: "Your work apps",
+        desc: "The ones the team you just made would use come first. Reading never changes anything, and sending, deleting and paying ask for your approval.",
+        connect: "Connect",
+        all: "See all apps",
+      },
+      people: {
+        todo: "Bring in the people you work with.",
+        todoDesc: "They talk to the agents too.",
+        action: "Invite",
+        done_one: "{{count}} person here",
+        done_other: "{{count}} people here",
+        doneNone: "Just you for now",
+      },
+      /** Its line for a moment once a row is done. */
+      say: {
+        about: "Noted. Every agent reads this.",
+        team: "The team is here.",
+        ai: "Now the team thinks.",
+        apps: "Done, I can read the apps now.",
+        people: "Good to have more people here.",
+      },
+      /** Once the team can think: what the person may ask next. `fit` and `who` are sent to the right hand as written. */
+      asks: {
+        lead: "Now ask me something:",
+        fit: "Fit the team to my business",
+        who: "Who on the team does what?",
+      },
     },
   },
   newAgent: {
@@ -15372,11 +15402,7 @@ export const en = {
   },
   teamPlan: {
     start: {
-      question: "What does {{org}} do? With that I build a ready team, and you just check it.",
-      orWrite: "Or write it your way below, in one sentence.",
-      footer: "Already know what you want?",
       templates: "See team templates",
-      presets: "Ready-made agents",
     },
     business: {
       agency: "Agency",
@@ -15387,7 +15413,6 @@ export const en = {
       services: "Services office",
       other: "Something else",
     },
-    answered: "answered",
     step: "Question {{step}} of {{of}}",
     send: "Send {{count}}",
     card: {
@@ -15444,11 +15469,14 @@ export const en = {
     templates: {
       title: "Team templates",
       lead: "A ready team for your kind of business. Then {{name}} fits it with you.",
-      heldLead: "Pick the closest to your business. You can change every agent before creating them.",
-      use: "Use this template",
+      heldLead: "Pick the closest to your business. You can change everything later.",
+      create: "Create the team",
+      import: "Bring agents from another app",
+      scratch: "Create an agent from scratch",
+      failed: "The team wasn't created. The reason is on the card in the chat.",
       none: "None of these",
       noneSub: "Tell what you do and {{name}} builds it",
-      tailor: "Then I ask 2 questions to fit it to your business.",
+      tailor: "Later, just ask me to fit it to your business.",
     },
     weekly: {
       name: "The team's week",
@@ -15599,7 +15627,6 @@ export const en = {
       },
     },
     approvals: "What goes out to customers waits for your approval. You can let it go later, once you trust them.",
-    ask: "I used the {{name}} template. To fit it to your business: **what makes {{org}} different?**",
   },
 };
 

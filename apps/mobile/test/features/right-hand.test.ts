@@ -6,11 +6,9 @@ import {
   firstVisitOf,
   introCards,
   offersTeamSetup,
-  presetsLeft,
   rightHandOf,
   tellsNameStory,
 } from "@agenteschat/client/lib/right-hand";
-import { startCardAnswer } from "@agenteschat/client/lib/team-plan";
 import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { stickerFrame } from "../../src/agent/sticker";
 import { agentStarters, buildConversations, homeLayout, rightHandPin } from "../../src/features/chats/logic";
@@ -58,91 +56,18 @@ test("outside its audience there is no pin", () => {
   expect(rightHandPin(rows, canTalk(hidden) ? hidden : undefined)).toEqual({ pin: null, rows });
 });
 
-test("the way to build the team: with a team and no card left under the greeting, for who may create agents", () => {
+test("the way to build the team: with a team, no card left and no open checklist, for who may create agents", () => {
   const base = { noAi: false, aiKnown: true, createsAgents: true, hasTeam: true, cards: [] };
   expect(offersTeamSetup(base)).toBe(true);
   // A card still asks, or there is no team to build again: the card or the interview is the way.
-  expect(offersTeamSetup({ ...base, cards: ["next"] })).toBe(false);
+  expect(offersTeamSetup({ ...base, cards: ["style"] })).toBe(false);
   expect(offersTeamSetup({ ...base, hasTeam: false })).toBe(false);
   expect(offersTeamSetup({ ...base, noAi: true })).toBe(false);
   expect(offersTeamSetup({ ...base, aiKnown: false })).toBe(false);
   expect(offersTeamSetup({ ...base, createsAgents: false })).toBe(false);
-});
-
-test("the start card's answer: one of its choices, or a message the interview followed; a greeting answers nothing", () => {
-  const at = (id: string, type: "person" | "agent", body = id, meta: Record<string, unknown> | null = null) => ({
-    id,
-    createdAt: `2026-11-05T10:00:0${id}.000Z`,
-    author: { type, id },
-    body,
-    meta,
-  });
-  const choices = ["Agência", "Loja online"];
-  expect(startCardAnswer(undefined, choices)).toBeNull();
-  expect(startCardAnswer([at("1", "agent")] as never, choices)).toBeNull();
-  expect(startCardAnswer([at("1", "person", "oi")] as never, choices)).toBeNull();
-  expect(startCardAnswer([at("1", "person", "Agência")] as never, choices)).toBe("Agência");
-  const asked = at("2", "agent", "?", { replyChips: { choices: ["a"], step: 2, of: 3 } });
-  expect(startCardAnswer([at("1", "person", "Vendo pão"), asked] as never, choices)).toBe("Vendo pão");
-  // A greeting first: the tap after it is the answer, at once and after the interview's next question.
-  expect(startCardAnswer([at("1", "person", "oi"), at("2", "person", "Agência")] as never, choices)).toBe("Agência");
-  expect(startCardAnswer([at("1", "person", "oi"), at("2", "person", "Agência"), asked] as never, choices)).toBe(
-    "Agência",
-  );
-  // A team card with no interview before it (asked outright, or a template's) stops the card asking too.
-  const team = at("3", "agent", "", {
-    actionCard: { kind: "team_proposal", state: "open", expiresAt: at("3", "agent").createdAt, params: { agents: [] } },
-  });
-  expect(startCardAnswer([at("1", "person", "Monta o time da padaria"), team] as never, choices)).toBe(
-    "Monta o time da padaria",
-  );
-  expect(startCardAnswer([team] as never, choices)).toBe("");
-});
-
-test("on a billing hold a sentence the wall kept answers nothing: the start card stays, as the way to a team", () => {
-  const said = {
-    id: "1",
-    createdAt: "2026-11-05T10:00:01.000Z",
-    author: { type: "person", id: "u" },
-    body: "Vendo pão",
-  };
-  const kept = {
-    id: "2",
-    createdAt: "2026-11-05T10:00:02.000Z",
-    author: { type: "agent", id: "lodi" },
-    body: "Guardei sua mensagem.",
-    meta: { noAi: { agentId: "lodi", forUserId: "u", reason: "plan_hold", intent: "task" } },
-  };
-  expect(startCardAnswer([said, kept] as never, ["Agência", "Loja online"])).toBeNull();
-  const held = { noAi: true, aiKnown: true, teamHandles: [], createsAgents: true, alone: true, held: true };
-  // The kept message's card is no Connect to press first: on a hold an AI comes after the plan.
-  expect(introCards({ ...held, noAiCard: true })).toEqual(["start"]);
-});
-
-test("its greeting's cards: Connect AI, then how to start, then what next, then none", () => {
-  const base = { noAi: false, aiKnown: true, teamHandles: [] as string[], createsAgents: true, alone: true };
-  expect(introCards({ ...base, noAi: true })).toEqual(["connect"]);
-  // Having typed with no AI, the card under their message offers Connect: not a second one up here.
-  expect(introCards({ ...base, noAi: true, noAiCard: true })).toEqual([]);
-  expect(introCards(base)).toEqual(["start"]);
-  // Not known yet, or someone who can't create agents: no start card.
-  expect(introCards({ ...base, aiKnown: false })).toEqual([]);
-  expect(introCards({ ...base, createsAgents: false })).toEqual([]);
-  // One ready-made agent created: the others still have their Criar, and what next shows under them.
-  expect(introCards({ ...base, teamHandles: ["theo"] })).toEqual(["start", "next"]);
-  expect(presetsLeft(["theo"])).toEqual(["ada", "lia", "atlas"]);
-  // All four, or an agent of their own: they moved on.
-  expect(introCards({ ...base, teamHandles: ["theo", "ada", "lia", "atlas"] })).toEqual(["next"]);
-  expect(introCards({ ...base, teamHandles: ["theo", "iara"] })).toEqual(["next"]);
-  expect(introCards({ ...base, teamHandles: ["iara"], alone: false })).toEqual([]);
-  // People here already: nothing left to offer, ready-made agents or not.
-  expect(introCards({ ...base, teamHandles: ["ada"], alone: false })).toEqual([]);
-  // On a billing hold an AI comes after the plan: how to start and what next, even with no AI or a saved key.
-  const held = { ...base, held: true, askStyle: true };
-  expect(introCards({ ...held, noAi: true })).toEqual(["start"]);
-  expect(introCards(held)).toEqual(["start"]);
-  expect(introCards({ ...held, teamHandles: ["iara"] })).toEqual(["next"]);
-  expect(introCards({ ...base, askStyle: true })).toEqual(["start"]);
+  // Under the owner's checklist (ADR 0152 §6): only once it is complete.
+  expect(offersTeamSetup({ ...base, checklist: "open" })).toBe(false);
+  expect(offersTeamSetup({ ...base, checklist: "complete" })).toBe(true);
 });
 
 test("on a billing hold its greeting offers no line to build the team: that message would be refused", () => {
@@ -151,18 +76,30 @@ test("on a billing hold its greeting offers no line to build the team: that mess
   expect(offersTeamSetup({ ...s, held: true })).toBe(false);
 });
 
-test("it asks how agents talk to them only once nothing else asks, while they never picked (ADR 0147)", () => {
-  const base = { noAi: false, aiKnown: true, teamHandles: ["ada"], createsAgents: true, alone: false };
-  expect(introCards({ ...base, askStyle: true })).toEqual(["style"]);
-  // One question at a time: the start card first, and what next waits for this one.
-  expect(introCards({ ...base, teamHandles: [], alone: true, askStyle: true })).toEqual(["start"]);
-  expect(introCards({ ...base, teamHandles: ["iara"], alone: true, askStyle: true })).toEqual(["style"]);
-  expect(introCards({ ...base, teamHandles: ["theo"], alone: true, askStyle: true })).toEqual(["start", "next"]);
-  // Picked (or an older server that sends no choice): never again.
+test("its greeting's cards beside the checklist: one question at a time (ADR 0152 §6)", () => {
+  const base = { noAi: false, aiKnown: true, askStyle: true };
+  // The owner's open checklist holds the whole setup: nothing else asks, Connect included.
+  expect(introCards({ ...base, noAi: true, checklist: "open" })).toEqual([]);
+  expect(introCards({ ...base, checklist: "open" })).toEqual([]);
+  // Complete: how agents talk to them, until they pick (ADR 0147); never a second Connect.
+  expect(introCards({ ...base, checklist: "complete" })).toEqual(["style"]);
+  expect(introCards({ ...base, noAi: true, checklist: "complete" })).toEqual(["style"]);
+  // Anyone without the checklist (an invited person): Connect AI first, then the question.
+  expect(introCards({ ...base, noAi: true, checklist: "none" })).toEqual(["connect"]);
+  expect(introCards({ ...base, noAi: true, noAiCard: true })).toEqual([]);
+  expect(introCards(base)).toEqual(["style"]);
   expect(introCards({ ...base, askStyle: false })).toEqual([]);
-  // Nothing to talk with yet: Connect AI alone, the question comes with the AI.
-  expect(introCards({ ...base, noAi: true, askStyle: true })).toEqual(["connect"]);
-  expect(introCards({ ...base, aiKnown: false, askStyle: true })).toEqual([]);
+  expect(introCards({ ...base, aiKnown: false })).toEqual([]);
+  // On a billing hold an AI comes after the plan, a saved key reading ready changes nothing: no card asks.
+  expect(introCards({ ...base, noAi: true, held: true })).toEqual([]);
+  expect(introCards({ ...base, held: true })).toEqual([]);
+});
+
+test("the phone's greeting draws the checklist and Conversas has one line back to it, not a second list", () => {
+  const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
+  expect(src("right-hand/Intro.tsx")).toContain("<FirstRunCard agent={agent} channelId={channelId} />");
+  expect(src("chats/ChatsScreen.tsx")).toContain("<FirstRunLine />");
+  expect(src("chats/FirstRunLine.tsx")).toContain('t("home.firstRun"');
 });
 
 test("Configurações has its section for who manages agents, at its own screen", () => {
