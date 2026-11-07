@@ -26,7 +26,8 @@ One time, in GitHub → Settings → Secrets and variables → Actions:
    its first step.
 2. Optional: `GOOGLE_SERVICES_JSON_BASE64`, Firebase's `google-services.json` in base64, for push on Android. The
    file must list the variant's package (`chat.agentes.app`, `chat.agentes.app.preview`); otherwise that build is
-   made without push and the run says so.
+   made without push and the run says so. The server sends those pushes to Firebase itself, with a service account of
+   the same Firebase project (`FIREBASE_SERVICE_ACCOUNT`); other servers send through its push relay (ADR 0152).
 3. Optional: `PLAY_SERVICE_ACCOUNT_JSON` (a Play Console service account allowed to release; Play takes API uploads
    only after the app's first bundle was uploaded by hand), and the variable `ANDROID_VERSION_CODE_BASE` (added to
    the run number) above the last version code on Play, if any.
@@ -55,7 +56,7 @@ on expo.dev (EAS environment variables) for EAS:
 | Variable | What | Default |
 | --- | --- | --- |
 | `EXPO_PUBLIC_API_URL` | The default server. **Must be the server's `PUBLIC_URL` host** (see below). | `https://app.agentes.chat` |
-| `EAS_PROJECT_ID` | EAS project, for push tokens. | ours (`8514d5b3-…`) |
+| `EAS_PROJECT_ID` | EAS project, for the iPhone's Expo push tokens. | ours (`8514d5b3-…`) |
 | `GOOGLE_SERVICES_JSON` | Path to Firebase's `google-services.json` (the Android workflow writes it from a secret): push on Android (FCM). | none |
 | `ANDROID_VERSION_CODE` | The build's version code (the Android workflow's run). | from the config |
 | `APP_VARIANT` | `development` / `preview` / `production`: name and bundle id suffix, so all three install side by side. | `production` |
@@ -69,7 +70,8 @@ People can point the app at their own server ("Servidor: agentes.chat · Trocar"
 app's "Abrir no celular", or an `agenteschat://connect?server=…` link). The app checks `GET /api/instance` first and,
 for the same reason, uses the address the server gives there (its `PUBLIC_URL`); when that address doesn't answer from
 the phone, the server is refused with that host in the message. Switching signs out of the previous server. Pushes from
-a self-hosted server reach the app only while the Expo project keeps "enhanced push security" off.
+a self-hosted server reach the iPhone app only while the Expo project keeps "enhanced push security" off, and the
+Android app through agentes.chat's push relay (`PUSH_SENDER`, ADR 0152).
 
 Server side (not in this folder): Better Auth's Expo plugin trusts `agenteschat://`; Sign in with Apple needs
 `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, and the native iOS button sends an ID
