@@ -104,6 +104,13 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
   return { orgId, agentId: rightHand?.id ?? null };
 }
 
+/**
+ * The line under its greeting: on a billing hold with no team yet, how the team comes and that it works with the
+ * plan; otherwise what it does (the hold's banner and the checklist's AI row already say the plan once a team is here).
+ */
+export const introLeadKey = (held: boolean, hasTeam: boolean) =>
+  held && !hasTeam ? ("rightHand.intro.heldLead" as const) : ("rightHand.intro.lead" as const);
+
 /** Where the first-run checklist stands for this person (ADR 0152 §6): `none` when it isn't theirs. */
 export type FirstRunState = "none" | "open" | "complete";
 

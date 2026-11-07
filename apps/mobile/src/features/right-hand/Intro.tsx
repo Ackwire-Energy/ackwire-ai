@@ -2,7 +2,7 @@ import { type Agent, useAiStatus, useComputerSetup, useMessages, useSetAgentStyl
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { introCards, isRightHand, offersTeamSetup } from "@agenteschat/client/lib/right-hand";
+import { introCards, introLeadKey, isRightHand, offersTeamSetup } from "@agenteschat/client/lib/right-hand";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -67,7 +67,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
           {t("rightHand.intro.greeting", agentGrammar(agent.name))}
         </Text>
         <Text variant="body" tone="ink2">
-          {t(held ? "rightHand.intro.heldLead" : "rightHand.intro.lead")}
+          {t(introLeadKey(held, team.length > 0))}
         </Text>
         {waveFrom !== undefined ? (
           <View style={styles.sticker} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

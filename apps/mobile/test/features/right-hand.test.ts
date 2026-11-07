@@ -5,6 +5,7 @@ import { canTalk } from "@agenteschat/client/lib/audience";
 import {
   firstVisitOf,
   introCards,
+  introLeadKey,
   offersTeamSetup,
   rightHandOf,
   tellsNameStory,
@@ -93,6 +94,13 @@ test("its greeting's cards beside the checklist: one question at a time (ADR 015
   // On a billing hold an AI comes after the plan, a saved key reading ready changes nothing: no card asks.
   expect(introCards({ ...base, noAi: true, held: true })).toEqual([]);
   expect(introCards({ ...base, held: true })).toEqual([]);
+  // On a hold the greeting says how the team comes only while there is none; then what it does, on web and phone.
+  expect(introLeadKey(true, false)).toBe("rightHand.intro.heldLead");
+  expect(introLeadKey(true, true)).toBe("rightHand.intro.lead");
+  expect(introLeadKey(false, false)).toBe("rightHand.intro.lead");
+  const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+  for (const f of ["../../src/features/right-hand/Intro.tsx", "../../../web/src/components/RightHandIntro.tsx"])
+    expect(src(f)).toContain("t(introLeadKey(held, team.length > 0))");
 });
 
 test("the phone's greeting draws the checklist and Conversas has one line back to it, not a second list", () => {
@@ -101,7 +109,17 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   expect(src("chats/ChatsScreen.tsx")).toContain("<FirstRunLine />");
   expect(src("chats/FirstRunLine.tsx")).toContain('t("home.firstRun"');
   // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected.
-  expect(src("right-hand/FirstRun.tsx")).toContain("apps: appNames, members: run.members");
+  const card = src("right-hand/FirstRun.tsx");
+  expect(card).toContain('{ org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members }');
+  // As on the web: row 3 connects the whole team, row 4 is its own screen of suggested apps, row 1 comes filled with
+  // what was typed.
+  expect(card).toContain("openConnectAi(team.length > 0 ? {} : { agentId: agent.id })");
+  expect(card).toContain('apps: () => openSetupStep(agent.id, "apps")');
+  expect(card).toContain('about: () => openSetupStep(agent.id, "about", run.typed)');
+  const steps = src("agents/setup/SetupStepScreen.tsx");
+  expect(steps).toContain("firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />");
+  expect(steps).toContain("firstRunAppList(");
+  expect(steps).toContain('router.push({ pathname: "/connectors", params: { connect: def.id } })');
 });
 
 test("Configurações has its section for who manages agents, at its own screen", () => {

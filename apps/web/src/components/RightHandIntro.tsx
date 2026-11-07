@@ -4,7 +4,7 @@ import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { introCards, isRightHand, offersTeamSetup } from "@agenteschat/client/lib/right-hand";
+import { introCards, introLeadKey, isRightHand, offersTeamSetup } from "@agenteschat/client/lib/right-hand";
 import { AgentSticker, Button, EventPillAction, Message, MessageText, WAVE_SECONDS } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { MESSAGE_STICKER } from "@/chat/ChatMedia";
@@ -80,7 +80,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
           <p>
             <b>{t("rightHand.intro.greeting", agentGrammar(agent.name))}</b>
           </p>
-          <p>{t(held ? "rightHand.intro.heldLead" : "rightHand.intro.lead")}</p>
+          <p>{t(introLeadKey(held, team.length > 0))}</p>
         </div>
       </MessageText>
       {wave && (
