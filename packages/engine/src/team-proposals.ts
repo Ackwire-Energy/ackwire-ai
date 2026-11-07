@@ -738,7 +738,12 @@ export async function denyTeam(deps: TeamDeps, userId: string, orgId: string, me
     decidedAt: new Date().toISOString(),
   };
   if (!(await writeCard(deps, message, next, "pending"))) throw decided();
-  await tellProposer(deps, message, "The person dismissed it. Don't propose it again unless they ask.");
+  const [person] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+  await tellProposer(
+    deps,
+    message,
+    `${person?.name ?? "A person"} dismissed it. Don't propose it again unless they ask.`,
+  );
   return { card: next };
 }
 
