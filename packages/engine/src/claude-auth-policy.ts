@@ -170,6 +170,7 @@ export async function operatorOrgClaudeAuth(db: Executor, orgId: string) {
         protocol: m.protocol,
         claudeLoginMethods,
         supportsSelected: claudeLoginMethods.includes(claudeAuthMethodFor(policy, orgId, system)),
+        claudeLoginBlocked: m.executors?.claudeLoginBlocked ?? null,
       };
     }),
   };
