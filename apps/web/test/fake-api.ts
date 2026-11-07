@@ -243,6 +243,7 @@ export interface FakeState {
   connections: Connection[];
   /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
   githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
+  githubAccess?: { orgs: string[] | null; manageUrl: string | null };
   /** The workspace's Composio calls this month (default: none counted, no cap). */
   composioUsage?: ComposioUsage;
   /** What the organization's GitHub reaches (`githubApp.repositories`); unset = not connected. */
@@ -1815,6 +1816,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         agents: state.agents.length,
         budgetUsedPercent: workspacePercent(),
         approvalsWaitingForMe: state.approvals.filter((a) => a.status === "pending" && a.canDecide).length,
+        proposalsWaitingForMe: state.proposals.filter((p) => p.status === "pending" && !p.stale && p.canDecide).length,
       }),
       people: async () =>
         state.members.map((m) => ({
@@ -2195,8 +2197,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.teamTemplates", orgId, locale);
         return state.teamTemplates ?? [];
       },
-      applyTeamTemplate: async (orgId, templateId, locale) => {
-        log("agents.applyTeamTemplate", orgId, templateId, locale);
+      applyTeamTemplate: async (orgId, templateId, locale, tap) => {
+        log("agents.applyTeamTemplate", orgId, templateId, locale, tap);
         return { channelId: `dm-${LODI_ID}`, messageId: id("message") };
       },
       decideCostly: async (orgId, signalId, decision) => {
@@ -3202,6 +3204,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     githubApp: {
+      access: async () =>
+        structuredClone(
+          state.githubAccess ?? {
+            orgs: [],
+            manageUrl: "https://github.com/settings/connections/applications/client-id",
+          },
+        ),
       info: async () => structuredClone(state.githubApp ?? { installable: false, installations: [] }),
       install: async (orgId, returnTo) => {
         log("githubApp.install", orgId, returnTo);

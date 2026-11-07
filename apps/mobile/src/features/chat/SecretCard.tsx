@@ -10,6 +10,7 @@ import { formatTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { secretAad } from "@agenteschat/client/lib/secret-box";
 import {
+  secretClosedBy,
   secretLabel,
   secretRefusalKey,
   secretValueProblem,
@@ -124,7 +125,10 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     if (away) return setError(t(away, { agent: agentName, time: formatTime(i18n.language, r.expiresAt) }));
     if ((err as { status?: number }).status !== 409) return setError(t("secret.failed"));
     const fresh = await api.secrets.get(orgId, r.id).catch(() => null);
-    done(fresh && fresh.status !== "pending" ? fresh : { ...r, status: "canceled", publicKey: null });
+    const closed = secretClosedBy(err, r, fresh);
+    if (closed) return done(closed);
+    if (fresh) setAnswered(fresh);
+    setError(t(fresh ? "secret.changed" : "secret.failed"));
   };
   const showNewer = async () => {
     const newer = r.supersededBy ? await api.secrets.get(orgId, r.supersededBy).catch(() => null) : null;

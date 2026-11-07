@@ -407,4 +407,20 @@ export const words: EmailWords = {
     button: "Ouvrir les notifications",
     why: (org) => `Vous recevez cet e-mail parce que quelqu’un dans ${org} a connecté votre forfait à un agent.`,
   },
+  planWaiting: {
+    subject: "Votre équipe attend",
+    preheader: "Votre espace de travail est prêt. Il lui faut un abonnement agentes.chat pour démarrer.",
+    headline: "Votre équipe attend",
+    body: (agents, channels, routines) => {
+      const a = plural("fr", agents, { one: `1 agent`, other: `${agents} agents` });
+      const c = plural("fr", channels, { one: `1 canal`, other: `${channels} canaux` });
+      const r = plural("fr", routines, { one: `1 routine`, other: `${routines} routines` });
+      return routines > 0
+        ? `${a}, ${c} et ${r} sont prêts. Il leur faut un abonnement agentes.chat pour démarrer.`
+        : `${a} et ${c} sont prêts. Il leur faut un abonnement agentes.chat pour démarrer.`;
+    },
+    button: "Voir les abonnements agentes.chat",
+    why: (org) =>
+      `Vous recevez cet e-mail parce que vous gérez ${org} sur agentes.chat. Nous n'envoyons que deux rappels comme celui-ci.`,
+  },
 };

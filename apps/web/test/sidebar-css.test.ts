@@ -151,3 +151,10 @@ test("every role mark is a full circle", async () => {
   const ui = await Bun.file(join(import.meta.dir, "../../../packages/ui/src/styles/components.css")).text();
   expect(declarations(ui, ".ac-rolemark").findLast(([p]) => p === "border-radius")?.[1]).toBe("50%");
 });
+
+test("Personalizar: the five parts of a tool's line have five columns, and on a phone the arrows stay on its first line", () => {
+  expect(value(".sidebar-setup", "grid-template-columns")).toBe("auto 1fr auto auto");
+  const first = declarations(css, ".sidebar-setup").find(([p]) => p === "grid-template-columns")?.[1];
+  expect(first?.split(/ (?![^(]*\))/)).toHaveLength(5);
+  expect(value(".sidebar-setup__row > .ac-seg", "grid-column")).toBe("2 / -1");
+});

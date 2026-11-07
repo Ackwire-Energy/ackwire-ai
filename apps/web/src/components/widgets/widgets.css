@@ -203,9 +203,6 @@
 }
 
 /* ── "Pin to a dashboard" ──────────────────────────────────────────────── */
-.wpin .wpin__body {
-  gap: 16px;
-}
 .wpin__stage {
   display: flex;
   justify-content: center;

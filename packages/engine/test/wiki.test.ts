@@ -152,7 +152,7 @@ describe("links", () => {
           kind: "page",
           slug: "runbook",
           title: "Runbook",
-          excerpt: "Antes, leia [[Guia de Deploy#Rollback|o rollback]].",
+          excerpt: "Antes, leia o rollback.",
         },
         expect.objectContaining({
           kind: "message",

@@ -47,7 +47,6 @@ export function DatabaseRulesPanel({
           <div className="ac-field">
             <span className="ac-field__label">{t("database.rule.databases")}</span>
             <Segmented
-              size="sm"
               label={t("database.rule.databases")}
               value={some ? "some" : "all"}
               onValueChange={(v) => {
@@ -140,12 +139,8 @@ export function DatabaseRulesPanel({
             onChange={(e) => set({ dailyQueryCap: numberOrNull(e.target.value) })}
           />
         </Field>
-        <div className="ac-field">
-          <span className="ac-field__label" id={id("timeout")}>
-            {t("database.rule.timeout")}
-          </span>
+        <Field label={t("database.rule.timeout")} group help={t("database.rule.timeoutHelp")}>
           <Segmented
-            size="sm"
             label={t("database.rule.timeout")}
             value={String(policy.timeoutSeconds)}
             onValueChange={(v) => !disabled && set({ timeoutSeconds: Number(v) })}
@@ -154,8 +149,7 @@ export function DatabaseRulesPanel({
               label: t("database.rule.seconds", { count: s }),
             }))}
           />
-          <span className="ac-field__help">{t("database.rule.timeoutHelp")}</span>
-        </div>
+        </Field>
       </section>
     </div>
   );

@@ -1366,8 +1366,12 @@ test.if(posix)(
     process.env.FAKE_ACCOUNT_MODE = "fail";
     const failed = LOGIN(94);
     expect((await signInClaude(m, failed, false, true, "cli_login")).state).toBe("failed");
-    await waitFor(() => !existsSync(path.join(root, "claude_code", failed)));
-    expect(existsSync(path.join(root, "claude_code", `${failed}.method`))).toBe(false);
+    // `discard` removes the folder, then the marker: wait for both.
+    await waitFor(
+      () =>
+        !existsSync(path.join(root, "claude_code", failed)) &&
+        !existsSync(path.join(root, "claude_code", `${failed}.method`)),
+    );
   },
   20_000,
 );

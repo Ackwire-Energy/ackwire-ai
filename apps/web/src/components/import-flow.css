@@ -172,14 +172,6 @@ html:not([data-pointer]) .imp-drop__area:focus-visible {
   align-items: center;
   gap: 10px;
 }
-.imp-paste {
-  display: flex;
-  gap: 8px;
-}
-.imp-paste .ac-input {
-  flex: 1;
-  min-width: 0;
-}
 .imp-failure {
   display: flex;
   flex-direction: column;
@@ -461,13 +453,6 @@ html:not([data-pointer]) .imp-link:focus-visible {
   .imp-row__chip {
     margin-left: 56px;
     max-width: none;
-  }
-  .imp-paste {
-    flex-direction: column;
-  }
-  /* In a column, `flex: 1` would size its height from nothing: the field keeps its own, Read's under it. */
-  .imp-paste .ac-input {
-    flex: none;
   }
   .imp-apply {
     align-items: stretch;

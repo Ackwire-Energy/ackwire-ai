@@ -1,6 +1,6 @@
 import { ASK_AGAIN, commandKind, loneMerge, type MergeDone, PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
-import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
+import { auditsCall, callSubject, callTitle, recordToolCall, type ToolCallSubject } from "../agent-audit";
 import {
   COMMAND_RULE_TOOL,
   coveringRules,
@@ -392,7 +392,7 @@ export type InvokeResult =
   | { type: "result"; output: ToolOutput; ran?: Approval; autoApproved?: { by: string | null; reads: boolean } }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
-  | { type: "question"; text: string; choices: string[] | null; why: string }
+  | { type: "question"; text: string; choices: string[] | null; requestedForUserId: string | null; why: string }
   /** `request_secret`: the executor posts the card and suspends the run. */
   | { type: "secret"; requestId: string };
 
@@ -847,7 +847,7 @@ export function createToolGateway(deps: {
       .update(approvals)
       .set({ result: { content: shown(output.content), isError: output.isError === true } })
       .where(sql`${approvals.id} = ${approval.id}`);
-    recordRead(ctx.runId, approval.tool, output.content);
+    recordRead(ctx.runId, approval.tool, output.content, output.data, approval.params);
     await addRunStep(ctx.db, { id: ctx.runId, orgId: ctx.orgId }, "tool_result", {
       toolUseId,
       name: approval.tool,
@@ -957,7 +957,12 @@ export function createToolGateway(deps: {
         authority?.kind === "routine" ? (authority.brief?.deliverTo.channelId ?? ctx.channelId) : ctx.channelId;
       const audit = (
         outcome: AuditOutcome,
-        extra: { reason?: string | null; approvalId?: string; secretRequestId?: string } = {},
+        extra: {
+          reason?: string | null;
+          approvalId?: string;
+          secretRequestId?: string;
+          about?: ToolCallSubject | null;
+        } = {},
       ) => {
         if (!tool) return Promise.resolve();
         const kind = toolKind(tool).kind;
@@ -986,7 +991,7 @@ export function createToolGateway(deps: {
         // A result read from outside marks the run (`runReadOutside`, ADR 0117), an error too: its text came from there.
         const outside = ran && tool && readsOutsideText(tool, output) ? { outside: true } : null;
         const data = output.data || outside ? { ...output.data, ...outside } : null;
-        recordRead(ctx.runId, call.name, output.content);
+        recordRead(ctx.runId, call.name, output.content, output.data, call.input);
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,
@@ -997,7 +1002,8 @@ export function createToolGateway(deps: {
           ...(data ? { data } : {}),
           ...(autoApproved ? { autoApproved } : {}),
         });
-        if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });
+        if (outcome)
+          await audit(outcome, outcome === "done" ? { about: callSubject(output) } : { reason: shown(output.content) });
         return { type: "result" as const, output, ...(autoApproved ? { autoApproved } : {}) };
       };
 
@@ -1316,7 +1322,7 @@ export function createToolGateway(deps: {
         if (prompt.poll && answer.behavior === "deny") await forgetPendingCommand(ctx.db, ctx.orgId, prompt.poll);
       }
       if (builtIn && output.waitForAnswer?.text) {
-        return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices, why };
+        return { type: "question", ...output.waitForAnswer, why };
       }
       const asked = tool.connectionId ? undefined : output.waitForApproval;
       if (asked) {

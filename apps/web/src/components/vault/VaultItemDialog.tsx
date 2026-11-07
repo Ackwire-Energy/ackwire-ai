@@ -214,7 +214,6 @@ export function ItemFields({
         <div className="ac-field">
           <span className="ac-field__label">{t("vault.field.match")}</span>
           <Segmented<VaultMatch>
-            size="sm"
             label={t("vault.field.match")}
             value={draft.match}
             disabled={fixed}

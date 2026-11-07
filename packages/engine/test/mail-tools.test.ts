@@ -11,6 +11,7 @@ import {
   wrapUntrusted,
 } from "../src";
 import { giveMail, gmailAccount, imapAccount, type MailFixture, mailSetup, runContext } from "./mail-fixtures";
+import { agentRunRow, channelRoutine, fire } from "./routine-fixtures";
 
 let m: MailFixture;
 afterEach(async () => {
@@ -460,4 +461,41 @@ test("attachments are saved in the Drive as untrusted files", async () => {
   const id = (r.output.data?.artifact as { id: string } | undefined)?.id ?? "";
   const [artifact] = await m.f.db.select().from(schema.artifacts).where(eq(schema.artifacts.id, id));
   expect(artifact).toMatchObject({ kind: "file", untrusted: true, title: "report.csv" });
+  expect(r.type === "result" && r.output.content).toContain("everyone in the workspace sees it");
+});
+
+test("a routine's attachment stays in its room, and the result says nobody sees it", async () => {
+  m = await mailSetup();
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read");
+  m.box.add({
+    id: "a1",
+    from: { address: "bob@acme.com" },
+    subject: "Salários",
+    attachments: [{ id: "att1", filename: "folha.csv", contentType: "text/csv", size: 5 }],
+  });
+  m.box.state.attachments.set("a1/att1", {
+    filename: "folha.csv",
+    contentType: "text/csv",
+    data: new TextEncoder().encode("a,b\n"),
+  });
+  const run = await agentRunRow(m.f, (await fire(m.f, (await channelRoutine(m.f)).id, new Date())).agentRunId);
+  const r = await m.tools.invoke(
+    {
+      db: m.f.db,
+      orgId: m.f.org.id,
+      agentId: run.agentId,
+      runId: run.id,
+      channelId: run.channelId,
+      threadRootId: run.threadRootId,
+      triggerMessageId: run.triggerMessageId,
+      background: run.background,
+    },
+    { toolUseId: "tu_1", name: "mail_support_attachment", input: { message_id: "a1", attachment_id: "att1" } },
+  );
+  if (r.type !== "result") throw new Error("expected a result");
+  expect(r.output.content).toContain("No person sees it");
+  const id = (r.output.data?.artifact as { id: string } | undefined)?.id ?? "";
+  const [artifact] = await m.f.db.select().from(schema.artifacts).where(eq(schema.artifacts.id, id));
+  expect(artifact?.channelId).toBe(run.channelId);
 });

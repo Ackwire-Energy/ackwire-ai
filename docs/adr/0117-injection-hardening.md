@@ -123,3 +123,7 @@ Four ways out stayed open after ADR 0109:
   from some runs, per-run caps on posting, a default site list for the browser. Two owner questions stay open
   without blocking: routines' browser clicks on send, post or pay stay as today (no new approval), and an opened
   agent page keeps loading anything.
+
+## Addendum: the browser's own address
+
+The address the run's browser is on, as a browser tool reports it (`data.url`), counts as seen, and so does any address that page shows on its own site. That server already has what they carry, so going back sends nothing new, while page text that repeated the query made reopening it read as a leak. Another site, the same site with something no page showed, and a refused `open` (its `data.url` is only what was asked) get the full check. So does an address on that site carrying what the agent wrote to its browser this run: a browser tool's answer repeats `find` and a target beside the page, and a field shows what was filled in, and neither came from the server.

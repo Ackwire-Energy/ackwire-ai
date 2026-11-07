@@ -28,6 +28,10 @@ export interface ImageMark {
 export type ProviderMark = PathMark | ImageMark;
 
 const MARKS = {
+  // Not a maker's mark: "Outro provedor", a workspace's own endpoint (`custom`), as the stacked boxes of a server.
+  custom: {
+    path: "M2 2h20a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM5.5 5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3zM2 13h20a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2zM5.5 16a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3z",
+  },
   // The Claude Spark (Clay), from the press kit: https://www.anthropic.com/press-kit
   claude: {
     color: "#D97757",

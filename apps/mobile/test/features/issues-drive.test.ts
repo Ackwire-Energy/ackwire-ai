@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Artifact, Issue, IssueColumn } from "@agenteschat/client";
+import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
 import { conversationLine } from "@agenteschat/client/lib/issues";
 import { cardPreview, cardShape, driveSections, gridRows, kindKey, matchesType } from "../../src/features/drive/logic";
 import {
@@ -40,6 +43,7 @@ function issue(over: Partial<Issue> & { number: number }): Issue {
     source: { type: "manual" },
     channelId: null,
     pullRequests: [],
+    githubUrl: null,
     artifacts: [],
     work: null,
     columnId: null,
@@ -487,5 +491,26 @@ describe("a task's number and title on one row; its conversation on the card", (
     // "Criada por…" under the title, the number no longer in it.
     expect(head.indexOf('accessibilityRole="header"')).toBeLessThan(head.indexOf("{line}"));
     expect(head).not.toMatch(/`#\$\{i\.number\}`,/);
+  });
+});
+
+describe("a task's GitHub link", () => {
+  test("its chip says the repository and the number; only an issue or a PR is a link", () => {
+    expect(githubLinkLabel("https://github.com/acme/app/pull/40/files")).toBe("app#40");
+    expect(githubLinkLabel("https://github.com/acme/app/issues/12")).toBe("app#12");
+    expect(isGithubLink("https://github.com/acme/app/issues/12")).toBe(true);
+    expect(isGithubLink("https://github.com/acme/app")).toBe(false);
+    expect(isGithubLink("https://evil.example/acme/app/issues/1")).toBe(false);
+  });
+
+  const source = (file: string) => readFileSync(join(import.meta.dir, "../../src/features/issues", file), "utf8");
+
+  test("the card and the task show the chip, the task's opens the link, and the menu edits it locked while saving", () => {
+    expect(source("parts.tsx")).toContain("<GithubChip url={i.githubUrl} />");
+    const screen = source("IssueScreen.tsx");
+    expect(screen).toContain("<GithubChip url={i.githubUrl} />");
+    expect(screen).toContain("webUrl(i.githubUrl)");
+    expect(screen).toContain("sheet.open(<GithubLinkForm issue={i} />)");
+    expect(screen).toContain("<Locked when={action.isPending}>");
   });
 });

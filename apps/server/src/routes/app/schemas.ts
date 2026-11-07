@@ -12,6 +12,14 @@ import {
 import { CONTEXT_LIMITS, ENDPOINT_STYLES, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
+/** Who a task or a wiki page is for (ADR 0151): "only me" is a list of one. Administrators always see it. */
+export const AudienceChoice = z
+  .discriminatedUnion("mode", [
+    z.object({ mode: z.literal("everyone") }),
+    z.object({ mode: z.literal("people"), userIds: z.array(z.string().min(1).max(200)).max(200) }),
+  ])
+  .openapi("AudienceChoice");
+
 /** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
 export const MediaKind = z.enum(["gif", "sticker", "voice"]).nullable().openapi({
   description:
@@ -425,6 +433,9 @@ export const Channel = z
       description: "Private and limited to these roles (departments, ADR 0125); empty: public or invite only.",
     }),
     isMember: z.boolean(),
+    seenAsAdmin: z.boolean().optional().openapi({
+      description: "Listed only because you're an administrator (ADR 0151): off the sidebar until opened or joined.",
+    }),
     createdByUserId: z
       .string()
       .nullable()
@@ -550,9 +561,11 @@ export const WorkView = z
     nextUpdateAt: z.string().nullable(),
     lastUpdate: z.object({ text: z.string(), at: z.string(), seq: z.number() }).nullable(),
     question: z
-      .object({ text: z.string(), messageId: z.uuid().nullable() })
+      .object({ text: z.string(), messageId: z.uuid().nullable(), requestedForUserId: z.string().nullable() })
       .nullable()
-      .openapi({ description: "Waiting on an answer: what its run asked, and the message that holds the card." }),
+      .openapi({
+        description: "Waiting on an answer: what its run asked, the message that holds the card, and who it is for.",
+      }),
     plan: z.array(z.object({ id: z.string(), text: z.string(), state: z.enum(["todo", "doing", "done"]) })),
     issue: z.object({ id: z.uuid(), number: z.number() }).nullable(),
     resultMessageId: z.uuid().nullable(),
@@ -613,6 +626,10 @@ const MessageBase = z.object({
         .literal(true)
         .optional()
         .openapi({ description: "Routed to nobody: the organization had no AI connected." }),
+      kept: z
+        .literal(true)
+        .optional()
+        .openapi({ description: "With `noAi`: it came in on a billing hold, to be answered after the plan." }),
       platformCap: z.literal(true).optional().openapi({
         description: "Routed to nobody: the workspace used up its platform AI for the month; @mentions still answer.",
       }),

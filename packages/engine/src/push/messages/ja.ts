@@ -54,6 +54,7 @@ export const strings: Partial<PushStrings> = {
     failing: "続けて何度も失敗したため停止しました。",
   },
   widgetFailedBody: "タップして理由を確認",
+  proposalWaitingTitle: (a) => `${a} が改善を提案しています`,
   dashboardProposalTitle: (a) => `${a} がダッシュボードの公開を提案しています`,
   dashboardProposalBody: (d) => (d ? `「${d}」 · タップして判断` : "タップして判断"),
   joinRequestTitle: (name, org) => `${name} が ${org} への参加をリクエストしています`,

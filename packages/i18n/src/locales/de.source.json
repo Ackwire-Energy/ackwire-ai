@@ -3176,6 +3176,9 @@
   "webPushAsk.mention.body": {
     "value": "Can you take a look when you have a minute?"
   },
+  "shell.otherChannels": {
+    "value": "Other channels"
+  },
   "shell.titleBar.back": {
     "value": "Back"
   },
@@ -3190,6 +3193,9 @@
   },
   "shell.moreWhat.approvals": {
     "value": "What agents ask you to allow"
+  },
+  "shell.moreWhat.proposals": {
+    "value": "What agents propose to change"
   },
   "shell.moreWhat.threads": {
     "value": "Conversations that branch off, and missions"
@@ -3211,6 +3217,12 @@
   },
   "shell.moreWhat.team": {
     "value": "Who's who: people, agents and their groups"
+  },
+  "shell.moreWhat.dashboards": {
+    "value": "Numbers and charts the agents keep up to date"
+  },
+  "shell.moreWhat.taskManager": {
+    "value": "What each agent is doing now, and stopping what you need"
   },
   "shell.customizeSidebar": {
     "value": "Customize sidebar"
@@ -3253,9 +3265,6 @@
   },
   "shell.sidebarSetup.reset": {
     "value": "Reset to default"
-  },
-  "shell.sidebarSetup.instant": {
-    "value": "Changes apply right away."
   },
   "shell.sidebarSetup.tools": {
     "value": "Tools"
@@ -3389,6 +3398,9 @@
   "shell.approvals": {
     "value": "Approvals"
   },
+  "shell.proposals": {
+    "value": "Improvement proposals"
+  },
   "shell.issues": {
     "value": "Tasks"
   },
@@ -3406,6 +3418,12 @@
   },
   "shell.team": {
     "value": "Team"
+  },
+  "shell.dashboards": {
+    "value": "Dashboards"
+  },
+  "shell.taskManager": {
+    "value": "Task manager"
   },
   "shell.calendar": {
     "value": "Calendar"
@@ -3504,6 +3522,12 @@
     "value": {
       "one": "{{count}} pending approval",
       "other": "{{count}} pending approvals"
+    }
+  },
+  "shell.pendingProposals": {
+    "value": {
+      "one": "{{count}} proposal waiting for you",
+      "other": "{{count}} proposals waiting for you"
     }
   },
   "shell.home": {
@@ -4289,6 +4313,9 @@
   "channel.notMemberText": {
     "value": "Join to read the messages and talk with the people and agents here."
   },
+  "channel.adminReading": {
+    "value": "You're not in this channel. Administrators can read it."
+  },
   "channel.join": {
     "value": "Join #{{channel}}"
   },
@@ -4356,7 +4383,7 @@
     "value": "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it."
   },
   "channel.deleteIssues": {
-    "value": "Its tasks go too, as only the channel's members could see them."
+    "value": "Its tasks go too, as only the channel's members and administrators could see them."
   },
   "channel.deleteOrArchive": {
     "value": "To keep the conversation, archive the channel instead."
@@ -4507,8 +4534,8 @@
   },
   "receipts.asking": {
     "value": {
-      "one": "{{names}} is waiting for your answer",
-      "other": "{{names}} are waiting for your answer"
+      "one": "{{names}} is waiting for an answer",
+      "other": "{{names}} are waiting for an answer"
     }
   },
   "receipts.outage": {
@@ -4572,7 +4599,7 @@
     "value": "Waiting for approval"
   },
   "receipts.status.asking": {
-    "value": "Waiting for your answer"
+    "value": "Waiting for an answer"
   },
   "receipts.status.outage": {
     "value": "The AI provider is down · retries by itself"
@@ -4666,6 +4693,9 @@
   },
   "rightHand.intro.lead": {
     "value": "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do."
+  },
+  "rightHand.intro.heldLead": {
+    "value": "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan."
   },
   "rightHand.intro.connect.title": {
     "value": "Connect an AI for the team"
@@ -5392,6 +5422,24 @@
   "noAi.rightHand.useKey": {
     "value": "Use an API key"
   },
+  "noAi.kept.title": {
+    "value": "I kept your message."
+  },
+  "noAi.kept.line": {
+    "value": "I'll answer here once the workspace has an agentes.chat plan and an AI connected."
+  },
+  "noAi.kept.plan": {
+    "value": "The plan brings the agents' computer, always on. The AI is the one you already pay for: Claude, ChatGPT and more, or an API key."
+  },
+  "noAi.kept.active": {
+    "value": "Plan active. Connect an AI and {{name}} answers here."
+  },
+  "noAi.kept.receipt": {
+    "value": "Kept"
+  },
+  "noAi.kept.channel": {
+    "value": "Kept. The agents answer once the workspace has an agentes.chat plan."
+  },
   "noAi.receipt": {
     "value": "Nobody will answer: no AI connected"
   },
@@ -5548,11 +5596,8 @@
   "connectAi.key.savedUnchecked": {
     "value": "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why."
   },
-  "connectAi.key.held": {
-    "value": "Agents use it once the workspace's agentes.chat plan is active."
-  },
-  "connectAi.key.savedHeld": {
-    "value": "Saved. Agents use it once the workspace's agentes.chat plan is active."
+  "connectAi.key.closed": {
+    "value": "API keys open with the workspace's agentes.chat plan."
   },
   "connectAi.key.notPlan": {
     "value": "A coding plan's key goes in its own option above."
@@ -5601,6 +5646,15 @@
   },
   "connectAi.own.each": {
     "value": "An account just for them"
+  },
+  "connectAi.popup.title": {
+    "value": "Connecting {{name}}"
+  },
+  "connectAi.popup.any": {
+    "value": "Connecting your AI"
+  },
+  "connectAi.popup.text": {
+    "value": "We're asking the computer for the sign-in page. It opens here in a few seconds."
   },
   "connectAi.chatgptCode.title": {
     "value": "Allow sign-in with a code in ChatGPT"
@@ -6402,6 +6456,9 @@
   },
   "agentActions.issueFields.dueDate": {
     "value": "the due date"
+  },
+  "agentActions.issueFields.githubUrl": {
+    "value": "the GitHub link"
   },
   "agentActions.issueFields.criteria": {
     "value": "the criteria"
@@ -7266,6 +7323,48 @@
   "messageRefs.noAccess": {
     "value": "Message you can't see"
   },
+  "linkPills.document": {
+    "value": "Document"
+  },
+  "linkPills.spreadsheet": {
+    "value": "Spreadsheet"
+  },
+  "linkPills.presentation": {
+    "value": "Presentation"
+  },
+  "linkPills.file": {
+    "value": "File"
+  },
+  "linkPills.folder": {
+    "value": "Folder"
+  },
+  "linkPills.customer": {
+    "value": "Customer"
+  },
+  "linkPills.payment": {
+    "value": "Payment"
+  },
+  "linkPills.invoice": {
+    "value": "Invoice"
+  },
+  "linkPills.subscription": {
+    "value": "Subscription"
+  },
+  "linkPills.pull": {
+    "value": "Pull request"
+  },
+  "linkPills.merge": {
+    "value": "Merge request"
+  },
+  "linkPills.issue": {
+    "value": "Issue"
+  },
+  "folded.more": {
+    "value": "Show more"
+  },
+  "folded.less": {
+    "value": "Show less"
+  },
   "secret.group": {
     "value": "Secret request from {{agent}}"
   },
@@ -7283,6 +7382,24 @@
   },
   "secret.replaces": {
     "value": "Replaces the key {{agent}} already has under this name."
+  },
+  "secret.labelPassword": {
+    "value": "Password for {{host}}"
+  },
+  "secret.labelCode": {
+    "value": "Code for {{host}}"
+  },
+  "secret.labelKey": {
+    "value": "A key for {{agent}}'s computer"
+  },
+  "secret.labelFile": {
+    "value": "The file {{path}}"
+  },
+  "secret.placeholder": {
+    "value": "Type it here"
+  },
+  "secret.account": {
+    "value": "Account: {{username}}."
   },
   "secret.private": {
     "value": "Sent encrypted straight to the computer. It stays out of the chat and away from the agent."
@@ -7308,8 +7425,41 @@
   "secret.outcomeWithdrawn": {
     "value": "{{agent}} no longer needs this."
   },
+  "secret.endedDeclined": {
+    "value": "Declined. {{agent}} goes on without it."
+  },
+  "secret.endedExpired": {
+    "value": "Nobody answered in time. {{agent}} goes on without it, and can ask again."
+  },
+  "secret.endedRunStopped": {
+    "value": "{{agent}}'s task stopped before this was answered. Ask {{agent}} again if you still need it."
+  },
+  "secret.endedSuperseded": {
+    "value": "{{agent}} asked again in a newer request."
+  },
+  "secret.endedComputer": {
+    "value": "This can't reach {{agent}} anymore: the computer that asked changed. Ask {{agent}} to ask again."
+  },
+  "secret.endedPersonLeft": {
+    "value": "{{person}} left the workspace before answering."
+  },
+  "secret.endedClosed": {
+    "value": "This request closed before anyone answered. Ask {{agent}} again if you still need it."
+  },
+  "secret.seeNewer": {
+    "value": "See the newer request"
+  },
+  "secret.computerAway": {
+    "value": "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment."
+  },
+  "secret.computerPaused": {
+    "value": "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}."
+  },
   "secret.failed": {
     "value": "Couldn't deliver it. Is the agent's computer on?"
+  },
+  "secret.changed": {
+    "value": "This request changed while you answered. Nothing was sent. Send it again."
   },
   "secret.empty": {
     "value": "Type the value."
@@ -8778,6 +8928,15 @@
   "home.steps.agent.action": {
     "value": "Create agent"
   },
+  "home.steps.plan.title": {
+    "value": "Choose an agentes.chat plan"
+  },
+  "home.steps.plan.text": {
+    "value": "The agents start working once the workspace has one."
+  },
+  "home.steps.plan.action": {
+    "value": "See plans"
+  },
   "home.steps.ai.title": {
     "value": "Connect an AI"
   },
@@ -9147,6 +9306,9 @@
   "notifications.what.changeRequest": {
     "value": "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>"
   },
+  "notifications.what.proposalWaiting": {
+    "value": "Improvement proposals from <b>{{names}}</b>"
+  },
   "notifications.what.changeRequestAgent": {
     "value": "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>"
   },
@@ -9483,6 +9645,9 @@
   "approvals.title": {
     "value": "Approvals"
   },
+  "approvals.tabs.requests": {
+    "value": "Requests"
+  },
   "approvals.groupHead": {
     "value": {
       "one": "<b>{{name}}</b> asked for {{count}} thing in one go",
@@ -9587,9 +9752,6 @@
   },
   "approvals.hold": {
     "value": "Hold to approve"
-  },
-  "approvals.holding": {
-    "value": "Hold…"
   },
   "approvals.holdLabel": {
     "value": "{{action}}: hold to confirm"
@@ -11702,6 +11864,12 @@
   "agentPage.saveBar.andMore": {
     "value": "{{names}} and more"
   },
+  "memory.fromRefusal": {
+    "value": "Not to propose again: {{text}}"
+  },
+  "memory.fromCorrection": {
+    "value": "A person corrected: {{text}}"
+  },
   "memory.back": {
     "value": "{{name}}"
   },
@@ -11861,6 +12029,27 @@
   },
   "proposals.title": {
     "value": "Improvement proposals"
+  },
+  "proposals.whyCode.refused": {
+    "value": "A person refused: {{text}}"
+  },
+  "proposals.whyCode.corrected": {
+    "value": "A person corrected: {{text}}"
+  },
+  "proposals.whyCode.seen": {
+    "value": "The agent noticed this more than once."
+  },
+  "proposals.whyCode.skill": {
+    "value": "It came from using this skill."
+  },
+  "proposals.whyCode.asked": {
+    "value": "Asked for in a conversation."
+  },
+  "proposals.whyCode.budget": {
+    "value": "It stopped at its monthly budget this week."
+  },
+  "proposals.whyCode.noChannel": {
+    "value": "It is in no channel."
   },
   "proposals.subtitle": {
     "value": "Changes the agents propose. Nothing changes until someone accepts."
@@ -13727,6 +13916,30 @@
   "scopes.custom_write.description": {
     "value": "Use the write tools. Those marked sensitive always ask for approval."
   },
+  "issues.delete.action": {
+    "value": "Delete task"
+  },
+  "issues.delete.title": {
+    "value": "Delete task #{{number}}?"
+  },
+  "issues.delete.body": {
+    "value": "It goes for everyone, with its conversation and the conversation's files."
+  },
+  "issues.delete.steps": {
+    "value": {
+      "one": "Its step goes too.",
+      "other": "Its {{count}} steps go too."
+    }
+  },
+  "issues.delete.working": {
+    "value": "{{name}} stops what it's doing on it."
+  },
+  "issues.delete.confirm": {
+    "value": "Delete"
+  },
+  "issues.delete.done": {
+    "value": "Task #{{number}} deleted."
+  },
   "issues.assigneeFilter": {
     "value": "Assignee"
   },
@@ -14316,9 +14529,6 @@
   "issues.fromAgent": {
     "value": "from a request to an agent"
   },
-  "issues.privateTask": {
-    "value": "Only people in this conversation see this task."
-  },
   "issues.subIssues": {
     "value": {
       "one": "Subtasks · {{count}}",
@@ -14455,6 +14665,18 @@
   "issues.noLinks": {
     "value": "Nothing linked yet."
   },
+  "issues.github.label": {
+    "value": "GitHub link"
+  },
+  "issues.github.placeholder": {
+    "value": "Issue or PR link"
+  },
+  "issues.github.invalid": {
+    "value": "That isn't the link of a GitHub issue or pull request."
+  },
+  "issues.github.remove": {
+    "value": "Remove the GitHub link"
+  },
   "issues.openConversation": {
     "value": "View conversation"
   },
@@ -14512,6 +14734,12 @@
   "issues.event.shared_everyone": {
     "value": "showed the card to the whole workspace"
   },
+  "issues.event.audience_everyone": {
+    "value": "showed the task to everyone"
+  },
+  "issues.event.audience_people": {
+    "value": "changed who sees the task"
+  },
   "issues.event.created": {
     "value": "created the task"
   },
@@ -14544,6 +14772,12 @@
   },
   "issues.event.pr_linked": {
     "value": "linked PR #{{number}}"
+  },
+  "issues.event.github_linked": {
+    "value": "linked it to GitHub"
+  },
+  "issues.event.github_unlinked": {
+    "value": "removed the GitHub link"
   },
   "issues.event.artifact_linked": {
     "value": "attached a file"
@@ -20977,7 +21211,7 @@
     "value": "Restricted"
   },
   "wiki.restrictedHint": {
-    "value": "Only owners and the people chosen see this page."
+    "value": "Only administrators and the people chosen see this page."
   },
   "wiki.audience": {
     "value": "Access"
@@ -20986,7 +21220,7 @@
     "value": "Access to {{title}}"
   },
   "wiki.audienceText": {
-    "value": "Owners always have access. Anyone without it won't find the page in lists, search or links."
+    "value": "Administrators always have access. Anyone without it won't find the page in lists, search or links."
   },
   "wiki.audienceEveryone": {
     "value": "Everyone in the workspace"
@@ -20998,7 +21232,7 @@
     "value": "Access to the folder {{folder}}"
   },
   "wiki.audienceFolderText": {
-    "value": "It reaches the pages in this folder and its subfolders, and the ones added later. Owners always have access."
+    "value": "It reaches the pages in this folder and its subfolders, and the ones added later. Administrators always have access."
   },
   "wiki.audienceAgents": {
     "value": "Agents"
@@ -21157,7 +21391,7 @@
     "value": "Everyone, no agents"
   },
   "wiki.access.ownersOnly": {
-    "value": "Owners only"
+    "value": "Administrators only"
   },
   "wiki.access.withAllAgents": {
     "value": "{{names}} and every agent"
@@ -23062,7 +23296,7 @@
     "value": "Everyone in the workspace can see it: it's in the public channel #{{name}}"
   },
   "drive.audience.privateChannel": {
-    "value": "Only members of #{{name}} can see it"
+    "value": "Only members of #{{name}} and administrators can see it"
   },
   "drive.audience.dm": {
     "value": "Only you and {{name}} can see it: it came from a direct message"
@@ -23074,7 +23308,7 @@
     "value": "Private"
   },
   "drive.privateHint": {
-    "value": "Only the people in the conversation see these files"
+    "value": "Only the people in the conversation see these files. In a channel, administrators do too."
   },
   "drive.downloadAs": {
     "value": "Download as"
@@ -25402,6 +25636,30 @@
   "connectFlow.continueInComposio": {
     "value": "Continue on Composio"
   },
+  "connectFlow.githubOrgs.title": {
+    "value": "Organizations it reaches"
+  },
+  "connectFlow.githubOrgs.none": {
+    "value": "No organization yet."
+  },
+  "connectFlow.githubOrgs.lead": {
+    "value": "GitHub asks about organizations only the first time. To add one, open the app's page there and press Grant beside it. If you don't own it, the button says Request and an owner approves."
+  },
+  "connectFlow.githubOrgs.open": {
+    "value": "Grant organizations on GitHub"
+  },
+  "connectFlow.githubOrgs.added": {
+    "value": "Now also: {{names}}."
+  },
+  "connectFlow.githubOrgs.removed": {
+    "value": "No longer: {{names}}."
+  },
+  "connectFlow.githubOrgs.same": {
+    "value": "Nothing changed in the organizations."
+  },
+  "connectFlow.githubOrgs.failed": {
+    "value": "Couldn't read the organizations now."
+  },
   "connectFlow.composioHelp": {
     "value": "You sign in on Composio's page, in English, and come back here. {{name}} shows the permission as “Composio”."
   },
@@ -26807,7 +27065,13 @@
     "value": "Drag to move around. Tap to fit it back"
   },
   "errors.issue.assigneeOutside": {
-    "value": "This person isn't in this conversation, so they can't see this task."
+    "value": "This person can't see this task. Add them to who sees it first."
+  },
+  "errors.issue.audienceEmpty": {
+    "value": "Choose who sees it."
+  },
+  "errors.issue.deleteForbidden": {
+    "value": "Only who created this task or an administrator can delete it."
   },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."
@@ -31952,6 +32216,9 @@
   "chat.body.no_ai_cli_missing": {
     "value": "I can't answer yet: my AI's program isn't installed on my computer."
   },
+  "chat.body.no_ai_plan_hold": {
+    "value": "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected."
+  },
   "chat.body.no_ai_no_computer": {
     "value": "I can't answer yet: my AI needs a computer and I have none."
   },
@@ -32390,6 +32657,12 @@
   "builtinTools.run_skill_script.description": {
     "value": "Runs a skill's script in the environment."
   },
+  "builtinTools.vault_make_password.label": {
+    "value": "Make a password"
+  },
+  "builtinTools.vault_make_password.description": {
+    "value": "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it."
+  },
   "builtinTools.computer_status.label": {
     "value": "Check the computer"
   },
@@ -32473,6 +32746,12 @@
   },
   "builtinTools.browser_type_secret.description": {
     "value": "Types a password you gave it into a password or code field, without seeing it."
+  },
+  "builtinTools.browser_make_password.label": {
+    "value": "Make a password"
+  },
+  "builtinTools.browser_make_password.description": {
+    "value": "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it."
   },
   "builtinTools.browser_wait.label": {
     "value": "Wait for the page"
@@ -33375,6 +33654,9 @@
   "browser.watch.step.browser_type_secret": {
     "value": "Typed a password"
   },
+  "browser.watch.step.browser_make_password": {
+    "value": "Made a password"
+  },
   "browser.watch.step.browser_wait": {
     "value": "Waited for the page"
   },
@@ -33482,6 +33764,12 @@
   },
   "standing.billing.paid": {
     "value": "Payment received. The agentes.chat plan starts in a moment."
+  },
+  "standing.billing.teamReady": {
+    "value": "Your team is ready. It needs an agentes.chat plan to start."
+  },
+  "standing.billing.invites": {
+    "value": "Invitations open with the agentes.chat plan."
   },
   "standing.cloud.review": {
     "value": "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 5). To contest it, write to {{email}}."
@@ -33678,14 +33966,14 @@
   "deleteAccount.intro": {
     "value": "This deletes your whole account, not just one workspace."
   },
+  "deleteAccount.when": {
+    "value": "Your account goes for good on {{date}}. Until then, sign in to restore it."
+  },
   "deleteAccount.whole": {
     "value": "Your whole account"
   },
   "deleteAccount.oneWorkspace": {
     "value": "Want to delete just one workspace? Your account stays."
-  },
-  "deleteAccount.when": {
-    "value": "Your account goes for good on {{date}}. Until then, sign in to restore it."
   },
   "deleteAccount.closes": {
     "value": "{{name}} closes now. You're the only one there, so it's deleted for good on {{date}}."
@@ -34516,9 +34804,6 @@
   "taskManager.subtitle": {
     "value": "What the agents are doing now and what ended today."
   },
-  "taskManager.nav": {
-    "value": "Task manager"
-  },
   "taskManager.search": {
     "value": "Search a task, agent or app"
   },
@@ -34890,9 +35175,6 @@
   },
   "taskManager.queue.computers": {
     "value": "Computers"
-  },
-  "taskManager.navWhat": {
-    "value": "What each agent is doing now, and stopping what you need"
   },
   "taskManager.cards.label": {
     "value": "Agents"
@@ -35433,12 +35715,6 @@
   },
   "dashboards.subtitle": {
     "value": "Numbers and charts the agents keep up to date."
-  },
-  "dashboards.sidebar": {
-    "value": "Dashboards"
-  },
-  "dashboards.navWhat": {
-    "value": "Numbers and charts the agents keep up to date"
   },
   "dashboards.new": {
     "value": "New dashboard"
@@ -36124,6 +36400,12 @@
   "teamPlan.firstTask.lead": {
     "value": "One short task per agent, so you see each one working today."
   },
+  "teamPlan.firstTask.heldLead": {
+    "value": "One short task per agent. Finish the sentence and send it. They start once the workspace has an agentes.chat plan."
+  },
+  "teamPlan.firstTask.example": {
+    "value": "Example of what {{name}} delivers"
+  },
   "teamPlan.firstTask.open": {
     "value": "Open with the task"
   },
@@ -36172,6 +36454,9 @@
   "teamPlan.templates.lead": {
     "value": "A ready team for your kind of business. Then {{name}} fits it with you."
   },
+  "teamPlan.templates.heldLead": {
+    "value": "Pick the closest to your business. You can change every agent before creating them."
+  },
   "teamPlan.templates.use": {
     "value": "Use this template"
   },
@@ -36186,6 +36471,60 @@
   },
   "teamPlan.weekly.name": {
     "value": "The team's week"
+  },
+  "whoSees.label": {
+    "value": "Who sees it"
+  },
+  "whoSees.everyone": {
+    "value": "Everyone in the workspace"
+  },
+  "whoSees.me": {
+    "value": "Only me"
+  },
+  "whoSees.people": {
+    "value": "Specific people"
+  },
+  "whoSees.only": {
+    "value": "Only {{name}}"
+  },
+  "whoSees.more": {
+    "value": {
+      "one": "{{names}} and {{count}} more",
+      "other": "{{names}} and {{count}} more"
+    }
+  },
+  "whoSees.some": {
+    "value": "some people"
+  },
+  "whoSees.taskTitle": {
+    "value": "Who sees this task"
+  },
+  "whoSees.pageTitle": {
+    "value": "Who sees this page"
+  },
+  "whoSees.admins": {
+    "value": "Administrators always see it."
+  },
+  "whoSees.tied": {
+    "value": "It follows who's in the conversation until you change it."
+  },
+  "whoSees.search": {
+    "value": "Search people"
+  },
+  "whoSees.noMatch": {
+    "value": "Nobody with that name"
+  },
+  "whoSees.moreOptions": {
+    "value": "More options"
+  },
+  "whoSees.receipt": {
+    "value": "Who sees it: {{who}}"
+  },
+  "whoSees.limited": {
+    "value": "limited access"
+  },
+  "whoSees.rolesToo": {
+    "value": "The roles already on this page keep seeing it."
   },
   "teamTemplates.lead": {
     "value": "A team for {{org}}, each agent in its own channel. You can adjust it before creating."
@@ -36254,7 +36593,7 @@
     "value": "Sum up what was left unanswered"
   },
   "teamTemplates.agents.iara.task": {
-    "value": "Answer the last customer message waiting for us"
+    "value": "Write a reply to this customer message:"
   },
   "teamTemplates.agents.caio.role": {
     "value": "Billing"
@@ -36266,7 +36605,7 @@
     "value": "List who is late on payment"
   },
   "teamTemplates.agents.caio.task": {
-    "value": "List who is late this month"
+    "value": "Write a friendly payment reminder for:"
   },
   "teamTemplates.agents.ada.role": {
     "value": "Dev"
@@ -36278,7 +36617,7 @@
     "value": "List the new bugs"
   },
   "teamTemplates.agents.ada.task": {
-    "value": "Look at the latest bug a customer reported"
+    "value": "Tell me where to start looking at this bug:"
   },
   "teamTemplates.agents.lia.role": {
     "value": "Content"
@@ -36290,7 +36629,7 @@
     "value": "Propose the week's posts"
   },
   "teamTemplates.agents.lia.task": {
-    "value": "Propose three posts for this week"
+    "value": "Suggest three posts for this week about:"
   },
   "teamTemplates.agents.theo.role": {
     "value": "Sales"
@@ -36302,7 +36641,7 @@
     "value": "List who asked for a quote and got no answer"
   },
   "teamTemplates.agents.theo.task": {
-    "value": "List who asked for a quote this week"
+    "value": "Write a short quote for this request:"
   },
   "teamTemplates.agents.nina.role": {
     "value": "Scheduling"
@@ -36314,7 +36653,7 @@
     "value": "Confirm tomorrow's appointments"
   },
   "teamTemplates.agents.nina.task": {
-    "value": "Show me tomorrow's appointments"
+    "value": "Organize tomorrow's schedule:"
   },
   "teamTemplates.agents.otto.role": {
     "value": "Orders"
@@ -36326,7 +36665,7 @@
     "value": "Warn what is running out in stock"
   },
   "teamTemplates.agents.otto.task": {
-    "value": "List the orders still waiting to ship"
+    "value": "List what's left to do on these orders:"
   },
   "teamTemplates.agents.bia.role": {
     "value": "Answer base"
@@ -36338,7 +36677,16 @@
     "value": "Update the base with the week's answers"
   },
   "teamTemplates.agents.bia.task": {
-    "value": "List the 5 questions customers ask the most"
+    "value": "Write answers to these customer questions:"
+  },
+  "teamTemplates.example.iara": {
+    "value": "Hi Marina. Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date."
+  },
+  "teamTemplates.example.lia": {
+    "value": "1. Three common mistakes when hiring an agency. 2. Behind the scenes of a project that almost went wrong. 3. A question for your followers: what do you want to see here?"
+  },
+  "teamTemplates.example.nina": {
+    "value": "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?"
   },
   "teamTemplates.channels.iara": {
     "value": "support"
@@ -36405,68 +36753,5 @@
   },
   "teamTemplates.ask": {
     "value": "I used the {{name}} template. To fit it to your business: **what makes {{org}} different?**"
-  },
-  "secret.labelPassword": {
-    "value": "Password for {{host}}"
-  },
-  "secret.labelCode": {
-    "value": "Code for {{host}}"
-  },
-  "secret.labelKey": {
-    "value": "A key for {{agent}}'s computer"
-  },
-  "secret.labelFile": {
-    "value": "The file {{path}}"
-  },
-  "secret.placeholder": {
-    "value": "Type it here"
-  },
-  "secret.account": {
-    "value": "Account: {{username}}."
-  },
-  "secret.endedDeclined": {
-    "value": "Declined. {{agent}} goes on without it."
-  },
-  "secret.endedExpired": {
-    "value": "Nobody answered in time. {{agent}} goes on without it, and can ask again."
-  },
-  "secret.endedRunStopped": {
-    "value": "{{agent}}'s task stopped before this was answered. Ask {{agent}} again if you still need it."
-  },
-  "secret.endedSuperseded": {
-    "value": "{{agent}} asked again in a newer request."
-  },
-  "secret.endedComputer": {
-    "value": "This can't reach {{agent}} anymore: the computer that asked changed. Ask {{agent}} to ask again."
-  },
-  "secret.endedPersonLeft": {
-    "value": "{{person}} left the workspace before answering."
-  },
-  "secret.endedClosed": {
-    "value": "This request closed before anyone answered. Ask {{agent}} again if you still need it."
-  },
-  "secret.seeNewer": {
-    "value": "See the newer request"
-  },
-  "secret.computerAway": {
-    "value": "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment."
-  },
-  "secret.computerPaused": {
-    "value": "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}."
-  },
-  "builtinTools.vault_make_password.label": {
-    "value": "Make a password"
-  },
-  "builtinTools.vault_make_password.description": {
-    "value": "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it."
-  },
-  "builtinTools.browser_make_password.label": {
-    "value": "Make a password"
-  },
-  "builtinTools.browser_make_password.description": {
-    "value": "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it."
-  },
-  "browser.watch.step.browser_make_password": {
-    "value": "Made a password"
   }
 }

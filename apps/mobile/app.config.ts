@@ -40,6 +40,7 @@ export const APP_LINK_PATTERNS = [
   "/org/*/threads/*",
   "/org/*/agents/*",
   "/org/*/approvals",
+  "/org/*/proposals",
   "/org/*/notifications",
   "/org/*/issues",
   "/org/*/issues/*",

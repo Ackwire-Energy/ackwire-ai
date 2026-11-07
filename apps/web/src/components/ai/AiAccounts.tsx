@@ -158,9 +158,9 @@ export function AiAccountsSection() {
         icon="computer"
         title={t("aiAccounts.page.title")}
         hint={{ name: t("common.about", { label: t("aiAccounts.page.title") }), text: t("aiAccounts.page.hint") }}
-        action={!noPlans && connect}
+        action={!noPlans && !hold && connect}
       />
-      {hold && <PlanHold hold={hold} onKey={connectAi ? () => connectAi.open({ intent: "api_key" }) : undefined} />}
+      {hold && <PlanHold hold={hold} />}
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {ai.isError && <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>}
       {noPlans && (
@@ -338,9 +338,11 @@ export function AiAccountsSection() {
               ? t("aiAccounts.page.disconnectAgents", {
                   count: open.account.usedBy.length,
                   agents: names(open.account.usedBy),
-                  computer: open.account.logins[0]?.computer ?? "",
+                  computer: computerNameOf(t, org.name, open.account.logins[0]?.computer ?? ""),
                 })
-              : t("aiAccounts.page.disconnectNone", { computer: open.account.logins[0]?.computer ?? "" }),
+              : t("aiAccounts.page.disconnectNone", {
+                  computer: computerNameOf(t, org.name, open.account.logins[0]?.computer ?? ""),
+                }),
             ...(open.account.logins.some((l) =>
               endsOnClaude(
                 l,

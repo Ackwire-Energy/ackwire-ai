@@ -89,6 +89,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     // The computer step's plan offer: only where the workspace gets its own computer (`setupView`, as
     // `computerSetup.`) and waits for its first plan (ADR 0079).
     "onboarding.computer.payment.",
+    // The wall's line on what the plan brings: only on a billing hold, which only the Cloud has (`planHoldOf`).
+    "noAi.kept.plan",
   ],
   selfhost: [
     "auth.owner.",

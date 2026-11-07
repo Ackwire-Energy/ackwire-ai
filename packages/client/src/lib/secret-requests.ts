@@ -74,6 +74,24 @@ export function secretRefusalKey(error: unknown): "secret.computerAway" | "secre
       : null;
 }
 
+const CLOSED = new Set<SecretRequest["status"]>(["delivered", "declined", "expired", "canceled"]);
+
+/**
+ * How a request stands after a 409 that isn't the computer's: `fresh` when reading it again shows it ended, else as the
+ * refusal says it ended. Null: it is still open, and only this card's copy was behind, so the person can send again.
+ */
+export function secretClosedBy(
+  error: unknown,
+  current: SecretRequest,
+  fresh: SecretRequest | null,
+): SecretRequest | null {
+  if (fresh && fresh.status !== "pending") return fresh;
+  const { code, params } = error as { code?: string; params?: { status?: string; endReason?: string | null } };
+  const status = params?.status as SecretRequest["status"] | undefined;
+  if (code !== "secret.closed" || !status || !CLOSED.has(status)) return null;
+  return { ...current, status, endReason: (params?.endReason ?? null) as SecretRequest["endReason"], publicKey: null };
+}
+
 /** A request's notification (`secret_request`) in one line, as its card says it: its label, what it is for. */
 export const secretNoticeLine = (n: Pick<AppNotification, "latest">) =>
   [n.latest.title, n.latest.text].filter(Boolean).join(" · ");

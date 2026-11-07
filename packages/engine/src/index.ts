@@ -134,6 +134,7 @@ export * from "./host-computer";
 export * from "./imports";
 export * from "./invite-requests";
 export * from "./issue-columns";
+export * from "./issue-deletion";
 export * from "./issue-tools";
 export * from "./issue-work";
 export * from "./issues";

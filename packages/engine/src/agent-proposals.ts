@@ -354,7 +354,7 @@ export async function checkRoutine(
   });
   if (!read.ok) {
     throw new ValidationError(
-      `The routine's schedule: ${read.error} Write it as the person said it ("todo dia ao meio-dia") or as cron ("0 12 * * *").`,
+      `The routine's schedule: ${read.error} Write it as 5-field cron ("0 12 * * *"): words need the workspace's own model, which a workspace on a plan alone doesn't have.`,
     );
   }
   try {

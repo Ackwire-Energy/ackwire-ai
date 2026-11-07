@@ -143,7 +143,7 @@ function ChatSticker({
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignSelf: "stretch", marginTop: 6 },
+  wrap: { alignSelf: "stretch" },
   end: { alignItems: "flex-end" },
   endSelf: { alignSelf: "flex-end" },
   // The app's cut corner ("tato com canto"): a hairline, small bottom-left corner.
@@ -172,5 +172,5 @@ const styles = StyleSheet.create({
   markOn: { backgroundColor: "rgba(0, 0, 0, 0.55)" },
   markOff: { borderWidth: 1.5 },
   markText: { fontSize: 10.5, lineHeight: 14, fontWeight: "700", letterSpacing: 0.5 },
-  sticker: { width: MESSAGE_STICKER, height: MESSAGE_STICKER, marginTop: 4 },
+  sticker: { width: MESSAGE_STICKER, height: MESSAGE_STICKER },
 });

@@ -542,7 +542,7 @@ export function waitingTotal(input: {
 // ── A new workspace's first steps (ADR 0108) ────────────────────────────────
 
 /** The screen each of Conversas' first steps opens, and its tile. */
-export const FIRST_STEP_SCREENS: Record<FirstStepId, { icon: IconName; href: string }> = {
+export const FIRST_STEP_SCREENS: Record<Exclude<FirstStepId, "plan">, { icon: IconName; href: string }> = {
   agent: { icon: "agent", href: "/new-agent" },
   ai: { icon: "brain", href: "/connect-ai" },
   ask: { icon: "chat", href: "/new-chat" },

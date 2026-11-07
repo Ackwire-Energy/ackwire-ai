@@ -46,7 +46,15 @@ import {
   requesterOf,
 } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
-import { type EmailArt, queuePlanLent, queuePlanOpenedEmail, sendQueuedEmail } from "./email";
+import {
+  type EmailArt,
+  PLAN_WAITING_JOB,
+  queuePlanLent,
+  queuePlanOpenedEmail,
+  queuePlanWaiting,
+  sendPlanWaitingEmail,
+  sendQueuedEmail,
+} from "./email";
 import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
@@ -713,6 +721,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (typeof message.meta.answersQuestionId === "string") return;
       // Delivered to an agent's task already in progress (steering): no second run.
       if (Array.isArray(message.meta.steeredRunIds)) return;
+      // A template tapped on a billing hold: the card is the answer, and nobody can be woken.
+      if (message.meta.templateTap) return;
       const channel = where;
       if (channel?.kind === "dm") {
         await dispatchDm(deps.db, message, { maxHops: deps.maxHops }); // idempotent safety net
@@ -732,7 +742,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (res.skipped === "already_routed" || res.skipped === "continued") return;
       // Nobody can think: what the person asks for may be to connect an AI (Jev reads it), for the Connect step.
       if (res.reason === NO_AI) {
-        const intent = await aiConnectIntent(deps.context?.judge, { orgId: message.orgId, text: message.body });
+        if (res.held) await queuePlanWaiting(deps.db, message.orgId);
+        const intent = res.held
+          ? undefined
+          : await aiConnectIntent(deps.context?.judge, { orgId: message.orgId, text: message.body });
         return routed("none", [], [], NO_AI, intent);
       }
       await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
@@ -911,6 +924,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         throw error;
       }
       await forgetCodeEmail(deps.db, job);
+    },
+    [PLAN_WAITING_JOB]: async (job) => {
+      if (deps.emailArt) await sendPlanWaitingEmail(deps.db, deps.emailArt.home, orgOf(job), job.payload.step);
     },
     // Someone else let more people talk to an agent on a person's plan: that person's email (`planOpened`).
     [PLAN_OPENED_JOB]: async (job) => {

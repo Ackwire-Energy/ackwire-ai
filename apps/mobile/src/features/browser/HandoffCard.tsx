@@ -216,7 +216,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   // A line that wraps keeps its icon on the first.
   done: {
-    marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,

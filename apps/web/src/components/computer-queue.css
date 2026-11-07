@@ -161,7 +161,6 @@ html:not([data-pointer]) .cq__open:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 16px;
-  margin-top: 4px;
   font-size: 13px;
   line-height: 18px;
 }

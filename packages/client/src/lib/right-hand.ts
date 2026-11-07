@@ -109,23 +109,27 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
 export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p) => !teamHandles.includes(p));
 
 /**
- * Whether its greeting ends with the way to build the team with it, for whoever may create agents once an AI is there.
- * Not while the start card still asks, or its interview runs: with no team, those are the way.
+ * Whether its greeting ends with the way to build the team again, for whoever may create agents once an AI is there:
+ * only with a team and no card left under the greeting (`cards`), which would offer the same or ask something first.
  */
 export const offersTeamSetup = (s: {
   noAi: boolean;
   aiKnown: boolean;
   createsAgents: boolean;
   hasTeam: boolean;
-  /** `startCardPassed`. */
-  cardPassed: boolean;
-}) => s.aiKnown && !s.noAi && s.createsAgents && (s.hasTeam || s.cardPassed);
+  /** `introCards`. */
+  cards: readonly string[];
+  /** A billing hold (`planHoldOf`): it can't answer, so its line would send a message that gets refused. */
+  held?: boolean;
+}) => s.aiKnown && !s.noAi && !s.held && s.createsAgents && s.hasTeam && s.cards.length === 0;
 
 /**
- * The cards under the right hand's greeting at the top of its DM (ADR 0137): Connect AI while there is none. With one,
- * how to start (for whoever may create agents): with no agent yet, or, still alone, while the team is only ready-made
- * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. Last, once an AI is
- * there, how the person wants agents to talk to them, until they pick (ADR 0147).
+ * The cards under the right hand's greeting at the top of its DM (ADR 0137), one question at a time: Connect AI while
+ * there is none. With one, how to start (for whoever may create agents): with no agent yet, or, still alone, while the
+ * team is only ready-made agents and some are left, each tile its own Criar, beside what next. Once that is settled,
+ * how the person wants agents to talk to them, until they pick (ADR 0147), and only then what next: the team here and
+ * nobody else yet. On a billing hold, how to start and what next alone: an AI comes after the plan, and a saved key
+ * reading as ready changes nothing.
  */
 export function introCards(s: {
   noAi: boolean;
@@ -138,8 +142,12 @@ export function introCards(s: {
   alone: boolean;
   /** They never picked how agents talk to them (`agentStyle` null; undefined from an older server). */
   askStyle?: boolean;
+  /** A billing hold (`planHoldOf`). */
+  held?: boolean;
+  /** A no-AI card already answered them in this conversation: its Connect is the one to press. */
+  noAiCard?: boolean;
 }): ("connect" | "start" | "next" | "style")[] {
-  if (s.noAi) return ["connect"];
+  if (s.noAi && !s.held) return s.noAiCard ? [] : ["connect"];
   const presets = new Set<string>(PRESETS);
   const start =
     s.aiKnown &&
@@ -147,9 +155,7 @@ export function introCards(s: {
     (s.teamHandles.length === 0 ||
       (s.alone && presetsLeft(s.teamHandles).length > 0 && s.teamHandles.every((h) => presets.has(h))));
   const next = s.teamHandles.length > 0 && s.alone;
-  return [
-    ...(start ? (["start"] as const) : []),
-    ...(next ? (["next"] as const) : []),
-    ...(s.askStyle && s.aiKnown ? (["style"] as const) : []),
-  ];
+  if (start) return next ? ["start", "next"] : ["start"];
+  if (s.askStyle && s.aiKnown && !s.held) return ["style"];
+  return next ? ["next"] : [];
 }

@@ -299,6 +299,10 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
 .ap-hold {
   position: relative;
   overflow: hidden;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
 }
 .ap-hold::before {
   content: "";

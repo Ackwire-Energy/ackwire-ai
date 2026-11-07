@@ -267,7 +267,7 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  acts: { marginTop: 4, gap: 2, alignItems: "flex-start" },
+  acts: { gap: 2, alignItems: "flex-start" },
   // Words-only actions: the ghost buttons' own side padding hangs outside, so their words line up with the text.
   textActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginLeft: -14 },
 });

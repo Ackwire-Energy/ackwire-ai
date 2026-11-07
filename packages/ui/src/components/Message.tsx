@@ -109,7 +109,7 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   bare?: boolean;
   /** The name's color in `bubbles`, on a light and on a dark surface. */
   nameColor?: readonly [string, string];
-  /** Wraps the body in a column with gaps (approval cards). */
+  /** Lays the body out as a column (approval cards). */
   stacked?: boolean;
   /** Muted, at the end of the first line, the header's or a grouped message's text's (e.g. the receipt check). */
   aside?: ReactNode;
@@ -291,6 +291,7 @@ export function Message({
       aria-busy={streaming || undefined}
       style={{ ...rowVars, ...style } as CSSProperties}
       data-look={look ? drawn : undefined}
+      data-own={own && !mine ? "true" : undefined}
       data-tone={mine && drawn === "bubbles" ? look?.tone : undefined}
       data-names={drawn === "bubbles" && look?.names === false ? "false" : undefined}
       data-run={mine || drawn === "bubbles" ? run : undefined}
@@ -321,7 +322,7 @@ export function Message({
       ) : (
         <span className="ac-msg__avatar">{avatar}</span>
       )}
-      <div className="ac-msg__body" style={stacked ? { display: "flex", flexDirection: "column", gap: 8 } : undefined}>
+      <div className="ac-msg__body" style={stacked ? { display: "flex", flexDirection: "column" } : undefined}>
         {(!inBubble || mine) && head}
         {aside && grouped && !mine && !inBubble && (
           <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>

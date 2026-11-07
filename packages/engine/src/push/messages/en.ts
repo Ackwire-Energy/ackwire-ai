@@ -42,6 +42,7 @@ export interface PushStrings {
   /** Why a widget didn't update, by its coded reason (`widgets.failure.*` in the apps); others: `widgetFailedBody`. */
   widgetFailedReasons: Record<string, string>;
   widgetFailedBody: string;
+  proposalWaitingTitle: (actor: string) => string;
   dashboardProposalTitle: (actor: string) => string;
   dashboardProposalBody: (dashboard: string) => string;
   joinRequestTitle: (name: string, org: string) => string;
@@ -118,6 +119,7 @@ export const en: PushStrings = {
     failing: "It failed several times in a row and stopped.",
   },
   widgetFailedBody: "Tap to see why.",
+  proposalWaitingTitle: (a) => `${a} proposes an improvement`,
   dashboardProposalTitle: (a) => `${a} wants to publish a dashboard`,
   dashboardProposalBody: (d) => (d ? `“${d}” · Tap to decide.` : "Tap to decide."),
   joinRequestTitle: (name, org) => `${name} asks to join ${org}`,

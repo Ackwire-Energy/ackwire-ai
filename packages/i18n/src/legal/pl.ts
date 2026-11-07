@@ -220,7 +220,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Treści Obszaru Roboczego przetwarzane w imieniu obszarów roboczych",
         blocks: [
           "Treści Obszaru Roboczego obejmują wiadomości w kanałach, wątkach i wiadomościach bezpośrednich, pliki w Drive oraz strony wiki. Obejmują też zadania, rutyny, wydarzenia w kalendarzu i zatwierdzenia, instrukcje, ustawienia i pamięć agentów, to, co agenci piszą i robią, oraz dane, które agenci odczytują za pośrednictwem konektorów, baz danych i komputerów podłączonych przez obszar roboczy. Przetwarzamy je wyłącznie w celu obsługi obszaru roboczego i jego agentów zgodnie z konfiguracją ustaloną przez obszar roboczy, wyświetlania ich członkom obszaru roboczego, wysyłania powiadomień, o które proszą, oraz zapewniania wsparcia.",
-          "Treści Obszaru Roboczego należą do obszaru roboczego: członkowie widzą to, na co pozwalają jego kanały i uprawnienia, a zarządzają nimi jego właściciele i administratorzy. Opublikowane przez Ciebie wiadomości pozostają w obszarze roboczym po Twoim odejściu z niego lub usunięciu Twojego konta, chyba że obszar roboczy je usunie.",
+          "Treści Obszaru Roboczego należą do obszaru roboczego: członkowie widzą to, na co pozwalają jego kanały i uprawnienia, a zarządzają nimi jego właściciele i administratorzy. Właściciele i administratorzy obszaru roboczego widzą wszystkie kanały, zadania i strony wiki, także prywatne. Nie mogą czytać wiadomości bezpośrednich między innymi osobami. Opublikowane przez Ciebie wiadomości pozostają w obszarze roboczym po Twoim odejściu z niego lub usunięciu Twojego konta, chyba że obszar roboczy je usunie.",
         ],
       },
       {

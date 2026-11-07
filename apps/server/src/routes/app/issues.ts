@@ -3,6 +3,7 @@ import {
   commentIssue,
   createIssue,
   createIssueColumn,
+  deleteIssue,
   deleteIssueColumn,
   getIssueDetail,
   type IssueDeps,
@@ -12,18 +13,33 @@ import {
   listIssues,
   openTaskConversation,
   setCriterion,
-  shareIssueWithEveryone,
+  setIssueAudience,
   updateIssue,
   updateIssueColumn,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
-import { WorkView } from "./schemas";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  json,
+  noContent,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
+import { AudienceChoice, WorkView } from "./schemas";
 
 const tags = ["Issues"];
 const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string() });
 const Status = z.enum(["todo", "in_progress", "in_review", "done", "canceled"]);
 const Priority = z.enum(["low", "normal", "high"]);
+const GithubUrl = z
+  .string()
+  .max(500)
+  .nullable()
+  .openapi({ description: "The GitHub issue or pull request this task is about (`null` removes it)." });
 const DueDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -59,8 +75,18 @@ const Issue = z
     createdBy: Actor,
     source: z.record(z.string(), z.unknown()),
     channelId: z.uuid().nullable(),
+    audience: z
+      .object({
+        mode: z.enum(["everyone", "people"]),
+        userIds: z.array(z.string()),
+        channelId: z.uuid().nullable().openapi({
+          description: "Those people are whoever is in this conversation now, a DM or a private channel.",
+        }),
+      })
+      .openapi({ description: "Who sees it besides administrators (ADR 0151)." }),
     parentIssueId: z.uuid().nullable().openapi({ description: "The issue this one is a sub-issue of." }),
     pullRequests: z.array(z.object({ number: z.number(), url: z.string(), openedBy: Actor.nullable() })),
+    githubUrl: z.string().nullable(),
     artifacts: z.array(z.object({ id: z.uuid(), title: z.string(), createdBy: Actor })),
     work: z
       .object({
@@ -223,12 +249,16 @@ export function issueRoutes(deps: AppDeps) {
             priority: Priority.optional(),
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
+            githubUrl: GithubUrl.optional(),
             parentIssueId: z.uuid().nullable().optional(),
             attachmentIds: z
               .array(z.uuid())
               .max(10)
               .optional()
               .openapi({ description: "Drive files uploaded from the new-issue box (linked to the issue)." }),
+            audience: AudienceChoice.optional().openapi({
+              description: "Who sees it. A sub-issue follows its parent. Left out: the whole workspace.",
+            }),
           }),
         ),
       },
@@ -268,6 +298,7 @@ export function issueRoutes(deps: AppDeps) {
             assignee: Actor.nullable().optional(),
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
+            githubUrl: GithubUrl.optional(),
             criteria: z
               .array(z.object({ id: z.string().optional(), text: z.string().max(500) }))
               .max(50)
@@ -284,6 +315,30 @@ export function issueRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, issueId } = c.req.valid("param");
       return c.json(await updateIssue(issues, person(c.get("user").id), orgId, issueId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/issues/{issueId}",
+      tags,
+      security,
+      summary: "Delete a task for good (who created it, an administrator; on an agent's task, whoever may assign work)",
+      description:
+        "Its steps and its conversation go with it, and what an agent is doing on it stops. The audit log keeps who deleted it and its title; its number isn't given again.",
+      request: { params: IssueParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, issueId } = c.req.valid("param");
+      await deleteIssue(
+        { db, pubsub: adapters.pubsub, hub: deps.extras?.sandbox?.machines?.hub ?? null, mail: adapters.mail },
+        c.get("user").id,
+        orgId,
+        issueId,
+      );
+      return c.body(null, 204);
     },
   );
 
@@ -395,14 +450,33 @@ export function issueRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Show a card to the whole workspace (Mostrar para todos)",
-      description:
-        "A card made from a conversation (an agent's background work, ADR 0121) is seen by who reads that conversation; anyone who can see it may share it with everyone in the workspace.",
+      description: "`PUT …/audience` with `everyone`, for apps from before it.",
       request: { params: IssueParams },
       responses: { 200: json(Issue), ...errors },
     }),
     async (c) => {
       const { orgId, issueId } = c.req.valid("param");
-      return c.json(await shareIssueWithEveryone(issues, person(c.get("user").id), orgId, issueId), 200);
+      const everyone = { mode: "everyone" as const };
+      return c.json(await setIssueAudience(issues, person(c.get("user").id), orgId, issueId, everyone), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/issues/{issueId}/audience",
+      tags,
+      security,
+      summary: "Change who sees a task",
+      description:
+        "Anyone who sees the task. Limited, its sub-issues go with it; to everyone, they stay as they are. Whoever changes it stays in the list unless they're an administrator, and so does a person assigned to it. `issue.audience_empty`: nobody chosen.",
+      request: { params: IssueParams, body: body(AudienceChoice) },
+      responses: { 200: json(Issue), ...errors },
+    }),
+    async (c) => {
+      const { orgId, issueId } = c.req.valid("param");
+      const audience = c.req.valid("json");
+      return c.json(await setIssueAudience(issues, person(c.get("user").id), orgId, issueId, audience), 200);
     },
   );
 

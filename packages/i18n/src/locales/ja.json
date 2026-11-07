@@ -1277,6 +1277,7 @@
     }
   },
   "shell": {
+    "otherChannels": "その他のチャンネル",
     "titleBar": {
       "back": "戻る",
       "forward": "進む"
@@ -1285,13 +1286,16 @@
     "more": "その他",
     "moreWhat": {
       "approvals": "エージェントからの許可のお願い",
+      "proposals": "エージェントが変更を提案している内容",
       "threads": "枝分かれした会話とミッション",
       "issues": "人とエージェントのためのチームの作業",
       "wiki": "チームの知識を全員向けにまとめたもの",
       "drive": "ファイル、レポート、表",
       "routines": "エージェントが時間どおりに自動で行うこと",
       "calendar": "会議と締め切り",
-      "team": "誰が誰か：メンバー、エージェント、そのグループ"
+      "team": "誰が誰か：メンバー、エージェント、そのグループ",
+      "dashboards": "エージェントが最新に保つ数値やグラフ",
+      "taskManager": "各エージェントが今していることを見て、必要なものを停止できます"
     },
     "customizeSidebar": "サイドバーをカスタマイズ",
     "sidebarMenu": {
@@ -1310,7 +1314,6 @@
       "auto": "何かあるとき",
       "autoHint": "あなたを待っているものがあるときに表示されます",
       "reset": "デフォルトに戻す",
-      "instant": "変更はすぐに反映されます。",
       "tools": "ツール",
       "toolsTitle": "上部",
       "order": "セクションの順序",
@@ -1355,11 +1358,14 @@
     "searchWorkspace": "ワークスペースを検索",
     "summary_other": "メンバー{{people}}人 · エージェント{{agents}}体",
     "approvals": "承認",
+    "proposals": "改善提案",
     "issues": "タスク",
     "missionsWaiting_other": "{{count}}件のミッションがあなたを待っています",
     "threads": "スレッド",
     "routines": "ルーティン",
     "team": "チーム",
+    "dashboards": "ダッシュボード",
+    "taskManager": "タスクマネージャー",
     "calendar": "カレンダー",
     "drive": "Drive",
     "members": "メンバー",
@@ -1391,6 +1397,7 @@
     "gallery": "コンポーネントギャラリー",
     "unread_other": "{{count}}件の未読メッセージ",
     "pendingApprovals_other": "{{count}}件の承認待ち",
+    "pendingProposals_other": "{{count}} 件の提案があなたを待っています",
     "home": "ホーム",
     "notifications": "通知",
     "unreadMark": "未読",
@@ -1698,6 +1705,7 @@
     "waitingApproval": "承認待ち",
     "notMemberTitle": "このチャンネルに参加していません",
     "notMemberText": "参加すると、メッセージを読んだり、ここにいる人やエージェントと話したりできます。",
+    "adminReading": "このチャンネルには参加していません。管理者は閲覧できます。",
     "join": "#{{channel}}に参加",
     "notFound": "このチャンネルは存在しないか、利用できなくなっています。",
     "loadOlder": "以前のメッセージを読み込む",
@@ -1720,7 +1728,7 @@
     "delete": "チャンネルを削除",
     "deleteTitle": "#{{channel}} を完全に削除しますか？",
     "deleteGoes": "すぐに消えるもの: メッセージ、スレッド、ファイル、ピン留め、エージェントがこのチャンネルから覚えたこと、ここに投稿するルーティン。",
-    "deleteIssues": "このチャンネルのメンバーしか見られなかったため、タスクも削除されます。",
+    "deleteIssues": "このチャンネルのメンバーと管理者しか見られなかったため、タスクも削除されます。",
     "deleteOrArchive": "会話を残したい場合は、削除せずにアーカイブしてください。",
     "deleteTypeName": "確認のため {{channel}} と入力してください",
     "deleteDone": "#{{channel}} を削除しました。",
@@ -1766,7 +1774,7 @@
     "handled_other": "{{names}}が回答しました",
     "passed_other": "誰も回答しませんでした",
     "failed_other": "{{names}}は回答できませんでした",
-    "asking_other": "{{names}}があなたの回答を待っています",
+    "asking_other": "{{names}}は回答を待っています",
     "outage_other": "{{names}}: AIプロバイダーが停止中 · 自動で再試行します",
     "queued_other": "{{names}}がコンピューターの順番待ちです",
     "away_other": "{{names}}がコンピューターを待っています",
@@ -1781,7 +1789,7 @@
       "picked": "回答予定",
       "claimed": "回答中",
       "waiting": "承認待ち",
-      "asking": "あなたの回答待ち",
+      "asking": "回答待ち",
       "outage": "AIプロバイダーが停止中 · 自動で再試行します",
       "queued": "コンピューターの順番待ち",
       "away": "コンピューター待ち",
@@ -1823,6 +1831,7 @@
     "intro": {
       "greeting": "こんにちは、{{name}}です。あなたと一緒にチームを作ります。",
       "lead": "エージェントを作り、アプリを接続し、メンバーを招待します。あなたがクリックしない限り何も変わらず、あなたにできることだけを行います。",
+      "heldLead": "事業の内容を選ぶと、ここにチームが表示されます。ワークスペースにagentes.chatのプランがあると、エージェントが作業を始めます。",
       "connect": {
         "title": "チームのAIを接続",
         "text": "エージェントはワークスペースのAIで考えます。ClaudeまたはChatGPTのプランでログインできます。APIキーは不要です。",
@@ -2124,6 +2133,14 @@
       "commands_off": "{{name}}は今は返信できません。プランのコンピューターでコマンドがオフになっていて、管理している人がオンにする必要があります。",
       "useKey": "APIキーを使う"
     },
+    "kept": {
+      "title": "メッセージを保存しました。",
+      "line": "ワークスペースにagentes.chatのプランとAIの接続が揃ったら、ここで返信します。",
+      "plan": "プランにはエージェントのコンピューターが含まれ、常に稼働します。AIはすでに支払っているものを使えます。Claude、ChatGPTなど、またはAPIキーです。",
+      "active": "プランが有効です。AIを接続すると{{name}}がここで返信します。",
+      "receipt": "保存済み",
+      "channel": "保存済み。ワークスペースにagentes.chatのプランがあると、エージェントが返信します。"
+    },
     "receipt": "誰も返信しません: AIが接続されていません",
     "chip": "AIなし"
   },
@@ -2209,8 +2226,7 @@
       "forAll": "プランのないエージェントは、すべてこのキーで動きます。",
       "saved": "保存しました。プランのないエージェントは、すべてこのキーで動きます。",
       "savedUnchecked": "保存しましたが、{{provider}}から応答がなく、キーを確認できませんでした。失敗したときは、会話に理由が表示されます。",
-      "held": "ワークスペースのagentes.chatプランが有効になると、エージェントがこのキーを使います。",
-      "savedHeld": "保存しました。ワークスペースのagentes.chatプランが有効になると、エージェントがこのキーを使います。",
+      "closed": "APIキーはワークスペースのagentes.chatプランとともに使えるようになります。",
       "notPlan": "コーディングプランのキーは、上の専用の項目に入力してください。",
       "billing": "キーのプロジェクトで課金を有効にしてください。課金がないと、エージェントが送った内容をGoogleが利用する場合があります。",
       "privacy": "エージェントが送った内容をどのプロバイダーが保存できるかは、OpenRouterのプライバシー設定で決まります。"
@@ -2231,6 +2247,11 @@
       "freeLower": "OpenCode の無料モデル",
       "one": "{{name}}専用のアカウント",
       "each": "それぞれ専用のアカウント"
+    },
+    "popup": {
+      "title": "{{name}} に接続しています",
+      "any": "AI に接続しています",
+      "text": "コンピューターにサインインページを問い合わせています。数秒でここに開きます。"
     },
     "chatgptCode": {
       "title": "ChatGPTでコードによるログインを許可",
@@ -2571,6 +2592,7 @@
       "assignee": "担当者",
       "labels": "ラベル",
       "dueDate": "期日",
+      "githubUrl": "GitHub リンク",
       "criteria": "完了条件"
     },
     "routineFields": {
@@ -2889,6 +2911,24 @@
     "dmLabel": "{{name}}とのDMでの {{author}} のメッセージ",
     "noAccess": "アクセスできないメッセージ"
   },
+  "linkPills": {
+    "document": "ドキュメント",
+    "spreadsheet": "スプレッドシート",
+    "presentation": "プレゼンテーション",
+    "file": "ファイル",
+    "folder": "フォルダ",
+    "customer": "顧客",
+    "payment": "支払い",
+    "invoice": "請求書",
+    "subscription": "サブスクリプション",
+    "pull": "プルリクエスト",
+    "merge": "マージリクエスト",
+    "issue": "Issue"
+  },
+  "folded": {
+    "more": "さらに表示",
+    "less": "表示を減らす"
+  },
   "secret": {
     "group": "{{agent}}からのシークレットのリクエスト",
     "chip": "待機中",
@@ -2921,6 +2961,7 @@
     "computerAway": "{{agent}}のコンピューターが今は応答していません。このリクエストは{{time}}まで開いています。少ししてからもう一度お試しください。",
     "computerPaused": "{{agent}}のコンピューターは所有者が一時停止しています。このリクエストは{{time}}まで開いています。",
     "failed": "送信できませんでした。エージェントのコンピューターの電源は入っていますか？",
+    "changed": "回答中にこのリクエストが変更されました。何も送信されていません。もう一度送信してください。",
     "empty": "値を入力してください。",
     "tooLarge": "大きすぎます（最大16 KB）。"
   },
@@ -3513,6 +3554,11 @@
         "text": "何をするかを伝えれば、チームに加わります。",
         "action": "エージェントを作成"
       },
+      "plan": {
+        "title": "agentes.chatのプランを選ぶ",
+        "text": "プランがあると、エージェントが作業を始めます。",
+        "action": "プランを見る"
+      },
       "ai": {
         "title": "AIを接続",
         "text": "エージェントはこれで考えます。",
@@ -3652,6 +3698,7 @@
       "joinRequestMany": "<b>{{names}}</b>が参加をリクエストしています",
       "joinSuggestion": "<b>{{by}}</b>が<b>{{name}}</b>を提案しました",
       "changeRequest": "<b>{{name}}</b>が<b>{{agent}}</b>の変更を依頼しています",
+      "proposalWaiting": "<b>{{names}}</b> からの改善提案",
       "changeRequestAgent": "<b>{{name}}</b>が新しいエージェントを依頼しています：<b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b>が「代わりに承認する人」にあなたを選びました",
       "approvalCoverDeclined": "<b>{{name}}</b>はあなたの代わりに承認しなくなりました",
@@ -3772,6 +3819,9 @@
   },
   "approvals": {
     "title": "承認",
+    "tabs": {
+      "requests": "リクエスト"
+    },
     "groupHead_other": "<b>{{name}}</b>が{{count}}件をまとめて依頼しました",
     "readsOnly": "読み取りのみ",
     "technical": "技術的な詳細",
@@ -3810,7 +3860,6 @@
     },
     "highRisk": "高リスクの操作",
     "hold": "長押しで承認",
-    "holding": "押し続けて…",
     "holdLabel": "{{action}}: 長押しで確定",
     "holdHint": "ボタンを長押しして承認してください。高リスクの操作のため、1回のクリックでは承認できません。",
     "holdNote": "高リスク: ボタンを長押しして確定してください。",
@@ -4618,6 +4667,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "再度提案しない: {{text}}",
+    "fromCorrection": "修正されました: {{text}}",
     "back": "{{name}}",
     "title": "{{name}}が知っていること",
     "subtitle": "{{name}}が会話やチームの訂正から学んだことです。",
@@ -4679,6 +4730,15 @@
   },
   "proposals": {
     "title": "改善提案",
+    "whyCode": {
+      "refused": "拒否されました: {{text}}",
+      "corrected": "修正されました: {{text}}",
+      "seen": "エージェントがこれを複数回確認しました。",
+      "skill": "このスキルの利用から生まれました。",
+      "asked": "会話の中で依頼されました。",
+      "budget": "今週、月間予算に達して停止しました。",
+      "noChannel": "どのチャンネルにも入っていません。"
+    },
     "subtitle": "エージェントが提案する変更。誰かが承認するまで何も変わりません。",
     "list": "提案",
     "proposes": "<b>{{agent}}</b>からの提案 · {{target}}",
@@ -5491,6 +5551,15 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "タスクを削除",
+      "title": "タスク #{{number}} を削除しますか？",
+      "body": "会話と会話内のファイルも含めて、全員の画面から消えます。",
+      "steps_other": "{{count}} 件のステップも一緒に消えます。",
+      "working": "{{name}}はこのタスクの作業をやめます。",
+      "confirm": "削除",
+      "done": "タスク #{{number}} を削除しました。"
+    },
     "assigneeFilter": "担当者",
     "priorityFilter": "優先度",
     "title": "タスク",
@@ -5718,7 +5787,6 @@
     "createdByShort": "作成者: {{name}}",
     "fromMessage": "<0>#{{channel}}のメッセージ</0>から",
     "fromAgent": "エージェントへの依頼から",
-    "privateTask": "このタスクは、この会話の参加者だけに表示されます。",
     "subIssues_other": "サブタスク · {{count}}",
     "fromWebhook": "{{provider}}のイベントから",
     "description": "説明",
@@ -5766,6 +5834,12 @@
     "prBy": "PR #{{number}} · 作成者: {{name}}",
     "artifactBy": "{{title}}（{{name}}）",
     "noLinks": "リンクされたものはまだありません。",
+    "github": {
+      "label": "GitHub リンク",
+      "placeholder": "Issue または PR のリンク",
+      "invalid": "GitHub の Issue または Pull Request のリンクではありません。",
+      "remove": "GitHub リンクを削除"
+    },
     "openConversation": "会話を見る",
     "labels": "ラベル",
     "tabs": {
@@ -5792,6 +5866,8 @@
       "work_update": "{{text}}",
       "work_stopped": "バックグラウンドの作業を停止しました",
       "shared_everyone": "カードをワークスペース全体に表示しました",
+      "audience_everyone": "タスクを全員に表示しました",
+      "audience_people": "タスクを閲覧できる人を変更しました",
       "created": "タスクを作成しました",
       "renamed": "タスクの名前を変更しました",
       "description_changed": "説明を編集しました",
@@ -5803,6 +5879,8 @@
       "due_date_set": "期日を{{date}}に設定しました",
       "due_date_removed": "期日を削除しました",
       "pr_linked": "PR #{{number}}をリンクしました",
+      "github_linked": "GitHub にリンクしました",
+      "github_unlinked": "GitHub リンクを削除しました",
       "artifact_linked": "ファイルを添付しました",
       "criterion_checked": "条件「{{text}}」にチェックを入れました",
       "criterion_unchecked": "条件「{{text}}」のチェックを外しました",
@@ -8267,14 +8345,14 @@
     "lockedDone": "ロックしました。今後は管理者だけが編集できます。",
     "unlockedDone": "ロックを解除しました。メンバーが再び編集できます。",
     "restricted": "制限付き",
-    "restrictedHint": "このページを見られるのは、オーナーと選ばれた人だけです。",
+    "restrictedHint": "このページを見られるのは、管理者と選ばれた人だけです。",
     "audience": "アクセス",
     "audienceTitle": "{{title}}へのアクセス",
-    "audienceText": "オーナーは常にアクセスできます。アクセス権のない人には、リスト、検索、リンクでこのページが表示されません。",
+    "audienceText": "管理者は常にアクセスできます。アクセス権のない人には、リスト、検索、リンクでこのページが表示されません。",
     "audienceEveryone": "ワークスペースの全員",
     "audienceEveryoneText": "すべてのメンバー",
     "audienceFolderTitle": "フォルダ{{folder}}へのアクセス",
-    "audienceFolderText": "このフォルダとサブフォルダのページ、今後追加されるページにも適用されます。オーナーは常にアクセスできます。",
+    "audienceFolderText": "このフォルダとサブフォルダのページ、今後追加されるページにも適用されます。管理者は常にアクセスできます。",
     "audienceAgents": "エージェント",
     "audienceAgentsAll": "すべてのエージェント",
     "audienceAgentsAllText": "Wikiにアクセスできるすべてのエージェント",
@@ -8328,7 +8406,7 @@
       "everyoneHint": "Wikiにアクセスできるメンバーとエージェントは全員このページを読めます。",
       "peopleAnd": "全員と{{agents}}",
       "peopleOnly": "全員（エージェントなし）",
-      "ownersOnly": "オーナーのみ",
+      "ownersOnly": "管理者のみ",
       "withAllAgents": "{{names}}とすべてのエージェント",
       "more_other": "ほか{{count}}"
     },
@@ -9055,12 +9133,12 @@
     "audience": {
       "workspace": "ワークスペースの全員が見られます",
       "publicChannel": "ワークスペースの全員が見られます（公開チャンネル #{{name}} にあります）",
-      "privateChannel": "#{{name}}のメンバーだけが見られます",
+      "privateChannel": "#{{name}}のメンバーと管理者だけが見られます",
       "dm": "あなたと{{name}}だけが見られます（ダイレクトメッセージから共有されました）",
       "dmGone": "その会話の参加者だけが見られます（ダイレクトメッセージから共有されました）"
     },
     "private": "非公開",
-    "privateHint": "これらのファイルは会話の参加者だけが見られます",
+    "privateHint": "これらのファイルは会話の参加者だけが見られます。チャンネルでは管理者も見られます。",
     "downloadAs": "形式を選んでダウンロード",
     "uploading_other": "{{count}}件のファイルをアップロード中",
     "uploadWaiting": "待機中",
@@ -10038,6 +10116,16 @@
     "namePlaceholder": "例: サポート",
     "continueIn": "{{name}}で続ける",
     "continueInComposio": "Composioで続ける",
+    "githubOrgs": {
+      "title": "届いている組織",
+      "none": "組織はまだありません。",
+      "lead": "GitHub が組織を確認するのは最初の一度だけです。追加するには、GitHub でアプリのページを開き、組織の横の Grant を押してください。オーナーでない場合、ボタンは Request になり、オーナーが承認します。",
+      "open": "GitHub で組織を許可",
+      "added": "新しく追加: {{names}}。",
+      "removed": "届かなくなった組織: {{names}}。",
+      "same": "組織に変更はありません。",
+      "failed": "今は組織を読み取れませんでした。"
+    },
     "composioHelp": "Composioのページ（英語）でログインして、ここに戻ってきます。{{name}}では権限が「Composio」と表示されます。",
     "or": "または",
     "withKey": "APIキーで接続",
@@ -10623,7 +10711,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "この人はこの会話に参加していないため、このタスクを見ることができません。"
+      "assigneeOutside": "この人はこのタスクを見ることができません。先に閲覧できる人に追加してください。",
+      "deleteForbidden": "このタスクを削除できるのは作成者か管理者だけです。",
+      "audienceEmpty": "閲覧できる人を選んでください。"
     },
     "connector": {
       "labelTaken": "この名前はすでに別のコネクタで使われています。",
@@ -12636,6 +12726,7 @@
       "no_ai_model_region": "返信できません。{{model}}にはOpenCodeでGlobalリージョンをオンにする必要があります（Settings › Privacy）。",
       "no_ai_commands_off": "今は返信できません。私のプランのコンピューターでコマンドがオフになっています。",
       "no_ai_cli_missing": "まだ返信できません。私のAIのプログラムがコンピューターにインストールされていません。",
+      "no_ai_plan_hold": "メッセージを保存しました。 ワークスペースにagentes.chatのプランとAIの接続が揃ったら、ここで返信します。",
       "no_ai_no_computer": "まだ返信できません。私のAIにはコンピューターが必要ですが、ありません。",
       "redacted": "[削除済み: ログイン情報またはキーのように見えました]",
       "action_connect_ai": "AIを接続",
@@ -13349,7 +13440,9 @@
         "ended": "再度登録する"
       },
       "askAdmin": "このワークスペースの管理者が対応できます。",
-      "paid": "お支払いを受け付けました。まもなくagentes.chatのプランが始まります。"
+      "paid": "お支払いを受け付けました。まもなくagentes.chatのプランが始まります。",
+      "teamReady": "チームの準備ができました。開始にはagentes.chatのプランが必要です。",
+      "invites": "招待はagentes.chatのプランとともに使えるようになります。"
     },
     "cloud": {
       "review": "安全確認のため、当社チームが確認するまで一時停止しています。自動チェックで、利用規約（第5条）に違反する可能性のあるアクティビティが検出されました。異議がある場合は{{email}}までご連絡ください。",
@@ -13809,7 +13902,6 @@
   "taskManager": {
     "title": "タスクマネージャー",
     "subtitle": "エージェントが今していることと、今日終わったこと。",
-    "nav": "タスクマネージャー",
     "search": "タスク、エージェント、アプリを検索",
     "working_other": "{{count}}件作業中",
     "waiting_other": "{{count}}件があなたの対応待ち",
@@ -13951,7 +14043,6 @@
       "room": "空きあり",
       "computers": "コンピューター"
     },
-    "navWhat": "各エージェントが今していることを見て、必要なものを停止できます",
     "cards": {
       "label": "エージェント",
       "previous": "前のエージェント",
@@ -14188,8 +14279,6 @@
   "dashboards": {
     "title": "ダッシュボード",
     "subtitle": "エージェントが最新に保つ数値やグラフ。",
-    "sidebar": "ダッシュボード",
-    "navWhat": "エージェントが最新に保つ数値やグラフ",
     "new": "新しいダッシュボード",
     "back": "ダッシュボード",
     "home": "マイホーム",
@@ -14448,6 +14537,8 @@
     "firstTask": {
       "suggestion": "提案",
       "lead": "エージェントごとに短いタスクを1つ。今日それぞれの働きを見られます。",
+      "heldLead": "エージェントごとに短いタスクを1つ。文を完成させて送信してください。ワークスペースにagentes.chatのプランがあると開始します。",
+      "example": "{{name}}の成果物の例",
       "open": "タスク付きで開く",
       "invite": "{{names}}を招待",
       "later": "あとで"
@@ -14470,6 +14561,7 @@
     "templates": {
       "title": "チームのテンプレート",
       "lead": "あなたの業種向けのすぐ使えるチーム。そのあと{{name}}が一緒に調整します。",
+      "heldLead": "事業に一番近いものを選んでください。各エージェントは作成前に調整できます。",
       "use": "このテンプレートを使う",
       "none": "どれも違う",
       "noneSub": "していることを伝えれば{{name}}が組みます",
@@ -14478,6 +14570,25 @@
     "weekly": {
       "name": "チームの1週間"
     }
+  },
+  "whoSees": {
+    "label": "閲覧できる人",
+    "everyone": "ワークスペース全体",
+    "me": "自分のみ",
+    "people": "特定の人",
+    "only": "{{name}}のみ",
+    "more_other": "{{names}}ほか{{count}}人",
+    "some": "一部の人",
+    "taskTitle": "このタスクを閲覧できる人",
+    "pageTitle": "このページを閲覧できる人",
+    "admins": "管理者は常に閲覧できます。",
+    "tied": "変更するまで、会話の参加者に合わせて変わります。",
+    "search": "人を検索",
+    "noMatch": "その名前の人はいません",
+    "moreOptions": "その他のオプション",
+    "receipt": "閲覧できる人：{{who}}",
+    "limited": "アクセス制限あり",
+    "rolesToo": "このページにすでに設定されているロールは引き続き閲覧できます。"
   },
   "teamTemplates": {
     "lead": "{{org}}のチーム。エージェントはそれぞれ自分のチャンネルにいます。作成前に調整できます。",
@@ -14516,50 +14627,55 @@
         "role": "サポート",
         "line": "WhatsAppとメールで顧客に返信します。わからないときはあなたを呼びます。",
         "routine": "未返信のものをまとめる",
-        "task": "待っている最新の顧客メッセージに返信する"
+        "task": "このお客様のメッセージへの返信を書いてください:"
       },
       "caio": {
         "role": "請求",
         "line": "支払いが遅れている人に連絡し、あなたの承認後に督促を送ります。",
         "routine": "支払いが遅れている人を一覧にする",
-        "task": "今月遅れている人を一覧にする"
+        "task": "次の相手への丁寧な支払いリマインダーを書いてください:"
       },
       "ada": {
         "role": "開発",
         "line": "顧客から報告されたバグを直してPRを作ります。",
         "routine": "新しいバグを一覧にする",
-        "task": "顧客が報告した最新のバグを見る"
+        "task": "このバグをどこから調べればよいか教えてください:"
       },
       "lia": {
         "role": "コンテンツ",
         "line": "会社のトーンで投稿や台本を書き、あなたの承認後に予約します。",
         "routine": "今週の投稿を提案する",
-        "task": "今週の投稿を3つ提案する"
+        "task": "次のテーマで今週の投稿を3つ提案してください:"
       },
       "theo": {
         "role": "営業",
         "line": "見積もりを依頼した人をフォローし、提案書を書きます。",
         "routine": "見積もりを依頼して返事がない人を一覧にする",
-        "task": "今週見積もりを依頼した人を一覧にする"
+        "task": "この依頼の短い見積もりを書いてください:"
       },
       "nina": {
         "role": "予約",
         "line": "予約の受付、確認、変更を行い、前日に顧客へリマインドします。",
         "routine": "明日の予約を確認する",
-        "task": "明日の予約を見せて"
+        "task": "明日のこの予定を整理してください:"
       },
       "otto": {
         "role": "注文",
         "line": "注文と在庫を追い、なくなりそうなものを知らせます。",
         "routine": "在庫切れが近いものを知らせる",
-        "task": "まだ発送待ちの注文を一覧にする"
+        "task": "これらの注文で残っている作業を挙げてください:"
       },
       "bia": {
         "role": "回答集",
         "line": "チームの回答をもとに回答集を最新に保ちます。",
         "routine": "今週の回答で回答集を更新する",
-        "task": "顧客がいちばんよく聞く5つの質問を一覧にする"
+        "task": "これらのお客様の質問への回答を書いてください:"
       }
+    },
+    "example": {
+      "iara": "マリナさん、こんにちは。ご注文は昨日発送され、金曜日までに届きます。追跡番号はこの下にあります。金曜日のご都合が悪ければ、別の日を探します。",
+      "lia": "1. 代理店選びでよくある3つの失敗。2. 失敗しかけたプロジェクトの舞台裏。3. フォロワーへの質問: ここで何を見たいですか?",
+      "nina": "明日: 9:00 Carla、10:30 Pedro、14:00 空き。Pedroはまだ確認していません。連絡しましょうか?"
     },
     "channels": {
       "iara": "support",

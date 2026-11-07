@@ -398,6 +398,51 @@ describe("what waits for a person's click comes last", () => {
   });
 });
 
+describe("a question for one person", () => {
+  const card = (requestedForUserId: string | null) => {
+    const m = answer("q-owner", []);
+    return {
+      ...m,
+      meta: {
+        ...m.meta,
+        question: {
+          id: "q-1",
+          agentId: ADA_ID,
+          channelId: ENG_ID,
+          threadId: null,
+          messageId: m.id,
+          text: "Posto às 9h ou às 10h?",
+          choices: ["9h", "10h"],
+          requestedForUserId,
+          status: "open",
+          answer: null,
+          answeredByUserId: null,
+        },
+      },
+    } as Message;
+  };
+
+  test("for someone else: who it waits for, and nothing to press", async () => {
+    await openChannel(() => [card("u-joao")]);
+    const rq = document.querySelector(".rq") as HTMLElement;
+    expect(rq.textContent).toContain("esperando João");
+    expect(rq.textContent).not.toContain("esperando você");
+    expect(within(rq).queryAllByRole("button")).toEqual([]);
+    expect(rq.hasAttribute("data-ask-mine")).toBe(false);
+  });
+
+  test("for the viewer, or for anyone here: it waits on them, with its actions", async () => {
+    for (const asked of [seedState().me?.user.id ?? "", null]) {
+      await openChannel(() => [card(asked)]);
+      const rq = document.querySelector(".rq") as HTMLElement;
+      expect(rq.textContent).toContain("esperando você");
+      expect(within(rq).getByRole("button", { name: "9h" })).toBeTruthy();
+      expect(within(rq).getByRole("button", { name: "Pular" })).toBeTruthy();
+      cleanup();
+    }
+  });
+});
+
 describe("a receipt's words stay whole", () => {
   test("Desfazer leaving with its time keeps its room: the sentence never rewraps", async () => {
     await openChannel((id) => [answer(id, [{ undoableUntil: inMs(1_200) }])]);

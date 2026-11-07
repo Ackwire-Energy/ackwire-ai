@@ -66,14 +66,18 @@ export function GroupedList({ children }: { children?: ReactNode }) {
   );
 }
 
-/** The small uppercase header of a group (it slides with the groups when one above grows or shrinks). */
-export function GroupedHeader({ children }: { children: string }) {
+/**
+ * The small uppercase header of a group (it slides with the groups when one above grows or shrinks), with `aside`
+ * at the end of its line: a small text action.
+ */
+export function GroupedHeader({ children, aside }: { children: string; aside?: ReactNode }) {
   const { reducedMotion } = useTheme();
   return (
-    <Animated.View layout={reducedMotion ? undefined : SLIDE}>
-      <Text variant="footnote" tone="faint" accessibilityRole="header" style={styles.header}>
+    <Animated.View layout={reducedMotion ? undefined : SLIDE} style={aside ? styles.headerRow : null}>
+      <Text variant="footnote" tone="faint" accessibilityRole="header" style={[styles.header, styles.shrink]}>
         {children.toLocaleUpperCase()}
       </Text>
+      {aside ? <View style={styles.headerAside}>{aside}</View> : null}
     </Animated.View>
   );
 }
@@ -125,6 +129,8 @@ export interface GroupedRowProps {
   onPress?: () => void;
   /** An ⓘ at the row's end: a tap on it shows the note under the row and never presses the row. */
   hint?: { name: string; text: string };
+  /** An × at the row's end that takes it off the list; VoiceOver merges it into the row, so it is the row's action too. */
+  remove?: { label: string; onPress: () => void };
 }
 
 /** One row of a group: icon tile, label, the value in faint, a chevron, a check or a switch. */
@@ -163,6 +169,7 @@ function Row({
   faint = false,
   disabled = false,
   onPress,
+  remove,
   said,
   after,
 }: Omit<GroupedRowProps, "hint"> & { said?: string; after?: ReactNode }) {
@@ -188,6 +195,12 @@ function Row({
       disabled={disabled || !onPress}
       accessibilityRole={toggle !== undefined ? "switch" : "button"}
       accessibilityLabel={[label, belowText, said, value].filter(Boolean).join(", ")}
+      {...(remove
+        ? {
+            accessibilityActions: [{ name: "delete", label: remove.label }],
+            onAccessibilityAction: remove.onPress,
+          }
+        : {})}
       accessibilityState={{
         disabled,
         ...(toggle !== undefined ? { checked: toggle } : {}),
@@ -261,6 +274,11 @@ function Row({
         <View style={onLine(18)}>
           <Icon name="more" size={18} color={c.faint} />
         </View>
+      ) : null}
+      {remove ? (
+        <Pressable onPress={remove.onPress} accessibilityRole="button" accessibilityLabel={remove.label} hitSlop={12}>
+          <Icon name="x" size={16} color={c.faint} />
+        </Pressable>
       ) : null}
     </Pressable>
   );
@@ -358,6 +376,8 @@ const styles = StyleSheet.create({
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
   header: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },
+  headerRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  headerAside: { paddingRight: 16 },
   footer: { paddingTop: 8, paddingHorizontal: 16 },
   row: {
     flexDirection: "row",

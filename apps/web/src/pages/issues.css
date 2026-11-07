@@ -1211,6 +1211,23 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   text-decoration: underline;
 }
 
+.issue-github {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.issue-github__field {
+  margin-top: 12px;
+}
+.issue-github__chip {
+  max-width: 100%;
+  color: var(--ink);
+  text-decoration: none;
+}
+.issue-github__chip:hover {
+  background: var(--sunken);
+}
+
 /* The agent's work: live steps, or stalled. */
 .issue-work {
   position: relative;
@@ -1963,6 +1980,11 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   justify-content: space-between;
   gap: 8px;
 }
+.issue-page__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 /* "Tasks" and "Conversation" sit a step above the details, never on the fields card. */
 .issue-page__main {
   display: flex;
@@ -2058,14 +2080,4 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   gap: 6px;
   font-size: 12.5px;
   color: var(--muted);
-}
-
-.issue-private {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 16px;
-  color: var(--text-muted);
-  font-size: 13px;
 }

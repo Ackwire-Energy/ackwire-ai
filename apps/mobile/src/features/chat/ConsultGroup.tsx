@@ -29,7 +29,7 @@ import { Icon, Text } from "@/ui";
 import { consultationHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { MSG_AVATAR, MSG_INSET } from "./logic";
+import { ROW_BODY_INSET, useRhythm, useRowLook } from "./look";
 
 /** A question's state in words, on the conversation's screen ("A Iris espera uma aprovação"). */
 export const consultLineLabel = (
@@ -114,15 +114,20 @@ export function ConsultPairRow({
   channelId,
   items,
   inline = false,
+  gap,
 }: {
   askerId: string;
   /** The conversation that asked: the screen opens from it. */
   channelId: string;
   items: readonly ConsultPairItem[];
-  /** Inside a message (its reach lines): no reply face to line up with. */
+  /** Inside a message (its reach lines): it reaches past the row's body to the conversation's width. */
   inline?: boolean;
+  /** Under what shows above it (a turn's, or a part's under another quiet line). */
+  gap?: number;
 }) {
   const { t, i18n } = useTranslation();
+  const rhythm = useRhythm();
+  const inset = ROW_BODY_INSET[useRowLook().style];
   const dir = useDirectory();
   const c = useColors();
   const live = items.some((x) => x.status === "open");
@@ -136,7 +141,15 @@ export function ConsultPairRow({
   // An old reply's question with no id of its own has no conversation to open.
   const opens = openableConsultation(pair.opens);
   return (
-    <View style={inline ? styles.inline : styles.slot}>
+    <View
+      style={[
+        styles.line,
+        inline
+          ? { marginLeft: LINE_INSET - inset.left, marginRight: LINE_INSET - inset.right }
+          : { marginTop: gap ?? rhythm.turn, paddingHorizontal: LINE_INSET },
+      ]}
+    >
+      <View style={[styles.rule, { backgroundColor: c.line }]} />
       <Pressable
         onPress={() => {
           if (opens) router.push(consultationHref(opens, channelId));
@@ -183,19 +196,22 @@ export function ConsultPairRow({
           </Text>
         ) : null}
       </Pressable>
+      <View style={[styles.rule, { backgroundColor: c.line }]} />
     </View>
   );
 }
 
 /** The pair's faces. */
 const FACE = 18;
-/** The row's inset: its first face centred over the reply's face column (MessageRow). */
-const ROW_INSET = (MSG_AVATAR - FACE) / 2;
+/** The row's room at each end, where its press lights. */
+const ROW_INSET = 8;
+/** The line's ends, the conversation's "Novas" line's. */
+const LINE_INSET = 16;
 
 const styles = StyleSheet.create({
-  slot: { flexDirection: "row", paddingLeft: MSG_INSET, paddingRight: 16, marginTop: 6, marginBottom: -6 },
-  // On a reach line, cancelling the row's own inset lines its first face up with the line's text.
-  inline: { flexDirection: "row", marginLeft: -ROW_INSET },
+  // Across the conversation, the two agents on its middle: a line, as the day and "Novas" are.
+  line: { flexDirection: "row", alignItems: "center" },
+  rule: { flex: 1, minWidth: 16, height: StyleSheet.hairlineWidth },
   row: {
     flexDirection: "row",
     alignItems: "center",

@@ -397,7 +397,7 @@ describe("upload_file", () => {
     const [a] = await f.db.select().from(schema.artifacts);
     expect(a).toMatchObject({ kind: "file", title: "Gráfico", channelId: f.general.id, untrusted: true });
     expect(out.content).toBe(
-      `Uploaded out/chart.png to the Drive as "Gráfico" (file, ${PNG.byteLength} bytes), artifact ${a?.id}, version 1.`,
+      `Uploaded out/chart.png as "Gráfico" (file, ${PNG.byteLength} bytes), artifact ${a?.id}, version 1. It is in the shared Drive, from #general: everyone in the workspace sees it.`,
     );
     expect(out.data).toEqual({ artifact: { id: a?.id, version: 1, title: "Gráfico" } });
     const [up] = await f.db.select().from(schema.artifactUploads);

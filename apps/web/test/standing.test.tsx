@@ -7,7 +7,7 @@ import { ApiError, keys, type OrgStanding, type Role } from "@agenteschat/client
 import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -144,15 +144,13 @@ describe("a billing hold (ADR 0079): its own words, and its fix for whoever runs
       billingUrl: BILLING,
     });
     const banner = () => screen().getByRole("region", { name: STATUS });
-    expect(banner().textContent).toContain(
-      "Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
+    // A team, waiting for its first plan: one line, no pause, no second line.
+    expect(banner().textContent).toBe(
+      "Seu time está pronto. Falta um plano do agentes.chat para ele começar.Ver planos do agentes.chat",
     );
+    expect(banner().querySelector(".outage__icon")).toBeNull();
     // Not back from paying: nothing to wait for, so `/me` isn't asked again.
     expect(meEvery(services.queryClient)).not.toContain(5000);
-    expect(banner().textContent).toContain(
-      "Dá para ler e escrever aqui. Os agentes voltam quando o plano do agentes.chat estiver em dia.",
-    );
-    expect(banner().textContent).not.toContain("payment");
     await act(async () =>
       fireEvent.click(within(banner()).getByRole("button", { name: "Ver planos do agentes.chat" })),
     );
@@ -161,10 +159,21 @@ describe("a billing hold (ADR 0079): its own words, and its fix for whoever runs
     expect(left).toEqual(["https://billing.example.com/link?t=hold"]);
 
     await set({ state: "hold", reason: "unpaid" });
+    expect(banner().textContent).toContain(
+      "Dá para ler e escrever aqui. Os agentes voltam quando o plano do agentes.chat estiver em dia.",
+    );
     expect(within(banner()).getByRole("button", { name: "Atualizar o pagamento" })).toBeTruthy();
     await set({ state: "hold", reason: "ended" });
     expect(banner().textContent).toContain("O plano do agentes.chat deste workspace terminou, e os agentes pararam.");
     expect(within(banner()).getByRole("button", { name: "Assinar de novo" })).toBeTruthy();
+  });
+
+  test("waiting for its first plan with only the right hand: no banner, its own words say it", async () => {
+    const state = seedState();
+    state.agents = [];
+    withRightHand(state);
+    await open({ state: "hold", reason: "payment" }, false, null, { billingUrl: BILLING, state });
+    expect(screen().queryByRole("region", { name: STATUS })).toBeNull();
   });
 
   test("back from paying (`?paid=1`): the payment received and nothing to click, until the hold lifts", async () => {

@@ -9,6 +9,7 @@ import type { ContextDeps } from "./context/summaries";
 import { publishMessageCreated } from "./events";
 import { insertMessage, messageView } from "./messages";
 import { requirePermission } from "./organizations";
+import { billingHold } from "./standing";
 import {
   channelPlaces,
   checkTeam,
@@ -116,7 +117,15 @@ async function blockedChannels(db: Database, orgId: string, userId: string, loca
  * The tool's input for a template, in `locale`, with a free handle for each agent (`iara-2` when Iara is taken) and a
  * usable channel name (`financeiro-2` when #financeiro is a private channel this person isn't in).
  */
-function templateInput(id: TeamTemplateId, locale: AppLocale, org: string, taken: Set<string>, blocked: Set<string>) {
+function templateInput(
+  id: TeamTemplateId,
+  locale: AppLocale,
+  org: string,
+  taken: Set<string>,
+  blocked: Set<string>,
+  /** A billing hold: nobody can answer yet, so the card shows what its first agent delivers. */
+  held = false,
+) {
   const t = (key: string, vars: Record<string, string> = {}) => serverText(locale, key, { org, ...vars });
   const members = TEAMS[id];
   const handleOf = (m: Member) => {
@@ -158,6 +167,7 @@ function templateInput(id: TeamTemplateId, locale: AppLocale, org: string, taken
     approvals: t("teamTemplates.approvals"),
     weekly_check: true,
     template: id,
+    ...(held ? { example: t(`teamTemplates.example.${members[0]}`) } : {}),
   };
 }
 
@@ -196,9 +206,14 @@ export async function listTeamTemplates(
   );
 }
 
+/** A team card made on a billing hold outlives the reminder on the third day: it waits for the plan. */
+const HELD_CARD_TTL_MS = 30 * 24 * 3600_000;
+
 /**
  * "Usar este modelo" (`POST …/team-templates/{id}/use`): the template's team as the right hand's card in the person's
  * DM with it (no model call), then its first question to fit it (1 of 2), whose answer starts the right hand's turn.
+ * On a billing hold nobody can answer that: no question, and `tap`, what the person tapped on the start card, is kept
+ * as their message with no run (`meta.templateTap`).
  */
 export async function useTeamTemplate(
   deps: { db: Database; pubsub?: PubSub; context?: ContextDeps },
@@ -206,8 +221,10 @@ export async function useTeamTemplate(
   orgId: string,
   id: TeamTemplateId,
   preferred?: string | null,
+  tap?: string,
 ) {
   await requirePermission(deps.db, userId, orgId, "create_agents");
+  const held = (await billingHold(deps.db, orgId)) !== null;
   const [locale, org, taken, { lodi, dm }] = await Promise.all([
     personLocale(deps.db, userId, preferred),
     orgName(deps.db, orgId),
@@ -218,11 +235,22 @@ export async function useTeamTemplate(
   const params = await checkTeam(
     deps,
     { orgId, channelId: dm.id, personId: userId },
-    templateInput(id, locale, org, taken, blocked),
+    templateInput(id, locale, org, taken, blocked, held),
     locale,
   );
+  if (held && tap) {
+    const said = await insertMessage(deps.db, {
+      orgId,
+      channelId: dm.id,
+      author: { type: "person", userId },
+      body: tap,
+      meta: { templateTap: id },
+    });
+    if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(said));
+  }
   const place = { orgId, channelId: dm.id, threadId: null, agentId: lodi.id, runId: null, hop: 0 };
-  const card = await postTeamCard(deps, place, params, userId);
+  const card = await postTeamCard(deps, place, params, userId, held ? HELD_CARD_TTL_MS : undefined);
+  if (held) return { channelId: dm.id, messageId: card.id };
   const chips: ReplyChips = { choices: [], multiple: false, step: 1, of: 2 };
   const question = await insertMessage(deps.db, {
     orgId,

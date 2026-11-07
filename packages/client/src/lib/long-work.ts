@@ -106,7 +106,9 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
     };
   const waits: Partial<Record<NonNullable<WorkView["state"]>, string>> = {
     waiting_approval: mine ? "work.line.waitingApprovalYou" : "work.line.waitingApproval",
-    waiting_input: mine ? "work.line.waitingAnswerYou" : "work.line.waitingAnswer",
+    waiting_input: (asked?.requestedForUserId ? asked.requestedForUserId === c.meId : mine)
+      ? "work.line.waitingAnswerYou"
+      : "work.line.waitingAnswer",
     waiting_computer: "work.line.waitingComputer",
   };
   if (w.state === "paused")

@@ -109,6 +109,8 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
       if (number === undefined || number === null) return "/issues";
       return /^\d{1,9}$/.test(number) ? `/issues/${number}` : null;
     }
+    case "proposals":
+      return "/proposals";
     case "routines":
       return open ? `/routines/${open}` : "/routines";
     case "search":

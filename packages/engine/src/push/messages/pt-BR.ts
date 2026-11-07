@@ -53,6 +53,7 @@ export const ptBR: PushStrings = {
     failing: "Falhou várias vezes seguidas e parou.",
   },
   widgetFailedBody: "Toque para ver o motivo.",
+  proposalWaitingTitle: (a) => `${a} propõe uma melhoria`,
   dashboardProposalTitle: (a) => `${a} quer publicar um painel`,
   dashboardProposalBody: (d) => (d ? `“${d}” · Toque para decidir.` : "Toque para decidir."),
   joinRequestTitle: (name, org) => `${name} pede para entrar na ${org}`,

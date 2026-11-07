@@ -37,9 +37,9 @@ export const usePlanHold = (orgId: string, org: OrgSummary | null | undefined) =
   planHoldOf(computerEdition(useComputerSetup(orgId).data), org?.standing);
 
 /** A plan this workspace's billing hold stops, said where it would sign in (`planHoldPhoneLine`). */
-export function PlanHoldNote({ org }: { org: OrgSummary | null | undefined }) {
+export function PlanHoldNote({ org, keys }: { org: OrgSummary | null | undefined; keys?: boolean }) {
   const { t } = useTranslation();
-  return <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false)}</Note>;
+  return <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false, keys)}</Note>;
 }
 
 /**

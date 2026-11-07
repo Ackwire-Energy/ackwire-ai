@@ -1299,12 +1299,14 @@ export const en = {
     mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
   },
   shell: {
+    otherChannels: "Other channels",
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },
     unshown: "Couldn't be shown",
     more: "More",
     moreWhat: {
       approvals: "What agents ask you to allow",
+      proposals: "What agents propose to change",
       threads: "Conversations that branch off, and missions",
       issues: "The team's work, for people and agents",
       wiki: "What the team knows, written for everyone",
@@ -1312,6 +1314,8 @@ export const en = {
       routines: "What agents do on their own, on time",
       calendar: "Meetings and deadlines",
       team: "Who's who: people, agents and their groups",
+      dashboards: "Numbers and charts the agents keep up to date",
+      taskManager: "What each agent is doing now, and stopping what you need",
     },
     customizeSidebar: "Customize sidebar",
     /** The sidebar's own menu (right click on its empty space), its headers' + and its rows' hover buttons. */
@@ -1331,7 +1335,6 @@ export const en = {
       auto: "When there's something",
       autoHint: "Shows up when something waits for you",
       reset: "Reset to default",
-      instant: "Changes apply right away.",
       tools: "Tools",
       toolsTitle: "On top",
       order: "Section order",
@@ -1378,12 +1381,15 @@ export const en = {
     summary_one: "{{people}} member · {{agents}} agents",
     summary_other: "{{people}} members · {{agents}} agents",
     approvals: "Approvals",
+    proposals: "Improvement proposals",
     issues: "Tasks",
     missionsWaiting_one: "{{count}} mission waiting for you",
     missionsWaiting_other: "{{count}} missions waiting for you",
     threads: "Threads",
     routines: "Routines",
     team: "Team",
+    dashboards: "Dashboards",
+    taskManager: "Task manager",
     calendar: "Calendar",
     drive: "Drive",
     members: "Members",
@@ -1419,6 +1425,8 @@ export const en = {
     unread_other: "{{count}} unread messages",
     pendingApprovals_one: "{{count}} pending approval",
     pendingApprovals_other: "{{count}} pending approvals",
+    pendingProposals_one: "{{count}} proposal waiting for you",
+    pendingProposals_other: "{{count}} proposals waiting for you",
     home: "Home",
     notifications: "Notifications",
     /** Read by screen readers on an unread channel with no number (the pill at its edge). */
@@ -1745,6 +1753,7 @@ export const en = {
     waitingApproval: "waiting for approval",
     notMemberTitle: "You're not in this channel",
     notMemberText: "Join to read the messages and talk with the people and agents here.",
+    adminReading: "You're not in this channel. Administrators can read it.",
     join: "Join #{{channel}}",
     notFound: "This channel doesn't exist or is no longer available.",
     loadOlder: "Load earlier messages",
@@ -1770,7 +1779,7 @@ export const en = {
     deleteGoes:
       "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it.",
     /** A private channel's tasks (issues): nobody could open them once its members are gone. */
-    deleteIssues: "Its tasks go too, as only the channel's members could see them.",
+    deleteIssues: "Its tasks go too, as only the channel's members and administrators could see them.",
     deleteOrArchive: "To keep the conversation, archive the channel instead.",
     deleteTypeName: "Type {{channel}} to confirm",
     deleteDone: "#{{channel}} was deleted.",
@@ -1825,8 +1834,8 @@ export const en = {
     passed_other: "No one replied",
     failed_one: "{{names}} couldn't answer",
     failed_other: "{{names}} couldn't answer",
-    asking_one: "{{names}} is waiting for your answer",
-    asking_other: "{{names}} are waiting for your answer",
+    asking_one: "{{names}} is waiting for an answer",
+    asking_other: "{{names}} are waiting for an answer",
     outage_one: "{{names}}: the AI provider is down · retries by itself",
     outage_other: "{{names}}: the AI provider is down · retries by itself",
     queued_one: "{{names}} is in line for the computer",
@@ -1851,7 +1860,7 @@ export const en = {
       picked: "Will answer",
       claimed: "Answering",
       waiting: "Waiting for approval",
-      asking: "Waiting for your answer",
+      asking: "Waiting for an answer",
       outage: "The AI provider is down · retries by itself",
       queued: "In line for the computer",
       away: "Waiting for the computer",
@@ -1899,6 +1908,9 @@ export const en = {
     intro: {
       greeting: "Hi, I'm {{name}}. I'll build the team with you.",
       lead: "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do.",
+      /** In place of `lead` on a billing hold: the team costs no model call, and the plan is said up front. */
+      heldLead:
+        "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan.",
       connect: {
         title: "Connect an AI for the team",
         text: "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed.",
@@ -2241,6 +2253,18 @@ export const en = {
         "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on.",
       useKey: "Use an API key",
     },
+    /** The card an agent posts on a billing hold (`reason: plan_hold`): the message waits for the plan. */
+    kept: {
+      title: "I kept your message.",
+      line: "I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
+      plan: "The plan brings the agents' computer, always on. The AI is the one you already pay for: Claude, ChatGPT and more, or an API key.",
+      /** The hold lifted: the plan is paid, an AI is what's left. */
+      active: "Plan active. Connect an AI and {{name}} answers here.",
+      /** A second message's receipt, where it would say no AI. */
+      receipt: "Kept",
+      /** The receipt of a channel message nobody mentioned. */
+      channel: "Kept. The agents answer once the workspace has an agentes.chat plan.",
+    },
     receipt: "Nobody will answer: no\u00a0AI connected",
     chip: "No AI",
   },
@@ -2313,9 +2337,8 @@ export const en = {
       /** Saved, though the provider gave no answer about the key: it may still fail. */
       savedUnchecked:
         "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why.",
-      /** On a billing hold no model runs, so a key waits for the plan as well (`connectAi.billing`). */
-      held: "Agents use it once the workspace's agentes.chat plan is active.",
-      savedHeld: "Saved. Agents use it once the workspace's agentes.chat plan is active.",
+      /** On a billing hold, in place of any way to add a key. */
+      closed: "API keys open with the workspace's agentes.chat plan.",
       notPlan: "A coding plan's key goes in its own option above.",
       billing: "Turn on billing for the key's project. Without billing, Google may use what your agents send.",
       privacy: "Your OpenRouter privacy settings decide which providers may keep what your agents send.",
@@ -2337,6 +2360,11 @@ export const en = {
       freeLower: "OpenCode's free models",
       one: "An account just for {{name}}",
       each: "An account just for them",
+    },
+    popup: {
+      title: "Connecting {{name}}",
+      any: "Connecting your AI",
+      text: "We're asking the computer for the sign-in page. It opens here in a few seconds.",
     },
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
@@ -2701,6 +2729,7 @@ export const en = {
       assignee: "the assignee",
       labels: "the labels",
       dueDate: "the due date",
+      githubUrl: "the GitHub link",
       criteria: "the criteria",
     },
     routineFields: {
@@ -3036,6 +3065,26 @@ export const en = {
     dmLabel: "Message from {{author}} in the DM with {{name}}",
     noAccess: "Message you can't see",
   },
+  /** A bare address of a known service in a message, as a pill. The words stand in for a title the address doesn't have. */
+  linkPills: {
+    document: "Document",
+    spreadsheet: "Spreadsheet",
+    presentation: "Presentation",
+    file: "File",
+    folder: "Folder",
+    customer: "Customer",
+    payment: "Payment",
+    invoice: "Invoice",
+    subscription: "Subscription",
+    pull: "Pull request",
+    merge: "Merge request",
+    issue: "Issue",
+  },
+  /** A long text an agent wrote, folded on a page: a run's record, a mission's summary. */
+  folded: {
+    more: "Show more",
+    less: "Show less",
+  },
   secret: {
     group: "Secret request from {{agent}}",
     chip: "Waiting",
@@ -3072,6 +3121,7 @@ export const en = {
       "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment.",
     computerPaused: "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}.",
     failed: "Couldn't deliver it. Is the agent's computer on?",
+    changed: "This request changed while you answered. Nothing was sent. Send it again.",
     empty: "Type the value.",
     tooLarge: "Too large (16 KB at most).",
   },
@@ -3710,6 +3760,12 @@ export const en = {
         text: "Say what it does and it joins the team.",
         action: "Create agent",
       },
+      /** First for whoever pays, on a billing hold. */
+      plan: {
+        title: "Choose an agentes.chat plan",
+        text: "The agents start working once the workspace has one.",
+        action: "See plans",
+      },
       ai: { title: "Connect an AI", text: "It's what your agents think with.", action: "Connect" },
       ask: { title: "Ask an agent for something", text: "Write below or in a conversation.", action: "Ask" },
       team: { title: "Invite your team", text: "People and agents work together here.", action: "Invite" },
@@ -3844,6 +3900,8 @@ export const en = {
       joinSuggestion: "<b>{{by}}</b> suggested <b>{{name}}</b>",
       /** ADR 0137: someone sent a change they can't make to the people who may ("Pedir a um admin"). */
       changeRequest: "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>",
+      /** Proposals wait on this person: `names`, the agents that made them. */
+      proposalWaiting: "Improvement proposals from <b>{{names}}</b>",
       changeRequestAgent: "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>",
       approvalCover: "<b>{{name}}</b> picked you in Who approves for me",
       approvalCoverDeclined: "<b>{{name}}</b> won't approve for you any more",
@@ -3973,6 +4031,8 @@ export const en = {
   },
   approvals: {
     title: "Approvals",
+    /** Beside `proposals.title`: what agents ask to do now, and what they propose to change. */
+    tabs: { requests: "Requests" },
     /** Requests sharing one card in the conversation, together here too. */
     groupHead_one: "<b>{{name}}</b> asked for {{count}} thing in one go",
     groupHead_other: "<b>{{name}}</b> asked for {{count}} things in one go",
@@ -4015,7 +4075,6 @@ export const en = {
     },
     highRisk: "High-risk action",
     hold: "Hold to approve",
-    holding: "Hold…",
     holdLabel: "{{action}}: hold to confirm",
     holdHint: "Hold the button to approve. High-risk action: a single click isn't enough.",
     holdNote: "High risk: hold the button to confirm.",
@@ -4852,6 +4911,9 @@ export const en = {
     },
   },
   memory: {
+    /** A lesson from a refused change: what it was. */
+    fromRefusal: "Not to propose again: {{text}}",
+    fromCorrection: "A person corrected: {{text}}",
     back: "{{name}}",
     title: "What {{name}} knows",
     subtitle: "What {{name}} learned from conversations and the team's corrections.",
@@ -4900,6 +4962,16 @@ export const en = {
   },
   proposals: {
     title: "Improvement proposals",
+    /** Why it is proposed, when the server gave a code and not an agent's words. */
+    whyCode: {
+      refused: "A person refused: {{text}}",
+      corrected: "A person corrected: {{text}}",
+      seen: "The agent noticed this more than once.",
+      skill: "It came from using this skill.",
+      asked: "Asked for in a conversation.",
+      budget: "It stopped at its monthly budget this week.",
+      noChannel: "It is in no channel.",
+    },
     subtitle: "Changes the agents propose. Nothing changes until someone accepts.",
     list: "Proposals",
     proposes: "<b>{{agent}}</b> proposes · {{target}}",
@@ -5710,6 +5782,16 @@ export const en = {
     },
   },
   issues: {
+    delete: {
+      action: "Delete task",
+      title: "Delete task #{{number}}?",
+      body: "It goes for everyone, with its conversation and the conversation's files.",
+      steps_one: "Its step goes too.",
+      steps_other: "Its {{count}} steps go too.",
+      working: "{{name}} stops what it's doing on it.",
+      confirm: "Delete",
+      done: "Task #{{number}} deleted.",
+    },
     assigneeFilter: "Assignee",
     priorityFilter: "Priority",
     title: "Tasks",
@@ -5930,7 +6012,6 @@ export const en = {
     createdByShort: "Created by {{name}}",
     fromMessage: "from <0>a message in #{{channel}}</0>",
     fromAgent: "from a request to an agent",
-    privateTask: "Only people in this conversation see this task.",
     subIssues_one: "Subtasks · {{count}}",
     subIssues_other: "Subtasks · {{count}}",
     fromWebhook: "from a {{provider}} event",
@@ -5987,6 +6068,12 @@ export const en = {
     prBy: "PR #{{number}} · opened by {{name}}",
     artifactBy: "{{title}} ({{name}})",
     noLinks: "Nothing linked yet.",
+    github: {
+      label: "GitHub link",
+      placeholder: "Issue or PR link",
+      invalid: "That isn't the link of a GitHub issue or pull request.",
+      remove: "Remove the GitHub link",
+    },
     openConversation: "View conversation",
     labels: "Labels",
     tabs: { label: "Task sections", details: "Details", files: "Attachments", history: "History" },
@@ -6005,6 +6092,8 @@ export const en = {
       work_update: "{{text}}",
       work_stopped: "stopped the background work",
       shared_everyone: "showed the card to the whole workspace",
+      audience_everyone: "showed the task to everyone",
+      audience_people: "changed who sees the task",
       created: "created the task",
       renamed: "renamed the task",
       description_changed: "edited the description",
@@ -6016,6 +6105,8 @@ export const en = {
       due_date_set: "set the due date to {{date}}",
       due_date_removed: "removed the due date",
       pr_linked: "linked PR #{{number}}",
+      github_linked: "linked it to GitHub",
+      github_unlinked: "removed the GitHub link",
       artifact_linked: "attached a file",
       criterion_checked: 'checked the criterion "{{text}}"',
       criterion_unchecked: 'unchecked the criterion "{{text}}"',
@@ -8479,15 +8570,15 @@ export const en = {
     lockedDone: "Locked. Only admins edit it now.",
     unlockedDone: "Unlocked. Members can edit again.",
     restricted: "Restricted",
-    restrictedHint: "Only owners and the people chosen see this page.",
+    restrictedHint: "Only administrators and the people chosen see this page.",
     audience: "Access",
     audienceTitle: "Access to {{title}}",
-    audienceText: "Owners always have access. Anyone without it won't find the page in lists, search or links.",
+    audienceText: "Administrators always have access. Anyone without it won't find the page in lists, search or links.",
     audienceEveryone: "Everyone in the workspace",
     audienceEveryoneText: "Any member",
     audienceFolderTitle: "Access to the folder {{folder}}",
     audienceFolderText:
-      "It reaches the pages in this folder and its subfolders, and the ones added later. Owners always have access.",
+      "It reaches the pages in this folder and its subfolders, and the ones added later. Administrators always have access.",
     audienceAgents: "Agents",
     audienceAgentsAll: "All agents",
     audienceAgentsAllText: "Any agent with access to the wiki",
@@ -8543,7 +8634,7 @@ export const en = {
       everyoneHint: "Any member and any agent with access to the wiki read this page.",
       peopleAnd: "Everyone and {{agents}}",
       peopleOnly: "Everyone, no agents",
-      ownersOnly: "Owners only",
+      ownersOnly: "Administrators only",
       withAllAgents: "{{names}} and every agent",
       more_one: "{{count}} more",
       more_other: "{{count}} more",
@@ -9312,12 +9403,12 @@ export const en = {
     audience: {
       workspace: "Everyone in the workspace can see it",
       publicChannel: "Everyone in the workspace can see it: it's in the public channel #{{name}}",
-      privateChannel: "Only members of #{{name}} can see it",
+      privateChannel: "Only members of #{{name}} and administrators can see it",
       dm: "Only you and {{name}} can see it: it came from a direct message",
       dmGone: "Only the people in that conversation can see it: it came from a direct message",
     },
     private: "Private",
-    privateHint: "Only the people in the conversation see these files",
+    privateHint: "Only the people in the conversation see these files. In a channel, administrators do too.",
     downloadAs: "Download as",
     uploading_one: "Uploading {{count}} file",
     uploading_other: "Uploading {{count}} files",
@@ -10133,6 +10224,17 @@ export const en = {
     namePlaceholder: "E.g. Support",
     continueIn: "Continue on {{name}}",
     continueInComposio: "Continue on Composio",
+    /** On Reconnect GitHub: its sign-in asks about organizations only the first time. */
+    githubOrgs: {
+      title: "Organizations it reaches",
+      none: "No organization yet.",
+      lead: "GitHub asks about organizations only the first time. To add one, open the app's page there and press Grant beside it. If you don't own it, the button says Request and an owner approves.",
+      open: "Grant organizations on GitHub",
+      added: "Now also: {{names}}.",
+      removed: "No longer: {{names}}.",
+      same: "Nothing changed in the organizations.",
+      failed: "Couldn't read the organizations now.",
+    },
     composioHelp:
       "You sign in on Composio's page, in English, and come back here. {{name}} shows the permission as “Composio”.",
     or: "or",
@@ -10675,7 +10777,9 @@ export const en = {
   },
   errors: {
     issue: {
-      assigneeOutside: "This person isn't in this conversation, so they can't see this task.",
+      assigneeOutside: "This person can't see this task. Add them to who sees it first.",
+      deleteForbidden: "Only who created this task or an administrator can delete it.",
+      audienceEmpty: "Choose who sees it.",
     },
     connector: {
       labelTaken: "Another connector already has this name.",
@@ -12768,6 +12872,8 @@ export const en = {
         "I can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
       no_ai_commands_off: "I can't answer now: commands are turned off on my plan's computer.",
       no_ai_cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
+      no_ai_plan_hold:
+        "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
       no_ai_no_computer: "I can't answer yet: my AI needs a computer and I have none.",
       /** Where the server took a sign-in or a key out of the team's right hand's reply, in place of it. */
       redacted: "[removed: it looked like a sign-in or a key]",
@@ -13502,6 +13608,10 @@ export const en = {
       askAdmin: "Whoever runs this workspace can sort this out.",
       /** In place of the hold's words, back from paying until the billing service lifts it. */
       paid: "Payment received. The agentes.chat plan starts in a moment.",
+      /** The banner's one line on a `payment` hold once there is a team. */
+      teamReady: "Your team is ready. It needs an agentes.chat plan to start.",
+      /** In place of the invite form. */
+      invites: "Invitations open with the agentes.chat plan.",
     },
     /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
     cloud: {
@@ -14029,7 +14139,6 @@ export const en = {
     title: "Task manager",
     /** Under the title when no agent is working or waiting on you. */
     subtitle: "What the agents are doing now and what ended today.",
-    nav: "Task manager",
     search: "Search a task, agent or app",
     working_one: "{{count}} working",
     working_other: "{{count}} working",
@@ -14184,7 +14293,6 @@ export const en = {
       room: "Has room",
       computers: "Computers",
     },
-    navWhat: "What each agent is doing now, and stopping what you need",
     cards: { label: "Agents", previous: "Previous agents", next: "More agents" },
     table: "Tasks",
     noResults: "No task matches this search.",
@@ -14395,9 +14503,6 @@ export const en = {
   dashboards: {
     title: "Dashboards",
     subtitle: "Numbers and charts the agents keep up to date.",
-    sidebar: "Dashboards",
-    /** Its line in the sidebar's More menu. */
-    navWhat: "Numbers and charts the agents keep up to date",
     new: "New dashboard",
     back: "Dashboards",
     home: "My Home",
@@ -14676,6 +14781,10 @@ export const en = {
     firstTask: {
       suggestion: "suggestion",
       lead: "One short task per agent, so you see each one working today.",
+      heldLead:
+        "One short task per agent. Finish the sentence and send it. They start once the workspace has an agentes.chat plan.",
+      /** Over the template's sample of its first agent's work: an example, never something it wrote. */
+      example: "Example of what {{name}} delivers",
       open: "Open with the task",
       invite: "Invite {{names}}",
       later: "Later",
@@ -14698,6 +14807,7 @@ export const en = {
     templates: {
       title: "Team templates",
       lead: "A ready team for your kind of business. Then {{name}} fits it with you.",
+      heldLead: "Pick the closest to your business. You can change every agent before creating them.",
       use: "Use this template",
       none: "None of these",
       noneSub: "Tell what you do and {{name}} builds it",
@@ -14706,6 +14816,26 @@ export const en = {
     weekly: {
       name: "The team's week",
     },
+  },
+  whoSees: {
+    label: "Who sees it",
+    everyone: "Everyone in the workspace",
+    me: "Only me",
+    people: "Specific people",
+    only: "Only {{name}}",
+    more_one: "{{names}} and {{count}} more",
+    more_other: "{{names}} and {{count}} more",
+    some: "some people",
+    taskTitle: "Who sees this task",
+    pageTitle: "Who sees this page",
+    admins: "Administrators always see it.",
+    tied: "It follows who's in the conversation until you change it.",
+    search: "Search people",
+    noMatch: "Nobody with that name",
+    moreOptions: "More options",
+    receipt: "Who sees it: {{who}}",
+    limited: "limited access",
+    rolesToo: "The roles already on this page keep seeing it.",
   },
   teamTemplates: {
     lead: "A team for {{org}}, each agent in its own channel. You can adjust it before creating.",
@@ -14744,50 +14874,56 @@ export const en = {
         role: "Customer service",
         line: "Answers customers on WhatsApp and email. Calls you when she doesn't know.",
         routine: "Sum up what was left unanswered",
-        task: "Answer the last customer message waiting for us",
+        task: "Write a reply to this customer message:",
       },
       caio: {
         role: "Billing",
         line: "Reminds whoever is late on payment and sends the reminder after your ok.",
         routine: "List who is late on payment",
-        task: "List who is late this month",
+        task: "Write a friendly payment reminder for:",
       },
       ada: {
         role: "Dev",
         line: "Fixes the bugs customers report and opens the PR.",
         routine: "List the new bugs",
-        task: "Look at the latest bug a customer reported",
+        task: "Tell me where to start looking at this bug:",
       },
       lia: {
         role: "Content",
         line: "Writes posts and scripts in the company's voice and schedules them after your ok.",
         routine: "Propose the week's posts",
-        task: "Propose three posts for this week",
+        task: "Suggest three posts for this week about:",
       },
       theo: {
         role: "Sales",
         line: "Follows up on everyone who asked for a quote and writes the proposals.",
         routine: "List who asked for a quote and got no answer",
-        task: "List who asked for a quote this week",
+        task: "Write a short quote for this request:",
       },
       nina: {
         role: "Scheduling",
         line: "Books, confirms and moves appointments, and reminds clients the day before.",
         routine: "Confirm tomorrow's appointments",
-        task: "Show me tomorrow's appointments",
+        task: "Organize tomorrow's schedule:",
       },
       otto: {
         role: "Orders",
         line: "Follows orders and stock and warns what is running out.",
         routine: "Warn what is running out in stock",
-        task: "List the orders still waiting to ship",
+        task: "List what's left to do on these orders:",
       },
       bia: {
         role: "Answer base",
         line: "Keeps the answer base up to date with what the team answers.",
         routine: "Update the base with the week's answers",
-        task: "List the 5 questions customers ask the most",
+        task: "Write answers to these customer questions:",
       },
+    },
+    /** On a billing hold, under Primeira tarefa: what the template's first agent delivers, labelled and never posted. */
+    example: {
+      iara: "Hi Marina. Your order left yesterday and arrives by Friday. The tracking code is right below. If Friday doesn't work, I'll find another date.",
+      lia: "1. Three common mistakes when hiring an agency. 2. Behind the scenes of a project that almost went wrong. 3. A question for your followers: what do you want to see here?",
+      nina: "Tomorrow: 9:00 Carla, 10:30 Pedro, 14:00 open. Pedro hasn't confirmed yet. Want me to write to him?",
     },
     channels: {
       iara: "support",

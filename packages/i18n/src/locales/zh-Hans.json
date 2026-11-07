@@ -1277,6 +1277,7 @@
     }
   },
   "shell": {
+    "otherChannels": "其他频道",
     "titleBar": {
       "back": "后退",
       "forward": "前进"
@@ -1285,13 +1286,16 @@
     "more": "更多",
     "moreWhat": {
       "approvals": "智能体请求你允许的事",
+      "proposals": "智能体提议更改的内容",
       "threads": "分支出去的对话和专项任务",
       "issues": "团队的工作，成员和智能体都有",
       "wiki": "团队知道的事，写给所有人看",
       "drive": "文件、报告和表格",
       "routines": "智能体按时自己完成的工作",
       "calendar": "会议和截止日期",
-      "team": "谁是谁：成员、智能体及其分组"
+      "team": "谁是谁：成员、智能体及其分组",
+      "dashboards": "智能体保持更新的数字和图表",
+      "taskManager": "查看每个智能体正在做什么，并停止需要停止的任务"
     },
     "customizeSidebar": "自定义侧边栏",
     "sidebarMenu": {
@@ -1310,7 +1314,6 @@
       "auto": "有内容时显示",
       "autoHint": "有事等你处理时显示",
       "reset": "恢复默认",
-      "instant": "更改会立即生效。",
       "tools": "工具",
       "toolsTitle": "顶部",
       "order": "分区顺序",
@@ -1355,11 +1358,14 @@
     "searchWorkspace": "搜索工作区",
     "summary_other": "{{people}} 位成员 · {{agents}} 个智能体",
     "approvals": "审批",
+    "proposals": "改进建议",
     "issues": "任务",
     "missionsWaiting_other": "{{count}} 个专项任务在等你",
     "threads": "话题",
     "routines": "例行工作",
     "team": "团队",
+    "dashboards": "仪表盘",
+    "taskManager": "任务管理器",
     "calendar": "日历",
     "drive": "Drive",
     "members": "成员",
@@ -1391,6 +1397,7 @@
     "gallery": "组件库",
     "unread_other": "{{count}} 条未读消息",
     "pendingApprovals_other": "{{count}} 个待审批",
+    "pendingProposals_other": "{{count}} 条提议等你处理",
     "home": "首页",
     "notifications": "通知",
     "unreadMark": "未读",
@@ -1698,6 +1705,7 @@
     "waitingApproval": "等待审批",
     "notMemberTitle": "你不在这个频道中",
     "notMemberText": "加入后即可阅读消息，并与这里的成员和智能体交流。",
+    "adminReading": "你不在这个频道中。管理员可以阅读。",
     "join": "加入 #{{channel}}",
     "notFound": "这个频道不存在或已不可用。",
     "loadOlder": "加载更早的消息",
@@ -1720,7 +1728,7 @@
     "delete": "删除频道",
     "deleteTitle": "要永久删除 #{{channel}} 吗？",
     "deleteGoes": "立即删除：消息、话题、文件和置顶，智能体从这个频道记住的内容，以及在这里发帖的例行任务。",
-    "deleteIssues": "它的任务也会一并删除，因为只有频道成员能看到它们。",
+    "deleteIssues": "它的任务也会一并删除，因为只有频道成员和管理员能看到它们。",
     "deleteOrArchive": "想保留对话的话，请归档频道而不是删除。",
     "deleteTypeName": "输入 {{channel}} 以确认",
     "deleteDone": "#{{channel}} 已删除。",
@@ -1769,7 +1777,7 @@
     "handled_other": "{{names}} 已回答",
     "passed_other": "没有人回答",
     "failed_other": "{{names}} 无法回答",
-    "asking_other": "{{names}} 正在等你回答",
+    "asking_other": "{{names}} 正在等待回答",
     "outage_other": "{{names}}：AI 服务商出现故障 · 会自动重试",
     "queued_other": "{{names}} 正在排队等待电脑",
     "away_other": "{{names}} 正在等待电脑",
@@ -1784,7 +1792,7 @@
       "picked": "将会回答",
       "claimed": "正在回答",
       "waiting": "等待审批",
-      "asking": "等你回答",
+      "asking": "等待回答",
       "outage": "AI 服务商出现故障 · 会自动重试",
       "queued": "排队等待电脑",
       "away": "等待电脑",
@@ -1822,6 +1830,7 @@
     "intro": {
       "greeting": "你好，我是 {{name}}。我和你一起组建团队。",
       "lead": "我创建智能体、连接应用、邀请成员。没有你的点击，什么都不会变，而且我只做你能做的事。",
+      "heldLead": "选择你的公司业务，团队就会出现在这里。工作区有 agentes.chat 套餐后，智能体就会开始工作。",
       "connect": {
         "title": "为团队连接 AI",
         "text": "智能体用工作区的 AI 思考。用你的 Claude 或 ChatGPT 套餐登录，不需要 API 密钥。",
@@ -2123,6 +2132,14 @@
       "commands_off": "{{name}} 现在无法回答：套餐所在的电脑上命令已关闭，需要负责这台电脑的人打开。",
       "useKey": "使用 API 密钥"
     },
+    "kept": {
+      "title": "我保留了你的消息。",
+      "line": "工作区有了 agentes.chat 套餐并连接 AI 后，我会在这里回复。",
+      "plan": "套餐包含智能体的电脑，始终开机。AI 用的是你已经付费的：Claude、ChatGPT 等，或 API 密钥。",
+      "active": "套餐已生效。连接 AI 后，{{name}} 会在这里回复。",
+      "receipt": "已保留",
+      "channel": "已保留。工作区有 agentes.chat 套餐后，智能体就会回复。"
+    },
     "receipt": "没有人会回复：未连接 AI",
     "chip": "无 AI"
   },
@@ -2210,8 +2227,7 @@
       "forAll": "所有没有套餐的智能体都用它来思考。",
       "saved": "已保存。所有没有套餐的智能体都用它来思考。",
       "savedUnchecked": "已保存，但 {{provider}} 没有回应，因此无法检查这个密钥。如果它失败，对话里会说明原因。",
-      "held": "工作区的 agentes.chat 套餐生效后，智能体就会使用它。",
-      "savedHeld": "已保存。工作区的 agentes.chat 套餐生效后，智能体就会使用它。",
+      "closed": "API 密钥随工作区的 agentes.chat 套餐开放。",
       "notPlan": "编程套餐的密钥请填在上方它自己的选项里。",
       "billing": "请为密钥所属的项目开通结算。不开通结算的话，Google 可能会使用你的智能体发送的内容。",
       "privacy": "你的 OpenRouter 隐私设置决定哪些服务商可以保留你的智能体发送的内容。"
@@ -2233,6 +2249,11 @@
       "one": "{{name}} 专用的账号",
       "one_female": "{{name}} 专用的账号",
       "each": "每个智能体专用的账号"
+    },
+    "popup": {
+      "title": "正在连接 {{name}}",
+      "any": "正在连接你的 AI",
+      "text": "正在向电脑请求登录页面，几秒后会在这里打开。"
     },
     "chatgptCode": {
       "title": "在 ChatGPT 中允许用代码登录",
@@ -2572,6 +2593,7 @@
       "assignee": "负责人",
       "labels": "标签",
       "dueDate": "截止日期",
+      "githubUrl": "GitHub 链接",
       "criteria": "验收标准"
     },
     "routineFields": {
@@ -2890,6 +2912,24 @@
     "dmLabel": "{{author}} 在与 {{name}} 的私信中的消息",
     "noAccess": "无权查看的消息"
   },
+  "linkPills": {
+    "document": "文档",
+    "spreadsheet": "电子表格",
+    "presentation": "演示文稿",
+    "file": "文件",
+    "folder": "文件夹",
+    "customer": "客户",
+    "payment": "付款",
+    "invoice": "发票",
+    "subscription": "订阅",
+    "pull": "拉取请求",
+    "merge": "合并请求",
+    "issue": "议题"
+  },
+  "folded": {
+    "more": "显示更多",
+    "less": "收起"
+  },
   "secret": {
     "group": "来自 {{agent}} 的密钥请求",
     "chip": "等待中",
@@ -2922,6 +2962,7 @@
     "computerAway": "{{agent}} 的电脑目前没有响应。此请求在 {{time}} 前保持开放。请稍后重试。",
     "computerPaused": "{{agent}} 的电脑已被所有者暂停。此请求在 {{time}} 前保持开放。",
     "failed": "无法送达。智能体的电脑开着吗？",
+    "changed": "你回复时此请求已更改。未发送任何内容。请重新发送。",
     "empty": "请输入值。",
     "tooLarge": "太大了（最多 16 KB）。"
   },
@@ -3516,6 +3557,11 @@
         "text": "说明它做什么，它就会加入团队。",
         "action": "创建智能体"
       },
+      "plan": {
+        "title": "选择 agentes.chat 套餐",
+        "text": "工作区有套餐后，智能体就会开始工作。",
+        "action": "查看套餐"
+      },
       "ai": {
         "title": "连接 AI",
         "text": "这是你的智能体用来思考的。",
@@ -3655,6 +3701,7 @@
       "joinRequestMany": "<b>{{names}}</b> 申请加入",
       "joinSuggestion": "<b>{{by}}</b> 推荐了 <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> 请求更改 <b>{{agent}}</b>",
+      "proposalWaiting": "来自 <b>{{names}}</b> 的改进提议",
       "changeRequestAgent": "<b>{{name}}</b> 请求新的智能体：<b>{{agent}}</b>",
       "approvalCover": "<b>{{name}}</b> 在“谁替我审批”中选了你",
       "approvalCoverDeclined": "<b>{{name}}</b> 不再替你审批",
@@ -3775,6 +3822,9 @@
   },
   "approvals": {
     "title": "审批",
+    "tabs": {
+      "requests": "请求"
+    },
     "groupHead_other": "<b>{{name}}</b> 一次请求了 {{count}} 项",
     "readsOnly": "只读",
     "technical": "技术细节",
@@ -3813,7 +3863,6 @@
     },
     "highRisk": "高风险操作",
     "hold": "按住以批准",
-    "holding": "按住…",
     "holdLabel": "{{action}}：按住以确认",
     "holdHint": "按住按钮以批准。高风险操作：单击不够。",
     "holdNote": "高风险：按住按钮以确认。",
@@ -4666,6 +4715,8 @@
     }
   },
   "memory": {
+    "fromRefusal": "不再提议：{{text}}",
+    "fromCorrection": "有人更正：{{text}}",
     "back": "{{name}}",
     "title": "{{name}} 知道的事",
     "subtitle": "{{name}} 从对话和团队的纠正中学到的内容。",
@@ -4727,6 +4778,15 @@
   },
   "proposals": {
     "title": "改进建议",
+    "whyCode": {
+      "refused": "有人拒绝：{{text}}",
+      "corrected": "有人更正：{{text}}",
+      "seen": "智能体多次注意到这一点。",
+      "skill": "来自使用这个技能。",
+      "asked": "在对话中提出。",
+      "budget": "本周已达到每月预算并停止。",
+      "noChannel": "不在任何频道中。"
+    },
     "subtitle": "智能体提议的更改。有人接受之前，什么都不会变。",
     "list": "建议",
     "proposes": "<b>{{agent}}</b> 提议 · {{target}}",
@@ -5531,6 +5591,15 @@
     }
   },
   "issues": {
+    "delete": {
+      "action": "删除任务",
+      "title": "删除任务 #{{number}}？",
+      "body": "它会对所有人消失，连同它的对话和对话中的文件。",
+      "steps_other": "它的 {{count}} 个步骤也会一起删除。",
+      "working": "{{name}} 会停止这项任务上的工作。",
+      "confirm": "删除",
+      "done": "任务 #{{number}} 已删除。"
+    },
     "assigneeFilter": "负责人",
     "priorityFilter": "优先级",
     "title": "任务",
@@ -5764,7 +5833,6 @@
     "createdByShort": "由 {{name}} 创建",
     "fromMessage": "来自<0>#{{channel}} 中的一条消息</0>",
     "fromAgent": "来自对智能体的一个请求",
-    "privateTask": "只有这段对话中的人能看到这个任务。",
     "subIssues_other": "子任务 · {{count}}",
     "fromWebhook": "来自一个 {{provider}} 事件",
     "description": "描述",
@@ -5815,6 +5883,12 @@
     "prBy": "PR #{{number}} · 由 {{name}} 创建",
     "artifactBy": "{{title}}（{{name}}）",
     "noLinks": "还没有关联内容。",
+    "github": {
+      "label": "GitHub 链接",
+      "placeholder": "Issue 或 PR 链接",
+      "invalid": "这不是 GitHub issue 或 pull request 的链接。",
+      "remove": "移除 GitHub 链接"
+    },
     "openConversation": "查看对话",
     "labels": "标签",
     "tabs": {
@@ -5841,6 +5915,8 @@
       "work_update": "{{text}}",
       "work_stopped": "停止了后台工作",
       "shared_everyone": "向整个工作区展示了卡片",
+      "audience_everyone": "向所有人展示了任务",
+      "audience_people": "更改了谁能看到任务",
       "created": "创建了任务",
       "renamed": "重命名了任务",
       "description_changed": "编辑了描述",
@@ -5852,6 +5928,8 @@
       "due_date_set": "将截止日期设为 {{date}}",
       "due_date_removed": "移除了截止日期",
       "pr_linked": "关联了 PR #{{number}}",
+      "github_linked": "已关联到 GitHub",
+      "github_unlinked": "已移除 GitHub 链接",
       "artifact_linked": "附加了一个文件",
       "criterion_checked": "勾选了标准“{{text}}”",
       "criterion_unchecked": "取消勾选了标准“{{text}}”",
@@ -8333,14 +8411,14 @@
     "lockedDone": "已锁定。现在只有管理员可以编辑。",
     "unlockedDone": "已解锁。成员可以再次编辑。",
     "restricted": "受限",
-    "restrictedHint": "只有所有者和被选中的人能看到这个页面。",
+    "restrictedHint": "只有管理员和被选中的人能看到这个页面。",
     "audience": "访问权限",
     "audienceTitle": "{{title}} 的访问权限",
-    "audienceText": "所有者始终有访问权限。没有权限的人在列表、搜索或链接中都找不到这个页面。",
+    "audienceText": "管理员始终有访问权限。没有权限的人在列表、搜索或链接中都找不到这个页面。",
     "audienceEveryone": "工作区中的所有人",
     "audienceEveryoneText": "任何成员",
     "audienceFolderTitle": "文件夹 {{folder}} 的访问权限",
-    "audienceFolderText": "适用于此文件夹及其子文件夹中的页面，包括以后添加的页面。所有者始终有访问权限。",
+    "audienceFolderText": "适用于此文件夹及其子文件夹中的页面，包括以后添加的页面。管理员始终有访问权限。",
     "audienceAgents": "智能体",
     "audienceAgentsAll": "所有智能体",
     "audienceAgentsAllText": "任何有 Wiki 访问权限的智能体",
@@ -8394,7 +8472,7 @@
       "everyoneHint": "任何成员和任何能访问Wiki的智能体都能读这页。",
       "peopleAnd": "所有人和{{agents}}",
       "peopleOnly": "所有人，不含智能体",
-      "ownersOnly": "仅所有者",
+      "ownersOnly": "仅管理员",
       "withAllAgents": "{{names}}和所有智能体",
       "more_other": "另外 {{count}} 个"
     },
@@ -9120,12 +9198,12 @@
     "audience": {
       "workspace": "工作区中的所有人都能看到",
       "publicChannel": "工作区中的所有人都能看到：它在公开频道 #{{name}} 中",
-      "privateChannel": "只有 #{{name}} 的成员能看到",
+      "privateChannel": "只有 #{{name}} 的成员和管理员能看到",
       "dm": "只有你和 {{name}} 能看到：它来自私信",
       "dmGone": "只有那段对话中的成员能看到：它来自私信"
     },
     "private": "私密",
-    "privateHint": "只有对话中的成员能看到这些文件",
+    "privateHint": "只有对话中的成员能看到这些文件。在频道中，管理员也能看到。",
     "downloadAs": "下载为",
     "uploading_other": "正在上传 {{count}} 个文件",
     "uploadWaiting": "排队中",
@@ -10099,6 +10177,16 @@
     "namePlaceholder": "例如：客服",
     "continueIn": "在 {{name}} 上继续",
     "continueInComposio": "在 Composio 上继续",
+    "githubOrgs": {
+      "title": "可访问的组织",
+      "none": "还没有组织。",
+      "lead": "GitHub 只在第一次询问组织。要添加其他组织，请在 GitHub 打开应用页面，然后点击组织旁边的 Grant。如果你不是所有者，按钮显示为 Request，由所有者批准。",
+      "open": "在 GitHub 上授权组织",
+      "added": "现在还包括：{{names}}。",
+      "removed": "不再包括：{{names}}。",
+      "same": "组织没有变化。",
+      "failed": "现在无法读取组织。"
+    },
     "composioHelp": "你会在 Composio 的英文页面上登录，然后回到这里。{{name}} 会把这项权限显示为“Composio”。",
     "or": "或",
     "withKey": "用 API 密钥连接",
@@ -10684,7 +10772,9 @@
   },
   "errors": {
     "issue": {
-      "assigneeOutside": "这个人不在这段对话中，因此看不到这个任务。"
+      "assigneeOutside": "这个人看不到这个任务。请先把他加入“谁能看到”。",
+      "deleteForbidden": "只有这项任务的创建者或管理员可以删除它。",
+      "audienceEmpty": "请选择谁能看到。"
     },
     "connector": {
       "labelTaken": "已有其他连接器使用这个名称。",
@@ -12703,6 +12793,7 @@
       "no_ai_model_region": "我无法回答：{{model}} 需要在 OpenCode 中开启 Global 区域（Settings › Privacy）。",
       "no_ai_commands_off": "我现在无法回答：我套餐所在电脑上的命令已关闭。",
       "no_ai_cli_missing": "我还无法回答：我的 AI 程序没有安装在我的电脑上。",
+      "no_ai_plan_hold": "我保留了你的消息。 工作区有了 agentes.chat 套餐并连接 AI 后，我会在这里回复。",
       "no_ai_no_computer": "我还无法回答：我的 AI 需要一台电脑，而我没有。",
       "redacted": "[已删除：看起来像登录信息或密钥]",
       "action_connect_ai": "连接 AI",
@@ -13462,7 +13553,9 @@
         "ended": "重新订阅"
       },
       "askAdmin": "此工作区的管理者可以解决这个问题。",
-      "paid": "已收到付款。agentes.chat 套餐马上开始。"
+      "paid": "已收到付款。agentes.chat 套餐马上开始。",
+      "teamReady": "你的团队已就绪。还需要一个 agentes.chat 套餐才能开始。",
+      "invites": "邀请随 agentes.chat 套餐开放。"
     },
     "cloud": {
       "review": "已暂停以进行安全审查，直到我们的团队查看为止。我们的自动检查发现了可能违反服务条款（第 5 节）的活动。如有异议，请写信至 {{email}}。",
@@ -13984,7 +14077,6 @@
   "taskManager": {
     "title": "任务管理器",
     "subtitle": "智能体现在在做什么，以及今天完成了什么。",
-    "nav": "任务管理器",
     "search": "搜索任务、智能体或应用",
     "working_other": "{{count}} 个进行中",
     "waiting_other": "{{count}} 个等你处理",
@@ -14126,7 +14218,6 @@
       "room": "有空位",
       "computers": "电脑"
     },
-    "navWhat": "查看每个智能体正在做什么，并停止需要停止的任务",
     "cards": {
       "label": "智能体",
       "previous": "前面的智能体",
@@ -14363,8 +14454,6 @@
   "dashboards": {
     "title": "仪表盘",
     "subtitle": "智能体保持更新的数字和图表。",
-    "sidebar": "仪表盘",
-    "navWhat": "智能体保持更新的数字和图表",
     "new": "新建仪表盘",
     "back": "仪表盘",
     "home": "我的首页",
@@ -14623,6 +14712,8 @@
     "firstTask": {
       "suggestion": "建议",
       "lead": "每个智能体一个简短任务，让你今天就看到每个人在工作。",
+      "heldLead": "每个智能体一个简短任务。补全句子并发送。工作区有 agentes.chat 套餐后，它们就会开始。",
+      "example": "{{name}} 的交付示例",
       "open": "带着任务打开",
       "invite": "邀请{{names}}",
       "later": "稍后"
@@ -14645,6 +14736,7 @@
     "templates": {
       "title": "团队模板",
       "lead": "适合你业务类型的现成团队。之后{{name}}会和你一起调整。",
+      "heldLead": "选择最接近你业务的一项。创建前可以调整每个智能体。",
       "use": "使用这个模板",
       "none": "都不是",
       "noneSub": "说说你做什么，{{name}}来组建",
@@ -14653,6 +14745,25 @@
     "weekly": {
       "name": "团队的一周"
     }
+  },
+  "whoSees": {
+    "label": "谁能看到",
+    "everyone": "整个工作区",
+    "me": "仅我自己",
+    "people": "指定的人",
+    "only": "仅 {{name}}",
+    "more_other": "{{names}} 等 {{count}} 人",
+    "some": "部分人",
+    "taskTitle": "谁能看到这个任务",
+    "pageTitle": "谁能看到这个页面",
+    "admins": "管理员始终可以看到。",
+    "tied": "在你更改之前，跟随对话中的成员。",
+    "search": "搜索成员",
+    "noMatch": "没有这个名字的人",
+    "moreOptions": "更多选项",
+    "receipt": "谁能看到：{{who}}",
+    "limited": "访问受限",
+    "rolesToo": "已在此页面上的角色仍可查看。"
   },
   "teamTemplates": {
     "lead": "为{{org}}准备的团队，每个智能体都有自己的频道。创建前可以调整。",
@@ -14691,50 +14802,55 @@
         "role": "客户服务",
         "line": "在 WhatsApp 和邮件上回复客户。不知道时会叫你。",
         "routine": "汇总还没回复的内容",
-        "task": "回复最近一条等待中的客户消息"
+        "task": "为这条客户消息写一条回复："
       },
       "caio": {
         "role": "收款",
         "line": "提醒逾期付款的人，并在你同意后发送催款。",
         "routine": "列出付款逾期的人",
-        "task": "列出本月逾期的人"
+        "task": "给以下对象写一条友好的付款提醒："
       },
       "ada": {
         "role": "开发",
         "line": "修复客户报告的 bug 并提交 PR。",
         "routine": "列出新的 bug",
-        "task": "查看客户最近报告的 bug"
+        "task": "告诉我该从哪里开始排查这个 bug："
       },
       "lia": {
         "role": "内容",
         "line": "按公司的语气写帖子和脚本，在你同意后排期发布。",
         "routine": "提出本周的帖子",
-        "task": "为本周提出三个帖子"
+        "task": "围绕以下主题提出本周的三篇帖子："
       },
       "theo": {
         "role": "销售",
         "line": "跟进所有询价的人并撰写方案。",
         "routine": "列出询价后没有得到回复的人",
-        "task": "列出本周询价的人"
+        "task": "为这个需求写一份简短报价："
       },
       "nina": {
         "role": "日程",
         "line": "预约、确认和改约，并在前一天提醒客户。",
         "routine": "确认明天的预约",
-        "task": "给我看明天的预约"
+        "task": "整理明天的这些时间安排："
       },
       "otto": {
         "role": "订单",
         "line": "跟踪订单和库存，提醒快用完的东西。",
         "routine": "提醒库存里快用完的东西",
-        "task": "列出还在等待发货的订单"
+        "task": "列出这些订单还有哪些事要做："
       },
       "bia": {
         "role": "回答库",
         "line": "让回答库与团队的回答保持一致。",
         "routine": "用本周的回答更新回答库",
-        "task": "列出客户最常问的 5 个问题"
+        "task": "写出这些客户问题的答案："
       }
+    },
+    "example": {
+      "iara": "你好，Marina。你的订单昨天已发出，周五前送达。物流单号就在下方。如果周五不方便，我再找别的日期。",
+      "lia": "1. 选择代理公司时常见的三个错误。2. 一个差点失败的项目的幕后故事。3. 问问关注者：你们想在这里看到什么？",
+      "nina": "明天：9:00 Carla，10:30 Pedro，14:00 空闲。Pedro 还没确认。要我给他写信吗？"
     },
     "channels": {
       "iara": "support",

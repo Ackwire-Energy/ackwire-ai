@@ -139,7 +139,7 @@ function ReceiptList({
         <View style={[styles.grow, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
           <OwnActions action={a} />
-          {a.undoneAt ? <UndoneBy action={a} /> : <CopyHook action={a} />}
+          {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}
         </View>
         <RowButton view={v} big onUndo={() => undo(a)} onRedo={() => redo(a)} />
       </View>
@@ -176,7 +176,7 @@ function ReceiptList({
           <View style={styles.grow}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
             <OwnActions action={a} />
-            {a.undoneAt ? <UndoneBy action={a} /> : <CopyHook action={a} />}
+            {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}
           </View>
           <RowButton view={v} onUndo={() => undo(a)} onRedo={() => redo(a)} />
         </View>
@@ -267,6 +267,37 @@ function CopyHook({ action: a }: { action: AgentAction }) {
     >
       <Text variant="footnote" tone="ink" style={styles.bold}>
         {t("agentActions.copyWebhook")}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** What a receipt offers under its sentence. */
+const HandyLines = ({ action }: { action: AgentAction }) => (
+  <>
+    <WhoSeesLine action={action} />
+    <CopyHook action={action} />
+  </>
+);
+
+/** Under a task the agent made: who sees it, and the way to change it (ADR 0151). */
+function WhoSeesLine({ action: a }: { action: AgentAction }) {
+  const { t } = useTranslation();
+  const mode = a.params.audience;
+  if (a.kind !== "issue.created" || a.undoneAt || (mode !== "everyone" && mode !== "people")) return null;
+  const number = Number(a.params.number);
+  return (
+    <Pressable
+      onPress={() => {
+        tapHaptic();
+        router.push({ pathname: "/who-sees", params: { number } });
+      }}
+      accessibilityRole="button"
+      hitSlop={12}
+      style={({ pressed }) => [styles.copyHook, pressed && styles.pressed]}
+    >
+      <Text variant="footnote" tone="muted">
+        {t("whoSees.receipt", { who: t(mode === "everyone" ? "whoSees.everyone" : "whoSees.some") })}
       </Text>
     </Pressable>
   );
@@ -394,7 +425,6 @@ const styles = StyleSheet.create({
   // The icon (as the conversation's event lines), the sentence's first line and the action share one middle; the
   // sentence wraps under it.
   one: {
-    marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
@@ -409,7 +439,7 @@ const styles = StyleSheet.create({
   undoneBy: { marginTop: 2 },
   copyHook: { alignSelf: "flex-start", marginTop: 6, paddingVertical: 2 },
   room: { opacity: 0 },
-  group: { marginTop: 12, overflow: "hidden" },
+  group: { overflow: "hidden" },
   hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 12 },
   it: {
     flexDirection: "row",

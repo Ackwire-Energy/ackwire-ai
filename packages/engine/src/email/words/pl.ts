@@ -420,4 +420,34 @@ export const words: EmailWords = {
     button: "Otwórz powiadomienia",
     why: (org) => `Dostajesz ten e-mail, bo ktoś w ${org} połączył twój plan z agentem.`,
   },
+  planWaiting: {
+    subject: "Twój zespół czeka",
+    preheader: "Twoja przestrzeń robocza jest gotowa. Do startu potrzebny jest plan agentes.chat.",
+    headline: "Twój zespół czeka",
+    body: (agents, channels, routines) => {
+      const a = plural("pl", agents, {
+        one: `1 agent`,
+        few: `${agents} agenci`,
+        many: `${agents} agentów`,
+        other: `${agents} agenta`,
+      });
+      const c = plural("pl", channels, {
+        one: `1 kanał`,
+        few: `${channels} kanały`,
+        many: `${channels} kanałów`,
+        other: `${channels} kanału`,
+      });
+      const r = plural("pl", routines, {
+        one: `1 rutyna`,
+        few: `${routines} rutyny`,
+        many: `${routines} rutyn`,
+        other: `${routines} rutyny`,
+      });
+      return routines > 0
+        ? `Gotowe: ${a}, ${c} i ${r}. Do startu potrzebny jest plan agentes.chat.`
+        : `Gotowe: ${a} i ${c}. Do startu potrzebny jest plan agentes.chat.`;
+    },
+    button: "Zobacz plany agentes.chat",
+    why: (org) => `Ten e-mail przyszedł, bo prowadzisz ${org} w agentes.chat. Wysyłamy tylko dwa takie powiadomienia.`,
+  },
 };

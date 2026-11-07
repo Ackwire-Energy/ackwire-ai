@@ -144,6 +144,8 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "widget_failed":
       // The agent's own words when it said why, else its coded reason in words.
       return out(s.widgetFailedTitle(what), text || s.widgetFailedReasons[input.reason ?? ""] || s.widgetFailedBody);
+    case "proposal_waiting":
+      return out(s.proposalWaitingTitle(actor), s.dashboardProposalBody(""));
     case "dashboard_proposal":
       // Only the board's name: publishing happens in the app, never from the notification.
       return out(s.dashboardProposalTitle(actor), s.dashboardProposalBody(what));

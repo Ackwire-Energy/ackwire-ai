@@ -669,7 +669,7 @@ function useEntrySignal(agent: Agent, view: AgentComputerView): EntrySignal {
     line: entryLine(t, entry, {
       edition: f.edition,
       locale: i18n.language,
-      computer: view.machine?.name ?? "",
+      computer: computerName(t, org.name, view.machine),
       lastSeenAt: null,
       person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
       step: null,

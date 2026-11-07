@@ -4,8 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Message } from "@agenteschat/client";
-import { act, cleanup } from "@testing-library/react";
-import { PrivateTaskBlock } from "@/components/BackgroundWork";
+import { cleanup } from "@testing-library/react";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderPage, settle } from "./render";
@@ -59,41 +58,5 @@ describe("asking an agent to implement an issue", () => {
     expect(line.textContent).toMatch(/Ada pegou a tarefa #24 · Checkout quebra/);
     expect(line.querySelector("a")?.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/24`);
     expect(line.textContent).not.toContain("iss_1");
-  });
-});
-
-describe("a task tied to a private conversation", () => {
-  const made = async (createdBy: { type: "agent" | "person"; id: string }) => {
-    const api = createFakeApi(seedState());
-    const issue = await api.issues.create(ORG_ID, { title: "Fechar a folha" });
-    const shared: string[] = [];
-    api.issues.share = async (_orgId, id) => {
-      shared.push(id);
-      return issue;
-    };
-    await renderPage(<PrivateTaskBlock issue={{ ...issue, channelId: "a-dm-not-in-the-list", createdBy }} />, {
-      api,
-      org: true,
-    });
-    await settle(3);
-    return shared;
-  };
-
-  test("an agent's says who sees it, and anyone there can show it to everyone", async () => {
-    const shared = await made({ type: "agent", id: ADA_ID });
-    const block = document.querySelector(".issue-private") as HTMLElement;
-    expect(block.textContent).toContain("Só quem está nesta conversa vê esta tarefa.");
-    const button = block.querySelector("button") as HTMLButtonElement;
-    expect(button.textContent).toBe("Mostrar para todos");
-    await act(async () => button.click());
-    await settle(3);
-    expect(shared).toHaveLength(1);
-  });
-
-  test("a person's only says who sees it", async () => {
-    await made({ type: "person", id: "someone" });
-    const block = document.querySelector(".issue-private") as HTMLElement;
-    expect(block.textContent).toContain("Só quem está nesta conversa");
-    expect(block.querySelector("button")).toBeNull();
   });
 });

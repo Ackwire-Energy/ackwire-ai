@@ -668,6 +668,15 @@ describe("agent page: memory and proposals", () => {
     expect(document.body.textContent).toContain("Mudança aceita. As instruções foram atualizadas.");
   });
 
+  test("a reason the server wrote reads in the person's language on the agent's page too", async () => {
+    const state = seedState();
+    const prop = state.proposals.find((p) => p.id === "prop-1");
+    if (prop) Object.assign(prop, { why: "", whyCode: "seen" });
+    await go("?tab=memory", state);
+    const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
+    expect(card.textContent).toContain("O agente notou isso mais de uma vez.");
+  });
+
   test("Editar antes de aceitar sends the final text; Recusar refuses", async () => {
     const { state } = await go("?tab=memory");
     const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
@@ -791,6 +800,16 @@ describe("agent page: activity", () => {
     createdAt: new Date().toISOString(),
     finishedAt: null,
     ...over,
+  });
+
+  test("what started a run reads as words: no list or bold marks", async () => {
+    const state = seedState();
+    state.runs.push(extra({ id: "run-md", what: "- **Verificado:** o login\n- **Mudou:** nada" }));
+    await go("?tab=activity", state);
+    const runs = screen().getByRole("region", { name: "Execuções" });
+    expect(runs.textContent).toContain("Verificado: o login");
+    expect(runs.textContent).not.toContain("**");
+    expect(runs.textContent).not.toContain("- Verificado");
   });
 
   test("by day, with tokens; filters for failures and waiting; search", async () => {

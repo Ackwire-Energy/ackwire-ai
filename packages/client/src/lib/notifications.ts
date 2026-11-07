@@ -351,6 +351,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/dm/person/$userId"; params: { userId: string }; search?: { m: string } }
   | { to: "/org/$orgId/issues/$number"; params: { number: string }; search?: { m: string } }
   | { to: "/org/$orgId/approvals"; search?: { open: string } }
+  | { to: "/org/$orgId/proposals" }
   | { to: "/org/$orgId/routines"; search?: { open: string } }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
@@ -392,6 +393,7 @@ export function openTarget(n: AppNotification): OpenTarget | null {
     return { to: "/org/$orgId/approvals", ...(s.approvalId ? { search: { open: s.approvalId } } : {}) };
   // A change someone sent to whoever decides (ADR 0137) is decided on its card in the row: the DM it came from is theirs.
   if (n.kind === "change_request") return null;
+  if (n.kind === "proposal_waiting") return { to: "/org/$orgId/proposals" };
   // Who approves for whom (ADR 0139) is set, seen and declined in Configurações › Você › Aprovações.
   if (n.kind === "approval_cover" || n.kind === "right_hand_paused")
     return { to: "/org/$orgId/settings/$section", params: { section: "approvals" } };

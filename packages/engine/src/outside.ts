@@ -89,16 +89,22 @@ export async function runReadOutside(
 ): Promise<boolean> {
   const key = `${run.orgId}:${run.id}`;
   if (caches.readOutsideRuns.get(key)) return true;
-  const tried = run.transcript?.harnessTried;
-  let read =
-    (Array.isArray(tried) && tried.some((l) => typeof l === "string" && HARNESS_OUTSIDE.test(l))) ||
-    (await stepReadOutside(db, run));
+  let read = await readOutsideItself(db, run);
   if (!read) {
     memo.conversation ??= await conversationReadOutside(db, run, authority);
     read = memo.conversation;
   }
   if (read && cachesEnabled()) caches.readOutsideRuns.set(key, true);
   return read;
+}
+
+/** What the run read with its own calls, its conversation aside. */
+async function readOutsideItself(db: Executor, run: OutsideRun): Promise<boolean> {
+  const tried = run.transcript?.harnessTried;
+  return (
+    (Array.isArray(tried) && tried.some((l) => typeof l === "string" && HARNESS_OUTSIDE.test(l))) ||
+    stepReadOutside(db, run)
+  );
 }
 
 async function stepReadOutside(db: Executor, run: OutsideRun): Promise<boolean> {
@@ -116,9 +122,20 @@ async function stepReadOutside(db: Executor, run: OutsideRun): Promise<boolean> 
   return Boolean(step);
 }
 
+/** `readOutsideItself` by the tool context's run id: unlike `runReadOutside`, a person's new message starts clean. */
+export async function runItselfReadOutside(db: Executor, orgId: string, runId: string): Promise<boolean> {
+  const run = await outsideRun(db, orgId, runId);
+  return run ? readOutsideItself(db, run) : false;
+}
+
 /** `runReadOutside` by the tool context's run id (false when the run is gone). */
 export async function runReadOutsideById(db: Executor, orgId: string, runId: string): Promise<boolean> {
-  if (!/^[0-9a-f-]{36}$/i.test(runId)) return false;
+  const run = await outsideRun(db, orgId, runId);
+  return run ? runReadOutside(db, run) : false;
+}
+
+async function outsideRun(db: Executor, orgId: string, runId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(runId)) return null;
   const [run] = await db
     .select({
       id: agentRuns.id,
@@ -129,7 +146,7 @@ export async function runReadOutsideById(db: Executor, orgId: string, runId: str
     })
     .from(agentRuns)
     .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, runId)));
-  return run ? runReadOutside(db, run) : false;
+  return run ?? null;
 }
 
 /** The refusal code of a remembered rule naming an address no person wrote (`remember`). */

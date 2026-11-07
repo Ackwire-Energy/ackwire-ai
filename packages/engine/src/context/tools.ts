@@ -23,6 +23,7 @@ import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-rea
 import { runAuthorityById, UUID } from "../authority";
 import { caches } from "../cache";
 import { isChannelMember, peopleAllIn } from "../channels";
+import { consultationOrigin } from "../consultations";
 import { personAgentDmKey } from "../dms";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -49,6 +50,7 @@ import {
   isHowTo,
   learnedQuietly,
   mayEditItem,
+  personMayRead,
   savedReceiptLine,
   supersede,
 } from "./items";
@@ -521,6 +523,12 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           const { trust, person, outside } = await learnTrust(ctx);
           const rule = input.kind === "rule";
           const said = (rule || input.basis !== "found") && person !== null && (await triggerAuthor(ctx)) === person;
+          // "Everywhere" from a DM reaches this person's runs only: what they said there never reads in someone else's.
+          const [here] = await ctx.db
+            .select({ kind: schema.channels.kind })
+            .from(schema.channels)
+            .where(and(eq(schema.channels.orgId, ctx.orgId), eq(schema.channels.id, ctx.channelId)));
+          const theirsAlone = !rule && input.everywhere === true && said && here?.kind === "dm";
           // A rule's authority is the person who wrote this run's message: another agent's or a page's words give none.
           if (rule && !said) return { content: NOT_THEIR_RULE, isError: true };
           // The permission judge can be absent or fail open: a run that read a page, a mail or an app makes no rule.
@@ -532,8 +540,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               kind: (["fact", "preference", "decision", "note", "rule"].includes(str(input.kind))
                 ? str(input.kind)
                 : "fact") as "fact" | "preference" | "decision" | "note" | "rule",
-              scopeType: "agent",
-              scopeId: ctx.agentId,
+              scopeType: theirsAlone ? "person" : "agent",
+              scopeId: theirsAlone ? person : ctx.agentId,
               agentId: ctx.agentId,
               title: str(input.title),
               subject: str(input.key).trim() || str(input.title) || content.slice(0, 120),
@@ -889,13 +897,16 @@ async function originReadable(ctx: ToolContext, origin: DescribedMessage) {
  */
 async function dmWithRunPerson(ctx: ToolContext): Promise<string | null> {
   const person = ctx.runId ? (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).personId : null;
-  if (!person) return null;
+  if (!person || !ctx.runId) return null;
   const dms = schema.channels;
   const [row] = await ctx.db
     .select({ id: dms.id })
     .from(dms)
     .where(and(eq(dms.orgId, ctx.orgId), eq(dms.dmKey, personAgentDmKey(person, ctx.agentId)), isNull(dms.archivedAt)));
-  return row?.id ?? null;
+  if (!row) return null;
+  // The asking agent relays the answer where it was asked: it stays out unless everyone there is in this DM.
+  const asked = await consultationOrigin(ctx.db, ctx.orgId, ctx.runId);
+  return !asked || (await peopleAllIn(ctx.db, ctx.orgId, asked.channelId, row.id)) ? row.id : null;
 }
 
 /** Whom the call's run works for in the agents' DM (`readerOf`); the trigger's person without a run. */
@@ -926,13 +937,6 @@ async function triggerAuthor(ctx: ToolContext) {
     .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
   return m?.type === "person" && m.meta.readOutside !== true ? m.userId : null;
 }
-
-/**
- * An item a run may read: not another agent's, and a person's preference only in a run that person is behind
- * (ADR 0120).
- */
-const personMayRead = (item: ContextItem | undefined, person: string | null, agentId: string) =>
-  !item || ((!item.agentId || item.agentId === agentId) && (item.scopeType !== "person" || item.scopeId === person));
 
 /**
  * What a memory is about, apart from its plain title (shown to people, in their language): the same thing saved again,

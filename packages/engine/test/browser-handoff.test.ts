@@ -466,12 +466,14 @@ describe("browser_ask_person", () => {
     await start();
     const ana = await addMember(f.db, f.org.id, "member", "ana");
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    // A plain member: an administrator reads every channel (ADR 0151), so the link would open for them.
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db.update(schema.agents).set({ ownerUserId: bob.id }).where(eq(schema.agents.id, f.agent.id));
     const run = await runFor(ana.id);
-    await leave(f.owner.id);
     const { h, notices } = await askFrom(run);
     const of = (userId: string) => notices.find((n) => n.userId === userId)?.source;
     expect(of(ana.id)).toMatchObject({ channelId: f.general.id, messageId: h?.id, handoffId: h?.id });
-    expect(of(f.owner.id)).toEqual({ handoffId: h?.id, agentId: f.agent.id });
+    expect(of(bob.id)).toEqual({ handoffId: h?.id, agentId: f.agent.id });
   });
 
   test("pending it waits 24 hours by default; in control there's no deadline, only the grace while they're away", async () => {

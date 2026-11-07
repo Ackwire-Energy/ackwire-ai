@@ -206,10 +206,11 @@ function OAuthStep({ provider, onClose }: { provider: "gmail" | "outlook"; onClo
         <p className="muted cflow__text">
           {t(`mail.choice.${provider}.text`)} {t("mail.oauthText", { company })}
         </p>
+      </DialogBody>
+      <DialogFooter bar note={t("connectFlow.nothingYet")}>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
-          block
-          className="cflow__oauth"
           disabled={connectComposio.isPending}
           loading={connectComposio.isPending}
           onClick={() =>
@@ -221,9 +222,6 @@ function OAuthStep({ provider, onClose }: { provider: "gmail" | "outlook"; onClo
         >
           {t("mail.continueWith", { company })}
         </Button>
-      </DialogBody>
-      <DialogFooter bar note={t("connectFlow.nothingYet")}>
-        <Button onClick={onClose}>{t("common.cancel")}</Button>
       </DialogFooter>
     </>
   );

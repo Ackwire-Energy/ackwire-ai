@@ -247,6 +247,12 @@ export async function orgStanding(db: Executor, orgId: string): Promise<Workspac
   })) as WorkspaceStanding;
 }
 
+/** The billing hold work is refused for here, or null: a workspace being deleted is closed for that, not for its plan. */
+export async function billingHold(db: Executor, orgId: string): Promise<BillingHold | null> {
+  const standing = await orgStanding(db, orgId);
+  return !standing.deletionDueAt && isBillingHold(standing) ? (standing.reason as BillingHold) : null;
+}
+
 /** This agent's hold (its stored reason), or null while it isn't held: cached 5 s per process like the standing. */
 async function agentHold(db: Executor, orgId: string, agentId: string): Promise<{ reason: string | null } | null> {
   return (await caches.standing.getOrLoad(`${orgId}:${agentId}`, async () => {

@@ -176,8 +176,8 @@ function BySector({ team, groups }: { team: Team; groups: AgentGroup[] }) {
           <span className="team-frame__title">
             {group && <SectorMark group={group} size={18} />}
             <b>{group?.name ?? t("agentGroups.none")}</b>
-            <span className="muted">{t("team.agents", { count: agents.length })}</span>
           </span>
+          <span className="muted small">{t("team.agents", { count: agents.length })}</span>
           {leads.length > 0 && (
             <span className="muted small">
               {t("team.chart.responsible", { names: leads.map((id) => look.personName(id)).join(", ") })}

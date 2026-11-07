@@ -155,7 +155,7 @@ describe("ask_user", () => {
     expect(timeline.every((m) => m.threadId === null)).toBe(true);
   });
 
-  test("a simple request is answered directly; the prompt tells when to ask", async () => {
+  test("a simple request is answered directly; the prompt tells when to ask, the tool what not to ask", async () => {
     f = await setup({ askUser: true, reply });
     await post("@dev what's 2+2?");
     await drainOutbox(f.db, f.handlers);
@@ -163,8 +163,11 @@ describe("ask_user", () => {
     expect(await questions()).toEqual([]);
     const request = f.provider.calls[0]?.request as ModelRequest;
     expect(request.tools?.map((t) => t.name)).toContain("ask_user");
-    expect(systemText(request.system)).toContain("Don't ask about simple requests");
     expect(systemText(request.system)).toContain("ambiguous after you have looked with your tools");
+    // What not to ask about lives in the tool's own description, read beside the call, not twice in the prompt.
+    expect(request.tools?.find((t) => t.name === "ask_user")?.description).toContain(
+      "Don't use it for what you can just do",
+    );
   });
 
   test("a person skips the question: the card says so and the run goes on without an answer", async () => {

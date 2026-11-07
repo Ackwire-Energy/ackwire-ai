@@ -148,7 +148,7 @@ test("wiki API: a page limited to admins and agents is out of reach for other me
   await api(owner, "/wiki/pages", { json: { title: "Margens", body: "Margem mínima de 40%." } });
   const denied = await api(bia, "/wiki/pages/margens/audience", {
     method: "PUT",
-    json: { audience: { roleIds: [], userIds: [] } },
+    json: { audience: { roleIds: [], userIds: [] }, agentIds: [] },
   });
   expect(denied.status).toBe(403);
   expect(await errorCode(denied)).toBe("wiki.audience_forbidden");

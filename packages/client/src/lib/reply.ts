@@ -1,14 +1,12 @@
 import type { ArtifactRef, Message, ReplyRef } from "../api/types";
 import { artifactRefs } from "./artifacts";
+import { plainLine } from "./markdown";
 import { mediaKindOf, messageMediaOf } from "./media";
 import { voiceOf } from "./voice";
 
-/** Same rule as the server (`replyExcerpt`): one line, no code fences, ~200 characters. */
+/** Same rule as the server (`replyExcerpt`): one line of plain words, ~200 characters. */
 export function quoteExcerpt(body: string, max = 200): string {
-  const line = body
-    .replace(/```[\w+-]*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const line = plainLine(body);
   return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
 }
 

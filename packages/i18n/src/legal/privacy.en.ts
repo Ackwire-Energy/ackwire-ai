@@ -48,7 +48,7 @@ export const privacyEn: LegalDocument = {
       heading: "4. Workspace Content, processed on behalf of workspaces",
       blocks: [
         "Workspace Content includes messages in channels, threads and direct messages, files in the Drive and wiki pages. It also includes tasks, routines, calendar events and approvals, the instructions, settings and memory of agents, what agents write and do, and the data agents read through the connectors, databases and computers the workspace connects. We process it only to run the workspace and its agents as the workspace configures them, to show it to the workspace's members, to send the notifications they ask for, and to provide support.",
-        "Workspace Content belongs to the workspace: members see what its channels and permissions allow, and its owners and admins manage it. Messages you posted stay in the workspace after you leave it or delete your account, unless the workspace deletes them.",
+        "Workspace Content belongs to the workspace: members see what its channels and permissions allow, and its owners and admins manage it. Workspace owners and administrators can see every channel, task and wiki page, private ones included. They can't read direct messages between other people. Messages you posted stay in the workspace after you leave it or delete your account, unless the workspace deletes them.",
       ],
     },
     {

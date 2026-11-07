@@ -971,7 +971,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   test("Adicionar conta: no address asked, Claude's page opens beside, Colar sends only this sign-in's code; Voltar stops it", async () => {
     const { state, api } = await onMac();
     const opened: string[] = [];
-    const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
+    const popup = {
+      closed: false,
+      opener: {},
+      location: {
+        href: "",
+        replace(url: string) {
+          this.href = url;
+        },
+      },
+      close: () => {},
+    };
     const realOpen = window.open;
     window.open = ((url?: string | URL) => {
       opened.push(String(url));
@@ -1004,7 +1014,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
         "claude_code",
       ]);
       // The window opened on the click itself went to Claude's page, cut off from the app.
-      expect(opened).toEqual(["about:blank"]);
+      expect(opened).toEqual(["/conectando?kind=claude_code"]);
       expect(popup.opener).toBeNull();
       expect(popup.location.href).toBe("https://claude.ai/oauth/authorize?code=true&state=st4te");
       expect(within(block).getByRole("link", { name: "Abrir de novo" }).getAttribute("href")).toBe(
@@ -1037,6 +1047,48 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
         login?.loginId,
       ]);
       expect(within(d).getByRole("combobox", { name: "Conta" })).toBeTruthy();
+    } finally {
+      window.open = realOpen;
+    }
+  });
+
+  test("a sign-in's popup the browser refused: the sign-in goes on and its link is there to open by hand", async () => {
+    await onMac();
+    const realOpen = window.open;
+    window.open = (() => null) as unknown as typeof window.open;
+    try {
+      const d = await brainDialog();
+      await pick(d, "Conta", /^Adicionar conta/);
+      await settle(6);
+      const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+      expect(within(block).getByRole("link", { name: "Abrir de novo" }).getAttribute("href")).toBe(
+        "https://claude.ai/oauth/authorize?code=true&state=st4te",
+      );
+    } finally {
+      window.open = realOpen;
+    }
+  });
+
+  test("a sign-in that can't get its link: the popup closes and the dialog says why", async () => {
+    const { api } = await onMac();
+    api.machines.beginAccountLogin = async () => {
+      throw new Error("the computer didn't answer");
+    };
+    let closed = 0;
+    const popup = { closed: false, opener: {}, location: { replace: () => {} }, close: () => closed++ };
+    const realOpen = window.open;
+    window.open = (() => popup) as unknown as typeof window.open;
+    try {
+      const d = await brainDialog();
+      await pick(d, "Conta", /^Adicionar conta/);
+      await settle(6);
+      const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+      expect(closed).toBe(1);
+      expect(shownText(block)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
     } finally {
       window.open = realOpen;
     }

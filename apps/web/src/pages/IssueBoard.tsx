@@ -564,7 +564,7 @@ export function AddColumnDialog({
           </DialogBody>
         </Locked>
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button type="button" onClick={onClose}>
             {t("issues.columns.cancel")}
           </Button>
           <Button type="submit" variant="primary" disabled={!ready || action.isPending} loading={action.isPending}>
@@ -704,7 +704,7 @@ function DeleteColumnDialog({
         </Locked>
       )}
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
+        <Button type="button" onClick={onClose}>
           {t("issues.columns.cancel")}
         </Button>
         <Button

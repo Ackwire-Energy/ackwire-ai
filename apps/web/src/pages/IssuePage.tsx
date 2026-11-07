@@ -1,7 +1,16 @@
 import type { Issue, IssueActivity, IssuePriority } from "@agenteschat/client";
-import { keys, useChannels, useIssue, useIssueAction, useIssueActivity, useIssueColumns } from "@agenteschat/client";
+import {
+  ApiError,
+  keys,
+  useChannels,
+  useIssue,
+  useIssueAction,
+  useIssueActivity,
+  useIssueColumns,
+} from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
+import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
 import { issueEventText } from "@agenteschat/client/lib/issues";
@@ -18,6 +27,7 @@ import {
   DetailsSection,
   Field,
   Icon,
+  Input,
   Locked,
   SavedNote,
   Select,
@@ -27,18 +37,20 @@ import {
   WorkSweep,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
-import { IssueWorkBlock, PrivateTaskBlock } from "@/components/BackgroundWork";
+import { IssueWorkBlock } from "@/components/BackgroundWork";
 import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
+import { GitHubMark } from "@/components/GitHubMark";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
 import { TaskConversationButton, TaskConversationPanel, TaskConversationSummary } from "@/components/TaskConversation";
+import { IssueWhoSeesDialog, WhoSeesButton } from "@/components/WhoSees";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import {
   columnIdOf,
@@ -56,6 +68,7 @@ import { Markdown } from "@/lib/markdown";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { useIssueRealtime } from "@/realtime/context";
+import { IssueDeleteButton, IssueDeleteProvider } from "./IssueDelete";
 import "./issues.css";
 
 /** One issue as a page (`/issues/131`); the board opens the same details in its panel. */
@@ -66,26 +79,35 @@ export function IssuePage({ number }: { number: number }) {
   // `?m=`: a link or a notice named a message of its conversation: it opens there.
   const [focus] = useOpenParam("m");
   const [talk, setTalk] = useState(Boolean(focus));
-  const i = issue.data;
+  // Out of reach since it opened (someone changed who sees it): what's on screen goes.
+  const i = issue.error instanceof ApiError && issue.error.status === 404 ? undefined : issue.data;
+  const navigate = useNavigate();
   return (
-    <div className={cx("page page--full", talk && i && "issue-page--talk")}>
-      <div className="issue-page__main">
-        <div className="issue-page__bar">
-          <Link to="/org/$orgId/issues" params={{ orgId: org.id }} className="ac-back">
-            <Icon name="chevronLeft" />
-            {t("issues.back")}
-          </Link>
-          {i && <TaskConversationButton issue={i} open={talk} onToggle={() => setTalk((v) => !v)} />}
+    <IssueDeleteProvider onDeleted={() => void navigate({ to: "/org/$orgId/issues", params: { orgId: org.id } })}>
+      <div className={cx("page page--full", talk && i && "issue-page--talk")}>
+        <div className="issue-page__main">
+          <div className="issue-page__bar">
+            <Link to="/org/$orgId/issues" params={{ orgId: org.id }} className="ac-back">
+              <Icon name="chevronLeft" />
+              {t("issues.back")}
+            </Link>
+            {i && (
+              <span className="issue-page__tools">
+                <IssueDeleteButton issue={i} />
+                <TaskConversationButton issue={i} open={talk} onToggle={() => setTalk((v) => !v)} />
+              </span>
+            )}
+          </div>
+          {issue.isError && <Alert>{t("issues.notFound")}</Alert>}
+          {i && <IssueDetails issue={i} variant="page" onConversation={() => setTalk(true)} />}
         </div>
-        {issue.isError && <Alert>{t("issues.notFound")}</Alert>}
-        {i && <IssueDetails issue={i} variant="page" onConversation={() => setTalk(true)} />}
+        {talk && i && (
+          <aside className="issue-page__talk" aria-label={t("issues.conversation.title")}>
+            <TaskConversationPanel issue={i} focusMessageId={focus ?? undefined} onClose={() => setTalk(false)} />
+          </aside>
+        )}
       </div>
-      {talk && i && (
-        <aside className="issue-page__talk" aria-label={t("issues.conversation.title")}>
-          <TaskConversationPanel issue={i} focusMessageId={focus ?? undefined} onClose={() => setTalk(false)} />
-        </aside>
-      )}
-    </div>
+    </IssueDeleteProvider>
   );
 }
 
@@ -138,36 +160,43 @@ export function IssueDialog({
   const focus = focusMessageId;
   const [talk, setTalk] = useState(Boolean(focus));
   return (
-    <DetailsDialog
-      actions={<TaskConversationButton issue={i} open={talk} onToggle={() => setTalk((v) => !v)} />}
-      side={
-        talk ? <TaskConversationPanel issue={i} focusMessageId={focus} onClose={() => setTalk(false)} /> : undefined
-      }
-      open
-      onOpenChange={(o) => !o && onClose()}
-      closeLabel={t("issues.close")}
-      size="lg"
-      fill
-      titleHidden
-      eyebrow={<IssueBarTitle issue={i} />}
-      title={i.title}
-      // Esc in a text being edited in place saves it and stays: the dialog closes on the next Esc.
-      onEscapeKeyDown={(e) => {
-        const el = document.activeElement;
-        if (el instanceof HTMLElement && el.closest("[data-inplace]")) {
-          e.preventDefault();
-          el.blur();
+    <IssueDeleteProvider onDeleted={onClose}>
+      <DetailsDialog
+        actions={
+          <>
+            <IssueDeleteButton issue={i} />
+            <TaskConversationButton issue={i} open={talk} onToggle={() => setTalk((v) => !v)} />
+          </>
         }
-      }}
-      page={{
-        label: t("issues.openPage"),
-        render: (props) => (
-          <Link to="/org/$orgId/issues/$number" params={{ orgId: org.id, number: String(i.number) }} {...props} />
-        ),
-      }}
-    >
-      <IssueDetails issue={i} variant="dialog" onConversation={() => setTalk(true)} />
-    </DetailsDialog>
+        side={
+          talk ? <TaskConversationPanel issue={i} focusMessageId={focus} onClose={() => setTalk(false)} /> : undefined
+        }
+        open
+        onOpenChange={(o) => !o && onClose()}
+        closeLabel={t("issues.close")}
+        size="lg"
+        fill
+        titleHidden
+        eyebrow={<IssueBarTitle issue={i} />}
+        title={i.title}
+        // Esc in a text being edited in place saves it and stays: the dialog closes on the next Esc.
+        onEscapeKeyDown={(e) => {
+          const el = document.activeElement;
+          if (el instanceof HTMLElement && el.closest("[data-inplace]")) {
+            e.preventDefault();
+            el.blur();
+          }
+        }}
+        page={{
+          label: t("issues.openPage"),
+          render: (props) => (
+            <Link to="/org/$orgId/issues/$number" params={{ orgId: org.id, number: String(i.number) }} {...props} />
+          ),
+        }}
+      >
+        <IssueDetails issue={i} variant="dialog" onConversation={() => setTalk(true)} />
+      </DetailsDialog>
+    </IssueDeleteProvider>
   );
 }
 
@@ -239,7 +268,6 @@ export function IssueDetails({
           <TabPanel value="details">
             <WorkBox issue={i} />
             <IssueWorkBlock issue={i} />
-            <PrivateTaskBlock issue={i} />
             {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
             <DetailsSection title={t("issues.description")}>
               <IssueDescription issue={i} hasFiles={createdFiles.length > 0} onSaved={flashSaved} />
@@ -749,6 +777,7 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
 function Details({ issue: i }: { issue: Issue }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const [choosing, setChoosing] = useState(false);
   const actors = useActors();
   const action = useIssueAction(org.id);
   const columns = useIssueColumns(org.id).data ?? [];
@@ -782,6 +811,10 @@ function Details({ issue: i }: { issue: Issue }) {
           onValueChange={(v) => action.mutate({ type: "update", id: i.id, patch: { assignee: actorFromKey(v) } })}
           options={actors.options(true, actorKey(i.assignee))}
         />
+      </Field>
+      <Field label={t("whoSees.label")} id={`is-who-sees-${i.id}`}>
+        <WhoSeesButton value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />
+        {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
       </Field>
       <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>
         <Select
@@ -817,6 +850,70 @@ function Details({ issue: i }: { issue: Issue }) {
   );
 }
 
+/** The GitHub issue or pull request the task is about: a field to paste it, then a chip that opens it. */
+function GithubLink({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useIssueAction(org.id);
+  const [text, setText] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const save = (githubUrl: string | null) =>
+    action.mutate({ type: "update", id: i.id, patch: { githubUrl } }, { onSuccess: () => setText("") });
+  const submit = () => {
+    const url = text.trim();
+    if (action.isPending) return;
+    if (!url) return setInvalid(false);
+    setInvalid(!isGithubLink(url));
+    if (isGithubLink(url)) save(url);
+  };
+  if (i.githubUrl) {
+    return (
+      <span className="issue-github">
+        <a href={webUrl(i.githubUrl)} target="_blank" rel="noopener noreferrer" className="ac-chip issue-github__chip">
+          <GitHubMark />
+          <span className="ac-chip__text">{githubLinkLabel(i.githubUrl)}</span>
+        </a>
+        <Button
+          size="sm"
+          variant="ghost"
+          iconOnly
+          icon="close"
+          aria-label={t("issues.github.remove")}
+          title={t("issues.github.remove")}
+          disabled={action.isPending}
+          onClick={() => save(null)}
+        />
+      </span>
+    );
+  }
+  return (
+    <Locked when={action.isPending}>
+      <Field
+        className="issue-github__field"
+        label={t("issues.github.label")}
+        id={`is-github-${i.id}`}
+        error={invalid ? t("issues.github.invalid") : undefined}
+      >
+        <Input
+          type="url"
+          inputMode="url"
+          spellCheck={false}
+          value={text}
+          placeholder={t("issues.github.placeholder")}
+          onChange={(e) => {
+            setText(e.target.value);
+            setInvalid(false);
+          }}
+          onBlur={submit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+        />
+      </Field>
+    </Locked>
+  );
+}
+
 /** Pull requests and labels (files are in "Anexos"). */
 function Links({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
@@ -825,7 +922,7 @@ function Links({ issue: i }: { issue: Issue }) {
     <>
       <div className="issue-aside__item">
         <span className="ac-field__label">{t("issues.links")}</span>
-        {i.pullRequests.length === 0 && <span className="small muted">{t("issues.noLinks")}</span>}
+        {i.pullRequests.length === 0 && !i.githubUrl && <span className="small muted">{t("issues.noLinks")}</span>}
         {i.pullRequests.map((pr) => (
           <a key={pr.number} href={webUrl(pr.url)} target="_blank" rel="noopener noreferrer" className="issue-link">
             <Icon name="pullRequest" size={16} />
@@ -834,6 +931,7 @@ function Links({ issue: i }: { issue: Issue }) {
               : t("issues.pr", { number: pr.number })}
           </a>
         ))}
+        <GithubLink issue={i} />
       </div>
       {i.labels.length > 0 && (
         <div className="issue-aside__item">
