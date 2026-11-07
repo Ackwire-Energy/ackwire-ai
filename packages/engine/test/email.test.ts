@@ -584,7 +584,7 @@ describe("where the pictures come from", () => {
     expect(html).toContain('src="cid:computer@agentes.chat"');
     expect(html).toContain('src="cid:agent-rose-dots-flower@agentes.chat"');
     expect(inline.map((p) => p.filename)).toEqual([
-      "logo-ink-halo.png",
+      "logo-ink-tile.png",
       "logo-bone.png",
       "computer.png",
       "sky-band.png",
@@ -596,7 +596,7 @@ describe("where the pictures come from", () => {
 
   test("linked from this server's /email/, with the web font", () => {
     const { html, inline } = renderEmail(EMAIL_SAMPLES["verify_email.en"] as EmailTemplate, art);
-    expect(html).toContain('src="https://x.test/email/logo-ink-halo.png"');
+    expect(html).toContain('src="https://x.test/email/logo-ink-tile.png"');
     expect(html).toContain("src:url('https://x.test/email/source-sans-3-latin.woff2')");
     expect(html).toContain('<a href="https://x.test" target="_blank"');
     expect(inline).toEqual([]);
@@ -647,14 +647,14 @@ describe("where the pictures come from", () => {
       },
       attached,
     );
-    expect(html).toContain('src="cid:logo-ink-halo@agentes.chat"');
+    expect(html).toContain('src="cid:logo-ink-tile@agentes.chat"');
     expect(inline.map((p) => p.filename)).toEqual([
-      "logo-ink-halo.png",
+      "logo-ink-tile.png",
       "logo-bone.png",
       "sky-band.png",
       "agent-rose.png",
     ]);
-    expect(inline[0]).toMatchObject({ cid: "logo-ink-halo@agentes.chat", contentType: "image/png" });
+    expect(inline[0]).toMatchObject({ cid: "logo-ink-tile@agentes.chat", contentType: "image/png" });
     expect([...(inline[0]?.content ?? []).slice(1, 4)].map((c) => String.fromCharCode(c)).join("")).toBe("PNG");
   });
 
@@ -750,7 +750,7 @@ describe("outbox delivery", () => {
     const attached: EmailArt = await emailArtFor("http://localhost:3000", WEB_DIR, "attach");
     await sendQueuedEmail(sender, { key: "k", to: ["a@b.c"], template: EMAIL_SAMPLES["verify_email.en"] }, attached);
     expect(sender.sent[0]?.inline?.map((p) => p.cid)).toEqual([
-      "logo-ink-halo@agentes.chat",
+      "logo-ink-tile@agentes.chat",
       "logo-bone@agentes.chat",
       "sky-band@agentes.chat",
     ]);

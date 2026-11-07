@@ -108,11 +108,11 @@ export const ONBOARDING_CREW = [
 export const WHOLE = { width: 36, height: 46, x: 2, y: 16, body: 28 } as const;
 export const wholeFile = (look: Required<Look>) => `agent-${look.color}-${look.eyes}-${look.accessory}.png`;
 /**
- * The ink logo with a ring of the page's colour around its wordmark: unseen on our light page, and the wordmark still
- * reads where a client darkens the page but not the picture (the Gmail apps, Gmail with other accounts, classic
- * Outlook). `logo-ink.png`, without the ring, stays for the emails already sent.
+ * The ink logo with its wordmark on a rounded tile of the page's colour: unseen on our light page, and the wordmark
+ * still reads where a client darkens the page but not the picture (the Gmail apps, Gmail with other accounts, classic
+ * Outlook), or inverts the picture too. `logo-ink.png`, without the tile, stays for the emails already sent.
  */
-const LOGO_INK = "logo-ink-halo.png";
+const LOGO_INK = "logo-ink-tile.png";
 /** Every picture an email may show, as the web app serves them (`apps/web/public/email/`). */
 export const EMAIL_PICTURES = [
   LOGO_INK,
