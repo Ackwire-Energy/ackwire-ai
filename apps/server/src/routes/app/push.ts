@@ -19,7 +19,7 @@ const IosToken = z
   .regex(EXPO_PUSH_TOKEN, "must be an Expo push token")
   .openapi({ example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" });
 
-/** An Android phone's FCM registration token (ADR 0123). */
+/** An Android phone's FCM registration token (ADR 0152). */
 const AndroidToken = z
   .string()
   .regex(FCM_PUSH_TOKEN, "must be an FCM registration token")
@@ -55,7 +55,7 @@ const WebDevice = z.object({
 });
 
 /**
- * Push devices (ADR 0035, ADR 0071, ADR 0123): the phone app's tokens (Android's FCM token, the iPhone's Expo
+ * Push devices (ADR 0035, ADR 0071, ADR 0152): the phone app's tokens (Android's FCM token, the iPhone's Expo
  * token) and browsers' Web Push subscriptions.
  * Per person: one device hears every organization of its person.
  */

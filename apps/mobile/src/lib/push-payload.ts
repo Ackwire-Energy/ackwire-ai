@@ -72,7 +72,7 @@ export const devicePath = (token: string) => `/api/app/push/devices/${encodeURIC
 
 /**
  * The token `getDevicePushTokenAsync` / `addPushTokenListener` hand over (`{ type, data }`): on Android the FCM
- * registration token, a string (ADR 0123). Anything else is no token.
+ * registration token, a string (ADR 0152). Anything else is no token.
  */
 export function systemToken(token: { data?: unknown } | null | undefined): string | null {
   const data = token?.data;

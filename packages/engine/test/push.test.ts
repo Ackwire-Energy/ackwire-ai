@@ -59,7 +59,7 @@ afterEach(async () => {
 const deps = () => ({ db: f.db, pubsub: f.pubsub });
 const TOKEN_BIA = "ExponentPushToken[bia-phone-0001]";
 const TOKEN_BIA_EN = "ExponentPushToken[bia-tablet-0001]";
-/** An Android phone's FCM registration token (ADR 0123). */
+/** An Android phone's FCM registration token (ADR 0152). */
 const FCM_BIA = `bia-android:APA91b${"a".repeat(140)}`;
 
 /** Bia in #general with a phone (pt-BR), and the fake sender wired into the job handlers. */

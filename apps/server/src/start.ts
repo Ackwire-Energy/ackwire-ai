@@ -198,10 +198,10 @@ async function boot(
   // say (`resolved`, ADR 0071).
   const localKeyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
   let resolved: Adapters | null = null;
-  // The push relay's credentials are sealed the same way (ADR 0123).
+  // The push relay's credentials are sealed the same way (ADR 0152).
   const keyWrappers = () => [resolved?.keyWrapper ?? localKeyWrapper, ...(resolved?.legacyKeyWrappers ?? [])];
   // Android pushes straight to Firebase and the push relay this server may run share one sender, so one access
-  // token (ADR 0123).
+  // token (ADR 0152).
   const account = config.FIREBASE_SERVICE_ACCOUNT;
   const fcm = account ? createFcmPushSender({ serviceAccount: account }) : null;
   // The GIPHY key its owner may add in Settings (ADR 0091, amended 2026-10-31), made below once modules had their
@@ -220,7 +220,7 @@ async function boot(
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
     platformBlobs: platformBlobStore(config, database.db),
-    // Phone app push (ADR 0035, ADR 0123): only devices that registered get anything. Android straight to
+    // Phone app push (ADR 0035, ADR 0152): only devices that registered get anything. Android straight to
     // Firebase or through the push relay (`PUSH_SENDER`); iPhones through Expo.
     push: createPhonePushSender({
       android: androidPushSender(config, fcm, database.db, keyWrappers, release),
@@ -267,7 +267,7 @@ async function boot(
   const androidPush = androidPushMode(config);
   log.info("phone push", { android: androidPush, ios: "expo" });
   if (androidPush === "relay") {
-    // Said at every boot, so whoever runs the server knows what leaves it and how to stop it (ADR 0123).
+    // Said at every boot, so whoever runs the server knows what leaves it and how to stop it (ADR 0152).
     log.info(
       "Android pushes go through the push relay: each one's phone token, title, text and ids pass through it, which keeps none of them. PUSH_SENDER=off turns them off; FIREBASE_SERVICE_ACCOUNT sends them straight to Firebase.",
       { relay: new URL(config.PUSH_RELAY_URL).host },
@@ -627,14 +627,14 @@ function platformBlobStore(config: Config, db: Database) {
   });
 }
 
-/** How this server sends Android pushes (ADR 0123): `PUSH_SENDER`, with `auto` resolved. */
+/** How this server sends Android pushes (ADR 0152): `PUSH_SENDER`, with `auto` resolved. */
 function androidPushMode(config: Config): "direct" | "relay" | "off" {
   if (config.PUSH_SENDER !== "auto") return config.PUSH_SENDER;
   return config.FIREBASE_SERVICE_ACCOUNT ? "direct" : "relay";
 }
 
 /**
- * Android pushes (ADR 0123): straight to Firebase with this server's service account (`fcm`), or through the
+ * Android pushes (ADR 0152): straight to Firebase with this server's service account (`fcm`), or through the
  * push relay, which registers this installation on its first push and keeps its credentials sealed with
  * `wrappers()`; null when off or `direct` has no account.
  */

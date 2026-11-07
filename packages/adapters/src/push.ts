@@ -1,5 +1,5 @@
 /**
- * Push notifications to the phone app (ADR 0035, ADR 0123). Core sends only from an
+ * Push notifications to the phone app (ADR 0035, ADR 0152). Core sends only from an
  * outbox job (`push.send`), never inline in a request. Android phones are reached
  * straight through Firebase Cloud Messaging (`push-fcm.ts`, the app registers its
  * FCM token); iPhones through the Expo Push API (the app registers an Expo push

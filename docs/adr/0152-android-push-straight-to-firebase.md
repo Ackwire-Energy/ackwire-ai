@@ -1,4 +1,4 @@
-# 0123. Android push straight to Firebase, and a push relay for self-hosted servers
+# 0152. Android push straight to Firebase, and a push relay for self-hosted servers
 
 - Status: Accepted
 - Date: 2026-11-02
@@ -8,7 +8,7 @@
   `packages/config/src/pem.ts` (`parseFirebaseServiceAccount`), `schema.ts` (`FIREBASE_SERVICE_ACCOUNT`,
   `PUSH_SENDER`, `PUSH_RELAY_URL`, `PUSH_RELAY_SERVE`); `packages/engine/src/push.ts` (`FCM_PUSH_TOKEN`, per-phone
   failures in `deliverPush`), `push-relay.ts` (the relay's side), `push-relay-client.ts` (`relayCredentials`);
-  `packages/db/src/schema/push.ts` (`push_relay_instances`, `instance_push.relay_*`, migration 0176);
+  `packages/db/src/schema/push.ts` (`push_relay_instances`, `instance_push.relay_*`, migration 0239);
   `apps/server/src/routes/app/push.ts`, `routes/push-relay.ts`, `app.ts`, `start.ts`; `apps/mobile/src/lib/push.ts`
   (`getDevicePushTokenAsync`, `watchPushToken`), `push-payload.ts` (`systemToken`), `src/providers/push.tsx`
 

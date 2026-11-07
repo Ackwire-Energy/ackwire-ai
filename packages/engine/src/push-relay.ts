@@ -7,7 +7,7 @@ import { FCM_PUSH_TOKEN } from "./push";
 const { pushRelayInstances } = schema;
 
 /**
- * The push relay's side (ADR 0123), on the server that holds the Android app's Firebase service account
+ * The push relay's side (ADR 0152), on the server that holds the Android app's Firebase service account
  * (`PUSH_RELAY_SERVE`). Self-hosted installations register on their own (no account) and send their
  * Android pushes here; the relay checks and limits them and passes them to Firebase Cloud Messaging.
  * Message text is never stored or logged: only counts.

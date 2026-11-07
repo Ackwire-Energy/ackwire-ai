@@ -8,7 +8,7 @@ import { serverUrl } from "./server";
 import { readValue, STORED, writeValue } from "./storage";
 
 /**
- * Push notifications (ADR 0035 §4, ADR 0123). The system's prompt comes only after our sheet on Conversas
+ * Push notifications (ADR 0035 §4, ADR 0152). The system's prompt comes only after our sheet on Conversas
  * (`features/push`, `@agenteschat/client/lib/push-offer`) or the switch in Você; the app registers its push token
  * with the server, and removes it on sign-out. Android registers the phone's own FCM token (the server sends to
  * Firebase directly); the iPhone registers an Expo push token.

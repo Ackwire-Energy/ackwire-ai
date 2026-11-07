@@ -8,7 +8,7 @@ import { sessions, users } from "./auth";
  * to one person at a time: registering it again moves it to whoever is signed in. Tokens the push
  * service reports as gone are deleted.
  *
- * Android phones carry their FCM registration token (ADR 0123), iPhones their Expo push token. Browsers
+ * Android phones carry their FCM registration token (ADR 0152), iPhones their Expo push token. Browsers
  * (`web`) carry their Web Push subscription: the endpoint in `token` and its keys in `webKeys`, and belong
  * to the session that turned them on (`sessionId`).
  */
@@ -42,7 +42,7 @@ export const pushDevices = pgTable(
 );
 
 /**
- * This installation's own push identity (ADR 0071, ADR 0123): one row, made on first use. Not a tenant's, so
+ * This installation's own push identity (ADR 0071, ADR 0152): one row, made on first use. Not a tenant's, so
  * no `org_id`. The Web Push (VAPID, RFC 8292) key pair the server made for itself, the private part
  * sealed with the installation's key (`AGENTES_SECRET`); and, when its Android pushes go through the push
  * relay, the credentials the relay gave it (the secret sealed the same way).
@@ -67,7 +67,7 @@ export const instancePush = pgTable(
 );
 
 /**
- * The installations that send their Android pushes through this server's push relay (ADR 0123,
+ * The installations that send their Android pushes through this server's push relay (ADR 0152,
  * `PUSH_RELAY_SERVE`). They register on their own, with no account: an id and a secret, of which only
  * the SHA-256 is kept. Not a tenant's, so no `org_id`. No message is stored: only how many went.
  */

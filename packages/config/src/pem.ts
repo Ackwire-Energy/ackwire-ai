@@ -13,7 +13,7 @@ export function parsePemKey(raw: string): string {
   return decoded.replace(/\\n/g, "\n");
 }
 
-/** What a Firebase service account key gives the server to send Android pushes (ADR 0123). */
+/** What a Firebase service account key gives the server to send Android pushes (ADR 0152). */
 export interface FirebaseServiceAccount {
   projectId: string;
   clientEmail: string;

@@ -19,7 +19,7 @@ import { accountClosed } from "./standing";
 const { pushDevices, notifications, agents, users, approvals, sessions } = schema;
 
 /**
- * Push to the phone app (ADR 0035, ADR 0123) and to browsers (Web Push, ADR 0071). A
+ * Push to the phone app (ADR 0035, ADR 0152) and to browsers (Web Push, ADR 0071). A
  * notification that should reach the person's devices enqueues one
  * `push.send` job; the job renders the text per device language and sends
  * through the `PushSender` adapter (phones: Android straight to Firebase,
@@ -63,7 +63,7 @@ export type PushDeviceInput =
 /** An Expo push token as the iPhone app gets it from `getExpoPushTokenAsync`. */
 export const EXPO_PUSH_TOKEN = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]{8,200}\]$/;
 
-/** An FCM registration token as the Android app gets it (ADR 0123): the shape the push relay also checks. */
+/** An FCM registration token as the Android app gets it (ADR 0152): the shape the push relay also checks. */
 export { FCM_PUSH_TOKEN } from "@agenteschat/adapters";
 
 type NotificationRow = typeof notifications.$inferSelect;

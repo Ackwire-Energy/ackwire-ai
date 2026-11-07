@@ -1,7 +1,7 @@
 import type { PushMessage, PushResult, PushSender } from "./push";
 
 /**
- * Android pushes straight through Firebase Cloud Messaging's HTTP v1 API (ADR 0123), with a service
+ * Android pushes straight through Firebase Cloud Messaging's HTTP v1 API (ADR 0152), with a service
  * account of the Firebase project the app is built with (`FIREBASE_SERVICE_ACCOUNT`). The account signs a
  * JWT (RS256), Google's token endpoint trades it for an access token (an hour), and each message is one
  * `messages:send` request. Message text is never logged.
@@ -28,7 +28,7 @@ export const FCM_TTL_SECONDS = 86_400;
 /** The Android notification channel the app creates for its notifications (`ensureAndroidChannel`). */
 export const FCM_ANDROID_CHANNEL = "default";
 /**
- * An FCM registration token as the Android app gets it from `getDevicePushTokenAsync` (ADR 0123): opaque,
+ * An FCM registration token as the Android app gets it from `getDevicePushTokenAsync` (ADR 0152): opaque,
  * about 150 to 200 characters of base64url and colons. Capped well under what a unique index takes. The
  * push relay refuses anything else, and its client never sends it one.
  */

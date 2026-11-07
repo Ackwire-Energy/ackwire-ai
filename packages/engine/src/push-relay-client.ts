@@ -8,7 +8,7 @@ const { instancePush } = schema;
 const RELAY_SECRET_AAD = "instance_push:relay";
 
 /**
- * This installation's credentials at the push relay (ADR 0123), in the `instance_push` row (id 1). The
+ * This installation's credentials at the push relay (ADR 0152), in the `instance_push` row (id 1). The
  * secret is sealed with the installation's key: `wrappers()` gives the current key wrappers, the first
  * one sealing (read on each call, since modules may replace them after boot). Credentials from another
  * relay (`url` changed) or that can never open (`AGENTES_SECRET` changed, a damaged value) read as none, so

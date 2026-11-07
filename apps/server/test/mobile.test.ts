@@ -31,7 +31,7 @@ afterEach(async () => {
 const MOBILE = { "x-agentes-client": "mobile" };
 /** The account's password, which the app sends to prove it's them (`DELETE /account`). */
 const TOKEN = "ExponentPushToken[phone-of-owner-01]";
-/** An Android phone's FCM registration token (ADR 0123). */
+/** An Android phone's FCM registration token (ADR 0152). */
 const FCM_TOKEN = `phone-of-bia:APA91b${"b".repeat(140)}`;
 
 /** A request the way the app sends it: no Origin, the app header, the stored cookie. */
