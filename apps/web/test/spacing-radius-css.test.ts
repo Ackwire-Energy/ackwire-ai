@@ -99,10 +99,14 @@ test("a popover with words and controls of its own has the menu's room, its word
   ];
   for (const [sheet, box] of boxes) {
     expect(last(sheets[sheet], box, "--menu-pad")).toBe("var(--space-2)");
-    expect(last(sheets[sheet], box, "padding")).toBe("var(--menu-pad)");
+    // The audience editor's foot room is its pinned Cancelar and Salvar's own, so it scrolls nothing below them.
+    expect(last(sheets[sheet], box, "padding")).toBe(
+      box === ".mcard-audience.ac-popover" ? "var(--menu-pad) var(--menu-pad) 0" : "var(--menu-pad)",
+    );
     // The corner is the menu's (`.ac-menu`), from that room: none of them sets its own.
     expect(last(sheets[sheet], box, "border-radius")).toBeUndefined();
   }
+  expect(last(sheets.card, ".mcard-audience__acts", "padding")).toBe("12px 0 var(--menu-pad)");
   // Words further in; the buttons' row back on the room, in its corners.
   expect(last(sheets.calendar, ".cal-pop .cal-details", "padding")).toBe("var(--popover-in)");
   expect(last(sheets.calendar, ".cal-pop .cal-details__actions:has(>.ac-btn)", "margin-bottom")).toBe(neg);
