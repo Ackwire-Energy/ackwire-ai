@@ -58,7 +58,7 @@ import {
   writeAgents,
 } from "./access";
 import { AccountBrains } from "./account-brains";
-import { accountSelfCheck, SELF_CHECK_EVERY_MS } from "./account-check";
+import { accountSelfCheck, SELF_CHECK_EVERY_MS, SELF_CHECK_RETRY_MS } from "./account-check";
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
 import {
@@ -354,6 +354,8 @@ export interface DaemonOptions {
     "sweep" | "stopScopes" | "sweepAgent" | "launcher" | "remove" | "ensure" | "room" | "bridge" | "carry"
   >;
   selfCheck?: () => Promise<string | null>;
+  /** Tests: how soon a failed self-check runs again (`SELF_CHECK_RETRY_MS`). */
+  selfCheckRetryMs?: number;
 }
 
 export class RunnerDaemon implements RequestObserver {
@@ -425,6 +427,7 @@ export class RunnerDaemon implements RequestObserver {
   private readonly accountUsers: NonNullable<DaemonOptions["accountUsers"]> | null;
   /** The self-check's last answer: null passed, a string why not. Undefined until it ran; only with the switch on. */
   private sharedLoginBlocked: string | null | undefined;
+  private sharedLoginRetry: ReturnType<typeof setTimeout> | null = null;
   /** Deleted agents cleared from the sign-ins by this process: each frame lists them all again. */
   private readonly swept = new Set<string>();
   /** The agents' desktops (ADR 0058): they outlive sessions and this process. */
@@ -547,9 +550,25 @@ export class RunnerDaemon implements RequestObserver {
     if (JSON.stringify(this.stored?.claudeSharedLogin) !== JSON.stringify(config.claudeSharedLogin)) return;
     const before = this.sharedLoginBlocked;
     this.sharedLoginBlocked = verdict;
+    if (this.sharedLoginRetry) clearTimeout(this.sharedLoginRetry);
+    this.sharedLoginRetry = null;
+    // A failure can be the machine's own moment (a busy boot, a relay starting): waiting for the next 6-hourly run
+    // would withhold the method that long.
+    if (verdict && !this.stopped) {
+      this.sharedLoginRetry = setTimeout(
+        () => void this.checkSharedLogin(),
+        this.opts.selfCheckRetryMs ?? SELF_CHECK_RETRY_MS,
+      );
+      this.sharedLoginRetry.unref?.();
+    }
     if (verdict) this.opts.log(`Claude's own login for all agents: ${verdict}`);
     this.keepHosted(this.agents);
-    if (verdict !== before) this.session?.connection.reconnect();
+    if (verdict !== before) {
+      // A look taken before this answer couldn't ask the sign-ins' CLIs (status unknown) and would stand for the
+      // list's whole TTL.
+      this.accounts.invalidate();
+      this.session?.connection.reconnect();
+    }
   }
 
   /**
@@ -722,6 +741,7 @@ export class RunnerDaemon implements RequestObserver {
     this.stopped = true;
     this.stopWatch?.();
     for (const t of this.timers) clearInterval(t);
+    if (this.sharedLoginRetry) clearTimeout(this.sharedLoginRetry);
     this.desktops.close();
     if (this.resumeTimer) clearTimeout(this.resumeTimer);
     this.pairing?.abort();
@@ -1292,6 +1312,9 @@ export class RunnerDaemon implements RequestObserver {
       reclaimBrains: supervisor
         ? (spare) => accountBrains?.reclaim(spare) ?? supervisor.reclaimBrains(spare)
         : (spare) => brains.reclaimIdle(spare),
+      warmBrain: supervisor
+        ? async (spare) => accountBrains?.warm(spare) || supervisor.warmBrain(spare)
+        : async (spare) => brains.warm(spare),
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
       // A config written later without the mode never turns a system session back into one that does agents' work.

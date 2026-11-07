@@ -446,14 +446,20 @@ test("a locked-down turn goes past the room check down to its own floor, and a l
 });
 
 describe("the slot held for a person's turn", () => {
-  const room = (over: { free?: number | null; reclaimBrains?: () => Promise<boolean> } = {}) => {
+  const room = (
+    over: {
+      free?: number | null;
+      reclaimBrains?: () => Promise<boolean>;
+      warmBrain?: (spare: string) => Promise<boolean>;
+    } = {},
+  ) => {
     const ws = tempDir();
     dirs.push(ws);
     const sent: { id: string; ok: boolean; error?: { code: string } }[] = [];
     const release = new Map<string, () => void>();
     const s = { free: "free" in over ? over.free : MIN_FREE_BYTES - 1, now: 1_000_000 };
     const runner = new RequestRunner(
-      { workspaceReal: ws, exec: true, token: "agm_x", reclaimBrains: over.reclaimBrains },
+      { workspaceReal: ws, exec: true, token: "agm_x", reclaimBrains: over.reclaimBrains, warmBrain: over.warmBrain },
       (f) => sent.push(f as unknown as (typeof sent)[number]),
       () => {},
       (_ctx, req) =>
@@ -558,6 +564,34 @@ describe("the slot held for a person's turn", () => {
     await person("ana");
     expect(refused()).toEqual(["ana"]);
     runner.close();
+  });
+
+  test("a turn on its session's open CLI isn't counted as a new one: it goes ahead while the floor holds", async () => {
+    let closes = 0;
+    const r = room({
+      free: MIN_FREE_BYTES + TURN_BYTES,
+      reclaimBrains: async () => {
+        closes++;
+        return false;
+      },
+      warmBrain: async (spare) => spare.endsWith(":warm"),
+    });
+    const turn = (id: string, session: string) => r.turn(id, { agent: { id: "ada" }, session: { id: session } });
+    // One cold turn takes the room the reading shows; the next ones on open CLIs still go ahead.
+    void turn("cold", "c1");
+    void turn("w1", "warm");
+    void turn("w2", "warm");
+    await waitFor(() => r.runner.size === 3);
+    expect(closes).toBe(0);
+    // A cold one waits, after trying to close an idle CLI.
+    await turn("cold2", "c2");
+    expect(r.refused()).toEqual(["cold2"]);
+    expect(closes).toBe(1);
+    // Under the floor even an open CLI waits.
+    r.s.free = MIN_FREE_BYTES - 1;
+    await turn("w3", "warm");
+    expect(r.refused()).toEqual(["cold2", "w3"]);
+    r.runner.close();
   });
 
   test("idle CLIs close first: the slot is only for what they couldn't free", async () => {

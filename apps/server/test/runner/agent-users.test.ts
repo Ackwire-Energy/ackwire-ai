@@ -25,6 +25,9 @@ import {
 import { agentCategorySlice, agentSlice, type RunCommand } from "../../runner/service";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
+/** A root-owned executable that is no link: `/usr/bin/true` is one where coreutils is a multicall binary (Ubuntu 26.04). */
+const ROOT_TOOL = realpathSync("/usr/bin/true");
+
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
 
@@ -459,10 +462,10 @@ test("a privileged network hook rejects writable ancestors, symlinks and non-exe
 
 test.if(process.platform !== "win32")("the optional namespace launcher precedes runuser for every agent launch", () => {
   const prefix = systemLauncher(
-    { id: ANA.id, user: "ag-a1b2c3d4", uid: 21000, networkLauncher: "/usr/bin/true" },
+    { id: ANA.id, user: "ag-a1b2c3d4", uid: 21000, networkLauncher: ROOT_TOOL },
     false,
   ).prefix;
-  expect(prefix).toEqual(["/usr/bin/true", "21000", "--", "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"]);
+  expect(prefix).toEqual([ROOT_TOOL, "21000", "--", "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"]);
 });
 
 test("a configured routing mark drops network capabilities even without a namespace hook", () => {
@@ -477,8 +480,8 @@ test("a configured routing mark drops network capabilities even without a namesp
     user.user,
     "--",
   ]);
-  const scoped = systemLauncher({ ...user, networkLauncher: "/usr/bin/true" }, true).prefix;
-  expect(scoped.indexOf("/usr/bin/true")).toBeLessThan(scoped.indexOf("/usr/bin/setpriv"));
+  const scoped = systemLauncher({ ...user, networkLauncher: ROOT_TOOL }, true).prefix;
+  expect(scoped.indexOf(ROOT_TOOL)).toBeLessThan(scoped.indexOf("/usr/bin/setpriv"));
   expect(scoped.join("\n")).toContain("mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc");
   expect(scoped.indexOf("/usr/bin/setpriv")).toBeLessThan(scoped.indexOf("/usr/sbin/runuser"));
   expect(systemLauncher({ ...user, networkMark: undefined }, false).prefix[0]).toBe("/usr/sbin/runuser");
@@ -590,7 +593,7 @@ const AGENT = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21000 };
 const CWD = "/home/ag-a1b2c3d4/ana-a1b2c3d4";
 
 test("the account launcher: the agent's cli slice, the view, its network hook, then the sign-in's user", () => {
-  const { prefix, env, home } = accountLauncher(AGC, { ...AGENT, networkLauncher: "/usr/bin/true" }, CWD);
+  const { prefix, env, home } = accountLauncher(AGC, { ...AGENT, networkLauncher: ROOT_TOOL }, CWD);
   const c = prefix.indexOf("-c");
   const unit = prefix[4] as string;
   expect(unit).toMatch(/^--unit=agentes-account-21000-[0-9a-f]{8}$/);
@@ -614,7 +617,7 @@ test("the account launcher: the agent's cli slice, the view, its network hook, t
     ADA_LOGIN,
     "21000",
     CWD,
-    "/usr/bin/true",
+    ROOT_TOOL,
     "21000",
     "--",
     "/usr/bin/setpriv",
@@ -986,7 +989,7 @@ test.if(process.platform !== "win32")(
 test.if(process.platform !== "win32")(
   "the self-check with a network hook: the auth route, a real agent's route, and no byte outside the relay",
   async () => {
-    const network = { networkLauncher: "/usr/bin/true", networkRevision: 2, networkAuthRoute: true as const };
+    const network = { networkLauncher: ROOT_TOOL, networkRevision: 2, networkAuthRoute: true as const };
     const config = { mode: "system" as const, claudeSharedLogin: SWITCH, server: "https://app.example.com" };
     const older = selfCheck();
     older.check.config = { ...config, ...network, networkAuthRoute: undefined };
