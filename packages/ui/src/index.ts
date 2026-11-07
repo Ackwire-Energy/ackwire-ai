@@ -414,6 +414,7 @@ export {
   wrapSelection,
 } from "./format";
 export { useDarkTheme } from "./hooks/useDarkTheme";
+export { useDragScroll } from "./hooks/useDragScroll";
 export {
   HOVER_CLOSE_MS,
   HOVER_SWITCH_MS,

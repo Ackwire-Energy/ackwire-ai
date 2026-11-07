@@ -27,3 +27,26 @@ test("a list beside what it opens: the page never scrolls, each column does; nar
   for (const page of SPLIT_PAGES)
     expect(await Bun.file(join(import.meta.dir, "..", page)).text()).toContain("page-split");
 });
+
+test("the task board as Trello's: it fills the window under the page's head with the split's rule, its scrollbar along the bottom, each column's cards scrolling on their own", async () => {
+  const css = await builtCss("src/styles.css", "src/pages/issues.css");
+  const board = await Bun.file(join(import.meta.dir, "..", "src/pages/IssueBoard.tsx")).text();
+  // The same height-passing rule as the list-and-detail pages, not a second one.
+  expect(board).toContain('className="issues-boardframe page-split"');
+  expect(board).toContain("useDragScroll(wrap, BOARD_SPACE)");
+  // The kit's scrollbar stays drawn: no strip that hides it, no fade, no arrows.
+  expect(declarations(css, ".issues-boardwrap")).toContainEqual(["overflow-x", "auto"]);
+  expect(declarations(css, ".issues-boardwrap").filter(([p]) => p === "scrollbar-width" || p.includes("mask"))).toEqual(
+    [],
+  );
+  expect(css).not.toContain("issues-boardframe__arrow");
+  const wide = atRule(css, WIDE);
+  expect(declarations(wide, ".issues-board")).toContainEqual(["height", "100%"]);
+  expect(declarations(wide, ".issues-col")).toContainEqual(["max-height", "100%"]);
+  const cards = declarations(wide, ".issues-col>.issues-col__cards");
+  expect(cards).toContainEqual(["overflow-y", "auto"]);
+  expect(cards).toContainEqual(["min-height", "0"]);
+  // A short or narrow window keeps the page's scroll and columns as tall as their cards.
+  expect(declarations(atRule(css, "@media (min-width: 941px)"), ".issues-col>.issues-col__cards")).toEqual([]);
+  expect(declarations(css, ".issues-col__cards").filter(([p]) => p.startsWith("overflow"))).toEqual([]);
+});

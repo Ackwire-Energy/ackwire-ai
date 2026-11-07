@@ -16,7 +16,7 @@ import {
   MenuNote,
   MenuSeparator,
   OptionList,
-  useScrollSides,
+  useDragScroll,
 } from "@agenteschat/ui";
 import { type Query, useQueryClient } from "@tanstack/react-query";
 import { type CSSProperties, type ReactNode, useRef, useState } from "react";
@@ -103,6 +103,10 @@ export interface IssueGroup {
   dropText: string;
 }
 
+/** The board's empty space, where a press and a drag slide it sideways: never a card, a word or a button. */
+const BOARD_SPACE =
+  ".issues-boardwrap, .issues-board, .issues-stage, .issues-stage__cols, .issues-col, .issues-col__head, .issues-col__cards";
+
 /** How a card shows while one moves: under the pointer (hidden), flying home (landing), picked with Space. */
 export type CardState = Extract<DragEntry<Issue>, { kind: "card" }>["state"];
 
@@ -179,9 +183,7 @@ export function Board({
   const grouped = stages !== null && isCustomBoard(columns);
   const byId = new Map(groups.map((g) => [g.id, g]));
   const wrap = useRef<HTMLDivElement>(null);
-  const more = useScrollSides(wrap);
-  // About two columns at a time, as far as a hand would drag it.
-  const slide = (direction: 1 | -1) => wrap.current?.scrollBy({ left: direction * 520, behavior: "smooth" });
+  useDragScroll(wrap, BOARD_SPACE);
   const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus, foot?: ReactNode) => (
     <section
       key={g.id}
@@ -197,32 +199,10 @@ export function Board({
 
   return (
     <>
-      {/* More columns than the width: the board fades at that side and an arrow there slides it (no scrollbar). */}
-      <div className="issues-boardframe" data-more={more}>
-        {/* A rail of no height that sticks as the page scrolls: the arrows stay in view on a long board. */}
-        <div className="issues-boardframe__rail">
-          <button
-            type="button"
-            className="issues-boardframe__arrow issues-boardframe__arrow--start"
-            aria-label={t("look.previous")}
-            title={t("look.previous")}
-            hidden={more !== "start" && more !== "both"}
-            onClick={() => slide(-1)}
-          >
-            <Icon name="chevronLeft" size={18} />
-          </button>
-          <button
-            type="button"
-            className="issues-boardframe__arrow issues-boardframe__arrow--end"
-            aria-label={t("look.next")}
-            title={t("look.next")}
-            hidden={more !== "end" && more !== "both"}
-            onClick={() => slide(1)}
-          >
-            <Icon name="chevronRight" size={18} />
-          </button>
-        </div>
-        <div ref={wrap} className="issues-boardwrap">
+      {/* As Trello's: the board fills the window under the page's head, its scrollbar along the window's bottom, each
+          column scrolling on its own (`.page-split`, layout.css); a press on its empty space and a drag slides it. */}
+      <div className="issues-boardframe page-split">
+        <div ref={wrap} className="issues-boardwrap" data-scroll-restoration-id="issues-board">
           <div className={cx("issues-board", grouped && "is-grouped")}>
             {stages ? (
               stages.map(({ stage, columns: cols }) => (

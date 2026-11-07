@@ -265,100 +265,21 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 }
 
 /* ── Board ──────────────────────────────────────────────────────────────── */
-/* The board scrolls sideways inside its own box; the page never does. */
 /*
- * A board wider than the page slides sideways with no scrollbar: the side with more columns fades out and an arrow
- * floats there (`data-more` on the frame, kept by the board as it scrolls), as the kit's carousel does. On a touch
- * screen a finger drags it and the arrows stay away. The card drag still scrolls `.issues-boardwrap` near its edges.
+ * The board scrolls sideways in its own box, with the kit's scrollbar always drawn along its bottom (no fade, no
+ * arrows: the bar, a drag on its empty space, shift and the wheel, a trackpad, a finger). The card drag scrolls it near
+ * its edges too. Where the page fills the window (`.page-split`, layout.css) that bottom is the window's and each column
+ * scrolls on its own, as Trello's lists do.
  */
-/* A column of flex items, so the arrows' rail keeps both of its margins (an empty block's would fold into one). */
 .issues-boardframe {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 .issues-boardwrap {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   margin: 0 -6px;
   padding: 2px 6px 10px;
-  scrollbar-width: none;
-}
-.issues-boardwrap::-webkit-scrollbar {
-  display: none;
-}
-.issues-boardframe[data-more="end"] > .issues-boardwrap {
-  mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent);
-}
-.issues-boardframe[data-more="start"] > .issues-boardwrap {
-  mask-image: linear-gradient(to right, transparent, #000 72px);
-}
-.issues-boardframe[data-more="both"] > .issues-boardwrap {
-  mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
-}
-/* A rail of no height that sticks a little above the middle of the view while the board is on screen: on a long
-   board the arrows follow the page's scroll instead of staying by the column heads. */
-.issues-boardframe__rail {
-  position: sticky;
-  top: 45vh;
-  z-index: var(--z-raised);
-  height: 0;
-  /* Never by the stage and column heads (72px in at the top) nor past the cards (64px short of the bottom), even on a
-     short board; the board under it takes back that room, so nothing moves. */
-  margin: 72px 0 64px;
-}
-.issues-boardframe__rail + .issues-boardwrap {
-  margin-top: -136px;
-}
-.issues-boardframe__arrow {
-  position: absolute;
-  top: calc(var(--control-h-md) / -2);
-  z-index: var(--z-raised);
-  display: grid;
-  place-items: center;
-  width: var(--control-h-md);
-  height: var(--control-h-md);
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--raised);
-  box-shadow: var(--e2), var(--top);
-  color: var(--ink2);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    transform 0.2s var(--spring);
-}
-/* Only where there is more: its own `display` would otherwise win over `hidden`. */
-.issues-boardframe__arrow[hidden] {
-  display: none;
-}
-.issues-boardframe__arrow--start {
-  left: -4px;
-}
-.issues-boardframe__arrow--end {
-  right: -4px;
-}
-.issues-boardframe__arrow:hover {
-  color: var(--ink);
-}
-.issues-boardframe__arrow:active {
-  transform: scale(0.94);
-}
-html:not([data-pointer]) .issues-boardframe__arrow:focus-visible {
-  outline: none;
-  box-shadow: var(--e2), var(--focus-ring);
-}
-@media (hover: none) {
-  .issues-boardframe__arrow {
-    display: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .issues-boardframe__arrow {
-    transition: none;
-  }
 }
 .issues-board {
   --cw: 248px;
@@ -488,6 +409,37 @@ html:not([data-pointer]) .issues-boardframe__arrow:focus-visible {
 }
 .issues-col__add.ac-btn:hover {
   color: var(--ink);
+}
+@media (min-width: 941px) and (min-height: 560px) {
+  .issues-board {
+    height: 100%;
+    align-items: stretch;
+  }
+  .issues-stage {
+    min-height: 0;
+  }
+  .issues-stage__cols {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  /* As tall as its cards, up to the board's height: then its cards scroll under its head, "Nova tarefa" under them. */
+  .issues-col {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+  }
+  .issues-col > * {
+    flex-shrink: 0;
+  }
+  /* Out to the column's sides and bottom, so the scroll cuts no card's shadow, lift or focus ring. */
+  .issues-col > .issues-col__cards {
+    flex-shrink: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: -4px -8px -8px;
+    padding: 4px 8px 8px;
+  }
 }
 .issue-card {
   position: relative;
@@ -1054,7 +1006,7 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   min-width: 0;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--space-2);
   color: var(--ink);
 }
 .issue-bartitle__number {
@@ -1064,9 +1016,14 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   line-height: 28px;
   color: var(--faint);
 }
-.issue-bartitle > .issue-inplace {
+/* The title's plate (on hover, and its field while editing) sits between the gaps, never on "#131" or on "Salvo":
+   its bleed to the sides, which lines its words up with the text above and below elsewhere, has nothing to line up
+   with in a row. */
+.issue-bartitle > :is(.issue-inplace, .issue-inplace__title) {
   flex: 1;
   min-width: 0;
+  margin-inline: 0;
+  padding-left: var(--space-2);
 }
 .issue-bartitle .issue-details__title,
 .issue-bartitle .issue-inplace__title {

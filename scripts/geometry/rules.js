@@ -6,6 +6,10 @@
   const EDGE_MIN = 8;
   /** A quiet line (the agents' pair, a date, "Novas") and a bubble: closer than this reads as touching. */
   const QUIET_MIN = 4;
+  /** The kit's smallest gap (`--space-1`): two things side by side in a row closer than this touch. */
+  const GAP_MIN = 4;
+  /** Taller than this is a layout's column or a card, not an inline item. */
+  const INLINE_MAX = 120;
   const PAD_DIFF = 2;
   const PLATE_DIFF = 1;
   const GAP_DIFF = 1.5;
@@ -393,6 +397,50 @@
         if (!time || !seen(time)) continue;
         if (name && seen(name) && contentRect(name)) continue;
         out.push({ rule: "nameless", node: head, el: sig(head), box: placeOf(head), text: words(time) });
+      }
+    },
+    /**
+     * Two things side by side in a row, words next to a field, an icon, a pill or a button: at least the kit's smallest
+     * gap between them. A box that shows a plate under the pointer (an in-place title, a link button) counts as its
+     * whole box, the plate's, even at rest. A field's own affixes and a segmented control are drawn as one.
+     */
+    touch(out) {
+      const control = (el) => {
+        if (el.matches("button,input,textarea,select,svg,img,canvas,[role=button],[class*='pill'],[class*='chip']"))
+          return true;
+        const s = style(el);
+        if (hasSurface(s)) return true;
+        const parent = el.parentElement;
+        return ["pointer", "text"].includes(s.cursor) && (!parent || style(parent).cursor !== s.cursor);
+      };
+      for (const row of document.body.querySelectorAll("*")) {
+        if (!seen(row) || row.closest("svg,.ac-input-affix,.ac-seg")) continue;
+        const s = style(row);
+        if (!s.display.includes("flex") || s.flexDirection.startsWith("column")) continue;
+        const kids = flow(row);
+        for (let i = 1; i < kids.length; i++) {
+          const [a, b] = [kids[i - 1], kids[i]];
+          // Words on one side, a control on the other: two controls side by side (a toolbar's ghost buttons, a pill's
+          // actions, faces in a stack) are drawn as one group.
+          const ca = control(a);
+          if (ca === control(b) || !((ca ? b : a).textContent ?? "").trim()) continue;
+          const ra = a.getBoundingClientRect();
+          const rb = b.getBoundingClientRect();
+          // Columns of a layout (a list beside a pane) are no inline items.
+          if (Math.max(ra.height, rb.height) > INLINE_MAX) continue;
+          // On different lines of a wrapping row: not side by side.
+          if (Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top) <= 0) continue;
+          const gap = Math.max(rb.left - ra.right, ra.left - rb.right);
+          if (gap < GAP_MIN - 0.25)
+            out.push({
+              rule: "touch",
+              node: b,
+              el: `${sig(a)} + ${sig(b)}`,
+              box: sig(row),
+              px: +gap.toFixed(1),
+              text: words(b),
+            });
+        }
       }
     },
     /** A quiet line across the conversation sitting on a bubble above or under it, with no gap between them. */
