@@ -12606,7 +12606,8 @@
     "stopFailed": "停止できませんでした。停止できるのは、依頼した人、エージェントのオーナー、管理者だけです。",
     "autoUpdate": "まだ作業中です（{{duration}}）。",
     "autoUpdateNow": "現在: {{now}}。",
-    "statusReply": "まだ作業中です({{duration}})。このステップのあとでメッセージを読みます。",
+    "statusReply": "タスクの途中です({{duration}})。まだ返信できません。メッセージは受け取っていて、次のステップで読みます。",
+    "statusReplyTurn": "タスクの途中です({{duration}})。まだ返信できません。メッセージは受け取っていて、今回の作業が終わったら読みます。",
     "statusReplyQueued": "コンピューターを待っています({{duration}})。順番が来たらメッセージを読みます。",
     "statusReplyAway": "コンピューターが戻るのを待っています。戻り次第メッセージを読みます。",
     "status": {
@@ -12652,7 +12653,8 @@
     "namesMore": "{{first}}ほか{{count}}名",
     "wait": {
       "thinking": "考えています…",
-      "held": "承認を待っています…"
+      "held": "承認を待っています…",
+      "said": "「{{text}}」"
     },
     "consult": {
       "asking": "{{from}}が{{to}}に質問しています",

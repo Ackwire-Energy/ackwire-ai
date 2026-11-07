@@ -261,10 +261,10 @@ describe("talker: fast replies while the task waits", () => {
     const meta = line?.meta as { bodyCode?: string; bodyParams?: Record<string, string>; talker?: unknown };
     expect(meta.bodyCode).toBe("talker_status");
     expect(Number(meta.bodyParams?.minutes)).toBeGreaterThanOrEqual(1);
-    expect(line?.body).toContain("Still on it");
+    expect(line?.body).toContain("in the middle of a task");
   });
 
-  test('an agent waiting for its computer says so: no "still on it", and the minutes are the wait\'s', async () => {
+  test('an agent waiting for its computer says so: no "middle of a task", and the minutes are the wait\'s', async () => {
     f = await setup();
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@dev analisa os logs",
@@ -287,7 +287,7 @@ describe("talker: fast replies while the task waits", () => {
     await park("waiting_input", line, machineId);
     const [waiting] = await f.db.select().from(schema.agentRuns);
     const inLine = await statusReply(f.db, waiting as NonNullable<typeof waiting>, new Date());
-    expect(inLine.text).not.toContain("Still on it");
+    expect(inLine.text).not.toContain("middle of a task");
     expect(inLine.meta.bodyParams).toMatchObject({ minutes: "11", wait: "queued" });
 
     // Asking again from the line, the row says `running` for a moment: the same wait.
@@ -305,7 +305,7 @@ describe("talker: fast replies while the task waits", () => {
     );
     const [away] = await f.db.select().from(schema.agentRuns);
     const gone = await statusReply(f.db, away as NonNullable<typeof away>, new Date());
-    expect(gone.text).not.toContain("Still on it");
+    expect(gone.text).not.toContain("middle of a task");
     expect(gone.meta.bodyParams).toMatchObject({ wait: "away" });
   });
 

@@ -721,6 +721,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (typeof message.meta.answersQuestionId === "string") return;
       // Delivered to an agent's task already in progress (steering): no second run.
       if (Array.isArray(message.meta.steeredRunIds)) return;
+      // A reply in an agent's background work thread: its reply turn started with the message.
+      if (message.meta.forWork) return;
       // A template tapped on a billing hold: the card is the answer, and nobody can be woken.
       if (message.meta.templateTap) return;
       const channel = where;

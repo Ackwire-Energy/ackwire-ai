@@ -267,6 +267,27 @@ const BUILTIN: Record<string, ActivityKind> = {
   add_agent_to_channel: "addingAgent",
 };
 
+/** A computer brain's own tools (`agent.step`: Claude Code's, Codex's, OpenCode's, Grok Build's), lower-cased. */
+const OWN_TOOLS: Record<string, ActivityKind> = {
+  read: "pcFiles",
+  write_file: "pcFiles",
+  edit_file: "pcFiles",
+  search_replace: "pcFiles",
+  list_dir: "pcFiles",
+  run_terminal_cmd: "runningCommandAny",
+  run_terminal_command: "runningCommandAny",
+  edit: "pcFiles",
+  multiedit: "pcFiles",
+  write: "pcFiles",
+  glob: "pcFiles",
+  grep: "pcFiles",
+  ls: "pcFiles",
+  file_change: "pcFiles",
+  bash: "runningCommandAny",
+  shell: "runningCommandAny",
+  toolsearch: "findingTools",
+};
+
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
 const CONNECTORS: Record<string, string> = {
   github: "GitHub",
@@ -334,7 +355,7 @@ function activityOf(tool: string | null | undefined, connector?: string | null, 
   // "Rodou: Rerun the tests": the command it checked, by the engine's label (`toolDetail`).
   if (name === PERMISSION_TOOL)
     return detail?.trim() ? { kind: "runningCommand", app: detail.trim() } : { kind: "runningCommandAny" };
-  const builtin = BUILTIN[name];
+  const builtin = BUILTIN[name] ?? OWN_TOOLS[name];
   if (builtin) return { kind: builtin };
   // The tools on demand: looking one up (a big connector's own directory too) is ours, not an app.
   if (name === "find_tools" || name.endsWith("_find_tools")) return { kind: "findingTools" };

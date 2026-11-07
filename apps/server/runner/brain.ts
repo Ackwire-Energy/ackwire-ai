@@ -487,6 +487,13 @@ export class ClaudeStreamParser {
           if (block.type === "tool_use") this.worked = true;
           if (block.type === "tool_use" && str(block.id) && str(block.name)) {
             this.tools.set(str(block.id), { name: str(block.name), input: block.input ?? {} });
+            // Ours run through the bridge, which tells the engine as they start.
+            if (!str(block.name).startsWith(OUR_TOOL_PREFIX))
+              events.push({
+                type: "tool_started",
+                id: str(block.id),
+                name: str(block.name).slice(0, BRAIN_LIMITS.toolName),
+              });
           } else if (block.type === "text" && str(block.text) && !streamed) {
             // No partial messages (an older Claude Code): the whole text block at once.
             events.push({ type: "text_delta", text: str(block.text) });

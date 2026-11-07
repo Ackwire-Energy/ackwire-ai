@@ -14020,7 +14020,8 @@
     "stopFailed": "Nie udało się zatrzymać. Może to zrobić tylko osoba, która prosiła, właściciel agenta albo administrator.",
     "autoUpdate": "Wciąż nad tym pracuję ({{duration}}).",
     "autoUpdateNow": "Teraz: {{now}}.",
-    "statusReply": "Nadal nad tym pracuję ({{duration}}). Przeczytam twoją wiadomość po tym kroku.",
+    "statusReply": "Jestem w trakcie zadania ({{duration}}) i nie mogę jeszcze odpowiedzieć. Twoja wiadomość czeka w kolejce, przeczytam ją w następnym kroku.",
+    "statusReplyTurn": "Jestem w trakcie zadania ({{duration}}) i nie mogę jeszcze odpowiedzieć. Twoja wiadomość czeka w kolejce, przeczytam ją, gdy skończy się ta runda pracy.",
     "statusReplyQueued": "Czekam na komputer ({{duration}}). Przeczytam twoją wiadomość, gdy przyjdzie moja kolej.",
     "statusReplyAway": "Czekam, aż mój komputer wróci. Przeczytam twoją wiadomość, gdy tylko wróci.",
     "status": {
@@ -14069,7 +14070,8 @@
     "namesMore": "{{first}} i jeszcze {{count}}",
     "wait": {
       "thinking": "Myśli…",
-      "held": "Czeka na zatwierdzenie…"
+      "held": "Czeka na zatwierdzenie…",
+      "said": "„{{text}}”"
     },
     "consult": {
       "asking": "{{from}} pyta: {{to}}",

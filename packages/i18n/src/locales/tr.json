@@ -13033,7 +13033,8 @@
     "stopFailed": "Durdurulamadı. Yalnızca isteyen kişi, ajanın sahibi ya da bir yönetici durdurabilir.",
     "autoUpdate": "Hâlâ üzerinde çalışıyor ({{duration}}).",
     "autoUpdateNow": "Şimdi: {{now}}.",
-    "statusReply": "Hâlâ üzerinde çalışıyorum ({{duration}}). Mesajını bu adımdan sonra okuyacağım.",
+    "statusReply": "Bir görevin ortasındayım ({{duration}}) ve henüz yanıt veremiyorum. Mesajın sırada, bir sonraki adımda okuyacağım.",
+    "statusReplyTurn": "Bir görevin ortasındayım ({{duration}}) ve henüz yanıt veremiyorum. Mesajın sırada, bu çalışma turu bitince okuyacağım.",
     "statusReplyQueued": "Bilgisayarı bekliyorum ({{duration}}). Sıram gelince mesajını okuyacağım.",
     "statusReplyAway": "Bilgisayarımın geri gelmesini bekliyorum. Geri gelir gelmez mesajını okuyacağım.",
     "status": {
@@ -13080,7 +13081,8 @@
     "namesMore": "{{first}} ve {{count}} kişi daha",
     "wait": {
       "thinking": "Düşünüyor…",
-      "held": "Onay bekleniyor…"
+      "held": "Onay bekleniyor…",
+      "said": "“{{text}}”"
     },
     "consult": {
       "asking": "{{from}}, {{to}} ajanına soruyor",

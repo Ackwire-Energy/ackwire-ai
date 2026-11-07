@@ -282,3 +282,36 @@ test("the card's notification follows its oldest waiting request, and leaves who
   expect(adminEntry?.doneAt).toBeNull();
   expect((adminEntry?.source as { approvalId?: string } | undefined)?.approvalId).toBe(d);
 });
+
+test("an action too long for its card is cut with a mark, never passing for the whole", async () => {
+  const body = `${"Olá equipe, segue o resumo da semana. ".repeat(80)}Fim.`;
+  const notes: ToolSource = {
+    name: "notes",
+    tools: async () => [
+      {
+        name: "note_send",
+        description: "Send a note outside",
+        scope: "",
+        sensitive: true,
+        inputSchema: { type: "object", properties: { text: { type: "string" } } },
+        describe: (input) => ({ title: "Enviar a nota", detail: String((input as { text: string }).text) }),
+        execute: async () => ({ content: "sent" }),
+      },
+    ],
+  };
+  f = await setup({
+    toolSources: [notes],
+    reply: (_req: unknown, call: number) =>
+      call === 1
+        ? { chunks: [""], toolUses: [{ name: "note_send", input: { text: body, why: WHY } }] }
+        : { chunks: ["Enviada."] },
+  });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev manda a nota da semana",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [row] = await f.db.select().from(schema.approvals);
+  expect(body.length).toBeGreaterThan(2000);
+  expect(row?.detail).toHaveLength(2000);
+  expect(row?.detail?.endsWith("…")).toBe(true);
+});

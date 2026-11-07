@@ -13566,7 +13566,8 @@
     "stopFailed": "Non è stato possibile fermarlo. Possono farlo solo chi l'ha chiesto, il proprietario dell'agente o un admin.",
     "autoUpdate": "Ancora al lavoro ({{duration}}).",
     "autoUpdateNow": "Ora: {{now}}.",
-    "statusReply": "Ci sto ancora lavorando ({{duration}}). Leggo il tuo messaggio dopo questo passaggio.",
+    "statusReply": "Sono nel mezzo di un compito ({{duration}}) e non posso ancora rispondere. Il tuo messaggio è in coda e lo leggo al prossimo passaggio.",
+    "statusReplyTurn": "Sono nel mezzo di un compito ({{duration}}) e non posso ancora rispondere. Il tuo messaggio è in coda e lo leggo quando finisce questo giro di lavoro.",
     "statusReplyQueued": "Sono in attesa del computer ({{duration}}). Leggo il tuo messaggio quando tocca a me.",
     "statusReplyAway": "Aspetto che il mio computer torni. Leggo il tuo messaggio appena torna.",
     "status": {
@@ -13614,7 +13615,8 @@
     "namesMore": "{{first}} e altri {{count}}",
     "wait": {
       "thinking": "Sta pensando…",
-      "held": "In attesa di approvazione…"
+      "held": "In attesa di approvazione…",
+      "said": "«{{text}}»"
     },
     "consult": {
       "asking": "{{from}} sta chiedendo a {{to}}",

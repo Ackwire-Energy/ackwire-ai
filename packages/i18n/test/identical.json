@@ -1,6 +1,7 @@
 {
   "app": {
     "pt-BR": [
+      "chat.wait.said",
       "access.area.skills",
       "agent.builtinName",
       "agentComputer.phone.trackpad",
@@ -2101,6 +2102,7 @@
       "routines.setup.sentry.url"
     ],
     "ko": [
+      "chat.wait.said",
       "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
@@ -2225,6 +2227,7 @@
       "routines.setup.sentry.url"
     ],
     "zh-Hans": [
+      "chat.wait.said",
       "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
@@ -2340,6 +2343,7 @@
       "routines.setup.sentry.url"
     ],
     "id": [
+      "chat.wait.said",
       "access.area.browser",
       "access.area.desktop",
       "agent.builtinName",
@@ -2570,6 +2574,7 @@
       "routines.setup.sentry.url"
     ],
     "tr": [
+      "chat.wait.said",
       "agent.builtinName",
       "agentPage.fields.model",
       "agentPage.work.brain.planModel",

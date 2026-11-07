@@ -5,6 +5,9 @@ import { type AppLocale, localeInfo } from "@agenteschat/i18n/locale";
  */
 export const cutText = (text: string, max: number) => text.slice(0, max).replace(/[\uD800-\uDBFF]$/, "");
 
+/** `cutText` for text people read: a cut ends in "…", never passing for the whole. */
+export const cutMarked = (text: string, max: number) => (text.length > max ? `${cutText(text, max - 1)}…` : text);
+
 /** Whether `text` asks something by its punctuation, in any script: `?`, the full-width `？`, the Arabic `؟`. */
 export const hasQuestionMark = (text: string) => /[?？؟]/.test(text);
 

@@ -12759,7 +12759,11 @@ export const en = {
     autoUpdate: "Still on it ({{duration}}).",
     autoUpdateNow: "Now: {{now}}.",
     /** The server's own line when a person writes to a working agent and the quick reply can't be written (ADR 0131). */
-    statusReply: "Still on it ({{duration}}). I'll read your message after this step.",
+    statusReply:
+      "I'm in the middle of a task ({{duration}}) and can't answer yet. Your message is queued and I'll read it at my next step.",
+    /** The same line when the agent's computer reads the message only once its current round of work ends. */
+    statusReplyTurn:
+      "I'm in the middle of a task ({{duration}}) and can't answer yet. Your message is queued and I'll read it when this round of work ends.",
     /** The same line for an agent waiting in line for its computer: {{duration}} is how long it has waited. */
     statusReplyQueued: "Waiting for the computer ({{duration}}). I'll read your message when my turn comes.",
     /** The same line for an agent whose computer is away. */
@@ -12806,7 +12810,12 @@ export const en = {
     namesMore: "{{first}} and {{count}} more",
     /** The card above the box turns its phrase. */
     /** The waiting row's step line before its first step (`waitStep`). */
-    wait: { thinking: "Thinking…", held: "Waiting for approval…" },
+    wait: {
+      thinking: "Thinking…",
+      held: "Waiting for approval…",
+      /** The agent's own words for its step (what it wrote before the call), quoted. */
+      said: "“{{text}}”",
+    },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} is asking {{to}}",

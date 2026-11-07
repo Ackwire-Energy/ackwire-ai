@@ -3758,7 +3758,7 @@ function ActivityBar({
   const soloAway = soloRun && !rowInView(soloRun) ? soloRun : undefined;
   const took = soloAway ? barElapsed(t, entries, runs, now) : null;
   // The row's own words for what it does now, after its name; a question out keeps its own phrase.
-  const step = soloAway && firstAgent && !firstAgent.consult ? barStep(t, soloAway, i18n.language) : null;
+  const step = soloAway && firstAgent && !firstAgent.consult ? barStep(t, soloAway, i18n.language, now) : null;
   const typers = entries.some((e) => e.type === "person");
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
@@ -4628,7 +4628,13 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             )}
             {/* Long work (ADR 0121): how it stands, under the agent's "Vou cuidar disso". */}
-            {m.longWork && !m.local && <MessageWorkLine message={m} threaded={Boolean(threadLine)} />}
+            {m.longWork && !m.local && (
+              <MessageWorkLine
+                message={m}
+                threaded={Boolean(threadLine)}
+                inThread={!threadsView && (m.threadId ?? m.id) === (m.longWork.threadId ?? m.longWork.anchorMessageId)}
+              />
+            )}
             {/* A "Responder" thread went on from here: its line (opens the panel). */}
             {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
             {feedback && (

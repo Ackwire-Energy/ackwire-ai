@@ -17,6 +17,15 @@ export const workKeepsThread = (r: SQL) =>
   sql`(${r}.work_id is null or exists (select 1 from agent_works w where w.id = ${r}.work_id and w.own_thread))`;
 
 /**
+ * SQL: the run `r` may take a person's new message where it is. A person who writes to an agent while it works in the
+ * background gets an answer now: a running work never takes their message, a reply turn of its own answers it and
+ * passes a change on with `steer_work` (ADR 0121 addendum 2026-11-06). Only a work waiting on something a person's
+ * message moves (browser help, another agent's answer), never on its computer, line or plan, still takes it.
+ */
+export const workTakesPersonMessage = (r: SQL) =>
+  sql`(${r}.work_id is null or (${r}.status = 'waiting_input' and ${r}.transcript->'waitingForBrain' is null and ${workKeepsThread(r)}))`;
+
+/**
  * SQL: the run `r` waits on its plan's limit or its budget (a conversation's catch-up): like a run waiting for its
  * computer, it takes every new message of its conversation instead of a second run beside it.
  */

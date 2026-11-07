@@ -14,7 +14,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
 /** The line of a long work (ADR 0121) and its actions, the same under the anchor and on the card. */
-function useWorkLine(work: WorkView) {
+function useWorkLine(work: WorkView, inUpdatesThread = false) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -40,6 +40,7 @@ function useWorkLine(work: WorkView) {
     agentName: agent?.name ?? t("channel.unknownAgent"),
     nameOf: (id) => dir.memberById.get(id)?.name ?? null,
     canStop,
+    inUpdatesThread,
   });
   return { view, stop, t };
 }
@@ -47,19 +48,28 @@ function useWorkLine(work: WorkView) {
 /**
  * Under the agent's "Vou cuidar disso": how the work stands, its last update or what it asks, Tarefa #, Parar, Ver
  * resultado. Once its thread has replies, the thread's own line under it opens the thread (`threaded`): no second way
- * in, unless it waits on someone, who goes straight to the card in the panel.
+ * in, unless it waits on someone, who goes straight to the card in the panel. In a thread view (`inThread`) its
+ * updates are the messages right under it: the line doesn't repeat the last one.
  */
-export function MessageWorkLine({ message, threaded }: { message: Message; threaded?: boolean }) {
+export function MessageWorkLine({
+  message,
+  threaded,
+  inThread,
+}: {
+  message: Message;
+  threaded?: boolean;
+  inThread?: boolean;
+}) {
   const work = message.longWork;
   if (!work) return null;
-  return <AnchorLine work={work} threaded={Boolean(threaded)} />;
+  return <AnchorLine work={work} threaded={Boolean(threaded)} inThread={Boolean(inThread)} />;
 }
 
-function AnchorLine({ work, threaded }: { work: WorkView; threaded: boolean }) {
+function AnchorLine({ work, threaded, inThread }: { work: WorkView; threaded: boolean; inThread: boolean }) {
   const { org } = useOrg();
   const navigate = useNavigate();
   const actions = useChannelActions();
-  const { view, stop, t } = useWorkLine(work);
+  const { view, stop, t } = useWorkLine(work, inThread);
   return (
     <WorkLine
       tone={view.tone}

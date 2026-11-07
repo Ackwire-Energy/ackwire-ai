@@ -13103,7 +13103,8 @@
     "stopFailed": "Konnte nicht gestoppt werden. Das können nur, wer gefragt hat, der Inhaber des Agenten oder ein Admin.",
     "autoUpdate": "Noch dran ({{duration}}).",
     "autoUpdateNow": "Gerade: {{now}}.",
-    "statusReply": "Ich arbeite noch daran ({{duration}}). Ich lese deine Nachricht nach diesem Schritt.",
+    "statusReply": "Ich bin mitten in einer Aufgabe ({{duration}}) und kann noch nicht antworten. Deine Nachricht ist vorgemerkt und ich lese sie beim nächsten Schritt.",
+    "statusReplyTurn": "Ich bin mitten in einer Aufgabe ({{duration}}) und kann noch nicht antworten. Deine Nachricht ist vorgemerkt und ich lese sie, wenn diese Arbeitsrunde endet.",
     "statusReplyQueued": "Ich warte auf den Computer ({{duration}}). Ich lese deine Nachricht, sobald ich dran bin.",
     "statusReplyAway": "Ich warte darauf, dass mein Computer zurückkommt. Ich lese deine Nachricht, sobald er wieder da ist.",
     "status": {
@@ -13150,7 +13151,8 @@
     "namesMore": "{{first}} und {{count}} weitere",
     "wait": {
       "thinking": "Denkt nach…",
-      "held": "Wartet auf Freigabe…"
+      "held": "Wartet auf Freigabe…",
+      "said": "„{{text}}“"
     },
     "consult": {
       "asking": "{{from}} fragt {{to}}",
