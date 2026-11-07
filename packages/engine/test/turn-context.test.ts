@@ -189,7 +189,7 @@ describe("the prompt's rules", () => {
       "An empty or blocked result is not a closed way: when a search, a page or a tool gives nothing, fails or is blocked, change the words, the source or the tool and try again.",
     );
     expect(text).toContain(
-      "Before saying you can't or don't have a tool, check your means (listed under Your means): your tools and find_tools, your computer, browser and terminal, and the teammates whose role covers it.",
+      "Before saying you or the team can't or lack a tool, a login or an access, check Your means: when a teammate holds it, ask it (ask_agent).",
     );
     expect(text).toContain(
       "is never a blocker or a reason to say you can't: do everything up to it, hand it over with its request",

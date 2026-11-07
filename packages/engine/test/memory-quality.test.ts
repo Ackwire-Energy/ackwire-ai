@@ -18,7 +18,13 @@ afterEach(async () => {
 });
 
 const item = (over: Partial<ContextItem> & Pick<ContextItem, "id" | "kind" | "content">): ContextItem =>
-  ({ pinned: false, scopeId: null, updatedAt: new Date("2026-10-10T00:00:00Z"), ...over }) as ContextItem;
+  ({
+    pinned: false,
+    scopeId: null,
+    subjectKey: "",
+    updatedAt: new Date("2026-10-10T00:00:00Z"),
+    ...over,
+  }) as ContextItem;
 
 test("an entity profile: a note that restates an older one replaces it; only the newest few stay", () => {
   let profile = "";
@@ -84,6 +90,16 @@ test("memory in the prompt: no restated claims, one period summary per channel, 
   expect(picked.map((i) => i.id)).toEqual(["p1", "s2", "s3", "e1"]);
   // A pinned item always stays.
   expect(pickDistinct([{ ...lesson, pinned: true }], instructions).map((i) => i.id)).toEqual(["l1"]);
+  // Two holders of one access read alike and are both true.
+  const holder = (id: string, who: string) =>
+    item({
+      id,
+      kind: "fact",
+      agentId: null,
+      subjectKey: `whoholds ${who} store console`,
+      content: `${who} is signed in to the store console in its browser.`,
+    });
+  expect(pickDistinct([holder("a1", "@ana"), holder("a2", "@bia")], "").map((i) => i.id)).toEqual(["a1", "a2"]);
 });
 
 test("a long thread loads its newest replies, so its summary follows the conversation", async () => {

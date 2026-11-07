@@ -81,8 +81,13 @@ function stepLine(r: StepReport, kind: ScreenKind): string {
     r.via === "image" ? "found on the screen image" : null,
     r.expected?.met === true ? `✓ ${JSON.stringify(r.step.expect?.trim() ?? "")}` : null,
   ].filter(Boolean);
-  return `${what.trim()}${extra.length > 0 ? ` (${extra.join("; ")})` : ""}.`;
+  const line = `${what.trim()}${extra.length > 0 ? ` (${extra.join("; ")})` : ""}.`;
+  return r.landedElsewhere ? `${line} ${LANDED_ELSEWHERE}` : line;
 }
+
+/** An `open` the site sent elsewhere: its own way in, not the address again. */
+export const LANDED_ELSEWHERE =
+  "The site sent you to another page (where you are now is below): it doesn't open that one by its address. Sign in if that is what it shows; otherwise get there through the site's own menus, links or search, not by trying more addresses.";
 
 export interface FormattedReport {
   /** What was done and where it stopped (no page text). */
