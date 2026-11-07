@@ -11,14 +11,14 @@ import { LiveBlockCard } from "@/components/blocks/LiveBlock";
 import { PollCard } from "@/components/blocks/PollCard";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useOrg } from "@/components/org-context";
-import { contextMenuHandler, copyText, type MenuEntry } from "@/lib/context-menu";
+import { contextMenuHandler, type MenuEntry } from "@/lib/context-menu";
 import { Markdown } from "@/lib/markdown";
-import { useToast } from "@/lib/toast";
 import { useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
-import { artifactLink, useArtifactViewer } from "./ArtifactViewer";
+import { useArtifactViewer } from "./ArtifactViewer";
 import { FileVideo, MAX_THUMB_BYTES, usePreviewUrl } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";
 import { MermaidDiagram } from "./Mermaid";
+import { useFileShare } from "./ShareDialog";
 
 /** What a cover shows of a table, a code change or a text file: the rest is in the viewer. */
 const COVER_ROWS = 5;
@@ -40,7 +40,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   const { org } = useOrg();
   const viewer = useArtifactViewer();
   const download = useArtifactDownload();
-  const toast = useToast();
+  const share = useFileShare();
   const remove = useDeleteArtifact();
   const query = useArtifact(org.id, ref.deleted ? null : ref.id, ref.version);
   const a = query.data;
@@ -67,19 +67,22 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   if (a.kind === "choices") return <ChoicesCard id={a.id} version={a.shownVersion} />;
   const open = () => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined);
   const save = () => void download.save(a, undefined, a.shownVersion, a.content);
-  // Open, download, its link, and the trash for who may delete it: the right click and the More menu.
+  // Open, download, Compartilhar, its link (through the share dialog while only its conversation sees it), and the
+  // trash for who may delete it: the right click and the More menu.
   const actions = (): MenuEntry[] => [
     { kind: "item", id: "open", label: t("contextMenu.open"), icon: "eye", run: open },
     { kind: "item", id: "download", label: t("contextMenu.download"), icon: "download", run: save },
+    ...(a.inDrive !== false
+      ? ([
+          { kind: "item", id: "share", label: t("share.button"), icon: "personAdd", run: () => share.open(a) },
+        ] as const)
+      : []),
     {
       kind: "item",
       id: "copy-link",
       label: t("contextMenu.copyLink"),
       icon: "link",
-      run: () =>
-        void copyText(artifactLink(window.location.origin, org.id, a.id, a.shownVersion), () =>
-          toast.show(t("contextMenu.linkCopied")),
-        ),
+      run: () => share.copyLink(a, a.shownVersion < a.version ? a.shownVersion : undefined),
     },
     ...(a.canDelete
       ? ([
@@ -99,6 +102,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
     <>
       <Tile artifact={a} actions={actions} onOpen={open} onDownload={save} {...props} />
       {remove.dialog}
+      {share.dialog}
     </>
   );
   const content = a.content;
@@ -134,6 +138,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
           }
         />
         {remove.dialog}
+        {share.dialog}
       </>
     );
   if (kind === "image" && content.size <= MAX_THUMB_BYTES)

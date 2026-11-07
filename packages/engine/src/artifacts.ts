@@ -36,10 +36,11 @@ import { assertStorageRoom } from "./limits";
 import { can, getMembership, requireActiveMembership } from "./organizations";
 import { runItselfReadOutside } from "./outside";
 import { markdownToPdf } from "./pdf";
+import { maySql } from "./permissions";
 import { routineCreatorOf } from "./requester";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 import { accountInUse } from "./standing";
-import { adminChannelSql, taskReaderSql } from "./task-access";
+import { AUDIENCE_MAX, adminChannelSql, artifactCol, fileSeenSql, fileSharedSql, taskReaderSql } from "./task-access";
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
 
@@ -139,6 +140,18 @@ export interface ArtifactView {
   untrusted: boolean;
   /** False for a block or a poll, which live in their conversation until someone keeps a block (ADR 0113). */
   inDrive: boolean;
+  /** Who sees it past its conversation (ADR 0153). */
+  sharing: FileSharing;
+}
+
+/**
+ * Who sees a file on top of where it lives (ADR 0153): its conversation alone (`conversation`, the default), also the
+ * people and roles chosen and administrators (`people`), or the whole workspace (`everyone`).
+ */
+export interface FileSharing {
+  mode: "conversation" | "people" | "everyone";
+  userIds: string[];
+  roleIds: string[];
 }
 
 export interface ArtifactDetailView extends ArtifactView {
@@ -551,8 +564,65 @@ export function diffToPatch(files: { path: string; patch: string }[]): string {
 
 // ── Access ───────────────────────────────────────────────────────────────────
 
-async function personCanRead(db: Database, userId: string, orgId: string, a: Pick<ArtifactRow, "channelId">) {
-  if (!a.channelId) return true;
+/**
+ * The wiki's rule for a run (ADR 0023 addendum), for what a file's sharing adds: a run reaches a shared file only when
+ * the person behind it and everyone who reads its conversation see the file, since what it says reaches them all. With
+ * nobody behind it, only a file shared with the whole workspace. As a condition over `artifacts`.
+ */
+function runSharedSql(personId: string | null, channelId: string) {
+  return and(
+    sql`${artifactCol("share")} <> 'conversation'`,
+    personId ? fileSharedSql(sql`${personId}::text`) : sql`${artifactCol("share")} = 'everyone'`,
+    // Aliases of their own: `fileSeenSql` nests `channelReaderSql`, whose `rm` and `rc` would take these rows' place.
+    sql`not exists (select 1 from ${channelMembers} runm where runm.channel_id = ${channelId}::uuid
+      and runm.user_id is not null and not ${fileSeenSql(sql`runm.user_id`)})`,
+    sql`not exists (select 1 from ${channels} runc join organization_members runo on runo.org_id = runc.org_id
+      where runc.id = ${channelId}::uuid and runc.kind = 'channel' and runc.visibility = 'public'
+        and not ${fileSeenSql(sql`runo.user_id`)})`,
+  ) as SQL;
+}
+
+/** What decides who reads a file: where it lives and its sharing (absent for a conversation alone, as `placeNew` asks). */
+type Readable = Pick<ArtifactRow, "channelId"> & Partial<Pick<ArtifactRow, "share" | "shareUserIds" | "shareRoleIds">>;
+
+const sharingOf = (a: Pick<ArtifactRow, "share" | "shareUserIds" | "shareRoleIds">): FileSharing => ({
+  mode: a.share,
+  userIds: a.share === "people" ? a.shareUserIds : [],
+  roleIds: a.share === "people" ? a.shareRoleIds : [],
+});
+
+/** Whether a person reads a file: where it lives (`readsWhereItLives`), or through its sharing (ADR 0153). */
+async function personCanRead(db: Database, userId: string, orgId: string, a: Readable) {
+  if (!a.channelId || a.share === "everyone" || (a.share === "people" && a.shareUserIds?.includes(userId))) return true;
+  if (await readsWhereItLives(db, userId, orgId, a.channelId)) return true;
+  return a.share === "people" && sharedByRole(db, userId, orgId, a.shareRoleIds ?? []);
+}
+
+/** Whether a people list's roles reach this person: one they hold, or administrator, who always sees a list. */
+async function sharedByRole(db: Database, userId: string, orgId: string, roleIds: string[]) {
+  const [row] = rowsOf<{ yes: boolean | string }>(
+    await db.execute(sql`select (${maySql(sql`${orgId}::uuid`, sql`${userId}::text`, "administrator")}
+      or exists (select 1 from organization_member_roles sr where sr.org_id = ${orgId}::uuid and sr.user_id = ${userId}
+        and sr.role_id = any(${`{${roleIds.join(",")}}`}::uuid[]))) as yes`),
+  );
+  return row?.yes === true || row?.yes === "t";
+}
+
+/** Of these files, the ones whose sharing shows them to this person (`fileSharedSql`), deleted ones included. */
+async function sharedWith(db: Database, userId: string, ids: string[]) {
+  if (ids.length === 0) return new Set<string>();
+  const rows = await db
+    .select({ id: artifacts.id })
+    .from(artifacts)
+    .where(and(inArray(artifacts.id, ids), fileSharedSql(sql`${userId}::text`)));
+  return new Set(rows.map((r) => r.id));
+}
+
+/**
+ * Whether a person reads a conversation's files: a member, anyone for a public channel, an administrator for any
+ * channel, whoever sees the task of a task's conversation.
+ */
+async function readsWhereItLives(db: Database, userId: string, orgId: string, channelId: string) {
   const [row] = await db
     .select({
       visibility: channels.visibility,
@@ -564,7 +634,7 @@ async function personCanRead(db: Database, userId: string, orgId: string, a: Pic
     })
     .from(channels)
     .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId)))
-    .where(and(eq(channels.id, a.channelId), eq(channels.orgId, orgId)));
+    .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!row) return false;
   if (row.kind === "task") return row.taskReader === true || String(row.taskReader) === "t";
   return (
@@ -664,18 +734,29 @@ async function agentReaches(
   return !dm || madeForSamePerson(db, dm, a.id);
 }
 
+/** Whether a run reaches a file through its sharing, by the wiki's rule (`runSharedSql`). */
+async function runReachesShared(db: Database, channelId: string, person: string | null, artifactId: string) {
+  const [row] = await db
+    .select({ id: artifacts.id })
+    .from(artifacts)
+    .where(and(eq(artifacts.id, artifactId), runSharedSql(person, channelId)));
+  return row !== undefined;
+}
+
 /**
- * By id an agent also reads whatever the person behind the run may read, and what a teammate made for that person in
- * the agents' DM, which no person sees: an id reaches it in ways `listArtifacts` doesn't list (attached from another
- * conversation, passed on by the agent asking it, named in a consulted agent's answer).
+ * By id an agent also reads whatever the person behind the run may read where it lives, a file shared past its
+ * conversation by the wiki's rule (`runSharedSql`), and what a teammate made for that person in the agents' DM, which
+ * no person sees: an id reaches it in ways `listArtifacts` doesn't list (attached from another conversation, passed
+ * on by the agent asking it, named in a consulted agent's answer).
  */
-async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pick<ArtifactRow, "id" | "channelId">) {
+async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pick<ArtifactRow, "id"> & Readable) {
   if (actor.type === "person") return personCanRead(db, actor.userId, orgId, a);
-  if (await agentReaches(db, actor, orgId, a)) return true;
+  if (!a.channelId || (await agentReaches(db, actor, orgId, { id: a.id, channelId: a.channelId }))) return true;
   const person = await runPerson(db, orgId, actor.runId ?? undefined);
+  if (person !== null && (await readsWhereItLives(db, person, orgId, a.channelId))) return true;
+  if (await runReachesShared(db, actor.channelId, person, a.id)) return true;
   if (person === null) return false;
-  if (await personCanRead(db, person, orgId, a)) return true;
-  const dm = await agentsDmReads(db, orgId, a.channelId as string, () => Promise.resolve(person));
+  const dm = await agentsDmReads(db, orgId, a.channelId, () => Promise.resolve(person));
   return dm !== null && madeForSamePerson(db, dm, a.id);
 }
 
@@ -703,6 +784,7 @@ function view(a: ArtifactRow, canEdit: boolean): ArtifactView {
     canEdit,
     untrusted: a.untrusted,
     inDrive: a.inDrive,
+    sharing: sharingOf(a),
   };
 }
 
@@ -797,7 +879,7 @@ async function placeNew(
   if (!title) throw new ValidationError("title is required");
   const channelId = actor.type === "agent" ? actor.channelId : (input.channelId ?? null);
   const threadId = actor.type === "agent" ? (actor.threadId ?? null) : (input.threadId ?? null);
-  if (channelId && actor.type === "person" && !(await personCanRead(db, actor.userId, orgId, { channelId }))) {
+  if (channelId && actor.type === "person" && !(await readsWhereItLives(db, actor.userId, orgId, channelId))) {
     throw new NotFoundError("Channel not found");
   }
   return { title, channelId, threadId };
@@ -1240,16 +1322,28 @@ const SHARED_DRIVE_HINT = "To put it there: update_artifact with shared_drive: t
 /** Where a file is and who sees it, for an agent to tell people (what `withPersonFacts` shows them). */
 export async function fileReach(db: Database, orgId: string, artifactId: string, hint = SHARED_DRIVE_HINT) {
   const [a] = await db
-    .select({ channelId: artifacts.channelId, kind: channels.kind, name: channels.name, open: channels.visibility })
+    .select({
+      channelId: artifacts.channelId,
+      kind: channels.kind,
+      name: channels.name,
+      open: channels.visibility,
+      share: artifacts.share,
+      userIds: artifacts.shareUserIds,
+      roleIds: artifacts.shareRoleIds,
+    })
     .from(artifacts)
     .leftJoin(channels, eq(channels.id, artifacts.channelId))
     .where(and(eq(artifacts.id, artifactId), eq(artifacts.orgId, orgId)));
   if (!a?.channelId) return "It is in the workspace's shared Drive: everyone in the workspace sees it.";
+  if (a.share === "everyone") return "It was shared with the whole workspace: everyone in the workspace sees it.";
+  const notShared = `in the Drive's private section, not in the shared Drive. ${hint}`.trimEnd();
+  if (a.share === "people") {
+    return `Who reads its conversation sees it, and it is also shared with ${await sharedList(db, orgId, a.userIds, a.roleIds)}: it is ${notShared}`;
+  }
   if (a.kind === "task") return "It is in the Drive, on its task: whoever sees the task sees it.";
   if (a.kind === "channel" && a.open === "public") {
     return `It is in the shared Drive, from #${a.name}: everyone in the workspace sees it.`;
   }
-  const notShared = `in the Drive's private section, not in the shared Drive. ${hint}`.trimEnd();
   if (a.kind === "channel") return `Only the members of #${a.name} and administrators see it: it is ${notShared}`;
   const people = await db
     .select({ name: schema.users.name })
@@ -1258,6 +1352,23 @@ export async function fileReach(db: Database, orgId: string, artifactId: string,
     .where(eq(channelMembers.channelId, a.channelId));
   if (people.length > 0) return `Only ${people.map((p) => p.name).join(", ")} can see it: it is ${notShared}`;
   return `No person sees it: it is in a conversation between agents, not in the shared Drive. Don't say it is saved for people. ${hint}`.trimEnd();
+}
+
+/** Who a people list adds, for `fileReach`: "Ana, the role Finance and administrators". */
+async function sharedList(db: Database, orgId: string, userIds: string[], roleIds: string[]) {
+  const [people, roles] = await Promise.all([
+    userIds.length
+      ? db.select({ name: schema.users.name }).from(schema.users).where(inArray(schema.users.id, userIds))
+      : Promise.resolve([]),
+    roleIds.length
+      ? db
+          .select({ name: schema.orgRoles.name })
+          .from(schema.orgRoles)
+          .where(and(eq(schema.orgRoles.orgId, orgId), inArray(schema.orgRoles.id, roleIds)))
+      : Promise.resolve([]),
+  ]);
+  const names = [...people.map((p) => p.name), ...roles.map((r) => `the role ${r.name}`), "administrators"];
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 /** The Drive files a run saved, as a message carries them, of those the people of `channelId` see (or everyone does). */
@@ -1282,7 +1393,7 @@ async function versionRow(db: Database, a: ArtifactRow, version?: number) {
     .select()
     .from(artifactVersions)
     .where(and(eq(artifactVersions.artifactId, a.id), eq(artifactVersions.version, version ?? a.currentVersion)));
-  if (!v) throw new NotFoundError("Version not found");
+  if (!v) throw new NotFoundError("Version not found", "artifact.version_not_found", { latest: a.currentVersion });
   return v;
 }
 
@@ -1392,7 +1503,8 @@ export async function listArtifactVersions(
 
 /**
  * Everything the actor can see, newest update first: org-wide files, files
- * of channels they belong to, and of public channels (people).
+ * of channels they belong to, and of public channels (people), and what a file's sharing adds (ADR 0153): for a
+ * person who it shows the file to, for an agent the wiki's rule (`runSharedSql`).
  */
 export async function listArtifacts(
   db: Database,
@@ -1416,7 +1528,10 @@ export async function listArtifacts(
   let visible: string[];
   let dm: AgentsDmReads | null = null;
   let ownRoom: SQL | undefined;
+  // What a file's sharing adds (ADR 0153).
+  let widened: SQL;
   if (actor.type === "agent") {
+    widened = runSharedSql(filters.requesterUserId ?? null, actor.channelId);
     dm = await agentsDmReads(db, orgId, actor.channelId, () => readerOfRun(db, orgId, actor.runId));
     visible = await agentSearchChannels(db, orgId, actor.agentId, actor.channelId, { files: true });
     if (await agentRoom(db, orgId, actor.channelId)) ownRoom = madeInRoomSql(actor.channelId);
@@ -1425,11 +1540,12 @@ export async function listArtifacts(
       // A run where the agent isn't a member (the right hand, called by name) still lists that conversation.
       const here =
         (await getMembership(db, filters.requesterUserId, orgId)) &&
-        (await personCanRead(db, filters.requesterUserId, orgId, { channelId: actor.channelId }));
+        (await readsWhereItLives(db, filters.requesterUserId, orgId, actor.channelId));
       visible = [...new Set([...visible, ...shared, ...(here ? [actor.channelId] : [])])];
     }
   } else {
     visible = await personReadableChannels(db, actor.userId, orgId);
+    widened = fileSharedSql(sql`${actor.userId}::text`);
   }
   const q = filters.q?.trim();
   const rows = await db
@@ -1444,6 +1560,7 @@ export async function listArtifacts(
           isNull(artifacts.channelId),
           visible.length > 0 ? inArray(artifacts.channelId, visible) : undefined,
           ownRoom,
+          widened,
         ),
         filters.kind ? eq(artifacts.kind, filters.kind) : undefined,
         filters.channelId ? eq(artifacts.channelId, filters.channelId) : undefined,
@@ -1462,8 +1579,10 @@ export async function listArtifacts(
   const fromDm = dm
     ? await Promise.all(
         rows.map(
+          // Shared past its conversation: listed by `runSharedSql`, which no file of the agents' DM passes (nobody may share one).
           (a) =>
             !a.channelId ||
+            a.share !== "conversation" ||
             (a.channelId !== dm.channelId && visible.includes(a.channelId)) ||
             madeForSamePerson(db, dm, a.id),
         ),
@@ -1557,7 +1676,7 @@ async function madeForAgentsOnly(db: Database, orgId: string, artifactId: string
  * An agent brings an artifact into its run's conversation (`share_artifact`):
  * allowed only when the person who asked can see where it came from (and the
  * agent was there too), or it was made for that person in the agents' DM.
- * Visible here already (same channel, org-wide or a public channel): the same
+ * Visible here already (same channel, org-wide, shared with the workspace or a public channel): the same
  * file is attached. From a DM or a private channel: a copy is saved here, so
  * the people here can open it; the original stays where it was. Audited
  * either way.
@@ -1580,7 +1699,10 @@ export async function shareArtifact(
         .where(and(eq(channels.id, a.channelId), eq(channels.orgId, orgId)))
     : [];
   const openHere =
-    !a.channelId || a.channelId === actor.channelId || (origin?.kind === "channel" && origin.visibility === "public");
+    !a.channelId ||
+    a.channelId === actor.channelId ||
+    a.share === "everyone" ||
+    (origin?.kind === "channel" && origin.visibility === "public");
   if (!openHere) {
     // From a DM or a private channel: the requester and the agent must both be in it. Reading for a person is no
     // reason to carry a file into another audience.
@@ -1761,10 +1883,15 @@ export type ArtifactAudience =
   /** `gone`: the other side is an archived agent or a person who left, so the DM can't be opened any more. */
   | { kind: "dm"; with: ArtifactAuthor | null; gone?: true };
 
-/** What the app adds for the person viewing: may they delete it, and who can see it. */
+/** What the app adds for the person viewing: may they delete it, who can see it, may they change who sees it. */
 export interface PersonArtifactFacts {
   canDelete: boolean;
   audience: ArtifactAudience;
+  /**
+   * They may change its sharing (`setFileSharing`): it lives in a conversation not everyone reads, and they read it
+   * there. False for what the whole workspace sees already.
+   */
+  canShare: boolean;
 }
 
 export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "channelId" | "createdBy" | "inDrive">>(
@@ -1828,6 +1955,8 @@ export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "chann
       : Promise.resolve([]),
   ]);
   const live = new Set([...liveAgents, ...livePeople].map((r) => r.id));
+  const closed = new Set(chans.filter((c) => c.kind !== "channel" || c.visibility !== "public").map((c) => c.id));
+  const readsThere = closed.size ? new Set(await personReadableChannels(db, userId, orgId)) : closed;
   const audience = new Map<string, ArtifactAudience>(
     chans.map((c): [string, ArtifactAudience] => {
       if (c.kind !== "dm") return [c.id, { kind: "channel", name: c.name, private: c.visibility !== "public" }];
@@ -1845,7 +1974,113 @@ export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "chann
     // What lives in its conversation was never in the Drive, so it has no trash to go to (ADR 0113).
     canDelete: a.inDrive && deletable.has(a.id),
     audience: a.channelId ? (audience.get(a.channelId) ?? { kind: "dm", with: null }) : { kind: "workspace" },
+    canShare: a.inDrive && a.channelId !== null && closed.has(a.channelId) && readsThere.has(a.channelId),
   }));
+}
+
+/** The people (active members of this workspace) and roles (its own, never `everyone`) a list may hold. */
+async function cleanSharing(db: Database, orgId: string, input: Partial<FileSharing>): Promise<FileSharing> {
+  if (input.mode === "everyone") return { mode: "everyone", userIds: [], roleIds: [] };
+  if (input.mode !== "people") return { mode: "conversation", userIds: [], roleIds: [] };
+  const askedPeople = [...new Set(input.userIds ?? [])];
+  const askedRoles = [...new Set(input.roleIds ?? [])].filter((id) => UUID.test(id));
+  if (askedPeople.length > AUDIENCE_MAX || askedRoles.length > AUDIENCE_MAX) {
+    throw new ValidationError(
+      `Choose at most ${AUDIENCE_MAX} people and ${AUDIENCE_MAX} roles`,
+      "artifact.sharing_too_many",
+      {
+        max: AUDIENCE_MAX,
+      },
+    );
+  }
+  const [people, roles] = await Promise.all([
+    askedPeople.length
+      ? db
+          .select({ id: schema.organizationMembers.userId })
+          .from(schema.organizationMembers)
+          .innerJoin(schema.users, eq(schema.users.id, schema.organizationMembers.userId))
+          .where(
+            and(
+              eq(schema.organizationMembers.orgId, orgId),
+              inArray(schema.organizationMembers.userId, askedPeople),
+              accountInUse,
+            ),
+          )
+      : Promise.resolve([]),
+    askedRoles.length
+      ? db
+          .select({ id: schema.orgRoles.id })
+          .from(schema.orgRoles)
+          .where(
+            and(
+              eq(schema.orgRoles.orgId, orgId),
+              eq(schema.orgRoles.kind, "custom"),
+              inArray(schema.orgRoles.id, askedRoles),
+            ),
+          )
+      : Promise.resolve([]),
+  ]);
+  const userIds = askedPeople.filter((id) => people.some((p) => p.id === id));
+  const roleIds = askedRoles.filter((id) => roles.some((r) => r.id === id));
+  if (userIds.length === 0 && roleIds.length === 0) {
+    throw new ValidationError("Choose who sees it", "artifact.sharing_empty");
+  }
+  return { mode: "people", userIds, roleIds };
+}
+
+/**
+ * "Compartilhar" (ADR 0153): who sees a file on top of the conversation it lives in. Whoever reads it there may change
+ * it (a DM's participants, a channel's members and administrators, whoever sees a task for its conversation); someone
+ * it was shared with may not. A file the whole workspace sees already (the shared Drive, a public channel) has nothing
+ * to widen. Audited, and its conversation hears of it.
+ */
+export async function setFileSharing(
+  deps: ArtifactDeps,
+  userId: string,
+  orgId: string,
+  artifactId: string,
+  input: Partial<FileSharing>,
+) {
+  const { db } = deps;
+  const a = await readable(deps, { type: "person", userId }, orgId, artifactId);
+  if (!a.inDrive) throw new ValidationError(`a ${a.kind} lives in its conversation`, "artifact.not_in_drive");
+  const [where] = a.channelId
+    ? await db
+        .select({ kind: channels.kind, visibility: channels.visibility })
+        .from(channels)
+        .where(eq(channels.id, a.channelId))
+    : [];
+  if (!a.channelId || (where?.kind === "channel" && where.visibility === "public")) {
+    throw new ValidationError("Everyone in the workspace sees this file already", "artifact.sharing_open");
+  }
+  if (!(await readsWhereItLives(db, userId, orgId, a.channelId))) {
+    throw new ForbiddenError(
+      "Only who is in the conversation the file is in changes who sees it",
+      "artifact.sharing_forbidden",
+    );
+  }
+  const next = await cleanSharing(db, orgId, input);
+  const before = sharingOf(a);
+  const row = await db.transaction(async (tx) => {
+    const [saved] = await tx
+      .update(artifacts)
+      .set({ share: next.mode, shareUserIds: next.userIds, shareRoleIds: next.roleIds })
+      .where(and(eq(artifacts.id, a.id), eq(artifacts.orgId, orgId)))
+      .returning();
+    if (!saved) throw new NotFoundError("Artifact not found");
+    await enqueueIndex(tx, { orgId, kind: "file", sourceId: a.id });
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "artifact.sharing_changed",
+      target: { type: "artifact", id: a.id },
+      details: { from: before.mode, mode: next.mode, userIds: next.userIds, roleIds: next.roleIds },
+    });
+    return saved;
+  });
+  const artifact = view(row, editableKind(row.kind));
+  await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: a.channelId, artifact });
+  return artifact;
 }
 
 /**
@@ -1921,11 +2156,16 @@ export async function listDeletedArtifacts(
     .limit(500);
   // Deleting a file never widens who may read it: the trash shows only files this person could still open.
   const readable = new Set(await personReadableChannels(db, userId, orgId));
+  const sharedIds = await sharedWith(
+    db,
+    userId,
+    rows.filter((a) => a.share !== "conversation").map((a) => a.id),
+  );
   const deletable = await deletableIds(
     db,
     userId,
     orgId,
-    rows.filter((a) => !a.channelId || readable.has(a.channelId)),
+    rows.filter((a) => !a.channelId || readable.has(a.channelId) || sharedIds.has(a.id)),
   );
   const out: TrashedArtifactView[] = [];
   for (const a of rows) {
@@ -2144,7 +2384,10 @@ export async function artifactFile(
   if (a.kind === "file") {
     // Uploaded files download as they are: original bytes, name and type.
     if (options.format) {
-      throw new ValidationError(`${options.format.toUpperCase()} export is not available for uploaded files`);
+      throw new ValidationError(
+        `${options.format.toUpperCase()} export is not available for uploaded files`,
+        "artifact.format_unavailable",
+      );
     }
     const object = await readVersion(deps, a, v);
     const filename = v.fileName ?? fileName(a, v.version, "bin");
@@ -2153,7 +2396,7 @@ export async function artifactFile(
   const object = await readVersion(deps, a, v);
   const content = decode(a.kind, object.body);
   if (options.format === "csv") {
-    if (content.kind !== "table") throw new ValidationError("CSV export is for tables");
+    if (content.kind !== "table") throw new ValidationError("CSV export is for tables", "artifact.format_unavailable");
     const body = new TextEncoder().encode(tableToCsv(content.columns, content.rows));
     return { body, contentType: "text/csv; charset=utf-8", filename: fileName(a, v.version, "csv") };
   }
@@ -2165,7 +2408,10 @@ export async function artifactFile(
           ? tableToMarkdown(content.columns, content.rows)
           : null;
     if (markdown === null)
-      throw new ValidationError(`${options.format.toUpperCase()} export is for documents and tables`);
+      throw new ValidationError(
+        `${options.format.toUpperCase()} export is for documents and tables`,
+        "artifact.format_unavailable",
+      );
     if (options.format === "docx") {
       return {
         body: markdownToDocx(markdown, { title: a.title }),
@@ -2177,14 +2423,17 @@ export async function artifactFile(
     return { body, contentType: "application/pdf", filename: fileName(a, v.version, "pdf") };
   }
   if (options.format === "patch") {
-    if (content.kind !== "diff") throw new ValidationError("Patch export is for diffs");
+    if (content.kind !== "diff") throw new ValidationError("Patch export is for diffs", "artifact.format_unavailable");
     const body = new TextEncoder().encode(diffToPatch(content.files));
     return { body, contentType: "text/x-diff; charset=utf-8", filename: fileName(a, v.version, "patch") };
   }
   return { body: object.body, contentType: object.contentType, filename: fileName(a, v.version, EXTENSIONS[a.kind]) };
 }
 
-// Search: title and excerpt, visible like the channel it came from.
+/**
+ * Search: title and excerpt, visible like the channel it came from; shared with the workspace, the whole org; shared
+ * with people, its own id, which `searchForUser` passes for who sees it (`visibleFileScopes`) and nobody else does.
+ */
 registerDocumentBuilder("file", async (db, orgId, id) => {
   const [a] = await db
     .select()
@@ -2195,7 +2444,7 @@ registerDocumentBuilder("file", async (db, orgId, id) => {
     orgId,
     kind: "file",
     sourceId: a.id,
-    channelIds: a.channelId ? [a.channelId] : [],
+    channelIds: a.share === "everyone" || !a.channelId ? [] : a.share === "people" ? [a.id] : [a.channelId],
     title: a.title,
     body: a.excerpt,
     createdAt: a.createdAt,

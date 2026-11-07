@@ -4,6 +4,7 @@ import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { filePath } from "@agenteschat/client/lib/message-links";
 import {
   Alert,
   Button,
@@ -26,6 +27,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { ArtifactMoreMenu, type DownloadFormat, useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
 import { fileSaver } from "./fileSaver";
+import { useFileShare } from "./ShareDialog";
 import { UploadButton, useDriveUpload } from "./Upload";
 import { ArtifactContentView, TableEditor } from "./views";
 
@@ -33,7 +35,7 @@ export { fileSaver };
 
 /** Link to an artifact (opens Drive with the viewer). */
 export const artifactLink = (origin: string, orgId: string, id: string, version?: number) =>
-  `${origin}/org/${orgId}/drive?artifact=${encodeURIComponent(id)}${version ? `&v=${version}` : ""}`;
+  `${origin}${filePath(orgId, id, version)}`;
 
 interface ViewerTarget {
   id: string;
@@ -70,6 +72,9 @@ export function useArtifactViewer() {
   return value;
 }
 
+/** The viewer where there is one; a text with no viewer around it (a page of its own) opens the Drive instead. */
+export const useMaybeArtifactViewer = () => useContext(ViewerContext);
+
 export function useAuthorName() {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -103,6 +108,7 @@ export function ArtifactViewer({
     onVersion(undefined);
   });
   const downloads = useArtifactDownload();
+  const share = useFileShare();
   const save = (format?: DownloadFormat) => {
     if (a) void downloads.save(a, format, a.shownVersion, a.content);
   };
@@ -123,16 +129,29 @@ export function ArtifactViewer({
   const actions = a && (
     <>
       {a.kind === "file" ? (
-        <Button size="sm" variant="ghost" icon="download" className="artifact-download" onClick={download}>
-          {t("artifacts.download")}
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="download"
+          className="artifact-download"
+          title={t("artifacts.download")}
+          onClick={download}
+        >
+          <span className="artifact-sheet__label">{t("artifacts.download")}</span>
         </Button>
       ) : (
         <Menu
           align="end"
           label={t("artifacts.downloadMenu")}
           trigger={
-            <Button size="sm" variant="ghost" icon="download" className="artifact-download">
-              {t("artifacts.downloadMenu")}
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="download"
+              className="artifact-download"
+              title={t("artifacts.downloadMenu")}
+            >
+              <span className="artifact-sheet__label">{t("artifacts.downloadMenu")}</span>
             </Button>
           }
         >
@@ -142,6 +161,18 @@ export function ArtifactViewer({
             </MenuItem>
           ))}
         </Menu>
+      )}
+      {a.inDrive !== false && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="personAdd"
+          className="artifact-share"
+          title={t("share.button")}
+          onClick={() => share.open(a)}
+        >
+          <span className="artifact-sheet__label">{t("share.button")}</span>
+        </Button>
       )}
       {canUploadVersion && (
         <UploadButton
@@ -264,6 +295,7 @@ export function ArtifactViewer({
         </div>
       )}
       {remover.dialog}
+      {share.dialog}
     </DetailsDialog>
   );
 }

@@ -28360,6 +28360,27 @@
   "errors.artifact.restoreForbidden": {
     "value": "Only who could delete it can restore it."
   },
+  "errors.artifact.versionNotFound": {
+    "value": "This version of the file doesn't exist."
+  },
+  "errors.artifact.formatUnavailable": {
+    "value": "This file can't be saved in that format."
+  },
+  "errors.artifact.sharingOpen": {
+    "value": "Everyone in the workspace sees this file already."
+  },
+  "errors.artifact.sharingForbidden": {
+    "value": "Only who's in the file's conversation changes who sees it."
+  },
+  "errors.artifact.sharingEmpty": {
+    "value": "Choose who sees it."
+  },
+  "errors.artifact.sharingTooMany": {
+    "value": "Choose at most {{max}} people and {{max}} roles."
+  },
+  "errors.artifact.notInDrive": {
+    "value": "This lives only in its conversation, so it can't be shared."
+  },
   "errors.machine.forbidden": {
     "value": "Only an admin, or whoever connected the computer, can do that."
   },
@@ -37617,6 +37638,171 @@
   },
   "whoSees.rolesToo": {
     "value": "The roles already on this page keep seeing it."
+  },
+  "share.button": {
+    "value": "Share"
+  },
+  "share.title": {
+    "value": "Share {{name}}"
+  },
+  "share.conversation": {
+    "value": "Only the conversation"
+  },
+  "share.people": {
+    "value": "People and roles you choose"
+  },
+  "share.everyone": {
+    "value": "Everyone in the workspace"
+  },
+  "share.whereDm": {
+    "value": "The DM with {{name}}"
+  },
+  "share.whereDmGone": {
+    "value": "A DM"
+  },
+  "share.whereChannel": {
+    "value": "Members of #{{name}}"
+  },
+  "share.add": {
+    "value": "Add a person or a role"
+  },
+  "share.addSearch": {
+    "value": "Search people and roles"
+  },
+  "share.noResults": {
+    "value": "Nobody with that name"
+  },
+  "share.groupPeople": {
+    "value": "People"
+  },
+  "share.groupRoles": {
+    "value": "Roles"
+  },
+  "share.access": {
+    "value": "Who has access"
+  },
+  "share.you": {
+    "value": "{{name}} (you)"
+  },
+  "share.agent": {
+    "value": "Agent"
+  },
+  "share.role": {
+    "value": "Role"
+  },
+  "share.remove": {
+    "value": "Remove {{name}}"
+  },
+  "share.admins": {
+    "value": "Administrators always see it."
+  },
+  "share.copyLink": {
+    "value": "Copy link"
+  },
+  "share.copied": {
+    "value": "Link copied."
+  },
+  "share.done": {
+    "value": "Done"
+  },
+  "share.onlyHere": {
+    "value": "People outside this conversation won't open the link."
+  },
+  "share.choosePeople": {
+    "value": "Choose people"
+  },
+  "share.readOnly": {
+    "value": "Only who's in the conversation changes who sees it."
+  },
+  "share.open": {
+    "value": "Everyone in the workspace sees this file."
+  },
+  "share.savedEveryone": {
+    "value": "Everyone in the workspace sees the file now."
+  },
+  "share.savedPeople": {
+    "value": "The people you chose see the file now."
+  },
+  "share.savedConversation": {
+    "value": "Only the conversation sees the file now."
+  },
+  "share.undo": {
+    "value": "Undo"
+  },
+  "share.fileRef": {
+    "value": "File {{title}}"
+  },
+  "share.fileRefNone": {
+    "value": "File without access"
+  },
+  "share.also": {
+    "value": "Also shared with {{who}}."
+  },
+  "share.someOnlyHere": {
+    "value": "Some of these links open only for who's in the file's conversation."
+  },
+  "linkErrors.signIn.title": {
+    "value": "Sign in to open this link"
+  },
+  "linkErrors.signIn.text": {
+    "value": "Once you're in, you come right back here."
+  },
+  "linkErrors.file.title": {
+    "value": "This file isn't available to you"
+  },
+  "linkErrors.file.text": {
+    "value": "It may have been deleted, or be shared only in a conversation you're not in. Ask whoever sent it to share it with you from the file's Share button."
+  },
+  "linkErrors.link.title": {
+    "value": "This link isn't available to you"
+  },
+  "linkErrors.link.text": {
+    "value": "It may have expired, been used already, or lead to a place you're not in. Ask whoever sent it for a new one."
+  },
+  "linkErrors.version.title": {
+    "value": "This version of the file doesn't exist"
+  },
+  "linkErrors.version.text": {
+    "value": "The link asks for a version the file doesn't have."
+  },
+  "linkErrors.format.title": {
+    "value": "This file doesn't come in that format"
+  },
+  "linkErrors.format.text": {
+    "value": "The link asks for a format this file can't be saved in."
+  },
+  "linkErrors.busy.title": {
+    "value": "Too many tries in a row"
+  },
+  "linkErrors.busy.text": {
+    "value": "Wait a moment and try again."
+  },
+  "linkErrors.server.title": {
+    "value": "Something failed on our side"
+  },
+  "linkErrors.server.text": {
+    "value": "It wasn't anything you did. Try again in a moment."
+  },
+  "linkErrors.other.title": {
+    "value": "This link didn't open"
+  },
+  "linkErrors.other.text": {
+    "value": "The address is incomplete or no longer works. Ask whoever sent it for a new one."
+  },
+  "linkErrors.action.signIn": {
+    "value": "Sign in"
+  },
+  "linkErrors.action.open": {
+    "value": "Open agentes.chat"
+  },
+  "linkErrors.action.latest": {
+    "value": "Open the latest version"
+  },
+  "linkErrors.action.retry": {
+    "value": "Try again"
+  },
+  "linkErrors.errorId": {
+    "value": "Error code: {{id}}"
   },
   "teamTemplates.lead": {
     "value": "A team for {{org}}, each agent in its own channel. You can adjust it before creating."

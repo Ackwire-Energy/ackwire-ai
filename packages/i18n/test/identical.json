@@ -431,7 +431,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "share.groupRoles"
     ],
     "fr": [
       "settings.about.version",
@@ -791,7 +792,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "share.agent"
     ],
     "de": [
       "settings.about.version",
@@ -1162,7 +1164,8 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "browser.live.emulated.desktop"
+      "browser.live.emulated.desktop",
+      "share.agent"
     ],
     "it": [
       "queue.fill.routine",
@@ -1463,7 +1466,8 @@
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
       "browser.live.emulated.desktop",
-      "artifacts.files"
+      "artifacts.files",
+      "share.fileRef"
     ],
     "nl": [
       "wiki.bulk.agents",
@@ -1974,7 +1978,8 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "browser.live.emulated.desktop"
+      "browser.live.emulated.desktop",
+      "share.agent"
     ],
     "ja": [
       "access.area.vault",
@@ -2576,7 +2581,8 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "browser.live.emulated.desktop"
+      "browser.live.emulated.desktop",
+      "share.fileRef"
     ],
     "tr": [
       "chat.wait.said",
@@ -2946,7 +2952,8 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
-      "browser.live.emulated.tablet"
+      "browser.live.emulated.tablet",
+      "share.agent"
     ],
     "ru": [
       "agent.builtinName",

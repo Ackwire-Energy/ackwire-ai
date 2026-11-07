@@ -19,7 +19,7 @@ import { VideoPlayer } from "./VideoPlayer";
 /**
  * A file opened from a message: Markdown and text drawn by the
  * app, PDF in a web view (iOS draws PDFs natively there), a video in our player, anything else as its card. Top: close, the
- * name and "Documento · 4 KB · Theo". Bottom: Ver no Drive and Compartilhar.
+ * name and "Documento · 4 KB · Theo". Bottom: Enviar and Compartilhar; Ver no Drive in the "…".
  */
 export function DocumentViewer({ id, version }: { id: string; version?: number }) {
   return (
@@ -43,9 +43,6 @@ function Viewer({ id, version }: { id: string; version?: number }) {
   const close = () => goBack();
   // A PDF is drawn in the web view on iOS only (Android's WebView has no PDF viewer).
   const pdf = info?.view === "pdf" && Platform.OS === "ios";
-  const shows = info
-    ? info.view === "markdown" || info.view === "text" || info.view === "video" || info.view === "image" || pdf
-    : false;
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
@@ -93,21 +90,28 @@ function Viewer({ id, version }: { id: string; version?: number }) {
       </View>
 
       <View style={[styles.bar, { paddingBottom: insets.bottom + 12, borderTopColor: c.line2, backgroundColor: c.bg }]}>
-        {shows ? (
-          <View style={styles.half}>
-            <Button variant="secondary" wide icon="drive" label={t("mobile.files.drive")} onPress={actions.drive} />
-          </View>
-        ) : null}
         <View style={styles.half}>
           <Button
-            variant="primary"
+            variant="secondary"
             wide
             icon="share"
-            label={t("mobile.files.share")}
+            label={t("mobile.files.send")}
             disabled={!detail || actions.busy !== null}
             onPress={actions.share}
           />
         </View>
+        {detail?.inDrive !== false ? (
+          <View style={styles.half}>
+            <Button
+              variant="primary"
+              wide
+              icon="person"
+              label={t("share.button")}
+              disabled={!detail}
+              onPress={actions.shareSheet}
+            />
+          </View>
+        ) : null}
       </View>
     </View>
   );

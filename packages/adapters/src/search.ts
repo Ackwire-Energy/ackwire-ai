@@ -28,6 +28,8 @@ export interface SearchQuery {
   visibleChannelIds: string[];
   /** Scopes the reader sees on tasks' documents only: a DM's id here reaches its tasks, never its messages. */
   visibleIssueScopes?: string[];
+  /** The same on files' documents only: a file shared with people carries its own id (ADR 0153). */
+  visibleFileScopes?: string[];
   kinds?: SearchKind[];
   limit?: number;
   /**
@@ -212,10 +214,16 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
           const text = q.text.trim();
           const filtered = Boolean(q.messages || q.after || q.before);
           if (!text && !q.embedding && !filtered) return [];
-          const visible = q.visibleIssueScopes?.length
-            ? sql`(${t.channelIds} <@ ${uuids(q.visibleChannelIds)}
-                or (${t.kind} = 'issue' and ${t.channelIds} <@ ${uuids(q.visibleIssueScopes)}))`
-            : sql`${t.channelIds} <@ ${uuids(q.visibleChannelIds)}`;
+          const scoped = (kind: "issue" | "file", scopes: string[] | undefined) =>
+            scopes?.length ? [sql`(${t.kind} = ${sql.raw(`'${kind}'`)} and ${t.channelIds} <@ ${uuids(scopes)})`] : [];
+          const visible = sql`(${sql.join(
+            [
+              sql`${t.channelIds} <@ ${uuids(q.visibleChannelIds)}`,
+              ...scoped("issue", q.visibleIssueScopes),
+              ...scoped("file", q.visibleFileScopes),
+            ],
+            sql` or `,
+          )})`;
           const kinds = q.messages
             ? eq(t.kind, "message")
             : q.kinds && q.kinds.length > 0

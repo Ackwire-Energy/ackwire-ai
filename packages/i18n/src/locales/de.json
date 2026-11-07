@@ -11697,7 +11697,14 @@
       "fileNameRequired": "Die Datei braucht einen Namen.",
       "notFound": "Diese Datei gibt es nicht mehr, oder du hast keinen Zugriff.",
       "deleteForbidden": "Nur wer es erstellt hat, wer den Agenten gefragt hat, der Inhaber des Agenten oder ein Admin kann das löschen.",
-      "restoreForbidden": "Nur wer es löschen durfte, kann es wiederherstellen."
+      "restoreForbidden": "Nur wer es löschen durfte, kann es wiederherstellen.",
+      "versionNotFound": "Diese Version der Datei gibt es nicht.",
+      "formatUnavailable": "Diese Datei kann nicht in diesem Format gespeichert werden.",
+      "sharingOpen": "Der ganze Workspace sieht diese Datei schon.",
+      "sharingForbidden": "Nur wer in der Unterhaltung der Datei ist, ändert, wer sie sieht.",
+      "sharingEmpty": "Wähle, wer es sieht.",
+      "sharingTooMany": "Wähle höchstens {{max}} Personen und {{max}} Rollen.",
+      "notInDrive": "Das gibt es nur in seiner Unterhaltung, deshalb kann es nicht geteilt werden."
     },
     "machine": {
       "forbidden": "Das kann nur ein Admin oder die Person, die den Computer verbunden hat.",
@@ -15547,6 +15554,83 @@
     "receipt": "Wer es sieht: {{who}}",
     "limited": "eingeschränkter Zugriff",
     "rolesToo": "Die Rollen, die schon auf dieser Seite sind, sehen sie weiterhin."
+  },
+  "share": {
+    "button": "Teilen",
+    "title": "{{name}} teilen",
+    "conversation": "Nur die Unterhaltung",
+    "people": "Personen und Rollen deiner Wahl",
+    "everyone": "Der ganze Workspace",
+    "whereDm": "Die Direktnachricht mit {{name}}",
+    "whereDmGone": "Eine Direktnachricht",
+    "whereChannel": "Mitglieder von #{{name}}",
+    "add": "Person oder Rolle hinzufügen",
+    "addSearch": "Personen und Rollen suchen",
+    "noResults": "Niemand mit diesem Namen",
+    "groupPeople": "Personen",
+    "groupRoles": "Rollen",
+    "access": "Wer Zugriff hat",
+    "you": "{{name}} (du)",
+    "agent": "Agent",
+    "role": "Rolle",
+    "remove": "{{name}} entfernen",
+    "admins": "Administratoren sehen es immer.",
+    "copyLink": "Link kopieren",
+    "copied": "Link kopiert.",
+    "done": "Fertig",
+    "onlyHere": "Wer nicht in dieser Unterhaltung ist, kann den Link nicht öffnen.",
+    "choosePeople": "Personen wählen",
+    "readOnly": "Nur wer in der Unterhaltung ist, ändert, wer es sieht.",
+    "open": "Der ganze Workspace sieht diese Datei.",
+    "savedEveryone": "Jetzt sieht der ganze Workspace die Datei.",
+    "savedPeople": "Jetzt sehen die gewählten Personen die Datei.",
+    "savedConversation": "Jetzt sieht nur die Unterhaltung die Datei.",
+    "undo": "Rückgängig",
+    "fileRef": "Datei {{title}}",
+    "fileRefNone": "Datei ohne Zugriff",
+    "also": "Auch geteilt mit {{who}}.",
+    "someOnlyHere": "Einige dieser Links öffnen sich nur für Personen in der Unterhaltung der Datei."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Melde dich an, um diesen Link zu öffnen",
+      "text": "Nach der Anmeldung kommst du direkt hierher zurück."
+    },
+    "file": {
+      "title": "Diese Datei ist für dich nicht verfügbar",
+      "text": "Sie wurde vielleicht gelöscht oder ist nur in einer Unterhaltung geteilt, in der du nicht bist. Bitte die Person, die sie geschickt hat, sie über den Teilen-Knopf der Datei mit dir zu teilen."
+    },
+    "link": {
+      "title": "Dieser Link ist für dich nicht verfügbar",
+      "text": "Er ist vielleicht abgelaufen, schon benutzt oder führt an einen Ort, an dem du nicht bist. Bitte die Person, die ihn geschickt hat, um einen neuen."
+    },
+    "version": {
+      "title": "Diese Version der Datei gibt es nicht",
+      "text": "Der Link fragt nach einer Version, die die Datei nicht hat."
+    },
+    "format": {
+      "title": "Diese Datei gibt es nicht in diesem Format",
+      "text": "Der Link fragt nach einem Format, in dem diese Datei nicht gespeichert werden kann."
+    },
+    "busy": {
+      "title": "Zu viele Versuche hintereinander",
+      "text": "Warte einen Moment und versuche es noch einmal."
+    },
+    "server": {
+      "title": "Bei uns ist etwas schiefgegangen",
+      "text": "Es lag nicht an dir. Versuche es gleich noch einmal."
+    },
+    "other": {
+      "title": "Dieser Link hat sich nicht geöffnet",
+      "text": "Die Adresse ist unvollständig oder funktioniert nicht mehr. Bitte die Person, die sie geschickt hat, um eine neue."
+    },
+    "action": {
+      "signIn": "Anmelden",
+      "open": "agentes.chat öffnen",
+      "latest": "Neueste Version öffnen",
+      "retry": "Noch einmal versuchen"
+    },
+    "errorId": "Fehlercode: {{id}}"
   },
   "teamTemplates": {
     "lead": "Ein Team für {{org}}, jeder Agent in seinem eigenen Kanal. Du kannst es vor dem Erstellen anpassen.",

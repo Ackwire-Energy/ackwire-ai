@@ -169,13 +169,20 @@ export function createMockArtifacts(
     if (!s) throw new MockNotFoundError("Arquivo não encontrado.");
     return s;
   };
-  const view = async (orgId: string, s: Stored): Promise<Artifact> => ({
-    canDelete: true,
-    ...clone(s.meta),
-    canEdit: editable(s.meta.kind),
-    untrusted: s.meta.kind === "html" || s.meta.kind === "file",
-    audience: await audienceOf(orgId, s.meta.channelId),
-  });
+  const view = async (orgId: string, s: Stored): Promise<Artifact> => {
+    const audience = await audienceOf(orgId, s.meta.channelId);
+    return {
+      canDelete: true,
+      sharing: { mode: "conversation", userIds: [], roleIds: [] },
+      ...clone(s.meta),
+      canEdit: editable(s.meta.kind),
+      untrusted: s.meta.kind === "html" || s.meta.kind === "file",
+      audience,
+      // As the server: whoever reads it where it lives may share what not everyone sees (the fake's viewer is there).
+      canShare:
+        s.meta.inDrive !== false && (audience.kind === "dm" || (audience.kind === "channel" && audience.private)),
+    };
+  };
   const detail = async (orgId: string, s: Stored, version?: number): Promise<ArtifactDetail> => {
     const v = s.versions.find((x) => x.version === (version ?? s.meta.version));
     if (!v) throw new MockNotFoundError("Versão não encontrada.");
@@ -226,6 +233,19 @@ export function createMockArtifacts(
       choices: { id, answer: { userId: "me", picks, messageId: null, at: new Date().toISOString() } },
       messageId: mockId("msg"),
     }),
+    setSharing: async (orgId, id, sharing) => {
+      record("artifacts.setSharing", orgId, id, sharing);
+      const s = await find(orgId, id);
+      const listed = [...(sharing.userIds ?? []), ...(sharing.roleIds ?? [])];
+      if (sharing.mode === "people" && listed.length === 0) {
+        throw new ApiError(400, "artifact.sharing_empty", "Choose who sees it");
+      }
+      s.meta.sharing =
+        sharing.mode === "people"
+          ? { mode: "people", userIds: sharing.userIds ?? [], roleIds: sharing.roleIds ?? [] }
+          : { mode: sharing.mode, userIds: [], roleIds: [] };
+      return view(orgId, s);
+    },
     versions: async (orgId, id) =>
       (await find(orgId, id)).versions.map(({ content: _c, bytes: _b, ...v }) => clone(v)).reverse(),
     fileUrl: (orgId, id, options = {}) => {

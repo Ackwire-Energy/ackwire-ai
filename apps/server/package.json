@@ -24,6 +24,7 @@
     "@agenteschat/modules": "workspace:*",
     "@agenteschat/providers": "workspace:*",
     "@agenteschat/setup": "workspace:*",
+    "@agenteschat/tokens": "workspace:*",
     "@better-auth/expo": "^1.7.7",
     "@hono/zod-openapi": "^1.6.3",
     "@scalar/hono-api-reference": "^0.12.9",

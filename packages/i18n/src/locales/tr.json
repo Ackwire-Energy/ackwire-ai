@@ -11633,7 +11633,14 @@
       "fileNameRequired": "Dosyanın bir adı olmalı.",
       "notFound": "Bu dosya artık yok ya da erişiminiz yok.",
       "deleteForbidden": "Bunu yalnızca oluşturan kişi, ajandan isteyen kişi, ajanın sahibi veya bir yönetici silebilir.",
-      "restoreForbidden": "Bunu yalnızca silebilecek kişi geri yükleyebilir."
+      "restoreForbidden": "Bunu yalnızca silebilecek kişi geri yükleyebilir.",
+      "versionNotFound": "Dosyanın bu sürümü yok.",
+      "formatUnavailable": "Bu dosya o biçimde kaydedilemez.",
+      "sharingOpen": "Tüm çalışma alanı bu dosyayı zaten görüyor.",
+      "sharingForbidden": "Kimin göreceğini yalnızca dosyanın sohbetindekiler değiştirebilir.",
+      "sharingEmpty": "Kimin göreceğini seçin.",
+      "sharingTooMany": "En fazla {{max}} kişi ve {{max}} rol seçin.",
+      "notInDrive": "Bu yalnızca kendi sohbetinde yaşıyor, bu yüzden paylaşılamaz."
     },
     "machine": {
       "forbidden": "Bunu yalnızca bir yönetici veya bilgisayarı bağlayan kişi yapabilir.",
@@ -15477,6 +15484,83 @@
     "receipt": "Kimler görüyor: {{who}}",
     "limited": "sınırlı erişim",
     "rolesToo": "Bu sayfada zaten olan roller onu görmeye devam eder."
+  },
+  "share": {
+    "button": "Paylaş",
+    "title": "{{name}} paylaş",
+    "conversation": "Yalnızca sohbet",
+    "people": "Seçtiğiniz kişiler ve roller",
+    "everyone": "Tüm çalışma alanı",
+    "whereDm": "{{name}} ile doğrudan mesaj",
+    "whereDmGone": "Bir doğrudan mesaj",
+    "whereChannel": "#{{name}} üyeleri",
+    "add": "Kişi veya rol ekle",
+    "addSearch": "Kişi ve rol ara",
+    "noResults": "Bu adda kimse yok",
+    "groupPeople": "Kişiler",
+    "groupRoles": "Roller",
+    "access": "Kimlerin erişimi var",
+    "you": "{{name}} (siz)",
+    "agent": "Ajan",
+    "role": "Rol",
+    "remove": "{{name}} kişisini çıkar",
+    "admins": "Yöneticiler her zaman görür.",
+    "copyLink": "Bağlantıyı kopyala",
+    "copied": "Bağlantı kopyalandı.",
+    "done": "Bitti",
+    "onlyHere": "Bu sohbette olmayanlar bağlantıyı açamaz.",
+    "choosePeople": "Kişi seç",
+    "readOnly": "Kimin göreceğini yalnızca sohbettekiler değiştirebilir.",
+    "open": "Tüm çalışma alanı bu dosyayı görüyor.",
+    "savedEveryone": "Artık tüm çalışma alanı dosyayı görüyor.",
+    "savedPeople": "Artık seçtiğiniz kişiler dosyayı görüyor.",
+    "savedConversation": "Artık dosyayı yalnızca sohbet görüyor.",
+    "undo": "Geri al",
+    "fileRef": "Dosya {{title}}",
+    "fileRefNone": "Erişim olmayan dosya",
+    "also": "{{who}} ile de paylaşıldı.",
+    "someOnlyHere": "Bu bağlantılardan bazılarını yalnızca dosyanın sohbetindekiler açabilir."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Bu bağlantıyı açmak için giriş yapın",
+      "text": "Giriş yaptıktan sonra doğrudan buraya dönersiniz."
+    },
+    "file": {
+      "title": "Bu dosya size açık değil",
+      "text": "Silinmiş ya da yalnızca içinde olmadığınız bir sohbette paylaşılmış olabilir. Gönderen kişiden dosyanın Paylaş düğmesiyle sizinle paylaşmasını isteyin."
+    },
+    "link": {
+      "title": "Bu bağlantı size açık değil",
+      "text": "Süresi dolmuş, zaten kullanılmış ya da içinde olmadığınız bir yere çıkıyor olabilir. Gönderen kişiden yenisini isteyin."
+    },
+    "version": {
+      "title": "Dosyanın bu sürümü yok",
+      "text": "Bağlantı, dosyada olmayan bir sürümü istiyor."
+    },
+    "format": {
+      "title": "Bu dosya o biçimde yok",
+      "text": "Bağlantı, bu dosyanın kaydedilemeyeceği bir biçimi istiyor."
+    },
+    "busy": {
+      "title": "Arka arkaya çok fazla deneme",
+      "text": "Biraz bekleyip yeniden deneyin."
+    },
+    "server": {
+      "title": "Bizim tarafımızda bir sorun oldu",
+      "text": "Sizin yaptığınız bir şey değildi. Biraz sonra yeniden deneyin."
+    },
+    "other": {
+      "title": "Bu bağlantı açılmadı",
+      "text": "Adres eksik ya da artık çalışmıyor. Gönderen kişiden yenisini isteyin."
+    },
+    "action": {
+      "signIn": "Giriş yap",
+      "open": "agentes.chat'i aç",
+      "latest": "En yeni sürümü aç",
+      "retry": "Yeniden dene"
+    },
+    "errorId": "Hata kodu: {{id}}"
   },
   "teamTemplates": {
     "lead": "{{org}} için bir ekip, her ajan kendi kanalında. Oluşturmadan önce ayarlayabilirsin.",

@@ -1,5 +1,6 @@
 import type { ArtifactDetail, ArtifactKind } from "@agenteschat/client";
 import { fileIcon, previewType } from "@agenteschat/client/lib/files";
+import { filePath } from "@agenteschat/client/lib/message-links";
 
 /**
  * Files on a message: which ones show as pictures, the card's tile and
@@ -188,11 +189,9 @@ export function safeFileName(name: string, fallback = "file"): string {
   return `${stem.slice(0, MAX - ext.length - 1).trim()}.${ext}`;
 }
 
-/** The web Drive opened at this file (there is no Drive screen in the app yet). */
+/** The web Drive opened at this file (`filePath`), the address a file's link carries. */
 export function driveWebUrl(apiUrl: string, orgId: string, id: string, version?: number): string {
-  const base = apiUrl.replace(/\/+$/, "");
-  const v = version ? `&v=${version}` : "";
-  return `${base}/org/${encodeURIComponent(orgId)}/drive?artifact=${encodeURIComponent(id)}${v}`;
+  return `${apiUrl.replace(/\/+$/, "")}${filePath(orgId, id, version)}`;
 }
 
 /** A download URL the server returned: signed (absolute, no session needed) or ours (relative, needs it). */

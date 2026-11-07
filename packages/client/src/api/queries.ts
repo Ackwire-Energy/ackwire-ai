@@ -3714,6 +3714,18 @@ export function useSaveArtifact(orgId: string, id: string) {
   });
 }
 
+/** "Compartilhar" (ADR 0153): who sees a file on top of its conversation. The dialog says a failure itself. */
+export function useSetArtifactSharing(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; sharing: Parameters<typeof api.artifacts.setSharing>[2] }) =>
+      api.artifacts.setSharing(orgId, input.id, input.sharing),
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) }),
+  });
+}
+
 /** Uploads a file to the Drive, or a new version of `artifactId`. Errors are shown by the caller. */
 export function useUploadFile(orgId: string) {
   const api = useApi();

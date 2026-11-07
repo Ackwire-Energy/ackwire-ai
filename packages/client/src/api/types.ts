@@ -3148,6 +3148,20 @@ export interface Artifact {
   inDrive?: boolean;
   /** Who can see it, from the conversation it came from (ADR 0111). */
   audience: ArtifactAudience;
+  /** Who sees it on top of that conversation (ADR 0153); absent from an older server. */
+  sharing?: ArtifactSharing;
+  /** I may change `sharing`: it lives in a conversation not everyone reads, and I read it there. */
+  canShare?: boolean;
+}
+
+/**
+ * Who sees a file past where it lives (ADR 0153): nobody more (`conversation`), the people and roles listed and
+ * administrators (`people`), or the whole workspace (`everyone`).
+ */
+export interface ArtifactSharing {
+  mode: "conversation" | "people" | "everyone";
+  userIds: string[];
+  roleIds: string[];
 }
 
 export type ArtifactAudience =

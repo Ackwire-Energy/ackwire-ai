@@ -1,9 +1,9 @@
 import type { Artifact } from "@agenteschat/client";
-import { useArtifact, useArtifactVersions } from "@agenteschat/client";
+import { useArtifact, useArtifactVersions, useRoles } from "@agenteschat/client";
 import { patchCounts } from "@agenteschat/client/lib/artifacts";
-import { artifactPlace } from "@agenteschat/client/lib/drive";
+import { artifactPlace, isPrivateArtifact } from "@agenteschat/client/lib/drive";
 import { formatBytes, previewKind } from "@agenteschat/client/lib/files";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { Button, Chip, DetailsDialog, DetailsSection, Icon, Menu, MenuItem, VideoPlayer } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -11,33 +11,56 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { ArtifactMoreMenu, useArtifactDownload } from "@/components/artifacts/ArtifactActions";
-import { artifactLink, useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { useVideoLabels } from "@/components/artifacts/FileView";
+import { useFileShare } from "@/components/artifacts/ShareDialog";
 import { goToTarget } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { useToast } from "@/lib/toast";
 import { itemIcon } from "./DriveItems";
 import { DrivePreview } from "./DrivePreview";
 
-/** Who can see a file, in plain words ("Só você e o Theo podem ver: veio de uma mensagem direta"). */
-export function AudienceLine({ artifact: a }: { artifact: Pick<Artifact, "audience"> }) {
+/**
+ * Who can see a file, in plain words ("Só você e o Theo podem ver: veio de uma mensagem direta"), with who its
+ * sharing adds (ADR 0153).
+ */
+export function AudienceLine({ artifact: a }: { artifact: Pick<Artifact, "audience" | "sharing"> }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const authorName = useAuthorName();
+  const dir = useDirectory(org.id);
+  const roles = useRoles(org.id);
   const aud = a.audience;
+  const sharing = a.sharing;
+  const priv = isPrivateArtifact(a);
   const text =
-    aud.kind === "workspace"
-      ? t("drive.audience.workspace")
-      : aud.kind === "channel"
-        ? t(aud.private ? "drive.audience.privateChannel" : "drive.audience.publicChannel", { name: aud.name })
-        : aud.with
-          ? t("drive.audience.dm", { name: authorName(aud.with) })
-          : t("drive.audience.dmGone");
-  const priv = aud.kind === "dm" || (aud.kind === "channel" && aud.private);
+    !priv && sharing?.mode === "everyone"
+      ? t("share.open")
+      : aud.kind === "workspace"
+        ? t("drive.audience.workspace")
+        : aud.kind === "channel"
+          ? t(aud.private ? "drive.audience.privateChannel" : "drive.audience.publicChannel", { name: aud.name })
+          : aud.with
+            ? t("drive.audience.dm", { name: authorName(aud.with) })
+            : t("drive.audience.dmGone");
+  const also =
+    priv && sharing?.mode === "people"
+      ? [
+          ...sharing.userIds.flatMap((id) => dir.memberById.get(id)?.name ?? []),
+          ...sharing.roleIds.flatMap((id) => roles.data?.roles.find((r) => r.id === id)?.name ?? []),
+        ]
+      : [];
+  const who =
+    also.length <= 3
+      ? joinNames(also, t)
+      : t("whoSees.more", { names: also.slice(0, 2).join(", "), count: also.length - 2 });
   return (
     <p className="drive-audience ac-iconline" data-private={priv || undefined}>
       <Icon name={priv ? "lock" : "audienceEveryone"} size={16} />
-      <span>{text}</span>
+      <span>
+        {text}
+        {also.length > 0 && ` ${t("share.also", { who })}`}
+      </span>
     </p>
   );
 }
@@ -61,7 +84,7 @@ export function DriveDetails({
   const viewer = useArtifactViewer();
   const authorName = useAuthorName();
   const dir = useDirectory(org.id);
-  const toast = useToast();
+  const share = useFileShare();
   const navigate = useNavigate();
   const downloads = useArtifactDownload();
   const detail = useArtifact(org.id, a.id, a.version);
@@ -97,11 +120,6 @@ export function DriveDetails({
       : null,
     t("drive.updated", { when: when(a.updatedAt) }),
   ].filter(Boolean);
-
-  const copyLink = async () => {
-    await navigator.clipboard?.writeText(artifactLink(window.location.origin, org.id, a.id));
-    toast.show(t("artifacts.linkCopied"));
-  };
 
   const openFile = (version?: number) => {
     onClose();
@@ -164,11 +182,12 @@ export function DriveDetails({
           icon="link"
           aria-label={t("artifacts.copyLink")}
           title={t("artifacts.copyLink")}
-          onClick={() => void copyLink()}
+          onClick={() => share.copyLink(a)}
         />
         <ArtifactMoreMenu artifact={a} onDelete={() => onDelete(a)} plain />
       </div>
       <AudienceLine artifact={a} />
+      {share.dialog}
 
       <DetailsSection title={isAgent ? t("drive.madeBy") : t("drive.sentBy")}>
         {/* The name's capitals on the face's top edge: the line under it (a long role) may wrap. */}

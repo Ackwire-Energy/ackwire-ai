@@ -3396,6 +3396,15 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   color: var(--ink-muted);
   font-weight: 600;
 }
+/* A file's link (FileRef): the #channel pill led by the file's icon; a long name wraps like the words around it. */
+.file-ref {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.file-ref > .ac-icon {
+  margin-right: 3px;
+  vertical-align: -2px;
+}
 /* A known service's address (LinkPill): the #channel pill, led by the service's logo. Its words wrap like the ones around
    it, so a long repository or title never pushes past a narrow bubble; `break-word`, not `anywhere`, which would let a
    table squeeze the column to a letter per line. The logo sits in the padding, not in the text: a picture in the text
@@ -6986,12 +6995,15 @@ html:not([data-pointer]) .run-continue:focus-visible {
     padding: 0 16px 12px;
   }
 }
-/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Editar, … and × on the bar. */
+/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Compartilhar, Editar, … and
+   × on the bar. */
 .artifact-sheet__title {
   display: block;
 }
+/* Narrow: the bar's buttons are their icons (named by their titles), so the title keeps the width. */
 @media (max-width: 720px) {
-  .artifact-edit__label {
+  .artifact-edit__label,
+  .artifact-sheet__label {
     position: absolute;
     width: 1px;
     height: 1px;

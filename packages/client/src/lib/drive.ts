@@ -1,4 +1,4 @@
-import type { Artifact, ArtifactKind } from "../api/types";
+import type { Artifact, ArtifactKind, ArtifactSharing } from "../api/types";
 import { ARTIFACT_KINDS } from "./artifacts";
 import { daysBetween } from "./format";
 import type { OpenTarget } from "./notifications";
@@ -66,9 +66,31 @@ export function groupArtifacts(list: Artifact[], group: DriveGroup, now = new Da
 /** The Drive's section of files only a DM's two sides or a private channel's members can see. */
 export const PRIVATE_SECTION = "private";
 
-/** Not open to the whole workspace: from a DM or a private channel (ADR 0111). */
-export const isPrivateArtifact = (a: Pick<Artifact, "audience">) =>
-  a.audience.kind === "dm" || (a.audience.kind === "channel" && a.audience.private);
+/** Not open to the whole workspace: from a DM or a private channel (ADR 0111), unless shared with everyone (ADR 0153). */
+export const isPrivateArtifact = (a: Pick<Artifact, "audience"> & Partial<Pick<Artifact, "sharing">>) =>
+  (a.audience.kind === "dm" || (a.audience.kind === "channel" && a.audience.private)) && a.sharing?.mode !== "everyone";
+
+/**
+ * Only the private conversation it lives in sees it (ADR 0153): a link to it opens for nobody else, so copying one
+ * goes through the share dialog, which says so.
+ */
+export const onlyItsConversation = (a: Pick<Artifact, "audience" | "sharing">) =>
+  isPrivateArtifact(a) && (a.sharing?.mode ?? "conversation") === "conversation";
+
+/** A file's own conversation alone: what a file is shared with by default (ADR 0153). */
+export const CONVERSATION_ONLY: ArtifactSharing = { mode: "conversation", userIds: [], roleIds: [] };
+
+/** The sharing with one person or role added, or taken out if there; a list left empty is the conversation alone. */
+export function toggledSharing(
+  sharing: ArtifactSharing | undefined,
+  who: { kind: "user" | "role"; id: string },
+): ArtifactSharing {
+  const now = sharing?.mode === "people" ? sharing : CONVERSATION_ONLY;
+  const flip = (list: string[]) => (list.includes(who.id) ? list.filter((x) => x !== who.id) : [...list, who.id]);
+  const userIds = who.kind === "user" ? flip(now.userIds) : now.userIds;
+  const roleIds = who.kind === "role" ? flip(now.roleIds) : now.roleIds;
+  return userIds.length + roleIds.length > 0 ? { mode: "people", userIds, roleIds } : CONVERSATION_ONLY;
+}
 
 /** `groupArtifacts` over the files the team can see, then the private ones in a section of their own, last. */
 export function driveSections(list: Artifact[], group: DriveGroup, now = new Date()): DriveSection[] {

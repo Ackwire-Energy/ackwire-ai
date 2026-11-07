@@ -36,6 +36,14 @@ describe("web addresses → the app's screens", () => {
     expect(linkOf(`${W}/org/${O}/threads?open=t2`)).toEqual({ org: O, thread: "t2" });
   });
 
+  test("a file's link (the share dialog's Copiar link) opens the file itself, at its version when named", () => {
+    const to = (path: string) => (linkOf(`${W}/org/${O}${path}`) as { to?: string }).to;
+    expect(to("/drive?artifact=a1")).toBe("/file/a1");
+    expect(to("/drive?artifact=a1&v=3")).toBe("/file/a1?v=3");
+    expect(to("/drive?artifact=a1&v=x")).toBe("/file/a1");
+    expect(to("/drive?artifact=..%2Fsettings")).toBe("/drive");
+  });
+
   test("a conversation with a thread in its panel opens that thread's screen, at its message", () => {
     expect(linkOf(`${W}/org/${O}/c/c1?thread=t1&reply=true`)).toEqual({ org: O, thread: "t1" });
     expect(linkOf(`${W}/org/${O}/c/c1?thread=t1&tm=m1`)).toEqual({ org: O, thread: "t1", m: "m1" });

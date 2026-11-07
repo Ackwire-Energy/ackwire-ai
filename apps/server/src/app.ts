@@ -11,6 +11,7 @@ import composeFile from "../../../docker-compose.yml" with { type: "text" };
 import installScript from "../../../install.sh" with { type: "text" };
 import { registerAppLinks } from "./app-links";
 import { authHandler, signInPageUrl } from "./auth";
+import { errorPages } from "./http/error-page";
 import { apiError, domainErrorResponse, routeOf, validationHook } from "./http/errors";
 import { createLogger, type Logger, loggedPath } from "./logger";
 import { accessRoutes } from "./routes/app/access";
@@ -321,6 +322,8 @@ export function createApp(options: AppOptions) {
     await next();
     if (!c.res.headers.has("cache-control")) c.res.headers.set("cache-control", "no-store");
   });
+  // A link a person opens in a browser that the API refuses: our page, never the JSON on screen (ADR 0153).
+  app.use("/api/*", errorPages(options.services?.config.PUBLIC_URL));
   app.route("/api", api);
   if (options.services) {
     registerAppLinks(app, options.services.config);

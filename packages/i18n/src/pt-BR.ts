@@ -11479,6 +11479,13 @@ export const ptBR = {
       notFound: "Este arquivo não existe mais ou você não tem acesso.",
       deleteForbidden: "Só quem criou, quem pediu ao agente, o dono do agente ou um admin pode apagar isto.",
       restoreForbidden: "Só quem poderia apagar pode restaurar.",
+      versionNotFound: "Esta versão do arquivo não existe.",
+      formatUnavailable: "Este arquivo não pode ser salvo nesse formato.",
+      sharingOpen: "Todos no workspace já veem este arquivo.",
+      sharingForbidden: "Só quem está na conversa do arquivo muda quem vê.",
+      sharingEmpty: "Escolha quem vê.",
+      sharingTooMany: "Escolha até {{max}} pessoas e {{max}} papéis.",
+      notInDrive: "Isto vive só na conversa e não pode ser compartilhado.",
     },
     machine: {
       forbidden: "Só um admin, ou quem conectou o computador, pode fazer isso.",
@@ -15565,6 +15572,90 @@ export const ptBR = {
     receipt: "Quem vê: {{who}}",
     limited: "acesso limitado",
     rolesToo: "Os papéis que já estão nesta página continuam vendo.",
+  },
+  /** Compartilhar (ADR 0153): quem vê um arquivo além da conversa em que ele está, e o link dele. */
+  share: {
+    button: "Compartilhar",
+    title: "Compartilhar {{name}}",
+    conversation: "Só a conversa",
+    people: "Pessoas e papéis que você escolher",
+    everyone: "Todos no workspace",
+    whereDm: "A DM com {{name}}",
+    whereDmGone: "Uma DM",
+    whereChannel: "Membros de #{{name}}",
+    add: "Adicionar pessoa ou papel",
+    addSearch: "Buscar pessoas e papéis",
+    noResults: "Ninguém com esse nome",
+    groupPeople: "Pessoas",
+    groupRoles: "Papéis",
+    access: "Quem tem acesso",
+    you: "{{name}} (você)",
+    agent: "Agente",
+    role: "Papel",
+    remove: "Tirar {{name}}",
+    admins: "Administradores sempre veem.",
+    copyLink: "Copiar link",
+    copied: "Link copiado.",
+    done: "Concluir",
+    /** Ao lado de Copiar link enquanto só uma conversa privada vê o arquivo. */
+    onlyHere: "Quem não está nesta conversa não vai abrir o link.",
+    choosePeople: "Escolher pessoas",
+    readOnly: "Só quem está na conversa muda quem vê.",
+    open: "Todos no workspace veem este arquivo.",
+    savedEveryone: "Agora todos no workspace veem o arquivo.",
+    savedPeople: "Agora as pessoas escolhidas veem o arquivo.",
+    savedConversation: "Agora só a conversa vê o arquivo.",
+    undo: "Desfazer",
+    fileRef: "Arquivo {{title}}",
+    fileRefNone: "Arquivo sem acesso",
+    also: "Também compartilhado com {{who}}.",
+    /** Copiar links de vários arquivos, alguns abertos só na própria conversa: o aviso, com Compartilhar. */
+    someOnlyHere: "Alguns desses links só abrem para quem está na conversa do arquivo.",
+  },
+  /**
+   * Um link aberto no navegador que o servidor recusa (ADR 0153): o título e o texto de cada causa, o botão que leva
+   * a pessoa adiante e o código do erro quando a falha é nossa.
+   */
+  linkErrors: {
+    signIn: {
+      title: "Entre para abrir este link",
+      text: "Depois de entrar, você volta direto para cá.",
+    },
+    file: {
+      title: "Este arquivo não está disponível para você",
+      text: "Ele pode ter sido apagado ou estar só numa conversa em que você não está. Peça a quem enviou para compartilhar com você pelo botão Compartilhar do arquivo.",
+    },
+    link: {
+      title: "Este link não está disponível para você",
+      text: "Ele pode ter expirado, já ter sido usado ou levar a um lugar em que você não está. Peça um novo a quem enviou.",
+    },
+    version: {
+      title: "Esta versão do arquivo não existe",
+      text: "O link pede uma versão que o arquivo não tem.",
+    },
+    format: {
+      title: "Este arquivo não sai nesse formato",
+      text: "O link pede um formato em que este arquivo não pode ser salvo.",
+    },
+    busy: {
+      title: "Muitas tentativas seguidas",
+      text: "Espere um pouco e tente de novo.",
+    },
+    server: {
+      title: "Algo falhou do nosso lado",
+      text: "Não foi nada que você fez. Tente de novo em instantes.",
+    },
+    other: {
+      title: "Este link não abriu",
+      text: "O endereço está incompleto ou não vale mais. Peça um novo a quem enviou.",
+    },
+    action: {
+      signIn: "Entrar",
+      open: "Abrir o agentes.chat",
+      latest: "Abrir a versão mais recente",
+      retry: "Tentar de novo",
+    },
+    errorId: "Código do erro: {{id}}",
   },
   teamTemplates: {
     lead: "Um time para a {{org}}, cada agente no seu canal. Dá para ajustar antes de criar.",

@@ -68,6 +68,7 @@ import type {
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
+  ArtifactSharing,
   ArtifactVersion,
   AskToJoinResult,
   AuditPage,
@@ -1523,6 +1524,12 @@ export interface ApiClient {
       id: string,
       input: { content: ArtifactContent; note?: string | null; baseVersion: number; title?: string },
     ): Promise<ArtifactDetail>;
+    /** Who sees it on top of its conversation (ADR 0153); 403 `artifact.sharing_forbidden` for who got it shared. */
+    setSharing(
+      orgId: string,
+      id: string,
+      sharing: { mode: ArtifactSharing["mode"]; userIds?: string[]; roleIds?: string[] },
+    ): Promise<Artifact>;
     /** To the trash for 30 days (403 `artifact.delete_forbidden`). */
     remove(orgId: string, id: string): Promise<void>;
     trash(orgId: string): Promise<TrashedArtifact[]>;

@@ -33,7 +33,7 @@ import { isQuietNotice } from "./notices";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
-import { adminChannelSql, taskSeenSql } from "./task-access";
+import { adminChannelSql, fileSeenSql, taskSeenSql } from "./task-access";
 import { visibleWikiPageIds } from "./wiki-links";
 
 const { messages, channelMembers, channels, contextItems, organizationMembers, routines } = schema;
@@ -319,6 +319,25 @@ async function issueSearchScopes(db: Database, orgId: string, userId: string) {
   return [...new Set(rows.map((r) => r.scope))];
 }
 
+/**
+ * The files shared with people (ADR 0153) a person sees, as the ids their search documents carry: their own. Only
+ * files' documents are searched with them (`visibleFileScopes`).
+ */
+async function fileSearchScopes(db: Database, orgId: string, userId: string) {
+  const rows = await db
+    .select({ id: schema.artifacts.id })
+    .from(schema.artifacts)
+    .where(
+      and(
+        eq(schema.artifacts.orgId, orgId),
+        eq(schema.artifacts.share, "people"),
+        isNull(schema.artifacts.deletedAt),
+        fileSeenSql(sql`${userId}::text`),
+      ),
+    );
+  return rows.map((r) => r.id);
+}
+
 /** Hybrid search with the query embedded when possible (else full-text only). */
 export async function searchVisible(
   deps: SearchDeps,
@@ -329,7 +348,10 @@ export async function searchVisible(
     kinds?: SearchKind[];
     limit?: number;
     match?: "all" | "any";
-  } & Pick<SearchQuery, "after" | "before" | "messages" | "sort" | "visibleIssueScopes" | "minTextRank">,
+  } & Pick<
+    SearchQuery,
+    "after" | "before" | "messages" | "sort" | "visibleIssueScopes" | "visibleFileScopes" | "minTextRank"
+  >,
 ): Promise<SearchHit[]> {
   // A list by date ranks by no vector: no embedding to pay for.
   const embedded =
@@ -342,6 +364,7 @@ export async function searchVisible(
     embedding: embedded?.vectors[0] ?? null,
     visibleChannelIds: input.visibleChannelIds,
     visibleIssueScopes: input.visibleIssueScopes,
+    visibleFileScopes: input.visibleFileScopes,
     kinds: input.kinds,
     limit: input.limit,
     match: input.match,
@@ -380,7 +403,13 @@ export async function searchForUser(
   // A channel scope or a message filter searches messages alone (a workspace-wide wiki page is in no channel).
   const kinds = channelIds || input.messages ? (["message"] satisfies SearchKind[]) : input.kinds;
   const messages = input.messages ?? (channelIds ? {} : undefined);
-  const visibleIssueScopes = channelIds ? [] : await issueSearchScopes(deps.db, orgId, userId);
+  const [visibleIssueScopes, visibleFileScopes] = channelIds
+    ? [[], []]
+    : await Promise.all([
+        issueSearchScopes(deps.db, orgId, userId),
+        // An agent reading for them follows the wiki's rule for what sharing adds, which a person's list can't check.
+        reach ? [] : fileSearchScopes(deps.db, orgId, userId),
+      ]);
   let hits = await searchVisible(deps, {
     orgId,
     ...rest,
@@ -388,7 +417,18 @@ export async function searchForUser(
     messages,
     visibleChannelIds: visible,
     visibleIssueScopes,
+    visibleFileScopes,
   });
+  // A file's document follows a change of who sees it a moment later: the file itself decides.
+  const files = hits.filter((h) => h.kind === "file").map((h) => h.sourceId);
+  if (files.length > 0) {
+    const shown = await deps.db
+      .select({ id: schema.artifacts.id })
+      .from(schema.artifacts)
+      .where(and(inArray(schema.artifacts.id, files), fileSeenSql(sql`${userId}::text`)));
+    const seen = new Set(shown.map((f) => f.id));
+    hits = hits.filter((h) => h.kind !== "file" || seen.has(h.sourceId));
+  }
   // A task's document follows a change of who sees it a moment later: the task itself decides.
   const tasks = hits.filter((h) => h.kind === "issue").map((h) => h.sourceId);
   if (tasks.length > 0) {

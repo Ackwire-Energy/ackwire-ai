@@ -11225,7 +11225,14 @@
       "fileNameRequired": "파일에 이름이 필요해요.",
       "notFound": "이 파일은 더 이상 없거나 접근 권한이 없어요.",
       "deleteForbidden": "만든 사람, 에이전트에게 요청한 사람, 에이전트 소유자 또는 관리자만 삭제할 수 있어요.",
-      "restoreForbidden": "삭제할 수 있는 사람만 복원할 수 있어요."
+      "restoreForbidden": "삭제할 수 있는 사람만 복원할 수 있어요.",
+      "versionNotFound": "이 버전의 파일은 없어요.",
+      "formatUnavailable": "이 파일은 그 형식으로 저장할 수 없어요.",
+      "sharingOpen": "워크스페이스 전체가 이미 이 파일을 볼 수 있어요.",
+      "sharingForbidden": "볼 수 있는 사람은 파일이 있는 대화의 사람만 바꿀 수 있어요.",
+      "sharingEmpty": "볼 수 있는 사람을 선택하세요.",
+      "sharingTooMany": "사람은 최대 {{max}}명, 역할은 최대 {{max}}개까지 선택할 수 있어요.",
+      "notInDrive": "이것은 대화 안에만 있어서 공유할 수 없어요."
     },
     "machine": {
       "forbidden": "관리자나 컴퓨터를 연결한 사람만 할 수 있어요.",
@@ -15000,6 +15007,83 @@
     "receipt": "볼 수 있는 사람: {{who}}",
     "limited": "제한된 접근",
     "rolesToo": "이 페이지에 이미 있는 역할은 계속 볼 수 있습니다."
+  },
+  "share": {
+    "button": "공유",
+    "title": "{{name}} 공유",
+    "conversation": "대화만",
+    "people": "선택한 사람과 역할",
+    "everyone": "워크스페이스 전체",
+    "whereDm": "{{name}}와(과)의 다이렉트 메시지",
+    "whereDmGone": "다이렉트 메시지",
+    "whereChannel": "#{{name}} 멤버",
+    "add": "사람 또는 역할 추가",
+    "addSearch": "사람과 역할 검색",
+    "noResults": "그 이름을 가진 사람이 없어요",
+    "groupPeople": "사람",
+    "groupRoles": "역할",
+    "access": "접근할 수 있는 사람",
+    "you": "{{name}} (나)",
+    "agent": "에이전트",
+    "role": "역할",
+    "remove": "{{name}} 빼기",
+    "admins": "관리자는 항상 볼 수 있어요.",
+    "copyLink": "링크 복사",
+    "copied": "링크를 복사했어요.",
+    "done": "완료",
+    "onlyHere": "이 대화에 없는 사람은 링크를 열 수 없어요.",
+    "choosePeople": "사람 선택",
+    "readOnly": "볼 수 있는 사람은 대화에 있는 사람만 바꿀 수 있어요.",
+    "open": "워크스페이스 전체가 이 파일을 볼 수 있어요.",
+    "savedEveryone": "이제 워크스페이스 전체가 파일을 볼 수 있어요.",
+    "savedPeople": "이제 선택한 사람들이 파일을 볼 수 있어요.",
+    "savedConversation": "이제 대화에 있는 사람만 파일을 볼 수 있어요.",
+    "undo": "실행 취소",
+    "fileRef": "파일 {{title}}",
+    "fileRefNone": "접근할 수 없는 파일",
+    "also": "{{who}}와(과)도 공유했어요.",
+    "someOnlyHere": "이 링크 중 일부는 파일이 있는 대화의 사람만 열 수 있어요."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "이 링크를 열려면 로그인하세요",
+      "text": "로그인하면 바로 여기로 돌아와요."
+    },
+    "file": {
+      "title": "이 파일은 볼 수 없어요",
+      "text": "삭제되었거나, 내가 없는 대화에서만 공유된 파일일 수 있어요. 보낸 사람에게 파일의 공유 버튼으로 나와 공유해 달라고 요청하세요."
+    },
+    "link": {
+      "title": "이 링크는 사용할 수 없어요",
+      "text": "만료되었거나, 이미 사용되었거나, 내가 없는 곳으로 가는 링크일 수 있어요. 보낸 사람에게 새 링크를 요청하세요."
+    },
+    "version": {
+      "title": "이 버전의 파일은 없어요",
+      "text": "링크가 파일에 없는 버전을 가리켜요."
+    },
+    "format": {
+      "title": "이 파일은 그 형식으로 받을 수 없어요",
+      "text": "링크가 이 파일을 저장할 수 없는 형식을 가리켜요."
+    },
+    "busy": {
+      "title": "연속으로 너무 많이 시도했어요",
+      "text": "잠시 기다린 뒤 다시 시도하세요."
+    },
+    "server": {
+      "title": "저희 쪽에서 문제가 생겼어요",
+      "text": "내가 잘못한 게 아니에요. 잠시 후 다시 시도하세요."
+    },
+    "other": {
+      "title": "이 링크가 열리지 않았어요",
+      "text": "주소가 불완전하거나 더 이상 쓸 수 없어요. 보낸 사람에게 새 주소를 요청하세요."
+    },
+    "action": {
+      "signIn": "로그인",
+      "open": "agentes.chat 열기",
+      "latest": "최신 버전 열기",
+      "retry": "다시 시도"
+    },
+    "errorId": "오류 코드: {{id}}"
   },
   "teamTemplates": {
     "lead": "{{org}}를 위한 팀, 에이전트마다 자기 채널이 있어요. 만들기 전에 조정할 수 있어요.",

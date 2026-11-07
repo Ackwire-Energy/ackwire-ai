@@ -11285,7 +11285,14 @@
       "fileNameRequired": "File harus punya nama.",
       "notFound": "File ini sudah tidak ada atau kamu tidak punya akses.",
       "deleteForbidden": "Hanya pembuatnya, orang yang meminta ke agen, pemilik agen, atau Admin yang bisa menghapus ini.",
-      "restoreForbidden": "Hanya orang yang bisa menghapusnya yang bisa memulihkannya."
+      "restoreForbidden": "Hanya orang yang bisa menghapusnya yang bisa memulihkannya.",
+      "versionNotFound": "Versi file ini tidak ada.",
+      "formatUnavailable": "File ini tidak bisa disimpan dalam format itu.",
+      "sharingOpen": "Seluruh ruang kerja sudah bisa melihat file ini.",
+      "sharingForbidden": "Hanya yang ada di percakapan file ini yang bisa mengubah siapa yang melihatnya.",
+      "sharingEmpty": "Pilih siapa yang melihat.",
+      "sharingTooMany": "Pilih paling banyak {{max}} orang dan {{max}} peran.",
+      "notInDrive": "Ini hanya ada di percakapannya, jadi tidak bisa dibagikan."
     },
     "machine": {
       "forbidden": "Hanya Admin, atau orang yang menghubungkan komputer, yang bisa melakukan itu.",
@@ -15110,6 +15117,83 @@
     "receipt": "Siapa yang melihat: {{who}}",
     "limited": "akses terbatas",
     "rolesToo": "Peran yang sudah ada di halaman ini tetap melihatnya."
+  },
+  "share": {
+    "button": "Bagikan",
+    "title": "Bagikan {{name}}",
+    "conversation": "Hanya percakapan",
+    "people": "Orang dan peran yang kamu pilih",
+    "everyone": "Seluruh ruang kerja",
+    "whereDm": "Pesan langsung dengan {{name}}",
+    "whereDmGone": "Sebuah pesan langsung",
+    "whereChannel": "Anggota #{{name}}",
+    "add": "Tambahkan orang atau peran",
+    "addSearch": "Cari orang dan peran",
+    "noResults": "Tidak ada orang dengan nama itu",
+    "groupPeople": "Orang",
+    "groupRoles": "Peran",
+    "access": "Siapa yang punya akses",
+    "you": "{{name}} (kamu)",
+    "agent": "Agen",
+    "role": "Peran",
+    "remove": "Keluarkan {{name}}",
+    "admins": "Administrator selalu bisa melihat.",
+    "copyLink": "Salin tautan",
+    "copied": "Tautan disalin.",
+    "done": "Selesai",
+    "onlyHere": "Orang di luar percakapan ini tidak akan bisa membuka tautannya.",
+    "choosePeople": "Pilih orang",
+    "readOnly": "Hanya yang ada di percakapan yang bisa mengubah siapa yang melihat.",
+    "open": "Seluruh ruang kerja bisa melihat file ini.",
+    "savedEveryone": "Sekarang seluruh ruang kerja bisa melihat file ini.",
+    "savedPeople": "Sekarang orang yang kamu pilih bisa melihat file ini.",
+    "savedConversation": "Sekarang hanya percakapan yang bisa melihat file ini.",
+    "undo": "Urungkan",
+    "fileRef": "File {{title}}",
+    "fileRefNone": "File tanpa akses",
+    "also": "Juga dibagikan dengan {{who}}.",
+    "someOnlyHere": "Beberapa tautan ini hanya bisa dibuka oleh yang ada di percakapan file."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Masuk untuk membuka tautan ini",
+      "text": "Setelah masuk, kamu langsung kembali ke sini."
+    },
+    "file": {
+      "title": "File ini tidak tersedia untukmu",
+      "text": "File ini mungkin sudah dihapus, atau hanya dibagikan di percakapan yang tidak kamu ikuti. Minta pengirimnya membagikannya denganmu lewat tombol Bagikan pada file."
+    },
+    "link": {
+      "title": "Tautan ini tidak tersedia untukmu",
+      "text": "Tautan ini mungkin sudah kedaluwarsa, sudah dipakai, atau mengarah ke tempat yang tidak kamu ikuti. Minta tautan baru kepada pengirimnya."
+    },
+    "version": {
+      "title": "Versi file ini tidak ada",
+      "text": "Tautan meminta versi yang tidak dimiliki file ini."
+    },
+    "format": {
+      "title": "File ini tidak tersedia dalam format itu",
+      "text": "Tautan meminta format yang tidak bisa dipakai untuk menyimpan file ini."
+    },
+    "busy": {
+      "title": "Terlalu banyak percobaan berturut-turut",
+      "text": "Tunggu sebentar lalu coba lagi."
+    },
+    "server": {
+      "title": "Ada yang gagal di pihak kami",
+      "text": "Ini bukan karena apa yang kamu lakukan. Coba lagi sebentar lagi."
+    },
+    "other": {
+      "title": "Tautan ini tidak terbuka",
+      "text": "Alamatnya tidak lengkap atau sudah tidak berlaku. Minta yang baru kepada pengirimnya."
+    },
+    "action": {
+      "signIn": "Masuk",
+      "open": "Buka agentes.chat",
+      "latest": "Buka versi terbaru",
+      "retry": "Coba lagi"
+    },
+    "errorId": "Kode kesalahan: {{id}}"
   },
   "teamTemplates": {
     "lead": "Tim untuk {{org}}, tiap agen di kanalnya sendiri. Kamu bisa menyesuaikannya sebelum membuat.",
