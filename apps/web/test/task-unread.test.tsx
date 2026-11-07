@@ -58,6 +58,23 @@ describe("mentions of me in a task's conversation (ADR 0145)", () => {
     expect(mentionsIn(document.querySelector('.issue-list__row[data-card="131"] .issue-list__title'))).toBe("1");
   });
 
+  test("a plain reply I haven't read in a task's conversation makes Tarefas bold, as a channel, with no red count", async () => {
+    const state = seedState();
+    const { api } = await mentioned(state);
+    const [first] = state.unreadTasks ?? [];
+    state.unreadTasks = first ? [{ ...first, mentions: 0 }] : [];
+    await renderApp(`/org/${ORG_ID}/issues`, { api });
+    await settle(8);
+    expect(tasksRow().dataset.unread).toBe("true");
+    expect(mentionsIn(tasksRow())).toBeNull();
+    cleanup();
+
+    state.unreadTasks = [];
+    await renderApp(`/org/${ORG_ID}/issues`, { api });
+    await settle(8);
+    expect(tasksRow().dataset.unread).toBe("false");
+  });
+
   test("Conversa on the task's page lights up with it; read there, every mark goes", async () => {
     const { api, at, marked } = await mentioned();
     await renderApp(`/org/${ORG_ID}/issues/131`, { api });

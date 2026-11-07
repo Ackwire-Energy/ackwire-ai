@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WorkspaceSky } from "@/sky/Sky";
 import { Icon, type IconName, SectionHeader, Text, textLineOf } from "@/ui";
 import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
-import { leadBox } from "@/ui/type-scale";
+import { leadBox, weights } from "@/ui/type-scale";
 import { useColors } from "./hooks";
 import { MentionCount, PushedHeader, Tile } from "./parts";
 
@@ -92,6 +92,7 @@ export function PageRow({
   danger = false,
   chevron = true,
   mentions = 0,
+  unread = false,
 }: {
   icon?: IconName;
   leading?: ReactNode;
@@ -104,6 +105,8 @@ export function PageRow({
   chevron?: boolean;
   /** Mentions of me not read where it leads: the red badge before the chevron. */
   mentions?: number;
+  /** Something I haven't read where it leads: the label bold, as an unread conversation's name. */
+  unread?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -126,7 +129,7 @@ export function PageRow({
         <View style={below ? styles.top : undefined}>{lead}</View>
       ) : null}
       <View style={styles.grow}>
-        <Text variant="body" tone={danger ? "danger" : "ink"} numberOfLines={1}>
+        <Text variant="body" tone={danger ? "danger" : "ink"} numberOfLines={1} style={unread && styles.unread}>
           {label}
         </Text>
         {below}
@@ -177,5 +180,6 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   value: { maxWidth: "45%" },
+  unread: { fontWeight: weights.bold },
   top: { alignSelf: "flex-start" },
 });

@@ -5564,9 +5564,16 @@ export function useTaskUnread(orgId: string, issueId: string) {
   return { unread: found?.unread ?? 0, mentions: found?.mentions ?? 0 };
 }
 
-/** Every task's mentions of me not read yet: the Tarefas entry's number. */
-export function useTaskMentions(orgId: string) {
-  return (useUnreadTasks(orgId).data ?? []).reduce((n, u) => n + u.mentions, 0);
+/**
+ * The Tarefas entry's marks, as a channel's: how many tasks have a reply I haven't read in their conversation (it goes
+ * bold) and every mention of me there not read yet (its red number).
+ */
+export function useTasksUnread(orgId: string) {
+  const list = useUnreadTasks(orgId).data ?? [];
+  return {
+    unread: list.filter((u) => u.unread > 0).length,
+    mentions: list.reduce((n, u) => n + u.mentions, 0),
+  };
 }
 
 /**
