@@ -137,10 +137,10 @@ describe("Aprovar sempre on a request", () => {
     await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(state) });
     await settle(4);
     // The deploy, closest to expiring, opens first: high risk, so no "Always approve".
-    const risky = screen().getByRole("region", { name: "Run deploy workflow" });
+    const risky = screen().getByRole("region", { name: "Fazer um deploy" });
     expect(within(risky).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     await click(document.querySelector('.ap-li[data-id="ap-merge"]') as HTMLElement);
-    const pane = screen().getByRole("region", { name: TITLE });
+    const pane = screen().getByRole("region", { name: /\(Github\)$/ });
     expect(pane.textContent).toContain(HINT);
     // Beside Refuse and Approve, first in the bar.
     const buttons = [...(pane.querySelector(".ap-bar__acts")?.querySelectorAll(".ac-locked > button") ?? [])];

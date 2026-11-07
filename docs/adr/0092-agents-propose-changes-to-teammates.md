@@ -1,6 +1,6 @@
 # 0092. Agents propose changes to their teammates; whoever may make each change decides it
 
-- Status: Accepted. Amended 2026-11-03 by ADR 0137 (§5): the right hand's own card changes a teammate's model, AI account, budget, owner, audience, channels, reply mode and archiving, each row decided by whoever may make that change, applied as them, out of date on its own and with Undo
+- Status: Accepted. Amended 2026-11-03 by ADR 0137 (§5): the right hand's own card changes a teammate's model, AI account, budget, owner, audience, channels, reply mode and archiving, each row decided by whoever may make that change, applied as them, out of date on its own and with Undo. Amended 2026-11-06 (§5): a change the person who asked may decide, in their own words, applies at once with Undo
 - Date: 2026-10-31
 - Extends: ADR 0017 §6 (proposals with a human gate), ADR 0081 (agents propose, a person decides), ADR 0085 (workspace roles)
 - Code: `packages/engine/src/context/proposals.ts`, `packages/engine/src/context/tools.ts` (`propose_instruction_change`), `packages/engine/src/access.ts` (`resolveApps`, `withAccessLines`, `accessInputOf`), `packages/db/src/schema/context.ts`, `apps/server/src/routes/app/memory.ts`, `packages/client/src/lib/proposals.ts`, `packages/client/src/api/queries.ts` (`useCardProposals`, `useDecideProposals`), `apps/web/src/components/ChatCards.tsx`, `apps/web/src/pages/ProposalsPage.tsx`, `apps/mobile/src/features/agents/InstructionProposalCard.tsx`
@@ -82,3 +82,20 @@ A proposal suspends no run, so accepting one woke nothing, and the agent couldn'
 - **An approval row**: all or nothing, no diff, and decided by `approve_actions` or the agent's owner, who may not edit instructions or give apps.
 - **Only the coordinator may propose**: brings back the refusal customers hit, for every other agent.
 - **"Passa a usar {{app}}"** on the chips: built-in scopes are named by what they do ("Usar um navegador"), which reads badly after it. `request_permission`'s "Ligar: …" reads well for both.
+
+## Amendment (2026-11-06): what the person who asked may decide applies at once
+
+### Context
+
+A customer moving 18 agents clicked one card per change, for changes he had just typed himself and could decide himself. §5 said "no Undo, the person reads it first". The owner decided that when the person who asked may decide it, the card only adds a click.
+
+### Decision
+
+- **The rule (`ownWords`, `context/learn.ts`).** A row applies when the tool is called, with a receipt and Desfazer in place of a card, when all of this holds: the run is high trust (`learnTrust`: a person behind it and no outside content read, ADR 0120), the message that started it is that person's own (not a colleague's or a notice's), nobody else wrote into it or answered its question while it worked, it read nothing others wrote with no outside mark (a task, a wiki page, a summary, a teammate's answer, `team_status`: `OTHERS_WORDS`, since such a title can be text an agent copied from an email), and that person may decide the row now (`mayDecide`, `maySettle`).
+- **Covered.** Instructions, a role and apps (`propose_instruction_change`, `applyAsked`), settings (`propose_settings_change`, the card posted already done, with its own Desfazer) and a skill (`update_skill`, whatever "Agentes melhoram as skills sozinhos" or a lock says, as who may decide could accept the card anyway).
+- **Not covered, still a card.** The org context, which every agent reads. A file of a skill that runs on computers. Deleting an agent, which has no Undo. An agent's settings row on itself (ADR 0139: an agent raising its own budget is the person's).
+- **Receipts.** `agent.settings_changed`, its `fields` then `instructions`, `role` or `apps` for those rows. Their texts sit in the action's `before` column, never in `params`, which everyone in the conversation reads. Desfazer refuses once someone changed it since, as any receipt. An instructions row is put back only by its owner or who may decide it, never by the owner of the agent that proposed it.
+
+### Consequences
+
+- `read_conversation` and `read_artifact` still count as outside (ADR 0120 stays), so a change made right after reading a file is a card, one click. How often that happens is worth watching.

@@ -24,7 +24,7 @@ import { routineCreatorOf } from "./requester";
 import { rightHandReaches } from "./right-hand";
 import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
-import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
+import { inChannelRun, waitsOnUsage, workKeepsThread, workTakesPersonMessage } from "./run-scope";
 import type { AgentRun } from "./runs";
 import { holdOf, hopLimitReached, pauseStretch, personAskedLately, stretchOf, stretchStop } from "./stretch";
 
@@ -156,7 +156,8 @@ export async function startOrJoinRun(
           eq(agentRuns.channelId, message.channelId),
           inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
           eq(agentRuns.background, false),
-          workKeepsThread(sql`${agentRuns}`),
+          // A person's message never goes to background work at work: a reply turn answers it (agents' still join).
+          message.authorUserId ? workTakesPersonMessage(sql`${agentRuns}`) : workKeepsThread(sql`${agentRuns}`),
           // In a DM the main timeline is one conversation; each thread (a mission's) is its own.
           sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or ${
             message.threadId

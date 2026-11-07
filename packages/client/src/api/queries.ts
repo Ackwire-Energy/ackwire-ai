@@ -31,6 +31,7 @@ import {
   upsertInPages,
   withServerCounts,
 } from "../lib/notifications";
+import { learnPlanModels } from "../lib/plans";
 import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
@@ -170,6 +171,10 @@ import type {
   ThreadPatch,
   ToolDecision,
   UnreadEvent,
+  WebhookProvider,
+  WebhookSetup,
+  WikiBulkFailed,
+  WikiBulkTarget,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
@@ -652,7 +657,9 @@ export const useTeam = (orgId: string) => {
 
 export const useModels = () => {
   const api = useApi();
-  return useQuery({ queryKey: keys.models, queryFn: () => api.agents.models(), staleTime: 10 * 60_000 });
+  const models = useQuery({ queryKey: keys.models, queryFn: () => api.agents.models(), staleTime: 10 * 60_000 });
+  if (models.data?.planModels) learnPlanModels(models.data.planModels);
+  return models;
 };
 
 /** A catalog model's name ("Claude Haiku 5.5") once the list is in: its id for one the list doesn't have, null before. */
@@ -2926,6 +2933,16 @@ export function useArchiveChannel(orgId: string) {
   });
 }
 
+/** "Sair do canal": it leaves my list, or stays in it to join again when it is public. */
+export function useLeaveChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => api.chat.leave(orgId, channelId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
 /** "Apagar canal" (owners and admins): `name` as the person typed it. */
 export function useDeleteChannel(orgId: string) {
   const api = useApi();
@@ -3947,6 +3964,51 @@ export function useRoutineHookAction(orgId: string, id: string) {
   });
 }
 
+/**
+ * Whether GitHub's or Sentry's webhook works here (`null`: not asked). `waiting`: asked again every few seconds, while
+ * Testar waits for its first call.
+ */
+export const useWebhookSetup = (orgId: string, provider: WebhookProvider | null, waiting = false) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: keys.webhookSetup(orgId, provider ?? ""),
+    queryFn: async () => {
+      const before = qc.getQueryData<WebhookSetup>(keys.webhookSetup(orgId, provider ?? ""));
+      const setup = await api.routines.webhookSetup(orgId, provider ?? "github");
+      // Its first good call moves the routines waiting on it out of "needs webhook" on the same screen.
+      if (before && !before.receivedAt && setup.receivedAt) {
+        void qc.invalidateQueries({ queryKey: keys.routines(orgId), exact: true });
+      }
+      return setup;
+    },
+    enabled: provider !== null,
+    refetchInterval: waiting ? 3000 : false,
+    // The person is likely on GitHub's or Sentry's tab saving the webhook while Testar waits.
+    refetchIntervalInBackground: waiting,
+  });
+};
+
+/** Makes the webhook, pastes the service's secret or adds it to a GitHub repository; the routines' states follow. */
+export function useWebhookSetupAction(orgId: string, provider: WebhookProvider) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      action: { type: "ensure" } | { type: "secret"; secret: string } | { type: "repo"; repo: string },
+    ): Promise<WebhookSetup> =>
+      action.type === "ensure"
+        ? api.routines.ensureWebhook(orgId, provider)
+        : action.type === "secret"
+          ? api.routines.setWebhookSecret(orgId, provider, action.secret)
+          : api.routines.addWebhookToRepo(orgId, action.repo),
+    onSuccess: (setup) => {
+      qc.setQueryData(keys.webhookSetup(orgId, provider), setup);
+      if (setup.receivedAt) void qc.invalidateQueries({ queryKey: keys.routines(orgId), exact: true });
+    },
+  });
+}
+
 export const useScheduleParse = (orgId: string, phrase: string, enabled: boolean, timezone?: string) => {
   const api = useApi();
   return useQuery({
@@ -4627,6 +4689,7 @@ export function useWikiAction(orgId: string) {
         | { type: "move"; slug: string; folder: string }
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
+        | { type: "context"; slug: string; on: boolean }
         | { type: "audience"; slug: string; access: WikiAccess }
         | { type: "who"; slug: string; audience: WikiAccess["audience"] }
         | {
@@ -4649,6 +4712,8 @@ export function useWikiAction(orgId: string) {
           return api.wiki.lock(orgId, action.slug, action.locked);
         case "pin":
           return api.wiki.pin(orgId, action.slug, action.pinned);
+        case "context":
+          return api.wiki.context(orgId, action.slug, action.on);
         case "audience":
           return api.wiki.audience(orgId, action.slug, action.access);
         case "who":
@@ -4659,6 +4724,52 @@ export function useWikiAction(orgId: string) {
     },
     onSuccess: (page) => {
       qc.setQueryData(keys.wikiPage(orgId, page.slug), page);
+      void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
+    },
+  });
+}
+
+/** The wiki's Lixeira: pages deleted in the last 30 days. */
+export const useWikiTrash = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.wikiTrash(orgId), queryFn: () => api.wiki.trash(orgId), enabled });
+};
+
+/** Delete, restore or purge many pages, or set their agents: the whole wiki is read again after. */
+export function useWikiBulk(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: async (
+      action:
+        | { type: "delete"; target: WikiBulkTarget }
+        | { type: "restore"; ids: string[] }
+        | { type: "purge"; ids?: string[] }
+        | { type: "agents"; ids: string[]; agentIds: string[] | null },
+    ) => {
+      // One shape for every action: how many changed, how many this person couldn't reach, and which failed.
+      const none: WikiBulkFailed = [];
+      switch (action.type) {
+        case "delete": {
+          const r = await api.wiki.removeMany(orgId, action.target);
+          return { count: r.deleted, kept: r.kept, failed: none };
+        }
+        case "restore": {
+          const r = await api.wiki.restoreMany(orgId, action.ids);
+          return { count: r.restored, kept: r.kept, failed: r.failed };
+        }
+        case "purge": {
+          const r = await api.wiki.purge(orgId, action.ids);
+          return { count: r.purged, kept: r.kept, failed: none };
+        }
+        case "agents": {
+          const r = await api.wiki.setAgents(orgId, action.ids, action.agentIds);
+          return { count: r.changed, kept: 0, failed: r.failed };
+        }
+      }
+    },
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
     },
   });
@@ -5445,10 +5556,11 @@ function clearThreadUnread(qc: QueryClient, orgId: string, threadId: string) {
   qc.setQueryData<ThreadInfo>(keys.threadInfo(orgId, threadId), (t) => (t ? { ...t, unread: 0 } : t));
 }
 
-/** The thread lists, the Threads mark and the channels (a thread's replies count there too) read again. */
+/** The thread lists, the Threads mark, the channels (a thread's replies count there too) and the tasks read again. */
 function refreshThreadUnread(qc: QueryClient, orgId: string) {
   void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
   void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.unreadTasks(orgId) });
 }
 
 /** How many threads I follow have a reply I haven't read (the Threads entry's mark); live via `applyUnreadEvent`. */
@@ -5460,6 +5572,38 @@ export function useUnreadThreads(orgId: string) {
     enabled: Boolean(api.reads),
     staleTime: 30_000,
   });
+}
+
+/**
+ * The tasks whose conversation has a reply I haven't read (ADR 0145), with the ones that mention me. Under the tasks'
+ * key, so whatever reads the boards again reads it too; a notice about a task and my reads refresh it as well.
+ */
+export function useUnreadTasks(orgId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.unreadTasks(orgId),
+    queryFn: () => api.reads?.unreadTasks?.(orgId) ?? Promise.resolve([]),
+    enabled: Boolean(api.reads?.unreadTasks),
+    staleTime: 30_000,
+  });
+}
+
+/** One task's unread replies and mentions of me in its conversation; none: zeros. */
+export function useTaskUnread(orgId: string, issueId: string) {
+  const found = useUnreadTasks(orgId).data?.find((u) => u.issueId === issueId);
+  return { unread: found?.unread ?? 0, mentions: found?.mentions ?? 0 };
+}
+
+/**
+ * The Tarefas entry's marks, as a channel's: how many tasks have a reply I haven't read in their conversation (it goes
+ * bold) and every mention of me there not read yet (its red number).
+ */
+export function useTasksUnread(orgId: string) {
+  const list = useUnreadTasks(orgId).data ?? [];
+  return {
+    unread: list.filter((u) => u.unread > 0).length,
+    mentions: list.reduce((n, u) => n + u.mentions, 0),
+  };
 }
 
 /**
@@ -5490,7 +5634,13 @@ export function applyIssueEvent(qc: QueryClient, orgId: string, event: { type: s
     event.type === "issue.audience"
   )
     readOncePerBurst(`${orgId}:issues`, () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }));
+  // A task's conversation has no members to hear `channel.activity`: a notice about the task is my news of it.
+  else if (event.type === "notification.upserted" && taskNoticeOf(event))
+    readOncePerBurst(`${orgId}:unread-tasks`, () => void qc.invalidateQueries({ queryKey: keys.unreadTasks(orgId) }));
 }
+
+const taskNoticeOf = (event: { type: string }) =>
+  Boolean((event as { notification?: { source?: { issueId?: unknown } } }).notification?.source?.issueId);
 
 /**
  * My own topic's unread marks, on the web and the phone: a message in a conversation I'm in has its list read again

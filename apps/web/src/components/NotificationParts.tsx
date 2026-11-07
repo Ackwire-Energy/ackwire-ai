@@ -176,6 +176,7 @@ type WhatKey =
   | "browserProfileRequest"
   | "desktopTaken"
   | "planLent"
+  | "planModelDropped"
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
@@ -289,6 +290,13 @@ export function Headline({
       const agent = n.source.label ?? "";
       return k("planLent", { name, agent, plan: n.latest.plan ?? "", context: agentGrammar(agent).context });
     }
+    case "plan_model_dropped":
+      return k("planModelDropped", {
+        name,
+        model: n.latest.title ?? "",
+        plan: n.latest.plan ?? "",
+        runs: n.latest.nowModel ?? "",
+      });
     case "routine_waiting_plan":
       return k("routineWaitingPlan", { name });
     case "plan_reset_unknown":

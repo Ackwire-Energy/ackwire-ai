@@ -114,7 +114,9 @@ describe("agents it asked first: one pair row right before the reply, never insi
 
   test("a hand-off by direct message is the same row on its reach line, left out of the reply's own row", () => {
     const reach = source("ReachLines.tsx");
-    expect(reach).toContain("<ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />");
+    expect(reach).toMatch(
+      /<ConsultPairRow\s+askerId=\{authorId\}\s+channelId=\{channelId\}\s+items=\{\[talk\]\}\s+inline\s/,
+    );
     expect(reach).not.toContain("reach.see");
     // One older than the conversation's list goes back is loaded on its own, never the "Entregue ao" text.
     expect(source("ConsultGroup.tsx")).toContain(

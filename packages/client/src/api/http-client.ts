@@ -213,8 +213,10 @@ import type {
   ToolChange,
   TrashedArtifact,
   UndoAllResult,
+  UnreadTask,
   UsageQueue,
   UsageReport,
+  WebhookSetup,
   WikiGraph,
   WikiImportResult,
   WikiPage,
@@ -308,6 +310,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ),
       markThreadRead: (orgId, threadId) => request<void>(`${org(orgId)}/threads/${enc(threadId)}/read`, { json: {} }),
       unreadThreads: async (orgId) => (await request<{ count: number }>(`${org(orgId)}/unread-threads`)).count,
+      unreadTasks: async (orgId) => (await request<{ tasks: UnreadTask[] }>(`${org(orgId)}/unread-tasks`)).tasks,
     },
     working: {
       list: async (orgId) => (await request<{ runs: WorkingRun[] }>(`${org(orgId)}/active-runs`)).runs,
@@ -903,6 +906,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       place: (orgId, channelId, input) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/place`, { method: "PUT", json: input }),
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
+      leave: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/leave`, { json: {} }),
       card: (orgId, channelId) => request<ChannelCard>(`${org(orgId)}/channels/${enc(channelId)}/card`),
       messageCard: (orgId, messageId) => request<MessageCard>(`${org(orgId)}/messages/${enc(messageId)}/card`),
       update: (orgId, channelId, input) =>
@@ -1526,6 +1530,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ runId: string | null; hook: RoutineHook }>(`${org(orgId)}/routines/${enc(id)}/hook/test`, {
           json: {},
         }),
+      webhookSetup: (orgId, provider) => request<WebhookSetup>(`${org(orgId)}/webhooks/${enc(provider)}`),
+      ensureWebhook: (orgId, provider) =>
+        request<WebhookSetup>(`${org(orgId)}/webhooks/${enc(provider)}`, { method: "PUT", json: {} }),
+      setWebhookSecret: (orgId, provider, secret) =>
+        request<WebhookSetup>(`${org(orgId)}/webhooks/${enc(provider)}/secret`, { method: "PUT", json: { secret } }),
+      addWebhookToRepo: (orgId, repo) =>
+        request<WebhookSetup>(`${org(orgId)}/webhooks/github/repository`, { json: { repo } }),
     },
     wiki: {
       tree: async (orgId) => (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/pages`)).pages,
@@ -1556,6 +1567,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       remove: async (orgId, slug) => {
         await request<void>(`${org(orgId)}/wiki/pages/${enc(slug)}`, { method: "DELETE" });
       },
+      removeMany: (orgId, target) => request(`${org(orgId)}/wiki/bulk/delete`, { json: target }),
+      trash: async (orgId) =>
+        (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/pages`, { query: { deleted: "true" } })).pages,
+      restoreMany: (orgId, ids) => request(`${org(orgId)}/wiki/trash/restore`, { json: { ids } }),
+      purge: (orgId, ids) => request(`${org(orgId)}/wiki/trash/purge`, { json: ids ? { ids } : {} }),
+      setAgents: (orgId, ids, agentIds) =>
+        request(`${org(orgId)}/wiki/bulk/agents`, { method: "PUT", json: { ids, agentIds } }),
+      context: (orgId, slug, on) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/context`, { json: { on } }),
       reads: (orgId) => request<WikiTopRead[]>(`${org(orgId)}/wiki/reads`),
       import: (orgId, input) => request<WikiImportResult>(`${org(orgId)}/wiki/import`, { json: input }),
       append: (orgId, slug, input) =>

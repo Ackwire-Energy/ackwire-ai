@@ -21,7 +21,17 @@ import { act, cleanup, fireEvent, render, within } from "@testing-library/react"
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { graphWidth, layoutGraph, neighborsOf } from "@/components/WikiGraph";
 import { headingId, Markdown, parseWikiToken, wikiLinksIn } from "@/lib/markdown";
-import { filesFromList, homeOf, parseNote, readVault, type VaultFile } from "@/lib/obsidian";
+import {
+  filesFromList,
+  homeOf,
+  parseNote,
+  readVault,
+  sendVaultNotes,
+  type VaultFile,
+  type VaultNote,
+  vaultBatches,
+  vaultInputs,
+} from "@/lib/obsidian";
 import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -225,7 +235,7 @@ describe("the wiki", () => {
     expect(screen().getByRole("region", { name: "Sobre a página" })).toBeTruthy();
   });
 
-  test("moving a page to the trash promises no restore a person can't do", async () => {
+  test("moving a page to the trash says where it goes and for how long; the Lixeira brings it back", async () => {
     await go("wiki/deploy");
     const more = screen().getByRole("button", { name: "Mais ações" });
     more.focus();
@@ -235,9 +245,33 @@ describe("the wiki", () => {
     });
     await act(() => new Promise((r) => setTimeout(r, 0)));
     await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Mover para a lixeira" }));
-    expect(screen().getByRole("dialog", { name: "Mover Deploy para a lixeira?" }).textContent).toContain(
-      "Ainda não dá para restaurar pelo app.",
-    );
+    const dialog = screen().getByRole("dialog", { name: "Mover Deploy para a lixeira?" });
+    expect(dialog.textContent).toContain("Vai para a Lixeira da wiki por 30 dias, e dá para restaurar de lá.");
+    await click(within(dialog).getByRole("button", { name: "Mover para a lixeira" }));
+    await settle(6);
+    await click(screen().getByRole("button", { name: /^Lixeira/ }));
+    await settle(6);
+    expect(document.body.textContent).toContain("Páginas apagadas ficam aqui por 30 dias e depois somem.");
+    const row = screen().getByText("Deploy").closest("li") as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Restaurar" }));
+    await settle(6);
+    expect(document.body.textContent).toContain("1 página restaurada.");
+    expect(document.body.textContent).toContain("A Lixeira está vazia.");
+  });
+
+  test("choosing pages: the confirmation says how many, and they go to the trash together", async () => {
+    const { state } = await go("wiki");
+    await click(screen().getByRole("button", { name: "Selecionar" }));
+    const boxes = screen().getAllByRole("checkbox");
+    await click(boxes[0] as HTMLElement);
+    await click(boxes[1] as HTMLElement);
+    await click(screen().getByRole("button", { name: "Apagar" }));
+    const dialog = screen().getByRole("dialog", { name: "Apagar 2 páginas?" });
+    await click(within(dialog).getByRole("button", { name: "Mover 2 páginas para a Lixeira" }));
+    await settle(6);
+    const call = state.calls.find((c) => c.method === "wiki.removeMany");
+    expect(call?.args[1]).toEqual({ ids: [expect.any(String), expect.any(String)] });
+    expect(document.body.textContent).toContain("2 páginas foram para a Lixeira.");
   });
 
   test("the visual editor: the page edits as it reads; a changed paragraph saves, the rest as written", async () => {
@@ -676,6 +710,67 @@ describe("Obsidian vaults", () => {
     expect(zipped.map((f) => f.path)).toEqual(["V/A.md"]);
     expect(await zipped[0]?.text()).toBe("x");
   });
+
+  test("sending: limits cut here, a note too long left out, batches by count and size", () => {
+    const note = (title: string, body: string, extra: Partial<VaultNote> = {}): VaultNote => ({
+      path: `${title}.md`,
+      title,
+      folder: "",
+      tags: [],
+      aliases: [],
+      links: [],
+      embeds: [],
+      body,
+      dataview: 0,
+      callouts: 0,
+      ...extra,
+    });
+    const { inputs, tooLong } = vaultInputs(
+      [note("Tags", "x", { tags: ["t".repeat(120)], aliases: ["a".repeat(400)] }), note("Enorme", "x".repeat(200_001))],
+      () => ({ ["n".repeat(400)]: "id", "ok.png": "id2" }),
+    );
+    expect(tooLong).toEqual(["Enorme"]);
+    expect(inputs[0]?.tags?.[0]).toHaveLength(80);
+    expect(inputs[0]?.aliases?.[0]).toHaveLength(300);
+    expect(inputs[0]?.attachments).toEqual({ "ok.png": "id2" });
+    const many = Array.from({ length: 450 }, (_, i) => ({ title: `N${i}`, body: "x" }));
+    expect(vaultBatches(many).map((b) => b.length)).toEqual([200, 200, 50]);
+    const heavy = Array.from({ length: 5 }, (_, i) => ({ title: `H${i}`, body: "x".repeat(3_000_000) }));
+    expect(vaultBatches(heavy).map((b) => b.length)).toEqual([2, 2, 1]);
+  });
+
+  test("sending: a failed batch is tried again; one that keeps failing comes back to retry, the rest still go", async () => {
+    const calls: number[] = [];
+    let n = 0;
+    const api = {
+      wiki: {
+        import: async (_org: string, input: { notes: { title: string }[]; importId?: string }) => {
+          n++;
+          calls.push(input.notes.length);
+          expect(input.importId).toBe("imp");
+          // The first batch fails once, then goes; the second always fails.
+          if (n === 1 || input.notes[0]?.title === "N200") throw new ApiError(503, "unavailable", "down");
+          return { created: input.notes.map((x) => ({ title: x.title })), skipped: [], failed: [] };
+        },
+      },
+    } as unknown as Parameters<typeof sendVaultNotes>[0];
+    const notes = Array.from({ length: 347 }, (_, i) => ({ title: `N${i}`, body: "x" }));
+    const r = await sendVaultNotes(api, ORG_ID, { name: "V", onConflict: "keep_both", importId: "imp", notes });
+    expect(r.created).toHaveLength(200);
+    expect(r.retry).toHaveLength(147);
+    expect(r.failures.filter((f) => f.reason === "batch")).toHaveLength(147);
+    expect(calls).toEqual([200, 200, 147, 147, 147]);
+    // Stopped: nothing more is sent, the rest waits for a retry.
+    const stopped = await sendVaultNotes(
+      api,
+      ORG_ID,
+      { name: "V", onConflict: "skip", importId: "imp", notes },
+      undefined,
+      () => true,
+    );
+    expect(stopped.retry).toHaveLength(347);
+    expect(stopped.failures.every((f) => f.reason === "stopped")).toBe(true);
+  }, 15_000);
 
   test("homeOf: the vault's home note, else the first", () => {
     const p = (title: string) => ({

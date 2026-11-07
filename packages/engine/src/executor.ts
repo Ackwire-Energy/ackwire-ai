@@ -33,7 +33,7 @@ import {
   type ToolImage,
   textOf,
 } from "@agenteschat/providers";
-import { ownLimitsModel } from "@agenteschat/providers/plans";
+import { autoPlanModel, droppedPlanModel, ownLimitsModel, planModel, planOf } from "@agenteschat/providers/plans";
 import { extraUsageLeft, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
@@ -71,12 +71,16 @@ import {
   brainSpeedFor,
   forgetModelLimit,
   forgetPlanLimit,
+  type ModelScope,
   mayFallBack,
   NO_AI_CODES,
+  noteAnswered,
   noteModelLimit,
   notePlanLimit,
+  offRefusal,
   recordRunBrain,
   refusalScope,
+  regionRefusal,
   resolveBrain,
   storedPlanUsage,
   UNAVAILABLE_CODES,
@@ -180,11 +184,14 @@ import {
 } from "./errors";
 import {
   type ChannelEvent,
+  holdStepWords,
   type LiveTurn,
   liveTurns,
   type MemoryUpdate,
   publishChannelEvent,
   publishMessageCreated,
+  STEP_HELD_MAX,
+  takeStepWords,
 } from "./events";
 import { comesBackHere, FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
@@ -219,6 +226,7 @@ import { type NoAiCardReason, postNoAiCard } from "./no-ai";
 import {
   notifyCatchUpClosed,
   notifyCatchUpClosedAsker,
+  notifyPlanModelDropped,
   notifyPlanResetUnknown,
   resolveRunFailed,
 } from "./notification-producers";
@@ -227,7 +235,7 @@ import { enqueue, PermanentJobError } from "./outbox";
 import { type OutsideMemo, personWords, runReadOutside } from "./outside";
 import { assertPersonUnderLimit } from "./person-usage";
 import { createProfiler, type StageTiming } from "./profile";
-import { ASK_USER_TOOL, questionResult } from "./questions";
+import { ASK_USER_TOOL, QUESTION_MAX_CHARS, questionResult } from "./questions";
 import {
   endsWithSentinel,
   isSentinelOnly,
@@ -597,8 +605,8 @@ export interface Transcript {
     plan?: string;
     /** A plan wait's model (null: the brain's default): a turn through on another model doesn't wake it. */
     model?: string | null;
-    /** A plan wait on the model's own limit or the region it needs (`refusalScope`): a fresh reading of the account doesn't wake it. */
-    scope?: "model" | "region";
+    /** A plan wait on one model's refusal (`refusalScope`): a fresh reading of the account doesn't wake it. */
+    scope?: ModelScope;
     /** Parked again on its limit right after a wake: no wake for `REPARK_STEADY_MS` after that park, only its timer. */
     steady?: true;
     /** A plan pause's: where its plan was read. */
@@ -2106,6 +2114,7 @@ async function executeRunInner(
           runId: run.id,
           channelId: run.channelId,
           pageIds,
+          kind: "context",
         }),
       );
       system.push({
@@ -2519,6 +2528,25 @@ async function executeRunInner(
     fresh: Boolean(viaRoutine) || run.background,
     promptKey: transcript.promptKey,
   });
+  // The agent's model left its plan's live list, so this turn runs another: its owner hears it, never silently.
+  const dropped =
+    brainPlan.kind === "claude_code" && !brainPlan.missionId && agent.brain === "claude_code"
+      ? droppedPlanModel(brainPlan.account?.provider, agent.brainModel)
+      : null;
+  const droppedFrom = dropped ? planOf(brainPlan.account?.provider) : undefined;
+  if (dropped && droppedFrom) {
+    await notifyPlanModelDropped(
+      { db, pubsub: deps.pubsub },
+      {
+        orgId: run.orgId,
+        agentId: agent.id,
+        agentName: agent.name,
+        plan: droppedFrom.name,
+        model: dropped,
+        runs: planModel(droppedFrom, brainPlan.model).label,
+      },
+    ).catch(() => {});
+  }
   // A mission's main session can't be replaced mid-mission: its first turn after an edit reads the settings again.
   if (brainPlan.settingsChanged && needsContext) {
     transcript.system = [
@@ -2549,6 +2577,8 @@ async function executeRunInner(
   // brain itself never changes). A resumed run keeps its choice; a run that couldn't ask is medium/medium.
   /** The agent as this run's model brain sees it: its `auto` model replaced by the one chosen. */
   let thinker: Agent = agent;
+  /** The computer brain's model is "Automático": a model of its plan the key can't use gives way (`autoPlanModel`). */
+  const autoBrain = brainPlan.kind !== "model" && isAutoModel(brainPlan.model);
   if (needsAutoChoice(agent, brainPlan)) {
     const t = transcript;
     const kept = t.autoModel;
@@ -2574,6 +2604,10 @@ async function executeRunInner(
       throw outage;
     }
     ({ agent: thinker, plan: brainPlan } = withAuto(agent, brainPlan, applied));
+    if (autoBrain) {
+      const model = autoPlanModel(brainPlan.account?.provider, brainPlan.model, brainPlan.usage);
+      if (model) brainPlan = { ...brainPlan, model };
+    }
     if (!kept) {
       t.autoModel = { ...choice, ...(applied.apiModel ? { apiModel: applied.apiModel } : {}) };
       const chosen = {
@@ -2768,7 +2802,7 @@ async function executeRunInner(
     const pause = await db.transaction(async (tx) => {
       const posted = await postPauseCards(tx, run, {
         approvals: [],
-        questions: [{ id: questionId, toolUseId, text: cutText(text, 1000), choices: null }],
+        questions: [{ id: questionId, toolUseId, text, choices: null }],
         secretRequestIds: [],
       });
       t.postedUpTo = t.messages.length;
@@ -2882,7 +2916,7 @@ async function executeRunInner(
     const stillBusy = busy && t.roomWaitSince !== undefined;
     if (busy) {
       t.roomWaitSince ??= Date.now();
-      if (!run.background && run.hop <= 1 && viaRoutine === null) {
+      if (!run.background && run.hop <= 1 && viaRoutine === null && !run.workId) {
         t.roomPeople = true;
         // Only the head asks again, and a person's slot can leave too little for the right hand's first ask: behind
         // people's turns it would wait for each, though its floor is the lowest and they can't pass it.
@@ -3251,17 +3285,26 @@ async function executeRunInner(
       notePlanLimit(machineId, plan.kind, resetsAt, Date.now(), account.id);
       return resetsAt ? { resetsAt } : {};
     }
-    const region = found.scope === "region";
+    // The region a model needs, the model switched off for the key, or no subscription: nothing resets them.
+    const fixed = found.scope === "region" || found.scope === "off" || found.scope === "inactive";
     await noteModelLimit(
       db,
       run.orgId,
       account.id,
       ownModel.id,
-      region ? { region } : resetsAt ? { until: resetsAt } : {},
+      found.scope === "region"
+        ? { region: true }
+        : found.scope === "off"
+          ? { off: true }
+          : found.scope === "inactive"
+            ? { inactive: true }
+            : resetsAt
+              ? { until: resetsAt }
+              : {},
     )
       .then(() => publishAccountsChanged(deps.pubsub, run.orgId, machineId))
       .catch(() => {});
-    return { scope: found.scope, ...(!region && resetsAt ? { resetsAt } : {}) };
+    return { scope: found.scope, ...(!fixed && resetsAt ? { resetsAt } : {}) };
   };
 
   /**
@@ -3279,8 +3322,8 @@ async function executeRunInner(
     soon?: boolean;
     /** Long work paused near a limit (ADR 0118): on what, how far along, and the plan's window. */
     pause?: { source: "plan" | "budget"; used: number; window?: string };
-    /** The model's own limit or the region it needs, not the account's (`refusalScope`). */
-    scope?: "model" | "region";
+    /** One model's refusal, not the account's (`refusalScope`). */
+    scope?: ModelScope;
   }) => {
     await deferred;
     const t = transcript as Transcript;
@@ -3317,11 +3360,13 @@ async function executeRunInner(
       at = Math.min(at, brainBack > now ? brainBack : now + ladderDelay(wait.step++));
     }
     const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * line.place);
-    // The region a model needs has no reset: its note already says what to turn on.
+    // The region a model needs, a model switched off or no subscription has no reset: its note says what to do.
     const tellOwner =
       !budget &&
       !paused &&
       scope !== "region" &&
+      scope !== "off" &&
+      scope !== "inactive" &&
       !known &&
       !wait.noticed &&
       now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
@@ -3369,20 +3414,30 @@ async function executeRunInner(
                   "plan_model_region_wait",
                   `This model (${ownModel.label}) needs the Global region on in OpenCode (Settings › Privacy).`,
                 ]
-              : ownModel
+              : ownModel && scope === "inactive"
                 ? [
-                    known ? "plan_model_limit_wait" : "plan_model_limit_wait_unknown",
-                    `${ownModel.label} hit its own limit on ${name}. The plan's other models keep working: change ${agent.name}'s model or wait ${known ? "until it resets" : "for it to reset"}.`,
+                    "plan_inactive_wait",
+                    "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
                   ]
-                : cut
+                : ownModel && scope === "off"
                   ? [
-                      known ? "plan_limit_cut" : "plan_limit_cut_unknown",
-                      `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                      "plan_model_off_wait",
+                      `OpenCode refused ${ownModel.label} with this key: the model or the account is turned off there. Turn it on in OpenCode or change ${agent.name}'s model.`,
                     ]
-                  : [
-                      known ? "plan_limit_wait" : "plan_limit_wait_unknown",
-                      `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
-                    ];
+                  : ownModel
+                    ? [
+                        known ? "plan_model_limit_wait" : "plan_model_limit_wait_unknown",
+                        `${ownModel.label} hit its own limit on ${name}. The plan's other models keep working: change ${agent.name}'s model or wait ${known ? "until it resets" : "for it to reset"}.`,
+                      ]
+                    : cut
+                      ? [
+                          known ? "plan_limit_cut" : "plan_limit_cut_unknown",
+                          `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                        ]
+                      : [
+                          known ? "plan_limit_wait" : "plan_limit_wait_unknown",
+                          `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
+                        ];
           const m = await post(
             tx,
             replyThreadId,
@@ -3810,7 +3865,14 @@ async function executeRunInner(
        */
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
-        personWaiting = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
+        // Background work is asked work, never a person's turn: it neither holds their reserved slot nor goes ahead of
+        // their reply turn in the line, whatever its first turn was before it moved (ADR 0032).
+        if (run.workId) {
+          delete transcript.roomPeople;
+          transcript.roomAsked = true;
+        }
+        personWaiting =
+          !run.workId && (Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null));
         // A routine's run: a person scheduled it.
         transcript.roomAsked ??=
           !personWaiting && (run.background || (await personAskedLately(db, run.orgId, runStretchOf(run))));
@@ -3886,6 +3948,19 @@ async function executeRunInner(
       const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;
       /** Calls the computer brain said it ran in this turn (through the bridge or on its own). */
       const executedNow: { id: string; name: string; input: unknown; result?: ToolResult }[] = [];
+      /** Its own calls whose step line went out as they started (`tool_started`): not again as they end. */
+      const stepTold = new Set<string>();
+      /** A call of its own (not ours through the bridge, which says its step as it starts) is the step line now. */
+      const ownStep = (call: { id: string; name: string }) => {
+        if (run.background || turnTools.some((t) => t.name === call.name)) return;
+        const said = takeStepWords(run.id);
+        void publishChannelEvent(deps.pubsub, {
+          type: "agent.step",
+          ...where,
+          tool: call.name,
+          ...(said ? { said } : {}),
+        }).catch(() => {});
+      };
       // Context budget: a request that wouldn't fit the model's window sends old tool results as a
       // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
       if (turnPlan.kind === "model") {
@@ -3973,6 +4048,9 @@ async function executeRunInner(
                   cacheWriteTokens: u.cacheWrite ?? 0,
                 }),
               ),
+            refusedByPlan: (message) =>
+              regionRefusal(turnPlan.account?.provider, turnPlan.model, message) ||
+              offRefusal(turnPlan.account?.provider, turnPlan.model, message),
             onLimit: (resetsAt) => {
               turnLimited = true;
               const machineId = turnPlan.session?.machineId;
@@ -3986,8 +4064,14 @@ async function executeRunInner(
               }
             },
             ...(deps.planLimitGraceMs !== undefined ? { limitGraceMs: deps.planLimitGraceMs } : {}),
+            onStarted: (call) => {
+              stepTold.add(call.id);
+              ownStep(call);
+            },
             onExecuted: (call) => {
               executedNow.push(call);
+              // A brain that tells its calls only once they ended (Codex, an older runner) says the step now.
+              if (!stepTold.delete(call.id)) ownStep(call);
               // The text it streams next is another model call's: never one reply with what it wrote before.
               deltas.toolEnded();
             },
@@ -4037,8 +4121,9 @@ async function executeRunInner(
             const ownModel = ownLimitsModel(account?.provider, turnPlan.model);
             if (account && ownModel)
               later(async () => {
-                if (await forgetModelLimit(db, run.orgId, account.id, ownModel.id))
-                  await publishAccountsChanged(deps.pubsub, run.orgId, planMachine);
+                const forgot = await forgetModelLimit(db, run.orgId, account.id, ownModel.id);
+                await noteAnswered(db, run.orgId, account.id, ownModel.id);
+                if (forgot) await publishAccountsChanged(deps.pubsub, run.orgId, planMachine);
               });
             const key = usageWaitKey({
               code: "plan_limit",
@@ -4168,15 +4253,26 @@ async function executeRunInner(
           (error.retryable || UNAVAILABLE_CODES.has(error.code))
         ) {
           const machineId = turnPlan.session?.machineId;
-          const handled = await brainUnavailable({
-            code: error.code,
-            message: error.message,
-            ...(error.code === "plan_limit" && machineId
+          const refusal =
+            error.code === "plan_limit" && machineId
               ? await refusalOf(machineId, error)
               : error.resetsAt
                 ? { resetsAt: error.resetsAt }
-                : {}),
-          });
+                : {};
+          // "Automático" refused on one model: the turn goes again at once on the model that last answered with this key.
+          if (autoBrain && refusal.scope && refusal.scope !== "inactive" && machineId) {
+            const stored = await storedPlanUsage(db, run.orgId, machineId, turnPlan.kind, turnPlan.account?.id).catch(
+              () => null,
+            );
+            const from = turnPlan.model;
+            const to = autoPlanModel(turnPlan.account?.provider, from, stored);
+            if (to && to !== from) {
+              plan = { ...plan, model: to };
+              later(() => addRunStep(db, run, "context", { autoModelStandIn: { from: from ?? null, to } }));
+              continue;
+            }
+          }
+          const handled = await brainUnavailable({ code: error.code, message: error.message, ...refusal });
           if (handled === "fallback") continue;
           if (handled === "waited" || handled === "failed") return;
         }
@@ -4294,6 +4390,8 @@ async function executeRunInner(
         const secretAsks: string[] = [];
         /** Mission tools' own waits (a blocking decision, a review): their ids. */
         const waits: string[] = [];
+        // What it wrote before these calls is the first one's step line (`takeStepWords`), never posted.
+        if (!run.background) holdStepWords(run.id, isRightHand(agent) ? scrubSignIns(turnText, "••••").text : turnText);
         for (const use of toolUses) {
           // Canceled during a tool, or the server is shutting down: the rest never run.
           if (signal.aborted) break;
@@ -4335,6 +4433,7 @@ async function executeRunInner(
             });
           }
         }
+        takeStepWords(run.id);
         // The server is shutting down: the calls that never started say so, and the step ends as any other (its
         // results saved, its approvals and questions asked); the next instance takes the run from there.
         if (shuttingDown()) {
@@ -4689,6 +4788,9 @@ async function executeRunInner(
             }).catch(() => (saysNeedsNothing(judged) ? ("none" as const) : ("person" as const)));
         if (asks === "none") decision = { outcome: "done", rule: "asks_nothing", verdict: "done" };
       }
+      // A card holds one short question: a longer reply is posted whole, and the person's answer wakes it all the same.
+      if (decision.outcome === "ask_card" && (text || judged).length > QUESTION_MAX_CHARS)
+        decision = { outcome: "done", rule: "ask_long", verdict: decision.verdict };
       turnEnd = decision;
       if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
       t.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
@@ -5028,12 +5130,16 @@ async function thinkOnce(
     limitGraceMs?: number;
     /** A call the brain already ran (through the bridge, or its own tools). */
     onExecuted?(call: { id: string; name: string; input: unknown; result?: ToolResult }): void;
+    /** A call of its own the brain started (`tool_started`): its `onExecuted` follows. */
+    onStarted?(call: { id: string; name: string }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
     /** The brain's first event that isn't an error: a computer had room for the turn. Done before that event is read. */
     onTaken?(): void | Promise<void>;
     /** Fast failed and the turn answered at standard speed. */
     onSpeedFallback?(message: string): void;
+    /** A failed turn that is the plan's refusal, though the CLI didn't call it a limit. */
+    refusedByPlan?(message: string): boolean;
   } = {},
 ): Promise<BrainStep> {
   let text: string | null = null;
@@ -5074,6 +5180,7 @@ async function thinkOnce(
       await hooks.onTaken?.();
     }
     if (event.type === "text_delta") onDelta(event.text);
+    else if (event.type === "tool_started") hooks.onStarted?.(event);
     else if (event.type === "tool_call") {
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.
       if (event.executed) {
@@ -5094,8 +5201,12 @@ async function thinkOnce(
         };
       }
     } else if (event.type === "error") {
-      // After a `limit`, whatever ended the turn was the plan's refusal.
+      // After a `limit`, whatever ended the turn was the plan's refusal. Without one, only before anything ran: the
+      // words of a later failure can be a command's own.
+      const untouched = executedCount === 0 && toolCalls.length === 0;
       if (limit) throw limitFailure(event.message, event.worked);
+      if (event.code === "claude_failed" && untouched && hooks.refusedByPlan?.(event.message))
+        throw limitFailure(event.message, false);
       throw new BrainFailure(
         event.code,
         event.message,
@@ -5367,6 +5478,7 @@ function createDeltaPublisher(
     const open = all.slice(openAt);
     return final || open.trim().length >= WORKING_TEXT_MAX ? kept + open : kept;
   };
+  const scrubbed = (text: string) => (first.scrub ? scrubSignIns(text, "••••").text : text);
   const live: LiveTurn = { turn: first.turn, text: "", from: 0, stretches: first.stretches };
   /** Length of `all` at the last send. */
   let sentUpTo = 0;
@@ -5438,6 +5550,9 @@ function createDeltaPublisher(
       }
       all += text;
       if (text) marks.push([Date.now(), all.length]);
+      // Only its start is read for a step line (`takeStepWords`): the rest of a long stretch is never copied.
+      if (!first.quiet && all.length - text.length - openAt < STEP_HELD_MAX)
+        holdStepWords(run.id, scrubbed(all.slice(openAt, openAt + STEP_HELD_MAX)));
       if (flushMs === 0 || all.length - sentUpTo >= MAX_CHUNK) send();
       else timer ??= setTimeout(() => send(), flushMs);
     },
@@ -5445,11 +5560,13 @@ function createDeltaPublisher(
     async flush(answer = false) {
       send(answer);
       liveTurns.delete(run.id);
+      takeStepWords(run.id);
       await pending;
     },
     seq: () => seq,
     /** A call the brain ran inside its turn ended (through the bridge or on its own): later text is a new stretch. */
     toolEnded() {
+      takeStepWords(run.id);
       breaks.push([Date.now(), all.length]);
       kept = showable(false);
       openAt = all.length;

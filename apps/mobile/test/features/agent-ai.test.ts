@@ -387,7 +387,7 @@ describe("the agent's AI", () => {
           email: "walt@gmail.com",
           usedBy: ["Atlas"],
         }),
-        account("team", { label: "Claude Team", plan: "team", email: "contato@estudio.example" }),
+        account("team", { label: "Claude Team", plan: "team", email: "team@example.com" }),
         // Her own login, signed out: its plan's page signs it in again, not this list.
         account("ada", { email: "ada@acme.com", status: "signed_out", usedBy: ["Ada"] }),
         account("joao", { label: "Claude Max", ownerId: "u2", ownerName: "João Silva", mine: false }),
@@ -397,7 +397,7 @@ describe("the agent's AI", () => {
     expect(
       rows.map((r) => [r.row.kind === "key" ? "key" : r.row.act, r.label, r.sub, "below" in r ? r.below : null]),
     ).toEqual([
-      ["use", "Claude Team", "contato@estudio.example", null],
+      ["use", "Claude Team", "team@example.com", null],
       ["also", "Claude Pessoal · Max", "Também usada por Atlas", null],
       ["also", "ChatGPT Plus", "Também usada por Atlas", null],
       ["key", "Claude da Acme", "Claude · termina em 7f2a", "Pago por uso. Conta no orçamento da Ada."],
@@ -580,7 +580,7 @@ describe("the agent's AI", () => {
     };
     const view = (effectiveModel: string) => ({ brain: "claude_code" as const, effectiveModel, options: [claude] });
     const go = modelRows(t, view("deepseek-v4.1-flash"), planOf("opencode"));
-    expect(go).toHaveLength(29);
+    expect(go).toHaveLength(31);
     expect(go[0]).toEqual({
       value: "auto",
       label: "Automático",
@@ -629,7 +629,7 @@ describe("the agent's AI", () => {
     // Every maker beside its own mark, never a letter.
     expect(sections.slice(1).filter((s) => !markOf(s.maker))).toEqual([]);
     // A model that trains on what it's sent: its provider does, said behind the row's ⓘ.
-    expect(go.find((r) => r.value === "beam-free")?.note).toBe(
+    expect(go.find((r) => r.value === "iceman-contributor-free")?.note).toBe(
       "Grátis. O provedor pode usar os pedidos para treinar o modelo. Ligue a permissão no OpenCode.",
     );
     expect(sections.flatMap((s) => s.rows)).toEqual(go);

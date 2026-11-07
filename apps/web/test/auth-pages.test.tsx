@@ -246,14 +246,17 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(screen().queryByRole("button", { name: "Esqueci a senha" })).toBeNull();
   });
 
-  test("a blocked account is told so; another refusal in the server's words when the app has none", async () => {
+  test("a blocked account is told so; another refusal in plain words, never the server's English", async () => {
     for (const [signIn, says] of [
       [
         { ok: false, status: 403, message: "This account can't sign in.", code: "ACCOUNT_BLOCKED" },
         "Esta conta não pode entrar.",
       ],
-      // A refusal the app has no words for: the server's own, English being every language's fallback.
-      [{ ok: false, status: 403, message: "Invalid origin" }, "Invalid origin"],
+      // A refusal the app has no words for: a plain line in the person's language, not the server's English.
+      [
+        { ok: false, status: 403, message: "Invalid origin" },
+        "Não deu certo. Confira o que preencheu e tente de novo.",
+      ],
     ] as const) {
       const { api } = authApi(ACCOUNT);
       await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });

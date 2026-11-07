@@ -551,3 +551,20 @@ test("a run's Abrir na conversa keeps off the Mostrar mais right above it: no sl
   const open = screen.slice(0, screen.indexOf(`t("routines.openInChat")`));
   expect(open.slice(open.lastIndexOf("<Pressable"))).toContain("hitSlop={{ bottom: 13, left: 13, right: 13 }}");
 });
+
+test("Nova rotina's templates: one row opens the search, by area, and picking one fills the draft", async () => {
+  // The screens are components the tests can't render: what they wire in, as text.
+  const read = (f: string) => Bun.file(new URL(`../../src/features/routines/${f}`, import.meta.url).pathname).text();
+  const [form, picker] = await Promise.all([read("RoutineForm.tsx"), read("TemplatePicker.tsx")]);
+  expect(form).toContain("<TemplatePicker value={template?.value} onPick={pickTemplate} />");
+  // The person's own words are never written over unasked, and a part in brackets holds "Criar" back.
+  expect(form).toContain("if (!ownWords(d.prompt, template)) return applyTemplate(o);");
+  expect(form).toContain("!unfilled &&");
+  expect(form).toContain('t("routines.presets.fillBlank")');
+  expect(form).toContain("rule: templateRule(picked, x.rule)");
+  expect(form).not.toContain("PRESETS");
+  expect(picker).toContain("routineTemplateOptions(t, catalog)");
+  expect(picker).toContain("<PickList");
+  // An app not connected yet has its way there, as a mailbox does.
+  expect(picker).toContain('router.push("/connectors")');
+});

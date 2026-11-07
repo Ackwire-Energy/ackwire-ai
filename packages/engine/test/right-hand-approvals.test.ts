@@ -66,7 +66,11 @@ const on = (userId = f.owner.id, extra = {}) =>
   setRightHandApprovals({ db: f.db, pubsub: f.pubsub }, userId, f.org.id, { enabled: true, ...extra });
 
 /** A run of `agentId` on a message: a person's (`by`), or the run's own `trigger`. */
-async function runFor(by: { userId: string } | { triggerMessageId: string }, agentId = f.agent.id) {
+async function runFor(
+  by: { userId: string } | { triggerMessageId: string },
+  agentId = f.agent.id,
+  meta?: Record<string, unknown>,
+) {
   const trigger =
     "userId" in by
       ? await insertMessage(f.db, {
@@ -74,6 +78,7 @@ async function runFor(by: { userId: string } | { triggerMessageId: string }, age
           channelId: f.general.id,
           author: { type: "person", userId: by.userId },
           body: "@dev a fila do suporte tá enorme, vê o que dá pra fazer",
+          meta,
         })
       : { id: by.triggerMessageId };
   const [run] = await f.db
@@ -354,7 +359,8 @@ describe("the right hand approves for a person (ADR 0139 §2)", () => {
       { model: "claude-sonnet-5-5" },
     );
     const settings = async (change: Record<string, unknown>, by = ops.id) => {
-      const out = await call(await runFor({ userId: f.owner.id }, by), PROPOSE_SETTINGS_TOOL, {
+      // Outside content keeps the card open (ADR 0092 §5): what it relays is what the right hand looks at.
+      const out = await call(await runFor({ userId: f.owner.id }, by, { readOutside: true }), PROPOSE_SETTINGS_TOOL, {
         changes: [{ agent: "@dev", ...change }],
         reason: "mais folga",
       });

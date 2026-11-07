@@ -667,9 +667,16 @@ export function accountSettingsEnv(
     if (ownKey) env.CLAUDE_CODE_PROMPT_CACHE_TTL = "1h";
     return env;
   }
-  for (const alias of PLAN_ALIASES) env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = planModel(plan, alias).id;
+  // On a plan whose models each have their own limit and switch (OpenCode Go), a turn's model runs every call of it,
+  // Claude Code's own small ones (titles, command checks) included: its owner may have only that model on, and
+  // another would be refused or spend that model's own limit. Elsewhere `haiku` keeps the plan's cheaper model.
+  const pinned = model && plan.limitsPerModel ? planModel(plan, model).id : undefined;
+  for (const alias of PLAN_ALIASES)
+    env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = pinned ?? planModel(plan, alias).id;
   // A subagent called with Claude Code's `fable` alias would otherwise ask the plan for a Claude model it doesn't serve.
-  env.ANTHROPIC_DEFAULT_FABLE_MODEL = planModel(plan, "opus").id;
+  env.ANTHROPIC_DEFAULT_FABLE_MODEL = pinned ?? planModel(plan, "opus").id;
+  // Older Claude Code reads its small model from here.
+  env.ANTHROPIC_SMALL_FAST_MODEL = pinned ?? planModel(plan, "haiku").id;
   env.CLAUDE_CODE_SUBAGENT_MODEL = planModel(plan, model).id;
   env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
   return { ...env, ...plan.claudeCode.env };

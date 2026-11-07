@@ -13,6 +13,8 @@ import {
   type TaskExecutor,
 } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { isAutoModel } from "@agenteschat/providers";
+import { autoPlanModel, claudeCodeModel, planOf } from "@agenteschat/providers/plans";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
@@ -303,7 +305,7 @@ const TASK_CLIS = {
 export async function taskSignIn(
   db: Database,
   input: Pick<QueuedTaskStart, "orgId" | "agent" | "machineId" | "executor">,
-): Promise<{ account?: string }> {
+): Promise<{ account?: string; model?: string }> {
   if (input.executor !== "claude" && input.executor !== "codex") return {};
   const [agent, machine] = await Promise.all([
     getAgentCached(db, input.orgId, input.agent.id),
@@ -311,7 +313,7 @@ export async function taskSignIn(
   ]);
   if (!agent || !machine) return {};
   // Loaded here: the brains' selection builds on the missions, which build on this module.
-  const { brainAccountFor, planIsOwners } = await import("./brains/select");
+  const { brainAccountFor, planIsOwners, storedPlanUsage } = await import("./brains/select");
   const { kind, cli, plan } = TASK_CLIS[input.executor];
   const own = await brainAccountFor(db, agent, kind, machine.id);
   const account = own && machine.protocol >= TASK_ACCOUNTS_PROTOCOL ? own : undefined;
@@ -353,7 +355,14 @@ export async function taskSignIn(
       `its owner can sign it in there, or your owner can connect a ${plan} account on your page`,
     );
   }
-  return account ? { account: account.id } : {};
+  if (!account) return {};
+  // On a coding plan's key, the agent's model there (its turns'), "Automático" as its turns run it.
+  const keyPlan = input.executor === "claude" ? planOf(account.provider) : undefined;
+  if (!keyPlan) return { account: account.id };
+  const chosen = agent.brainModel && !isAutoModel(agent.brainModel) ? agent.brainModel : undefined;
+  const usage = chosen ? null : await storedPlanUsage(db, input.orgId, machine.id, kind, account.id).catch(() => null);
+  const model = chosen ?? autoPlanModel(account.provider, "sonnet", usage);
+  return { account: account.id, ...(model ? { model: claudeCodeModel(keyPlan, model) } : {}) };
 }
 
 /**

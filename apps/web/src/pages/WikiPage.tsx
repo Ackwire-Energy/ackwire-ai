@@ -1,13 +1,13 @@
 import type { WikiPageSummary } from "@agenteschat/client";
-import { keys, useWikiPage, useWikiReads, useWikiTree } from "@agenteschat/client";
+import { keys, useWikiPage, useWikiReads, useWikiTrash, useWikiTree } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { outlineOf, type WikiFolder, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
-import { Button, EmptyState, Icon, Kbd, PageHeader, SearchField } from "@agenteschat/ui";
+import { Button, Checkbox, EmptyState, Icon, Kbd, PageHeader, SearchField } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -17,6 +17,7 @@ import { useOrg } from "@/components/org-context";
 import { WikiGraphView } from "@/components/WikiGraph";
 import { ObsidianMark } from "@/components/wiki/ObsidianMark";
 import { WikiAudienceDialog } from "@/components/wiki/WikiAudience";
+import { WikiBulkAgentsDialog, WikiBulkDeleteDialog, WikiTrash } from "@/components/wiki/WikiBulk";
 import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
 import { AuthorAvatar, PageOutline, typingIn, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -51,7 +52,7 @@ export function starterPages(t: TFunction) {
 const isFresh = (p: WikiPageSummary) =>
   p.sourceType === "obsidian" && (p.version ?? 1) === 1 && Date.now() - Date.parse(p.updatedAt) < 86_400_000;
 
-type View = "home" | "graph";
+type View = "home" | "graph" | "trash";
 
 /**
  * The org wiki: pages on the left
@@ -61,6 +62,7 @@ type View = "home" | "graph";
 export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const navigate = useNavigate();
   const tree = useWikiTree(org.id);
   const pages = tree.data ?? [];
   const [view, setView] = useState<View>("home");
@@ -124,6 +126,7 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
       />
     );
   else if (view === "graph") center = <WikiGraphView onOpen={() => setView("home")} />;
+  else if (view === "trash") center = <WikiTrash />;
   else if (slug) center = <WikiReader key={slug} slug={slug} pages={pages} onCreate={startNew} onTag={setTag} />;
   else if (tree.isLoading) center = <LoadingCards count={4} />;
   else if (pages.length === 0)
@@ -159,6 +162,12 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
           setWriting(null);
           setNavOpen(false);
         }}
+        onTrash={() => {
+          setView("trash");
+          setWriting(null);
+          setNavOpen(false);
+          if (slug) void navigate({ to: "/org/$orgId/wiki", params: { orgId: org.id } });
+        }}
         onNew={() => startNew()}
         onImport={() => setImporting({})}
         onClose={() => setNavOpen(false)}
@@ -173,7 +182,7 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
         />
       )}
       <div className="wiki__center">
-        {(slug || writing || view === "graph") && (
+        {(slug || writing || view !== "home") && (
           <Button size="sm" variant="ghost" icon="menu" className="wiki__navbtn" onClick={() => setNavOpen(true)}>
             {t("wiki.tree")}
           </Button>
@@ -198,6 +207,7 @@ function WikiNav({
   onTag,
   onHome,
   onGraph,
+  onTrash,
   onNew,
   onImport,
   onClose,
@@ -212,15 +222,35 @@ function WikiNav({
   onTag: (tag: string | null) => void;
   onHome: () => void;
   onGraph: () => void;
+  onTrash: () => void;
   onNew: () => void;
   onImport: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const writes = can(org, "edit_wiki");
   // Who sees a folder: people who write the wiki and manage roles (the server checks the same).
-  const choosesAudience = can(org, "edit_wiki") && can(org, "manage_roles");
+  const choosesAudience = writes && can(org, "manage_roles");
+  // "" is the wiki's root: every page and folder.
   const [audienceFolder, setAudienceFolder] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<{ folder: string; count: number } | null>(null);
+  // Choosing pages to delete or to set their agents at once: the rows become checkboxes.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<"delete" | "agents" | null>(null);
+  const uid = useId();
+  const trashed = useWikiTrash(org.id, writes).data?.length ?? 0;
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  };
   const navigate = useNavigate();
   const toast = useToast();
   const [q, setQ] = useState("");
@@ -261,23 +291,30 @@ function WikiNav({
   const count = (f: WikiFolder<WikiPageSummary>): number =>
     f.pages.length + f.folders.reduce((n, sub) => n + count(sub), 0);
 
-  const pageRow = (p: WikiPageSummary, inTree = true) => (
-    <Fragment key={p.slug}>
-      <Link
-        to="/org/$orgId/wiki/$slug"
-        params={{ orgId: org.id, slug: p.slug }}
-        className="wiki-row"
-        aria-current={p.slug === current ? "page" : undefined}
-        onClick={onClose}
-        {...rowMenu(p)}
-      >
+  const pageRow = (p: WikiPageSummary, inTree = true) =>
+    selecting ? (
+      <label key={p.slug} className="wiki-row wiki-row--pick" htmlFor={`${uid}-${p.id}`}>
+        <Checkbox id={`${uid}-${p.id}`} checked={selected.has(p.id)} onCheckedChange={() => toggle(p.id)} />
         <Icon name={p.locked ? "lock" : "document"} size={14} />
         <span className="wiki-row__t">{p.title}</span>
-        {isFresh(p) && <span className="wiki-row__new">{t("wiki.fresh")}</span>}
-      </Link>
-      {inTree && p.slug === current && outline.length > 0 && <PageOutline items={outline} />}
-    </Fragment>
-  );
+      </label>
+    ) : (
+      <Fragment key={p.slug}>
+        <Link
+          to="/org/$orgId/wiki/$slug"
+          params={{ orgId: org.id, slug: p.slug }}
+          className="wiki-row"
+          aria-current={p.slug === current ? "page" : undefined}
+          onClick={onClose}
+          {...rowMenu(p)}
+        >
+          <Icon name={p.locked ? "lock" : "document"} size={14} />
+          <span className="wiki-row__t">{p.title}</span>
+          {isFresh(p) && <span className="wiki-row__new">{t("wiki.fresh")}</span>}
+        </Link>
+        {inTree && p.slug === current && outline.length > 0 && <PageOutline items={outline} />}
+      </Fragment>
+    );
   const folderRows = (f: WikiFolder<WikiPageSummary>): ReactNode => {
     const isOpen = filtering || !closed.has(f.path);
     const limited = f.pages.some((p) => p.audienceFolder === f.path);
@@ -316,6 +353,17 @@ function WikiNav({
               <Icon name="eye" size={14} />
             </span>
           ) : null}
+          {writes && !selecting && (
+            <button
+              type="button"
+              className="wiki-folder-row__act wiki-folder-row__act--del"
+              aria-label={t("wiki.bulk.deleteFolder", { folder: f.path })}
+              title={t("wiki.bulk.deleteFolder", { folder: f.path })}
+              onClick={() => setDeleting({ folder: f.path, count: count(f) })}
+            >
+              <Icon name="trash" size={14} />
+            </button>
+          )}
         </div>
         {isOpen && (
           <div className="wiki-sub">
@@ -329,7 +377,29 @@ function WikiNav({
 
   return (
     <aside className="wiki-nav" data-open={open || undefined} aria-label={t("wiki.nav")}>
-      {audienceFolder && <WikiAudienceDialog folder={audienceFolder} onClose={() => setAudienceFolder(null)} />}
+      {audienceFolder !== null && (
+        <WikiAudienceDialog folder={audienceFolder} onClose={() => setAudienceFolder(null)} />
+      )}
+      {deleting && (
+        <WikiBulkDeleteDialog
+          target={{ folder: deleting.folder }}
+          count={deleting.count}
+          what={{ kind: "folder", name: deleting.folder }}
+          onClose={() => setDeleting(null)}
+        />
+      )}
+      {bulk === "delete" && (
+        <WikiBulkDeleteDialog
+          target={{ ids: [...selected] }}
+          count={selected.size}
+          what={{ kind: "pages" }}
+          onClose={() => setBulk(null)}
+          onDone={stopSelecting}
+        />
+      )}
+      {bulk === "agents" && (
+        <WikiBulkAgentsDialog ids={[...selected]} onClose={() => setBulk(null)} onDone={stopSelecting} />
+      )}
       <div className="wiki-nav__head">
         <b>{t("wiki.title")}</b>
         {can(org, "edit_wiki") && (
@@ -373,6 +443,18 @@ function WikiNav({
           <span className="wiki-row__t">{t("wiki.graph")}</span>
           <span className="wiki-row__n ac-num">{pages.length}</span>
         </button>
+        {writes && (
+          <button
+            type="button"
+            className="wiki-row"
+            aria-current={view === "trash" ? "page" : undefined}
+            onClick={onTrash}
+          >
+            <Icon name="trash" size={14} />
+            <span className="wiki-row__t">{t("wiki.trash.title")}</span>
+            {trashed > 0 && <span className="wiki-row__n ac-num">{trashed}</span>}
+          </button>
+        )}
       </div>
       {!filtering && pinned.length > 0 && (
         <section className="wiki-nav__section" aria-label={t("wiki.pinnedPages")}>
@@ -384,7 +466,30 @@ function WikiNav({
           with that name" only after a search. */}
       {(loading || filtering || pages.length > 0) && (
         <nav className="wiki-nav__section" aria-label={t("wiki.tree")}>
-          <span className="wiki-label">{filtering ? t("wiki.results", { count: shown.length }) : t("wiki.tree")}</span>
+          <span className="wiki-label wiki-label--acts">
+            {filtering ? t("wiki.results", { count: shown.length }) : t("wiki.tree")}
+            {!filtering && choosesAudience && !selecting && pages.length > 0 && (
+              <button
+                type="button"
+                className="wiki-label__act"
+                data-on={pages.some((p) => p.audienceFolder === "") || undefined}
+                aria-label={t("wiki.audienceRootTitle")}
+                title={t("wiki.audienceRootTitle")}
+                onClick={() => setAudienceFolder("")}
+              >
+                <Icon name="eye" size={14} />
+              </button>
+            )}
+            {writes && pages.length > 0 && (
+              <button
+                type="button"
+                className="wiki-label__act wiki-label__act--text"
+                onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+              >
+                {selecting ? t("common.cancel") : t("wiki.bulk.select")}
+              </button>
+            )}
+          </span>
           {loading ? (
             <LoadingList count={5} avatar={false} />
           ) : (
@@ -395,6 +500,40 @@ function WikiNav({
             </div>
           )}
         </nav>
+      )}
+      {selecting && (
+        <div className="wiki-pickbar" role="toolbar" aria-label={t("wiki.bulk.selected", { count: selected.size })}>
+          <label className="wiki-pickbar__all" htmlFor={`${uid}-all`}>
+            <Checkbox
+              id={`${uid}-all`}
+              checked={
+                shown.length > 0 && shown.every((p) => selected.has(p.id))
+                  ? true
+                  : selected.size > 0
+                    ? "indeterminate"
+                    : false
+              }
+              onCheckedChange={(on) => setSelected(on ? new Set(shown.map((p) => p.id)) : new Set())}
+            />
+            <span>{selected.size ? t("wiki.bulk.selected", { count: selected.size }) : t("wiki.bulk.selectAll")}</span>
+          </label>
+          <span className="wiki-pickbar__acts">
+            {choosesAudience && (
+              <Button size="sm" icon="agent" disabled={selected.size === 0} onClick={() => setBulk("agents")}>
+                {t("wiki.bulk.agents")}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="danger"
+              icon="trash"
+              disabled={selected.size === 0}
+              onClick={() => setBulk("delete")}
+            >
+              {t("wiki.bulk.delete")}
+            </Button>
+          </span>
+        </div>
       )}
       {tags.length > 0 && (
         <section className="wiki-nav__section" aria-label={t("wiki.tags")}>

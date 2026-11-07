@@ -919,6 +919,29 @@ describe("tasks sign in with their agent's own account (ADR 0041 §5.1, protocol
     expect(runner.started[4]?.account).toBeUndefined();
   });
 
+  test("on an OpenCode Go key, a task runs the agent's model there, and Automático the model the key last answered with", async () => {
+    const { runner, start, dev } = await devOnAccount();
+    await f.db.update(schema.machineAccounts).set({ provider: "opencode" });
+    const agent = (brainModel: string) =>
+      f.db.update(schema.agents).set({ brainModel }).where(eq(schema.agents.id, f.agent.id));
+    await agent("deepseek-v4.1-flash");
+    await start(dev, "claude");
+    expect(runner.started.at(-1)).toMatchObject({ account: ACCOUNT, model: "deepseek-v4.1-flash" });
+    await agent("auto");
+    await start(dev, "claude");
+    expect(runner.started.at(-1)?.model).toBe("sonnet");
+    const at = new Date().toISOString();
+    await f.db.update(schema.machineAccounts).set({
+      usage: { windows: [], source: "turn", at, models: { "minimax-m3": { at, off: true } }, answered: "glm-5.3" },
+    });
+    await start(dev, "claude");
+    expect(runner.started.at(-1)?.model).toBe("glm-5.3");
+    // A plan that isn't a key's (a Claude sign-in) names no model, as before.
+    await f.db.update(schema.machineAccounts).set({ provider: null });
+    await start(dev, "claude");
+    expect(runner.started.at(-1)?.model).toBeUndefined();
+  });
+
   test("a task with nothing to sign in with is refused at once with what the agent can do, never sent", async () => {
     const { runner, start, machine, dev, bia } = await devOnAccount();
     // The workspace's own computer: nobody signs its CLIs in.

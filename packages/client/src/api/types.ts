@@ -1255,6 +1255,8 @@ export interface AiStatus {
       | "plan_limit"
       | "model_limit"
       | "model_region"
+      | "model_off"
+      | "plan_inactive"
       | "commands_off"
       | "plan_not_shared"
       | "runner_outdated"
@@ -2001,6 +2003,8 @@ export type ProposalSettingField =
   | "channel_add"
   | "channel_remove"
   | "reply_mode"
+  | "name"
+  | "look"
   | "archive"
   | "delete";
 
@@ -2008,7 +2012,7 @@ export type ProposalSettingField =
  * One line of a settings card: `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or
  * null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` /
  * `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a
- * mention); `archive` true. `label`: the server's names for ids.
+ * mention); `name` its name; `look` `{ color, eyes, accessory }`; `archive` true. `label`: the server's names for ids.
  */
 export interface ProposalSettingLine {
   field: ProposalSettingField;
@@ -2744,7 +2748,8 @@ export interface AgentActionTarget {
  * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
  * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
  * - `agent.settings_changed` (ADR 0137): `agentName`, `fields`, `proposalId` (the right hand's card, applied by the
- *   person who clicked: Undo puts each setting back)
+ *   person who clicked: Undo puts each setting back; or one row applied at once from what they asked, `fields` then
+ *   `instructions`, `role` or `apps`, ADR 0092 §5)
  */
 export type AgentActionParams = Record<string, string | number | boolean | null | string[] | ApiRule>;
 
@@ -3446,6 +3451,29 @@ export interface RoutineHook {
   signed: boolean;
   methods: RoutineHookMethod[];
   calls: RoutineHookCall[];
+}
+
+/** A service whose webhook brings routine events (`EVENT_WEBHOOK`). */
+export type WebhookProvider = "github" | "sentry";
+
+/** `GET …/webhooks/{provider}`: whether the service's webhook works here, and where and with what to set it up. */
+export interface WebhookSetup {
+  provider: WebhookProvider;
+  /** Null: none made yet. */
+  id: string | null;
+  /** Where the service sends its events (who sets webhooks up). */
+  url: string | null;
+  /** GitHub's secret, to paste there (who sets webhooks up). Sentry signs with its own. */
+  secret: string | null;
+  /** The last call with a valid signature: it works. */
+  receivedAt: string | null;
+  /** The last call whose signature didn't match. */
+  refusedAt: string | null;
+  /** Sentry: its integration's Client Secret was pasted here. */
+  secretSet: boolean;
+  canManage: boolean;
+  /** GitHub: the server may add the webhook to a repository itself (`addWebhookToRepo`). */
+  oneClick: boolean;
 }
 
 /** "Quando chegar um email" (ADR 0038): new mail in a folder of a connected mailbox, optionally filtered. */
@@ -4457,6 +4485,8 @@ export interface WikiPageSummary {
   locked?: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned?: boolean;
+  /** "Sempre no contexto dos agentes": in every run of an agent that reads it (at most 3 per workspace). */
+  agentContext?: boolean;
   /** Limited to these roles and people (owners always read it); null or missing = every member. */
   audience?: WikiAudience | null;
   /** Limited to these agents; null or missing = every agent. */
@@ -4471,8 +4501,14 @@ export interface WikiPageSummary {
   excerpt?: string;
   /** `obsidian` for an imported page. */
   sourceType?: string | null;
+  /** An imported page: the vault's name. */
+  sourceName?: string | null;
+  /** The import that brought it (null for pages imported before imports had ids). */
+  importId?: string | null;
   updatedAt: string;
   updatedBy: WikiAuthor;
+  /** In the trash since then (the trash's list). */
+  deletedAt?: string | null;
 }
 
 /** Agents that used pages (in their context or reading them), last 7 days. */
@@ -4503,7 +4539,19 @@ export interface WikiImportInput {
   notes: WikiImportNote[];
   folder?: string;
   onConflict: "keep_both" | "skip";
+  /** The same for every batch and retry of one import. */
+  importId?: string;
 }
+
+/** What "Apagar" reaches: chosen pages, a folder with its subfolders, or one import (by id, or by vault for older ones). */
+export type WikiBulkTarget =
+  | { ids: string[] }
+  | { folder: string }
+  | { importId: string }
+  | { source: { type: string; name: string } };
+
+/** Pages a bulk change couldn't reach, with the error code. */
+export type WikiBulkFailed = { id: string; title: string; code: string }[];
 
 export interface WikiImportResult {
   created: WikiPageSummary[];
@@ -4784,6 +4832,14 @@ export interface ThreadContext {
   moved: boolean;
   /** Messages in the range now (deleted and excluded ones don't count). */
   count: number;
+}
+
+/** A task's conversation with something I haven't read (`GET …/unread-tasks`, ADR 0145). */
+export interface UnreadTask {
+  issueId: string;
+  /** Replies I haven't read: every one where I follow the conversation, else only those that mention me. */
+  unread: number;
+  mentions: number;
 }
 
 export interface ThreadInfo {
@@ -5318,8 +5374,11 @@ export interface PlanUsage {
   limited?: boolean;
   source: "turn" | "probe";
   at: string;
-  /** Models at a limit of their own, by model id: until `until` (absent: unknown), or `region` the model needs. */
-  models?: Record<string, { at: string; until?: string; region?: true }>;
+  /**
+   * Models at a limit of their own, by model id: until `until` (absent: unknown), `region` the model needs, or `off`
+   * the plan refused it for the key.
+   */
+  models?: Record<string, { at: string; until?: string; region?: true; off?: true; inactive?: true }>;
 }
 
 export interface AgentBrainInput {
@@ -5831,6 +5890,12 @@ export type NotificationKind =
    */
   | "plan_lent"
   /**
+   * A model an agent thinks with left its plan's live list, so its turns run another (the agent's owner, once per agent
+   * and model). `source.agentId`, the model in `latest.title`, the plan in `latest.plan`, what runs now in
+   * `latest.nowModel`. Choosing another model makes it done.
+   */
+  | "plan_model_dropped"
+  /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
@@ -6000,6 +6065,8 @@ export interface NotificationLatest {
   text?: string;
   /** The latest message was a GIF or a sticker (ADR 0091): with no `text`, the card names what it was. */
   media?: MediaKind;
+  /** A body the server wrote: `text` in the reader's language by `latestText`. */
+  meta?: PreviewMeta;
   /** Issue title, the approval's action title, the topic's question. */
   title?: string;
   /** Reactions: distinct emojis (≤ 5) and my message's snippet. */
@@ -6039,6 +6106,8 @@ export interface NotificationLatest {
   failures?: RunFailure[];
   /** `run_failed` on a computer brain: the plan's name its cause names ("Claude"). */
   plan?: string;
+  /** `plan_model_dropped`: the model the agent's turns run now. */
+  nowModel?: string;
   /** `usage_limit`: the share of the person's limit used. */
   percent?: number;
   /** `usage_limit` to who decides: the limit, the raise offered, where the limit comes from, this month's requests. */
@@ -6361,9 +6430,9 @@ export interface TaskWait {
   key: string | null;
   /** The plan in words ("Claude"); null for a budget. */
   plan: string | null;
-  /** A wait on a model's own limit or the region it needs: the model's name, and which. */
+  /** A wait on one model's refusal (its own limit, the region it needs, switched off): the model's name, and which. */
   model: string | null;
-  scope: "model" | "region" | null;
+  scope: "model" | "region" | "off" | "inactive" | null;
   /** Paused near a limit: how far along, and the plan's window. */
   percent: number | null;
   window: string | null;
@@ -6692,7 +6761,7 @@ export type ScreenKind = "browser" | "desktop";
  * with the run it is bound to, `runId`).
  */
 /** Where the person in control sends the agent's page: an address they typed, or the address bar's arrows and reload. */
-export type PageTarget = string | { go: "back" | "forward" | "reload" };
+export type PageTarget = string | { go: "back" | "forward" | "reload" | "normalSize" };
 
 export interface BrowserHandoff {
   id: string;

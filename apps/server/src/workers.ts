@@ -38,12 +38,14 @@ import {
   pruneRoutineHookCalls,
   purgeApps,
   purgeDeletedArtifacts,
+  purgeDeletedWikiPages,
   queueApprovalDigests,
   reapRoutineRuns,
   reconcileComposioAccounts,
   reconcileComposioConnectors,
   reconcileWorks,
   recoverStaleRuns,
+  refreshPlanModels,
   releaseJobs,
   sweepEndedInboxes,
   sweepExpiredVoice,
@@ -122,6 +124,8 @@ export const WORKER_INTERVALS_MS = {
   inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
+  /** Wiki pages in the trash past 30 days are removed with their history. */
+  wikiPurge: 6 * 3600_000,
   voiceExpiry: 24 * 3600_000,
   /** How often watched IMAP folders are looked at (each is checked every `MAIL_POLL_SECONDS`). */
   mailPoll: 30_000,
@@ -143,6 +147,8 @@ export const WORKER_INTERVALS_MS = {
   vaultSyncs: 5 * 60_000,
   /** Lodi's weekly card of admins whose slot just passed (ADR 0137 §9; one per person and week: its dedupe key). */
   teamWeek: 10 * 60_000,
+  /** The coding plans' public lists of models, each replica for itself: also at boot. */
+  planModels: 3600_000,
 };
 
 /**
@@ -199,6 +205,7 @@ export function startWorkers(deps: WorkerDeps) {
   });
 
   every("apps", WORKER_INTERVALS_MS.apps, () => purgeApps(db));
+  every("planModels", WORKER_INTERVALS_MS.planModels, () => refreshPlanModels());
   every("skillUpdates", WORKER_INTERVALS_MS.skillUpdates, async () => {
     if ((await enqueueSkillUpdates(db)) > 0) void ticks.get("outbox")?.();
   });
@@ -285,6 +292,11 @@ export function startWorkers(deps: WorkerDeps) {
       if (purged > 0) log.info("deleted files purged", { versions: purged });
     });
   }
+
+  every("wikiPurge", WORKER_INTERVALS_MS.wikiPurge, async () => {
+    const purged = await purgeDeletedWikiPages(db);
+    if (purged > 0) log.info("wiki pages past the trash purged", { pages: purged });
+  });
 
   every("widgetDrafts", WORKER_INTERVALS_MS.widgetDrafts, async () => {
     const swept = await sweepWidgetDrafts({ db, pubsub: deps.pubsub });

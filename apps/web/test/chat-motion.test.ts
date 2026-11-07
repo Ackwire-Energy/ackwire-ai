@@ -243,7 +243,9 @@ describe("humanized activity", () => {
     expect(toolActivity("read_artifact")).toEqual({ kind: "readingDrive" });
     expect(toolActivity("search_context")).toEqual({ kind: "searchingMemory" });
     expect(toolActivity("github_merge_pr")).toEqual({ kind: "consulting", app: "GitHub" });
-    expect(toolActivity("himetrica_get_analytics")).toEqual({ kind: "consulting", app: "himetrica" });
+    // Only a catalog connector's prefix names an app; another's tool is named by the event's label.
+    expect(toolActivity("himetrica_get_analytics")).toEqual({ kind: "usingTool" });
+    expect(toolActivity("himetrica_get_analytics", "himetrica")).toEqual({ kind: "consulting", app: "himetrica" });
     expect(toolActivity("drive_search_files")).toEqual({ kind: "readingDrive" });
     expect(toolActivity("x_query", "Google Drive")).toEqual({ kind: "readingDrive" });
     // Google Drive through Composio: its tools' names, and its accounts' names.
@@ -291,7 +293,7 @@ describe("humanized activity", () => {
   test("the bar's sentence (pt-BR)", () => {
     expect(activityText(t, [])).toBe("");
     expect(activityText(t, [entry("Theo", { kind: "thinking" })])).toBe("Theo está trabalhando…");
-    expect(activityText(t, [entry("Theo", toolActivity("himetrica_get_events"))])).toBe(
+    expect(activityText(t, [entry("Theo", toolActivity("himetrica_get_events", "himetrica"))])).toBe(
       "Theo está consultando o Himetrica…",
     );
     expect(activityText(t, [entry("Theo", toolActivity("create_issue"))])).toBe("Theo está criando uma tarefa…");

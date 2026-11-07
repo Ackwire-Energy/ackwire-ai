@@ -435,8 +435,6 @@
     "camera": "カメラ",
     "photos": "写真",
     "file": "ファイル",
-    "audio": "音声",
-    "audioSoon": "音声はまもなく使えるようになります。",
     "noCamera": "カメラへのアクセスがありません。スマートフォンの設定で許可してください。",
     "mission": "ミッションを開始",
     "missionHint": "計画を立てて、最初から最後までやり遂げる長い仕事",
@@ -706,6 +704,7 @@
   },
   "activity": {
     "title": "アクティビティ",
+    "chooseModel": "別のモデルを選ぶ",
     "filter": {
       "all": "すべて",
       "waiting": "あなたの対応待ち",
@@ -766,6 +765,7 @@
       "desktop_taken_female_other": "{{names}}が{{agent}}のコンピューターの画面の操作を引き継ぎました",
       "plan_lent_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました",
       "plan_lent_female_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました",
+      "plan_model_dropped_other": "{{model}}が{{plan}}から外れました。{{names}}は当面{{runs}}を使います",
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
       "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",

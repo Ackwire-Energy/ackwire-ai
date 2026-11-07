@@ -463,7 +463,7 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
     },
     describe: (input) => ({
       title: input.wake_me === true ? "Hand off the report" : "Post the message",
-      detail: String(input.message ?? "").slice(0, 500),
+      detail: String(input.message ?? ""),
     }),
     async execute(input, ctx) {
       const text = String(input.message ?? "").trim();

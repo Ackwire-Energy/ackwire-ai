@@ -157,6 +157,12 @@ export function opencodeConfig(input: {
   key?: boolean;
   /** OpenCode's own provider alone. */
   freeTier?: boolean;
+  /**
+   * The turn's model, which also writes the session's title: OpenCode otherwise picks a small model of the same
+   * provider for that (the `gpt-luna` family first, github.com/anomalyco/opencode issue 56755, 2026-10), a call on
+   * a model nobody chose that a key pays for.
+   */
+  small?: string;
 }): string {
   const env = (name: string) => `{env:${name}}`;
   const [command, ...args] = input.command ?? [];
@@ -172,6 +178,7 @@ export function opencodeConfig(input: {
     mcp: { [CODEX_MCP_SERVER]: server },
     permission: input.chat ? OPENCODE_CHAT_PERMISSION : opencodePermissions(input.profile),
     ...(input.chat?.model ? { model: input.chat.model } : {}),
+    ...(input.small ? { small_model: input.small } : {}),
     share: "disabled",
     autoupdate: false,
     ...(input.key ? { provider: { opencode: { options: { apiKey: env(OPENCODE_KEY_ENV) } } } } : {}),
@@ -441,6 +448,7 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
     ...(input.chat ? { chat: input.model ? { model: input.model } : {} } : {}),
     key: Boolean(key),
     freeTier: Boolean(input.freeTier && !input.account),
+    ...(input.model ? { small: input.model } : {}),
   });
   if (key) env[OPENCODE_KEY_ENV] = key;
   env.OPENCODE_DISABLE_PROJECT_CONFIG = "1";

@@ -306,7 +306,9 @@ export const routineHookCalls = pgTable(
 
 /**
  * Incoming webhooks of an organization (GitHub, Sentry). The signing secret
- * is sealed; each request's signature is checked before anything runs.
+ * is sealed; each request's signature is checked before anything runs. GitHub's
+ * secret is ours (people paste it there); Sentry's is its integration's Client
+ * Secret, pasted here (`secret_set_at`).
  */
 export const webhookEndpoints = pgTable(
   "webhook_endpoints",
@@ -322,6 +324,12 @@ export const webhookEndpoints = pgTable(
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp({ withTimezone: true }),
+    /** The last call that carried a valid signature (any event, GitHub's ping too): the webhook works. */
+    lastDeliveryAt: timestamp({ withTimezone: true }),
+    /** The last call whose signature didn't match: set up with another secret. */
+    lastRefusedAt: timestamp({ withTimezone: true }),
+    /** When a person pasted the provider's own secret (Sentry's Client Secret). */
+    secretSetAt: timestamp({ withTimezone: true }),
   },
   (t) => [index().on(t.orgId)],
 );

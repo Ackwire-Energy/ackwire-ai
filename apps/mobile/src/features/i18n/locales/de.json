@@ -450,8 +450,6 @@
     "camera": "Kamera",
     "photos": "Fotos",
     "file": "Datei",
-    "audio": "Audio",
-    "audioSoon": "Audio kommt bald.",
     "noCamera": "Kein Kamerazugriff. Erlaube ihn in den Einstellungen des Handys.",
     "mission": "Mission starten",
     "missionHint": "Lange Arbeit, mit Plan, von Anfang bis Ende",
@@ -730,6 +728,7 @@
   },
   "activity": {
     "title": "Aktivität",
+    "chooseModel": "Anderes Modell wählen",
     "filter": {
       "all": "Alle",
       "waiting": "Wartet auf dich",
@@ -832,6 +831,8 @@
       "plan_lent_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden",
       "plan_lent_female_one": "{{names}} hat dein {{plan}}-Abo mit {{agent}} verbunden",
       "plan_lent_female_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden",
+      "plan_model_dropped_one": "{{model}} ist nicht mehr bei {{plan}}. {{names}} nutzt vorerst {{runs}}",
+      "plan_model_dropped_other": "{{model}} ist nicht mehr bei {{plan}}. {{names}} nutzt vorerst {{runs}}",
       "connector_tool_changed_one": "Ein verbundener Server hat Tools geändert, die du freigegeben hast",
       "connector_tool_changed_other": "Verbundene Server haben Tools geändert, die du freigegeben hast",
       "computer_disk_full_one": "Die Festplatte eines Computers ist fast voll",

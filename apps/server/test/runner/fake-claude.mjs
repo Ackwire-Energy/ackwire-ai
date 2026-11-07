@@ -14,7 +14,7 @@
 // deltas, each 150 ms before the next line, "KEY401" is refused by the endpoint and retries for good
 // (as Claude Code 2.1.310 does, ten times with backoff), "ASKCONTROL" asks for an elicitation on stdout and answers
 // with what it got back, "ECHOSHAPE" prints a token-shaped text in two deltas, "ECHOLONGSHAPE" one that goes on over
-// three after its prefix. Control requests: `initialize`, and `get_usage`
+// three after its prefix, "KEY403" is forbidden by it (a model or account switched off). Control requests: `initialize`, and `get_usage`
 // as $FAKE_CLAUDE_USAGE says ("" a Max plan's windows, "signed_out", "error",
 // "hang": never).
 // With `--json-schema` it is a route (`brain.route`): the prompt on stdin, one JSON result whose
@@ -362,6 +362,22 @@ async function answer(line) {
       error: "authentication_failed",
     });
     await sleep(60_000);
+    return;
+  }
+  if (prompt.includes("KEY403")) {
+    out({
+      type: "assistant",
+      parent_tool_use_id: null,
+      error: "authentication_failed",
+      message: { id: "msg_403", content: [{ type: "text", text: "API Error: 403" }] },
+    });
+    out({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      result: 'API Error: 403 {"type":"error","error":{"type":"permission_error","message":"Account.Disabled"}}',
+      usage: { input_tokens: 0, output_tokens: 0 },
+    });
     return;
   }
   if (prompt.includes("AUTH")) {

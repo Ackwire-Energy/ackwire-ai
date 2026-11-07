@@ -10,11 +10,13 @@ import {
   chosenRows,
   memoryLine,
   messageProposalCards,
+  pendingOnAgent,
   proposalSections,
   proposalWhy,
   proposerOf,
   removalOf,
   rowStatus,
+  settingLineText,
   sortProposals,
   staleCount,
 } from "../src/lib/proposals";
@@ -55,6 +57,55 @@ const access = (id: string, patch: Partial<Proposal> = {}) =>
     access: [{ id: "browser:use", label: "Use a browser", on: false }],
     ...patch,
   });
+
+describe("what waits on an agent's page", () => {
+  test("its instructions and the skills it asked to change, nothing decided or another agent's", () => {
+    const skill = row("a", {
+      agentId: "ada",
+      target: { type: "skill", agentId: "ada", skillId: "s", name: "relatorios" },
+    });
+    const list = [
+      row("b", { agentId: "ada", target: { type: "agent_instructions", agentId: "ada" } }),
+      skill,
+      row("c", { agentId: "ada", target: { type: "agent_role", agentId: "ada" } }),
+      row("d", { agentId: "theo", target: { type: "agent_instructions", agentId: "theo" } }),
+      { ...skill, id: "e", status: "accepted" as const },
+    ];
+    expect(pendingOnAgent(list, "ada").map((p) => p.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("a skill on a card", () => {
+  test("reads as a text change, so the phone's card shows its lines", () => {
+    const skill = row("a", {
+      target: { type: "skill", agentId: "agent-a", skillId: "s", name: "relatorios" },
+      before: "# Passos",
+      after: "# Passos\n1. Conferir os totais.",
+    });
+    expect(proposalSections([skill])).toMatchObject([
+      { kind: "text", lines: [{ kind: "add", text: "1. Conferir os totais." }], rows: [{ id: "a" }] },
+    ]);
+  });
+});
+
+describe("a name and a look on a settings card", () => {
+  const names = { model: (id: string) => id, person: () => undefined, channel: () => undefined, role: () => undefined };
+  test("a name reads as itself, a look in words, a custom color as its code", () => {
+    expect(settingLineText(t, "pt-BR", { field: "name", from: "Dev", to: "Ada" }, names)).toEqual({
+      field: "rightHand.field.name",
+      from: "Dev",
+      to: "Ada",
+    });
+    const line = settingLineText(
+      t,
+      "pt-BR",
+      { field: "look", from: null, to: { color: "#123456", eyes: "happy", accessory: "crown" } },
+      names,
+    );
+    expect(line.from).toBe("rightHand.value.lookDefault");
+    expect(line.to).toBe("#123456 · look.eyesNames.happy · look.accessories.crown");
+  });
+});
 
 describe("a card of proposals", () => {
   test("its rows: every id, else the one an older server sent; its proposer, else the agent it changes", () => {

@@ -1,9 +1,8 @@
-import { presenceOfAvailability } from "@agenteschat/client/lib/presence";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, PresenceBadge, Text, useTheme } from "@/ui";
 import { useMyPerson } from "./hooks";
-import { availabilityOf, personLine } from "./logic";
+import { personLine } from "./logic";
 import { openStatus } from "./StatusScreen";
 
 /**
@@ -14,7 +13,8 @@ export function MyStatusRow() {
   const { t, i18n } = useTranslation();
   const { colors: c, shadows } = useTheme();
   const me = useMyPerson();
-  const presence = presenceOfAvailability(me?.availability ?? availabilityOf(me?.presence));
+  // As every list shows me (hidden stays hidden), so this row and the members never disagree.
+  const presence = me?.presence ?? "offline";
   const status = me?.status ?? null;
   const title = presence === "online" && !status ? t("presence.setStatus") : t(`presence.${presence}`);
   const sub = status

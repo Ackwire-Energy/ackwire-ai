@@ -37,6 +37,8 @@ export type NoAiReason =
   | "plan_limit"
   | "model_limit"
   | "model_region"
+  | "model_off"
+  | "plan_inactive"
   | "commands_off"
   | "plan_not_shared"
   | "runner_outdated"

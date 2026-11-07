@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
+  addChannelMember,
   agentSearchChannels,
   closeRoutineRun,
+  createChannel,
   createIssue,
   createRoutine,
   drainOutbox,
@@ -98,6 +100,39 @@ test("a routine's room is read only by its own runs: other runs' searches never 
   const room = brief?.channelId ?? "";
   expect(await agentSearchChannels(f.db, f.org.id, f.agent.id, f.general.id)).toEqual([f.general.id]);
   expect(await agentSearchChannels(f.db, f.org.id, f.agent.id, room)).toContain(room);
+});
+
+test("a routine's run reads the private conversation it reports to while its creator is in it, never another", async () => {
+  f = await setup();
+  const privateRoom = async (name: string) => {
+    const room = await createChannel(f.db, f.owner.id, f.org.id, { name, visibility: "private" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, room.id, { agentId: f.agent.id });
+    return room;
+  };
+  const sales = await privateRoom("vendas");
+  const secret = await privateRoom("secreto");
+  const routine = await channelRoutine(f, { target: { type: "channel", channelId: sales.id } });
+  await fire(f, routine.id, new Date());
+  const room = (await briefs(f))[0]?.channelId ?? "";
+  const reach = () => agentSearchChannels(f.db, f.org.id, f.agent.id, room);
+  expect(new Set(await reach())).toEqual(new Set([room, sales.id, f.general.id]));
+  // Elsewhere the agent reaches neither private channel.
+  expect(await agentSearchChannels(f.db, f.org.id, f.agent.id, f.general.id)).toEqual([f.general.id]);
+
+  await f.db
+    .delete(schema.channelMembers)
+    .where(and(eq(schema.channelMembers.channelId, sales.id), eq(schema.channelMembers.userId, f.owner.id)));
+  expect(await reach()).not.toContain(sales.id);
+  expect(await reach()).not.toContain(secret.id);
+});
+
+test("a DM routine's run reads its creator's DM with the agent", async () => {
+  f = await setup();
+  const routine = await channelRoutine(f, { target: { type: "dm" } });
+  await fire(f, routine.id, new Date());
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  const room = (await briefs(f))[0]?.channelId ?? "";
+  expect(await agentSearchChannels(f.db, f.org.id, f.agent.id, room)).toContain(dm.id);
 });
 
 test("a DM routine reports to its creator's DM with the agent", async () => {

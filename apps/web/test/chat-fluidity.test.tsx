@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -135,6 +135,9 @@ describe("following the bottom", () => {
         log.scrollTop = opts.top ?? 0;
       }) as typeof log.scrollTo;
       await act(() => new Promise((r) => setTimeout(r, 1600)));
+      // The bar opens within the glide's 600ms, whatever a loaded machine takes to send and settle: the clock stands
+      // still from the send until it opens.
+      setSystemTime(new Date());
       const composer = screen().getByRole("combobox", { name: /Mensagem para/ });
       await act(async () => fireEvent.change(composer, { target: { value: "bom dia" } }));
       await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
@@ -145,6 +148,7 @@ describe("following the bottom", () => {
       await act(async () => {
         for (const cb of observers) cb([], {} as ResizeObserver);
       });
+      setSystemTime();
       expect(log.scrollTop).toBe(2000);
       await act(() => new Promise((r) => setTimeout(r, 700)));
       expect(log.scrollTop).toBe(2032);
@@ -160,6 +164,7 @@ describe("following the bottom", () => {
       expect(log.scrollTop).toBe(2060);
       expect(glides.length).toBe(glided);
     } finally {
+      setSystemTime();
       globalThis.ResizeObserver = native;
       device.prefersReducedMotion = "reduce";
     }

@@ -93,6 +93,7 @@ import type {
   TaskSteps,
   TeamProposalCard,
   TeamTemplate,
+  UnreadTask,
   UsageQueue,
   WorkspaceLimits,
 } from "@agenteschat/client";
@@ -103,6 +104,7 @@ import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
 import { ISSUES_VIEW_DEFAULT } from "@agenteschat/client/lib/issues-view";
 import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
+import type { PlanModel } from "@agenteschat/client/lib/plans";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
 import { SIDEBAR_ITEMS } from "@agenteschat/client/lib/sidebar-items";
 import type { TeamWeekPrefs } from "@agenteschat/client/lib/team-week";
@@ -204,6 +206,8 @@ export interface FakeState {
   answerHold?: Promise<void>;
   /** Threads I follow with an unread reply (`reads.unreadThreads`). */
   unreadThreads?: number;
+  /** Tasks whose conversation has a reply I haven't read (`reads.unreadTasks`). */
+  unreadTasks?: UnreadTask[];
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
@@ -229,6 +233,8 @@ export interface FakeState {
   keyRefusalParams?: Record<string, unknown>;
   /** What an endpoint lists (ADR 0146); absent: nothing. */
   endpointList?: { baseURL: string; models: { id: string }[]; error?: string };
+  /** The coding plans' models as the server read them from their makers' lists; absent: an older server. */
+  planModels?: Partial<Record<string, readonly PlanModel[]>>;
   /** Each model's test result when an endpoint is saved; absent: `ok`. */
   endpointChecks?: Record<string, EndpointCheck>;
   approvals: Approval[];
@@ -2302,6 +2308,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       former: async () => state.former ?? [],
       models: async () => ({
+        ...(state.planModels ? { planModels: state.planModels } : {}),
         defaultModel: "claude-sonnet-5-5",
         models: [
           {
@@ -2847,6 +2854,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       unarchive: async (orgId, channelId) => {
         log("chat.unarchive", orgId, channelId);
       },
+      leave: async (orgId, channelId) => {
+        log("chat.leave", orgId, channelId);
+        const c = state.channels.find((x) => x.id === channelId);
+        if (c) c.isMember = false;
+      },
       deleteChannel: async (orgId, channelId, name) => {
         log("chat.deleteChannel", orgId, channelId, name);
         const c = state.channels.find((x) => x.id === channelId);
@@ -3334,6 +3346,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       markThreadRead: async (orgId, threadId) => log("reads.markThreadRead", orgId, threadId),
       unreadThreads: async () => state.unreadThreads ?? 0,
+      unreadTasks: async () => structuredClone(state.unreadTasks ?? []),
     },
     questions: {
       // Same rules as the server: the choice must be one of the options; answering twice is 409.

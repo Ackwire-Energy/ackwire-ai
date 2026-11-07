@@ -297,7 +297,7 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   --msg-inline: 12px;
 }
 .search-result__jump.ac-btn {
-  margin: 4px 8px 0 0;
+  margin: 4px 8px 4px 0;
   opacity: 0;
 }
 .search-result:is(:hover, :focus-within) {

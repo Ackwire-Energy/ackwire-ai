@@ -347,7 +347,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/threads/$threadId"; params: { threadId: string }; search?: { m: string } }
   | { to: "/org/$orgId/c/$channelId"; params: { channelId: string }; search?: { m: string } }
   | { to: "/org/$orgId/dm/agent/$agentId"; params: { agentId: string }; search?: { m: string } }
-  | { to: "/org/$orgId/agents/$agentId"; params: { agentId: string } }
+  | { to: "/org/$orgId/agents/$agentId"; params: { agentId: string }; search?: { sec: "brain" } }
   | { to: "/org/$orgId/dm/person/$userId"; params: { userId: string }; search?: { m: string } }
   | { to: "/org/$orgId/issues/$number"; params: { number: string }; search?: { m: string } }
   | { to: "/org/$orgId/approvals"; search?: { open: string } }
@@ -434,6 +434,9 @@ export function openTarget(n: AppNotification): OpenTarget | null {
       ...(theirs && s.userId ? { search: { person: s.userId } } : {}),
     };
   }
+  // The agent's model left its plan's list: its page, with "Quem pensa" open to choose another.
+  if (n.kind === "plan_model_dropped" && s.agentId)
+    return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId }, search: { sec: "brain" } };
   // Someone gave an agent the person's plan: Contas de IA, where their plans and the agents on them are.
   if (n.kind === "plan_lent") return { to: "/org/$orgId/settings/$section", params: { section: "keys" } };
   // A server changed approved tools: accepted in Conectores.

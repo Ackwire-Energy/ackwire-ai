@@ -139,7 +139,9 @@ async function readsInRun(ctx: RunCtx & { db: Database }, name: string) {
  * author told. Otherwise each part becomes a proposal a person who manages agents accepts. A file that runs (a
  * script, an executable: `runsCode`) is always a proposal, whatever the setting.
  * `trust` is the run's (`learnTrust`): after outside content (the web, mail, a connected app) nothing applies at
- * once, since skills load as trusted instructions and can be shared with other agents.
+ * once, since skills load as trusted instructions and can be shared with other agents. `asked`: who is behind the run
+ * and, with `decides`, that they asked in their own words and may decide it (`ownWords`, ADR 0092 §5): it applies at
+ * once whatever the setting or a lock, a file that runs aside.
  */
 export async function changeSkillAsAgent(
   deps: { db: Database; pubsub?: PubSub; judge?: Judge; blobs?: BlobStoreResolver },
@@ -147,6 +149,7 @@ export async function changeSkillAsAgent(
   slug: string,
   change: string | { body?: string; files?: SkillFileEdit[] },
   trust: "high" | "low",
+  asked?: { person: string | null; decides: boolean },
 ): Promise<SkillChange> {
   const name = slug.trim().toLowerCase();
   const { body: rawBody, files = [] } = typeof change === "string" ? { body: change } : change;
@@ -205,7 +208,7 @@ export async function changeSkillAsAgent(
   const why =
     trust === "low"
       ? "outside"
-      : own
+      : own || asked?.decides
         ? undefined
         : skill.locked
           ? "locked"
@@ -216,7 +219,7 @@ export async function changeSkillAsAgent(
   const propose = async (body: string, file?: { path: string; text: string }) => {
     const p = await proposeSkillChange(
       { db: ctx.db, pubsub: deps.pubsub },
-      { orgId: ctx.orgId, agentId: ctx.agentId, skill, body, file },
+      { orgId: ctx.orgId, agentId: ctx.agentId, skill, body, file, requesterId: asked?.person },
     );
     if (p) proposalIds.push(p.id);
   };

@@ -1843,6 +1843,13 @@
     "generalName": "#general garde son nom.",
     "archive": "Archiver le canal",
     "archived": "#{{channel}} archivé. La conversation est conservée.",
+    "leave": "Quitter le canal",
+    "left": "Vous avez quitté #{{channel}}",
+    "leaveTitle": "Quitter #{{channel}} ?",
+    "leavePrivate": "C'est un canal privé : pour revenir, une personne du canal doit vous ajouter.",
+    "leaveLast": "Vous êtes la dernière personne ici : partir archive le canal.",
+    "leaveConfirm": "Quitter",
+    "leaveLastConfirm": "Quitter et archiver",
     "delete": "Supprimer le canal",
     "deleteTitle": "Supprimer #{{channel}} définitivement ?",
     "deleteGoes": "Disparaît maintenant : messages, fils, fichiers et épingles, ce que les agents ont retenu du canal et les routines qui y publient.",
@@ -1981,7 +1988,7 @@
     "composerHint": "rien ne change sans vous",
     "intro": {
       "greeting": "Bonjour, je suis {{name}}. Je monte l’équipe avec vous.",
-      "lead": "Je crée les agents, je connecte les applications et j’invite les personnes. Rien ne change sans votre clic, et je ne fais que ce que vous pouvez faire.",
+      "lead": "Je crée les agents, je connecte les applications et j’invite les personnes. Rien ne change sans votre demande, et je ne fais que ce que vous pouvez faire.",
       "heldLead": "Choisissez ce que fait votre entreprise et l'équipe apparaît ici. Les agents se mettent au travail dès que le workspace a un abonnement agentes.chat.",
       "connect": {
         "title": "Connecter une IA pour l’équipe",
@@ -2100,6 +2107,8 @@
         "audience": "Seuls les admins et son responsable changent qui lui parle",
         "channels": "Seuls les admins et son responsable changent ses canaux",
         "ai_account": "Seul le propriétaire du compte l’attribue",
+        "name": "Seuls les admins renomment un agent",
+        "look": "Seuls les admins et son responsable changent son apparence",
         "many": "Seuls les admins font ces changements"
       }
     },
@@ -2110,9 +2119,12 @@
       "owner": "Responsable",
       "audience": "Qui peut parler",
       "archive": "Statut",
-      "channel": "Canal"
+      "channel": "Canal",
+      "name": "Nom",
+      "look": "Apparence"
     },
     "value": {
+      "lookDefault": "L'apparence par défaut",
       "none": "Aucun",
       "budgetDefault": "Par défaut du workspace",
       "anAccount": "Un compte d’IA",
@@ -2307,6 +2319,8 @@
       "plan_tools": "{{name}} s'est arrêté avant de répondre : l'IA de l'abonnement sur cet ordinateur n'est pas restée dans les outils d'agentes.chat.",
       "model_limit": "{{name}} ne peut pas répondre maintenant : {{model}} a atteint sa propre limite sur l'abonnement. Les autres modèles de l'abonnement fonctionnent toujours.",
       "model_region": "{{name}} ne peut pas répondre : {{model}} a besoin de la région Global activée dans OpenCode (Settings › Privacy).",
+      "model_off": "{{name}} ne peut pas répondre : OpenCode a refusé {{model}} avec cette clé. Activez le modèle ou le compte dans OpenCode, ou choisissez un autre modèle.",
+      "plan_inactive": "{{name}} ne peut pas répondre : OpenCode Go n'est pas actif sur le compte OpenCode de cette clé. Vérifiez l'abonnement Go dans OpenCode, ou connectez une clé du compte qui a Go.",
       "commands_off": "{{name}} ne peut pas répondre maintenant : les commandes sont désactivées sur l'ordinateur de l'abonnement, et la personne qui s'en occupe doit les activer.",
       "useKey": "Utiliser une clé API"
     },
@@ -2771,7 +2785,10 @@
       "updated": "J'ai corrigé la compétence <b>{{name}}</b>"
     },
     "agent": {
-      "settings_changed": "J'ai modifié les paramètres de <b>{{agentName}}</b>"
+      "settings_changed": "J'ai modifié les paramètres de <b>{{agentName}}</b>",
+      "settings_changed_instructions": "J'ai modifié les instructions de <b>{{agentName}}</b>",
+      "settings_changed_role": "J'ai modifié le rôle de <b>{{agentName}}</b>",
+      "settings_changed_apps": "J'ai modifié les apps de <b>{{agentName}}</b>"
     },
     "pr": {
       "merged": "J'ai mergé la PR <b>#{{number}}</b> dans <b>{{repo}}</b>",
@@ -3563,6 +3580,11 @@
     "dismissedByYou": "Vous avez passé cette question."
   },
   "ask": {
+    "kindOther": {
+      "approval": "Demande une approbation",
+      "browser": "A besoin de quelqu'un dans le navigateur",
+      "desktop": "A besoin de quelqu'un sur l'ordinateur"
+    },
     "kind": {
       "approval": "Demande votre approbation",
       "secret": "Demande un secret",
@@ -3609,12 +3631,16 @@
     },
     "said": "<b>{{name}} :</b> « {{text}} »",
     "askPlain": "J'ai besoin de votre accord pour continuer :",
+    "askPlainOther": "J'ai besoin d'un accord pour continuer :",
     "seeEmail": "Voir l'e-mail",
     "seeDetails": "Voir les détails",
     "notNow": "Pas maintenant",
     "askMany_one": "J'ai besoin de votre accord pour continuer ceci :",
     "askMany_many": "J'ai besoin de votre accord pour continuer ces {{count}} actions :",
     "askMany_other": "J'ai besoin de votre accord pour continuer ces {{count}} actions :",
+    "askManyOther_one": "J'ai besoin d'un accord pour continuer ceci :",
+    "askManyOther_many": "J'ai besoin d'un accord pour continuer ces {{count}} actions :",
+    "askManyOther_other": "J'ai besoin d'un accord pour continuer ces {{count}} actions :",
     "all": {
       "approve": "Tout approuver",
       "refuse": "Pas maintenant pour tout",
@@ -3735,7 +3761,29 @@
       "delete_branches_one": "Supprimer {{count}} branche dans {{repo}}",
       "delete_branches_many": "Supprimer {{count}} branches dans {{repo}}",
       "delete_branches_other": "Supprimer {{count}} branches dans {{repo}}",
-      "request_branch_push": "Push vers {{branch}} dans {{repo}} (24 h, sans force push)"
+      "request_branch_push": "Push vers {{branch}} dans {{repo}} (24 h, sans force push)",
+      "action": {
+        "merge": "Merger",
+        "deploy": "Déployer",
+        "rollback": "Revenir en arrière",
+        "publish": "Publier",
+        "delete": "Supprimer des données",
+        "send": "Envoyer un message à l'extérieur",
+        "draft": "Enregistrer un brouillon"
+      },
+      "vault_make_password": "Créer un mot de passe",
+      "pg_query": "Interroger {{target}}",
+      "request_approval": {
+        "merge": "Faire le merge de {{target}}",
+        "deploy": "Déployer {{target}}",
+        "rollback": "Revenir en arrière sur {{target}}",
+        "other": "Approuver {{target}}"
+      },
+      "github": {
+        "merge_pull_request": "Faire le merge de la PR #{{number}} dans {{repo}}",
+        "pull_request_review_write": "Relire la PR #{{number}} dans {{repo}}",
+        "actions_run_trigger": "Lancer {{method}} dans {{repo}}"
+      }
     }
   },
   "home": {
@@ -3836,6 +3884,9 @@
       "takeBack": "Reprendre",
       "takeBackAll": "Reprendre de tous les agents",
       "done": "Votre forfait est revenu"
+    },
+    "planModelDropped": {
+      "choose": "Choisir un autre modèle"
     },
     "docTitleUnread": "({{count}}) Notifications",
     "summaryWaiting_one": "{{count}} chose vous attend",
@@ -3945,6 +3996,7 @@
       "browserProfileRequest": "<b>{{name}}</b> demande un profil de navigateur de plus pour <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> a pris le contrôle de l'écran de l'ordinateur de <b>{{agent}}</b>",
       "planLent": "<b>{{name}}</b> a connecté votre forfait {{plan}} à <b>{{agent}}</b>",
+      "planModelDropped": "{{model}} a quitté {{plan}}. <b>{{name}}</b> utilise {{runs}} jusqu’à ce que tu choisisses un autre modèle.",
       "routineWaitingPlan": "<b>{{name}}</b> attend la réinitialisation de son abonnement pour exécuter une routine",
       "planResetUnknown": "{{plan}} n'a pas indiqué quand sa limite se réinitialise. Le travail de <b>{{name}}</b> attend toujours.",
       "catchUpClosed_one": "<b>{{name}}</b> est de retour et a sauté {{count}} conversation qui n'avait pas besoin de réponse",
@@ -6407,6 +6459,48 @@
         "rate_limited": "Refusé : trop d'appels par minute"
       }
     },
+    "setup": {
+      "title": "Webhook {{provider}}",
+      "working": "Ça marche. {{provider}} envoie déjà ses événements ici.",
+      "waiting": {
+        "github": "En attente de GitHub. Il envoie un ping dès que le webhook est enregistré.",
+        "sentry": "En attente de Sentry. Il appelle quand une nouvelle erreur arrive."
+      },
+      "refused": {
+        "github": "GitHub a appelé avec un autre secret. Recopie le Secret ci-dessous dans le webhook.",
+        "sentry": "Sentry a appelé avec un autre secret. Colle de nouveau le Client Secret de l’intégration."
+      },
+      "timeout": "Rien n’est arrivé en 3 minutes. Vérifie l’URL et le secret, puis teste de nouveau.",
+      "adminOnly": "Les personnes qui gèrent les connecteurs activent le webhook {{provider}}. Demande à un admin d’ouvrir cette routine.",
+      "test": "Tester",
+      "retest": "Tester de nouveau",
+      "copied": "Copié.",
+      "github": {
+        "repo": "Dépôt",
+        "repoPlaceholder": "propriétaire/nom",
+        "oneClick": "Créer le webhook",
+        "added": "Webhook créé dans {{repo}}.",
+        "byHand": "Ou à la main : dans le dépôt, Settings › Webhooks › Add webhook.",
+        "open": "Dans le dépôt, ouvre Settings › Webhooks › Add webhook.",
+        "openLink": "Ouvrir sur GitHub",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Dans Which events, choisis Let me select individual events. Coche Pull requests et Deployment statuses, puis Add webhook.",
+        "another": "Ajouter à un autre dépôt"
+      },
+      "sentry": {
+        "open": "Dans Sentry, crée une intégration interne.",
+        "openLink": "Ouvrir dans Sentry",
+        "url": "Webhook URL",
+        "events": "Sous Permissions, mets Issue & Event sur Read. Puis sous Webhooks, coche issue et enregistre.",
+        "secret": "Client Secret de l’intégration",
+        "secretPlaceholder": "Colle le Client Secret",
+        "secretSaved": "Enregistré. Colles-en un autre pour le remplacer",
+        "save": "Enregistrer",
+        "saved": "Client Secret enregistré."
+      }
+    },
     "once": "Une fois · {{weekday}} {{date}} à {{time}}{{zone}}",
     "reminder": "Rappel",
     "fired": "Déclenché",
@@ -6569,17 +6663,142 @@
     },
     "presets": {
       "title": "Partir d'un modèle",
+      "placeholder": "Choisir un modèle",
+      "search": "Rechercher des modèles",
+      "searchPlaceholder": "Nom, domaine ou app",
+      "noResults": "Aucun modèle trouvé",
+      "list": "Modèles",
+      "needsApp": "Nécessite cette app : {{app}}",
+      "needsApps": "Nécessite une de ces apps : {{apps}}",
+      "needsMailbox": "Nécessite une boîte mail connectée",
+      "connectFirst": "Connectez-la pour que la routine fonctionne.",
+      "fillBlank": "Remplacez d'abord le texte entre parenthèses.",
+      "replaceTitle": "Remplacer ce que vous avez écrit par ce modèle ?",
+      "replaceConfirm": "Remplacer",
+      "areas": {
+        "team": "Équipe et routine du jour",
+        "sales": "Ventes et clients",
+        "support": "Service client",
+        "marketing": "Marketing et contenu",
+        "finance": "Finances",
+        "ops": "Opérations",
+        "people": "Personnes et RH",
+        "tech": "Technologie"
+      },
+      "dayPlan": {
+        "name": "Plan de la journée",
+        "text": "Les jours ouvrés à 8 h 30, tâches et réunions du jour.",
+        "prompt": "Listez les tâches ouvertes à faire aujourd'hui et les réunions du jour. Dites ce qui demande de l'attention en premier."
+      },
+      "late": {
+        "name": "Tâches en retard",
+        "text": "Les jours ouvrés à 10 h, ce qui a dépassé son échéance.",
+        "prompt": "Cherchez les tâches ouvertes dont l'échéance est passée. Pour chacune, dites qui en est responsable et combien de jours de retard elle a."
+      },
+      "unanswered": {
+        "name": "Questions sans réponse",
+        "text": "Les jours ouvrés à 16 h, ce que personne n'a traité aujourd'hui.",
+        "prompt": "Cherchez dans le canal les questions et demandes du jour restées sans réponse. Listez chacune avec son auteur."
+      },
+      "leads": {
+        "name": "Nouveaux contacts du CRM",
+        "text": "Les jours ouvrés à 9 h, qui est arrivé et par qui commencer.",
+        "prompt": "Regardez dans le CRM les contacts arrivés depuis la dernière fois. Dites lesquels semblent les plus prometteurs et proposez la prochaine étape pour chacun."
+      },
+      "stalled": {
+        "name": "Affaires à l'arrêt",
+        "text": "Le lundi à 9 h, les affaires sans activité récente.",
+        "prompt": "Regardez dans le CRM les affaires ouvertes sans activité depuis plus de 7 jours. Proposez la prochaine étape pour chacune."
+      },
+      "prospects": {
+        "name": "Trouver de nouveaux clients",
+        "text": "Le lundi à 8 h, cinq entreprises à contacter.",
+        "prompt": "Cherchez sur le web 5 entreprises qui correspondent à notre client idéal. Pour chacune, dites ce qu'elle fait et pourquoi elle vaut le contact."
+      },
+      "newEmail": {
+        "name": "Préparer les réponses aux e-mails",
+        "text": "À l'arrivée d'un e-mail, l'agent prépare la réponse.",
+        "prompt": "Lisez l'e-mail reçu et dites de quoi il s'agit et à quel point c'est urgent. Rédigez une proposition de réponse, sans l'envoyer."
+      },
+      "tickets": {
+        "name": "Tickets sans réponse",
+        "text": "Les jours ouvrés à 9 h et 14 h, qui attend encore.",
+        "prompt": "Regardez les tickets ouverts sans réponse depuis plus de 4 heures. Listez d'abord les plus urgents et proposez une réponse pour chacun."
+      },
+      "themes": {
+        "name": "Demandes les plus fréquentes",
+        "text": "Le vendredi à 16 h, ce que les clients ont le plus demandé.",
+        "prompt": "Lisez les tickets de la semaine et groupez-les par sujet. Dites quels sont les 5 plus fréquents et ce qui éviterait chacun."
+      },
+      "mentions": {
+        "name": "Mentions de l'entreprise",
+        "text": "Les jours ouvrés à 9 h, ce qui se dit sur nous.",
+        "prompt": "Cherchez sur le web les actualités et mentions récentes de notre entreprise. Dites où c'est paru, si c'est positif ou négatif et s'il faut répondre."
+      },
+      "rivals": {
+        "name": "Surveiller la concurrence",
+        "text": "Le lundi à 9 h, ce que les concurrents ont changé.",
+        "prompt": "Cherchez ce que nos concurrents ont lancé ou changé la semaine dernière : prix, produits et campagnes. Dites ce qui compte pour nous."
+      },
+      "ideas": {
+        "name": "Idées de contenu",
+        "text": "Le lundi à 10 h, cinq idées pour la semaine.",
+        "prompt": "Proposez 5 idées de contenu pour cette semaine, d'après ce que demandent les clients et ce qui se passe sur notre marché. Donnez à chacune un titre et un format."
+      },
+      "traffic": {
+        "name": "Chiffres du site",
+        "text": "Le lundi à 8 h 30, la semaine face à la précédente.",
+        "prompt": "Regardez les chiffres de la semaine dernière : visites, inscriptions et pages les plus vues. Comparez-les à la semaine d'avant et dites ce qui a changé."
+      },
+      "revenue": {
+        "name": "Ventes d'hier",
+        "text": "Tous les jours à 8 h, les ventes face à la moyenne de la semaine.",
+        "prompt": "Regardez combien nous avons vendu hier et comparez à la moyenne des 7 derniers jours. Dites si quelque chose sort de l'ordinaire."
+      },
+      "failed": {
+        "name": "Problèmes de paiement",
+        "text": "Les jours ouvrés à 10 h, refus et litiges.",
+        "prompt": "Regardez les paiements refusés, les remboursements et les litiges depuis la dernière fois. Listez chacun avec le montant et le client."
+      },
+      "monthClose": {
+        "name": "Clôture du mois",
+        "text": "Le 1er à 9 h, l'argent du mois dernier.",
+        "prompt": "Préparez un résumé du mois dernier : revenus, remboursements et litiges. Comparez au mois d'avant."
+      },
+      "sheet": {
+        "name": "Vérifier un tableur",
+        "text": "Les jours ouvrés à 11 h, les trous et les chiffres étranges.",
+        "prompt": "Vérifiez ce tableur : (dites lequel). Signalez les champs vides, les valeurs inhabituelles et ce qui a changé depuis la dernière fois."
+      },
+      "page": {
+        "name": "Surveiller une page",
+        "text": "Tous les jours à 9 h, seulement si elle change.",
+        "prompt": "Ouvrez cette page : (collez l'adresse ici). Si quelque chose d'important a changé depuis la dernière fois, dites quoi."
+      },
+      "newTask": {
+        "name": "Trier les nouvelles tâches",
+        "text": "À la création d'une tâche, l'agent la vérifie.",
+        "prompt": "Lisez la nouvelle tâche. Dites ce qu'il manque pour la commencer et proposez un responsable et une échéance."
+      },
+      "pulse": {
+        "name": "Question de la semaine",
+        "text": "Le jeudi à 16 h, une question pour l'équipe.",
+        "prompt": "Résumez les réponses à la question de la semaine dernière, sans citer de noms. Puis publiez dans le canal une courte question sur le déroulement de la semaine."
+      },
+      "away": {
+        "name": "Qui est absent cette semaine",
+        "text": "Le lundi à 8 h 30, congés et déplacements.",
+        "prompt": "Regardez dans le calendrier les congés et déplacements de cette semaine. Listez-les par jour et dites ce qui doit être couvert."
+      },
       "digest": {
         "name": "Résumé quotidien du canal",
         "text": "Les jours ouvrés à 9 h, ce qui s'est passé la veille.",
-        "prompt": "Résume ce qui s'est passé hier dans le canal : les demandes, ce qui a été résolu et ce qui est resté sans réponse.",
-        "phrase": "les jours ouvrés à 9 h"
+        "prompt": "Résume ce qui s'est passé dans le canal depuis le dernier résumé : les demandes, ce qui a été résolu et ce qui est resté sans réponse."
       },
       "errors": {
         "name": "Surveiller les nouvelles erreurs",
         "text": "Toutes les heures, seulement s'il y a une nouvelle erreur.",
-        "prompt": "Vérifie les nouvelles erreurs Sentry depuis la dernière exécution. S'il y en a, résume-les et indique où elles se produisent dans le code. S'il n'y a rien de nouveau, n'envoie pas de message.",
-        "phrase": "toutes les heures"
+        "prompt": "Vérifie les nouvelles erreurs Sentry depuis la dernière exécution. S'il y en a, résume-les et indique où elles se produisent dans le code. S'il n'y a rien de nouveau, n'envoie pas de message."
       },
       "prs": {
         "name": "Relire les nouvelles PR",
@@ -6589,8 +6808,7 @@
       "week": {
         "name": "Bilan de la semaine",
         "text": "Le vendredi à 17 h : décisions et points ouverts.",
-        "prompt": "Résume la semaine : décisions, tâches terminées et ce qui reste ouvert.",
-        "phrase": "tous les vendredis à 17 h"
+        "prompt": "Résume la semaine : décisions, tâches terminées et ce qui reste ouvert."
       }
     },
     "close": "Fermer",
@@ -9058,6 +9276,67 @@
     "audienceUseFolder": "Définir pour le dossier {{folder}}",
     "audienceFolderSaved": "C'est fait. L'audience du dossier a été mise à jour.",
     "audienceFolderOpened": "C'est fait. Le dossier n'a plus de restriction.",
+    "audienceRootTitle": "Accès à tout le wiki",
+    "audienceRootText": "Vaut pour toutes les pages et tous les dossiers du wiki, et pour ceux ajoutés plus tard.",
+    "audienceInRoot": "Tout le wiki est limité : ici, vous pouvez seulement le restreindre davantage.",
+    "audienceFollowsRoot": "De tout le wiki",
+    "context": {
+      "on": "Toujours dans le contexte des agents",
+      "off": "Retirer du contexte des agents",
+      "chip": "Toujours en contexte",
+      "hint": "Va dans chaque réponse de chaque agent qui la lit, même quand personne n'en parle. 3 pages au plus.",
+      "added": "Chaque agent qui lit cette page la reçoit maintenant dans chaque réponse.",
+      "removed": "Les agents ne reçoivent plus cette page que quand un message en parle."
+    },
+    "bulk": {
+      "select": "Sélectionner",
+      "selectAll": "Tout sélectionner",
+      "selected_one": "{{count}} sélectionnée",
+      "selected_other": "{{count}} sélectionnées",
+      "agents": "Agents",
+      "delete": "Supprimer",
+      "deleteFolder": "Supprimer le dossier {{folder}}",
+      "deleteImport_one": "Supprimer l'import « {{name}} » ({{count}} page)",
+      "deleteImport_other": "Supprimer l'import « {{name}} » ({{count}} pages)",
+      "deleteTitle_one": "Supprimer {{count}} page ?",
+      "deleteTitle_other": "Supprimer {{count}} pages ?",
+      "deleteFolderTitle_one": "Supprimer le dossier {{folder}} et sa page ?",
+      "deleteFolderTitle_other": "Supprimer le dossier {{folder}} et ses {{count}} pages ?",
+      "deleteImportTitle_one": "Supprimer la page importée de « {{name}} » ?",
+      "deleteImportTitle_other": "Supprimer les {{count}} pages importées de « {{name}} » ?",
+      "deleteText": "Elles vont dans la corbeille du wiki pendant 30 jours, et vous pouvez les restaurer de là.",
+      "deleteGo_one": "Mettre {{count}} page à la corbeille",
+      "deleteGo_other": "Mettre {{count}} pages à la corbeille",
+      "deleted_one": "{{count}} page est dans la corbeille.",
+      "deleted_other": "{{count}} pages sont dans la corbeille.",
+      "kept_one": "{{count}} est restée : elle est verrouillée ou seules certaines personnes la modifient.",
+      "kept_other": "{{count}} sont restées : elles sont verrouillées ou seules certaines personnes les modifient.",
+      "failed_one": "{{count}} n'a pas changé ({{titles}}) : {{reason}}",
+      "failed_other": "{{count}} n'ont pas changé ({{titles}}) : {{reason}}",
+      "agentsTitle_one": "Agents qui lisent {{count}} page",
+      "agentsTitle_other": "Agents qui lisent {{count}} pages",
+      "agentsText": "Qui voit chaque page parmi les personnes ne change pas.",
+      "agentsSaved_one": "C'est fait. {{count}} page mise à jour.",
+      "agentsSaved_other": "C'est fait. {{count}} pages mises à jour."
+    },
+    "trash": {
+      "title": "Corbeille",
+      "text": "Les pages supprimées restent ici 30 jours, puis elles disparaissent.",
+      "none": "La corbeille est vide.",
+      "restore": "Restaurer",
+      "restoreMany_one": "Restaurer {{count}}",
+      "restoreMany_other": "Restaurer {{count}}",
+      "purge": "Supprimer définitivement",
+      "empty": "Vider la corbeille",
+      "emptyTitle_one": "Supprimer {{count}} page définitivement ?",
+      "emptyTitle_other": "Supprimer {{count}} pages définitivement ?",
+      "emptyText": "Elles disparaissent avec leur historique. C'est irréversible.",
+      "deletedWhen": "supprimée {{when}}",
+      "restored_one": "{{count}} page restaurée.",
+      "restored_other": "{{count}} pages restaurées.",
+      "purged_one": "{{count}} page supprimée définitivement.",
+      "purged_other": "{{count}} pages supprimées définitivement."
+    },
     "audienceLevel": "Ce que {{name}} peut faire",
     "audienceLevelNone": "Aucun accès",
     "audienceLevelView": "Lire",
@@ -9079,7 +9358,7 @@
     "noAccessText": "Elle est réservée à certaines personnes. Si vous en avez besoin, demandez à la personne qui s'occupe du wiki.",
     "delete": "Mettre à la corbeille",
     "deleteTitle": "Mettre {{title}} à la corbeille ?",
-    "deleteText": "Les liens vers elle deviennent « page à créer ». Vous ne pouvez pas encore la restaurer depuis l'app.",
+    "deleteText": "Elle va dans la corbeille du wiki pendant 30 jours, et vous pouvez la restaurer de là. En attendant, les liens vers elle deviennent « page à créer ».",
     "deleted": "{{title}} mise à la corbeille.",
     "noBacklinksHint": "Aucune page ne pointe encore ici. Écrivez [[{{title}}]] dans une autre.",
     "allVersions": "Voir les {{count}} versions",
@@ -9255,9 +9534,29 @@
       "uploaded_many": "{{count}} pièces jointes sont dans le Drive.",
       "uploaded_other": "{{count}} pièces jointes sont dans le Drive.",
       "open": "Ouvrir {{title}}",
-      "someFailed_one": "{{count}} note n'est pas arrivée : {{titles}}",
-      "someFailed_many": "{{count}} notes ne sont pas arrivées : {{titles}}",
-      "someFailed_other": "{{count}} notes ne sont pas arrivées : {{titles}}",
+      "sendingNotes_one": "sur {{count}} note envoyée",
+      "sendingNotes_other": "sur {{count}} notes envoyées",
+      "stop": "Arrêter",
+      "stopping": "Arrêt…",
+      "partialTitle": "Tout n'est pas entré",
+      "partial_one": "{{count}} note : {{done}} entrée, {{failed}} non",
+      "partial_other": "{{count}} notes : {{done}} entrées, {{failed}} non",
+      "partialText": "Les pages entrées sont déjà dans le wiki.",
+      "whyTitle": "Ce qui n'est pas entré",
+      "why": {
+        "batch_one": "{{count}} n'a pas été envoyée : {{error}}",
+        "batch_other": "{{count}} n'ont pas été envoyées : {{error}}",
+        "stopped_one": "{{count}} n'a pas été envoyée parce que vous avez arrêté",
+        "stopped_other": "{{count}} n'ont pas été envoyées parce que vous avez arrêté",
+        "tooLong_one": "{{count}} dépasse 200 000 caractères : découpez-la dans Obsidian",
+        "tooLong_other": "{{count}} dépassent 200 000 caractères : découpez-les dans Obsidian",
+        "title_one": "{{count}} n'a pas de nom qui puisse servir de titre",
+        "title_other": "{{count}} n'ont pas de nom qui puisse servir de titre",
+        "skipped_one": "{{count}} avait déjà une page du même nom",
+        "skipped_other": "{{count}} avaient déjà des pages du même nom"
+      },
+      "retry_one": "Réessayer {{count}}",
+      "retry_other": "Réessayer {{count}}",
       "overlayTitle": "Déposez pour importer dans le wiki",
       "overlayText": "Un .zip de coffre Obsidian, le dossier du coffre ou des fichiers .md. Vous vérifiez tout avant que cela entre.",
       "error": {
@@ -9446,6 +9745,8 @@
     "modelLimit": "{{model}} a atteint sa propre limite sur cet abonnement et se réinitialise {{when}}. Les autres modèles de l'abonnement fonctionnent toujours.",
     "modelLimitUnknown": "{{model}} a atteint sa propre limite sur cet abonnement. Les autres modèles de l'abonnement fonctionnent toujours.",
     "modelRegion": "{{model}} a besoin de la région Global activée dans OpenCode (Settings › Privacy). Les autres modèles de l'abonnement fonctionnent toujours.",
+    "modelOff": "OpenCode a refusé {{model}} avec cette clé : le modèle ou le compte y est désactivé. Activez-le dans OpenCode ou choisissez un autre modèle.",
+    "planInactive": "OpenCode Go n'est pas actif sur le compte OpenCode de cette clé, donc aucun de ses modèles ne répond. Vérifiez l'abonnement Go dans OpenCode, ou connectez une clé du compte qui a Go.",
     "modelHow": {
       "globalRegion": "Activez la région Global dans OpenCode, dans Settings › Privacy. Sans elle, ce modèle ne répond pas.",
       "paidTraining": "Le fournisseur de ce modèle peut utiliser les requêtes pour l'entraîner. Dans OpenCode, dans Settings › Privacy, activez l'autorisation pour les modèles payants. Sans elle, ce modèle ne répond pas.",
@@ -11580,6 +11881,61 @@
     }
   },
   "errors": {
+    "said": {
+      "gone": "Ceci n'est plus là. Actualisez la page et réessayez.",
+      "alreadyDone": "Ceci a déjà reçu une réponse ou est terminé. Actualisez pour voir où ça en est.",
+      "changed": "Ceci a changé entre-temps. Actualisez et réessayez.",
+      "tooLateUndo": "Ceci ne peut plus être annulé. Changez-le à la main.",
+      "futureTime": "Choisissez une heure dans le futur.",
+      "tooFar": "Choisissez une date dans l'année qui vient.",
+      "checkDate": "Vérifiez la date et l'heure.",
+      "notInWorkspace": "Cette personne n'est pas dans cet espace de travail.",
+      "validEmail": "Saisissez une adresse e-mail valide, comme ana@exemple.com.",
+      "tooMany": "C'est plus que ce qui tient ici. Retirez-en et réessayez.",
+      "fillIn": "Remplissez ce qui manque et réessayez.",
+      "checkAddress": "Vérifiez l'adresse et réessayez.",
+      "tooLong": "C'est trop long. Raccourcissez et réessayez.",
+      "updateComputerApp": "L'application de l'ordinateur est trop ancienne pour ceci. Mettez-la à jour et réessayez.",
+      "offHere": "Ceci est désactivé ici.",
+      "notInConversation": "Absent de cette conversation.",
+      "accountStart": "L'ordinateur n'a pas pu lancer la connexion. Vérifiez qu'il est allumé et réessayez.",
+      "accountInUse": "Ce compte pense déjà pour un autre agent.",
+      "noAiYet": "Aucune IA n'est encore connectée.",
+      "filePurged": "Ce fichier a été supprimé il y a plus de 30 jours et ne peut pas revenir.",
+      "looksSecret": "Cela ressemble à un mot de passe ou à une clé, et tout le monde ici le verrait.",
+      "blockSpec": "Ce bloc contient une erreur dans ses éléments ou ses formules, il ne peut donc pas être affiché. Corrigez-le et réessayez.",
+      "takeControl": "Prenez d'abord le contrôle du profil.",
+      "profileBusy": "Quelqu'un d'autre utilise ce profil.",
+      "nameTaken": "Ce nom est déjà utilisé. Choisissez-en un autre.",
+      "deleteName": "Saisissez le nom du canal pour le supprimer.",
+      "generalKept": "#general ne peut pas être supprimé.",
+      "generalStays": "Tout le monde reste dans #general.",
+      "mcpUnreachable": "Connexion au serveur MCP impossible. Vérifiez son adresse et réessayez.",
+      "notApproved": "Ce service n'a pas encore approuvé agentes.chat.",
+      "alreadyInvited": "Cette personne a déjà une invitation.",
+      "alreadyAsked": "Quelqu'un a déjà demandé pour cette personne.",
+      "mailboxConnected": "Cette boîte mail est déjà connectée.",
+      "sendNeedsRecipients": "Envoyer sans demander exige une liste de destinataires autorisés.",
+      "missionLive": "La mission a encore des éléments en cours ou qui attendent son ordinateur. Arrêtez-les d'abord.",
+      "createRefused": "Vous ne pouvez pas créer d'espace de travail pour le moment.",
+      "noAgentToRemind": "Aucun agent de cette conversation ne peut vous le rappeler.",
+      "agentCantRead": "Laissez d'abord l'agent lire ceci, dans ses accès.",
+      "neverHappens": "Cette planification n'arrive jamais.",
+      "soleOwner": "Vous êtes le seul propriétaire d'un espace de travail avec d'autres membres. Nommez un autre propriétaire ou supprimez l'espace de travail d'abord.",
+      "testFirst": "Testez la connexion avec ces réglages avant de l'activer.",
+      "voiceLength": "L'enregistrement est trop long ou trop court.",
+      "sendAgain": "Le fichier n'est pas arrivé entier. Renvoyez-le.",
+      "serverKey": "Cette clé est définie dans les réglages du serveur.",
+      "input": "Cela n'a pas abouti. Vérifiez ce que vous avez rempli et réessayez.",
+      "conflict": "Ce n'est pas possible pour le moment. Actualisez et réessayez.",
+      "computer": "L'ordinateur n'a pas pu faire ceci pour le moment. Vérifiez qu'il est allumé et réessayez."
+    },
+    "webhook": {
+      "githubNoAccess": "Le GitHub de ce workspace ne peut pas créer de webhooks dans {{repo}}. Suis les étapes ci-dessous pour le créer à la main.",
+      "githubFailed": "GitHub n’a pas créé le webhook dans {{repo}} ({{status}}). Suis les étapes ci-dessous pour le créer à la main.",
+      "invalidSecret": "Colle le Client Secret en entier, sans espaces.",
+      "invalidRepo": "Écris le dépôt sous la forme propriétaire/nom."
+    },
     "issue": {
       "assigneeOutside": "Cette personne ne voit pas cette tâche. Ajoutez-la d'abord à Qui le voit.",
       "deleteForbidden": "Seule la personne qui a créé cette tâche ou un administrateur peut la supprimer.",
@@ -11602,6 +11958,8 @@
       "audienceWiderThanFolder": "Ce dossier est restreint : ici, vous pouvez seulement restreindre davantage. Pour l'ouvrir, modifiez le dossier.",
       "editLimited": "Seules les personnes choisies modifient cette page.",
       "editorsExcludeYou": "Incluez-vous parmi les personnes qui modifient, pour garder cette page.",
+      "contextFull": "{{max}} pages sont déjà toujours dans le contexte des agents. Retirez-en une d'abord.",
+      "restoreSlugTaken": "Une autre page porte ce nom maintenant. Renommez-la, puis restaurez à nouveau.",
       "titleTaken": "Une page s'appelle déjà « {{title}} ».",
       "titleCharacters": "Un titre ne peut pas contenir [ ] | ou #.",
       "titleNoLetters": "Un titre doit contenir des lettres ou des chiffres.",
@@ -11668,7 +12026,8 @@
       "createInviteOnly": "Les nouveaux espaces de travail nécessitent une invitation pour le moment.",
       "membersFull": "Toutes les places de cet espace de travail sont prises pour le moment. Demandez à la personne qui vous a invité de libérer une place.",
       "deleting": "Cet espace de travail est en cours de suppression.",
-      "notRestorable": "Cet espace de travail ne peut plus être restauré."
+      "notRestorable": "Cet espace de travail ne peut plus être restauré.",
+      "paused": "Cet espace de travail est en pause et ne peut pas connecter d’apps pour l’instant. La personne qui gère l’espace de travail peut le réactiver."
     },
     "reauth": {
       "code": "Saisissez le code que nous vous avons envoyé par e-mail.",
@@ -13206,7 +13565,8 @@
     "stopFailed": "Impossible de l'arrêter. Seuls la personne qui a demandé, le propriétaire de l'agent ou un admin le peuvent.",
     "autoUpdate": "Toujours dessus ({{duration}}).",
     "autoUpdateNow": "En ce moment : {{now}}.",
-    "statusReply": "Je suis toujours dessus ({{duration}}). Je lis votre message après cette étape.",
+    "statusReply": "Je suis en pleine tâche ({{duration}}) et je ne peux pas encore répondre. Votre message est en attente et je le lis à la prochaine étape.",
+    "statusReplyTurn": "Je suis en pleine tâche ({{duration}}) et je ne peux pas encore répondre. Votre message est en attente et je le lis quand cette série de travail se termine.",
     "statusReplyQueued": "J'attends l'ordinateur ({{duration}}). Je lis votre message dès que c'est mon tour.",
     "statusReplyAway": "J'attends que mon ordinateur revienne. Je lis votre message dès son retour.",
     "status": {
@@ -13254,7 +13614,8 @@
     "namesMore": "{{first}} et {{count}} de plus",
     "wait": {
       "thinking": "Réflexion…",
-      "held": "En attente d'approbation…"
+      "held": "En attente d'approbation…",
+      "said": "« {{text}} »"
     },
     "consult": {
       "asking": "{{from}} interroge {{to}}",
@@ -13478,6 +13839,32 @@
         "requestingAccess": "A demandé un accès",
         "requestingSecret": "A demandé un secret",
         "queryingDatabase": "A interrogé la base de données",
+        "searchingWeb": "A cherché sur le web",
+        "readingWeb": "A lu une page web",
+        "preparingCard": "A préparé une carte",
+        "startingPoll": "A ouvert un sondage",
+        "askingChoices": "A posé une question avec des options",
+        "usingVault": "A travaillé dans le Vault",
+        "makingPassword": "A créé un mot de passe",
+        "startingWork": "A commencé un long travail",
+        "updatingWork": "A mis à jour un long travail",
+        "withdrawingRequest": "A retiré une demande",
+        "schedulingAction": "A préparé une action pour plus tard",
+        "updatingDashboard": "A travaillé sur un tableau de bord",
+        "readingDashboards": "A regardé les tableaux de bord",
+        "pushingBranch": "A demandé à envoyer du code",
+        "deletingBranches": "A supprimé des branches",
+        "postingMessage": "A publié un message",
+        "sendingDm": "A envoyé un message direct",
+        "settingStatus": "A mis à jour son statut",
+        "settingReplyStyle": "A ajusté sa façon de répondre",
+        "deletingRoutine": "A supprimé une routine",
+        "runningRoutine": "A lancé une routine maintenant",
+        "proposingTeam": "A proposé une équipe",
+        "proposingChange": "A proposé un changement",
+        "updatingThread": "A mis à jour un fil",
+        "addingAgent": "A ajouté un agent à un canal",
+        "readingConversation": "A lu la conversation",
         "usingTool": "A utilisé l'outil {{tool}}",
         "thinking": "A réfléchi",
         "typing": "A écrit",
@@ -13560,6 +13947,32 @@
       "requestingAccess": "demande d'accès",
       "requestingSecret": "demande d'un secret",
       "queryingDatabase": "interrogation de la base de données",
+      "searchingWeb": "recherche sur le web",
+      "readingWeb": "lecture d'une page web",
+      "preparingCard": "préparation d'une carte",
+      "startingPoll": "ouverture d'un sondage",
+      "askingChoices": "question avec des options",
+      "usingVault": "travail dans le Vault",
+      "makingPassword": "création d'un mot de passe",
+      "startingWork": "début d'un long travail",
+      "updatingWork": "mise à jour d'un long travail",
+      "withdrawingRequest": "retrait d'une demande",
+      "schedulingAction": "préparation d'une action pour plus tard",
+      "updatingDashboard": "travail sur un tableau de bord",
+      "readingDashboards": "consultation des tableaux de bord",
+      "pushingBranch": "demande d'envoi de code",
+      "deletingBranches": "suppression de branches",
+      "postingMessage": "publication d'un message",
+      "sendingDm": "envoi d'un message direct",
+      "settingStatus": "mise à jour de son statut",
+      "settingReplyStyle": "réglage de sa façon de répondre",
+      "deletingRoutine": "suppression d'une routine",
+      "runningRoutine": "lancement d'une routine maintenant",
+      "proposingTeam": "proposition d'une équipe",
+      "proposingChange": "proposition d'un changement",
+      "updatingThread": "mise à jour d'un fil",
+      "addingAgent": "ajout d'un agent à un canal",
+      "readingConversation": "lecture de la conversation",
       "usingTool": "utilisation d'un outil"
     },
     "tokens": "{{value}} jetons",
@@ -13654,6 +14067,8 @@
       "plan_model_limit_wait": "{{model}} a atteint sa propre limite sur {{plan}}. Les autres modèles de l'abonnement fonctionnent toujours : changez le modèle de {{agent}} ou attendez qu'il se réinitialise {{when}}.",
       "plan_model_limit_wait_unknown": "{{model}} a atteint sa propre limite sur {{plan}}. Les autres modèles de l'abonnement fonctionnent toujours : changez le modèle de {{agent}} ou attendez qu'il se réinitialise.",
       "plan_model_region_wait": "Ce modèle ({{model}}) a besoin de la région Global activée dans OpenCode (Settings › Privacy).",
+      "plan_model_off_wait": "OpenCode a refusé {{model}} avec cette clé : le modèle ou le compte y est désactivé. Activez-le dans OpenCode ou changez le modèle de {{agent}}.",
+      "plan_inactive_wait": "OpenCode Go n'est pas actif sur le compte OpenCode de cette clé, donc aucun de ses modèles ne répond. Vérifiez l'abonnement Go dans OpenCode, ou connectez une clé du compte qui a Go.",
       "budget_wait": "Mon budget du mois est épuisé. Je reprendrai {{when}}, ou plus tôt si un admin l'augmente.",
       "usage_wait_canceled": "Annulé. Ça ne s'exécutera pas quand la limite se renouvellera.",
       "usage_wait_archived": "Ça ne s'exécutera pas : l'agent a été archivé.",
@@ -13684,6 +14099,8 @@
       "no_ai_plan_tools": "Je me suis arrêté avant de répondre : l'IA de mon abonnement sur cet ordinateur n'est pas restée dans les outils d'agentes.chat.",
       "no_ai_model_limit": "Je ne peux pas répondre maintenant : {{model}} a atteint sa propre limite sur mon abonnement.",
       "no_ai_model_region": "Je ne peux pas répondre : {{model}} a besoin de la région Global activée dans OpenCode (Settings › Privacy).",
+      "no_ai_model_off": "Je ne peux pas répondre : OpenCode a refusé {{model}} avec ma clé. Activez le modèle ou le compte dans OpenCode, ou changez mon modèle.",
+      "no_ai_plan_inactive": "Je ne peux pas répondre : OpenCode Go n'est pas actif sur le compte OpenCode de ma clé. Vérifiez l'abonnement Go dans OpenCode, ou connectez une clé du compte qui a Go.",
       "no_ai_commands_off": "Je ne peux pas répondre maintenant : les commandes sont désactivées sur l'ordinateur de mon abonnement.",
       "no_ai_cli_missing": "Je ne peux pas encore répondre : le programme de mon IA n'est pas installé sur mon ordinateur.",
       "no_ai_plan_hold": "J'ai gardé votre message. Je répondrai ici dès que le workspace aura un abonnement agentes.chat et une IA connectée.",
@@ -14228,6 +14645,12 @@
       "starting": "Ouverture de la page…",
       "page": "Page de {{name}}, en direct",
       "page_female": "Page de {{name}}, en direct",
+      "emulated": {
+        "phone": "Téléphone · {{size}}",
+        "tablet": "Tablette · {{size}}",
+        "desktop": "Ordinateur · {{size}}"
+      },
+      "normalSize": "Taille normale",
       "tabs_one": "{{count}} onglet",
       "tabs_many": "{{count}} onglets",
       "tabs_other": "{{count}} onglets",
@@ -15053,6 +15476,10 @@
       "modelLimit": "{{model}} à sa limite",
       "modelRegion": "{{model}} a besoin de la région Global",
       "modelRegionNext": "Activez-la dans OpenCode (Settings › Privacy)",
+      "modelOff": "OpenCode a refusé {{model}}",
+      "modelOffNext": "Activez-le dans OpenCode ou choisissez un autre modèle",
+      "planInactive": "OpenCode Go n'est pas actif",
+      "planInactiveNext": "Vérifiez l'abonnement Go dans OpenCode",
       "budgetOut": "Budget du mois épuisé",
       "workLine": "Dans la file de travail de l'agent",
       "workLineNext": "Commence quand un autre travail se termine",

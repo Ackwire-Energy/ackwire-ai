@@ -470,6 +470,8 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
       void qc.invalidateQueries({ queryKey: keys.members(orgId) });
+      // Who came and went while this socket was down: their `member.status` never reached it.
+      void qc.invalidateQueries({ queryKey: keys.people(orgId) });
       void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
       // The groups of agents someone changed meanwhile.
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });

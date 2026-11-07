@@ -13,6 +13,7 @@ import {
   setThreadFollow,
   type ThreadDeps,
   unarchiveThread,
+  unreadTaskConversations,
   updateThread,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -313,6 +314,27 @@ export function threadRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       return c.json({ count: await countUnreadThreads(db, c.get("user").id, orgId) }, 200);
+    },
+  );
+
+  const UnreadTask = z
+    .object({ issueId: z.uuid(), unread: z.number().int(), mentions: z.number().int() })
+    .openapi("UnreadTask");
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/unread-tasks",
+      tags,
+      security,
+      summary: "Tasks whose conversation has a reply you haven't read, with the ones that mention you",
+      description:
+        "Only tasks you see. A reply counts when you follow the conversation or it mentions you, at most 100 each.",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ tasks: z.array(UnreadTask) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ tasks: await unreadTaskConversations(db, c.get("user").id, orgId) }, 200);
     },
   );
 

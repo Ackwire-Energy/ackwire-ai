@@ -2030,6 +2030,27 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
 .task-talk__toggle .ac-countchip {
   margin-left: 2px;
 }
+/* A reply I haven't read in it: the label in ink and heavier, as an unread channel's name. A ghost button is already
+   600 in the muted color, so weight alone would change nothing. */
+.task-talk__toggle[data-unread] {
+  color: var(--ink);
+  font-weight: 700;
+}
+/* Mentions of me not read there: the sidebar's red count (`.sidebar__unread`), on the button, a card and a row. */
+.task-talk__mentions {
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--danger);
+  color: var(--raised);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: normal;
+}
+.issue-card__title > .task-talk__mentions {
+  margin-left: 6px;
+}
 /* The task's own page with its conversation: the details and the thread panel side by side. */
 .issue-page__bar {
   display: flex;
@@ -2049,53 +2070,33 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   gap: 16px;
   min-width: 0;
 }
-/* With its conversation the page is as tall as the area it scrolls in: the details scroll in their column and the
-   conversation runs to the bottom, the same margin below as above (the area is shorter than the window under the
-   desktop app's title bar or a banner, so a height taken from the window left a gap or cut the panel short). */
+/* With its conversation the page is as tall as the area it scrolls in, the details scrolling in their column and the
+   conversation docked at its right like a thread beside its channel (`.thread-panel--docked`): flush with the area's
+   top, right and bottom edges, the same width and hairline. The area is shorter than the window under the desktop
+   app's title bar or a banner, so a height taken from the window would leave a gap or cut the pane short. Too narrow
+   for both (the `channel-body` container's rule), the conversation takes the page until it closes. */
 .issue-page--talk {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(360px, 38%, 520px);
-  gap: 24px;
-  align-items: stretch;
+  container: channel-body / inline-size;
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  gap: 0;
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
-  padding-top: 24px;
-  padding-bottom: 24px;
+  padding: 0;
 }
-/* Room at the scrolling column's edges for what reaches past its content: the cards' shadows and focus rings, and the
-   hover plate and field of the title and the description, 10px out on each side (`.issue-inplace`), which 4px cut
-   flat at both ends. */
 .issue-page--talk > .issue-page__main {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  margin: -10px;
-  padding: 10px;
+  padding: 24px;
 }
-.issue-page__talk {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-  border-radius: var(--radius-section);
-  box-shadow: inset 0 0 0 1px var(--line);
-  background: var(--surface-raised);
-}
-.issue-page__talk > .thread-panel__chat,
 .ac-details__side > .thread-panel__chat {
   flex: 1 1 auto;
   height: 100%;
   min-height: 0;
-}
-@media (max-width: 960px) {
-  .issue-page--talk {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .issue-page--talk > .issue-page__main {
-    display: none;
-  }
 }
 .issue-subl {
   list-style: none;

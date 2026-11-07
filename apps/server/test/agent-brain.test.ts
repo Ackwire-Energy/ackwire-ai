@@ -391,7 +391,7 @@ test("the agent list carries a plan agent's account and its last windows, for ev
 test("a new agent starts on Automático on every brain; one with a fixed model keeps the brain's default", async () => {
   // The deployment's AGENT_DEFAULT_MODEL doesn't decide it any more.
   const { api, owner, agentId: fixedId } = await workspace({ AGENT_DEFAULT_MODEL: "claude-haiku-5-5" });
-  expect(await (await owner("/api/app/models")).json()).toMatchObject({ defaultModel: "auto" });
+  expect(await (await owner("/api/app/models")).json()).toMatchObject({ defaultModel: "auto", planModels: {} });
   const created = await api("/agents", { json: { name: "Eva", handle: "eva" } });
   expect(created.status).toBe(201);
   const eva = (await created.json()) as { id: string; model: string };

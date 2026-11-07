@@ -1725,6 +1725,13 @@
     "generalName": "#general tetap dengan namanya.",
     "archive": "Arsipkan kanal",
     "archived": "#{{channel}} diarsipkan. Percakapannya tetap disimpan.",
+    "leave": "Keluar dari kanal",
+    "left": "Kamu keluar dari #{{channel}}",
+    "leaveTitle": "Keluar dari #{{channel}}?",
+    "leavePrivate": "Ini kanal privat: untuk kembali, seseorang di dalamnya harus menambahkanmu.",
+    "leaveLast": "Kamu orang terakhir di sini: keluar akan mengarsipkan kanal.",
+    "leaveConfirm": "Keluar",
+    "leaveLastConfirm": "Keluar dan arsipkan",
     "delete": "Hapus kanal",
     "deleteTitle": "Hapus #{{channel}} untuk selamanya?",
     "deleteGoes": "Hilang sekarang: pesan, utas, file dan sematan, apa yang diingat agen dari kanal ini, serta rutinitas yang memposting di sini.",
@@ -1830,7 +1837,7 @@
     "composerHint": "tak ada yang berubah tanpa Anda",
     "intro": {
       "greeting": "Halo, saya {{name}}. Saya menyusun tim bersama Anda.",
-      "lead": "Saya membuat agen, menghubungkan aplikasi, dan mengundang orang. Tidak ada yang berubah tanpa klik Anda, dan saya hanya melakukan apa yang bisa Anda lakukan.",
+      "lead": "Saya membuat agen, menghubungkan aplikasi, dan mengundang orang. Tidak ada yang berubah tanpa permintaan Anda, dan saya hanya melakukan apa yang bisa Anda lakukan.",
       "heldLead": "Pilih bidang usahamu dan timnya muncul di sini. Agen mulai bekerja setelah workspace punya paket agentes.chat.",
       "connect": {
         "title": "Hubungkan AI untuk tim",
@@ -1949,6 +1956,8 @@
         "audience": "Hanya admin dan penanggung jawabnya yang mengubah siapa yang bicara dengannya",
         "channels": "Hanya admin dan penanggung jawabnya yang mengubah kanalnya",
         "ai_account": "Hanya pemilik akun yang memberikannya",
+        "name": "Hanya admin yang mengganti nama agen",
+        "look": "Hanya admin dan penanggung jawabnya yang mengubah tampilannya",
         "many": "Hanya admin yang membuat perubahan ini"
       }
     },
@@ -1959,9 +1968,12 @@
       "owner": "Penanggung jawab",
       "audience": "Siapa yang bisa bicara",
       "archive": "Status",
-      "channel": "Kanal"
+      "channel": "Kanal",
+      "name": "Nama",
+      "look": "Tampilan"
     },
     "value": {
+      "lookDefault": "Tampilan bawaan",
       "none": "Tidak ada",
       "budgetDefault": "Bawaan workspace",
       "anAccount": "Sebuah akun AI",
@@ -2136,6 +2148,8 @@
       "plan_tools": "{{name}} berhenti sebelum menjawab: AI paket di komputer itu tidak tetap memakai alat agentes.chat saja.",
       "model_limit": "{{name}} tidak bisa menjawab sekarang: {{model}} sudah mencapai batasnya sendiri di paket. Model lain di paket itu tetap berjalan.",
       "model_region": "{{name}} tidak bisa menjawab: {{model}} butuh wilayah Global dinyalakan di OpenCode (Settings › Privacy).",
+      "model_off": "{{name}} tidak bisa menjawab: OpenCode menolak {{model}} dengan kunci ini. Aktifkan model atau akunnya di OpenCode, atau pilih model lain.",
+      "plan_inactive": "{{name}} tidak bisa menjawab: OpenCode Go tidak aktif di akun OpenCode kunci ini. Periksa langganan Go di OpenCode, atau hubungkan kunci dari akun yang punya Go.",
       "commands_off": "{{name}} tidak bisa menjawab sekarang: perintah dimatikan di komputer paketnya, dan orang yang mengurusnya perlu menyalakannya.",
       "useKey": "Pakai kunci API"
     },
@@ -2587,7 +2601,10 @@
       "updated": "Memperbaiki skill <b>{{name}}</b>"
     },
     "agent": {
-      "settings_changed": "Mengubah pengaturan <b>{{agentName}}</b>"
+      "settings_changed": "Mengubah pengaturan <b>{{agentName}}</b>",
+      "settings_changed_instructions": "Mengubah instruksi <b>{{agentName}}</b>",
+      "settings_changed_role": "Mengubah peran <b>{{agentName}}</b>",
+      "settings_changed_apps": "Mengubah aplikasi <b>{{agentName}}</b>"
     },
     "pr": {
       "merged": "Merge PR <b>#{{number}}</b> di <b>{{repo}}</b>",
@@ -3343,6 +3360,11 @@
     "dismissedByYou": "Kamu melewati pertanyaan ini."
   },
   "ask": {
+    "kindOther": {
+      "approval": "Meminta persetujuan",
+      "browser": "Butuh seseorang di browser",
+      "desktop": "Butuh seseorang di komputer"
+    },
     "kind": {
       "approval": "Meminta persetujuanmu",
       "secret": "Meminta rahasia",
@@ -3389,10 +3411,12 @@
     },
     "said": "<b>{{name}}:</b> “{{text}}”",
     "askPlain": "Aku perlu persetujuanmu untuk lanjut:",
+    "askPlainOther": "Aku perlu persetujuan untuk lanjut:",
     "seeEmail": "Lihat email",
     "seeDetails": "Lihat detail",
     "notNow": "Jangan sekarang",
     "askMany_other": "Aku perlu persetujuanmu agar {{count}} hal ini bisa lanjut:",
+    "askManyOther_other": "Aku perlu persetujuan agar {{count}} hal ini bisa lanjut:",
     "all": {
       "approve": "Setujui semua",
       "refuse": "Jangan sekarang untuk semua",
@@ -3506,7 +3530,29 @@
       "post_message": "Posting di #{{channel}}",
       "request_permission": "Nyalakan: {{permission}}",
       "delete_branches_other": "Hapus {{count}} branch di {{repo}}",
-      "request_branch_push": "Push ke {{branch}} di {{repo}} (24 jam, tanpa force push)"
+      "request_branch_push": "Push ke {{branch}} di {{repo}} (24 jam, tanpa force push)",
+      "action": {
+        "merge": "Lakukan merge",
+        "deploy": "Lakukan deploy",
+        "rollback": "Rollback",
+        "publish": "Menerbitkan",
+        "delete": "Menghapus data",
+        "send": "Mengirim pesan ke luar",
+        "draft": "Menyimpan draf"
+      },
+      "vault_make_password": "Buat kata sandi",
+      "pg_query": "Kueri {{target}}",
+      "request_approval": {
+        "merge": "Lakukan merge {{target}}",
+        "deploy": "Lakukan deploy {{target}}",
+        "rollback": "Kembalikan {{target}}",
+        "other": "Setujui {{target}}"
+      },
+      "github": {
+        "merge_pull_request": "Merge PR #{{number}} di {{repo}}",
+        "pull_request_review_write": "Tinjau PR #{{number}} di {{repo}}",
+        "actions_run_trigger": "Jalankan {{method}} di {{repo}}"
+      }
     }
   },
   "home": {
@@ -3606,6 +3652,9 @@
       "takeBackAll": "Tarik kembali dari semua agen",
       "done": "Paketmu sudah kembali"
     },
+    "planModelDropped": {
+      "choose": "Pilih model lain"
+    },
     "docTitleUnread": "({{count}}) Notifikasi",
     "summaryWaiting_other": "{{count}} hal menunggumu",
     "summaryUnread_other": "{{count}} belum dibaca",
@@ -3697,6 +3746,7 @@
       "browserProfileRequest": "<b>{{name}}</b> meminta satu profil browser lagi untuk <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> mengambil alih layar komputer <b>{{agent}}</b>",
       "planLent": "<b>{{name}}</b> menghubungkan paket {{plan}} kamu ke <b>{{agent}}</b>",
+      "planModelDropped": "{{model}} keluar dari {{plan}}. <b>{{name}}</b> memakai {{runs}} sampai kamu memilih model lain.",
       "routineWaitingPlan": "<b>{{name}}</b> menunggu paketnya direset untuk menjalankan rutinitas",
       "planResetUnknown": "{{plan}} tidak memberi tahu kapan batasnya direset. Pekerjaan <b>{{name}}</b> masih menunggu.",
       "catchUpClosed_other": "<b>{{name}}</b> kembali dan melewati {{count}} percakapan yang tidak perlu dijawab",
@@ -5988,6 +6038,48 @@
         "rate_limited": "Ditolak: terlalu banyak panggilan per menit"
       }
     },
+    "setup": {
+      "title": "Webhook {{provider}}",
+      "working": "Berjalan. {{provider}} sudah mengirim event-nya ke sini.",
+      "waiting": {
+        "github": "Menunggu GitHub. GitHub mengirim ping begitu webhook disimpan.",
+        "sentry": "Menunggu Sentry. Sentry memanggil saat ada error baru."
+      },
+      "refused": {
+        "github": "GitHub memanggil dengan secret lain. Salin lagi Secret di bawah ke webhook.",
+        "sentry": "Sentry memanggil dengan secret lain. Tempel lagi Client Secret integrasinya."
+      },
+      "timeout": "Tidak ada yang masuk dalam 3 menit. Periksa URL dan secret, lalu uji lagi.",
+      "adminOnly": "Orang yang mengelola konektor menyalakan webhook {{provider}}. Minta admin membuka rutinitas ini.",
+      "test": "Uji",
+      "retest": "Uji lagi",
+      "copied": "Disalin.",
+      "github": {
+        "repo": "Repositori",
+        "repoPlaceholder": "pemilik/nama",
+        "oneClick": "Buat webhook",
+        "added": "Webhook dibuat di {{repo}}.",
+        "byHand": "Atau manual: di repositori, Settings › Webhooks › Add webhook.",
+        "open": "Di repositori, buka Settings › Webhooks › Add webhook.",
+        "openLink": "Buka di GitHub",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Di Which events, pilih Let me select individual events. Centang Pull requests dan Deployment statuses, lalu Add webhook.",
+        "another": "Tambahkan ke repositori lain"
+      },
+      "sentry": {
+        "open": "Di Sentry, buat integrasi internal.",
+        "openLink": "Buka di Sentry",
+        "url": "Webhook URL",
+        "events": "Di Permissions, setel Issue & Event ke Read. Lalu di Webhooks, centang issue dan simpan.",
+        "secret": "Client Secret integrasi",
+        "secretPlaceholder": "Tempel Client Secret",
+        "secretSaved": "Tersimpan. Tempel yang baru untuk menggantinya",
+        "save": "Simpan",
+        "saved": "Client Secret disimpan."
+      }
+    },
     "once": "Sekali · {{weekday}}, {{date}} pukul {{time}}{{zone}}",
     "reminder": "Pengingat",
     "fired": "Terkirim",
@@ -6146,17 +6238,142 @@
     },
     "presets": {
       "title": "Mulai dari templat",
+      "placeholder": "Pilih templat",
+      "search": "Cari templat",
+      "searchPlaceholder": "Nama, bidang, atau aplikasi",
+      "noResults": "Templat tidak ditemukan",
+      "list": "Templat",
+      "needsApp": "Butuh aplikasi ini: {{app}}",
+      "needsApps": "Butuh salah satu aplikasi ini: {{apps}}",
+      "needsMailbox": "Butuh kotak surat yang terhubung",
+      "connectFirst": "Hubungkan agar rutinitas berjalan.",
+      "fillBlank": "Ganti dulu teks di dalam tanda kurung.",
+      "replaceTitle": "Ganti tulisan Anda dengan templat ini?",
+      "replaceConfirm": "Ganti",
+      "areas": {
+        "team": "Tim dan rutinitas harian",
+        "sales": "Penjualan dan pelanggan",
+        "support": "Layanan pelanggan",
+        "marketing": "Pemasaran dan konten",
+        "finance": "Keuangan",
+        "ops": "Operasional",
+        "people": "Orang dan SDM",
+        "tech": "Teknologi"
+      },
+      "dayPlan": {
+        "name": "Rencana hari ini",
+        "text": "Hari kerja pukul 8.30, tugas dan rapat hari ini.",
+        "prompt": "Daftarkan tugas terbuka yang jatuh tempo hari ini dan rapat hari ini. Katakan mana yang perlu perhatian lebih dulu."
+      },
+      "late": {
+        "name": "Tugas terlambat",
+        "text": "Hari kerja pukul 10, yang melewati tenggat.",
+        "prompt": "Cari tugas terbuka yang melewati tenggat. Untuk masing-masing, sebutkan penanggung jawabnya dan berapa hari terlambat."
+      },
+      "unanswered": {
+        "name": "Pertanyaan belum dijawab",
+        "text": "Hari kerja pukul 4 sore, yang belum dijawab hari ini.",
+        "prompt": "Cari di kanal pertanyaan dan permintaan hari ini yang belum dijawab. Daftarkan masing-masing dengan siapa yang bertanya."
+      },
+      "leads": {
+        "name": "Kontak CRM baru",
+        "text": "Hari kerja pukul 9, siapa yang masuk dan mulai dari siapa.",
+        "prompt": "Periksa di CRM kontak yang masuk sejak terakhir kali. Katakan siapa yang paling menjanjikan dan sarankan langkah berikutnya untuk masing-masing."
+      },
+      "stalled": {
+        "name": "Kesepakatan macet",
+        "text": "Senin pukul 9, kesepakatan tanpa aktivitas terbaru.",
+        "prompt": "Periksa di CRM kesepakatan terbuka tanpa aktivitas lebih dari 7 hari. Sarankan langkah berikutnya untuk masing-masing."
+      },
+      "prospects": {
+        "name": "Cari pelanggan baru",
+        "text": "Senin pukul 8, lima perusahaan untuk dihubungi.",
+        "prompt": "Cari di internet 5 perusahaan yang cocok dengan pelanggan ideal kita. Untuk masing-masing, katakan bidangnya dan mengapa layak dihubungi."
+      },
+      "newEmail": {
+        "name": "Siapkan balasan email",
+        "text": "Saat email masuk, agen menyiapkan balasan.",
+        "prompt": "Baca email yang masuk dan katakan isinya serta seberapa mendesak. Tulis saran balasan, tetapi jangan dikirim."
+      },
+      "tickets": {
+        "name": "Tiket belum dibalas",
+        "text": "Hari kerja pukul 9 dan pukul 2 siang, siapa yang masih menunggu.",
+        "prompt": "Periksa tiket terbuka yang belum dibalas lebih dari 4 jam. Daftarkan yang paling mendesak lebih dulu dan sarankan balasan untuk masing-masing."
+      },
+      "themes": {
+        "name": "Permintaan terbanyak",
+        "text": "Jumat pukul 4 sore, yang paling banyak diminta pelanggan.",
+        "prompt": "Baca tiket minggu ini dan kelompokkan menurut topik. Sebutkan 5 yang paling umum dan apa yang bisa mencegah masing-masing."
+      },
+      "mentions": {
+        "name": "Sebutan tentang perusahaan",
+        "text": "Hari kerja pukul 9, apa yang dibicarakan tentang kita.",
+        "prompt": "Cari di internet berita dan sebutan terbaru tentang perusahaan kita. Katakan di mana munculnya, apakah positif atau negatif, dan apakah perlu dibalas."
+      },
+      "rivals": {
+        "name": "Pantau pesaing",
+        "text": "Senin pukul 9, apa yang diubah pesaing.",
+        "prompt": "Teliti apa yang diluncurkan atau diubah pesaing kita minggu lalu, seperti harga, produk, dan kampanye. Katakan mana yang penting bagi kita."
+      },
+      "ideas": {
+        "name": "Ide konten",
+        "text": "Senin pukul 10, lima ide untuk minggu ini.",
+        "prompt": "Sarankan 5 ide konten untuk minggu ini, berdasarkan pertanyaan pelanggan dan yang terjadi di pasar kita. Beri masing-masing judul dan format."
+      },
+      "traffic": {
+        "name": "Angka situs",
+        "text": "Senin pukul 8.30, minggu ini dibanding sebelumnya.",
+        "prompt": "Periksa angka minggu lalu: kunjungan, pendaftaran, dan halaman teratas. Bandingkan dengan minggu sebelumnya dan katakan apa yang berubah."
+      },
+      "revenue": {
+        "name": "Penjualan kemarin",
+        "text": "Setiap hari pukul 8, penjualan dibanding rata-rata mingguan.",
+        "prompt": "Periksa berapa penjualan kemarin dan bandingkan dengan rata-rata 7 hari terakhir. Katakan jika ada yang tidak biasa."
+      },
+      "failed": {
+        "name": "Masalah pembayaran",
+        "text": "Hari kerja pukul 10, penolakan dan sengketa.",
+        "prompt": "Periksa pembayaran yang ditolak, pengembalian dana, dan sengketa sejak terakhir kali. Daftarkan masing-masing dengan jumlah dan pelanggannya."
+      },
+      "monthClose": {
+        "name": "Tutup bulan",
+        "text": "Tanggal 1 pukul 9, uang bulan lalu.",
+        "prompt": "Susun ringkasan bulan lalu: pendapatan, pengembalian dana, dan sengketa. Bandingkan dengan bulan sebelumnya."
+      },
+      "sheet": {
+        "name": "Periksa spreadsheet",
+        "text": "Hari kerja pukul 11, celah dan angka aneh.",
+        "prompt": "Periksa spreadsheet ini: (sebutkan yang mana). Tunjukkan kolom kosong, nilai tidak biasa, dan yang berubah sejak terakhir kali."
+      },
+      "page": {
+        "name": "Pantau halaman web",
+        "text": "Setiap hari pukul 9, hanya saat berubah.",
+        "prompt": "Buka halaman ini: (tempel alamatnya di sini). Jika ada hal penting yang berubah sejak terakhir kali, katakan apa."
+      },
+      "newTask": {
+        "name": "Rapikan tugas baru",
+        "text": "Saat tugas dibuat, agen memeriksanya.",
+        "prompt": "Baca tugas baru itu. Katakan apa yang kurang untuk mulai, dan sarankan penanggung jawab serta tenggatnya."
+      },
+      "pulse": {
+        "name": "Pertanyaan minggu ini",
+        "text": "Kamis pukul 4 sore, satu pertanyaan untuk tim.",
+        "prompt": "Ringkas jawaban atas pertanyaan minggu lalu tanpa menyebut nama. Lalu kirim di kanal satu pertanyaan singkat baru tentang bagaimana minggu ini berjalan."
+      },
+      "away": {
+        "name": "Siapa yang tidak masuk minggu ini",
+        "text": "Senin pukul 8.30, cuti dan perjalanan.",
+        "prompt": "Periksa di kalender cuti dan perjalanan minggu ini. Daftarkan per hari dan katakan apa yang perlu digantikan."
+      },
       "digest": {
         "name": "Ringkasan harian kanal",
         "text": "Hari kerja pukul 9 pagi, apa yang terjadi kemarin.",
-        "prompt": "Ringkas apa yang terjadi kemarin di kanal: permintaan, apa yang sudah selesai, dan apa yang belum dijawab.",
-        "phrase": "hari kerja pukul 9 pagi"
+        "prompt": "Ringkas apa yang terjadi di kanal sejak ringkasan terakhir: permintaan, apa yang sudah selesai, dan apa yang belum dijawab."
       },
       "errors": {
         "name": "Pantau error baru",
         "text": "Setiap jam, hanya kalau ada error baru.",
-        "prompt": "Periksa error Sentry baru sejak jalan terakhir. Kalau ada, ringkas dan sebutkan di bagian kode mana error itu terjadi. Kalau tidak ada yang baru, jangan kirim pesan.",
-        "phrase": "setiap jam"
+        "prompt": "Periksa error Sentry baru sejak jalan terakhir. Kalau ada, ringkas dan sebutkan di bagian kode mana error itu terjadi. Kalau tidak ada yang baru, jangan kirim pesan."
       },
       "prs": {
         "name": "Tinjau PR baru",
@@ -6166,8 +6383,7 @@
       "week": {
         "name": "Rangkuman minggu ini",
         "text": "Jumat pukul 5 sore: keputusan dan hal yang masih terbuka.",
-        "prompt": "Ringkas minggu ini: keputusan, tugas yang selesai, dan apa yang masih terbuka.",
-        "phrase": "setiap jumat pukul 5 sore"
+        "prompt": "Ringkas minggu ini: keputusan, tugas yang selesai, dan apa yang masih terbuka."
       }
     },
     "close": "Tutup",
@@ -8415,6 +8631,52 @@
     "audienceUseFolder": "Atur untuk folder {{folder}}",
     "audienceFolderSaved": "Beres. Akses folder diperbarui.",
     "audienceFolderOpened": "Beres. Folder ini sekarang tidak dibatasi.",
+    "audienceRootTitle": "Akses ke seluruh wiki",
+    "audienceRootText": "Berlaku untuk setiap halaman dan folder wiki, juga yang ditambahkan nanti.",
+    "audienceInRoot": "Seluruh wiki dibatasi: di sini kamu hanya bisa mempersempitnya lagi.",
+    "audienceFollowsRoot": "Dari seluruh wiki",
+    "context": {
+      "on": "Selalu dalam konteks agen",
+      "off": "Keluarkan dari konteks agen",
+      "chip": "Selalu dalam konteks",
+      "hint": "Masuk ke setiap jawaban setiap agen yang membacanya, meski tak ada yang menyebutnya. Paling banyak 3 halaman.",
+      "added": "Setiap agen yang membaca halaman ini kini mendapatkannya di setiap jawaban.",
+      "removed": "Agen kini hanya mendapat halaman ini saat pesannya tentang halaman itu."
+    },
+    "bulk": {
+      "select": "Pilih",
+      "selectAll": "Pilih semua",
+      "selected_other": "{{count}} dipilih",
+      "agents": "Agen",
+      "delete": "Hapus",
+      "deleteFolder": "Hapus folder {{folder}}",
+      "deleteImport_other": "Hapus impor “{{name}}” ({{count}} halaman)",
+      "deleteTitle_other": "Hapus {{count}} halaman?",
+      "deleteFolderTitle_other": "Hapus folder {{folder}} dan {{count}} halamannya?",
+      "deleteImportTitle_other": "Hapus {{count}} halaman yang diimpor dari “{{name}}”?",
+      "deleteText": "Halaman masuk ke sampah wiki selama 30 hari, dan bisa dipulihkan dari sana.",
+      "deleteGo_other": "Pindahkan {{count}} halaman ke sampah",
+      "deleted_other": "{{count}} halaman masuk ke sampah.",
+      "kept_other": "{{count}} tetap di tempat: terkunci atau hanya beberapa orang yang mengeditnya.",
+      "failed_other": "{{count}} tidak berubah ({{titles}}): {{reason}}",
+      "agentsTitle_other": "Agen yang membaca {{count}} halaman",
+      "agentsText": "Siapa yang melihat tiap halaman di antara orang-orang tetap seperti semula.",
+      "agentsSaved_other": "Selesai. {{count}} halaman diperbarui."
+    },
+    "trash": {
+      "title": "Sampah",
+      "text": "Halaman yang dihapus ada di sini selama 30 hari, lalu hilang.",
+      "none": "Sampah kosong.",
+      "restore": "Pulihkan",
+      "restoreMany_other": "Pulihkan {{count}}",
+      "purge": "Hapus permanen",
+      "empty": "Kosongkan sampah",
+      "emptyTitle_other": "Hapus {{count}} halaman secara permanen?",
+      "emptyText": "Halaman hilang bersama riwayatnya. Ini tidak bisa dibatalkan.",
+      "deletedWhen": "dihapus {{when}}",
+      "restored_other": "{{count}} halaman dipulihkan.",
+      "purged_other": "{{count}} halaman dihapus permanen."
+    },
     "audienceLevel": "Yang bisa dilakukan {{name}}",
     "audienceLevelNone": "Tanpa akses",
     "audienceLevelView": "Lihat",
@@ -8436,7 +8698,7 @@
     "noAccessText": "Halaman ini hanya untuk orang tertentu. Kalau kamu butuh, tanyakan ke pengurus wiki.",
     "delete": "Pindahkan ke sampah",
     "deleteTitle": "Pindahkan {{title}} ke sampah?",
-    "deleteText": "Tautan ke halaman ini menjadi “halaman untuk dibuat”. Untuk saat ini halaman tidak bisa dipulihkan dari aplikasi.",
+    "deleteText": "Halaman masuk ke sampah wiki selama 30 hari, dan bisa dipulihkan dari sana. Sementara itu, tautan ke halaman ini menjadi “halaman untuk dibuat”.",
     "deleted": "{{title}} dipindahkan ke sampah.",
     "noBacklinksHint": "Belum ada halaman yang menautkan ke sini. Tulis [[{{title}}]] di halaman lain.",
     "allVersions": "Lihat semua {{count}} versi",
@@ -8574,7 +8836,21 @@
       "newMarked": "Halaman baru ditandai “baru”.",
       "uploaded_other": "{{count}} lampiran ada di Drive.",
       "open": "Buka {{title}}",
-      "someFailed_other": "{{count}} catatan tidak masuk: {{titles}}",
+      "sendingNotes_other": "dari {{count}} catatan terkirim",
+      "stop": "Hentikan",
+      "stopping": "Menghentikan…",
+      "partialTitle": "Tidak semuanya masuk",
+      "partial_other": "{{count}} catatan: {{done}} masuk, {{failed}} tidak",
+      "partialText": "Halaman yang masuk sudah ada di wiki.",
+      "whyTitle": "Yang tidak masuk",
+      "why": {
+        "batch_other": "{{count}} tidak terkirim: {{error}}",
+        "stopped_other": "{{count}} tidak terkirim karena kamu menghentikannya",
+        "tooLong_other": "{{count}} lebih dari 200.000 karakter: bagi di Obsidian",
+        "title_other": "{{count}} tidak punya nama yang bisa jadi judul",
+        "skipped_other": "{{count}} sudah punya halaman dengan nama yang sama"
+      },
+      "retry_other": "Coba {{count}} lagi",
       "overlayTitle": "Lepaskan untuk mengimpor ke wiki",
       "overlayText": ".zip vault Obsidian, folder vault, atau file .md. Kamu meninjau semuanya sebelum masuk.",
       "error": {
@@ -8759,6 +9035,8 @@
     "modelLimit": "{{model}} mencapai batasnya sendiri di paket ini dan direset {{when}}. Model lain di paket tetap berfungsi.",
     "modelLimitUnknown": "{{model}} mencapai batasnya sendiri di paket ini. Model lain di paket tetap berfungsi.",
     "modelRegion": "{{model}} butuh region Global yang dinyalakan di OpenCode (Settings › Privacy). Model lain di paket tetap berfungsi.",
+    "modelOff": "OpenCode menolak {{model}} dengan kunci ini: model atau akunnya dimatikan di sana. Aktifkan di OpenCode atau pilih model lain.",
+    "planInactive": "OpenCode Go tidak aktif di akun OpenCode kunci ini, jadi tidak ada modelnya yang menjawab. Periksa langganan Go di OpenCode, atau hubungkan kunci dari akun yang punya Go.",
     "modelHow": {
       "globalRegion": "Nyalakan region Global di OpenCode, di Settings › Privacy. Tanpa itu, model ini tidak menjawab.",
       "paidTraining": "Penyedia model ini mungkin memakai permintaan untuk melatihnya. Di OpenCode, di Settings › Privacy, nyalakan izin untuk model berbayar. Tanpa itu, model ini tidak menjawab.",
@@ -10767,6 +11045,61 @@
     }
   },
   "errors": {
+    "said": {
+      "gone": "Ini sudah tidak ada di sini. Muat ulang halaman dan coba lagi.",
+      "alreadyDone": "Ini sudah dijawab atau selesai. Muat ulang untuk melihat statusnya.",
+      "changed": "Ini berubah sementara itu. Muat ulang dan coba lagi.",
+      "tooLateUndo": "Ini tidak bisa dibatalkan lagi. Ubah secara manual.",
+      "futureTime": "Pilih waktu di masa depan.",
+      "tooFar": "Pilih tanggal dalam satu tahun.",
+      "checkDate": "Periksa tanggal dan waktunya.",
+      "notInWorkspace": "Orang itu tidak ada di ruang kerja ini.",
+      "validEmail": "Ketik email yang valid, seperti ana@contoh.com.",
+      "tooMany": "Itu lebih dari yang muat di sini. Hapus beberapa dan coba lagi.",
+      "fillIn": "Isi yang kurang dan coba lagi.",
+      "checkAddress": "Periksa alamatnya dan coba lagi.",
+      "tooLong": "Itu terlalu panjang. Persingkat dan coba lagi.",
+      "updateComputerApp": "Aplikasi di komputer terlalu lama untuk ini. Perbarui dan coba lagi.",
+      "offHere": "Ini dimatikan di sini.",
+      "notInConversation": "Tidak ada di percakapan ini.",
+      "accountStart": "Komputer tidak bisa memulai proses masuk. Pastikan komputer menyala dan coba lagi.",
+      "accountInUse": "Akun itu sudah berpikir untuk agen lain.",
+      "noAiYet": "Belum ada AI yang terhubung.",
+      "filePurged": "File ini dihapus lebih dari 30 hari lalu dan tidak bisa kembali.",
+      "looksSecret": "Itu terlihat seperti kata sandi atau kunci, dan semua orang di sini akan melihatnya.",
+      "blockSpec": "Blok ini punya kesalahan di bagian atau rumusnya, jadi tidak bisa ditampilkan. Perbaiki lalu coba lagi.",
+      "takeControl": "Ambil alih kontrol profil dulu.",
+      "profileBusy": "Orang lain sedang memakai profil ini.",
+      "nameTaken": "Nama itu sudah dipakai. Pilih yang lain.",
+      "deleteName": "Ketik nama kanal untuk menghapusnya.",
+      "generalKept": "#general tidak bisa dihapus.",
+      "generalStays": "Semua orang tetap di #general.",
+      "mcpUnreachable": "Tidak bisa terhubung ke server MCP. Periksa alamatnya dan coba lagi.",
+      "notApproved": "Layanan ini belum menyetujui agentes.chat.",
+      "alreadyInvited": "Orang ini sudah punya undangan.",
+      "alreadyAsked": "Seseorang sudah meminta untuk orang ini.",
+      "mailboxConnected": "Kotak surat ini sudah terhubung.",
+      "sendNeedsRecipients": "Mengirim tanpa bertanya butuh daftar penerima yang diizinkan.",
+      "missionLive": "Misi masih punya item yang berjalan atau menunggu komputernya. Hentikan dulu.",
+      "createRefused": "Kamu tidak bisa membuat ruang kerja sekarang.",
+      "noAgentToRemind": "Tidak ada agen di percakapan ini yang bisa mengingatkanmu.",
+      "agentCantRead": "Izinkan agen membaca ini dulu, di akses agen.",
+      "neverHappens": "Jadwal ini tidak pernah terjadi.",
+      "soleOwner": "Kamu satu-satunya pemilik ruang kerja yang punya anggota lain. Jadikan orang lain pemilik, atau hapus ruang kerjanya, lebih dulu.",
+      "testFirst": "Uji koneksi dengan pengaturan ini sebelum menyalakannya.",
+      "voiceLength": "Rekamannya terlalu panjang atau terlalu pendek.",
+      "sendAgain": "File tidak sampai utuh. Kirim lagi.",
+      "serverKey": "Kunci ini ada di pengaturan server.",
+      "input": "Itu tidak berhasil. Periksa isianmu dan coba lagi.",
+      "conflict": "Itu tidak bisa dilakukan sekarang. Muat ulang dan coba lagi.",
+      "computer": "Komputer tidak bisa melakukan ini sekarang. Pastikan komputer menyala dan coba lagi."
+    },
+    "webhook": {
+      "githubNoAccess": "GitHub workspace ini tidak bisa membuat webhook di {{repo}}. Ikuti langkah di bawah untuk membuatnya manual.",
+      "githubFailed": "GitHub tidak membuat webhook di {{repo}} ({{status}}). Ikuti langkah di bawah untuk membuatnya manual.",
+      "invalidSecret": "Tempel Client Secret secara utuh, tanpa spasi.",
+      "invalidRepo": "Tulis repositori sebagai pemilik/nama."
+    },
     "issue": {
       "assigneeOutside": "Orang ini tidak bisa melihat tugas ini. Tambahkan dulu ke Siapa yang melihat.",
       "deleteForbidden": "Hanya pembuat tugas ini atau administrator yang bisa menghapusnya.",
@@ -10789,6 +11122,8 @@
       "audienceWiderThanFolder": "Folder ini terbatas: di sini kamu hanya bisa mempersempitnya lagi. Untuk membukanya, ubah foldernya.",
       "editLimited": "Hanya orang yang dipilih yang bisa mengedit halaman ini.",
       "editorsExcludeYou": "Sertakan dirimu di antara orang yang mengedit, supaya halaman ini tetap bisa kamu kelola.",
+      "contextFull": "Sudah ada {{max}} halaman yang selalu dalam konteks agen. Keluarkan satu dulu.",
+      "restoreSlugTaken": "Halaman lain kini memakai nama ini. Ganti namanya, lalu pulihkan lagi.",
       "titleTaken": "Sudah ada halaman bernama “{{title}}”.",
       "titleCharacters": "Judul tidak boleh berisi [ ] | atau #.",
       "titleNoLetters": "Judul harus berisi huruf atau angka.",
@@ -10855,7 +11190,8 @@
       "createInviteOnly": "Untuk saat ini, ruang kerja baru membutuhkan undangan.",
       "membersFull": "Semua kursi di ruang kerja ini sedang terisi. Minta orang yang mengundangmu untuk membuka kursi.",
       "deleting": "Ruang kerja ini sedang dihapus.",
-      "notRestorable": "Ruang kerja ini sudah tidak bisa dipulihkan."
+      "notRestorable": "Ruang kerja ini sudah tidak bisa dipulihkan.",
+      "paused": "Ruang kerja ini sedang dijeda, jadi belum bisa menghubungkan aplikasi. Pengelola ruang kerja bisa mengaktifkannya lagi."
     },
     "reauth": {
       "code": "Ketik kode yang kami kirim lewat email.",
@@ -12327,7 +12663,8 @@
     "stopFailed": "Tidak bisa dihentikan. Hanya yang meminta, pemilik agen, atau admin yang bisa.",
     "autoUpdate": "Masih dikerjakan ({{duration}}).",
     "autoUpdateNow": "Sekarang: {{now}}.",
-    "statusReply": "Masih mengerjakannya ({{duration}}). Saya baca pesan Anda setelah langkah ini.",
+    "statusReply": "Saya sedang di tengah tugas ({{duration}}) dan belum bisa menjawab. Pesan Anda sudah antre dan saya baca di langkah berikutnya.",
+    "statusReplyTurn": "Saya sedang di tengah tugas ({{duration}}) dan belum bisa menjawab. Pesan Anda sudah antre dan saya baca setelah putaran kerja ini selesai.",
     "statusReplyQueued": "Menunggu komputer ({{duration}}). Saya baca pesan Anda saat tiba giliran saya.",
     "statusReplyAway": "Menunggu komputer saya kembali. Saya baca pesan Anda begitu komputer kembali.",
     "status": {
@@ -12373,7 +12710,8 @@
     "namesMore": "{{first}} dan {{count}} lainnya",
     "wait": {
       "thinking": "Berpikir…",
-      "held": "Menunggu persetujuan…"
+      "held": "Menunggu persetujuan…",
+      "said": "“{{text}}”"
     },
     "consult": {
       "asking": "{{from}} sedang bertanya ke {{to}}",
@@ -12578,6 +12916,32 @@
         "requestingAccess": "Meminta akses",
         "requestingSecret": "Meminta rahasia",
         "queryingDatabase": "Mengkueri database",
+        "searchingWeb": "Mencari di web",
+        "readingWeb": "Membaca halaman web",
+        "preparingCard": "Menyiapkan kartu",
+        "startingPoll": "Membuka polling",
+        "askingChoices": "Bertanya dengan pilihan",
+        "usingVault": "Bekerja di Vault",
+        "makingPassword": "Membuat kata sandi",
+        "startingWork": "Memulai pekerjaan panjang",
+        "updatingWork": "Memperbarui pekerjaan panjang",
+        "withdrawingRequest": "Menarik permintaan",
+        "schedulingAction": "Menyiapkan tindakan untuk nanti",
+        "updatingDashboard": "Mengerjakan dasbor",
+        "readingDashboards": "Melihat dasbor",
+        "pushingBranch": "Meminta untuk mengirim kode",
+        "deletingBranches": "Menghapus branch",
+        "postingMessage": "Memposting pesan",
+        "sendingDm": "Mengirim pesan langsung",
+        "settingStatus": "Memperbarui statusnya",
+        "settingReplyStyle": "Menyesuaikan cara menjawab",
+        "deletingRoutine": "Menghapus rutinitas",
+        "runningRoutine": "Menjalankan rutinitas sekarang",
+        "proposingTeam": "Mengusulkan tim",
+        "proposingChange": "Mengusulkan perubahan",
+        "updatingThread": "Memperbarui utas",
+        "addingAgent": "Menambahkan agen ke kanal",
+        "readingConversation": "Membaca percakapan",
         "usingTool": "Memakai alat {{tool}}",
         "thinking": "Berpikir",
         "typing": "Menulis",
@@ -12660,6 +13024,32 @@
       "requestingAccess": "meminta akses",
       "requestingSecret": "meminta rahasia",
       "queryingDatabase": "mengkueri database",
+      "searchingWeb": "mencari di web",
+      "readingWeb": "membaca halaman web",
+      "preparingCard": "menyiapkan kartu",
+      "startingPoll": "membuka polling",
+      "askingChoices": "bertanya dengan pilihan",
+      "usingVault": "bekerja di Vault",
+      "makingPassword": "membuat kata sandi",
+      "startingWork": "memulai pekerjaan panjang",
+      "updatingWork": "memperbarui pekerjaan panjang",
+      "withdrawingRequest": "menarik permintaan",
+      "schedulingAction": "menyiapkan tindakan untuk nanti",
+      "updatingDashboard": "mengerjakan dasbor",
+      "readingDashboards": "melihat dasbor",
+      "pushingBranch": "meminta untuk mengirim kode",
+      "deletingBranches": "menghapus branch",
+      "postingMessage": "memposting pesan",
+      "sendingDm": "mengirim pesan langsung",
+      "settingStatus": "memperbarui statusnya",
+      "settingReplyStyle": "menyesuaikan cara menjawab",
+      "deletingRoutine": "menghapus rutinitas",
+      "runningRoutine": "menjalankan rutinitas sekarang",
+      "proposingTeam": "mengusulkan tim",
+      "proposingChange": "mengusulkan perubahan",
+      "updatingThread": "memperbarui utas",
+      "addingAgent": "menambahkan agen ke kanal",
+      "readingConversation": "membaca percakapan",
       "usingTool": "memakai alat"
     },
     "tokens": "{{value}} token",
@@ -12751,6 +13141,8 @@
       "plan_model_limit_wait": "{{model}} mencapai batasnya sendiri di {{plan}}. Model lain di paket tetap berfungsi: ganti model {{agent}} atau tunggu sampai direset {{when}}.",
       "plan_model_limit_wait_unknown": "{{model}} mencapai batasnya sendiri di {{plan}}. Model lain di paket tetap berfungsi: ganti model {{agent}} atau tunggu sampai direset.",
       "plan_model_region_wait": "Model ini ({{model}}) butuh region Global yang dinyalakan di OpenCode (Settings › Privacy).",
+      "plan_model_off_wait": "OpenCode menolak {{model}} dengan kunci ini: model atau akunnya dimatikan di sana. Aktifkan di OpenCode atau ganti model {{agent}}.",
+      "plan_inactive_wait": "OpenCode Go tidak aktif di akun OpenCode kunci ini, jadi tidak ada modelnya yang menjawab. Periksa langganan Go di OpenCode, atau hubungkan kunci dari akun yang punya Go.",
       "budget_wait": "Anggaranku untuk bulan ini sudah habis. Aku akan lanjut {{when}}, atau lebih cepat jika admin menaikkannya.",
       "usage_wait_canceled": "Dibatalkan. Tidak akan berjalan saat batasnya diatur ulang.",
       "usage_wait_archived": "Tidak akan berjalan: agennya diarsipkan.",
@@ -12781,6 +13173,8 @@
       "no_ai_plan_tools": "Aku berhenti sebelum menjawab: AI paketku di komputer itu tidak tetap memakai alat agentes.chat saja.",
       "no_ai_model_limit": "Aku tidak bisa menjawab sekarang: {{model}} sudah mencapai batasnya sendiri di paketku.",
       "no_ai_model_region": "Aku tidak bisa menjawab: {{model}} butuh wilayah Global dinyalakan di OpenCode (Settings › Privacy).",
+      "no_ai_model_off": "Saya tidak bisa menjawab: OpenCode menolak {{model}} dengan kunci saya. Aktifkan model atau akunnya di OpenCode, atau ganti model saya.",
+      "no_ai_plan_inactive": "Saya tidak bisa menjawab: OpenCode Go tidak aktif di akun OpenCode kunci saya. Periksa langganan Go di OpenCode, atau hubungkan kunci dari akun yang punya Go.",
       "no_ai_commands_off": "Aku tidak bisa menjawab sekarang: perintah dimatikan di komputer paketku.",
       "no_ai_cli_missing": "Aku belum bisa menjawab: program AI-ku tidak terpasang di komputerku.",
       "no_ai_plan_hold": "Saya menyimpan pesanmu. Saya akan menjawab di sini setelah workspace punya paket agentes.chat dan AI yang terhubung.",
@@ -13293,6 +13687,12 @@
       "ended": "Browser {{name}} ditutup.",
       "starting": "Membuka halaman…",
       "page": "Halaman {{name}}, langsung",
+      "emulated": {
+        "phone": "Ponsel · {{size}}",
+        "tablet": "Tablet · {{size}}",
+        "desktop": "Desktop · {{size}}"
+      },
+      "normalSize": "Ukuran normal",
       "tabs_other": "{{count}} tab",
       "typeHere": "Ketik di sini",
       "typeTo": "masuk ke {{field}}",
@@ -14056,6 +14456,10 @@
       "modelLimit": "{{model}} mencapai batas",
       "modelRegion": "{{model}} butuh region Global",
       "modelRegionNext": "Nyalakan di OpenCode (Settings › Privacy)",
+      "modelOff": "OpenCode menolak {{model}}",
+      "modelOffNext": "Aktifkan di OpenCode atau pilih model lain",
+      "planInactive": "OpenCode Go tidak aktif",
+      "planInactiveNext": "Periksa langganan Go di OpenCode",
       "budgetOut": "Anggaran bulan ini habis",
       "workLine": "Dalam antrean kerja agen",
       "workLineNext": "Mulai saat pekerjaan lain selesai",

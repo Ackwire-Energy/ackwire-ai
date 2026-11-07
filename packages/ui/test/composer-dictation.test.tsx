@@ -116,3 +116,23 @@ describe("dictated text lands in the message box", () => {
     expect(typed).toEqual(["falado"]);
   });
 });
+
+test("a click in the empty room under the text puts the caret in the box; a button keeps its own click", () => {
+  render(
+    <Composer
+      value=""
+      onChange={() => {}}
+      onSend={() => {}}
+      label="Message"
+      sendLabel="Send"
+      pills={<button type="button">Ada</button>}
+    />,
+  );
+  const box = screen.getByLabelText("Message");
+  const row = document.querySelector(".ac-composer__tools") as HTMLElement;
+  expect(fireEvent.mouseDown(row)).toBe(false);
+  expect(document.activeElement).toBe(box);
+  (document.activeElement as HTMLElement).blur();
+  expect(fireEvent.mouseDown(screen.getByRole("button", { name: "Ada" }))).toBe(true);
+  expect(document.activeElement).not.toBe(box);
+});

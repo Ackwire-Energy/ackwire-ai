@@ -186,7 +186,9 @@ export type BrainEvent =
   /** Messages handed mid-turn (`BrainIO.steerable`) that the turn read, by their `uuid`. */
   | { type: "steer_read"; uuids: string[] }
   /** Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
-  | { type: "speed_fallback"; message: string };
+  | { type: "speed_fallback"; message: string }
+  /** A computer brain started a call of its own: shown only, its `tool_call` with `executed` follows. */
+  | { type: "tool_started"; id: string; name: string };
 
 export interface Brain {
   kind: BrainKind;

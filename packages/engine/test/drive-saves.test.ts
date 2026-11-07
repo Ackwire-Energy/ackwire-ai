@@ -60,6 +60,7 @@ async function world(reply?: Reply) {
     handOff: true,
     chatTools: true,
     wikiTools: true,
+    contextTools: true,
     reply:
       reply ??
       ((req) => {
@@ -410,6 +411,9 @@ describe("a routine's own files", () => {
     const run = ctxOf(await routineRun({ target: { type: "dm" } }));
     expect((await call(run, "list_artifacts", {})).content).not.toContain(theirs.id);
     expect((await call(run, "read_artifact", { artifact_id: theirs.id })).isError).toBe(true);
+    // Nor by search, which reads that DM's messages.
+    await drainOutbox(f.db, f.handlers);
+    expect((await call(run, "search_context", { query: "meu", kinds: ["file"] })).content).not.toContain(theirs.id);
   });
 
   test("hand_off's message carries the card of what the run saved", async () => {

@@ -28,7 +28,7 @@ function useNow(live: boolean) {
 }
 
 /** The phone's long-work line (ADR 0121), as the web's WorkLine: how it stands, its last update and its actions. */
-function useLine(work: WorkView) {
+function useLine(work: WorkView, inUpdatesThread = false) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -53,6 +53,7 @@ function useLine(work: WorkView) {
     agentName: agent?.name ?? "",
     nameOf: (id) => dir.memberById.get(id)?.name ?? null,
     canStop: manage || agent?.ownerUserId === meId || work.requestedByUserId === meId,
+    inUpdatesThread,
   });
   return { view, stop, t };
 }
@@ -61,9 +62,19 @@ function useLine(work: WorkView) {
 const threadHref = (work: WorkView) =>
   chatHref(work.channelId, work.threadId ?? work.anchorMessageId, work.question?.messageId);
 
-function Line({ work, onThread, extra }: { work: WorkView; onThread?: () => void; extra?: ReactNode }) {
+function Line({
+  work,
+  onThread,
+  extra,
+  inUpdatesThread,
+}: {
+  work: WorkView;
+  onThread?: () => void;
+  extra?: ReactNode;
+  inUpdatesThread?: boolean;
+}) {
   const c = useColors();
-  const { view, stop, t } = useLine(work);
+  const { view, stop, t } = useLine(work, inUpdatesThread);
   const jump = useContext(JumpToMessageContext);
   // An icon per state, never a colored dot: the shape says it without the color.
   const mark =
@@ -160,7 +171,8 @@ function Action({
 
 /**
  * Under the agent's "Vou cuidar disso": the work's line. Abrir thread only where nothing else opens it: not under a
- * root whose thread link shows (`threaded`), unless it waits on someone, nor inside that thread.
+ * root whose thread link shows (`threaded`), unless it waits on someone, nor inside that thread, where its updates
+ * are the messages under it and the line doesn't repeat the last one.
  */
 export function MessageWorkLine({ message, threaded }: { message: Message; threaded?: boolean }) {
   const { thread } = useLocalSearchParams<{ thread?: string }>();
@@ -168,7 +180,9 @@ export function MessageWorkLine({ message, threaded }: { message: Message; threa
   if (!work) return null;
   const inside = thread === (work.threadId ?? work.anchorMessageId);
   const hidden = inside || (threaded && !workWaitsOnPerson(work));
-  return <Line work={work} onThread={hidden ? undefined : () => router.push(threadHref(work))} />;
+  return (
+    <Line work={work} inUpdatesThread={inside} onThread={hidden ? undefined : () => router.push(threadHref(work))} />
+  );
 }
 
 /** On a task's screen: the work's line and the agent's plan. */

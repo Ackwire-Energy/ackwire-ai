@@ -4373,6 +4373,27 @@
   "channel.archived": {
     "value": "#{{channel}} archived. The conversation is kept."
   },
+  "channel.leave": {
+    "value": "Leave channel"
+  },
+  "channel.left": {
+    "value": "You left #{{channel}}"
+  },
+  "channel.leaveTitle": {
+    "value": "Leave #{{channel}}?"
+  },
+  "channel.leavePrivate": {
+    "value": "It's a private channel: to come back, someone in it has to add you."
+  },
+  "channel.leaveLast": {
+    "value": "You're the last person here: leaving archives the channel."
+  },
+  "channel.leaveConfirm": {
+    "value": "Leave"
+  },
+  "channel.leaveLastConfirm": {
+    "value": "Leave and archive"
+  },
   "channel.delete": {
     "value": "Delete channel"
   },
@@ -4692,7 +4713,7 @@
     "value": "Hi, I'm {{name}}. I'll build the team with you."
   },
   "rightHand.intro.lead": {
-    "value": "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do."
+    "value": "I create the agents, connect the apps and invite the people. Nothing changes unless you ask, and I only do what you can do."
   },
   "rightHand.intro.heldLead": {
     "value": "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan."
@@ -4985,6 +5006,12 @@
   "rightHand.card.only.ai_account": {
     "value": "Only the account's owner gives it"
   },
+  "rightHand.card.only.name": {
+    "value": "Only admins rename an agent"
+  },
+  "rightHand.card.only.look": {
+    "value": "Only admins and its owner change its look"
+  },
   "rightHand.card.only.many": {
     "value": "Only admins make these changes"
   },
@@ -5008,6 +5035,15 @@
   },
   "rightHand.field.channel": {
     "value": "Channel"
+  },
+  "rightHand.field.name": {
+    "value": "Name"
+  },
+  "rightHand.field.look": {
+    "value": "Look"
+  },
+  "rightHand.value.lookDefault": {
+    "value": "The default look"
   },
   "rightHand.value.none": {
     "value": "None"
@@ -5415,6 +5451,12 @@
   },
   "noAi.rightHand.model_region": {
     "value": "{{name}} can't answer: {{model}} needs the Global region on in OpenCode (Settings › Privacy)."
+  },
+  "noAi.rightHand.model_off": {
+    "value": "{{name}} can't answer: OpenCode refused {{model}} with this key. Turn the model or the account on in OpenCode, or choose another model."
+  },
+  "noAi.rightHand.plan_inactive": {
+    "value": "{{name}} can't answer: OpenCode Go isn't active on this key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it."
   },
   "noAi.rightHand.commands_off": {
     "value": "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on."
@@ -6423,6 +6465,15 @@
   },
   "agentActions.agent.settings_changed": {
     "value": "Changed the settings of <b>{{agentName}}</b>"
+  },
+  "agentActions.agent.settings_changed_instructions": {
+    "value": "Changed the instructions of <b>{{agentName}}</b>"
+  },
+  "agentActions.agent.settings_changed_role": {
+    "value": "Changed the role of <b>{{agentName}}</b>"
+  },
+  "agentActions.agent.settings_changed_apps": {
+    "value": "Changed the apps of <b>{{agentName}}</b>"
   },
   "agentActions.pr.merged": {
     "value": "Merged PR <b>#{{number}}</b> in <b>{{repo}}</b>"
@@ -8394,6 +8445,15 @@
   "question.dismissedByYou": {
     "value": "You skipped this question."
   },
+  "ask.kindOther.approval": {
+    "value": "Asks for approval"
+  },
+  "ask.kindOther.browser": {
+    "value": "Needs someone in the browser"
+  },
+  "ask.kindOther.desktop": {
+    "value": "Needs someone on the computer"
+  },
   "ask.kind.approval": {
     "value": "Asks for your approval"
   },
@@ -8502,6 +8562,9 @@
   "approval.askPlain": {
     "value": "I need your OK to go on:"
   },
+  "approval.askPlainOther": {
+    "value": "I need an OK to go on:"
+  },
   "approval.seeEmail": {
     "value": "See the email"
   },
@@ -8515,6 +8578,12 @@
     "value": {
       "one": "I need your OK for this to go on:",
       "other": "I need your OK for these {{count}} to go on:"
+    }
+  },
+  "approval.askManyOther": {
+    "value": {
+      "one": "I need an OK for this to go on:",
+      "other": "I need an OK for these {{count}} to go on:"
     }
   },
   "approval.all.approve": {
@@ -8823,6 +8892,54 @@
   "approval.titles.request_branch_push": {
     "value": "Push to {{branch}} in {{repo}} (24 h, no force push)"
   },
+  "approval.titles.action.merge": {
+    "value": "Merge"
+  },
+  "approval.titles.action.deploy": {
+    "value": "Deploy"
+  },
+  "approval.titles.action.rollback": {
+    "value": "Roll back"
+  },
+  "approval.titles.action.publish": {
+    "value": "Publish"
+  },
+  "approval.titles.action.delete": {
+    "value": "Delete data"
+  },
+  "approval.titles.action.send": {
+    "value": "Send a message outside"
+  },
+  "approval.titles.action.draft": {
+    "value": "Save a draft"
+  },
+  "approval.titles.vault_make_password": {
+    "value": "Make a password"
+  },
+  "approval.titles.pg_query": {
+    "value": "Query {{target}}"
+  },
+  "approval.titles.request_approval.merge": {
+    "value": "Merge {{target}}"
+  },
+  "approval.titles.request_approval.deploy": {
+    "value": "Deploy {{target}}"
+  },
+  "approval.titles.request_approval.rollback": {
+    "value": "Roll back {{target}}"
+  },
+  "approval.titles.request_approval.other": {
+    "value": "Approve {{target}}"
+  },
+  "approval.titles.github.merge_pull_request": {
+    "value": "Merge PR #{{number}} in {{repo}}"
+  },
+  "approval.titles.github.pull_request_review_write": {
+    "value": "Review PR #{{number}} in {{repo}}"
+  },
+  "approval.titles.github.actions_run_trigger": {
+    "value": "Run {{method}} in {{repo}}"
+  },
   "home.greeting.morning": {
     "value": "Good morning, {{name}}"
   },
@@ -8993,6 +9110,9 @@
   },
   "notifications.planLent.done": {
     "value": "Your plan is back"
+  },
+  "notifications.planModelDropped.choose": {
+    "value": "Choose another model"
   },
   "notifications.docTitleUnread": {
     "value": "({{count}}) Notifications"
@@ -9257,6 +9377,9 @@
   },
   "notifications.what.planLent": {
     "value": "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>"
+  },
+  "notifications.what.planModelDropped": {
+    "value": "{{model}} left {{plan}}. <b>{{name}}</b> is using {{runs}} until you choose another model."
   },
   "notifications.what.routineWaitingPlan": {
     "value": "<b>{{name}}</b> is waiting for its plan to reset to run a routine"
@@ -14968,6 +15091,102 @@
   "routines.webhook.outcome.rate_limited": {
     "value": "Refused: too many calls a minute"
   },
+  "routines.setup.title": {
+    "value": "{{provider}} webhook"
+  },
+  "routines.setup.working": {
+    "value": "Working. {{provider}} already sends its events here."
+  },
+  "routines.setup.waiting.github": {
+    "value": "Waiting for GitHub. It sends a ping the moment the webhook is saved."
+  },
+  "routines.setup.waiting.sentry": {
+    "value": "Waiting for Sentry. It calls when a new error comes in."
+  },
+  "routines.setup.refused.github": {
+    "value": "GitHub called with another secret. Copy the secret below into the webhook again."
+  },
+  "routines.setup.refused.sentry": {
+    "value": "Sentry called with another secret. Paste the integration's Client Secret again."
+  },
+  "routines.setup.timeout": {
+    "value": "Nothing came in 3 minutes. Check the URL and the secret, then test again."
+  },
+  "routines.setup.adminOnly": {
+    "value": "Someone who manages connectors turns on the {{provider}} webhook. Ask an admin to open this routine."
+  },
+  "routines.setup.test": {
+    "value": "Test"
+  },
+  "routines.setup.retest": {
+    "value": "Test again"
+  },
+  "routines.setup.copied": {
+    "value": "Copied."
+  },
+  "routines.setup.github.repo": {
+    "value": "Repository"
+  },
+  "routines.setup.github.repoPlaceholder": {
+    "value": "owner/name"
+  },
+  "routines.setup.github.oneClick": {
+    "value": "Create the webhook"
+  },
+  "routines.setup.github.added": {
+    "value": "Webhook created in {{repo}}."
+  },
+  "routines.setup.github.byHand": {
+    "value": "Or by hand: in the repository, Settings › Webhooks › Add webhook."
+  },
+  "routines.setup.github.open": {
+    "value": "In the repository, open Settings › Webhooks › Add webhook."
+  },
+  "routines.setup.github.openLink": {
+    "value": "Open on GitHub"
+  },
+  "routines.setup.github.url": {
+    "value": "Payload URL"
+  },
+  "routines.setup.github.type": {
+    "value": "Content type: application/json"
+  },
+  "routines.setup.github.secret": {
+    "value": "Secret"
+  },
+  "routines.setup.github.events": {
+    "value": "Under Which events, choose Let me select individual events. Tick Pull requests and Deployment statuses, then Add webhook."
+  },
+  "routines.setup.github.another": {
+    "value": "Add to another repository"
+  },
+  "routines.setup.sentry.open": {
+    "value": "In Sentry, create an internal integration."
+  },
+  "routines.setup.sentry.openLink": {
+    "value": "Open in Sentry"
+  },
+  "routines.setup.sentry.url": {
+    "value": "Webhook URL"
+  },
+  "routines.setup.sentry.events": {
+    "value": "Under Permissions, set Issue & Event to Read. Then under Webhooks, tick issue and save."
+  },
+  "routines.setup.sentry.secret": {
+    "value": "The integration's Client Secret"
+  },
+  "routines.setup.sentry.secretPlaceholder": {
+    "value": "Paste the Client Secret"
+  },
+  "routines.setup.sentry.secretSaved": {
+    "value": "Saved. Paste a new one to replace it"
+  },
+  "routines.setup.sentry.save": {
+    "value": "Save"
+  },
+  "routines.setup.sentry.saved": {
+    "value": "Client Secret saved."
+  },
   "routines.once": {
     "value": "Once · {{weekday}}, {{date}} at {{time}}{{zone}}"
   },
@@ -15358,6 +15577,255 @@
   "routines.presets.title": {
     "value": "Start from a template"
   },
+  "routines.presets.placeholder": {
+    "value": "Choose a template"
+  },
+  "routines.presets.search": {
+    "value": "Search templates"
+  },
+  "routines.presets.searchPlaceholder": {
+    "value": "Name, area or app"
+  },
+  "routines.presets.noResults": {
+    "value": "No template found"
+  },
+  "routines.presets.list": {
+    "value": "Templates"
+  },
+  "routines.presets.needsApp": {
+    "value": "Needs this app: {{app}}"
+  },
+  "routines.presets.needsApps": {
+    "value": "Needs one of these apps: {{apps}}"
+  },
+  "routines.presets.needsMailbox": {
+    "value": "Needs a connected mailbox"
+  },
+  "routines.presets.connectFirst": {
+    "value": "Connect it so the routine can work."
+  },
+  "routines.presets.fillBlank": {
+    "value": "Replace the text in brackets first."
+  },
+  "routines.presets.replaceTitle": {
+    "value": "Replace what you wrote with this template?"
+  },
+  "routines.presets.replaceConfirm": {
+    "value": "Replace"
+  },
+  "routines.presets.areas.team": {
+    "value": "Team and daily routine"
+  },
+  "routines.presets.areas.sales": {
+    "value": "Sales and customers"
+  },
+  "routines.presets.areas.support": {
+    "value": "Customer service"
+  },
+  "routines.presets.areas.marketing": {
+    "value": "Marketing and content"
+  },
+  "routines.presets.areas.finance": {
+    "value": "Finance"
+  },
+  "routines.presets.areas.ops": {
+    "value": "Operations"
+  },
+  "routines.presets.areas.people": {
+    "value": "People and HR"
+  },
+  "routines.presets.areas.tech": {
+    "value": "Technology"
+  },
+  "routines.presets.dayPlan.name": {
+    "value": "Plan for the day"
+  },
+  "routines.presets.dayPlan.text": {
+    "value": "Weekdays at 8:30am, today's tasks and meetings."
+  },
+  "routines.presets.dayPlan.prompt": {
+    "value": "List the open tasks due today and today's meetings. Say what needs attention first."
+  },
+  "routines.presets.late.name": {
+    "value": "Overdue tasks"
+  },
+  "routines.presets.late.text": {
+    "value": "Weekdays at 10am, what's past its due date."
+  },
+  "routines.presets.late.prompt": {
+    "value": "Look for open tasks past their due date. For each one, say who owns it and how many days late it is."
+  },
+  "routines.presets.unanswered.name": {
+    "value": "Unanswered questions"
+  },
+  "routines.presets.unanswered.text": {
+    "value": "Weekdays at 4pm, what nobody answered today."
+  },
+  "routines.presets.unanswered.prompt": {
+    "value": "Look in the channel for today's questions and requests that got no answer. List each one with who asked."
+  },
+  "routines.presets.leads.name": {
+    "value": "New CRM contacts"
+  },
+  "routines.presets.leads.text": {
+    "value": "Weekdays at 9am, who came in and who to call first."
+  },
+  "routines.presets.leads.prompt": {
+    "value": "Check the CRM for contacts added since last time. Say who looks most promising and suggest the next step for each."
+  },
+  "routines.presets.stalled.name": {
+    "value": "Stalled deals"
+  },
+  "routines.presets.stalled.text": {
+    "value": "Mondays at 9am, deals with no recent activity."
+  },
+  "routines.presets.stalled.prompt": {
+    "value": "Check the CRM for open deals with no activity for over 7 days. Suggest the next step for each."
+  },
+  "routines.presets.prospects.name": {
+    "value": "Find new customers"
+  },
+  "routines.presets.prospects.text": {
+    "value": "Mondays at 8am, five companies worth contacting."
+  },
+  "routines.presets.prospects.prompt": {
+    "value": "Search the web for 5 companies that fit our ideal customer. For each one, say what it does and why it's worth contacting."
+  },
+  "routines.presets.newEmail.name": {
+    "value": "Draft email replies"
+  },
+  "routines.presets.newEmail.text": {
+    "value": "When an email arrives, the agent drafts a reply."
+  },
+  "routines.presets.newEmail.prompt": {
+    "value": "Read the email that arrived and say what it's about and how urgent it is. Draft a reply, but don't send it."
+  },
+  "routines.presets.tickets.name": {
+    "value": "Unanswered tickets"
+  },
+  "routines.presets.tickets.text": {
+    "value": "Weekdays at 9am and 2pm, who's still waiting."
+  },
+  "routines.presets.tickets.prompt": {
+    "value": "Check the open tickets with no reply for over 4 hours. List the most urgent first and suggest a reply for each."
+  },
+  "routines.presets.themes.name": {
+    "value": "Most common requests"
+  },
+  "routines.presets.themes.text": {
+    "value": "Fridays at 4pm, what customers asked for most."
+  },
+  "routines.presets.themes.prompt": {
+    "value": "Read this week's tickets and group them by subject. Say which 5 came up most and what would prevent each one."
+  },
+  "routines.presets.mentions.name": {
+    "value": "Company mentions"
+  },
+  "routines.presets.mentions.text": {
+    "value": "Weekdays at 9am, what's being said about us."
+  },
+  "routines.presets.mentions.prompt": {
+    "value": "Search the web for recent news and mentions of our company. Say where it appeared, whether it's positive or negative, and whether it needs a reply."
+  },
+  "routines.presets.rivals.name": {
+    "value": "Watch competitors"
+  },
+  "routines.presets.rivals.text": {
+    "value": "Mondays at 9am, what competitors changed."
+  },
+  "routines.presets.rivals.prompt": {
+    "value": "Research what our competitors launched or changed last week, such as prices, products and campaigns. Say what matters to us."
+  },
+  "routines.presets.ideas.name": {
+    "value": "Content ideas"
+  },
+  "routines.presets.ideas.text": {
+    "value": "Mondays at 10am, five ideas for the week."
+  },
+  "routines.presets.ideas.prompt": {
+    "value": "Suggest 5 content ideas for this week, based on what customers ask and what's happening in our market. Give each one a title and a format."
+  },
+  "routines.presets.traffic.name": {
+    "value": "Website numbers"
+  },
+  "routines.presets.traffic.text": {
+    "value": "Mondays at 8:30am, the week against the one before."
+  },
+  "routines.presets.traffic.prompt": {
+    "value": "Check last week's numbers: visits, sign-ups and top pages. Compare them with the week before and say what changed."
+  },
+  "routines.presets.revenue.name": {
+    "value": "Yesterday's sales"
+  },
+  "routines.presets.revenue.text": {
+    "value": "Every day at 8am, sales against the weekly average."
+  },
+  "routines.presets.revenue.prompt": {
+    "value": "Check how much we sold yesterday and compare it with the average of the last 7 days. Say if anything looks unusual."
+  },
+  "routines.presets.failed.name": {
+    "value": "Payment problems"
+  },
+  "routines.presets.failed.text": {
+    "value": "Weekdays at 10am, declined charges and disputes."
+  },
+  "routines.presets.failed.prompt": {
+    "value": "Check declined payments, refunds and disputes since last time. List each one with the amount and the customer."
+  },
+  "routines.presets.monthClose.name": {
+    "value": "Month-end summary"
+  },
+  "routines.presets.monthClose.text": {
+    "value": "On the 1st at 9am, last month's money."
+  },
+  "routines.presets.monthClose.prompt": {
+    "value": "Put together a summary of last month: revenue, refunds and disputes. Compare it with the month before."
+  },
+  "routines.presets.sheet.name": {
+    "value": "Check a spreadsheet"
+  },
+  "routines.presets.sheet.text": {
+    "value": "Weekdays at 11am, gaps and odd numbers."
+  },
+  "routines.presets.sheet.prompt": {
+    "value": "Check this spreadsheet: (say which one). Point out empty fields, unusual values and what changed since last time."
+  },
+  "routines.presets.page.name": {
+    "value": "Watch a web page"
+  },
+  "routines.presets.page.text": {
+    "value": "Every day at 9am, only when it changes."
+  },
+  "routines.presets.page.prompt": {
+    "value": "Open this page: (paste the address here). If something important changed since last time, say what changed."
+  },
+  "routines.presets.newTask.name": {
+    "value": "Sort new tasks"
+  },
+  "routines.presets.newTask.text": {
+    "value": "When a task is created, the agent reviews it."
+  },
+  "routines.presets.newTask.prompt": {
+    "value": "Read the new task. Say what's missing to start it, and suggest who should own it and a due date."
+  },
+  "routines.presets.pulse.name": {
+    "value": "Question of the week"
+  },
+  "routines.presets.pulse.text": {
+    "value": "Thursdays at 4pm, one question for the team."
+  },
+  "routines.presets.pulse.prompt": {
+    "value": "Summarize the answers to last week's question without naming anyone. Then post a short new question in the channel about how the week went."
+  },
+  "routines.presets.away.name": {
+    "value": "Who's out this week"
+  },
+  "routines.presets.away.text": {
+    "value": "Mondays at 8:30am, time off and trips."
+  },
+  "routines.presets.away.prompt": {
+    "value": "Check the calendar for time off and trips this week. List them by day and say what needs covering."
+  },
   "routines.presets.digest.name": {
     "value": "Daily channel digest"
   },
@@ -15365,10 +15833,7 @@
     "value": "Weekdays at 9am, what happened yesterday."
   },
   "routines.presets.digest.prompt": {
-    "value": "Summarize what happened yesterday in the channel: requests, what got solved and what was left unanswered."
-  },
-  "routines.presets.digest.phrase": {
-    "value": "weekdays at 9am"
+    "value": "Summarize what happened in the channel since the last digest: requests, what got solved and what was left unanswered."
   },
   "routines.presets.errors.name": {
     "value": "Watch for new errors"
@@ -15378,9 +15843,6 @@
   },
   "routines.presets.errors.prompt": {
     "value": "Check the new Sentry errors since the last run. If there are any, summarize them and say where in the code they happen. If there's nothing new, don't send a message."
-  },
-  "routines.presets.errors.phrase": {
-    "value": "every hour"
   },
   "routines.presets.prs.name": {
     "value": "Review new PRs"
@@ -15399,9 +15861,6 @@
   },
   "routines.presets.week.prompt": {
     "value": "Summarize the week: decisions, closed tasks and what's still open."
-  },
-  "routines.presets.week.phrase": {
-    "value": "every friday at 5pm"
   },
   "routines.close": {
     "value": "Close"
@@ -21261,6 +21720,171 @@
   "wiki.audienceFolderOpened": {
     "value": "Done. The folder has no limit now."
   },
+  "wiki.audienceRootTitle": {
+    "value": "Access to the whole wiki"
+  },
+  "wiki.audienceRootText": {
+    "value": "It reaches every page and folder of the wiki, and the ones added later."
+  },
+  "wiki.audienceInRoot": {
+    "value": "The whole wiki is limited: here you can only narrow it further."
+  },
+  "wiki.audienceFollowsRoot": {
+    "value": "From the whole wiki"
+  },
+  "wiki.context.on": {
+    "value": "Always in the agents' context"
+  },
+  "wiki.context.off": {
+    "value": "Take out of the agents' context"
+  },
+  "wiki.context.chip": {
+    "value": "Always in context"
+  },
+  "wiki.context.hint": {
+    "value": "Goes into every answer of every agent that reads it, even when nobody mentions it. At most 3 pages."
+  },
+  "wiki.context.added": {
+    "value": "Every agent that reads this page now gets it in every answer."
+  },
+  "wiki.context.removed": {
+    "value": "Agents now get this page only when a message is about it."
+  },
+  "wiki.bulk.select": {
+    "value": "Select"
+  },
+  "wiki.bulk.selectAll": {
+    "value": "Select all"
+  },
+  "wiki.bulk.selected": {
+    "value": {
+      "one": "{{count}} selected",
+      "other": "{{count}} selected"
+    }
+  },
+  "wiki.bulk.agents": {
+    "value": "Agents"
+  },
+  "wiki.bulk.delete": {
+    "value": "Delete"
+  },
+  "wiki.bulk.deleteFolder": {
+    "value": "Delete the folder {{folder}}"
+  },
+  "wiki.bulk.deleteImport": {
+    "value": {
+      "one": "Delete the import “{{name}}” ({{count}} page)",
+      "other": "Delete the import “{{name}}” ({{count}} pages)"
+    }
+  },
+  "wiki.bulk.deleteTitle": {
+    "value": {
+      "one": "Delete {{count}} page?",
+      "other": "Delete {{count}} pages?"
+    }
+  },
+  "wiki.bulk.deleteFolderTitle": {
+    "value": {
+      "one": "Delete the folder {{folder}} and its page?",
+      "other": "Delete the folder {{folder}} and its {{count}} pages?"
+    }
+  },
+  "wiki.bulk.deleteImportTitle": {
+    "value": {
+      "one": "Delete the page imported from “{{name}}”?",
+      "other": "Delete the {{count}} pages imported from “{{name}}”?"
+    }
+  },
+  "wiki.bulk.deleteText": {
+    "value": "They go to the wiki's trash for 30 days, and you can restore them from there."
+  },
+  "wiki.bulk.deleteGo": {
+    "value": {
+      "one": "Move {{count}} page to the trash",
+      "other": "Move {{count}} pages to the trash"
+    }
+  },
+  "wiki.bulk.deleted": {
+    "value": {
+      "one": "{{count}} page moved to the trash.",
+      "other": "{{count}} pages moved to the trash."
+    }
+  },
+  "wiki.bulk.kept": {
+    "value": {
+      "one": "{{count}} stayed: it's locked or only some people edit it.",
+      "other": "{{count}} stayed: they're locked or only some people edit them."
+    }
+  },
+  "wiki.bulk.failed": {
+    "value": {
+      "one": "{{count}} didn't change ({{titles}}): {{reason}}",
+      "other": "{{count}} didn't change ({{titles}}): {{reason}}"
+    }
+  },
+  "wiki.bulk.agentsTitle": {
+    "value": {
+      "one": "Agents that read {{count}} page",
+      "other": "Agents that read {{count}} pages"
+    }
+  },
+  "wiki.bulk.agentsText": {
+    "value": "Who sees each page among people stays as it is."
+  },
+  "wiki.bulk.agentsSaved": {
+    "value": {
+      "one": "Done. {{count}} page updated.",
+      "other": "Done. {{count}} pages updated."
+    }
+  },
+  "wiki.trash.title": {
+    "value": "Trash"
+  },
+  "wiki.trash.text": {
+    "value": "Deleted pages stay here for 30 days, then they're gone."
+  },
+  "wiki.trash.none": {
+    "value": "The trash is empty."
+  },
+  "wiki.trash.restore": {
+    "value": "Restore"
+  },
+  "wiki.trash.restoreMany": {
+    "value": {
+      "one": "Restore {{count}}",
+      "other": "Restore {{count}}"
+    }
+  },
+  "wiki.trash.purge": {
+    "value": "Delete for good"
+  },
+  "wiki.trash.empty": {
+    "value": "Empty trash"
+  },
+  "wiki.trash.emptyTitle": {
+    "value": {
+      "one": "Delete {{count}} page for good?",
+      "other": "Delete {{count}} pages for good?"
+    }
+  },
+  "wiki.trash.emptyText": {
+    "value": "They're gone with their history. This can't be undone."
+  },
+  "wiki.trash.deletedWhen": {
+    "value": "deleted {{when}}"
+  },
+  "wiki.trash.restored": {
+    "value": {
+      "one": "{{count}} page restored.",
+      "other": "{{count}} pages restored."
+    }
+  },
+  "wiki.trash.purged": {
+    "value": {
+      "one": "{{count}} page deleted for good.",
+      "other": "{{count}} pages deleted for good."
+    }
+  },
   "wiki.audienceLevel": {
     "value": "What {{name}} can do"
   },
@@ -21325,7 +21949,7 @@
     "value": "Move {{title}} to the trash?"
   },
   "wiki.deleteText": {
-    "value": "Links to it become “page to create”. You can't restore it from the app yet."
+    "value": "It goes to the wiki's trash for 30 days, and you can restore it from there. Meanwhile, links to it become “page to create”."
   },
   "wiki.deleted": {
     "value": "{{title}} moved to the trash."
@@ -21744,10 +22368,67 @@
   "wiki.import.open": {
     "value": "Open {{title}}"
   },
-  "wiki.import.someFailed": {
+  "wiki.import.sendingNotes": {
     "value": {
-      "one": "{{count}} note didn't come in: {{titles}}",
-      "other": "{{count}} notes didn't come in: {{titles}}"
+      "one": "of {{count}} note sent",
+      "other": "of {{count}} notes sent"
+    }
+  },
+  "wiki.import.stop": {
+    "value": "Stop"
+  },
+  "wiki.import.stopping": {
+    "value": "Stopping…"
+  },
+  "wiki.import.partialTitle": {
+    "value": "Not everything came in"
+  },
+  "wiki.import.partial": {
+    "value": {
+      "one": "{{count}} note: {{done}} came in, {{failed}} didn't",
+      "other": "{{count}} notes: {{done}} came in, {{failed}} didn't"
+    }
+  },
+  "wiki.import.partialText": {
+    "value": "The pages that came in are in the wiki already."
+  },
+  "wiki.import.whyTitle": {
+    "value": "What didn't come in"
+  },
+  "wiki.import.why.batch": {
+    "value": {
+      "one": "{{count}} wasn't sent: {{error}}",
+      "other": "{{count}} weren't sent: {{error}}"
+    }
+  },
+  "wiki.import.why.stopped": {
+    "value": {
+      "one": "{{count}} wasn't sent because you stopped",
+      "other": "{{count}} weren't sent because you stopped"
+    }
+  },
+  "wiki.import.why.tooLong": {
+    "value": {
+      "one": "{{count}} is over 200,000 characters: split it in Obsidian",
+      "other": "{{count}} are over 200,000 characters: split them in Obsidian"
+    }
+  },
+  "wiki.import.why.title": {
+    "value": {
+      "one": "{{count}} has no name that can be a title",
+      "other": "{{count}} have no name that can be a title"
+    }
+  },
+  "wiki.import.why.skipped": {
+    "value": {
+      "one": "{{count}} already had a page with the same name",
+      "other": "{{count}} already had pages with the same name"
+    }
+  },
+  "wiki.import.retry": {
+    "value": {
+      "one": "Try {{count}} again",
+      "other": "Try {{count}} again"
     }
   },
   "wiki.import.overlayTitle": {
@@ -22187,6 +22868,12 @@
   },
   "brain.modelRegion": {
     "value": "{{model}} needs the Global region turned on in OpenCode (Settings › Privacy). The plan's other models keep working."
+  },
+  "brain.modelOff": {
+    "value": "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or choose another model."
+  },
+  "brain.planInactive": {
+    "value": "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it."
   },
   "brain.modelHow.globalRegion": {
     "value": "Turn on the Global region in OpenCode, under Settings › Privacy. Without it, this model doesn't answer."
@@ -27073,14 +27760,167 @@
   "files.zoom.hintZoomedTouch": {
     "value": "Drag to move around. Tap to fit it back"
   },
+  "errors.said.gone": {
+    "value": "This isn't here anymore. Refresh the page and try again."
+  },
+  "errors.said.alreadyDone": {
+    "value": "This was already answered or finished. Refresh to see how it stands."
+  },
+  "errors.said.changed": {
+    "value": "This changed in the meantime. Refresh and try again."
+  },
+  "errors.said.tooLateUndo": {
+    "value": "This can't be undone anymore. Change it by hand."
+  },
+  "errors.said.futureTime": {
+    "value": "Pick a time in the future."
+  },
+  "errors.said.tooFar": {
+    "value": "Pick a date within a year."
+  },
+  "errors.said.checkDate": {
+    "value": "Check the date and time."
+  },
+  "errors.said.notInWorkspace": {
+    "value": "That person isn't in this workspace."
+  },
+  "errors.said.validEmail": {
+    "value": "Type a valid email address, like ana@example.com."
+  },
+  "errors.said.tooMany": {
+    "value": "That's more than fits here. Remove some and try again."
+  },
+  "errors.said.fillIn": {
+    "value": "Fill in what's missing and try again."
+  },
+  "errors.said.checkAddress": {
+    "value": "Check the address and try again."
+  },
+  "errors.said.tooLong": {
+    "value": "That's too long. Shorten it and try again."
+  },
+  "errors.said.updateComputerApp": {
+    "value": "The computer's app is too old for this. Update it and try again."
+  },
+  "errors.said.offHere": {
+    "value": "This is turned off here."
+  },
+  "errors.said.notInConversation": {
+    "value": "They aren't in this conversation."
+  },
+  "errors.said.accountStart": {
+    "value": "The computer couldn't start the sign-in. Check that it's on and try again."
+  },
+  "errors.said.accountInUse": {
+    "value": "That account already thinks for another agent."
+  },
+  "errors.said.noAiYet": {
+    "value": "There's still no AI connected."
+  },
+  "errors.said.filePurged": {
+    "value": "This file was deleted more than 30 days ago and can't come back."
+  },
+  "errors.said.looksSecret": {
+    "value": "That looks like a password or a key, and everyone here would see it."
+  },
+  "errors.said.blockSpec": {
+    "value": "This block has a mistake in its parts or formulas, so it can't be shown. Fix it and try again."
+  },
+  "errors.said.takeControl": {
+    "value": "Take control of the profile first."
+  },
+  "errors.said.profileBusy": {
+    "value": "Someone else is using this profile."
+  },
+  "errors.said.nameTaken": {
+    "value": "That name is already in use. Pick another one."
+  },
+  "errors.said.deleteName": {
+    "value": "Type the channel's name to delete it."
+  },
+  "errors.said.generalKept": {
+    "value": "#general can't be deleted."
+  },
+  "errors.said.generalStays": {
+    "value": "Everyone stays in #general."
+  },
+  "errors.said.mcpUnreachable": {
+    "value": "Couldn't connect to the MCP server. Check its address and try again."
+  },
+  "errors.said.notApproved": {
+    "value": "This service hasn't approved agentes.chat yet."
+  },
+  "errors.said.alreadyInvited": {
+    "value": "This person already has an invitation."
+  },
+  "errors.said.alreadyAsked": {
+    "value": "Someone already asked for this person."
+  },
+  "errors.said.mailboxConnected": {
+    "value": "This mailbox is already connected."
+  },
+  "errors.said.sendNeedsRecipients": {
+    "value": "Sending without asking needs a list of allowed recipients."
+  },
+  "errors.said.missionLive": {
+    "value": "The mission still has items running or waiting on its computer. Stop them first."
+  },
+  "errors.said.createRefused": {
+    "value": "You can't create a workspace right now."
+  },
+  "errors.said.noAgentToRemind": {
+    "value": "No agent in this conversation can remind you."
+  },
+  "errors.said.agentCantRead": {
+    "value": "Let the agent read this first, in its access settings."
+  },
+  "errors.said.neverHappens": {
+    "value": "This schedule never happens."
+  },
+  "errors.said.soleOwner": {
+    "value": "You're the only owner of a workspace with other members. Make someone else an owner, or delete the workspace, first."
+  },
+  "errors.said.testFirst": {
+    "value": "Test the connection with these settings before turning it on."
+  },
+  "errors.said.voiceLength": {
+    "value": "The recording is too long or too short."
+  },
+  "errors.said.sendAgain": {
+    "value": "The file didn't arrive whole. Send it again."
+  },
+  "errors.said.serverKey": {
+    "value": "This key is set in the server's settings."
+  },
+  "errors.said.input": {
+    "value": "That didn't go through. Check what you filled in and try again."
+  },
+  "errors.said.conflict": {
+    "value": "That can't be done right now. Refresh and try again."
+  },
+  "errors.said.computer": {
+    "value": "The computer couldn't do this now. Check that it's on and try again."
+  },
+  "errors.webhook.githubNoAccess": {
+    "value": "This workspace's GitHub can't add webhooks to {{repo}}. Follow the steps below to add it by hand."
+  },
+  "errors.webhook.githubFailed": {
+    "value": "GitHub didn't create the webhook in {{repo}} ({{status}}). Follow the steps below to add it by hand."
+  },
+  "errors.webhook.invalidSecret": {
+    "value": "Paste the whole Client Secret, with no spaces."
+  },
+  "errors.webhook.invalidRepo": {
+    "value": "Write the repository as owner/name."
+  },
   "errors.issue.assigneeOutside": {
     "value": "This person can't see this task. Add them to who sees it first."
   },
-  "errors.issue.audienceEmpty": {
-    "value": "Choose who sees it."
-  },
   "errors.issue.deleteForbidden": {
     "value": "Only who created this task or an administrator can delete it."
+  },
+  "errors.issue.audienceEmpty": {
+    "value": "Choose who sees it."
   },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."
@@ -27123,6 +27963,12 @@
   },
   "errors.wiki.editorsExcludeYou": {
     "value": "Include yourself among the people who edit, to keep this page."
+  },
+  "errors.wiki.contextFull": {
+    "value": "{{max}} pages are already always in the agents' context. Take one out first."
+  },
+  "errors.wiki.restoreSlugTaken": {
+    "value": "Another page has this name now. Rename it, then restore again."
   },
   "errors.wiki.titleTaken": {
     "value": "There's already a page called “{{title}}”."
@@ -27264,6 +28110,9 @@
   },
   "errors.org.notRestorable": {
     "value": "This workspace can't be restored anymore."
+  },
+  "errors.org.paused": {
+    "value": "This workspace is paused, so it can't connect apps now. Whoever runs this workspace can bring it back."
   },
   "errors.reauth.code": {
     "value": "Type the code we emailed you."
@@ -30979,7 +31828,10 @@
     "value": "Now: {{now}}."
   },
   "work.statusReply": {
-    "value": "Still on it ({{duration}}). I'll read your message after this step."
+    "value": "I'm in the middle of a task ({{duration}}) and can't answer yet. Your message is queued and I'll read it at my next step."
+  },
+  "work.statusReplyTurn": {
+    "value": "I'm in the middle of a task ({{duration}}) and can't answer yet. Your message is queued and I'll read it when this round of work ends."
   },
   "work.statusReplyQueued": {
     "value": "Waiting for the computer ({{duration}}). I'll read your message when my turn comes."
@@ -31082,6 +31934,9 @@
   },
   "chat.wait.held": {
     "value": "Waiting for approval…"
+  },
+  "chat.wait.said": {
+    "value": "“{{text}}”"
   },
   "chat.consult.asking": {
     "value": "{{from}} is asking {{to}}"
@@ -31640,6 +32495,84 @@
   "chat.work.step.queryingDatabase": {
     "value": "Queried the database"
   },
+  "chat.work.step.searchingWeb": {
+    "value": "Searched the web"
+  },
+  "chat.work.step.readingWeb": {
+    "value": "Read a web page"
+  },
+  "chat.work.step.preparingCard": {
+    "value": "Prepared a card"
+  },
+  "chat.work.step.startingPoll": {
+    "value": "Opened a poll"
+  },
+  "chat.work.step.askingChoices": {
+    "value": "Asked with options"
+  },
+  "chat.work.step.usingVault": {
+    "value": "Worked in the Vault"
+  },
+  "chat.work.step.makingPassword": {
+    "value": "Made a password"
+  },
+  "chat.work.step.startingWork": {
+    "value": "Started a long work"
+  },
+  "chat.work.step.updatingWork": {
+    "value": "Updated a long work"
+  },
+  "chat.work.step.withdrawingRequest": {
+    "value": "Withdrew a request"
+  },
+  "chat.work.step.schedulingAction": {
+    "value": "Prepared an action for later"
+  },
+  "chat.work.step.updatingDashboard": {
+    "value": "Worked on a dashboard"
+  },
+  "chat.work.step.readingDashboards": {
+    "value": "Looked at the dashboards"
+  },
+  "chat.work.step.pushingBranch": {
+    "value": "Asked to send code"
+  },
+  "chat.work.step.deletingBranches": {
+    "value": "Deleted branches"
+  },
+  "chat.work.step.postingMessage": {
+    "value": "Posted a message"
+  },
+  "chat.work.step.sendingDm": {
+    "value": "Sent a direct message"
+  },
+  "chat.work.step.settingStatus": {
+    "value": "Updated its status"
+  },
+  "chat.work.step.settingReplyStyle": {
+    "value": "Adjusted how it replies"
+  },
+  "chat.work.step.deletingRoutine": {
+    "value": "Deleted a routine"
+  },
+  "chat.work.step.runningRoutine": {
+    "value": "Ran a routine now"
+  },
+  "chat.work.step.proposingTeam": {
+    "value": "Proposed a team"
+  },
+  "chat.work.step.proposingChange": {
+    "value": "Proposed a change"
+  },
+  "chat.work.step.updatingThread": {
+    "value": "Updated a thread"
+  },
+  "chat.work.step.addingAgent": {
+    "value": "Added an agent to a channel"
+  },
+  "chat.work.step.readingConversation": {
+    "value": "Read the conversation"
+  },
   "chat.work.step.usingTool": {
     "value": "Used the {{tool}} tool"
   },
@@ -31876,6 +32809,84 @@
   },
   "chat.activity.queryingDatabase": {
     "value": "querying the database"
+  },
+  "chat.activity.searchingWeb": {
+    "value": "searching the web"
+  },
+  "chat.activity.readingWeb": {
+    "value": "reading a web page"
+  },
+  "chat.activity.preparingCard": {
+    "value": "preparing a card"
+  },
+  "chat.activity.startingPoll": {
+    "value": "opening a poll"
+  },
+  "chat.activity.askingChoices": {
+    "value": "asking with options"
+  },
+  "chat.activity.usingVault": {
+    "value": "working in the Vault"
+  },
+  "chat.activity.makingPassword": {
+    "value": "making a password"
+  },
+  "chat.activity.startingWork": {
+    "value": "starting a long work"
+  },
+  "chat.activity.updatingWork": {
+    "value": "updating a long work"
+  },
+  "chat.activity.withdrawingRequest": {
+    "value": "withdrawing a request"
+  },
+  "chat.activity.schedulingAction": {
+    "value": "preparing an action for later"
+  },
+  "chat.activity.updatingDashboard": {
+    "value": "working on a dashboard"
+  },
+  "chat.activity.readingDashboards": {
+    "value": "looking at the dashboards"
+  },
+  "chat.activity.pushingBranch": {
+    "value": "asking to send code"
+  },
+  "chat.activity.deletingBranches": {
+    "value": "deleting branches"
+  },
+  "chat.activity.postingMessage": {
+    "value": "posting a message"
+  },
+  "chat.activity.sendingDm": {
+    "value": "sending a direct message"
+  },
+  "chat.activity.settingStatus": {
+    "value": "updating its status"
+  },
+  "chat.activity.settingReplyStyle": {
+    "value": "adjusting how it replies"
+  },
+  "chat.activity.deletingRoutine": {
+    "value": "deleting a routine"
+  },
+  "chat.activity.runningRoutine": {
+    "value": "running a routine now"
+  },
+  "chat.activity.proposingTeam": {
+    "value": "proposing a team"
+  },
+  "chat.activity.proposingChange": {
+    "value": "proposing a change"
+  },
+  "chat.activity.updatingThread": {
+    "value": "updating a thread"
+  },
+  "chat.activity.addingAgent": {
+    "value": "adding an agent to a channel"
+  },
+  "chat.activity.readingConversation": {
+    "value": "reading the conversation"
   },
   "chat.activity.usingTool": {
     "value": "using a tool"
@@ -32129,6 +33140,12 @@
   "chat.body.plan_model_region_wait": {
     "value": "This model ({{model}}) needs the Global region turned on in OpenCode (Settings › Privacy)."
   },
+  "chat.body.plan_model_off_wait": {
+    "value": "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or change {{agent}}'s model."
+  },
+  "chat.body.plan_inactive_wait": {
+    "value": "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it."
+  },
   "chat.body.budget_wait": {
     "value": "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it."
   },
@@ -32218,6 +33235,12 @@
   },
   "chat.body.no_ai_model_region": {
     "value": "I can't answer: {{model}} needs the Global region on in OpenCode (Settings › Privacy)."
+  },
+  "chat.body.no_ai_model_off": {
+    "value": "I can't answer: OpenCode refused {{model}} with my key. Turn the model or the account on in OpenCode, or change my model."
+  },
+  "chat.body.no_ai_plan_inactive": {
+    "value": "I can't answer: OpenCode Go isn't active on my key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it."
   },
   "chat.body.no_ai_commands_off": {
     "value": "I can't answer now: commands are turned off on my plan's computer."
@@ -33233,6 +34256,18 @@
   },
   "browser.live.page": {
     "value": "{{name}}'s page, live"
+  },
+  "browser.live.emulated.phone": {
+    "value": "Phone · {{size}}"
+  },
+  "browser.live.emulated.tablet": {
+    "value": "Tablet · {{size}}"
+  },
+  "browser.live.emulated.desktop": {
+    "value": "Desktop · {{size}}"
+  },
+  "browser.live.normalSize": {
+    "value": "Normal size"
   },
   "browser.live.tabs": {
     "value": {
@@ -34950,6 +35985,18 @@
   },
   "taskManager.wait.modelRegionNext": {
     "value": "Turn it on in OpenCode (Settings › Privacy)"
+  },
+  "taskManager.wait.modelOff": {
+    "value": "OpenCode refused {{model}}"
+  },
+  "taskManager.wait.modelOffNext": {
+    "value": "Turn it on in OpenCode or choose another model"
+  },
+  "taskManager.wait.planInactive": {
+    "value": "OpenCode Go isn't active"
+  },
+  "taskManager.wait.planInactiveNext": {
+    "value": "Check the Go subscription in OpenCode"
   },
   "taskManager.wait.budgetOut": {
     "value": "This month's budget ran out"

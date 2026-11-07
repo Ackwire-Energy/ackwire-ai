@@ -668,6 +668,19 @@ describe("agent page: memory and proposals", () => {
     expect(document.body.textContent).toContain("Mudança aceita. As instruções foram atualizadas.");
   });
 
+  test("a skill it asked to change counts on its page, and is decided there as proposed", async () => {
+    const state = seedState();
+    const prop = state.proposals.find((p) => p.id === "prop-1");
+    if (!prop) throw new Error("no proposal");
+    prop.target = { type: "skill", agentId: prop.agentId, skillId: "sk-1", name: "relatorios" };
+    await go("?tab=memory", state);
+    const card = screen().getByRole("article", { name: "Corrigir a skill relatorios" });
+    expect(within(card).queryByRole("button", { name: "Editar antes" })).toBeNull();
+    await click(within(card).getByRole("button", { name: "Aceitar mudança" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "proposals.accept")?.args).toEqual([ORG_ID, "prop-1", undefined]);
+  });
+
   test("a reason the server wrote reads in the person's language on the agent's page too", async () => {
     const state = seedState();
     const prop = state.proposals.find((p) => p.id === "prop-1");

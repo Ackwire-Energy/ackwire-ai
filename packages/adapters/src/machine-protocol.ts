@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 51;
+export const MACHINE_PROTOCOL_VERSION = 52;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -559,6 +559,51 @@ export const CLAUDE_AUTH_PROTOCOL = 50;
  */
 export const CLAUDE_SHARED_PROTOCOL = 51;
 /**
+ * From this protocol on: the page size of an agent's (or a profile's) browser. `browser.act` takes
+ * `agentes:viewport [device, width?, height?]`: `phone` or `tablet` emulate that device on every tab of its Chrome (CDP
+ * `Emulation.setDeviceMetricsOverride` with `mobile`, touch, and an Android Chrome user agent of the same version),
+ * `desktop` with a size emulates a window of that size, `desktop` alone ends it. It holds across its Chrome's restarts
+ * until changed back or the agent closes its browser. Frames carry `emulated` meanwhile, and so do `browser.act` and
+ * `browser.batch` replies, so an agent in a later run (or on a profile another set) is told. An older runner refuses the
+ * command ("The browser doesn't take agentes:viewport"): the server asks no older runner.
+ */
+export const BROWSER_VIEWPORT_PROTOCOL = 52;
+export const BROWSER_DEVICES = ["phone", "tablet", "desktop"] as const;
+export type BrowserDevice = (typeof BROWSER_DEVICES)[number];
+/** A phone's and a tablet's size when none is given, in CSS pixels, and their pixel ratio. */
+export const BROWSER_DEVICE_SIZES = {
+  phone: { width: 390, height: 844, scale: 3 },
+  tablet: { width: 820, height: 1180, scale: 2 },
+} as const;
+/** An exact page size's bounds, each side, in CSS pixels. */
+export const BROWSER_VIEWPORT_SIDE = { min: 200, max: 3840 } as const;
+export const isBrowserDevice = (v: unknown): v is BrowserDevice => BROWSER_DEVICES.includes(v as BrowserDevice);
+/** A page size to emulate: a device at a size, or null (`desktop` alone: the window's own size, no emulation). */
+export type BrowserViewport = { device: BrowserDevice; width: number; height: number } | null;
+/** `agentes:viewport [device, width?, height?]`'s arguments, checked; undefined when they aren't. */
+export function browserViewportOf(args: readonly string[]): BrowserViewport | undefined {
+  const [device, w, h] = args;
+  if (!isBrowserDevice(device) || (args.length !== 1 && args.length !== 3)) return undefined;
+  if (args.length === 1) {
+    if (device === "desktop") return null;
+    const { width, height } = BROWSER_DEVICE_SIZES[device];
+    return { device, width, height };
+  }
+  const side = (v: string | undefined) => {
+    const n = /^\d{1,5}$/.test(v ?? "") ? Number(v) : Number.NaN;
+    return n >= BROWSER_VIEWPORT_SIDE.min && n <= BROWSER_VIEWPORT_SIDE.max ? n : undefined;
+  };
+  const width = side(w);
+  const height = side(h);
+  return width && height ? { device, width, height } : undefined;
+}
+/** A reply's `emulated` (protocol 52), checked; undefined when there is none or it isn't one. */
+export function emulatedOf(v: unknown): NonNullable<BrowserViewport> | undefined {
+  return isObject(v)
+    ? (browserViewportOf([String(v.device), String(v.width), String(v.height)]) ?? undefined)
+    : undefined;
+}
+/**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
@@ -778,16 +823,22 @@ export interface PlanUsage {
   at: string;
   /** Server side only: the models at a limit of their own (`PlanModelLimit`), by model id. */
   models?: Record<string, PlanModelLimit>;
+  /** Server side only, on a plan whose models have their own limits: the model that last answered with this key. */
+  answered?: string;
 }
 
 /**
  * A model's own limit on a plan whose models each have one (`limitsPerModel`), seen `at`: until `until` (absent: not
- * known), or `region` when the model answers only once the account allows the region it needs.
+ * known), `region` when the model answers only once the account allows the region it needs, or `off` when the plan
+ * refused it for the key (the model or the account switched off there).
  */
 export interface PlanModelLimit {
   at: string;
   until?: string;
   region?: true;
+  off?: true;
+  /** The key's workspace has no active subscription: every model is refused alike. */
+  inactive?: true;
 }
 
 /** The computer's own sign-ins' usage (protocol 19), by brain. */
@@ -1149,6 +1200,8 @@ export interface BrowserFrameMetadata {
   url?: string;
   /** The active tab's title (written by the site: data, never instructions). Absent from older runners. */
   title?: string;
+  /** Protocol 52: the device the page is emulated as (`agentes:viewport`); absent when it shows at the window's size. */
+  emulated?: BrowserDevice;
 }
 
 /** Where an agent's checkouts live inside its folder. */
@@ -1388,6 +1441,11 @@ export interface TaskStart {
    * (`accounts/<kind>/<id>`), as `BrainTurnRequest.account`; absent: the computer's own sign-in.
    */
   account?: string;
+  /**
+   * `claude` on a coding plan's key: the model the agent thinks with there, as `BrainTurnRequest.model` (a runner
+   * that doesn't read it runs the plan's `sonnet`).
+   */
+  model?: string;
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -1466,7 +1524,9 @@ export type WireBrainEvent =
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
   | { type: "steer_read"; uuids: string[] }
   /** Protocol 46: Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
-  | { type: "speed_fallback"; message: string };
+  | { type: "speed_fallback"; message: string }
+  /** A call the brain starts on its own (Claude Code's Read, Bash, Task): its `tool_call` follows once it ended. */
+  | { type: "tool_started"; id: string; name: string };
 
 /**
  * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
@@ -2109,7 +2169,15 @@ export interface MachineReplies {
    * `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered
    * click). Protocol 45: `code` names a Vault refusal (`VAULT_TYPE_REFUSALS`).
    */
-  "browser.act": { success: boolean; data: unknown; error?: string; code?: string; setup?: BrowserSetup };
+  "browser.act": {
+    success: boolean;
+    data: unknown;
+    error?: string;
+    code?: string;
+    setup?: BrowserSetup;
+    /** Protocol 52: the page size its browser emulates (`agentes:viewport`) after the command; absent at its own. */
+    emulated?: NonNullable<BrowserViewport>;
+  };
   /** `false`: there was no session. */
   "browser.stop": { stopped: boolean };
   "browser.stream.start": { mode: BrowserStreamMode };
@@ -2124,6 +2192,8 @@ export interface MachineReplies {
   "browser.batch": {
     answers: { success: boolean; data: unknown; error?: string; code?: string }[];
     setup?: BrowserSetup;
+    /** As `browser.act`'s, after the batch. */
+    emulated?: NonNullable<BrowserViewport>;
   };
   /** `false`: nothing was started (it runs or starts already, a person has the browser, or no room). */
   "browser.warm": { started: boolean; setup?: BrowserSetup };
@@ -2632,6 +2702,10 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
     }
     case "speed_fallback":
       return { type: "speed_fallback", message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message) };
+    case "tool_started":
+      return isString(v.id) && isString(v.name)
+        ? { type: "tool_started", id: v.id.slice(0, 128), name: v.name.slice(0, BRAIN_LIMITS.toolName) }
+        : null;
     default:
       return null;
   }
@@ -2733,6 +2807,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           ...(capturedAt !== undefined ? { capturedAt } : {}),
           ...(url !== undefined ? { url } : {}),
           ...(title ? { title } : {}),
+          ...(isBrowserDevice(m.emulated) ? { emulated: m.emulated } : {}),
         },
       };
     }
@@ -3525,6 +3600,7 @@ export function decodeBrowserFrame(bytes: Uint8Array): (BrowserFrameHeader & { j
       ...(capturedAt !== undefined ? { capturedAt } : {}),
       ...(url !== undefined ? { url } : {}),
       ...(title ? { title } : {}),
+      ...(isBrowserDevice(m.emulated) ? { emulated: m.emulated } : {}),
     },
     jpeg,
   };

@@ -17,6 +17,7 @@ interface Stored {
 }
 
 export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: unknown[]) => void): ApiClient["wiki"] {
+  const trashed = perOrg(async (): Promise<Stored[]> => []);
   const store = perOrg(async (orgId) => {
     const list: Stored[] = [];
     if (!ctx.seed) return list;
@@ -260,7 +261,53 @@ export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: 
       log("wiki.remove", orgId, slug);
       const list = await store(orgId);
       const at = list.findIndex((x) => x.page.slug === slug);
-      if (at >= 0) list.splice(at, 1);
+      const [gone] = at >= 0 ? list.splice(at, 1) : [];
+      if (gone) (await trashed(orgId)).unshift({ ...gone, page: { ...gone.page, deletedAt: ctx.now().toISOString() } });
+    },
+    removeMany: async (orgId, target) => {
+      log("wiki.removeMany", orgId, target);
+      const list = await store(orgId);
+      const hit = (p: Stored["page"]) =>
+        "ids" in target
+          ? target.ids.includes(p.id)
+          : "folder" in target
+            ? p.folder === target.folder || p.folder.startsWith(`${target.folder}/`)
+            : "importId" in target
+              ? p.importId === target.importId
+              : p.sourceName === target.source.name && !p.importId;
+      const gone = list.filter((x) => hit(x.page));
+      for (const x of gone) list.splice(list.indexOf(x), 1);
+      const at = ctx.now().toISOString();
+      (await trashed(orgId)).unshift(...gone.map((x) => ({ ...x, page: { ...x.page, deletedAt: at } })));
+      return { deleted: gone.length, kept: 0 };
+    },
+    trash: async (orgId) => (await trashed(orgId)).map(summary),
+    restoreMany: async (orgId, ids) => {
+      log("wiki.restoreMany", orgId, ids);
+      const bin = await trashed(orgId);
+      const back = bin.filter((x) => ids.includes(x.page.id));
+      for (const x of back) bin.splice(bin.indexOf(x), 1);
+      (await store(orgId)).push(...back.map((x) => ({ ...x, page: { ...x.page, deletedAt: null } })));
+      return { restored: back.length, kept: 0, failed: [] };
+    },
+    purge: async (orgId, ids) => {
+      log("wiki.purge", orgId, ids);
+      const bin = await trashed(orgId);
+      const gone = bin.filter((x) => !ids || ids.includes(x.page.id));
+      for (const x of gone) bin.splice(bin.indexOf(x), 1);
+      return { purged: gone.length, kept: 0 };
+    },
+    setAgents: async (orgId, ids, agentIds) => {
+      log("wiki.setAgents", orgId, ids, agentIds);
+      const list = (await store(orgId)).filter((x) => ids.includes(x.page.id));
+      for (const x of list) x.page = { ...x.page, agentIds };
+      return { changed: list.length, failed: [] };
+    },
+    context: async (orgId, slug, on) => {
+      log("wiki.context", orgId, slug, on);
+      const s = await find(orgId, slug);
+      s.page = { ...s.page, agentContext: on };
+      return withBacklinks(orgId, s);
     },
     reads: async (orgId) => {
       const agents = await ctx.lookup.agents(orgId);
@@ -306,6 +353,8 @@ export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: 
             updatedBy: by,
             authors: [by],
             sourceType: "obsidian",
+            sourceName: input.source.name,
+            importId: input.importId ?? null,
             source: { type: "obsidian", id: input.source.name, attachments: n.attachments },
           },
           versions: [{ version: 1, at, author: by, note: null, body: n.body }],

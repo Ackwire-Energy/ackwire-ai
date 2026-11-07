@@ -391,7 +391,8 @@ export async function deliverPush(
     actorType: actor?.type ?? null,
     label: source.label,
     title: latest.title,
-    text: latest.text,
+    // A body the server wrote is English: only the apps word it (`previewBody`), so the push says to open it.
+    text: latest.meta?.bodyCode ? null : latest.text,
     media: await sentMediaOf(db, row.orgId, row.kind, source, latest),
     suggestedBy: latest.suggestedBy ?? null,
     highRisk,

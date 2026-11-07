@@ -123,7 +123,7 @@ describe("Approvals: the open request", () => {
     };
     await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(state) });
     await settle(8);
-    const pane = screen().getByRole("region", { name: "Merge PR #42 into main" });
+    const pane = screen().getByRole("region", { name: "Fazer um merge" });
     const track = within(pane).getByRole("list", { name: "Como chegou aqui" });
     const steps = [...track.querySelectorAll(".ac-track__step")];
     expect(steps.map((li) => [...li.classList].find((c) => c.startsWith("is-")))).toEqual([

@@ -150,6 +150,9 @@ export interface ComposerVoice {
   };
 }
 
+/** What takes its own click in the row under the text; a click anywhere else in it belongs to the text box. */
+const COMPOSER_CONTROLS = "button, a, input, select, textarea, label, [role='button'], [role='menuitem']";
+
 /** The clock counts down over the last seconds of the five minutes. */
 const VOICE_LIMIT_S = 300;
 const VOICE_COUNTDOWN_S = 15;
@@ -837,7 +840,16 @@ export function Composer({
               )}
             </div>
             {attachments && <div className="ac-composer__attachments">{attachments}</div>}
-            <div className={cx("ac-composer__tools", format && "ac-composer__tools--format")}>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: the row's empty room is part of the text box, as a mouse sees it; the keyboard is already in the box */}
+            <div
+              className={cx("ac-composer__tools", format && "ac-composer__tools--format")}
+              onMouseDown={(e) => {
+                if ((e.target as HTMLElement).closest(COMPOSER_CONTROLS)) return;
+                // Keeps the caret where it was.
+                e.preventDefault();
+                ref.current?.focus();
+              }}
+            >
               {voice && recording && (
                 <>
                   <Button

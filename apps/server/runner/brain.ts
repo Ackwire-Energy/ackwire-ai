@@ -36,7 +36,14 @@ import {
   type TurnContext,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
-import { claudeCodeModel, type PlanId, planOf } from "@agenteschat/providers/plans";
+import {
+  claudeCodeModel,
+  PLAN_FORBIDDEN_TEXT,
+  PLAN_INACTIVE_TEXT,
+  type PlanId,
+  planForTurn,
+  planOf,
+} from "@agenteschat/providers/plans";
 import {
   ACCOUNT_MISSING_MESSAGE,
   ACCOUNT_SIGNED_OUT,
@@ -360,6 +367,11 @@ export class ClaudeStreamParser {
   compacted = false;
   /** Told at the compaction itself: a runner that dies before the turn ends still knows on its next start. */
   onCompacted?: () => void;
+  /**
+   * Thinks with a coding plan's key: a 403 is the plan refusing this model (switched off there, or the account), for
+   * the engine to read (`claude_failed`), never the key refused, which would sign out every agent on that key.
+   */
+  planKey = false;
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
@@ -413,7 +425,12 @@ export class ClaudeStreamParser {
           });
           if (failure.cause || failure.httpStatus) this.failure = failure;
         }
-        if (ev.subtype === "api_retry" && (ev.error === "authentication_failed" || ev.error_status === 401)) {
+        const forbidden = this.planKey && ev.error_status === 403;
+        if (
+          ev.subtype === "api_retry" &&
+          !forbidden &&
+          (ev.error === "authentication_failed" || ev.error_status === 401)
+        ) {
           this.authFailed = true;
           return { events: [], authRetry: true };
         }
@@ -470,6 +487,13 @@ export class ClaudeStreamParser {
           if (block.type === "tool_use") this.worked = true;
           if (block.type === "tool_use" && str(block.id) && str(block.name)) {
             this.tools.set(str(block.id), { name: str(block.name), input: block.input ?? {} });
+            // Ours run through the bridge, which tells the engine as they start.
+            if (!str(block.name).startsWith(OUR_TOOL_PREFIX))
+              events.push({
+                type: "tool_started",
+                id: str(block.id),
+                name: str(block.name).slice(0, BRAIN_LIMITS.toolName),
+              });
           } else if (block.type === "text" && str(block.text) && !streamed) {
             // No partial messages (an older Claude Code): the whole text block at once.
             events.push({ type: "text_delta", text: str(block.text) });
@@ -582,7 +606,8 @@ export class ClaudeStreamParser {
           ...(this.rejected ? {} : { rateLimit: { status: "rejected" } }),
         };
       }
-      if (this.authFailed || AUTH_TEXT.test(text)) {
+      const planRefusal = this.planKey && (PLAN_FORBIDDEN_TEXT.test(text) || PLAN_INACTIVE_TEXT.test(text));
+      if ((this.authFailed || AUTH_TEXT.test(text)) && !planRefusal) {
         return {
           events,
           final: {
@@ -2189,7 +2214,8 @@ export class BrainManager {
       : ctx.accountHome
         ? accountEnv("claude_code", ctx.accountHome, base)
         : base;
-    const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
+    const keyPlan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
+    const plan = keyPlan && planForTurn(keyPlan, req.model);
     if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
     // Protocol 28: the agent's context limit; Claude Code compacts the conversation there instead of at its window.
     if (isContextTokens(req.contextTokens)) env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(req.contextTokens);
@@ -2325,6 +2351,7 @@ export class BrainManager {
     if (delegated) {
       proc.onControl = (subtype) => this.log(`[${ctx.agent.handle}] refused the CLI's control_request ${subtype}`);
     }
+    proc.parser.planKey = Boolean(plan);
     const live: Live = {
       key,
       agentId: ctx.agent.id,

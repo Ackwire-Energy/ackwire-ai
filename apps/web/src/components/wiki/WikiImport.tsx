@@ -1,4 +1,4 @@
-import { keys, useWikiTree } from "@agenteschat/client";
+import { keys, useWikiTree, type WikiImportNote } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { Button, Checkbox, Dialog, DialogBody, DialogFooter, Icon, Input, Segmented } from "@agenteschat/ui";
@@ -20,6 +20,8 @@ import {
   homeOf,
   importVault,
   readVault,
+  sendVaultNotes,
+  type VaultFailure,
   type VaultFile,
   type VaultReport,
 } from "@/lib/obsidian";
@@ -232,6 +234,70 @@ export function VaultLines({ lines }: { lines: Line[] }) {
   );
 }
 
+/** The end of an import: what came in, what didn't and why, and what "Tentar de novo" sends. */
+type ImportDone = {
+  total: number;
+  count: number;
+  uploaded: number;
+  slug?: string;
+  title?: string;
+  failures: VaultFailure[];
+  skipped: string[];
+  retry: WikiImportNote[];
+  importId: string;
+  name: string;
+  folder?: string;
+  onConflict: "keep_both" | "skip";
+};
+
+const titlesOf = (titles: string[]) => `${titles.slice(0, 6).join(", ")}${titles.length > 6 ? " …" : ""}`;
+
+/** Why notes didn't come in, one line per reason, with their titles. */
+function failureLines(t: TFunction, locale: string, done: ImportDone): Line[] {
+  const lines: Line[] = [];
+  const by = (reason: VaultFailure["reason"]) => done.failures.filter((f) => f.reason === reason);
+  const batch = by("batch");
+  if (batch.length)
+    lines.push({
+      icon: "alert",
+      tone: "warn",
+      title: t("wiki.import.why.batch", { count: batch.length, error: errorText(t, batch[0]?.error, locale) }),
+      text: titlesOf(batch.map((f) => f.title)),
+    });
+  const stopped = by("stopped");
+  if (stopped.length)
+    lines.push({
+      icon: "alert",
+      tone: "warn",
+      title: t("wiki.import.why.stopped", { count: stopped.length }),
+      text: titlesOf(stopped.map((f) => f.title)),
+    });
+  const tooLong = by("too_long");
+  if (tooLong.length)
+    lines.push({
+      icon: "close",
+      tone: "muted",
+      title: t("wiki.import.why.tooLong", { count: tooLong.length }),
+      text: titlesOf(tooLong.map((f) => f.title)),
+    });
+  const untitled = by("title");
+  if (untitled.length)
+    lines.push({
+      icon: "close",
+      tone: "muted",
+      title: t("wiki.import.why.title", { count: untitled.length }),
+      text: titlesOf(untitled.map((f) => f.title)),
+    });
+  if (done.skipped.length)
+    lines.push({
+      icon: "close",
+      tone: "muted",
+      title: t("wiki.import.why.skipped", { count: done.skipped.length }),
+      text: titlesOf(done.skipped),
+    });
+  return lines;
+}
+
 /** Reads a vault and keeps the progress (the dialog and the onboarding card). */
 export function useVaultReader(existing: { title: string }[]) {
   const { t } = useTranslation();
@@ -324,7 +390,9 @@ export function WikiImportDialog({
   const [into, setInto] = useState("Obsidian");
   const [conflict, setConflict] = useState<"keep_both" | "skip">("keep_both");
   const [importing, setImporting] = useState<{ step: "files" | "pages"; done: number; total: number } | null>(null);
-  const [done, setDone] = useState<{ count: number; uploaded: number; slug?: string; title?: string } | null>(null);
+  const [done, setDone] = useState<ImportDone | null>(null);
+  const stop = useRef(false);
+  const [stopping, setStopping] = useState(false);
 
   const read = async (f: Promise<VaultFile[]>, n?: string) => {
     const r = await reader.read(f, n);
@@ -344,35 +412,82 @@ export function WikiImportDialog({
 
   const run = async () => {
     if (!report) return;
+    stop.current = false;
     setImporting({ step: "files", done: 0, total: 0 });
     try {
       const result = await importVault(api, org.id, report, {
         folders: pick,
         into: dest === "folder" ? into : "",
         onConflict: conflict,
+        stopped: () => stop.current,
         onProgress: (step, d, total) => setImporting({ step, done: d, total }),
       });
-      void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
       const home = homeOf(result.created);
-      setDone({ count: result.created.length, uploaded: result.uploaded, slug: home?.slug, title: home?.title });
-      if (result.failed.length)
-        toast.show(
-          t("wiki.import.someFailed", {
-            count: result.failed.length,
-            titles: result.failed.map((f) => f.title).join(", "),
-          }),
-          "error",
-        );
+      setDone({
+        total: result.total,
+        count: result.created.length,
+        uploaded: result.uploaded,
+        slug: home?.slug,
+        title: home?.title,
+        failures: result.failures,
+        skipped: result.skipped,
+        retry: result.retry,
+        importId: result.importId,
+        name: report.name,
+        folder: dest === "folder" ? into.trim() || undefined : undefined,
+        onConflict: conflict,
+      });
     } catch (e) {
       toast.show(errorText(t, e, i18n.language), "error");
     } finally {
+      void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
       setImporting(null);
+      setStopping(false);
+    }
+  };
+
+  /**
+   * "Tentar de novo": only the batches that failed, with the same import id, so a note of a batch that went in after
+   * all comes back as in, not doubled.
+   */
+  const retry = async () => {
+    if (!done || done.retry.length === 0) return;
+    stop.current = false;
+    setImporting({ step: "pages", done: 0, total: done.retry.length });
+    try {
+      const again = await sendVaultNotes(
+        api,
+        org.id,
+        {
+          name: done.name,
+          folder: done.folder,
+          onConflict: done.onConflict,
+          importId: done.importId,
+          notes: done.retry,
+        },
+        (d, total) => setImporting({ step: "pages", done: d, total }),
+        () => stop.current,
+      );
+      setDone({
+        ...done,
+        count: done.count + again.created.length,
+        skipped: [...done.skipped, ...again.skipped],
+        failures: [...done.failures.filter((f) => f.reason !== "batch" && f.reason !== "stopped"), ...again.failures],
+        retry: again.retry,
+      });
+    } finally {
+      void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
+      setImporting(null);
+      setStopping(false);
     }
   };
 
   const agents = dir.agents.slice(0, 2);
+  const missing = done ? done.failures.length + done.skipped.length : 0;
   const title = done
-    ? t("wiki.import.doneTitle")
+    ? missing
+      ? t("wiki.import.partialTitle")
+      : t("wiki.import.doneTitle")
     : report && reader.state.step === "ready"
       ? report.name
       : t("wiki.import.title");
@@ -388,7 +503,49 @@ export function WikiImportDialog({
 
   let body: ReactNode;
   let footer: ReactNode;
-  if (done) {
+  if (done && missing > 0) {
+    body = (
+      <>
+        <div className="vault-done vault-done--partial">
+          <b>
+            {t("wiki.import.partial", {
+              count: done.total,
+              done: done.count,
+              failed: done.total - done.count,
+            })}
+          </b>
+          {done.count > 0 && <span>{t("wiki.import.partialText")}</span>}
+        </div>
+        <section className="vault-block" aria-label={t("wiki.import.whyTitle")}>
+          <header>
+            <b>{t("wiki.import.whyTitle")}</b>
+          </header>
+          <VaultLines lines={failureLines(t, i18n.language, done)} />
+        </section>
+      </>
+    );
+    footer = (
+      <>
+        <Button onClick={onClose}>{t("common.close")}</Button>
+        {done.retry.length > 0 && (
+          <Button variant="primary" icon="refresh" onClick={() => void retry()}>
+            {t("wiki.import.retry", { count: done.retry.length })}
+          </Button>
+        )}
+        {done.retry.length === 0 && done.slug && (
+          <Button
+            variant="primary"
+            onClick={() => {
+              onClose();
+              void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: done.slug ?? "" } });
+            }}
+          >
+            {t("wiki.import.open", { title: done.title })}
+          </Button>
+        )}
+      </>
+    );
+  } else if (done) {
     body = (
       <div className="vault-done">
         <WikiSky variant="glow" />
@@ -436,10 +593,25 @@ export function WikiImportDialog({
         done={importing.done}
         total={importing.total}
         path=""
-        label={importing.step === "files" ? t("wiki.import.sendingFiles") : t("wiki.import.creatingPages")}
+        label={
+          importing.step === "files"
+            ? t("wiki.import.sendingFiles")
+            : t("wiki.import.sendingNotes", { count: importing.total })
+        }
       />
     );
-    footer = null;
+    footer =
+      importing.step === "pages" ? (
+        <Button
+          disabled={stopping}
+          onClick={() => {
+            stop.current = true;
+            setStopping(true);
+          }}
+        >
+          {stopping ? t("wiki.import.stopping") : t("wiki.import.stop")}
+        </Button>
+      ) : null;
   } else if (reader.state.step === "reading") {
     body = <VaultReading {...reader.state} label={t("wiki.import.notesRead")} />;
     footer = null;

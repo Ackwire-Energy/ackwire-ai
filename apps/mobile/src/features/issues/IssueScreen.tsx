@@ -12,6 +12,7 @@ import {
   useIssue,
   useIssueAction,
   useIssueColumns,
+  useTaskUnread,
 } from "@agenteschat/client";
 import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
@@ -70,6 +71,7 @@ import {
   ActionList,
   errorHaptic,
   FocusLive,
+  MentionCount,
   PushedHeader,
   successHaptic,
   tapHaptic,
@@ -216,6 +218,8 @@ function ConversationRow({ issue, onOpen }: { issue: Issue; onOpen: () => void }
   const { t, i18n } = useTranslation();
   const c = useColors();
   const surface = useSurface();
+  // Mentions of me there not read yet: red before the chevron, as Conversa on the web.
+  const { mentions } = useTaskUnread(useOrgId(), issue.id);
   const line = conversationLine(issue);
   const label = line ? t("issues.conversation.messages", { count: line.count }) : t("issues.conversation.start");
   const state = line?.working
@@ -226,7 +230,14 @@ function ConversationRow({ issue, onOpen }: { issue: Issue; onOpen: () => void }
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[t("issues.conversation.title"), label, state].filter(Boolean).join(", ")}
+      accessibilityLabel={[
+        t("issues.conversation.title"),
+        label,
+        state,
+        mentions > 0 ? t("shell.unreadMentions", { count: mentions }) : null,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       onPress={onOpen}
       style={({ pressed }) => [styles.talk, surface, pressed && styles.pressed]}
     >
@@ -246,6 +257,7 @@ function ConversationRow({ issue, onOpen }: { issue: Issue; onOpen: () => void }
           {state}
         </Text>
       ) : null}
+      <MentionCount count={mentions} />
       <Icon name="right" size={16} color={c.faint} />
     </Pressable>
   );

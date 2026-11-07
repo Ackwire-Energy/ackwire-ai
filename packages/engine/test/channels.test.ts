@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { orgTopic, type RealtimeEvent, userTopic } from "@agenteschat/adapters";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
   archiveChannel,
@@ -12,6 +12,7 @@ import {
   joinChannel,
   listChannels,
   NotFoundError,
+  openDm,
   postPersonMessage,
   type RouterStrategy,
   removeChannelMember,
@@ -87,19 +88,22 @@ test("removing a channel member: self, creator or admin; publishes the revocatio
   const opts = { pubsub: f.pubsub };
   const a = await addMember(f.db, f.org.id, "member", "a");
   const b = await addMember(f.db, f.org.id, "member", "b");
-  for (const m of [a, b]) await joinChannel(f.db, m.id, f.org.id, f.general.id);
+  const room = await createChannel(f.db, f.owner.id, f.org.id, { name: "room", visibility: "public" });
+  for (const m of [a, b]) await joinChannel(f.db, m.id, f.org.id, room.id);
+  await addChannelMember(f.db, f.owner.id, f.org.id, room.id, { agentId: f.agent.id });
+  events.length = 0;
 
-  await expect(removeChannelMember(f.db, a.id, f.org.id, f.general.id, { userId: b.id }, opts)).rejects.toBeInstanceOf(
+  await expect(removeChannelMember(f.db, a.id, f.org.id, room.id, { userId: b.id }, opts)).rejects.toBeInstanceOf(
     ForbiddenError,
   );
-  await removeChannelMember(f.db, a.id, f.org.id, f.general.id, { userId: a.id }, opts); // leave
-  await removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: b.id }, opts); // creator/admin
-  await removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: f.agent.id }, opts);
+  await removeChannelMember(f.db, a.id, f.org.id, room.id, { userId: a.id }, opts); // leave
+  await removeChannelMember(f.db, f.owner.id, f.org.id, room.id, { userId: b.id }, opts); // creator/admin
+  await removeChannelMember(f.db, f.owner.id, f.org.id, room.id, { agentId: f.agent.id }, opts);
   const changed = { type: "org.broadcast", orgId: f.org.id, event: { type: "channels.changed" } };
   expect(events).toEqual([
-    { type: "membership.revoked", orgId: f.org.id, userId: a.id, channelId: f.general.id },
+    { type: "membership.revoked", orgId: f.org.id, userId: a.id, channelId: room.id },
     changed,
-    { type: "membership.revoked", orgId: f.org.id, userId: b.id, channelId: f.general.id },
+    { type: "membership.revoked", orgId: f.org.id, userId: b.id, channelId: room.id },
     changed,
     changed,
   ]);
@@ -110,6 +114,35 @@ test("removing a channel member: self, creator or admin; publishes the revocatio
     { type: "membership.revoked", orgId: f.org.id, userId: a.id },
     { type: "org.broadcast", orgId: f.org.id, event: { type: "org.members" } },
   ]);
+});
+
+test("leaving: never #general or a DM; a public channel stays open, the last person out of a private one archives it", async () => {
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await joinChannel(f.db, bia.id, f.org.id, f.general.id);
+  await expect(removeChannelMember(f.db, bia.id, f.org.id, f.general.id, { userId: bia.id })).rejects.toMatchObject({
+    code: "channel.general_stays",
+  });
+  // An admin can still take someone out of it.
+  await removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+
+  const dm = await openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id });
+  await expect(removeChannelMember(f.db, bia.id, f.org.id, dm.id, { userId: bia.id })).rejects.toMatchObject({
+    code: "channel.leave_kind",
+  });
+
+  const open = await createChannel(f.db, bia.id, f.org.id, { name: "open", visibility: "public" });
+  await removeChannelMember(f.db, bia.id, f.org.id, open.id, { userId: bia.id });
+  const row = async (id: string) => (await f.db.select().from(schema.channels).where(eq(schema.channels.id, id))).at(0);
+  expect((await row(open.id))?.archivedAt).toBeNull();
+
+  const quiet = await createChannel(f.db, bia.id, f.org.id, { name: "quiet", visibility: "private" });
+  await addChannelMember(f.db, bia.id, f.org.id, quiet.id, { userId: f.owner.id });
+  await addChannelMember(f.db, f.owner.id, f.org.id, quiet.id, { agentId: f.agent.id });
+  await removeChannelMember(f.db, bia.id, f.org.id, quiet.id, { userId: bia.id });
+  expect((await row(quiet.id))?.archivedAt).toBeNull();
+  // The agent left behind reaches nobody: the last person out closes it.
+  await removeChannelMember(f.db, f.owner.id, f.org.id, quiet.id, { userId: f.owner.id });
+  expect((await row(quiet.id))?.archivedAt).not.toBeNull();
 });
 
 test("a channel's creator taken out of it manages it no more: he can't put himself back or remove anyone", async () => {

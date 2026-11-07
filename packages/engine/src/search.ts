@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/db";
 import { agentIdsSeen, isPlaybook } from "./audience";
 import { caches } from "./cache";
+import { personAgentDmKey } from "./dms";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { mediaOf } from "./media";
@@ -35,7 +36,7 @@ import { isRoutineRoomKey } from "./routine-brief";
 import { adminChannelSql, taskSeenSql } from "./task-access";
 import { visibleWikiPageIds } from "./wiki-links";
 
-const { messages, channelMembers, channels, contextItems } = schema;
+const { messages, channelMembers, channels, contextItems, organizationMembers, routines } = schema;
 
 export interface SearchDeps {
   db: Database;
@@ -202,8 +203,17 @@ async function loadAgentChannels(db: Database, orgId: string, agentId: string) {
  * DMs it belongs to stay out, so a question in one place can't pull private
  * conversations from another. A routine's room (ADR 0053 §4) is read only by
  * that routine's own runs: never by another routine's run or a conversation's.
+ * A routine's run also reads the conversation it reports to, private or a DM,
+ * while its creator is still in it (`routineReportChannel`); `files: true` leaves that conversation out, since a
+ * routine never holds its creator's files (ADR 0053 §2).
  */
-export async function agentSearchChannels(db: Database, orgId: string, agentId: string, currentChannelId: string) {
+export async function agentSearchChannels(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  currentChannelId: string,
+  { files = false }: { files?: boolean } = {},
+) {
   const rows = (await caches.scopes.getOrLoad(`${orgId}:${agentId}:visible-kind`, async () =>
     db
       .select({
@@ -216,12 +226,62 @@ export async function agentSearchChannels(db: Database, orgId: string, agentId: 
       .innerJoin(channels, eq(channels.id, channelMembers.channelId))
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt))),
   )) as { id: string; visibility: string; kind: string; dmKey: string | null }[];
+  const room = rows.find((r) => r.id === currentChannelId && isRoutineRoomKey(r.dmKey));
+  const reports = room?.dmKey && !files ? await routineReportChannel(db, orgId, agentId, room.dmKey) : null;
   return rows
     .filter(
       (r) =>
-        r.id === currentChannelId || (r.visibility === "public" && r.kind === "channel" && !isRoutineRoomKey(r.dmKey)),
+        r.id === currentChannelId ||
+        r.id === reports ||
+        (r.visibility === "public" && r.kind === "channel" && !isRoutineRoomKey(r.dmKey)),
     )
     .map((r) => r.id);
+}
+
+/**
+ * The conversation the routine of this room reports to, when its creator is still a member of it and of the
+ * workspace: its runs summarize it, so they read what the creator reads there and nothing else. Null otherwise.
+ */
+async function routineReportChannel(db: Database, orgId: string, agentId: string, roomKey: string) {
+  const routineId = roomKey.match(/\|r:([^|]+)$/)?.[1];
+  if (!routineId) return null;
+  const [routine] = await db
+    .select({ target: routines.target, creator: routines.createdByUserId })
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, orgId),
+        eq(routines.id, routineId),
+        eq(routines.agentId, agentId),
+        isNull(routines.deletedAt),
+      ),
+    );
+  const creator = routine?.creator;
+  if (!creator) return null;
+  const target = routine.target as { type?: unknown; channelId?: unknown };
+  const channelId =
+    (target.type === "channel" || target.type === "conversation") && typeof target.channelId === "string"
+      ? target.channelId
+      : target.type === "dm"
+        ? (
+            await db
+              .select({ id: channels.id })
+              .from(channels)
+              .where(and(eq(channels.orgId, orgId), eq(channels.dmKey, personAgentDmKey(creator, agentId))))
+          )[0]?.id
+        : undefined;
+  if (!channelId) return null;
+  const [reads] = await db
+    .select({ id: channelMembers.id })
+    .from(channelMembers)
+    .innerJoin(
+      organizationMembers,
+      and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, channelMembers.userId)),
+    )
+    .where(
+      and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, creator)),
+    );
+  return reads ? channelId : null;
 }
 
 /** Channels a person can read: the ones they belong to and, for an administrator, every channel (never a DM). */
@@ -269,7 +329,7 @@ export async function searchVisible(
     kinds?: SearchKind[];
     limit?: number;
     match?: "all" | "any";
-  } & Pick<SearchQuery, "after" | "before" | "messages" | "sort" | "visibleIssueScopes">,
+  } & Pick<SearchQuery, "after" | "before" | "messages" | "sort" | "visibleIssueScopes" | "minTextRank">,
 ): Promise<SearchHit[]> {
   // A list by date ranks by no vector: no embedding to pay for.
   const embedded =
@@ -285,6 +345,7 @@ export async function searchVisible(
     kinds: input.kinds,
     limit: input.limit,
     match: input.match,
+    minTextRank: input.minTextRank,
     after: input.after,
     before: input.before,
     messages: input.messages,
@@ -296,6 +357,8 @@ export async function searchVisible(
 export interface UserSearchFilters extends Pick<SearchQuery, "after" | "before" | "sort"> {
   /** Only these channels and DMs (`in:`); the ones the person can't read are dropped, never searched. */
   channelIds?: string[];
+  /** What an agent reads for them, in place of `userVisibleChannels` (`personReach`). */
+  reach?: string[];
   messages?: MessageFilter;
 }
 
@@ -307,8 +370,8 @@ export async function searchForUser(
   input: { text: string; kinds?: SearchKind[]; limit?: number } & UserSearchFilters,
 ) {
   const membership = await requirePermission(deps.db, userId, orgId, "read");
-  const { channelIds, ...rest } = input;
-  let visible = await userVisibleChannels(deps.db, orgId, userId);
+  const { channelIds, reach, ...rest } = input;
+  let visible = reach ?? (await userVisibleChannels(deps.db, orgId, userId));
   if (channelIds) {
     const wanted = new Set(channelIds);
     visible = visible.filter((id) => wanted.has(id));

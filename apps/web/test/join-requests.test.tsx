@@ -604,13 +604,13 @@ describe("an invitation link asks to join", () => {
     }
   });
 
-  test("the workspace's logo in place of its initial, on a link and an invitation alike; the initial without one", async () => {
+  test("the workspace's logo, on a link and an invitation alike; the pixel mark without one", async () => {
     const mark = () => document.querySelector<HTMLImageElement>(".invite__org img.org-mark");
-    const initial = () => document.querySelector(".invite__org .org-badge");
+    const pixels = () => document.querySelector(".invite__org svg.ac-logo__mark");
     const logo = "/api/app/invitations/lnk/logo/0123456789abcdef.png";
     await openLink({ ...LINK, logo });
     expect(mark()?.getAttribute("src")).toBe(logo);
-    expect(initial()).toBeNull();
+    expect(pixels()).toBeNull();
     cleanup();
 
     const invitation: InvitationPreview = { orgName: "Acme", email: "ana@acme.com.br", role: "member", kind: "email" };
@@ -621,12 +621,12 @@ describe("an invitation link asks to join", () => {
     await renderApp("/invite/inv", { api: createFakeApi(state) });
     await settle(4);
     expect(mark()?.getAttribute("src")).toBe("/api/app/invitations/inv/logo/a.png");
-    expect(initial()).toBeNull();
+    expect(pixels()).toBeNull();
     cleanup();
 
     await openLink(LINK);
     expect(mark()).toBeNull();
-    expect(initial()?.textContent).toBe("A");
+    expect(pixels()).not.toBeNull();
   });
 
   test("at phone width the step bars take the column; wider, they start where the bubble does", async () => {

@@ -435,8 +435,6 @@
     "camera": "相机",
     "photos": "照片",
     "file": "文件",
-    "audio": "音频",
-    "audioSoon": "音频功能即将推出。",
     "noCamera": "无法访问相机。请在手机的设置中允许。",
     "mission": "开始专项任务",
     "missionHint": "有计划、从头到尾的长期工作",
@@ -706,6 +704,7 @@
   },
   "activity": {
     "title": "动态",
+    "chooseModel": "选择其他模型",
     "filter": {
       "all": "全部",
       "waiting": "等你处理",
@@ -766,6 +765,7 @@
       "desktop_taken_female_other": "{{names}} 接管了 {{agent}} 的电脑屏幕",
       "plan_lent_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
       "plan_lent_female_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
+      "plan_model_dropped_other": "{{model}} 已从 {{plan}} 下架。{{names}} 暂时使用 {{runs}}",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
       "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",

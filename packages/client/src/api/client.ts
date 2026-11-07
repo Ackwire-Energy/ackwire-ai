@@ -1,4 +1,5 @@
 import type { AppLocale } from "@agenteschat/i18n/locale";
+import type { PlanModel } from "@agenteschat/providers/plans";
 import type { DashboardsApi } from "../dashboards/api";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
@@ -294,8 +295,13 @@ import type {
   ToolDecision,
   TrashedArtifact,
   UndoAllResult,
+  UnreadTask,
   UsageQueue,
   UsageReport,
+  WebhookProvider,
+  WebhookSetup,
+  WikiBulkFailed,
+  WikiBulkTarget,
   WikiFolderAudience,
   WikiGraph,
   WikiImportInput,
@@ -631,7 +637,12 @@ export interface ApiClient {
     purge(orgId: string, agentId: string): Promise<void>;
     /** Agents no longer in the team (archived or deleted), for the names and faces of what they left. */
     former(orgId: string): Promise<FormerAgent[]>;
-    models(): Promise<{ models: Model[]; defaultModel: string }>;
+    models(): Promise<{
+      models: Model[];
+      defaultModel: string;
+      /** Absent on an older server. */
+      planModels?: Partial<Record<string, readonly PlanModel[]>>;
+    }>;
     credentials(orgId: string): Promise<Credential[]>;
     addCredential(
       orgId: string,
@@ -773,6 +784,8 @@ export interface ApiClient {
       input: { categoryId: string | null; beforeChannelId?: string | null },
     ): Promise<void>;
     join(orgId: string, channelId: string): Promise<void>;
+    /** Out of a channel I'm in. The last person out of a private channel archives it. Never #general. */
+    leave(orgId: string, channelId: string): Promise<void>;
     /** A `#channel` link's card; 404 for a channel I can't see (private and not mine). Archived ones too. */
     card(orgId: string, channelId: string): Promise<ChannelCard>;
     /** A pasted message link's pill; 404 for a message I can't see (a private channel's, a DM I'm not in). */
@@ -1343,6 +1356,14 @@ export interface ApiClient {
     removeHookSecret(orgId: string, id: string): Promise<RoutineHook>;
     /** "Testar": a sample call; the agent is told it is a test. */
     testHook(orgId: string, id: string): Promise<{ runId: string | null; hook: RoutineHook }>;
+    /** Whether GitHub's or Sentry's webhook works here, and where and with what to set it up. */
+    webhookSetup(orgId: string, provider: WebhookProvider): Promise<WebhookSetup>;
+    /** Makes the service's webhook when the workspace has none (who sets webhooks up). */
+    ensureWebhook(orgId: string, provider: WebhookProvider): Promise<WebhookSetup>;
+    /** The secret the service signs with, pasted from it (Sentry's Client Secret). */
+    setWebhookSecret(orgId: string, provider: WebhookProvider, secret: string): Promise<WebhookSetup>;
+    /** Adds the GitHub webhook to a repository (`owner/name`) with the workspace's GitHub access. */
+    addWebhookToRepo(orgId: string, repo: string): Promise<WebhookSetup>;
   };
   /** The org wiki: pages in folders, `[[links]]`, backlinks, history and the graph. */
   wiki: {
@@ -1378,8 +1399,23 @@ export interface ApiClient {
     ): Promise<{ own: WikiFolderAudience | null; above: WikiFolderAudience | null }>;
     /** Reaches the pages in it and its subfolders, and the pages that land in it later. */
     setFolderAudience(orgId: string, folder: string, access: WikiAccess): Promise<{ folder: string; pages: number }>;
-    /** To the trash (the server can restore it). */
+    /** To the trash (restored from the Lixeira for 30 days). */
     remove(orgId: string, slug: string): Promise<void>;
+    /** Many pages to the trash: `kept` counts the ones this person may not delete. */
+    removeMany(orgId: string, target: WikiBulkTarget): Promise<{ deleted: number; kept: number }>;
+    /** The Lixeira: pages deleted in the last 30 days, most recent first. */
+    trash(orgId: string): Promise<WikiPageSummary[]>;
+    restoreMany(orgId: string, ids: string[]): Promise<{ restored: number; kept: number; failed: WikiBulkFailed }>;
+    /** Deletes pages of the trash for good; no `ids` empties it. */
+    purge(orgId: string, ids?: string[]): Promise<{ purged: number; kept: number }>;
+    /** Which agents read many pages at once (null = every agent); who sees them stays. */
+    setAgents(
+      orgId: string,
+      ids: string[],
+      agentIds: string[] | null,
+    ): Promise<{ changed: number; failed: WikiBulkFailed }>;
+    /** "Sempre no contexto dos agentes" (at most 3 pages per workspace). */
+    context(orgId: string, slug: string, on: boolean): Promise<WikiPage>;
     /** What the agents read most in the last 7 days. */
     reads(orgId: string): Promise<WikiTopRead[]>;
     /** Notes of an Obsidian vault (≤ 500 per call; the app batches). */
@@ -1592,6 +1628,8 @@ export interface ApiClient {
     markThreadRead(orgId: string, threadId: string): Promise<void>;
     /** How many threads I follow have a reply I haven't read (at most 100). */
     unreadThreads(orgId: string): Promise<number>;
+    /** The tasks whose conversation has a reply I haven't read, with the ones that mention me (ADR 0145). */
+    unreadTasks?(orgId: string): Promise<UnreadTask[]>;
   };
   /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
   working?: {

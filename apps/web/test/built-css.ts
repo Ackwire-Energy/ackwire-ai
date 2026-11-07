@@ -50,8 +50,8 @@ export function topLevel(css: string) {
 /** A block's condition as the minifier writes it: `(max-width: 720px)` as `(width<=720px)`, spaces out. */
 const condition = (query: string) =>
   query
-    .replace(/\(\s*max-width\s*:\s*([\d.]+px)\s*\)/g, "(width<=$1)")
-    .replace(/\(\s*min-width\s*:\s*([\d.]+px)\s*\)/g, "(width>=$1)")
+    .replace(/\(\s*max-(width|height)\s*:\s*([\d.]+px)\s*\)/g, "($1<=$2)")
+    .replace(/\(\s*min-(width|height)\s*:\s*([\d.]+px)\s*\)/g, "($1>=$2)")
     .replace(/\s+/g, "")
     .toLowerCase();
 

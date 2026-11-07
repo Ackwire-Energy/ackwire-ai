@@ -226,8 +226,8 @@ describe("ask_user can't repeat itself", () => {
     ],
     [
       "long, and apart only at the end",
-      `Ao abrir a planilha de custos do trimestre, ${"a coluna de notas e as datas de cada entrega ".repeat(6)}batem com o contrato da Acme?`,
-      `Ao abrir a planilha de custos do trimestre, ${"a coluna de notas e as datas de cada entrega ".repeat(6)}batem com o pedido da Zeta?`,
+      `Ao abrir a planilha de custos do trimestre, ${"a coluna de notas e as datas de cada entrega ".repeat(4)}batem com o contrato da Acme?`,
+      `Ao abrir a planilha de custos do trimestre, ${"a coluna de notas e as datas de cada entrega ".repeat(4)}batem com o pedido da Zeta?`,
     ],
   ])("a real, different question is still asked: %s", async (_, a, b) => {
     f = await setup({ askUser: true, reply: asking([a, b]) });

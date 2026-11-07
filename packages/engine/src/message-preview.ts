@@ -47,6 +47,9 @@ export interface PreviewMeta {
   brainInterrupted?: { brain?: string; text: string; tools?: string[] };
   memoryUpdates?: { action: string; text: string }[];
   noAi?: { reason: string; own?: string };
+  /** What a computer brain's wait is on, and a usage wait's state: the chat's words depend on them. */
+  brainUnavailable?: Record<string, unknown>;
+  usageWait?: Record<string, unknown>;
   /** A GIF or a sticker (ADR 0091), as `meta.media`: a message of only that has no text to preview. */
   media?: MessageMedia;
   /** A voice message (ADR 0100): its length, never its words. */
@@ -79,6 +82,12 @@ export function previewMeta(meta: Record<string, unknown> | null | undefined): P
   const noAi = meta.noAi as { reason?: unknown; own?: unknown } | undefined;
   if (out.bodyCode === "no_ai" && typeof noAi?.reason === "string") {
     out.noAi = { reason: noAi.reason, ...(typeof noAi.own === "string" ? { own: noAi.own } : {}) };
+  }
+  if (out.bodyCode && meta.brainUnavailable && typeof meta.brainUnavailable === "object") {
+    out.brainUnavailable = meta.brainUnavailable as Record<string, unknown>;
+  }
+  if (out.bodyCode && meta.usageWait && typeof meta.usageWait === "object") {
+    out.usageWait = meta.usageWait as Record<string, unknown>;
   }
   const cut = (v: unknown) => (typeof v === "string" ? oneLine(v) : null);
   const interrupted = meta.interrupted as { text?: unknown } | undefined;

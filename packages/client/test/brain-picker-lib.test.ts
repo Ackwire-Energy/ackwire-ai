@@ -156,6 +156,7 @@ describe("Quem pensa as one list (the new agent's step)", () => {
     expect(options.filter((o) => o.free).map((o) => o.value)).toEqual([
       "some-free-model",
       "opencode@m1#acc-go/beam-free",
+      "opencode@m1#acc-go/crouton-alpha-free",
       "opencode@m1#acc-go/iceman-contributor-free",
     ]);
     expect(finds(options, "deepseek-v4.1-flash")).toEqual(["opencode@m1#acc-go/deepseek-v4.1-flash"]);
@@ -287,6 +288,7 @@ describe("OpenCode (ADR 0132) in Quem pensa", () => {
     expect(go[0]?.hint).toBe("brain.opencodeFreeHint");
     expect(options.find((o) => o.value === "claude@m1/auto")?.hint).toBeUndefined();
     expect(planFreeHint(t, CODING_PLANS.opencode)).toBe("brain.opencodeFreeHint");
+    expect(planFreeHint(t, { ...CODING_PLANS.opencode })).toBe("brain.opencodeFreeHint");
     expect(planFreeHint(t, CODING_PLANS.zai)).toBeUndefined();
     expect(planFreeHint(t, undefined)).toBeUndefined();
   });

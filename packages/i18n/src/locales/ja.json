@@ -1725,6 +1725,13 @@
     "generalName": "#generalの名前は変更できません。",
     "archive": "チャンネルをアーカイブ",
     "archived": "#{{channel}}をアーカイブしました。会話は残ります。",
+    "leave": "チャンネルから退出",
+    "left": "#{{channel}}から退出しました",
+    "leaveTitle": "#{{channel}}から退出しますか？",
+    "leavePrivate": "非公開チャンネルです。戻るには、中の人に追加してもらう必要があります。",
+    "leaveLast": "あなたが最後の一人です。退出するとチャンネルはアーカイブされます。",
+    "leaveConfirm": "退出",
+    "leaveLastConfirm": "退出してアーカイブ",
     "delete": "チャンネルを削除",
     "deleteTitle": "#{{channel}} を完全に削除しますか？",
     "deleteGoes": "すぐに消えるもの: メッセージ、スレッド、ファイル、ピン留め、エージェントがこのチャンネルから覚えたこと、ここに投稿するルーティン。",
@@ -1830,7 +1837,7 @@
     "composerHint": "あなたなしでは何も変わりません",
     "intro": {
       "greeting": "こんにちは、{{name}}です。あなたと一緒にチームを作ります。",
-      "lead": "エージェントを作り、アプリを接続し、メンバーを招待します。あなたがクリックしない限り何も変わらず、あなたにできることだけを行います。",
+      "lead": "エージェントを作り、アプリを接続し、メンバーを招待します。あなたが頼まない限り何も変わらず、あなたにできることだけを行います。",
       "heldLead": "事業の内容を選ぶと、ここにチームが表示されます。ワークスペースにagentes.chatのプランがあると、エージェントが作業を始めます。",
       "connect": {
         "title": "チームのAIを接続",
@@ -1949,6 +1956,8 @@
         "audience": "話せる人を変えられるのは管理者と責任者だけです",
         "channels": "チャンネルを変えられるのは管理者と責任者だけです",
         "ai_account": "割り当てられるのはアカウントの持ち主だけです",
+        "name": "エージェントの名前を変えられるのは管理者だけです",
+        "look": "見た目を変えられるのは管理者と責任者だけです",
         "many": "これらの変更ができるのは管理者だけです"
       }
     },
@@ -1959,9 +1968,12 @@
       "owner": "責任者",
       "audience": "話せる人",
       "archive": "状態",
-      "channel": "チャンネル"
+      "channel": "チャンネル",
+      "name": "名前",
+      "look": "見た目"
     },
     "value": {
+      "lookDefault": "標準の見た目",
       "none": "なし",
       "budgetDefault": "ワークスペースの既定",
       "anAccount": "AIアカウント",
@@ -2130,6 +2142,8 @@
       "plan_tools": "{{name}}は返信する前に止まりました。そのコンピューターのプランのAIがagentes.chatのツールだけにとどまりませんでした。",
       "model_limit": "{{name}}は今は返信できません。{{model}}がプランでの独自の上限に達しました。プランのほかのモデルは引き続き使えます。",
       "model_region": "{{name}}は返信できません。{{model}}にはOpenCodeでGlobalリージョンをオンにする必要があります（Settings › Privacy）。",
+      "model_off": "{{name}}は返信できません。OpenCodeがこのキーでの{{model}}を拒否しました。OpenCodeでモデルかアカウントをオンにするか、別のモデルを選んでください。",
+      "plan_inactive": "{{name}}は返信できません。このキーのOpenCodeアカウントでOpenCode Goが有効になっていません。OpenCodeでGoのサブスクリプションを確認するか、Goがあるアカウントのキーを接続してください。",
       "commands_off": "{{name}}は今は返信できません。プランのコンピューターでコマンドがオフになっていて、管理している人がオンにする必要があります。",
       "useKey": "APIキーを使う"
     },
@@ -2576,7 +2590,10 @@
       "updated": "スキル<b>{{name}}</b>を修正しました"
     },
     "agent": {
-      "settings_changed": "<b>{{agentName}}</b>の設定を変更しました"
+      "settings_changed": "<b>{{agentName}}</b>の設定を変更しました",
+      "settings_changed_instructions": "<b>{{agentName}}</b>の指示を変更しました",
+      "settings_changed_role": "<b>{{agentName}}</b>の役割を変更しました",
+      "settings_changed_apps": "<b>{{agentName}}</b>のアプリを変更しました"
     },
     "pr": {
       "merged": "<b>{{repo}}</b>のPR <b>#{{number}}</b>をマージしました",
@@ -3332,6 +3349,11 @@
     "dismissedByYou": "この質問をスキップしました。"
   },
   "ask": {
+    "kindOther": {
+      "approval": "承認を求めています",
+      "browser": "ブラウザで誰かの操作が必要です",
+      "desktop": "コンピューターで誰かの操作が必要です"
+    },
     "kind": {
       "approval": "承認を求めています",
       "secret": "シークレットを求めています",
@@ -3378,10 +3400,12 @@
     },
     "said": "<b>{{name}}:</b>「{{text}}」",
     "askPlain": "続けるにはあなたの承認が必要です:",
+    "askPlainOther": "続けるには承認が必要です:",
     "seeEmail": "メールを見る",
     "seeDetails": "詳細を見る",
     "notNow": "今はしない",
     "askMany_other": "続けるには、この{{count}}件についてあなたの承認が必要です:",
+    "askManyOther_other": "続けるには、この{{count}}件について承認が必要です:",
     "all": {
       "approve": "すべて承認",
       "refuse": "すべて今はしない",
@@ -3495,7 +3519,29 @@
       "post_message": "#{{channel}}に投稿",
       "request_permission": "オンにする: {{permission}}",
       "delete_branches_other": "{{repo}}のブランチ{{count}}個を削除",
-      "request_branch_push": "{{repo}}の{{branch}}にプッシュ（24時間、強制プッシュなし）"
+      "request_branch_push": "{{repo}}の{{branch}}にプッシュ（24時間、強制プッシュなし）",
+      "action": {
+        "merge": "マージ",
+        "deploy": "デプロイ",
+        "rollback": "ロールバック",
+        "publish": "公開",
+        "delete": "データを削除",
+        "send": "外部にメッセージを送信",
+        "draft": "下書きを保存"
+      },
+      "vault_make_password": "パスワードを作成",
+      "pg_query": "{{target}}を照会",
+      "request_approval": {
+        "merge": "{{target}}をマージ",
+        "deploy": "{{target}}をデプロイ",
+        "rollback": "{{target}}をロールバック",
+        "other": "{{target}}を承認"
+      },
+      "github": {
+        "merge_pull_request": "{{repo}}のPR #{{number}}をマージ",
+        "pull_request_review_write": "{{repo}}のPR #{{number}}をレビュー",
+        "actions_run_trigger": "{{repo}}で{{method}}を実行"
+      }
     }
   },
   "home": {
@@ -3593,6 +3639,9 @@
       "takeBackAll": "すべてのエージェントから取り戻す",
       "done": "プランが戻りました"
     },
+    "planModelDropped": {
+      "choose": "別のモデルを選ぶ"
+    },
     "docTitleUnread": "（{{count}}）通知",
     "summaryWaiting_other": "あなたの対応待ち{{count}}件",
     "summaryUnread_other": "未読{{count}}件",
@@ -3683,6 +3732,7 @@
       "browserProfileRequest": "<b>{{name}}</b>が<b>{{agent}}</b>用のブラウザプロファイルの追加を求めています",
       "desktopTaken": "<b>{{name}}</b>が<b>{{agent}}</b>のコンピューターの画面の操作を引き継ぎました",
       "planLent": "<b>{{name}}</b>さんがあなたの {{plan}} プランを<b>{{agent}}</b>に接続しました",
+      "planModelDropped": "{{model}}が{{plan}}から外れました。別のモデルを選ぶまで、<b>{{name}}</b>は{{runs}}を使います。",
       "routineWaitingPlan": "<b>{{name}}</b>はルーティンを実行するため、プランのリセットを待っています",
       "planResetUnknown": "{{plan}}は上限がいつリセットされるかを伝えませんでした。<b>{{name}}</b>の作業はまだ待機中です。",
       "catchUpClosed_other": "<b>{{name}}</b>が再開し、返信が不要だった会話{{count}}件をスキップしました",
@@ -5951,6 +6001,48 @@
         "rate_limited": "拒否: 1分あたりの呼び出しが多すぎます"
       }
     },
+    "setup": {
+      "title": "{{provider}}のWebhook",
+      "working": "動いています。{{provider}}はすでにここへイベントを送っています。",
+      "waiting": {
+        "github": "GitHubを待っています。Webhookを保存するとすぐにpingが届きます。",
+        "sentry": "Sentryを待っています。新しいエラーが出ると呼び出されます。"
+      },
+      "refused": {
+        "github": "GitHubが別のシークレットで呼び出しました。下のSecretをもう一度Webhookにコピーしてください。",
+        "sentry": "Sentryが別のシークレットで呼び出しました。インテグレーションのClient Secretをもう一度貼り付けてください。"
+      },
+      "timeout": "3分間なにも届きませんでした。URLとシークレットを確認して、もう一度テストしてください。",
+      "adminOnly": "{{provider}}のWebhookはコネクタを管理する人がオンにします。このルーティンを開くよう管理者に頼んでください。",
+      "test": "テスト",
+      "retest": "もう一度テスト",
+      "copied": "コピーしました。",
+      "github": {
+        "repo": "リポジトリ",
+        "repoPlaceholder": "オーナー/名前",
+        "oneClick": "Webhookを作成",
+        "added": "{{repo}}にWebhookを作成しました。",
+        "byHand": "手動でも作れます。リポジトリでSettings › Webhooks › Add webhookを開きます。",
+        "open": "リポジトリでSettings › Webhooks › Add webhookを開きます。",
+        "openLink": "GitHubで開く",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Which eventsでLet me select individual eventsを選びます。Pull requestsとDeployment statusesにチェックを入れ、Add webhookを押します。",
+        "another": "別のリポジトリに追加"
+      },
+      "sentry": {
+        "open": "Sentryで内部インテグレーションを作成します。",
+        "openLink": "Sentryで開く",
+        "url": "Webhook URL",
+        "events": "PermissionsでIssue & EventをReadにします。次にWebhooksでissueにチェックを入れて保存します。",
+        "secret": "インテグレーションのClient Secret",
+        "secretPlaceholder": "Client Secretを貼り付け",
+        "secretSaved": "保存済み。置き換えるには新しいものを貼り付け",
+        "save": "保存",
+        "saved": "Client Secretを保存しました。"
+      }
+    },
     "once": "1回のみ · {{date}}（{{weekday}}）{{time}}{{zone}}",
     "reminder": "リマインダー",
     "fired": "実行済み",
@@ -6109,17 +6201,142 @@
     },
     "presets": {
       "title": "テンプレートから始める",
+      "placeholder": "テンプレートを選ぶ",
+      "search": "テンプレートを検索",
+      "searchPlaceholder": "名前、分野、アプリ",
+      "noResults": "テンプレートが見つかりません",
+      "list": "テンプレート",
+      "needsApp": "このアプリが必要です：{{app}}",
+      "needsApps": "次のいずれかのアプリが必要です：{{apps}}",
+      "needsMailbox": "接続済みのメールボックスが必要です",
+      "connectFirst": "ルーティンを動かすには接続してください。",
+      "fillBlank": "先に括弧内の文を書き換えてください。",
+      "replaceTitle": "入力した内容をこのテンプレートに置き換えますか？",
+      "replaceConfirm": "置き換える",
+      "areas": {
+        "team": "チームと毎日の業務",
+        "sales": "営業と顧客",
+        "support": "カスタマーサービス",
+        "marketing": "マーケティングとコンテンツ",
+        "finance": "経理",
+        "ops": "業務運営",
+        "people": "人事",
+        "tech": "テクノロジー"
+      },
+      "dayPlan": {
+        "name": "今日の予定",
+        "text": "平日8:30に、今日のタスクと会議をまとめます。",
+        "prompt": "今日が期限の未完了タスクと今日の会議を一覧にしてください。最初に対応すべきものを教えてください。"
+      },
+      "late": {
+        "name": "遅れているタスク",
+        "text": "平日10時に、期限を過ぎたものを確認します。",
+        "prompt": "期限を過ぎた未完了タスクを探してください。それぞれ担当者と何日遅れているかを教えてください。"
+      },
+      "unanswered": {
+        "name": "未回答の質問",
+        "text": "平日16時に、今日誰も答えていないものを確認します。",
+        "prompt": "チャンネルで、今日の質問や依頼のうち回答がないものを探してください。質問した人と一緒に一覧にしてください。"
+      },
+      "leads": {
+        "name": "CRMの新しい連絡先",
+        "text": "平日9時に、新しい連絡先と優先順を確認します。",
+        "prompt": "前回以降にCRMへ追加された連絡先を確認してください。最も有望な相手を挙げ、それぞれの次の一手を提案してください。"
+      },
+      "stalled": {
+        "name": "止まっている商談",
+        "text": "月曜9時に、最近動きのない商談を確認します。",
+        "prompt": "CRMで7日以上動きのない進行中の商談を確認してください。それぞれの次の一手を提案してください。"
+      },
+      "prospects": {
+        "name": "新規顧客を探す",
+        "text": "月曜8時に、連絡すべき会社を5社見つけます。",
+        "prompt": "理想の顧客に合う会社をウェブで5社探してください。それぞれ事業内容と、連絡する価値がある理由を教えてください。"
+      },
+      "newEmail": {
+        "name": "メールの返信案を作る",
+        "text": "メールが届くと、エージェントが返信案を作ります。",
+        "prompt": "届いたメールを読み、内容と緊急度を教えてください。返信案を書きますが、送信はしないでください。"
+      },
+      "tickets": {
+        "name": "未返信のチケット",
+        "text": "平日9時と14時に、まだ待っている人を確認します。",
+        "prompt": "4時間以上返信のない未解決チケットを確認してください。緊急度の高いものから並べ、それぞれの返信案を提案してください。"
+      },
+      "themes": {
+        "name": "多かった問い合わせ",
+        "text": "金曜16時に、顧客の要望が多かったものをまとめます。",
+        "prompt": "今週のチケットを読み、テーマごとにまとめてください。多かった5件と、それぞれを防ぐ方法を教えてください。"
+      },
+      "mentions": {
+        "name": "会社への言及",
+        "text": "平日9時に、自社について言われていることを確認します。",
+        "prompt": "自社に関する最近のニュースや言及をウェブで探してください。掲載場所、肯定的か否定的か、返信が必要かを教えてください。"
+      },
+      "rivals": {
+        "name": "競合の動向",
+        "text": "月曜9時に、競合が変えたことを確認します。",
+        "prompt": "競合が先週始めたことや変えたこと（価格、製品、キャンペーンなど）を調べてください。自社にとって重要な点を教えてください。"
+      },
+      "ideas": {
+        "name": "コンテンツのアイデア",
+        "text": "月曜10時に、今週のアイデアを5つ出します。",
+        "prompt": "顧客の質問と市場の動きをもとに、今週のコンテンツのアイデアを5つ提案してください。それぞれにタイトルと形式を付けてください。"
+      },
+      "traffic": {
+        "name": "サイトの数字",
+        "text": "月曜8:30に、今週を前週と比べます。",
+        "prompt": "先週の数字（訪問数、登録数、人気ページ）を確認してください。その前の週と比べ、変わった点を教えてください。"
+      },
+      "revenue": {
+        "name": "昨日の売上",
+        "text": "毎日8時に、売上を週平均と比べます。",
+        "prompt": "昨日の売上を確認し、過去7日の平均と比べてください。普段と違う点があれば教えてください。"
+      },
+      "failed": {
+        "name": "支払いの問題",
+        "text": "平日10時に、拒否と異議申し立てを確認します。",
+        "prompt": "前回以降の拒否された支払い、返金、異議申し立てを確認してください。それぞれ金額と顧客を一覧にしてください。"
+      },
+      "monthClose": {
+        "name": "月次のまとめ",
+        "text": "毎月1日9時に、先月のお金をまとめます。",
+        "prompt": "先月の売上、返金、異議申し立てをまとめてください。その前の月と比べてください。"
+      },
+      "sheet": {
+        "name": "スプレッドシートの確認",
+        "text": "平日11時に、抜けや不自然な数字を確認します。",
+        "prompt": "このスプレッドシートを確認してください：（どれかを書いてください）。空欄、普段と違う値、前回からの変更点を指摘してください。"
+      },
+      "page": {
+        "name": "ページの監視",
+        "text": "毎日9時に、変わったときだけ知らせます。",
+        "prompt": "このページを開いてください：（ここにアドレスを貼り付け）。前回から重要な変更があれば、何が変わったかを教えてください。"
+      },
+      "newTask": {
+        "name": "新しいタスクの整理",
+        "text": "タスクが作られると、エージェントが確認します。",
+        "prompt": "新しいタスクを読んでください。始めるのに足りないものを挙げ、担当者と期限を提案してください。"
+      },
+      "pulse": {
+        "name": "今週の質問",
+        "text": "木曜16時に、チームに質問を1つ投げかけます。",
+        "prompt": "先週の質問への回答を、名前を出さずにまとめてください。そのあと、今週の様子を聞く短い質問をチャンネルに投稿してください。"
+      },
+      "away": {
+        "name": "今週不在の人",
+        "text": "月曜8:30に、休暇と出張を確認します。",
+        "prompt": "カレンダーで今週の休暇と出張を確認してください。日ごとに一覧にし、代わりが必要なことを教えてください。"
+      },
       "digest": {
         "name": "チャンネルの毎日のダイジェスト",
         "text": "平日の9時に、前日の出来事をまとめます。",
-        "prompt": "昨日チャンネルで起きたことを要約してください。依頼、解決したこと、未回答のままのものをまとめてください。",
-        "phrase": "平日の9時"
+        "prompt": "前回の要約以降にチャンネルで起きたことを要約してください。依頼、解決したこと、未回答のままのものをまとめてください。"
       },
       "errors": {
         "name": "新しいエラーを監視",
         "text": "1時間ごと、新しいエラーがあるときだけ。",
-        "prompt": "前回の実行以降のSentryの新しいエラーを確認してください。あれば要約し、コードのどこで発生しているかを伝えてください。新しいものがなければ、メッセージは送らないでください。",
-        "phrase": "1時間ごと"
+        "prompt": "前回の実行以降のSentryの新しいエラーを確認してください。あれば要約し、コードのどこで発生しているかを伝えてください。新しいものがなければ、メッセージは送らないでください。"
       },
       "prs": {
         "name": "新しいPRをレビュー",
@@ -6129,8 +6346,7 @@
       "week": {
         "name": "週のまとめ",
         "text": "金曜の17時に、決定事項と未完了の項目をまとめます。",
-        "prompt": "今週をまとめてください。決定事項、完了したタスク、まだ未完了のものを挙げてください。",
-        "phrase": "毎週金曜の17時"
+        "prompt": "今週をまとめてください。決定事項、完了したタスク、まだ未完了のものを挙げてください。"
       }
     },
     "close": "閉じる",
@@ -8362,6 +8578,52 @@
     "audienceUseFolder": "フォルダ{{folder}}に設定",
     "audienceFolderSaved": "完了しました。フォルダの公開範囲を更新しました。",
     "audienceFolderOpened": "完了しました。フォルダの制限がなくなりました。",
+    "audienceRootTitle": "Wiki全体へのアクセス",
+    "audienceRootText": "Wikiのすべてのページとフォルダ、あとから追加されるものにも適用されます。",
+    "audienceInRoot": "Wiki全体が制限されています。ここではさらに絞り込むことだけができます。",
+    "audienceFollowsRoot": "Wiki全体から",
+    "context": {
+      "on": "常にエージェントのコンテキストに入れる",
+      "off": "エージェントのコンテキストから外す",
+      "chip": "常にコンテキストに",
+      "hint": "誰も触れていなくても、このページを読むすべてのエージェントの回答に毎回入ります。最大3ページです。",
+      "added": "このページを読むすべてのエージェントが、回答のたびにこのページを受け取ります。",
+      "removed": "エージェントは、メッセージがこのページに関するときだけ受け取ります。"
+    },
+    "bulk": {
+      "select": "選択",
+      "selectAll": "すべて選択",
+      "selected_other": "{{count}}件選択中",
+      "agents": "エージェント",
+      "delete": "削除",
+      "deleteFolder": "フォルダ{{folder}}を削除",
+      "deleteImport_other": "インポート「{{name}}」を削除（{{count}}ページ）",
+      "deleteTitle_other": "{{count}}ページを削除しますか？",
+      "deleteFolderTitle_other": "フォルダ{{folder}}とその{{count}}ページを削除しますか？",
+      "deleteImportTitle_other": "「{{name}}」からインポートした{{count}}ページを削除しますか？",
+      "deleteText": "Wikiのゴミ箱に30日間移り、そこから復元できます。",
+      "deleteGo_other": "{{count}}ページをゴミ箱に移動",
+      "deleted_other": "{{count}}ページをゴミ箱に移しました。",
+      "kept_other": "{{count}}ページは残りました。ロックされているか、一部の人だけが編集できます。",
+      "failed_other": "{{count}}ページは変わりませんでした（{{titles}}）：{{reason}}",
+      "agentsTitle_other": "{{count}}ページを読むエージェント",
+      "agentsText": "人の中で各ページを見られる人はそのままです。",
+      "agentsSaved_other": "完了しました。{{count}}ページを更新しました。"
+    },
+    "trash": {
+      "title": "ゴミ箱",
+      "text": "削除したページは30日間ここに残り、その後消えます。",
+      "none": "ゴミ箱は空です。",
+      "restore": "復元",
+      "restoreMany_other": "{{count}}件を復元",
+      "purge": "完全に削除",
+      "empty": "ゴミ箱を空にする",
+      "emptyTitle_other": "{{count}}ページを完全に削除しますか？",
+      "emptyText": "履歴ごと消え、元に戻せません。",
+      "deletedWhen": "{{when}}に削除",
+      "restored_other": "{{count}}ページを復元しました。",
+      "purged_other": "{{count}}ページを完全に削除しました。"
+    },
     "audienceLevel": "{{name}}ができること",
     "audienceLevelNone": "アクセスなし",
     "audienceLevelView": "閲覧",
@@ -8383,7 +8645,7 @@
     "noAccessText": "一部の人だけに公開されています。必要な場合は、Wikiの管理者に依頼してください。",
     "delete": "ゴミ箱に移動",
     "deleteTitle": "{{title}}をゴミ箱に移動しますか？",
-    "deleteText": "このページへのリンクは「作成予定のページ」になります。アプリからはまだ復元できません。",
+    "deleteText": "Wikiのゴミ箱に30日間移り、そこから復元できます。その間、このページへのリンクは「作成するページ」になります。",
     "deleted": "{{title}}をゴミ箱に移動しました。",
     "noBacklinksHint": "まだこのページにリンクしているページはありません。別のページに[[{{title}}]]と書いてください。",
     "allVersions": "{{count}}件のバージョンをすべて見る",
@@ -8521,7 +8783,21 @@
       "newMarked": "新しいページには「新着」の印が付きます。",
       "uploaded_other": "{{count}}件の添付ファイルがDriveにあります。",
       "open": "{{title}}を開く",
-      "someFailed_other": "{{count}}件のノートを取り込めませんでした: {{titles}}",
+      "sendingNotes_other": "／{{count}}件のノートを送信",
+      "stop": "停止",
+      "stopping": "停止しています…",
+      "partialTitle": "すべては取り込めませんでした",
+      "partial_other": "{{count}}件のノート：{{done}}件取り込み、{{failed}}件取り込めず",
+      "partialText": "取り込んだページはすでにWikiにあります。",
+      "whyTitle": "取り込めなかったもの",
+      "why": {
+        "batch_other": "{{count}}件を送信できませんでした：{{error}}",
+        "stopped_other": "停止したため{{count}}件を送信していません",
+        "tooLong_other": "{{count}}件は20万文字を超えています。Obsidianで分けてください",
+        "title_other": "{{count}}件はタイトルにできる名前がありません",
+        "skipped_other": "{{count}}件はすでに同じ名前のページがありました"
+      },
+      "retry_other": "{{count}}件をもう一度試す",
       "overlayTitle": "ドロップしてWikiにインポート",
       "overlayText": "ObsidianのVaultの.zip、Vaultのフォルダ、または.mdファイル。取り込む前にすべて確認できます。",
       "error": {
@@ -8706,6 +8982,8 @@
     "modelLimit": "{{model}}はこのプランでモデル自体の上限に達しました。{{when}}にリセットされます。プランのほかのモデルはそのまま使えます。",
     "modelLimitUnknown": "{{model}}はこのプランでモデル自体の上限に達しました。プランのほかのモデルはそのまま使えます。",
     "modelRegion": "{{model}}を使うには、OpenCodeの「Settings › Privacy」でGlobalリージョンをオンにしてください。プランのほかのモデルはそのまま使えます。",
+    "modelOff": "OpenCodeがこのキーでの{{model}}を拒否しました。モデルかアカウントがOpenCodeでオフになっています。OpenCodeでオンにするか、別のモデルを選んでください。",
+    "planInactive": "このキーのOpenCodeアカウントでOpenCode Goが有効になっていないため、どのモデルも応答しません。OpenCodeでGoのサブスクリプションを確認するか、Goがあるアカウントのキーを接続してください。",
     "modelHow": {
       "globalRegion": "OpenCodeの「Settings › Privacy」でGlobalリージョンをオンにしてください。オンにしないと、このモデルは応答しません。",
       "paidTraining": "このモデルのプロバイダーは、リクエストを学習に使う場合があります。OpenCodeの「Settings › Privacy」で、有料モデルの許可をオンにしてください。オンにしないと、このモデルは応答しません。",
@@ -10713,6 +10991,61 @@
     }
   },
   "errors": {
+    "said": {
+      "gone": "これはもうありません。ページを更新して、もう一度お試しください。",
+      "alreadyDone": "これはすでに回答済みか終了しています。更新して状況を確認してください。",
+      "changed": "その間に変更がありました。更新して、もう一度お試しください。",
+      "tooLateUndo": "これはもう元に戻せません。手動で変更してください。",
+      "futureTime": "未来の時刻を選んでください。",
+      "tooFar": "1年以内の日付を選んでください。",
+      "checkDate": "日付と時刻を確認してください。",
+      "notInWorkspace": "その人はこのワークスペースにいません。",
+      "validEmail": "ana@example.com のような有効なメールアドレスを入力してください。",
+      "tooMany": "ここに入る数を超えています。いくつか減らして、もう一度お試しください。",
+      "fillIn": "足りない項目を入力して、もう一度お試しください。",
+      "checkAddress": "アドレスを確認して、もう一度お試しください。",
+      "tooLong": "長すぎます。短くして、もう一度お試しください。",
+      "updateComputerApp": "コンピューターのアプリが古すぎます。更新して、もう一度お試しください。",
+      "offHere": "ここではオフになっています。",
+      "notInConversation": "この会話にいません。",
+      "accountStart": "コンピューターがログインを開始できませんでした。電源が入っているか確認して、もう一度お試しください。",
+      "accountInUse": "そのアカウントはすでに別のエージェントのために考えています。",
+      "noAiYet": "まだAIが接続されていません。",
+      "filePurged": "このファイルは30日以上前に削除されたため、元に戻せません。",
+      "looksSecret": "パスワードかキーのようです。ここにいる全員に見えてしまいます。",
+      "blockSpec": "このブロックのパーツか数式に誤りがあるため、表示できません。直してからもう一度お試しください。",
+      "takeControl": "先にプロフィールの操作権を取ってください。",
+      "profileBusy": "別の人がこのプロフィールを使用中です。",
+      "nameTaken": "その名前はすでに使われています。別の名前を選んでください。",
+      "deleteName": "削除するにはチャンネル名を入力してください。",
+      "generalKept": "#generalは削除できません。",
+      "generalStays": "全員が#generalに残ります。",
+      "mcpUnreachable": "MCPサーバーに接続できませんでした。アドレスを確認して、もう一度お試しください。",
+      "notApproved": "このサービスはまだagentes.chatを承認していません。",
+      "alreadyInvited": "この人はすでに招待を受けています。",
+      "alreadyAsked": "この人についてはすでに別の人が依頼しています。",
+      "mailboxConnected": "このメールボックスはすでに接続されています。",
+      "sendNeedsRecipients": "確認なしで送信するには、許可された宛先のリストが必要です。",
+      "missionLive": "ミッションに実行中またはコンピューター待ちの項目が残っています。先に止めてください。",
+      "createRefused": "今はワークスペースを作成できません。",
+      "noAgentToRemind": "この会話には、リマインドできるエージェントがいません。",
+      "agentCantRead": "先にエージェントのアクセス設定で、これを読めるようにしてください。",
+      "neverHappens": "このスケジュールは実行されません。",
+      "soleOwner": "他のメンバーがいるワークスペースのオーナーはあなただけです。先に別の人をオーナーにするか、ワークスペースを削除してください。",
+      "testFirst": "オンにする前に、この設定で接続をテストしてください。",
+      "voiceLength": "録音が長すぎるか短すぎます。",
+      "sendAgain": "ファイルが完全に届きませんでした。もう一度送ってください。",
+      "serverKey": "このキーはサーバーの設定で指定されています。",
+      "input": "うまくいきませんでした。入力内容を確認して、もう一度お試しください。",
+      "conflict": "今はできません。更新して、もう一度お試しください。",
+      "computer": "コンピューターが今はこれを実行できませんでした。電源が入っているか確認して、もう一度お試しください。"
+    },
+    "webhook": {
+      "githubNoAccess": "このワークスペースのGitHubは{{repo}}にWebhookを作成できません。下の手順で手動で作成してください。",
+      "githubFailed": "GitHubは{{repo}}にWebhookを作成しませんでした（{{status}}）。下の手順で手動で作成してください。",
+      "invalidSecret": "Client Secretを空白なしで全部貼り付けてください。",
+      "invalidRepo": "リポジトリは オーナー/名前 の形で書いてください。"
+    },
     "issue": {
       "assigneeOutside": "この人はこのタスクを見ることができません。先に閲覧できる人に追加してください。",
       "deleteForbidden": "このタスクを削除できるのは作成者か管理者だけです。",
@@ -10735,6 +11068,8 @@
       "audienceWiderThanFolder": "このフォルダは制限されています。ここではさらに絞り込むことしかできません。広げるにはフォルダを変更してください。",
       "editLimited": "このページを編集できるのは、選ばれた人だけです。",
       "editorsExcludeYou": "このページを残すには、編集する人に自分を含めてください。",
+      "contextFull": "すでに{{max}}ページが常にエージェントのコンテキストに入っています。先に1ページ外してください。",
+      "restoreSlugTaken": "別のページが今この名前を使っています。そのページの名前を変えてから、もう一度復元してください。",
       "titleTaken": "「{{title}}」というページはすでにあります。",
       "titleCharacters": "タイトルに [ ] | # は使えません。",
       "titleNoLetters": "タイトルには文字か数字が必要です。",
@@ -10801,7 +11136,8 @@
       "createInviteOnly": "新しいワークスペースの作成には、現在招待が必要です。",
       "membersFull": "このワークスペースの席は現在すべて埋まっています。招待した人に席を空けてもらってください。",
       "deleting": "このワークスペースは削除中です。",
-      "notRestorable": "このワークスペースはもう復元できません。"
+      "notRestorable": "このワークスペースはもう復元できません。",
+      "paused": "このワークスペースは一時停止中のため、今はアプリを接続できません。ワークスペースの管理者が再開できます。"
     },
     "reauth": {
       "code": "メールで送ったコードを入力してください。",
@@ -12273,7 +12609,8 @@
     "stopFailed": "停止できませんでした。停止できるのは、依頼した人、エージェントのオーナー、管理者だけです。",
     "autoUpdate": "まだ作業中です（{{duration}}）。",
     "autoUpdateNow": "現在: {{now}}。",
-    "statusReply": "まだ作業中です({{duration}})。このステップのあとでメッセージを読みます。",
+    "statusReply": "タスクの途中です({{duration}})。まだ返信できません。メッセージは受け取っていて、次のステップで読みます。",
+    "statusReplyTurn": "タスクの途中です({{duration}})。まだ返信できません。メッセージは受け取っていて、今回の作業が終わったら読みます。",
     "statusReplyQueued": "コンピューターを待っています({{duration}})。順番が来たらメッセージを読みます。",
     "statusReplyAway": "コンピューターが戻るのを待っています。戻り次第メッセージを読みます。",
     "status": {
@@ -12319,7 +12656,8 @@
     "namesMore": "{{first}}ほか{{count}}名",
     "wait": {
       "thinking": "考えています…",
-      "held": "承認を待っています…"
+      "held": "承認を待っています…",
+      "said": "「{{text}}」"
     },
     "consult": {
       "asking": "{{from}}が{{to}}に質問しています",
@@ -12524,6 +12862,32 @@
         "requestingAccess": "アクセスを求めました",
         "requestingSecret": "シークレットを求めました",
         "queryingDatabase": "データベースを照会しました",
+        "searchingWeb": "ウェブを検索しました",
+        "readingWeb": "ウェブページを読みました",
+        "preparingCard": "カードを準備しました",
+        "startingPoll": "投票を開始しました",
+        "askingChoices": "選択肢付きで質問しました",
+        "usingVault": "Vaultで作業しました",
+        "makingPassword": "パスワードを作成しました",
+        "startingWork": "長い作業を開始しました",
+        "updatingWork": "長い作業を更新しました",
+        "withdrawingRequest": "リクエストを取り下げました",
+        "schedulingAction": "後で行う操作を準備しました",
+        "updatingDashboard": "ダッシュボードで作業しました",
+        "readingDashboards": "ダッシュボードを確認しました",
+        "pushingBranch": "コードの送信を依頼しました",
+        "deletingBranches": "ブランチを削除しました",
+        "postingMessage": "メッセージを投稿しました",
+        "sendingDm": "ダイレクトメッセージを送りました",
+        "settingStatus": "自分のステータスを更新しました",
+        "settingReplyStyle": "返信のしかたを調整しました",
+        "deletingRoutine": "ルーティンを削除しました",
+        "runningRoutine": "ルーティンを今すぐ実行しました",
+        "proposingTeam": "チームを提案しました",
+        "proposingChange": "変更を提案しました",
+        "updatingThread": "スレッドを更新しました",
+        "addingAgent": "エージェントをチャンネルに追加しました",
+        "readingConversation": "会話を読みました",
         "usingTool": "ツール{{tool}}を使いました",
         "thinking": "考えました",
         "typing": "書きました",
@@ -12606,6 +12970,32 @@
       "requestingAccess": "アクセスを求めています",
       "requestingSecret": "シークレットを求めています",
       "queryingDatabase": "データベースを照会中",
+      "searchingWeb": "ウェブを検索中",
+      "readingWeb": "ウェブページを読み中",
+      "preparingCard": "カードを準備中",
+      "startingPoll": "投票を開始中",
+      "askingChoices": "選択肢付きで質問中",
+      "usingVault": "Vaultで作業中",
+      "makingPassword": "パスワードを作成中",
+      "startingWork": "長い作業を開始中",
+      "updatingWork": "長い作業を更新中",
+      "withdrawingRequest": "リクエストを取り下げ中",
+      "schedulingAction": "後で行う操作を準備中",
+      "updatingDashboard": "ダッシュボードで作業中",
+      "readingDashboards": "ダッシュボードを確認中",
+      "pushingBranch": "コードの送信を依頼中",
+      "deletingBranches": "ブランチを削除中",
+      "postingMessage": "メッセージを投稿中",
+      "sendingDm": "ダイレクトメッセージを送信中",
+      "settingStatus": "自分のステータスを更新中",
+      "settingReplyStyle": "返信のしかたを調整中",
+      "deletingRoutine": "ルーティンを削除中",
+      "runningRoutine": "ルーティンを今すぐ実行中",
+      "proposingTeam": "チームを提案中",
+      "proposingChange": "変更を提案中",
+      "updatingThread": "スレッドを更新中",
+      "addingAgent": "エージェントをチャンネルに追加中",
+      "readingConversation": "会話を読み中",
       "usingTool": "ツールを使用中"
     },
     "tokens": "{{value}}トークン",
@@ -12697,6 +13087,8 @@
       "plan_model_limit_wait": "{{model}}は{{plan}}でモデル自体の上限に達しました。プランのほかのモデルはそのまま使えます。{{agent}}のモデルを変えるか、{{when}}のリセットまでお待ちください。",
       "plan_model_limit_wait_unknown": "{{model}}は{{plan}}でモデル自体の上限に達しました。プランのほかのモデルはそのまま使えます。{{agent}}のモデルを変えるか、リセットまでお待ちください。",
       "plan_model_region_wait": "このモデル（{{model}}）を使うには、OpenCodeの「Settings › Privacy」でGlobalリージョンをオンにする必要があります。",
+      "plan_model_off_wait": "OpenCodeがこのキーでの{{model}}を拒否しました。モデルかアカウントがOpenCodeでオフになっています。OpenCodeでオンにするか、{{agent}}のモデルを変えてください。",
+      "plan_inactive_wait": "このキーのOpenCodeアカウントでOpenCode Goが有効になっていないため、どのモデルも応答しません。OpenCodeでGoのサブスクリプションを確認するか、Goがあるアカウントのキーを接続してください。",
       "budget_wait": "今月の予算を使い切りました。{{when}}に再開します。管理者が予算を引き上げればもっと早く再開します。",
       "usage_wait_canceled": "キャンセルしました。上限がリセットされても実行されません。",
       "usage_wait_archived": "実行されません。エージェントがアーカイブされました。",
@@ -12727,6 +13119,8 @@
       "no_ai_plan_tools": "返信する前に止まりました。そのコンピューターの私のプランのAIがagentes.chatのツールだけにとどまりませんでした。",
       "no_ai_model_limit": "今は返信できません。{{model}}が私のプランでの独自の上限に達しました。",
       "no_ai_model_region": "返信できません。{{model}}にはOpenCodeでGlobalリージョンをオンにする必要があります（Settings › Privacy）。",
+      "no_ai_model_off": "返信できません。OpenCodeが私のキーでの{{model}}を拒否しました。OpenCodeでモデルかアカウントをオンにするか、私のモデルを変えてください。",
+      "no_ai_plan_inactive": "返信できません。私のキーのOpenCodeアカウントでOpenCode Goが有効になっていません。OpenCodeでGoのサブスクリプションを確認するか、Goがあるアカウントのキーを接続してください。",
       "no_ai_commands_off": "今は返信できません。私のプランのコンピューターでコマンドがオフになっています。",
       "no_ai_cli_missing": "まだ返信できません。私のAIのプログラムがコンピューターにインストールされていません。",
       "no_ai_plan_hold": "メッセージを保存しました。 ワークスペースにagentes.chatのプランとAIの接続が揃ったら、ここで返信します。",
@@ -13239,6 +13633,12 @@
       "ended": "{{name}}のブラウザを閉じました。",
       "starting": "ページを開いています…",
       "page": "{{name}}のページ（ライブ）",
+      "emulated": {
+        "phone": "スマートフォン · {{size}}",
+        "tablet": "タブレット · {{size}}",
+        "desktop": "デスクトップ · {{size}}"
+      },
+      "normalSize": "通常サイズ",
       "tabs_other": "{{count}}個のタブ",
       "typeHere": "ここに入力",
       "typeTo": "{{field}}に入力されます",
@@ -13954,6 +14354,10 @@
       "modelLimit": "{{model}}が上限です",
       "modelRegion": "{{model}}にはGlobalリージョンが必要です",
       "modelRegionNext": "OpenCodeでオンにしてください（Settings › Privacy）",
+      "modelOff": "OpenCodeが{{model}}を拒否",
+      "modelOffNext": "OpenCodeでオンにするか、別のモデルを選んでください",
+      "planInactive": "OpenCode Goが有効ではありません",
+      "planInactiveNext": "OpenCodeでGoのサブスクリプションを確認してください",
       "budgetOut": "今月の予算を使い切りました",
       "workLine": "エージェントの作業待ちの列にあります",
       "workLineNext": "ほかの作業が終わると始まります",

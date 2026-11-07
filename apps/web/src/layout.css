@@ -163,17 +163,6 @@ p {
 .grid-fields--wide {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
 }
-.org-badge {
-  width: 48px;
-  height: 48px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  font-weight: 700;
-  font-size: 20px;
-}
 .soft-box {
   display: flex;
   flex-wrap: wrap;
@@ -262,7 +251,7 @@ p {
   align-items: center;
   gap: 10px;
   min-height: 44px;
-  padding: 6px 10px 6px 16px;
+  padding: var(--action-clear) 10px var(--action-clear) 16px;
 }
 .outage + .outage {
   border-top: 1px solid var(--line);
@@ -847,6 +836,54 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   gap: 14px;
   padding-bottom: 96px;
 }
+/*
+ * A list or a nav beside what it opens (Aprovações, Propostas, Settings): `.page-split` holds the columns. Where they
+ * sit side by side, the page fills the work area and never scrolls: the split takes the height under the page's
+ * header and each of its columns scrolls on its own, so the header, a column's head and a footer floating at its
+ * bottom stay put. Every element between the work area and the split hands the height down. Narrower (these pages
+ * stack their columns at 940px), the page scrolls as any other. So it does in a window under 560px tall (a small or
+ * zoomed-in one): there the page's header would leave the columns too little room, or none, and what they hold out of
+ * reach. `.shell__main` in each selector: the pages' own stylesheets load after this one and must not win.
+ */
+@media (min-width: 941px) and (min-height: 560px) {
+  .shell__main:has(.page-split) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .shell__main > :is(:has(.page-split), .page-split) {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+  .shell__main :has(.page-split) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 0;
+  }
+  .shell__main :has(.page-split) > * {
+    flex-shrink: 0;
+  }
+  .shell__main :has(.page-split) > :is(:has(.page-split), .page-split) {
+    flex: 1 1 auto;
+  }
+  .shell__main .page-split {
+    min-height: 0;
+    align-items: stretch;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .shell__main .page-split > * {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* A column is as tall as the split, not as its content: what it holds scrolls in it instead of squeezing to fit. */
+  .shell__main .page-split > * > * {
+    flex-shrink: 0;
+  }
+}
 .list-group-head {
   display: flex;
   align-items: center;
@@ -1028,6 +1065,16 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 /* A card in a row of its own under the same author's words: as far off them as in the same row. */
 .channel__messages > .ac-msg + .ac-msg--grouped:not(:has(.ac-msg__text)):has(.rq, .mi-card, .iw-card, .brw-ac) {
   --row-gap: var(--msg-card-gap);
+}
+/* A message that ends on the agents' line (`.ag-rc--talk`) already holds part of the turn's gap under it. */
+.channel__messages
+  > .ac-msg:has(
+    > .ac-msg__body
+      > .ag-rcs:nth-last-child(1 of :not(.ac-msg__actions, .ac-visually-hidden, .ac-msg__aside--floating))
+      > .ag-rc--talk:last-child
+  )
+  + * {
+  --row-gap: var(--msg-part-gap);
 }
 .channel__messages > .ac-msg {
   margin-block: calc(var(--row-gap) - var(--msg-block)) calc(-1 * var(--msg-block));
@@ -1419,6 +1466,24 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   flex: 999 1 480px;
   min-width: 0;
   gap: 16px;
+}
+/* Columns of their own (`.page-split`), on one line: a wrapping line would grow to the taller column instead of the
+   split's height. The card keeps its height and scrolls inside once it is taller than the column; the list keeps room
+   for its cards' shadows and focus rings, which its scroll would cut. */
+@media (min-width: 941px) and (min-height: 560px) {
+  .proposals {
+    flex-wrap: nowrap;
+  }
+  .proposals__detail {
+    align-self: flex-start;
+    max-height: 100%;
+  }
+  .proposals__list {
+    flex-basis: 272px;
+    max-width: 332px;
+    margin: -6px -6px 0;
+    padding: 6px;
+  }
 }
 /* Too narrow for the list beside the proposal (260 + 16 + 480): it goes above it at its full width instead of a
    320px column left alone on the left, whatever the window (the sidebar takes its share of it). */
@@ -3304,6 +3369,12 @@ html:not([data-pointer]) .channel-ref:focus-visible {
 .level-matrix tbody th {
   font-weight: 600;
 }
+/* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. */
+@media (max-width: 760px) {
+  .level-matrix th:first-child {
+    width: 45%;
+  }
+}
 .level-matrix__head,
 .level-matrix__agent {
   display: inline-flex;
@@ -3786,6 +3857,29 @@ html:not([data-pointer]) .settings__link:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+/*
+ * Side by side the nav and the section are columns that scroll on their own (`.page-split`). The section's column runs
+ * to the work area's right edge, so the wheel scrolls it there too, and its text keeps the old width: the page's
+ * centred 1120px, its side room as before (28px, or half of what the window has past 1120px). The page's top room
+ * moves into the columns, so they scroll up to the window's top. Both keep room for the shadows and focus rings at
+ * their edges, which their scroll would cut.
+ */
+@media (min-width: 941px) and (min-height: 560px) {
+  .settings {
+    max-width: none;
+    margin: 0;
+    padding: 0 0 0 max(28px, calc(50% - 532px));
+  }
+  .settings__nav {
+    flex-basis: 228px;
+    margin: 0 -6px;
+    padding: 36px 6px 24px;
+  }
+  .settings__body {
+    margin-left: -12px;
+    padding: 36px max(28px, calc(100% - 1064px)) 96px 12px;
+  }
 }
 .settings__section {
   display: flex;
@@ -6159,6 +6253,7 @@ html:not([data-pointer]) .save-wiki__page:focus-visible {
   place-items: center;
   width: 18px;
   height: 18px;
+  padding: 0;
   border: 0;
   border-radius: 5px;
   background: transparent;
@@ -7361,9 +7456,15 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
   font-size: 13px;
   color: var(--ink-muted);
 }
-/* The hint only where the bar holds it whole: a narrower stage keeps the bare tools. */
+/* The hint only where the bar holds it whole: a narrower stage keeps the bare tools. A phone's stage (under 440px)
+   can't hold them all either: actual size goes, + and − still reach it. */
 @container (max-width: 900px) {
   .izoom__hint {
+    display: none;
+  }
+}
+@container (max-width: 439px) {
+  .izoom__actual {
     display: none;
   }
 }
@@ -7853,9 +7954,6 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
   gap: 2px;
   margin-right: 10px;
 }
-.ac-dialog__body > .ac-setnote {
-  margin: 0;
-}
 .machine-page__agent {
   flex: 1;
   min-width: 0;
@@ -8343,8 +8441,13 @@ html:not([data-pointer]) .onb__step:focus-visible {
   box-shadow: var(--e2), var(--top);
   box-sizing: border-box;
 }
+/* As a dialog's footer note: beside the buttons while it fits on one line, on a line of its own above them when not. */
+.newag__foot:has(> .newag__hint) {
+  flex-wrap: wrap;
+}
 .newag__hint {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -9769,14 +9872,14 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   gap: 16px;
   min-width: 0;
 }
-/* 12px above and below, as the attention tiles (`.agp-attn`): a head with a button (a 32px row) reaches 6px into
-   the padding, so the title still sits 12px in. The foot meets the card's edge, so it pulls 12px, not --card-pad. */
+/* 12px above and below, as the attention tiles (`.agp-attn`): a head with a button (a 32px row) reaches into the padding
+   as far as `--action-clear` lets it. The foot meets the card's edge, so it pulls 12px, not --card-pad. */
 .agp-card.ac-card {
   gap: 12px;
   padding-block: 12px;
 }
 .agp-card > .ac-card__head:first-child:has(.ac-card__action .ac-btn) {
-  margin-block: -6px -2px;
+  margin-block: calc(var(--action-clear) - var(--row-py)) -2px;
 }
 .agp-card > .ac-card__foot {
   margin-bottom: -12px;
@@ -10186,13 +10289,12 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
 .agp-attn__t b {
   font-weight: 600;
 }
-/* One line box as tall as the title's (15/22), with its rise (`ac-captop`): the button overflows it evenly, so it sits
-   centred on that line. */
+/* In the row's middle, as Home's rows: on the title's line a 32px button would reach the card's edge. */
 .agp-attn__tail {
   display: flex;
   flex: none;
+  align-self: center;
   align-items: center;
-  height: 22px;
 }
 .agp-attn__t span {
   color: var(--muted);
@@ -10830,8 +10932,13 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
     transform: none;
   }
 }
+/* As a dialog's footer note: beside the buttons while it fits on one line, on a line of its own above them when not. */
+.agp-savebar:has(> .agp-savebar__hint) {
+  flex-wrap: wrap;
+}
 .agp-savebar__hint {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -12919,13 +13026,24 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 /* Its two actions (an account already there): one under the other when they don't fit, and a long email ends in "…"
    (the note above says it whole). */
-.ai-panel__row > .ac-acts {
+.ai-panel__row > .ac-acts,
+.ai-panel > .ac-acts {
   flex-wrap: wrap;
   row-gap: 8px;
   min-width: 0;
 }
 .ai-panel__row > .ac-acts > .ac-btn {
   max-width: 100%;
+}
+/* A long action on a phone takes two lines rather than run past the panel's edge. */
+@media (max-width: 640px) {
+  .ai-panel__row > .ac-btn {
+    max-width: 100%;
+    height: auto;
+    min-height: var(--control-h-sm);
+    padding-block: 6px;
+    white-space: normal;
+  }
 }
 /* A sign-in that didn't end signed in: what to do next goes under the note's words, 22px in (its 14px icon and 8px
    gap), as a step's button goes under its words. Before the plan's panel's rules, whose text column wins there. */

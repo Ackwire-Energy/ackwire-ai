@@ -76,6 +76,7 @@ import {
   useTeamTemplate,
 } from "@agenteschat/engine";
 import { contextWindowOf, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
+import { learnedPlanModels } from "@agenteschat/providers/plans";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
@@ -112,6 +113,7 @@ import {
   FormerAgent,
   Model,
   NewAgentSetup,
+  PlanModelOut,
   ProviderId,
   Usage,
 } from "./schemas";
@@ -387,6 +389,10 @@ export function agentRoutes(deps: AppDeps) {
           z.object({
             models: z.array(Model),
             defaultModel: z.string().openapi({ description: "What a new agent gets when no model is chosen: `auto`." }),
+            planModels: z.record(z.string(), z.array(PlanModelOut)).openapi({
+              description:
+                "The coding plans whose makers' public lists this server has read, by plan id: their models now. A plan not here goes by the table in `@agenteschat/providers/plans`.",
+            }),
           }),
         ),
         401: errors[401],
@@ -396,6 +402,7 @@ export function agentRoutes(deps: AppDeps) {
       c.json(
         {
           defaultModel: NEW_AGENT_DEFAULTS.model,
+          planModels: learnedPlanModels(),
           models: (await pickerModels(db, await endpointOrgsOf(db, c.get("user").id))).map(([id, m]) => ({
             id,
             label: m.label,
@@ -672,6 +679,8 @@ export function agentRoutes(deps: AppDeps) {
                     "plan_limit",
                     "model_limit",
                     "model_region",
+                    "model_off",
+                    "plan_inactive",
                     "commands_off",
                     "plan_not_shared",
                     "runner_outdated",

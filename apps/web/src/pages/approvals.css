@@ -561,11 +561,12 @@ html:not([data-pointer]) .ap-link:focus-visible {
     grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: start;
   }
-  /* Open on the title's first line (its 22px line, with the same rise), not centred on the wrapped title. */
+  /* Open on the title's first line, as `.ac-captail` holds a button with a plate: a box as tall as that line, and the
+     button, taller than it (40px on touch), kept `--action-clear` inside the row's 8px padding instead of past it. */
   .ap-mi__row .ap-row__end {
     grid-column: auto;
     height: 22px;
-    margin-block-start: calc(var(--cap-top) - 11px);
+    margin-block: calc((var(--control-h-sm) + 2 * var(--action-clear) - 22px - 16px) / 2);
     font-size: 14px;
   }
   .ap-mi__row .ap-row__end > .ac-chip {
@@ -577,6 +578,11 @@ html:not([data-pointer]) .ap-link:focus-visible {
     -webkit-box-orient: vertical;
     white-space: normal;
     margin-block-start: calc(var(--cap-top) - 11px);
+  }
+}
+@media (max-width: 720px) and (pointer: coarse) {
+  .ap-mi__row .ap-row__end {
+    margin-block: calc((var(--control-h-md) + 2 * var(--action-clear) - 22px - 16px) / 2);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -648,14 +654,10 @@ html:not([data-pointer]) .ap-link:focus-visible {
   border-top: 1px solid var(--line);
 }
 .ap-list {
-  position: sticky;
-  top: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  max-height: 100vh;
-  overflow-y: auto;
   padding: 12px 16px 24px 0;
 }
 .ap-list__section {
@@ -710,23 +712,21 @@ html:not([data-pointer]) .ap-li:focus-visible {
   font-size: 14px;
   line-height: 19px;
   color: var(--ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ap-li__line b {
   color: var(--ink);
   font-weight: 600;
 }
+/* Two lines when it says where: the place, then its time or decision. Neither is ever cut. */
 .ap-li__meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   min-width: 0;
   font-size: 12px;
   line-height: 16px;
   color: var(--faint);
-  white-space: nowrap;
 }
 .ap-li__meta .connector-icon,
 .ap-li__meta .ap-conn__own {
@@ -737,9 +737,8 @@ html:not([data-pointer]) .ap-li:focus-visible {
   background: none;
 }
 .ap-li__where {
+  flex: 1 1 calc(100% - 20px);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ap-li__left {
   flex: none;
@@ -777,7 +776,8 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin: 0 -12px;
 }
 
-/* The open request. */
+/* The open request. In the page's scroll (a narrow or short window) tall enough that its decision bar floats at the
+   window's bottom. */
 .ap-review {
   position: relative;
   display: flex;
@@ -787,6 +787,17 @@ html:not([data-pointer]) .ap-li:focus-visible {
   min-height: calc(100vh - 220px);
   padding: 0 0 16px 28px;
   border-left: 1px solid var(--line);
+}
+/* Its own column (`.page-split`): out to the work area's right edge, where its scrollbar runs. Its decision bar floats
+   16px over the column's bottom, the column's padding (Chrome sets a sticky box's offset inside the padding). */
+@media (min-width: 941px) and (min-height: 560px) {
+  .ap-review {
+    margin-right: -24px;
+    padding-right: 24px;
+  }
+  .ap-review > .ap-bar--float {
+    bottom: 0;
+  }
 }
 /* The face's top on the first line's capitals (`.ac-captop` on "by"), as a chat name starts at its face. */
 .ap-review__head {
@@ -811,9 +822,6 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin-inline: 0;
   margin-block-end: 0;
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ap-review__by {
   font-size: 12.5px;
@@ -927,9 +935,6 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin: 0;
   font-size: 13.5px;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ap-bar__acts {
   display: flex;
@@ -945,13 +950,11 @@ html:not([data-pointer]) .ap-li:focus-visible {
   white-space: normal;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 940px) {
   .ap-split {
     grid-template-columns: minmax(0, 1fr);
   }
   .ap-list {
-    position: static;
-    max-height: none;
     padding-right: 0;
   }
   .ap-review {
@@ -984,8 +987,6 @@ html:not([data-pointer]) .ap-li:focus-visible {
 }
 .ap-li__when {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* What became of it: one card among the review's, its state's color on the head's key. */

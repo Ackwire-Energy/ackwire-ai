@@ -85,6 +85,32 @@ export type ActivityKind =
   | "queryingDatabase"
   | "checkingUsage"
   | "findingAgent"
+  | "searchingWeb"
+  | "readingWeb"
+  | "preparingCard"
+  | "startingPoll"
+  | "askingChoices"
+  | "usingVault"
+  | "makingPassword"
+  | "startingWork"
+  | "updatingWork"
+  | "withdrawingRequest"
+  | "schedulingAction"
+  | "updatingDashboard"
+  | "readingDashboards"
+  | "pushingBranch"
+  | "deletingBranches"
+  | "postingMessage"
+  | "sendingDm"
+  | "settingStatus"
+  | "settingReplyStyle"
+  | "deletingRoutine"
+  | "runningRoutine"
+  | "proposingTeam"
+  | "proposingChange"
+  | "updatingThread"
+  | "addingAgent"
+  | "readingConversation"
   | "usingTool";
 
 /** The computer's own permission check before a command (`PERMISSION_TOOL` in `@agenteschat/adapters`). */
@@ -198,7 +224,70 @@ const BUILTIN: Record<string, ActivityKind> = {
   follow_up: "followingUp",
   get_my_usage: "checkingUsage",
   find_agent: "findingAgent",
+  // The right hand's look at the team: its tasks, open and stuck, and what waits.
+  team_status: "listingTasks",
   cancel_follow_up: "cancelingFollowUp",
+  web_search: "searchingWeb",
+  web_fetch: "readingWeb",
+  read_conversation: "readingConversation",
+  // A card of ours in the conversation: the card itself says what it holds.
+  show_block: "preparingCard",
+  offer_approvals: "preparingCard",
+  offer_open_page: "preparingCard",
+  set_team_week: "preparingCard",
+  start_poll: "startingPoll",
+  ask_choices: "askingChoices",
+  offer_answers: "askingChoices",
+  vault_list: "usingVault",
+  vault_save: "usingVault",
+  vault_delete: "usingVault",
+  vault_make_password: "makingPassword",
+  work_in_background: "startingWork",
+  steer_work: "updatingWork",
+  stop_work: "updatingWork",
+  post_update: "updatingWork",
+  withdraw_request: "withdrawingRequest",
+  schedule_action: "schedulingAction",
+  create_dashboard: "updatingDashboard",
+  create_widget: "updatingDashboard",
+  update_widget: "updatingDashboard",
+  share_dashboard: "updatingDashboard",
+  list_dashboards: "readingDashboards",
+  request_branch_push: "pushingBranch",
+  delete_branches: "deletingBranches",
+  post_message: "postingMessage",
+  send_dm: "sendingDm",
+  set_status: "settingStatus",
+  set_reply_style: "settingReplyStyle",
+  delete_routine: "deletingRoutine",
+  run_routine_now: "runningRoutine",
+  propose_team: "proposingTeam",
+  propose_settings_change: "proposingChange",
+  propose_member_changes: "proposingChange",
+  propose_remove_agents: "proposingChange",
+  update_thread: "updatingThread",
+  add_agent_to_channel: "addingAgent",
+};
+
+/** A computer brain's own tools (`agent.step`: Claude Code's, Codex's, OpenCode's, Grok Build's), lower-cased. */
+const OWN_TOOLS: Record<string, ActivityKind> = {
+  read: "pcFiles",
+  write_file: "pcFiles",
+  edit_file: "pcFiles",
+  search_replace: "pcFiles",
+  list_dir: "pcFiles",
+  run_terminal_cmd: "runningCommandAny",
+  run_terminal_command: "runningCommandAny",
+  edit: "pcFiles",
+  multiedit: "pcFiles",
+  write: "pcFiles",
+  glob: "pcFiles",
+  grep: "pcFiles",
+  ls: "pcFiles",
+  file_change: "pcFiles",
+  bash: "runningCommandAny",
+  shell: "runningCommandAny",
+  toolsearch: "findingTools",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
@@ -215,35 +304,9 @@ const CONNECTORS: Record<string, string> = {
   mail: "Email",
 };
 
-/** First words that are verbs, not a connector prefix ("send_email" is a tool, not the app "send"). */
-const VERBS = new Set([
-  "get",
-  "list",
-  "create",
-  "update",
-  "delete",
-  "read",
-  "write",
-  "search",
-  "find",
-  "send",
-  "add",
-  "remove",
-  "set",
-  "run",
-  "fetch",
-  "ask",
-  "propose",
-  "comment",
-  "query",
-  "post",
-  "make",
-  "do",
-]);
-
 const isDrive = (id: string) => id === "drive" || id === "google_drive";
 /** A connection's service as its name says it: "Google Drive (ana@acme.com) 2" → "google_drive". */
-const serviceKey = (label: string) =>
+export const serviceKey = (label: string) =>
   label
     .replace(/\s+\d+$/, "")
     .replace(/\s*\([^)]*\)$/, "")
@@ -256,7 +319,7 @@ const MAILBOX_TOOL = /^(?:mcp__agentes__)?mail_[a-z0-9]+_[a-z]+$/;
 
 /**
  * The friendly activity of a tool call. `connector` is the app label when the
- * event carries it; otherwise it is guessed from the tool name's prefix.
+ * event carries it; without it, only a catalog connector's prefix names an app.
  * `where`: the service the call names, for its logo. A mailbox goes by its maker's
  * name when the app draws its mark ("Consultou o Gmail"), else by "Email".
  */
@@ -294,7 +357,7 @@ function activityOf(tool: string | null | undefined, connector?: string | null, 
   // "Rodou: Rerun the tests": the command it checked, by the engine's label (`toolDetail`).
   if (name === PERMISSION_TOOL)
     return detail?.trim() ? { kind: "runningCommand", app: detail.trim() } : { kind: "runningCommandAny" };
-  const builtin = BUILTIN[name];
+  const builtin = BUILTIN[name] ?? OWN_TOOLS[name];
   if (builtin) return { kind: builtin };
   // The tools on demand: looking one up (a big connector's own directory too) is ours, not an app.
   if (name === "find_tools" || name.endsWith("_find_tools")) return { kind: "findingTools" };
@@ -311,9 +374,8 @@ function activityOf(tool: string | null | undefined, connector?: string | null, 
   const prefix = name.split(/[_.:]/)[0] ?? "";
   if (isDrive(prefix) || name.startsWith("google_drive_")) return { kind: "readingDrive" };
   const known = CONNECTORS[prefix];
-  if (known) return { kind: "consulting", app: known };
-  if (prefix.length >= 2 && prefix !== name && !VERBS.has(prefix)) return { kind: "consulting", app: prefix };
-  return { kind: "usingTool" };
+  // Only a catalog connector's own prefix names an app: any other first word is a word of the tool's name.
+  return known ? { kind: "consulting", app: known } : { kind: "usingTool" };
 }
 
 /** An agent's run is in the timeline (its first words arrived, or it failed): not in the bar. */

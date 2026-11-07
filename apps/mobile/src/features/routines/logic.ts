@@ -510,14 +510,6 @@ export function draftChanges(r: Routine, d: RoutineDraft, savedRule: string, rul
   return patch;
 }
 
-/** Starting points for "Nova rotina" (the words come from i18n; the phrase is read by the server, like a typed one). */
-export const PRESETS = [
-  { key: "digest", icon: "doc", kind: "schedule" },
-  { key: "errors", icon: "eye", kind: "schedule" },
-  { key: "prs", icon: "bolt", kind: "event", event: "github.pr_opened" },
-  { key: "week", icon: "checkc", kind: "schedule" },
-] as const satisfies readonly { key: string; icon: IconName; kind: "schedule" | "event"; event?: RoutineEvent }[];
-
 /** A long toast in two parts: its first sentence as the title, the rest under it (the title takes one line). */
 export function toastParts(text: string): { title: string; subtitle?: string } {
   const at = text.indexOf(". ");

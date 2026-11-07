@@ -43,11 +43,11 @@ import { can } from "./organizations";
 import { maySql } from "./permissions";
 import { afterReplyAnswered } from "./questions";
 import { rightHandReaches } from "./right-hand";
-import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
+import { inChannelRun, waitsOnUsage, workKeepsThread, workTakesPersonMessage } from "./run-scope";
 import { computerWaitSql, KEPT_ON_HOLD, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
-import { admitTaskAgents } from "./task-access";
+import { admitTaskAgents, taskReaderSql } from "./task-access";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 import { type WorkView, workViews } from "./works";
@@ -703,6 +703,13 @@ export async function insertMessageWithRuns(
       ), fresh as (
         -- The write goes ahead: no client id, or this send claimed it.
         select 1 where ${clientId}::text is null or exists (select 1 from claimed)
+      ), task_readers_named as (
+        -- A task's conversation (ADR 0145) has no people in it: who is named there and sees the task is mentioned.
+        select om.user_id from ${schema.organizationMembers} om
+        where om.org_id = ${input.orgId}::uuid and om.user_id is distinct from ${userId}
+          and om.handle = any(${handles}::text[])
+          and exists (select 1 from ${channels} tc where tc.id = ${input.channelId}::uuid and tc.kind = 'task')
+          and ${taskReaderSql(sql`${input.channelId}::uuid`, sql`om.user_id`)}
       ), muted as (
         -- A mission's thread (ADR 0029): only its owner and those who can decide make its agent act.
         -- Anyone else addressing it starts nothing: the message becomes a suggestion.
@@ -775,8 +782,25 @@ export async function insertMessageWithRuns(
             select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
               and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))
         returning q.id, q.run_id, q.agent_id
+      ), work_thread as (
+        -- A person's reply in the thread where an agent's background work posts (its anchor's, or the thread it was
+        -- asked in) is for that agent, as a reply in a thread an agent works in always was: a reply turn of its own
+        -- answers it now (ADR 0121 addendum 2026-11-06). In a DM the agent is addressed anyway. Naming a person there
+        -- talks to them: the router decides.
+        select distinct w.agent_id from ${schema.agentWorks} w
+        join ${agents} wa on wa.id = w.agent_id and wa.archived_at is null
+        where ${startRuns}::boolean and ${threadId}::uuid is not null and not exists (select 1 from mentioned)
+          and not exists (select 1 from mentioned_people)
+          and w.org_id = ${input.orgId}::uuid and w.channel_id = ${input.channelId}::uuid
+          and w.status in ('live', 'queued')
+          and ((w.own_thread and w.anchor_message_id = ${threadId}::uuid)
+            or (not w.own_thread and w.home_thread_id = ${threadId}::uuid))
+          and exists (select 1 from ${channels} wc where wc.id = ${input.channelId}::uuid and wc.kind = 'channel')
+          and ${audienceSql("wa", sql`${userId}::text`, inChannel)}
       ), addressed as (
-        select a.id as agent_id, case when exists (select 1 from mentioned) then 'mention' else 'dm' end as trig,
+        select a.id as agent_id,
+          case when exists (select 1 from mentioned) or a.id in (select agent_id from work_thread) then 'mention'
+            else 'dm' end as trig,
           ${audienceSql("a", sql`${userId}::text`, inChannel)} as allowed
         from ${agents} a
         where ${startRuns}::boolean and a.org_id = ${input.orgId}::uuid and a.archived_at is null
@@ -785,7 +809,7 @@ export async function insertMessageWithRuns(
             or ${rightHandReaches(sql`a`, sql`${input.channelId}::uuid`)})
           and a.id not in (select agent_id from answered)
           and a.id <> all(${referenced}::uuid[])
-          and (a.id in (select id from mentioned)
+          and (a.id in (select id from mentioned) or a.id in (select agent_id from work_thread)
             or (not exists (select 1 from mentioned) and not exists (select 1 from answered) and exists (
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
       ), answering as (
@@ -827,8 +851,8 @@ export async function insertMessageWithRuns(
         where ${deliver}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running', 'waiting_input')
           and not r.background
-          -- Background work (ADR 0121) answers only in its own thread: in the conversation it left, the agent is free.
-          and ${workKeepsThread(sql`r`)}
+          -- Background work (ADR 0121) never holds a person's message while it works: a reply turn answers it.
+          and ${workTakesPersonMessage(sql`r`)}
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
@@ -884,7 +908,8 @@ export async function insertMessageWithRuns(
             where sr.id = ${runId}::uuid)),
           ${body},
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
-          coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
+          coalesce((select array_agg(user_id) from (select user_id from mentioned_people
+            union select user_id from task_readers_named) mp), '{}'::text[]),
           -- Only this statement says a message mentions everyone.
           (${JSON.stringify(input.meta ?? {})}::jsonb - 'mentionsEveryone' - 'everyoneAgentIds')
             || coalesce((select jsonb_build_object('mentionsEveryone', true) from everyone), '{}'::jsonb)
@@ -893,6 +918,8 @@ export async function insertMessageWithRuns(
                 having count(*) > 0), '{}'::jsonb)
             || ${channelNames.length > 0 ? channelRefsSql(input.orgId, input.channelId, channelNames) : sql`'{}'::jsonb`}
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
+            -- For an agent's background work, answered by its own reply turn: nobody routes it again.
+            || coalesce((select jsonb_build_object('forWork', true) from work_thread limit 1), '{}'::jsonb)
             -- Delivered to a task in progress: nobody routes it again (no second run).
             || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(st.id)) from steered st
                 having count(*) > 0), '{}'::jsonb)
@@ -947,11 +974,11 @@ export async function insertMessageWithRuns(
             or m.hop < ${AGENT_CHIME_IN_MAX_HOP})
         union all
         -- In-app notifications: people mentioned, a reply in a thread, a person's DM, an agent's answer to whoever
-        -- is behind its run (ADR 0071).
+        -- is behind its run (ADR 0071), a routine's report (it may have no mention and no run).
         select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),
           'notifications.message:' || m.id, 4 from m
           where not ${silent}::boolean and (cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null
-            or m.agent_run_id is not null
+            or m.agent_run_id is not null or m.meta -> 'routine' is not null
             or (m.author_type = 'person' and exists (
               select 1 from ${channels} dc where dc.id = ${input.channelId}::uuid and dc.kind = 'dm')))
         on conflict do nothing

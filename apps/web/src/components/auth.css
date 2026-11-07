@@ -266,10 +266,11 @@ html:not([data-pointer]) .auth__quiet:focus-visible {
   height: 20px;
   flex: none;
 }
+/* "Último usado" belongs to the button above it: tight under it, the next button at the list's own gap. */
 .auth-social__item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 .auth-social__last {
   justify-content: center;

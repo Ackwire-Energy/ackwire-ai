@@ -18,7 +18,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { aiSelect, chooseAi, closeAiSelect, openAiSelect, payWith } from "./ai-picker";
 import {
   ADA_ID,
@@ -40,6 +40,14 @@ const click = async (el: Element) => {
   await settle(3);
 };
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+/**
+ * The key or code a panel is sending, sealed and gone: sealing is WebCrypto, which runs off the JS thread, so on a
+ * loaded machine it can outlast any number of ticks.
+ */
+const sealed = async (panel: HTMLElement, ticks = 12) => {
+  await waitFor(() => expect(shownText(panel)).not.toMatch(/Enviando (a chave|o código) a/), { timeout: 10_000 });
+  await settle(ticks);
+};
 
 const MAC: AiComputer = {
   machineId: "machine_1",
@@ -400,6 +408,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // With a key typed, sending is the one primary: opening the page steps back.
     expect(within(panel).getByRole("link", { name: "Abrir z.ai" }).className).not.toContain("ac-btn--primary");
     await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
+    // The fake computer is signed in before the key lands: the panel moves on while the key is still being sealed.
+    await waitFor(() => expect(calls(state, "machines.sendAccountCode")).toHaveLength(1), { timeout: 10_000 });
     await settle(8);
     expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([
       ORG_ID,
@@ -501,6 +511,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const keyBox = within(panel).getByLabelText("Chave do Cursor");
     await type(keyBox, "key_fake_0000000000001234");
     await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
+    // The fake computer is signed in before the key lands: the panel moves on while the key is still being sealed.
+    await waitFor(() => expect(calls(state, "machines.sendAccountCode")).toHaveLength(1), { timeout: 10_000 });
     await settle(8);
     expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([
       ORG_ID,
@@ -1160,7 +1172,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(panel).getByRole("button", { name: "Enviar ao computador" })).toBeTruthy();
     // This sign-in's code goes by itself.
     await type(within(panel).getByRole("textbox", { name: "Código do Claude" }), "c0de#st4te");
-    await settle(4);
+    await sealed(panel, 4);
     expect(calls(state, "machines.sendAccountCode")).toHaveLength(1);
     expect(shownText(panel)).toContain("Código enviado. O computador está terminando de entrar.");
     // Its hints too.
@@ -1486,7 +1498,7 @@ describe("All agents: one plan for the team, a login per agent", () => {
     const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
     await type(within(panel).getByLabelText("Chave do GLM Coding"), KEY);
     await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
-    await settle(12);
+    await sealed(panel);
     expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual(
       [1, 2, 3].map(() => [ORG_ID, "machine_1", "claude_code", { provider: "zai" }]),
     );
@@ -1513,7 +1525,7 @@ describe("All agents: one plan for the team, a login per agent", () => {
       "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp",
     );
     await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
-    await settle(12);
+    await sealed(panel);
     expect([...panel.querySelectorAll(".ai-panel__who > li")].map((li) => li.getAttribute("data-state"))).toEqual([
       "done",
       "now",
@@ -1535,7 +1547,7 @@ describe("All agents: one plan for the team, a login per agent", () => {
     const who = () => [...panel.querySelectorAll(".ai-panel__who > li")].map((li) => li.getAttribute("data-state"));
     await type(within(panel).getByLabelText("Chave do GLM Coding"), GLM_KEY);
     await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
-    await settle(12);
+    await sealed(panel);
     // Ada has an AI now, the first that had none: the panel stays on everyone, the key sent once.
     expect(forWhom()).toBe("Todos os agentes");
     expect(who()).toEqual(["done", "now", "now"]);
@@ -1567,7 +1579,7 @@ describe("All agents: one plan for the team, a login per agent", () => {
     const send = async () => {
       await type(within(panel).getByLabelText("Chave do GLM Coding"), GLM_KEY);
       await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
-      await settle(12);
+      await sealed(panel);
     };
     await send();
     expect(shownText(panel)).toContain("Não deu para entrar nessa conta. Tente de novo.");
@@ -2001,7 +2013,7 @@ describe("A sign-in through a restart of the server or a reconnect of its comput
     };
     await type(within(panel).getByLabelText("Chave do GLM Coding"), GLM_KEY);
     await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
-    await settle(12);
+    await sealed(panel);
     expect(shownText(panel)).toContain("Reconectando…");
     expect(shownText(panel)).not.toMatch(/Não deu para entrar|não respondeu/);
     for (const n of [2, 3]) machines?.endLogin(`login_${n}`, { state: "done", account: account({ id: `acct_${n}` }) });
@@ -2039,7 +2051,7 @@ describe("A sign-in through a restart of the server or a reconnect of its comput
     await ask(0, (loginId) => fails[loginId]);
     await type(within(panel).getByLabelText("Chave do GLM Coding"), GLM_KEY);
     await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
-    await settle(12);
+    await sealed(panel);
     expect(shownText(panel)).toContain("Não deu para entrar nessa conta. Tente de novo.");
     await ask(LOGIN_RECONNECT_MS, (loginId) => (loginId === "login_2" ? proxy : undefined));
     expect(shownText(panel)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
@@ -2081,7 +2093,7 @@ describe("A sign-in through a restart of the server or a reconnect of its comput
     await ask(20_000);
     expect(send.disabled).toBe(false);
     await click(send);
-    await settle(6);
+    await sealed(panel, 6);
     expect(calls(state, "machines.sendAccountCode")).toHaveLength(1);
     expect(shownText(panel)).toContain("Código enviado. O MacBook está terminando de entrar.");
     expect(calls(state, "machines.beginAccountLogin")).toHaveLength(1);

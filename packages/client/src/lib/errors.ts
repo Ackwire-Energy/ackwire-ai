@@ -14,10 +14,14 @@ export const REAUTH_SIGN_IN = "reauth.sign_in";
 export const REAUTH_PASSWORD = "reauth.password";
 
 /**
- * Server error codes the app says in the person's language (the server's
- * own message is English). Anything else falls back to that message.
+ * Server error codes the app says in the person's language (the server's own message is English). Anything else
+ * takes `untranslatedText`; a guard test (`error-words.test.ts`) fails on a new code that isn't here or on its list.
  */
 const KNOWN = {
+  "webhook.github_no_access": "errors.webhook.githubNoAccess",
+  "webhook.github_failed": "errors.webhook.githubFailed",
+  "webhook.invalid_secret": "errors.webhook.invalidSecret",
+  "webhook.invalid_repo": "errors.webhook.invalidRepo",
   "channel.post_denied": "channel.perms.readOnlyComposer",
   "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
@@ -94,6 +98,8 @@ const KNOWN = {
   "mission.closed": "errors.mission.closed",
   "mission.wrong_status": "errors.mission.wrongStatus",
   "mission.paused": "errors.mission.paused",
+  // Apps can't connect to a workspace on hold (`apps/grants.ts`, `apps/oauth.ts`).
+  workspace_paused: "errors.org.paused",
   "mission.invalid": "errors.mission.invalid",
   "mission.bad_folder": "errors.mission.badFolder",
   "mission.bad_option": "errors.mission.badOption",
@@ -137,6 +143,8 @@ const KNOWN = {
   "wiki.locked": "wiki.lockedHint",
   "wiki.lock_admins_only": "errors.wiki.lockAdminsOnly",
   "wiki.editors_exclude_you": "errors.wiki.editorsExcludeYou",
+  "wiki.context_full": "errors.wiki.contextFull",
+  "wiki.restore_slug_taken": "errors.wiki.restoreSlugTaken",
   "role.name_required": "errors.role.nameRequired",
   "role.name_long": "errors.role.nameLong",
   "role.too_many": "errors.role.tooMany",
@@ -193,6 +201,13 @@ const KNOWN = {
   SIGNUP_CLOSED: "auth.flow.closedLead",
   // A sign-up whose name is its password (apps/server auth.ts `NAME_IS_PASSWORD`).
   NAME_IS_PASSWORD: "auth.flow.nameIsPassword",
+  // Better Auth's own refusals on sign-up or a password change (an expired reset link is the reset page's own state).
+  USER_ALREADY_EXISTS: "auth.refused.linked",
+  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: "auth.refused.linked",
+  INVALID_EMAIL: "errors.said.validEmail",
+  PASSWORD_TOO_SHORT: "auth.passwordHelp",
+  PASSWORD_TOO_LONG: "auth.passwordTooLong",
+  INVALID_PASSWORD: "errors.reauth.password",
   account_not_linked: "auth.unconfirmed",
   // A provider that hasn't confirmed its own address, to a confirmed account here (apps/server auth.ts `authHandler`).
   provider_email_unverified: "auth.providerUnverified",
@@ -307,6 +322,171 @@ const KNOWN = {
   "vault.source.unreachable": "errors.vault.source.unreachable",
   "vault.source.unsupported": "errors.vault.source.unsupported",
   "vault.source.invalid_input": "errors.vault.source.invalidInput",
+  "account.login_not_found": "errors.said.gone",
+  "account.not_found": "errors.said.gone",
+  "account.invalid": "errors.said.gone",
+  "action.not_found": "errors.said.gone",
+  "action.target_gone": "errors.said.gone",
+  "agent_proposal.not_found": "errors.said.gone",
+  "approval_cover.not_found": "errors.said.gone",
+  "database.not_found": "errors.said.gone",
+  "follow_up.not_found": "errors.said.gone",
+  "message.not_found": "errors.said.gone",
+  "mission.command_not_found": "errors.said.gone",
+  "mission.delivery_item_not_found": "errors.said.gone",
+  "mission.delivery_not_found": "errors.said.gone",
+  "mission.join_not_found": "errors.said.gone",
+  "mission.rule_not_found": "errors.said.gone",
+  "pull.not_found": "errors.said.gone",
+  "right_hand.not_found": "errors.said.gone",
+  "routine.no_webhook": "errors.said.gone",
+  "task.not_found": "errors.said.gone",
+  "team_proposal.no_agent": "errors.said.gone",
+  "team_proposal.not_found": "errors.said.gone",
+  "upload.not_found": "errors.said.gone",
+  "wiki.page_not_found": "errors.said.gone",
+  "wiki.version_not_found": "errors.said.gone",
+  "action.already_undone": "errors.said.alreadyDone",
+  "action.not_undone": "errors.said.alreadyDone",
+  "agent_proposal.asked": "errors.said.alreadyDone",
+  "approval.not_ahead": "errors.said.alreadyDone",
+  "approval.not_cancelable": "errors.said.alreadyDone",
+  "browser.handoff_over": "errors.said.alreadyDone",
+  "choices.answered": "errors.said.alreadyDone",
+  "follow_up.not_pending": "errors.said.alreadyDone",
+  "join.verified": "errors.said.alreadyDone",
+  "message.already_sent": "errors.said.alreadyDone",
+  "mission.already_participant": "errors.said.alreadyDone",
+  "mission.delivery_decided": "errors.said.alreadyDone",
+  "mission.join_decided": "errors.said.alreadyDone",
+  "mission.review_decided": "errors.said.alreadyDone",
+  "poll.closed": "errors.said.alreadyDone",
+  "proposal.asked": "errors.said.alreadyDone",
+  "proposal.decided": "errors.said.alreadyDone",
+  "right_hand.undone": "errors.said.alreadyDone",
+  run_finished: "errors.said.alreadyDone",
+  "secret.closed": "errors.said.alreadyDone",
+  "team_week.done": "errors.said.alreadyDone",
+  "upload.not_pending": "errors.said.alreadyDone",
+  "agent.mail_loss_changed": "errors.said.changed",
+  "mission.plan_conflict": "errors.said.changed",
+  "run.state_changed": "errors.said.changed",
+  "action.changed_since": "errors.said.tooLateUndo",
+  "action.expired": "errors.said.tooLateUndo",
+  "action.not_undoable": "errors.said.tooLateUndo",
+  "right_hand.changed_since": "errors.said.tooLateUndo",
+  "right_hand.undo_expired": "errors.said.tooLateUndo",
+  "approval_cover.ends_past": "errors.said.futureTime",
+  "notifications.snooze_in_past": "errors.said.futureTime",
+  "schedule.in_the_past": "errors.said.futureTime",
+  "when.past": "errors.said.futureTime",
+  "notifications.snooze_too_far": "errors.said.tooFar",
+  "when.too_far": "errors.said.tooFar",
+  "calendar.invalid_date": "errors.said.checkDate",
+  "notifications.bad_snooze": "errors.said.checkDate",
+  "schedule.invalid_datetime": "errors.said.checkDate",
+  "schedule.invalid_time": "errors.said.checkDate",
+  "schedule.invalid_start": "errors.said.checkDate",
+  "schedule.invalid_until": "errors.said.checkDate",
+  "schedule.until_before_start": "errors.said.checkDate",
+  "agent_group.not_member": "errors.said.notInWorkspace",
+  "approval_cover.not_member": "errors.said.notInWorkspace",
+  "account.invalid_email": "errors.said.validEmail",
+  invalid_email: "errors.said.validEmail",
+  "join.invalid_email": "errors.said.validEmail",
+  "mail.invalid_address": "errors.said.validEmail",
+  "mail.invalid_alias": "errors.said.validEmail",
+  "mail.invalid_from": "errors.said.validEmail",
+  "mail.invalid_rule": "errors.said.validEmail",
+  "database.too_many": "errors.said.tooMany",
+  "endpoint.too_many_models": "errors.said.tooMany",
+  "mail.too_many_addresses": "errors.said.tooMany",
+  "mail.too_many_aliases": "errors.said.tooMany",
+  "mail.too_many_folders": "errors.said.tooMany",
+  "message.too_many_attachments": "errors.said.tooMany",
+  "pins.limit": "errors.said.tooMany",
+  "routine.too_many_actions": "errors.said.tooMany",
+  token_limit: "errors.said.tooMany",
+  "voice.limit": "errors.said.tooMany",
+  "wiki.folder_depth": "errors.said.tooMany",
+  "wiki.import_too_many": "errors.said.tooMany",
+  "database.host_required": "errors.said.fillIn",
+  "database.password_required": "errors.said.fillIn",
+  "database.user_required": "errors.said.fillIn",
+  "endpoint.no_models": "errors.said.fillIn",
+  "mail.hosts_required": "errors.said.fillIn",
+  "mail.password_required": "errors.said.fillIn",
+  "mission.delivery_note_required": "errors.said.fillIn",
+  "reminder.text_required": "errors.said.fillIn",
+  "routine.connector_inbox_invalid": "errors.said.fillIn",
+  "routine.connector_not_found": "errors.said.fillIn",
+  "routine.mail_account_not_found": "errors.said.fillIn",
+  "routine.name_required": "errors.said.fillIn",
+  "routine.once_needs_time": "errors.said.fillIn",
+  "routine.prompt_required": "errors.said.fillIn",
+  "routine.schedule_required": "errors.said.fillIn",
+  "storage.credentials_required": "errors.said.fillIn",
+  "wiki.folder_required": "errors.said.fillIn",
+  "wiki.title_required": "errors.said.fillIn",
+  "browser.bad_address": "errors.said.checkAddress",
+  "database.port": "errors.said.checkAddress",
+  "database.url": "errors.said.checkAddress",
+  "url.credentials": "errors.said.checkAddress",
+  "url.https_required": "errors.said.checkAddress",
+  "url.internal": "errors.said.checkAddress",
+  "url.invalid": "errors.said.checkAddress",
+  "url.not_found": "errors.said.checkAddress",
+  "database.too_long": "errors.said.tooLong",
+  "right_hand_approvals.guidance": "errors.said.tooLong",
+  "status.too_long": "errors.said.tooLong",
+  "wiki.body_too_long": "errors.said.tooLong",
+  "account.runner_old": "errors.said.updateComputerApp",
+  "machine.access_outdated": "errors.said.updateComputerApp",
+  "machine.outdated": "errors.said.updateComputerApp",
+  "database.disabled": "errors.said.offHere",
+  "mail.composio_disabled": "errors.said.offHere",
+  "mail.imap_disabled": "errors.said.offHere",
+  "secret.computer_changed": "errors.said.offHere",
+  "voice.unavailable": "errors.said.offHere",
+  "reminder.agent_not_here": "errors.said.notInConversation",
+  "reminder.person_not_here": "errors.said.notInConversation",
+  "account.begin_failed": "errors.said.accountStart",
+  "account.in_use": "errors.said.accountInUse",
+  "ai.still_missing": "errors.said.noAiYet",
+  "artifact.purged": "errors.said.filePurged",
+  "block.secret": "errors.said.looksSecret",
+  "block.spec": "errors.said.blockSpec",
+  "browser.not_in_control": "errors.said.takeControl",
+  "browser_profile.busy": "errors.said.profileBusy",
+  "browser_profile.name_taken": "errors.said.nameTaken",
+  "channel.delete_name": "errors.said.deleteName",
+  "channel.general": "errors.said.generalKept",
+  "channel.general_stays": "errors.said.generalStays",
+  "connector.mcp_status": "errors.said.mcpUnreachable",
+  "connector.mcp_unreachable": "errors.said.mcpUnreachable",
+  "connector.not_approved": "errors.said.notApproved",
+  "join.invited": "errors.said.alreadyInvited",
+  "join.waiting": "errors.said.alreadyAsked",
+  "mail.already_connected": "errors.said.mailboxConnected",
+  "mail.send_without_asking_needs_recipients": "errors.said.sendNeedsRecipients",
+  "mission.tasks_live": "errors.said.missionLive",
+  "org.create_refused": "errors.said.createRefused",
+  "reminder.no_agent": "errors.said.noAgentToRemind",
+  "routine.connector_agent_cannot_read": "errors.said.agentCantRead",
+  "routine.mail_agent_cannot_read": "errors.said.agentCantRead",
+  "schedule.never": "errors.said.neverHappens",
+  sole_owner: "errors.said.soleOwner",
+  "storage.test_first": "errors.said.testFirst",
+  "voice.bad_duration": "errors.said.voiceLength",
+  "voice.too_large": "errors.said.voiceLength",
+  "upload.expired": "errors.said.sendAgain",
+  "upload.sha_mismatch": "errors.said.sendAgain",
+  gif_key_env: "errors.said.serverKey",
+  jev_key_env: "errors.said.serverKey",
+  "oauth.link_expired": "oauthReturn.expired",
+  "oauth.link_used": "oauthReturn.used",
+  "oauth.other_account": "oauthReturn.otherAccount",
+  "github_app.not_visible": "githubApp.notVisible",
 } as const;
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
@@ -492,6 +672,9 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
 }
 
+/** The app has its own line for this server code. */
+export const hasWordsFor = (code: string) => Object.hasOwn(KNOWN, code);
+
 /**
  * `knownErrorText` for the person an invitation is for: a full workspace says whom to tell, never its numbers,
  * which are for its admins.
@@ -509,14 +692,26 @@ const deviceOffline = () => (globalThis as { navigator?: { onLine?: boolean } })
 const noAnswerText = (t: TFunction) => t(deviceOffline() ? "common.offline" : "common.unreachable");
 
 /**
- * The words of a refusal the app doesn't translate: the server's own (English, written for people) for a 4xx, in
- * every language, since English is every language's fallback, and for a computer's own refusal (its 503
- * `machine.<code>`); any other 5xx's (a runner's `machine.internal` too) are for the log, and the person reads that it
- * failed on our side.
+ * The words of a refusal the app has no line for: in English, the server's own (written for people) for a 4xx and for
+ * a computer's own refusal (its 503 `machine.<code>`); in any other language a plain line by what kind of refusal it
+ * is, never English mid-screen. Any other 5xx (a runner's `machine.internal` too) is for the log, and the person reads
+ * that it failed on our side.
  */
 function untranslatedText(t: TFunction, error: ApiError): string {
   const told = error.status < 500 || (error.code.startsWith("machine.") && error.code !== "machine.internal");
-  return told && error.message ? error.message : t("common.ourSide");
+  if (!told || !error.message) return t("common.ourSide");
+  if (readsEnglish(t)) return error.message;
+  if (error.status >= 500) return t("errors.said.computer");
+  if (error.status === 404 || error.status === 410) return t("errors.said.gone");
+  return t(error.status === 409 ? "errors.said.conflict" : "errors.said.input");
+}
+
+/** The language the person's words come from is English: a plain `t` with no details is one a test made. */
+function readsEnglish(t: TFunction) {
+  const line = (t as unknown as (key: string, o: object) => string | { usedLng?: string })("common.close", {
+    returnDetails: true,
+  });
+  return typeof line === "string" || !line.usedLng || line.usedLng.startsWith("en");
 }
 
 /**

@@ -17,8 +17,9 @@ import {
   updateIssue,
   type WorkActor,
 } from "./issues";
-import { listMembers } from "./organizations";
+import { can, getMembership, listMembers } from "./organizations";
 import { chosenAudience, visibleToField } from "./requester";
+import { isRightHand, rightHandAway, rightHandReader } from "./right-hand";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 
@@ -41,6 +42,8 @@ const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
 });
+/** The right hand's tasks are its person's, in their DM (ADR 0137 §13): in a channel, others read the reply. */
+const ONLY_IN_DM: ToolOutput = { content: "Tasks only in your private conversation with a person.", isError: true };
 
 /** Who each assignee is, as the agent can name them: "@ada (you)", "Walter (@walter)". */
 async function assigneeNames(deps: IssueDeps, ctx: ToolContext, list: IssueView[]) {
@@ -64,7 +67,7 @@ async function assigneeNames(deps: IssueDeps, ctx: ToolContext, list: IssueView[
 const line = (i: IssueView, names: Map<string, string>) =>
   `#${i.number} [${i.status}] ${i.title}${
     i.assignee ? ` (assignee: ${names.get(i.assignee.id) ?? `${i.assignee.type} ${i.assignee.id}`})` : ""
-  } id=${i.id}`;
+  }${i.dueDate ? ` due ${i.dueDate}` : ""} id=${i.id}`;
 
 /** One issue's line with its assignee's name. */
 const lineOf = async (deps: IssueDeps, ctx: ToolContext, i: IssueView) => line(i, await assigneeNames(deps, ctx, [i]));
@@ -169,6 +172,28 @@ const assigneeField = {
 const STATUSES = ["todo", "in_progress", "in_review", "done", "canceled"];
 const PRIORITIES = ["low", "normal", "high"];
 
+/**
+ * Why the right hand can't make this task for `person` (ADR 0137 §13): it acts as them, so not what they couldn't, it
+ * does no work of its own, and it reaches nobody else: who sees the task is theirs to widen, on the task.
+ */
+async function rightHandTaskRefusal(
+  deps: IssueDeps,
+  ctx: ToolContext,
+  person: string,
+  assignee: WorkActor | null | undefined,
+  visibleTo: unknown,
+) {
+  if (!can(await getMembership(deps.db, person, ctx.orgId), "post")) return "This person can't make tasks.";
+  if (visibleTo === "everyone")
+    return "A task you make stays with the person who asked: they open it to others on the task.";
+  if (assignee?.type !== "agent") return null;
+  const [agent] = await deps.db
+    .select({ builtin: schema.agents.builtin })
+    .from(schema.agents)
+    .where(eq(schema.agents.id, assignee.id));
+  return isRightHand(agent) ? "You do no hands-on work: assign it to the agent whose job it is." : null;
+}
+
 /** What the agent tells the person after making a task: they change it on the task, in one click. */
 function whoSees(i: IssueView, nameable: boolean) {
   const { mode, channelId, userIds } = i.audience;
@@ -206,13 +231,20 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
       },
       async execute(input, ctx) {
         try {
+          if (await rightHandAway(ctx)) return ONLY_IN_DM;
           if (str(input.issue))
             return { content: await describeIssue(deps, ctx, await find(deps, ctx, str(input.issue))) };
-          const list = await listIssues(deps.db, actorOf(ctx), ctx.orgId, {
-            q: str(input.query) || undefined,
-            status: (input.status as IssueStatus | undefined) ?? undefined,
-            limit: 30,
-          });
+          const reader = await rightHandReader(ctx);
+          const list = await listIssues(
+            deps.db,
+            reader ? { type: "person", userId: reader } : actorOf(ctx),
+            ctx.orgId,
+            {
+              q: str(input.query) || undefined,
+              status: (input.status as IssueStatus | undefined) ?? undefined,
+              limit: 30,
+            },
+          );
           const names = await assigneeNames(deps, ctx, list);
           return { content: list.length ? list.map((i) => line(i, names)).join("\n") : "No issues." };
         } catch (error) {
@@ -243,7 +275,13 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
       },
       async execute(input, ctx) {
         try {
+          if (await rightHandAway(ctx)) return ONLY_IN_DM;
           const assignee = str(input.assignee) ? await assigneeOf(deps, ctx, str(input.assignee)) : undefined;
+          const reader = await rightHandReader(ctx);
+          if (reader) {
+            const refused = await rightHandTaskRefusal(deps, ctx, reader, assignee, input.visible_to);
+            if (refused) return { content: refused, isError: true };
+          }
           const audience = await chosenAudience(ctx, input.visible_to);
           const i = await actWithUndo(
             ctx,

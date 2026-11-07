@@ -260,7 +260,8 @@ export const TurnRow = memo(function TurnRow({
         <View style={[styles.body, { gap: rhythm.part }]}>
           <View>
             <View style={styles.who}>
-              {!bubbled || look.names ? (
+              {/* A DM drops the name only where a bubble stands under it, as on a saved row. */}
+              {!bubbled || look.names || !(said || run.text) ? (
                 <Text
                   variant="footnote"
                   tone="ink2"
@@ -474,7 +475,7 @@ export function WorkingLine({
   if (entries.length === 0) return null;
   // The one agent it speaks for with its row out of view; a question it asks keeps its own phrase.
   const away = awayRun(entries, runs, rowInView);
-  const step = away && lead && !lead.consult ? barStep(t, away, i18n.language) : null;
+  const step = away && lead && !lead.consult ? barStep(t, away, i18n.language, now) : null;
   const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
   const took = away ? barElapsed(t, entries, runs, now) : null;
   // Who types beside that agent, after its time ("· Marina digitando…"): the names give way first, never what they do.

@@ -268,6 +268,10 @@ test.skipIf(!posix)(
     expect(events.filter((e) => e.type === "tool_call").map((e) => (e as { name: string }).name)).toEqual([
       "run_terminal_command",
     ]);
+    // Its own call is told as it starts (the step line); the bridge's says its own.
+    expect(events.filter((e) => e.type === "tool_started").map((e) => (e as { name: string }).name)).toEqual([
+      "run_terminal_command",
+    ]);
     expect(events.find((e) => e.type === "usage")).toMatchObject({
       source: "plan",
       input: 1000,

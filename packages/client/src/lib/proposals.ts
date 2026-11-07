@@ -30,6 +30,15 @@ export function messageProposalCards(meta: Record<string, unknown> | null | unde
   return cards.length || typeof meta?.proposalId !== "string" ? cards : [[meta.proposalId]];
 }
 
+/** What waits on an agent's page: its instructions and the skills it asked to change, both decided from there. */
+export const pendingOnAgent = <P extends Pick<Proposal, "agentId" | "status" | "target">>(list: P[], agentId: string) =>
+  list.filter(
+    (p) =>
+      p.agentId === agentId &&
+      p.status === "pending" &&
+      (p.target.type === "agent_instructions" || p.target.type === "skill"),
+  );
+
 /** The agent that proposed it (older servers: the agent it changes). */
 export const proposerOf = (p: Pick<Proposal, "agentId" | "proposedByAgentId">) => p.proposedByAgentId || p.agentId;
 
@@ -243,6 +252,16 @@ export interface SettingNames {
   role: (roleId: string) => string | undefined;
 }
 
+/** A look in words, in the person's language; a custom color reads as its code. */
+function lookWords(t: TFunction, value: unknown) {
+  const v = (value ?? {}) as { color?: string; eyes?: string; accessory?: string };
+  if (!v.color) return t("rightHand.value.lookDefault");
+  const tt = t as unknown as (key: string) => string;
+  const color = v.color.startsWith("#") ? v.color : tt(`look.colors.${v.color}`);
+  const accessory = v.accessory && v.accessory !== "none" ? tt(`look.accessories.${v.accessory}`) : null;
+  return [color, tt(`look.eyesNames.${v.eyes}`), accessory].filter(Boolean).join(" · ");
+}
+
 /**
  * One line of the right hand's settings card (ADR 0137) in the person's language: what it changes ("Modelo",
  * "#suporte") and the value then and proposed ("Haiku 4.5" → "Sonnet 4.5"). A seat in a channel reads as how the
@@ -272,6 +291,10 @@ export function settingLineText(
         const roles = (a.roleIds ?? []).map((id) => names.role(id)).filter((r): r is string => Boolean(r));
         return roles.length ? roles.join(", ") : (label ?? t("rightHand.value.somePeople"));
       }
+      case "name":
+        return typeof v === "string" ? v : t("rightHand.value.none");
+      case "look":
+        return lookWords(t, v);
       case "archive":
         return v === true ? t("rightHand.value.archived") : t("rightHand.value.active");
       case "delete":

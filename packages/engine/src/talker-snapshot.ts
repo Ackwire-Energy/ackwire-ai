@@ -49,13 +49,13 @@ export interface TalkerSnapshot {
   message: { from: string; text: string };
 }
 
-const ago = (now: Date, at: Date) => {
+export const ago = (now: Date, at: Date) => {
   const s = Math.max(0, Math.round((now.getTime() - at.getTime()) / 1000));
   return s < 90 ? `${s}s ago` : `${Math.round(s / 60)} min ago`;
 };
 
 /** A run step as one line (null: nothing worth telling). */
-function stepLine(kind: string, data: Record<string, unknown>): string | null {
+export function stepLine(kind: string, data: Record<string, unknown>): string | null {
   const name = typeof data.name === "string" ? data.name : "a tool";
   switch (kind) {
     case "model_call":

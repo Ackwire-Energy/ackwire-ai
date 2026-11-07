@@ -530,6 +530,46 @@ test("a task's end in a thread names its computer only where the workspace has m
   expect(await latest()).toBe(`Task "Run the tests" finished on ${computer} after 2 min.`);
 });
 
+test("in a DM, a reminder and a routine's report reach the person, in their own words", async () => {
+  f = await setup();
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  const say = async (body: string, meta: Record<string, unknown>) => {
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: dm.id,
+      threadId: null,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
+      body,
+      meta,
+    });
+    await drainOutbox(f.db, f.handlers);
+  };
+  const routine = { id: "00000000-0000-4000-8000-000000000002", name: "Bom dia", runId: "r" };
+  await say("Reminder: call the bank", { reminderText: "call the bank", reminder: true, routine });
+  await say("Good morning!", { routine });
+  const dms = (await inbox(f.owner.id)).items.filter((n) => n.kind === "dm");
+  expect(dms.map((n) => n.latest.text).sort()).toEqual(["Good morning!", "call the bank"]);
+  // The agent's replies in a DM are still the conversation itself.
+  await say("Just talking", {});
+  expect((await inbox(f.owner.id)).items.filter((n) => n.kind === "dm").length).toBe(2);
+});
+
+test("a body the server wrote keeps its code: the apps say it in the reader's language, never the push", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const m = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    threadId: null,
+    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
+    body: `@bia I can't answer now: the plan I think with reached its limit.`,
+    meta: { bodyCode: "no_ai", noAi: { reason: "plan_limit" } },
+  });
+  await notifyMessage(deps(), f.org.id, m.id);
+  const row = (await inbox(bia.id)).items.find((n) => n.kind === "mention");
+  expect(row?.latest.meta).toMatchObject({ bodyCode: "no_ai", noAi: { reason: "plan_limit" } });
+});
+
 test("snippets are plain text and at most 280 characters", () => {
   expect(notificationSnippet("**Bold** and [a link](https://x.y) in `code`\n\n```ts\nconst a = 1\n```")).toBe(
     "Bold and a link in code const a = 1",

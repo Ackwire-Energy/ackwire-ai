@@ -1,6 +1,7 @@
-import { afterEach, expect, setSystemTime, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
+import { autoPlanModel, CODING_PLANS, learnPlanModels } from "@agenteschat/providers/plans";
 import {
   addChannelMember,
   archiveAgent,
@@ -38,6 +39,7 @@ import {
   storeOwnUsage as reportOwnUsage,
   resumeBudgetWaits,
   runRoutineNow,
+  setAgentBrain,
   stopRun,
   storedPlanLimit,
   updateAgent,
@@ -1718,6 +1720,167 @@ test("a model that needs the Global region waits with no reset time and says wha
   expect((await accountUsage(f, accountId))?.models?.["deepseek-v4.1-flash"]).toMatchObject({ region: true });
 });
 
+describe("a refusal the CLI didn't call a limit", () => {
+  const reading = (): PlanUsage => ({
+    windows: [{ kind: "five_hour", usedPercent: 0, resetsAt: later(5 * 3600_000).toISOString() }],
+    source: "probe",
+    at: new Date().toISOString(),
+  });
+  const REFUSED = "API Error: 403 Model not allowed in this workspace's region";
+
+  test("on a model that needs the Global region, it says what to turn on", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "deepseek-v4-pro", reading());
+    const { brain } = scripted(() => [{ type: "error", code: "claude_failed", message: REFUSED }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    const [run] = await runs(f);
+    expect(waitOf(run)).toMatchObject({ scope: "region", model: "deepseek-v4-pro" });
+    const [note] = await notes(f, "plan_model_region_wait");
+    expect(note?.meta.bodyParams).toMatchObject({ model: "DeepSeek V4 Pro" });
+    expect((await accountUsage(f, accountId))?.models?.["deepseek-v4-pro"]).toMatchObject({ region: true });
+  });
+
+  test("on a model the setting can't open (Beam: some countries only), it stays the failure it was", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "beam-free", reading());
+    const { brain } = scripted(() => [{ type: "error", code: "claude_failed", message: REFUSED }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(waitOf((await runs(f))[0])).toBeUndefined();
+    expect(await notes(f, "plan_model_region_wait")).toEqual([]);
+    expect((await accountUsage(f, accountId))?.models).toBeUndefined();
+  });
+
+  test("after the turn worked, the word in a command's error parks nothing", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "deepseek-v4-pro", reading());
+    const { brain } = scripted(() => [
+      {
+        type: "tool_call",
+        id: "t1",
+        name: "Bash",
+        input: { command: "aws s3 ls" },
+        executed: { content: "ok" },
+      },
+      { type: "error", code: "claude_failed", message: "Claude Code ended without an answer (exit 1): bad region" },
+    ]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(waitOf((await runs(f))[0])).toBeUndefined();
+    expect((await accountUsage(f, accountId))?.models).toBeUndefined();
+  });
+});
+
+describe("a model OpenCode refuses for the key (a 403: the model or the account switched off there)", () => {
+  const reading = (answered?: string): PlanUsage => ({
+    windows: [{ kind: "five_hour", usedPercent: 0, resetsAt: later(5 * 3600_000).toISOString() }],
+    source: "probe",
+    at: new Date().toISOString(),
+    ...(answered ? { answered } : {}),
+  });
+  const FORBIDDEN =
+    'API Error: 403 {"type":"error","error":{"type":"permission_error","message":"Model access is disabled"}}';
+  // OpenCode Go's words when the key's account has no active Go subscription (public reports, 2026-09).
+  const INACTIVE =
+    'API Error: 403 {"type":"error","error":{"type":"Account.Disabled","message":"An active OpenCode Go subscription is required to use Go models."}}';
+
+  test("a model chosen for the agent: that model waits, says which and what to do, and the key stays signed in", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { machineId, accountId } = await goAgent(f, "glm-5.3", reading());
+    const { brain } = scripted(() => [{ type: "error", code: "claude_failed", message: FORBIDDEN }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    const [run] = await runs(f);
+    expect(waitOf(run)).toMatchObject({ scope: "off", model: "glm-5.3" });
+    expect(waitOf(run)?.resetsAt).toBeUndefined();
+    const [note] = await notes(f, "plan_model_off_wait");
+    expect(note?.meta.bodyParams).toMatchObject({ model: "GLM-5.3", agent: f.agent.name });
+    const usage = await accountUsage(f, accountId);
+    expect(usage?.models?.["glm-5.3"]).toMatchObject({ off: true });
+    const [row] = await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, accountId));
+    expect(row?.status).toBe("active");
+    const account = { id: accountId, label: "Plano Go", status: "active" as const, provider: "opencode" };
+    const status = { ...statusOf(machineId), protocol: MACHINE_PROTOCOL_VERSION };
+    expect(
+      computerBrainUnavailable("claude_code", machineId, status, Date.now(), account, true, usage, "glm-5.3"),
+    ).toMatchObject({ code: "plan_limit", scope: "off" });
+    expect(
+      computerBrainUnavailable(
+        "claude_code",
+        machineId,
+        status,
+        Date.now(),
+        account,
+        true,
+        usage,
+        "deepseek-v4.1-flash",
+      ),
+    ).toBeNull();
+  });
+
+  test("Automático: the turn goes again at once on the model that last answered with the key, and later runs start there", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "auto", reading("deepseek-v4.1-flash"));
+    const { brain, seen } = scripted((n) =>
+      n === 0 ? [{ type: "error", code: "claude_failed", message: FORBIDDEN }] : [{ type: "done", text: "feito" }],
+    );
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(seen.map((t) => t.model)).toEqual(["sonnet", "deepseek-v4.1-flash"]);
+    const [run] = await runs(f);
+    expect(run?.status).toBe("done");
+    expect(await notes(f, "plan_model_off_wait")).toEqual([]);
+    const usage = await accountUsage(f, accountId);
+    expect(usage?.models?.["minimax-m3"]).toMatchObject({ off: true });
+    expect(usage?.answered).toBe("deepseek-v4.1-flash");
+    // While MiniMax M3 is held, the next run starts on the model that answers.
+    await post(f, "@dev e agora?");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(seen.at(-1)?.model).toBe("deepseek-v4.1-flash");
+  });
+
+  test("Automático with no model known to answer: it waits naming the model refused", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    await goAgent(f, "auto", reading());
+    const { brain, seen } = scripted(() => [{ type: "error", code: "claude_failed", message: FORBIDDEN }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(seen).toHaveLength(1);
+    expect(waitOf((await runs(f))[0])).toMatchObject({ scope: "off" });
+    const [note] = await notes(f, "plan_model_off_wait");
+    expect(note?.meta.bodyParams).toMatchObject({ model: "MiniMax M3" });
+  });
+
+  test("no active Go subscription: the account's words, no stand-in that would be refused too, the key signed in", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "auto", reading("deepseek-v4.1-flash"));
+    const { brain, seen } = scripted(() => [{ type: "error", code: "claude_failed", message: INACTIVE }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(seen).toHaveLength(1);
+    const [run] = await runs(f);
+    expect(waitOf(run)).toMatchObject({ scope: "inactive" });
+    expect(waitOf(run)?.resetsAt).toBeUndefined();
+    expect(await notes(f, "plan_model_off_wait")).toEqual([]);
+    expect(await notes(f, "plan_inactive_wait")).toHaveLength(1);
+    const usage = await accountUsage(f, accountId);
+    expect(usage?.models?.["minimax-m3"]).toMatchObject({ inactive: true });
+    expect(autoPlanModel("opencode", "sonnet", usage)).toBe("sonnet");
+    const [row] = await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, accountId));
+    expect(row?.status).toBe("active");
+  });
+
+  test("a turn that goes through keeps its model as the one that answers with the key", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    const { accountId } = await goAgent(f, "deepseek-v4.1-flash", reading());
+    const { brain } = scripted(() => [{ type: "done", text: "feito" }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect((await accountUsage(f, accountId))?.answered).toBe("deepseek-v4.1-flash");
+  });
+});
+
 test("a full window of the OpenCode Go account is still the account's limit", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   const reset = later(2 * 3600_000).toISOString();
@@ -1806,4 +1969,54 @@ test("a wait woken into the same limit backs off to its own reset, with no new n
   expect(await wakePlanWaits(f.db, f.org.id, key, model, Date.now() + REPARK_STEADY_MS + 1000)).toEqual([
     first?.id ?? "",
   ]);
+});
+
+describe("a model its plan's live list dropped", () => {
+  const table = CODING_PLANS.opencode.claudeCode.models;
+  afterEach(() => learnPlanModels({ opencode: table }));
+  const reading = (): PlanUsage => ({
+    windows: [{ kind: "five_hour", usedPercent: 0, resetsAt: later(5 * 3600_000).toISOString() }],
+    source: "probe",
+    at: new Date().toISOString(),
+  });
+  const dropped = (fx: Fixture) =>
+    fx.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "plan_model_dropped"));
+
+  test("its owner hears it once, with the model and what runs now, until another model is chosen", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    await goAgent(f, "hy3", reading());
+    await f.db.update(schema.agents).set({ ownerUserId: f.owner.id }).where(eq(schema.agents.id, f.agent.id));
+    learnPlanModels({ opencode: table.filter((m) => m.id !== "hy3") });
+    const { brain, seen } = scripted(() => [{ type: "done", text: "oi" }]);
+    for (const body of ["@dev oi", "@dev de novo"]) {
+      await post(f, body);
+      await drainOutbox(f.db, accountHandlers(f, brain));
+    }
+    expect(seen.map((turn) => turn.model)).toEqual(["sonnet", "sonnet"]);
+    const rows = await dropped(f);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      userId: f.owner.id,
+      doneAt: null,
+      waiting: false,
+      actors: [{ type: "agent", id: f.agent.id }],
+      source: { agentId: f.agent.id, label: f.agent.name },
+      latest: { title: "Hy3", plan: "OpenCode Go", nowModel: "MiniMax M3" },
+    });
+    expect(noticeCategoryOf("plan_model_dropped", false)).toBeNull();
+
+    await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { model: "sonnet" });
+    expect((await dropped(f))[0]?.doneAt).not.toBeNull();
+  });
+
+  test("a model still on the list, or an alias, says nothing", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    await goAgent(f, "hy3", reading());
+    await f.db.update(schema.agents).set({ ownerUserId: f.owner.id }).where(eq(schema.agents.id, f.agent.id));
+    const { brain, seen } = scripted(() => [{ type: "done", text: "oi" }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(seen.map((turn) => turn.model)).toEqual(["hy3"]);
+    expect(await dropped(f)).toEqual([]);
+  });
 });

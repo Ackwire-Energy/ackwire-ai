@@ -33,7 +33,7 @@
   overflow-wrap: anywhere;
 }
 .who-sees__note {
-  margin: var(--space-3) 0 0;
+  margin: 0;
 }
 .who-sees__grow {
   flex: 1;

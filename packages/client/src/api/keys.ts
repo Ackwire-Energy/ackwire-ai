@@ -168,6 +168,7 @@ export const keys = {
   threadInfo: (orgId: string, threadId: string) => ["org", orgId, "threads", "one", threadId] as const,
   /** How many threads I follow have an unread reply (the Threads entry's mark). */
   unreadThreads: (orgId: string) => ["org", orgId, "threads", "unread"] as const,
+  unreadTasks: (orgId: string) => ["org", orgId, "issues", "unread"] as const,
   channelThreads: (orgId: string, channelId: string, tab: string) =>
     ["org", orgId, "threads", "channel", channelId, tab] as const,
   /** The messages of a thread's context range (another channel's, or this one's). */
@@ -184,6 +185,7 @@ export const keys = {
   routines: (orgId: string) => ["org", orgId, "routines"] as const,
   routineRuns: (orgId: string, id: string) => ["org", orgId, "routines", "runs", id] as const,
   routineHook: (orgId: string, id: string) => ["org", orgId, "routines", "hook", id] as const,
+  webhookSetup: (orgId: string, provider: string) => ["org", orgId, "routines", "webhook", provider] as const,
   calendar: (orgId: string) => ["org", orgId, "calendar"] as const,
   calendarRange: (orgId: string, from: string) => ["org", orgId, "calendar", from] as const,
   artifactList: (orgId: string, filters: object) => ["org", orgId, "artifacts", "list", filters] as const,
@@ -212,6 +214,7 @@ export const keys = {
   wikiHistory: (orgId: string, slug: string) => ["org", orgId, "wiki", "history", slug] as const,
   wikiGraph: (orgId: string) => ["org", orgId, "wiki", "graph"] as const,
   wikiReads: (orgId: string) => ["org", orgId, "wiki", "reads"] as const,
+  wikiTrash: (orgId: string) => ["org", orgId, "wiki", "trash"] as const,
   pins: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "pins"] as const,
   /** Every GIF search (prefix): the workspace's rating or its GIFs switch changing refreshes them all (ADR 0091). */
   gifs: (orgId: string) => ["org", orgId, "gifs"] as const,

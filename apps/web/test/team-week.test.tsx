@@ -77,7 +77,10 @@ test("the week's card: its numbers, what worked, a row per fix and the schedule;
   expect(group.textContent).toContain("trabalhos em #");
   expect(group.textContent).toContain("Os passos #12, #13 e #14 estão parados há 4 h esperando o #11.");
   expect(group.textContent).toContain("Toda sexta às 17:00");
-  expect(document.body.textContent).toContain("Como foi a semana do time");
+  // Its week is the message's words, in a bubble in a DM, with the card under them: never a line of the card's own.
+  const week = screen.getAllByRole("article").find((a) => a.contains(group)) as HTMLElement;
+  expect(week.querySelector(".ac-msg__text")?.textContent).toContain("Como foi a semana do time");
+  expect(group.textContent).not.toContain("Como foi a semana do time");
 
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Criar rotina" }));

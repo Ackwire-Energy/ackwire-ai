@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { channelTopic, createMemoryPubSub, type RealtimeEvent } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
+  addChannelMember,
   consolidateItem,
   createAgent,
   createJobHandlers,
@@ -419,20 +420,37 @@ describe("memory changes on request", () => {
     ]);
   });
 
-  test("instructions are never edited directly: a proposal is shown inline and the owner accepts it", async () => {
-    f = await setup({
-      contextTools: true,
-      reply: memoryModel((text) =>
-        text.includes("sempre")
-          ? {
-              name: "propose_instruction_change",
-              input: { target: "my_instructions", change: "Sempre responda em português." },
-            }
-          : null,
-      ),
-    });
+  const instructionsModel = () =>
+    memoryModel((text) =>
+      text.includes("sempre")
+        ? {
+            name: "propose_instruction_change",
+            input: { target: "my_instructions", change: "Sempre responda em português." },
+          }
+        : null,
+    );
+
+  test("who may decide asks in their own words: the instructions change at once, with Undo on the reply", async () => {
+    f = await setup({ contextTools: true, reply: instructionsModel() });
     const events = f.listen(f.general.id);
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev daqui pra frente sempre responda em português",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(events.find((e) => e.type === "memory.updated")).toBeUndefined();
+    const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    expect(agent?.instructions).toContain("- Sempre responda em português.");
+    const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.agentId, f.agent.id));
+    expect(receipt).toMatchObject({ kind: "agent.settings_changed", requestedByUserId: f.owner.id });
+    expect(receipt?.messageId).not.toBeNull();
+  });
+
+  test("who can't decide gets a proposal inline, and the owner accepts it", async () => {
+    f = await setup({ contextTools: true, reply: instructionsModel() });
+    const member = await addMember(f.db, f.org.id, "member");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: member.id });
+    const events = f.listen(f.general.id);
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, member.id, f.org.id, f.general.id, {
       body: "@dev daqui pra frente sempre responda em português",
     });
     await drainOutbox(f.db, f.handlers);
@@ -441,7 +459,7 @@ describe("memory changes on request", () => {
         update: { proposalId: string; canDecide: boolean; undo?: unknown };
       }
     ).update;
-    expect(update).toMatchObject({ canDecide: true });
+    expect(update).toMatchObject({ canDecide: false });
     expect(update.undo).toBeUndefined();
     const [agentBefore] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
     expect(agentBefore?.instructions).toBe("Answer briefly.");

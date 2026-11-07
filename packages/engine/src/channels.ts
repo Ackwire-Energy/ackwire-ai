@@ -42,6 +42,7 @@ import {
   resolvePermissions,
 } from "./permissions";
 import { refuseRightHand } from "./right-hand";
+import { isRoutineRoomKey } from "./routine-brief";
 import { accountInUse, closedRefusal, STANDING_COLUMNS } from "./standing";
 import { adminChannelSql, channelReaderSql, channelReadersSql, taskReaderSql } from "./task-access";
 
@@ -498,6 +499,40 @@ export async function peopleAllIn(db: Executor, orgId: string, hereId: string, t
   return row?.ok === true;
 }
 
+/** Of `channelIds`, what a person reads (`readableChannelIds`), and public channels, which they may join at will. */
+export async function readsOrMayJoin(db: Database, orgId: string, userId: string, channelIds: readonly string[]) {
+  const reads = await readableChannelIds(db, orgId, userId, channelIds);
+  const open = channelIds.length
+    ? await db
+        .select({ id: channels.id })
+        .from(channels)
+        .where(
+          and(
+            eq(channels.orgId, orgId),
+            inArray(channels.id, [...new Set(channelIds)]),
+            eq(channels.kind, "channel"),
+            eq(channels.visibility, "public"),
+            isNull(channels.archivedAt),
+          ),
+        )
+    : [];
+  for (const c of open) reads.add(c.id);
+  return reads;
+}
+
+/**
+ * What the right hand reads for a person in their DM with it (ADR 0137 §13): `readsOrMayJoin` over the workspace, never
+ * a routine's room, which is its own runs' (`agentSearchChannels`).
+ */
+export async function personReach(db: Database, orgId: string, userId: string) {
+  const rows = await db
+    .select({ id: channels.id, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), isNull(channels.archivedAt), isNull(channels.deletedAt)));
+  const ids = rows.filter((c) => !isRoutineRoomKey(c.dmKey)).map((c) => c.id);
+  return [...(await readsOrMayJoin(db, orgId, userId, ids))];
+}
+
 /**
  * Which of `channelIds` a person reads, by the rule of `requireChannelAccess`: a member, an administrator in a channel,
  * or a task's reader; archived channels left out. For screens that quote a conversation outside it (run history).
@@ -862,6 +897,10 @@ export async function removeChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
+  if (self && channel.kind !== "channel") throw new ValidationError("Only a channel can be left", "channel.leave_kind");
+  // Every person joins #general with the workspace: it is how they all hear the same thing.
+  if (self && channel.name === "general")
+    throw new ValidationError("Everyone stays in #general", "channel.general_stays");
   if (!self && !(await managesChannel(db, membership, actorId, channel))) {
     if ("userId" in member)
       throw new ForbiddenError(
@@ -870,7 +909,7 @@ export async function removeChannelMember(
       );
     await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   }
-  await db
+  const gone = await db
     .delete(channelMembers)
     .where(
       and(
@@ -878,8 +917,18 @@ export async function removeChannelMember(
         eq(channelMembers.channelId, channelId),
         "userId" in member ? eq(channelMembers.userId, member.userId) : eq(channelMembers.agentId, member.agentId),
       ),
-    );
+    )
+    .returning({ channelId: channelMembers.channelId });
   caches.channelMembers.delete(`${orgId}:${channelId}`);
+  // The last person out of a private channel: nobody could reach it again, so it closes (its messages are kept).
+  if (self && gone.length > 0 && channel.visibility === "private" && !channel.archivedAt) {
+    const [stays] = await db
+      .select({ userId: channelMembers.userId })
+      .from(channelMembers)
+      .where(and(eq(channelMembers.channelId, channelId), isNotNull(channelMembers.userId)))
+      .limit(1);
+    if (!stays) await closeChannel(db, orgId, channelId, options);
+  }
   if ("userId" in member) {
     await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, [{ channelId, userId: member.userId }]);
     return;
@@ -917,6 +966,11 @@ export async function archiveChannel(
 ) {
   const channel = await archivableChannel(db, actorId, orgId, channelId);
   if (channel.name === "general") throw new ValidationError("#general can't be archived");
+  await closeChannel(db, orgId, channelId, options);
+}
+
+/** Takes a channel off everyone's list, at once for who has it open. */
+async function closeChannel(db: Database, orgId: string, channelId: string, options: { pubsub?: PubSub }) {
   await db.update(channels).set({ archivedAt: new Date() }).where(eq(channels.id, channelId));
   caches.channels.delete(`${orgId}:${channelId}`);
   await publishOrgEvent(options.pubsub, { type: "channel.archived", orgId, channelId });

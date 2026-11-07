@@ -166,7 +166,7 @@ describe("ask_user", () => {
     expect(systemText(request.system)).toContain("ambiguous after you have looked with your tools");
     // What not to ask about lives in the tool's own description, read beside the call, not twice in the prompt.
     expect(request.tools?.find((t) => t.name === "ask_user")?.description).toContain(
-      "Don't use it for what you can just do",
+      "Don't ask before what you can just do and undo",
     );
   });
 
@@ -189,6 +189,67 @@ describe("ask_user", () => {
     expect((await questions())[0]?.status).toBe("dismissed");
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.find((m) => m.id === q?.messageId)?.meta.question).toMatchObject({ dismissed: true, answer: null });
+  });
+
+  test("a long question is refused with what to do: the explanation goes above the card, which holds a short question", async () => {
+    const explanation =
+      "A política de privacidade já existe, então esse item não é mais bloqueio. Ainda faltam a classificação de conteúdo, o título, o ícone 512x512 e o AAB assinado. ".repeat(
+        3,
+      );
+    const why = "Preencher o Play Console muda o cadastro do app: a pessoa decide quando começo.";
+    f = await setup({
+      askUser: true,
+      reply: (req) => {
+        const last = lastText(req);
+        if (last.includes("this question is"))
+          return {
+            chunks: [explanation],
+            toolUses: [
+              {
+                name: "ask_user",
+                input: { why, question: "Posso começar a preencher o Play Console?", choices: ["Sim", "Ainda não"] },
+              },
+            ],
+          };
+        if (last.includes("tool_result")) return { chunks: ["Ok."] };
+        return {
+          chunks: [],
+          toolUses: [{ name: "ask_user", input: { why, question: `${explanation}Posso fazer isso agora?` } }],
+        };
+      },
+    });
+    await post("@dev o que falta para enviar o android pra review?");
+    await drainOutbox(f.db, f.handlers);
+
+    expect(lastText(f.provider.calls[1]?.request as ModelRequest)).toContain(
+      `this question is ${`${explanation}Posso fazer isso agora?`.trim().length} characters`,
+    );
+    const [q] = await questions();
+    expect(q).toMatchObject({ text: "Posso começar a preencher o Play Console?", choices: ["Sim", "Ainda não"] });
+    // The whole explanation reads first, as a message of its own; nothing of it is cut.
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual([
+      "@dev o que falta para enviar o android pra review?",
+      explanation.trim(),
+      "Posso começar a preencher o Play Console?",
+    ]);
+  });
+
+  test("a why longer than a card shows is refused, never cut", async () => {
+    f = await setup({
+      askUser: true,
+      reply: (req) =>
+        lastText(req).includes("tool_result")
+          ? { chunks: ["Ok."] }
+          : {
+              chunks: [],
+              toolUses: [{ name: "ask_user", input: { why: "x".repeat(1001), question: "Qual ambiente?" } }],
+            },
+    });
+    await post("@dev deploy it");
+    await drainOutbox(f.db, f.handlers);
+    expect(await questions()).toEqual([]);
+    expect(lastText(f.provider.calls[1]?.request as ModelRequest)).toContain("(at most 1000)");
   });
 
   test("with no answer in 24 hours the run goes on and the model is told", async () => {
