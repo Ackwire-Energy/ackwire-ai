@@ -181,6 +181,12 @@ html[data-pointer] :focus-visible {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* A glyph inside a line of words (after a name, in a sentence): its middle on the words' capitals' middle, as an inline
+   face's (`.ac-who > .ac-avatar`). An inline box sits on the baseline, which floats a glyph above the capitals.
+   `--glyph` is its size (`Icon inline` sets it). */
+.ac-icon--inline {
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - var(--glyph, 20px) / 2);
+}
 
 /*
  * A line of text led by an icon (or a mark, a spinner, a stack of logos): the lead's middle sits on the first line's
@@ -1031,6 +1037,17 @@ textarea.ac-input {
   object-fit: cover;
   border-radius: inherit;
 }
+/* The initials' box trimmed to their capitals, so the tile centres the letters the eye sees, not the line around them
+   (a line's room above and below the capitals differs, and its baseline lands on a whole pixel). Without text-box the
+   capitals' middle sits --cap-mid above the line's. */
+.ac-avatar__initials {
+  text-box: trim-both cap alphabetic;
+}
+@supports not (text-box: trim-both cap alphabetic) {
+  .ac-avatar__initials {
+    translate: 0 var(--cap-mid);
+  }
+}
 .ac-avatar--agent {
   background: var(--agent);
   color: var(--on-agent);
@@ -1716,10 +1733,12 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   line-height: 18px;
   color: var(--ink2);
 }
+/* The mark on the sentence's first line's capitals and the time on its baseline, however the sentence wraps: never
+   floating in the middle of two lines. */
 .ac-eventpill__main {
   display: inline-flex;
   flex: 1 1 auto;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--icon-gap);
   min-width: 0;
   padding: 6px 12px;
@@ -1728,12 +1747,21 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   display: inline-flex;
   flex: none;
   color: var(--faint);
+  /* Browsers without the lh unit: the frame's 18px line. */
+  translate: 0 calc(9px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-eventpill__mark {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .ac-eventpill__text {
+  align-self: baseline;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .ac-eventpill__time {
+  align-self: baseline;
   flex: none;
   font-size: 12px;
   color: var(--faint);

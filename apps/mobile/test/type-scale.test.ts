@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   CHROME_MAX_SCALE,
   countBadge,
+  initialText,
   leadBox,
   readingMiddle,
   type TypeStyle,
@@ -121,6 +122,19 @@ describe("count badge", () => {
       expect(text.includeFontPadding).toBe(false);
       expect(box).not.toHaveProperty("paddingLeft");
       expect(box).not.toHaveProperty("paddingTop");
+    }
+  });
+
+  test("a face's initial is one line the tile's height, centred both ways, as a count sits in its pill", () => {
+    for (const size of [24, 32, 40]) {
+      const text = initialText(size);
+      expect(text).toEqual({
+        fontSize: size * 0.42,
+        lineHeight: size,
+        includeFontPadding: false,
+        textAlign: "center",
+        textAlignVertical: "center",
+      });
     }
   });
 });
