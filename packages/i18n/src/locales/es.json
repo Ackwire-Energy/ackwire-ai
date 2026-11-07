@@ -3510,6 +3510,7 @@
     "failed": "No se pudo enviar la respuesta. Inténtalo de nuevo.",
     "withdrawn": "{{name}} ya no necesita una respuesta.",
     "withdrawn_female": "{{name}} ya no necesita una respuesta.",
+    "keysHint": "Presiona 1–{{count}} para responder",
     "skip": "Omitir",
     "skipFailed": "No se pudo omitir la pregunta. Inténtalo de nuevo.",
     "dismissed": "{{name}} omitió esta pregunta.",

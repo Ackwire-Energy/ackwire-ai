@@ -15,7 +15,7 @@ const last = (selector: string, property: string) =>
     .at(-1)?.[1];
 
 test("an agent's answer choices grow with their text and wrap: the island, the conversation's card, notifications", () => {
-  for (const choice of [".ni__choice", ".rq__foot > .ac-btn[data-choice]", ".nt-sug button"]) {
+  for (const choice of [".ni__choice", ".rq__choice", ".nt-sug button"]) {
     const own = declarations(css, choice);
     // A fixed height let a two-line choice spill over the next one.
     expect([choice, own.filter(([p, v]) => p === "height" && v !== "auto")]).toEqual([choice, []]);

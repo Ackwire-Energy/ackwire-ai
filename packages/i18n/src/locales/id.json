@@ -3295,6 +3295,7 @@
     "failed": "Jawaban tidak bisa dikirim. Coba lagi.",
     "withdrawn": "{{name}} tidak butuh jawaban lagi.",
     "withdrawn_female": "{{name}} tidak butuh jawaban lagi.",
+    "keysHint": "Tekan 1–{{count}} untuk menjawab",
     "skip": "Lewati",
     "skipFailed": "Tidak dapat melewati pertanyaan. Coba lagi.",
     "dismissed": "{{name}} melewati pertanyaan ini.",

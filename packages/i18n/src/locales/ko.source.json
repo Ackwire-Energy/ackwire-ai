@@ -8229,6 +8229,9 @@
   "question.withdrawn": {
     "value": "{{name}} no longer needs an answer."
   },
+  "question.keysHint": {
+    "value": "Press 1–{{count}} to answer"
+  },
   "question.skip": {
     "value": "Skip"
   },

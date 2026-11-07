@@ -3412,6 +3412,7 @@
     "closed": "Gesloten zonder antwoord.",
     "failed": "Kon het antwoord niet sturen. Probeer het opnieuw.",
     "withdrawn": "{{name}} heeft geen antwoord meer nodig.",
+    "keysHint": "Druk op 1–{{count}} om te antwoorden",
     "skip": "Overslaan",
     "skipFailed": "De vraag kon niet worden overgeslagen. Probeer het opnieuw.",
     "dismissed": "{{name}} heeft deze vraag overgeslagen.",

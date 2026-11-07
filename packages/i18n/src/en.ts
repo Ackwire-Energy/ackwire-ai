@@ -3466,6 +3466,8 @@ export const en = {
     failed: "Couldn't send the answer. Try again.",
     withdrawn: "{{name}} no longer needs an answer.",
     /** Closes the question without an answer: the agent goes on with its own judgement. */
+    /** Under a question's choices: their number keys answer it. */
+    keysHint: "Press 1–{{count}} to answer",
     skip: "Skip",
     skipFailed: "Couldn't skip the question. Try again.",
     dismissed: "{{name}} skipped this question.",

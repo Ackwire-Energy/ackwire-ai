@@ -3513,6 +3513,7 @@
     "failed": "Impossible d'envoyer la réponse. Réessayez.",
     "withdrawn": "{{name}} n'a plus besoin de réponse.",
     "withdrawn_female": "{{name}} n'a plus besoin de réponse.",
+    "keysHint": "Appuyez sur 1–{{count}} pour répondre",
     "skip": "Passer",
     "skipFailed": "Impossible de passer la question. Réessayez.",
     "dismissed": "{{name}} a passé cette question.",

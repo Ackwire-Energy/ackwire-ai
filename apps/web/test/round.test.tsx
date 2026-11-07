@@ -459,6 +459,53 @@ describe("agent questions (ask_user)", () => {
     ]);
   });
 
+  test("the choices are a list, one a line with its number key; with the focus in it, a number answers", async () => {
+    const state = seedState();
+    const question = {
+      id: "q-keys",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      threadId: null,
+      messageId: "msg-keys",
+      text: "Para qual faixa a versão 8 deve ir?",
+      choices: ["Teste fechado", "Teste aberto", "Produção"],
+      status: "open",
+      answer: null,
+      answeredByUserId: null,
+    };
+    state.messages.push({
+      id: "msg-keys",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-keys",
+      meta: { question },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    await settle();
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    const list = card.querySelector(".rq__choices") as HTMLElement;
+    // Each choice its key and words; "Outra resposta" the list's last line; the footer says the keys.
+    expect([...list.querySelectorAll(".rq__choice")].map((b) => b.textContent)).toEqual([
+      "1Teste fechado",
+      "2Teste aberto",
+      "3Produção",
+      "Outra resposta",
+    ]);
+    expect(card.querySelector(".rq__foot .rq__keys")?.textContent).toBe("Tecle 1–3 para responder");
+    within(list).getByRole("button", { name: "Teste fechado" }).focus();
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "2" });
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
+      ORG_ID,
+      "q-keys",
+      { choice: "Teste aberto" },
+    ]);
+  });
+
   test("'Responder' on a question without choices opens a field; its text answers the question", async () => {
     const state = seedState();
     const question = {

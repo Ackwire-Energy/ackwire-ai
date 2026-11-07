@@ -3463,6 +3463,7 @@ export const ptBR = {
     withdrawn: "O {{name}} não precisa mais da resposta.",
     withdrawn_female: "A {{name}} não precisa mais da resposta.",
     failed: "Não foi possível enviar a resposta. Tente de novo.",
+    keysHint: "Tecle 1–{{count}} para responder",
     skip: "Pular",
     skipFailed: "Não foi possível pular a pergunta. Tente de novo.",
     dismissed: "{{name}} pulou esta pergunta.",

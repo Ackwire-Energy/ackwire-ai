@@ -47,6 +47,7 @@ import {
   Icon,
   Input,
   MessageText,
+  Spinner,
   Switch,
   Textarea,
 } from "@agenteschat/ui";
@@ -555,10 +556,27 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
   );
 }
 
+/** Number keys answer a question's choices while the focus is in their list (never while typing elsewhere). */
+function choiceKeys(pick: (index: number) => void) {
+  return (list: HTMLElement | null) => {
+    if (!list) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || !/^[1-9]$/.test(e.key)) return;
+      e.preventDefault();
+      pick(Number(e.key) - 1);
+    };
+    list.addEventListener("keydown", onKey);
+    return () => list.removeEventListener("keydown", onKey);
+  };
+}
+
+/** The keys a question's list answers with: one to nine. */
+const CHOICE_KEYS = 9;
+
 /**
  * An agent's question (`ask_user`): neutral card in the thread with the
- * choices as buttons, and "Responder" (or "Outra resposta") opening a field in
- * the card. The field answers this question wherever the card shows (a thread
+ * choices as a list, one a line with its number key, and "Outra resposta" (or
+ * "Responder" without choices) opening a field in the card. The field answers this question wherever the card shows (a thread
  * in the panel, a consultation, a channel whose composer posts elsewhere), so
  * it never depends on which composer is on screen.
  */
@@ -603,17 +621,42 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
-  // Open: a request card, the choices in its footer and "Outra resposta" opening a field to write one.
+  // Open: a request card, the choices a list in its body, each with its number key, and "Outra resposta" the list's
+  // last line, opening a field to write one.
   if (!done) {
     const choices = current.choices ?? [];
     const send = () => {
       if (text.trim() && !busy) answer.mutate({ text: text.trim() });
     };
+    const pick = (choice: string | undefined) => {
+      if (choice !== undefined && !busy) answer.mutate({ choice });
+    };
+    const picking = (choice: string) =>
+      answer.isPending && "choice" in answer.variables && answer.variables.choice === choice;
     const errorLine = error ? (
       <p className="rq__error" role="alert">
         {error}
       </p>
     ) : null;
+    const field = writing && (
+      <div className="rq__field">
+        <Textarea
+          rows={2}
+          autoGrow
+          autoFocus
+          value={text}
+          placeholder={t("question.placeholder")}
+          aria-label={t("question.placeholder")}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              send();
+            }
+          }}
+        />
+      </div>
+    );
     return (
       <RequestCard
         id={question.id}
@@ -623,82 +666,87 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         mine
         lead={current.text}
         body={
-          writing ? (
+          choices.length > 0 || field || errorLine ? (
             <>
-              <div className="rq__field">
-                <Textarea
-                  rows={2}
-                  autoGrow
-                  autoFocus
-                  value={text}
-                  placeholder={t("question.placeholder")}
-                  aria-label={t("question.placeholder")}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                      e.preventDefault();
-                      send();
-                    }
-                  }}
-                />
-              </div>
+              {choices.length > 0 && (
+                <ul className="rq__choices" ref={choiceKeys((i) => pick(choices[i]))}>
+                  {choices.map((choice, i) => (
+                    <li key={choice}>
+                      <button
+                        type="button"
+                        className="rq__choice"
+                        data-choice=""
+                        disabled={busy}
+                        aria-busy={picking(choice) || undefined}
+                        onClick={() => pick(choice)}
+                      >
+                        {i < CHOICE_KEYS && (
+                          <span className="rq__key" aria-hidden="true">
+                            {i + 1}
+                          </span>
+                        )}
+                        <span className="rq__choice-text">{choice}</span>
+                        {picking(choice) && <Spinner size={14} />}
+                      </button>
+                    </li>
+                  ))}
+                  {!writing && (
+                    <li>
+                      <button
+                        ref={reopen}
+                        type="button"
+                        className="rq__choice rq__choice--other"
+                        disabled={busy}
+                        onClick={() => setWriting(true)}
+                      >
+                        <span className="rq__key" aria-hidden="true">
+                          <Icon name="edit" size={14} />
+                        </span>
+                        <span className="rq__choice-text">{t("ask.otherAnswer")}</span>
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
+              {field}
               {errorLine}
             </>
-          ) : (
-            (errorLine ?? undefined)
-          )
+          ) : undefined
         }
         actions={
-          <>
-            {choices.map((choice) => (
+          writing ? (
+            <>
               <Button
-                key={choice}
+                type="submit"
+                variant="primary"
                 size="sm"
-                data-choice=""
+                disabled={!text.trim() || skip.isPending || (answer.isPending && !("text" in answer.variables))}
+                loading={answer.isPending && "text" in answer.variables}
+              >
+                {t("channel.send")}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 disabled={busy}
-                loading={answer.isPending && "choice" in answer.variables && answer.variables.choice === choice}
-                onClick={() => answer.mutate({ choice })}
+                onClick={() => {
+                  setWriting(false);
+                  setText("");
+                  setError(null);
+                  // The button leaves with the field: focus goes back to the one that opened it.
+                  requestAnimationFrame(() => reopen.current?.focus());
+                }}
               >
-                {choice}
+                {t("common.cancel")}
               </Button>
-            ))}
-            {writing ? (
-              <>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  disabled={!text.trim() || skip.isPending || (answer.isPending && !("text" in answer.variables))}
-                  loading={answer.isPending && "text" in answer.variables}
-                >
-                  {t("channel.send")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => {
-                    setWriting(false);
-                    setText("");
-                    setError(null);
-                    // The button leaves with the field: focus goes back to the one that opened it.
-                    requestAnimationFrame(() => reopen.current?.focus());
-                  }}
-                >
-                  {t("common.cancel")}
-                </Button>
-              </>
-            ) : (
-              <Button
-                ref={reopen}
-                variant={choices.length > 0 ? "ghost" : "primary"}
-                size="sm"
-                onClick={() => setWriting(true)}
-              >
-                {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
-              </Button>
-            )}
-          </>
+            </>
+          ) : choices.length > 1 ? (
+            <span className="rq__keys">{t("question.keysHint", { count: Math.min(choices.length, CHOICE_KEYS) })}</span>
+          ) : choices.length === 0 ? (
+            <Button ref={reopen} variant="primary" size="sm" onClick={() => setWriting(true)}>
+              {t("question.answer")}
+            </Button>
+          ) : undefined
         }
         end={
           <Button variant="ghost" size="sm" disabled={busy} loading={skip.isPending} onClick={() => skip.mutate()}>

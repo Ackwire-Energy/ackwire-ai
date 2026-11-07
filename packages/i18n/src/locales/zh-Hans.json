@@ -3284,6 +3284,7 @@
     "closed": "未回答就关闭了。",
     "failed": "无法发送回答，请重试。",
     "withdrawn": "{{name}} 不再需要回答了。",
+    "keysHint": "按 1–{{count}} 回答",
     "skip": "跳过",
     "skipFailed": "无法跳过此问题，请重试。",
     "dismissed": "{{name}}跳过了此问题。",

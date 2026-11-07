@@ -3513,6 +3513,7 @@
     "closed": "Chiusa senza risposta.",
     "failed": "Non è stato possibile inviare la risposta. Riprova.",
     "withdrawn": "{{name}} non ha più bisogno di una risposta.",
+    "keysHint": "Premi 1–{{count}} per rispondere",
     "skip": "Salta",
     "skipFailed": "Impossibile saltare la domanda. Riprova.",
     "dismissed": "{{name}} ha saltato questa domanda.",
