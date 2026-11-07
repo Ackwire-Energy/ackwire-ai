@@ -392,8 +392,14 @@ describe("team templates", () => {
 
   test("Criar o time makes the template's team in one call: its card reads created, with no question after", async () => {
     f = await setup({ rightHand: true });
-    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "clinic", "pt-BR");
+    // What the conversation hears: the card once, already made, so no other device shows it open for a moment.
+    const heard: { type: string; message?: { meta: Record<string, unknown> } }[] = [];
+    const pubsub = { ...f.pubsub, publish: async (_topic: string, e: unknown) => void heard.push(e as never) };
+    const used = await useTeamTemplate({ db: f.db, pubsub }, f.owner.id, f.org.id, "clinic", "pt-BR");
     expect(used).toMatchObject({ state: "created", error: null });
+    const announced = heard.filter((e) => e.type === "message.created");
+    expect(announced).toHaveLength(1);
+    expect(announced[0]?.message?.meta.actionCard).toMatchObject({ state: "created" });
     const card = await cardOf(f, used.messageId);
     expect(card.params.template).toBe("clinic");
     expect(card.state).toBe("created");

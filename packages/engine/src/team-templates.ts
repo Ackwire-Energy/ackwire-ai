@@ -5,6 +5,8 @@ import { takenHandles } from "./agents";
 import type { AgentAppearance } from "./appearance";
 import { CHANNEL_NAME_PATTERN } from "./channels";
 import type { ContextDeps } from "./context/summaries";
+import { publishMessageCreated } from "./events";
+import { getMessage, messageView } from "./messages";
 import { requirePermission } from "./organizations";
 import { billingHold } from "./standing";
 import {
@@ -233,7 +235,14 @@ export async function useTeamTemplate(
     locale,
   );
   const place = { orgId, channelId: dm.id, threadId: null, agentId: lodi.id, runId: null, hop: 0 };
-  const card = await postTeamCard(deps, place, params, userId);
-  const made = await createTeam(deps, userId, orgId, card.id);
+  // The conversation hears of the card once it is made (or failed), so no device shows it open for a moment.
+  const card = await postTeamCard(deps, place, params, userId, undefined, false);
+  let made: Awaited<ReturnType<typeof createTeam>>;
+  try {
+    made = await createTeam(deps, userId, orgId, card.id);
+  } finally {
+    const now = await getMessage(deps.db, orgId, card.id);
+    if (deps.pubsub && now) await publishMessageCreated(deps.pubsub, messageView(now));
+  }
   return { channelId: dm.id, messageId: card.id, state: made.card.state, error: made.card.error ?? null };
 }

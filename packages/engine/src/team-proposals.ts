@@ -358,6 +358,8 @@ export async function postTeamCard(
   params: TeamParams,
   forUserId: string | null,
   ttlMs = APPROVAL_TTL_MS,
+  /** False: the caller tells the conversation itself, once the card is in its final state. */
+  announce = true,
 ): Promise<Message> {
   const card: TeamProposalCard = {
     kind: "team_proposal",
@@ -381,7 +383,7 @@ export async function postTeamCard(
       actionCard: card,
     },
   });
-  if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
+  if (deps.pubsub && announce) await publishMessageCreated(deps.pubsub, messageView(message));
   // A newer team in the same conversation takes the place of the open ones before it (the person revised it).
   const older = await deps.db
     .select()
