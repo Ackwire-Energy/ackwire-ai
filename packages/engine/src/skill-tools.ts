@@ -3,6 +3,7 @@ import { and, asc, eq, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { recordAgentActions } from "./agent-actions";
 import { sniffModelImage } from "./avatars";
 import { readsOrMayJoin } from "./channels";
+import { cardPlace } from "./consultations";
 import { learnTrust, ownWords } from "./context/learn";
 import { changeSkillAsAgent } from "./context/learned-skills";
 import { memoryResult } from "./context/tools";
@@ -14,9 +15,8 @@ import { insertMessage, messageView } from "./messages";
 import { can, getMembership } from "./organizations";
 import { personBehindCall } from "./requester";
 import { bodyCode } from "./run-tools";
-import { replyThreadOf } from "./runs";
 import { type SandboxDeps, withSandbox } from "./sandbox";
-import { cardsLeft, hopOf, whoActs } from "./setup-tools";
+import { cardsLeft, hopOf, NOBODY_READS, whoActs } from "./setup-tools";
 import { updateSkillFromSource } from "./skill-updates";
 import {
   agentSkillByName,
@@ -110,12 +110,17 @@ export function createSkillToolSource(
       (error: unknown) => ({ why: error instanceof Error ? error.message : String(error) }),
     );
   };
-  /** Posts an install or update card in the run's conversation. */
-  const postCard = async (ctx: ToolContext, body: string, code: string, card: InstallSkillCard | UpdateSkillsCard) => {
+  /** Posts an install or update card where it goes (`cardPlace`). */
+  const postCard = async (
+    ctx: ToolContext,
+    at: { channelId: string; threadId: string | null },
+    body: string,
+    code: string,
+    card: InstallSkillCard | UpdateSkillsCard,
+  ) => {
     const message = await insertMessage(ctx.db, {
       orgId: ctx.orgId,
-      channelId: ctx.channelId,
-      threadId: replyThreadOf(ctx),
+      ...at,
       author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
       body,
       meta: { ...bodyCode(code), actionCard: card },
@@ -361,8 +366,10 @@ export function createSkillToolSource(
               isError: true,
             };
           }
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const forUserId = await personBehindCall(ctx);
-          const acts = await whoActs(ctx, forUserId, "manage_agents");
+          const acts = await whoActs(ctx, forUserId, "manage_agents", at.channelId);
           if (!acts) {
             return {
               content:
@@ -372,7 +379,7 @@ export function createSkillToolSource(
           }
           const full = await cardsLeft(ctx);
           if (full) return full;
-          const message = await postCard(ctx, `Install the skill at ${url}: ${why}`, INSTALL_SKILL_CARD, {
+          const message = await postCard(ctx, at, `Install the skill at ${url}: ${why}`, INSTALL_SKILL_CARD, {
             kind: "install_skill",
             forUserId,
             params: { url, why },
@@ -436,8 +443,10 @@ export function createSkillToolSource(
           }
           const why = str(input.why).trim();
           const names = (ids: string[]) => ids.map((id) => rows.find((r) => r.id === id)?.name ?? "").join(", ");
+          const at = await cardPlace(ctx);
           if (!can(await getMembership(ctx.db, forUserId, ctx.orgId), "manage_agents")) {
-            const acts = await whoActs(ctx, forUserId, "manage_agents");
+            if (!at) return NOBODY_READS;
+            const acts = await whoActs(ctx, forUserId, "manage_agents", at.channelId);
             if (!acts) {
               return {
                 content:
@@ -448,11 +457,17 @@ export function createSkillToolSource(
             const full = await cardsLeft(ctx);
             if (full) return full;
             const ids = rows.map((r) => r.id);
-            const message = await postCard(ctx, `Update ${names(ids)}${why ? `: ${why}` : ""}`, UPDATE_SKILLS_CARD, {
-              kind: "update_skills",
-              forUserId,
-              params: { skillIds: ids, why },
-            });
+            const message = await postCard(
+              ctx,
+              at,
+              `Update ${names(ids)}${why ? `: ${why}` : ""}`,
+              UPDATE_SKILLS_CARD,
+              {
+                kind: "update_skills",
+                forUserId,
+                params: { skillIds: ids, why },
+              },
+            );
             return {
               content: `The person who asked can't update skills: posted a card for someone who manages agents here to update ${names(ids)}. Say so.`,
               data: { actionCard: { messageId: message.id } },
@@ -492,11 +507,12 @@ export function createSkillToolSource(
           }
           let card = "";
           if (waiting.length > 0) {
-            const full = await cardsLeft(ctx);
+            const full = at ? await cardsLeft(ctx) : NOBODY_READS;
             if (full) card = `\n${full.content}`;
-            else {
+            else if (at) {
               await postCard(
                 ctx,
+                at,
                 `Review the update of ${names(waiting)}${why ? `: ${why}` : ""}`,
                 UPDATE_SKILLS_CARD,
                 {

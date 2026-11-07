@@ -21,6 +21,7 @@ import { findMember } from "./chat-tools";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorListing, type ServerCatalog } from "./connectors/listing";
 import { MCP_PRESETS, presetForServer } from "./connectors/presets";
+import { cardPlace, NO_PERSON_READS } from "./consultations";
 import { ownWords } from "./context/learn";
 import { decideProposal, proposeSettings, type SettingsProposalCard } from "./context/proposals";
 import type { ContextDeps } from "./context/summaries";
@@ -32,7 +33,6 @@ import { personBehindCall } from "./requester";
 import { isRightHand } from "./right-hand";
 import { queueRightHandLook } from "./right-hand-approvals";
 import { bodyCode } from "./run-tools";
-import { replyThreadOf } from "./runs";
 import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
 import { deletes, type WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
@@ -256,14 +256,17 @@ export function mcpAddress(raw: string): string | null {
 }
 
 /**
- * Whether the person behind the run may do it themselves, and else whether someone who may can open this
- * conversation (so the card is still of use): what the tool tells the agent to say.
+ * Whether the person behind the run may do it themselves, and else whether someone who may can open the
+ * conversation the card goes to (so the card is still of use): what the tool tells the agent to say.
  */
-export async function whoActs(ctx: ToolContext, userId: string | null, permission: RolePermission) {
+export async function whoActs(ctx: ToolContext, userId: string | null, permission: RolePermission, channelId: string) {
   const membership = userId ? await getMembership(ctx.db, userId, ctx.orgId) : null;
   if (can(membership, permission)) return "person" as const;
-  return (await deciderCanOpen(ctx.db, ctx.orgId, ctx.channelId, permission)) ? ("admin_here" as const) : null;
+  return (await deciderCanOpen(ctx.db, ctx.orgId, channelId, permission)) ? ("admin_here" as const) : null;
 }
+
+/** A card with no place (`cardPlace`): nobody would see it. */
+export const NOBODY_READS: ToolOutput = { content: NO_PERSON_READS, isError: true };
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
@@ -388,6 +391,8 @@ export function createSetupToolSource(deps: {
             const self = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
             if (self) targets = [{ id: self.id, handle: self.handle, name: self.name }];
           }
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx, true);
           if (full) return full;
           const card: ActionCard = {
@@ -403,8 +408,7 @@ export function createSetupToolSource(deps: {
           const names = targets.map((a) => a.name).join(", ");
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Connect ${what ? STEPS[what] : "an AI"}${names ? ` for ${names}` : ""}: ${why}`,
             meta: { ...bodyCode(CONNECT_AI_CARD), actionCard: card },
@@ -618,11 +622,13 @@ export function createSetupToolSource(deps: {
         try {
           const why = str(input.why).trim();
           if (!why) return { content: "Say in `why` why this agent: one short line.", isError: true };
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           // The right hand's card goes to whoever may create agents when the person who asked can't ("Pedir a um admin").
           const rightHand = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
-          if (!rightHand && !(await deciderCanOpen(ctx.db, ctx.orgId, ctx.channelId))) {
+          if (!rightHand && !(await deciderCanOpen(ctx.db, ctx.orgId, at.channelId))) {
             return {
               content:
                 "Nothing was posted: nobody who may create agents can open this conversation, so nobody could decide the card. Tell the person that an admin or owner creates agents: they can ask one, or ask you again in a public channel.",
@@ -630,7 +636,7 @@ export function createSetupToolSource(deps: {
             };
           }
           const forUserId = await personBehindCall(ctx);
-          const place = { orgId: ctx.orgId, channelId: ctx.channelId, personId: forUserId };
+          const place = { orgId: ctx.orgId, channelId: at.channelId, personId: forUserId };
           const draft = {
             ...(await checkAgentDraft({ db: ctx.db, context: deps.context }, place, input)),
             ai: await suggestAgentAi({ db: ctx.db, gateway: deps.ai?.gateway }, ctx.orgId, forUserId),
@@ -651,8 +657,7 @@ export function createSetupToolSource(deps: {
           };
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Proposed a new agent, ${draft.name}: ${why}`,
             meta: { ...bodyCode(AGENT_PROPOSAL_CARD, { name: draft.name }), actionCard: card },
@@ -721,6 +726,8 @@ export function createSetupToolSource(deps: {
             else targets.push({ agentId: row.id, lines: [{ field, to: true }] });
           }
           if (targets.length === 0) return { content: `Nothing to propose: ${left.join("; ")}.`, isError: true };
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           const { proposals, skipped } = await proposeSettings(
@@ -736,8 +743,7 @@ export function createSetupToolSource(deps: {
           const who = proposals.map((p) => named.rows.find((r) => r.id === p.agentId)?.name ?? "").join(", ");
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Proposed ${field === "delete" ? "deleting" : "archiving"} ${who}: ${reason}`,
             meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },
@@ -822,8 +828,10 @@ export function createSetupToolSource(deps: {
               isError: true,
             };
           }
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const forUserId = await personBehindCall(ctx);
-          const acts = await whoActs(ctx, forUserId, "manage_connectors");
+          const acts = await whoActs(ctx, forUserId, "manage_connectors", at.channelId);
           if (!acts) {
             return {
               content:
@@ -841,8 +849,7 @@ export function createSetupToolSource(deps: {
           const name = known?.label ?? (url ? new URL(url).host : null);
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Connect ${name ?? "an MCP server"}: ${why}`,
             meta: { ...(name ? bodyCode(CONNECT_APP_CARD, { name }) : bodyCode(ADD_MCP_CARD)), actionCard: card },
@@ -893,7 +900,9 @@ export function createSetupToolSource(deps: {
           if (bad.length > 0) return { content: `Not an email address: ${bad.join(", ")}.`, isError: true };
           const forUserId = await personBehindCall(ctx);
           if (!forUserId) return { content: "Only a person's request can lead to invitations.", isError: true };
-          const acts = await whoActs(ctx, forUserId, "invite_people");
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
+          const acts = await whoActs(ctx, forUserId, "invite_people", at.channelId);
           if (!acts) {
             return {
               content:
@@ -906,8 +915,7 @@ export function createSetupToolSource(deps: {
           const card: InviteCard = { kind: "invite_people", forUserId, params: { emails, why } };
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Invite ${emails.join(", ")}: ${why}`,
             meta: { ...bodyCode(INVITE_CARD), actionCard: card },
@@ -934,17 +942,17 @@ export function createSetupToolSource(deps: {
   };
 }
 
-/** Posts an agent's card in this conversation (its reply's thread) and announces it. */
+/** Posts an agent's card where it goes (`cardPlace`) and announces it. */
 async function postCard(
   deps: { pubsub?: PubSub },
   ctx: ToolContext,
+  at: { channelId: string; threadId: string | null },
   body: string,
   meta: Record<string, unknown>,
 ): Promise<string> {
   const message = await insertMessage(ctx.db, {
     orgId: ctx.orgId,
-    channelId: ctx.channelId,
-    threadId: replyThreadOf(ctx),
+    ...at,
     author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
     body,
     meta,
@@ -1003,6 +1011,8 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             .filter((a) => a.canDecide && (only.size === 0 || only.has(a.agentId)))
             .slice(0, MAX_ROWS_PER_CARD);
           if (waiting.length === 0) return { content: "Nothing waits for their decision: no card was posted." };
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           const card: ApprovalsCard = {
@@ -1012,7 +1022,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           };
           // No titles in the body: in a channel everyone reads it (and its notifications), while each viewer's card
           // shows only the approvals they may see.
-          const messageId = await postCard(deps, ctx, `Approvals waiting: ${waiting.length}`, {
+          const messageId = await postCard(deps, ctx, at, `Approvals waiting: ${waiting.length}`, {
             ...bodyCode(APPROVALS_CARD),
             actionCard: card,
           });
@@ -1085,6 +1095,8 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           }
           if (rows.length === 0)
             return { content: "Say what changes: owner, add_roles, remove_roles or remove.", isError: true };
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           const kept = rows.slice(0, MAX_ROWS_PER_CARD);
@@ -1094,7 +1106,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             params: { rows: kept, why: str(input.why).trim() },
           };
           const who = [...new Set(kept.map((r) => r.name))].join(", ");
-          const messageId = await postCard(deps, ctx, `Proposed a change to ${who}: ${card.params.why}`, {
+          const messageId = await postCard(deps, ctx, at, `Proposed a change to ${who}: ${card.params.why}`, {
             ...bodyCode(MEMBER_CHANGES_CARD, { names: who }),
             actionCard: card,
           });
@@ -1151,11 +1163,13 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             if (!channel) return { content: `They see no channel #${name}.`, isError: true };
             params.channelId = channel.id;
           }
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           const forUserId = await personBehindCall(ctx);
           const card: OpenPageCard = { kind: "open_page", forUserId, params };
-          const messageId = await postCard(deps, ctx, `Open ${page}: ${params.why}`, {
+          const messageId = await postCard(deps, ctx, at, `Open ${page}: ${params.why}`, {
             ...bodyCode(OPEN_PAGE_CARD),
             actionCard: card,
           });
@@ -1426,6 +1440,8 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
           if (typeof lines === "string") return { content: lines, isError: true };
           targets.push({ agentId: named.rowOf(change.agent)?.id ?? "", lines });
         }
+        const at = await cardPlace(ctx);
+        if (!at) return NOBODY_READS;
         const full = await cardsLeft(ctx);
         if (full) return full;
         const atOnce = (await ownWords(ctx)) === forUserId;
@@ -1450,8 +1466,7 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
         );
         const message = await insertMessage(ctx.db, {
           orgId: ctx.orgId,
-          channelId: ctx.channelId,
-          threadId: replyThreadOf(ctx),
+          ...at,
           author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
           body: `Proposed a change to ${who}: ${str(input.reason).trim()}`,
           meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },

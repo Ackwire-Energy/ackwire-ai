@@ -26,6 +26,7 @@ import {
   requireChannelAccess,
   unarchiveChannel,
 } from "./channels";
+import { cardPlace, NO_PERSON_READS } from "./consultations";
 import type { ContextDeps } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { openPersonAgentDm } from "./dms";
@@ -41,7 +42,6 @@ import { RIGHT_HAND } from "./right-hand";
 import { createRoutine, deleteRoutine } from "./routines";
 import { deliverNoticeToRun } from "./run-resume";
 import { bodyCode } from "./run-tools";
-import { replyThreadOf } from "./runs";
 import { SKILL_NAME } from "./skills";
 import { billingHold } from "./standing";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
@@ -895,6 +895,8 @@ export function teamTools(deps: {
       },
       async execute(input, ctx) {
         try {
+          const at = await cardPlace(ctx);
+          if (!at) return { content: NO_PERSON_READS, isError: true };
           const full = await deps.cardsLeft(ctx, true);
           if (full) return full;
           const of = Math.max(1, Number(input.of) || 1);
@@ -906,8 +908,7 @@ export function teamTools(deps: {
           };
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await deps.hopOf(ctx) },
             body: str(input.text),
             meta: { replyChips: chips },
@@ -1027,13 +1028,15 @@ export function teamTools(deps: {
       },
       async execute(input, ctx) {
         try {
+          const at = await cardPlace(ctx);
+          if (!at) return { content: NO_PERSON_READS, isError: true };
           const full = await deps.cardsLeft(ctx, true);
           if (full) return full;
           const forUserId = await personBehindCall(ctx);
           const locale = await personLocale(ctx.db, forUserId);
           const params = await checkTeam(
             { db: ctx.db, context: deps.context },
-            { orgId: ctx.orgId, channelId: ctx.channelId, personId: forUserId },
+            { orgId: ctx.orgId, channelId: at.channelId, personId: forUserId },
             input,
             locale,
           );
@@ -1041,8 +1044,7 @@ export function teamTools(deps: {
             { db: ctx.db, pubsub: deps.pubsub },
             {
               orgId: ctx.orgId,
-              channelId: ctx.channelId,
-              threadId: replyThreadOf(ctx),
+              ...at,
               agentId: ctx.agentId,
               runId: ctx.runId,
               hop: await deps.hopOf(ctx),

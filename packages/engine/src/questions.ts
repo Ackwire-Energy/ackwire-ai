@@ -3,7 +3,7 @@ import { and, type Database, desc, type Executor, eq, gte, isNull, lt, ne, schem
 import { runAuthorityById } from "./authority";
 import { readableChannelIds, requireChannelAccess } from "./channels";
 import { findMember, plainName } from "./chat-tools";
-import { consultedFor } from "./consultations";
+import { consultedFor, NO_PERSON_READS } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -113,11 +113,7 @@ export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource 
         .where(and(eq(schema.channels.id, ctx.channelId), eq(schema.channels.orgId, ctx.orgId)));
       // In an agents' DM only a run answering a question or note for a person it answers may ask (`consultedFor`).
       if (channel && isAgentOnlyDm(channel) && !(await consultedFor(ctx))) {
-        return {
-          content:
-            "No person reads this conversation: you are answering another agent. Answer with what you know and say in your answer what is missing.",
-          isError: true,
-        };
+        return { content: NO_PERSON_READS, isError: true };
       }
       const named = typeof input.person === "string" ? input.person.trim() : "";
       const matches = named ? await findMember(ctx, named) : [];

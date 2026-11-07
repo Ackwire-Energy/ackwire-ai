@@ -20,6 +20,7 @@ import {
   MAX_CARDS_PER_RUN,
   MAX_CHANNELS_PER_RUN,
   MCP_PRESETS,
+  openAgentDm,
   presentTools,
   redoAgentAction,
   replyThreadOf,
@@ -475,5 +476,116 @@ describe("create_channel", () => {
       content: `You already created ${MAX_CHANNELS_PER_RUN} channels in this turn.`,
     });
     expect(await channelNamed(f, "canal-extra")).toBeUndefined();
+  });
+});
+
+describe("a consulted agent's cards", () => {
+  /** @dev answering a note from @lia in their DM; @lia's run answers the person's message in #general. */
+  async function consulted(fx: Fixture, userId: string) {
+    const lia = await addLia(fx, fx.owner.id);
+    const asked = await insertMessage(fx.db, {
+      orgId: fx.org.id,
+      channelId: fx.general.id,
+      author: { type: "person", userId },
+      body: "@lia resume o canal de vendas do Slack",
+    });
+    const [askerRun] = await fx.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: fx.org.id,
+        agentId: lia.id,
+        channelId: fx.general.id,
+        threadRootId: asked.id,
+        triggerMessageId: asked.id,
+        trigger: "mention",
+        hop: 1,
+        status: "running",
+      })
+      .returning();
+    const dm = await openAgentDm(fx.db, fx.org.id, lia.id, fx.agent.id);
+    const note = await insertMessage(fx.db, {
+      orgId: fx.org.id,
+      channelId: dm.id,
+      author: { type: "agent", agentId: lia.id, runId: askerRun?.id ?? "", hop: 1 },
+      body: "Resume o canal de vendas do Slack.",
+    });
+    const [run] = await fx.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: fx.org.id,
+        agentId: fx.agent.id,
+        channelId: dm.id,
+        threadRootId: note.id,
+        triggerMessageId: note.id,
+        trigger: "dm",
+        hop: 2,
+        status: "running",
+      })
+      .returning();
+    if (!askerRun || !run) throw new Error("no runs");
+    const ctx: ToolContext = {
+      db: fx.db,
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      runId: run.id,
+      channelId: dm.id,
+      threadRootId: note.id,
+      triggerMessageId: note.id,
+    };
+    const ask = () =>
+      fx.db.insert(schema.agentConsultations).values({
+        orgId: fx.org.id,
+        askerRunId: askerRun.id,
+        askerAgentId: lia.id,
+        targetAgentId: fx.agent.id,
+        channelId: dm.id,
+        messageId: note.id,
+        targetRunId: run.id,
+        waitId: `async:${crypto.randomUUID()}`,
+        question: note.body,
+        kind: "note",
+        chain: [lia.id],
+        expiresAt: new Date(Date.now() + 15 * 60_000),
+      });
+    return { ctx, dm, ask };
+  }
+
+  test("go where the person asked, never into the agents' DM; with nobody behind it, nothing is posted", async () => {
+    f = await setup();
+    const { ctx, dm, ask } = await consulted(f, f.owner.id);
+    // A note that isn't a row (nobody to trace it to): the card would reach nobody.
+    const lost = await call(f, ctx, "offer_connect_app", { app: "linear", why: "Para ler as tarefas." });
+    expect(lost).toMatchObject({
+      isError: true,
+      content: expect.stringContaining("No person reads this conversation"),
+    });
+    expect(await cards(f)).toEqual([]);
+    await ask();
+    for (const [name, input] of [
+      ["offer_connect_app", { app: "linear", why: "Para ler as tarefas." }],
+      ["offer_connect_ai", { what: "claude", why: "Para pensar com o seu plano." }],
+      ["offer_invites", { emails: ["bia@example.com"], why: "Ela cuida das vendas." }],
+    ] as const) {
+      expect((await call(f, ctx, name, input)).isError).toBeUndefined();
+    }
+    const posted = await cards(f);
+    expect(posted).toHaveLength(3);
+    for (const card of posted)
+      expect({ channelId: card.channelId, threadId: card.threadId }).toEqual({
+        channelId: f.general.id,
+        threadId: null,
+      });
+    expect(posted.some((m) => m.channelId === dm.id)).toBe(false);
+  });
+
+  test("who may act is read where the card goes: a member's request in a public channel reaches an admin there", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const { ctx, ask } = await consulted(f, bia.id);
+    await ask();
+    const out = await call(f, ctx, "offer_connect_app", { app: "linear", why: "Para ler as tarefas." });
+    expect(out.isError).toBeUndefined();
+    expect(out.content).toContain("can't connect apps: an admin here does it from the card");
+    expect((await cards(f)).map((m) => m.channelId)).toEqual([f.general.id]);
   });
 });
