@@ -179,11 +179,21 @@ describe("the right hand's team setup tools", () => {
     expect(prompt).toContain(TEAM_INTERVIEW);
     expect(prompt).toContain("ONE propose_team card");
     expect(prompt).toContain("One thing at a time");
-    // With no team, nothing else is raised over the interview.
-    expect(prompt).toContain("build the first team with them");
+    // The owner's first-run card shows the setup: no gap is raised over it (ADR 0152 §6).
+    expect(prompt).toContain("The checklist card at the top of your DM");
+    expect(prompt).not.toContain("build the first team with them");
     expect(prompt).not.toContain("offer_invites).");
     expect(prompt).not.toContain("No computer is ready");
     expect(prompt).not.toContain("offer one the team needs");
+    // Without the card (a workspace that had a team before it): with no team, the interview first, nothing else.
+    await f.db.update(schema.agents).set({ setup: null }).where(eq(schema.agents.id, lodi.id));
+    const bare = await rightHandPrompt(
+      { db: f.db },
+      { orgId: f.org.id, agent: lodi, personId: f.owner.id, inDm: true },
+    );
+    expect(bare).toContain("build the first team with them");
+    expect(bare).not.toContain("offer_invites).");
+    expect(bare).not.toContain("No computer is ready");
   });
 
   test("with a team too: asked to build or redo it in its DM, it runs the interview", async () => {

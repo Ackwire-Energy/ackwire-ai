@@ -318,7 +318,9 @@ test("what it and the agents advise about computers follows where the server get
     expect(await text(agent, run)).not.toContain("# The computer");
   }
 
-  // Paid, a 100% coupon included: no hold, so nobody is sent to pay for the computer they are waiting for.
+  // Paid, a 100% coupon included: no hold, so nobody is sent to pay for the computer they are waiting for. (Its
+  // first-run card set aside: while a row is open the card shows the setup and the prompt names no gap.)
+  await f.db.update(schema.agents).set({ setup: null }).where(eq(schema.agents.id, lodi.id));
   const paid = await text(lodi, lodiRun, { billing: true });
   expect(paid).toContain("Nobody sets it up: it is on its way, and Settings › Computers shows how far it is.");
   expect(paid).not.toContain("once the plan is paid");
