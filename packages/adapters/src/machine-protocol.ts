@@ -563,7 +563,8 @@ export const CLAUDE_SHARED_PROTOCOL = 51;
  * `agentes:viewport [device, width?, height?]`: `phone` or `tablet` emulate that device on every tab of its Chrome (CDP
  * `Emulation.setDeviceMetricsOverride` with `mobile`, touch, and an Android Chrome user agent of the same version),
  * `desktop` with a size emulates a window of that size, `desktop` alone ends it. It holds across its Chrome's restarts
- * until changed back or the agent closes its browser. Frames carry `emulated` meanwhile. An older runner refuses the
+ * until changed back or the agent closes its browser. Frames carry `emulated` meanwhile, and so do `browser.act` and
+ * `browser.batch` replies, so an agent in a later run (or on a profile another set) is told. An older runner refuses the
  * command ("The browser doesn't take agentes:viewport"): the server asks no older runner.
  */
 export const BROWSER_VIEWPORT_PROTOCOL = 52;
@@ -595,6 +596,12 @@ export function browserViewportOf(args: readonly string[]): BrowserViewport | un
   const width = side(w);
   const height = side(h);
   return width && height ? { device, width, height } : undefined;
+}
+/** A reply's `emulated` (protocol 52), checked; undefined when there is none or it isn't one. */
+export function emulatedOf(v: unknown): NonNullable<BrowserViewport> | undefined {
+  return isObject(v)
+    ? (browserViewportOf([String(v.device), String(v.width), String(v.height)]) ?? undefined)
+    : undefined;
 }
 /**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
@@ -2149,7 +2156,15 @@ export interface MachineReplies {
    * `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered
    * click). Protocol 45: `code` names a Vault refusal (`VAULT_TYPE_REFUSALS`).
    */
-  "browser.act": { success: boolean; data: unknown; error?: string; code?: string; setup?: BrowserSetup };
+  "browser.act": {
+    success: boolean;
+    data: unknown;
+    error?: string;
+    code?: string;
+    setup?: BrowserSetup;
+    /** Protocol 52: the page size its browser emulates (`agentes:viewport`) after the command; absent at its own. */
+    emulated?: NonNullable<BrowserViewport>;
+  };
   /** `false`: there was no session. */
   "browser.stop": { stopped: boolean };
   "browser.stream.start": { mode: BrowserStreamMode };
@@ -2164,6 +2179,8 @@ export interface MachineReplies {
   "browser.batch": {
     answers: { success: boolean; data: unknown; error?: string; code?: string }[];
     setup?: BrowserSetup;
+    /** As `browser.act`'s, after the batch. */
+    emulated?: NonNullable<BrowserViewport>;
   };
   /** `false`: nothing was started (it runs or starts already, a person has the browser, or no room). */
   "browser.warm": { started: boolean; setup?: BrowserSetup };

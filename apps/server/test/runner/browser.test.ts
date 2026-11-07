@@ -3506,8 +3506,26 @@ test.if(posix)(
     });
     // The user agent is this Chrome's version, as Chrome on Android says it.
     expect(JSON.stringify(emulationOn(cdp, "tab-1")[2]?.params)).toContain("Chrome/156.0.0.0 Mobile Safari");
-    // The live view's frames carry it.
-    await t.act("open", ["https://shop.example.com/"]);
+    // Every answer says it, so an agent in a later run is told.
+    expect(await t.act("open", ["https://shop.example.com/"])).toMatchObject({
+      emulated: { device: "phone", width: 390, height: 844 },
+    });
+    const dir = await t.folder();
+    expect(
+      await t.manager.batch(dev, dir, {
+        op: "browser.batch",
+        commands: [{ command: "get", args: ["url"], timeoutSeconds: 30 }],
+      }),
+    ).toMatchObject({ emulated: { device: "phone" } });
+    // A full-page shot sizes the page itself (agent-browser leaves it at the window's pixel ratio): the size goes back.
+    const sent = emulationOn(cdp, "tab-1").length;
+    await t.act("screenshot", ["screenshots/whole.png"]);
+    expect(emulationOn(cdp, "tab-1")).toHaveLength(sent);
+    await t.act("screenshot", ["screenshots/whole.png", "--full"]);
+    expect(emulationOn(cdp, "tab-1").slice(sent)[0]).toMatchObject({
+      method: "Emulation.setDeviceMetricsOverride",
+      params: { width: 390, deviceScaleFactor: 3, mobile: true },
+    });
     await t.manager.streamStart(dev, "watch");
     t.sockets[0]?.push({ type: "frame", seq: 1, data: "/9j/A", metadata: { deviceWidth: 390, deviceHeight: 844 } });
     const frames = () => t.frames.filter((f) => f.type === "browser.frame");
@@ -3522,7 +3540,9 @@ test.if(posix)(
     });
     expect(emulationOn(devtools[1], "tab-2")[0]?.params).toMatchObject({ width: 390, mobile: true });
     // `desktop` alone ends it on every tab.
-    expect(await t.act("agentes:viewport", ["desktop"])).toMatchObject({ success: true, data: { device: "desktop" } });
+    const ended = await t.act("agentes:viewport", ["desktop"]);
+    expect(ended).toMatchObject({ success: true, data: { device: "desktop" } });
+    expect(ended).not.toHaveProperty("emulated");
     expect(
       emulationOn(devtools[1], "tab-2")
         .slice(3)

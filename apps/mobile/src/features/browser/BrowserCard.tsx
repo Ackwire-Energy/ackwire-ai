@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
   emu: {
     position: "absolute",
     bottom: 8,
-    alignSelf: "center",
+    left: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,

@@ -1804,7 +1804,7 @@ export class BrowserManager {
         opening.close();
       }
     });
-    return { ...answer, ...withSetup(setup) };
+    return { ...answer, ...withSetup(setup), ...(session.viewport ? { emulated: session.viewport } : {}) };
   }
 
   /**
@@ -1887,7 +1887,7 @@ export class BrowserManager {
         // Each Vault value this batch opened goes with it (ADR 0144).
         opening.close();
       }
-      return { answers, ...withSetup(setup) };
+      return { answers, ...withSetup(setup), ...(session.viewport ? { emulated: session.viewport } : {}) };
     });
   }
 
@@ -2129,6 +2129,11 @@ export class BrowserManager {
             signal,
           },
         )));
+    // agent-browser sizes the page for a full-page shot and leaves it at the window's pixel ratio after (measured on
+    // Chrome for Testing 156): the emulated size goes back.
+    if (session.viewport && command === "screenshot" && (args.includes("--full") || args.includes("-f"))) {
+      this.setViewport(session, session.viewport);
+    }
     // Up when it just answered (the next read skips the check); unknown after an error.
     session.aliveAt = answer.success ? this.now() : null;
     this.noteAct(session, command, args, answer, link);

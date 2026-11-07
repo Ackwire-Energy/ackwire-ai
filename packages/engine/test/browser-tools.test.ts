@@ -1072,10 +1072,26 @@ test("browser_open's viewport sizes the page before it loads, on a computer that
   const b = await browserSetup();
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
   b.s.status = { protocol: BROWSER_VIEWPORT_PROTOCOL };
-  b.s.respond = (r) =>
-    r.op === "browser.batch"
-      ? { answers: r.commands.map((c) => (c.command === "snapshot" ? page('- button "Menu" [ref=e1]') : ok())) }
-      : ok({ device: "phone" });
+  // What the runner emulates, as its answers say (protocol 52).
+  let emulated: Record<string, unknown> | undefined;
+  b.s.respond = (r) => {
+    if (r.op === "browser.act" && r.command === "agentes:viewport") {
+      const [device, width, height] = r.args;
+      emulated =
+        width && height
+          ? { device, width: Number(width), height: Number(height) }
+          : device === "desktop"
+            ? undefined
+            : { device, ...(device === "phone" ? { width: 390, height: 844 } : { width: 820, height: 1180 }) };
+    }
+    const sized = emulated ? { emulated } : {};
+    return r.op === "browser.batch"
+      ? {
+          answers: r.commands.map((c) => (c.command === "snapshot" ? page('- button "Menu" [ref=e1]') : ok())),
+          ...sized,
+        }
+      : { ...ok({ device: "phone" }), ...sized };
+  };
   const sent = () => {
     const n = b.calls.length;
     return () =>
@@ -1089,19 +1105,23 @@ test("browser_open's viewport sizes the page before it loads, on a computer that
   let since = sent();
   const phone = await open({ device: "phone" });
   expect(phone.isError).toBeUndefined();
-  expect(phone.content).toStartWith(
-    "Every tab shows as a phone (390×844) until you open with viewport desktop and no size.\n",
+  expect(phone.content).toContain(
+    "Every tab shows as a phone (390×844) until you open with viewport desktop and no size, or your browser closes.",
   );
   // The size first: the site sees the phone from its first request.
   expect(since()[0]).toBe("agentes:viewport phone");
   expect(since().indexOf("open https://shop.example/")).toBeGreaterThan(0);
   since = sent();
-  expect((await open({ device: "desktop", width: 1440, height: 900 })).content).toStartWith(
+  expect((await open({ device: "desktop", width: 1440, height: 900 })).content).toContain(
     "Every tab shows as a desktop (1440×900)",
   );
+  // A later call that didn't choose it (another run, another agent on a profile) is told too.
+  expect((await b.call("browser_read", {})).content).toContain("Every tab shows as a desktop (1440×900)");
   expect(since()[0]).toBe("agentes:viewport desktop 1440 900");
   since = sent();
-  expect((await open({ device: "desktop" })).content).toStartWith("The page shows at the window's own size again.");
+  const reset = await open({ device: "desktop" });
+  expect(reset.content).toStartWith("The page shows at the window's own size again.");
+  expect(reset.content).not.toContain("Every tab shows");
   expect(since()[0]).toBe("agentes:viewport desktop");
   // Without one, nothing about the size goes.
   since = sent();

@@ -8,10 +8,12 @@ import {
   BROWSER_WARM_PROTOCOL,
   type BrowserBatchCommand,
   type BrowserSetup,
+  type BrowserViewport,
   browserSetupOf,
   browserViewportOf,
   chromeFailureKind,
   type ErrorReporter,
+  emulatedOf,
   formatVaultRule,
   type MachineReplies,
   PASSWORD_CLASSES,
@@ -528,12 +530,11 @@ function viewportArgs(v: unknown): string[] | null {
   return browserViewportOf(args) === undefined ? null : args;
 }
 
-/** What the agent is told its page size is now. */
-function viewportText(args: string[]): string {
-  const v = browserViewportOf(args);
+/** What the agent is told while its browser shows pages at an emulated size, as a line of its own; "" otherwise. */
+function emulatedLine(v: NonNullable<BrowserViewport> | undefined): string {
   return v
-    ? `Every tab shows as a ${v.device} (${v.width}×${v.height}) until you open with viewport desktop and no size.`
-    : "The page shows at the window's own size again.";
+    ? `\nEvery tab shows as a ${v.device} (${v.width}×${v.height}) until you open with viewport desktop and no size, or your browser closes.`
+    : "";
 }
 
 /** An image a judge can take (Jev: each side 280 to 1568 pixels), or null. */
@@ -778,6 +779,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         setup: BrowserSetup;
         /** The profile the commands went to (the chat's chip); null: the agent's own browser. */
         profile: { id: string; name: string } | null;
+        /** The page size its browser emulated at its last answer (protocol 52); undefined at its own. */
+        emulated: () => NonNullable<BrowserViewport> | undefined;
       }
     | { ok: false; text: string }
   > {
@@ -853,6 +856,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     };
     const fast = status.protocol >= BROWSER_FAST_PROTOCOL;
     let reached = false;
+    let emulated: NonNullable<BrowserViewport> | undefined;
     // The live view, take over and Stop follow the computer the browser runs on (a mission's or the agent's own).
     const reachedOnce = async () => {
       if (reached || profileId) return;
@@ -884,6 +888,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         return { ok: false, text: explain(error, status.machineName) };
       }
       addSetup(reply);
+      emulated = emulatedOf(reply.emulated);
       await reachedOnce();
       return reply.success ? { ok: true, data: reply.data } : failed(reply.error, reply.code);
     };
@@ -924,6 +929,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
           return [{ ok: false, text: explain(error, status.machineName) }];
         }
         addSetup(reply);
+        emulated = emulatedOf(reply.emulated);
         await reachedOnce();
         return reply.answers.map((a) => (a.success ? { ok: true, data: a.data } : failed(a.error, a.code)));
       },
@@ -961,7 +967,14 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         }`,
       };
     }
-    return { ok: true, link, status, setup, profile: turn ? { id: turn.profile.id, name: turn.profile.name } : null };
+    return {
+      ok: true,
+      link,
+      status,
+      setup,
+      profile: turn ? { id: turn.profile.id, name: turn.profile.name } : null,
+      emulated: () => emulated,
+    };
   }
 
   /** Runs one `agent-browser` command and answers with `done(data)`, or the failure as an error result. */
@@ -977,7 +990,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     if (!r.ok) return { content: neutralizeUntrusted(r.text), isError: true };
     const url = urlOf(r.data);
     return {
-      content: done(r.data),
+      content: `${done(r.data)}${emulatedLine(linked.emulated())}`,
       data: { ...(url ? { url } : {}), ...profileData(linked.profile), ...(extra?.(r.data) ?? {}) },
     };
   }
@@ -1167,7 +1180,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       await markPageRead(ctx.db, ctx);
     }
     const f = formatPlanReport(report);
-    const content = f.screen ? `${f.summary}\n${wrapPage(f.screen)}` : f.summary;
+    // Said on every answer while it lasts: a later run, or another agent on a profile, didn't choose it.
+    const summary = `${f.summary}${emulatedLine(linked.emulated())}`;
+    const content = f.screen ? `${summary}\n${wrapPage(f.screen)}` : summary;
     const url = report.after?.url ?? null;
     const timing = {
       ms: report.ms,
@@ -1447,7 +1462,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         const sized = await linked.link.act({ command: "agentes:viewport", args, timeoutSeconds: COMMAND_SECONDS });
         if (!sized.ok) return { content: neutralizeUntrusted(sized.text), isError: true };
         const out = await plan(ctx, [{ do: "open", url }]);
-        return { ...out, content: `${viewportText(args)}\n${out.content}` };
+        // An emulated size is said by every answer while it lasts (`plan`).
+        return args.length === 1 && args[0] === "desktop"
+          ? { ...out, content: `The page shows at the window's own size again.\n${out.content}` }
+          : out;
       },
     ),
     step(
@@ -1533,7 +1551,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         const url = urlOf(r.data);
         const page = whole ? observationOf(r.data) : null;
         if (page) seen.remember(seenKey(ctx), page);
-        const head = url ? `Page: ${neutralizeUntrusted(url)}\n` : "";
+        const sized = emulatedLine(linked.emulated()).slice(1);
+        const head = `${url ? `Page: ${neutralizeUntrusted(url)}\n` : ""}${sized ? `${sized}\n` : ""}`;
         if (question && page && deps.judge) {
           const found = await findInPage({
             judge,
@@ -1825,7 +1844,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         });
         if (!r.ok) return { content: neutralizeUntrusted(r.text), isError: true };
         const url = urlOf(r.data);
-        const saved = { content: `Saved ${path} in your folder.`, data: { ...(url ? { url } : {}), path } };
+        const saved = {
+          content: `Saved ${path} in your folder.${emulatedLine(linked.emulated())}`,
+          data: { ...(url ? { url } : {}), path },
+        };
         if (input.share !== true) return { ...saved, content: `${saved.content} ${SHARE_HINT}` };
         return shareSavedFile(deps, ctx, linked.status.machineId, path, saved);
       },

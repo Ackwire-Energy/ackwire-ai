@@ -684,7 +684,8 @@ html:not([data-pointer]) .brw-ac__tt:focus-visible {
   user-select: none;
   -webkit-user-drag: none;
 }
-/* A page the agent shows at a phone's (or another) size: centred on the stage, the bands around it the stage's. */
+/* A page the agent shows at a phone's (or another) size: centred on the stage, the bands around it the stage's. Its
+   label sits in the left band, off the page's bottom bar a person in control may need to tap. */
 .brw-ac__page.is-emulated {
   background: transparent;
   box-shadow: none;
@@ -692,8 +693,7 @@ html:not([data-pointer]) .brw-ac__tt:focus-visible {
 .brw-emu {
   position: absolute;
   bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 18px;
   z-index: 3;
   display: flex;
   align-items: center;
