@@ -1461,7 +1461,13 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         const linked = await linkFor(ctx);
         if (!linked.ok) return { content: linked.text, isError: true };
         if (linked.status.protocol < BROWSER_VIEWPORT_PROTOCOL) {
-          return { content: vaultUpdateText(linked.status.machineName, "change the page size"), isError: true };
+          return {
+            content: vaultUpdateText(
+              { name: linked.status.machineName, kind: linked.status.kind },
+              "change the page size",
+            ),
+            isError: true,
+          };
         }
         // Before the page loads: its site sees the phone from the first request.
         const sized = await linked.link.act({ command: "agentes:viewport", args, timeoutSeconds: COMMAND_SECONDS });

@@ -82,10 +82,7 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       const asked = locale === "en" ? what : "";
       // High risk and no title to show: the warning alone.
       if (input.highRisk)
-        return out(
-          s.approvalTitle(actor),
-          from(asked ? s.approvalHighRisk(clip(asked, 120)) : s.approvalHighRiskBody),
-        );
+        return out(s.approvalTitle(actor), from(asked ? s.approvalHighRisk(clip(asked, 120)) : s.approvalHighRiskBody));
       return out(s.approvalTitle(actor), from(asked || s.approvalBody));
     }
     case "agent_question":
