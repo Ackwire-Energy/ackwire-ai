@@ -596,7 +596,10 @@ describe("approval flow (end to end)", () => {
     expect(run?.status).toBe("done");
     expect(gh.executed.map((e) => e.tool)).toEqual(["github_get_pr"]);
     const last = f.provider.calls.at(-1)?.request.messages.at(-1);
-    expect(textOf(last?.content ?? "")).toBe("");
+    // Beside the refusal, only who decided it: the reply is for them.
+    expect(textOf(last?.content ?? "")).toBe(
+      "Decided by ana. Your reply is for ana: address them, not whoever asked you before.",
+    );
     expect(JSON.stringify(last?.content)).toContain("Reason: freeze until Monday");
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.at(-1)?.body).toBe("Understood, I won't merge it.");
