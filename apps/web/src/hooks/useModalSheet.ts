@@ -1,9 +1,14 @@
 import { type RefObject, useEffect, useState } from "react";
 
+/** The opener of a sheet that just went, for one taking its place in the same commit (opened from inside it). */
+let handedOver: HTMLElement | null = null;
+
 /**
  * A full-screen sheet over the page (phone): while it is mounted, focus is inside it and everything behind it is
  * inert, except the elements matching `keep` (its scrim, which closes it). When it goes, focus returns to what had it
- * before, unless something else already took it (a panel the sheet opened).
+ * before, unless something else already took it (a panel the sheet opened). A sheet that replaced another (Ver perfil
+ * from a thread) was opened from inside it, gone by then: the focus goes back to what opened the first. Nothing left
+ * of either (a popover's row): the conversation's composer, as Esc does (`useEscClose`).
  */
 export function useModalSheet(sheet: RefObject<HTMLElement | null>, keep?: string) {
   // Read on the first render, before a field inside takes the focus (`autoFocus`).
@@ -11,6 +16,7 @@ export function useModalSheet(sheet: RefObject<HTMLElement | null>, keep?: strin
   useEffect(() => {
     const el = sheet.current;
     if (!el) return;
+    const replaced = handedOver;
     const behind: HTMLElement[] = [];
     for (let node: HTMLElement | null = el; node && node !== document.body; node = node.parentElement) {
       const parent: HTMLElement | null = node.parentElement;
@@ -24,7 +30,12 @@ export function useModalSheet(sheet: RefObject<HTMLElement | null>, keep?: strin
       for (const b of behind) b.inert = false;
       const now = document.activeElement;
       const lost = !now || now === document.body || el.contains(now);
-      if (lost && opener?.isConnected) opener.focus({ preventScroll: true });
+      const back = opener?.isConnected ? opener : replaced?.isConnected ? replaced : null;
+      if (lost) (back ?? document.querySelector<HTMLElement>('[id^="composer-"]'))?.focus({ preventScroll: true });
+      handedOver = back;
+      queueMicrotask(() => {
+        if (handedOver === back) handedOver = null;
+      });
     };
   }, [sheet, keep, opener]);
 }

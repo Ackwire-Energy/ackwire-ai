@@ -1404,6 +1404,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .mi-card,
   .mi-evt,
+  .mi-files__diff,
   .mi-mc,
   .mi-md__l[data-fresh],
   .mi-session__line > span:first-child,

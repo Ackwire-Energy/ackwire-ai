@@ -172,11 +172,11 @@ describe("the picture in a DM's sidebar", () => {
     return side() as HTMLElement;
   };
 
-  test("opens the panel in the sidebar's place", async () => {
+  test("opens the panel over the conversation, the sidebar staying under it out of reach", async () => {
     const aside = await openDm(seedState());
     await click(within(aside).getByRole("button", PICTURE));
     expect(panel()).toBeTruthy();
-    expect(side()).toBeNull();
+    expect(side()?.closest("[inert]")).toBeTruthy();
   });
 
   test("stays plain for who sees only its head", async () => {

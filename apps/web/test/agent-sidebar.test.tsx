@@ -130,7 +130,7 @@ describe("the toggle", () => {
     const page = document.querySelector(".thread-panel--wide") as HTMLElement;
     expect(page).toBeTruthy();
     expect(side()).toBe(column);
-    expect(column?.inert).toBe(true);
+    expect(column?.closest("[inert]")).toBeTruthy();
     await act(async () => fireEvent.click(document.querySelector(".thread-panel__scrim") as HTMLElement));
     await settle(6);
     expect(document.querySelector(".thread-panel--wide")).toBeNull();

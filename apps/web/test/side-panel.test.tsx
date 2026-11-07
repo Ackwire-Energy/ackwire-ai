@@ -76,7 +76,7 @@ test("a thread floats over a scrim: everything behind it is out of reach, the to
   // The sidebar, the conversation and the members are inert; the toasts (a Desfazer) stay live.
   const sidebar = document.querySelector(".sidebar") as HTMLElement;
   expect(sidebar.closest("[inert]")).toBeTruthy();
-  expect((document.querySelector(".channel__col") as HTMLElement).inert).toBe(true);
+  expect((document.querySelector(".channel__col") as HTMLElement).closest("[inert]")).toBeTruthy();
   expect(side.closest("[inert]")).toBeNull();
   await act(async () => services.toasts.show("Salvo"));
   expect((document.querySelector(".ac-toasts") as HTMLElement).closest("[inert]")).toBeNull();
@@ -88,7 +88,7 @@ test("a thread floats over a scrim: everything behind it is out of reach, the to
   expect(thread()).toBeNull();
   expect(document.querySelector(".thread-panel__scrim")).toBeNull();
   expect(sidebar.closest("[inert]")).toBeNull();
-  expect((document.querySelector(".channel__col") as HTMLElement).inert).toBe(false);
+  expect((document.querySelector(".channel__col") as HTMLElement).closest("[inert]")).toBeNull();
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
 });
 
@@ -141,4 +141,40 @@ test("over the agent's page with unsaved edits, a click on the scrim asks first 
   await settle(2);
   expect(document.querySelector(".thread-panel--wide")).toBeTruthy();
   expect(screen().getByRole("button", { name: "Continuar editando" })).toBeTruthy();
+});
+
+test("in <body>, over everything: a page's entrance can't hold it inside the page, and a toast stays live", async () => {
+  await openThread();
+  const side = thread() as HTMLElement;
+  // The panel and its scrim are the body's own children, as is the toasts' host; the app (#root's place) is inert.
+  expect(side.parentElement).toBe(document.body);
+  expect(side.previousElementSibling?.classList.contains("thread-panel__scrim")).toBe(true);
+  expect((document.querySelector(".ac-toasts") as HTMLElement).parentElement).toBe(document.body);
+  expect((document.querySelector(".shell") as HTMLElement).closest("[inert]")).toBeTruthy();
+});
+
+test("Ver perfil from a thread, then closed: the focus goes back to what opened the thread", async () => {
+  await openThread();
+  await click(document.querySelector(".thread-panel__scrim") as HTMLElement);
+  await settle(3);
+  const reply = within(document.querySelector(".channel__col") as HTMLElement).getAllByRole("button", {
+    name: "Responder",
+  })[0] as HTMLElement;
+  reply.focus();
+  await click(reply);
+  await settle(6);
+  await click(within(thread() as HTMLElement).getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
+  await settle(6);
+  const card = screen().getByRole("dialog", { name: "Perfil" });
+  await act(async () =>
+    fireEvent.pointerDown(within(card).getByRole("button", { name: "Mais" }), { button: 0, ctrlKey: false }),
+  );
+  await settle(2);
+  await click(within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: "Ver perfil" }));
+  await settle(6);
+  // The menu that opened the agent's page is gone; closing the page brings the focus back to Responder.
+  await click(document.querySelector(".thread-panel__scrim") as HTMLElement);
+  await settle(4);
+  expect(document.querySelector(".thread-panel")).toBeNull();
+  expect(document.activeElement).toBe(reply);
 });

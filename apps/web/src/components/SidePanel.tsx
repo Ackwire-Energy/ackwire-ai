@@ -1,5 +1,6 @@
 import { cx } from "@agenteschat/ui";
 import { type ReactNode, type RefObject, useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useModalSheet } from "@/hooks/useModalSheet";
 import { leaveAnimated, takeOverLeaving } from "@/lib/leave";
@@ -37,7 +38,9 @@ export function SidePanel({
     if (takeOverLeaving()) for (const el of [panel, dim]) el?.setAttribute("data-swap", "");
     return () => leaveAnimated([dim, panel]);
   }, [ref]);
-  return (
+  // In <body>: `fixed` is the window's whatever the page does (a page's entrance holds a transform that would keep the
+  // scrim off the sidebar), and everything else, #root, goes inert under it.
+  return createPortal(
     <>
       <button
         ref={scrim}
@@ -50,6 +53,7 @@ export function SidePanel({
       <aside ref={ref} tabIndex={-1} className={cx("thread-panel", className)} aria-label={label}>
         {children}
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }

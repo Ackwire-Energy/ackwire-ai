@@ -10,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import { AgentWho } from "@/components/AgentAvatar";
 
 /**
@@ -128,51 +129,55 @@ export function ToastProvider({
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="ac-toasts" aria-live="polite">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`ac-toast ac-toast--${toast.tone}`}
-            role={toast.tone === "error" ? "alert" : "status"}
-            data-leaving={toast.leaving || undefined}
-          >
-            <Icon name={toast.tone === "error" || toast.tone === "warning" ? "alert" : "check"} />
-            <span className="ac-toast__text">
-              {toast.detail ? (
-                <>
-                  <b className="ac-toast__title">
-                    <ToastWords toast={toast} />
-                  </b>
-                  <small className="ac-toast__detail">{toast.detail}</small>
-                </>
-              ) : (
-                <ToastWords toast={toast} />
-              )}
-            </span>
-            {toast.actions?.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                className="ac-btn ac-btn--ghost ac-btn--sm"
-                onClick={() => {
-                  action.run();
-                  store.dismiss(toast.id);
-                }}
-              >
-                {action.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"
-              aria-label={closeLabel}
-              onClick={() => store.dismiss(toast.id)}
+      {/* In <body>, beside any side panel (also there): everything else goes inert under one, and a Desfazer must not. */}
+      {createPortal(
+        <div className="ac-toasts" aria-live="polite">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`ac-toast ac-toast--${toast.tone}`}
+              role={toast.tone === "error" ? "alert" : "status"}
+              data-leaving={toast.leaving || undefined}
             >
-              <Icon name="close" size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
+              <Icon name={toast.tone === "error" || toast.tone === "warning" ? "alert" : "check"} />
+              <span className="ac-toast__text">
+                {toast.detail ? (
+                  <>
+                    <b className="ac-toast__title">
+                      <ToastWords toast={toast} />
+                    </b>
+                    <small className="ac-toast__detail">{toast.detail}</small>
+                  </>
+                ) : (
+                  <ToastWords toast={toast} />
+                )}
+              </span>
+              {toast.actions?.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  className="ac-btn ac-btn--ghost ac-btn--sm"
+                  onClick={() => {
+                    action.run();
+                    store.dismiss(toast.id);
+                  }}
+                >
+                  {action.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"
+                aria-label={closeLabel}
+                onClick={() => store.dismiss(toast.id)}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          ))}
+        </div>,
+        document.body,
+      )}
     </ToastContext.Provider>
   );
 }

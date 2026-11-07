@@ -106,7 +106,7 @@ describe("the header search (Discord's)", () => {
     expect(panel.className).toContain("thread-panel");
     expect(panel.previousElementSibling?.className).toBe("thread-panel__scrim");
     // The conversation is under the scrim, out of reach until the panel closes.
-    expect((document.querySelector(".channel__col") as HTMLElement).inert).toBe(true);
+    expect((document.querySelector(".channel__col") as HTMLElement).closest("[inert]")).toBeTruthy();
     expect(within(panel).getByRole("heading", { level: 1 }).textContent).toBe("1 resultado");
     const group = within(panel).getByRole("region", { name: "eng" });
     expect([...group.querySelectorAll(".search-hit__mark")].map((m) => m.textContent)).toEqual(["Achei"]);
