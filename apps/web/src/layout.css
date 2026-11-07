@@ -1793,16 +1793,29 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   font-size: 11.5px;
   font-weight: 600;
 }
+/* A path keeps its file's name whole: the folders before it give way first. */
 .artifact-tile__files code {
   flex: 1;
+  display: flex;
   min-width: 0;
-  overflow: hidden;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 400;
   color: var(--ink2);
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.artifact-tile__dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--faint);
+}
+.artifact-tile__files code > :last-child {
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .artifact-tile__added {
   color: var(--ok);
@@ -1926,11 +1939,15 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   background: none;
   box-shadow: none;
 }
-/* On a phone: two to a row; alone, the whole width up to its size. */
+/* On a phone: two to a row (a table's cover keeps two columns, the rest wouldn't read); alone, the whole width up to
+   its size. */
 @media (max-width: 640px) {
   .artifact-tile {
     --tile-w: calc(50% - 5px);
     --tile-cover: 120px;
+  }
+  .artifact-tile__table :is(th, td):nth-child(n + 3) {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -22,7 +22,7 @@ import { MermaidDiagram } from "./Mermaid";
 
 /** What a cover shows of a table, a code change or a text file: the rest is in the viewer. */
 const COVER_ROWS = 5;
-const COVER_COLUMNS = 4;
+const COVER_COLUMNS = 3;
 const COVER_FILES = 4;
 const COVER_LINES = 12;
 /** The start of a document drawn on its cover (cut at a line, never mid-word). */
@@ -280,7 +280,12 @@ function Cover({ content, title }: { content: ArtifactContent; title: string }) 
             const c = patchCounts(f.patch);
             return (
               <li key={f.path}>
-                <code>{f.path}</code>
+                <code>
+                  {f.path.includes("/") && (
+                    <span className="artifact-tile__dir">{f.path.slice(0, f.path.lastIndexOf("/") + 1)}</span>
+                  )}
+                  <span>{f.path.slice(f.path.lastIndexOf("/") + 1)}</span>
+                </code>
                 <span className="artifact-tile__added tabular">+{c.added}</span>
                 <span className="artifact-tile__removed tabular">−{c.removed}</span>
               </li>
