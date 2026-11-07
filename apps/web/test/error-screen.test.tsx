@@ -13,7 +13,7 @@ import { I18nextProvider } from "react-i18next";
 import { ErrorScreen } from "@/components/ErrorScreen";
 import { ErrorState } from "@/components/Loading";
 import { createI18n } from "@/i18n";
-import { reloadForNewVersion, resetVersionReload } from "@/lib/app-version";
+import { createVersionWatch, reloadForNewVersion, resetVersionReload, startVersionWatch } from "@/lib/app-version";
 import { catchEarlyErrors, type ErrorSdk, reportError, startErrorReports } from "@/lib/error-reports";
 import { Route as RootRoute } from "@/routes/__root";
 import { createFakeApi } from "./fake-api";
@@ -146,6 +146,40 @@ describe("the error screen (ADR 0104)", () => {
       expect(reportError(new Error("another while reloading"))).toBeUndefined();
     } finally {
       stayed.mockRestore();
+      reload.mockRestore();
+      resetVersionReload();
+      sessionStorage.clear();
+    }
+  });
+
+  test("a crash in a tab a deploy left behind reloads into the new version; staying brings the crash screen back", async () => {
+    const reload = spyOn(window.location, "reload").mockImplementation(() => {});
+    let entry = "/assets/index-abc.js";
+    startVersionWatch(
+      createVersionWatch({
+        loaded: "/assets/index-abc.js",
+        fetchHtml: async () => `<script type="module" src="${entry}"></script>`,
+        onStale: () => {},
+      }),
+    );
+    const crash = () => broken(new TypeError("Cannot read properties of undefined (reading 'icon')"));
+    try {
+      // The version this tab runs: the crash is a real one and stays on screen.
+      await renderPage(crash(), { api: createFakeApi() });
+      await settle();
+      expect(reload).not.toHaveBeenCalled();
+      expect(screen().getByRole("heading", { name: "Algo deu errado" })).toBeTruthy();
+      cleanup();
+      entry = "/assets/index-def.js";
+      await renderPage(crash(), { api: createFakeApi() });
+      await waitFor(() => expect(document.querySelector(".sky-boot")).not.toBeNull());
+      expect(reload).toHaveBeenCalledTimes(1);
+      // The page didn't leave (it asked before leaving and the person stayed): the crash screen and its button again.
+      act(() => resetVersionReload());
+      expect(document.querySelector(".sky-boot")).toBeNull();
+      expect(screen().getByRole("button", { name: "Recarregar" })).toBeTruthy();
+    } finally {
+      startVersionWatch(createVersionWatch({ loaded: null, fetchHtml: async () => "", onStale: () => {} }));
       reload.mockRestore();
       resetVersionReload();
       sessionStorage.clear();

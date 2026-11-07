@@ -7,7 +7,7 @@ import { useBrowserOffline } from "@/chat/offline";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
 import { BootSplash } from "@/components/Sky";
 import { useServerBack } from "@/hooks/useServerBack";
-import { reloadIfStale, reloadingForNewVersion } from "@/lib/app-version";
+import { onVersionReload, reloadIfStale, reloadingForNewVersion } from "@/lib/app-version";
 import { inDesktopApp, pageReadyAfterPaint } from "@/lib/desktop";
 import { onReportTaken, reportError, reportTaken, shortErrorId } from "@/lib/error-reports";
 
@@ -27,12 +27,13 @@ export function ErrorScreen({ error }: ErrorComponentProps) {
   const unreachable = noAnswer(error);
   const offline = useBrowserOffline();
   useServerBack(unreachable);
-  const [updating, setUpdating] = useState(false);
+  // The sky only while the reload is on its way: a person who stayed (a page asked before leaving) gets the crash back.
+  const reloading = useSyncExternalStore(onVersionReload, reloadingForNewVersion);
   useEffect(pageReadyAfterPaint, []);
   useEffect(() => {
-    if (!unreachable) void reloadIfStale().then(setUpdating);
+    if (!unreachable) void reloadIfStale();
   }, [unreachable]);
-  if (updating || reloadingForNewVersion()) return <BootSplash />;
+  if (reloading) return <BootSplash />;
   const reload = () => window.location.reload();
   return (
     <div className="page page--mid">

@@ -83,9 +83,20 @@ export const checkAppVersion = () => current?.check() ?? Promise.resolve();
 const VERSION_RELOAD_MS = 60_000;
 let reloading = false;
 let stayed: ReturnType<typeof setTimeout> | undefined;
+const reloadWatchers = new Set<() => void>();
+const setReloading = (now: boolean) => {
+  reloading = now;
+  for (const watcher of reloadWatchers) watcher();
+};
 
 /** True once the app is reloading into a new version: nothing is reported, and the error screen is the boot sky. */
 export const reloadingForNewVersion = () => reloading;
+
+/** Calls `watcher` when `reloadingForNewVersion()` changes (`useSyncExternalStore`); returns the unsubscribe. */
+export function onVersionReload(watcher: () => void) {
+  reloadWatchers.add(watcher);
+  return () => void reloadWatchers.delete(watcher);
+}
 
 /**
  * A page's code or styles from before a deploy are gone from the server (Vite's `vite:preloadError`): the app
@@ -96,7 +107,7 @@ export function reloadForNewVersion(now = Date.now()): boolean {
   sessionStore.set(STORAGE_KEYS.versionReload, String(now));
   // Storage that keeps nothing would reload forever.
   if (sessionStore.get(STORAGE_KEYS.versionReload) !== String(now)) return false;
-  reloading = true;
+  setReloading(true);
   window.location.reload();
   // Still here a moment later: the reload didn't happen (the person stayed when a page asked before leaving).
   stayed = setTimeout(resetVersionReload, 3000);
@@ -116,5 +127,5 @@ export async function reloadIfStale(): Promise<boolean> {
 /** Not reloading: the page stayed, or a test starts. */
 export function resetVersionReload() {
   clearTimeout(stayed);
-  reloading = false;
+  setReloading(false);
 }
