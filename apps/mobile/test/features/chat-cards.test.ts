@@ -316,9 +316,14 @@ describe("the secret card on the phone", () => {
     expect(card).toContain('t("secret.seeNewer")');
   });
 
-  test("where it goes and whose account wrap: only a well with a way to read the rest is cut", () => {
+  test('the name line reads whole (never cut mid-sentence), its mark and "Ver …" on the title\'s line, the deadline at the foot', () => {
     const asks = source("asks.tsx");
-    expect(asks).toContain("numberOfLines={well.more ? (open ? 3 : 1) : undefined}");
-    expect(asks).toContain("numberOfLines={well.more ? 4 : undefined}");
+    const line = asks.slice(asks.indexOf("const line = well ? ("), asks.indexOf("const opened ="));
+    expect(line).not.toContain("numberOfLines");
+    expect(asks).toContain('alignItems: "flex-start",\n    gap: 10,\n    paddingVertical: 10,');
+    expect(asks).toContain("lineMark: { flexShrink: 0, width: 20, height: 20,");
+    // The fuse and the time left under the decision, never on the card's top line.
+    expect(asks).toContain('{waitsFor === "you" && expiry ? <View style={styles.expiryRow}>{expiry}</View> : null}');
+    expect(asks).toContain('{waitsFor && waitsFor !== "you" ? (');
   });
 });

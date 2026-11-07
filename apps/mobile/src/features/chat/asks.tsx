@@ -416,13 +416,14 @@ export const ASK_ICON: Record<AskKind, IconName> = {
 
 /**
  * The request card, the same as Atividade's and Conversas' waiting cards (`WaitingCard`): the app's card with its cut
- * corner, the kind on top with its icon and, at its right, the fuse to `expiry` (`ExpiryLine`) or who else decides
- * (`waitsFor`: "esperando Ana", "Aguardando um admin"; no "waiting for you" mark: the card itself is the ask). Then
+ * corner, the kind on top with its icon and, at its right, who else decides (`waitsFor`: "esperando Ana", "Aguardando
+ * um admin"; no "waiting for you" mark: the card itself is the ask). Then
  * the agent's words (`lead`), what will happen drawn small edge to edge (`preview`: an email as it will go, the values
  * it runs with), and the thing it is about on its name line, edge to edge between hairlines (`well`: its mark alone,
  * its title, its details and, with `more`, "Ver …" opening the rest in the preview's place, or under the line with
- * no preview). `body` sits under it (a secret's field); `foot` holds the decision (`AskFoot`). In a conversation the card
- * tells it where it is (`id`), for the line above the composer.
+ * no preview). `body` sits under it (a secret's field); `foot` holds the decision (`AskFoot`) and, at its end, the fuse
+ * to `expiry` (`ExpiryLine`) while the person decides. In a conversation the card tells it where it is (`id`), for the
+ * line above the composer.
  */
 export function AskCard({
   id,
@@ -444,7 +445,7 @@ export function AskCard({
   /** What will happen, drawn small over the name line (an approval's email or values); "Ver …" opens it whole. */
   preview?: ReactNode;
   body?: ReactNode;
-  /** Its deadline (`ExpiryLine`), at the top line's right while the person decides. */
+  /** Its deadline (`ExpiryLine`), at the foot's end while the person decides. */
   expiry?: ReactNode;
   foot?: ReactNode;
 }) {
@@ -473,11 +474,11 @@ export function AskCard({
     <>
       <View style={styles.lineMark}>{well.tile}</View>
       <View style={styles.grow}>
-        <Text variant="subhead" tone="ink" style={styles.semibold} numberOfLines={well.more ? 4 : undefined}>
+        <Text variant="subhead" tone="ink" style={styles.semibold}>
           {well.title}
         </Text>
         {well.detail ? (
-          <Text variant="footnote" tone="faint" numberOfLines={well.more ? 3 : undefined}>
+          <Text variant="footnote" tone="faint">
             {well.detail}
           </Text>
         ) : null}
@@ -514,9 +515,7 @@ export function AskCard({
             <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.grow]}>
               {askKindWords(t, kind, waitsFor === "you")}
             </Text>
-            {waitsFor === "you" ? (
-              expiry
-            ) : waitsFor ? (
+            {waitsFor && waitsFor !== "you" ? (
               <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
                 {waitsFor}
               </Text>
@@ -553,6 +552,7 @@ export function AskCard({
           {preview ? null : opened}
           {body ? <View style={styles.body}>{body}</View> : null}
           {foot}
+          {waitsFor === "you" && expiry ? <View style={styles.expiryRow}>{expiry}</View> : null}
         </View>
       </Animated.View>
     </View>
@@ -580,8 +580,8 @@ export function AskButtons({ primary, secondary }: { primary: ReactNode; seconda
 }
 
 /**
- * The amber fuse burning to the expiry and the time left ("23 h"; "expira em 23 h" read aloud), for the card's top
- * line; without a start, the time alone.
+ * The amber fuse burning to the expiry and the time left ("23 h para decidir"; "expira em 23 h" read aloud), at the
+ * card's foot; without a start, the time alone.
  */
 export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null; expiresAt: string }) {
   const { t } = useTranslation();
@@ -605,7 +605,7 @@ export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null
         maxFontSizeMultiplier={CHROME_MAX_SCALE}
         style={[styles.expiryText, { color: c.amber }]}
       >
-        {left || t("approval.expired")}
+        {left ? t("approvals.left", { time: left }) : t("approval.expired")}
       </Text>
     </View>
   );
@@ -860,16 +860,19 @@ const styles = StyleSheet.create({
   // What will happen, drawn small: as tall as a preview gets, fading at its foot.
   preview: { maxHeight: 152, overflow: "hidden", paddingVertical: 10 },
   fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 40 },
-  // The name line: its mark, its title and details, "Ver …"; a hairline under it too, over the decision.
+  // The name line: its mark, its title and details, "Ver …"; a hairline under it too, over the decision. The mark
+  // and "Ver …" stand on the title's line (20 points), not in the middle of a tall detail.
   line: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  lineMark: { flexShrink: 0, width: 20, alignItems: "center" },
-  lineMore: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 0, maxWidth: "40%" },
+  lineMark: { flexShrink: 0, width: 20, height: 20, alignItems: "center", justifyContent: "center" },
+  lineMore: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 0, maxWidth: "40%", height: 20 },
+  // The deadline at the foot's end, right-aligned under the decision.
+  expiryRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 10 },
   pressed: { opacity: 0.7 },
   flip: { transform: [{ rotate: "180deg" }] },
   exact: { gap: 10, paddingVertical: 12 },
@@ -880,7 +883,7 @@ const styles = StyleSheet.create({
   primary: { flexGrow: 1.5, flexShrink: 1, minWidth: 0 },
   secondary: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
   expiry: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
-  fuse: { width: 44 },
+  fuse: { width: 36, height: 6 },
   expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
   // A decided request: its pill on the conversation itself, from where the message's text starts; the body sets its top.
   done: { alignSelf: "stretch" },
