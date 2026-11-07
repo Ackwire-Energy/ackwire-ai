@@ -1,7 +1,9 @@
 import type { ErrorBoundaryProps } from "expo-router";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { reportError } from "@/lib/error-reports";
 import { Button, EmptyState, Text } from "@/ui";
 import { useColors } from "./hooks";
 import { MONO } from "./parts";
@@ -16,6 +18,7 @@ export function ScreenError({ error, retry }: ErrorBoundaryProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const words = error instanceof Error ? error.message : String(error);
+  useEffect(() => reportError(error), [error]);
   return (
     <ScrollView
       style={{ backgroundColor: c.bg }}

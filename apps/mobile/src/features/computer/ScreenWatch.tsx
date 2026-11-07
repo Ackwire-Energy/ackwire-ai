@@ -4,13 +4,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
-import { WebView } from "react-native-webview";
-import { lastCookie } from "@/lib/auth";
 import { useServer } from "@/lib/server";
 import { useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Cover } from "./Cover";
-import { screenCall, screenEvent, screenPageStays, screenPageUrl, sessionCookieScript } from "./screen-page";
+import { reportStuck, ScreenPage, type ScreenPageHandle } from "./ScreenPage";
 import { DEFAULT_DESKTOP, fitScale, type Size } from "./screen-view";
 
 /** How long the screen may stay opening: a socket refused before it opens never closes with a code. */
@@ -49,19 +47,19 @@ export function ScreenWatch({
   const agent = useDirectory().agentById.get(agentId);
   const { color } = agentLook(agent);
   const g = agentGrammar(agent?.name ?? "");
-  const web = useRef<WebView<object>>(null);
+  const web = useRef<ScreenPageHandle>(null);
   const [life, setLife] = useState(0);
   const [ready, setReady] = useState(false);
+  const readyNow = useRef(ready);
+  readyNow.current = ready;
   const [page, setPage] = useState<DesktopViewState>("connecting");
   const [box, setBox] = useState<Size>({ width: 0, height: 0 });
   const [desk, setDesk] = useState<Size>(DEFAULT_DESKTOP);
   const said = useRef(onState);
   said.current = onState;
 
-  const call = (js: string) => web.current?.injectJavaScript(js);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: what the page should be doing, once it can hear
   useEffect(() => {
-    if (ready) call(screenCall("set", { connect, mode: "watch" }));
+    if (ready) web.current?.call("set", { connect, mode: "watch" });
   }, [ready, connect]);
 
   useEffect(() => {
@@ -71,16 +69,19 @@ export function ScreenWatch({
   // Opening for too long counts as offline: the card goes back to its browser's frames.
   useEffect(() => {
     if (!connect || page !== "connecting") return;
-    const id = setTimeout(() => setPage("offline"), STUCK_MS);
+    const id = setTimeout(() => {
+      reportStuck("card", agentId, { ready: readyNow.current, page: "connecting" });
+      setPage("offline");
+    }, STUCK_MS);
     return () => clearTimeout(id);
-  }, [connect, page]);
+  }, [connect, page, agentId]);
 
   useImperativeHandle(
     ref,
     () => ({
       retry: () => {
         setPage("connecting");
-        if (ready) web.current?.injectJavaScript(screenCall("retry"));
+        if (ready) web.current?.call("retry");
         else setLife((n) => n + 1);
       },
     }),
@@ -112,24 +113,14 @@ export function ScreenWatch({
         pointerEvents="none"
         style={[styles.frame, { width: desk.width, height: desk.height, transform: [{ scale }] }]}
       >
-        <WebView
+        <ScreenPage
           key={life}
           ref={web}
-          source={{ uri: screenPageUrl(server, orgId, agentId, { preview: true }) }}
-          originWhitelist={[new URL(server).origin]}
-          onShouldStartLoadWithRequest={(request) => screenPageStays(server, request.url)}
-          injectedJavaScriptBeforeContentLoaded={sessionCookieScript(lastCookie(), server)}
-          incognito
-          javaScriptEnabled
-          scrollEnabled={false}
-          bounces={false}
-          overScrollMode="never"
-          textInteractionEnabled={false}
-          androidLayerType="hardware"
-          style={styles.web}
-          onMessage={(e) => {
-            const event = screenEvent(server, e.nativeEvent);
-            if (!event) return;
+          server={server}
+          orgId={orgId}
+          agentId={agentId}
+          preview
+          onEvent={(event) => {
             if (event.type === "ready") setReady(true);
             else if (event.type === "view") setPage(event.state);
             else if (event.type === "size") setDesk({ width: event.width, height: event.height });
@@ -137,8 +128,7 @@ export function ScreenWatch({
               void qc.invalidateQueries({ queryKey: keys.agentDesktop(orgId, agentId) });
             }
           }}
-          onContentProcessDidTerminate={restart}
-          onRenderProcessGone={restart}
+          onGone={restart}
         />
       </View>
       {page === "live" ? null : <Cover fill sky spinner color={color} text={t("agentComputer.state.opening", g)} />}
@@ -151,5 +141,4 @@ const styles = StyleSheet.create({
   // Out of the layout and out of sight, still rendering (a zero size could stop the page).
   parked: { position: "absolute", left: 0, top: 0, width: 1, height: 1, opacity: 0 },
   frame: { position: "absolute", left: 0, top: 0, transformOrigin: "left top" },
-  web: { flex: 1, backgroundColor: "transparent" },
 });

@@ -964,6 +964,13 @@ export const envVars = {
     section: "Observability",
     example: "https://<key>@errors.example.com/2",
   },
+  SENTRY_MOBILE_DSN: {
+    schema: z.string().regex(DSN, DSN_MESSAGE).optional(),
+    description:
+      "The same for the phone app, so its reports land in a project of their own. Unset (default): the phone app reports where `SENTRY_WEB_DSN` says, and nowhere without it.",
+    section: "Observability",
+    example: "https://<key>@errors.example.com/3",
+  },
   SENTRY_ENVIRONMENT: {
     schema: z.string().min(1).max(64).default("production"),
     description: "The environment error reports are filed under (`production`, `staging`).",

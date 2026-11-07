@@ -148,6 +148,7 @@ export async function startServer(options: StartOptions) {
     dsn: config.SENTRY_DSN,
     environment: config.SENTRY_ENVIRONMENT,
     release,
+    runtime: { name: "bun", version: Bun.version },
   });
   const log = createLogger(config.LOG_LEVEL, errors);
   try {

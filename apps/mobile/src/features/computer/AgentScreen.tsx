@@ -44,9 +44,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { WebView } from "react-native-webview";
 import { scheduleOnRN } from "react-native-worklets";
-import { lastCookie } from "@/lib/auth";
 import { useServer } from "@/lib/server";
 import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useAppActive } from "@/lib/useAppActive";
@@ -83,17 +81,14 @@ import { Cover } from "./Cover";
 import { DOCK_HANG, DockDone, DockIcon, DockRule, DockText, EdgeDock } from "./EdgeDock";
 import { LiveTrail } from "./LiveTrail";
 import { PixelCursor } from "./PixelCursor";
+import { reportStuck, ScreenPage, type ScreenPageHandle } from "./ScreenPage";
 import {
   BUTTON,
   PointerLine,
   SCREEN_ROW_KEYS,
   type ScreenKey,
   type ScreenRowKey,
-  screenCall,
-  screenEvent,
-  screenPageStays,
-  screenPageUrl,
-  sessionCookieScript,
+  screenWaits,
   typedSince,
 } from "./screen-page";
 import {
@@ -213,11 +208,14 @@ export function AgentScreen({
   const name = agent?.name ?? "";
   const g = agentGrammar(name);
 
-  const web = useRef<WebView<object>>(null);
+  const web = useRef<ScreenPageHandle>(null);
   const [life, setLife] = useState(0);
   const [ready, setReady] = useState(false);
   const [page, setPage] = useState<DesktopViewState>("connecting");
   const [stuck, setStuck] = useState(false);
+  // How far the page got, for the report of a screen that never opens.
+  const pageNow = useRef({ ready, page, status: view.desktopQ.status });
+  pageNow.current = { ready, page, status: view.desktopQ.status };
   const [taking, setTaking] = useState(false);
   // The mode of the stream's session now, as the page says it (`session`): a switch's cover waits for it.
   const [session, setSession] = useState<DesktopMode | null>(null);
@@ -237,13 +235,11 @@ export function AgentScreen({
   const shown: DesktopViewState = blocked ?? page;
   const live = shown === "live";
 
-  const call = (js: string) => web.current?.injectJavaScript(js);
-  const line = useRef(new PointerLine((x, y, buttons) => call(screenCall("pointer", x, y, buttons)))).current;
+  const line = useRef(new PointerLine((x, y, buttons) => web.current?.call("pointer", x, y, buttons))).current;
   useEffect(() => () => line.stop(), [line]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: what the page should be doing, once it can hear
   useEffect(() => {
-    if (ready) call(screenCall("set", { connect, mode }));
+    if (ready) web.current?.call("set", { connect, mode });
   }, [ready, connect, mode]);
 
   const s = useSharedValue(0.25);
@@ -310,15 +306,18 @@ export function AgentScreen({
     session,
   });
   // Opening, or a switch the stream never takes: past `STUCK_MS` it says so, with Tentar de novo.
-  const waitsOn = connect && (shown === "connecting" || (live && switching !== null));
+  const waitsOn = screenWaits({ active, shown, switching: switching !== null });
   useEffect(() => {
     if (!waitsOn) {
       setStuck(false);
       return;
     }
-    const id = setTimeout(() => setStuck(true), STUCK_MS);
+    const id = setTimeout(() => {
+      setStuck(true);
+      reportStuck("computer", agentId, pageNow.current);
+    }, STUCK_MS);
     return () => clearTimeout(id);
-  }, [waitsOn]);
+  }, [waitsOn, agentId]);
   const lost = stuck && waitsOn;
   const words = askControlWords(status, Boolean(f?.browser), Boolean(run));
   // Watching, a tap on the screen asks before control and reaches nothing there; the question stays until Cancelar.
@@ -425,7 +424,7 @@ export function AgentScreen({
   const retry = () => {
     setStuck(false);
     setPage("connecting");
-    if (ready) call(screenCall("retry"));
+    if (ready) web.current?.call("retry");
     else setLife((n) => n + 1);
     void view.desktopQ.refetch();
   };
@@ -774,24 +773,13 @@ export function AgentScreen({
                 pointerEvents="none"
                 style={[{ width: deskSize.width, height: deskSize.height }, styles.frame, frame]}
               >
-                <WebView
+                <ScreenPage
                   key={life}
                   ref={web}
-                  source={{ uri: screenPageUrl(server, orgId, agentId) }}
-                  originWhitelist={[new URL(server).origin]}
-                  onShouldStartLoadWithRequest={(request) => screenPageStays(server, request.url)}
-                  injectedJavaScriptBeforeContentLoaded={sessionCookieScript(lastCookie(), server)}
-                  incognito
-                  javaScriptEnabled
-                  scrollEnabled={false}
-                  bounces={false}
-                  overScrollMode="never"
-                  textInteractionEnabled={false}
-                  androidLayerType="hardware"
-                  style={styles.web}
-                  onMessage={(e) => {
-                    const event = screenEvent(server, e.nativeEvent);
-                    if (!event) return;
+                  server={server}
+                  orgId={orgId}
+                  agentId={agentId}
+                  onEvent={(event) => {
                     if (event.type === "ready") setReady(true);
                     else if (event.type === "view") setPage(event.state);
                     else if (event.type === "session") setSession(event.mode);
@@ -799,12 +787,7 @@ export function AgentScreen({
                     else if (event.type === "changed") void view.desktopQ.refetch();
                     else toast({ title: t("desktop.clipboard.tooLong", g), icon: "x" });
                   }}
-                  onContentProcessDidTerminate={() => {
-                    setReady(false);
-                    setSession(null);
-                    setLife((n) => n + 1);
-                  }}
-                  onRenderProcessGone={() => {
+                  onGone={() => {
                     setReady(false);
                     setSession(null);
                     setLife((n) => n + 1);
@@ -863,8 +846,8 @@ export function AgentScreen({
             label={t("desktop.keyboard.field", g)}
             bottom={insets.bottom}
             sides={wide ? Math.max(insets.left, insets.right) : 0}
-            onText={(text) => call(screenCall("type", text))}
-            onKey={(k) => call(screenCall("key", k))}
+            onText={(text) => web.current?.call("type", text)}
+            onKey={(k) => web.current?.call("key", k)}
             onPassword={() => setTyping("password")}
             onClose={() => {
               setTyping(null);
@@ -1489,7 +1472,6 @@ const styles = StyleSheet.create({
   box: { marginHorizontal: 12, borderRadius: 20, overflow: "hidden", backgroundColor: "#101010" },
   boxWide: { marginHorizontal: 0, borderRadius: 0 },
   frame: { position: "absolute", left: 0, top: 0, transformOrigin: "left top" },
-  web: { flex: 1, backgroundColor: "transparent" },
   cursor: {
     position: "absolute",
     left: 0,

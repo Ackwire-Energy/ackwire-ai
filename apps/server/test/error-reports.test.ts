@@ -175,12 +175,29 @@ describe("error reports (ADR 0104)", () => {
     expect(await (await t.app.request("/api/health")).json()).toMatchObject({ version: "2026.10.31.4" });
     expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
       errorReports: { dsn: "https://public@example.invalid/2", environment: "production", release: "2026.10.31.4" },
+      mobileErrorReports: { dsn: "https://public@example.invalid/2" },
+    });
+  });
+
+  test("the phone app reports to its own project when SENTRY_MOBILE_DSN is set", async () => {
+    t = await createTestServer({
+      env: {
+        SENTRY_WEB_DSN: "https://public@example.invalid/2",
+        SENTRY_MOBILE_DSN: "https://public@example.invalid/3",
+      },
+    });
+    expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
+      errorReports: { dsn: "https://public@example.invalid/2" },
+      mobileErrorReports: { dsn: "https://public@example.invalid/3", environment: "production" },
     });
   });
 
   test("without SENTRY_WEB_DSN the web app gets no reporting, and the version is the server's own", async () => {
     t = await createTestServer();
     expect(await (await t.app.request("/api/instance")).json()).toMatchObject({ version: "test" });
-    expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({ errorReports: null });
+    expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
+      errorReports: null,
+      mobileErrorReports: null,
+    });
   });
 });

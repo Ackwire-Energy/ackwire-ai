@@ -1,4 +1,4 @@
-import { keys, useApi, useMe } from "@agenteschat/client";
+import { keys, useApi, useAuthConfig, useMe } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { type Href, ThemeProvider as NavigationThemeProvider, router, Stack, usePathname } from "expo-router";
@@ -16,6 +16,7 @@ import { takeLink } from "@/features/links/pending";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { ScreenError } from "@/features/shared/ScreenError";
+import { catchGlobalErrors, setErrorScope, startErrorReports } from "@/lib/error-reports";
 import { keepLastCrash } from "@/lib/last-crash";
 import { deletingOf, enteringShown, firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
@@ -32,6 +33,7 @@ void SplashScreen.preventAutoHideAsync().catch(() => {});
 // Upright everywhere but the agent's screen (`useSideways`). iOS starts this way (the plugin); Android only from here.
 void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
 keepLastCrash();
+catchGlobalErrors();
 
 /**
  * Root: the providers, then the session gate. What breaks while drawing outside `(app)`'s own boundary (the sign-in
@@ -72,6 +74,15 @@ function Gate() {
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading) && down === null;
   // The account was deleted and waits for its date: its own screen, over everything else.
   const me = useMe();
+  // Where the phone's error reports go, once the server says (ADR 0104).
+  const authConfig = useAuthConfig();
+  const reportsTo = authConfig.isSuccess ? (authConfig.data.mobileErrorReports ?? null) : undefined;
+  useEffect(() => {
+    if (reportsTo !== undefined) void startErrorReports(reportsTo);
+  }, [reportsTo]);
+  const userId = me.data?.user.id;
+  const orgId = org.state?.orgId;
+  useEffect(() => setErrorScope({ orgId, userId }), [orgId, userId]);
   const accountDeletion = ready && signedIn ? me.data?.user.deletion : undefined;
   const suspended = ready && signedIn && org.state ? suspendedOf(org.state.orgs, org.state.orgId) : null;
   // Being deleted: its own screen, after the suspension, the stronger fact.

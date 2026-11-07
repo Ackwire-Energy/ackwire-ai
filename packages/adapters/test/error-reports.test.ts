@@ -108,7 +108,9 @@ describe("scrubbing (ADR 0104)", () => {
 });
 
 /** A reporter whose server is a fake `fetch` that keeps every envelope it is sent. */
-async function reporterToFakeServer() {
+async function reporterToFakeServer(
+  from: { platform?: string; runtime: { name: string } } = { runtime: { name: "bun" } },
+) {
   const sent: { url: string; body: string }[] = [];
   const fake = (async (url: string | URL | Request, init?: RequestInit) => {
     sent.push({ url: String(url), body: String(init?.body) });
@@ -119,6 +121,7 @@ async function reporterToFakeServer() {
     environment: "staging",
     release: "2026.10.31.4",
     fetch: fake,
+    ...from,
   });
   return { reporter, sent };
 }
@@ -133,7 +136,9 @@ describe("the reporter", () => {
       loaded = true;
       return import("@sentry/core");
     };
-    expect(await createErrorReporter({ environment: "production", release: "1" }, load)).toBe(noErrorReports);
+    expect(await createErrorReporter({ environment: "production", release: "1", runtime: { name: "bun" } }, load)).toBe(
+      noErrorReports,
+    );
     expect(loaded).toBe(false);
     expect(noErrorReports.capture(new Error("x"))).toBeUndefined();
   });
@@ -179,6 +184,18 @@ describe("the reporter", () => {
     });
     expect(event.tags.empty).toBeUndefined();
     expect(event.exception.values[0].stacktrace.frames.length).toBeGreaterThan(0);
+  });
+
+  test("the phone app's reports say what runs them, scrubbed the same", async () => {
+    const { reporter, sent } = await reporterToFakeServer({ platform: "javascript", runtime: { name: "android" } });
+    reporter.capture(new Error("for ana@example.com"), { view: "computer", page_ready: false });
+    expect(await reporter.flush(2000)).toBe(true);
+    expect(eventOf(sent[0]?.body ?? "")).toMatchObject({
+      platform: "javascript",
+      contexts: { runtime: { name: "android" } },
+      tags: { view: "computer", page_ready: "false" },
+      exception: { values: [{ value: "for [email]" }] },
+    });
   });
 
   test("a failed query is reported with its SQL and its cause, never the values it was given", async () => {
