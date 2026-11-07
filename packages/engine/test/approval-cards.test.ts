@@ -269,18 +269,18 @@ test("the card's notification follows its oldest waiting request, and leaves who
       decision: "approve",
     });
 
+  // Bia is the agent's responsável: hers alone; the admin decides it from Aprovações, untold.
+  expect(await entry(f.owner.id)).toBeUndefined();
   await decide([a]);
-  const ownerEntry = await entry(f.owner.id);
-  expect((ownerEntry?.source as { approvalId?: string } | undefined)?.approvalId).toBe(b);
-  expect((ownerEntry?.latest as { title?: string } | undefined)?.title).toBe(rows[1]?.title);
-  expect(ownerEntry?.doneAt).toBeNull();
+  const biaEntry = await entry(bia.id);
+  expect((biaEntry?.source as { approvalId?: string } | undefined)?.approvalId).toBe(b);
+  expect((biaEntry?.latest as { title?: string } | undefined)?.title).toBe(rows[1]?.title);
+  expect(biaEntry?.doneAt).toBeNull();
 
-  // Only the admin-only request waits: the agent's owner has nothing left there, the admin still does.
+  // Only the admin-only request waits: the agent's owner has nothing left there.
   await decide([b, rows[2]?.id]);
   expect((await entry(bia.id))?.doneAt).not.toBeNull();
-  const adminEntry = await entry(f.owner.id);
-  expect(adminEntry?.doneAt).toBeNull();
-  expect((adminEntry?.source as { approvalId?: string } | undefined)?.approvalId).toBe(d);
+  expect(d).toBeDefined();
 });
 
 test("an action too long for its card is cut with a mark, never passing for the whole", async () => {

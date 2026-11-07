@@ -762,7 +762,7 @@ describe("outbox delivery", () => {
     });
   });
 
-  test("approval digest: one email per approver for requests waiting too long, never twice, opening a lone request", async () => {
+  test("approval digest: one email per person told for requests waiting too long, never twice, opening a lone request", async () => {
     const gh = fakeGithub();
     f = await setup({
       toolSources: [gh.source],
@@ -782,13 +782,14 @@ describe("outbox delivery", () => {
     await drainOutbox(f.db, f.handlers);
     const later = new Date(Date.now() + 5 * 3600_000);
     expect(await queueApprovalDigests(f.db, "https://x", 4)).toBe(0);
-    expect(await queueApprovalDigests(f.db, "https://x", 4, later)).toBe(2); // owner + admin
+    // The agent's responsável (the owner), not every admin (`notifiedIds`).
+    expect(await queueApprovalDigests(f.db, "https://x", 4, later)).toBe(1);
     expect(await queueApprovalDigests(f.db, "https://x", 4, later)).toBe(0);
     const [approval] = await f.db.select().from(schema.approvals);
     const digests = (await f.db.select().from(schema.outbox)).filter(
       (j) => j.kind === "email.send" && JSON.stringify(j.payload).includes("approval_digest"),
     );
-    expect(digests).toHaveLength(2);
+    expect(digests).toHaveLength(1);
     for (const d of digests) {
       expect(d.payload).toMatchObject({
         template: { url: `https://x/org/${f.org.id}/approvals?open=${approval?.id}`, afterHours: 4 },
