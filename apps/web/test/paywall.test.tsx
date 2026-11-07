@@ -257,6 +257,7 @@ describe("Lodi's DM on a hold", () => {
     const state = withRightHand(held(seedState({ aiStatus })), { setup: { role: null, done: [] } });
     state.agents = state.agents.filter((a) => a.id === LODI_ID);
     state.members = state.members.slice(0, 1);
+    state.connections = [];
     return state;
   };
   const row = (text: string) =>

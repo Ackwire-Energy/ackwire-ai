@@ -286,6 +286,7 @@ describe("Início", () => {
   test("while Lodi's first-run checklist has a row left: one line back to it, never a second list (ADR 0152 §6)", async () => {
     const state = withRightHand(seedState({ agents: [] }), { setup: { role: null, done: [] } });
     state.members = state.members.filter((m) => m.userId === "u-walter");
+    state.connections = [];
     const { router } = await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
     await settle(6);
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(

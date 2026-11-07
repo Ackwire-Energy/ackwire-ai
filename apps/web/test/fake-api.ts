@@ -2208,10 +2208,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       // As the server: the template's team is made at once (ADR 0152 §6).
       applyTeamTemplate: async (orgId, templateId, locale) => {
         log("agents.applyTeamTemplate", orgId, templateId, locale);
-        const team = state.teamTemplates?.find((x) => x.id === templateId)?.team.agents ?? [];
+        const template = state.teamTemplates?.find((x) => x.id === templateId);
+        const team = template?.team.agents ?? [];
+        const agentIds: string[] = [];
         for (const a of team) {
+          agentIds.push(id("agent"));
           state.agents.push({
-            id: id("agent"),
+            id: agentIds.at(-1) ?? "",
             name: a.name,
             handle: a.handle,
             role: a.role,
@@ -2225,7 +2228,33 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             setup: { role: null, done: ["who", "how"] },
           });
         }
-        return { channelId: `dm-${LODI_ID}`, messageId: id("message"), state: "created", error: null };
+        // The card in the person's DM with the right hand, already created.
+        const channelId = state.dms.find((d) => d.with.id === LODI_ID)?.channelId ?? `dm-${LODI_ID}`;
+        const messageId = id("message");
+        const me = state.me?.user.id ?? "";
+        state.messages.push({
+          id: messageId,
+          channelId,
+          threadId: null,
+          author: { type: "agent", id: LODI_ID },
+          body: "",
+          mentionedAgentIds: [],
+          agentRunId: null,
+          meta: {
+            actionCard: {
+              kind: "team_proposal",
+              forUserId: me,
+              params: template?.team,
+              state: "created",
+              decidedByUserId: me,
+              decidedAt: NOW.toISOString(),
+              expiresAt: new Date(NOW.getTime() + 86_400_000).toISOString(),
+              created: { agentIds, channelIds: [], routineIds: [], skillIds: [], skipped: [], noAi: [] },
+            },
+          },
+          createdAt: new Date().toISOString(),
+        });
+        return { channelId, messageId, state: "created", error: null };
       },
       decideCostly: async (orgId, signalId, decision) => {
         log("agents.decideCostly", orgId, signalId, decision);
