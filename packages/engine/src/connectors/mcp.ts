@@ -8,7 +8,7 @@ import { connectorKeyOf } from "../connector-usage";
 import { cutText } from "../format";
 import { assertPublicHttpsUrl, type ResolveHost } from "../net-guard";
 import { replyThreadOf } from "../runs";
-import { alwaysAsks, MAX_RESULT_CHARS } from "../tools/gateway";
+import { alwaysAsks, customAlwaysAsks, MAX_RESULT_CHARS } from "../tools/gateway";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
 import { sqlArgOf } from "./classify";
@@ -266,8 +266,9 @@ export function createConnectorToolSource(
    * never shows). `approval` and sensitive tools ask a person for every call;
    * `write` tools run on their own and each call goes to the audit log.
    * Composio's executor says which actions each call runs: reads go as the
-   * server's reads, and "Aprovar sempre" may cover its other actions (no other
-   * tool's); its workbench, bash and proxy always ask.
+   * server's reads, and "Aprovar sempre" may cover its other actions; its
+   * workbench, bash and proxy always ask. A tool that asks only because of its
+   * level may be approved for good for one agent (`customAlwaysAsks` aside).
    */
   async function customToolsOf(connection: ConnectorConnection): Promise<ToolDefinition[]> {
     // A Composio account that stopped working has no tools until it is reconnected.
@@ -317,11 +318,15 @@ export function createConnectorToolSource(
           // Its exact call may be approved ahead, except a tool that runs whatever its input says.
           ahead: !COMPOSIO_ANY_ACTION.has(tool.name),
           external: true, // whatever the server returns is third-party text
-          // Only the executor names what each call does; any other tool approved for good would run with any params.
-          // A Composio action is one action: approved for good when it asks only because of its level.
+          // The executor names what each call does. A Composio action, and a custom server's own tool, is one action:
+          // approved for good when it asks only because of its level (never a sensitive one, nor one that runs
+          // whatever its arguments say), with any values.
           ...(executor
             ? { actions: composioActions, readScope: customScope(connection.id, "read"), rememberAs: tool.name }
-            : action && !row.sensitive && !asks && !alwaysAsks(action)
+            : !row.sensitive &&
+                !asks &&
+                !COMPOSIO_ANY_ACTION.has(tool.name) &&
+                (action ? !alwaysAsks(action) : !composio && !customAlwaysAsks(tool.name))
               ? { rememberAs: tool.name }
               : {}),
           ...(sqlArg ? { sqlReads: { tool: tool.name, arg: sqlArg } } : {}),

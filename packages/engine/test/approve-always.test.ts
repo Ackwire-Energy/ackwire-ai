@@ -216,6 +216,49 @@ async function composio(fx: Fixture, mcp: ReturnType<typeof composioMcp>, label 
   return { deps, serverId: started.server.id };
 }
 
+/** A server connected by address, like Higgsfield's: one tool that makes images, and others that must always ask. */
+function imageMcp() {
+  const calls: { tool: string; args: Record<string, unknown> }[] = [];
+  const build = () => {
+    const server = new McpServer({ name: "images", version: "1" });
+    const add = (name: string, description: string, inputSchema: Record<string, z.ZodType>) =>
+      server.registerTool(name, { description, inputSchema }, async (args) => {
+        calls.push({ tool: name, args });
+        return { content: [{ type: "text" as const, text: "ok" }] };
+      });
+    add("generate_image", "Makes an image from a prompt, spending credits", { prompt: z.string() });
+    add("deploy_site", "Publishes the site", { site: z.string() });
+    add("run_script", "Runs a script", { code: z.string() });
+    add("delete_image", "Deletes an image", { id: z.string() });
+    return server;
+  };
+  const connect: McpConnect = async () => {
+    const [client, server] = InMemoryTransport.createLinkedPair();
+    await build().connect(server);
+    return mcpSessionOver(client);
+  };
+  return { connect, calls };
+}
+
+/** Any server connected by address with its suggestions accepted (each undecided tool asks first). */
+async function connectServer(fx: Fixture, mcp: { connect: McpConnect }, label: string, serverUrl: string) {
+  const deps: CustomDeps = {
+    db: fx.db,
+    keyWrappers: [fx.keyWrapper],
+    publicUrl: "https://chat.example.com",
+    resolveHost: async () => ["93.184.216.34"],
+    connect: mcp.connect,
+  };
+  const started = await connectCustomServer(deps, fx.owner.id, fx.org.id, {
+    serverUrl,
+    apiKey: "fake_key_for_tests",
+    label,
+  });
+  if (started.status !== "connected") throw new Error(`expected connected, got ${started.status}`);
+  await acceptCustomSuggestion(deps, fx.owner.id, fx.org.id, started.server.id);
+  return { deps, serverId: started.server.id };
+}
+
 async function world(fx: Fixture) {
   const mcp = composioMcp();
   const server = await composio(fx, mcp);
@@ -510,25 +553,50 @@ describe("Aprovar sempre", () => {
     expect(mcp.calls).toEqual([]);
   });
 
-  test("a plain tool of the server asks every time: approved for good, it would run with any params", async () => {
+  test("a plain tool of the server is one action: approved for good, that agent runs it with any values", async () => {
     f = await setup();
     const { mcp, gateway, serverId } = await world(f);
     const ctx = await runOf(f);
     const ask = asked(await invoke(gateway, ctx, "composio_close_ticket", { id: 1, why: WHY }));
-    expect(ask.approveAlways).toBeNull();
-    await expect(decide(f, f.owner.id, ask.id, { decision: "approve", always: true })).rejects.toMatchObject({
-      code: "approval.always_unavailable",
-    });
-    // Even a rule in the table gives it nothing.
-    await f.db.insert(schema.approvalRules).values({
-      orgId: f.org.id,
-      agentId: f.agent.id,
-      connectionId: serverId,
-      tool: "close_ticket",
-      action: "",
-    });
-    asked(await invoke(gateway, ctx, "composio_close_ticket", { id: 2, why: WHY }));
-    expect(mcp.calls).toEqual([]);
+    expect(ask.approveAlways).toEqual({ tool: "close_ticket", actions: [] });
+    await decide(f, f.owner.id, ask.id, { decision: "approve", always: true });
+    expect((await rules(f)).map((r) => [r.agentId, r.tool, r.action])).toEqual([[f.agent.id, "close_ticket", ""]]);
+    expect((await invoke(gateway, ctx, "composio_close_ticket", { id: 2, why: WHY })).type).toBe("result");
+    // The first runs when the run resumes; the second ran at once, without asking.
+    expect(mcp.calls.map((c) => c.args)).toEqual([{ id: 2 }]);
+    // Another agent of the workspace still asks.
+    const other = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", role: "Ops", instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await grantScopes(f.db, f.org.id, other.id, [{ connectionId: serverId, scope: "connector:*" }]);
+    asked(await invoke(gateway, await runOf(f, other.id), "composio_close_ticket", { id: 3, why: WHY }));
+  });
+
+  test("a custom server's tool asking because of its level is offered: deploys, deletes and code runners never", async () => {
+    f = await setup();
+    const mcp = imageMcp();
+    const server = await connectServer(f, mcp, "Higgsfield", "https://mcp.higgsfield.example/mcp");
+    const gateway = createToolGateway({ sources: [createConnectorToolSource(server.deps)] });
+    const ctx = await runOf(f);
+    const ask = asked(await invoke(gateway, ctx, "higgsfield_generate_image", { prompt: "capa", why: WHY }));
+    expect(ask.approveAlways).toEqual({ tool: "generate_image", actions: [] });
+    await decide(f, f.owner.id, ask.id, { decision: "approve", always: true });
+    expect((await invoke(gateway, ctx, "higgsfield_generate_image", { prompt: "outra", why: WHY })).type).toBe(
+      "result",
+    );
+    for (const [tool, input] of [
+      ["deploy_site", { site: "loja" }],
+      ["run_script", { code: "rm -rf /" }],
+      ["delete_image", { id: "img-1" }],
+    ] as const) {
+      const other = asked(await invoke(gateway, ctx, `higgsfield_${tool}`, { ...input, why: WHY }));
+      expect({ tool, offered: other.approveAlways }).toEqual({ tool, offered: null });
+    }
+    expect(mcp.calls.map((c) => c.tool)).toEqual(["generate_image"]);
   });
 
   test("a rule is kept by the server's own tool name: it outlives a renamed connection", async () => {
