@@ -113,6 +113,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { AgentSetupIntro, useSetupSteps } from "../agents/setup/SetupCard";
 import { usePlanHold } from "../ai/parts";
 import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";
@@ -365,6 +366,8 @@ function Chat({
   const rhythm = CHAT_RHYTHM[rowLook.style];
   // The right hand (ADR 0137): its own line and composer hint, no computer, and its greeting on top.
   const rightHand = isRightHand(dmAgent) && !isThread;
+  // A new agent's setup checklist (ADR 0152 §2) for whoever sets it up: its greeting and the checklist on top.
+  const setupIntro = useSetupSteps(dmAgent).length > 0 && !rightHand && !isThread;
   // Its DM is open, from its row or any other way in: its row's "Novo" goes.
   useEffect(() => {
     if (rightHand && meId) rightHandSeen.mark(rightHandSeenKey(meId, orgId));
@@ -1675,7 +1678,7 @@ function Chat({
   const planHeld = usePlanHold(orgId, org) !== null;
   // The right hand's greeting says it itself (its Connect AI card).
   const banner =
-    member && !rightHand && !planHeld
+    member && !rightHand && !planHeld && !setupIntro
       ? noAiBanner(aiStatus.data, {
           agentIds: dmAgentId ? [dmAgentId] : channelAgents,
           dmAgentId,
@@ -2097,10 +2100,17 @@ function Chat({
                               keyboardOffset={lift}
                               contentInsetEndAdjustment={contentInsetEndAdjustment}
                               contentContainerStyle={listPad}
-                              // The right hand's greeting stays at the conversation's start, once the start is loaded.
+                              // The right hand's greeting, or a new agent's checklist, stays at the conversation's start,
+                              // once the start is loaded.
                               ListHeaderComponent={
-                                dmAgent && rightHand && (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
-                                  <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
+                                dmAgent &&
+                                (rightHand || setupIntro) &&
+                                (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
+                                  rightHand ? (
+                                    <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
+                                  ) : (
+                                    <AgentSetupIntro agent={dmAgent} channelId={channelId} />
+                                  )
                                 ) : undefined
                               }
                             />
@@ -2118,6 +2128,10 @@ function Chat({
                   {dmAgent && rightHand ? (
                     <ScrollView contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: composerHeight }}>
                       <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
+                    </ScrollView>
+                  ) : dmAgent && setupIntro ? (
+                    <ScrollView contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: composerHeight }}>
+                      <AgentSetupIntro agent={dmAgent} channelId={channelId} />
                     </ScrollView>
                   ) : dmAgent && !isThread ? (
                     <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />

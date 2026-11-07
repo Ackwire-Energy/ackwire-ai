@@ -2139,6 +2139,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           createdAt: NOW.toISOString(),
           audience: input.audience ?? { mode: "everyone", userIds: [] },
           ...(input.appearance ? { appearance: input.appearance } : {}),
+          // As the backend: every new agent starts with its setup checklist (ADR 0152 §2), who and how done.
+          setup: { role: input.setup?.role ?? null, done: ["who", "how"] },
         };
         state.agents.push(agent);
         if (input.proposal) Object.assign(proposalCard(input.proposal).card, { state: "created", agentId: agent.id });
@@ -2216,9 +2218,56 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.teamTemplates", orgId, locale);
         return state.teamTemplates ?? [];
       },
-      applyTeamTemplate: async (orgId, templateId, locale, tap) => {
-        log("agents.applyTeamTemplate", orgId, templateId, locale, tap);
-        return { channelId: `dm-${LODI_ID}`, messageId: id("message") };
+      // As the server: the template's team is made at once (ADR 0152 §6).
+      applyTeamTemplate: async (orgId, templateId, locale) => {
+        log("agents.applyTeamTemplate", orgId, templateId, locale);
+        const template = state.teamTemplates?.find((x) => x.id === templateId);
+        const team = template?.team.agents ?? [];
+        const agentIds: string[] = [];
+        for (const a of team) {
+          agentIds.push(id("agent"));
+          state.agents.push({
+            id: agentIds.at(-1) ?? "",
+            name: a.name,
+            handle: a.handle,
+            role: a.role,
+            instructions: a.instructions,
+            model: "auto",
+            ownerUserId: state.me?.user.id ?? null,
+            hasCredential: false,
+            monthlyBudgetUsd: null,
+            createdAt: NOW.toISOString(),
+            audience: { mode: "everyone", userIds: [] },
+            setup: { role: null, done: ["who", "how"] },
+          });
+        }
+        // The card in the person's DM with the right hand, already created.
+        const channelId = state.dms.find((d) => d.with.id === LODI_ID)?.channelId ?? `dm-${LODI_ID}`;
+        const messageId = id("message");
+        const me = state.me?.user.id ?? "";
+        state.messages.push({
+          id: messageId,
+          channelId,
+          threadId: null,
+          author: { type: "agent", id: LODI_ID },
+          body: "",
+          mentionedAgentIds: [],
+          agentRunId: null,
+          meta: {
+            actionCard: {
+              kind: "team_proposal",
+              forUserId: me,
+              params: template?.team,
+              state: "created",
+              decidedByUserId: me,
+              decidedAt: NOW.toISOString(),
+              expiresAt: new Date(NOW.getTime() + 86_400_000).toISOString(),
+              created: { agentIds, channelIds: [], routineIds: [], skillIds: [], skipped: [], noAi: [] },
+            },
+          },
+          createdAt: new Date().toISOString(),
+        });
+        return { channelId, messageId, state: "created", error: null };
       },
       decideCostly: async (orgId, signalId, decision) => {
         log("agents.decideCostly", orgId, signalId, decision);
@@ -2301,6 +2350,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           throw new ApiError(409, "agent.mail_loss_changed", "It holds a mailbox you weren't asked about");
         }
         Object.assign(agent, fields);
+        return { ...agent };
+      },
+      confirmSetup: async (orgId, agentId, step) => {
+        log("agents.confirmSetup", orgId, agentId, step);
+        const agent = state.agents.find((a) => a.id === agentId);
+        if (!agent) throw new ApiError(404, "not_found", "Agent not found");
+        if (agent.setup && !agent.setup.done.includes(step)) {
+          agent.setup = { ...agent.setup, done: [...agent.setup.done, step] };
+        }
         return { ...agent };
       },
       mailLoss: async (orgId, agentId, audience) => {

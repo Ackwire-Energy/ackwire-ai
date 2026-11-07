@@ -30,7 +30,7 @@ import {
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
@@ -696,11 +696,14 @@ export function TeamTemplatesSheet({
   open,
   onClose,
   onNone,
+  initial,
 }: {
   open: boolean;
   onClose: () => void;
   /** "Nenhum desses": back to writing what they do. */
   onNone: () => void;
+  /** The business the first run's row 1 saved (ADR 0152 §6): its template opens picked. */
+  initial?: string | undefined;
 }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
@@ -712,6 +715,11 @@ export function TeamTemplatesSheet({
   const list = useTeamTemplates(orgId, i18n.language, open);
   const use = useApplyTeamTemplate(orgId);
   const [picked, setPicked] = useState<string | null>(null);
+  const [refused, setRefused] = useState<string | null>(null);
+  useEffect(() => {
+    if (open) setPicked(initial ?? null);
+    setRefused(null);
+  }, [open, initial]);
   const chosen = list.data?.find((x) => x.id === picked) ?? null;
   return (
     <Sheet open={open} onClose={onClose} solid>
@@ -738,12 +746,29 @@ export function TeamTemplatesSheet({
             <Button
               variant="primary"
               wide
-              label={t("teamPlan.templates.use")}
+              label={t("teamPlan.templates.create")}
               loading={use.isPending}
               onPress={() =>
-                use.mutate({ templateId: chosen.id, locale: i18n.language }, { onSuccess: onClose, onError: failed })
+                use.mutate(
+                  { templateId: chosen.id, locale: i18n.language },
+                  {
+                    // A step that failed: its reason, and the card stays open in the right hand's DM.
+                    onSuccess: (out) =>
+                      out.state === "created"
+                        ? onClose()
+                        : setRefused(
+                            out.error ? teamFailureText(t, out.error, i18n.language) : t("teamPlan.templates.failed"),
+                          ),
+                    onError: failed,
+                  },
+                )
               }
             />
+            {refused ? (
+              <Text variant="small" tone="danger">
+                {refused}
+              </Text>
+            ) : null}
             <Button
               variant="ghost"
               wide
@@ -801,6 +826,24 @@ export function TeamTemplatesSheet({
                 </View>
               </Pressable>
             )}
+            <Button
+              variant="text"
+              size="sm"
+              label={t("teamPlan.templates.import")}
+              onPress={() => {
+                onClose();
+                router.push("/settings/import");
+              }}
+            />
+            <Button
+              variant="text"
+              size="sm"
+              label={t("teamPlan.templates.scratch")}
+              onPress={() => {
+                onClose();
+                router.push("/new-agent");
+              }}
+            />
           </>
         )}
       </ScrollView>

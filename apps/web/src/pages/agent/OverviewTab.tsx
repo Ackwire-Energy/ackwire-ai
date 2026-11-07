@@ -5,6 +5,7 @@ import { excerpt } from "@agenteschat/client/lib/text";
 import { Button, Card, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { AgentSetupCard } from "@/components/AgentSetup";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { CardHead, useAgentEdit } from "./context";
@@ -38,6 +39,8 @@ export function OverviewTab() {
   return (
     <>
       <ReadOnlyNote />
+      {/* A new agent's checklist (ADR 0152 §2), while something is left. */}
+      <AgentSetupCard agent={agent} place="profile" />
       <div className="agp-overview">
         {(approvals > 0 || pending.length > 0) && (
           <div className="agp-attns">

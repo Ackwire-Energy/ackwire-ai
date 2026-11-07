@@ -104,8 +104,7 @@
     "waiting": "あなたの対応待ち",
     "workingNow": "作業中",
     "missionTitle": "ミッション: {{title}}",
-    "directChat": "ダイレクトチャット",
-    "stepAsk": "エージェントとの会話を始めましょう。"
+    "directChat": "ダイレクトチャット"
   },
   "approval": {
     "asksIn": "があなたの承認を求めています · #{{channel}}",

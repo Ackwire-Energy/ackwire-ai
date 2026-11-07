@@ -2161,6 +2161,10 @@ function ChannelView({
     },
     resend: (body) => send(body),
     focusComposer: () => composer.current?.focus(),
+    fillComposer: (text) => {
+      setDraft(text);
+      composer.current?.focus();
+    },
     followBottom: () => {
       if (stick.current && Date.now() >= autoScrollUntil.current) follow();
     },
@@ -2220,6 +2224,7 @@ function ChannelView({
       retry: (local) => now().retry(local),
       resend: (body) => now().resend(body),
       focusComposer: () => now().focusComposer(),
+      fillComposer: (text) => now().fillComposer(text),
       followBottom: () => now().followBottom(),
       channelAgents,
       reply: replies ? (message) => now().reply(message) : undefined,

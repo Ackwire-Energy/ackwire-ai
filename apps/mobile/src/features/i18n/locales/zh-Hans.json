@@ -104,8 +104,7 @@
     "waiting": "等你处理",
     "workingNow": "正在工作",
     "missionTitle": "专项任务 {{title}}",
-    "directChat": "私聊",
-    "stepAsk": "和智能体开始对话。"
+    "directChat": "私聊"
   },
   "approval": {
     "asksIn": "请求你审批 · #{{channel}}",

@@ -44,8 +44,6 @@ export const STORAGE_KEYS = {
   lastOrg: "agentes.lastOrg",
   /** The last page shown in each workspace (JSON, by workspace id): where "Onde você parou" opens (ADR 0108). */
   lastPlace: "agentes.lastPlace",
-  /** Workspaces whose "Primeiros passos" the person hid on Início (JSON array of ids). */
-  firstStepsHidden: "agentes.home.stepsHidden",
   /** How this browser signed in last ("google", "github", "apple" or "email"): marked on the sign-in screen. */
   lastSignIn: "agentes.lastSignIn",
   /** "0" when the person switched off the picture viewer's hover lens (on by default). */

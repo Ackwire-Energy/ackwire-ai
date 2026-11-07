@@ -7,7 +7,6 @@ import {
   createAgentRuns,
   createCredential,
   createJobHandlers,
-  createTeam,
   drainOutbox,
   emailArtAt,
   getMessage,
@@ -294,48 +293,39 @@ describe("the team before paying", () => {
   const lodiDm = async (channelId: string) =>
     f.db.select().from(schema.messages).where(eq(schema.messages.channelId, channelId));
 
-  test("a tap is kept as the person's message with no run, then the card, with no question", async () => {
+  test("Criar o time makes the team at once, with no question, no run and no model call", async () => {
     f = await setup({ rightHand: true });
     await hold("payment");
-    const used = await useTeamTemplate(
-      { db: f.db, pubsub: f.pubsub },
-      f.owner.id,
-      f.org.id,
-      "store",
-      "pt-BR",
-      "Loja online",
-    );
+    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "store", "pt-BR");
     await drainOutbox(f.db, f.handlers);
+    expect(used.state).toBe("created");
     const rows = await lodiDm(used.channelId);
-    expect(rows.find((m) => m.authorType === "person")?.body).toBe("Loja online");
+    expect(rows.some((m) => m.authorType === "person")).toBe(false);
     expect(rows.some((m) => m.meta.replyChips)).toBe(false);
     expect(await cards()).toHaveLength(0);
     expect(await f.db.select().from(schema.agentRuns)).toHaveLength(0);
     expect(f.provider.calls).toHaveLength(0);
-
-    const card = rows.find((m) => m.id === used.messageId)?.meta.actionCard as {
-      expiresAt: string;
-      params: { example?: string };
-    };
-    expect(Date.parse(card.expiresAt) - Date.now()).toBeGreaterThan(29 * 24 * 3600_000);
+    const team = await f.db.select({ name: schema.agents.name }).from(schema.agents);
+    expect(team.map((a) => a.name)).toEqual(expect.arrayContaining(["Iara", "Lia", "Otto"]));
+    // On a hold the card shows what its first agent delivers.
+    const card = rows.find((m) => m.id === used.messageId)?.meta.actionCard as { params: { example?: string } };
     expect(card.params.example).toContain("Marina");
   });
 
-  test("with a plan in force the same template asks its question and shows no example", async () => {
+  test("with a plan in force the same template is made at once and shows no example", async () => {
     f = await setup({ rightHand: true });
-    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "store", "pt-BR", "Loja");
+    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "store", "pt-BR");
+    expect(used.state).toBe("created");
     const rows = await lodiDm(used.channelId);
-    expect(rows.some((m) => m.authorType === "person")).toBe(false);
-    expect(rows.some((m) => m.meta.replyChips)).toBe(true);
+    expect(rows.some((m) => m.meta.replyChips)).toBe(false);
     const card = rows.find((m) => m.id === used.messageId)?.meta.actionCard as { params: { example?: string } };
     expect(card.params.example).toBeUndefined();
   });
 
-  test("creating the team queues the two reminders", async () => {
+  test("making the team on a hold queues the two reminders", async () => {
     f = await setup({ rightHand: true });
     await hold("payment");
-    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "support", "en");
-    await createTeam({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, used.messageId);
+    await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "support", "en");
     expect(await reminders()).toHaveLength(2);
   });
 });

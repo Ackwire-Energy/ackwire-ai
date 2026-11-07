@@ -1863,22 +1863,12 @@
         "text": "Agen berpikir dengan AI workspace. Masuk dengan paket Claude atau ChatGPT Anda, tanpa kunci API.",
         "action": "Hubungkan"
       },
-      "start": {
-        "question": "Bagaimana Anda ingin mulai?",
-        "createOne": "Buat {{name}}",
-        "team": "Susun tim awal",
-        "describe": "Jelaskan yang saya butuhkan",
-        "import": "Impor agen saya",
-        "form": "Isi formulir"
-      },
       "again": {
         "question": "Mau menyusun tim bersama saya?",
         "action": "Susun tim",
         "message": "Bantu saya menyusun tim."
       },
       "next": {
-        "question": "Timnya sudah datang. Lalu apa?",
-        "invite": "Undang orang",
         "firstTask": "Beri {{name}} tugas pertama"
       },
       "style": {
@@ -1886,12 +1876,6 @@
         "text": "Berlaku untuk semua agen, dan bisa kamu ubah kapan saja di akunmu.",
         "simple": "Sederhana, tanpa istilah teknis",
         "technical": "Teknis, lengkap dengan detailnya"
-      },
-      "firstTask": {
-        "theo": "Susun rencana minggu pertama kita: apa yang dikerjakan masing-masing dari kita lebih dulu?",
-        "ada": "Apa yang bisa kamu bangun atau otomatiskan untuk kami lebih dulu?",
-        "lia": "Siapa 5 pesaing terdekat kita, dan apa yang mereka lakukan lebih baik dari kita?",
-        "atlas": "Apa yang akan kamu pantau lebih dulu dari error, antrean, dan deploy kita, dan bagaimana kamu memberi tahu saya saat ada yang rusak?"
       }
     },
     "profile": {
@@ -3631,46 +3615,11 @@
       "answer": "Jawab",
       "open": "Buka"
     },
-    "steps": {
-      "title": "Langkah pertama",
-      "progress": "{{done}} dari {{total}}",
-      "hide": "Sembunyikan",
-      "done": "Selesai",
-      "agent": {
-        "title": "Buat agen pertamamu",
-        "text": "Sebutkan tugasnya dan agen itu bergabung ke tim.",
-        "action": "Buat agen"
-      },
-      "plan": {
-        "title": "Pilih paket agentes.chat",
-        "text": "Agen mulai bekerja setelah workspace punya paket.",
-        "action": "Lihat paket"
-      },
-      "ai": {
-        "title": "Hubungkan AI",
-        "text": "Dengan inilah agenmu berpikir.",
-        "action": "Hubungkan"
-      },
-      "ask": {
-        "title": "Minta sesuatu ke agen",
-        "text": "Tulis di bawah atau di percakapan.",
-        "action": "Minta"
-      },
-      "team": {
-        "title": "Undang timmu",
-        "text": "Di sini orang dan agen bekerja bersama.",
-        "action": "Undang"
-      },
-      "routine": {
-        "title": "Buat rutinitas",
-        "text": "Agen mengerjakan sesuatu sendiri, sesuai jadwal.",
-        "action": "Buat rutinitas"
-      }
-    },
     "calm": {
       "title": "Semua beres",
       "text": "Agenmu akan memberi tahu di sini saat mereka membutuhkanmu."
-    }
+    },
+    "firstRun": "Lanjutkan dari terakhir · {{done}} dari {{total}}"
   },
   "notifications": {
     "title": "Notifikasi",
@@ -4906,6 +4855,170 @@
       "app": "Dikirim lewat aplikasi AI"
     }
   },
+  "agentSetup": {
+    "greeting": "Hai, {{person}}. Aku {{name}}.",
+    "greeting_female": "Hai, {{person}}. Aku {{name}}.",
+    "greetingRole": "Hai, {{person}}. Aku {{name}}, agen {{role}} yang baru.",
+    "greetingRole_female": "Hai, {{person}}. Aku {{name}}, agen {{role}} yang baru.",
+    "asked": "Kamu memintaku: “{{what}}”.",
+    "lead": "Untuk memulai, bantu aku dengan beberapa hal cepat:",
+    "title": "Untuk memulai",
+    "ready": "Aku siap.",
+    "ready_female": "Aku siap.",
+    "titleProfile": "Agar {{name}} bisa mulai",
+    "titleProfile_female": "Agar {{name}} bisa mulai",
+    "count": "{{done}} dari {{total}}",
+    "change": "Ubah",
+    "switch": "Ganti",
+    "choose": "Pilih",
+    "see": "Lihat",
+    "suggested": "Disarankan",
+    "ai": {
+      "todo": "Hubungkan AI",
+      "todoDesc": "Supaya aku bisa berpikir.",
+      "action": "Hubungkan",
+      "done": "Aku punya AI untuk berpikir"
+    },
+    "apps": {
+      "todo": "Baca {{apps}}",
+      "todoDesc": "Membaca tidak mengubah apa pun.",
+      "action": "Izinkan",
+      "todoNone": "Pakai aplikasi {{org}}",
+      "todoNoneDesc": "Yang sudah kamu hubungkan, seperti Gmail dan Drive.",
+      "done": "Aku memakai {{apps}}",
+      "doneNone": "Belum ada aplikasi",
+      "title": "Yang bisa dipakai {{name}}",
+      "title_female": "Yang bisa dipakai {{name}}",
+      "desc": "Membaca tidak mengubah apa pun. Mengirim, menghapus, dan membayar meminta persetujuanmu.",
+      "ok_other": "Izinkan {{count}} aplikasi",
+      "okNone": "Lanjut tanpa aplikasi",
+      "empty": "{{org}} belum punya aplikasi yang terhubung.",
+      "connectOther": "Hubungkan aplikasi lain"
+    },
+    "where": {
+      "todo": "Gabung ke {{channel}}",
+      "todoDesc": "Aku menjawab kalau ada yang memanggilku di sana.",
+      "action": "Gabung",
+      "todoNone": "Gabung ke kanal",
+      "done": "Aku ada di {{channels}}",
+      "doneNone": "Aku tetap di chat langsung kita",
+      "title": "Tempat {{name}} bekerja",
+      "title_female": "Tempat {{name}} bekerja",
+      "desc": "Dia menjawab kalau ada yang memanggilnya di sana. Chat langsung selalu berlaku.",
+      "okNone": "Hanya chat langsung",
+      "okOne": "Gabung ke {{channel}}",
+      "ok_other": "Gabung ke {{count}} kanal"
+    },
+    "who": {
+      "todo": "Bicara dengan semua orang di {{org}}",
+      "todoDesc": "Siapa saja bisa memanggilku.",
+      "todoPlan": "Bicara hanya denganmu",
+      "todoPlanDesc": "Paketmu bersifat pribadi.",
+      "doneEveryone": "Aku bicara dengan semua orang di {{org}}",
+      "doneYou": "Aku bicara hanya denganmu",
+      "doneOwner": "Aku bicara hanya dengan {{name}}",
+      "donePeople": "Aku bicara dengan orang yang kamu pilih",
+      "title": "Siapa yang bicara dengan {{name}}",
+      "title_female": "Siapa yang bicara dengan {{name}}",
+      "people": "Orang dan peran",
+      "add": "Pilih orang",
+      "addMore": "Tambahkan orang lain",
+      "you": "kamu",
+      "youCap": "Kamu",
+      "ownerHelp": "Menerima permintaan persetujuan dan peringatannya.",
+      "ownerHelp_female": "Menerima permintaan persetujuan dan peringatannya."
+    },
+    "how": {
+      "todo": "Lihat cara kerjaku",
+      "todoDesc": "Aku mulai dari instruksi {{role}}.",
+      "todoDescBlank": "Aku mulai dari yang kamu tulis.",
+      "done": "Aku bekerja dengan caramu",
+      "title": "Cara kerja {{name}}",
+      "title_female": "Cara kerja {{name}}",
+      "desc": "Tulis seperti untuk orang baru di tim.",
+      "instructions": "Instruksi",
+      "budget": "Batas bulanan",
+      "budgetHelp": "Kami kabari di 80%. Saat mencapai batas, dia berhenti sementara dan memberi tahumu.",
+      "budgetHelp_female": "Kami kabari di 80%. Saat mencapai batas, dia berhenti sementara dan memberi tahumu.",
+      "more": "Opsi lainnya",
+      "model": "Model"
+    },
+    "say": {
+      "ai": "Sekarang aku bisa berpikir.",
+      "apps": "Beres, sekarang aku bisa memakai aplikasinya.",
+      "where": "Aku akan memantaunya di sana.",
+      "who": "Oke, aku tahu harus bicara dengan siapa.",
+      "how": "Oke, aku tahu kamu mau aku bekerja seperti apa."
+    },
+    "tasksLead": "Kita bisa mulai sekarang. Tanyakan sesuatu padaku:",
+    "tasksAllDone": "Semua siap. Tanyakan sesuatu padaku:",
+    "tasks": {
+      "a": "Apa yang bisa kamu lakukan untukku?",
+      "b": "Mulai dari mana?"
+    },
+    "firstRun": {
+      "title": "Agar tim {{org}} mulai bekerja",
+      "complete": "Semua siap.",
+      "notNow": "Nanti saja",
+      "afterPlan": "Terbuka dengan paket.",
+      "about": {
+        "todo": "Ceritakan apa yang dilakukan {{org}}.",
+        "todoDesc": "Semua agen membaca ini.",
+        "action": "Ceritakan",
+        "done": "Saya tahu apa yang dilakukan {{org}}",
+        "title": "Apa yang dilakukan {{org}}?",
+        "desc": "Semua agen membaca ini. Kamu bisa mengubahnya kapan saja.",
+        "line": "Dalam satu kalimat",
+        "optional": "Opsional. Tanpa kalimat, jenis yang kamu pilih yang dipakai."
+      },
+      "team": {
+        "todo": "Bentuk timnya.",
+        "todoDesc": "Template untuk bisnismu, semuanya bisa diubah nanti.",
+        "action": "Lihat tim",
+        "done_other": "{{count}} agen di tim",
+        "card": "Lanjutkan di kartu di bawah"
+      },
+      "ai": {
+        "todo": "Hubungkan AI.",
+        "todoDesc": "Yang sudah kamu bayar bisa dipakai.",
+        "action": "Hubungkan",
+        "done": "Saya berpikir dengan {{label}}",
+        "doneAny": "Saya sudah berpikir dengan AI",
+        "plan": "Terbuka dengan paket agentes.chat.",
+        "planAction": "Lihat paket agentes.chat"
+      },
+      "apps": {
+        "todo": "Hubungkan aplikasi kerjamu.",
+        "todoDesc": "Membaca tidak pernah mengubah apa pun.",
+        "action": "Pilih",
+        "done": "Saya membaca {{apps}}",
+        "doneNone": "Belum ada aplikasi",
+        "title": "Aplikasi kerjamu",
+        "desc": "Yang akan dipakai tim barumu muncul lebih dulu. Membaca tidak pernah mengubah apa pun, dan mengirim, menghapus, serta membayar meminta persetujuanmu.",
+        "connect": "Hubungkan",
+        "all": "Lihat semua aplikasi"
+      },
+      "people": {
+        "todo": "Ajak orang yang bekerja denganmu.",
+        "todoDesc": "Mereka juga bicara dengan agen.",
+        "action": "Undang",
+        "done_other": "{{count}} orang di sini",
+        "doneNone": "Baru kamu saja"
+      },
+      "say": {
+        "about": "Dicatat. Semua agen membaca ini.",
+        "team": "Timnya sudah datang.",
+        "ai": "Sekarang tim bisa berpikir.",
+        "apps": "Selesai, saya sudah membaca aplikasinya.",
+        "people": "Senang ada lebih banyak orang di sini."
+      },
+      "asks": {
+        "lead": "Sekarang minta sesuatu ke saya:",
+        "fit": "Sesuaikan tim dengan bisnis saya",
+        "who": "Siapa di tim mengurus apa?"
+      }
+    }
+  },
   "newAgent": {
     "title": "Buat agen",
     "railOrg": "{{org}} · kamu {{role}}",
@@ -4959,79 +5072,144 @@
         "name": "Dev",
         "agent": "Ada",
         "desc": "Menulis kode, meninjau PR, dan menyelidiki bug.",
-        "instructions": "Menyelidiki dulu: membaca kode serta tugas dan galat terkait sebelum menjawab, lalu kembali dengan temuannya dan usulan PR yang konkret beserta tesnya.\nBekerja di branch dan membuka PR kecil. Untuk perubahan besar, membuka PR sebagai draf dan menjelaskan rencananya di sana.\nTidak pernah merge sendiri: meminta orang untuk meninjau."
+        "instructions": "Menyelidiki dulu: membaca kode serta tugas dan galat terkait sebelum menjawab, lalu kembali dengan temuannya dan usulan PR yang konkret beserta tesnya.\nBekerja di branch dan membuka PR kecil. Untuk perubahan besar, membuka PR sebagai draf dan menjelaskan rencananya di sana.\nTidak pernah merge sendiri: meminta orang untuk meninjau.",
+        "tasks": {
+          "a": "Error apa yang paling sering muncul sekarang?",
+          "b": "Review PR terbuka terbaru",
+          "c": "Ambil tugas terlama di backlog"
+        }
       },
       "ops": {
         "name": "Ops",
         "agent": "Atlas",
         "desc": "Memantau galat, antrean, dan deploy.",
-        "instructions": "Mengikuti galat dan deploy serta menulis laporan insiden.\nSaat ada peringatan, menyelidiki dulu (galat, log, deploy terbaru) lalu memposting temuannya di kanal: sejak kapan, seberapa besar, kemungkinan penyebab, dan langkah berikutnya.\nRollback dan deploy hanya dengan persetujuan."
+        "instructions": "Mengikuti galat dan deploy serta menulis laporan insiden.\nSaat ada peringatan, menyelidiki dulu (galat, log, deploy terbaru) lalu memposting temuannya di kanal: sejak kapan, seberapa besar, kemungkinan penyebab, dan langkah berikutnya.\nRollback dan deploy hanya dengan persetujuan.",
+        "tasks": {
+          "a": "Ada yang aneh sejak deploy terakhir?",
+          "b": "Ringkas error hari ini",
+          "c": "Apa yang berubah di rilis terbaru?"
+        }
       },
       "qa": {
         "name": "QA",
         "agent": "Iris",
         "desc": "Menguji alur dan mereproduksi bug yang dilaporkan.",
-        "instructions": "Mereproduksi setiap bug yang dilaporkan sebelum membuka tugas. Menulis langkah yang jelas dan melampirkan bukti.\nJika tidak bisa mereproduksi, memeriksa dulu galat, perubahan terbaru, dan tugas terkait. Menanyakan lingkungan dan versi hanya jika belum ada.\nMemprioritaskan yang menghambat pelanggan."
+        "instructions": "Mereproduksi setiap bug yang dilaporkan sebelum membuka tugas. Menulis langkah yang jelas dan melampirkan bukti.\nJika tidak bisa mereproduksi, memeriksa dulu galat, perubahan terbaru, dan tugas terkait. Menanyakan lingkungan dan versi hanya jika belum ada.\nMemprioritaskan yang menghambat pelanggan.",
+        "tasks": {
+          "a": "Reproduksi bug terakhir yang dilaporkan",
+          "b": "Bug mana yang belum ada langkahnya?",
+          "c": "Ada error baru sejak deploy?"
+        }
       },
       "pm": {
         "name": "PM",
         "agent": "Theo",
         "desc": "Mengatur tugas dan ringkasan.",
-        "instructions": "Mencari dulu (tugas, utas, wiki, masukan) dan hanya menanyakan yang tersisa.\nMengatur tugas, merangkum diskusi panjang, dan menjaga roadmap tetap terkini."
+        "instructions": "Mencari dulu (tugas, utas, wiki, masukan) dan hanya menanyakan yang tersisa.\nMengatur tugas, merangkum diskusi panjang, dan menjaga roadmap tetap terkini.",
+        "tasks": {
+          "a": "Ringkas apa yang dikerjakan tim minggu ini",
+          "b": "Tugas mana yang macet?",
+          "c": "Perbarui roadmap"
+        }
       },
       "support": {
         "name": "Dukungan",
         "agent": "Nina",
         "desc": "Menjawab pelanggan dan meneruskan yang butuh orang.",
-        "instructions": "Sebelum menjawab, mencari riwayat pelanggan, percakapan sebelumnya, dan pusat bantuan, lalu kembali dengan balasan siap pakai beserta sumbernya.\nJika masalahnya di produk, membuka tugas dengan langkah-langkahnya dan memberi tahu tim. Tidak pernah menjanjikan tanggal atau perbaikan yang tidak ada.\nPesan ke pelanggan, pengembalian dana, dan diskon hanya dengan persetujuan."
+        "instructions": "Sebelum menjawab, mencari riwayat pelanggan, percakapan sebelumnya, dan pusat bantuan, lalu kembali dengan balasan siap pakai beserta sumbernya.\nJika masalahnya di produk, membuka tugas dengan langkah-langkahnya dan memberi tahu tim. Tidak pernah menjanjikan tanggal atau perbaikan yang tidak ada.\nPesan ke pelanggan, pengembalian dana, dan diskon hanya dengan persetujuan.",
+        "tasks": {
+          "a": "Pelanggan mana yang paling lama menunggu jawaban?",
+          "b": "Ringkas keluhan minggu ini",
+          "c": "Buat draf balasan untuk email pelanggan terbaru"
+        }
       },
       "sales": {
         "name": "Penjualan",
         "agent": "Leo",
         "desc": "Menyiapkan penawaran dan menindaklanjuti prospek.",
-        "instructions": "Sebelum berbicara dengan siapa pun, meneliti perusahaannya, riwayat dengan perusahaan itu, dan apa yang sudah disepakati, lalu kembali dengan ringkasan dan langkah berikutnya.\nMenjaga daftar prospek tetap terkini dan mengingatkan tim tentang yang macet.\nTidak pernah mengarang harga, diskon, atau syarat: hanya memakai yang ada di daftar harga. Mengirim penawaran atau email ke pelanggan hanya dengan persetujuan."
+        "instructions": "Sebelum berbicara dengan siapa pun, meneliti perusahaannya, riwayat dengan perusahaan itu, dan apa yang sudah disepakati, lalu kembali dengan ringkasan dan langkah berikutnya.\nMenjaga daftar prospek tetap terkini dan mengingatkan tim tentang yang macet.\nTidak pernah mengarang harga, diskon, atau syarat: hanya memakai yang ada di daftar harga. Mengirim penawaran atau email ke pelanggan hanya dengan persetujuan.",
+        "tasks": {
+          "a": "Siapa yang diam lebih dari seminggu?",
+          "b": "Siapkan proposal untuk prospek terbaru",
+          "c": "Berapa yang masuk dari pelanggan baru bulan ini?"
+        }
       },
       "marketing": {
         "name": "Pemasaran",
         "agent": "Mila",
         "desc": "Merencanakan kampanye, postingan, dan halaman situs.",
-        "instructions": "Mulai dengan melihat apa yang sudah dilakukan, hasilnya, dan gaya bahasa merek sebelum menyarankan sesuatu yang baru.\nMenulis draf kampanye, postingan, dan halaman, dengan satu ide utama dan untuk siapa.\nTidak pernah mengarang angka atau testimoni. Menerbitkan di situs atau media sosial hanya dengan persetujuan."
+        "instructions": "Mulai dengan melihat apa yang sudah dilakukan, hasilnya, dan gaya bahasa merek sebelum menyarankan sesuatu yang baru.\nMenulis draf kampanye, postingan, dan halaman, dengan satu ide utama dan untuk siapa.\nTidak pernah mengarang angka atau testimoni. Menerbitkan di situs atau media sosial hanya dengan persetujuan.",
+        "tasks": {
+          "a": "Sarankan 3 postingan untuk minggu ini",
+          "b": "Rencanakan kampanye berikutnya",
+          "c": "Periksa teks di halaman harga"
+        }
       },
       "content": {
         "name": "Konten",
         "agent": "Bento",
         "desc": "Menulis dan menyunting teks, artikel, dan newsletter.",
-        "instructions": "Sebelum menulis, membaca apa yang sudah ada tentang topiknya (wiki, dokumen, percakapan) dan memastikan untuk siapa teks itu.\nMenyerahkan draf yang jelas dan singkat dengan sumber di bagian akhir. Saat menyunting, menjelaskan apa yang diubah dan alasannya.\nTidak pernah mengarang data atau kutipan. Menerbitkan atau mengirim ke luar tim hanya dengan persetujuan."
+        "instructions": "Sebelum menulis, membaca apa yang sudah ada tentang topiknya (wiki, dokumen, percakapan) dan memastikan untuk siapa teks itu.\nMenyerahkan draf yang jelas dan singkat dengan sumber di bagian akhir. Saat menyunting, menjelaskan apa yang diubah dan alasannya.\nTidak pernah mengarang data atau kutipan. Menerbitkan atau mengirim ke luar tim hanya dengan persetujuan.",
+        "tasks": {
+          "a": "Tulis newsletter bulan ini",
+          "b": "Review postingan blog terbaru",
+          "c": "Daftar 5 topik untuk artikel"
+        }
       },
       "data": {
         "name": "Data",
         "agent": "Dora",
         "desc": "Menjawab pertanyaan dengan angka dan membuat laporan.",
-        "instructions": "Mengambil angka dari sumbernya sebelum menjawab dan menunjukkan asalnya, periodenya, dan cara menghitungnya.\nJika datanya tidak cukup atau terlihat salah, mengatakannya alih-alih menebak. Tidak pernah mengarang angka.\nSetiap Senin, memposting ringkasan angka utama minggu itu."
+        "instructions": "Mengambil angka dari sumbernya sebelum menjawab dan menunjukkan asalnya, periodenya, dan cara menghitungnya.\nJika datanya tidak cukup atau terlihat salah, mengatakannya alih-alih menebak. Tidak pernah mengarang angka.\nSetiap Senin, memposting ringkasan angka utama minggu itu.",
+        "tasks": {
+          "a": "Bagaimana penjualan minggu ini?",
+          "b": "Buat laporan bulan ini",
+          "c": "Pelanggan mana yang paling banyak membeli?"
+        }
       },
       "finance": {
         "name": "Keuangan",
         "agent": "Otto",
         "desc": "Memantau pembayaran, tagihan, dan pengeluaran.",
-        "instructions": "Memeriksa pembayaran, tagihan, dan pengeluaran di sumbernya sebelum menjawab dan menunjukkan jumlahnya beserta tanggal dan asalnya.\nMenandai yang tidak biasa: tagihan yang gagal, pengeluaran di atas perkiraan, faktur yang akan jatuh tempo.\nPembayaran, pengembalian dana, dan perpindahan uang apa pun hanya dengan persetujuan. Tidak pernah mengarang jumlah."
+        "instructions": "Memeriksa pembayaran, tagihan, dan pengeluaran di sumbernya sebelum menjawab dan menunjukkan jumlahnya beserta tanggal dan asalnya.\nMenandai yang tidak biasa: tagihan yang gagal, pengeluaran di atas perkiraan, faktur yang akan jatuh tempo.\nPembayaran, pengembalian dana, dan perpindahan uang apa pun hanya dengan persetujuan. Tidak pernah mengarang jumlah.",
+        "tasks": {
+          "a": "Berapa yang masuk bulan ini?",
+          "b": "Penagihan mana yang gagal?",
+          "c": "Ringkas pengeluaran bulan lalu"
+        }
       },
       "people": {
         "name": "SDM",
         "agent": "Clara",
         "desc": "Membantu rekrutmen, orientasi, dan pertanyaan tim.",
-        "instructions": "Sebelum menjawab, mencari di kebijakan, wiki, dan dokumen tim, lalu menyebutkan di mana jawabannya ditemukan.\nMengatur lowongan, wawancara, dan hari-hari pertama anggota baru, dengan daftar periksa yang jelas.\nMenangani data pribadi dengan hati-hati dan hanya membagikannya kepada yang membutuhkan. Mengirim pesan ke kandidat hanya dengan persetujuan."
+        "instructions": "Sebelum menjawab, mencari di kebijakan, wiki, dan dokumen tim, lalu menyebutkan di mana jawabannya ditemukan.\nMengatur lowongan, wawancara, dan hari-hari pertama anggota baru, dengan daftar periksa yang jelas.\nMenangani data pribadi dengan hati-hati dan hanya membagikannya kepada yang membutuhkan. Mengirim pesan ke kandidat hanya dengan persetujuan.",
+        "tasks": {
+          "a": "Rencanakan minggu pertama orang yang mulai hari Senin",
+          "b": "Apa aturan cutinya?",
+          "c": "Jadwalkan wawancara minggu ini"
+        }
       },
       "research": {
         "name": "Riset",
         "agent": "Hugo",
         "desc": "Meneliti suatu topik dan menyerahkan ringkasan beserta sumbernya.",
-        "instructions": "Melihat dulu apa yang sudah dimiliki tim (wiki, dokumen, percakapan), lalu sumber dari luar.\nMenyerahkan ringkasan singkat berisi temuan utama, apa yang masih belum diketahui, dan sumber untuk tiap poin.\nMemisahkan fakta dari opini dan tidak pernah mengarang data atau kutipan."
+        "instructions": "Melihat dulu apa yang sudah dimiliki tim (wiki, dokumen, percakapan), lalu sumber dari luar.\nMenyerahkan ringkasan singkat berisi temuan utama, apa yang masih belum diketahui, dan sumber untuk tiap poin.\nMemisahkan fakta dari opini dan tidak pernah mengarang data atau kutipan.",
+        "tasks": {
+          "a": "Teliti 5 pesaing terbesar",
+          "b": "Ringkas apa yang sudah kita tahu tentang pasar",
+          "c": "Bandingkan harga para pesaing"
+        }
       },
       "assistant": {
         "name": "Asisten",
         "agent": "Eva",
         "desc": "Mengurus kalender, email, dan pengingat.",
-        "instructions": "Sebelum bertanya, memeriksa kalender, email, dan percakapan terbaru, lalu kembali dengan temuannya dan sebuah saran.\nMengatur rapat, menyusun draf balasan, dan mengirim pengingat pada waktu yang tepat.\nMengirim email atau pesan atas nama seseorang, menerima undangan, dan melakukan pembayaran hanya dengan persetujuan."
+        "instructions": "Sebelum bertanya, memeriksa kalender, email, dan percakapan terbaru, lalu kembali dengan temuannya dan sebuah saran.\nMengatur rapat, menyusun draf balasan, dan mengirim pengingat pada waktu yang tepat.\nMengirim email atau pesan atas nama seseorang, menerima undangan, dan melakukan pembayaran hanya dengan persetujuan.",
+        "tasks": {
+          "a": "Ringkas emailku hari ini",
+          "b": "Apa yang perlu kujawab minggu ini?",
+          "c": "Cari spreadsheet target kuartal"
+        }
       },
       "custom": {
         "name": "Dari awal",
@@ -15041,11 +15219,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "Apa yang dikerjakan {{org}}? Dengan itu saya susun tim yang siap, dan kamu tinggal mengecek.",
-      "orWrite": "Atau tulis dengan caramu di bawah, dalam satu kalimat.",
-      "footer": "Sudah tahu yang kamu mau?",
-      "templates": "Lihat template tim",
-      "presets": "Agen siap pakai"
+      "templates": "Lihat template tim"
     },
     "business": {
       "agency": "Agensi",
@@ -15056,7 +15230,6 @@
       "services": "Kantor jasa",
       "other": "Lainnya"
     },
-    "answered": "terjawab",
     "step": "Pertanyaan {{step}} dari {{of}}",
     "send": "Kirim {{count}}",
     "card": {
@@ -15108,11 +15281,14 @@
     "templates": {
       "title": "Template tim",
       "lead": "Tim siap untuk jenis usahamu. Lalu {{name}} menyesuaikannya bersamamu.",
-      "heldLead": "Pilih yang paling dekat dengan usahamu. Kamu bisa menyesuaikan setiap agen sebelum membuatnya.",
-      "use": "Pakai template ini",
+      "heldLead": "Pilih yang paling mirip bisnismu. Semuanya bisa diubah nanti.",
+      "create": "Buat tim",
+      "import": "Bawa agen dari aplikasi lain",
+      "scratch": "Buat agen dari awal",
+      "failed": "Tim tidak dibuat. Alasannya ada di kartu percakapan.",
       "none": "Tidak ada yang cocok",
       "noneSub": "Ceritakan apa yang kamu kerjakan dan {{name}} menyusunnya",
-      "tailor": "Lalu saya ajukan 2 pertanyaan untuk menyesuaikannya dengan usahamu."
+      "tailor": "Nanti, cukup minta saya menyesuaikannya dengan bisnismu."
     },
     "weekly": {
       "name": "Minggu tim"
@@ -15260,7 +15436,6 @@
         "line": "apa yang dicek sebelum membuka PR"
       }
     },
-    "approvals": "Yang dikirim ke pelanggan menunggu persetujuanmu. Kamu bisa melepasnya nanti, saat sudah percaya pada mereka.",
-    "ask": "Saya pakai template {{name}}. Untuk menyesuaikannya dengan usahamu: **apa yang membuat {{org}} berbeda?**"
+    "approvals": "Yang dikirim ke pelanggan menunggu persetujuanmu. Kamu bisa melepasnya nanti, saat sudah percaya pada mereka."
   }
 }

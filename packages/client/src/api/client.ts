@@ -256,6 +256,7 @@ import type {
   SecretRequest,
   SeriesScope,
   ServerTelemetry,
+  SetupStep,
   SidebarItem,
   SidebarItems,
   SidebarPlace,
@@ -625,17 +626,22 @@ export interface ApiClient {
     ): Promise<{ card: TeamProposalCard }>;
     /** "Ver modelos de time": the templates in `locale`. */
     teamTemplates(orgId: string, locale?: string): Promise<TeamTemplate[]>;
-    /** "Usar este modelo": its card, then the right hand's first question, in the person's DM with it. */
+    /** "Criar o time": the template's team, made at once; its card in the person's DM with the right hand. */
     applyTeamTemplate(
       orgId: string,
       templateId: string,
       locale?: string,
-      /** On a billing hold: what the person tapped, kept as their message with no run. */
-      tap?: string,
-    ): Promise<{ channelId: string; messageId: string }>;
+    ): Promise<{
+      channelId: string;
+      messageId: string;
+      state: TeamProposalCard["state"];
+      error: TeamProposalCard["error"] | null;
+    }>;
     /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
     decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;
     update(orgId: string, agentId: string, input: Partial<AgentInput>): Promise<Agent>;
+    /** Confirms a step of a new agent's setup checklist (ADR 0152 §2): its owner or whoever manages agents. */
+    confirmSetup(orgId: string, agentId: string, step: SetupStep): Promise<Agent>;
     /** The mailboxes saving `audience` would take from it (others gave them), taking nothing: ask before widening. */
     mailLoss(orgId: string, agentId: string, audience: AgentAudience): Promise<ForeignMailbox[]>;
     archive(orgId: string, agentId: string): Promise<void>;

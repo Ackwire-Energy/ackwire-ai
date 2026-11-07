@@ -1,13 +1,11 @@
 import type { Agent, AppNotification, Mission, Routine } from "@agenteschat/client";
 import {
-  useAgentStatuses,
   useAiStatus,
   useChannels,
   useDms,
   useMissionList,
   useNotificationAction,
   useNotifications,
-  useOverview,
   useRoutines,
   useSendDm,
   useSetStart,
@@ -17,15 +15,11 @@ import { canTalk, listsAgent } from "@agenteschat/client/lib/audience";
 import { firstName, relativeTime, timeLeft, upcomingAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
-  type FirstStep,
-  firstSteps,
   HOME_ROWS,
   homeDone,
   homeMentions,
   homeWaiting,
   homeWidgetFailures,
-  startingOut,
-  stepPermissions,
   upcomingRoutines,
 } from "@agenteschat/client/lib/home";
 import { latestText } from "@agenteschat/client/lib/message-body";
@@ -34,14 +28,12 @@ import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
-import { Button, Composer, cx, EmptyState, Icon, PageHeader, Select } from "@agenteschat/ui";
+import { Composer, cx, EmptyState, Icon, PageHeader, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { usePlanHold } from "@/components/ai/ConnectAiSteps";
-import { BillingLinkButton } from "@/components/BillingLinkButton";
-import { useConnectAi } from "@/components/ConnectAi";
+import { useFirstRun } from "@/components/FirstRun";
 import { useMissionsWaitingYou } from "@/components/missions/MissionWaiting";
 import { useNotificationOpener } from "@/components/NotificationOpen";
 import { Face, Headline, SystemFace } from "@/components/NotificationParts";
@@ -53,7 +45,6 @@ import { useNow } from "@/hooks/useNow";
 import { agentLine, useAgentPresence } from "@/hooks/usePresence";
 import { TYPED_VALUES } from "@/i18n";
 import { lookOf } from "@/lib/look";
-import { firstStepsHidden, hideFirstSteps } from "@/lib/start";
 import "./home.css";
 // Its "Para você" draws the inbox's rows (Face, SystemFace, the calm card).
 import "./notifications.css";
@@ -77,12 +68,8 @@ export function HomePage() {
   const runs = useWorkingRuns(org.id, true, WORKING_POLL_MS);
   const active = useMissionList(org.id, { status: "active" });
   const routines = useRoutines(org.id);
-  const statuses = useAgentStatuses(org.id);
-  const ai = useAiStatus(org.id);
-  const overview = useOverview(org.id);
   const dms = useDms(org.id);
   const composer = useRef<HTMLTextAreaElement>(null);
-  const [stepsHidden, setStepsHidden] = useState(() => firstStepsHidden(org.id));
 
   const listed = (id: string) => listsAgent(org, dir.agentById.get(id));
   const waiting = homeWaiting(allItems(waitingList.data), now);
@@ -104,32 +91,16 @@ export function HomePage() {
     .filter((a) => listsAgent(org, a) && canTalk(a))
     .sort((a, b) => (lastTalk.get(b.id) ?? "").localeCompare(lastTalk.get(a.id) ?? ""));
 
-  const held = usePlanHold() !== null;
-  const steps = stepsHidden
-    ? []
-    : firstSteps({
-        agents: dir.agents.length,
-        made: dir.agents.filter((a) => !isRightHand(a)).length,
-        hasAi: ai.data?.any ?? true,
-        asked: (statuses.data ?? []).some((s) => s.activeAt !== null),
-        people: overview.data?.people ?? 1,
-        routines: routines.data?.length ?? 0,
-        may: stepPermissions(org, me.user.id, dir.agents),
-        held,
-      });
-  // Each check reads what it needs, so the card doesn't flash its steps open while the lists still come.
-  const stepsReady = !dir.loading && ai.isFetched && statuses.isFetched && overview.isFetched && routines.isFetched;
+  // The right hand's first-run checklist (ADR 0152 §6), while a row is left: one line back to it, never a second list.
+  const lodi = dir.agents.find(isRightHand);
+  const firstRun = useFirstRun(lodi, null);
+  const showSteps = firstRun.ready && firstRun.state === "open";
   const loaded = waitingList.isSuccess && inbox.isSuccess && missionList.isSuccess && !runs.isLoading;
-  const showSteps = stepsReady && steps.length > 0;
   const calm = loaded && !showSteps && waitingCount === 0 && working.length === 0 && done.length === 0;
-  const hideSteps = () => {
-    hideFirstSteps(org.id);
-    setStepsHidden(true);
-  };
 
   const summary =
     waitingCount === 0 && working.length === 0
-      ? t(showSteps && startingOut(steps) ? "home.summary.new" : "home.summary.calm")
+      ? t(showSteps ? "home.summary.new" : "home.summary.calm")
       : [
           waitingCount > 0 ? t("home.summary.waiting", { count: waitingCount }) : "",
           working.length > 0 ? t("sky.working", { count: working.length }) : "",
@@ -145,7 +116,18 @@ export function HomePage() {
         actions={<StartChoice />}
       />
 
-      {showSteps && <FirstSteps steps={steps} onAsk={() => composer.current?.focus()} onHide={hideSteps} />}
+      {showSteps && lodi && (
+        <Link className="home-continue" to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: lodi.id }}>
+          <AgentAvatar agentId={lodi.id} name={lodi.name} size="sm" />
+          <span>
+            {t("home.firstRun", {
+              done: firstRun.steps.filter((s) => firstRun.done.has(s)).length,
+              total: firstRun.steps.length,
+            })}
+          </span>
+          <Icon name="chevronRight" size={16} />
+        </Link>
+      )}
 
       {askable.length > 0 && <AskAgent agents={askable} composer={composer} />}
 
@@ -576,82 +558,5 @@ function RoutineRow({ r, dir, now }: { r: Routine; dir: Dir; now: number }) {
         />
       </Link>
     </li>
-  );
-}
-
-/** "Primeiros passos": what to do first in a new workspace, each step with the one button that does it. */
-function FirstSteps({ steps, onAsk, onHide }: { steps: FirstStep[]; onAsk: () => void; onHide: () => void }) {
-  const { t } = useTranslation();
-  const finished = steps.filter((s) => s.done).length;
-  return (
-    <section className="home-sec" aria-label={t("home.steps.title")}>
-      <div className="list-group-head">
-        <h2>{t("home.steps.title")}</h2>
-        <span className="list-group-head__count">
-          {t("home.steps.progress", { done: finished, total: steps.length })}
-        </span>
-        <button type="button" className="home-sec__more" onClick={onHide}>
-          {t("home.steps.hide")}
-        </button>
-      </div>
-      <ol className="list-card home-list">
-        {steps.map((s) => (
-          <li key={s.id} className="home-row home-step" data-done={s.done || undefined}>
-            <span className="home-row__face home-step__mark">
-              {s.done ? <Icon name="check" size={16} label={t("home.steps.done")} /> : null}
-            </span>
-            <span className="home-row__text">
-              <span className="home-row__title">{t(`home.steps.${s.id}.title`)}</span>
-              {!s.done && <span className="home-row__sub">{t(`home.steps.${s.id}.text`)}</span>}
-            </span>
-            {!s.done && <StepAction id={s.id} onAsk={onAsk} />}
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
-function StepAction({ id, onAsk }: { id: FirstStep["id"]; onAsk: () => void }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const connect = useConnectAi();
-  const label = t(`home.steps.${id}.action`);
-  const params = { orgId: org.id };
-  if (id === "plan")
-    return (
-      <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary" className="home-row__act">
-        {label}
-      </BillingLinkButton>
-    );
-  if (id === "agent")
-    return (
-      <Button size="sm" asChild className="home-row__act">
-        <Link to="/org/$orgId/agents/new" params={params}>
-          {label}
-        </Link>
-      </Button>
-    );
-  if (id === "team")
-    return (
-      <Button size="sm" asChild className="home-row__act">
-        <Link to="/org/$orgId/settings/$section" params={{ ...params, section: "members" }}>
-          {label}
-        </Link>
-      </Button>
-    );
-  if (id === "routine")
-    return (
-      <Button size="sm" asChild className="home-row__act">
-        <Link to="/org/$orgId/routines" params={params}>
-          {label}
-        </Link>
-      </Button>
-    );
-  if (id === "ai" && !connect) return null;
-  return (
-    <Button size="sm" className="home-row__act" onClick={id === "ai" ? () => connect?.open({}) : onAsk}>
-      {label}
-    </Button>
   );
 }

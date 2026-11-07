@@ -3,7 +3,7 @@ import { isVisible, sortWaiting } from "./notifications";
 import { can } from "./permissions";
 
 /**
- * Início (ADR 0108): what opens when the app starts, the home's sections and a new workspace's first steps. Pure:
+ * Início (ADR 0108): what opens when the app starts and the home's sections. Pure:
  * the web's Início and the phone's start draw them.
  */
 
@@ -77,14 +77,7 @@ export function upcomingRoutines<T extends Pick<Routine, "active" | "nextRunAt">
     .slice(0, max);
 }
 
-export type FirstStepId = "plan" | "agent" | "ai" | "ask" | "team" | "routine";
-
-export interface FirstStep {
-  id: FirstStepId;
-  done: boolean;
-}
-
-/** Who may take each first step (`firstSteps`' `may`), from this membership and the agents the person owns. */
+/** What this person may do of a new workspace's setup, from this membership and the agents they own. */
 export const stepPermissions = (
   org: { permissions?: readonly string[] } | null | undefined,
   meId: string | null | undefined,
@@ -97,46 +90,3 @@ export const stepPermissions = (
   routines: can(org, "manage_routines"),
   pay: can(org, "manage_billing"),
 });
-
-/**
- * A new workspace's first steps, in order, each checked from what the apps already load and offered only to who may
- * take it: an AI, a request and a routine need an agent first. None once every step offered is done. On a billing
- * hold the plan comes first for who pays, and an AI and invitations wait for it.
- */
-export function firstSteps(input: {
-  agents: number;
-  /**
-   * Agents the team made, without the right hand that every workspace starts with (the agents' count otherwise):
-   * "Create your first agent" is done by one of those, while the right hand alone already opens the steps after it.
-   */
-  made?: number;
-  /** An agent has an AI to think with (`ai-status`'s `any`). */
-  hasAi: boolean;
-  /** An agent has worked here (`agent-status`'s `activeAt`). */
-  asked: boolean;
-  people: number;
-  routines: number;
-  /** `connectAi`: may add the workspace's key, or owns an agent (a plan thinks only for its owner's agents). */
-  may: { createAgents: boolean; connectAi: boolean; talk: boolean; invite: boolean; routines: boolean; pay?: boolean };
-  /** A billing hold (`planHoldOf`). */
-  held?: boolean;
-}): FirstStep[] {
-  const { agents, may, held } = input;
-  const steps: FirstStep[] = [
-    ...(held && may.pay ? [{ id: "plan" as const, done: false }] : []),
-    ...(may.createAgents ? [{ id: "agent" as const, done: (input.made ?? agents) > 0 }] : []),
-    ...(agents > 0 && may.connectAi && !held ? [{ id: "ai" as const, done: input.hasAi }] : []),
-    ...(agents > 0 && may.talk ? [{ id: "ask" as const, done: input.asked }] : []),
-    ...(may.invite && !held ? [{ id: "team" as const, done: input.people > 1 }] : []),
-    ...(agents > 0 && may.routines ? [{ id: "routine" as const, done: input.routines > 0 }] : []),
-  ];
-  return steps.some((s) => !s.done) ? steps : [];
-}
-
-const CORE_STEPS: ReadonlySet<FirstStepId> = new Set(["plan", "agent", "ai", "ask"]);
-
-/**
- * Whether the workspace is still starting out ("Comece por aqui"): an agent, its AI or a first request is still to
- * do. Inviting and a routine can stay open for good (a workspace of one), so they don't count.
- */
-export const startingOut = (steps: readonly FirstStep[]) => steps.some((s) => !s.done && CORE_STEPS.has(s.id));
