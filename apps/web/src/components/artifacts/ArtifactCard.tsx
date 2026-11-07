@@ -325,7 +325,6 @@ function CoverTable({ columns, rows }: { columns: string[]; rows: string[][] }) 
       <thead>
         <tr>
           {cols.map((c, j) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a static drawing
             <th key={j} className={numeric[j] ? "is-num" : undefined}>
               {c}
             </th>
@@ -334,14 +333,12 @@ function CoverTable({ columns, rows }: { columns: string[]; rows: string[][] }) 
       </thead>
       <tbody>
         {shown.map((r, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: a static drawing
           <tr key={i}>
             {cols.map((_, j) => {
               const cell = (r[j] ?? "").trim();
               const sign = SIGNED.exec(cell)?.[1];
               const tone = sign ? (sign === "+" ? "is-up" : "is-down") : "";
               return (
-                // biome-ignore lint/suspicious/noArrayIndexKey: a static drawing
                 <td key={j} className={[numeric[j] ? "is-num" : "", tone].filter(Boolean).join(" ") || undefined}>
                   {cell}
                 </td>
