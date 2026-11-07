@@ -1813,10 +1813,10 @@ function AccountMenu() {
     });
   }, []);
   const handle = dir.memberById.get(me.user.id)?.handle;
-  // How you appear to yourself (hidden stays hidden; what you picked, even before your socket is up) and your line.
+  // How you appear to yourself, read as the members column reads it (hidden stays hidden), and your line.
   const shown = usePersonPresence(me.user.id);
   const picked = shown?.person.availability;
-  const presence = picked ? presenceOfAvailability(picked) : (shown?.presence ?? null);
+  const presence = shown?.presence ?? null;
   const presenceWord = presence ? t(`presence.${presence}`) : undefined;
   const availability = picked ?? availabilityOf(shown?.presence);
   const line = shown?.status ? personLine(shown.status) : null;
