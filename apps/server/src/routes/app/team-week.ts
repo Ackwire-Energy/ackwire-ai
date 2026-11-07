@@ -21,6 +21,9 @@ const TeamWeekPrefs = z
     off: z.boolean(),
     day: z.number().int().min(0).max(6).openapi({ description: "0 = Sunday." }),
     hour: z.number().int().min(0).max(23),
+    daily: z.boolean().openapi({
+      description: "Resumo do dia: the same card every day at `hour`, over the last day. Anyone may turn it on.",
+    }),
     timezone: z.string().openapi({ description: "The workspace's time zone, which `day` and `hour` are in." }),
   })
   .openapi("TeamWeekPrefs");

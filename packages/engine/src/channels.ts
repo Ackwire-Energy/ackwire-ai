@@ -502,6 +502,12 @@ export async function peopleAllIn(db: Executor, orgId: string, hereId: string, t
 /** Of `channelIds`, what a person reads (`readableChannelIds`), and public channels, which they may join at will. */
 export async function readsOrMayJoin(db: Database, orgId: string, userId: string, channelIds: readonly string[]) {
   const reads = await readableChannelIds(db, orgId, userId, channelIds);
+  for (const id of await publicChannelIds(db, orgId, channelIds)) reads.add(id);
+  return reads;
+}
+
+/** Which of `channelIds` are public channels, which anyone in the workspace may join and read. */
+export async function publicChannelIds(db: Database, orgId: string, channelIds: readonly string[]) {
   const open = channelIds.length
     ? await db
         .select({ id: channels.id })
@@ -516,8 +522,7 @@ export async function readsOrMayJoin(db: Database, orgId: string, userId: string
           ),
         )
     : [];
-  for (const c of open) reads.add(c.id);
-  return reads;
+  return new Set(open.map((c) => c.id));
 }
 
 /**

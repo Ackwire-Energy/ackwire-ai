@@ -1632,7 +1632,10 @@
       "subPerson": "Ogni agente sotto la persona responsabile, o sotto chi guida il suo reparto quando non ne ha una.",
       "subSector": "Ogni reparto con i suoi agenti. {{name}} lavora con tutti.",
       "workspace": "Spazio di lavoro",
-      "responsible": "Responsabili: {{names}}"
+      "responsible": "Responsabili: {{names}}",
+      "lodi": "segue tutto con te",
+      "supervisor": "Supervisore: {{name}}",
+      "dragSector": "Trascina su un agente perché gli agenti di questo settore rispondano a lui"
     },
     "map": {
       "lead": "Chi si occupa degli agenti, i canali in cui sono, cosa fa ognuno da solo e cosa aspetta una persona. Le linee tratteggiate sono agenti che si sono chiesti aiuto nell'ultimo giorno.",
@@ -1652,7 +1655,9 @@
       "emptyTitle": "Guarda dove lavora ogni agente",
       "emptyAction": "Aggiungi a un canale",
       "emptyViewer": "Chi gestisce gli agenti li aggiunge ai canali, e la mappa compare qui.",
-      "others": "Altri canali"
+      "others": "Altri canali",
+      "band": "Supervisori",
+      "reportsTo": "Risponde a {{name}}"
     },
     "sectors": {
       "lead": "Ogni reparto ha un responsabile, un sostituto, i suoi agenti e i loro canali e routine.",
@@ -1662,6 +1667,18 @@
       "backupLabel": "Sostituto",
       "leadOf": "Responsabile di {{name}}",
       "backupOf": "Sostituto in {{name}}",
+      "supervisor": "Supervisore",
+      "supervisorOf": "Supervisore di {{name}}",
+      "unsupervised_one": "{{count}} agente senza supervisore",
+      "unsupervised_many": "{{count}} agenti senza supervisore",
+      "unsupervised_other": "{{count}} agenti senza supervisore",
+      "apply": "Applica",
+      "supervisorDone_one": "{{count}} agente di {{sector}} ora risponde a {{name}}",
+      "supervisorDone_many": "{{count}} agenti di {{sector}} ora rispondono a {{name}}",
+      "supervisorDone_other": "{{count}} agenti di {{sector}} ora rispondono a {{name}}",
+      "supervisorCleared_one": "{{count}} agente di {{sector}} non risponde più a un supervisore",
+      "supervisorCleared_many": "{{count}} agenti di {{sector}} non rispondono più a un supervisore",
+      "supervisorCleared_other": "{{count}} agenti di {{sector}} non rispondono più a un supervisore",
       "nobody": "Nessuno",
       "none": "Nessuna",
       "channels": "Canali",
@@ -1677,6 +1694,14 @@
       "empty": "Ogni reparto ha un responsabile, così tutti vedono chi si occupa di cosa.",
       "emptyViewerTitle": "Vedi chi si occupa di cosa",
       "emptyViewer": "I reparti li crea chi gestisce gli agenti, e poi appaiono qui."
+    },
+    "reportsTo": {
+      "label": "Risponde a",
+      "help": "Dice solo a chi questo agente rende conto. Non dà nessun permesso.",
+      "none": "Nessuno",
+      "done": "{{agent}} ora risponde a {{to}}",
+      "cleared": "{{agent}} non risponde più a un agente",
+      "reports": "Chi risponde a {{name}}"
     },
     "usage": {
       "lead": "Quanto usa degli agenti ogni persona questo mese, e i limiti.",
@@ -2105,6 +2130,7 @@
         "ai_account": "Solo il proprietario dell’account lo assegna",
         "name": "Solo gli admin rinominano un agente",
         "look": "Solo gli admin e il responsabile cambiano il suo aspetto",
+        "reports_to": "Solo gli admin cambiano a chi risponde un agente",
         "many": "Solo gli admin fanno queste modifiche"
       }
     },
@@ -2117,10 +2143,12 @@
       "archive": "Stato",
       "channel": "Canale",
       "name": "Nome",
-      "look": "Aspetto"
+      "look": "Aspetto",
+      "reports_to": "Risponde a"
     },
     "value": {
       "lookDefault": "L'aspetto predefinito",
+      "anAgent": "Un agente",
       "none": "Nessuno",
       "budgetDefault": "Predefinito del workspace",
       "anAccount": "Un account di IA",
@@ -2171,6 +2199,7 @@
   },
   "teamWeek": {
     "title": "Settimana del team",
+    "dayTitle": "Riepilogo del giorno",
     "suggestions_one": "{{count}} suggerimento",
     "suggestions_many": "{{count}} suggerimenti",
     "suggestions_other": "{{count}} suggerimenti",
@@ -2249,7 +2278,8 @@
       "wed": "Ogni mercoledì alle {{time}}",
       "thu": "Ogni giovedì alle {{time}}",
       "fri": "Ogni venerdì alle {{time}}",
-      "sat": "Ogni sabato alle {{time}}"
+      "sat": "Ogni sabato alle {{time}}",
+      "day": "Ogni giorno alle {{time}}"
     },
     "off": "Spenta",
     "schedule": {
@@ -2257,11 +2287,14 @@
       "day": "Giorno",
       "hour": "Ora",
       "stop": "Non riceverla più",
-      "start": "Riceverla di nuovo"
+      "start": "Riceverla di nuovo",
+      "daily": "Ogni giorno"
     },
     "settings": {
       "label": "Settimana del team",
-      "help": "Ogni settimana {{name}} ti racconta nella tua DM com’è andato il team e cosa migliorare. La ricevono solo gli admin."
+      "help": "Ogni settimana {{name}} ti racconta nella tua DM com’è andato il team e cosa migliorare. La ricevono solo gli admin.",
+      "dayLabel": "Riepilogo del giorno",
+      "dayHelp": "Ogni giorno {{name}} ti racconta nella tua DM cosa ha fatto il team e cosa ti aspetta, solo nei giorni in cui c'è qualcosa da dire."
     }
   },
   "routing": {
@@ -14022,7 +14055,8 @@
       "askedBy": "{{name}} ha chiesto l'attività",
       "view": "Vedi attività",
       "taken": "{{name}} ha preso l'attività",
-      "agent": "Con {{name}}"
+      "agent": "Con {{name}}",
+      "chipLabel": "Apri la conversazione dell'attività #{{number}}, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -14034,6 +14068,7 @@
       "autonomy_digest_many": "{{count}} avvisi sembravano noti o innocui, quindi non ci ho lavorato:",
       "autonomy_digest_other": "{{count}} avvisi sembravano noti o innocui, quindi non ci ho lavorato:",
       "team_week": "Com’è andata la settimana del team, dal {{from}} al {{to}}",
+      "team_day": "Com'è andata la giornata del team, fino al {{day}}",
       "autonomy_loop": "Ho smesso di lavorarci di mia iniziativa. È tornato {{count}} volte in un giorno ({{title}}). Dimmi come vuoi che lo gestisca.",
       "mission_plan": "Piano per “{{title}}” su {{computer}}",
       "mission_planNoComputer": "Piano per “{{title}}”",

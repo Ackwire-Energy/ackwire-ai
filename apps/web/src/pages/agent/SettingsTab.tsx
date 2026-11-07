@@ -46,6 +46,7 @@ import {
 import { AgentSecretsList } from "@/components/AgentSecrets";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { ReportsList, ReportsToField } from "@/components/team/ReportsTo";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AGENT_SECTIONS, type AgentSection, type Field as EditField, FIELD_PLACE } from "@/lib/agent-edit";
@@ -294,6 +295,9 @@ export function SettingsTab({
                     </div>
                   )
                 )}
+                {/* Responde a (ADR 0148 addendum): applied at once with Desfazer, never part of the save bar. */}
+                <ReportsToField agentId={agent.id} id="agp-reports-to" />
+                <ReportsList agentId={agent.id} name={agent.name} />
               </div>
             </div>
             {can("look") ? (

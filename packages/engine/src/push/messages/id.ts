@@ -76,4 +76,5 @@ export const strings: Partial<PushStrings> = {
   usageRaisedBody: "Kamu bisa lanjut.",
   usageRefusedTitle: (a) => `${a} menolak permintaan tambahan pemakaianmu`,
   teamWeekReady: "Ringkasan minggu timmu sudah siap",
+  teamDayReady: "Ringkasan harimu sudah siap",
 };

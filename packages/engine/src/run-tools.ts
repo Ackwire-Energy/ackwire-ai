@@ -130,6 +130,18 @@ export interface ToolSideEffects {
   browser?: BrowserTrailStep[];
   /** Its desktop calls since the last post (`meta.desktop`, ADR 0062), the same shape: the app an open started. */
   desktop?: BrowserTrailStep[];
+  /** Tasks the right hand handed to an agent (`create_issue`), shown as chips on its reply (`meta.tasks`). */
+  tasks?: HandedTask[];
+}
+
+/** A task handed on, as a reply's chip reads it: the task, its agent and its conversation's root (the thread). */
+export interface HandedTask {
+  issueId: string;
+  number: number;
+  title: string;
+  agentId: string;
+  channelId: string;
+  rootId: string;
 }
 
 /**
@@ -252,6 +264,9 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
       step.profileName = profile.name;
     }
   }
+  const task = data.handedTask as HandedTask | undefined;
+  if (task && typeof task.issueId === "string" && typeof task.rootId === "string")
+    t.tasks = [...(t.tasks ?? []).filter((x) => x.issueId !== task.issueId), task];
   const update = data.memoryUpdate as MemoryUpdate | undefined;
   if (update) t.memoryUpdates = [...(t.memoryUpdates ?? []), update];
   return update ?? null;
@@ -271,6 +286,7 @@ export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null |
   if (e.deniedRepo) t.deniedRepo = e.deniedRepo;
   if (e.browser?.length) t.browser = withTrail(t.browser, e.browser);
   if (e.desktop?.length) t.desktop = withTrail(t.desktop, e.desktop);
+  if (e.tasks?.length) t.tasks = [...(t.tasks ?? []), ...e.tasks];
 }
 
 const hasEffects = (e: ToolSideEffects) =>
@@ -285,7 +301,8 @@ const hasEffects = (e: ToolSideEffects) =>
       e.repo ||
       e.deniedRepo ||
       e.browser?.length ||
-      e.desktop?.length,
+      e.desktop?.length ||
+      e.tasks?.length,
   );
 
 /** The transcript key where the bridge leaves a computer-brain turn's side effects for the engine. */

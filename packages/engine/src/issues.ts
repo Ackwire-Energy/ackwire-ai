@@ -50,6 +50,7 @@ const {
   channels,
   channelMembers,
   artifacts,
+  agentConsultations,
   agentRuns,
   agentRunSteps,
   notifications,
@@ -1499,6 +1500,11 @@ export async function askAgentToImplement(
   orgId: string,
   issueId: string,
   agentId: string,
+  /**
+   * The right hand handing it on for `userId` from its run (ADR 0137 §13): the start is written as it, never in the
+   * person's name, and is a `note` row of that run, so what comes of it goes back to their DM (`reportHandOffs`).
+   */
+  by?: { agentId: string; runId: string; hop: number },
 ): Promise<IssueView> {
   const { db } = deps;
   if (!deps.pubsub) throw new Error("askAgentToImplement needs pub/sub");
@@ -1508,26 +1514,49 @@ export async function askAgentToImplement(
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   if (!canTalkTo(agent, userId, await speakerFor(db, orgId, userId))) throw await audienceError(db, agent);
-  const updated = await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });
+  const updated =
+    issue.assigneeType === "agent" && issue.assigneeId === agentId
+      ? await one(db, issue, userId)
+      : await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });
   const conversation = await ensureTaskConversation(db, issue.id);
   await admitTaskAgents(db, orgId, conversation.channelId, { ids: [agentId] });
   const card: IssueWorkMeta = { issueId: issue.id, number: issue.number, title: issue.title, agentId };
+  const author: WorkActor = by ? { type: "agent", id: by.agentId } : { type: "person", id: userId };
   const { start, runId } = await db.transaction(async (tx) => {
+    const consultationId = Bun.randomUUIDv7();
     // What starts the run, in the conversation: short and human (shown in the person's language).
     const start = await insertMessage(tx, {
       orgId,
       channelId: conversation.channelId,
       threadId: conversation.rootId,
-      author: { type: "person", userId },
+      author: by ? { type: "agent", agentId: by.agentId, runId: by.runId, hop: by.hop } : { type: "person", userId },
       body: `Please implement issue #${issue.number}.`,
       meta: {
         issueId: issue.id,
         issueWorkStart: true,
         bodyCode: "issue_work_start",
         bodyParams: { number: issue.number },
+        ...(by ? { agentNote: { runId: by.runId }, consultation: { id: consultationId } } : {}),
       },
     });
-    const { run } = await enqueueRunJob(tx, start, agentId);
+    const { run, steered } = await enqueueRunJob(tx, start, agentId);
+    const targetRunId = run?.id ?? steered;
+    if (by)
+      await tx.insert(agentConsultations).values({
+        id: consultationId,
+        orgId,
+        kind: "note",
+        askerRunId: by.runId,
+        askerAgentId: by.agentId,
+        targetAgentId: agentId,
+        channelId: conversation.channelId,
+        messageId: start.id,
+        targetRunId,
+        waitId: `async:${Bun.randomUUIDv7()}`,
+        question: `Work on task #${issue.number}: ${issue.title}`.slice(0, 2_000),
+        chain: [by.agentId],
+        expiresAt: new Date(Date.now() + TASK_HAND_OFF_TTL_MS),
+      });
     return { start, runId: run?.id ?? null };
   });
   await publishMessageCreated(pubsub, messageView(start));
@@ -1543,7 +1572,7 @@ export async function askAgentToImplement(
   await db.transaction(async (tx) => {
     await addActivity(tx, issue, {
       kind: "event",
-      author: { type: "person", id: userId },
+      author,
       text: `asked ${agent.name} to implement`,
       event: "agent_asked",
       data: {
@@ -1557,10 +1586,11 @@ export async function askAgentToImplement(
     });
     await recordAudit(tx, {
       orgId,
-      actor: { type: "person", id: userId },
+      actor: author,
       action: "issue.agent_asked",
       target: { type: "issue", id: issue.id },
       details: { agentId },
+      ...(by ? { runId: by.runId, onBehalfOfUserId: userId } : {}),
     });
   });
   await announceTaken(deps, issue, card);
@@ -1571,6 +1601,9 @@ export async function askAgentToImplement(
   await announce(deps, orgId, view, "issue.updated");
   return view;
 }
+
+/** How long a hand-off of a task waits before it counts as hung while its agent hasn't started (the work extends it). */
+const TASK_HAND_OFF_TTL_MS = 15 * 60_000;
 
 /** An issue made from a channel message: one discreet line there ("Ada took issue #24"), never a thread. */
 async function announceTaken(deps: IssueDeps, issue: IssueRow, card: IssueWorkMeta) {

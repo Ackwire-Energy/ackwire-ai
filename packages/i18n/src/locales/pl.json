@@ -1683,7 +1683,10 @@
       "subPerson": "Każdy agent pod osobą, która za niego odpowiada, albo pod kierownikiem swojego działu, gdy takiej osoby nie ma.",
       "subSector": "Każdy dział z jego agentami. {{name}} pracuje ze wszystkimi.",
       "workspace": "Przestrzeń robocza",
-      "responsible": "Odpowiedzialni: {{names}}"
+      "responsible": "Odpowiedzialni: {{names}}",
+      "lodi": "śledzi wszystko razem z tobą",
+      "supervisor": "Przełożony: {{name}}",
+      "dragSector": "Przeciągnij na agenta, aby agenci tego działu mu podlegali"
     },
     "map": {
       "lead": "Kto opiekuje się agentami, w jakich kanałach są, co każdy robi sam i co czeka na człowieka. Linie przerywane to agenci, którzy w ostatniej dobie prosili się nawzajem o pomoc.",
@@ -1705,7 +1708,9 @@
       "emptyTitle": "Zobacz, gdzie pracuje każdy agent",
       "emptyAction": "Dodaj do kanału",
       "emptyViewer": "Osoba zarządzająca agentami dodaje ich do kanałów, a mapa pojawi się tutaj.",
-      "others": "Inne kanały"
+      "others": "Inne kanały",
+      "band": "Przełożeni",
+      "reportsTo": "Podlega: {{name}}"
     },
     "sectors": {
       "lead": "Każdy dział ma kierownika, zastępcę, swoich agentów oraz ich kanały i rutyny.",
@@ -1715,6 +1720,21 @@
       "backupLabel": "Zastępca",
       "leadOf": "Kierownik działu {{name}}",
       "backupOf": "Zastępca w dziale {{name}}",
+      "supervisor": "Przełożony",
+      "supervisorOf": "Przełożony działu {{name}}",
+      "unsupervised_one": "{{count}} agent bez przełożonego",
+      "unsupervised_few": "{{count}} agentów bez przełożonego",
+      "unsupervised_many": "{{count}} agentów bez przełożonego",
+      "unsupervised_other": "{{count}} agenta bez przełożonego",
+      "apply": "Zastosuj",
+      "supervisorDone_one": "{{count}} agent z działu {{sector}} podlega teraz: {{name}}",
+      "supervisorDone_few": "{{count}} agentów z działu {{sector}} podlega teraz: {{name}}",
+      "supervisorDone_many": "{{count}} agentów z działu {{sector}} podlega teraz: {{name}}",
+      "supervisorDone_other": "{{count}} agenta z działu {{sector}} podlega teraz: {{name}}",
+      "supervisorCleared_one": "{{count}} agent z działu {{sector}} nie podlega już przełożonemu",
+      "supervisorCleared_few": "{{count}} agentów z działu {{sector}} nie podlega już przełożonemu",
+      "supervisorCleared_many": "{{count}} agentów z działu {{sector}} nie podlega już przełożonemu",
+      "supervisorCleared_other": "{{count}} agenta z działu {{sector}} nie podlega już przełożonemu",
       "nobody": "Nikt",
       "none": "Brak",
       "channels": "Kanały",
@@ -1730,6 +1750,14 @@
       "empty": "Każdy dział ma kierownika, więc wszyscy widzą, kto czym się zajmuje.",
       "emptyViewerTitle": "Zobacz, kto czym się zajmuje",
       "emptyViewer": "Działy tworzy osoba zarządzająca agentami. Potem pojawią się tutaj."
+    },
+    "reportsTo": {
+      "label": "Podlega",
+      "help": "Mówi tylko, przed kim ten agent odpowiada. Nie daje żadnych uprawnień.",
+      "none": "Nikt",
+      "done": "{{agent}} podlega teraz: {{to}}",
+      "cleared": "{{agent}} nie podlega już agentowi",
+      "reports": "Kto podlega: {{name}}"
     },
     "usage": {
       "lead": "Ile każda osoba korzysta z agentów w tym miesiącu, i limity.",
@@ -2182,6 +2210,7 @@
         "ai_account": "Przydziela je tylko właściciel konta",
         "name": "Tylko admini zmieniają nazwę agenta",
         "look": "Tylko admini i opiekun zmieniają jego wygląd",
+        "reports_to": "Tylko admini zmieniają, komu podlega agent",
         "many": "Tylko admini wprowadzają te zmiany"
       }
     },
@@ -2194,10 +2223,12 @@
       "archive": "Stan",
       "channel": "Kanał",
       "name": "Nazwa",
-      "look": "Wygląd"
+      "look": "Wygląd",
+      "reports_to": "Podlega"
     },
     "value": {
       "lookDefault": "Domyślny wygląd",
+      "anAgent": "Agent",
       "none": "Brak",
       "budgetDefault": "Domyślny workspace",
       "anAccount": "Konto AI",
@@ -2252,6 +2283,7 @@
   },
   "teamWeek": {
     "title": "Tydzień zespołu",
+    "dayTitle": "Podsumowanie dnia",
     "suggestions_one": "{{count}} sugestia",
     "suggestions_few": "{{count}} sugestie",
     "suggestions_many": "{{count}} sugestii",
@@ -2339,7 +2371,8 @@
       "wed": "W każdą środę o {{time}}",
       "thu": "W każdy czwartek o {{time}}",
       "fri": "W każdy piątek o {{time}}",
-      "sat": "W każdą sobotę o {{time}}"
+      "sat": "W każdą sobotę o {{time}}",
+      "day": "Codziennie o {{time}}"
     },
     "off": "Wyłączone",
     "schedule": {
@@ -2347,11 +2380,14 @@
       "day": "Dzień",
       "hour": "Godzina",
       "stop": "Przestań otrzymywać",
-      "start": "Otrzymuj znowu"
+      "start": "Otrzymuj znowu",
+      "daily": "Codziennie"
     },
     "settings": {
       "label": "Tydzień zespołu",
-      "help": "Co tydzień {{name}} opowiada ci w DM, jak poszło zespołowi i co poprawić. Dostają go tylko admini."
+      "help": "Co tydzień {{name}} opowiada ci w DM, jak poszło zespołowi i co poprawić. Dostają go tylko admini.",
+      "dayLabel": "Podsumowanie dnia",
+      "dayHelp": "Codziennie {{name}} mówi ci w DM, co zrobił zespół i co na ciebie czeka, tylko w dni, gdy jest coś do powiedzenia."
     }
   },
   "routing": {
@@ -14481,7 +14517,8 @@
       "askedBy": "Prośba o zadanie od: {{name}}",
       "view": "Zobacz zadanie",
       "taken": "Zadanie przejęte przez: {{name}}",
-      "agent": "Z {{name}}"
+      "agent": "Z {{name}}",
+      "chipLabel": "Otwórz rozmowę zadania #{{number}}, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -14494,6 +14531,7 @@
       "autonomy_digest_many": "{{count}} alertów wyglądało na znane lub nieszkodliwe, więc się nimi nie zająłem:",
       "autonomy_digest_other": "{{count}} alertu wyglądało na znane lub nieszkodliwe, więc się nimi nie zająłem:",
       "team_week": "Jak minął tydzień zespołu, od {{from}} do {{to}}",
+      "team_day": "Jak minął dzień zespołu, do {{day}}",
       "autonomy_loop": "Przestałem nad tym pracować z własnej inicjatywy. Wróciło {{count}} razy w ciągu dnia ({{title}}). Powiedz mi, jak mam to potraktować.",
       "mission_plan": "Plan dla „{{title}}” na komputerze {{computer}}",
       "mission_planNoComputer": "Plan dla „{{title}}”",

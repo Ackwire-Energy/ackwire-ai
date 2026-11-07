@@ -2064,6 +2064,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.calls.push({ method: "agents.proposeChannelMove", args: [orgId, input] });
         return { channelId: crypto.randomUUID(), messageId: crypto.randomUUID(), rightHandId: crypto.randomUUID() };
       },
+      // Same as the server's `setReportsTo`: in order, answering what each was (the same call is Desfazer).
+      setLines: async (orgId, changes) => {
+        state.calls.push({ method: "agents.setLines", args: [orgId, changes] });
+        const previous = changes.flatMap((c) => {
+          const agent = state.agents.find((a) => a.id === c.agentId);
+          if (!agent || (agent.reportsToAgentId ?? null) === c.reportsToAgentId) return [];
+          const was = { agentId: c.agentId, reportsToAgentId: agent.reportsToAgentId ?? null };
+          agent.reportsToAgentId = c.reportsToAgentId;
+          return [was];
+        });
+        return { previous };
+      },
       team: async () => ({
         agents: state.agents.map((a) => ({
           id: a.id,
@@ -2072,6 +2084,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           role: a.role,
           appearance: a.appearance ?? null,
           ownerUserId: a.ownerUserId,
+          reportsToAgentId: a.reportsToAgentId ?? null,
           capabilities: ["drive", "issues"],
           busy: false,
           channelIds: state.channels

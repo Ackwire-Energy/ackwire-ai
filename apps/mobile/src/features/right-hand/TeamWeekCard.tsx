@@ -11,6 +11,7 @@ import {
   useTeamWeekPrefs,
 } from "@agenteschat/client";
 import { clockAt, formatUsd, joinNames } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import {
   appliesInBulk,
@@ -19,9 +20,11 @@ import {
   type TeamWeekRow,
   teamWeekCardOf,
   teamWeekDoneText,
+  teamWeekOn,
   teamWeekRowMessage,
   teamWeekRowState,
   teamWeekRowText,
+  teamWeekTitleKey,
   teamWeekWhen,
 } from "@agenteschat/client/lib/team-week";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,7 +60,7 @@ export function TeamWeek({ message: m }: { message: Message }) {
 
 function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
   const { t, i18n } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
   const c = useColors();
   const cardTop = useCardTop();
   const dir = useDirectory();
@@ -125,7 +128,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
       <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }, cardTop]}>
         <View style={styles.head}>
           <Text variant="footnote" tone="muted" style={styles.semibold}>
-            {t("teamWeek.title")}
+            {t(teamWeekTitleKey(card))}
           </Text>
           {open.length > 0 && !dismissed ? (
             <Text variant="caption" style={[styles.semibold, { color: c.amber }]}>
@@ -137,7 +140,10 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
           {stat(String(stats.done), t("teamWeek.stat.done"))}
           {stat(String(stats.stuck), t("teamWeek.stat.stuck"), stats.stuck > 0 ? c.danger : undefined)}
           {stat(String(stats.waiting), t("teamWeek.stat.waiting"), stats.waiting > 0 ? c.amber : undefined)}
-          {stat(names.usd(stats.spentNanoUsd), t("teamWeek.stat.budget", { budget: names.usd(stats.budgetNanoUsd) }))}
+          {/* The workspace's money: only on an administrator's card. */}
+          {stats.budgetNanoUsd > 0
+            ? stat(names.usd(stats.spentNanoUsd), t("teamWeek.stat.budget", { budget: names.usd(stats.budgetNanoUsd) }))
+            : null}
         </View>
         {card.worked.length > 0 ? (
           <View style={styles.section}>
@@ -214,7 +220,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
               style={({ pressed }) => [styles.when, pressed && styles.pressed]}
             >
               <Text variant="footnote" tone="muted">
-                {prefs.off ? t("teamWeek.off") : teamWeekWhen(t, locale, prefs)}
+                {teamWeekOn(prefs, can(org, "administrator")) ? teamWeekWhen(t, locale, prefs) : t("teamWeek.off")}
                 {" · "}
                 <Text variant="footnote" tone="ink" style={styles.semibold}>
                   {t("teamWeek.change")}

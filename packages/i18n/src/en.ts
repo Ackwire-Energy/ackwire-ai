@@ -1571,6 +1571,10 @@ export const en = {
       subSector: "Each department with its agents. {{name}} works with everyone.",
       workspace: "Workspace",
       responsible: "Responsible: {{names}}",
+      /** Lodi beside the workspace, out of the reporting line. */
+      lodi: "follows everything with you",
+      supervisor: "Supervisor: {{name}}",
+      dragSector: "Drag onto an agent to make this sector's agents report to it",
     },
     /** The team map: people on top, a column per channel, the right hand below. */
     map: {
@@ -1592,6 +1596,8 @@ export const en = {
       emptyViewer: "Whoever manages the agents adds them to channels, and the map shows up here.",
       /** Channels with no agent yet, under the columns: drop an agent on one. */
       others: "Other channels",
+      band: "Supervisors",
+      reportsTo: "Reports to {{name}}",
     },
     sectors: {
       lead: "Each department has a lead, a substitute, its agents and their channels and routines.",
@@ -1602,6 +1608,15 @@ export const en = {
       backupLabel: "Substitute",
       leadOf: "Lead of {{name}}",
       backupOf: "Substitute in {{name}}",
+      supervisor: "Supervisor",
+      supervisorOf: "Supervisor of {{name}}",
+      unsupervised_one: "{{count}} agent without a supervisor",
+      unsupervised_other: "{{count}} agents without a supervisor",
+      apply: "Apply",
+      supervisorDone_one: "{{count}} agent of {{sector}} now reports to {{name}}",
+      supervisorDone_other: "{{count}} agents of {{sector}} now report to {{name}}",
+      supervisorCleared_one: "{{count}} agent of {{sector}} no longer reports to a supervisor",
+      supervisorCleared_other: "{{count}} agents of {{sector}} no longer report to a supervisor",
       nobody: "Nobody",
       none: "None",
       channels: "Channels",
@@ -1618,6 +1633,15 @@ export const en = {
       /** For who can't create one. */
       emptyViewerTitle: "See who looks after what",
       emptyViewer: "Whoever manages the agents creates departments, and they show up here.",
+    },
+    /** Responde a (ADR 0148 addendum): who an agent reports to. It grants nothing. */
+    reportsTo: {
+      label: "Reports to",
+      help: "Only says who this agent answers to. It grants no permission.",
+      none: "Nobody",
+      done: "{{agent}} now reports to {{to}}",
+      cleared: "{{agent}} no longer reports to an agent",
+      reports: "Who reports to {{name}}",
     },
     usage: {
       lead: "What each person uses of the agents this month, and the limits.",
@@ -2051,6 +2075,7 @@ export const en = {
         ai_account: "Only the account's owner gives it",
         name: "Only admins rename an agent",
         look: "Only admins and its owner change its look",
+        reports_to: "Only admins change who an agent reports to",
         many: "Only admins make these changes",
       },
     },
@@ -2064,9 +2089,11 @@ export const en = {
       channel: "Channel",
       name: "Name",
       look: "Look",
+      reports_to: "Reports to",
     },
     value: {
       lookDefault: "The default look",
+      anAgent: "An agent",
       none: "None",
       budgetDefault: "Workspace default",
       anAccount: "An AI account",
@@ -2112,6 +2139,8 @@ export const en = {
   /** Lodi's weekly card in an admin's DM with it (ADR 0137 §9). */
   teamWeek: {
     title: "Team week",
+    /** The same card, daily ("Resumo do dia"). */
+    dayTitle: "Daily summary",
     suggestions_one: "{{count}} suggestion",
     suggestions_other: "{{count}} suggestions",
     stat: {
@@ -2187,6 +2216,7 @@ export const en = {
       thu: "Every Thursday at {{time}}",
       fri: "Every Friday at {{time}}",
       sat: "Every Saturday at {{time}}",
+      day: "Every day at {{time}}",
     },
     off: "Off",
     schedule: {
@@ -2195,10 +2225,15 @@ export const en = {
       hour: "Time",
       stop: "Stop receiving it",
       start: "Receive it again",
+      daily: "Every day",
     },
     settings: {
       label: "Team week",
       help: "Every week {{name}} tells you in your DM how the team did and what to fix. Only admins get it.",
+      /** "Resumo do dia": the same card every day, which anyone may turn on. */
+      dayLabel: "Daily summary",
+      dayHelp:
+        "Every day {{name}} tells you in your DM what the team did and what waits for you, on days with something to say.",
     },
   },
   routing: {
@@ -13243,6 +13278,8 @@ export const en = {
       view: "View task",
       taken: "{{name}} took task",
       agent: "With {{name}}",
+      /** A task the right hand handed on, as a chip under its reply: it opens the task's conversation. */
+      chipLabel: "Open the conversation of task #{{number}}, {{title}}",
     },
     body: {
       /** The autonomy brakes (ADR 0131): an agent asks before costly work nobody asked for, the noise digest, a loop stop. */
@@ -13254,6 +13291,8 @@ export const en = {
       autonomy_digest_one: "{{count}} alert looked known or harmless, so I didn't work on it:",
       autonomy_digest_other: "{{count}} alerts looked known or harmless, so I didn't work on them:",
       team_week: "How the team's week went, {{from}} to {{to}}",
+      /** "Resumo do dia": the same card, daily. */
+      team_day: "How the team's day went, up to {{day}}",
       autonomy_loop:
         "I stopped working on this on my own. It came back {{count}} times in a day ({{title}}). Tell me how you want it handled.",
       mission_plan: "Plan for “{{title}}” on {{computer}}",

@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
 import { AgentGroupMenu, type GroupDialogFor, GroupNameDialog } from "@/components/AgentGroups";
 import { useOrg } from "@/components/org-context";
+import { ReportsToMenu } from "./ReportsTo";
 import { AgentNow, ChannelName, SectorMark, useTeamLookups } from "./shared";
 import "@/components/people-usage.css";
 
@@ -198,7 +199,9 @@ function AgentsTable({ agents, groups }: { agents: TeamAgent[]; groups: AgentGro
                 agent={directory}
                 groups={groups}
                 onNewGroup={() => setDialog({ mode: "create", agentIds: [a.id] })}
-              />
+              >
+                <ReportsToMenu agent={a} team={agents} lodiId={look.lodi?.id} />
+              </AgentGroupMenu>
             )}
           </td>
         )}

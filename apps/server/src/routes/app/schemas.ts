@@ -392,6 +392,10 @@ export const Agent = z
       description:
         "A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand, one per workspace, never archived, deleted or exported. Null for the agents people make.",
     }),
+    reportsToAgentId: z.uuid().nullable().optional().openapi({
+      description:
+        "Responde a (ADR 0148 addendum): the agent it reports to. It says where news goes by default and grants nothing; null = its owner, else its setor's lead.",
+    }),
     brakes: AgentBrakes,
     brain: z
       .object({

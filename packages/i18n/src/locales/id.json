@@ -1530,7 +1530,10 @@
       "subPerson": "Setiap agen di bawah orang yang bertanggung jawab atasnya, atau di bawah pemimpin departemennya bila tidak ada.",
       "subSector": "Setiap departemen dengan agennya. {{name}} bekerja dengan semua orang.",
       "workspace": "Ruang kerja",
-      "responsible": "Penanggung jawab: {{names}}"
+      "responsible": "Penanggung jawab: {{names}}",
+      "lodi": "mengikuti semuanya bersamamu",
+      "supervisor": "Supervisor: {{name}}",
+      "dragSector": "Seret ke sebuah agen agar agen di sektor ini melapor kepadanya"
     },
     "map": {
       "lead": "Siapa yang mengurus agen, kanal tempat mereka berada, apa yang dikerjakan masing-masing sendiri, dan apa yang menunggu seseorang. Garis putus-putus adalah agen yang saling minta bantuan dalam sehari terakhir.",
@@ -1546,7 +1549,9 @@
       "emptyTitle": "Lihat di mana setiap agen bekerja",
       "emptyAction": "Tambahkan ke kanal",
       "emptyViewer": "Orang yang mengelola agen menambahkannya ke kanal, lalu peta muncul di sini.",
-      "others": "Kanal lain"
+      "others": "Kanal lain",
+      "band": "Supervisor",
+      "reportsTo": "Melapor ke {{name}}"
     },
     "sectors": {
       "lead": "Setiap departemen punya penanggung jawab, pengganti, agen, serta kanal dan rutinitas mereka.",
@@ -1556,6 +1561,12 @@
       "backupLabel": "Pengganti",
       "leadOf": "Penanggung jawab {{name}}",
       "backupOf": "Pengganti di {{name}}",
+      "supervisor": "Supervisor",
+      "supervisorOf": "Supervisor {{name}}",
+      "unsupervised_other": "{{count}} agen tanpa supervisor",
+      "apply": "Terapkan",
+      "supervisorDone_other": "{{count}} agen {{sector}} sekarang melapor ke {{name}}",
+      "supervisorCleared_other": "{{count}} agen {{sector}} tidak lagi melapor ke supervisor",
       "nobody": "Tidak ada",
       "none": "Tidak ada",
       "channels": "Kanal",
@@ -1571,6 +1582,14 @@
       "empty": "Setiap departemen punya penanggung jawab, jadi semua orang tahu siapa mengurus apa.",
       "emptyViewerTitle": "Lihat siapa mengurus apa",
       "emptyViewer": "Orang yang mengelola agen membuat departemen, lalu departemen muncul di sini."
+    },
+    "reportsTo": {
+      "label": "Melapor ke",
+      "help": "Hanya menunjukkan kepada siapa agen ini bertanggung jawab. Tidak memberi izin apa pun.",
+      "none": "Tidak ada",
+      "done": "{{agent}} sekarang melapor ke {{to}}",
+      "cleared": "{{agent}} tidak lagi melapor ke agen",
+      "reports": "Yang melapor ke {{name}}"
     },
     "usage": {
       "lead": "Penggunaan agen oleh setiap orang bulan ini, dan batasnya.",
@@ -1958,6 +1977,7 @@
         "ai_account": "Hanya pemilik akun yang memberikannya",
         "name": "Hanya admin yang mengganti nama agen",
         "look": "Hanya admin dan penanggung jawabnya yang mengubah tampilannya",
+        "reports_to": "Hanya admin yang mengubah kepada siapa agen melapor",
         "many": "Hanya admin yang membuat perubahan ini"
       }
     },
@@ -1970,10 +1990,12 @@
       "archive": "Status",
       "channel": "Kanal",
       "name": "Nama",
-      "look": "Tampilan"
+      "look": "Tampilan",
+      "reports_to": "Melapor ke"
     },
     "value": {
       "lookDefault": "Tampilan bawaan",
+      "anAgent": "Sebuah agen",
       "none": "Tidak ada",
       "budgetDefault": "Bawaan workspace",
       "anAccount": "Sebuah akun AI",
@@ -2016,6 +2038,7 @@
   },
   "teamWeek": {
     "title": "Minggu tim",
+    "dayTitle": "Ringkasan harian",
     "suggestions_other": "{{count}} saran",
     "stat": {
       "done": "tugas selesai",
@@ -2076,7 +2099,8 @@
       "wed": "Setiap Rabu pukul {{time}}",
       "thu": "Setiap Kamis pukul {{time}}",
       "fri": "Setiap Jumat pukul {{time}}",
-      "sat": "Setiap Sabtu pukul {{time}}"
+      "sat": "Setiap Sabtu pukul {{time}}",
+      "day": "Setiap hari pukul {{time}}"
     },
     "off": "Mati",
     "schedule": {
@@ -2084,11 +2108,14 @@
       "day": "Hari",
       "hour": "Jam",
       "stop": "Berhenti menerima",
-      "start": "Terima lagi"
+      "start": "Terima lagi",
+      "daily": "Setiap hari"
     },
     "settings": {
       "label": "Minggu tim",
-      "help": "Setiap minggu {{name}} menceritakan di DM-mu bagaimana tim bekerja dan apa yang bisa diperbaiki. Hanya admin yang menerimanya."
+      "help": "Setiap minggu {{name}} menceritakan di DM-mu bagaimana tim bekerja dan apa yang bisa diperbaiki. Hanya admin yang menerimanya.",
+      "dayLabel": "Ringkasan harian",
+      "dayHelp": "Setiap hari {{name}} memberi tahu di DM-mu apa yang dikerjakan tim dan apa yang menunggumu, hanya pada hari yang ada kabarnya."
     }
   },
   "routing": {
@@ -13094,7 +13121,8 @@
       "askedBy": "{{name}} meminta tugas",
       "view": "Lihat tugas",
       "taken": "{{name}} mengambil tugas",
-      "agent": "Bersama {{name}}"
+      "agent": "Bersama {{name}}",
+      "chipLabel": "Buka percakapan tugas #{{number}}, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13104,6 +13132,7 @@
       },
       "autonomy_digest_other": "{{count}} peringatan tampak sudah dikenal atau tidak berbahaya, jadi tidak saya kerjakan:",
       "team_week": "Bagaimana minggu tim berjalan, {{from}} sampai {{to}}",
+      "team_day": "Bagaimana hari tim, sampai {{day}}",
       "autonomy_loop": "Saya berhenti mengerjakan ini atas inisiatif sendiri. Ini muncul lagi {{count}} kali dalam sehari ({{title}}). Beri tahu saya bagaimana Anda ingin menanganinya.",
       "mission_plan": "Rencana untuk “{{title}}” di {{computer}}",
       "mission_planNoComputer": "Rencana untuk “{{title}}”",

@@ -9,9 +9,11 @@ import {
   appliesInBulk,
   type TeamWeekCard,
   type TeamWeekNames,
+  teamWeekOn,
   teamWeekRowMessage,
   teamWeekRowState,
   teamWeekRowText,
+  teamWeekTitleKey,
   teamWeekWhen,
   weekDay,
 } from "../src/lib/team-week";
@@ -129,5 +131,26 @@ test("every language says every row, with no key left showing", () => {
       for (const s of [title, line, action]) expect([lng, s.includes("teamWeek.")]).toEqual([lng, false]);
     }
     expect([lng, teamWeekWhen(t, lng, { day: 1, hour: 9 }).includes("teamWeek.")]).toEqual([lng, false]);
+  }
+});
+
+test("Resumo do dia: its title, its hour, its line, and who gets it", () => {
+  const t = tOf("pt-BR");
+  expect(teamWeekTitleKey({ period: "day" })).toBe("teamWeek.dayTitle");
+  expect(teamWeekTitleKey({})).toBe("teamWeek.title");
+  expect(t(teamWeekTitleKey({ period: "day" }))).toBe("Resumo do dia");
+  expect(teamWeekWhen(t, "pt-BR", { day: 5, hour: 9, daily: true })).toBe("Todo dia às 9:00");
+  expect(serverBody(t, "Seu resumo", { bodyCode: "team_week", bodyParams: { ...card, period: "day" } }, "pt-BR")).toBe(
+    "Como foi o dia do time, até 6 de nov.",
+  );
+  // An admin's weekly card comes unless off; anyone else's only once they asked for it daily.
+  expect(teamWeekOn({ off: false }, true)).toBe(true);
+  expect(teamWeekOn({ off: false }, false)).toBe(false);
+  expect(teamWeekOn({ off: false, daily: true }, false)).toBe(true);
+  expect(teamWeekOn({ off: true, daily: true }, true)).toBe(false);
+  for (const lng of LOCALE_CODES) {
+    const tl = tOf(lng);
+    expect([lng, teamWeekWhen(tl, lng, { day: 1, hour: 9, daily: true }).includes("teamWeek.")]).toEqual([lng, false]);
+    expect([lng, tl("teamWeek.dayTitle").includes("teamWeek.")]).toEqual([lng, false]);
   }
 });

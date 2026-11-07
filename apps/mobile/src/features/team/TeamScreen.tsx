@@ -1,7 +1,14 @@
 import { type TeamAgent, useAgentGroups, useChannels, useMembers, useTeam } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
-import { chartByPerson, mapColumns, noSectorsCopy } from "@agenteschat/client/lib/team-views";
+import {
+  type ChartNode,
+  chartByPerson,
+  mapColumns,
+  noSectorsCopy,
+  sectorSupervisor,
+  supervisorOf,
+} from "@agenteschat/client/lib/team-views";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -14,7 +21,7 @@ import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hoo
 import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { Tile, useSurface } from "../shared/parts";
-import { teamSections } from "./logic";
+import { chartRows, lineContinues, teamSections } from "./logic";
 
 /** The org chart's faces: the right hand and the people at 40, their agents at 30, the lines through their centers. */
 const LEAD = 40;
@@ -25,14 +32,19 @@ const SCROLL_COLUMN = 168;
 const PAGE = 16;
 /** The line from an agent's trunk to its face. */
 const ELBOW = 18;
+/** How far a supervisor's reports sit in under it: their line drops from its face's center. */
+const INDENT = 32;
+/** Where the line of the agents at `level` runs: the person's (0), else under their supervisor's face. */
+const lineX = (level: number) => (level === 0 ? 0 : ELBOW + 8 + (level - 1) * INDENT + AGENT / 2 - 0.5);
 /** Faces on a channel's card before "+N". */
 const CHANNEL_FACES = 4;
 
 /**
- * Equipe on the phone (ADR 0148), one page with each thing said once: the org chart (the right hand on top, each
- * person with the agents that report to them, joined by lines), the channels as places with who works in each, who is
- * in none, and the setores with their lead and substitute. With no setores, what they give and, for who can, the first
- * one. Editing setores, the map's drag and Governança e uso are on the web.
+ * Equipe on the phone (ADR 0148), one page with each thing said once: the org chart (the right hand on top, out of the
+ * line, then each person with the agents that report to them, a supervisor's reports indented under it, ADR 0148
+ * addendum), the channels as places with who works in each and who each reports to, who is in none, and the setores
+ * with their lead, substitute and supervisor. With no setores, what they give and, for who can, the first one.
+ * Editing setores, the map's drag and Governança e uso are on the web; Responde a is on the agent's edit screen.
  */
 export function TeamScreen() {
   const { t } = useTranslation();
@@ -95,6 +107,7 @@ export function TeamScreen() {
                 channelId={r.channelId ?? ""}
                 name={channelName(r.channelId ?? "")}
                 agents={r.agents}
+                team={agents}
               />
             ))}
           </View>
@@ -148,8 +161,11 @@ export function TeamScreen() {
             sub={[
               `${t("team.sectors.leadLabel")}: ${s.lead ?? t("team.sectors.nobody")}`,
               `${t("team.sectors.backupLabel")}: ${s.backup ?? t("team.sectors.nobody")}`,
+              ...(s.group && sectorSupervisor(s.group, agents)
+                ? [`${t("team.sectors.supervisor")}: ${sectorSupervisor(s.group, agents)?.supervisor.name}`]
+                : []),
             ].join(" · ")}
-            subLines={1}
+            subLines={2}
             time={t("team.agents", { count: s.agents.length })}
           />
         ))
@@ -167,7 +183,7 @@ function OrgChart({
   columns,
 }: {
   lodi: { id: string; name: string } | null;
-  columns: { personId: string | null; agents: TeamAgent[] }[];
+  columns: { personId: string | null; agents: TeamAgent[]; nodes: ChartNode[] }[];
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -176,7 +192,6 @@ function OrgChart({
   const wide = columns.length > 2;
   const column = wide ? SCROLL_COLUMN : Math.floor((width - PAGE * 2 - COLUMN_GAP) / 2);
   const line = { backgroundColor: c.line2 };
-  const bar = (columns.length - 1) * (column + COLUMN_GAP);
   return (
     <View>
       {lodi ? (
@@ -192,11 +207,10 @@ function OrgChart({
                 {lodi.name}
               </Text>
               <Text variant="footnote" tone="muted" numberOfLines={1}>
-                {t("team.map.lodi")}
+                {t("team.chart.lodi")}
               </Text>
             </View>
           </Pressable>
-          {columns.length > 0 ? <View style={[styles.stem, line]} /> : null}
         </View>
       ) : null}
       <ScrollView
@@ -205,10 +219,8 @@ function OrgChart({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.columns}
       >
-        {lodi && columns.length > 1 ? <View style={[styles.bar, line, { width: bar + 1 }]} /> : null}
         {columns.map((col) => (
           <View key={col.personId ?? "none"} style={[styles.column, { width: column }]}>
-            {lodi ? <View style={[styles.drop, line]} /> : null}
             <View style={styles.person}>
               {col.personId ? (
                 <Face who={{ type: "person", id: col.personId }} size={LEAD} />
@@ -225,16 +237,42 @@ function OrgChart({
               </View>
             </View>
             <View style={styles.branch}>
-              {col.agents.map((a, i) => (
+              {chartRows(col.nodes).map(({ agent: a, depth }, i, rows) => (
                 <Pressable
                   key={a.id}
                   onPress={() => router.push(`/agent/${a.id}`)}
                   accessibilityRole="button"
                   accessibilityLabel={[a.name, a.role].filter(Boolean).join(", ")}
-                  style={({ pressed }) => [styles.node, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.node,
+                    { paddingLeft: ELBOW + 8 + depth * INDENT },
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <View style={[styles.trunk, line, i === col.agents.length - 1 ? styles.trunkEnd : null]} />
-                  <View style={[styles.elbow, line]} />
+                  {/* Each level's line runs on while a later row of that level follows; a row's own stops at it. */}
+                  {Array.from({ length: depth + 1 }, (_, level) => {
+                    const goesOn = lineContinues(rows, i, level);
+                    if (level < depth && !goesOn) return null;
+                    return (
+                      <View
+                        // biome-ignore lint/suspicious/noArrayIndexKey: a level is the line's position, fixed per row
+                        key={level}
+                        style={[
+                          styles.trunk,
+                          line,
+                          { left: lineX(level) },
+                          level === depth && !goesOn ? styles.trunkEnd : null,
+                        ]}
+                      />
+                    );
+                  })}
+                  <View
+                    style={[
+                      styles.elbow,
+                      line,
+                      { left: lineX(depth), width: ELBOW + 8 + depth * INDENT - lineX(depth) - 8 },
+                    ]}
+                  />
                   <AgentFace agentId={a.id} size={AGENT} mode={a.busy ? "run" : "idle"} live={false} />
                   <View style={styles.grow}>
                     <Text variant="subhead" style={styles.semibold} numberOfLines={1}>
@@ -256,8 +294,22 @@ function OrgChart({
   );
 }
 
-/** A channel as a place (an object, so a card): its name, the faces of the agents in it and who they are. */
-function ChannelCard({ channelId, name, agents }: { channelId: string; name: string; agents: TeamAgent[] }) {
+/**
+ * A channel as a place (an object, so a card): its name, the faces of the agents in it and who they are, and who each
+ * reports to ("Responde a Nina"), as the web's map says it below 720 px.
+ */
+function ChannelCard({
+  channelId,
+  name,
+  agents,
+  team,
+}: {
+  channelId: string;
+  name: string;
+  agents: TeamAgent[];
+  team: TeamAgent[];
+}) {
+  const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
   const { width } = useWindowDimensions();
@@ -292,6 +344,16 @@ function ChannelCard({ channelId, name, agents }: { channelId: string; name: str
       <Text variant="caption" tone="muted" numberOfLines={1}>
         {agents.map((a) => a.name).join(", ")}
       </Text>
+      {agents.flatMap((a) => {
+        const up = supervisorOf(a, team);
+        return up
+          ? [
+              <Text key={a.id} variant="caption" tone="faint" numberOfLines={1}>
+                {`${a.name} · ${t("team.map.reportsTo", { name: up.name })}`}
+              </Text>,
+            ]
+          : [];
+      })}
     </Pressable>
   );
 }
@@ -301,13 +363,8 @@ const styles = StyleSheet.create({
   summary: { paddingHorizontal: 20, marginTop: -4 },
   page: { paddingHorizontal: PAGE },
   lead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  // From the right hand's face center down to the people's bar.
-  stem: { width: 1, height: 14, marginLeft: LEAD / 2 - 0.5 },
   columns: { paddingHorizontal: PAGE, gap: COLUMN_GAP },
-  // Across the people's face centers, at the top of their drops.
-  bar: { position: "absolute", top: 0, left: PAGE + LEAD / 2 - 0.5, height: 1 },
   column: { paddingTop: 14 },
-  drop: { position: "absolute", top: 0, left: LEAD / 2 - 0.5, width: 1, height: 14 },
   person: { flexDirection: "row", alignItems: "center", gap: 10 },
   // The agents hang from a line under the person's face center.
   branch: { marginLeft: LEAD / 2 - 0.5 },

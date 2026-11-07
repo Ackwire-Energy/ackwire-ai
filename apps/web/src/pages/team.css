@@ -190,6 +190,86 @@
   position: relative;
   min-width: 220px;
 }
+/* The workspace, with Lodi as a slim chip at its right: out of the reporting line. */
+.team-tree__org {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.team-tree__org > .team-node {
+  min-width: 220px;
+}
+.team-lodi-chip {
+  position: absolute;
+  left: calc(100% + 12px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px 4px 6px;
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: var(--e1);
+  color: var(--ink);
+  font-size: 13px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.team-lodi-chip:hover {
+  background: var(--raised-2);
+}
+/* A supervisor's reports, indented under it and joined by a line. */
+.team-line {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.team-line__reports {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 14px;
+  padding-left: 12px;
+  border-left: 1.5px solid var(--line-strong);
+}
+.team-line__count {
+  align-self: flex-start;
+}
+.team-node[data-line-drop] {
+  border-color: var(--agent);
+  box-shadow: 0 0 0 2px var(--agent-soft);
+}
+.team-frame__head[draggable="true"] {
+  cursor: grab;
+}
+.team-frame__sup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* A supervisor's page: who reports to it. */
+.team-reports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.team-reports__one {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  text-decoration: none;
+}
+@media (max-width: 720px) {
+  .team-lodi-chip {
+    position: static;
+  }
+  .team-tree__org {
+    flex-direction: column;
+  }
+}
 .team-tree__top > .team-node + .team-node::before {
   content: "";
   position: absolute;
@@ -332,6 +412,40 @@
   stroke: var(--agent);
   stroke-dasharray: 4 4;
 }
+.team-map__lines path[data-kind="line"] {
+  stroke: color-mix(in srgb, var(--ink) 55%, transparent);
+  stroke-width: 1.75;
+}
+/* The supervisors' band, between the people and the channels (ADR 0148 addendum). */
+.team-map__band {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.team-map__sup {
+  min-width: 180px;
+}
+.team-map__sup[data-drop="true"] {
+  border-color: var(--agent);
+  box-shadow: 0 0 0 2px var(--agent-soft);
+}
+.team-map__face {
+  display: inline-flex;
+  margin-left: auto;
+}
+.team-map__reports-to {
+  display: none;
+}
+@media (max-width: 720px) {
+  .team-map__lines path[data-kind="line"] {
+    display: none;
+  }
+  .team-map__reports-to {
+    display: block;
+  }
+}
 .team-map__people {
   position: relative;
   display: flex;
@@ -369,6 +483,9 @@
   outline-offset: 2px;
 }
 .team-map__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 650;
 }
 .team-map__head a {
@@ -562,4 +679,16 @@
   .team-map__lines {
     display: none;
   }
+}
+
+/* Setores: the Supervisor row, and the agents that don't report to it yet. */
+.team-sector-card__sup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.team-sector-card__off {
+  color: var(--muted);
+  font-size: 13px;
 }

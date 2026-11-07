@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   foreignKey,
@@ -241,6 +242,12 @@ export const agents = pgTable(
     groupId: uuid().references(() => agentGroups.id, { onDelete: "set null" }),
     /** Order inside its group. */
     groupPosition: integer().notNull().default(0),
+    /**
+     * "Responde a" (ADR 0148 addendum): the agent it reports to, in the same workspace (checked in code, as the right
+     * hand, loops and depth are). It says where its news goes by default and who it may always call; it grants nothing.
+     * Null: its owner, else its setor's lead.
+     */
+    reportsToAgentId: uuid().references((): AnyPgColumn => agents.id, { onDelete: "set null" }),
     /**
      * A built-in agent the product ships (ADR 0137): `right_hand` is the team's right hand, one per workspace (the
      * index below), never archived, deleted, exported or imported. Null = an agent people made.

@@ -282,7 +282,7 @@ import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useArchiveChannelWithUndo } from "@/components/entity-menus";
 import { InPlaceProvider } from "@/components/InPlace";
-import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
+import { HandedTaskChips, IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
 import { InviteOfferRow, useInviteDialog, useInviteOffer } from "@/components/invite/InviteDialog";
 import { useLeaveChannelWithUndo } from "@/components/LeaveChannelDialog";
@@ -4529,6 +4529,7 @@ export const TimelineMessage = memo(function TimelineMessage({
               </p>
             )}
             {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
+            {m.author.type === "agent" && !m.local && <HandedTaskChips message={m} />}
             {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
             {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
             {agent &&

@@ -50,3 +50,25 @@ Every string is in the 14 languages. The old sky, card and feed strings are gone
 
 - **Moving an agent by dragging on the map at once**: the concept asked for a proposal, and a channel change has deciders (its owner or who manages agents). The right hand's card already decides, applies, audits and undoes it.
 - **A new `sectors` table**: the groups already are the sidebar's sections and the agent page's field. Four columns keep one source of truth.
+
+## Addendum (2026-11-07): Responde a, a supervisor agent between a person and the agents
+
+### Context
+
+A customer wanted to put one agent of his own between himself and the sectors in Mapa and Organograma. `reportsTo` could only answer a person (the owner beats the setor's lead), so nothing could change the picture.
+
+### Decision
+
+- **One nullable column, `agents.reports_to_agent_id`** (migration 0239), same workspace, `on delete set null`. A supervisor is any agent others report to: no flag, no role, no permission. The owner stays accountable (approvals, plan, budget); the supervisor is who it tells.
+- **Refused** (`lineRefusal`): itself, the right hand at either end, a loop, more than 3 agents top to bottom (`MAX_LINE_DEPTH`: the right hand, 3, and a specialist fit `MAX_CONSULTATION_CHAIN`). Set by who manages agents, at once, with Desfazer (`setReportsTo`, `PUT /organizations/{orgId}/agent-lines`: changes in order, all or none, answering what they were, which the same call puts back). Audited as `agent.reports_to_changed`. The right hand proposes it with one more line on its settings card (`reports_to`, group `admin`).
+- **What it changes: where information goes by default, never what anyone may do.** The supervisor's context lists its reports always, past `TEAM_IN_PROMPT`, and a report's says who it reports to and to ask it when work stalls with nobody to ask (`# Your line`, only when there is a line). The two may always call each other (`inLine`, before `mayCall`'s lists); audience still applies. A supervisor gets `team_status` over its reports and their tasks, as the person behind the run sees them, and none with nobody behind it. Where others read the reply too (any conversation but that person's own DM with it), it names only places anyone may read and tasks that conversation may name, and leaves out what waits for the person. Approvals stay with people; the router, channels and wakes don't change.
+- **Organograma.** By person: a supervisor sits in its line's top person's column with its reports indented under it, joined by a line, and a count. Who manages agents drags an agent onto another agent to make it report there, onto a person to clear it, and a setor's frame onto an agent for all its agents, each with Desfazer. By setor, the frame says its supervisor.
+- **Mapa.** A band of supervisors between the people and the channels, only when one exists, with a solid line to each report; dashed lines stay consultations. A column whose agents all report to one shows that face on its header. Dropping an agent on a supervisor in the band sets it at once. While who manages agents drags one, the band also offers every agent it may report to, so the first supervisor is made on the Mapa too. Below 720 px the lines hide and each card reads "Responde a Nina".
+- **Setores.** A Supervisor row under Substituto: a picker of agents that sets the setor's agents, and "1 agente sem supervisor · Aplicar" when one doesn't (an agent moved in later keeps its own).
+- **Agent page and Lista.** "Responde a" in Configurações next to Setor, applied at once with Desfazer, with "Só diz a quem este agente presta contas. Não dá nenhuma permissão."; a supervisor's page lists who reports to it. The same choice in the Lista row's menu.
+- **Phone.** Organograma indents a supervisor's reports under it, the channel cards say who each reports to, the setor rows name the supervisor, and the agent's edit screen has Responde a with Desfazer. No drag.
+
+### Consequences
+
+- An agent moved into a setor later doesn't inherit its supervisor: the setor card says so with Aplicar. A setor column (`agent_groups.lead_agent_id`) waits until that is annoying.
+- A failed routine doesn't wake its supervisor on its own; its prompt says to ask it.

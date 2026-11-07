@@ -41,6 +41,7 @@ import type {
   AgentGroup,
   AgentGroupPatch,
   AgentInput,
+  AgentLineChange,
   AgentMailbox,
   AgentMailboxInput,
   AgentPlanUsage,
@@ -580,6 +581,11 @@ export interface ApiClient {
     planUsage(orgId: string, agentId: string): Promise<AgentPlanUsage>;
     /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
+    /**
+     * Responde a (ADR 0148 addendum): who each agent reports to, in order, all or none. Answers what they reported to
+     * before: the same call with it is Desfazer.
+     */
+    setLines(orgId: string, changes: AgentLineChange[]): Promise<{ previous: AgentLineChange[] }>;
     /** The team map's drag (ADR 0148): the right hand's settings card in my DM with it; nothing changes yet. */
     proposeChannelMove(
       orgId: string,

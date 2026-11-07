@@ -76,4 +76,5 @@ export const strings: Partial<PushStrings> = {
   usageRaisedBody: "続けられます。",
   usageRefusedTitle: (a) => `${a} が利用の追加の依頼を断りました`,
   teamWeekReady: "チームの1週間のまとめができました",
+  teamDayReady: "今日のまとめができました",
 };

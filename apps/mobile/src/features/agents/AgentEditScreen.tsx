@@ -34,6 +34,7 @@ import { openAgentDelete } from "./DeleteAgentScreen";
 import { type AgentDraft, agentChanges, editableFields, fullLook } from "./edit";
 import { ErrorLine, HandleInput } from "./HandleInput";
 import { LookList } from "./LookPicker";
+import { ReportsToSection } from "./ReportsToSection";
 import { RoleInput } from "./RoleInput";
 
 /** Opens "Editar" for an agent. */
@@ -255,6 +256,7 @@ export function AgentEditScreen({ id }: { id: string }) {
             <>
               {admin ? <BudgetSection agent={agent} /> : null}
               <BrakesSection agent={agent} />
+              <ReportsToSection agentId={id} />
 
               <GroupedHeader>{t("agent.instructions")}</GroupedHeader>
               {/* The list draws the field's surface (radius 14, raised), as on "Create agent". */}

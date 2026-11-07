@@ -4,7 +4,7 @@ import { currentHandles } from "./agents";
 import { type AiStatusDeps, agentAiStates } from "./ai-status";
 import type { AgentAppearance } from "./appearance";
 import { canTalkTo, type Speaker, seesAgentDetails, speakerFor, speakerOf, viaAgent } from "./audience";
-import { mayCall } from "./autonomy-settings";
+import { inLine, mayCall } from "./autonomy-settings";
 import { agentBrowserStatus } from "./browser/status";
 import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
@@ -122,6 +122,7 @@ type Teammate = Pick<
   | "consultable"
   | "brain"
   | "autonomyBrakes"
+  | "reportsToAgentId"
 >;
 
 /** The org's active agents, oldest first (per-process cache; agent writes drop it). */
@@ -141,6 +142,7 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
         consultable: agents.consultable,
         brain: agents.brain,
         autonomyBrakes: agents.autonomyBrakes,
+        reportsToAgentId: agents.reportsToAgentId,
       })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
@@ -246,13 +248,13 @@ export const teammatesFor = (
   skip: Set<string>,
   talks: Speaker,
 ) => {
-  const self = team.find((a) => a.id === selfId)?.autonomyBrakes;
+  const self = team.find((a) => a.id === selfId);
   return team.filter(
     (a) =>
       a.id !== selfId &&
       !skip.has(a.id) &&
       canTalkTo(a, requester, viaAgent(talks)) &&
-      mayCall(self, { id: a.id, autonomy: a.autonomyBrakes }),
+      ((!!self && inLine(self, a)) || mayCall(self?.autonomyBrakes, { id: a.id, autonomy: a.autonomyBrakes })),
   );
 };
 
@@ -466,6 +468,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       audienceRoleIds: agents.audienceRoleIds,
       consultable: agents.consultable,
       brain: agents.brain,
+      reportsToAgentId: agents.reportsToAgentId,
     })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
@@ -534,6 +537,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
         role: a.role,
         appearance: (a.appearance ?? null) as AgentAppearance | null,
         ownerUserId: a.ownerUserId,
+        reportsToAgentId: a.reportsToAgentId,
         capabilities: seesDetails ? capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)) : [],
         busy: busyIds.has(a.id),
         channelIds: seats.filter((r) => r.agentId === a.id).map((r) => r.channelId),

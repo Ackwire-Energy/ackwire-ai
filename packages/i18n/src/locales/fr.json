@@ -1632,7 +1632,10 @@
       "subPerson": "Chaque agent sous la personne qui en est responsable, ou sous la tête de son service quand il n'en a pas.",
       "subSector": "Chaque service avec ses agents. {{name}} travaille avec tout le monde.",
       "workspace": "Espace de travail",
-      "responsible": "Responsables : {{names}}"
+      "responsible": "Responsables : {{names}}",
+      "lodi": "suit tout avec vous",
+      "supervisor": "Superviseur : {{name}}",
+      "dragSector": "Glissez sur un agent pour que les agents de ce secteur lui rendent compte"
     },
     "map": {
       "lead": "Qui s'occupe des agents, les canaux où ils sont, ce que chacun fait seul et ce qui attend une personne. Les lignes pointillées relient les agents qui se sont demandé de l'aide ces dernières 24 h.",
@@ -1652,7 +1655,9 @@
       "emptyTitle": "Voyez où travaille chaque agent",
       "emptyAction": "Ajouter à un canal",
       "emptyViewer": "Les personnes qui gèrent les agents les ajoutent aux canaux, et la carte apparaît ici.",
-      "others": "Autres canaux"
+      "others": "Autres canaux",
+      "band": "Superviseurs",
+      "reportsTo": "Rend compte à {{name}}"
     },
     "sectors": {
       "lead": "Chaque service a un responsable, un suppléant, ses agents, leurs canaux et leurs routines.",
@@ -1662,6 +1667,18 @@
       "backupLabel": "Suppléant",
       "leadOf": "Responsable de {{name}}",
       "backupOf": "Suppléant dans {{name}}",
+      "supervisor": "Superviseur",
+      "supervisorOf": "Superviseur de {{name}}",
+      "unsupervised_one": "{{count}} agent sans superviseur",
+      "unsupervised_many": "{{count}} agents sans superviseur",
+      "unsupervised_other": "{{count}} agents sans superviseur",
+      "apply": "Appliquer",
+      "supervisorDone_one": "{{count}} agent de {{sector}} rend maintenant compte à {{name}}",
+      "supervisorDone_many": "{{count}} agents de {{sector}} rendent maintenant compte à {{name}}",
+      "supervisorDone_other": "{{count}} agents de {{sector}} rendent maintenant compte à {{name}}",
+      "supervisorCleared_one": "{{count}} agent de {{sector}} ne rend plus compte à un superviseur",
+      "supervisorCleared_many": "{{count}} agents de {{sector}} ne rendent plus compte à un superviseur",
+      "supervisorCleared_other": "{{count}} agents de {{sector}} ne rendent plus compte à un superviseur",
       "nobody": "Personne",
       "none": "Aucun",
       "channels": "Canaux",
@@ -1677,6 +1694,14 @@
       "empty": "Chaque service a un responsable, et tout le monde voit qui s'occupe de quoi.",
       "emptyViewerTitle": "Voyez qui s'occupe de quoi",
       "emptyViewer": "Les personnes qui gèrent les agents créent les services, et ils apparaissent ici."
+    },
+    "reportsTo": {
+      "label": "Rend compte à",
+      "help": "Indique seulement à qui cet agent rend compte. Ne donne aucune permission.",
+      "none": "Personne",
+      "done": "{{agent}} rend maintenant compte à {{to}}",
+      "cleared": "{{agent}} ne rend plus compte à un agent",
+      "reports": "Qui rend compte à {{name}}"
     },
     "usage": {
       "lead": "Ce que chaque personne utilise des agents ce mois-ci, et les limites.",
@@ -2109,6 +2134,7 @@
         "ai_account": "Seul le propriétaire du compte l’attribue",
         "name": "Seuls les admins renomment un agent",
         "look": "Seuls les admins et son responsable changent son apparence",
+        "reports_to": "Seuls les admins changent à qui un agent rend compte",
         "many": "Seuls les admins font ces changements"
       }
     },
@@ -2121,10 +2147,12 @@
       "archive": "Statut",
       "channel": "Canal",
       "name": "Nom",
-      "look": "Apparence"
+      "look": "Apparence",
+      "reports_to": "Rend compte à"
     },
     "value": {
       "lookDefault": "L'apparence par défaut",
+      "anAgent": "Un agent",
       "none": "Aucun",
       "budgetDefault": "Par défaut du workspace",
       "anAccount": "Un compte d’IA",
@@ -2175,6 +2203,7 @@
   },
   "teamWeek": {
     "title": "Semaine de l’équipe",
+    "dayTitle": "Résumé du jour",
     "suggestions_one": "{{count}} proposition",
     "suggestions_many": "{{count}} propositions",
     "suggestions_other": "{{count}} propositions",
@@ -2253,7 +2282,8 @@
       "wed": "Tous les mercredis à {{time}}",
       "thu": "Tous les jeudis à {{time}}",
       "fri": "Tous les vendredis à {{time}}",
-      "sat": "Tous les samedis à {{time}}"
+      "sat": "Tous les samedis à {{time}}",
+      "day": "Tous les jours à {{time}}"
     },
     "off": "Désactivée",
     "schedule": {
@@ -2261,11 +2291,14 @@
       "day": "Jour",
       "hour": "Heure",
       "stop": "Ne plus la recevoir",
-      "start": "La recevoir à nouveau"
+      "start": "La recevoir à nouveau",
+      "daily": "Tous les jours"
     },
     "settings": {
       "label": "Semaine de l’équipe",
-      "help": "Chaque semaine, {{name}} vous raconte dans votre DM comment l’équipe s’en est sortie et ce qu’il faut améliorer. Seuls les admins la reçoivent."
+      "help": "Chaque semaine, {{name}} vous raconte dans votre DM comment l’équipe s’en est sortie et ce qu’il faut améliorer. Seuls les admins la reçoivent.",
+      "dayLabel": "Résumé du jour",
+      "dayHelp": "Chaque jour {{name}} vous raconte dans votre DM ce que l'équipe a fait et ce qui vous attend, seulement les jours où il y a quelque chose à dire."
     }
   },
   "routing": {
@@ -14018,7 +14051,8 @@
       "askedBy": "{{name}} a demandé la tâche",
       "view": "Voir la tâche",
       "taken": "{{name}} a pris la tâche",
-      "agent": "Avec {{name}}"
+      "agent": "Avec {{name}}",
+      "chipLabel": "Ouvrir la conversation de la tâche #{{number}}, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -14030,6 +14064,7 @@
       "autonomy_digest_many": "{{count}} alertes semblaient connues ou sans danger, je n'ai donc pas travaillé dessus :",
       "autonomy_digest_other": "{{count}} alertes semblaient connues ou sans danger, je n'ai donc pas travaillé dessus :",
       "team_week": "La semaine de l’équipe, du {{from}} au {{to}}",
+      "team_day": "Comment s'est passée la journée de l'équipe, jusqu'au {{day}}",
       "autonomy_loop": "J'ai arrêté de travailler là-dessus de moi-même. C'est revenu {{count}} fois en un jour ({{title}}). Dites-moi comment vous voulez que je le traite.",
       "mission_plan": "Plan pour « {{title}} » sur {{computer}}",
       "mission_planNoComputer": "Plan pour « {{title}} »",

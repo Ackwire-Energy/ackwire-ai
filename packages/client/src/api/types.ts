@@ -631,6 +631,8 @@ export interface Agent {
   brain?: AgentBrainLine;
   /** A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand. Null or absent for the others. */
   builtin?: "right_hand" | null;
+  /** Responde a (ADR 0148 addendum): the agent it reports to; null or absent = its owner, else its setor's lead. */
+  reportsToAgentId?: string | null;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
   /**
@@ -719,6 +721,8 @@ export interface TeamAgent {
   role: string;
   appearance: AgentLookInput | null;
   ownerUserId: string | null;
+  /** Responde a: the agent it reports to (absent from an older server). */
+  reportsToAgentId?: string | null;
   /** What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…). */
   capabilities: string[];
   /** Working on something right now. */
@@ -728,6 +732,12 @@ export interface TeamAgent {
   canTalk: boolean;
   /** Whether I see how it works (absent = yes); without it `capabilities` is empty. */
   seesDetails?: boolean;
+}
+
+/** Responde a: one agent and the agent it reports to (null: nobody, its owner then). */
+export interface AgentLineChange {
+  agentId: string;
+  reportsToAgentId: string | null;
 }
 
 /** One agent asked another (`ask_agent`); the question itself stays private. */
@@ -2007,6 +2017,7 @@ export type ProposalSettingField =
   | "reply_mode"
   | "name"
   | "look"
+  | "reports_to"
   | "archive"
   | "delete";
 
@@ -2014,7 +2025,8 @@ export type ProposalSettingField =
  * One line of a settings card: `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or
  * null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` /
  * `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a
- * mention); `name` its name; `look` `{ color, eyes, accessory }`; `archive` true. `label`: the server's names for ids.
+ * mention); `name` its name; `look` `{ color, eyes, accessory }`; `reports_to` an agent id or null (Responde a);
+ * `archive` true. `label`: the server's names for ids.
  */
 export interface ProposalSettingLine {
   field: ProposalSettingField;

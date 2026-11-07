@@ -244,13 +244,17 @@ export async function rightHandReader(
   const [agent] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
   if (!isRightHand(agent)) return null;
   const person = await personBehindCall(ctx);
-  if (!person) return null;
-  const people = await ctx.db
+  return person && (await readsAlone(ctx.db, ctx.channelId, person)) ? person : null;
+}
+
+/** Whether `person` is the one person who reads `channelId`: their own DM with an agent, where nobody else reads a reply. */
+export async function readsAlone(db: Executor, channelId: string, person: string) {
+  const people = await db
     .select({ userId: channelMembers.userId })
     .from(channelMembers)
     .innerJoin(channels, eq(channels.id, channelMembers.channelId))
-    .where(and(eq(channelMembers.channelId, ctx.channelId), eq(channels.kind, "dm"), isNotNull(channelMembers.userId)));
-  return people.length === 1 && people[0]?.userId === person ? person : null;
+    .where(and(eq(channelMembers.channelId, channelId), eq(channels.kind, "dm"), isNotNull(channelMembers.userId)));
+  return people.length === 1 && people[0]?.userId === person;
 }
 
 /** The right hand anywhere but a person's own DM with it: what only reads or writes for that person stays out. */

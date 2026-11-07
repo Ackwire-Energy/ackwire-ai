@@ -10,6 +10,7 @@ import {
   chosenRows,
   memoryLine,
   messageProposalCards,
+  onlyKey,
   pendingOnAgent,
   proposalSections,
   proposalWhy,
@@ -104,6 +105,24 @@ describe("a name and a look on a settings card", () => {
     );
     expect(line.from).toBe("rightHand.value.lookDefault");
     expect(line.to).toBe("#123456 · look.eyesNames.happy · look.accessories.crown");
+  });
+  test("Responde a reads the agents' names the server gave, or none", () => {
+    expect(
+      settingLineText(
+        t,
+        "pt-BR",
+        { field: "reports_to", from: "a-nina", to: "a-bea", label: { from: "Nina", to: "Bea" } },
+        names,
+      ),
+    ).toEqual({ field: "rightHand.field.reports_to", from: "Nina", to: "Bea" });
+    expect(settingLineText(t, "pt-BR", { field: "reports_to", from: null, to: "a-bea" }, names)).toEqual({
+      field: "rightHand.field.reports_to",
+      from: "rightHand.value.none",
+      to: "rightHand.value.anAgent",
+    });
+    expect(onlyKey({ settings: [{ field: "reports_to", from: null, to: "a-bea" }] })).toBe(
+      "rightHand.card.only.reports_to",
+    );
   });
 });
 

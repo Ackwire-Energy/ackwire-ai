@@ -156,7 +156,8 @@ describe("setores on Equipe (ADR 0083, ADR 0148)", () => {
       within(menu)
         .getAllByRole("menuitemradio")
         .map((o) => o.textContent),
-    ).toEqual(["Sem setor", "Integrations"]);
+      // Then Responde a (ADR 0148 addendum): nobody, or the agents it may report to.
+    ).toEqual(["Sem setor", "Integrations", "Ninguém", "Atlas"]);
     await click(within(menu).getByRole("menuitemradio", { name: "Integrations" }));
     expect(calls(list.state, "agentGroups.move")).toEqual([[ADA_ID, { groupId: INTEGRATIONS }]]);
     // A new setor made from a row takes that agent.

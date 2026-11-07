@@ -2,7 +2,10 @@ import { and, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, type AgentActionParams, actWithUndo } from "./agent-actions";
 import { issueDiff, issueSnapshot } from "./agent-undo";
 import { currentHandles } from "./agents";
+import { canTalkTo, speakerFor } from "./audience";
+import { callableAgents, notCallableText } from "./brakes";
 import {
+  askAgentToImplement,
   commentIssue,
   createIssue,
   getIssue,
@@ -13,6 +16,7 @@ import {
   type IssueView,
   listIssues,
   nameableIn,
+  openTaskConversation,
   setCriterion,
   updateIssue,
   type WorkActor,
@@ -187,11 +191,41 @@ async function rightHandTaskRefusal(
   if (visibleTo === "everyone")
     return "A task you make stays with the person who asked: they open it to others on the task.";
   if (assignee?.type !== "agent") return null;
-  const [agent] = await deps.db
-    .select({ builtin: schema.agents.builtin })
-    .from(schema.agents)
-    .where(eq(schema.agents.id, assignee.id));
-  return isRightHand(agent) ? "You do no hands-on work: assign it to the agent whose job it is." : null;
+  const [agent] = await deps.db.select().from(schema.agents).where(eq(schema.agents.id, assignee.id));
+  if (!agent || isRightHand(agent)) return "You do no hands-on work: assign it to the agent whose job it is.";
+  // It starts on it at once, in the task's conversation the person reads: only an agent they may talk to.
+  if (!canTalkTo(agent, person, await speakerFor(deps.db, ctx.orgId, person)))
+    return `@${agent.handle} only works with some people, and this person isn't one of them. Tell them; its owner or an admin can let them in.`;
+  if (!(await callableAgents(deps.db, ctx.orgId, ctx.agentId, [agent.id])).has(agent.id))
+    return notCallableText([`@${agent.handle}`]);
+  return null;
+}
+
+/**
+ * The right hand's task, assigned to an agent: that agent starts on it now in the task's conversation, the start
+ * written as the right hand, and what comes of it goes back to this DM (`askAgentToImplement` with `by`). Its reply
+ * carries the task as a chip (`data.handedTask`).
+ */
+async function handTask(deps: IssueDeps, ctx: ToolContext, person: string, i: IssueView) {
+  if (i.assignee?.type !== "agent" || !deps.pubsub) return null;
+  const [run] = await deps.db
+    .select({ hop: schema.agentRuns.hop })
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, ctx.runId));
+  await askAgentToImplement(deps, person, ctx.orgId, i.id, i.assignee.id, {
+    agentId: ctx.agentId,
+    runId: ctx.runId,
+    hop: run?.hop ?? 0,
+  });
+  const conversation = await openTaskConversation(deps.db, { type: "person", userId: person }, ctx.orgId, i.id);
+  return {
+    issueId: i.id,
+    number: i.number,
+    title: i.title,
+    agentId: i.assignee.id,
+    channelId: conversation.channelId,
+    rootId: conversation.rootId,
+  };
 }
 
 /** What the agent tells the person after making a task: they change it on the task, in one click. */
@@ -308,9 +342,24 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             },
           );
           const nameable = await nameableIn(deps.db, ctx.channelId, i);
+          // The task stands either way: a start that fails is said, never a second task.
+          const handed = reader
+            ? await handTask(deps, ctx, reader, i).catch((e: unknown) =>
+                e instanceof Error ? e : new Error(String(e)),
+              )
+            : null;
           return {
-            content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i, nameable)}`,
-            data: { issue: { id: i.id, number: i.number } },
+            content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i, nameable)}${
+              handed instanceof Error
+                ? `\nIts agent couldn't start on it: ${handed.message} Don't make it again: tell them why; they can start it from the task.`
+                : handed
+                  ? "\nIts agent started on it in the task's own conversation, where the person follows it from the task's chip on your reply. What comes of it reaches you here by itself: tell them in a line who has it, without promising a time, and don't check on it."
+                  : ""
+            }`,
+            data: {
+              issue: { id: i.id, number: i.number },
+              ...(handed && !(handed instanceof Error) ? { handedTask: handed } : {}),
+            },
           };
         } catch (error) {
           return failed(error);

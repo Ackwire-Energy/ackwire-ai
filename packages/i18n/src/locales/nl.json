@@ -1581,7 +1581,10 @@
       "subPerson": "Elke agent onder de verantwoordelijke persoon, of onder het hoofd van zijn afdeling als hij er geen heeft.",
       "subSector": "Elke afdeling met haar agenten. {{name}} werkt met iedereen.",
       "workspace": "Werkruimte",
-      "responsible": "Verantwoordelijk: {{names}}"
+      "responsible": "Verantwoordelijk: {{names}}",
+      "lodi": "volgt alles met je",
+      "supervisor": "Supervisor: {{name}}",
+      "dragSector": "Sleep op een agent zodat de agenten van deze sector aan hem rapporteren"
     },
     "map": {
       "lead": "Wie voor de agenten zorgt, in welke kanalen ze zitten, wat elk zelfstandig doet en wat op een persoon wacht. Stippellijnen zijn agenten die elkaar de afgelopen dag om hulp vroegen.",
@@ -1599,7 +1602,9 @@
       "emptyTitle": "Zie waar elke agent werkt",
       "emptyAction": "Aan een kanaal toevoegen",
       "emptyViewer": "Wie de agents beheert, voegt ze toe aan kanalen, en de kaart verschijnt hier.",
-      "others": "Andere kanalen"
+      "others": "Andere kanalen",
+      "band": "Supervisors",
+      "reportsTo": "Rapporteert aan {{name}}"
     },
     "sectors": {
       "lead": "Elke afdeling heeft een hoofd, een vervanger, haar agenten en hun kanalen en routines.",
@@ -1609,6 +1614,15 @@
       "backupLabel": "Vervanger",
       "leadOf": "Hoofd van {{name}}",
       "backupOf": "Vervanger bij {{name}}",
+      "supervisor": "Supervisor",
+      "supervisorOf": "Supervisor van {{name}}",
+      "unsupervised_one": "{{count}} agent zonder supervisor",
+      "unsupervised_other": "{{count}} agenten zonder supervisor",
+      "apply": "Toepassen",
+      "supervisorDone_one": "{{count}} agent van {{sector}} rapporteert nu aan {{name}}",
+      "supervisorDone_other": "{{count}} agenten van {{sector}} rapporteren nu aan {{name}}",
+      "supervisorCleared_one": "{{count}} agent van {{sector}} rapporteert niet meer aan een supervisor",
+      "supervisorCleared_other": "{{count}} agenten van {{sector}} rapporteren niet meer aan een supervisor",
       "nobody": "Niemand",
       "none": "Geen",
       "channels": "Kanalen",
@@ -1624,6 +1638,14 @@
       "empty": "Elke afdeling heeft een hoofd, zodat iedereen ziet wie waarvoor zorgt.",
       "emptyViewerTitle": "Zie wie waarvoor zorgt",
       "emptyViewer": "Wie de agenten beheert, maakt de afdelingen. Ze verschijnen dan hier."
+    },
+    "reportsTo": {
+      "label": "Rapporteert aan",
+      "help": "Zegt alleen aan wie deze agent verantwoording aflegt. Geeft geen enkele toestemming.",
+      "none": "Niemand",
+      "done": "{{agent}} rapporteert nu aan {{to}}",
+      "cleared": "{{agent}} rapporteert niet meer aan een agent",
+      "reports": "Wie aan {{name}} rapporteert"
     },
     "usage": {
       "lead": "Wat elke persoon deze maand van de agenten gebruikt, en de limieten.",
@@ -2032,6 +2054,7 @@
         "ai_account": "Alleen de eigenaar van het account geeft het",
         "name": "Alleen admins hernoemen een agent",
         "look": "Alleen admins en de verantwoordelijke wijzigen het uiterlijk",
+        "reports_to": "Alleen admins veranderen aan wie een agent rapporteert",
         "many": "Alleen admins maken deze wijzigingen"
       }
     },
@@ -2044,10 +2067,12 @@
       "archive": "Status",
       "channel": "Kanaal",
       "name": "Naam",
-      "look": "Uiterlijk"
+      "look": "Uiterlijk",
+      "reports_to": "Rapporteert aan"
     },
     "value": {
       "lookDefault": "Het standaarduiterlijk",
+      "anAgent": "Een agent",
       "none": "Geen",
       "budgetDefault": "Standaard van de workspace",
       "anAccount": "Een AI-account",
@@ -2094,6 +2119,7 @@
   },
   "teamWeek": {
     "title": "Teamweek",
+    "dayTitle": "Dagoverzicht",
     "suggestions_one": "{{count}} suggestie",
     "suggestions_other": "{{count}} suggesties",
     "stat": {
@@ -2163,7 +2189,8 @@
       "wed": "Elke woensdag om {{time}}",
       "thu": "Elke donderdag om {{time}}",
       "fri": "Elke vrijdag om {{time}}",
-      "sat": "Elke zaterdag om {{time}}"
+      "sat": "Elke zaterdag om {{time}}",
+      "day": "Elke dag om {{time}}"
     },
     "off": "Uit",
     "schedule": {
@@ -2171,11 +2198,14 @@
       "day": "Dag",
       "hour": "Tijd",
       "stop": "Niet meer ontvangen",
-      "start": "Weer ontvangen"
+      "start": "Weer ontvangen",
+      "daily": "Elke dag"
     },
     "settings": {
       "label": "Teamweek",
-      "help": "Elke week vertelt {{name}} je in je DM hoe het team het deed en wat beter kan. Alleen admins krijgen hem."
+      "help": "Elke week vertelt {{name}} je in je DM hoe het team het deed en wat beter kan. Alleen admins krijgen hem.",
+      "dayLabel": "Dagoverzicht",
+      "dayHelp": "Elke dag vertelt {{name}} je in je DM wat het team deed en wat op je wacht, alleen op dagen met iets te zeggen."
     }
   },
   "routing": {
@@ -13609,7 +13639,8 @@
       "askedBy": "{{name}} vroeg om taak",
       "view": "Taak bekijken",
       "taken": "{{name}} pakte taak op",
-      "agent": "Met {{name}}"
+      "agent": "Met {{name}}",
+      "chipLabel": "Gesprek van taak #{{number}} openen, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13620,6 +13651,7 @@
       "autonomy_digest_one": "{{count}} melding leek bekend of onschuldig, dus ik heb er niet aan gewerkt:",
       "autonomy_digest_other": "{{count}} meldingen leken bekend of onschuldig, dus ik heb er niet aan gewerkt:",
       "team_week": "Hoe de week van het team ging, {{from}} tot {{to}}",
+      "team_day": "Hoe de dag van het team ging, tot {{day}}",
       "autonomy_loop": "Ik ben er uit mezelf mee gestopt. Het kwam {{count}} keer op een dag terug ({{title}}). Zeg me hoe je wilt dat ik ermee omga.",
       "mission_plan": "Plan voor “{{title}}” op {{computer}}",
       "mission_planNoComputer": "Plan voor “{{title}}”",

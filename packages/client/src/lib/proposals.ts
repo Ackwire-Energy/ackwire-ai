@@ -295,6 +295,8 @@ export function settingLineText(
         return typeof v === "string" ? v : t("rightHand.value.none");
       case "look":
         return lookWords(t, v);
+      case "reports_to":
+        return typeof v === "string" ? (label ?? t("rightHand.value.anAgent")) : t("rightHand.value.none");
       case "archive":
         return v === true ? t("rightHand.value.archived") : t("rightHand.value.active");
       case "delete":

@@ -144,11 +144,13 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   // the server wrote in the person's language.
   if (code === "team_week")
     return locale && typeof params.from === "string" && typeof params.to === "string"
-      ? t("chat.body.team_week", {
-          from: weekDay(locale, params.from),
-          to: weekDay(locale, params.to),
-          defaultValue: body,
-        })
+      ? params.period === "day"
+        ? t("chat.body.team_day", { day: weekDay(locale, params.to), defaultValue: body })
+        : t("chat.body.team_week", {
+            from: weekDay(locale, params.from),
+            to: weekDay(locale, params.to),
+            defaultValue: body,
+          })
       : body;
   // Long work's own update of a silent work (ADR 0121): what it does now, in the reader's words.
   if (code === "work_auto_update") return autoUpdateText(t, params);
