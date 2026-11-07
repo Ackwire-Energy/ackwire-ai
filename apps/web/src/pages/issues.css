@@ -2028,29 +2028,6 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   gap: 16px;
   min-width: 0;
 }
-/* With its conversation the page is as tall as the area it scrolls in, the details scrolling in their column and the
-   conversation docked at its right like a thread beside its channel (`.thread-panel--docked`): flush with the area's
-   top, right and bottom edges, the same width and hairline. The area is shorter than the window under the desktop
-   app's title bar or a banner, so a height taken from the window would leave a gap or cut the pane short. Too narrow
-   for both (the `channel-body` container's rule), the conversation takes the page until it closes. */
-.issue-page--talk {
-  container: channel-body / inline-size;
-  position: relative;
-  display: flex;
-  flex-direction: row;
-  gap: 0;
-  box-sizing: border-box;
-  height: 100%;
-  min-height: 0;
-  padding: 0;
-}
-.issue-page--talk > .issue-page__main {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 24px;
-}
 .ac-details__side > .thread-panel__chat {
   flex: 1 1 auto;
   height: 100%;

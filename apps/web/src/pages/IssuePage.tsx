@@ -51,6 +51,7 @@ import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components
 import { GitHubMark } from "@/components/GitHubMark";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
+import { SidePanel } from "@/components/SidePanel";
 import { TaskConversationButton, TaskConversationPanel, TaskConversationSummary } from "@/components/TaskConversation";
 import { IssueWhoSeesDialog, WhoSeesButton } from "@/components/WhoSees";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
@@ -86,7 +87,7 @@ export function IssuePage({ number }: { number: number }) {
   const navigate = useNavigate();
   return (
     <IssueDeleteProvider onDeleted={() => void navigate({ to: "/org/$orgId/issues", params: { orgId: org.id } })}>
-      <div className={cx("page page--full", talk && i && "issue-page--talk")}>
+      <div className="page page--full">
         <div className="issue-page__main">
           <div className="issue-page__bar">
             <Link to="/org/$orgId/issues" params={{ orgId: org.id }} className="ac-back">
@@ -104,12 +105,9 @@ export function IssuePage({ number }: { number: number }) {
           {i && <IssueDetails issue={i} variant="page" onConversation={() => setTalk(true)} />}
         </div>
         {talk && i && (
-          <aside
-            className="thread-panel thread-panel--docked issue-page__talk"
-            aria-label={t("issues.conversation.title")}
-          >
+          <SidePanel className="issue-page__talk" label={t("issues.conversation.title")} onClose={() => setTalk(false)}>
             <TaskConversationPanel issue={i} focusMessageId={focus ?? undefined} onClose={() => setTalk(false)} />
-          </aside>
+          </SidePanel>
         )}
       </div>
     </IssueDeleteProvider>

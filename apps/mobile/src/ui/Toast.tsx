@@ -65,17 +65,17 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
 
   useEffect(() => {
     y.value = reducedMotion ? 0 : withSpring(0, motion.pop);
-    opacity.value = withTiming(1, { duration: 250 });
+    opacity.value = withTiming(1, { duration: motion.base });
     const hide = setTimeout(() => {
-      opacity.value = withTiming(0, { duration: 250 });
-      if (!reducedMotion) y.value = withTiming(-200, { duration: 300 });
+      opacity.value = withTiming(0, { duration: motion.fast });
+      if (!reducedMotion) y.value = withTiming(-200, { duration: motion.base });
     }, SHOW_MS);
-    const done = setTimeout(() => doneRef.current(), SHOW_MS + 320);
+    const done = setTimeout(() => doneRef.current(), SHOW_MS + motion.base + 20);
     return () => {
       clearTimeout(hide);
       clearTimeout(done);
     };
-  }, [y, opacity, reducedMotion, motion.pop]);
+  }, [y, opacity, reducedMotion, motion]);
 
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: y.value }] }));
   const look = item.agent ?? (item.agentId ? lookOf(item.agentId) : undefined);

@@ -664,13 +664,11 @@ describe("an agent's tasks beside its DM", () => {
     expect(screen().getByRole("heading", { level: 2, name: "Tarefas de Ada" })).toBeTruthy();
   });
 
-  test("the panel docks beside the DM, nothing dimmed, and its pill closes it; no pill in a channel, nor for an agent with nothing on", async () => {
+  test("the panel floats over the DM, its scrim closes it; no pill in a channel, nor for an agent with nothing on", async () => {
     await open(withDm({ taskManager: busy() }), `dm/agent/${ADA_ID}`);
     await click(screen().getByRole("button", { name: PILL }));
     const panel = screen().getByRole("complementary", { name: "Tarefas de Ada" });
-    expect(panel.parentElement?.className).toBe("channel__body");
-    expect(document.querySelector(".thread-panel__scrim")).toBeNull();
-    await click(screen().getByRole("button", { name: PILL }));
+    await click(panel.previousElementSibling as HTMLElement);
     expect(screen().queryByRole("complementary", { name: "Tarefas de Ada" })).toBeNull();
     cleanup();
     await open(seedState({ taskManager: busy() }), `c/${ENG_ID}`);

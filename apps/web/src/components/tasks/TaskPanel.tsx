@@ -18,6 +18,7 @@ import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
+import { SidePanel } from "@/components/SidePanel";
 import { colorOf } from "@/components/Sky";
 import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -116,107 +117,98 @@ export function TaskPanel({
   const hasSteps = steps.data?.steps.some((s) => s.kind === "tool_call") ?? false;
 
   return (
-    <>
-      <button
-        type="button"
-        className="thread-panel__scrim"
-        tabIndex={-1}
-        aria-label={t("common.close")}
-        onClick={onClose}
-      />
-      <aside className="thread-panel tm-panel" aria-label={title}>
-        <header className="channel__header thread-head thread-head--panel">
-          <span className="thread-head__who">
-            <OpensAgent agentId={source.agentId}>
-              <AgentAvatar agentId={source.agentId} name={name} size="sm" />
-            </OpensAgent>
-          </span>
-          <div className="thread-head__text">
-            <h2 className="channel__title thread-title">
-              <span className="thread-title__text">{title}</span>
-            </h2>
-            <span className="channel__topic thread-head__meta">{meta}</span>
-          </div>
-          <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
-        </header>
-
-        <div className="thread-panel__page tm-panel__body">
-          {working && (
-            <p className="tm-panel__now" aria-live="polite">
-              <AgentSpinner agentId={source.agentId} size={14} />
-              <b className="ac-tools__shimmer">{capitalize(activityVerb(t, doing), i18n.language)}…</b>
-              {task?.now?.detail && <small>{task.now.detail}</small>}
-            </p>
-          )}
-          {end === "stopped" && (
-            <div className="tm-panel__stopped">
-              <p className="ac-iconline">
-                <PixelStop size={12} dim />
-                <span>
-                  <b>
-                    {byMe
-                      ? t("taskManager.stopped.line", { agent: name, context: agentGrammar(name).context })
-                      : stopper
-                        ? t("taskManager.stopped.lineBy", {
-                            name: stopper.name,
-                            agent: name,
-                            context: agentGrammar(name).context,
-                          })
-                        : t("taskManager.state.stopped")}
-                  </b>
-                  {reason && ` · ${t("taskManager.stopped.reason", { reason })}`}
-                </span>
-              </p>
-              {byMe && !reason && <SayWhy runId={runId} onSent={setSent} />}
-            </div>
-          )}
-          <dl className="tm-panel__facts">
-            {facts.map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <h3 className="tm-panel__h">{t("taskManager.panel.steps")}</h3>
-          {steps.isLoading ? (
-            <LoadingList count={2} avatar={false} />
-          ) : steps.isError && !steps.data ? (
-            <ErrorState error={steps.error} onRetry={() => void refetch()} />
-          ) : steps.data && hasSteps ? (
-            <TaskStepsBlock
-              steps={steps.data.steps}
-              run={steps.data.run}
-              working={working}
-              agentName={name}
-              color={colorOf(dir.anyAgent(source.agentId))}
-            />
-          ) : (
-            <p className="tm-panel__none">{t("taskManager.panel.noSteps")}</p>
-          )}
+    <SidePanel className="tm-panel" label={title} onClose={onClose}>
+      <header className="channel__header thread-head thread-head--panel">
+        <span className="thread-head__who">
+          <OpensAgent agentId={source.agentId}>
+            <AgentAvatar agentId={source.agentId} name={name} size="sm" />
+          </OpensAgent>
+        </span>
+        <div className="thread-head__text">
+          <h2 className="channel__title thread-title">
+            <span className="thread-title__text">{title}</span>
+          </h2>
+          <span className="channel__topic thread-head__meta">{meta}</span>
         </div>
+        <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
+      </header>
 
-        <footer className="tm-panel__foot">
-          {task?.delegation && task.canStop && (
-            <p className="tm-panel__note">
-              {t("taskManager.delegated.stopNote", { name: nameOf(task.delegation.agentId) ?? "" })}
+      <div className="thread-panel__page tm-panel__body">
+        {working && (
+          <p className="tm-panel__now" aria-live="polite">
+            <AgentSpinner agentId={source.agentId} size={14} />
+            <b className="ac-tools__shimmer">{capitalize(activityVerb(t, doing), i18n.language)}…</b>
+            {task?.now?.detail && <small>{task.now.detail}</small>}
+          </p>
+        )}
+        {end === "stopped" && (
+          <div className="tm-panel__stopped">
+            <p className="ac-iconline">
+              <PixelStop size={12} dim />
+              <span>
+                <b>
+                  {byMe
+                    ? t("taskManager.stopped.line", { agent: name, context: agentGrammar(name).context })
+                    : stopper
+                      ? t("taskManager.stopped.lineBy", {
+                          name: stopper.name,
+                          agent: name,
+                          context: agentGrammar(name).context,
+                        })
+                      : t("taskManager.state.stopped")}
+                </b>
+                {reason && ` · ${t("taskManager.stopped.reason", { reason })}`}
+              </span>
             </p>
-          )}
-          {!source.background && !source.betweenAgents && (
-            <Button size="sm" variant="ghost" icon="message" onClick={() => openTask(source)}>
-              {t("taskManager.actions.open")}
-            </Button>
-          )}
-          {task?.canStop && (
-            <StopTaskButton
-              label={t(task.helpers ? "taskManager.actions.stopAll" : "taskManager.actions.stopTask")}
-              stopping={stopping}
-              onClick={onStop}
-              className="tm-panel__stop"
-            />
-          )}
-        </footer>
-      </aside>
-    </>
+            {byMe && !reason && <SayWhy runId={runId} onSent={setSent} />}
+          </div>
+        )}
+        <dl className="tm-panel__facts">
+          {facts.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <h3 className="tm-panel__h">{t("taskManager.panel.steps")}</h3>
+        {steps.isLoading ? (
+          <LoadingList count={2} avatar={false} />
+        ) : steps.isError && !steps.data ? (
+          <ErrorState error={steps.error} onRetry={() => void refetch()} />
+        ) : steps.data && hasSteps ? (
+          <TaskStepsBlock
+            steps={steps.data.steps}
+            run={steps.data.run}
+            working={working}
+            agentName={name}
+            color={colorOf(dir.anyAgent(source.agentId))}
+          />
+        ) : (
+          <p className="tm-panel__none">{t("taskManager.panel.noSteps")}</p>
+        )}
+      </div>
+
+      <footer className="tm-panel__foot">
+        {task?.delegation && task.canStop && (
+          <p className="tm-panel__note">
+            {t("taskManager.delegated.stopNote", { name: nameOf(task.delegation.agentId) ?? "" })}
+          </p>
+        )}
+        {!source.background && !source.betweenAgents && (
+          <Button size="sm" variant="ghost" icon="message" onClick={() => openTask(source)}>
+            {t("taskManager.actions.open")}
+          </Button>
+        )}
+        {task?.canStop && (
+          <StopTaskButton
+            label={t(task.helpers ? "taskManager.actions.stopAll" : "taskManager.actions.stopTask")}
+            stopping={stopping}
+            onClick={onStop}
+            className="tm-panel__stop"
+          />
+        )}
+      </footer>
+    </SidePanel>
   );
 }

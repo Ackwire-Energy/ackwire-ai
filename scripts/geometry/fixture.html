@@ -2,10 +2,13 @@
 <style>
   .box { border: 1px solid #000; width: 400px; margin: 8px; }
   .inline { display: flex; align-items: center; }
-  .dock { position: fixed; inset: 0; pointer-events: none; }
-  .dock > .thread-panel { position: absolute; width: 100px; animation: none; }
-  .dock > .bad-docked { top: 10px; right: 10px; bottom: 10px; }
-  .dock > .good-docked { top: 0; right: 0; bottom: 0; }
+  .float { pointer-events: none; }
+  .float > .thread-panel { position: fixed; width: 100px; animation: none; }
+  .float > .thread-panel__scrim { position: fixed; top: 0; right: 0; bottom: 0; }
+  .float > .thread-panel.bad-floating { top: 0; right: 0; bottom: 0; }
+  .float > .thread-panel__scrim.bad-floating { left: 300px; }
+  .float > .thread-panel.good-floating { top: 10px; right: 10px; bottom: 10px; }
+  .float > .thread-panel__scrim.good-floating { left: 0; }
 </style>
 <div class="box bad-edge inline" style="height: 40px; justify-content: space-between"><span>Row</span><span class="ac-btn" style="height: 36px">Abrir</span></div>
 <div class="box good-edge inline" style="height: 60px; padding: 0 12px; justify-content: space-between"><span>Row</span><span class="ac-btn" style="height: 36px">Abrir</span></div>
@@ -48,8 +51,8 @@
 <div class="inline" style="gap: 10px; width: 400px"><span class="bad-touch">#2</span><div style="flex: 1; cursor: text; margin-left: -10px; padding-left: 10px">Subir app iOS</div></div>
 <div class="inline" style="gap: 8px; width: 400px"><span class="good-touch">#2</span><div style="flex: 1; cursor: text; padding-left: 8px">Subir app iOS</div></div>
 
-<div class="dock"><aside class="thread-panel bad-docked">Uma conversa</aside></div>
-<div class="dock"><aside class="thread-panel good-docked">Outra conversa</aside></div>
+<div class="float"><div class="thread-panel__scrim bad-floating"></div><aside class="thread-panel bad-floating">Uma conversa</aside></div>
+<div class="float"><div class="thread-panel__scrim good-floating"></div><aside class="thread-panel good-floating">Outra conversa</aside></div>
 
 <div class="bad-inset" style="display: flex; align-items: center; gap: 8px; width: 360px; background: #eee; border-radius: 10px; padding: 7px 8px 7px 12px"><span style="display: grid; width: 16px"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></span><span style="flex: 1">Não consegui chamar a Ivy</span><button type="button" style="border: 0; background: none; padding: 0; font: inherit">Deixar falar</button></div>
 <div class="good-inset" style="display: flex; align-items: center; gap: 8px; width: 360px; background: #eee; border-radius: 10px; padding: 7px 12px"><span style="display: grid; width: 16px"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></span><span style="flex: 1">Não consegui chamar a Ivy</span><button type="button" style="border: 0; background: none; padding: 0; font: inherit">Deixar falar</button></div>

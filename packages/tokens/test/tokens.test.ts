@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   agentRadius,
   dark,
+  durations,
   fonts,
   light,
   motion,
@@ -136,5 +137,11 @@ describe("@agenteschat/tokens equals tokens.css", () => {
       (/cubic-bezier\(([^)]*)\)/.exec(sharedVars.get(name) ?? "")?.[1] ?? "").split(",").map((n) => Number(n.trim()));
     expect<unknown>([...motion.spring]).toEqual(bezier("spring"));
     expect<unknown>([...motion.out]).toEqual(bezier("out"));
+    expect<unknown>([...motion.ios]).toEqual(bezier("drawer"));
+    for (const [key, value] of Object.entries(durations))
+      expect<unknown>(`${value}ms`).toBe(sharedVars.get(`dur-${key}`));
+    // UI motion stays short: presses, menus and arrivals within 120 to 200ms, a panel's slide at most 260ms.
+    for (const ms of [durations.fast, durations.base]) expect(ms >= 120 && ms <= 200).toBe(true);
+    expect(durations.panel).toBeLessThanOrEqual(260);
   });
 });

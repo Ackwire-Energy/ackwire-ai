@@ -95,7 +95,7 @@ describe("the header search (Discord's)", () => {
     expect(screen().getByRole("option", { name: /^Ada/ })).toBeTruthy();
   });
 
-  test("Enter docks the results in the thread's place, words marked; Ir para highlights the message and they stay", async () => {
+  test("Enter floats the results over the window, words marked; Ir para shows the message and closes them", async () => {
     const state = seeded();
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
@@ -103,22 +103,26 @@ describe("the header search (Discord's)", () => {
     expect(results()).toBeNull();
     await enter();
     const panel = results() as HTMLElement;
-    expect(panel.className).toContain("thread-panel--docked");
-    expect(panel.parentElement?.className).toBe("channel__body");
-    expect(document.querySelector(".thread-panel__scrim")).toBeNull();
-    expect(document.querySelector(".channel__col [id^='composer-']")).toBeTruthy();
+    expect(panel.className).toContain("thread-panel");
+    expect(panel.previousElementSibling?.className).toBe("thread-panel__scrim");
+    // The conversation is under the scrim, out of reach until the panel closes.
+    expect((document.querySelector(".channel__col") as HTMLElement).closest("[inert]")).toBeTruthy();
     expect(within(panel).getByRole("heading", { level: 1 }).textContent).toBe("1 resultado");
     const group = within(panel).getByRole("region", { name: "eng" });
     expect([...group.querySelectorAll(".search-hit__mark")].map((m) => m.textContent)).toEqual(["Achei"]);
     await act(async () => fireEvent.click(within(group).getByRole("button", { name: "Ir para a mensagem de Ada" })));
     await settle(4);
-    expect(results()).toBeTruthy();
+    expect(results()).toBeNull();
     expect(row("m-2").classList.contains("ac-msg--focus")).toBe(true);
+    expect((document.querySelector(".channel__col") as HTMLElement).inert).toBe(false);
+    // The words stay in the field: Enter brings the results back.
     expect(box().value).toBe("achei");
+    await enter();
+    expect(results()).toBeTruthy();
   });
 
   // Many renders/tool calls in one test: over 5 s on a loaded CI runner, well under alone.
-  test("a message older than what's loaded: the conversation pages back to it, the buttons waiting meanwhile", async () => {
+  test("a message older than what's loaded: the conversation pages back to it, the buttons waiting meanwhile, then they close", async () => {
     const state = seedState();
     const at = Date.now() - 3_600_000;
     for (let i = 0; i < 400; i++)
@@ -153,8 +157,7 @@ describe("the header search (Discord's)", () => {
     release();
     await waitFor(() => expect(row("h-3")?.classList.contains("ac-msg--focus")).toBe(true), { timeout: 10_000 });
     expect(pages.mock.calls.at(-1)?.[2]?.limit).toBe(200);
-    expect((jump as HTMLButtonElement).disabled).toBe(false);
-    expect(results()).toBeTruthy();
+    expect(results()).toBeNull();
   }, 15_000);
 
   test("a message no longer there says so, and the results stay", async () => {
@@ -253,7 +256,7 @@ describe("the header search (Discord's)", () => {
     expect(router.state.location.search).toEqual({});
   });
 
-  test("another conversation's hit: there with the results still open, the query kept, ready for the next", async () => {
+  test("another conversation's hit: there with the results closed, the query kept, ready for the next", async () => {
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
@@ -265,9 +268,11 @@ describe("the header search (Discord's)", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
     expect(router.state.location.search).toEqual({ m: "m-general" });
     expect(row("m-general").classList.contains("ac-msg--focus")).toBe(true);
+    expect(results()).toBeNull();
     expect(box().value).toBe("zebra");
 
     // The next hit, a reply back in #eng: that channel with its thread over the results.
+    await enter();
     const reply = within(results() as HTMLElement).getByRole("region", { name: /^@ada o login está devolvendo 401/ });
     await act(async () => fireEvent.click(within(reply).getByRole("button", { name: "Ir para a mensagem de Ada" })));
     await settle(8);
@@ -341,7 +346,7 @@ describe("the header search (Discord's)", () => {
     expect(document.activeElement).toBe(jump);
   });
 
-  test("where the pane covers the conversation, Ver em #canal in a hit's thread closes the results too", async () => {
+  test("Ver em #canal in a hit's thread closes the results too", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
@@ -351,7 +356,6 @@ describe("the header search (Discord's)", () => {
     await act(async () => fireEvent.click(within(group).getByRole("button", { name: "Ir para a mensagem de Ada" })));
     await settle(6);
     const pane = screen().getByRole("complementary", { name: "Thread" });
-    pane.style.position = "fixed";
     const more = within(pane).getByRole("button", { name: "Mais ações da thread" });
     more.focus();
     await act(async () => {
@@ -366,7 +370,7 @@ describe("the header search (Discord's)", () => {
     expect(row("m-1").classList.contains("ac-msg--focus")).toBe(true);
   });
 
-  test("a DM's hit: the search keeps its scope there, so the other hits stay; closed, the DM holds to itself again", async () => {
+  test("a DM's hit: there with the results closed, the words kept; Enter brings them back, the × closes them", async () => {
     const state = seeded();
     const dm = seedDm(state, { type: "agent", id: ADA_ID }, { body: "uma zebra na DM" });
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
@@ -379,24 +383,14 @@ describe("the header search (Discord's)", () => {
     await settle(8);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     expect(row(`m-${dm}`).classList.contains("ac-msg--focus")).toBe(true);
+    expect(results()).toBeNull();
+    expect(box().value).toBe("zebra");
+    await enter();
     const panel = results() as HTMLElement;
-    expect(within(panel).getByRole("region", { name: "general" })).toBeTruthy();
+    expect(within(panel).getByRole("region", { name: "DM com Ada" })).toBeTruthy();
     await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Fechar" })));
     await settle(4);
     expect(results()).toBeNull();
-  });
-
-  test("where the pane covers the conversation (a narrow window), Ir para closes it to show the message", async () => {
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
-    await settle(6);
-    await typeIn("achei");
-    await enter();
-    const panel = results() as HTMLElement;
-    panel.style.position = "absolute";
-    await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Ir para a mensagem de Ada" })));
-    await settle(4);
-    expect(results()).toBeNull();
-    expect(row("m-2").classList.contains("ac-msg--focus")).toBe(true);
   });
 
   test("moving to another channel scopes an untouched search there; words typed keep the search as it is", async () => {

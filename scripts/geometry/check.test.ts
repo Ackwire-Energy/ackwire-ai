@@ -54,10 +54,10 @@ describe("geometry check", () => {
     expect(coverage(["c", "b", "a"], (name) => html[name] as string)).toEqual(["a", "c"]);
   });
 
-  test("every rule the run checks has an offender and a sound twin in the fixture, the docked panes, cards' sides, icon gaps and square icon buttons too", () => {
+  test("every rule the run checks has an offender and a sound twin in the fixture, the floating panes, cards' sides, icon gaps and square icon buttons too", () => {
     const fixture = readFileSync(join(import.meta.dir, "fixture.html"), "utf8");
     const rules = readFileSync(join(import.meta.dir, "rules.js"), "utf8");
-    for (const rule of ["docked", "inset", "icongap", "square"]) expect(SELF_TESTED).toContain(rule);
+    for (const rule of ["floating", "inset", "icongap", "square"]) expect(SELF_TESTED).toContain(rule);
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);

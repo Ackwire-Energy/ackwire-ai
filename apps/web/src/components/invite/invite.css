@@ -457,6 +457,7 @@ html:not([data-pointer]) .invite-each:focus-visible {
   }
   .invite-screen[data-sent] .invite-person,
   .invite-screen[data-sent] .invite-host__face,
+  .invite-screen[data-party] .invite-host__face,
   .invite-screen[data-sent] .invite-person[data-ok] .invite-state .ac-icon path {
     animation: none;
   }

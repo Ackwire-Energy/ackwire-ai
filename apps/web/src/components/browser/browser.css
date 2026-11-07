@@ -1770,6 +1770,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible .brw-mf__hist {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .brw-ac,
   .brw-ac.brw-mf.is-working {
     animation: none;
   }

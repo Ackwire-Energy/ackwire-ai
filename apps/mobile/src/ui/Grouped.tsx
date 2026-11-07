@@ -6,7 +6,7 @@ import { Icon, type IconName } from "./Icon";
 import { useInfoHint } from "./InfoHint";
 import { Text, textLineOf } from "./Text";
 import { ToggleSwitch } from "./Toggle";
-import { useTheme } from "./theme";
+import { motion, useTheme } from "./theme";
 import { leadBox } from "./type-scale";
 
 /** The leading column of a row with a face or a mark: whatever leads is centered in it. */
@@ -15,9 +15,9 @@ const LEAD = 32;
 const TILE = 28;
 
 /** A row that comes or goes while the list is on screen fades; what is around it slides into place. */
-const ROW_IN = FadeIn.duration(160);
-const ROW_OUT = FadeOut.duration(120);
-const SLIDE = LinearTransition.duration(220);
+const ROW_IN = FadeIn.duration(motion.fast);
+const ROW_OUT = FadeOut.duration(motion.fast);
+const SLIDE = LinearTransition.duration(motion.base);
 
 /**
  * Settings as on the iPhone: grouped inset lists, radius 14, hairlines inset to
