@@ -9,6 +9,8 @@
   const PAD_DIFF = 2;
   const PLATE_DIFF = 1;
   const GAP_DIFF = 1.5;
+  /** The narrowest window a side pane docks in instead of covering the screen (threads.css, 861px). */
+  const DESKTOP_MIN = 861;
 
   const sig = (el) => {
     const classes = (typeof el.className === "string" ? el.className : (el.className?.baseVal ?? ""))
@@ -124,6 +126,17 @@
     return { left: Math.min(...rects.map((r) => r.left)), right: Math.max(...rects.map((r) => r.right)) };
   };
 
+  /** A text node in `box` laid out on more than one line. */
+  const wraps = (box) => {
+    const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim()) continue;
+      const tops = new Set([...textRange(n).getClientRects()].map((r) => Math.round(r.top)));
+      if (tops.size > 1) return true;
+    }
+    return false;
+  };
+
   const SIDES = ["Top", "Bottom", "Left", "Right"];
   const ROW_NAME = /(^|\s|[_-])(row|card|item)(\s|$|--)/;
   /**
@@ -160,6 +173,10 @@
         const row = rowOf(el);
         if (!row || !seen(row.box) || words(row.box) === words(el)) continue;
         const a = el.getBoundingClientRect();
+        // A capped card's body cuts what runs past its height under a fade and "See more" (`useCardCut`, which a captured
+        // screen can't measure): an action there is cut, not on the card's edge.
+        const cut = el.closest("[data-capped] > *");
+        if (cut && row.box.contains(cut) && a.bottom > cut.getBoundingClientRect().bottom) continue;
         const b = row.box.getBoundingClientRect();
         const s = style(row.box);
         const inset = {
@@ -193,6 +210,10 @@
         if (b.width > 320 || el.scrollWidth > el.clientWidth + 1) continue;
         // A face at the start of a pill sits concentric with its round end, tighter than the words at the other.
         if (el.firstElementChild?.matches(".ac-avatar,.ac-rolemark,canvas,[class*='face']")) continue;
+        // A frame split into segments (an event pill's actions, each after a hairline) pads each one, not the whole.
+        if (el.querySelector(":scope > [class*='__actions']")) continue;
+        // Words that wrap end where their widest line does, not where the box does: the right side is their rag.
+        if (wraps(el)) continue;
         const c = contentRect(el);
         if (!c) continue;
         const left = c.left - b.left;
@@ -333,6 +354,32 @@
               px: +gap.toFixed(1),
               want,
               text: words(kids[i]),
+            });
+        }
+      }
+    },
+    /**
+     * A side pane (`.thread-panel`: a thread, search, an agent's page, a task's conversation, Auditoria's details) on a
+     * desktop window: flush with the top of the area it docks in (under a channel's header, the area's top is the
+     * header's foot) and with the window's right and bottom edges, no gap. Phones take the whole screen (another rule).
+     */
+    docked(out) {
+      if (innerWidth < DESKTOP_MIN) return;
+      // An inline position is a test's own stand-in for a narrow window, not the app's layout.
+      for (const pane of document.querySelectorAll(".thread-panel:not([style])")) {
+        if (!seen(pane)) continue;
+        const a = pane.getBoundingClientRect();
+        const area = pane.parentElement.getBoundingClientRect();
+        const gaps = { Top: a.top - area.top, Right: innerWidth - a.right, Bottom: innerHeight - a.bottom };
+        for (const [side, px] of Object.entries(gaps)) {
+          if (Math.abs(px) > 0.5)
+            out.push({
+              rule: "docked",
+              node: pane,
+              el: sig(pane),
+              box: sig(pane.parentElement),
+              side,
+              px: +px.toFixed(1),
             });
         }
       }

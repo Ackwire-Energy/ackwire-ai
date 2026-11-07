@@ -223,6 +223,21 @@ export async function openTab(send: Send, url: string) {
   return { run, resize, send: (method: string, params: object = {}) => send(method, params, sessionId) };
 }
 
+/** What `rules.js` reports, each with a `bad-` offender and a `good-` twin in `fixture.html`. */
+export const SELF_TESTED = [
+  "edge",
+  "pad",
+  "clipped",
+  "overlap",
+  "wordwrap",
+  "viewport",
+  "plate",
+  "stack",
+  "nameless",
+  "quiet",
+  "docked",
+];
+
 /** Every rule fires on its fixture's offender and stays quiet on the sound twin next to it. */
 async function selfTest(tab: Awaited<ReturnType<typeof openTab>>) {
   const fixture = readFileSync(join(HERE, "fixture.html"), "utf8");
@@ -231,18 +246,7 @@ async function selfTest(tab: Awaited<ReturnType<typeof openTab>>) {
   const found = await tab.run<Finding[]>("geometry.detect()");
   const hit = (rule: string, cls: string) => found.some((f) => f.rule === rule && (f.el + (f.box ?? "")).includes(cls));
   const wrong: string[] = [];
-  for (const rule of [
-    "edge",
-    "pad",
-    "clipped",
-    "overlap",
-    "wordwrap",
-    "viewport",
-    "plate",
-    "stack",
-    "nameless",
-    "quiet",
-  ]) {
+  for (const rule of SELF_TESTED) {
     if (!hit(rule, `bad-${rule}`)) wrong.push(`${rule} missed its offender`);
     if (hit(rule, `good-${rule}`)) wrong.push(`${rule} flagged a sound element`);
   }

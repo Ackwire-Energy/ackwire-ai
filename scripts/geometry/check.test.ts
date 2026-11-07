@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { compare, coverage, edgesOf, keyOf, playwrightChromes } from "./check";
+import { compare, coverage, edgesOf, keyOf, playwrightChromes, SELF_TESTED } from "./check";
 
 describe("geometry check", () => {
   test("a new offender is new at its width, and words or size never make one", () => {
@@ -52,5 +52,16 @@ describe("geometry check", () => {
       c: '<div class="a"><em></em></div>',
     };
     expect(coverage(["c", "b", "a"], (name) => html[name] as string)).toEqual(["a", "c"]);
+  });
+
+  test("every rule the run checks has an offender and a sound twin in the fixture, the docked panes too", () => {
+    const fixture = readFileSync(join(import.meta.dir, "fixture.html"), "utf8");
+    const rules = readFileSync(join(import.meta.dir, "rules.js"), "utf8");
+    expect(SELF_TESTED).toContain("docked");
+    for (const rule of SELF_TESTED) {
+      expect(fixture).toContain(`bad-${rule}`);
+      expect(fixture).toContain(`good-${rule}`);
+      expect(rules).toContain(`rule: "${rule}"`);
+    }
   });
 });
