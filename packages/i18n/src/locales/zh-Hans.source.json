@@ -27760,6 +27760,15 @@
   "files.zoom.hintZoomedTouch": {
     "value": "Drag to move around. Tap to fit it back"
   },
+  "files.nav.previous": {
+    "value": "Previous image"
+  },
+  "files.nav.next": {
+    "value": "Next image"
+  },
+  "files.nav.place": {
+    "value": "{{index}} of {{count}}"
+  },
   "errors.said.gone": {
     "value": "This isn't here anymore. Refresh the page and try again."
   },

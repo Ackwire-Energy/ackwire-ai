@@ -241,6 +241,7 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, AgentPanelShownContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { AgentSidebar } from "@/components/agents/AgentSidebar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
+import { ImageSet } from "@/components/artifacts/ArtifactViewer";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { MessageWorkLine } from "@/components/BackgroundWork";
 import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/browser/BrowserCard";
@@ -4566,11 +4567,13 @@ export const TimelineMessage = memo(function TimelineMessage({
               <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
             )}
             {artifacts.length > 0 && (
-              <div className="artifact-cards">
-                {artifacts.map((r) => (
-                  <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
-                ))}
-              </div>
+              <ImageSet refs={artifacts}>
+                <div className="artifact-cards">
+                  {artifacts.map((r) => (
+                    <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
+                  ))}
+                </div>
+              </ImageSet>
             )}
             {/* Its tools after its words and what it changed: the same place live, kept and saved. */}
             {keptSteps?.length && seenLive ? (

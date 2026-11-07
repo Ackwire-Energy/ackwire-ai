@@ -7468,6 +7468,60 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
     display: none;
   }
 }
+/* "Loading…" only when a picture takes a moment: moving to one already here shows no flash of it. */
+.izoom__status {
+  animation: izoom-wait 0.3s;
+}
+@keyframes izoom-wait {
+  from,
+  to {
+    opacity: 0;
+  }
+}
+/* Moving through a message's pictures: square buttons on the stage's sides, halfway down, raised like the zoom bar so
+   they read on any picture, and "2 de 4" in the head before Baixar. */
+.artifact-viewer--image .artifact-viewer__main {
+  position: relative;
+}
+.artifact-nav {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  translate: 0 -50%;
+  box-shadow: var(--e2);
+}
+.artifact-nav--prev {
+  left: 12px;
+}
+.artifact-nav--next {
+  right: 12px;
+}
+.artifact-sheet__place {
+  font-size: 13px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+/* The picture moved to slides in from its side as it fades up; the first one opens as it always did. */
+@media (prefers-reduced-motion: no-preference) {
+  .artifact-viewer[data-moved] .izoom__img[data-ready] {
+    animation: izoom-in-next 0.22s var(--out);
+  }
+  .artifact-viewer[data-moved="prev"] .izoom__img[data-ready] {
+    animation-name: izoom-in-prev;
+  }
+}
+@keyframes izoom-in-next {
+  from {
+    opacity: 0;
+    translate: 32px 0;
+  }
+}
+@keyframes izoom-in-prev {
+  from {
+    opacity: 0;
+    translate: -32px 0;
+  }
+}
 .file-view__pdf {
   width: 100%;
   height: 100%;

@@ -10988,6 +10988,11 @@
       "hintZoomed": "ドラッグで移動。Esc で全体表示に戻る",
       "hintTouch": "タップまたはピンチで拡大",
       "hintZoomedTouch": "ドラッグで移動。タップで全体表示に戻る"
+    },
+    "nav": {
+      "previous": "前の画像",
+      "next": "次の画像",
+      "place": "{{index}}/{{count}}"
     }
   },
   "errors": {

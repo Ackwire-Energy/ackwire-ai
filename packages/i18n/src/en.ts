@@ -11113,6 +11113,12 @@ export const en = {
       hintTouch: "Tap or pinch to zoom in",
       hintZoomedTouch: "Drag to move around. Tap to fit it back",
     },
+    /** Moving through a message's pictures in the viewer: the buttons on the picture's sides and the count. */
+    nav: {
+      previous: "Previous image",
+      next: "Next image",
+      place: "{{index}} of {{count}}",
+    },
   },
   errors: {
     /** Refusals in plain words: each server code that needs no line of its own shares one of these. */

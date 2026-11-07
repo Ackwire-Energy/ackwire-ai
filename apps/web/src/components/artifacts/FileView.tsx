@@ -182,11 +182,14 @@ export function FileView({
   artifactId,
   version,
   title,
+  onSwipe,
 }: {
   content: ArtifactFileContent;
   artifactId: string;
   version: number;
   title: string;
+  /** A picture: a finger's sideways swipe moves to the next or previous one. */
+  onSwipe?: ((dir: 1 | -1) => void) | undefined;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -218,11 +221,11 @@ export function FileView({
     );
   }
 
-  // A picture fills the viewer, with its zoom.
-  if (kind === "image" && canPreview && url && !failed) {
+  // A picture fills the viewer, with its zoom: its stage at once, the picture as soon as its bytes are here.
+  if (kind === "image" && canPreview && !failed) {
     return (
       <div className="file-view file-view--image">
-        <ImageZoom key={url} src={url} alt={t("files.imageAlt", { title })} />
+        <ImageZoom key={url} src={url} alt={t("files.imageAlt", { title })} onSwipe={onSwipe} />
       </div>
     );
   }

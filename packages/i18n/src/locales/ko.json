@@ -10982,6 +10982,11 @@
       "hintZoomed": "드래그해 이동. Esc로 다시 맞춤",
       "hintTouch": "탭하거나 핀치해 확대",
       "hintZoomedTouch": "드래그해 이동. 탭하면 다시 맞춤"
+    },
+    "nav": {
+      "previous": "이전 이미지",
+      "next": "다음 이미지",
+      "place": "{{count}}개 중 {{index}}번째"
     }
   },
   "errors": {

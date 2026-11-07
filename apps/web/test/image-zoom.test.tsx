@@ -51,10 +51,10 @@ afterEach(() => {
 });
 
 /** A 3600×600 banner (fits at a third of its size, centered 250 px down) in a 1200×700 stage. */
-const show = async (w = 3600, h = 600) => {
+const show = async (w = 3600, h = 600, onSwipe?: (dir: 1 | -1) => void) => {
   const r = render(
     <I18nextProvider i18n={createI18n("pt-BR")}>
-      <ImageZoom src="blob:picture" alt="Imagem: banner.png" />
+      <ImageZoom src="blob:picture" alt="Imagem: banner.png" onSwipe={onSwipe} />
     </I18nextProvider>,
   );
   const img = r.container.querySelector<HTMLImageElement>(".izoom__img");
@@ -204,6 +204,53 @@ describe("the picture viewer's zoom", () => {
     expect(lens.getAttribute("aria-pressed")).toBe("false");
     expect(container.querySelector(".izoom__lens")).toBeNull();
     expect(localStorage.getItem("agentes.image.lens")).toBe("0");
+  });
+
+  test("a finger drags a fitted picture sideways: far enough asks for the next or previous one, short springs back", async () => {
+    touch = true;
+    const swipes: number[] = [];
+    const { img, stage } = await show(3600, 600, (dir) => swipes.push(dir));
+    const finger = async (from: number, to: number, pointerType = "touch") => {
+      await act(async () => {
+        fireEvent.pointerDown(stage, { pointerId: 1, button: 0, pointerType, clientX: from, clientY: 350 });
+      });
+      await act(async () => {
+        fireEvent.pointerMove(stage, { pointerId: 1, pointerType, clientX: (from + to) / 2, clientY: 350 });
+      });
+      const midway = img.style.transform;
+      await act(async () => {
+        fireEvent.pointerUp(stage, { pointerId: 1, button: 0, pointerType, clientX: to, clientY: 350 });
+      });
+      return midway;
+    };
+    // The picture follows the finger, then goes back to its place.
+    expect(await finger(600, 400)).toContain("translate(-100px, 250px)");
+    expect(img.style.transform).toContain("translate(0px, 250px)");
+    expect(swipes).toEqual([1]);
+    await finger(600, 800);
+    expect(swipes).toEqual([1, -1]);
+    await finger(600, 570);
+    expect(swipes).toEqual([1, -1]);
+    // A mouse drag on a fitted picture still does nothing.
+    await finger(600, 200, "mouse");
+    expect(swipes).toEqual([1, -1]);
+    expect(scaleOf(img)).toBeCloseTo(1 / 3);
+    // Zoomed, the finger moves around the picture instead.
+    key(stage, "1");
+    await finger(600, 300);
+    expect(swipes).toEqual([1, -1]);
+    expect(scaleOf(img)).toBe(1);
+  });
+
+  test("without its bytes yet, the stage waits with its status", async () => {
+    const r = render(
+      <I18nextProvider i18n={createI18n("pt-BR")}>
+        <ImageZoom src={null} alt="Imagem: x.png" />
+      </I18nextProvider>,
+    );
+    expect(r.container.querySelector(".izoom__img")).toBeNull();
+    expect(r.getByRole("status").textContent).toContain("Carregando");
+    expect(r.getByRole("group", { name: "Imagem: x.png" })).toBeTruthy();
   });
 
   test("a picture the browser can't draw says so instead of an empty stage", async () => {

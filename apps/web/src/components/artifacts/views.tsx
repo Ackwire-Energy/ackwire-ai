@@ -17,10 +17,13 @@ export function ArtifactContentView({
   content,
   title,
   source,
+  onSwipe,
 }: {
   content: ArtifactContent;
   title: string;
   source?: { id: string; version: number; agentId?: string };
+  /** A picture: a finger's sideways swipe moves to the next or previous one. */
+  onSwipe?: ((dir: 1 | -1) => void) | undefined;
 }) {
   const { t } = useTranslation();
   switch (content.kind) {
@@ -61,7 +64,7 @@ export function ArtifactContentView({
       return source ? <ChoicesCard id={source.id} version={source.version} /> : null;
     case "file":
       return source ? (
-        <FileView content={content} artifactId={source.id} version={source.version} title={title} />
+        <FileView content={content} artifactId={source.id} version={source.version} title={title} onSwipe={onSwipe} />
       ) : (
         <FileSummary content={content} />
       );

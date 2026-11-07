@@ -11388,6 +11388,11 @@
       "hintZoomed": "Gezinmek için sürükleyin. Esc yeniden sığdırır",
       "hintTouch": "Yakınlaştırmak için dokunun veya iki parmakla sıkıştırın",
       "hintZoomedTouch": "Gezinmek için sürükleyin. Yeniden sığdırmak için dokunun"
+    },
+    "nav": {
+      "previous": "Önceki görsel",
+      "next": "Sonraki görsel",
+      "place": "{{index}} / {{count}}"
     }
   },
   "errors": {

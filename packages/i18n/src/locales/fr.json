@@ -11878,6 +11878,11 @@
       "hintZoomed": "Faites glisser pour vous déplacer. Échap réajuste",
       "hintTouch": "Touchez ou pincez pour agrandir",
       "hintZoomedTouch": "Faites glisser pour vous déplacer. Touchez pour réajuster"
+    },
+    "nav": {
+      "previous": "Image précédente",
+      "next": "Image suivante",
+      "place": "{{index}} sur {{count}}"
     }
   },
   "errors": {

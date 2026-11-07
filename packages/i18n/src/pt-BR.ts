@@ -11213,6 +11213,11 @@ export const ptBR = {
       hintTouch: "Toque ou faça pinça para ampliar",
       hintZoomedTouch: "Arraste para mover. Toque para voltar a ajustar",
     },
+    nav: {
+      previous: "Imagem anterior",
+      next: "Próxima imagem",
+      place: "{{index}} de {{count}}",
+    },
   },
   errors: {
     /** Refusals in plain words: each server code that needs no line of its own shares one of these. */
