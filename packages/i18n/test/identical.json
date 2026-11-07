@@ -1462,7 +1462,8 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "browser.live.emulated.desktop"
+      "browser.live.emulated.desktop",
+      "artifacts.files"
     ],
     "nl": [
       "wiki.bulk.agents",
