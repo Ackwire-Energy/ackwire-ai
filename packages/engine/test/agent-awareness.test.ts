@@ -66,7 +66,9 @@ describe("what earlier runs did", () => {
     const prompt = systemText(f.provider.calls.at(-1)?.request.system ?? "");
     expect(prompt).toContain("# Recent actions in this thread");
     expect(prompt).toMatch(/@dev create_issue → Created #1 \[todo\] Integração com TikTok Ads.*\(ok\)/);
-    expect(prompt).toContain("not with `search_context`");
+    expect(prompt).toContain(
+      "check its current state with the matching tool or page (`list_issues`, `read_artifact`, `list_events`…), not `search_context`",
+    );
     expect(prompt).toContain("Never say you didn't do");
   });
 });
