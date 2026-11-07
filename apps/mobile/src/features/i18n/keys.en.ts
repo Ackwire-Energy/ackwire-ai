@@ -73,6 +73,7 @@ export const featureKeysEn = {
     copied: "Copied",
     fullScreen: "Full screen",
     wrap: "Wrap lines",
+    raw: "Raw",
     more: "See all {{count}} lines",
     gone: "This code is no longer open.",
   },

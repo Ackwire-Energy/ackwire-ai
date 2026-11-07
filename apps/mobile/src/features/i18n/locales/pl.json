@@ -73,6 +73,7 @@
     "copied": "Skopiowano",
     "fullScreen": "Pełny ekran",
     "wrap": "Zawijaj wiersze",
+    "raw": "Oryginał",
     "more": "Zobacz wszystkie wiersze ({{count}})",
     "gone": "Ten kod nie jest już otwarty."
   },

@@ -3061,9 +3061,11 @@ html:not([data-pointer]) .ac-row:focus-visible {
   /* Over a modal dialog too, which turns the page's own off. */
   pointer-events: auto;
 }
+/* A name or a title in it (a setor someone named) breaks a word longer than the toast instead of running past it. */
 .ac-toast__text {
   flex: 1;
   min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* Progress bars */
@@ -3411,11 +3413,13 @@ html:not([data-pointer]) .ac-back:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-/* Selectable list item in a side list */
+/* Selectable list item in a side list. What people and agents wrote in it (a version's note, a proposal's title) breaks
+   a word longer than its line instead of running past the card ("alerta15:15:57,link/ts"). */
 .ac-navcard {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  overflow-wrap: break-word;
   text-align: left;
   padding: var(--space-3);
   font: inherit;

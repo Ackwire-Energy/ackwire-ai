@@ -71,6 +71,7 @@
     "copied": "Copié",
     "fullScreen": "Plein écran",
     "wrap": "Retour à la ligne",
+    "raw": "Brut",
     "more": "Voir les {{count}} lignes",
     "gone": "Ce code n'est plus ouvert."
   },

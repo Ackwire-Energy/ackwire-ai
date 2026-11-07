@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type CodeToken, codeLabel, highlightCode } from "../src/lib/code";
+import { type CodeToken, codeLabel, formatJson, highlightCode } from "../src/lib/code";
 
 const kinds = (line: CodeToken[] | undefined, kind: CodeToken["kind"]) =>
   (line ?? []).filter((t) => t.kind === kind).map((t) => t.text.trim());
@@ -66,5 +66,41 @@ describe("highlightCode", () => {
   test("no language: plain text, nothing colored", () => {
     const lines = highlightCode("if this then that 42", "");
     expect(lines).toEqual([[{ kind: "plain", text: "if this then that 42" }]]);
+  });
+});
+
+describe("formatJson", () => {
+  test("one value a line, two spaces deep, every key, string and number exactly as written", () => {
+    const raw = '{"id":12345678901234567890,"note":"a\\"b, c: {d}","tags":["x", 1.50],"empty":{},"none":[ ],"ok":true}';
+    expect(formatJson(raw)).toBe(
+      [
+        "{",
+        '  "id": 12345678901234567890,',
+        '  "note": "a\\"b, c: {d}",',
+        '  "tags": [',
+        '    "x",',
+        "    1.50",
+        "  ],",
+        '  "empty": {},',
+        '  "none": [],',
+        '  "ok": true',
+        "}",
+      ].join("\n"),
+    );
+  });
+
+  test("only an object or an array of valid JSON", () => {
+    expect(formatJson('  [1,{"a":null}]\n')).toBe('[\n  1,\n  {\n    "a": null\n  }\n]');
+    for (const text of ["", "42", '"text"', "{bad}", '{ "a": 1 } trailing', "SELECT 1"])
+      expect(formatJson(text)).toBeNull();
+  });
+
+  test("a JSON key reads apart from the strings it maps to", () => {
+    const [line] = highlightCode('  "key": "value", "n": 2', "json");
+    expect(kinds(line, "property")).toEqual(['"key"', '"n"']);
+    expect(kinds(line, "string")).toEqual(['"value"']);
+    expect(kinds(line, "number")).toEqual(["2"]);
+    // Elsewhere a string before a colon is just a string.
+    expect(kinds(highlightCode('x = {"a": 1}', "py")[0], "property")).toEqual([]);
   });
 });

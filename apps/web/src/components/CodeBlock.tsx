@@ -1,6 +1,6 @@
-import { type CodeToken, codeLabel, highlightCode } from "@agenteschat/client/lib/code";
+import { type CodeToken, codeLabel, formatJson, highlightCode, isJsonLang } from "@agenteschat/client/lib/code";
 import { Button, Dialog, DialogBody } from "@agenteschat/ui";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useGrowFrom } from "@/lib/grow";
 
@@ -10,7 +10,8 @@ import { useGrowFrom } from "@/lib/grow";
  * into a dialog with line numbers and an optional wrap; Esc closes. Colors from the shared highlighter
  * (`@agenteschat/client/lib/code`, the phone app uses the same one). `preview`: the block drawn (a diagram), shown
  * in place of the code until "Código" is pressed; full screen shows whichever is on. `action`: a button of the
- * block's own on top ("Ver diagrama").
+ * block's own on top ("Ver diagrama"). JSON reads formatted (`formatJson`), its long lines wrapped under their own
+ * indent, the text as written one press away ("Original"); copy takes what shows.
  */
 export function CodeBlock({
   lang,
@@ -24,7 +25,11 @@ export function CodeBlock({
   action?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const lines = useMemo(() => highlightCode(text, lang), [text, lang]);
+  const formatted = useMemo(() => (isJsonLang(lang) ? formatJson(text) : null), [lang, text]);
+  const [raw, setRaw] = useState(false);
+  const pretty = formatted !== null && !raw;
+  const shown = pretty ? formatted : text;
+  const lines = useMemo(() => highlightCode(shown, lang), [shown, lang]);
   const label = codeLabel(lang) || t("common.code");
   const [open, setOpen] = useState(false);
   const [wrap, setWrap] = useState(false);
@@ -47,7 +52,12 @@ export function CodeBlock({
             {t("common.code")}
           </Button>
         )}
-        <CopyCode text={text} />
+        {formatted !== null && formatted !== text.trim() && (
+          <Button variant="ghost" size="sm" aria-pressed={raw} onClick={() => setRaw((r) => !r)}>
+            {t("common.raw")}
+          </Button>
+        )}
+        <CopyCode text={shown} />
         <Button
           variant="ghost"
           size="sm"
@@ -61,9 +71,9 @@ export function CodeBlock({
       {drawing ? (
         <div className="code-card__preview">{drawing}</div>
       ) : (
-        <pre className="code-card__code">
+        <pre className="code-card__code" data-wrap={pretty || undefined}>
           <code>
-            <CodeLines lines={lines} />
+            <CodeLines lines={lines} hang={pretty} />
           </code>
         </pre>
       )}
@@ -81,7 +91,7 @@ export function CodeBlock({
                 {t("common.wrapLines")}
               </Button>
             )}
-            <CopyCode text={text} />
+            <CopyCode text={shown} />
           </>
         }
       >
@@ -101,10 +111,23 @@ export function CodeBlock({
   );
 }
 
-function CodeLines({ lines, numbered = false }: { lines: CodeToken[][]; numbered?: boolean }) {
+/** `hang`: a wrapped line goes on under its own indent (`--hang`, its leading spaces), not at the block's edge. */
+function CodeLines({
+  lines,
+  numbered = false,
+  hang = false,
+}: {
+  lines: CodeToken[][];
+  numbered?: boolean;
+  hang?: boolean;
+}) {
   return lines.map((line, i) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: the lines of one block, in order
-    <span key={i} className={numbered ? "code-line code-line--numbered" : "code-line"}>
+    <span
+      // biome-ignore lint/suspicious/noArrayIndexKey: the lines of one block, in order
+      key={i}
+      className={numbered ? "code-line code-line--numbered" : "code-line"}
+      style={hang ? ({ "--hang": `${line[0]?.text.match(/^ */)?.[0].length ?? 0}ch` } as CSSProperties) : undefined}
+    >
       {line.map((tok, j) =>
         tok.kind === "plain" ? (
           tok.text

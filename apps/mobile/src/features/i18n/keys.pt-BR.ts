@@ -78,6 +78,7 @@ export const featureKeysPtBR = {
     copied: "Copiado",
     fullScreen: "Tela cheia",
     wrap: "Quebrar linhas",
+    raw: "Original",
     more: "Ver as {{count}} linhas",
     gone: "Esse código não está mais aberto.",
   },

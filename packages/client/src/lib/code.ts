@@ -5,7 +5,17 @@
  * no language stays plain (it is often prose or output); an unknown language gets the common keywords.
  */
 
-export type CodeTokenKind = "plain" | "keyword" | "string" | "number" | "comment" | "function" | "inserted" | "deleted";
+export type CodeTokenKind =
+  | "plain"
+  | "keyword"
+  | "string"
+  | "number"
+  | "comment"
+  | "function"
+  | "inserted"
+  | "deleted"
+  /** A JSON object's key, apart from the strings it maps to. */
+  | "property";
 export interface CodeToken {
   kind: CodeTokenKind;
   text: string;
@@ -90,6 +100,8 @@ type Syntax = {
   line: string[];
   block: boolean;
   hashOnlyAfterSpace?: boolean;
+  /** A string followed by ":" is a key. */
+  keys?: boolean;
 };
 
 const C_LIKE: Syntax = { keywords: GENERIC, line: ["//"], block: true };
@@ -99,7 +111,7 @@ const SYNTAX: Record<string, Syntax> = {
   py: { keywords: PY, line: ["#"], block: false },
   sh: { keywords: SH, line: ["#"], block: false, hashOnlyAfterSpace: true },
   sql: { keywords: SQL, caseless: true, line: ["--"], block: true },
-  json: { keywords: JSON_WORDS, line: [], block: false },
+  json: { keywords: JSON_WORDS, line: [], block: false, keys: true },
   yaml: { keywords: JSON_WORDS, line: ["#"], block: false },
   css: { keywords: new Set(), line: [], block: true },
   rb: { keywords: GENERIC, line: ["#"], block: false },
@@ -178,7 +190,10 @@ function tokenizeLine(line: string, syntax: Syntax, state: { inBlock: boolean })
     if (ch === '"' || ch === "'" || ch === "`") {
       let j = i + 1;
       while (j < line.length && line[j] !== ch) j += line[j] === "\\" ? 2 : 1;
-      push("string", line.slice(i, Math.min(line.length, j + 1)));
+      push(
+        syntax.keys && /^\s*:/.test(line.slice(j + 1)) ? "property" : "string",
+        line.slice(i, Math.min(line.length, j + 1)),
+      );
       i = j + 1;
       continue;
     }
@@ -200,6 +215,47 @@ function tokenizeLine(line: string, syntax: Syntax, state: { inBlock: boolean })
     }
     push("plain", ch);
     i += 1;
+  }
+  return out;
+}
+
+/** The languages a block is JSON in. */
+export const isJsonLang = (lang: string) => lang.trim().toLowerCase() === "json";
+
+/**
+ * A JSON object or array as people read it: one value a line, indented two spaces, every key, string and number
+ * exactly as written (a long id never rounded, as `JSON.stringify(JSON.parse(…))` would). Null when `text` isn't an
+ * object or array of valid JSON.
+ */
+export function formatJson(text: string): string | null {
+  const raw = text.trim();
+  if (!/^[[{]/.test(raw)) return null;
+  try {
+    JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const pad = (depth: number) => `\n${"  ".repeat(depth)}`;
+  let out = "";
+  let depth = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i] as string;
+    if (ch === '"') {
+      let j = i + 1;
+      while (raw[j] !== '"') j += raw[j] === "\\" ? 2 : 1;
+      out += raw.slice(i, j + 1);
+      i = j;
+    } else if (ch === "{" || ch === "[") {
+      let next = i + 1;
+      while (/\s/.test(raw[next] ?? "")) next++;
+      if (raw[next] === (ch === "{" ? "}" : "]")) {
+        out += ch + raw[next];
+        i = next;
+      } else out += ch + pad(++depth);
+    } else if (ch === "}" || ch === "]") out += pad(--depth) + ch;
+    else if (ch === ",") out += `,${pad(depth)}`;
+    else if (ch === ":") out += ": ";
+    else if (!/\s/.test(ch)) out += ch;
   }
   return out;
 }

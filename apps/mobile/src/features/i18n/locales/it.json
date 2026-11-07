@@ -71,6 +71,7 @@
     "copied": "Copiato",
     "fullScreen": "Schermo intero",
     "wrap": "A capo automatico",
+    "raw": "Originale",
     "more": "Vedi tutte le {{count}} righe",
     "gone": "Questo codice non è più aperto."
   },

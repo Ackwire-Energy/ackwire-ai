@@ -39,6 +39,8 @@ export const en = {
     code: "Code",
     fullScreen: "Full screen",
     wrapLines: "Wrap lines",
+    /** A formatted block (JSON) shown as it was written. */
+    raw: "Raw",
     table: "Table",
     chartItem: "Item",
     chartShare: "Share",
