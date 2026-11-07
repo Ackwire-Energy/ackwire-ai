@@ -544,7 +544,12 @@ export async function reportDroppedMentions(
       deliverNoticeToRun(tx, sender, {
         kind: "wake_skipped",
         text: `${names} ${audience.length === 1 ? "wasn't" : "weren't"} woken by your mention: only certain people may talk to ${audience.length === 1 ? "it" : "them"}, and ${person ? "the person you work for isn't one" : "nobody is behind this work"}. Tell the people here what still needs ${names}, so someone who may talk to ${audience.length === 1 ? "it" : "them"} hands it over.`,
-        refs: { runId: sender.id, messageId: message.id, agentHandles: audience.map((d) => d.handle).join(",") },
+        refs: {
+          runId: sender.id,
+          messageId: message.id,
+          agentHandles: audience.map((d) => d.handle).join(","),
+          reason: "audience",
+        },
       }),
     );
     await publishDelivery(deps.pubsub, delivered);

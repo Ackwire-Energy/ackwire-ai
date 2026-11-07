@@ -57,10 +57,18 @@ export const agentOnlyNoticeSql = (meta: SQL): SQL =>
   )})`;
 
 /**
- * Notices people see in the conversation but that are never news (ADR 0128): a person stopping a task is a receipt.
- * Conversation previews, unread counts and a thread's activity skip them, like the agent-only ones.
+ * Notices people see in the conversation but that are never news: a person stopping a task is a receipt (ADR 0128), a
+ * follow-up's line and the notice that wakes it are followed by the agent's own reply, and an @mention that couldn't
+ * wake an agent is said under the message that named it (`meta.reach`). Their text is written for the agent, in
+ * English. Conversation previews, unread counts, a thread's activity, notifications and search skip them, like the
+ * agent-only ones.
  */
-export const QUIET_NOTICES: readonly NoticeKind[] = ["run_stopped"];
+export const QUIET_NOTICES: readonly NoticeKind[] = ["run_stopped", "follow_up", "wake_skipped"];
+
+/** Agent-only or quiet (`QUIET_NOTICES`): never news, never found. */
+export const isQuietNotice = (meta: Record<string, unknown> | null | undefined) =>
+  isAgentOnlyNotice(meta) ||
+  QUIET_NOTICES.includes((meta?.notice as { kind?: unknown } | undefined)?.kind as NoticeKind);
 
 /** Agent-only or quiet, in SQL, on a message's `meta`: left out of previews, unread counts and thread activity. */
 export const quietNoticeSql = (meta: SQL): SQL =>

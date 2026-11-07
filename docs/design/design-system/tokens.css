@@ -129,6 +129,12 @@
   --row-py: var(--space-3);
   /* The least a button with a plate stands from the edges of its row or card. */
   --action-clear: 8px;
+  /* Between an icon and the words it leads (a button's, a pill's, a card's): measured from the glyph's box. */
+  --icon-gap: var(--space-2);
+  /* The same in a compact control (32px: toolbars, in-row actions), a step closer. */
+  --icon-gap-sm: 6px;
+  /* And in a full screen's main action (48px). */
+  --icon-gap-lg: 10px;
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-item: 10px;

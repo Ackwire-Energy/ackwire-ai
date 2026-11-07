@@ -236,6 +236,9 @@ export const SELF_TESTED = [
   "nameless",
   "quiet",
   "docked",
+  "inset",
+  "icongap",
+  "square",
 ];
 
 /** Every rule fires on its fixture's offender and stays quiet on the sound twin next to it. */

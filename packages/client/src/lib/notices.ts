@@ -1,22 +1,25 @@
 import type { ConsultationStatus, MessageConsultation } from "../api/types";
 import { daysBetween, formatShortDate } from "./format";
+import { reachOf } from "./reach";
 import { routineReplyOf } from "./routines";
 
 type Meta = Record<string, unknown> | undefined;
 
-/** What reached the agent's conversation (packages/engine/src/notices.ts). */
-export type NoticeKind =
-  | "routine_handoff"
-  | "consult_reply"
-  | "agent_note"
-  | "wait_result"
-  | "talker_reply"
-  | "proposal_result"
-  | "poll_result"
-  | "follow_up"
-  | "wake_skipped"
-  | "work_check_in"
-  | "run_stopped";
+/** What reached the agent's conversation (packages/engine/src/notices.ts; a test keeps the two lists equal). */
+export const NOTICE_KINDS = [
+  "routine_handoff",
+  "consult_reply",
+  "agent_note",
+  "wait_result",
+  "talker_reply",
+  "proposal_result",
+  "poll_result",
+  "follow_up",
+  "wake_skipped",
+  "work_check_in",
+  "run_stopped",
+] as const;
+export type NoticeKind = (typeof NOTICE_KINDS)[number];
 
 /**
  * An event an agent's conversation got (`meta.notice`): its routine's report,
@@ -129,6 +132,138 @@ export function followUpLine(
     values,
     pending: state === "pending",
   };
+}
+
+/**
+ * What a person reads of a notice, on the web and the phone alike: its line (`key`/`values`) and what "Ver" opens
+ * (`detail`). `notice.text` and a notice message's body are written for the agent, in English: never shown. The
+ * detail is the app's own words built from the refs (`words`), or what the notice carried that people wrote or asked
+ * for (`content`: a routine's report, another agent's own answer); null when the line says it all.
+ */
+export interface NoticeView {
+  key: string;
+  values: Record<string, string>;
+  detail: { words: { key: string; values: Record<string, string> } } | { content: string } | null;
+  /** A follow-up still to come: it can be canceled. */
+  pending: boolean;
+}
+
+export function noticeView(
+  m: { body: string; meta?: Meta | null },
+  names: { author: string; agentByHandle: (handle: string) => string | null },
+  when: { time: (iso: string) => string; locale: string },
+  now = new Date(),
+): NoticeView | null {
+  const notice = noticeOf(m.meta ?? undefined);
+  if (!notice) return null;
+  const line = (key: string, values: Record<string, string> = {}, detail: NoticeView["detail"] = null) => ({
+    key,
+    values,
+    detail,
+    pending: false,
+  });
+  const kind = notice.kind as NoticeKind;
+  switch (kind) {
+    case "routine_handoff": {
+      const routine = noticeRoutineName(notice);
+      // The report is what the routine found for people: the same words the agent's reply unfolds.
+      const report = m.body.trim() || notice.text.trim();
+      const detail = report ? { content: report } : null;
+      return routine
+        ? line("chat.notice.routineHandoff", { routine }, detail)
+        : line("chat.notice.routineHandoffAnon", {}, detail);
+    }
+    case "consult_reply": {
+      const handle = noticeAgentHandle(notice);
+      // `from` is written for the agent ("@infra"): the app says the agent's name, without the @.
+      const from = handle ? (names.agentByHandle(handle) ?? handle) : null;
+      const answer = notice.refs.answer?.trim();
+      const detail = answer ? { content: answer } : null;
+      return from
+        ? line("chat.notice.consultReply", { from }, detail)
+        : line("chat.notice.consultReplyAnon", {}, detail);
+    }
+    case "follow_up": {
+      const followUp = followUpLine(notice, names.author, when, now);
+      return followUp ? { ...line(followUp.key, followUp.values), pending: followUp.pending } : null;
+    }
+    case "wake_skipped": {
+      const agents = skippedHandles(notice)
+        .map((h) => names.agentByHandle(h) ?? h)
+        .join(", ");
+      if (!agents) return line("chat.notice.wakeSkippedAnon", { name: names.author });
+      const values = { name: names.author, agents };
+      const why =
+        notice.refs.reason === "callable" ? "chat.notice.wakeSkippedCallable" : "chat.notice.wakeSkippedAudience";
+      return line("chat.notice.wakeSkipped", values, { words: { key: why, values } });
+    }
+    // Only their agent reads these (`AGENT_ONLY_NOTICES`), a fast reply is the agent's own message, a stopped task
+    // has its own pill: a person never gets a line of them here. Their words, if they ever show, are the app's.
+    case "agent_note": {
+      const handle = noticeAgentHandle(notice);
+      const from = handle ? (names.agentByHandle(handle) ?? handle) : null;
+      return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
+    }
+    case "wait_result":
+      return line("chat.notice.waitResult", { name: names.author });
+    case "proposal_result":
+    case "poll_result":
+    case "work_check_in":
+    case "talker_reply":
+    case "run_stopped":
+      return line("chat.notice.other", { name: names.author });
+    default:
+      kind satisfies never;
+      return line("chat.notice.other", { name: names.author });
+  }
+}
+
+/**
+ * Notices that only matter while they happen, left out of the conversation once over (the agent's message says the
+ * rest): a follow-up that came (its line now past, and the notice that woke the agent once its turn is over: the
+ * agent said something after it there, or something else came after it while the agent isn't at work, `working`
+ * holding the agents at work here), and an @mention that couldn't wake an agent when the message that named it is
+ * here with its own line about it (`meta.reach`). A follow-up still to come or canceled stays.
+ */
+export function settledNotices(
+  messages: readonly {
+    id: string;
+    threadId: string | null;
+    author: { type: string; id: string | null };
+    createdAt: string;
+    meta?: Meta | null;
+  }[],
+  working: ReadonlySet<string> = new Set(),
+): Set<string> {
+  const out = new Set<string>();
+  const byId = new Map(messages.map((m) => [m.id, m]));
+  // The latest message that isn't a notice, by place, and by place and agent.
+  const latest = new Map<string, string>();
+  for (const m of messages) {
+    if (noticeOf(m.meta ?? undefined)) continue;
+    const place = m.threadId ?? "";
+    for (const key of [place, `${place}|${m.author.type === "agent" ? m.author.id : ""}`])
+      if ((latest.get(key) ?? "") < m.createdAt) latest.set(key, m.createdAt);
+  }
+  for (const m of messages) {
+    const notice = noticeOf(m.meta ?? undefined);
+    if (!notice) continue;
+    if (notice.kind === "follow_up") {
+      if (notice.refs.state === "done") out.add(m.id);
+      else if (notice.refs.wake && m.author.id) {
+        const place = m.threadId ?? "";
+        const said = (latest.get(`${place}|${m.author.id}`) ?? "") > m.createdAt;
+        const after = (latest.get(place) ?? "") > m.createdAt;
+        if (said || (after && !working.has(m.author.id))) out.add(m.id);
+      }
+    } else if (notice.kind === "wake_skipped") {
+      const named = byId.get(notice.refs.messageId ?? "");
+      const told = new Set(reachOf(named?.meta).map((e) => e.handle.toLowerCase()));
+      const handles = skippedHandles(notice);
+      if (handles.length > 0 && handles.every((h) => told.has(h.toLowerCase()))) out.add(m.id);
+    }
+  }
+  return out;
 }
 
 const CONSULTATION_STATUSES: ReadonlySet<string> = new Set<ConsultationStatus>(["answered", "expired", "failed"]);

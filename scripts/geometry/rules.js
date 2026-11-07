@@ -137,6 +137,73 @@
     return false;
   };
 
+  /** The kit's gaps between an icon and the words it leads, by the control's size (`--icon-gap`, `-sm`, `-lg`). */
+  const iconGaps = () =>
+    ["--icon-gap", "--icon-gap-sm", "--icon-gap-lg"]
+      .map((t) => parseFloat(style(document.documentElement).getPropertyValue(t)))
+      .filter((v) => v > 0);
+  /** Words the eye reads: a text node laid out wider than a pixel (a visually hidden label is one pixel wide). */
+  const visibleText = (el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim() || !seen(n.parentElement)) continue;
+      if ([...textRange(n).getClientRects()].some((r) => r.width > 1 && r.height > 1)) return true;
+    }
+    return false;
+  };
+  /** Words a button has, shown or hidden at this width, but not a label only a screen reader reads (one pixel, clipped). */
+  const hasWords = (el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim()) continue;
+      const box = n.parentElement;
+      const r = box.getBoundingClientRect();
+      const clipped = r.width <= 1 && r.height <= 1 && style(box).position === "absolute";
+      if (!clipped && !box.closest(".sr-only,.ac-sr-only,.visually-hidden")) return true;
+    }
+    return false;
+  };
+  /**
+   * The glyph a flow child is, if it is only one: an `svg`, or a box around one and nothing else that shows. A control
+   * (a button, a link) is its own thing, and an icon on a tile of its own (a surface: a connector's tile, a face) is
+   * that tile.
+   */
+  const glyphOf = (el) => {
+    if (el.tagName.toLowerCase() === "svg") return el;
+    if (el.matches("button,a,[role=button]") || visibleText(el) || hasSurface(style(el))) return null;
+    const svgs = [...el.querySelectorAll("svg")].filter(seen);
+    if (svgs.length !== 1) return null;
+    for (let p = svgs[0].parentElement; p && p !== el; p = p.parentElement) if (hasSurface(style(p))) return null;
+    return svgs[0];
+  };
+  /** Where what shows of a flow child starts and ends: its glyph, its plate, or its words. */
+  const inkOf = (el) => {
+    const glyph = glyphOf(el);
+    if (glyph) return glyph.getBoundingClientRect();
+    if (hasSurface(style(el))) return el.getBoundingClientRect();
+    return contentRect(el);
+  };
+  /** Pills, chips, tokens and buttons with words: the `pad` rule's family. */
+  const PILLS =
+    ".ac-btn:not(.ac-btn--icon,.ac-btn--glyph,.ac-btn--loading),.ac-token,.ac-chip,.ac-countchip,[class*='pill'],[class*='chip'],[class*='__tag'],[class*='-tag']";
+  /**
+   * A card: a row with a surface of its own that starts with an icon and ends with what can be done about it (a button,
+   * a link) or another icon. Pills are the `pad` rule's.
+   */
+  const cards = () =>
+    [...document.querySelectorAll("div,li,section,article,aside")].filter((el) => {
+      // A list's row or an option has no corners of its own, a field is a field.
+      if (!seen(el) || el.matches(`${PILLS},[role=option]`) || el.querySelector("input,textarea,[contenteditable]"))
+        return false;
+      const s = style(el);
+      if (!s.display.includes("flex") || s.flexDirection.startsWith("column") || !hasSurface(s)) return false;
+      if (!(parseFloat(s.borderTopLeftRadius) > 0 && parseFloat(s.borderBottomRightRadius) > 0)) return false;
+      const kids = flow(el);
+      if (kids.length < 3) return false;
+      const last = kids[kids.length - 1];
+      return Boolean(glyphOf(kids[0])) && (last.matches("button,a,[role=button]") || Boolean(glyphOf(last)));
+    });
+
   const SIDES = ["Top", "Bottom", "Left", "Right"];
   const ROW_NAME = /(^|\s|[_-])(row|card|item)(\s|$|--)/;
   /**
@@ -200,9 +267,7 @@
       }
     },
     pad(out) {
-      const q =
-        ".ac-btn:not(.ac-btn--icon,.ac-btn--glyph,.ac-btn--loading),.ac-token,.ac-chip,.ac-countchip,[class*='pill'],[class*='chip'],[class*='__tag'],[class*='-tag']";
-      for (const el of document.querySelectorAll(q)) {
+      for (const el of document.querySelectorAll(PILLS)) {
         if (!seen(el)) continue;
         const s = style(el);
         if (!hasSurface(s) || s.display === "inline") continue;
@@ -227,6 +292,90 @@
             left: +left.toFixed(1),
             right: +right.toFixed(1),
             text: words(el),
+          });
+      }
+    },
+    /** A card (`cards`): its first icon's glyph as far from its start as what ends it is from its end. */
+    inset(out) {
+      for (const el of cards()) {
+        const kids = flow(el);
+        const first = inkOf(kids[0]);
+        const last = inkOf(kids[kids.length - 1]);
+        if (!first || !last) continue;
+        const b = el.getBoundingClientRect();
+        const s = style(el);
+        const left = first.left - b.left - parseFloat(s.borderLeftWidth);
+        const right = b.right - parseFloat(s.borderRightWidth) - last.right;
+        if (left < 0 || right < 0) continue;
+        if (Math.abs(left - right) > PAD_DIFF)
+          out.push({
+            rule: "inset",
+            node: el,
+            el: sig(el),
+            left: +left.toFixed(1),
+            right: +right.toFixed(1),
+            text: words(el),
+          });
+      }
+    },
+    /** In a pill or a card, the words an icon leads stand one of the kit's icon gaps from its glyph. */
+    icongap(out) {
+      const gaps = iconGaps();
+      const want = gaps.join(" or ");
+      const boxes = new Set([...document.querySelectorAll(PILLS)].filter(seen));
+      for (const card of cards()) boxes.add(card);
+      for (const box of boxes) {
+        // An inline pill flows with its line's words and spaces, as the `pad` rule leaves it.
+        if (style(box).display === "inline") continue;
+        // A pill's sentence sits in a part of its frame (`__main`): its row is the one the icon is in.
+        const rows = [box, ...box.querySelectorAll(":scope > [class*='__main']")];
+        for (const row of rows) {
+          // Words can be the row's own text, not a box of their own: its child nodes, not only its laid-out boxes.
+          const nodes = [...row.childNodes].filter((n) =>
+            n.nodeType === 3 ? n.textContent.trim() : n.nodeType === 1 && flow(row).includes(n),
+          );
+          const at = nodes.findIndex((n) => n.nodeType === 1 && glyphOf(n));
+          const next = at >= 0 ? nodes[at + 1] : undefined;
+          // Words, not another glyph or a count on its own plate.
+          if (!next || (next.nodeType === 1 && (glyphOf(next) || !visibleText(next) || hasSurface(style(next)))))
+            continue;
+          const ink = next.nodeType === 3 ? textRange(next).getClientRects()[0] : contentRect(next);
+          if (!ink) continue;
+          const gap = ink.left - glyphOf(nodes[at]).getBoundingClientRect().right;
+          if (!gaps.some((g) => Math.abs(gap - g) <= 1))
+            out.push({ rule: "icongap", node: row, el: sig(row), px: +gap.toFixed(1), want, text: words(row) });
+        }
+      }
+    },
+    /**
+     * A button that is only an icon is a square: its box, or the plate it shows on hover and focus when that is drawn
+     * apart from its box (a `::before` set in from its sides, as `.ac-btn--glyph` does).
+     */
+    square(out) {
+      // A select's trigger and a segmented control's part are sized by the control they belong to.
+      const parts = "[role=combobox],[aria-haspopup=listbox],.ac-select__trigger,.ac-seg__item,[role=tab],[role=radio]";
+      for (const el of document.querySelectorAll("button,a.ac-btn,[role=button]")) {
+        if (!seen(el) || el.matches(parts) || hasWords(el)) continue;
+        // One glyph: two side by side (a face and a +) are a pill of their own.
+        if ([...el.querySelectorAll("svg")].filter(seen).length !== 1) continue;
+        const b = el.getBoundingClientRect();
+        const before = getComputedStyle(el, "::before");
+        const plate =
+          before.content !== "none" && before.position === "absolute"
+            ? {
+                width: b.width - (parseFloat(before.left) || 0) - (parseFloat(before.right) || 0),
+                height: b.height - (parseFloat(before.top) || 0) - (parseFloat(before.bottom) || 0),
+              }
+            : b;
+        const r = { width: plate.width, height: plate.height };
+        if (Math.abs(r.width - r.height) > 0.5)
+          out.push({
+            rule: "square",
+            node: el,
+            el: sig(el),
+            box: placeOf(el),
+            w: +r.width.toFixed(1),
+            h: +r.height.toFixed(1),
           });
       }
     },

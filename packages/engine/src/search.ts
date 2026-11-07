@@ -29,7 +29,7 @@ import type { ModelGateway } from "./gateway";
 import { mediaOf } from "./media";
 import { readableBody, voiceOf } from "./message-preview";
 import { replyExcerpt } from "./messages";
-import { isAgentOnlyNotice } from "./notices";
+import { isQuietNotice } from "./notices";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
@@ -59,8 +59,8 @@ registerDocumentBuilder("message", async (db, orgId, id) => {
     .select()
     .from(messages)
     .where(and(eq(messages.id, id), eq(messages.orgId, orgId)));
-  // A notice only its agent reads is nobody's to find.
-  if (!m || m.deletedAt || isAgentOnlyNotice(m.meta)) return null;
+  // A notice only its agent reads, or one written for the agent that is never news, is nobody's to find.
+  if (!m || m.deletedAt || isQuietNotice(m.meta)) return null;
   return { orgId, kind: "message", sourceId: m.id, channelIds: [m.channelId], body: m.body, createdAt: m.createdAt };
 });
 

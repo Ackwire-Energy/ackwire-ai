@@ -51,9 +51,18 @@ export function RowAction({
   );
 }
 
+/** The room around the action's word inside its press area. */
+const FACE_PAD = 4;
+
+/**
+ * The side padding of a card whose row can end in a `RowAction` (a receipt, a team check, a mention's reach): its
+ * first icon and the action's word as far from the card's edges, 12 each.
+ */
+export const ROW_CARD_INSET = { paddingLeft: 12, paddingRight: 12 - FACE_PAD } as const;
+
 const styles = StyleSheet.create({
   row: { height: 32 },
-  face: { flexGrow: 1, paddingHorizontal: 4, alignItems: "center", justifyContent: "center" },
+  face: { flexGrow: 1, paddingHorizontal: FACE_PAD, alignItems: "center", justifyContent: "center" },
   word: { fontSize: 14 },
   detail: { fontVariant: ["tabular-nums"] },
 });

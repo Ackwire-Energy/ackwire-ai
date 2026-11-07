@@ -13037,6 +13037,11 @@ export const ptBR = {
       followUpCancel: "Cancelar",
       other: "Aviso para {{name}}",
       wakeSkipped: "A menção de {{name}} não chamou {{agents}}",
+      wakeSkippedAnon: "A menção de {{name}} não chamou outro agente",
+      wakeSkippedAudience:
+        "Só algumas pessoas podem chamar {{agents}}, e este trabalho de {{name}} não veio de nenhuma delas. Alguém que pode chamar {{agents}} passa o pedido adiante.",
+      wakeSkippedCallable:
+        "As configurações de {{name}} não deixam chamar {{agents}} (outro projeto, ou fora da lista de agentes que pode chamar). Quem cuida de {{name}} muda isso na página do agente.",
       show: "Ver",
       hide: "Ocultar",
       talker: "enquanto trabalha",

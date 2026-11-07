@@ -84,7 +84,7 @@ export { PressScale, type PressScaleProps } from "./PressScale";
 export { ProviderLogo, type ProviderLogoProps, ProviderQuad, ProviderStack } from "./ProviderLogo";
 export { type BadgePresence, badgeCell } from "./presence-badge";
 export { Row, type RowProps } from "./Row";
-export { RowAction } from "./RowAction";
+export { ROW_CARD_INSET, RowAction } from "./RowAction";
 export { SearchField, type SearchFieldProps } from "./SearchField";
 export { Section, type SectionProps } from "./Section";
 export { SectionHeader, type SectionHeaderProps } from "./SectionHeader";

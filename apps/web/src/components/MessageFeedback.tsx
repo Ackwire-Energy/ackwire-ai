@@ -1,7 +1,7 @@
 import type { ReactionCount } from "@agenteschat/client";
 import { useCorrectMessage } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Locked, Textarea } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Locked, Textarea } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
@@ -56,9 +56,9 @@ export function MessageFeedback({
           aria-label={t("channel.helpful")}
           aria-pressed={up.mine}
           disabled={reactions.pending}
+          icon="thumbUp"
           onClick={() => reactions.toggle(UP)}
         >
-          <Icon name="thumbUp" size={16} />
           {up.count > 0 && <span className="ac-msg__reaction-count">{up.count}</span>}
         </Button>
         <Button
@@ -67,9 +67,9 @@ export function MessageFeedback({
           aria-label={t("channel.notHelpful")}
           aria-pressed={down.mine}
           disabled={reactions.pending}
+          icon="thumbDown"
           onClick={() => reactions.toggle(DOWN)}
         >
-          <Icon name="thumbDown" size={16} />
           {down.count > 0 && <span className="ac-msg__reaction-count">{down.count}</span>}
         </Button>
         <Button

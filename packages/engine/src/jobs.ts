@@ -408,7 +408,12 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           deliverNoticeToRun(tx, run, {
             kind: "wake_skipped",
             text: notCallableText(handles.map((h) => `@${h.handle}`)),
-            refs: { runId: run.id, messageId: message.id },
+            refs: {
+              runId: run.id,
+              messageId: message.id,
+              agentHandles: handles.map((h) => h.handle).join(","),
+              reason: "callable",
+            },
           }),
         );
         await publishDelivery(deps.pubsub, delivered).catch(() => {});

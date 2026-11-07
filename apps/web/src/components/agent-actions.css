@@ -14,25 +14,26 @@
   flex-direction: column;
   gap: 6px;
 }
+/* The same room on both sides (its icon's glyph and its action's words 12px in) and the kit's gap after the icon. */
 .ag-rc {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--icon-gap);
   max-width: var(--msg-card-w);
-  padding: 7px 8px;
+  padding: 7px 12px;
   border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: var(--surface-raised);
   box-shadow: var(--card-shadow);
   font-size: 14px;
   color: var(--muted);
 }
-/* The icon sits flat on the card, no tile of its own inside it: its 16px glyph 12px in from the card's edge, as the
-   other cards' first glyph. */
+/* The icon sits flat on the card, no tile of its own inside it: its box is its 16px glyph, 12px in from the card's
+   edge, as the other cards' first glyph. */
 .ag-rc__ic {
   flex: none;
   display: grid;
   place-items: center;
-  width: 24px;
+  width: 16px;
   height: 24px;
   /* On the first line's middle, which is the 32px button's. */
   margin-block: 4px;

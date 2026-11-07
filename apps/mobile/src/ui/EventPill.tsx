@@ -215,10 +215,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingLeft: 10,
-    paddingRight: 12,
+    paddingVertical: 6,
+    // The same room on both sides, as the web's pill.
+    paddingHorizontal: 12,
   },
   mainBeside: { flexShrink: 1, minWidth: 0 },
   words: { flexShrink: 1, minWidth: 0 },

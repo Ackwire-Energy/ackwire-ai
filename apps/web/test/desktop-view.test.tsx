@@ -1708,12 +1708,12 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(kit, ".ac-dialog__acts > .ac-btn--glyph:last-child")).toContain(
       "--glyph-air: calc(var(--control-icon-sm) * 5.2 / 20)",
     );
-    // The kit reaches out by that air; its plate and ring keep to the box less it, under the glyph, so they end where
-    // a neighbour's plate starts.
+    // The kit reaches out by that air; its plate and ring keep to the box less it on every side, a square under the
+    // glyph, so they end where a neighbour's plate starts.
     expect(rule(kit, ".ac-acts > .ac-btn--glyph")).toContain(
       "margin-inline: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)))",
     );
-    expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph::before")).toContain("inset: 0 var(--glyph-air, 0px)");
+    expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph::before")).toContain("inset: var(--glyph-air, 0px)");
     expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph > *")).toContain("position: relative");
     expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph:hover::before")).toContain("background: var(--plate)");
     // Rings only for the keys (`trackInput`): with the pointer, a focused button looks as it does unfocused.
