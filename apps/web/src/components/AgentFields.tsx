@@ -436,7 +436,7 @@ export function OwnerSelect({
         {
           value: NO_OWNER,
           label: t("newAgent.noOwnerOption"),
-          description: t("newAgent.noOwnerShort"),
+          hint: t("newAgent.noOwnerShort"),
           leading: (
             <span className="newag__ib">
               <Icon name="members" size={16} />

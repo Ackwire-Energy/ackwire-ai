@@ -38,7 +38,7 @@ export interface SelectProps<V extends string = string> {
   className?: string;
   /** Accessible name of the listbox; defaults to `aria-label`. */
   listLabel?: string;
-  /** What the trigger shows for the chosen option (default: its label), e.g. a card with an avatar. */
+  /** What the trigger shows for the chosen option (default: its `leading`, smaller, then its label). */
   renderValue?: (option: SelectOption<V>) => ReactNode;
   /**
    * The trigger's edge a list wider than the trigger lines up with: `end` for a select that ends its row, so the
@@ -71,7 +71,7 @@ function SelectItem<V extends string>({ option: o }: { option: SelectOption<V> }
   const hide = () => setAt(null);
   const keep = (e: { stopPropagation: () => void }) => e.stopPropagation();
   return (
-    // The chosen option shows by its background (no check column, so every row lines up).
+    // The chosen option shows by its background and a check at its end, whose room every row keeps: names line up.
     <RSelect.Item
       value={o.value}
       disabled={o.disabled}
@@ -115,6 +115,9 @@ function SelectItem<V extends string>({ option: o }: { option: SelectOption<V> }
           </span>
         </span>
       )}
+      <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="m5.5 10.5 3 3 6-7" />
+      </svg>
       {at &&
         createPortal(
           <span
@@ -127,6 +130,20 @@ function SelectItem<V extends string>({ option: o }: { option: SelectOption<V> }
           document.body,
         )}
     </RSelect.Item>
+  );
+}
+
+/** The chosen option in the trigger: a person's face or a maker's logo before the name, as in the list. */
+function ChosenValue<V extends string>({ option }: { option: SelectOption<V> }) {
+  return (
+    <>
+      {option.leading && (
+        <span className="ac-select__lead" aria-hidden="true">
+          {option.leading}
+        </span>
+      )}
+      <span className="ac-select__text">{option.label}</span>
+    </>
   );
 }
 
@@ -179,7 +196,7 @@ export function Select<V extends string = string>({
             <RSelect.Value
               placeholder={placeholder ? <span className="ac-select__text">{placeholder}</span> : undefined}
             >
-              {chosen ? (renderValue?.(chosen) ?? <span className="ac-select__text">{chosen.label}</span>) : undefined}
+              {chosen ? (renderValue?.(chosen) ?? <ChosenValue option={chosen} />) : undefined}
             </RSelect.Value>
           </span>
           <svg className="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true">

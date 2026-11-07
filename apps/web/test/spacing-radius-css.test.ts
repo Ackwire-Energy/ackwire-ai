@@ -21,11 +21,12 @@ test("a menu's rows have the same room at its ends as at its sides, a select's t
   // A select's room at its ends is its viewport's (kept when scrolled), never the menu's on top of it.
   expect(last(kit, ".ac-menu--select", "padding-block")).toBe("0");
   expect(last(kit, ".ac-menu--select [data-radix-select-viewport]", "padding-block")).toBe("var(--menu-pad)");
-  // A row's top and bottom are one value; a row with a face or a description is as deep as its sides.
+  // A row's top and bottom are one value; a row with a description is as deep as its sides, and a row led by a face
+  // (OptionRow) keeps the face 6 from its top and bottom (10 on touch) and the rows' 8 from its start.
   expect(last(kit, ".ac-menu__item", "padding")).toBe("calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px)");
   expect(last(kit, ".ac-menu__item:has(>.ac-menu__label>.ac-menu__desc)", "padding-block")).toBe("var(--menu-item-px)");
-  expect(last(kit, ".ac-menu--select:has(.ac-menu__leading>.ac-avatar) .ac-menu__item", "padding-block")).toBe(
-    "var(--space-2)",
+  expect(last(kit, ":is(.ac-menu,.ac-palette__list):has(.ac-menu__leading>.ac-avatar) .ac-menu__item", "padding")).toBe(
+    "calc((var(--option-h) - var(--option-face)) / 2) var(--menu-item-px)",
   );
   expect(last(kit, ":root", "--menu-item-px")).toBe("8px");
   expect(last(kit, ".ac-option", "padding")).toBe("var(--space-3)");

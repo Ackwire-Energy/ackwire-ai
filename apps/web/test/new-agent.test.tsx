@@ -1445,7 +1445,14 @@ describe("Criar agente: what gets created", () => {
     await open();
     await startAs("QA");
     await proceed(3);
-    await pick(screen().getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
+    // Every option of the picker is one size: "Sem responsável" says what it means behind its ⓘ, not on a second line.
+    const owner = screen().getByRole("combobox", { name: "Responsável" });
+    owner.focus();
+    await act(async () => fireEvent.keyDown(owner, { key: "Enter" }));
+    const none = screen().getByRole("option", { name: /Sem responsável/ });
+    expect(none.querySelector(".ac-menu__desc")).toBeNull();
+    expect(none.querySelector(".ac-menu__hint")?.textContent).toBe("Os admins recebem os avisos e aprovam");
+    await pick(owner, /Sem responsável/);
     const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com a Iris" });
     await click(within(audience).getByRole("radio", { name: /^Só o responsável/ }));
     await click(continueButton());

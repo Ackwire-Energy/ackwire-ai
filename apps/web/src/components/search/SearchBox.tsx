@@ -438,7 +438,11 @@ export function SearchBox({
                   onClick={o.pick}
                   onKeyDown={() => {}}
                 >
-                  {o.leading}
+                  {o.leading && (
+                    <span className="ac-menu__leading" aria-hidden="true">
+                      {o.leading}
+                    </span>
+                  )}
                   <span className="ac-menu__label">
                     <span>{o.label}</span>
                     {o.description && <span className="ac-menu__desc">{o.description}</span>}

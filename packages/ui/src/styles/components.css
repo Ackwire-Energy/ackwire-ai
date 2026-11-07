@@ -576,6 +576,13 @@ html:not([data-pointer]) .ac-link:focus-visible {
 :where(.ac-form, .ac-field, .ac-dialog__body) > p {
   margin: 0;
 }
+/* A field's control fills its stack: every control in a form is as wide as the form. A button that shows a value is
+   drawn as a select (`.ac-select__trigger`), never a plain button dropped into a field. */
+.ac-field > :is(.ac-select, .ac-select__trigger, .ac-input, .ac-input-affix, .ac-seg, textarea) {
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
+}
 .ac-form__actions {
   display: flex;
   align-items: center;
@@ -2003,6 +2010,28 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The chosen option's lead before its name, as the list draws it smaller: a person's or an agent's face (20, 8 from
+   the trigger's edge and 8 before the name), a maker's logo or an icon (16). */
+.ac-select__value > span:has(> .ac-select__lead) {
+  gap: var(--space-2);
+}
+.ac-select__lead {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+.ac-select__lead > .ac-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+.ac-select__lead .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+.ac-select__trigger:has(.ac-select__lead > .ac-avatar) {
+  padding-inline-start: var(--space-2);
+}
 .ac-select__trigger[data-placeholder] .ac-select__value {
   color: var(--ink-muted);
 }
@@ -2038,6 +2067,11 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   --menu-item-h: 28px;
   --menu-item-px: 8px;
   --menu-pad: var(--space-1);
+}
+/* A row led by a face (OptionRow, below): the face, and the row around it, 44 on touch. */
+:root {
+  --option-face: 24px;
+  --option-h: 36px;
 }
 .ac-menu {
   z-index: var(--z-floating);
@@ -2242,30 +2276,6 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
 }
-/*
- * People and agents in a picker ("Responsável", an agent to ask): their face as the channel's members column draws it
- * (32px), centred on the name and the line under it, and more air between the rows than a list of words has (every
- * row of that list, so a row with an icon tile instead lines up with the faces).
- */
-.ac-menu--select:has(.ac-menu__leading > .ac-avatar) .ac-menu__item {
-  gap: var(--space-3);
-  padding-block: var(--space-2);
-}
-.ac-menu--select .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-avatar) {
-  align-self: center;
-  translate: none;
-}
-.ac-menu--select .ac-menu__leading > .ac-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: var(--text-sm);
-}
-/* The empty choice ("Sem responsável", any agent) leads with a glyph: in the middle of the faces' 32px column, so its
-   name starts where theirs do. */
-.ac-menu--select:has(.ac-menu__leading > .ac-avatar) .ac-menu__leading:has(> .ac-icon) {
-  justify-content: center;
-  width: 32px;
-}
 /* Two lines (a name and its description): the room above and below matches the sides, as a one-line row's does. */
 .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
   padding-block: var(--menu-item-px);
@@ -2281,6 +2291,48 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   font-weight: 400;
   color: var(--ink-muted);
   white-space: normal;
+}
+/*
+ * OptionRow: a list with people or agents in it (a select's, a menu's, the mentions', search's, the palette's). The
+ * face is 24, 6 from the row's top and bottom (10 on touch) and 8 from its start, so it never touches the highlight,
+ * which is the whole row, in the list's own concentric corner. The name, then the muted role on the same line, the
+ * check at the end. Every row of that list takes the same room and a lead as wide as a face (the glyph of "Sem
+ * responsável" too), so every option is one size: a long description goes behind the option's ⓘ (`hint`), never on a
+ * second line.
+ */
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item {
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--option-h);
+  padding: calc((var(--option-h) - var(--option-face)) / 2) var(--menu-item-px);
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item > .ac-menu__leading {
+  align-self: center;
+  justify-content: center;
+  min-width: var(--option-face);
+  translate: none;
+}
+:is(.ac-menu, .ac-palette__list) .ac-menu__leading > .ac-avatar {
+  width: var(--option-face);
+  height: var(--option-face);
+  font-size: 11px;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item :is(.ac-icon, .ac-menu__check) {
+  margin-top: 0;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__label {
+  flex-direction: row;
+  align-items: baseline;
+  column-gap: 0.4em;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__label > :first-child {
+  flex: none;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__desc {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ac-menu__heading {
   padding: 6px var(--menu-item-px) 2px;
@@ -9348,6 +9400,7 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   }
   :root {
     --menu-item-h: 40px;
+    --option-h: 44px;
   }
   .ac-menu__reaction {
     width: 40px;

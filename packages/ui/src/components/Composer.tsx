@@ -1022,7 +1022,11 @@ export function Composer({
                         onClick={() => pick(item)}
                         onKeyDown={() => {}}
                       >
-                        {item.leading}
+                        {item.leading && (
+                          <span className="ac-menu__leading" aria-hidden="true">
+                            {item.leading}
+                          </span>
+                        )}
                         <span className="ac-menu__label">
                           <span>{item.label}</span>
                           {item.description && <span className="ac-menu__desc">{item.description}</span>}
