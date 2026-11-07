@@ -1,19 +1,21 @@
 import type { TFunction } from "i18next";
-import type {
-  Agent,
-  AgentDraft,
-  AgentProposalCard,
-  AiStatus,
-  CardDelegate,
-  CostKind,
-  CostlyDecision,
-  Member,
-  PersonLimitCard,
-  ProposedRoutine,
-  Role,
-  Skill,
-  SuggestedAi,
-  TeamProposalCard,
+import {
+  type Agent,
+  type AgentDraft,
+  type AgentProposalCard,
+  type AiStatus,
+  type CardDelegate,
+  type CostKind,
+  type CostlyDecision,
+  type Member,
+  type PersonLimitCard,
+  type ProposedRoutine,
+  type Role,
+  type Skill,
+  type SuggestedAi,
+  type TeamProposalCard,
+  WORKSPACE_ACTION_IDS,
+  type WorkspaceActionCard,
 } from "../api/types";
 import type { Level } from "./access-levels";
 import { type AppPage, isAppPage } from "./app-pages";
@@ -196,6 +198,7 @@ export interface OpenPageCard {
 }
 
 export type ActionCard =
+  | WorkspaceActionCard
   | ApprovalsCard
   | MemberChangesCard
   | OpenPageCard
@@ -403,6 +406,8 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;
+  const workspace = workspaceActionCardOf(raw);
+  if (workspace) return workspace;
   if ((raw as { kind?: unknown }).kind === "settings_proposal") {
     const r = raw as { forUserId?: unknown; proposalIds?: unknown; delegate?: CardDelegate | null };
     const proposalIds = Array.isArray(r.proposalIds)
@@ -543,4 +548,53 @@ export function skillUpdateState(skill: Pick<Skill, "checkedAt" | "pendingUpdate
   if (!skill) return "done" as const;
   if (skill.pendingUpdate && !skill.pendingUpdate.dismissed) return "waiting" as const;
   return skill.checkedAt && skill.checkedAt >= postedAt ? ("done" as const) : ("open" as const);
+}
+
+/**
+ * The right hand's card of a workspace change (`workspace_action`), or null: an action of its catalog for whoever may,
+ * with the words of its sentence (`rightHand.action.{action}`).
+ */
+export function workspaceActionCardOf(raw: unknown): WorkspaceActionCard | null {
+  const c = (raw ?? {}) as Partial<WorkspaceActionCard>;
+  if (c.kind !== "workspace_action" || !c.params || typeof c.params.action !== "string") return null;
+  const words = Object.fromEntries(
+    Object.entries(c.params.words ?? {}).filter((e): e is [string, string] => typeof e[1] === "string"),
+  );
+  return {
+    kind: "workspace_action",
+    forUserId: typeof c.forUserId === "string" ? c.forUserId : "",
+    params: {
+      action: c.params.action,
+      input: c.params.input && typeof c.params.input === "object" ? c.params.input : {},
+      words,
+      needs: typeof c.params.needs === "string" ? c.params.needs : null,
+      why: typeof c.params.why === "string" ? c.params.why : "",
+    },
+    state: c.state === "applied" || c.state === "dismissed" ? c.state : "pending",
+    decidedByUserId: typeof c.decidedByUserId === "string" ? c.decidedByUserId : null,
+    decidedAt: typeof c.decidedAt === "string" ? c.decidedAt : null,
+    askedAt: typeof c.askedAt === "string" ? c.askedAt : null,
+  };
+}
+
+/** The card's sentence: `rightHand.action.{action}`, or the plain one for an action this build doesn't know. */
+export const actionCardKey = (card: WorkspaceActionCard) =>
+  (WORKSPACE_ACTION_IDS as readonly string[]).includes(card.params.action)
+    ? `rightHand.action.${card.params.action}`
+    : "rightHand.action.other";
+
+/**
+ * What a role or a channel's exception gives or takes, in the permissions' own words under the card's sentence
+ * ("conversar, dar missões e editar a wiki"; "+ editar a wiki, − aprovar ações"). Empty for other actions.
+ */
+export function actionCardDetail(card: WorkspaceActionCard, t: TFunction): string {
+  const input = card.params.input;
+  const keys = (v: unknown) => (Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : []);
+  const short = (k: string) => t(`permissions.${k}.short` as never, { defaultValue: k }) as string;
+  const change = (add: unknown, take: unknown) =>
+    [...keys(add).map((k) => `+ ${short(k)}`), ...keys(take).map((k) => `− ${short(k)}`)].join(", ");
+  if (card.params.action === "create_role") return joinNames(keys(input.permissions).map(short), t);
+  if (card.params.action === "update_role") return change(input.add_permissions, input.remove_permissions);
+  if (card.params.action === "set_channel_permissions") return change(input.allow, input.deny);
+  return "";
 }

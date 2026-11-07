@@ -172,6 +172,19 @@ describe("receipt sentence values", () => {
     expect(actionPhase(action({ ...pr, undoableUntil: new Date(now).toISOString() }), now)).toBe("settled");
   });
 
+  test("a workspace change: its words, and its action as the context when this build knows it", () => {
+    const made = action({
+      kind: "workspace.changed",
+      target: { type: "role", id: "r1", title: "Marketing" },
+      params: { action: "create_role", name: "Marketing" },
+    });
+    expect(actionTextValues(made, t)).toEqual({ name: "Marketing", context: "create_role" });
+    expect(actionTextKey(made)).toBe("agentActions.workspace.changed");
+    // A newer server's action reads the plain sentence.
+    const newer = action({ ...made, params: { action: "paint_office", color: "red" } });
+    expect(actionTextValues(newer, t)).toEqual({ color: "red", context: "" });
+  });
+
   test("every kind the app knows has its own case (the default gives no values)", () => {
     const missing = AGENT_ACTION_KINDS.filter((kind) => !Object.keys(actionTextValues(action({ kind }), t)).length);
     expect(missing).toEqual([]);

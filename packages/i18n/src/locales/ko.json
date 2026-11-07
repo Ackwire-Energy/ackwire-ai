@@ -2018,6 +2018,18 @@
       "open": "열기",
       "web": "사이트에서 열기",
       "notAllowed": "이 화면에 접근할 수 없어요"
+    },
+    "action": {
+      "title": "워크스페이스 변경",
+      "only": "이 변경을 할 수 있는 사람만 적용해요",
+      "ask": "권한 있는 사람에게 보내기",
+      "other": "워크스페이스 변경하기",
+      "create_role": "역할 <b>{{name}}</b> 만들기",
+      "update_role": "역할 <b>{{name}}</b> 변경",
+      "delete_role": "역할 <b>{{name}}</b> 영구 삭제",
+      "move_role": "역할 <b>{{name}}</b> 순서 바꾸기",
+      "set_member_roles": "<b>{{name}}</b>님의 역할 변경: {{change}}",
+      "set_channel_permissions": "<b>#{{channel}}</b>에서 {{who}}이(가) 할 수 있는 일 변경"
     }
   },
   "teamWeek": {
@@ -2607,6 +2619,15 @@
     "pr": {
       "merged": "<b>{{repo}}</b>의 PR <b>#{{number}}</b>을 병합했어요",
       "merged_branch": "<b>{{repo}}</b>에 <b>{{ref}}</b>을 병합했어요"
+    },
+    "workspace": {
+      "changed": "워크스페이스를 변경했어요",
+      "changed_create_role": "역할 <b>{{name}}</b>을(를) 만들었어요",
+      "changed_update_role": "역할 <b>{{name}}</b>을(를) 변경했어요",
+      "changed_delete_role": "역할 <b>{{name}}</b>을(를) 삭제했어요",
+      "changed_move_role": "역할 <b>{{name}}</b>의 순서를 바꿨어요",
+      "changed_set_member_roles": "<b>{{name}}</b>님의 역할을 변경했어요: {{change}}",
+      "changed_set_channel_permissions": "<b>#{{channel}}</b>에서 {{who}}이(가) 할 수 있는 일을 변경했어요"
     },
     "other": "변경 사항을 적용했어요",
     "copyWebhook": "웹훅 주소 복사",
@@ -13342,6 +13363,7 @@
       "action_update_skills": "스킬 업데이트",
       "action_approvals": "내 승인을 기다리는 요청",
       "action_open_page": "화면 열기",
+      "action_workspace": "워크스페이스 변경을 제안했어요",
       "agent_proposal": "새 에이전트를 제안했어요: {{name}}",
       "team_proposal": "팀을 제안했어요: {{names}}",
       "settings_proposal": "{{names}}에 대한 변경을 제안했어요",

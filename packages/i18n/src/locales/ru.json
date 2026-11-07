@@ -2260,6 +2260,18 @@
       "open": "Открыть",
       "web": "Открыть на сайте",
       "notAllowed": "У вас нет доступа к этому экрану"
+    },
+    "action": {
+      "title": "Изменение в рабочем пространстве",
+      "only": "Применить может только тот, кому разрешено это изменение",
+      "ask": "Отправить тому, кто может",
+      "other": "Внести изменение в рабочее пространство",
+      "create_role": "Создать роль <b>{{name}}</b>",
+      "update_role": "Изменить роль <b>{{name}}</b>",
+      "delete_role": "Удалить роль <b>{{name}}</b> навсегда",
+      "move_role": "Переместить роль <b>{{name}}</b>",
+      "set_member_roles": "Изменить роли <b>{{name}}</b>: {{change}}",
+      "set_channel_permissions": "Изменить, что {{who}} может делать в <b>#{{channel}}</b>"
     }
   },
   "teamWeek": {
@@ -2901,6 +2913,15 @@
     "pr": {
       "merged": "Слит пул-реквест <b>#{{number}}</b> в <b>{{repo}}</b>",
       "merged_branch": "<b>{{ref}}</b> слита в <b>{{repo}}</b>"
+    },
+    "workspace": {
+      "changed": "Внесено изменение в рабочее пространство",
+      "changed_create_role": "Создана роль <b>{{name}}</b>",
+      "changed_update_role": "Изменена роль <b>{{name}}</b>",
+      "changed_delete_role": "Удалена роль <b>{{name}}</b>",
+      "changed_move_role": "Перемещена роль <b>{{name}}</b>",
+      "changed_set_member_roles": "Изменены роли <b>{{name}}</b>: {{change}}",
+      "changed_set_channel_permissions": "Изменено, что {{who}} может делать в <b>#{{channel}}</b>"
     },
     "other": "Внесено изменение",
     "copyWebhook": "Скопировать адрес вебхука",
@@ -14754,6 +14775,7 @@
       "action_update_skills": "Обновить навыки",
       "action_approvals": "Одобрения ждут вас",
       "action_open_page": "Открыть экран",
+      "action_workspace": "Предложено изменение в рабочем пространстве",
       "agent_proposal": "Предложил нового агента: {{name}}",
       "team_proposal": "Предложил команду: {{names}}",
       "settings_proposal": "Предложил изменение для: {{names}}",

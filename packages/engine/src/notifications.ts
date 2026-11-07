@@ -268,6 +268,8 @@ export interface NotificationSource {
   screen?: ScreenKind;
   /** `change_request`: the proposed change to decide (ADR 0137). */
   proposalId?: string;
+  /** `change_request` of a right hand's catalog card (`messageId`): the action's id. */
+  action?: string;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
   userId?: string;
   /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`); a widget's agent. */

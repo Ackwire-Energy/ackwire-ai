@@ -225,6 +225,8 @@ import type {
   WikiTopRead,
   WikiVersion,
   WorkingRun,
+  WorkspaceActionCard,
+  WorkspaceActionCardView,
   WorkspaceLimits,
 } from "./types";
 
@@ -284,6 +286,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       redo: (orgId, actionId) => request<AgentAction>(`${org(orgId)}/actions/${enc(actionId)}/redo`, { json: {} }),
       undoMessage: (orgId, messageId) =>
         request<UndoAllResult>(`${org(orgId)}/messages/${enc(messageId)}/actions/undo`, { json: {} }),
+    },
+    actionCards: {
+      get: (orgId, messageId) => request<WorkspaceActionCardView>(`${org(orgId)}/action-cards/${enc(messageId)}`),
+      decide: (orgId, messageId, decision) =>
+        request<{ card: WorkspaceActionCard }>(`${org(orgId)}/action-cards/${enc(messageId)}/${decision}`, {
+          json: {},
+        }),
     },
     agentForYou: {
       get: (orgId, agentId, limit) =>

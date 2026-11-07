@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AgentProposalCard } from "../src/api/types";
 import {
+  actionCardDetail,
+  actionCardKey,
   actionCardOf,
   agentProposalOf,
   connectAppDone,
@@ -296,4 +298,35 @@ test("a people row is settled when it holds, or once the person is gone", () => 
   expect(memberRowDone({ userId: "u2", name: "Ana", remove: true }, members)).toBe(false);
   expect(memberRowDone({ userId: "u9", name: "Zé", role: "owner" }, members)).toBe(true);
   expect(rolesAfter({ addRoleIds: ["r3"], removeRoleIds: ["r1"] }, ["r1", "r2"])).toEqual(["r2", "r3"]);
+});
+
+test("a card of a workspace change: read from the message, its sentence, what a role gives in the permissions' words", () => {
+  const meta = {
+    actionCard: {
+      kind: "workspace_action",
+      forUserId: "u1",
+      params: {
+        action: "create_role",
+        input: { name: "Marketing", permissions: ["talk_to_agents", "edit_wiki"] },
+        words: { name: "Marketing", bad: 3 },
+        needs: "manage_roles",
+        why: "Cargo da Bia",
+      },
+      state: "weird",
+    },
+  };
+  const card = actionCardOf(meta);
+  if (card?.kind !== "workspace_action") throw new Error("not read");
+  expect(card).toMatchObject({ state: "pending", decidedByUserId: null, params: { words: { name: "Marketing" } } });
+  expect(actionCardKey(card)).toBe("rightHand.action.create_role");
+  expect(actionCardKey({ ...card, params: { ...card.params, action: "paint_office" } })).toBe("rightHand.action.other");
+  const t = ((key: string, o?: Record<string, unknown>) =>
+    key === "format.list" ? ((o?.names ?? []) as string[]).join(" e ") : key.split(".")[1]) as unknown as TFunction;
+  expect(actionCardDetail(card, t)).toBe("talk_to_agents e edit_wiki");
+  const changed = {
+    ...card,
+    params: { ...card.params, action: "update_role", input: { remove_permissions: ["post"] } },
+  };
+  expect(actionCardDetail(changed, t)).toBe("− post");
+  expect(actionCardOf({ actionCard: { kind: "workspace_action", params: {} } })).toBeNull();
 });

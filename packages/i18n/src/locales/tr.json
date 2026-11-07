@@ -2096,6 +2096,18 @@
       "open": "Aç",
       "web": "Sitede aç",
       "notAllowed": "Bu ekrana erişiminiz yok"
+    },
+    "action": {
+      "title": "Çalışma alanında değişiklik",
+      "only": "Bu değişikliği yalnızca yapmaya yetkisi olan uygular",
+      "ask": "Yetkisi olana gönder",
+      "other": "Çalışma alanında değişiklik yap",
+      "create_role": "<b>{{name}}</b> rolünü oluştur",
+      "update_role": "<b>{{name}}</b> rolünü değiştir",
+      "delete_role": "<b>{{name}}</b> rolünü kalıcı olarak sil",
+      "move_role": "<b>{{name}}</b> rolünün yerini değiştir",
+      "set_member_roles": "<b>{{name}}</b> kişisinin rollerini değiştir: {{change}}",
+      "set_channel_permissions": "{{who}} için <b>#{{channel}}</b> kanalındaki izinleri değiştir"
     }
   },
   "teamWeek": {
@@ -2701,6 +2713,15 @@
     "pr": {
       "merged": "<b>{{repo}}</b> içindeki <b>#{{number}}</b> PR'ını birleştirdim",
       "merged_branch": "<b>{{ref}}</b> dalını <b>{{repo}}</b> içine birleştirdim"
+    },
+    "workspace": {
+      "changed": "Çalışma alanında bir değişiklik yaptım",
+      "changed_create_role": "<b>{{name}}</b> rolünü oluşturdum",
+      "changed_update_role": "<b>{{name}}</b> rolünü değiştirdim",
+      "changed_delete_role": "<b>{{name}}</b> rolünü sildim",
+      "changed_move_role": "<b>{{name}}</b> rolünün yerini değiştirdim",
+      "changed_set_member_roles": "<b>{{name}}</b> kişisinin rollerini değiştirdim: {{change}}",
+      "changed_set_channel_permissions": "{{who}} için <b>#{{channel}}</b> kanalındaki izinleri değiştirdim"
     },
     "other": "Bir değişiklik yaptım",
     "copyWebhook": "Webhook adresini kopyala",
@@ -13790,6 +13811,7 @@
       "action_update_skills": "Becerileri güncelle",
       "action_approvals": "Sizi bekleyen onaylar",
       "action_open_page": "Bir ekran aç",
+      "action_workspace": "Çalışma alanında bir değişiklik önerdi",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
       "team_proposal": "Bir ekip önerdi: {{names}}",
       "settings_proposal": "{{names}} için bir değişiklik önerdi",

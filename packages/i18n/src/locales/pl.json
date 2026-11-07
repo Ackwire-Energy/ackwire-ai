@@ -2263,6 +2263,18 @@
       "open": "Otwórz",
       "web": "Otwórz w witrynie",
       "notAllowed": "Nie masz dostępu do tego ekranu"
+    },
+    "action": {
+      "title": "Zmiana w przestrzeni roboczej",
+      "only": "Zastosować ją może tylko ktoś, kto może wprowadzić tę zmianę",
+      "ask": "Wyślij do kogoś uprawnionego",
+      "other": "Wprowadź zmianę w przestrzeni roboczej",
+      "create_role": "Utwórz rolę <b>{{name}}</b>",
+      "update_role": "Zmień rolę <b>{{name}}</b>",
+      "delete_role": "Usuń rolę <b>{{name}}</b> na zawsze",
+      "move_role": "Przesuń rolę <b>{{name}}</b>",
+      "set_member_roles": "Zmień role osoby <b>{{name}}</b>: {{change}}",
+      "set_channel_permissions": "Zmień, co {{who}} może robić w <b>#{{channel}}</b>"
     }
   },
   "teamWeek": {
@@ -2900,6 +2912,15 @@
     "pr": {
       "merged": "Scalono PR <b>#{{number}}</b> w <b>{{repo}}</b>",
       "merged_branch": "Scalono <b>{{ref}}</b> w <b>{{repo}}</b>"
+    },
+    "workspace": {
+      "changed": "Wprowadzono zmianę w przestrzeni roboczej",
+      "changed_create_role": "Utworzono rolę <b>{{name}}</b>",
+      "changed_update_role": "Zmieniono rolę <b>{{name}}</b>",
+      "changed_delete_role": "Usunięto rolę <b>{{name}}</b>",
+      "changed_move_role": "Przesunięto rolę <b>{{name}}</b>",
+      "changed_set_member_roles": "Zmieniono role osoby <b>{{name}}</b>: {{change}}",
+      "changed_set_channel_permissions": "Zmieniono, co {{who}} może robić w <b>#{{channel}}</b>"
     },
     "other": "Wprowadzono zmianę",
     "copyWebhook": "Kopiuj adres webhooka",
@@ -14815,6 +14836,7 @@
       "action_update_skills": "Zaktualizuj umiejętności",
       "action_approvals": "Zatwierdzenia czekające na ciebie",
       "action_open_page": "Otwórz ekran",
+      "action_workspace": "Zaproponowano zmianę w przestrzeni roboczej",
       "agent_proposal": "Propozycja nowego agenta: {{name}}",
       "team_proposal": "Zaproponował zespół: {{names}}",
       "settings_proposal": "Zaproponował zmianę dla: {{names}}",

@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { AGENT_ACTION_KINDS, type AgentAction, type ApiRule } from "../api/types";
+import { AGENT_ACTION_KINDS, type AgentAction, type ApiRule, WORKSPACE_ACTION_IDS } from "../api/types";
 import { joinNames } from "./format";
 
 /** A receipt's `params.rule` when it is a rule (`freq`, `timezone`); anything else is none. */
@@ -63,6 +63,7 @@ export const undoableNow = (list: AgentAction[], now = Date.now()) =>
   list.filter((a) => actionPhase(a, now) === "undo");
 
 const KNOWN_KINDS = new Set<string>(AGENT_ACTION_KINDS);
+const KNOWN_ACTIONS = new Set<string>(WORKSPACE_ACTION_IDS);
 
 /**
  * The i18n key of a receipt's sentence: `agentActions.issue.created`… (params: `action.params`). A kind this build
@@ -173,6 +174,13 @@ export function actionTextValues(
       return p.number
         ? { repo: str(p.repo), number: str(p.number) }
         : { repo: str(p.repo), ref: str(p.ref), context: "branch" };
+    case "workspace.changed": {
+      // Its words as the server wrote them, and the catalog action as the sentence's context (`changed_create_role`).
+      const words = Object.fromEntries(
+        Object.entries(p).flatMap(([k, v]) => (k !== "action" && typeof v === "string" ? [[k, v]] : [])),
+      );
+      return { ...words, context: KNOWN_ACTIONS.has(str(p.action)) ? str(p.action) : "" };
+    }
     default:
       // A kind the server knows and this build doesn't yet (an open tab, an older app): the key's own words.
       return {};

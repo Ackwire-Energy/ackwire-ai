@@ -2180,6 +2180,18 @@
       "open": "Abrir",
       "web": "Abrir en el sitio",
       "notAllowed": "No tienes acceso a esta pantalla"
+    },
+    "action": {
+      "title": "Cambio en el espacio de trabajo",
+      "only": "Solo quien puede hacer este cambio lo aplica",
+      "ask": "Enviar a quien puede",
+      "other": "Hacer un cambio en el espacio de trabajo",
+      "create_role": "Crear el rol <b>{{name}}</b>",
+      "update_role": "Cambiar el rol <b>{{name}}</b>",
+      "delete_role": "Eliminar el rol <b>{{name}}</b> para siempre",
+      "move_role": "Mover el rol <b>{{name}}</b>",
+      "set_member_roles": "Cambiar los roles de <b>{{name}}</b>: {{change}}",
+      "set_channel_permissions": "Cambiar lo que {{who}} puede hacer en <b>#{{channel}}</b>"
     }
   },
   "teamWeek": {
@@ -2807,6 +2819,15 @@
     "pr": {
       "merged": "Hice merge del PR <b>#{{number}}</b> en <b>{{repo}}</b>",
       "merged_branch": "Hice merge de <b>{{ref}}</b> en <b>{{repo}}</b>"
+    },
+    "workspace": {
+      "changed": "Hice un cambio en el espacio de trabajo",
+      "changed_create_role": "Creé el rol <b>{{name}}</b>",
+      "changed_update_role": "Cambié el rol <b>{{name}}</b>",
+      "changed_delete_role": "Eliminé el rol <b>{{name}}</b>",
+      "changed_move_role": "Moví el rol <b>{{name}}</b>",
+      "changed_set_member_roles": "Cambié los roles de <b>{{name}}</b>: {{change}}",
+      "changed_set_channel_permissions": "Cambié lo que {{who}} puede hacer en <b>#{{channel}}</b>"
     },
     "other": "Hice un cambio",
     "copyWebhook": "Copiar dirección del webhook",
@@ -14262,6 +14283,7 @@
       "action_update_skills": "Actualizar habilidades",
       "action_approvals": "Aprobaciones esperándote",
       "action_open_page": "Abrir una pantalla",
+      "action_workspace": "Propuso un cambio en el espacio de trabajo",
       "agent_proposal": "Propuso un nuevo agente: {{name}}",
       "team_proposal": "Propuso un equipo: {{names}}",
       "settings_proposal": "Propuso un cambio para {{names}}",

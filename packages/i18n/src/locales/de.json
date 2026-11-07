@@ -2100,6 +2100,18 @@
       "open": "Öffnen",
       "web": "Auf der Website öffnen",
       "notAllowed": "Du hast keinen Zugriff auf diese Seite"
+    },
+    "action": {
+      "title": "Änderung im Workspace",
+      "only": "Nur wer diese Änderung vornehmen darf, wendet sie an",
+      "ask": "An jemanden senden, der darf",
+      "other": "Eine Änderung im Workspace vornehmen",
+      "create_role": "Rolle <b>{{name}}</b> erstellen",
+      "update_role": "Rolle <b>{{name}}</b> ändern",
+      "delete_role": "Rolle <b>{{name}}</b> endgültig löschen",
+      "move_role": "Rolle <b>{{name}}</b> verschieben",
+      "set_member_roles": "Rollen von <b>{{name}}</b> ändern: {{change}}",
+      "set_channel_permissions": "Ändern, was {{who}} in <b>#{{channel}}</b> darf"
     }
   },
   "teamWeek": {
@@ -2714,6 +2726,15 @@
     "pr": {
       "merged": "PR <b>#{{number}}</b> in <b>{{repo}}</b> gemergt",
       "merged_branch": "<b>{{ref}}</b> in <b>{{repo}}</b> gemergt"
+    },
+    "workspace": {
+      "changed": "Eine Änderung im Workspace vorgenommen",
+      "changed_create_role": "Rolle <b>{{name}}</b> erstellt",
+      "changed_update_role": "Rolle <b>{{name}}</b> geändert",
+      "changed_delete_role": "Rolle <b>{{name}}</b> gelöscht",
+      "changed_move_role": "Rolle <b>{{name}}</b> verschoben",
+      "changed_set_member_roles": "Rollen von <b>{{name}}</b> geändert: {{change}}",
+      "changed_set_channel_permissions": "Geändert, was {{who}} in <b>#{{channel}}</b> darf"
     },
     "other": "Eine Änderung vorgenommen",
     "copyWebhook": "Webhook-Adresse kopieren",
@@ -13860,6 +13881,7 @@
       "action_update_skills": "Skills aktualisieren",
       "action_approvals": "Freigaben, die auf dich warten",
       "action_open_page": "Eine Seite öffnen",
+      "action_workspace": "Hat eine Änderung im Workspace vorgeschlagen",
       "agent_proposal": "Hat einen neuen Agenten vorgeschlagen: {{name}}",
       "team_proposal": "Hat ein Team vorgeschlagen: {{names}}",
       "settings_proposal": "Hat eine Änderung für {{names}} vorgeschlagen",

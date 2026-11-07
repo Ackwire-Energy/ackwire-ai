@@ -2183,6 +2183,18 @@
       "open": "Ouvrir",
       "web": "Ouvrir sur le site",
       "notAllowed": "Vous n'avez pas accès à cet écran"
+    },
+    "action": {
+      "title": "Modification dans l'espace de travail",
+      "only": "Seule une personne autorisée à faire cette modification l'applique",
+      "ask": "Envoyer à qui peut",
+      "other": "Faire une modification dans l'espace de travail",
+      "create_role": "Créer le rôle <b>{{name}}</b>",
+      "update_role": "Modifier le rôle <b>{{name}}</b>",
+      "delete_role": "Supprimer définitivement le rôle <b>{{name}}</b>",
+      "move_role": "Déplacer le rôle <b>{{name}}</b>",
+      "set_member_roles": "Modifier les rôles de <b>{{name}}</b> : {{change}}",
+      "set_channel_permissions": "Modifier ce que {{who}} peut faire dans <b>#{{channel}}</b>"
     }
   },
   "teamWeek": {
@@ -2810,6 +2822,15 @@
     "pr": {
       "merged": "J'ai mergé la PR <b>#{{number}}</b> dans <b>{{repo}}</b>",
       "merged_branch": "J'ai mergé <b>{{ref}}</b> dans <b>{{repo}}</b>"
+    },
+    "workspace": {
+      "changed": "J'ai fait une modification dans l'espace de travail",
+      "changed_create_role": "J'ai créé le rôle <b>{{name}}</b>",
+      "changed_update_role": "J'ai modifié le rôle <b>{{name}}</b>",
+      "changed_delete_role": "J'ai supprimé le rôle <b>{{name}}</b>",
+      "changed_move_role": "J'ai déplacé le rôle <b>{{name}}</b>",
+      "changed_set_member_roles": "J'ai modifié les rôles de <b>{{name}}</b> : {{change}}",
+      "changed_set_channel_permissions": "J'ai modifié ce que {{who}} peut faire dans <b>#{{channel}}</b>"
     },
     "other": "A fait une modification",
     "copyWebhook": "Copier l’adresse du webhook",
@@ -14342,6 +14363,7 @@
       "action_update_skills": "Mettre à jour des compétences",
       "action_approvals": "Approbations qui vous attendent",
       "action_open_page": "Ouvrir un écran",
+      "action_workspace": "A proposé une modification dans l'espace de travail",
       "agent_proposal": "A proposé un nouvel agent : {{name}}",
       "team_proposal": "A proposé une équipe : {{names}}",
       "settings_proposal": "A proposé un changement pour {{names}}",

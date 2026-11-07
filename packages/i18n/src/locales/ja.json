@@ -2018,6 +2018,18 @@
       "open": "開く",
       "web": "サイトで開く",
       "notAllowed": "この画面へのアクセス権がありません"
+    },
+    "action": {
+      "title": "ワークスペースの変更",
+      "only": "この変更ができる人だけが適用できます",
+      "ask": "権限のある人に送る",
+      "other": "ワークスペースを変更する",
+      "create_role": "ロール<b>{{name}}</b>を作成",
+      "update_role": "ロール<b>{{name}}</b>を変更",
+      "delete_role": "ロール<b>{{name}}</b>を完全に削除",
+      "move_role": "ロール<b>{{name}}</b>の順番を変える",
+      "set_member_roles": "<b>{{name}}</b>のロールを変更: {{change}}",
+      "set_channel_permissions": "<b>#{{channel}}</b>で{{who}}ができることを変更"
     }
   },
   "teamWeek": {
@@ -2609,6 +2621,15 @@
     "pr": {
       "merged": "<b>{{repo}}</b>のPR <b>#{{number}}</b>をマージしました",
       "merged_branch": "<b>{{repo}}</b>に<b>{{ref}}</b>をマージしました"
+    },
+    "workspace": {
+      "changed": "ワークスペースを変更しました",
+      "changed_create_role": "ロール<b>{{name}}</b>を作成しました",
+      "changed_update_role": "ロール<b>{{name}}</b>を変更しました",
+      "changed_delete_role": "ロール<b>{{name}}</b>を削除しました",
+      "changed_move_role": "ロール<b>{{name}}</b>の順番を変えました",
+      "changed_set_member_roles": "<b>{{name}}</b>のロールを変更しました: {{change}}",
+      "changed_set_channel_permissions": "<b>#{{channel}}</b>で{{who}}ができることを変更しました"
     },
     "other": "変更を加えました",
     "copyWebhook": "Webhook のアドレスをコピー",
@@ -13350,6 +13371,7 @@
       "action_update_skills": "スキルを更新",
       "action_approvals": "あなたの承認待ち",
       "action_open_page": "画面を開く",
+      "action_workspace": "ワークスペースの変更を提案しました",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
       "team_proposal": "チームを提案しました：{{names}}",
       "settings_proposal": "{{names}}への変更を提案しました",

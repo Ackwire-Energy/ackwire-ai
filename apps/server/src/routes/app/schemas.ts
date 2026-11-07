@@ -532,7 +532,19 @@ export const AgentAction = z
       .nullable()
       .openapi({ description: "The person the agent worked for: they, admins and the agent's owner may undo." }),
     target: z.object({
-      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill", "agent", "repository"]),
+      type: z.enum([
+        "issue",
+        "memory",
+        "routine",
+        "channel",
+        "wiki_page",
+        "thread",
+        "skill",
+        "agent",
+        "repository",
+        "role",
+        "person",
+      ]),
       id: z.string(),
       number: z.number().optional().openapi({ description: "Issues." }),
       title: z.string().optional().openapi({ description: "Issue, routine, page or thread title; channel name." }),

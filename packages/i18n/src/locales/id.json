@@ -2018,6 +2018,18 @@
       "open": "Buka",
       "web": "Buka di situs",
       "notAllowed": "Kamu tidak punya akses ke layar ini"
+    },
+    "action": {
+      "title": "Perubahan di ruang kerja",
+      "only": "Hanya yang boleh membuat perubahan ini yang menerapkannya",
+      "ask": "Kirim ke yang berwenang",
+      "other": "Buat perubahan di ruang kerja",
+      "create_role": "Buat peran <b>{{name}}</b>",
+      "update_role": "Ubah peran <b>{{name}}</b>",
+      "delete_role": "Hapus peran <b>{{name}}</b> selamanya",
+      "move_role": "Pindahkan peran <b>{{name}}</b>",
+      "set_member_roles": "Ubah peran yang dimiliki <b>{{name}}</b>: {{change}}",
+      "set_channel_permissions": "Ubah apa yang boleh dilakukan {{who}} di <b>#{{channel}}</b>"
     }
   },
   "teamWeek": {
@@ -2620,6 +2632,15 @@
     "pr": {
       "merged": "Merge PR <b>#{{number}}</b> di <b>{{repo}}</b>",
       "merged_branch": "Merge <b>{{ref}}</b> di <b>{{repo}}</b>"
+    },
+    "workspace": {
+      "changed": "Membuat perubahan di ruang kerja",
+      "changed_create_role": "Membuat peran <b>{{name}}</b>",
+      "changed_update_role": "Mengubah peran <b>{{name}}</b>",
+      "changed_delete_role": "Menghapus peran <b>{{name}}</b>",
+      "changed_move_role": "Memindahkan peran <b>{{name}}</b>",
+      "changed_set_member_roles": "Mengubah peran yang dimiliki <b>{{name}}</b>: {{change}}",
+      "changed_set_channel_permissions": "Mengubah apa yang boleh dilakukan {{who}} di <b>#{{channel}}</b>"
     },
     "other": "Membuat perubahan",
     "copyWebhook": "Salin alamat webhook",
@@ -13404,6 +13425,7 @@
       "action_update_skills": "Perbarui skill",
       "action_approvals": "Persetujuan yang menunggumu",
       "action_open_page": "Buka layar",
+      "action_workspace": "Mengusulkan perubahan di ruang kerja",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "team_proposal": "Mengusulkan tim: {{names}}",
       "settings_proposal": "Mengusulkan perubahan untuk {{names}}",

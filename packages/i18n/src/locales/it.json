@@ -2179,6 +2179,18 @@
       "open": "Apri",
       "web": "Apri sul sito",
       "notAllowed": "Non hai accesso a questa schermata"
+    },
+    "action": {
+      "title": "Modifica nello spazio di lavoro",
+      "only": "La applica solo chi può fare questa modifica",
+      "ask": "Invia a chi può",
+      "other": "Fai una modifica nello spazio di lavoro",
+      "create_role": "Crea il ruolo <b>{{name}}</b>",
+      "update_role": "Modifica il ruolo <b>{{name}}</b>",
+      "delete_role": "Elimina per sempre il ruolo <b>{{name}}</b>",
+      "move_role": "Sposta il ruolo <b>{{name}}</b>",
+      "set_member_roles": "Cambia i ruoli di <b>{{name}}</b>: {{change}}",
+      "set_channel_permissions": "Cambia cosa può fare {{who}} in <b>#{{channel}}</b>"
     }
   },
   "teamWeek": {
@@ -2811,6 +2823,15 @@
     "pr": {
       "merged": "Ho fatto il merge della PR <b>#{{number}}</b> in <b>{{repo}}</b>",
       "merged_branch": "Ho fatto il merge di <b>{{ref}}</b> in <b>{{repo}}</b>"
+    },
+    "workspace": {
+      "changed": "Ho fatto una modifica nello spazio di lavoro",
+      "changed_create_role": "Ho creato il ruolo <b>{{name}}</b>",
+      "changed_update_role": "Ho modificato il ruolo <b>{{name}}</b>",
+      "changed_delete_role": "Ho eliminato il ruolo <b>{{name}}</b>",
+      "changed_move_role": "Ho spostato il ruolo <b>{{name}}</b>",
+      "changed_set_member_roles": "Ho cambiato i ruoli di <b>{{name}}</b>: {{change}}",
+      "changed_set_channel_permissions": "Ho cambiato cosa può fare {{who}} in <b>#{{channel}}</b>"
     },
     "other": "Ho fatto una modifica",
     "copyWebhook": "Copia indirizzo del webhook",
@@ -14346,6 +14367,7 @@
       "action_update_skills": "Aggiorna le skill",
       "action_approvals": "Approvazioni che ti aspettano",
       "action_open_page": "Apri una schermata",
+      "action_workspace": "Ha proposto una modifica nello spazio di lavoro",
       "agent_proposal": "Ha proposto un nuovo agente: {{name}}",
       "team_proposal": "Ha proposto un team: {{names}}",
       "settings_proposal": "Ha proposto una modifica per {{names}}",

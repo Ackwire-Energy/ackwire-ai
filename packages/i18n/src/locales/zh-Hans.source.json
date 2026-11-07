@@ -5180,6 +5180,36 @@
   "rightHand.open.notAllowed": {
     "value": "You don't have access to this screen"
   },
+  "rightHand.action.title": {
+    "value": "Change in the workspace"
+  },
+  "rightHand.action.only": {
+    "value": "Only someone who may make this change applies it"
+  },
+  "rightHand.action.ask": {
+    "value": "Send to whoever may"
+  },
+  "rightHand.action.other": {
+    "value": "Make a change in the workspace"
+  },
+  "rightHand.action.create_role": {
+    "value": "Create the role <b>{{name}}</b>"
+  },
+  "rightHand.action.update_role": {
+    "value": "Change the role <b>{{name}}</b>"
+  },
+  "rightHand.action.delete_role": {
+    "value": "Delete the role <b>{{name}}</b> for good"
+  },
+  "rightHand.action.move_role": {
+    "value": "Move the role <b>{{name}}</b>"
+  },
+  "rightHand.action.set_member_roles": {
+    "value": "Change the roles of <b>{{name}}</b>: {{change}}"
+  },
+  "rightHand.action.set_channel_permissions": {
+    "value": "Change what {{who}} may do in <b>#{{channel}}</b>"
+  },
   "teamWeek.title": {
     "value": "Team week"
   },
@@ -6528,6 +6558,27 @@
   },
   "agentActions.pr.merged_branch": {
     "value": "Merged <b>{{ref}}</b> in <b>{{repo}}</b>"
+  },
+  "agentActions.workspace.changed": {
+    "value": "Made a change in the workspace"
+  },
+  "agentActions.workspace.changed_create_role": {
+    "value": "Created the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_update_role": {
+    "value": "Changed the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_delete_role": {
+    "value": "Deleted the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_move_role": {
+    "value": "Moved the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_set_member_roles": {
+    "value": "Changed the roles of <b>{{name}}</b>: {{change}}"
+  },
+  "agentActions.workspace.changed_set_channel_permissions": {
+    "value": "Changed what {{who}} may do in <b>#{{channel}}</b>"
   },
   "agentActions.other": {
     "value": "Made a change"
@@ -33787,6 +33838,9 @@
   },
   "chat.body.action_open_page": {
     "value": "Open a screen"
+  },
+  "chat.body.action_workspace": {
+    "value": "Proposed a change in the workspace"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"

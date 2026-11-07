@@ -2099,6 +2099,18 @@
       "open": "Openen",
       "web": "Openen op de website",
       "notAllowed": "Je hebt geen toegang tot dit scherm"
+    },
+    "action": {
+      "title": "Wijziging in de werkruimte",
+      "only": "Alleen wie deze wijziging mag maken, past haar toe",
+      "ask": "Sturen naar wie het mag",
+      "other": "Iets wijzigen in de werkruimte",
+      "create_role": "Rol <b>{{name}}</b> maken",
+      "update_role": "Rol <b>{{name}}</b> wijzigen",
+      "delete_role": "Rol <b>{{name}}</b> definitief verwijderen",
+      "move_role": "Rol <b>{{name}}</b> verplaatsen",
+      "set_member_roles": "Rollen van <b>{{name}}</b> wijzigen: {{change}}",
+      "set_channel_permissions": "Wijzigen wat {{who}} mag in <b>#{{channel}}</b>"
     }
   },
   "teamWeek": {
@@ -2715,6 +2727,15 @@
     "pr": {
       "merged": "PR <b>#{{number}}</b> in <b>{{repo}}</b> gemerged",
       "merged_branch": "<b>{{ref}}</b> in <b>{{repo}}</b> gemerged"
+    },
+    "workspace": {
+      "changed": "Iets gewijzigd in de werkruimte",
+      "changed_create_role": "Rol <b>{{name}}</b> aangemaakt",
+      "changed_update_role": "Rol <b>{{name}}</b> gewijzigd",
+      "changed_delete_role": "Rol <b>{{name}}</b> verwijderd",
+      "changed_move_role": "Rol <b>{{name}}</b> verplaatst",
+      "changed_set_member_roles": "Rollen van <b>{{name}}</b> gewijzigd: {{change}}",
+      "changed_set_channel_permissions": "Gewijzigd wat {{who}} mag in <b>#{{channel}}</b>"
     },
     "other": "Iets gewijzigd",
     "copyWebhook": "Webhookadres kopiëren",
@@ -13927,6 +13948,7 @@
       "action_update_skills": "Skills bijwerken",
       "action_approvals": "Goedkeuringen die op jou wachten",
       "action_open_page": "Een scherm openen",
+      "action_workspace": "Stelde een wijziging in de werkruimte voor",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "team_proposal": "Stelde een team voor: {{names}}",
       "settings_proposal": "Stelde een wijziging voor {{names}} voor",

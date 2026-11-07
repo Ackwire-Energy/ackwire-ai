@@ -41,6 +41,7 @@ import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
 import { OFFER_CONNECT_APP_TOOL } from "./tools/connector-first";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
+import { actNow, workspaceAction, workspaceActionTool } from "./workspace-actions";
 
 const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles } = schema;
 
@@ -926,7 +927,12 @@ export function createSetupToolSource(deps: {
   // Any agent that may set the team up proposes teammates' settings too: the right hand decides another agent's card
   // for the person who asked (ADR 0139), never its own.
   const all = [...tools, settingsTool(deps)];
-  const rightHand = [...all, ...rightHandCards(deps), ...teamTools({ ...deps, cardsLeft, hopOf })];
+  const rightHand = [
+    ...all,
+    ...rightHandCards(deps),
+    ...teamTools({ ...deps, cardsLeft, hopOf }),
+    workspaceActionTool({ ...deps, cardsLeft, hopOf }),
+  ];
   return {
     name: "setup",
     // Only the right hand starts the rest of the app with cards (ADR 0137).
@@ -1028,7 +1034,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
     {
       name: PROPOSE_MEMBER_CHANGES_TOOL,
       description:
-        "Propose changing people in the workspace with one card in this conversation, a row per change: making someone an owner or not (owners only), giving or taking roles, or removing them from the workspace (with the confirmation the members screen shows). Whoever may applies each row from the card as themselves. Inviting is offer_invites. Nothing changes until someone clicks: never say it is done.",
+        "Change people in the workspace, a row per change: making someone an owner or not (owners only), giving or taking roles, or removing them from the workspace. Roles the person who asked may give, asked in their own words, apply at once with Undo; the rest is one card whoever may applies row by row as themselves (removal with the members screen's confirmation). Inviting is offer_invites. The result says what changed: never say more is done.",
       scope: SETUP_SCOPE,
       inputSchema: {
         type: "object",
@@ -1085,6 +1091,26 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           }
           if (rows.length === 0)
             return { content: "Say what changes: owner, add_roles, remove_roles or remove.", isError: true };
+          // Roles they may give, asked in their own words, apply at once with Undo (ADR 0137 amendment of
+          // 2026-11-07); ownership and removal stay on the card, with the members screen's own confirmation.
+          const applied: string[] = [];
+          const giving = workspaceAction("set_member_roles");
+          if (giving && (await ownWords(ctx)) === forUserId) {
+            for (const r of [...rows]) {
+              if (!("addRoleIds" in r)) continue;
+              const done = await actNow(deps, ctx, forUserId, giving, {
+                userId: r.userId,
+                name: r.name,
+                add: r.addRoleIds,
+                remove: r.removeRoleIds,
+              }).catch(() => null);
+              if (!done) continue;
+              applied.push(`${r.name} (${done.words.change})`);
+              rows.splice(rows.indexOf(r), 1);
+            }
+          }
+          const now = applied.length ? `Applied at once, with Undo under your reply: ${applied.join("; ")}.` : "";
+          if (rows.length === 0) return { content: `${now} Say it is done.` };
           const full = await cardsLeft(ctx);
           if (full) return full;
           const kept = rows.slice(0, MAX_ROWS_PER_CARD);
@@ -1103,7 +1129,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             "role" in r ? membership?.role === "owner" : can(membership, "manage_members"),
           );
           return {
-            content: `Posted the card for ${who}.${may ? " They apply each row there." : " Some rows need someone with more rights (an owner for ownership, an admin for the rest): say so."} Nothing has changed yet.`,
+            content: `${now ? `${now} ` : ""}Posted the card for ${who}.${may ? " They apply each row there." : " Some rows need someone with more rights (an owner for ownership, an admin for the rest): say so."} ${now ? "Nothing on it has changed yet." : "Nothing has changed yet."}`,
             data: { actionCard: { messageId } },
           };
         } catch (error) {
@@ -1114,7 +1140,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
     {
       name: OFFER_OPEN_PAGE_TOOL,
       description:
-        "Open one of the app's screens for this person with a card whose button takes them there: billing, deleting the workspace or their account, their password, API keys, roles, the audit log, routines, Drive, wiki, issues, an agent's page, a channel's settings and the rest. Use it for anything they ask that your other cards don't do: the screen asks for what it always does (an email code and the typed name to delete, Stripe to pay, our dialog for a key) and checks who may. Never take a key, password or token in the chat.",
+        "Open one of the app's screens for this person with a card whose button takes them there: billing, deleting the workspace or their account, their password, API keys, the audit log and the rest. Use it for what needs that screen's own dialog or what workspace_action and your other cards don't do, or when they ask to see a screen: it asks for what it always does (an email code and the typed name to delete, Stripe to pay, our dialog for a key) and checks who may. Never take a key, password or token in the chat.",
       scope: SETUP_SCOPE,
       inputSchema: {
         type: "object",
@@ -1224,7 +1250,7 @@ interface SettingsChangeInput {
   budget_usd?: unknown;
   budget_default?: unknown;
   owner?: unknown;
-  who_talks?: { everyone?: unknown; roles?: unknown };
+  who_talks?: { everyone?: unknown; roles?: unknown; people?: unknown };
   join?: unknown;
   leave?: unknown;
   replies?: unknown;
@@ -1255,7 +1281,8 @@ async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promi
   }
   if (change.who_talks) {
     const roles = names(change.who_talks.roles);
-    if (change.who_talks.everyone === true || roles.length === 0)
+    const named = names(change.who_talks.people);
+    if (change.who_talks.everyone === true || roles.length + named.length === 0)
       lines.push({ field: "audience", to: { mode: "everyone", userIds: [], roleIds: [] } });
     else {
       const rows = await ctx.db
@@ -1264,10 +1291,17 @@ async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promi
         .where(and(eq(orgRoles.orgId, ctx.orgId), eq(orgRoles.kind, "custom")));
       const picked = roles.map((r) => rows.find((x) => x.name.toLowerCase() === r.toLowerCase()));
       if (picked.some((r) => !r)) return `Roles here: ${rows.map((r) => r.name).join(", ")}.`;
+      const people: { userId: string; name: string }[] = [];
+      for (const who of named) {
+        const found = await findMember(ctx, who);
+        if (found.length !== 1 || !found[0])
+          return found.length ? `Several people match "${who}": ask which one.` : `No one called "${who}" here.`;
+        people.push(found[0]);
+      }
       lines.push({
         field: "audience",
-        to: { mode: "people", userIds: [], roleIds: picked.map((r) => r?.id ?? "") },
-        label: { to: picked.map((r) => r?.name).join(", ") },
+        to: { mode: "people", userIds: people.map((p) => p.userId), roleIds: picked.map((r) => r?.id ?? "") },
+        label: { to: [...picked.map((r) => r?.name), ...people.map((p) => p.name)].join(", ") },
       });
     }
   }
@@ -1379,9 +1413,11 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
                 properties: {
                   everyone: { type: "boolean" },
                   roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+                  people: { type: "array", items: { type: "string", minLength: 1, maxLength: 200 }, maxItems: 20 },
                 },
                 additionalProperties: false,
-                description: "Everyone, or only people with these roles (by name).",
+                description:
+                  "Everyone, or only people with these roles (by name) and these people (@handle, email or name).",
               },
               join: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
               leave: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },

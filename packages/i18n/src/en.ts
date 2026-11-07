@@ -2116,6 +2116,21 @@ export const en = {
     approvals: { title: "Approvals waiting for you", done: "Decided" },
     /** Its "Abrir" card (`offer_open_page`): one of the app's screens. */
     open: { open: "Open", web: "Open on the website", notAllowed: "You don't have access to this screen" },
+    /** Its card of a change in the workspace (`workspace_action`): applied as whoever clicks, Undo on it after. */
+    action: {
+      title: "Change in the workspace",
+      /** Under the card, for someone who may not make the change. */
+      only: "Only someone who may make this change applies it",
+      /** The person it was for can't make it: sends it to the inbox of whoever may. */
+      ask: "Send to whoever may",
+      other: "Make a change in the workspace",
+      create_role: "Create the role <b>{{name}}</b>",
+      update_role: "Change the role <b>{{name}}</b>",
+      delete_role: "Delete the role <b>{{name}}</b> for good",
+      move_role: "Move the role <b>{{name}}</b>",
+      set_member_roles: "Change the roles of <b>{{name}}</b>: {{change}}",
+      set_channel_permissions: "Change what {{who}} may do in <b>#{{channel}}</b>",
+    },
   },
   /** Lodi's weekly card in an admin's DM with it (ADR 0137 §9). */
   teamWeek: {
@@ -2755,6 +2770,16 @@ export const en = {
     pr: {
       merged: "Merged PR <b>#{{number}}</b> in <b>{{repo}}</b>",
       merged_branch: "Merged <b>{{ref}}</b> in <b>{{repo}}</b>",
+    },
+    /** A change from the right hand's catalog (`params.action`), at once or from its card. Undo puts it back. */
+    workspace: {
+      changed: "Made a change in the workspace",
+      changed_create_role: "Created the role <b>{{name}}</b>",
+      changed_update_role: "Changed the role <b>{{name}}</b>",
+      changed_delete_role: "Deleted the role <b>{{name}}</b>",
+      changed_move_role: "Moved the role <b>{{name}}</b>",
+      changed_set_member_roles: "Changed the roles of <b>{{name}}</b>: {{change}}",
+      changed_set_channel_permissions: "Changed what {{who}} may do in <b>#{{channel}}</b>",
     },
     other: "Made a change",
     /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */
@@ -13600,6 +13625,7 @@ export const en = {
       action_update_skills: "Update skills",
       action_approvals: "Approvals waiting for you",
       action_open_page: "Open a screen",
+      action_workspace: "Proposed a change in the workspace",
       agent_proposal: "Proposed a new agent: {{name}}",
       team_proposal: "Proposed a team: {{names}}",
       settings_proposal: "Proposed a change to {{names}}",

@@ -315,6 +315,8 @@ import type {
   WikiUpdateInput,
   WikiVersion,
   WorkingRun,
+  WorkspaceActionCard,
+  WorkspaceActionCardView,
   WorkspaceLimits,
 } from "./types";
 
@@ -1624,6 +1626,18 @@ export interface ApiClient {
     redo(orgId: string, actionId: string): Promise<AgentAction>;
     /** Desfazer tudo: every receipt of the message still undoable, newest first. */
     undoMessage(orgId: string, messageId: string): Promise<UndoAllResult>;
+  };
+  /**
+   * The right hand's cards of a workspace change (`workspace_action`): read where it is (its conversation, or the inbox
+   * of whom it was sent to), applied as whoever clicks, dismissed, or sent to whoever may. 409 `action_card.decided`.
+   */
+  actionCards?: {
+    get(orgId: string, messageId: string): Promise<WorkspaceActionCardView>;
+    decide(
+      orgId: string,
+      messageId: string,
+      decision: "apply" | "dismiss" | "ask",
+    ): Promise<{ card: WorkspaceActionCard }>;
   };
   /** "O que fez por você": what an agent did that involves the viewer (agent profile). */
   agentForYou?: {

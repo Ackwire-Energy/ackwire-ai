@@ -2017,6 +2017,18 @@
       "open": "打开",
       "web": "在网站上打开",
       "notAllowed": "你无权访问此页面"
+    },
+    "action": {
+      "title": "工作区更改",
+      "only": "只有能做这项更改的人可以应用",
+      "ask": "发给有权限的人",
+      "other": "在工作区做一项更改",
+      "create_role": "创建角色 <b>{{name}}</b>",
+      "update_role": "更改角色 <b>{{name}}</b>",
+      "delete_role": "永久删除角色 <b>{{name}}</b>",
+      "move_role": "调整角色 <b>{{name}}</b> 的顺序",
+      "set_member_roles": "更改 <b>{{name}}</b> 的角色：{{change}}",
+      "set_channel_permissions": "更改 {{who}} 在 <b>#{{channel}}</b> 中能做的事"
     }
   },
   "teamWeek": {
@@ -2610,6 +2622,15 @@
     "pr": {
       "merged": "已合并 <b>{{repo}}</b> 的 PR <b>#{{number}}</b>",
       "merged_branch": "已将 <b>{{ref}}</b> 合并到 <b>{{repo}}</b>"
+    },
+    "workspace": {
+      "changed": "在工作区做了一项更改",
+      "changed_create_role": "创建了角色 <b>{{name}}</b>",
+      "changed_update_role": "更改了角色 <b>{{name}}</b>",
+      "changed_delete_role": "删除了角色 <b>{{name}}</b>",
+      "changed_move_role": "调整了角色 <b>{{name}}</b> 的顺序",
+      "changed_set_member_roles": "更改了 <b>{{name}}</b> 的角色：{{change}}",
+      "changed_set_channel_permissions": "更改了 {{who}} 在 <b>#{{channel}}</b> 中能做的事"
     },
     "other": "做了一项更改",
     "copyWebhook": "复制 Webhook 地址",
@@ -13417,6 +13438,7 @@
       "action_update_skills": "更新技能",
       "action_approvals": "等你处理的审批",
       "action_open_page": "打开页面",
+      "action_workspace": "提议了一项工作区更改",
       "agent_proposal": "提议了一个新智能体：{{name}}",
       "team_proposal": "提议了一个团队：{{names}}",
       "settings_proposal": "提议更改 {{names}}",

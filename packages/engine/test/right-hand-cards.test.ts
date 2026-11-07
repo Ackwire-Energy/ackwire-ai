@@ -10,6 +10,7 @@ import {
   decideApprovals,
   listAudit,
   MAX_CARDS_PER_RUN_RIGHT_HAND,
+  memberRoleIds,
   OFFER_APPROVALS_TOOL,
   OFFER_OPEN_PAGE_TOOL,
   openPersonAgentDm,
@@ -20,6 +21,7 @@ import {
   rightHandPrompt,
   setMemberRoles,
   type ToolContext,
+  undoAgentAction,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -37,11 +39,16 @@ const lodiOf = async (fx: Fixture) => {
   return lodi;
 };
 
-/** A run of Lodi on what `userId` wrote in their DM with it: its tools act for that person. */
-async function lodiRun(fx: Fixture, userId: string, body: string): Promise<ToolContext> {
+/** A run of Lodi on what `userId` wrote in their DM with it: its tools act for that person (`outside`: it relays outside content). */
+async function lodiRun(fx: Fixture, userId: string, body: string, outside = false): Promise<ToolContext> {
   const lodi = await lodiOf(fx);
   const dm = await openPersonAgentDm(fx.db, fx.org.id, userId, lodi.id);
   const trigger = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, userId, fx.org.id, dm.id, { body });
+  if (outside)
+    await fx.db
+      .update(schema.messages)
+      .set({ meta: { readOutside: true } })
+      .where(eq(schema.messages.id, trigger.id));
   const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
   if (!run) throw new Error("no run");
   return {
@@ -201,9 +208,10 @@ describe("propose_member_changes", () => {
     const nina = await addMember(f.db, f.org.id, "member", "Nina");
     const caio = await addMember(f.db, f.org.id, "member", "Caio");
     const sales = await createRole(f.db, f.owner.id, f.org.id, { name: "Vendas" });
+    // Outside content read this turn: even what the owner may give waits on the card.
     const out = await call(
       f,
-      await lodiRun(f, f.owner.id, "Nina vira dona e entra em Vendas, tira o Caio"),
+      await lodiRun(f, f.owner.id, "Nina vira dona e entra em Vendas, tira o Caio", true),
       PROPOSE_MEMBER_CHANGES_TOOL,
       {
         changes: [
@@ -234,6 +242,35 @@ describe("propose_member_changes", () => {
     await setMemberRoles(f.db, f.owner.id, f.org.id, nina.id, [sales.id], { via: id });
     await removeMember(f.db, f.owner.id, f.org.id, caio.id, { via: id });
     expect(await appliedVia(f, lodi.id)).toEqual(["member.removed", "member.role_changed", "member.roles_changed"]);
+  });
+
+  test("roles the person may give, in their own words, apply at once with Undo; ownership stays on the card", async () => {
+    f = await setup({ rightHand: true });
+    const nina = await addMember(f.db, f.org.id, "member", "Nina");
+    const sales = await createRole(f.db, f.owner.id, f.org.id, { name: "Vendas" });
+    const ctx = await lodiRun(f, f.owner.id, "Nina entra em Vendas e vira dona");
+    const out = await call(f, ctx, PROPOSE_MEMBER_CHANGES_TOOL, {
+      changes: [{ person: "Nina", owner: true, add_roles: ["vendas"] }],
+      why: "Nina assume a conta.",
+    });
+    expect(out.content).toContain("Applied at once, with Undo under your reply: Nina (+ Vendas).");
+    expect(await memberRoleIds(f.db, f.org.id, nina.id)).toEqual([sales.id]);
+    const { card } = await lastCard(f, "member_changes");
+    expect(card.params.rows).toEqual([{ userId: nina.id, name: "Nina", role: "owner" }]);
+    const [receipt] = await f.db
+      .select()
+      .from(schema.agentActions)
+      .where(and(eq(schema.agentActions.runId, ctx.runId), eq(schema.agentActions.kind, "workspace.changed")));
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, receipt?.id ?? "");
+    expect(await memberRoleIds(f.db, f.org.id, nina.id)).toEqual([]);
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, ctx.runId));
+    // Only roles: nothing left for a card.
+    const only = await call(f, await lodiRun(f, f.owner.id, "Nina entra em Vendas"), PROPOSE_MEMBER_CHANGES_TOOL, {
+      changes: [{ person: "Nina", add_roles: ["vendas"] }],
+      why: "x",
+    });
+    expect(only.content).toContain("Say it is done.");
+    expect(only.data).toBeUndefined();
   });
 
   test("an unknown person or role posts nothing and says why", async () => {

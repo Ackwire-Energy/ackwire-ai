@@ -2115,6 +2115,18 @@ export const ptBR = {
     approvals: { title: "Aprovações esperando você", done: "Decididas" },
     /** Its "Abrir" card (`offer_open_page`): one of the app's screens. */
     open: { open: "Abrir", web: "Abrir no site", notAllowed: "Você não tem acesso a esta tela" },
+    action: {
+      title: "Mudança no workspace",
+      only: "Só quem pode fazer essa mudança aplica",
+      ask: "Pedir a quem pode",
+      other: "Fazer uma mudança no workspace",
+      create_role: "Criar o papel <b>{{name}}</b>",
+      update_role: "Mudar o papel <b>{{name}}</b>",
+      delete_role: "Apagar o papel <b>{{name}}</b> de vez",
+      move_role: "Mudar o papel <b>{{name}}</b> de lugar",
+      set_member_roles: "Mudar os papéis de <b>{{name}}</b>: {{change}}",
+      set_channel_permissions: "Mudar o que {{who}} pode fazer em <b>#{{channel}}</b>",
+    },
   },
   teamWeek: {
     title: "Semana da equipe",
@@ -2761,6 +2773,15 @@ export const ptBR = {
     pr: {
       merged: "Fiz o merge do PR <b>#{{number}}</b> em <b>{{repo}}</b>",
       merged_branch: "Fiz o merge de <b>{{ref}}</b> em <b>{{repo}}</b>",
+    },
+    workspace: {
+      changed: "Fiz uma mudança no workspace",
+      changed_create_role: "Criei o papel <b>{{name}}</b>",
+      changed_update_role: "Mudei o papel <b>{{name}}</b>",
+      changed_delete_role: "Apaguei o papel <b>{{name}}</b>",
+      changed_move_role: "Mudei o papel <b>{{name}}</b> de lugar",
+      changed_set_member_roles: "Mudei os papéis de <b>{{name}}</b>: {{change}}",
+      changed_set_channel_permissions: "Mudei o que {{who}} pode fazer em <b>#{{channel}}</b>",
     },
     /** A kind this app doesn't know yet (a newer server's). */
     other: "Fiz uma mudança",
@@ -13729,6 +13750,7 @@ export const ptBR = {
       action_update_skills: "Atualizar skills",
       action_approvals: "Aprovações esperando você",
       action_open_page: "Abrir uma tela",
+      action_workspace: "Propôs uma mudança no workspace",
       agent_proposal: "Propôs um novo agente: {{name}}",
       team_proposal: "Propôs um time: {{names}}",
       settings_proposal: "Propôs uma mudança para {{names}}",

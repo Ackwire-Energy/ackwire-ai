@@ -27,6 +27,7 @@ import {
   type ToolContext,
   type ToolSource,
   teamStatus,
+  undoAgentAction,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -117,6 +118,7 @@ describe("what it may use", () => {
       "team_status",
       "list_issues",
       "create_issue",
+      "update_issue",
       "ask_agent",
       "tell_agent",
       "follow_up",
@@ -124,7 +126,7 @@ describe("what it may use", () => {
       "read_conversation",
     ])
       expect(names).toContain(tool);
-    for (const tool of ["update_issue", "comment_issue", "remember", "forget"]) expect(names).not.toContain(tool);
+    for (const tool of ["comment_issue", "remember", "forget"]) expect(names).not.toContain(tool);
   });
 
   test("team_status is no other agent's", async () => {
@@ -187,6 +189,41 @@ describe("tasks stay in the person's DM, and go no further than they could", () 
     const out = await use(issueTools(), await lodiRun(bia.id, "minhas tarefas?"), "list_issues");
     expect(out.content).toContain("A dela");
     expect(out.content).not.toContain("Sigilo");
+  });
+
+  test("it changes a task the person sees, with Undo; not one they don't, nor in a channel", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const issue = (title: string, userIds: string[]) =>
+      createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
+        title,
+        audience: { mode: "people", userIds },
+      });
+    const hers = await issue("A dela", [bia.id, f.owner.id]);
+    const secret = await issue("Sigilo", [f.owner.id]);
+    const ctx = await lodiRun(bia.id, "marca a minha como feita");
+    const done = await use(issueTools(), ctx, "update_issue", { issue: `#${hers.number}`, status: "done" });
+    expect(done.isError).toBeFalsy();
+    const status = async (id: string) =>
+      (await f.db.select().from(schema.issues).where(eq(schema.issues.id, id)))[0]?.status;
+    expect(await status(hers.id)).toBe("done");
+    const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, ctx.runId));
+    expect(receipt?.kind).toBe("issue.updated");
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, receipt?.id ?? "");
+    expect(await status(hers.id)).not.toBe("done");
+    const hidden = await use(issueTools(), ctx, "update_issue", { issue: `#${secret.number}`, status: "done" });
+    expect(hidden.isError).toBe(true);
+    expect(await status(secret.id)).not.toBe("done");
+    const lodi = await lodiOf();
+    const itself = await use(issueTools(), ctx, "update_issue", {
+      issue: `#${hers.number}`,
+      assignee: `@${lodi.handle}`,
+    });
+    expect(itself.isError).toBe(true);
+    const away = await lodiRun(f.owner.id, "@lodi fecha a tarefa", f.general.id);
+    expect((await use(issueTools(), away, "update_issue", { issue: `#${hers.number}`, status: "done" })).isError).toBe(
+      true,
+    );
   });
 
   test("it never takes a task itself", async () => {
