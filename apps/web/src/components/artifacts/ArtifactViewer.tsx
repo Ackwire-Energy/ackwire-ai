@@ -70,6 +70,9 @@ export function useArtifactViewer() {
   return value;
 }
 
+/** The viewer where there is one; a text with no viewer around it (a page of its own) opens the Drive instead. */
+export const useMaybeArtifactViewer = () => useContext(ViewerContext);
+
 export function useAuthorName() {
   const { org } = useOrg();
   const dir = useDirectory(org.id);

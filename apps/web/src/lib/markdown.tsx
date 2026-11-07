@@ -1,4 +1,5 @@
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
+import { splitIdRefs } from "@agenteschat/client/lib/id-refs";
 import { linkPill } from "@agenteschat/client/lib/link-pills";
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
 import { parseMessageLink } from "@agenteschat/client/lib/message-links";
@@ -26,6 +27,8 @@ export type ChannelRenderer = (name: string, text: string, key: string) => React
 export type WikiLinkRenderer = (title: string, label: string, key: string) => ReactNode;
 /** `![[foto.png]]`: how an embed shows (`block` alone on its line, else inside a sentence). */
 export type EmbedRenderer = (target: string, key: string, block: boolean) => ReactNode;
+/** An internal id in the words (`splitIdRefs`): the pill of what it names, or `text` as written. */
+export type IdRenderer = (id: string, text: string, key: string) => ReactNode;
 
 /**
  * A streaming answer's words, each in its own span (keyed by position, so a
@@ -48,14 +51,23 @@ function wordSpans(text: string, key: string): ReactNode[] {
   return out;
 }
 
-/** `#channel` references first (`channel`), then @mentions in the words between them. */
+/** Internal ids first (`idRef`, never in words still being written), then `#channel` references, then @mentions. */
 function withRefs(
   text: string,
   key: string,
   mention?: MentionRenderer,
   words?: boolean,
   channel?: ChannelRenderer,
+  idRef?: IdRenderer,
 ): ReactNode[] {
+  const parts = idRef && !words ? splitIdRefs(text) : [];
+  if (idRef && parts.some((p) => p.id !== undefined)) {
+    return parts.flatMap((part, i) =>
+      part.id === undefined
+        ? withRefs(part.text, `${key}-x${i}`, mention, words, channel)
+        : [idRef(part.id, part.text, `${key}-id${i}`)],
+    );
+  }
   if (!channel) return withMentions(text, key, mention, words);
   return splitChannelRefs(text).flatMap((part, i) =>
     part.name === undefined
@@ -107,15 +119,16 @@ export function renderInline(
   channel?: ChannelRenderer,
   /** Bare addresses as pills. Off while being written, which would change pill at every letter, and in a link's words. */
   pills = !words,
+  idRef?: IdRenderer,
 ): ReactNode[] {
   const out: ReactNode[] = [];
   let rest = text;
   let n = 0;
-  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words, channel, pills);
+  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words, channel, pills, idRef);
   while (rest) {
     const m = rest.match(INLINE);
     if (!m || m.index === undefined) {
-      out.push(...withRefs(rest, `${key}-t${n}`, mention, words, channel));
+      out.push(...withRefs(rest, `${key}-t${n}`, mention, words, channel, idRef));
       break;
     }
     const tok = m[0];
@@ -126,7 +139,7 @@ export function renderInline(
     // `![[…]]` inside a sentence: the "!" belongs to the embed.
     const isEmbed = Boolean(m[6] && embed && m.index > 0 && rest[m.index - 1] === "!");
     const before = rest.slice(0, isEmbed ? m.index - 1 : m.index);
-    if (before) out.push(...withRefs(before, textKey, mention, words, channel));
+    if (before) out.push(...withRefs(before, textKey, mention, words, channel, idRef));
     if (isEmbed && embed) {
       out.push(embed(parseWikiToken(tok).title, k, false));
       rest = rest.slice(m.index + tok.length);
@@ -172,6 +185,8 @@ export interface MarkdownProps {
   wikiLink?: WikiLinkRenderer;
   /** Obsidian embeds (`![[file]]`); without it they show as a plain link. */
   embed?: EmbedRenderer;
+  /** Internal ids in the words (what agents write: chat, tasks, the wiki); without it they stay text. */
+  idRef?: IdRenderer;
   /** Skip a leading `# Title` equal to this (the page shows the title itself). */
   title?: string;
   /** Plain words in `.ac-word` spans: a streaming answer's newest block, whose words fade in. */
@@ -204,6 +219,7 @@ export function Markdown({
   channel,
   wikiLink,
   embed,
+  idRef,
   title,
   words,
   excerpt,
@@ -211,7 +227,8 @@ export function Markdown({
   bare,
 }: MarkdownProps) {
   const message = variant === "message";
-  const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink, embed, words, channel);
+  const inline = (text: string, k: string) =>
+    renderInline(text, k, mention, wikiLink, embed, words, channel, undefined, idRef);
   // Parsed once per source (a streaming row re-renders every reveal frame); never mutated.
   const all = useMemo(() => parseMarkdown(source, { breaks: message, details: true }), [source, message]);
   const [first] = all;
@@ -302,6 +319,7 @@ export function Markdown({
               channel={channel}
               wikiLink={wikiLink}
               embed={embed}
+              idRef={idRef}
               words={words}
               excerpt={excerpt}
               bare

@@ -12,6 +12,7 @@ import {
   actionTextValues,
   formatTimeLeft,
   hookToCopy,
+  receiptFiles,
   routineOwnActions,
 } from "@agenteschat/client/lib/actions";
 import { ownActionName } from "@agenteschat/client/lib/approval-words";
@@ -275,10 +276,23 @@ function CopyHook({ action: a }: { action: AgentAction }) {
 /** What a receipt offers under its sentence. */
 const HandyLines = ({ action }: { action: AgentAction }) => (
   <>
+    <FilesLine action={action} />
     <WhoSeesLine action={action} />
     <CopyHook action={action} />
   </>
 );
+
+/** Under a task change that brought files: which ones went with it. */
+function FilesLine({ action: a }: { action: AgentAction }) {
+  const { t } = useTranslation();
+  const files = receiptFiles(a);
+  if (files.length === 0) return null;
+  return (
+    <Text variant="footnote" tone="muted" style={styles.undoneBy}>
+      {t("agentActions.issue.files", { names: joinNames(files, t) })}
+    </Text>
+  );
+}
 
 /** Under a task the agent made: who sees it, and the way to change it (ADR 0151). */
 function WhoSeesLine({ action: a }: { action: AgentAction }) {

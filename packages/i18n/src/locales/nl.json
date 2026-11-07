@@ -2658,7 +2658,8 @@
       "updated_status": "<b>#{{number}}</b> verplaatst naar {{status}} · {{title}}",
       "updated_priority": "Prioriteit van <b>#{{number}}</b> op {{priority}} gezet · {{title}}",
       "assigned": "<b>#{{number}}</b> toegewezen aan {{assignee}} · {{title}}",
-      "assigned_self": "<b>#{{number}}</b> zelf opgepakt · {{title}}"
+      "assigned_self": "<b>#{{number}}</b> zelf opgepakt · {{title}}",
+      "files": "Bijgevoegd: {{names}}"
     },
     "memory": {
       "saved": "Opgeslagen in <b>geheugen</b>: {{text}}",
@@ -2713,7 +2714,8 @@
       "labels": "de labels",
       "dueDate": "de deadline",
       "githubUrl": "de GitHub-link",
-      "criteria": "de criteria"
+      "criteria": "de criteria",
+      "files": "de bijlagen"
     },
     "routineFields": {
       "name": "de naam",
@@ -6183,7 +6185,8 @@
       "add": "Bestanden toevoegen",
       "addHint": "of sleep ze hierheen",
       "grid": "Raster",
-      "empty": "Nog geen bijlagen. Sleep bestanden hierheen of plak een screenshot.",
+      "emptyTitle": "De bestanden van de taak staan hier",
+      "empty": "Sleep bestanden hierheen, plak een screenshot of stuur ze in het gesprek van de taak.",
       "fromCreation": "Bij het maken · {{when}}",
       "fromComment": "Reactie van {{name}} · {{when}}",
       "linked": "Gekoppeld door {{name}}"
@@ -6212,6 +6215,8 @@
       "github_linked": "heeft het aan GitHub gekoppeld",
       "github_unlinked": "heeft de GitHub-link verwijderd",
       "artifact_linked": "heeft een bestand toegevoegd",
+      "files_attached": "heeft {{names}} toegevoegd",
+      "files_removed": "heeft {{names}} uit de bijlagen gehaald",
       "criterion_checked": "heeft het criterium \"{{text}}\" aangevinkt",
       "criterion_unchecked": "heeft het criterium \"{{text}}\" uitgevinkt",
       "agent_asked": "heeft {{name}} gevraagd het te doen"

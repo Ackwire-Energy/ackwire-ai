@@ -2838,7 +2838,8 @@
       "updated_status": "<b>#{{number}}</b> перенесена в {{status}} · {{title}}",
       "updated_priority": "Для <b>#{{number}}</b> задан приоритет {{priority}} · {{title}}",
       "assigned": "<b>#{{number}}</b> назначена на {{assignee}} · {{title}}",
-      "assigned_self": "Беру <b>#{{number}}</b> на себя · {{title}}"
+      "assigned_self": "Беру <b>#{{number}}</b> на себя · {{title}}",
+      "files": "Прикреплено: {{names}}"
     },
     "memory": {
       "saved": "Сохранено в <b>память</b>: {{text}}",
@@ -2893,7 +2894,8 @@
       "labels": "метки",
       "dueDate": "срок",
       "githubUrl": "ссылку на GitHub",
-      "criteria": "критерии"
+      "criteria": "критерии",
+      "files": "вложения"
     },
     "routineFields": {
       "name": "название",
@@ -6521,7 +6523,8 @@
       "add": "Добавить файлы",
       "addHint": "или перетащите их сюда",
       "grid": "Сетка",
-      "empty": "Вложений пока нет. Перетащите файлы сюда или вставьте скриншот.",
+      "emptyTitle": "Здесь собираются файлы задачи",
+      "empty": "Перетащите файлы сюда, вставьте скриншот или отправьте их в обсуждении задачи.",
       "fromCreation": "При создании · {{when}}",
       "fromComment": "Комментарий: {{name}} · {{when}}",
       "linked": "Связал(а): {{name}}"
@@ -6550,6 +6553,8 @@
       "github_linked": "связал с GitHub",
       "github_unlinked": "убрал ссылку на GitHub",
       "artifact_linked": "прикрепил(а) файл",
+      "files_attached": "прикрепил(а) {{names}}",
+      "files_removed": "убрал(а) {{names}} из вложений",
       "criterion_checked": "отметил(а) критерий «{{text}}»",
       "criterion_unchecked": "снял(а) отметку с критерия «{{text}}»",
       "agent_asked": "попросил(а) {{name}} выполнить задачу"

@@ -2556,7 +2556,8 @@
       "updated_status": "将 <b>#{{number}}</b> 移至{{status}} · {{title}}",
       "updated_priority": "将 <b>#{{number}}</b> 的优先级设为{{priority}} · {{title}}",
       "assigned": "将 <b>#{{number}}</b> 分配给 {{assignee}} · {{title}}",
-      "assigned_self": "自己接手了 <b>#{{number}}</b> · {{title}}"
+      "assigned_self": "自己接手了 <b>#{{number}}</b> · {{title}}",
+      "files": "附加了 {{names}}"
     },
     "memory": {
       "saved": "已存入<b>记忆</b>：{{text}}",
@@ -2611,7 +2612,8 @@
       "labels": "标签",
       "dueDate": "截止日期",
       "githubUrl": "GitHub 链接",
-      "criteria": "验收标准"
+      "criteria": "验收标准",
+      "files": "附件"
     },
     "routineFields": {
       "name": "名称",
@@ -5952,7 +5954,8 @@
       "add": "添加文件",
       "addHint": "或拖到这里",
       "grid": "网格",
-      "empty": "还没有附件。把文件拖到这里，或粘贴一张截图。",
+      "emptyTitle": "任务的文件都在这里",
+      "empty": "把文件拖到这里、粘贴截图，或在任务对话里发送。",
       "fromCreation": "创建时 · {{when}}",
       "fromComment": "{{name}} 的评论 · {{when}}",
       "linked": "由 {{name}} 关联"
@@ -5981,6 +5984,8 @@
       "github_linked": "已关联到 GitHub",
       "github_unlinked": "已移除 GitHub 链接",
       "artifact_linked": "附加了一个文件",
+      "files_attached": "附加了 {{names}}",
+      "files_removed": "从附件中移除了 {{names}}",
       "criterion_checked": "勾选了标准“{{text}}”",
       "criterion_unchecked": "取消勾选了标准“{{text}}”",
       "agent_asked": "请 {{name}} 来完成"

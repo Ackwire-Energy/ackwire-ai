@@ -1,13 +1,15 @@
 import { type AgentColor, Mention } from "@agenteschat/ui";
 import { memo, type ReactNode, useCallback, useRef } from "react";
 import { ChannelRef } from "@/chat/ChannelRef";
+import { renderIdRef } from "@/chat/IdRef";
 import { splitSettled } from "@/chat/live-text";
 import { ChartAccent, ChartMessage } from "@/components/ChartBlock";
 import { type ChannelRenderer, Markdown, type MentionRenderer, type WikiLinkRenderer } from "@/lib/markdown";
 
 /**
  * Renders a message body as safe Markdown (bold, italic, `code`, ```blocks```,
- * lists, links, line breaks) with @mentions (neutral, an agent's in its tone) and #channel links.
+ * lists, links, line breaks) with @mentions (neutral, an agent's in its tone), #channel links and an internal id as
+ * the pill of what it names (`IdRef`).
  * React elements only: HTML in a message is shown as text.
  *
  * `live` (an agent's answer still streaming): the finished blocks render once
@@ -98,6 +100,7 @@ export function MessageBody({
             mention={mention}
             channel={channel}
             wikiLink={wikiLink}
+            idRef={renderIdRef}
             words={live}
             bare
           />
@@ -119,5 +122,15 @@ const SettledBlocks = memo(function SettledBlocks({
   channel: ChannelRenderer;
   wikiLink?: WikiLinkRenderer;
 }) {
-  return <Markdown source={source} variant="message" mention={mention} channel={channel} wikiLink={wikiLink} bare />;
+  return (
+    <Markdown
+      source={source}
+      variant="message"
+      mention={mention}
+      channel={channel}
+      wikiLink={wikiLink}
+      idRef={renderIdRef}
+      bare
+    />
+  );
 });

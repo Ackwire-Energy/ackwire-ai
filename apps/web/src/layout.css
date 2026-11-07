@@ -3391,6 +3391,20 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   color: var(--ink-muted);
   font-weight: 600;
 }
+/* An internal id in a text, as what it names (IdRef): laid out as a known service's pill (.link-pill below), its words
+   wrapping like the ones around it and its icon in the padding, never ending a line alone. */
+.id-ref {
+  position: relative;
+  padding-left: calc(1em + 6px);
+  overflow-wrap: break-word;
+}
+.id-ref > .ac-icon {
+  position: absolute;
+  top: 0.27em;
+  left: 3px;
+  width: 1em;
+  height: 1em;
+}
 /* A known service's address (LinkPill): the #channel pill, led by the service's logo. Its words wrap like the ones around
    it, so a long repository or title never pushes past a narrow bubble; `break-word`, not `anywhere`, which would let a
    table squeeze the column to a letter per line. The logo sits in the padding, not in the text: a picture in the text

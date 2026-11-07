@@ -66,6 +66,10 @@
   font-size: 12.5px;
   color: var(--faint);
 }
+/* A file's name can be one long word: it breaks inside the receipt rather than running out of it. */
+.ag-rc__files {
+  overflow-wrap: anywhere;
+}
 /* A row's action: words only, as `.cq-link`; its height is the first line's, so the sentence and it share a middle. */
 .ag-rc__btn {
   flex: none;

@@ -41,6 +41,7 @@ export const keys = {
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
   channelCard: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "card"] as const,
   messageCard: (orgId: string, messageId: string) => ["org", orgId, "message", messageId, "card"] as const,
+  idRef: (orgId: string, id: string) => ["org", orgId, "ref", id] as const,
   channelCategories: (orgId: string) => ["org", orgId, "channel-categories"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
   channelPermissions: (orgId: string, channelId: string) =>

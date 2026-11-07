@@ -2,7 +2,7 @@ import type { Issue, IssueActivity } from "@agenteschat/client";
 import { useArtifact, useIssueAction } from "@agenteschat/client";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { whenAt } from "@agenteschat/client/lib/format";
-import { Button, Icon, Segmented, Spinner } from "@agenteschat/ui";
+import { Button, EmptyState, Icon, Segmented, Spinner } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useActors } from "@/components/actors";
@@ -21,18 +21,20 @@ export interface IssueFileEntry {
 }
 
 /**
- * Every file of a task, in the order they came: the ones it was created with, each comment's, then the ones
- * linked later (an agent's report, a file linked by hand).
+ * Every file of a task, in the order they came: the ones it was created with, each comment's, the ones an agent
+ * attached, then the ones linked later (sent in its conversation, an agent's report). Only what is still linked: one
+ * taken off (Desfazer) or in the trash isn't.
  */
 export function useIssueFileEntries(issue: Issue, activity: IssueActivity[]): IssueFileEntry[] {
   const { t, i18n } = useTranslation();
   const actors = useActors();
+  const linked = new Set(issue.artifacts.map((f) => f.id));
   const seen = new Set<string>();
   const out: IssueFileEntry[] = [];
   for (const a of activity) {
     const when = whenAt(t, i18n.language, a.createdAt);
     for (const f of a.attachments ?? []) {
-      if (seen.has(f.id)) continue;
+      if (seen.has(f.id) || !linked.has(f.id)) continue;
       seen.add(f.id);
       out.push({
         id: f.id,
@@ -40,7 +42,9 @@ export function useIssueFileEntries(issue: Issue, activity: IssueActivity[]): Is
         origin:
           a.kind === "comment"
             ? t("issues.files.fromComment", { name: actors.name(a.author), when })
-            : t("issues.files.fromCreation", { when }),
+            : a.event === "artifact_linked"
+              ? t("issues.files.linked", { name: actors.name(a.author) })
+              : t("issues.files.fromCreation", { when }),
       });
     }
   }
@@ -55,7 +59,8 @@ export function useIssueFileEntries(issue: Issue, activity: IssueActivity[]): Is
 /**
  * "Anexos": every file of the task in a grid (the real preview, as in the Drive) or a list, with where each one
  * came from. "Adicionar arquivos", a drop or a paste here sends them as a comment of their own, so the
- * discussion and the history show who attached what.
+ * discussion and the history show who attached what. Empty, one way in: the kit's empty state with its one button
+ * (a drop and a paste still work anywhere on it), which also says files sent in the task's conversation land here.
  */
 export function IssueFiles({ issue, activity }: { issue: Issue; activity: IssueActivity[] }) {
   const { t } = useTranslation();
@@ -84,6 +89,7 @@ export function IssueFiles({ issue, activity }: { issue: Issue; activity: IssueA
     );
   }, [doneIds]);
   const pick = () => picker.current?.click();
+  const empty = entries.length === 0 && adding.items.length === 0;
   return (
     <section
       className="issue-files"
@@ -97,72 +103,83 @@ export function IssueFiles({ issue, activity }: { issue: Issue; activity: IssueA
       }}
       {...drop.props}
     >
-      <div className="issue-files__bar">
-        <Segmented
-          size="sm"
-          label={t("issues.view")}
-          value={view}
-          onValueChange={setView}
-          options={[
-            {
-              value: "grid",
-              label: (
-                <>
-                  <Icon name="grid" size={16} />
-                  {t("issues.files.grid")}
-                </>
-              ),
-            },
-            {
-              value: "list",
-              label: (
-                <>
-                  <Icon name="list" size={16} />
-                  {t("issues.list")}
-                </>
-              ),
-            },
-          ]}
-        />
-        <span className="issue-files__grow" />
-        <Button size="sm" icon="upload" onClick={pick} loading={adding.uploading}>
-          {t("issues.files.add")}
-        </Button>
-        <input
-          ref={picker}
-          type="file"
-          multiple
-          hidden
-          tabIndex={-1}
-          aria-label={t("issues.files.add")}
-          onChange={(e) => {
-            const list = Array.from(e.target.files ?? []);
-            e.target.value = "";
-            if (list.length > 0) adding.onFiles(list);
-          }}
-        />
-      </div>
-      {entries.length === 0 && adding.items.length === 0 && <p className="small muted">{t("issues.files.empty")}</p>}
-      {view === "grid" ? (
-        <div className="issue-files__grid">
-          {entries.map((e) => (
-            <IssueFileTile key={e.id} entry={e} />
-          ))}
-          {adding.items.map((f) => (
-            <PendingTile key={f.key} file={f} onRemove={() => adding.remove(f.key)} />
-          ))}
-          <button type="button" className="issue-files__add" onClick={pick}>
-            <Icon name="upload" />
-            <b>{t("issues.files.add")}</b>
-            <span>{t("issues.files.addHint")}</span>
-          </button>
-        </div>
+      <input
+        ref={picker}
+        type="file"
+        multiple
+        hidden
+        tabIndex={-1}
+        aria-label={t("issues.files.add")}
+        onChange={(e) => {
+          const list = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (list.length > 0) adding.onFiles(list);
+        }}
+      />
+      {empty ? (
+        <EmptyState
+          size="panel"
+          icon="upload"
+          title={t("issues.files.emptyTitle")}
+          actions={
+            <Button variant="primary" icon="upload" onClick={pick} loading={adding.uploading}>
+              {t("issues.files.add")}
+            </Button>
+          }
+        >
+          {t("issues.files.empty")}
+        </EmptyState>
       ) : (
-        <ul className="issue-files__list">
-          {entries.map((e) => (
-            <IssueFileRow key={e.id} entry={e} />
-          ))}
-        </ul>
+        <>
+          <div className="issue-files__bar">
+            <Segmented
+              size="sm"
+              label={t("issues.view")}
+              value={view}
+              onValueChange={setView}
+              options={[
+                {
+                  value: "grid",
+                  label: (
+                    <>
+                      <Icon name="grid" size={16} />
+                      {t("issues.files.grid")}
+                    </>
+                  ),
+                },
+                {
+                  value: "list",
+                  label: (
+                    <>
+                      <Icon name="list" size={16} />
+                      {t("issues.list")}
+                    </>
+                  ),
+                },
+              ]}
+            />
+            <span className="issue-files__grow" />
+            <Button size="sm" icon="upload" onClick={pick} loading={adding.uploading}>
+              {t("issues.files.add")}
+            </Button>
+          </div>
+          {view === "grid" ? (
+            <div className="issue-files__grid">
+              {entries.map((e) => (
+                <IssueFileTile key={e.id} entry={e} />
+              ))}
+              {adding.items.map((f) => (
+                <PendingTile key={f.key} file={f} onRemove={() => adding.remove(f.key)} />
+              ))}
+            </div>
+          ) : (
+            <ul className="issue-files__list">
+              {entries.map((e) => (
+                <IssueFileRow key={e.id} entry={e} />
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </section>
   );

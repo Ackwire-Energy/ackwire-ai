@@ -1067,6 +1067,23 @@ export interface MessageCard {
   author: string;
 }
 
+/**
+ * What an internal id written in a text names (`chat.idRef`), as its pill shows it: a file, a task, or a message (a
+ * run's id: its reply; a background work's: its card). Only what the viewer may see; anything else is a 404 and the
+ * text stays as written.
+ */
+export type IdRef =
+  | {
+      kind: "file";
+      id: string;
+      title: string;
+      artifactKind: string;
+      fileName: string | null;
+      contentType: string | null;
+    }
+  | { kind: "task"; id: string; number: number; title: string }
+  | { kind: "message"; message: MessageCard };
+
 export interface ChannelCard {
   id: string;
   name: string;

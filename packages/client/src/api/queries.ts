@@ -1171,6 +1171,17 @@ export const useMessageCard = (orgId: string, messageId: string) => {
   });
 };
 
+/** What an internal id in a text names (`IdRef`), for its pill; an error (404) leaves the text as written. */
+export const useIdRef = (orgId: string, id: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.idRef(orgId, id),
+    queryFn: () => api.chat.idRef(orgId, id),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+};
+
 export function useJoinChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();

@@ -1505,6 +1505,12 @@ const fileNameOf = (meta: Record<string, unknown>) => {
   return typeof title === "string" ? title : "";
 };
 
+/** The ids of the files on a message (`meta.artifacts`), in order. */
+export const fileIdsOf = (meta: Record<string, unknown> | undefined): string[] =>
+  (Array.isArray(meta?.artifacts) ? (meta.artifacts as { id?: unknown }[]) : []).flatMap((f) =>
+    typeof f?.id === "string" ? [f.id] : [],
+  );
+
 /** Files for a message: the person's own uploads or files of this channel, not deleted. */
 async function attachmentRefsFor(db: Database, userId: string, orgId: string, channelId: string, ids: string[]) {
   const wanted = [...new Set(ids)];

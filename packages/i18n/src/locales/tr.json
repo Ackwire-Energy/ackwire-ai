@@ -2644,7 +2644,8 @@
       "updated_status": "<b>#{{number}}</b> görevini {{status}} durumuna taşıdım · {{title}}",
       "updated_priority": "<b>#{{number}}</b> görevinin önceliğini {{priority}} yaptım · {{title}}",
       "assigned": "<b>#{{number}}</b> görevini {{assignee}} kişisine atadım · {{title}}",
-      "assigned_self": "<b>#{{number}}</b> görevini kendim üstlendim · {{title}}"
+      "assigned_self": "<b>#{{number}}</b> görevini kendim üstlendim · {{title}}",
+      "files": "{{names}} ekledim"
     },
     "memory": {
       "saved": "<b>Belleğe</b> kaydettim: {{text}}",
@@ -2699,7 +2700,8 @@
       "labels": "etiketleri",
       "dueDate": "bitiş tarihini",
       "githubUrl": "GitHub bağlantısını",
-      "criteria": "kriterleri"
+      "criteria": "kriterleri",
+      "files": "ekleri"
     },
     "routineFields": {
       "name": "adı",
@@ -6094,7 +6096,8 @@
       "add": "Dosya ekle",
       "addHint": "ya da buraya sürükleyin",
       "grid": "Izgara",
-      "empty": "Henüz ek yok. Dosyaları buraya sürükleyin ya da bir ekran görüntüsü yapıştırın.",
+      "emptyTitle": "Görevin dosyaları burada toplanır",
+      "empty": "Dosyaları buraya sürükleyin, bir ekran görüntüsü yapıştırın ya da görevin sohbetinde gönderin.",
       "fromCreation": "Oluşturulurken · {{when}}",
       "fromComment": "{{name}} yorumu · {{when}}",
       "linked": "{{name}} bağladı"
@@ -6123,6 +6126,8 @@
       "github_linked": "GitHub'a bağladı",
       "github_unlinked": "GitHub bağlantısını kaldırdı",
       "artifact_linked": "bir dosya ekledi",
+      "files_attached": "{{names}} ekledi",
+      "files_removed": "{{names}} eklerden çıkardı",
       "criterion_checked": "\"{{text}}\" kriterini işaretledi",
       "criterion_unchecked": "\"{{text}}\" kriterinin işaretini kaldırdı",
       "agent_asked": "{{name}} ajanından yapmasını istedi"

@@ -2751,7 +2751,8 @@
       "updated_status": "Ho spostato <b>#{{number}}</b> in {{status}} · {{title}}",
       "updated_priority": "Ho impostato la priorità di <b>#{{number}}</b> su {{priority}} · {{title}}",
       "assigned": "Ho assegnato <b>#{{number}}</b> a {{assignee}} · {{title}}",
-      "assigned_self": "Ho preso <b>#{{number}}</b> io · {{title}}"
+      "assigned_self": "Ho preso <b>#{{number}}</b> io · {{title}}",
+      "files": "Ho allegato {{names}}"
     },
     "memory": {
       "saved": "Salvato in <b>memoria</b>: {{text}}",
@@ -2806,7 +2807,8 @@
       "labels": "le etichette",
       "dueDate": "la scadenza",
       "githubUrl": "il link GitHub",
-      "criteria": "i criteri"
+      "criteria": "i criteri",
+      "files": "gli allegati"
     },
     "routineFields": {
       "name": "il nome",
@@ -6368,7 +6370,8 @@
       "add": "Aggiungi file",
       "addHint": "o trascinali qui",
       "grid": "Griglia",
-      "empty": "Ancora nessun allegato. Trascina qui i file o incolla uno screenshot.",
+      "emptyTitle": "I file dell'attività stanno qui",
+      "empty": "Trascina qui i file, incolla uno screenshot o inviali nella conversazione dell'attività.",
       "fromCreation": "Alla creazione · {{when}}",
       "fromComment": "Commento di {{name}} · {{when}}",
       "linked": "Collegato da {{name}}"
@@ -6397,6 +6400,8 @@
       "github_linked": "l'ha collegata a GitHub",
       "github_unlinked": "ha rimosso il link GitHub",
       "artifact_linked": "ha allegato un file",
+      "files_attached": "ha allegato {{names}}",
+      "files_removed": "ha tolto {{names}} dagli allegati",
       "criterion_checked": "ha spuntato il criterio \"{{text}}\"",
       "criterion_unchecked": "ha tolto la spunta al criterio \"{{text}}\"",
       "agent_asked": "ha chiesto a {{name}} di farla"

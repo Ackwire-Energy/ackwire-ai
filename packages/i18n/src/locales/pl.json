@@ -2837,7 +2837,8 @@
       "updated_status": "Przeniesiono <b>#{{number}}</b> do: {{status}} · {{title}}",
       "updated_priority": "Ustawiono priorytet <b>#{{number}}</b> na {{priority}} · {{title}}",
       "assigned": "Przypisano <b>#{{number}}</b> do: {{assignee}} · {{title}}",
-      "assigned_self": "Biorę <b>#{{number}}</b> na siebie · {{title}}"
+      "assigned_self": "Biorę <b>#{{number}}</b> na siebie · {{title}}",
+      "files": "Załączono {{names}}"
     },
     "memory": {
       "saved": "Zapisano w <b>pamięci</b>: {{text}}",
@@ -2892,7 +2893,8 @@
       "labels": "etykiety",
       "dueDate": "termin",
       "githubUrl": "link do GitHub",
-      "criteria": "kryteria"
+      "criteria": "kryteria",
+      "files": "załączniki"
     },
     "routineFields": {
       "name": "nazwę",
@@ -6554,7 +6556,8 @@
       "add": "Dodaj pliki",
       "addHint": "albo przeciągnij je tutaj",
       "grid": "Siatka",
-      "empty": "Jeszcze nie ma załączników. Przeciągnij tu pliki albo wklej zrzut ekranu.",
+      "emptyTitle": "Tu trafiają pliki zadania",
+      "empty": "Przeciągnij tu pliki, wklej zrzut ekranu albo wyślij je w rozmowie zadania.",
       "fromCreation": "Przy tworzeniu · {{when}}",
       "fromComment": "Komentarz: {{name}} · {{when}}",
       "linked": "Połączone przez: {{name}}"
@@ -6583,6 +6586,8 @@
       "github_linked": "połączono z GitHub",
       "github_unlinked": "usunięto link do GitHub",
       "artifact_linked": "załączył(a) plik",
+      "files_attached": "załączył(a) {{names}}",
+      "files_removed": "usunął(ęła) {{names}} z załączników",
       "criterion_checked": "zaznaczył(a) kryterium „{{text}}”",
       "criterion_unchecked": "odznaczył(a) kryterium „{{text}}”",
       "agent_asked": "poprosił(a) o wykonanie: {{name}}"

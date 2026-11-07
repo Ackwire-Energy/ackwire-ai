@@ -12,6 +12,7 @@ import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/c
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
+import { splitIdRefs } from "@agenteschat/client/lib/id-refs";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { detailsAt, MENTION, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import { messageMediaOf } from "@agenteschat/client/lib/media";
@@ -639,6 +640,8 @@ export function threadFaces<T extends { type: string; id: string | null }>(parti
 export type Inline =
   | { kind: "text" | "bold" | "italic" | "code" | "mention"; text: string }
   | { kind: "link"; text: string; href: string }
+  /** An internal id (`splitIdRefs`): the pill of what it names, or its text as written. */
+  | { kind: "id"; text: string; id: string }
   /** `#name` (`name` lower case): a channel link when it means a channel the viewer sees, else its text. */
   | { kind: "channel"; text: string; name: string };
 export type Block =
@@ -701,11 +704,17 @@ export function mentionTint(
   return { color: tone.ink, backgroundColor: tone.background };
 }
 
-/** `#channel` references, then @mentions in the words between them. */
+/** Internal ids, then `#channel` references, then @mentions in the words between them. */
 function mentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {
-  for (const part of splitChannelRefs(text)) {
-    if (part.name === undefined) atMentions(part.text, out, kind);
-    else out.push({ kind: "channel", text: part.text, name: part.name });
+  for (const piece of splitIdRefs(text)) {
+    if (piece.id !== undefined) {
+      out.push({ kind: "id", text: piece.text, id: piece.id });
+      continue;
+    }
+    for (const part of splitChannelRefs(piece.text)) {
+      if (part.name === undefined) atMentions(part.text, out, kind);
+      else out.push({ kind: "channel", text: part.text, name: part.name });
+    }
   }
 }
 

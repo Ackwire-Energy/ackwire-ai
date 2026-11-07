@@ -13,12 +13,14 @@ import { openPage } from "../ai/parts";
 import { useColors, useDirectory, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
+import { IdRefText } from "./IdRefText";
 import { LinkPillText } from "./LinkPillText";
 import { type Block, type Inline, mentionTint, tableColumnWidths, tableHidden } from "./logic";
 import { MessageRefText } from "./MessageRefText";
 
 /**
- * Inline marks of a message (bold, italic, `code`, links, a message's link as its pill, @mentions, #channels), inside a Text. `channelRefs`: the
+ * Inline marks of a message (bold, italic, `code`, links, a message's link as its pill, an internal id as what it names,
+ * @mentions, #channels), inside a Text. `channelRefs`: the
  * message's `meta.channelRefs` (a renamed channel still links).
  */
 export function Spans({
@@ -81,6 +83,8 @@ export function Spans({
           }
           case "channel":
             return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
+          case "id":
+            return live ? <RNText key={key}>{s.text}</RNText> : <IdRefText key={key} id={s.id} text={s.text} />;
           case "mention": {
             const all = everyone && isEveryoneWord(s.text.slice(1));
             return (

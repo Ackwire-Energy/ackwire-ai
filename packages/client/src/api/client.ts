@@ -132,6 +132,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  IdRef,
   ImportedFile,
   ImportedSource,
   ImportFileInput,
@@ -790,6 +791,8 @@ export interface ApiClient {
     card(orgId: string, channelId: string): Promise<ChannelCard>;
     /** A pasted message link's pill; 404 for a message I can't see (a private channel's, a DM I'm not in). */
     messageCard(orgId: string, messageId: string): Promise<MessageCard>;
+    /** What an internal id in a text names, as its pill; 404 for anything I can't see or that isn't ours. */
+    idRef(orgId: string, id: string): Promise<IdRef>;
     update(orgId: string, channelId: string, input: ChannelInput & { name?: string }): Promise<Channel>;
     /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
     archive(orgId: string, channelId: string): Promise<void>;

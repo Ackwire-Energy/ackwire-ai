@@ -2747,7 +2747,8 @@
       "updated_status": "Moví <b>#{{number}}</b> a {{status}} · {{title}}",
       "updated_priority": "Puse <b>#{{number}}</b> en prioridad {{priority}} · {{title}}",
       "assigned": "Asigné <b>#{{number}}</b> a {{assignee}} · {{title}}",
-      "assigned_self": "Me asigné <b>#{{number}}</b> · {{title}}"
+      "assigned_self": "Me asigné <b>#{{number}}</b> · {{title}}",
+      "files": "Adjunté {{names}}"
     },
     "memory": {
       "saved": "Guardé en la <b>memoria</b>: {{text}}",
@@ -2802,7 +2803,8 @@
       "labels": "las etiquetas",
       "dueDate": "la fecha de entrega",
       "githubUrl": "el enlace de GitHub",
-      "criteria": "los criterios"
+      "criteria": "los criterios",
+      "files": "los adjuntos"
     },
     "routineFields": {
       "name": "el nombre",
@@ -6310,7 +6312,8 @@
       "add": "Agregar archivos",
       "addHint": "o arrástralos aquí",
       "grid": "Cuadrícula",
-      "empty": "Todavía no hay adjuntos. Arrastra archivos aquí o pega una captura.",
+      "emptyTitle": "Los archivos de la tarea quedan aquí",
+      "empty": "Arrastra archivos aquí, pega una captura o envíalos en la conversación de la tarea.",
       "fromCreation": "Al crearla · {{when}}",
       "fromComment": "Comentario de {{name}} · {{when}}",
       "linked": "Vinculado por {{name}}"
@@ -6339,6 +6342,8 @@
       "github_linked": "lo enlazó a GitHub",
       "github_unlinked": "quitó el enlace de GitHub",
       "artifact_linked": "adjuntó un archivo",
+      "files_attached": "adjuntó {{names}}",
+      "files_removed": "quitó {{names}} de los adjuntos",
       "criterion_checked": "marcó el criterio \"{{text}}\"",
       "criterion_unchecked": "desmarcó el criterio \"{{text}}\"",
       "agent_asked": "le pidió a {{name}} que lo hiciera"

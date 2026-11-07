@@ -2692,6 +2692,8 @@ export const en = {
       updated_priority: "Set <b>#{{number}}</b> to {{priority}} priority · {{title}}",
       assigned: "Assigned <b>#{{number}}</b> to {{assignee}} · {{title}}",
       assigned_self: "Took <b>#{{number}}</b> myself · {{title}}",
+      /** Under the line: the files that went with the task (their names). */
+      files: "Attached {{names}}",
     },
     memory: {
       saved: "Saved to <b>memory</b>: {{text}}",
@@ -2753,6 +2755,7 @@ export const en = {
       dueDate: "the due date",
       githubUrl: "the GitHub link",
       criteria: "the criteria",
+      files: "the attachments",
     },
     routineFields: {
       name: "the name",
@@ -6139,7 +6142,8 @@ export const en = {
       add: "Add files",
       addHint: "or drop them here",
       grid: "Grid",
-      empty: "No attachments yet. Drop files here or paste a screenshot.",
+      emptyTitle: "This task's files live here",
+      empty: "Drop files here, paste a screenshot or send them in the task's conversation.",
       fromCreation: "At creation · {{when}}",
       fromComment: "{{name}}'s comment · {{when}}",
       linked: "Linked by {{name}}",
@@ -6165,6 +6169,8 @@ export const en = {
       github_linked: "linked it to GitHub",
       github_unlinked: "removed the GitHub link",
       artifact_linked: "attached a file",
+      files_attached: "attached {{names}}",
+      files_removed: "removed {{names}} from the attachments",
       criterion_checked: 'checked the criterion "{{text}}"',
       criterion_unchecked: 'unchecked the criterion "{{text}}"',
       agent_asked: "asked {{name}} to do it",

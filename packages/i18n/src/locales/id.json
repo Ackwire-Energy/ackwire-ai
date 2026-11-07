@@ -2566,7 +2566,8 @@
       "updated_status": "Memindahkan <b>#{{number}}</b> ke {{status}} · {{title}}",
       "updated_priority": "Mengatur prioritas <b>#{{number}}</b> ke {{priority}} · {{title}}",
       "assigned": "Menugaskan <b>#{{number}}</b> ke {{assignee}} · {{title}}",
-      "assigned_self": "Mengambil <b>#{{number}}</b> sendiri · {{title}}"
+      "assigned_self": "Mengambil <b>#{{number}}</b> sendiri · {{title}}",
+      "files": "Melampirkan {{names}}"
     },
     "memory": {
       "saved": "Disimpan ke <b>memori</b>: {{text}}",
@@ -2621,7 +2622,8 @@
       "labels": "label",
       "dueDate": "tenggat",
       "githubUrl": "tautan GitHub",
-      "criteria": "kriteria"
+      "criteria": "kriteria",
+      "files": "lampiran"
     },
     "routineFields": {
       "name": "nama",
@@ -5940,7 +5942,8 @@
       "add": "Tambah file",
       "addHint": "atau seret ke sini",
       "grid": "Kisi",
-      "empty": "Belum ada lampiran. Seret file ke sini atau tempel tangkapan layar.",
+      "emptyTitle": "File tugas ini ada di sini",
+      "empty": "Seret file ke sini, tempel tangkapan layar, atau kirim di percakapan tugas.",
       "fromCreation": "Saat dibuat · {{when}}",
       "fromComment": "Komentar {{name}} · {{when}}",
       "linked": "Ditautkan oleh {{name}}"
@@ -5969,6 +5972,8 @@
       "github_linked": "menautkannya ke GitHub",
       "github_unlinked": "menghapus tautan GitHub",
       "artifact_linked": "melampirkan file",
+      "files_attached": "melampirkan {{names}}",
+      "files_removed": "menghapus {{names}} dari lampiran",
       "criterion_checked": "mencentang kriteria \"{{text}}\"",
       "criterion_unchecked": "menghapus centang kriteria \"{{text}}\"",
       "agent_asked": "meminta {{name}} mengerjakannya"
