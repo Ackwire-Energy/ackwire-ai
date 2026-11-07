@@ -4,9 +4,9 @@ import { filesOfRun } from "./artifacts";
 import { routineBriefOfRun } from "./background";
 import { sameSentence } from "./context/items";
 import { deliverNotice, publishDelivery } from "./delivery";
-import { cutText } from "./format";
+import { cutText, stringsOf } from "./format";
 import type { Judge } from "./judge";
-import { insertMessage, type Message, unreachedAgents, unreachedNote } from "./messages";
+import { insertMessage, type Message, unreachedAgents, unreachedNote, unreachedPeople } from "./messages";
 import { runReadOutsideById } from "./outside";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
@@ -89,7 +89,7 @@ export async function deliverRoutineReport(
   if (!open) return null;
   const relays = await runReadOutsideById(tx, run.orgId, run.id);
   if (!input.wake) {
-    // Agents it names outside that conversation: its mention reaches nobody, and the tool's result says so.
+    // Agents and people it names outside that conversation: its mention reaches nobody, and the tool's result says so.
     const unreached = await unreachedAgents(tx, {
       orgId: run.orgId,
       channelId: brief.deliverTo.channelId,
@@ -97,6 +97,7 @@ export async function deliverRoutineReport(
       body: text,
       handedTo: run.id,
     });
+    const missed = await unreachedPeople(tx, { orgId: run.orgId, channelId: brief.deliverTo.channelId, body: text });
     // Its saved files come with it, as a reply's do: no other card of the run reaches the people.
     const files = await filesOfRun(tx, run.orgId, run.id, brief.deliverTo.channelId);
     const message = await insertMessage(tx, {
@@ -110,6 +111,7 @@ export async function deliverRoutineReport(
         routine: { id: brief.routineId, name: brief.name, runId: brief.routineRunId },
         ...(files.length > 0 ? { artifacts: files } : {}),
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+        ...(missed.length > 0 ? { unreachedPeople: missed } : {}),
         ...(relays ? { readOutside: true } : {}),
       },
     });
@@ -502,8 +504,8 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
       });
       if ("refused" in handed) return { content: handed.refused ?? "", isError: true };
       await publishDelivery(deps.pubsub, handed.delivered);
-      const missed = handed.delivered.message.meta.unreachedAgents;
-      const note = Array.isArray(missed) ? unreachedNote(missed as string[], "that conversation", false) : "";
+      const { unreachedAgents: agents, unreachedPeople: people } = handed.delivered.message.meta;
+      const note = unreachedNote(stringsOf(agents), "that conversation", false, stringsOf(people), true);
       return {
         content:
           input.wake_me === true

@@ -10,7 +10,14 @@ import { cutText } from "./format";
 import type { GifMedia } from "./media";
 import type { AgentGifPoster } from "./media-tools";
 import { messageLink } from "./message-links";
-import { insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
+import {
+  insertMessage,
+  MAX_MESSAGE_LENGTH,
+  messageView,
+  unreachedAgents,
+  unreachedNote,
+  unreachedPeople,
+} from "./messages";
 import { enqueue } from "./outbox";
 import { runReadOutsideById } from "./outside";
 import { actingRoutineOfCall, personBehindCall } from "./requester";
@@ -262,13 +269,14 @@ export function createChatToolSource(deps: {
             });
             files.push({ id: shared.artifact.id, version: shared.artifact.version, title: shared.artifact.title });
           }
-          // A mention reaches only that channel's members: the result names the agents it missed.
+          // A mention reaches only that channel's members: the result names the agents and people it missed.
           const unreached = await unreachedAgents(ctx.db, {
             orgId: ctx.orgId,
             channelId: channel.id,
             authorAgentId: ctx.agentId,
             body: text,
           });
+          const missed = await unreachedPeople(ctx.db, { orgId: ctx.orgId, channelId: channel.id, body: text });
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
             channelId: channel.id,
@@ -281,6 +289,7 @@ export function createChatToolSource(deps: {
               ...(gif ? { media: gif } : {}),
               postedFrom: origin(ctx),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+              ...(missed.length > 0 ? { unreachedPeople: missed } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
           });
@@ -303,7 +312,7 @@ export function createChatToolSource(deps: {
             if (view) await publishMessageCreated(deps.pubsub, view);
           }
           if (moving && run) await moveRun({ db: ctx.db, pubsub: deps.pubsub }, run, message);
-          const note = unreachedNote(unreached, `#${channel.name}`, true);
+          const note = unreachedNote(unreached, `#${channel.name}`, true, missed, routine !== null);
           const next = moving
             ? `Your replies land there from now on, at its top level, your background work's updates and report too; the people where you were see a line linking to it. Go on with the work.`
             : "Tell the person it's there.";
@@ -406,6 +415,7 @@ export function createChatToolSource(deps: {
             authorAgentId: ctx.agentId,
             body: text,
           });
+          const missed = await unreachedPeople(ctx.db, { orgId: ctx.orgId, channelId: dm.id, body: text });
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
             channelId: dm.id,
@@ -417,6 +427,7 @@ export function createChatToolSource(deps: {
               ...(files.length > 0 ? { artifacts: files } : {}),
               agentDm: origin(ctx),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+              ...(missed.length > 0 ? { unreachedPeople: missed } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
           });
@@ -444,7 +455,7 @@ export function createChatToolSource(deps: {
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);
             if (view) await publishMessageCreated(deps.pubsub, view);
           }
-          const note = unreachedNote(unreached, `your DM with ${to.name}`, false);
+          const note = unreachedNote(unreached, `your DM with ${to.name}`, false, missed, routine !== null);
           return {
             content: `Sent to ${to.name} in your DM with them${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. Tell the person who asked.${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: dm.id } },

@@ -30,7 +30,7 @@ import { peopleAllIn } from "./channels";
 import { consultationOrigin, type HandOff, handOffsFrom } from "./consultations";
 import { widgetRunContext } from "./dashboards/refresh-context";
 import { isAgentOnlyDm } from "./dms";
-import { cutText } from "./format";
+import { cutText, stringsOf } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
@@ -2124,14 +2124,15 @@ function undoNotes(meta: Record<string, unknown> | undefined): string {
   return notes.map((n) => `[Undo]: ${n}. Don't redo it unless asked.`).join("\n");
 }
 
-/** `meta.unreachedAgents` (the agents its mentions didn't reach: not in this conversation) as a line; "" when none. */
+/**
+ * `meta.unreachedAgents` and `meta.unreachedPeople` (who its mentions didn't reach: not in this conversation) as a
+ * line; "" when none.
+ */
 function unreachedLine(meta: Record<string, unknown> | undefined, canAdd: boolean): string {
   const reach = reachOf(meta);
   const settled = new Set(reach.map((e) => e.handle));
-  const handles = Array.isArray(meta?.unreachedAgents)
-    ? meta.unreachedAgents.filter((h): h is string => typeof h === "string" && !settled.has(h))
-    : [];
-  const note = unreachedNote(handles, "this conversation", canAdd);
+  const handles = stringsOf(meta?.unreachedAgents).filter((h) => !settled.has(h));
+  const note = unreachedNote(handles, "this conversation", canAdd, stringsOf(meta?.unreachedPeople));
   return [note ? `[Not delivered]: ${note}` : "", reachNote(reach)].filter(Boolean).join("\n");
 }
 
