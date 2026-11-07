@@ -50,7 +50,11 @@ export function Popover({
   const [pull, setPull] = useState(0);
   const pulled = useRef({ now: 0, base: 0 });
   const watch = useRef<ResizeObserver | null>(null);
+  // The hover card's ref rides on this stable one: a ref that changed each render would rerun `fit` and reset the pull.
+  const hoverRef = useRef(hover?.content.ref);
+  hoverRef.current = hover?.content.ref;
   const fit = useCallback((el: HTMLDivElement | null) => {
+    hoverRef.current?.(el);
     watch.current?.disconnect();
     watch.current = null;
     if (!el) {
@@ -62,9 +66,15 @@ export function Popover({
     const check = () => {
       const room = Number.parseFloat(getComputedStyle(el).getPropertyValue("--radix-popover-content-available-height"));
       if (!pulled.current.now) pulled.current.base = room;
+      // Measured without its scrollbar: the narrower rows wrap a line more than the card shows once it fits.
+      const was = el.style.overflowY;
+      el.style.overflowY = "hidden";
+      const scroll = el.scrollHeight;
+      const client = el.clientHeight;
+      el.style.overflowY = was;
       const want = pullToFit({
-        scroll: el.scrollHeight,
-        client: el.clientHeight,
+        scroll,
+        client,
         height: el.offsetHeight,
         room,
         base: pulled.current.base,
@@ -104,12 +114,12 @@ export function Popover({
           className={cx("ac-menu ac-popover", className)}
           side={side}
           align={align}
-          ref={fit}
           sideOffset={6 - pull}
           collisionPadding={EDGE_ROOM}
           aria-label={label}
           role="dialog"
           {...hover?.content}
+          ref={fit}
           onOpenAutoFocus={(e) => {
             if (moveFocus || !e.currentTarget) return;
             e.preventDefault();
