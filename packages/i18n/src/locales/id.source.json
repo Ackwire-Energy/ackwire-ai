@@ -25585,6 +25585,9 @@
   "toolNames.order": {
     "value": "modifiers-first"
   },
+  "toolNames.catalog": {
+    "value": "en"
+  },
   "toolNames.verb.get": {
     "value": "Get"
   },

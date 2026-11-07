@@ -10510,6 +10510,7 @@
   },
   "toolNames": {
     "order": "modifiers-first",
+    "catalog": "none",
     "verb": {
       "get": "Getir",
       "list": "Listele",

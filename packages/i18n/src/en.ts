@@ -10314,6 +10314,11 @@ export const en = {
      * orçamento da campanha) or "verb-last" (ja, ko: the words, then the verb).
      */
     order: "modifiers-first",
+    /**
+     * Which column of the tool catalog (`@agenteschat/client` `lib/tool-labels.ts`) names this language's tools, kept
+     * in English: "en", "pt-BR", or "none" (then a name is built from the verbs and nouns below).
+     */
+    catalog: "en",
     verb: {
       get: "Get",
       list: "List",

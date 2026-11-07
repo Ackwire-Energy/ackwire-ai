@@ -11372,6 +11372,7 @@
   },
   "toolNames": {
     "order": "head-first",
+    "catalog": "none",
     "verb": {
       "get": "Pobierz",
       "list": "Wyświetl",

@@ -2,6 +2,7 @@ import type { AccessTool } from "@agenteschat/client";
 import { type AccessResource, type LevelState, toolsAt } from "@agenteschat/client/lib/access-levels";
 import type { ConnectedItem } from "@agenteschat/client/lib/connected";
 import { humanize } from "@agenteschat/client/lib/custom-tools";
+import { labelIsName } from "@agenteschat/client/lib/tool-labels";
 import { partsOf, type ReviewTool, reviewTool, toolName } from "@agenteschat/client/lib/tool-review";
 import { Button, DetailsDialog, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -28,7 +29,7 @@ function fromAccessTool(t: TFunction, r: AccessResource, tool: AccessTool): Revi
   const level = tool.sensitive ? "approval" : tool.readOnly ? "read" : "write";
   return {
     name: tool.name,
-    label: r.custom ? tool.label || toolName(t, parts, tool.name) : toolName(t, parts, tool.name),
+    label: r.custom && !labelIsName(tool.label ?? "", tool.name) ? (tool.label ?? "") : toolName(t, parts, tool.name),
     description: tool.description,
     subject: parts.subject,
     level,

@@ -3,6 +3,7 @@ import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import {
   aheadEndLine,
   alwaysRoutineName,
+  approvalDetail,
   approvalWaitsFor,
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
@@ -165,9 +166,9 @@ export function ApprovalSheet({
             ) : (
               <>
                 {/* A connector's detail is its raw call (`tool · key=value`); its values are in the table, in words. */}
-                {a.detail && !a.connector ? (
+                {!a.connector && approvalDetail(a, i18n.language) ? (
                   <Text variant="body" tone="ink2" style={styles.detail}>
-                    {a.detail}
+                    {approvalDetail(a, i18n.language)}
                   </Text>
                 ) : null}
                 <ApprovalDetails approval={a} max={Number.POSITIVE_INFINITY} long />

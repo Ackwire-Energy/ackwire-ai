@@ -8,7 +8,7 @@ import {
   useRoutines,
   useToolChanges,
 } from "@agenteschat/client";
-import { approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { approvalDetail, approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft, upperFirst } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
@@ -369,7 +369,7 @@ function ApprovalSource({ approval: a }: { approval: Approval }) {
   const detail = a.email
     ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
     : !a.connector
-      ? a.detail
+      ? approvalDetail(a, i18n.language)
       : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   return detail ? <WaitingSource mark={<ApprovalMark approval={a} size={20} />} text={detail} /> : null;
 }

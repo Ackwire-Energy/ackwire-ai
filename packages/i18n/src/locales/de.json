@@ -10574,6 +10574,7 @@
   },
   "toolNames": {
     "order": "head-first",
+    "catalog": "none",
     "verb": {
       "get": "Hole",
       "list": "Liste",

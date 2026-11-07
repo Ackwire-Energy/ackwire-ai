@@ -10971,6 +10971,7 @@
   },
   "toolNames": {
     "order": "head-first",
+    "catalog": "none",
     "verb": {
       "get": "Obtenir",
       "list": "Lister",

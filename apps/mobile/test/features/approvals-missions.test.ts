@@ -40,6 +40,28 @@ import {
 import { approval, decision, mission, translator } from "./fixtures";
 
 describe("requests to approve", () => {
+  test("a custom server's tool, as Higgsfield's: its words, never its code name, and Aprovar sempre, as on the web", async () => {
+    const pt = await translator("pt-BR");
+    const image = approval({
+      id: "img",
+      tool: "higgsfield_generate_image",
+      scope: "custom:c-hf:approval",
+      connector: "custom:c-hf",
+      title: "Higgsfield: Generate image",
+      detail: "generate_image · prompt=Capa",
+      params: { prompt: "Capa" },
+      approveAlways: { tool: "generate_image", actions: [] },
+    });
+    expect(approvalTitle(pt, image)).toBe("Gerar imagem");
+    expect(approveAlwaysOffered(image)).toBe(true);
+    expect(approveAlwaysHint(pt, image, "Ada")).toBe(
+      "Cobre Gerar imagem, de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.",
+    );
+    expect(approvalRuleWords(pt, { tool: "generate_image", action: "", toolLabel: "Generate image" })).toBe(
+      "Gerar imagem",
+    );
+  });
+
   test("deploys, deletes and sends take a hold; merges are a tap", () => {
     expect(approvalRisk({ tool: "github_merge_pull_request", scope: "github:pulls.merge" })).toBe("normal");
     expect(approvalRisk({ tool: "deploy_production", scope: "vercel:deploy" })).toBe("high");
@@ -95,10 +117,10 @@ describe("Aprovar sempre on the phone", () => {
 
   test("under the button, before the tap: what it approves for good, with any values, and where to undo it", async () => {
     expect(approveAlwaysHint(await translator("pt-BR"), offered, "Ada")).toBe(
-      "Cobre Criar comentário da issue (Github), de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.",
+      "Cobre Comentar numa issue (GitHub), de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
     expect(approveAlwaysHint(await translator("en"), offered, "Theo")).toBe(
-      "Covers Create issue comment (Github) from now on, with any values. To undo: Tools and access, on Theo's page.",
+      "Covers Comment on an issue (GitHub) from now on, with any values. To undo: Tools and access, on Theo's page.",
     );
   });
 
@@ -113,10 +135,10 @@ describe("Aprovar sempre on the phone", () => {
     expect(approveAlwaysLabel(pt, reads)).toBe("Aprovar sempre leituras");
     expect(approveAlwaysLabel(en, offered)).toBe("Always approve");
     expect(approveAlwaysHint(pt, reads, "Theo")).toBe(
-      "Cobre só leituras de Executar sql, neste projeto (project_id=p1), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do Theo.",
+      "Cobre só leituras de Rodar SQL, neste projeto (project_id=p1), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do Theo.",
     );
     expect(approveAlwaysHint(en, reads, "Ada")).toBe(
-      "Covers only reads by Run sql in this project (project_id=p1) from now on. Anything that changes data still asks. To undo: Tools and access, on Ada's page.",
+      "Covers only reads by Run SQL in this project (project_id=p1) from now on. Anything that changes data still asks. To undo: Tools and access, on Ada's page.",
     );
     const rule = { tool: "execute_sql", action: "sql-read:project_id=p1", toolLabel: "Execute sql" };
     expect(approvalRuleWords(pt, rule)).toBe("Leituras de Execute sql · project_id=p1");
