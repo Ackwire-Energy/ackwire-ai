@@ -152,27 +152,30 @@ export function ToastProvider({
                   <ToastWords toast={toast} />
                 )}
               </span>
-              {toast.actions?.map((action) => (
+              {/* One item after the words (`.ac-actrow`): the action and the × go under them together, never the × alone. */}
+              <span className="ac-toast__acts">
+                {toast.actions?.map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    className="ac-btn ac-btn--ghost ac-btn--sm"
+                    onClick={() => {
+                      action.run();
+                      store.dismiss(toast.id);
+                    }}
+                  >
+                    {action.label}
+                  </button>
+                ))}
                 <button
-                  key={action.label}
                   type="button"
-                  className="ac-btn ac-btn--ghost ac-btn--sm"
-                  onClick={() => {
-                    action.run();
-                    store.dismiss(toast.id);
-                  }}
+                  className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"
+                  aria-label={closeLabel}
+                  onClick={() => store.dismiss(toast.id)}
                 >
-                  {action.label}
+                  <Icon name="close" size={16} />
                 </button>
-              ))}
-              <button
-                type="button"
-                className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"
-                aria-label={closeLabel}
-                onClick={() => store.dismiss(toast.id)}
-              >
-                <Icon name="close" size={16} />
-              </button>
+              </span>
             </div>
           ))}
         </div>,

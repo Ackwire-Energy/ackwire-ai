@@ -119,7 +119,7 @@ export function HomePage() {
       {showSteps && lodi && (
         <Link className="home-continue" to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: lodi.id }}>
           <AgentAvatar agentId={lodi.id} name={lodi.name} size="sm" />
-          <span>
+          <span className="home-continue__text">
             {t("home.firstRun", {
               done: firstRun.steps.filter((s) => firstRun.done.has(s)).length,
               total: firstRun.steps.length,

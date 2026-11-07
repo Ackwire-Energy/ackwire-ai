@@ -301,12 +301,12 @@ html:not([data-pointer]) .tp-gallery__item:focus-visible {
   box-shadow: var(--card-well-shadow);
 }
 
-/* Under the templates: the other ways in (an import, one agent from scratch). */
+/* Under the templates: the other ways in (an import, one agent from scratch). The dialog body's gap is its room above. */
 .tp-gallery__more {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  margin: 14px 0 0;
+  margin: 0;
 }
 .tp-gallery__error {
   color: var(--danger);

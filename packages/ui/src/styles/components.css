@@ -5313,8 +5313,15 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
     --toast-button: var(--control-h-md);
   }
 }
+/* Its action and its × as one item after the words, which `.ac-actrow` moves under them together. */
+.ac-toast__acts {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--icon-gap);
+}
 /* The close's × stands as far from the right edge as the tone's icon from the left: it reaches out by its air. */
-.ac-toast > .ac-btn--icon:last-child {
+.ac-toast__acts > .ac-btn--icon:last-child {
   margin-inline-end: calc((var(--control-icon-sm) - var(--toast-button)) / 2);
 }
 .ac-toast > :is(.ac-icon, .ac-toast__text) {
@@ -10781,10 +10788,9 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 /* Through the row, so a component's own `flex: 1` on its words doesn't win. A line breaks on the words' 24 characters,
    capped at their own length so a short title never sends its action down; then they grow, never wider than all of
-   them on one line. */
+   them on one line. A basis, not a width: a row as wide as its content (a toast) still sizes to all of them. */
 .ac-actrow > .ac-actrow__text {
-  flex: 1 1 auto;
-  width: 24ch;
+  flex: 1 1 24ch;
   max-width: max-content;
   min-width: 0;
 }

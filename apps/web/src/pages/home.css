@@ -224,7 +224,7 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   font-weight: 600;
   text-decoration: none;
 }
-.home-continue > span {
+.home-continue__text {
   flex: 1;
   min-width: 0;
 }
