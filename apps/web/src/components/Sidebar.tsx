@@ -32,6 +32,7 @@ import {
   usePrefetchRecent,
   useSidebarItems,
   useSkills,
+  useTaskMentions,
   useUnreadThreads,
 } from "@agenteschat/client";
 import { agentSections, groupOf } from "@agenteschat/client/lib/agent-groups";
@@ -239,6 +240,8 @@ export function Sidebar() {
   // Threads: how many open missions wait for me (the server counts: a decision, a review, a suggestion…).
   const missionList = useMissionList(orgId, MISSIONS_WAITING_COUNT);
   const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
+  // Tarefas: mentions of me in a task's conversation not read there yet, red like a channel's.
+  const taskMentions = useTaskMentions(orgId);
   // …and whether a thread I follow has a reply I haven't read: the entry lights like an unread channel.
   const unreadThreads = useUnreadThreads(orgId).data ?? 0;
   // The tools on top, each where I put it (the rest in More); one there "when there's something" while its count is.
@@ -269,6 +272,8 @@ export function Sidebar() {
       >
         {missionsWaiting}
       </CountChip>
+    ) : id === "issues" && taskMentions > 0 ? (
+      <UnreadCount count={taskMentions} mentions />
     ) : null;
   // The name is on the row: only the rail, which hides it, says it on hover.
   const railTip = (id: SidebarItem | "home") => (rail ? t(`shell.${id}`) : undefined);

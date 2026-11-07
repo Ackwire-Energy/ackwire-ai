@@ -47,7 +47,7 @@ import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
 import { computerWaitSql, KEPT_ON_HOLD, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
-import { admitTaskAgents } from "./task-access";
+import { admitTaskAgents, taskReaderSql } from "./task-access";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 import { type WorkView, workViews } from "./works";
@@ -703,6 +703,13 @@ export async function insertMessageWithRuns(
       ), fresh as (
         -- The write goes ahead: no client id, or this send claimed it.
         select 1 where ${clientId}::text is null or exists (select 1 from claimed)
+      ), task_readers_named as (
+        -- A task's conversation (ADR 0145) has no people in it: who is named there and sees the task is mentioned.
+        select om.user_id from ${schema.organizationMembers} om
+        where om.org_id = ${input.orgId}::uuid and om.user_id is distinct from ${userId}
+          and om.handle = any(${handles}::text[])
+          and exists (select 1 from ${channels} tc where tc.id = ${input.channelId}::uuid and tc.kind = 'task')
+          and ${taskReaderSql(sql`${input.channelId}::uuid`, sql`om.user_id`)}
       ), muted as (
         -- A mission's thread (ADR 0029): only its owner and those who can decide make its agent act.
         -- Anyone else addressing it starts nothing: the message becomes a suggestion.
@@ -884,7 +891,8 @@ export async function insertMessageWithRuns(
             where sr.id = ${runId}::uuid)),
           ${body},
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
-          coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
+          coalesce((select array_agg(user_id) from (select user_id from mentioned_people
+            union select user_id from task_readers_named) mp), '{}'::text[]),
           -- Only this statement says a message mentions everyone.
           (${JSON.stringify(input.meta ?? {})}::jsonb - 'mentionsEveryone' - 'everyoneAgentIds')
             || coalesce((select jsonb_build_object('mentionsEveryone', true) from everyone), '{}'::jsonb)

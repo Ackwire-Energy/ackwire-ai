@@ -4,6 +4,7 @@ import {
   useDms,
   useMissionList,
   useNotificationCount,
+  useTaskMentions,
   useThreadList,
   useWorkingRuns,
 } from "@agenteschat/client";
@@ -130,6 +131,11 @@ export function useUnreadThreads() {
       ),
     [threads.data],
   );
+}
+
+/** Mentions of you in tasks' conversations you haven't read there: Tarefas' badge in Você. */
+export function useTaskMentionCount() {
+  return useTaskMentions(useOrgId());
 }
 
 /** Requests you may decide now, the one closest to expiring first. */

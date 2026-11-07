@@ -25,6 +25,7 @@ import { pendingCommandsSql } from "./mission-command-rules";
 import { quietNoticeSql } from "./notices";
 import { can, type Membership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
+import { taskReaderSql } from "./task-access";
 
 const { threads, messages, channels, channelMembers } = schema;
 
@@ -1410,6 +1411,40 @@ export async function countUnreadThreads(db: Database, userId: string, orgId: st
       ) x`),
   );
   return Number(row?.n ?? 0);
+}
+
+/** A task's conversation with something I haven't read (ADR 0145): replies, and of them the ones that mention me. */
+export interface UnreadTask {
+  issueId: string;
+  /** Replies I haven't read: every one in a conversation I follow, else only those that mention me. */
+  unread: number;
+  mentions: number;
+}
+
+/**
+ * The tasks whose conversation has a reply I haven't read, by the threads' rule (`unreadReplySql`, at most
+ * `MAX_THREAD_UNREAD` each), only where I see the task now: people are never members of a task's channel, so there is
+ * no joining to count from, and a mention counts until I read it there.
+ */
+export async function unreadTaskConversations(db: Database, userId: string, orgId: string): Promise<UnreadTask[]> {
+  await requirePermission(db, userId, orgId, "read");
+  const rows = rowsOf<{ id: string; following: boolean; n: number | string; m: number | string }>(
+    await db.execute(sql`select i.id, f.following, u.n, u.m from ${schema.issues} i
+        cross join lateral (select ${followsThreadSql(orgId, userId, sql`i.conversation_root_id`)} as following) f
+        cross join lateral (select count(*)::int as n,
+            count(*) filter (where ${userId} = any(ur.mentioned_user_ids))::int as m
+          from (select ur.mentioned_user_ids from ${messages} ur
+            where ${unreadReplySql(orgId, userId, sql`i.conversation_root_id`, sql`'-infinity'::timestamptz`)}
+            limit ${MAX_THREAD_UNREAD}) ur) u
+        where i.org_id = ${orgId}::uuid and i.conversation_channel_id is not null and i.conversation_root_id is not null
+          and (u.m > 0 or (f.following and u.n > 0))
+          and ${taskReaderSql(sql`i.conversation_channel_id`, sql`${userId}`)}`),
+  );
+  return rows.map((r) => ({
+    issueId: r.id,
+    unread: Number(r.following === true ? r.n : r.m),
+    mentions: Number(r.m),
+  }));
 }
 
 // ── Run context ───────────────────────────────────────────────────────────────

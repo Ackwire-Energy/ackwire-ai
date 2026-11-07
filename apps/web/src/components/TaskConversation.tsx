@@ -1,7 +1,8 @@
 import type { Issue } from "@agenteschat/client";
-import { runsInChannel, useTaskConversation } from "@agenteschat/client";
+import { runsInChannel, useTaskConversation, useTaskUnread } from "@agenteschat/client";
 import { conversationLine } from "@agenteschat/client/lib/issues";
-import { Button, CountChip, Icon } from "@agenteschat/ui";
+import { badgeCount } from "@agenteschat/client/lib/unread";
+import { Button, CountBadge, CountChip, Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { ThreadLineBody } from "@/components/threads/ThreadLines";
@@ -22,7 +23,23 @@ function useWorking(issue: Pick<Issue, "conversation">) {
   return Boolean(issue.conversation?.working) || live;
 }
 
-/** "Conversa 5" on the task dialog's top bar: opens or closes the conversation beside the details. */
+/** Mentions of me in a task's conversation that I haven't read there: red, as a channel's in the sidebar. */
+export function TaskMentions({ issue }: { issue: Pick<Issue, "id"> }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const { mentions } = useTaskUnread(org.id, issue.id);
+  if (mentions === 0) return null;
+  return (
+    <CountBadge className="task-talk__mentions" role="img" aria-label={t("shell.unreadMentions", { count: mentions })}>
+      {badgeCount(mentions)}
+    </CountBadge>
+  );
+}
+
+/**
+ * "Conversa 5" on the task dialog's top bar: opens or closes the conversation beside the details. A reply I haven't
+ * read there lights it like an unread channel; a mention of me adds its red number.
+ */
 export function TaskConversationButton({
   issue,
   open,
@@ -33,6 +50,8 @@ export function TaskConversationButton({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const { unread } = useTaskUnread(org.id, issue.id);
   const count = issue.conversation?.count ?? 0;
   return (
     <Button
@@ -42,10 +61,12 @@ export function TaskConversationButton({
       aria-pressed={open}
       aria-label={count > 0 ? t("issues.conversation.toggle", { count }) : t("issues.conversation.button")}
       className="task-talk__toggle"
+      data-unread={unread > 0 || undefined}
       onClick={onToggle}
     >
       {t("issues.conversation.button")}
       {count > 0 && <CountChip size="sm">{count}</CountChip>}
+      <TaskMentions issue={issue} />
     </Button>
   );
 }

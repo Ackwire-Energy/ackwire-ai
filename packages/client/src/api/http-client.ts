@@ -213,6 +213,7 @@ import type {
   ToolChange,
   TrashedArtifact,
   UndoAllResult,
+  UnreadTask,
   UsageQueue,
   UsageReport,
   WebhookSetup,
@@ -309,6 +310,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ),
       markThreadRead: (orgId, threadId) => request<void>(`${org(orgId)}/threads/${enc(threadId)}/read`, { json: {} }),
       unreadThreads: async (orgId) => (await request<{ count: number }>(`${org(orgId)}/unread-threads`)).count,
+      unreadTasks: async (orgId) => (await request<{ tasks: UnreadTask[] }>(`${org(orgId)}/unread-tasks`)).tasks,
     },
     working: {
       list: async (orgId) => (await request<{ runs: WorkingRun[] }>(`${org(orgId)}/active-runs`)).runs,
