@@ -174,7 +174,8 @@ function ChartPin(props: { messageId: string; agentId: string; block: string; on
   return <PinToDashboard orgId={org.id} {...props} />;
 }
 
-function ChartView({ spec, big = false }: { spec: ChartSpec; big?: boolean }) {
+/** The chart itself, with no card around it: a message's chart card, and a chart inside a live block (ADR 0113). */
+export function ChartView({ spec, big = false }: { spec: ChartSpec; big?: boolean }) {
   switch (spec.type) {
     case "bar":
       return <BarChart spec={spec} big={big} />;

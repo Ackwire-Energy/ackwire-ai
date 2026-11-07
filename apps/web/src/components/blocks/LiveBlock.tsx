@@ -18,6 +18,7 @@ import { CardSky, colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useDarkTheme } from "@/lib/grow";
 import { useToast } from "@/lib/toast";
+import { SpecBlock } from "./SpecBlock";
 import "./blocks.css";
 
 /**
@@ -26,7 +27,7 @@ import "./blocks.css";
  */
 const INLINE_HEIGHT = 420;
 
-type Kept = { height?: number; open?: boolean; sent?: { text: string; at: string } };
+type Kept = { height?: number; open?: boolean; sent?: { text: string; at: string }; run?: boolean };
 /**
  * What stays when a frame goes away (scrolled out, opened big). Its state is everyone's and lives on the server
  * (`useSharedBlock`); this is only how tall it was, whether it was shown whole and what this person sent from it.
@@ -180,7 +181,8 @@ function BlockFrame({
 }
 
 /**
- * A live block (ADR 0113): the agent's page in its frame, and under it, outside the frame, what would go back to the
+ * A live block that is the agent's own page (ADR 0113): what no part of ours could show (a game, a free drawing).
+ * It runs only when the person asks, in its frame, and under it, outside the frame, sits what would go back to the
  * agent and the button that sends it. The page only proposes: it can't reach this button, and the person reads the
  * text before it goes.
  */
@@ -210,6 +212,7 @@ export function LiveBlock({
   const [sent, setSent] = useState(keptOf(blockKey).sent ?? null);
   const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
   const [open, setOpen] = useState(keptOf(blockKey).open ?? false);
+  const [run, setRun] = useState(big || (keptOf(blockKey).run ?? false));
   const changedAt = useRef(0);
   // Taller than the card: cut with a fade, "Show all" under it.
   const tall = !big && height > INLINE_HEIGHT;
@@ -249,6 +252,26 @@ export function LiveBlock({
       setSent(done);
     });
   };
+
+  if (!run) {
+    return (
+      <div className="live-block__gate">
+        <span>
+          <b>{t("blocks.pageTitle")}</b>
+          <small>{t("blocks.pageBody")}</small>
+        </span>
+        <Button
+          size="sm"
+          onClick={() => {
+            keptOf(blockKey).run = true;
+            setRun(true);
+          }}
+        >
+          {t("blocks.runPage")}
+        </Button>
+      </div>
+    );
+  }
 
   if (broken) {
     return (
@@ -379,7 +402,11 @@ export function LiveBlockCard({ id, version }: { id: string; version?: number })
           </MenuItem>
         </Menu>
       </header>
-      <LiveBlock id={a.id} version={a.shownVersion} title={a.title} html={a.content.html} agentId={agentId} />
+      {a.content.spec ? (
+        <SpecBlock id={a.id} version={a.shownVersion} spec={a.content.spec} agentId={agentId} />
+      ) : (
+        <LiveBlock id={a.id} version={a.shownVersion} title={a.title} html={a.content.html ?? ""} agentId={agentId} />
+      )}
     </section>
   );
 }

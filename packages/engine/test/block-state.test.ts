@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { desc, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
+import type { BlockSpec } from "@agenteschat/ui/blocks/spec";
 import {
   addChannelMember,
+  blockShows,
+  blockSpecAt,
   blockStateText,
   buildRunContext,
   drainOutbox,
@@ -24,9 +27,21 @@ afterEach(async () => {
 const WHEEL = `<ac-result label="Sorteado" bind="nome"></ac-result>
 <ac-actions><button onclick="agentes.draw('nome', ['Bento', 'Luna'])">Girar</button></ac-actions>`;
 
+const PRICE: BlockSpec = {
+  data: { custo: 40 },
+  compute: { margem: "(preco - custo) / preco * 100", serie: "map(range(3), m => {label: 'M' + m, value: m})" },
+  parts: [
+    { type: "slider", name: "preco", label: "Preço", min: 50, max: 200, step: 10, value: 100 },
+    { type: "stat", label: "Margem", value: "margem", format: "pct" },
+  ],
+};
+
 function agent(req: ModelRequest) {
   const text = JSON.stringify(req.messages.at(-1)?.content);
   if (text.includes("tool_result")) return { chunks: ["Gira aí."] };
+  if (text.includes("preço")) {
+    return { chunks: [], toolUses: [{ name: "show_block", input: { title: "Preço", spec: PRICE } }] };
+  }
   if (text.includes("roleta")) {
     return { chunks: [], toolUses: [{ name: "show_block", input: { title: "Roleta", html: WHEEL } }] };
   }
@@ -118,6 +133,31 @@ describe("a live block's state is everyone's (ADR 0113)", () => {
     // Before the person's message, which talks about it.
     expect(text.indexOf("drawnAmong")).toBeLessThan(text.indexOf("decidido na sorte"));
   });
+});
+
+test("the agent reads what a block of parts shows, as everyone sees it", async () => {
+  f = await setup({ blockTools: true, reply: agent });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev simula o preço",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [block] = await f.db.select().from(schema.artifacts);
+  if (!block) throw new Error("no block");
+  await setBlockState(f.artifactDeps, f.owner.id, f.org.id, block.id, { version: 1, values: { preco: 80 } });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev fechou nesse",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).orderBy(desc(schema.agentRuns.createdAt)).limit(1);
+  if (!run) throw new Error("no run");
+  const ctx = await buildRunContext(f.db, run, f.agent, {
+    maxMessages: 30,
+    blockSpec: (orgId, id, version) => blockSpecAt(f.artifactDeps, orgId, id, version),
+  });
+  const text = JSON.stringify(ctx.messages);
+  expect(text).toContain('\\"values\\":{\\"preco\\":80}');
+  expect(text).toContain('\\"shows\\":{\\"margem\\":50}');
+  // A list (a chart's points) follows from the values and the block; only plain results are read.
+  expect(blockShows(PRICE, { preco: 80 })).toEqual({ margem: 50 });
 });
 
 describe("fairIndex", () => {

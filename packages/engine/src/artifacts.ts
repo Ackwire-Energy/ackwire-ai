@@ -15,6 +15,13 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import {
+  type BlockSpec,
+  BlockSpecError,
+  blockSpecText,
+  dryRunBlock,
+  parseBlockSpec,
+} from "@agenteschat/ui/blocks/spec";
 import { type AgentsDmReads, agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { recordAudit } from "./audit";
 import { runAuthorityById, runPerson, UUID } from "./authority";
@@ -78,7 +85,11 @@ export type ArtifactContent =
   | { kind: "diff"; files: { path: string; patch: string }[] }
   | { kind: "diagram"; mermaid: string }
   | { kind: "html"; html: string }
-  | { kind: "block"; html: string; subtitle?: string }
+  /**
+   * A live block (ADR 0113): parts the apps draw (`spec`), or, when no part can show it, the agent's own page (`html`),
+   * which runs only when a person asks. Exactly one of the two.
+   */
+  | { kind: "block"; spec?: BlockSpec; html?: string; subtitle?: string }
   | { kind: "poll"; question: string; options: string[]; multiple: boolean }
   | { kind: "choices"; questions: ChoiceQuestion[] }
   | FileContent;
@@ -223,10 +234,26 @@ export function validateContent(raw: unknown): TextContent {
       return { kind: "html", html: c.html };
     }
     case "block": {
-      if (typeof c.html !== "string" || !c.html.trim()) throw new ValidationError("a block needs html");
-      if (bytes(c.html) > ARTIFACT_LIMITS.blockBytes) throw tooBig("block");
       const subtitle = typeof c.subtitle === "string" ? c.subtitle.trim().slice(0, 120) : "";
-      return { kind: "block", html: c.html, ...(subtitle ? { subtitle } : {}) };
+      const more = subtitle ? { subtitle } : {};
+      if (c.spec !== undefined) {
+        if (c.html !== undefined) throw new ValidationError("a block is a spec or html, not both");
+        if (bytes(JSON.stringify(c.spec)) > ARTIFACT_LIMITS.blockBytes) throw tooBig("block");
+        let spec: BlockSpec;
+        try {
+          spec = parseBlockSpec(c.spec);
+        } catch (error) {
+          if (error instanceof BlockSpecError) throw new ValidationError(error.message, "block.spec");
+          throw error;
+        }
+        // Drawn once from its start: a formula that fails on the block's own data is the agent's to fix now.
+        const failing = dryRunBlock(spec);
+        if (failing.length > 0) throw new ValidationError(failing.slice(0, 5).join(". "), "block.spec");
+        return { kind: "block", spec, ...more };
+      }
+      if (typeof c.html !== "string" || !c.html.trim()) throw new ValidationError("a block needs a spec or html");
+      if (bytes(c.html) > ARTIFACT_LIMITS.blockBytes) throw tooBig("block");
+      return { kind: "block", html: c.html, ...more };
     }
     case "poll": {
       const options = Array.isArray(c.options) ? c.options.map((o) => String(o).trim()).filter(Boolean) : [];
@@ -312,7 +339,10 @@ function encode(content: TextContent): { body: Uint8Array; contentType: string }
     case "html":
       return text(content.html, "text/html; charset=utf-8");
     case "block":
-      return text(JSON.stringify({ html: content.html, subtitle: content.subtitle }), "application/json");
+      return text(
+        JSON.stringify({ spec: content.spec, html: content.html, subtitle: content.subtitle }),
+        "application/json",
+      );
     case "poll":
       return text(
         JSON.stringify({ question: content.question, options: content.options, multiple: content.multiple }),
@@ -337,7 +367,7 @@ function decode(kind: Exclude<ArtifactKind, "file">, body: Uint8Array): TextCont
     case "html":
       return { kind, html: s };
     case "block":
-      return { kind, ...(JSON.parse(s) as { html: string; subtitle?: string }) };
+      return { kind, ...(JSON.parse(s) as { spec?: BlockSpec; html?: string; subtitle?: string }) };
     case "poll":
       return { kind, ...(JSON.parse(s) as { question: string; options: string[]; multiple: boolean }) };
     case "choices":
@@ -483,17 +513,19 @@ function excerptOf(content: ArtifactContent): string {
       ? content.name
       : content.kind === "document"
         ? content.markdown
-        : content.kind === "html" || content.kind === "block"
-          ? content.html.replace(/<[^>]+>/g, " ")
-          : content.kind === "poll"
-            ? [content.question, ...content.options].join("\n")
-            : content.kind === "choices"
-              ? choicesText(content.questions)
-              : content.kind === "diagram"
-                ? content.mermaid
-                : content.kind === "table"
-                  ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
-                  : content.files.map((f) => f.path).join("\n");
+        : content.kind === "block" && content.spec
+          ? blockSpecText(content.spec)
+          : content.kind === "html" || content.kind === "block"
+            ? (content.html ?? "").replace(/<[^>]+>/g, " ")
+            : content.kind === "poll"
+              ? [content.question, ...content.options].join("\n")
+              : content.kind === "choices"
+                ? choicesText(content.questions)
+                : content.kind === "diagram"
+                  ? content.mermaid
+                  : content.kind === "table"
+                    ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
+                    : content.files.map((f) => f.path).join("\n");
   return s.replace(/\s+/g, " ").trim().slice(0, 20_000);
 }
 
@@ -1263,6 +1295,27 @@ async function readVersion(deps: ArtifactDeps, a: ArtifactRow, v: VersionRow) {
 async function contentOf(deps: ArtifactDeps, a: ArtifactRow, v: VersionRow): Promise<ArtifactContent> {
   if (a.kind === "file") return fileContent(v, wantsFileText(v) ? (await readVersion(deps, a, v)).body : null);
   return decode(a.kind, (await readVersion(deps, a, v)).body);
+}
+
+/**
+ * A block's parts at `version`, or null for a page or anything else: what the agent's context computes the block's
+ * results from (`blockStateNotes`). The context only names blocks of messages the run already reads.
+ */
+export async function blockSpecAt(
+  deps: ArtifactDeps,
+  orgId: string,
+  artifactId: string,
+  version: number,
+): Promise<BlockSpec | null> {
+  const [a] = await deps.db
+    .select()
+    .from(artifacts)
+    .where(and(eq(artifacts.id, artifactId), eq(artifacts.orgId, orgId), isNull(artifacts.deletedAt)));
+  if (a?.kind !== "block") return null;
+  const v = await versionRow(deps.db, a, version).catch(() => null);
+  if (!v) return null;
+  const content = await contentOf(deps, a, v);
+  return content.kind === "block" ? (content.spec ?? null) : null;
 }
 
 /**

@@ -245,6 +245,8 @@ export interface Expectations {
   ask?: "never" | "required";
   /** Tools that must not be called at all (e.g. `ask_agent`: no relaying the person's request). */
   mustNotCall?: string[];
+  /** A live block must be shown as parts the app draws (`spec`), not the agent's own page, and be accepted (ADR 0113). */
+  blockSpec?: boolean;
   /** Handles of other agents the trigger must not start (mentioned only as a reference). */
   notTriggered?: string[];
   /** Act with undo (ADR 0037 round 2): receipt kinds the reply must carry (`issue.created`…). */
@@ -391,6 +393,23 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
     pass: !/\bNO[_\s-]?REPLY\b/i.test(text),
     detail: /\bNO[_\s-]?REPLY\b/i.test(text) ? "posted the silence word" : "ok",
   });
+  if (expect.blockSpec) {
+    const shows = run.calls.filter((c) => c.name === "show_block" && (c.input.spec !== undefined || c.input.html));
+    const shown = shows.find((c) => c.executed && !c.isError);
+    const page = shows.some((c) => typeof c.input.html === "string" && c.input.html.trim() !== "");
+    const refused = shows.filter((c) => c.isError).length;
+    out.push({
+      id: "block_as_parts",
+      pass: Boolean(shown && shown.input.spec !== undefined) && !page,
+      detail: !shown
+        ? `no block was accepted${refused ? ` (${refused} refused: ${String(shows.find((c) => c.isError)?.result ?? "").slice(0, 160)})` : ""}`
+        : page
+          ? "sent its own page (html) instead of parts"
+          : refused
+            ? `ok after ${refused} refused`
+            : "ok",
+    });
+  }
   if (expect.mustNotCall?.length) {
     const called = [...new Set(run.calls.filter((c) => expect.mustNotCall?.includes(c.name)).map((c) => c.name))];
     out.push({

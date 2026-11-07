@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
+import type { BlockSpec } from "@agenteschat/ui/blocks/spec";
 import {
   addChannelMember,
   BLOCK_MANUAL,
@@ -37,10 +38,42 @@ const last = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content)
 const person = (userId: string) => ({ type: "person" as const, userId });
 
 const BLOCK = '<ac-slider name="x" label="X" min="0" max="10"></ac-slider>';
+const SPEC: BlockSpec = {
+  data: { custo: 40 },
+  compute: { margem: "(preco - custo) / preco * 100" },
+  parts: [
+    { type: "slider", name: "preco", label: "Preço", min: 50, max: 200, step: 10, value: 100, format: "brl" },
+    { type: "stat", label: "Margem", value: "margem", format: "pct" },
+  ],
+  send: { label: "Usar este preço", text: "Usar {preco:brl}." },
+};
+
+/** What the agent's last tool call answered, as the model read it. */
+let toolResult = "";
 
 function agent(req: ModelRequest) {
   const text = last(req);
-  if (text.includes("tool_result")) return { chunks: ["Mexe aí."] };
+  if (text.includes("tool_result")) {
+    toolResult = text;
+    return { chunks: ["Mexe aí."] };
+  }
+  if (text.includes("errado")) {
+    return {
+      chunks: [],
+      toolUses: [
+        {
+          name: "show_block",
+          input: { title: "Preço", spec: { parts: [{ type: "stat", label: "X", value: "lucro" }] } },
+        },
+      ],
+    };
+  }
+  if (text.includes("monta")) {
+    return {
+      chunks: [],
+      toolUses: [{ name: "show_block", input: { title: "Preço", spec: SPEC, html: BLOCK } }],
+    };
+  }
   if (text.includes("simula")) {
     return {
       chunks: [],
@@ -76,10 +109,12 @@ test("a block goes to the trash only once it is in the Drive", async () => {
 });
 
 describe("the prompt", () => {
-  test("the manual gives an agent our look: the parts, its tones, and no colors of its own", () => {
-    for (const part of ["<ac-card", "<ac-result", "<ac-actions", "--s1", "--on-s"])
+  test("the manual describes blocks as parts and formulas the app draws, and a page only as the way out", () => {
+    for (const part of ['"type":"slider"', '"type":"card"', '"type":"result"', '"type":"actions"', "draw", "send"])
       expect(BLOCK_MANUAL).toContain(part);
-    expect(BLOCK_MANUAL).toContain("Never write a color");
+    expect(BLOCK_MANUAL).toContain("you write no HTML, CSS or colors");
+    expect(BLOCK_MANUAL).toContain("runs only when a person presses it");
+    expect(BLOCK_MANUAL.length).toBeLessThan(6500);
   });
 
   test("show_block is short and says to show one unprompted; the manual comes with a call without html", async () => {
@@ -166,6 +201,40 @@ describe("live blocks", () => {
       content: { kind: "document", markdown: "a" },
     });
     await expect(replyToBlock(deps, f.owner.id, f.org.id, doc.id, { text: "oi" })).rejects.toThrow("Block not found");
+  });
+
+  test("an agent describes one in parts: kept as its spec, never run as a page", async () => {
+    f = await setup({ blockTools: true, reply: agent });
+    const row = await ask("@dev monta um simulador de preço");
+    const shown = await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, row.id);
+    // Sent with both, the parts win: a page would wait for a click.
+    expect(shown.content).toEqual({ kind: "block", spec: SPEC });
+  });
+
+  test("a spec that reads a value it doesn't have comes back to the agent, saying where", async () => {
+    f = await setup({ blockTools: true, reply: agent });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev monta um errado",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(await f.db.select().from(schema.artifacts)).toEqual([]);
+    expect(toolResult).toContain('parts[0].value: there is no value \\"lucro\\"');
+  });
+
+  test("a spec is checked like any content: its parts, its formulas on its own data, and both kinds at once", () => {
+    expect(validateContent({ kind: "block", spec: SPEC, subtitle: " Hoje " })).toEqual({
+      kind: "block",
+      spec: SPEC,
+      subtitle: "Hoje",
+    });
+    expect(() => validateContent({ kind: "block", spec: { parts: [{ type: "script" }] } })).toThrow(ValidationError);
+    expect(() =>
+      validateContent({
+        kind: "block",
+        spec: { data: { n: 1 }, parts: [{ type: "stat", label: "X", value: "sum(n)" }] },
+      }),
+    ).toThrow("sum() needs a list");
+    expect(() => validateContent({ kind: "block", spec: SPEC, html: BLOCK })).toThrow("a spec or html, not both");
   });
 
   test("it can't be made as a file", () => {

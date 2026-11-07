@@ -3066,7 +3066,11 @@ export type ArtifactContent =
   | { kind: "diff"; files: ArtifactDiffFile[] }
   | { kind: "diagram"; mermaid: string }
   | { kind: "html"; html: string }
-  | { kind: "block"; html: string; subtitle?: string }
+  /**
+   * Parts the apps draw (`spec`, checked and drawn by `@agenteschat/ui/blocks/spec`), or the agent's own page (`html`),
+   * which runs only when a person asks (ADR 0113). Exactly one of the two.
+   */
+  | { kind: "block"; spec?: Record<string, unknown>; html?: string; subtitle?: string }
   | { kind: "poll"; question: string; options: string[]; multiple: boolean }
   | { kind: "choices"; questions: ChoiceQuestion[] }
   | ArtifactFileContent;

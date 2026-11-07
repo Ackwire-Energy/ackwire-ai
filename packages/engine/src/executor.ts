@@ -58,6 +58,7 @@ import {
   orgAutoModels,
   withAuto,
 } from "./auto-model";
+import type { BlockSpecReader } from "./block-state";
 import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, someoneAnswers } from "./blocks";
 import { brainOf } from "./brain-settings";
 import { missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
@@ -398,6 +399,8 @@ const UNCOUNTED_TOOLS = `^(${REACT_TOOL}|${ON_DEMAND_FIND}|${ON_DEMAND_USE})$|_$
  */
 export interface EngineDeps {
   db: Database;
+  /** Reads a live block's parts (`blockSpecAt`): the agent reads what its blocks show (ADR 0113). */
+  blockSpec?: BlockSpecReader;
   gateway: ModelGateway;
   pubsub: PubSub;
   maxOutputTokens: number;
@@ -1992,6 +1995,7 @@ async function executeRunInner(
         followUp: tools.some((t) => t.name === FOLLOW_UP_TOOL),
         work: workApplies && tools.some((t) => t.name === WORK_IN_BACKGROUND_TOOL),
         blocks: tools.some((t) => t.name === SHOW_BLOCK_TOOL),
+        ...(deps.blockSpec ? { blockSpec: deps.blockSpec } : {}),
         choices: choicesApply && tools.some((t) => t.name === ASK_CHOICES_TOOL),
         // "What you can do" names the loaded groups: it waits for the judge.
         capabilities: Promise.resolve(judging).then(() =>

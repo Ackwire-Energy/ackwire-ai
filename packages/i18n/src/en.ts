@@ -9290,6 +9290,10 @@ export const en = {
     brokenBody: "The answer is above. You can ask for it again.",
     retry: "Ask again",
     retryText: "That block didn't open here. Can you send it again?",
+    /** A block that is the agent's own page runs only when the person asks (ADR 0113). */
+    pageTitle: "A block with its own code",
+    pageBody: "It runs apart from the app, with no access to your account or the internet.",
+    runPage: "Open block",
     someone: "Someone",
     pollCloses: "Closes {{time}}",
     pollClosed: "Voting closed",

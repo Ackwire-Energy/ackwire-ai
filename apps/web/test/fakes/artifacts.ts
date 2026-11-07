@@ -66,7 +66,9 @@ export function serializeContent(content: ArtifactContent): { text: string; type
     case "file":
       return { text: content.text ?? "", type: content.contentType };
     case "block":
-      return { text: content.html, type: "text/html" };
+      return content.spec
+        ? { text: JSON.stringify(content.spec, null, 2), type: "application/json" }
+        : { text: content.html ?? "", type: "text/html" };
     case "poll":
       return { text: content.question, type: "text/plain" };
     case "choices":
