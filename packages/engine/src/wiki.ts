@@ -1679,8 +1679,11 @@ export async function restoreWikiPage(deps: WikiDeps, actor: WikiActor, orgId: s
 
 // ── Many pages at once, and the trash ────────────────────────────────────────
 
-/** Deleted pages stay in the trash this long, as the Drive's files do (ADR 0111); then they are gone for good. */
-export const WIKI_TRASH_DAYS = ARTIFACT_TRASH_DAYS;
+/**
+ * Deleted pages stay in the trash this long, as the Drive's files do (ADR 0111); then they are gone for good. A
+ * re-export, read when used: `artifacts` imports this module through a cycle, so a copy here would read it unset.
+ */
+export { ARTIFACT_TRASH_DAYS as WIKI_TRASH_DAYS } from "./artifacts";
 
 /** What "Apagar" reaches: chosen pages, a folder with its subfolders, or one import. */
 export type WikiBulkTarget =
@@ -1690,7 +1693,7 @@ export type WikiBulkTarget =
   /** An import made before imports had ids: every page from that vault without one. */
   | { source: { type: string; name: string } };
 
-const inTrashWindow = () => sql`${wikiPages.deletedAt} > ${since(WIKI_TRASH_DAYS).toISOString()}::timestamptz`;
+const inTrashWindow = () => sql`${wikiPages.deletedAt} > ${since(ARTIFACT_TRASH_DAYS).toISOString()}::timestamptz`;
 
 function targetSql(target: WikiBulkTarget | { all: true }) {
   if ("all" in target) return sql`true`;
@@ -1855,7 +1858,7 @@ export async function purgeWikiPages(deps: WikiDeps, userId: string, orgId: stri
 
 /** Job: pages in the trash longer than `WIKI_TRASH_DAYS` are removed with their history. */
 export async function purgeDeletedWikiPages(db: Database, now = new Date()) {
-  const cutoff = new Date(now.getTime() - WIKI_TRASH_DAYS * 86_400_000).toISOString();
+  const cutoff = new Date(now.getTime() - ARTIFACT_TRASH_DAYS * 86_400_000).toISOString();
   const gone = await db
     .delete(wikiPages)
     .where(
