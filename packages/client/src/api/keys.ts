@@ -184,6 +184,7 @@ export const keys = {
   routines: (orgId: string) => ["org", orgId, "routines"] as const,
   routineRuns: (orgId: string, id: string) => ["org", orgId, "routines", "runs", id] as const,
   routineHook: (orgId: string, id: string) => ["org", orgId, "routines", "hook", id] as const,
+  webhookSetup: (orgId: string, provider: string) => ["org", orgId, "routines", "webhook", provider] as const,
   calendar: (orgId: string) => ["org", orgId, "calendar"] as const,
   calendarRange: (orgId: string, from: string) => ["org", orgId, "calendar", from] as const,
   artifactList: (orgId: string, filters: object) => ["org", orgId, "artifacts", "list", filters] as const,

@@ -89,7 +89,7 @@ import {
   requireMission,
   requireOpen,
 } from "./missions";
-import { planLentGroup } from "./notification-producers";
+import { planLentGroup, planModelDroppedGroup } from "./notification-producers";
 import { resolveNotifications } from "./notifications";
 import { can, getMembership, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -1208,6 +1208,13 @@ export async function setAgentBrain(
   caches.agents.delete(`${orgId}:${agentId}`);
   if (audience) caches.agents.delete(`${orgId}:team`);
   forgetAgents(orgId, released);
+  // Another model chosen: the note that its model left its plan's list is done.
+  if (changed || model !== agent.brainModel || account !== agent.brainAccountId) {
+    await resolveNotifications(deps, orgId, {
+      groupKeyPrefix: planModelDroppedGroup(agentId),
+      kind: "plan_model_dropped",
+    });
+  }
   if (thinks) {
     await recordAudit(deps.db, {
       orgId,

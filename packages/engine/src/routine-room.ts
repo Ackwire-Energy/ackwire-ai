@@ -12,7 +12,8 @@ const { channels, channelMembers, routineRuns } = schema;
  * The routine room (ADR 0053 §4): an agent-only private conversation per routine (`routineRoomKey`),
  * where the routine's brief is written and its background run works. No person is a member, so
  * nobody reads it and it never shows in anyone's lists; other runs' searches never reach it
- * (`agentSearchChannels` keeps only a run's own channel and public ones). Created the first time.
+ * (`agentSearchChannels` keeps only a run's own channel, public ones and, for a routine's run, where it reports).
+ * Created the first time.
  */
 export async function openRoutineRoom(tx: Executor, orgId: string, agentId: string, routineId: string) {
   const dmKey = routineRoomKey(agentId, routineId);

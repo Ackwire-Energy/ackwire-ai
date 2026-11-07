@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
-import { autoPlanModel } from "@agenteschat/providers/plans";
+import { autoPlanModel, CODING_PLANS, learnPlanModels } from "@agenteschat/providers/plans";
 import {
   addChannelMember,
   archiveAgent,
@@ -39,6 +39,7 @@ import {
   storeOwnUsage as reportOwnUsage,
   resumeBudgetWaits,
   runRoutineNow,
+  setAgentBrain,
   stopRun,
   storedPlanLimit,
   updateAgent,
@@ -1968,4 +1969,54 @@ test("a wait woken into the same limit backs off to its own reset, with no new n
   expect(await wakePlanWaits(f.db, f.org.id, key, model, Date.now() + REPARK_STEADY_MS + 1000)).toEqual([
     first?.id ?? "",
   ]);
+});
+
+describe("a model its plan's live list dropped", () => {
+  const table = CODING_PLANS.opencode.claudeCode.models;
+  afterEach(() => learnPlanModels({ opencode: table }));
+  const reading = (): PlanUsage => ({
+    windows: [{ kind: "five_hour", usedPercent: 0, resetsAt: later(5 * 3600_000).toISOString() }],
+    source: "probe",
+    at: new Date().toISOString(),
+  });
+  const dropped = (fx: Fixture) =>
+    fx.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "plan_model_dropped"));
+
+  test("its owner hears it once, with the model and what runs now, until another model is chosen", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    await goAgent(f, "hy3", reading());
+    await f.db.update(schema.agents).set({ ownerUserId: f.owner.id }).where(eq(schema.agents.id, f.agent.id));
+    learnPlanModels({ opencode: table.filter((m) => m.id !== "hy3") });
+    const { brain, seen } = scripted(() => [{ type: "done", text: "oi" }]);
+    for (const body of ["@dev oi", "@dev de novo"]) {
+      await post(f, body);
+      await drainOutbox(f.db, accountHandlers(f, brain));
+    }
+    expect(seen.map((turn) => turn.model)).toEqual(["sonnet", "sonnet"]);
+    const rows = await dropped(f);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      userId: f.owner.id,
+      doneAt: null,
+      waiting: false,
+      actors: [{ type: "agent", id: f.agent.id }],
+      source: { agentId: f.agent.id, label: f.agent.name },
+      latest: { title: "Hy3", plan: "OpenCode Go", nowModel: "MiniMax M3" },
+    });
+    expect(noticeCategoryOf("plan_model_dropped", false)).toBeNull();
+
+    await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { model: "sonnet" });
+    expect((await dropped(f))[0]?.doneAt).not.toBeNull();
+  });
+
+  test("a model still on the list, or an alias, says nothing", async () => {
+    f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+    await goAgent(f, "hy3", reading());
+    await f.db.update(schema.agents).set({ ownerUserId: f.owner.id }).where(eq(schema.agents.id, f.agent.id));
+    const { brain, seen } = scripted(() => [{ type: "done", text: "oi" }]);
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, accountHandlers(f, brain));
+    expect(seen.map((turn) => turn.model)).toEqual(["hy3"]);
+    expect(await dropped(f)).toEqual([]);
+  });
 });

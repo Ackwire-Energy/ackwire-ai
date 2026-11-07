@@ -3446,6 +3446,29 @@ export interface RoutineHook {
   calls: RoutineHookCall[];
 }
 
+/** A service whose webhook brings routine events (`EVENT_WEBHOOK`). */
+export type WebhookProvider = "github" | "sentry";
+
+/** `GET …/webhooks/{provider}`: whether the service's webhook works here, and where and with what to set it up. */
+export interface WebhookSetup {
+  provider: WebhookProvider;
+  /** Null: none made yet. */
+  id: string | null;
+  /** Where the service sends its events (who sets webhooks up). */
+  url: string | null;
+  /** GitHub's secret, to paste there (who sets webhooks up). Sentry signs with its own. */
+  secret: string | null;
+  /** The last call with a valid signature: it works. */
+  receivedAt: string | null;
+  /** The last call whose signature didn't match. */
+  refusedAt: string | null;
+  /** Sentry: its integration's Client Secret was pasted here. */
+  secretSet: boolean;
+  canManage: boolean;
+  /** GitHub: the server may add the webhook to a repository itself (`addWebhookToRepo`). */
+  oneClick: boolean;
+}
+
 /** "Quando chegar um email" (ADR 0038): new mail in a folder of a connected mailbox, optionally filtered. */
 export interface RoutineEmailTrigger {
   type: "email";
@@ -5832,6 +5855,12 @@ export type NotificationKind =
    */
   | "plan_lent"
   /**
+   * A model an agent thinks with left its plan's live list, so its turns run another (the agent's owner, once per agent
+   * and model). `source.agentId`, the model in `latest.title`, the plan in `latest.plan`, what runs now in
+   * `latest.nowModel`. Choosing another model makes it done.
+   */
+  | "plan_model_dropped"
+  /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
@@ -6042,6 +6071,8 @@ export interface NotificationLatest {
   failures?: RunFailure[];
   /** `run_failed` on a computer brain: the plan's name its cause names ("Claude"). */
   plan?: string;
+  /** `plan_model_dropped`: the model the agent's turns run now. */
+  nowModel?: string;
   /** `usage_limit`: the share of the person's limit used. */
   percent?: number;
   /** `usage_limit` to who decides: the limit, the raise offered, where the limit comes from, this month's requests. */

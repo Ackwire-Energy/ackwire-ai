@@ -4,6 +4,7 @@ import {
   autoPlanModel,
   CODING_PLANS,
   claudeCodeModel,
+  droppedPlanModel,
   FAST_MODE_MODELS,
   isPlanModelId,
   learnedPlanModels,
@@ -357,4 +358,32 @@ describe("a model OpenCode refused for the key, and what Automático runs instea
     expect(autoPlanModel("opencode", "sonnet", { models: off, answered: "gone-model" }, now)).toBe("sonnet");
     expect(autoPlanModel("zai", "sonnet", usage, now)).toBe("sonnet");
   });
+});
+
+test("a model the plan's live list dropped: named, with the table's label; nothing else counts as dropped", () => {
+  const table = models("opencode");
+  const gone = table.find((m) => !m.alias);
+  if (!gone) throw new Error("the table has a model without an alias");
+  try {
+    expect(droppedPlanModel("opencode", gone.id)).toBeNull();
+    learnPlanModels({ opencode: table.filter((m) => m.id !== gone.id) });
+    expect(droppedPlanModel("opencode", gone.id)).toEqual(gone);
+    expect(claudeCodeModel(planOf("opencode"), gone.id)).toBe("sonnet");
+    learnPlanModels({ opencode: [...table.filter((m) => m.id !== gone.id), { id: "glm-9", label: "GLM-9" }] });
+    learnPlanModels({ opencode: table.filter((m) => m.id !== gone.id) });
+    expect(droppedPlanModel("opencode", "glm-9")).toEqual({ id: "glm-9", label: "glm-9" });
+    for (const value of ["sonnet", "claude-opus-4-1", ids("zai")[0], null])
+      expect(droppedPlanModel("opencode", value)).toBeNull();
+    expect(droppedPlanModel("zai", "glm-9")).toBeNull();
+  } finally {
+    learnPlanModels({ opencode: table });
+  }
+});
+
+test("before this process has read the plan's live list, no model counts as dropped", () => {
+  // A fresh process: this file's other tests have already taught the list to this one.
+  const code = `import { droppedPlanModel } from ${JSON.stringify(`${import.meta.dir}/../src/plans.ts`)};
+console.log(JSON.stringify([droppedPlanModel("opencode", "glm-9"), droppedPlanModel("opencode", "hy3")]));`;
+  const run = Bun.spawnSync([process.execPath, "-e", code]);
+  expect(run.stdout.toString().trim()).toBe("[null,null]");
 });

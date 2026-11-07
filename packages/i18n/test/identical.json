@@ -233,7 +233,11 @@
       "files.video.volume",
       "linkPills.issue",
       "linkPills.merge",
-      "linkPills.pull"
+      "linkPills.pull",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "es": [
       "agent.builtinName",
@@ -423,7 +427,11 @@
       "connectAi.pick.plan",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "fr": [
       "settings.about.version",
@@ -779,7 +787,11 @@
       "linkPills.document",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "de": [
       "settings.about.version",
@@ -1143,7 +1155,11 @@
       "approvals.review.state",
       "agentSide.label",
       "agentPage.work.brain.speeds.standard",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "it": [
       "queue.fill.routine",
@@ -1438,7 +1454,11 @@
       "linkPills.file",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "nl": [
       "deleteAccount.agentCount",
@@ -1943,7 +1963,11 @@
       "linkPills.spreadsheet",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "ja": [
       "access.area.vault",
@@ -2067,7 +2091,11 @@
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
       "teamTemplates.channels.bia",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "ko": [
       "access.area.vault",
@@ -2187,7 +2215,11 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "zh-Hans": [
       "access.area.vault",
@@ -2298,7 +2330,11 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "id": [
       "access.area.browser",
@@ -2524,7 +2560,11 @@
       "linkPills.invoice",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "tr": [
       "agent.builtinName",
@@ -2658,7 +2698,11 @@
       "connectAi.pick.plan",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "pl": [
       "deleteAccount.agentCount",
@@ -2884,7 +2928,11 @@
       "linkPills.folder",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "ru": [
       "agent.builtinName",
@@ -2996,7 +3044,11 @@
       "teamTemplates.channels.bia",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ]
   },
   "mobile-base": {

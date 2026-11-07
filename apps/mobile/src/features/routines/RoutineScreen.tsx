@@ -12,6 +12,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   busyOnComputer,
+  eventWebhook,
   healthWords,
   isRunAtWork,
   isStoppable,
@@ -65,6 +66,7 @@ import {
 import { agentLook } from "../shared/logic";
 import { FocusLive, goBack, PushedHeader } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
+import { EventWebhookSetup } from "./EventWebhookSetup";
 import {
   editRoutineHref,
   useNextText,
@@ -405,6 +407,9 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
             </Block>
           </Section>
 
+          {r.trigger.type === "event" && eventWebhook(r.trigger.event) && !done ? (
+            <EventWebhookSetup provider={eventWebhook(r.trigger.event) ?? "github"} />
+          ) : null}
           {r.trigger.type === "webhook" ? (
             r.canManage ? (
               <WebhookCard routine={r} runs={list} />

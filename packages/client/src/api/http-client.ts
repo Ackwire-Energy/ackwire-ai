@@ -215,6 +215,7 @@ import type {
   UndoAllResult,
   UsageQueue,
   UsageReport,
+  WebhookSetup,
   WikiGraph,
   WikiImportResult,
   WikiPage,
@@ -1527,6 +1528,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ runId: string | null; hook: RoutineHook }>(`${org(orgId)}/routines/${enc(id)}/hook/test`, {
           json: {},
         }),
+      webhookSetup: (orgId, provider) => request<WebhookSetup>(`${org(orgId)}/webhooks/${enc(provider)}`),
+      ensureWebhook: (orgId, provider) =>
+        request<WebhookSetup>(`${org(orgId)}/webhooks/${enc(provider)}`, { method: "PUT", json: {} }),
+      setWebhookSecret: (orgId, provider, secret) =>
+        request<WebhookSetup>(`${org(orgId)}/webhooks/${enc(provider)}/secret`, { method: "PUT", json: { secret } }),
+      addWebhookToRepo: (orgId, repo) =>
+        request<WebhookSetup>(`${org(orgId)}/webhooks/github/repository`, { json: { repo } }),
     },
     wiki: {
       tree: async (orgId) => (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/pages`)).pages,

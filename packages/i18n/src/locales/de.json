@@ -3765,6 +3765,9 @@
       "takeBackAll": "Von allen Agenten zurücknehmen",
       "done": "Dein Abo ist zurück"
     },
+    "planModelDropped": {
+      "choose": "Anderes Modell wählen"
+    },
     "docTitleUnread": "({{count}}) Benachrichtigungen",
     "summaryWaiting_one": "{{count}} Sache wartet auf dich",
     "summaryWaiting_other": "{{count}} Sachen warten auf dich",
@@ -3865,6 +3868,7 @@
       "browserProfileRequest": "<b>{{name}}</b> bittet um ein weiteres Browserprofil für <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> hat den Bildschirm des Computers von <b>{{agent}}</b> übernommen",
       "planLent": "<b>{{name}}</b> hat dein {{plan}}-Abo mit <b>{{agent}}</b> verbunden",
+      "planModelDropped": "{{model}} ist nicht mehr bei {{plan}}. <b>{{name}}</b> nutzt {{runs}}, bis du ein anderes Modell wählst.",
       "routineWaitingPlan": "<b>{{name}}</b> wartet, bis sein Abo zurückgesetzt wird, um eine Routine auszuführen",
       "planResetUnknown": "{{plan}} hat nicht gesagt, wann das Limit zurückgesetzt wird. Die Arbeit von <b>{{name}}</b> wartet noch.",
       "catchUpClosed_one": "<b>{{name}}</b> ist zurück und hat {{count}} Unterhaltung übersprungen, die keine Antwort brauchte",
@@ -6219,6 +6223,48 @@
         "rate_limited": "Abgelehnt: zu viele Aufrufe pro Minute"
       }
     },
+    "setup": {
+      "title": "{{provider}}-Webhook",
+      "working": "Läuft. {{provider}} schickt seine Ereignisse schon hierher.",
+      "waiting": {
+        "github": "Warte auf GitHub. Es schickt einen Ping, sobald der Webhook gespeichert ist.",
+        "sentry": "Warte auf Sentry. Es meldet sich, wenn ein neuer Fehler auftritt."
+      },
+      "refused": {
+        "github": "GitHub hat sich mit einem anderen Secret gemeldet. Kopiere das Secret unten noch einmal in den Webhook.",
+        "sentry": "Sentry hat sich mit einem anderen Secret gemeldet. Füge das Client Secret der Integration noch einmal ein."
+      },
+      "timeout": "In 3 Minuten kam nichts an. Prüfe URL und Secret und teste noch einmal.",
+      "adminOnly": "Wer Konnektoren verwaltet, schaltet den {{provider}}-Webhook ein. Bitte einen Admin, diese Routine zu öffnen.",
+      "test": "Testen",
+      "retest": "Noch einmal testen",
+      "copied": "Kopiert.",
+      "github": {
+        "repo": "Repo",
+        "repoPlaceholder": "besitzer/name",
+        "oneClick": "Webhook erstellen",
+        "added": "Webhook in {{repo}} erstellt.",
+        "byHand": "Oder von Hand: im Repo Settings › Webhooks › Add webhook.",
+        "open": "Öffne im Repo Settings › Webhooks › Add webhook.",
+        "openLink": "Auf GitHub öffnen",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Wähle bei Which events Let me select individual events. Hake Pull requests und Deployment statuses an, dann Add webhook.",
+        "another": "Zu einem weiteren Repo hinzufügen"
+      },
+      "sentry": {
+        "open": "Erstelle in Sentry eine interne Integration.",
+        "openLink": "In Sentry öffnen",
+        "url": "Webhook URL",
+        "events": "Stelle unter Permissions Issue & Event auf Read. Hake dann unter Webhooks issue an und speichere.",
+        "secret": "Client Secret der Integration",
+        "secretPlaceholder": "Client Secret einfügen",
+        "secretSaved": "Gespeichert. Füge ein neues ein, um es zu ersetzen",
+        "save": "Speichern",
+        "saved": "Client Secret gespeichert."
+      }
+    },
     "once": "Einmal · {{weekday}}, {{date}} um {{time}}{{zone}}",
     "reminder": "Erinnerung",
     "fired": "Ausgelöst",
@@ -6518,8 +6564,8 @@
       },
       "prs": {
         "name": "Neue PRs prüfen",
-        "text": "Werktags um 9 und 14 Uhr liest der Agent neue PRs und weist auf Risiken hin.",
-        "prompt": "Sieh dir die seit dem letzten Mal geöffneten PRs an. Lies jeden Diff, weise auf Risiken hin und sag, was von Hand getestet werden sollte."
+        "text": "Wenn ein PR geöffnet wird, liest der Agent ihn und kommentiert.",
+        "prompt": "Lies den Diff des neuen PRs, weise auf Risiken hin und sag, was von Hand getestet werden sollte."
       },
       "week": {
         "name": "Wochenrückblick",
@@ -11364,6 +11410,12 @@
       "input": "Das hat nicht geklappt. Prüf deine Angaben und versuch es noch einmal.",
       "conflict": "Das geht gerade nicht. Lade neu und versuch es noch einmal.",
       "computer": "Der Computer konnte das gerade nicht tun. Prüf, ob er an ist, und versuch es noch einmal."
+    },
+    "webhook": {
+      "githubNoAccess": "Das GitHub dieses Workspace kann keine Webhooks in {{repo}} anlegen. Folge den Schritten unten, um ihn von Hand anzulegen.",
+      "githubFailed": "GitHub hat den Webhook in {{repo}} nicht erstellt ({{status}}). Folge den Schritten unten, um ihn von Hand anzulegen.",
+      "invalidSecret": "Füge das ganze Client Secret ein, ohne Leerzeichen.",
+      "invalidRepo": "Schreib das Repo als besitzer/name."
     },
     "issue": {
       "assigneeOutside": "Diese Person sieht diese Aufgabe nicht. Füge sie zuerst bei Wer es sieht hinzu.",

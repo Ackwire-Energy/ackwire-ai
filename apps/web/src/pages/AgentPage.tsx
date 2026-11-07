@@ -429,6 +429,10 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     // The tabs stay where they are; the content starts from the top of the tabs.
     if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView?.({ block: "start" });
   };
+  // "Quem pensa" is a dialog, not a section: a link to it opens the dialog.
+  useEffect(() => {
+    if (section === "brain") setWork("brain");
+  }, [section]);
   // A section in the URL: scroll to it once Configurações shows.
   useEffect(() => {
     if (tab !== "settings" || !section) return;
@@ -784,7 +788,13 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         />
       )}
 
-      <WorkDialogs open={work} onClose={() => setWork(null)} />
+      <WorkDialogs
+        open={work}
+        onClose={() => {
+          setWork(null);
+          if (section === "brain") onNavigate(tab);
+        }}
+      />
 
       <Dialog
         open={blocker.status === "blocked" || closing}

@@ -701,6 +701,7 @@
   },
   "activity": {
     "title": "Aktivitas",
+    "chooseModel": "Pilih model lain",
     "filter": {
       "all": "Semua",
       "waiting": "Menunggumu",
@@ -761,6 +762,7 @@
       "desktop_taken_female_other": "{{names}} mengambil alih layar komputer {{agent}}",
       "plan_lent_other": "{{names}} menghubungkan paket {{plan}} kamu ke {{agent}}",
       "plan_lent_female_other": "{{names}} menghubungkan paket {{plan}} kamu ke {{agent}}",
+      "plan_model_dropped_other": "{{model}} keluar dari {{plan}}. {{names}} memakai {{runs}} untuk sementara",
       "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",
       "computer_no_chrome_other": "Komputer memerlukan Google Chrome. Unduh di google.com/chrome",

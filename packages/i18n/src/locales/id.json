@@ -3643,6 +3643,9 @@
       "takeBackAll": "Tarik kembali dari semua agen",
       "done": "Paketmu sudah kembali"
     },
+    "planModelDropped": {
+      "choose": "Pilih model lain"
+    },
     "docTitleUnread": "({{count}}) Notifikasi",
     "summaryWaiting_other": "{{count}} hal menunggumu",
     "summaryUnread_other": "{{count}} belum dibaca",
@@ -3734,6 +3737,7 @@
       "browserProfileRequest": "<b>{{name}}</b> meminta satu profil browser lagi untuk <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> mengambil alih layar komputer <b>{{agent}}</b>",
       "planLent": "<b>{{name}}</b> menghubungkan paket {{plan}} kamu ke <b>{{agent}}</b>",
+      "planModelDropped": "{{model}} keluar dari {{plan}}. <b>{{name}}</b> memakai {{runs}} sampai kamu memilih model lain.",
       "routineWaitingPlan": "<b>{{name}}</b> menunggu paketnya direset untuk menjalankan rutinitas",
       "planResetUnknown": "{{plan}} tidak memberi tahu kapan batasnya direset. Pekerjaan <b>{{name}}</b> masih menunggu.",
       "catchUpClosed_other": "<b>{{name}}</b> kembali dan melewati {{count}} percakapan yang tidak perlu dijawab",
@@ -6026,6 +6030,48 @@
         "rate_limited": "Ditolak: terlalu banyak panggilan per menit"
       }
     },
+    "setup": {
+      "title": "Webhook {{provider}}",
+      "working": "Berjalan. {{provider}} sudah mengirim event-nya ke sini.",
+      "waiting": {
+        "github": "Menunggu GitHub. GitHub mengirim ping begitu webhook disimpan.",
+        "sentry": "Menunggu Sentry. Sentry memanggil saat ada error baru."
+      },
+      "refused": {
+        "github": "GitHub memanggil dengan secret lain. Salin lagi Secret di bawah ke webhook.",
+        "sentry": "Sentry memanggil dengan secret lain. Tempel lagi Client Secret integrasinya."
+      },
+      "timeout": "Tidak ada yang masuk dalam 3 menit. Periksa URL dan secret, lalu uji lagi.",
+      "adminOnly": "Orang yang mengelola konektor menyalakan webhook {{provider}}. Minta admin membuka rutinitas ini.",
+      "test": "Uji",
+      "retest": "Uji lagi",
+      "copied": "Disalin.",
+      "github": {
+        "repo": "Repositori",
+        "repoPlaceholder": "pemilik/nama",
+        "oneClick": "Buat webhook",
+        "added": "Webhook dibuat di {{repo}}.",
+        "byHand": "Atau manual: di repositori, Settings › Webhooks › Add webhook.",
+        "open": "Di repositori, buka Settings › Webhooks › Add webhook.",
+        "openLink": "Buka di GitHub",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Di Which events, pilih Let me select individual events. Centang Pull requests dan Deployment statuses, lalu Add webhook.",
+        "another": "Tambahkan ke repositori lain"
+      },
+      "sentry": {
+        "open": "Di Sentry, buat integrasi internal.",
+        "openLink": "Buka di Sentry",
+        "url": "Webhook URL",
+        "events": "Di Permissions, setel Issue & Event ke Read. Lalu di Webhooks, centang issue dan simpan.",
+        "secret": "Client Secret integrasi",
+        "secretPlaceholder": "Tempel Client Secret",
+        "secretSaved": "Tersimpan. Tempel yang baru untuk menggantinya",
+        "save": "Simpan",
+        "saved": "Client Secret disimpan."
+      }
+    },
     "once": "Sekali · {{weekday}}, {{date}} pukul {{time}}{{zone}}",
     "reminder": "Pengingat",
     "fired": "Terkirim",
@@ -6323,8 +6369,8 @@
       },
       "prs": {
         "name": "Tinjau PR baru",
-        "text": "Hari kerja pukul 9 dan pukul 2 siang, agen membaca PR baru dan menunjukkan risikonya.",
-        "prompt": "Periksa PR yang dibuka sejak terakhir kali. Baca setiap diff, tunjukkan risikonya, dan sebutkan apa yang perlu diuji manual."
+        "text": "Saat PR dibuka, agen membacanya dan memberi komentar.",
+        "prompt": "Baca diff PR baru, tunjukkan risikonya, dan sebutkan apa yang perlu diuji manual."
       },
       "week": {
         "name": "Rangkuman minggu ini",
@@ -10976,6 +11022,12 @@
       "input": "Itu tidak berhasil. Periksa isianmu dan coba lagi.",
       "conflict": "Itu tidak bisa dilakukan sekarang. Muat ulang dan coba lagi.",
       "computer": "Komputer tidak bisa melakukan ini sekarang. Pastikan komputer menyala dan coba lagi."
+    },
+    "webhook": {
+      "githubNoAccess": "GitHub workspace ini tidak bisa membuat webhook di {{repo}}. Ikuti langkah di bawah untuk membuatnya manual.",
+      "githubFailed": "GitHub tidak membuat webhook di {{repo}} ({{status}}). Ikuti langkah di bawah untuk membuatnya manual.",
+      "invalidSecret": "Tempel Client Secret secara utuh, tanpa spasi.",
+      "invalidRepo": "Tulis repositori sebagai pemilik/nama."
     },
     "issue": {
       "assigneeOutside": "Orang ini tidak bisa melihat tugas ini. Tambahkan dulu ke Siapa yang melihat.",

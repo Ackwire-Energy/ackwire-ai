@@ -1,15 +1,19 @@
 import { ComposioSignatureError } from "@agenteschat/adapters";
 import {
+  addGitHubRepoHook,
   createWebhookEndpoint,
+  ensureWebhookEndpoint,
   ForbiddenSignatureError,
   HOOK_LIMIT_PER_IP,
   handleComposioWebhook,
   handleWebhook,
   NotFoundError,
   receiveRoutineHook,
+  setWebhookSecret,
   ValidationError,
   WEBHOOK_PROVIDERS,
   type WebhookProvider,
+  webhookSetup,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { requestLimitIp } from "../http/client-ip";
@@ -25,6 +29,7 @@ import {
   routineHookDeps,
   security,
 } from "./app/context";
+import { githubAccess } from "./github-app";
 import { readWebhookBytes, readWebhookText } from "./webhook-body";
 
 /** What a routine's address answers when it refuses a call (English: the caller is a program). */
@@ -109,10 +114,102 @@ export function registerRoutineHooks(api: OpenAPIHono, deps: AppDeps) {
   });
 }
 
+const Provider = z.enum(["github", "sentry"]);
+
+const Setup = z
+  .object({
+    provider: Provider,
+    id: z.string().nullable().openapi({ description: "Null: the workspace has none yet." }),
+    url: z.string().nullable().openapi({ description: "Where the service sends its events (who sets webhooks up)." }),
+    secret: z
+      .string()
+      .nullable()
+      .openapi({ description: "GitHub's secret to paste there (who sets webhooks up). Sentry's is its own." }),
+    receivedAt: z.string().nullable().openapi({ description: "The last call with a valid signature: it works." }),
+    refusedAt: z.string().nullable().openapi({ description: "The last call whose signature didn't match." }),
+    secretSet: z.boolean().openapi({ description: "Sentry: its integration's Client Secret was pasted here." }),
+    canManage: z.boolean(),
+    oneClick: z.boolean().openapi({
+      description: "GitHub: the server may add the webhook to a repository itself (`…/github/repository`).",
+    }),
+  })
+  .openapi("WebhookSetup");
+
 export function webhookAdminRoutes(deps: AppDeps) {
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
-  const webhookDeps = { db: deps.db, keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers] };
+  const webhookDeps = {
+    db: deps.db,
+    keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
+    github: githubAccess(deps),
+  };
+  const publicUrl = deps.config.PUBLIC_URL;
+  const ProviderParams = OrgParams.extend({ provider: Provider });
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/webhooks/{provider}",
+      tags: ["Routines"],
+      security,
+      summary: "A service's webhook for this workspace: whether it works; where and with what to set it up",
+      request: { params: ProviderParams },
+      responses: { 200: json(Setup), ...errors },
+    }),
+    async (c) => {
+      const { orgId, provider } = c.req.valid("param");
+      return c.json(await webhookSetup(webhookDeps, c.get("user").id, orgId, provider, publicUrl), 200);
+    },
+  );
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/webhooks/{provider}",
+      tags: ["Routines"],
+      security,
+      summary: "Make the service's webhook when the workspace has none (who sets webhooks up)",
+      request: { params: ProviderParams },
+      responses: { 200: json(Setup), ...errors },
+    }),
+    async (c) => {
+      const { orgId, provider } = c.req.valid("param");
+      return c.json(await ensureWebhookEndpoint(webhookDeps, c.get("user").id, orgId, provider, publicUrl), 200);
+    },
+  );
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/webhooks/{provider}/secret",
+      tags: ["Routines"],
+      security,
+      summary: "The secret the service signs with, pasted from it (Sentry's Client Secret)",
+      request: { params: ProviderParams, body: body(z.object({ secret: z.string().max(500) })) },
+      responses: { 200: json(Setup), ...errors },
+    }),
+    async (c) => {
+      const { orgId, provider } = c.req.valid("param");
+      const { secret } = c.req.valid("json");
+      return c.json(await setWebhookSecret(webhookDeps, c.get("user").id, orgId, provider, secret, publicUrl), 200);
+    },
+  );
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/webhooks/github/repository",
+      tags: ["Routines"],
+      security,
+      summary: "Add the workspace's GitHub webhook to a repository with the workspace's GitHub access",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ repo: z.string().max(200).openapi({ description: "`owner/name`." }) })),
+      },
+      responses: { 200: json(Setup), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { repo } = c.req.valid("json");
+      return c.json(await addGitHubRepoHook(webhookDeps, c.get("user").id, orgId, repo, publicUrl), 200);
+    },
+  );
   app.openapi(
     createRoute({
       method: "post",
@@ -132,7 +229,7 @@ export function webhookAdminRoutes(deps: AppDeps) {
         c.get("user").id,
         c.req.valid("param").orgId,
         c.req.valid("json").provider,
-        deps.config.PUBLIC_URL,
+        publicUrl,
       );
       return c.json(created, 201);
     },

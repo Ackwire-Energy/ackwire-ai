@@ -3751,6 +3751,9 @@
       "takeBackAll": "Tüm ajanlardan geri al",
       "done": "Planın geri geldi"
     },
+    "planModelDropped": {
+      "choose": "Başka bir model seç"
+    },
     "docTitleUnread": "({{count}}) Bildirimler",
     "summaryWaiting_one": "Sizi bekleyen {{count}} şey var",
     "summaryWaiting_other": "Sizi bekleyen {{count}} şey var",
@@ -3850,6 +3853,7 @@
       "browserProfileRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir tarayıcı profili daha istiyor",
       "desktopTaken": "<b>{{name}}</b>, <b>{{agent}}</b> ajanının bilgisayar ekranını devraldı",
       "planLent": "<b>{{name}}</b>, {{plan}} planını <b>{{agent}}</b> ajanına bağladı",
+      "planModelDropped": "{{model}}, {{plan}} listesinden çıktı. Başka bir model seçene kadar <b>{{name}}</b> {{runs}} kullanıyor.",
       "routineWaitingPlan": "<b>{{name}}</b> bir rutini çalıştırmak için planının sıfırlanmasını bekliyor",
       "planResetUnknown": "{{plan}} sınırının ne zaman sıfırlanacağını söylemedi. <b>{{name}}</b> ajanının işi hâlâ bekliyor.",
       "catchUpClosed_one": "<b>{{name}}</b> döndü ve yanıt gerektirmeyen {{count}} konuşmayı atladı",
@@ -6180,6 +6184,48 @@
         "rate_limited": "Reddedildi: dakikada çok fazla çağrı"
       }
     },
+    "setup": {
+      "title": "{{provider}} webhook'u",
+      "working": "Çalışıyor. {{provider}} olaylarını zaten buraya gönderiyor.",
+      "waiting": {
+        "github": "GitHub bekleniyor. Webhook kaydedilir kaydedilmez bir ping gönderir.",
+        "sentry": "Sentry bekleniyor. Yeni bir hata çıktığında çağırır."
+      },
+      "refused": {
+        "github": "GitHub başka bir gizli anahtarla çağırdı. Aşağıdaki Secret'ı webhook'a yeniden kopyala.",
+        "sentry": "Sentry başka bir gizli anahtarla çağırdı. Entegrasyonun Client Secret'ını yeniden yapıştır."
+      },
+      "timeout": "3 dakikada hiçbir şey gelmedi. URL'yi ve gizli anahtarı kontrol edip yeniden test et.",
+      "adminOnly": "{{provider}} webhook'unu bağlayıcıları yöneten kişi açar. Bir yöneticiden bu rutini açmasını iste.",
+      "test": "Test et",
+      "retest": "Yeniden test et",
+      "copied": "Kopyalandı.",
+      "github": {
+        "repo": "Depo",
+        "repoPlaceholder": "sahip/ad",
+        "oneClick": "Webhook oluştur",
+        "added": "{{repo}} içinde webhook oluşturuldu.",
+        "byHand": "Ya da elle: depoda Settings › Webhooks › Add webhook.",
+        "open": "Depoda Settings › Webhooks › Add webhook'u aç.",
+        "openLink": "GitHub'da aç",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Which events altında Let me select individual events'i seç. Pull requests ve Deployment statuses'ı işaretle, sonra Add webhook.",
+        "another": "Başka bir depoya ekle"
+      },
+      "sentry": {
+        "open": "Sentry'de bir dahili entegrasyon oluştur.",
+        "openLink": "Sentry'de aç",
+        "url": "Webhook URL",
+        "events": "Permissions altında Issue & Event'i Read yap. Sonra Webhooks altında issue'yu işaretle ve kaydet.",
+        "secret": "Entegrasyonun Client Secret'ı",
+        "secretPlaceholder": "Client Secret'ı yapıştır",
+        "secretSaved": "Kaydedildi. Değiştirmek için yenisini yapıştır",
+        "save": "Kaydet",
+        "saved": "Client Secret kaydedildi."
+      }
+    },
     "once": "Bir kez · {{weekday}}, {{date}} saat {{time}}{{zone}}",
     "reminder": "Anımsatıcı",
     "fired": "Tetiklendi",
@@ -6476,8 +6522,8 @@
       },
       "prs": {
         "name": "Yeni PR'ları incele",
-        "text": "Hafta içi saat 9 ve 14'te ajan yeni PR'ları okur ve riskleri belirtir.",
-        "prompt": "Son seferden beri açılan PR'lara bakın. Her birinin diff'ini okuyun, riskleri belirtin ve elle neyin test edilmesi gerektiğini söyleyin."
+        "text": "Bir PR açıldığında ajan onu okur ve yorum yapar.",
+        "prompt": "Yeni PR'ın diff'ini oku, riskleri belirt ve elle neyin test edilmesi gerektiğini söyle."
       },
       "week": {
         "name": "Hafta kapanışı",
@@ -11300,6 +11346,12 @@
       "input": "Olmadı. Doldurduklarınızı kontrol edip tekrar deneyin.",
       "conflict": "Bu şu anda yapılamıyor. Yenileyip tekrar deneyin.",
       "computer": "Bilgisayar bunu şu anda yapamadı. Açık olduğunu kontrol edip tekrar deneyin."
+    },
+    "webhook": {
+      "githubNoAccess": "Bu çalışma alanının GitHub'ı {{repo}} içinde webhook oluşturamıyor. Elle oluşturmak için aşağıdaki adımları izle.",
+      "githubFailed": "GitHub, {{repo}} içinde webhook'u oluşturmadı ({{status}}). Elle oluşturmak için aşağıdaki adımları izle.",
+      "invalidSecret": "Client Secret'ın tamamını boşluksuz yapıştır.",
+      "invalidRepo": "Depoyu sahip/ad biçiminde yaz."
     },
     "issue": {
       "assigneeOutside": "Bu kişi bu görevi göremiyor. Önce onu Kimler görüyor listesine ekleyin.",

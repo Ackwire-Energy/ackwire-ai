@@ -55,7 +55,7 @@ export type RoutineTemplate = {
 /**
  * Starting points for "Nova rotina", each area's together (the select's sections are runs of one area). Their words
  * are `routines.presets.{key}` in i18n; a schedule is a rule, not a phrase, so it means the same in every language.
- * None waits on a GitHub or Sentry event: their webhooks can't be set up from the app, so it would never run.
+ * One on a GitHub or Sentry event shows that service's webhook setup in the form (`EventWebhookSetup`).
  */
 export const ROUTINE_TEMPLATES = [
   { key: "digest", area: "team", kind: "schedule", rule: weekdays("09:00") },
@@ -102,7 +102,7 @@ export const ROUTINE_TEMPLATES = [
     rule: { freq: "hourly", interval: 1, times: ["00:00"] },
     apps: ["sentry"],
   },
-  { key: "prs", area: "tech", kind: "schedule", rule: weekdays("09:00", "14:00"), apps: ["github"] },
+  { key: "prs", area: "tech", kind: "event", event: "github.pr_opened", report: "always", apps: ["github"] },
 ] as const satisfies readonly RoutineTemplate[];
 
 export type RoutineTemplateItem = (typeof ROUTINE_TEMPLATES)[number];

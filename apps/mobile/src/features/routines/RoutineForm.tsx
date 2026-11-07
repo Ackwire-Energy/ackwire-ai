@@ -18,7 +18,7 @@ import {
   type RoutineTemplateOption,
   templateRule,
 } from "@agenteschat/client/lib/routine-templates";
-import { busyOnComputer, runsPerDay } from "@agenteschat/client/lib/routine-view";
+import { busyOnComputer, eventWebhook, runsPerDay } from "@agenteschat/client/lib/routine-view";
 import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { router } from "expo-router";
 import { type ReactNode, useDeferredValue, useEffect, useState } from "react";
@@ -48,6 +48,7 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
+import { EventWebhookSetup } from "./EventWebhookSetup";
 import { useFailed, useMyZone, useSay, useTargetLabel } from "./hooks";
 import {
   draftChanges,
@@ -570,6 +571,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
                 ))}
               </GroupedList>
               <GroupedFooter>{t("routines.form.eventHelp", { org: org?.name ?? "" })}</GroupedFooter>
+              {eventWebhook(d.event) ? <EventWebhookSetup provider={eventWebhook(d.event) ?? "github"} /> : null}
             </>
           ) : null}
           {d.kind === "email" ? (

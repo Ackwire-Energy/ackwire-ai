@@ -3630,6 +3630,9 @@
       "takeBackAll": "すべてのエージェントから取り戻す",
       "done": "プランが戻りました"
     },
+    "planModelDropped": {
+      "choose": "別のモデルを選ぶ"
+    },
     "docTitleUnread": "（{{count}}）通知",
     "summaryWaiting_other": "あなたの対応待ち{{count}}件",
     "summaryUnread_other": "未読{{count}}件",
@@ -3720,6 +3723,7 @@
       "browserProfileRequest": "<b>{{name}}</b>が<b>{{agent}}</b>用のブラウザプロファイルの追加を求めています",
       "desktopTaken": "<b>{{name}}</b>が<b>{{agent}}</b>のコンピューターの画面の操作を引き継ぎました",
       "planLent": "<b>{{name}}</b>さんがあなたの {{plan}} プランを<b>{{agent}}</b>に接続しました",
+      "planModelDropped": "{{model}}が{{plan}}から外れました。別のモデルを選ぶまで、<b>{{name}}</b>は{{runs}}を使います。",
       "routineWaitingPlan": "<b>{{name}}</b>はルーティンを実行するため、プランのリセットを待っています",
       "planResetUnknown": "{{plan}}は上限がいつリセットされるかを伝えませんでした。<b>{{name}}</b>の作業はまだ待機中です。",
       "catchUpClosed_other": "<b>{{name}}</b>が再開し、返信が不要だった会話{{count}}件をスキップしました",
@@ -5989,6 +5993,48 @@
         "rate_limited": "拒否: 1分あたりの呼び出しが多すぎます"
       }
     },
+    "setup": {
+      "title": "{{provider}}のWebhook",
+      "working": "動いています。{{provider}}はすでにここへイベントを送っています。",
+      "waiting": {
+        "github": "GitHubを待っています。Webhookを保存するとすぐにpingが届きます。",
+        "sentry": "Sentryを待っています。新しいエラーが出ると呼び出されます。"
+      },
+      "refused": {
+        "github": "GitHubが別のシークレットで呼び出しました。下のSecretをもう一度Webhookにコピーしてください。",
+        "sentry": "Sentryが別のシークレットで呼び出しました。インテグレーションのClient Secretをもう一度貼り付けてください。"
+      },
+      "timeout": "3分間なにも届きませんでした。URLとシークレットを確認して、もう一度テストしてください。",
+      "adminOnly": "{{provider}}のWebhookはコネクタを管理する人がオンにします。このルーティンを開くよう管理者に頼んでください。",
+      "test": "テスト",
+      "retest": "もう一度テスト",
+      "copied": "コピーしました。",
+      "github": {
+        "repo": "リポジトリ",
+        "repoPlaceholder": "オーナー/名前",
+        "oneClick": "Webhookを作成",
+        "added": "{{repo}}にWebhookを作成しました。",
+        "byHand": "手動でも作れます。リポジトリでSettings › Webhooks › Add webhookを開きます。",
+        "open": "リポジトリでSettings › Webhooks › Add webhookを開きます。",
+        "openLink": "GitHubで開く",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "Which eventsでLet me select individual eventsを選びます。Pull requestsとDeployment statusesにチェックを入れ、Add webhookを押します。",
+        "another": "別のリポジトリに追加"
+      },
+      "sentry": {
+        "open": "Sentryで内部インテグレーションを作成します。",
+        "openLink": "Sentryで開く",
+        "url": "Webhook URL",
+        "events": "PermissionsでIssue & EventをReadにします。次にWebhooksでissueにチェックを入れて保存します。",
+        "secret": "インテグレーションのClient Secret",
+        "secretPlaceholder": "Client Secretを貼り付け",
+        "secretSaved": "保存済み。置き換えるには新しいものを貼り付け",
+        "save": "保存",
+        "saved": "Client Secretを保存しました。"
+      }
+    },
     "once": "1回のみ · {{date}}（{{weekday}}）{{time}}{{zone}}",
     "reminder": "リマインダー",
     "fired": "実行済み",
@@ -6286,8 +6332,8 @@
       },
       "prs": {
         "name": "新しいPRをレビュー",
-        "text": "平日9時と14時に、エージェントが新しいPRを読んでリスクを指摘します。",
-        "prompt": "前回以降に作成されたPRを確認してください。それぞれの差分を読み、リスクを指摘し、手動でテストすべき点を伝えてください。"
+        "text": "PRが作成されると、エージェントが読んでコメントします。",
+        "prompt": "新しいPRの差分を読み、リスクを指摘し、手動でテストすべき点を伝えてください。"
       },
       "week": {
         "name": "週のまとめ",
@@ -10922,6 +10968,12 @@
       "input": "うまくいきませんでした。入力内容を確認して、もう一度お試しください。",
       "conflict": "今はできません。更新して、もう一度お試しください。",
       "computer": "コンピューターが今はこれを実行できませんでした。電源が入っているか確認して、もう一度お試しください。"
+    },
+    "webhook": {
+      "githubNoAccess": "このワークスペースのGitHubは{{repo}}にWebhookを作成できません。下の手順で手動で作成してください。",
+      "githubFailed": "GitHubは{{repo}}にWebhookを作成しませんでした（{{status}}）。下の手順で手動で作成してください。",
+      "invalidSecret": "Client Secretを空白なしで全部貼り付けてください。",
+      "invalidRepo": "リポジトリは オーナー/名前 の形で書いてください。"
     },
     "issue": {
       "assigneeOutside": "この人はこのタスクを見ることができません。先に閲覧できる人に追加してください。",

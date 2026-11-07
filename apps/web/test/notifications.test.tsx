@@ -523,6 +523,28 @@ describe("someone gave an agent the person's plan (ADR 0059 §3)", () => {
   });
 });
 
+describe("an agent's model left its plan's list", () => {
+  test("which model, which plan, what runs now; Escolher outro modelo opens the agent's Quem pensa", async () => {
+    const dropped = notification({
+      id: "n-dropped",
+      kind: "plan_model_dropped",
+      actors: [{ type: "agent", id: ADA_ID }],
+      source: { agentId: ADA_ID, label: "Ada" },
+      latest: { title: "DeepSeek V4.1 Flash", plan: "OpenCode Go", nowModel: "MiniMax M3" },
+      updatedAt: ago(3),
+    });
+    const { router } = await go(seedState({ notifications: [dropped] }));
+    const row = document.querySelector('[data-n="n-dropped"]') as HTMLElement;
+    expect(row.textContent).toContain(
+      "O DeepSeek V4.1 Flash saiu do OpenCode Go. Ada está usando o MiniMax M3 até você escolher outro modelo.",
+    );
+    await click(within(row).getByRole("button", { name: "Escolher outro modelo" }));
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
+    expect(screen().getByRole("dialog", { name: "Quem pensa" })).toBeTruthy();
+  });
+});
+
 describe("agents that failed for one cause (ADR 0097)", () => {
   const failure = (agentId: string, messageId: string) => ({
     key: `run_failed:${agentId}:${ENG_ID}:${messageId}`,

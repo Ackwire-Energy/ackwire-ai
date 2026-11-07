@@ -749,6 +749,7 @@
   },
   "activity": {
     "title": "Actividad",
+    "chooseModel": "Elegir otro modelo",
     "filter": {
       "all": "Todo",
       "waiting": "Esperándote",
@@ -893,6 +894,9 @@
       "plan_lent_female_one": "{{names}} conectó tu plan de {{plan}} a {{agent}}",
       "plan_lent_female_many": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
       "plan_lent_female_other": "{{names}} conectaron tu plan de {{plan}} a {{agent}}",
+      "plan_model_dropped_one": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
+      "plan_model_dropped_many": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
+      "plan_model_dropped_other": "{{model}} salió de {{plan}}. {{names}} usa {{runs}} por ahora",
       "connector_tool_changed_one": "Un servidor conectado cambió herramientas que aprobaste",
       "connector_tool_changed_many": "Un servidor conectado cambió herramientas que aprobaste",
       "connector_tool_changed_other": "Un servidor conectado cambió herramientas que aprobaste",

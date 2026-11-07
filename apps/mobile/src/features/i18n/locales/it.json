@@ -749,6 +749,7 @@
   },
   "activity": {
     "title": "Attività recenti",
+    "chooseModel": "Scegli un altro modello",
     "filter": {
       "all": "Tutto",
       "waiting": "Ti aspetta",
@@ -893,6 +894,9 @@
       "plan_lent_female_one": "{{names}} ha collegato il tuo piano {{plan}} a {{agent}}",
       "plan_lent_female_many": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
       "plan_lent_female_other": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_model_dropped_one": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
+      "plan_model_dropped_many": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
+      "plan_model_dropped_other": "{{model}} è uscito da {{plan}}. {{names}} usa {{runs}} per ora",
       "connector_tool_changed_one": "Un server connesso ha cambiato strumenti che avevi approvato",
       "connector_tool_changed_many": "Un server connesso ha cambiato strumenti che avevi approvato",
       "connector_tool_changed_other": "Un server connesso ha cambiato strumenti che avevi approvato",

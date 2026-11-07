@@ -18,6 +18,7 @@ export type AppHref =
   | `/chat/${string}?handoff=${string}`
   | `/chat/${string}?thread=${string}&handoff=${string}`
   | `/agent/${string}`
+  | `/agent-model/${string}`
   | `/computer/${string}`
   | `/handoff/${string}`
   | `/issues/${number}`
@@ -236,6 +237,8 @@ export function notificationHref(
   if (n.kind === "agent_unreached" || n.kind === "browser_profile_request" || n.kind === "desktop_taken")
     return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
+  // The agent's model left its plan's list: its model, to choose another.
+  if (n.kind === "plan_model_dropped") return isSafeId(s.agentId) ? `/agent-model/${s.agentId}` : null;
   // Someone gave an agent the person's plan: their AI accounts, where the agents on each plan are.
   if (n.kind === "plan_lent") return "/ai-accounts";
   // What an AI app created as the person: the newest agent, else the newest routine.

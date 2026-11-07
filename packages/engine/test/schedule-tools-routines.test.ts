@@ -12,7 +12,7 @@ import {
 } from "../src";
 import { addMember, type Fixture, SECRET, setup } from "./fixtures";
 
-/** A live webhook of `provider` in the fixture's workspace: its events can start routines. */
+/** A webhook of `provider` in the fixture's workspace, made in the app and not called yet. */
 const hook = (f: Fixture, provider: "github" | "sentry") =>
   createWebhookEndpoint(
     { db: f.db, keyWrappers: [f.keyWrapper] },
@@ -21,6 +21,10 @@ const hook = (f: Fixture, provider: "github" | "sentry") =>
     provider,
     "http://localhost:3000",
   );
+
+/** The service called it with its secret: its events can start routines. */
+const delivered = (f: Fixture, id: string) =>
+  f.db.update(schema.webhookEndpoints).set({ lastDeliveryAt: new Date() }).where(eq(schema.webhookEndpoints.id, id));
 
 let f: Fixture;
 afterEach(async () => {
@@ -96,7 +100,7 @@ describe("schedule tools: routines", () => {
     f = await setup();
     const ctx = await runContext(f);
     const call = await tools(f, ctx);
-    await hook(f, "sentry");
+    await delivered(f, (await hook(f, "sentry")).id);
     const out = await call("create_routine", {
       prompt: "Investigue o erro novo e diga o que fazer.",
       trigger: { type: "event", event: "sentry.issue_created" },
@@ -323,7 +327,7 @@ describe("schedule tools: routines", () => {
     expect(refused.isError).toBe(true);
     expect(refused.content).toContain("Not created: nothing would ever start it. No GitHub webhook");
     // In the person's words: our private app API is nothing they can call.
-    expect(refused.content).toContain("a workspace admin sets up a GitHub webhook for this workspace");
+    expect(refused.content).toContain("someone who manages connectors picks the GitHub event in Rotinas");
     expect(refused.content).toContain("offer a schedule that checks instead");
     expect(refused.content).not.toContain("/api/");
     expect(await f.db.select().from(schema.routines)).toEqual([]);
@@ -345,8 +349,10 @@ describe("schedule tools: routines", () => {
     expect(moved.isError).toBe(true);
     expect(moved.content).toContain("Not changed: nothing would ever start it.");
 
-    // With a GitHub webhook here it is created, and the next pull request starts it.
+    // A GitHub webhook made but never called from GitHub starts nothing yet; once GitHub calls it, the routine is made.
     const endpoint = await hook(f, "github");
+    expect((await call("create_routine", { prompt: "Revise o PR novo.", trigger: event })).isError).toBe(true);
+    await delivered(f, endpoint.id);
     const out = await call("create_routine", { prompt: "Revise o PR novo e mande o resumo.", trigger: event });
     expect(out.isError).toBeFalsy();
     const id = (out.data?.routine as { id: string } | undefined)?.id ?? "";
@@ -359,6 +365,10 @@ describe("schedule tools: routines", () => {
     expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).state).toBe("needs_webhook");
     expect((await call("list_routines", {})).content).toContain(
       "can't run yet: no GitHub webhook sends its event here",
+    );
+    // Its edit tells the agent where the person sets the webhook up: the routine's own GitHub webhook card.
+    expect((await call("update_routine", { id, prompt: "Revise o PR novo." })).content).toContain(
+      "opens this routine in Rotinas and follows the GitHub webhook steps shown there",
     );
     // Paused, it says so first.
     const paused = await call("update_routine", { id, active: false });

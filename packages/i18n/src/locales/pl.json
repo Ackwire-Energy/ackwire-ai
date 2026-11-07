@@ -4011,6 +4011,9 @@
       "takeBackAll": "Odbierz od wszystkich agentów",
       "done": "Twój plan wrócił"
     },
+    "planModelDropped": {
+      "choose": "Wybierz inny model"
+    },
     "docTitleUnread": "({{count}}) Powiadomienia",
     "summaryWaiting_one": "{{count}} rzecz czeka na ciebie",
     "summaryWaiting_few": "{{count}} rzeczy czekają na ciebie",
@@ -4128,6 +4131,7 @@
       "browserProfileRequest": "<b>{{name}}</b> prosi o kolejny profil przeglądarki dla <b>{{agent}}</b>",
       "desktopTaken": "Ekran komputera <b>{{agent}}</b> przejęty przez <b>{{name}}</b>",
       "planLent": "<b>{{name}}</b> połączył(a) twój plan {{plan}} z agentem <b>{{agent}}</b>",
+      "planModelDropped": "{{model}} zniknął z {{plan}}. <b>{{name}}</b> używa {{runs}}, dopóki nie wybierzesz innego modelu.",
       "routineWaitingPlan": "<b>{{name}}</b> czeka na odnowienie limitu planu, by uruchomić rutynę",
       "planResetUnknown": "{{plan}} nie podaje, kiedy odnowi się limit. Praca <b>{{name}}</b> nadal czeka.",
       "catchUpClosed_one": "<b>{{name}}</b> wrócił i pominął {{count}} rozmowę, która nie wymagała odpowiedzi",
@@ -6640,6 +6644,48 @@
         "rate_limited": "Odrzucone: za dużo wywołań na minutę"
       }
     },
+    "setup": {
+      "title": "Webhook {{provider}}",
+      "working": "Działa. {{provider}} już wysyła tu swoje zdarzenia.",
+      "waiting": {
+        "github": "Czekam na GitHub. Wyśle ping, gdy tylko webhook zostanie zapisany.",
+        "sentry": "Czekam na Sentry. Wywoła, gdy pojawi się nowy błąd."
+      },
+      "refused": {
+        "github": "GitHub wywołał z innym sekretem. Skopiuj ponownie Secret poniżej do webhooka.",
+        "sentry": "Sentry wywołał z innym sekretem. Wklej ponownie Client Secret integracji."
+      },
+      "timeout": "Przez 3 minuty nic nie przyszło. Sprawdź URL i sekret, potem przetestuj ponownie.",
+      "adminOnly": "Webhook {{provider}} włącza osoba, która zarządza konektorami. Poproś admina, żeby otworzył tę rutynę.",
+      "test": "Testuj",
+      "retest": "Testuj ponownie",
+      "copied": "Skopiowano.",
+      "github": {
+        "repo": "Repozytorium",
+        "repoPlaceholder": "właściciel/nazwa",
+        "oneClick": "Utwórz webhook",
+        "added": "Utworzono webhook w {{repo}}.",
+        "byHand": "Albo ręcznie: w repozytorium Settings › Webhooks › Add webhook.",
+        "open": "W repozytorium otwórz Settings › Webhooks › Add webhook.",
+        "openLink": "Otwórz na GitHubie",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "W Which events wybierz Let me select individual events. Zaznacz Pull requests i Deployment statuses, potem Add webhook.",
+        "another": "Dodaj do innego repozytorium"
+      },
+      "sentry": {
+        "open": "W Sentry utwórz integrację wewnętrzną.",
+        "openLink": "Otwórz w Sentry",
+        "url": "Webhook URL",
+        "events": "W Permissions ustaw Issue & Event na Read. Potem w Webhooks zaznacz issue i zapisz.",
+        "secret": "Client Secret integracji",
+        "secretPlaceholder": "Wklej Client Secret",
+        "secretSaved": "Zapisano. Wklej nowy, żeby go zastąpić",
+        "save": "Zapisz",
+        "saved": "Zapisano Client Secret."
+      }
+    },
     "once": "Raz · {{weekday}}, {{date}} o {{time}}{{zone}}",
     "reminder": "Przypomnienie",
     "fired": "Wykonane",
@@ -6940,8 +6986,8 @@
       },
       "prs": {
         "name": "Przeglądaj nowe PR",
-        "text": "W dni robocze o 9:00 i 14:00 agent czyta nowe PR i wskazuje ryzyka.",
-        "prompt": "Sprawdź PR otwarte od ostatniego razu. Przeczytaj każdy diff, wskaż ryzyka i powiedz, co przetestować ręcznie."
+        "text": "Gdy pojawi się PR, agent go czyta i komentuje.",
+        "prompt": "Przeczytaj diff nowego PR, wskaż ryzyka i powiedz, co przetestować ręcznie."
       },
       "week": {
         "name": "Podsumowanie tygodnia",
@@ -12176,6 +12222,12 @@
       "input": "Nie udało się. Sprawdź, co wpisano, i spróbuj ponownie.",
       "conflict": "Teraz nie można tego zrobić. Odśwież i spróbuj ponownie.",
       "computer": "Komputer nie mógł tego teraz zrobić. Sprawdź, czy jest włączony, i spróbuj ponownie."
+    },
+    "webhook": {
+      "githubNoAccess": "GitHub tego workspace’u nie może tworzyć webhooków w {{repo}}. Wykonaj kroki poniżej, żeby utworzyć go ręcznie.",
+      "githubFailed": "GitHub nie utworzył webhooka w {{repo}} ({{status}}). Wykonaj kroki poniżej, żeby utworzyć go ręcznie.",
+      "invalidSecret": "Wklej cały Client Secret, bez spacji.",
+      "invalidRepo": "Wpisz repozytorium jako właściciel/nazwa."
     },
     "issue": {
       "assigneeOutside": "Ta osoba nie widzi tego zadania. Najpierw dodaj ją do Kto to widzi.",

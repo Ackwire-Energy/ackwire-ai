@@ -3829,6 +3829,8 @@ export const en = {
       takeBackAll: "Take it back from every agent",
       done: "Your plan is back",
     },
+    /** Under `plan_model_dropped`: opens the agent's "Quem pensa". */
+    planModelDropped: { choose: "Choose another model" },
     docTitleUnread: "({{count}}) Notifications",
     summaryWaiting_one: "{{count}} thing waiting on you",
     summaryWaiting_other: "{{count}} things waiting on you",
@@ -3926,6 +3928,8 @@ export const en = {
       desktopTaken: "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer",
       /** Someone gave an agent the person's plan (`plan_lent`): `plan` its maker ("Claude"). */
       planLent: "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>",
+      /** The agent's model left its plan's list (`plan_model_dropped`): `runs` the model it uses now. */
+      planModelDropped: "{{model}} left {{plan}}. <b>{{name}}</b> is using {{runs}} until you choose another model.",
       routineWaitingPlan: "<b>{{name}}</b> is waiting for its plan to reset to run a routine",
       planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       catchUpClosed_one: "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
@@ -6227,6 +6231,51 @@ export const en = {
         rate_limited: "Refused: too many calls a minute",
       },
     },
+    setup: {
+      /** Over a GitHub or Sentry event's webhook, in the routine form and on its page: `provider` GitHub or Sentry. */
+      title: "{{provider}} webhook",
+      working: "Working. {{provider}} already sends its events here.",
+      waiting: {
+        github: "Waiting for GitHub. It sends a ping the moment the webhook is saved.",
+        sentry: "Waiting for Sentry. It calls when a new error comes in.",
+      },
+      refused: {
+        github: "GitHub called with another secret. Copy the secret below into the webhook again.",
+        sentry: "Sentry called with another secret. Paste the integration's Client Secret again.",
+      },
+      timeout: "Nothing came in 3 minutes. Check the URL and the secret, then test again.",
+      adminOnly: "Someone who manages connectors turns on the {{provider}} webhook. Ask an admin to open this routine.",
+      test: "Test",
+      retest: "Test again",
+      copied: "Copied.",
+      github: {
+        repo: "Repository",
+        repoPlaceholder: "owner/name",
+        oneClick: "Create the webhook",
+        /** After the one-click add: `repo` is owner/name. */
+        added: "Webhook created in {{repo}}.",
+        byHand: "Or by hand: in the repository, Settings\u00a0›\u00a0Webhooks\u00a0›\u00a0Add webhook.",
+        open: "In the repository, open Settings\u00a0›\u00a0Webhooks\u00a0›\u00a0Add webhook.",
+        openLink: "Open on GitHub",
+        url: "Payload URL",
+        type: "Content type: application/json",
+        secret: "Secret",
+        events:
+          "Under Which events, choose Let me select individual events. Tick Pull requests and Deployment statuses, then Add webhook.",
+        another: "Add to another repository",
+      },
+      sentry: {
+        open: "In Sentry, create an internal integration.",
+        openLink: "Open in Sentry",
+        url: "Webhook URL",
+        events: "Under Permissions, set Issue & Event to Read. Then under Webhooks, tick issue and save.",
+        secret: "The integration's Client Secret",
+        secretPlaceholder: "Paste the Client Secret",
+        secretSaved: "Saved. Paste a new one to replace it",
+        save: "Save",
+        saved: "Client Secret saved.",
+      },
+    },
     once: "Once · {{weekday}}, {{date}} at {{time}}{{zone}}",
     reminder: "Reminder",
     fired: "Fired",
@@ -6526,8 +6575,8 @@ export const en = {
       },
       prs: {
         name: "Review new PRs",
-        text: "Weekdays at 9am and 2pm, the agent reads new PRs and points out risks.",
-        prompt: "Check the PRs opened since last time. Read each diff, point out risks and say what to test by hand.",
+        text: "When a PR opens, the agent reads it and comments.",
+        prompt: "Read the new PR's diff, point out risks and say what to test by hand.",
       },
       week: {
         name: "Week wrap-up",
@@ -11017,6 +11066,15 @@ export const en = {
       input: "That didn't go through. Check what you filled in and try again.",
       conflict: "That can't be done right now. Refresh and try again.",
       computer: "The computer couldn't do this now. Check that it's on and try again.",
+    },
+    /** Setting up a GitHub or Sentry routine's webhook: `repo` is owner/name, `status` GitHub's HTTP status. */
+    webhook: {
+      githubNoAccess:
+        "This workspace's GitHub can't add webhooks to {{repo}}. Follow the steps below to add it by hand.",
+      githubFailed:
+        "GitHub didn't create the webhook in {{repo}} ({{status}}). Follow the steps below to add it by hand.",
+      invalidSecret: "Paste the whole Client Secret, with no spaces.",
+      invalidRepo: "Write the repository as owner/name.",
     },
     issue: {
       assigneeOutside: "This person can't see this task. Add them to who sees it first.",

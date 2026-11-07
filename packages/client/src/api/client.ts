@@ -297,6 +297,8 @@ import type {
   UndoAllResult,
   UsageQueue,
   UsageReport,
+  WebhookProvider,
+  WebhookSetup,
   WikiFolderAudience,
   WikiGraph,
   WikiImportInput,
@@ -1351,6 +1353,14 @@ export interface ApiClient {
     removeHookSecret(orgId: string, id: string): Promise<RoutineHook>;
     /** "Testar": a sample call; the agent is told it is a test. */
     testHook(orgId: string, id: string): Promise<{ runId: string | null; hook: RoutineHook }>;
+    /** Whether GitHub's or Sentry's webhook works here, and where and with what to set it up. */
+    webhookSetup(orgId: string, provider: WebhookProvider): Promise<WebhookSetup>;
+    /** Makes the service's webhook when the workspace has none (who sets webhooks up). */
+    ensureWebhook(orgId: string, provider: WebhookProvider): Promise<WebhookSetup>;
+    /** The secret the service signs with, pasted from it (Sentry's Client Secret). */
+    setWebhookSecret(orgId: string, provider: WebhookProvider, secret: string): Promise<WebhookSetup>;
+    /** Adds the GitHub webhook to a repository (`owner/name`) with the workspace's GitHub access. */
+    addWebhookToRepo(orgId: string, repo: string): Promise<WebhookSetup>;
   };
   /** The org wiki: pages in folders, `[[links]]`, backlinks, history and the graph. */
   wiki: {

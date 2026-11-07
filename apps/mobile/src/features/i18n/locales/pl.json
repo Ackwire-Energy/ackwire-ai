@@ -773,6 +773,7 @@
   },
   "activity": {
     "title": "Aktywność",
+    "chooseModel": "Wybierz inny model",
     "filter": {
       "all": "Wszystko",
       "waiting": "Czeka na ciebie",
@@ -959,6 +960,10 @@
       "plan_lent_female_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
       "plan_lent_female_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
       "plan_lent_female_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_model_dropped_one": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
+      "plan_model_dropped_few": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
+      "plan_model_dropped_many": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
+      "plan_model_dropped_other": "{{model}} zniknął z {{plan}}. {{names}} na razie używa {{runs}}",
       "connector_tool_changed_one": "Podłączony serwer zmienił zatwierdzone przez ciebie narzędzia",
       "connector_tool_changed_few": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
       "connector_tool_changed_many": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",

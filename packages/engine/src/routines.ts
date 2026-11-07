@@ -159,8 +159,9 @@ export const EVENT_WEBHOOK: Partial<Record<RoutineEvent, "github" | "sentry">> =
 };
 
 /**
- * The service whose webhook an event routine would wait on when the workspace has none live (null: something can
- * fire it). An agent's routine that could never fire is refused at creation (I7); people see `needs_webhook`.
+ * The service whose webhook an event routine would wait on when the workspace has none that ever delivered (null:
+ * something can fire it). An agent's routine that could never fire is refused at creation (I7); people see
+ * `needs_webhook` and set it up from the routine (`webhookSetup`).
  */
 export async function missingEventSource(
   db: Executor,
@@ -177,6 +178,7 @@ export async function missingEventSource(
         eq(webhookEndpoints.orgId, orgId),
         eq(webhookEndpoints.provider, provider),
         isNull(webhookEndpoints.revokedAt),
+        isNotNull(webhookEndpoints.lastDeliveryAt),
       ),
     )
     .limit(1);
@@ -880,6 +882,7 @@ async function views(
           and(
             eq(webhookEndpoints.orgId, orgId),
             isNull(webhookEndpoints.revokedAt),
+            isNotNull(webhookEndpoints.lastDeliveryAt),
             inArray(webhookEndpoints.provider, wantedHooks),
           ),
         ),
