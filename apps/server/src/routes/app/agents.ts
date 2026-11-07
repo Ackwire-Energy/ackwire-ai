@@ -782,6 +782,10 @@ export function agentRoutes(deps: AppDeps) {
                   })
                   .nullable(),
                 activeAt: z.string().nullable(),
+                working: z.boolean().openapi({
+                  description:
+                    "Something of its own thinks now (a run, or long work at work): drawn at work whatever its AI reads as for the viewer.",
+                }),
               }),
             ),
           }),

@@ -2299,6 +2299,8 @@ export interface AgentStatus {
   status: AgentStatusLine | null;
   /** Its last run's end (now while one is going); null = it never worked. */
   activeAt: string | null;
+  /** Something of its own thinks now (a run, or long work at work). Absent from older servers. */
+  working?: boolean;
 }
 
 export interface InvitationWithStatus {

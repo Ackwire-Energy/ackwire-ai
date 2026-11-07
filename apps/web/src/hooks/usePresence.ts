@@ -8,12 +8,13 @@ import type {
   MemberStatus,
   Person,
 } from "@agenteschat/client";
-import { keys, useApi } from "@agenteschat/client";
+import { agentStateIn, keys, useApi } from "@agenteschat/client";
 import { agentPresenceShown, agentStatusText } from "@agenteschat/client/lib/presence";
 import { useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useCallback } from "react";
 import { useOrg } from "@/components/org-context";
+import { useStreams } from "@/realtime/context";
 
 /*
  * Presence and written status (ADR 0084) for one person or one agent, read from the lists every screen shares
@@ -108,10 +109,13 @@ export function useAgentPresence(agentId: string | null | undefined): AgentShown
     enabled: on,
     select: pickAi,
   }).data;
+  // A run of its this tab hears: at work before the list's next read says so.
+  const working = useStreams((s) => (agentId ? agentStateIn(s, agentId) !== "idle" : false));
   if (!on || status === undefined) return null;
-  const noAi = ai === "no_ai";
+  // At work it has an AI, whatever the AIs' list reads for this person (the right hand's is each person's own).
+  const noAi = ai === "no_ai" && !working && status?.working !== true;
   return {
-    presence: agentPresenceShown(status ?? undefined, !noAi),
+    presence: agentPresenceShown(status ?? undefined, !noAi, working),
     line: noAi ? null : live(status?.status),
     activeAt: status?.activeAt ?? null,
     noAi,

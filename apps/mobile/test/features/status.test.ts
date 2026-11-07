@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { STATUS_SUGGESTIONS, statusEndNote } from "@agenteschat/client/lib/presence";
+import type { AgentPresence } from "@agenteschat/client";
+import { agentPresenceShown, STATUS_SUGGESTIONS, statusEndNote } from "@agenteschat/client/lib/presence";
 import {
   agentWhyKey,
   availabilityOf,
@@ -93,5 +94,26 @@ describe("how a status reads in a row, a pill and a profile", () => {
     expect(agentWhyKey("away", null, false)).toBe("awayNever");
     expect(agentWhyKey("offline", null, false)).toBe("offline");
     expect(agentWhyKey("away", null, true)).toBe("noAi");
+  });
+
+  test("an agent at work is online (busy on heavy work), whatever its AI reads for this person; held, it's offline", () => {
+    const row = (presence: AgentPresence, working?: boolean) => ({
+      agentId: "lodi",
+      presence,
+      status: null,
+      activeAt: null,
+      ...(working === undefined ? {} : { working }),
+    });
+    // Idle with no AI here (the right hand's is each person's own): offline, and away when it has one.
+    expect(agentPresenceShown(row("away"), false)).toBe("offline");
+    expect(agentPresenceShown(row("away"), true)).toBe("away");
+    // The list says it works.
+    expect(agentPresenceShown(row("online", true), false)).toBe("online");
+    expect(agentPresenceShown(row("busy", true), false)).toBe("busy");
+    // Its run heard here before the list's next read says so.
+    expect(agentPresenceShown(row("away", false), false, true)).toBe("online");
+    expect(agentPresenceShown(undefined, false, true)).toBe("online");
+    // Held by the server's operators, nothing of it runs.
+    expect(agentPresenceShown(row("offline", true), true, true)).toBe("offline");
   });
 });
