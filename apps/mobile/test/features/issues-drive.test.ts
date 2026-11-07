@@ -515,4 +515,8 @@ describe("a task's GitHub link", () => {
     expect(screen).toContain("sheet.open(<GithubLinkForm issue={i} />)");
     expect(screen).toContain("<Locked when={action.isPending}>");
   });
+
+  test("on a narrow card the date, the chip and the face wrap onto the next line instead of running past its edge", () => {
+    expect(source("parts.tsx")).toMatch(/meta: \{ flexDirection: "row", flexWrap: "wrap",/);
+  });
 });
