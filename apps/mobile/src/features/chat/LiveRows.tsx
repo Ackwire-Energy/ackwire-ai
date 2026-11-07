@@ -60,6 +60,7 @@ import {
   awayRun,
   CHAT_TEXT_MAX_SCALE,
   chatNameOf,
+  chatTimeOf,
   type LineDrawn,
   type LineWords,
   leavingWords,
@@ -282,7 +283,12 @@ export const TurnRow = memo(function TurnRow({
               `RunClock`); "parado" once stopped. */}
               <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
                 {live ? (
-                  <Text variant="footnote" tone="faint">
+                  <Text
+                    variant="footnote"
+                    tone="faint"
+                    style={look.text ? chatTimeOf(look.text) : undefined}
+                    maxFontSizeMultiplier={look.text ? CHAT_TEXT_MAX_SCALE : undefined}
+                  >
                     {when.time(new Date(since ?? mountedAt).toISOString())}
                   </Text>
                 ) : (

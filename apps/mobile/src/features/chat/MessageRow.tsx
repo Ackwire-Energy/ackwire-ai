@@ -96,6 +96,7 @@ import {
   artifactsOf,
   CHAT_TEXT_MAX_SCALE,
   chatNameOf,
+  chatTimeOf,
   consultationsOf,
   hangsUnder,
   hidesBody,
@@ -339,8 +340,9 @@ export const MessageRow = memo(function MessageRow({
   // like anyone's.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
   const look = useRowLook();
-  // The name over the words follows the person's Tamanho do texto, as the words do.
+  // The name over the words and its time follow the person's Tamanho do texto, as the words do.
   const nameSize = look.text ? chatNameOf(look.text) : undefined;
+  const timeSize = look.text ? chatTimeOf(look.text) : undefined;
   const onRight = mine && mineOnRight(look.style);
   const bubbled = look.style === "bubbles";
   const compact = look.style === "compact";
@@ -583,14 +585,19 @@ export const MessageRow = memo(function MessageRow({
         </Text>
       ) : null}
       {inBubble || compact ? null : (
-        <Text variant="footnote" tone="faint">
+        <Text
+          variant="footnote"
+          tone="faint"
+          style={timeSize}
+          maxFontSizeMultiplier={timeSize ? CHAT_TEXT_MAX_SCALE : undefined}
+        >
           {when.time(m.createdAt)}
         </Text>
       )}
       {brainWait ? <AwayPill message={m} /> : null}
       {m.pinned ? <PinMark /> : null}
       {(receipt || seenBy) && !m.local && !inBubble ? (
-        <View style={compact ? undefined : styles.whoMark}>
+        <View style={compact ? undefined : [styles.whoMark, nameSize ? { height: nameSize.lineHeight } : null]}>
           <ReceiptMark message={m} mine={mine} receipt={receipt} seenBy={seenBy} />
         </View>
       ) : null}

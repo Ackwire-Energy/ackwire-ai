@@ -71,11 +71,33 @@ export const CHAT_TEXT: Record<ChatTextSize, { fontSize: number; lineHeight: num
  * iOS's larger sizes up to its second accessibility one. Past it a row's column holds a word or two a line.
  */
 export const CHAT_TEXT_MAX_SCALE = 2;
+export type ChatText = (typeof CHAT_TEXT)[ChatTextSize];
 /** The name over the words: a step under them, on a line that holds it (14 on 19 at the default, as before). */
-export const chatNameOf = (text: { fontSize: number; lineHeight: number }) => ({
+export const chatNameOf = (text: ChatText) => ({
   fontSize: text.fontSize - 1,
   lineHeight: text.lineHeight - 2,
 });
+/** The time beside the name, on its line: 13 at the default (iOS's footnote), never under 11. */
+export const chatTimeOf = (text: ChatText) => ({
+  fontSize: Math.max(11, text.fontSize - 2),
+  lineHeight: text.lineHeight - 2,
+});
+/** Code, inline or in its card: the mono face runs wide, so two points under the words (13 on 20 at the default). */
+export const chatCodeOf = (text: ChatText) => ({
+  fontSize: text.fontSize - 2,
+  lineHeight: text.lineHeight - 1,
+});
+/**
+ * A table's cell: its own variant's size moved by as many points as the step moves the words, so the default table
+ * keeps its size and a larger step grows it with the words around it.
+ */
+export const chatCellOf = (cell: { fontSize?: number; lineHeight?: number }, text: ChatText) => {
+  const by = text.fontSize - CHAT_TEXT.md.fontSize;
+  return {
+    fontSize: (cell.fontSize ?? text.fontSize) + by,
+    lineHeight: (cell.lineHeight ?? text.lineHeight) + Math.round(by * 1.4),
+  };
+};
 
 /**
  * A row in the list, `gap` under what shows above it. Its plate (a mention, a press) reaches past its content, and it

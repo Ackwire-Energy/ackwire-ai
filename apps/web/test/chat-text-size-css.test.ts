@@ -89,3 +89,32 @@ test("the name, its time and the clocks beside the words follow the step too", (
   expect(last('.ac-msg[data-look="compact"]', "min-height")).toBe("var(--msg-line)");
   expect(css.replace(/\s+/g, "")).toContain("top:calc(7px+var(--msg-line)/2-var(--cap-mid)-15px)");
 });
+
+test("code in a message takes the step as its words do, the default keeping its 12.5px on a 20px line", () => {
+  const block = (p: string) => last(".ac-msg__text .code-card__code", p)?.replace(/\s+/g, "");
+  expect(block("font-size")).toBe("calc(var(--msg-text)-1.5px)");
+  expect(block("line-height")).toBe("var(--msg-line-tight)");
+  expect(STEPS.md[0] - 1.5).toBe(12.5);
+  expect(STEPS.md[2]).toBe(20);
+  // Inline code is a share of the words; outside a message (a document), a card's code keeps its own size.
+  expect(last(".ac-msg__text code", "font-size")).toMatch(/em$/);
+  expect(last(".code-card__code", "font-size")).toBe("12.5px");
+  expect(last(".code-card__code", "line-height")).toBe("20px");
+});
+
+test("Compacta's event rows read like its lines at every step: sentence, time, mark and actions take the step", () => {
+  const at = (part: string, p: string) =>
+    last(`.channel__messages[data-look="compact"] .ac-eventpill__${part}`, p)?.replace(/\s+/g, "");
+  expect(at("frame", "font-size")).toBe("calc(var(--msg-text)-1px)");
+  expect(at("frame", "line-height")).toBe("var(--msg-line)");
+  expect(at("frame", "min-height")).toBe("var(--msg-line)");
+  expect(at("action", "font-size")).toBe("calc(var(--msg-text)-1.5px)");
+  expect(at("action", "line-height")).toBe("var(--msg-line)");
+  // Its time is the rows' clock, in the clock's size, and the mark stands where the small face does.
+  expect(at("time", "font-size")).toBe(last(".ac-msg__clock", "font-size")?.replace(/\s+/g, ""));
+  expect(at("time", "top")).toBe("calc(var(--msg-line)/2-8px)");
+  expect(at("mark", "top")).toBe("calc(var(--msg-line)/2-9px)");
+  // At the default: a 13px sentence and 12.5px actions on Compacta's 20px line, the mark 1px and the time 2px down.
+  const [text, , tight] = STEPS.md;
+  expect([text - 1, text - 1.5, tight / 2 - 9, tight / 2 - 8]).toEqual([13, 12.5, 1, 2]);
+});

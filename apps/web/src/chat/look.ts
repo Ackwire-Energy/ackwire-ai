@@ -1,6 +1,6 @@
 import { type ChatPrefs, chatLookOf, textSizeOf } from "@agenteschat/client/lib/chat-look";
 import { type AgentColor, agentGradient, MessageLookContext } from "@agenteschat/ui";
-import { useContext, useEffect, useMemo } from "react";
+import { useContext, useLayoutEffect, useMemo } from "react";
 import { useOrg } from "@/components/org-context";
 
 /** The deep end of an agent's color: what my bubbles take in a DM. */
@@ -21,11 +21,12 @@ export function useConversationLook(dm: boolean, agentColor?: AgentColor) {
 
 /**
  * My Tamanho do texto on the page (`html[data-text-size]`, packages/ui's components.css), so every conversation on
- * screen, the panels and the floating thread included, takes a new choice at once.
+ * screen, the panels and the floating thread included, takes a new choice at once. Set before the first paint: rows
+ * already in the cache (the device snapshot) would otherwise show at the default for a frame, then jump.
  */
 export function usePageTextSize(prefs: ChatPrefs | undefined) {
   const size = textSizeOf(prefs);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     root.dataset.textSize = size;
     return () => {

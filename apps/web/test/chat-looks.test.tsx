@@ -5,7 +5,9 @@ setupDom();
 
 import { keys, type Message } from "@agenteschat/client";
 import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
+import { useLayoutEffect } from "react";
+import { usePageTextSize } from "@/chat/look";
 import {
   ADA_ID,
   createFakeApi,
@@ -137,6 +139,29 @@ describe("Tamanho do texto in a conversation", () => {
     expect(document.documentElement.dataset.textSize).toBeUndefined();
     await openDm();
     expect(document.documentElement.dataset.textSize).toBe("md");
+  });
+
+  test("the page has the step before it paints: rows from the device's snapshot never show at the default first", () => {
+    delete document.documentElement.dataset.textSize;
+    let painted: string | undefined;
+    function Page() {
+      usePageTextSize({ textSize: "xl" });
+      return null;
+    }
+    // A later sibling's layout effect runs ahead of every passive one, when the browser is about to paint.
+    function Rows() {
+      useLayoutEffect(() => {
+        painted = document.documentElement.dataset.textSize;
+      }, []);
+      return null;
+    }
+    render(
+      <>
+        <Page />
+        <Rows />
+      </>,
+    );
+    expect(painted).toBe("xl");
   });
 });
 

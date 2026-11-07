@@ -443,18 +443,19 @@
 }
 /*
  * An event pill here is a row of the look's grid, read like the lines around it: no frame, its time in the clock's
- * column, its mark in the small face's, its sentence on the text's column and its actions as words after it.
+ * column, its mark in the small face's, its sentence on the text's column and its actions as words after it. So it
+ * takes the person's Tamanho do texto as those lines do (a 20px line at the default).
  */
 .channel__messages[data-look="compact"] .ac-eventpill {
   position: relative;
 }
 .channel__messages[data-look="compact"] .ac-eventpill__frame {
   display: block;
-  min-height: 20px;
+  min-height: var(--msg-line);
   border-radius: 0;
   box-shadow: none;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: calc(var(--msg-text) - 1px);
+  line-height: var(--msg-line);
   color: var(--muted);
 }
 .channel__messages[data-look="compact"] .ac-eventpill--waiting .ac-eventpill__frame {
@@ -464,10 +465,10 @@
   display: inline;
   padding: 0;
 }
-/* The text's column is 88px in: the small face's at 62px, the clock's 40px at 14px. */
+/* The text's column is 88px in: the small face's at 62px, the clock's 40px at 14px, both on the first line. */
 .channel__messages[data-look="compact"] .ac-eventpill__mark {
   position: absolute;
-  top: 1px;
+  top: calc(var(--msg-line) / 2 - 9px);
   left: -26px;
   width: 18px;
   height: 18px;
@@ -478,12 +479,12 @@
    row's inset, never a second line over the next row's clock. */
 .channel__messages[data-look="compact"] .ac-eventpill__time {
   position: absolute;
-  top: 2px;
+  top: calc(var(--msg-line) / 2 - 8px);
   left: -74px;
   display: flex;
   justify-content: flex-end;
   width: 40px;
-  font-size: 11px;
+  font-size: max(11px, calc(var(--msg-text) - 3px));
   line-height: 17px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -499,8 +500,8 @@
   border: 0;
   border-radius: 0;
   background: none;
-  font-size: 12.5px;
-  line-height: 20px;
+  font-size: calc(var(--msg-text) - 1.5px);
+  line-height: var(--msg-line);
   color: var(--ink2);
 }
 .channel__messages[data-look="compact"] .ac-eventpill__action:hover:not(:disabled) {

@@ -9,12 +9,22 @@ import { ScrollView as GestureScrollView } from "react-native-gesture-handler";
 import { serverUrl } from "@/lib/server";
 import { Text, useTheme } from "@/ui";
 import { withAlpha } from "@/ui/palette";
+import { variantStyle } from "@/ui/Text";
 import { openPage } from "../ai/parts";
 import { useColors, useDirectory, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
 import { LinkPillText } from "./LinkPillText";
-import { type Block, type Inline, mentionTint, tableColumnWidths, tableHidden } from "./logic";
+import {
+  type Block,
+  CHAT_TEXT_MAX_SCALE,
+  chatCellOf,
+  chatCodeOf,
+  type Inline,
+  mentionTint,
+  tableColumnWidths,
+  tableHidden,
+} from "./logic";
 import { useRowLook } from "./look";
 import { MessageRefText } from "./MessageRefText";
 
@@ -43,9 +53,9 @@ export function Spans({
   const { i18n } = useTranslation();
   const { agents } = useDirectory();
   const { scheme } = useTheme();
-  // The mono face runs wide: a step under the words, in a conversation the person's size.
+  // In a conversation, the size of code in its card (`chatCodeOf`), so inline and fenced code agree at every step.
   const sized = useRowLook().text;
-  const codeSize = sized ? { fontSize: Math.round(sized.fontSize * 0.88) } : undefined;
+  const codeSize = sized ? { fontSize: chatCodeOf(sized).fontSize } : undefined;
   return (
     <>
       {inline.map((s, i) => {
@@ -145,11 +155,18 @@ export function Table({
     scroller.current?.flashScrollIndicators();
   }, [hidden.right]);
   const fadeTo = surface ?? c.bg;
+  // In a conversation the cells follow the person's Tamanho do texto, as the words around the table do.
+  const sized = useRowLook().text;
   const words = (inline: Inline[], col: number, head: boolean) => (
     <Text
       variant={head ? "label" : "subhead"}
       tone={head ? "muted" : "ink"}
-      style={[styles.cellText, { textAlign: align[col] ?? "left" }]}
+      style={[
+        styles.cellText,
+        sized ? chatCellOf(variantStyle(head ? "label" : "subhead"), sized) : null,
+        { textAlign: align[col] ?? "left" },
+      ]}
+      maxFontSizeMultiplier={sized ? CHAT_TEXT_MAX_SCALE : undefined}
     >
       <Spans inline={inline} />
     </Text>

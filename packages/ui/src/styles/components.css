@@ -1195,7 +1195,7 @@ textarea.ac-input {
   display: flex;
   justify-content: center;
 }
-/* No height of its own: the time's 26px line would stand under a shorter row's one line and open its gap. */
+/* No height of its own: the time's line, the words', would stand under a shorter row's one line and open its gap. */
 .ac-msg__gutter {
   height: 0;
 }

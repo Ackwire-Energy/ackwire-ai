@@ -36,8 +36,6 @@ const X_HEIGHT_AIM = /(?:^|;)\s*(?:translate|top|margin(?:-top)?|vertical-align)
 
 /** Leads still placed by hand, and why. An entry leaves when its rule does. */
 const PLACED_BY_HAND: Record<string, string> = {
-  'apps/web/src/chat/looks.css .channel__messages[data-look="compact"] .ac-eventpill__mark':
-    "Compacta's event row: its 18px mark stands in the small face's column on the row's 20px line, as the face",
   "packages/ui/src/styles/components.css .ac-menu__item .ac-icon":
     "menu items are one line (no wrapping) of 14px text on their own 20px line, which the 16px icon sits on",
   "apps/web/src/components/import-flow.css .imp-row__mark":
