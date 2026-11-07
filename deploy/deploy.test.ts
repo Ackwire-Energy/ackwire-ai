@@ -24,7 +24,7 @@ describe("deploy/deploy.sh", () => {
     GIT_COMMITTER_NAME: "test",
     GIT_COMMITTER_EMAIL: "test@example.com",
   };
-  const commits = { first: "", second: "" };
+  const commits = { first: "", second: "", third: "" };
   let runs = 0;
 
   function git(cwd: string, ...args: string[]): string {
@@ -50,11 +50,14 @@ describe("deploy/deploy.sh", () => {
     writeFileSync(join(work, ".gitignore"), ".env\n");
     commits.first = commit(work, "first");
     commits.second = commit(work, "second");
+    // A later version whose compose file has a service the versions before it don't have.
+    writeFileSync(join(work, "services"), "postgres\nagentes\nnewcomer\nspeech\n");
+    commits.third = commit(work, "third");
     git(work, "push", "--quiet", "origin", "HEAD:main");
 
     // `compose config` answers as for an .env with AGENTES_IMAGE=agentes:current and no backup profile, or with the
-    // services in the state's `services`. Files in the state make the speech image's build, the speech service's start
-    // or the app's health check fail.
+    // services in the checkout's `services`, else the state's. Files in the state make the speech image's build, the
+    // speech service's start or the app's health check fail.
     stub(
       bin,
       "docker",
@@ -66,7 +69,7 @@ id_of() { awk -v tag="$1" '$1 == tag { id = $2 } END { if (id == "") exit 1; pri
 tag() { { grep -v "^$1 " "$state/tags" || true; echo "$1 $2"; } >"$state/tags.new" && mv "$state/tags.new" "$state/tags"; }
 case "$*" in
 "compose config --images") printf 'pgvector/pgvector:0.8.7-pg18\\nagentes:current\\n' ;;
-"compose config --services") cat "$state/services" 2>/dev/null || printf 'postgres\\nagentes\\n' ;;
+"compose config --services") cat services 2>/dev/null || cat "$state/services" 2>/dev/null || printf 'postgres\\nagentes\\n' ;;
 "image inspect --format {{index"*) cat "$state/speech-label" 2>/dev/null ;;
 "image inspect --format "*) id_of "$5" ;;
 "build "*" -") cat >"$state/dockerfile" && tag agentes:next sha256:versioned ;;
@@ -234,6 +237,18 @@ esac
       "docker compose up --detach --wait --wait-timeout 150 postgres agentes",
     ]);
     expect(failed.calls.filter((call) => call.includes("speech"))).toEqual([]);
+  });
+
+  test("a rollback brings up the previous version's own services, never ones only the new compose file has", () => {
+    const at = server(commits.second, "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\n");
+    writeFileSync(join(at.state, "unhealthy"), "");
+    const run = at.deploy([commits.third]);
+    expect(run.code).toBe(1);
+    expect(at.head()).toBe(commits.second);
+    expect(run.calls.filter((call) => call.startsWith("docker compose up --detach --wait"))).toEqual([
+      "docker compose up --detach --wait --wait-timeout 150 postgres agentes newcomer",
+      "docker compose up --detach --wait --wait-timeout 150 postgres agentes",
+    ]);
   });
 
   test("a dump in progress holds every table: the migration waits for it to end, and one that outlasts the wait stops the deploy", () => {

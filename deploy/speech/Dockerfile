@@ -7,7 +7,7 @@ FROM base AS models
 COPY models.txt /tmp/models.txt
 RUN set -eu; grep -Ev '^(#|$)' /tmp/models.txt | while read -r sum _ path url; do \
       mkdir -p "$(dirname "/models/$path")"; \
-      python -c 'import sys, urllib.request; urllib.request.urlretrieve(*sys.argv[1:])' "$url" "/models/$path"; \
+      python -c 'import socket, sys, urllib.request; socket.setdefaulttimeout(60); urllib.request.urlretrieve(*sys.argv[1:])' "$url" "/models/$path"; \
       echo "$sum  /models/$path" | sha256sum -c --quiet -; \
     done
 

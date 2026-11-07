@@ -25,17 +25,24 @@ except ImportError:
 class Fake:
     """Models that hear what they are told; `hold` keeps a recording inside Parakeet until it is set."""
 
-    def __init__(self, shares=None, seconds=3):
+    def __init__(self, shares=None, seconds=3, words="oi, tudo bem?", quiet=False):
         self.shares = shares or {"pt": 0.9, "es": 0.06, "ja": 0.04}
         self.samples = range(int(seconds * server.RATE))
+        self.said = words
+        self.quiet = quiet
         self.inside = threading.Event()
         self.hold = None
+        self.guessed = 0
         self.transcribed = 0
 
     def decode(self, audio):
         return None if audio == b"not audio" else self.samples
 
+    def silent(self, samples):
+        return self.quiet
+
     def guess(self, samples):
+        self.guessed += 1
         return self.shares
 
     def words(self, samples):
@@ -45,7 +52,7 @@ class Fake:
         if self.shares.get("boom"):
             raise RuntimeError("the model broke")
         self.transcribed += 1
-        return "oi, tudo bem?"
+        return self.said
 
 
 def form(fields):
@@ -127,6 +134,18 @@ class Routing(Server):
         self.start(Fake({"pt": 0.5, "es": 0.3, "gl": 0.2}))
         self.assertEqual(self.transcribe()[0], 200)
 
+    def test_silence_has_no_words_here_and_no_model_runs(self):
+        # A muted microphone, or the key test's second of zeros: Whisper's guess on silence is noise.
+        self.start(Fake(quiet=True))
+        self.assertEqual(self.transcribe()[:2], (200, {"text": ""}))
+        self.assertEqual((self.models.guessed, self.models.transcribed), (0, 0))
+
+    def test_no_words_from_a_recording_with_sound_go_to_the_next_engine(self):
+        # The core drops a recording whose words are empty as silent: a slip of Parakeet's must not lose a message.
+        self.start(Fake(words=""))
+        status, body, _ = self.transcribe()
+        self.assertEqual((status, body["error"]["code"]), (422, "no_words"))
+
 
 class Busy(Server):
     def test_past_the_workers_one_waits_then_hears_busy_and_past_the_queue_at_once(self):
@@ -183,6 +202,18 @@ class Busy(Server):
         self.speech.models = Fake()
         self.assertEqual(self.call("/health", method="GET")[0], 200)
 
+    def test_models_that_dont_load_leave_it_up_and_unhealthy_instead_of_restarting(self):
+        self.start(None)
+        with (
+            unittest.mock.patch.object(server, "Models", side_effect=RuntimeError("Invalid input name")),
+            unittest.mock.patch.object(server.traceback, "print_exc"),
+        ):
+            server.load(self.speech, 4)
+        self.assertIsNone(self.speech.models)
+        self.assertEqual(self.logged[-1], {"event": "load_failed"})
+        self.assertEqual(self.call("/health", method="GET")[0], 503)
+        self.assertEqual(self.transcribe()[0], 503)
+
 
 class Requests(Server):
     def test_the_key_guards_recordings_and_warm_ups_not_health(self):
@@ -232,6 +263,13 @@ class Audio(unittest.TestCase):
         self.assertEqual([len(p) / rate for p in parts], [20.05, 19.95, 20.0])
         self.assertTrue(np.array_equal(np.concatenate(parts), samples))
         self.assertEqual(len(server.pieces(samples[: 25 * rate])), 1)
+
+    def test_silence_is_no_signal_at_all_and_a_quiet_voice_is_still_sound(self):
+        models = server.Models.__new__(server.Models)
+        models.np = np
+        self.assertTrue(models.silent(np.zeros(server.RATE, np.float32)))
+        quiet = (0.001 * np.sin(np.arange(server.RATE) / 5)).astype(np.float32)
+        self.assertFalse(models.silent(quiet))
 
     def test_the_guess_shares_out_whispers_language_tokens_alone(self):
         class Session:

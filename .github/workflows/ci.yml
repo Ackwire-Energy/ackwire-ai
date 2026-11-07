@@ -541,7 +541,8 @@ jobs:
   # is private only tags publish: an edge image per push to main costs about 10 runner minutes, and
   # public repositories run them free. The backup and speech services' images ship on the same tags, so
   # the standalone compose file needs no build context. The speech image has no layer cache: its models
-  # (about 700 MB) would crowd the app's layers out of the repository's cache quota.
+  # (about 700 MB) would crowd the app's layers out of the repository's cache quota. It is optional like
+  # its service: a build that fails (its models come from Hugging Face) publishes the app without it.
   #
   # Each platform builds on its own native runner (Bun under QEMU emulation is slow and fragile) and
   # pushes by digest only; publish then stitches the digests into one tag per image.
@@ -605,6 +606,9 @@ jobs:
           cache-to: type=gha,scope=backup-${{ matrix.slug }},mode=max
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         id: speech
+        continue-on-error: true
+        # Within the job's 30 minutes, so a stalled download fails this step and not the app's release.
+        timeout-minutes: 12
         with:
           context: deploy/speech
           platforms: ${{ matrix.platform }}
@@ -619,8 +623,8 @@ jobs:
           SPEECH_DIGEST: ${{ steps.speech.outputs.digest }}
         run: |
           mkdir -p /tmp/digests/app /tmp/digests/backup /tmp/digests/speech
-          touch "/tmp/digests/app/${DIGEST#sha256:}" "/tmp/digests/backup/${BACKUP_DIGEST#sha256:}" \
-            "/tmp/digests/speech/${SPEECH_DIGEST#sha256:}"
+          touch "/tmp/digests/app/${DIGEST#sha256:}" "/tmp/digests/backup/${BACKUP_DIGEST#sha256:}"
+          if [[ -n $SPEECH_DIGEST ]]; then touch "/tmp/digests/speech/${SPEECH_DIGEST#sha256:}"; fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digests-${{ matrix.slug }}
@@ -667,12 +671,19 @@ jobs:
             backup+=(-t "$BACKUP_IMAGE:${tag##*:}")
             speech+=(-t "$SPEECH_IMAGE:${tag##*:}")
           done
-          for digest in app/*; do app+=("$APP_IMAGE@sha256:${digest#app/}"); done
+          shopt -s nullglob
+          apps=(app/*) speeches=(speech/*)
+          for digest in "${apps[@]}"; do app+=("$APP_IMAGE@sha256:${digest#app/}"); done
           for digest in backup/*; do backup+=("$BACKUP_IMAGE@sha256:${digest#backup/}"); done
-          for digest in speech/*; do speech+=("$SPEECH_IMAGE@sha256:${digest#speech/}"); done
+          for digest in "${speeches[@]}"; do speech+=("$SPEECH_IMAGE@sha256:${digest#speech/}"); done
           docker buildx imagetools create "${app[@]}"
           docker buildx imagetools create "${backup[@]}"
-          docker buildx imagetools create "${speech[@]}"
+          # Every platform's speech image or none: the tags stay on the last release that built them all.
+          if ((${#speeches[@]} == ${#apps[@]})); then
+            docker buildx imagetools create "${speech[@]}"
+          else
+            echo "::warning::The speech image didn't build on every platform; its tags stay where they were."
+          fi
           docker buildx imagetools inspect "$(jq -r '.tags[0]' <<<"$META")"
 
   # A version tag's GitHub release carries that version's install.sh, from a green run only, so

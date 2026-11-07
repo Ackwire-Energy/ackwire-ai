@@ -4,8 +4,9 @@ ONNX Runtime, for the core's `local` engine (LOCAL_SPEECH_URL=http://speech:8000
 The spoken language comes from the audio, never from the app: Whisper tiny guesses it from the first 30 seconds.
 Parakeet knows 25 European languages; when the guess gives them less than SPEECH_LANGUAGE_MIN together, the answer is
 422 `unsupported_language`, and a full house answers 503: either way the core's next engine takes the recording at
-once. The request's `language`, `prompt` and `model` are ignored. Logs hold timings and the guessed language, never
-audio or words.
+once. Parakeet hearing no words in a recording that has sound is 422 `no_words` too, since the core drops a recording
+whose words are empty as silent. The request's `language`, `prompt` and `model` are ignored. Logs hold timings and the
+guessed language, never audio or words.
 """
 
 import hmac
@@ -18,9 +19,12 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 RATE = 16_000
+# -80 dBFS at the loudest: no microphone signal at all (a muted one, or the second of zeros a key test sends).
+SILENCE = 1e-4
 # The apps record up to 5 minutes, and the core takes 5 s more for the clock's slack.
 MAX_SECONDS = 305
 # The core's VOICE_MAX_BYTES, and the multipart around it.
@@ -120,6 +124,9 @@ class Models:
 
     decode = staticmethod(decode)
 
+    def silent(self, samples):
+        return float(self.np.abs(samples).max()) < SILENCE
+
     def guess(self, samples):
         """Each language's share of Whisper tiny's first token, over the first 30 seconds."""
         np = self.np
@@ -188,6 +195,9 @@ class Speech:
             seconds = round(len(samples) / RATE, 1)
             if seconds > MAX_SECONDS:
                 return failure(413, "too_long", f"Recordings go up to {MAX_SECONDS} seconds")
+            if self.models.silent(samples):
+                log(event="silent", seconds=seconds)
+                return 200, {"text": ""}
             shares = self.models.guess(samples)
             heard = max(shares, key=shares.get)
             share = round(sum(p for code, p in shares.items() if code in PARAKEET), 3)
@@ -195,6 +205,9 @@ class Speech:
                 log(event="not_for_me", seconds=seconds, heard=heard, share=share)
                 return failure(422, "unsupported_language", f"Parakeet doesn't know this language (it heard {heard})")
             text = self.models.words(samples)
+            if not text:
+                log(event="no_words", seconds=seconds, heard=heard, share=share)
+                return failure(422, "no_words", "Parakeet heard no words: the next engine should try this one")
             waited, took = round(started - asked, 2), round(time.monotonic() - started, 2)
             log(event="transcribed", seconds=seconds, heard=heard, share=share, waited=waited, took=took)
             return 200, {"text": text}
@@ -255,6 +268,19 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(status, body, [("Retry-After", "1")] if status == 503 else [])
 
 
+def load(speech, threads):
+    """The models into `speech`. Ones that don't load leave it answering 503 and unhealthy, but up: a restart would load
+    the same files again, taking the shared machine's CPU each time for nothing."""
+    started = time.monotonic()
+    try:
+        speech.models = Models(threads)
+    except Exception:
+        traceback.print_exc()
+        log(event="load_failed")
+        return
+    log(event="ready", threads=threads, took=round(time.monotonic() - started, 1))
+
+
 def main():
     workers = env("SPEECH_WORKERS", 2)
     gate = Gate(workers, env("SPEECH_QUEUE", 4), env("SPEECH_WAIT_SECONDS", 3, float))
@@ -264,9 +290,7 @@ def main():
     # As PID 1 without an init, Python would ignore SIGTERM.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    started = time.monotonic()
-    speech.models = Models(workers * env("SPEECH_THREADS", 2))
-    log(event="ready", workers=workers, took=round(time.monotonic() - started, 1))
+    load(speech, workers * env("SPEECH_THREADS", 2))
     threading.Event().wait()
 
 

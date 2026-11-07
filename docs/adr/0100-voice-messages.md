@@ -69,7 +69,11 @@ as `language_hints`, which is a hint. Our server never reads it: Whisper tiny gu
 and when the shares of Parakeet's 25 European languages add up to `SPEECH_LANGUAGE_MIN` (0.7) or more, Parakeet
 transcribes; it detects which of them by itself. Anything else, or a guess that unsure, answers 422
 `unsupported_language`, which the adapter reads as `refused`: the next engine tries at once, in the same attempt, and
-with no next engine the message goes out as audio with no words, as for any refusal. Parakeet takes no prompt, so the
+with no next engine the message goes out as audio with no words, as for any refusal. A recording with no signal at all
+(a muted microphone, the silent second a key test sends) has no words and runs no model. Parakeet hearing no words in
+one that has sound answers 422 `no_words` the same way, since the core drops a recording whose words are empty as
+silent, and a slip of ours must not lose a message. The core gives up on a recording only when every engine refused
+it: an earlier engine that was busy still earns a retry, whatever the order. Parakeet takes no prompt, so the
 workspace's names don't steer it as they steer Whisper.
 
 **The overflow.** The service runs `SPEECH_WORKERS` recordings at once (2) on `SPEECH_THREADS` threads each (2; one
@@ -81,5 +85,8 @@ recording, counts as busy the same way. When the next engine fails too, the job 
 **Optional, everywhere.** The service is on an internal network the app alone reaches, so the audio never leaves the
 machine, and the image carries its models, pinned by revision and sha256 (`deploy/speech/models.txt`, credits in
 `deploy/speech/NOTICE`). `deploy/deploy.sh` builds and starts it after the app is live and never waits for it, so a
-speech image that doesn't build or a service that doesn't start never holds a deploy or a rollback. Self-hosted servers
-turn on the same profile, with the image each release publishes (SELF_HOSTING.md, Voice messages).
+speech image that doesn't build or a service that doesn't start never holds a deploy or a rollback; a build gets 15
+minutes at most. Models that don't load leave the service up, unhealthy and answering 503, rather than restarting to
+load the same files again on a machine it shares. A release whose speech image doesn't build publishes the app without
+it. Self-hosted servers turn on the same profile, with the image each release publishes (SELF_HOSTING.md, Voice
+messages).

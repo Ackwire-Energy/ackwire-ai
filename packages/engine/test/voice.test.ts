@@ -170,6 +170,19 @@ describe("sending", () => {
     await transcribeVoiceClip(deps, clipId, { finalAttempt: true });
     expect(voiceOf((await messageOf(clipId))?.meta)?.noWords).toBe(true);
   });
+
+  test("a refusal after a busy engine still leaves the recording for a retry, in any order", async () => {
+    f = await setup();
+    // SPEECH_ENGINES=groq,local: Groq busy for a moment, then our server's "not for me".
+    const busy = new SpeechError("busy", "Groq answered 503");
+    const notForMe = new SpeechError("refused", "The speech server answered 422: unsupported_language");
+    const deps = voiceDeps([engine(busy, "oi"), engine(notForMe)]);
+    const { clipId } = await accept(deps);
+    await expect(transcribeVoiceClip(deps, clipId, { finalAttempt: false })).rejects.toBe(busy);
+    expect((await clipOf(clipId)).status).toBe("pending");
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    expect((await messageOf(clipId))?.body).toBe("oi");
+  });
 });
 
 describe("when there are no words", () => {

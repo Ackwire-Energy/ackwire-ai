@@ -126,6 +126,8 @@ main() {
     if [[ -n $current ]]; then
       docker tag "$current" agentes:current
     fi
+    # The previous commit's services: the new compose file may name one the previous file doesn't have.
+    mapfile -t services < <(docker compose config --services | grep -vx speech)
     docker compose up --detach --wait --wait-timeout 150 "${services[@]}" || echo "deploy: the rollback is not healthy either" >&2
     return 1
   fi
@@ -136,12 +138,13 @@ main() {
     git update-ref refs/deploy/previous "$previous"
   fi
   # The speech service, once the app is live: built again only when deploy/speech changed (the image's
-  # label says), and not waited for, since its models load while the next engine answers.
+  # label says), and not waited for, since its models load while the next engine answers. A download that
+  # stalls ends the build after 15 minutes.
   local speech
   if docker compose config --services | grep -x speech >/dev/null && speech=$(git rev-parse HEAD:deploy/speech 2>/dev/null); then
     if [[ $(docker image inspect --format '{{index .Config.Labels "agentes.speech"}}' agentes-speech:current 2>/dev/null) != "$speech" ]]; then
       echo "deploy: building the speech image (about 1 GB of models the first time)"
-      docker build --quiet --label "agentes.speech=$speech" --tag agentes-speech:current deploy/speech >/dev/null ||
+      timeout 900 docker build --quiet --label "agentes.speech=$speech" --tag agentes-speech:current deploy/speech >/dev/null ||
         echo "deploy: the speech image didn't build; voice messages go to the next engine until a deploy builds it" >&2
     fi
     docker compose up --detach speech >/dev/null 2>&1 ||
