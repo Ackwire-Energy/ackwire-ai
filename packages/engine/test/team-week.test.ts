@@ -469,6 +469,23 @@ describe("Resumo do dia", () => {
     ).toBeNull();
   });
 
+  test("a member's card offers no budget raise and leaves no proposal it couldn't show", async () => {
+    f = await setup({ rightHand: true });
+    await inZone(f);
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await setTeamWeekPrefs(f.db, f.org.id, bia.id, { daily: true, hour: 9 });
+    await run(f, f.agent.id, new Date(NINE.getTime() - 2 * HOUR), "done");
+    await budgetStop(f, new Date(NINE.getTime() - HOUR));
+    const id = await postTeamWeek({ db: f.db, pubsub: f.pubsub }, f.org.id, {
+      userId: bia.id,
+      slot: NINE.toISOString(),
+    });
+    expect(id).not.toBeNull();
+    const { card } = await cardOf(f, id as string);
+    expect(card.rows.map((r) => r.kind)).not.toContain("budget");
+    expect(await f.db.select().from(schema.contextProposals)).toEqual([]);
+  });
+
   test("asked of Lodi: set_team_week turns it on for the person behind the run", async () => {
     f = await setup({ rightHand: true });
     const bia = await addMember(f.db, f.org.id, "member", "bia");

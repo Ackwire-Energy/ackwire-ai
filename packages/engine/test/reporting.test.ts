@@ -4,6 +4,7 @@ import {
   applySettings,
   callableAgents,
   createAgent,
+  createIssue,
   createTeamStatusToolSource,
   createToolGateway,
   getAgent,
@@ -195,8 +196,12 @@ describe("what it changes", () => {
 });
 
 describe("team_status for a supervisor", () => {
-  async function runOf(agentId: string, author: { type: "person"; userId: string } | null): Promise<ToolContext> {
-    const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, agentId);
+  async function runOf(
+    agentId: string,
+    author: { type: "person"; userId: string } | null,
+    channelId?: string,
+  ): Promise<ToolContext> {
+    const dm = channelId ? { id: channelId } : await openPersonAgentDm(f.db, f.org.id, f.owner.id, agentId);
     const trigger = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: dm.id,
@@ -245,6 +250,39 @@ describe("team_status for a supervisor", () => {
     expect(text).not.toContain(`@${ada.handle}`);
     const all = await teamStatus(f.db, f.org.id, f.owner.id);
     expect(all).toContain("@ada");
+  });
+
+  test("only its reports' tasks, and in a channel others read, none this conversation may not name", async () => {
+    f = await setup();
+    const nina = await addAgent("Nina");
+    const ada = await addAgent("Ada");
+    await setReportsTo(f, f.owner.id, f.org.id, [{ agentId: f.agent.id, reportsToAgentId: nina.id }]);
+    const task = (title: string, assigneeId: string, userIds?: string[]) =>
+      createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
+        title,
+        assignee: { type: "agent", id: assigneeId },
+        ...(userIds ? { audience: { mode: "people" as const, userIds } } : {}),
+      });
+    await task("Relatorio aberto", f.agent.id);
+    await task("Reajuste sigiloso", f.agent.id, [f.owner.id]);
+    await task("Trabalho da Ada", ada.id);
+    const status = async (channelId?: string) => {
+      const res = await gateway().invoke(await runOf(nina.id, { type: "person", userId: f.owner.id }, channelId), {
+        toolUseId: `tu_${crypto.randomUUID()}`,
+        name: "team_status",
+        input: {},
+      });
+      if (res.type !== "result") throw new Error(res.type);
+      return (res.output as { content: string }).content;
+    };
+    const dm = await status();
+    expect(dm).toContain("Relatorio aberto");
+    expect(dm).toContain("Reajuste sigiloso");
+    expect(dm).not.toContain("Trabalho da Ada");
+    const channel = await status(f.general.id);
+    expect(channel).toContain("Relatorio aberto");
+    expect(channel).not.toContain("Reajuste sigiloso");
+    expect(channel).not.toContain("Trabalho da Ada");
   });
 
   test("with nobody behind the run it reads nothing and says what to do instead", async () => {

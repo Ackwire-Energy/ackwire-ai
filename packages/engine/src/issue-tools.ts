@@ -342,14 +342,24 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             },
           );
           const nameable = await nameableIn(deps.db, ctx.channelId, i);
-          const handed = reader ? await handTask(deps, ctx, reader, i) : null;
+          // The task stands either way: a start that fails is said, never a second task.
+          const handed = reader
+            ? await handTask(deps, ctx, reader, i).catch((e: unknown) =>
+                e instanceof Error ? e : new Error(String(e)),
+              )
+            : null;
           return {
             content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i, nameable)}${
-              handed
-                ? "\nIts agent started on it in the task's own conversation, where the person follows it from the task's chip on your reply. What comes of it reaches you here by itself: tell them in a line who has it, without promising a time, and don't check on it."
-                : ""
+              handed instanceof Error
+                ? `\nIts agent couldn't start on it: ${handed.message} Don't make it again: tell them why; they can start it from the task.`
+                : handed
+                  ? "\nIts agent started on it in the task's own conversation, where the person follows it from the task's chip on your reply. What comes of it reaches you here by itself: tell them in a line who has it, without promising a time, and don't check on it."
+                  : ""
             }`,
-            data: { issue: { id: i.id, number: i.number }, ...(handed ? { handedTask: handed } : {}) },
+            data: {
+              issue: { id: i.id, number: i.number },
+              ...(handed && !(handed instanceof Error) ? { handedTask: handed } : {}),
+            },
           };
         } catch (error) {
           return failed(error);

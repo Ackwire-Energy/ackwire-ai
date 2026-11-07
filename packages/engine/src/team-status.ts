@@ -3,14 +3,14 @@ import { lineInEnglish, loadAgentStatuses } from "./agent-status";
 import { readerOfRun } from "./agents-dm-reads";
 import { listApprovals } from "./approvals";
 import { seesAgentDetails } from "./audience";
-import { readsOrMayJoin } from "./channels";
+import { publicChannelIds, readsOrMayJoin } from "./channels";
 import { proposalsWaitingFor } from "./context/proposals";
-import { listIssues } from "./issues";
+import { listIssues, nameableIn } from "./issues";
 import { oneLine } from "./mail/text";
 import { appPageLink } from "./message-links";
 import { getMembership } from "./organizations";
 import { personBehindCall } from "./requester";
-import { isRightHand, rightHandReader } from "./right-hand";
+import { isRightHand, readsAlone, rightHandReader } from "./right-hand";
 import { loadTeam } from "./team";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 import { cleanOutside } from "./untrusted";
@@ -36,16 +36,27 @@ const TITLE_CHARS = 100;
 const clean = (text: string) => oneLine(cleanOutside(text).replace(/[<>]/g, " "), TITLE_CHARS);
 
 /**
+ * A supervisor's view (ADR 0148 addendum): its reports only, and their tasks only. In a conversation others read too
+ * (`shared`), only places anyone may read and tasks this conversation may name: the person's own reach stays out of a
+ * reply others read, as the right hand keeps it to their DM.
+ */
+export interface SupervisorScope {
+  agentIds: ReadonlySet<string>;
+  channelId: string;
+  shared: boolean;
+}
+
+/**
  * What the team is doing, for this person, from stored data with no model call (ADR 0137 §13): only agents they see
- * (the rest a count), and work in a place they can't read says so, with no subject. `only`: a supervisor's reports
- * (ADR 0148 addendum), still as this person sees them.
+ * (the rest a count), and work in a place they can't read says so, with no subject. `only`: a supervisor's reports,
+ * still as this person sees them.
  */
 export async function teamStatus(
   db: Database,
   orgId: string,
   personId: string,
   now = new Date(),
-  only?: ReadonlySet<string>,
+  only?: SupervisorScope,
 ) {
   const membership = await getMembership(db, personId, orgId);
   const team = (
@@ -54,12 +65,12 @@ export async function teamStatus(
       .from(agents)
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
       .orderBy(agents.createdAt)
-  ).filter((a) => !only || only.has(a.id));
+  ).filter((a) => !only || only.agentIds.has(a.id));
   const visible = team.filter((a) => seesAgentDetails(a, personId, membership));
   const seen = visible.slice(0, TEAM_MAX);
   const ids = seen.map((a) => a.id);
   const since = new Date(now.getTime() - LATELY_MS).toISOString();
-  const [statuses, works, runsNow, ended, tasks, approvals, proposals, questions] = await Promise.all([
+  const [statuses, works, runsNow, ended, allTasks, approvals, proposals, questions] = await Promise.all([
     loadAgentStatuses(db, orgId, now, ids),
     liveWorksByAgent(db, orgId, ids),
     ids.length
@@ -84,9 +95,9 @@ export async function teamStatus(
         )
       : [],
     listIssues(db, { type: "person", userId: personId }, orgId, { limit: 200 }),
-    listApprovals(db, personId, orgId, { status: "pending", limit: 200 }),
-    proposalsWaitingFor(db, personId, orgId),
-    ids.length
+    only ? [] : listApprovals(db, personId, orgId, { status: "pending", limit: 200 }),
+    only ? 0 : proposalsWaitingFor(db, personId, orgId),
+    ids.length && !only
       ? db
           .select({ runId: agentQuestions.runId })
           .from(agentQuestions)
@@ -99,22 +110,35 @@ export async function teamStatus(
           )
       : [],
   ]);
+  const reportsTask = (t: (typeof allTasks)[number]) =>
+    t.assignee?.type === "agent" && !!only?.agentIds.has(t.assignee.id);
+  let tasks = only ? allTasks.filter(reportsTask) : allTasks;
+  if (only?.shared) {
+    const named = await Promise.all(tasks.map((t) => nameableIn(db, only.channelId, t)));
+    tasks = tasks.filter((_, i) => named[i]);
+  }
   const places = [
     ...runsNow.map((r) => r.channelId),
     ...[...works.values()].flat().map((w) => w.channelId),
     ...ended.map((r) => r.channel_id),
   ];
-  const reads = await readsOrMayJoin(db, orgId, personId, places);
+  let reads = await readsOrMayJoin(db, orgId, personId, places);
+  if (only?.shared) {
+    const open = await publicChannelIds(db, orgId, places);
+    reads = new Set([...reads].filter((id) => open.has(id) || id === only.channelId));
+  }
   const forThem = async (runIds: (string | null)[]) => {
     const ids = [...new Set(runIds.filter((id): id is string => !!id))];
     const readers = await Promise.all(ids.map((id) => readerOfRun(db, orgId, id)));
     return new Set(ids.filter((_, i) => readers[i] === personId));
   };
-  // What they handed on runs in the agents' DM, which no person reads: it is still theirs to hear about.
+  // What they handed on runs in the agents' DM, which no person reads: it is still theirs to hear about, not others'.
   const theirs = await forThem(
-    [...runsNow.map((r) => ({ runId: r.id, channelId: r.channelId })), ...[...works.values()].flat()]
-      .filter((r) => !reads.has(r.channelId))
-      .map((r) => r.runId),
+    only?.shared
+      ? []
+      : [...runsNow.map((r) => ({ runId: r.id, channelId: r.channelId })), ...[...works.values()].flat()]
+          .filter((r) => !reads.has(r.channelId))
+          .map((r) => r.runId),
   );
   const shows = (place: { channelId: string; runId: string | null }) =>
     reads.has(place.channelId) || (!!place.runId && theirs.has(place.runId));
@@ -239,7 +263,12 @@ export function createTeamStatusToolSource(): ToolSource {
           isError: true,
         };
       const team = await loadTeam(ctx.db as Database, ctx.orgId);
-      return { content: await teamStatus(ctx.db, ctx.orgId, person, new Date(), reportsUnder(team, ctx.agentId)) };
+      const scope = {
+        agentIds: reportsUnder(team, ctx.agentId),
+        channelId: ctx.channelId,
+        shared: !(await readsAlone(ctx.db, ctx.channelId, person)),
+      };
+      return { content: await teamStatus(ctx.db, ctx.orgId, person, new Date(), scope) };
     },
   };
   return {

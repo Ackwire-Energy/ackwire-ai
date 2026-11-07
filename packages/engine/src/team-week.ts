@@ -24,7 +24,7 @@ import { taskSeenSql } from "./task-access";
  * proposal (budget, a channel), the approvals list, a routine, a message to Lodi or to a task's conversation.
  */
 
-const { agents, organizationMembers, organizationSettings } = schema;
+const { agents, contextProposals, organizationMembers, organizationSettings } = schema;
 
 export const TEAM_WEEK_JOB = "team_week.post";
 export const TEAM_WEEK_CARD = "team_week";
@@ -291,7 +291,8 @@ export async function buildTeamWeek(
           and m.author_agent_id in (select id from agents where org_id = ${w.orgId} and builtin is null)
       ) s group by agent_id order by n desc limit 2`),
   );
-  for (const s of stops) {
+  // A budget is the workspace's money: only an administrator's card offers to raise it.
+  for (const s of admin ? stops : []) {
     const agent = team.find((a) => a.id === s.agent_id);
     if (!agent) continue;
     const from = budgetOf(agent.budget);
@@ -426,7 +427,12 @@ async function settingsProposal(
     },
   );
   const [p] = proposals;
-  return p?.canDecide ? p.id : null;
+  if (p && !p.canDecide) {
+    // Not on the card: a row nobody sees would only pile up, one a day on a "Resumo do dia".
+    await db.delete(contextProposals).where(eq(contextProposals.id, p.id));
+    return null;
+  }
+  return p?.id ?? null;
 }
 
 /** The same request this person typed to one agent on `REPEAT_DAYS` days or more, with no routine doing it. */
